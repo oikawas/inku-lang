@@ -900,11 +900,12 @@ impl NumericSize {
     }
 }
 
-/// What the laws stage writes in numbers for one layer: its place, its size,
-/// its turn, the two colors it alternates and the polygon it is drawn as. The
-/// layer's own words are edited before printing (a numeric size drops the size
-/// word, a row has no line-up direction, a turn has no angle word).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+/// What the laws and color stages write in numbers for one layer: its place,
+/// its size, its turn, the colors its marks take in turn, its fade and the
+/// polygon it is drawn as. The layer's own words are edited before printing (a
+/// numeric size drops the size word, a row has no line-up direction, a turn has
+/// no angle word).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct NumericWriting {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub place: Option<NumericPlace>,
@@ -914,11 +915,23 @@ pub struct NumericWriting {
     /// numeric size in Japanese, `rotated 30 degrees` after it in English.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub turn: Option<f64>,
-    /// Two colors the marks alternate in their order, written instead of the
-    /// color word: `白と青を交互にして、` after the place in Japanese, and
-    /// `, alternating white and blue` at the end in English.
+    /// The colors the marks take in their order, written instead of the color
+    /// word, after the place in Japanese and at the end in English: two
+    /// alternate (`白と青を交互にして、`, `, alternating white and blue`), and
+    /// three or more repeat in order (`白・青・灰の順に繰り返して、`,
+    /// `, repeating white, blue, and gray in order`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cycle: Option<[inku_score::Color; 2]>,
+    pub cycle: Option<Vec<inku_score::Color>>,
+    /// The colors shift once through the marks in their order instead of
+    /// repeating (DDL 23): `黄・橙・赤の順に段々に移して、`,
+    /// `, shifting through yellow, orange, and red in order`.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub shift: bool,
+    /// The way the marks fade (DDL 23): `左から右へ薄れさせて、` after the
+    /// colors in Japanese, and `, fading from left to right` at the end in
+    /// English.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fade: Option<crate::FadeDirection>,
     /// The sides of the regular polygon the layer is drawn as (5 to 8), written
     /// as its own noun (`六角形`, `hexagon`) instead of the layer's shape word.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -984,14 +997,26 @@ fn print_layer_ja(
         out.push_str(MarkerId::JaNi.surface());
         out.push('、');
     }
-    // Two alternating colors say the color of every mark, before its noun phrase.
-    let cycle = numeric.and_then(|numeric| numeric.cycle);
-    if let Some([first, second]) = cycle {
-        out.push_str(&format!(
-            "{}と{}を交互にして、",
-            surface(WorkPlanSlot::Color, first.as_str(), ja),
-            surface(WorkPlanSlot::Color, second.as_str(), ja)
-        ));
+    // The colors the marks take in turn say the color of every mark, before its
+    // noun phrase, and a fade follows them.
+    let cycle = numeric.and_then(|numeric| numeric.cycle.as_deref());
+    if let Some(colors) = cycle {
+        let words = colors
+            .iter()
+            .map(|color| surface(WorkPlanSlot::Color, color.as_str(), ja))
+            .collect::<Vec<_>>();
+        out.push_str(&match (
+            numeric.is_some_and(|numeric| numeric.shift),
+            words.as_slice(),
+        ) {
+            (false, [first, second]) => format!("{first}と{second}を交互にして、"),
+            (false, _) => format!("{}の順に繰り返して、", words.join("・")),
+            (true, _) => format!("{}の順に段々に移して、", words.join("・")),
+        });
+    }
+    if let Some(fade) = numeric.and_then(|numeric| numeric.fade) {
+        out.push_str(fade.written_ja());
+        out.push('、');
     }
     // A numeric size heads the noun phrase, before every word of the layer, and
     // a numeric angle follows it.
@@ -1073,7 +1098,7 @@ fn print_layer_en(
     if let Some(bleeding) = layer.attribute(WorkPlanSlot::Bleeding) {
         words.push(surface(WorkPlanSlot::Bleeding, bleeding, en));
     }
-    let cycle = numeric.and_then(|numeric| numeric.cycle);
+    let cycle = numeric.and_then(|numeric| numeric.cycle.as_deref());
     for slot in [
         WorkPlanSlot::Color,
         WorkPlanSlot::Thinness,
@@ -1155,15 +1180,36 @@ fn print_layer_en(
             surface(WorkPlanSlot::Position, place, en)
         ));
     }
-    if let Some([first, second]) = cycle {
-        out.push_str(&format!(
-            ", alternating {} and {}",
-            surface(WorkPlanSlot::Color, first.as_str(), en),
-            surface(WorkPlanSlot::Color, second.as_str(), en)
-        ));
+    if let Some(colors) = cycle {
+        let words = colors
+            .iter()
+            .map(|color| surface(WorkPlanSlot::Color, color.as_str(), en))
+            .collect::<Vec<_>>();
+        out.push_str(&match (
+            numeric.is_some_and(|numeric| numeric.shift),
+            words.as_slice(),
+        ) {
+            (false, [first, second]) => format!(", alternating {first} and {second}"),
+            (false, _) => format!(", repeating {} in order", english_series(&words)),
+            (true, _) => format!(", shifting through {} in order", english_series(&words)),
+        });
+    }
+    if let Some(fade) = numeric.and_then(|numeric| numeric.fade) {
+        out.push_str(", ");
+        out.push_str(fade.written_en());
     }
     out.push('.');
     out
+}
+
+/// English items in a series: `a and b`, or `a, b, and c`.
+fn english_series(words: &[String]) -> String {
+    match words {
+        [] => String::new(),
+        [only] => only.clone(),
+        [first, second] => format!("{first} and {second}"),
+        [init @ .., last] => format!("{}, and {last}", init.join(", ")),
+    }
 }
 
 /// The plan words a printed value came from, keyed by the semantic ID the
@@ -1217,7 +1263,8 @@ fn plan_size_id(value: CoreModifierValue) -> Option<String> {
 /// line-up direction. An alternate composition reads these from the visible
 /// instructions alone (draw-system05, 2026-10-04). `None` for an instruction a
 /// plan does not write: a Macro word, a relation, a sequence, a fill of a
-/// shape, a numeric point, segment or angle, or a value outside the plan's words.
+/// shape, a numeric point, segment or angle, a fade, or a value outside the
+/// plan's words.
 #[must_use]
 pub fn composition_layer(instruction: &crate::SemanticInstruction) -> Option<WorkPlanLayer> {
     let entity = &instruction.entity;
@@ -1230,6 +1277,7 @@ pub fn composition_layer(instruction: &crate::SemanticInstruction) -> Option<Wor
         || entity.numeric_position.is_some()
         || entity.numeric_segment.is_some()
         || entity.numeric_angle.is_some()
+        || entity.fade.is_some()
         || !entity.additional_relative_scales.is_empty()
     {
         return None;

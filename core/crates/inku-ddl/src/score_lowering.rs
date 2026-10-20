@@ -282,6 +282,11 @@ fn project_source_instruction<'a>(
             .as_ref()
             .map(|term| (&term.identity).into()),
         numeric_angle: instruction.entity.numeric_angle.as_ref(),
+        fade: instruction.entity.fade.as_ref().map(|fade| fade.direction),
+        color_shift: instruction.sequence.as_ref().is_some_and(|sequence| {
+            matches!(sequence.kind, crate::SemanticSequenceKind::Color)
+                && sequence.progression == crate::SemanticSequenceProgression::Shift
+        }),
         angle_context: Some(ScoreAngleContext {
             composition_seed: view.composition_seed(),
             original_pre_expansion_digest: view.original_pre_expansion_digest(),
@@ -1473,6 +1478,7 @@ fn macro_caller_has_unbound_geometry(instruction: &SemanticInstruction) -> bool 
         || instruction.entity.numeric_segment.is_some()
         || instruction.entity.angle.is_some()
         || instruction.entity.numeric_angle.is_some()
+        || instruction.entity.fade.is_some()
         || instruction.entity.fluctuation.amplitude.is_some()
         || instruction.entity.fluctuation.frequency.is_some()
         || instruction.entity.fluctuation.quality.is_some()
@@ -1772,6 +1778,8 @@ fn project_macro_emit<'a>(
         }),
         angle,
         numeric_angle: None,
+        fade: None,
+        color_shift: false,
         angle_context: None,
         layout_direction,
         fluctuation,
@@ -4451,6 +4459,17 @@ fn source_span_for_gap(
                 .as_ref()
                 .map(|segment| segment.source().span)
         }
+        ScoreFieldGap::UnsupportedFade | ScoreFieldGap::FadeDirectionOffAxis => instruction
+            .entity
+            .fade
+            .as_ref()
+            .map(|fade| fade.source().span),
+        ScoreFieldGap::UnsupportedColorShift | ScoreFieldGap::ColorShiftLongerThanCount => {
+            instruction
+                .sequence
+                .as_ref()
+                .map(|sequence| sequence.operator.provenance.source.span)
+        }
         ScoreFieldGap::NamedAndNumericPositionConflict
         | ScoreFieldGap::UnsupportedNamedPosition
         | ScoreFieldGap::UnsupportedNumericRange
@@ -4770,6 +4789,11 @@ struct ScoreLoweringInput<'a> {
     angle: Option<SemanticInputIdentity<'a>>,
     /// The degrees written in numbers (stage B-4a); exclusive with `angle`.
     numeric_angle: Option<&'a crate::SemanticNumericAngle>,
+    /// The way the marks fade, written in words (DDL 23).
+    fade: Option<crate::FadeDirection>,
+    /// The color sequence shifts once through its items instead of repeating
+    /// them (DDL 23).
+    color_shift: bool,
     angle_context: Option<ScoreAngleContext<'a>>,
     layout_direction: Option<SemanticInputIdentity<'a>>,
     fluctuation: [Option<SemanticInputIdentity<'a>>; 3],
@@ -4945,6 +4969,8 @@ struct ResolvedObject {
     dimensions: ResolvedGeometryDimensions,
     appearance: ResolvedObjectAppearance,
     color_cycle: Vec<Color>,
+    /// The colors shift once through the marks instead of repeating (DDL 23).
+    color_shift: bool,
     rotation: Option<f64>,
     layout_direction: Option<crate::composition_plan::ResolvedLayoutDirection>,
     placement: ScorePlacement,
@@ -5054,6 +5080,10 @@ fn resolve_object_plan(
                 ),
             )?
         };
+        let (fade, reversed) = match input.fade {
+            Some(direction) => planned_fade(direction, &recipe, n)?,
+            None => (inku_score::Fade::None, false),
+        };
         Ok(ObjectPlacementPlan {
             arc_form: resolved.arc_form,
             proportion_width_extent: input.proportion_width_extent.map(|identity| {
@@ -5082,6 +5112,9 @@ fn resolve_object_plan(
             relative_scale: input.relative_scale,
             appearance: resolved.appearance,
             color_cycle: resolved.color_cycle,
+            color_shift: resolved.color_shift,
+            fade,
+            reversed,
             angle: resolved.rotation,
             layout_direction,
             line_axis,
@@ -5093,6 +5126,51 @@ fn resolve_object_plan(
         })
     };
     build().map_err(|gap| vec![gap])
+}
+
+/// The fade a row or a scatter takes for a fade written in words, and whether
+/// the row's marks are numbered from its other end so that the named end is
+/// the first and darkest (DDL 23). A horizontal row is numbered from the left,
+/// a vertical row from the top, and any other row from its first point.
+fn planned_fade(
+    direction: crate::FadeDirection,
+    recipe: &PlacementRecipe,
+    count: u32,
+) -> Result<(inku_score::Fade, bool), ScoreFieldGap> {
+    use crate::FadeDirection::{BottomToTop, LeftToRight, Outward, RightToLeft, TopToBottom};
+    if count < 2 {
+        return Err(ScoreFieldGap::UnsupportedFade);
+    }
+    // The sign of the step from one mark to the next, across and down.
+    let step = match recipe {
+        PlacementRecipe::HorizontalLine { .. } => Some([1, 0]),
+        PlacementRecipe::VerticalLine { .. } => Some([0, 1]),
+        PlacementRecipe::DiagonalLine { step } => {
+            Some([step[0].numerator().signum(), step[1].numerator().signum()])
+        }
+        PlacementRecipe::ScatterUniformWithCentroidTranslation => None,
+        _ => return Err(ScoreFieldGap::UnsupportedFade),
+    };
+    let Some([across, down]) = step else {
+        return match direction {
+            Outward => Ok((inku_score::Fade::Outward, false)),
+            _ => Err(ScoreFieldGap::UnsupportedFade),
+        };
+    };
+    let reversed = match direction {
+        Outward => return Ok((inku_score::Fade::Outward, false)),
+        LeftToRight | RightToLeft if across == 0 => {
+            return Err(ScoreFieldGap::FadeDirectionOffAxis);
+        }
+        TopToBottom | BottomToTop if down == 0 => {
+            return Err(ScoreFieldGap::FadeDirectionOffAxis);
+        }
+        LeftToRight => across < 0,
+        RightToLeft => across > 0,
+        TopToBottom => down < 0,
+        BottomToTop => down > 0,
+    };
+    Ok((inku_score::Fade::Directional, reversed))
 }
 
 struct PreparedFillGroup {
@@ -6224,6 +6302,14 @@ fn resolve_complete_object<'a>(
         )
     {
         gaps.push(ScoreFieldGap::UnsupportedInstructionMeaning);
+    } else if input.color_shift
+        && !matches!(action, PlacementAction::LineUp | PlacementAction::Tile)
+    {
+        // A shift runs once from one end of a row or a tile to the other, which
+        // the scattered or filling marks of a sentence have no order for (DDL 23).
+        gaps.push(ScoreFieldGap::UnsupportedColorShift);
+    } else if input.color_shift && (count as usize) < color_cycle.len() {
+        gaps.push(ScoreFieldGap::ColorShiftLongerThanCount);
     }
     let range_use = range_use_for(action, count);
     // A word, a point, a range, and two points each say where the mark goes;
@@ -6395,6 +6481,7 @@ fn resolve_complete_object<'a>(
             surface_intensity,
         },
         color_cycle,
+        color_shift: input.color_shift,
     })
 }
 

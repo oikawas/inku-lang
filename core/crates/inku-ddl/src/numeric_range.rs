@@ -1,5 +1,5 @@
 //! Numeric position ranges and numeric segments written into a DDL position phrase,
-//! and numeric angles written into a noun phrase.
+//! numeric angles written into a noun phrase, and fades written in words.
 //!
 //! A segment (stage B-2a, the author's decision of 2026-10-19) gives the two
 //! points a row or a line runs between, read as one lexeme in its own language:
@@ -13,6 +13,16 @@
 //! and English `rotated 30 degrees`. Its value is a whole or decimal number
 //! without a sign or a fraction, and whether it is below 360 is checked by the
 //! geometry analysis.
+//!
+//! A fade (DDL 23, the author's decision of 2026-10-20) makes the marks of a
+//! row fade from one named end to the other, or the marks of a row or a scatter
+//! fade outward from their center. It is a grammar form, not a Saijiki word,
+//! read as one lexeme so that the place words inside it (`上`, `中心`) are not
+//! read alone: Japanese `左から右へ薄れさせて` (and `右から左へ`, `上から下へ`,
+//! `下から上へ`, `中心から外へ`) and English `fading from left to right` (and
+//! `right to left`, `top to bottom`, `bottom to top`) or
+//! `fading outward from the center`. Which marks may fade is checked when the
+//! instruction is lowered.
 //!
 //! A range is read as one lexeme, and only in its own instruction language:
 //!
@@ -208,7 +218,114 @@ fn angle_lexeme(
     }
 }
 
+/// The way a fade runs: from one named end of a row to the other, or outward
+/// from the center of a row or a scatter.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FadeDirection {
+    LeftToRight,
+    RightToLeft,
+    TopToBottom,
+    BottomToTop,
+    Outward,
+}
+
+impl FadeDirection {
+    pub const ALL: [Self; 5] = [
+        Self::LeftToRight,
+        Self::RightToLeft,
+        Self::TopToBottom,
+        Self::BottomToTop,
+        Self::Outward,
+    ];
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::LeftToRight => "left_to_right",
+            Self::RightToLeft => "right_to_left",
+            Self::TopToBottom => "top_to_bottom",
+            Self::BottomToTop => "bottom_to_top",
+            Self::Outward => "outward",
+        }
+    }
+
+    /// The Japanese words, as the lexeme reads them and a work plan prints them.
+    pub const fn written_ja(self) -> &'static str {
+        match self {
+            Self::LeftToRight => "左から右へ薄れさせて",
+            Self::RightToLeft => "右から左へ薄れさせて",
+            Self::TopToBottom => "上から下へ薄れさせて",
+            Self::BottomToTop => "下から上へ薄れさせて",
+            Self::Outward => "中心から外へ薄れさせて",
+        }
+    }
+
+    /// The English words after `fading`, one space apart.
+    const fn words_en(self) -> &'static [&'static str] {
+        match self {
+            Self::LeftToRight => &["from", "left", "to", "right"],
+            Self::RightToLeft => &["from", "right", "to", "left"],
+            Self::TopToBottom => &["from", "top", "to", "bottom"],
+            Self::BottomToTop => &["from", "bottom", "to", "top"],
+            Self::Outward => &["outward", "from", "the", "center"],
+        }
+    }
+
+    /// The English words, as a work plan prints them.
+    pub const fn written_en(self) -> &'static str {
+        match self {
+            Self::LeftToRight => "fading from left to right",
+            Self::RightToLeft => "fading from right to left",
+            Self::TopToBottom => "fading from top to bottom",
+            Self::BottomToTop => "fading from bottom to top",
+            Self::Outward => "fading outward from the center",
+        }
+    }
+}
+
+/// One fade lexeme and the way it runs.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FadeLexeme {
+    pub span: SourceSpan,
+    pub direction: FadeDirection,
+}
+
+/// Read a fade that starts exactly at `start`, or return `None`.
+pub(crate) fn fade_at(
+    source: &str,
+    start: usize,
+    language: ResolvedInstructionLanguage,
+) -> Option<FadeLexeme> {
+    if !source.is_char_boundary(start) || start >= source.len() {
+        return None;
+    }
+    match language {
+        ResolvedInstructionLanguage::Ja => japanese_fade(source, start),
+        ResolvedInstructionLanguage::En => english_fade(source, start),
+    }
+}
+
+fn fade_lexeme(start: usize, end: usize, direction: FadeDirection) -> FadeLexeme {
+    FadeLexeme {
+        span: SourceSpan {
+            start_byte: start,
+            end_byte: end,
+        },
+        direction,
+    }
+}
+
 // ----- Japanese -------------------------------------------------------------
+
+// `左から右へ薄れさせて` and the other four, written as they are.
+fn japanese_fade(source: &str, start: usize) -> Option<FadeLexeme> {
+    if !japanese_keyword_left_boundary(source, start) {
+        return None;
+    }
+    FadeDirection::ALL.into_iter().find_map(|direction| {
+        literal(source, start, direction.written_ja()).map(|end| fade_lexeme(start, end, direction))
+    })
+}
 
 // `回転A度`, with optional spaces between the parts. The number has no sign and
 // no fraction.
@@ -455,6 +572,19 @@ fn followed_by_ni(source: &str, end: usize) -> bool {
 }
 
 // ----- English --------------------------------------------------------------
+
+// `fading from left to right` and the other four, in any letter case, with one
+// or more spaces between the words.
+fn english_fade(source: &str, start: usize) -> Option<FadeLexeme> {
+    let after_fading = english_word(source, start, "fading")?;
+    FadeDirection::ALL.into_iter().find_map(|direction| {
+        let mut cursor = after_fading;
+        for word in direction.words_en() {
+            cursor = english_word(source, skip_english_space_required(source, cursor)?, word)?;
+        }
+        Some(fade_lexeme(start, cursor, direction))
+    })
+}
 
 // `rotated A degrees` (or `degree`), in any letter case. The number has no sign
 // and no fraction.
@@ -1162,6 +1292,88 @@ mod tests {
             "Place one square unrotated 30 degrees at horizontal 0.5, vertical 0.5.",
         ] {
             assert_eq!(angle(source, "rotated", en), None, "{source}");
+        }
+    }
+
+    fn fade(
+        source: &str,
+        start_text: &str,
+        language: ResolvedInstructionLanguage,
+    ) -> Option<FadeLexeme> {
+        let start = source
+            .find(start_text)
+            .expect("the start text is in the source");
+        fade_at(source, start, language)
+    }
+
+    /// DDL 23: each of the five Japanese fades is one lexeme, read only in
+    /// Japanese and only from a word boundary.
+    #[test]
+    fn a_japanese_fade_reads_its_direction() {
+        let ja = ResolvedInstructionLanguage::Ja;
+        for direction in FadeDirection::ALL {
+            let source = format!(
+                "中央の縦（横1/3〜2/3、縦0〜1）に、{}、赤い小さな円を9個並べる。",
+                direction.written_ja()
+            );
+            let lexeme = fade(&source, direction.written_ja(), ja).unwrap();
+            assert_eq!(lexeme.direction, direction);
+            assert_eq!(
+                &source[lexeme.span.start_byte..lexeme.span.end_byte],
+                direction.written_ja()
+            );
+            assert!(source[lexeme.span.end_byte..].starts_with('、'));
+            assert_eq!(
+                fade(
+                    &source,
+                    direction.written_ja(),
+                    ResolvedInstructionLanguage::En
+                ),
+                None
+            );
+        }
+        for source in [
+            "左から右へ薄くして、赤い円を9個並べる。",
+            "左から右へ薄れる赤い円を9個並べる。",
+            "赤い左から右へ薄れさせて、円を9個並べる。",
+        ] {
+            assert_eq!(fade(source, "左", ja), None, "{source}");
+        }
+    }
+
+    /// English: `fading` and its direction words, in any letter case, at the
+    /// end of the sentence as an alternation is.
+    #[test]
+    fn an_english_fade_reads_its_direction() {
+        let en = ResolvedInstructionLanguage::En;
+        for direction in FadeDirection::ALL {
+            let source = format!(
+                "Line up 9 small red circles in the range horizontal 0.1 to 0.9, vertical 0.45 to 0.55, {}.",
+                direction.written_en()
+            );
+            let lexeme = fade(&source, "fading", en).unwrap();
+            assert_eq!(lexeme.direction, direction);
+            assert_eq!(
+                &source[lexeme.span.start_byte..lexeme.span.end_byte],
+                direction.written_en()
+            );
+            assert_eq!(
+                fade(&source, "fading", ResolvedInstructionLanguage::Ja),
+                None
+            );
+        }
+        let loose = "Scatter 30 points, Fading  Outward from THE center.";
+        assert_eq!(
+            fade(loose, "Fading", en).unwrap().direction,
+            FadeDirection::Outward
+        );
+        for source in [
+            "Scatter five thin black fading lines across the whole canvas.",
+            "Line up 9 circles, fading from left.",
+            "Line up 9 circles, fading from left to the right.",
+            "Line up 9 circles, unfading from left to right.",
+        ] {
+            assert_eq!(fade(source, "fading", en), None, "{source}");
         }
     }
 }

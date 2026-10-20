@@ -2050,6 +2050,7 @@ fn assert_owned_occurrence_join(case: &Case, result: &inku_ddl::SemanticAssociat
             OwnedSemanticOccurrence::NumericRange(range) => range.source().span,
             OwnedSemanticOccurrence::NumericSegment(segment) => segment.source().span,
             OwnedSemanticOccurrence::NumericAngle(angle) => angle.source().span,
+            OwnedSemanticOccurrence::Fade(fade) => fade.source().span,
             OwnedSemanticOccurrence::Touch(term)
             | OwnedSemanticOccurrence::Continuity(term)
             | OwnedSemanticOccurrence::Angle(term)

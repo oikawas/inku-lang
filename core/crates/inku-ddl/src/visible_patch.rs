@@ -1065,6 +1065,16 @@ fn record_entity_associations(
             crate::semantic_association::semantic_numeric_angle_value(angle),
         );
     }
+    if let Some(fade) = &entity.fade
+        && span_within(fade.source().span, range)
+    {
+        record_association(
+            associations,
+            target,
+            "fade",
+            crate::semantic_association::semantic_fade_value(fade),
+        );
+    }
     for (owner, term, value) in [
         ("touch", entity.touch.as_ref(), field("touch")),
         (

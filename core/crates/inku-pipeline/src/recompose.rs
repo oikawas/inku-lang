@@ -39,7 +39,7 @@ use inku_ddl::{
     CompilerLockState, ExactFraction, MacroDefinition, MacroExpansionLimits, MacroLock,
     NormalizedDdlDocument, ResolvedInstructionLanguage, SemanticExplicitGeometry,
     SemanticGeometryValue, SemanticHead, SemanticInstruction, SemanticPreviousReference,
-    SemanticRelation, SemanticRelationKind, compile_typed_ddl,
+    SemanticRelation, SemanticRelationKind, SemanticSequenceKind, compile_typed_ddl,
 };
 use serde::{Deserialize, Serialize};
 
@@ -146,6 +146,7 @@ fn pinned_layer(instruction: &SemanticInstruction) -> Option<WorkPlanLayer> {
     entity.numeric_position = None;
     entity.numeric_segment = None;
     entity.numeric_angle = None;
+    entity.fade = None;
     entity.additional_relative_scales.clear();
     composition_layer(&SemanticInstruction {
         entity,
@@ -154,6 +155,27 @@ fn pinned_layer(instruction: &SemanticInstruction) -> Option<WorkPlanLayer> {
         fill_target: None,
         ..instruction.clone()
     })
+}
+
+/// A sentence read without the clauses that color and fade its marks (DDL 23):
+/// a color sequence or a fade does not say where the marks go, and only the
+/// range is written again, so the clauses stay as they are written. The layer
+/// takes the color of its first mark, as its color word would say. A sequence
+/// of shapes or groups still makes a sentence a plan does not write.
+fn without_color_clauses(instruction: &SemanticInstruction) -> SemanticInstruction {
+    let mut readable = instruction.clone();
+    readable.entity.fade = None;
+    if let Some(sequence) = readable
+        .sequence
+        .take_if(|sequence| matches!(sequence.kind, SemanticSequenceKind::Color))
+    {
+        readable.entity.color = readable
+            .entity
+            .color
+            .take()
+            .or_else(|| sequence.items.first().cloned());
+    }
+    readable
 }
 
 /// Half the width and half the height a mark of a sentence covers: its numeric
@@ -369,13 +391,14 @@ fn read_layers(
                     .ok_or("unsupported_sentence")?,
             ),
         };
+        let readable = without_color_clauses(instruction);
         let layer = if joint.is_some() {
             composition_layer(&SemanticInstruction {
                 relation: None,
-                ..instruction.clone()
+                ..readable
             })
         } else {
-            composition_layer(instruction)
+            composition_layer(&readable)
         };
         let mut layer = layer.ok_or("unsupported_sentence")?;
         after_layer = true;

@@ -6,6 +6,7 @@ use crate::language::ResolvedInstructionLanguage;
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum MarkerId {
     JaRepeat,
+    JaShift,
     JaGroup,
     JaSequenceTe,
     JaWo,
@@ -30,6 +31,7 @@ pub enum MarkerId {
     EnOf,
     EnAnd,
     EnRepeating,
+    EnShiftingThrough,
 }
 
 /// Existing consumer roles associated with one marker identity.
@@ -69,6 +71,7 @@ impl MarkerId {
     pub const fn surface(self) -> &'static str {
         match self {
             Self::JaRepeat => "繰り返して",
+            Self::JaShift => "段々に移して",
             Self::JaGroup => "組",
             Self::JaSequenceTe => "して",
             Self::JaWo => "を",
@@ -93,6 +96,7 @@ impl MarkerId {
             Self::EnOf => "of",
             Self::EnAnd => "and",
             Self::EnRepeating => "repeating",
+            Self::EnShiftingThrough => "shifting through",
         }
     }
 
@@ -100,6 +104,7 @@ impl MarkerId {
     pub const fn language(self) -> ResolvedInstructionLanguage {
         match self {
             Self::JaRepeat
+            | Self::JaShift
             | Self::JaGroup
             | Self::JaSequenceTe
             | Self::JaWo
@@ -123,7 +128,8 @@ impl MarkerId {
             | Self::EnTo
             | Self::EnOf
             | Self::EnAnd
-            | Self::EnRepeating => ResolvedInstructionLanguage::En,
+            | Self::EnRepeating
+            | Self::EnShiftingThrough => ResolvedInstructionLanguage::En,
         }
     }
 
@@ -134,7 +140,11 @@ impl MarkerId {
 
     const fn capabilities(self) -> MarkerCapabilities {
         MarkerCapabilities(match self {
-            Self::JaRepeat | Self::JaSequenceTe | Self::EnRepeating => SEQUENCE,
+            Self::JaRepeat
+            | Self::JaShift
+            | Self::JaSequenceTe
+            | Self::EnRepeating
+            | Self::EnShiftingThrough => SEQUENCE,
             Self::JaGroup | Self::EnGroupOf => GROUP,
             Self::JaWo => ATTACHMENT | FILL | SEQUENCE,
             Self::JaNi | Self::JaHe | Self::EnIn | Self::EnAt | Self::EnOn | Self::EnTo => {
@@ -172,6 +182,11 @@ pub(crate) const GRAMMAR_MARKER_PRIORITY: u8 = 1;
 const GRAMMAR_MARKERS: &[GrammarMarkerDefinition] = &[
     GrammarMarkerDefinition {
         id: MarkerId::JaRepeat,
+        match_kind: MarkerMatchKind::JapaneseAttached,
+        priority: GRAMMAR_MARKER_PRIORITY,
+    },
+    GrammarMarkerDefinition {
+        id: MarkerId::JaShift,
         match_kind: MarkerMatchKind::JapaneseAttached,
         priority: GRAMMAR_MARKER_PRIORITY,
     },
@@ -295,6 +310,11 @@ const GRAMMAR_MARKERS: &[GrammarMarkerDefinition] = &[
         match_kind: MarkerMatchKind::EnglishWord,
         priority: GRAMMAR_MARKER_PRIORITY,
     },
+    GrammarMarkerDefinition {
+        id: MarkerId::EnShiftingThrough,
+        match_kind: MarkerMatchKind::EnglishWord,
+        priority: GRAMMAR_MARKER_PRIORITY,
+    },
 ];
 
 pub(crate) fn grammar_marker_definitions(
@@ -313,7 +333,7 @@ mod tests {
 
     #[test]
     fn registry_has_unique_language_surface_and_identity_rows() {
-        assert_eq!(GRAMMAR_MARKERS.len(), 25);
+        assert_eq!(GRAMMAR_MARKERS.len(), 27);
         assert_eq!(
             GRAMMAR_MARKERS
                 .iter()

@@ -378,7 +378,16 @@
 # rotation. Such a sentence was an unresolved clause, its whole number read
 # as a count. No saved work changes (the 4,712 works of the 2026-10-14 5173
 # export).
-DDL_ENGINE_VERSION = "66"
+# 67: A fade written in words (`左から右へ薄れさせて`, `fading from left to
+# right`, the other three directions, and `中心から外へ薄れさせて`, `fading
+# outward from the center`) sets the Score's fade of a row, or of a row or a
+# scatter outward, of two or more marks; a row fading from its other end is
+# numbered from that end as a row stepping back, its marks in the same places.
+# Colors in order may shift once through the marks (`黄・橙・赤の順に段々に移して`,
+# `shifting through yellow, orange, and red in order`), each run of marks
+# taking one color. Such sentences were unresolved clauses. No saved work
+# changes (the 5,188 works of the 2026-10-17 5173 export).
+DDL_ENGINE_VERSION = "67"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write
@@ -433,4 +442,10 @@ DDL_ENGINE_VERSION = "66"
 # horizontal C, vertical D`.
 # 22 (2026-10-20): The angle a mark turns may be written in numbers,
 # `回転A度` and `rotated A degrees`.
-DDL_VERSION = "22"
+# 23 (2026-10-20): A fade may be written in words, `左から右へ薄れさせて`
+# (and from right to left, top to bottom, bottom to top, and `中心から外へ`)
+# and `fading from left to right` (and the others, and `fading outward from
+# the center`), and colors in order may shift once through the marks,
+# `A・B・Cの順に段々に移して` and `shifting through A, B, and C in order`. Both
+# are grammar, not Saijiki words.
+DDL_VERSION = "23"

@@ -114,6 +114,7 @@ pub enum SemanticDeliveryOwner {
     Continuity,
     Angle,
     NumericAngle,
+    Fade,
     LayoutDirection,
     SurfaceQuality,
     SurfaceIntensity,
@@ -155,6 +156,7 @@ impl SemanticDeliveryOwner {
             Self::Continuity => "continuity",
             Self::Angle => "angle",
             Self::NumericAngle => "numeric_angle",
+            Self::Fade => "fade",
             Self::LayoutDirection => "layout_direction",
             Self::SurfaceQuality => "surface_quality",
             Self::SurfaceIntensity => "surface_intensity",
@@ -1143,6 +1145,7 @@ fn project_deliveries(
             | SemanticAssociationIssueKind::ConflictingTouches
             | SemanticAssociationIssueKind::ConflictingContinuities
             | SemanticAssociationIssueKind::ConflictingAngles
+            | SemanticAssociationIssueKind::ConflictingFades
             | SemanticAssociationIssueKind::ConflictingSurfaceQualities
             | SemanticAssociationIssueKind::ConflictingSurfaceIntensities
             | SemanticAssociationIssueKind::ConflictingFluctuationAmplitudes
@@ -2127,6 +2130,14 @@ fn project_instruction(instruction: &crate::SemanticInstruction, projection: &mu
             )),
         );
     }
+    if let Some(fade) = &instruction.entity.fade {
+        add_explicit(
+            projection,
+            fade.source().span,
+            SemanticDeliveryOwner::Fade,
+            compact_json(&crate::semantic_association::semantic_fade_value(fade)),
+        );
+    }
     if let Some(relation) = &instruction.relation {
         add_explicit(
             projection,
@@ -2242,6 +2253,10 @@ fn owned_occurrence_key(occurrence: &OwnedSemanticOccurrence) -> String {
             compact_json(&crate::semantic_association::semantic_numeric_angle_value(
                 angle
             ))
+        ),
+        OwnedSemanticOccurrence::Fade(fade) => format!(
+            "fade:{}",
+            compact_json(&crate::semantic_association::semantic_fade_value(fade))
         ),
     }
 }
@@ -3033,6 +3048,9 @@ pub(crate) fn semantic_source_occurrences(ast: &SemanticDocumentAst) -> Vec<&Sou
         if let Some(angle) = &entity.numeric_angle {
             occurrences.push(angle.source());
         }
+        if let Some(fade) = &entity.fade {
+            occurrences.push(fade.source());
+        }
     }
 
     let mut occurrences = Vec::new();
@@ -3399,6 +3417,10 @@ fn entity_provenance_value(entity: &crate::SemanticEntity) -> Value {
             "numeric_angle".to_owned(),
             numeric_angle_provenance_value(angle),
         );
+    }
+    // Absent from older records, so an entity without a fade keeps its bytes.
+    if let Some(fade) = &entity.fade {
+        record.insert("fade".to_owned(), source_occurrence_value(&fade.provenance));
     }
     Value::Object(record.into_iter().collect())
 }

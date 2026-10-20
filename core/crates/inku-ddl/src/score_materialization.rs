@@ -199,9 +199,29 @@ pub fn materialize_selected_composition(
         } else {
             saved_recipe(object.recipe())?
         };
+        // A fade runs the way its words say (DDL 23): a row numbered from its
+        // other end keeps its marks' places, and its colors stay where the
+        // row's own order puts them.
+        let reversed = object.reversed() && !owned_elsewhere;
+        let recipe = if reversed {
+            reversed_row(recipe)
+        } else {
+            recipe
+        };
+        let color_cycle = if owned_elsewhere {
+            object.color_cycle().to_vec()
+        } else {
+            marks_color_cycle(object.color_cycle(), object.color_shift(), count, reversed)
+        };
+        let fade = if owned_elsewhere {
+            Fade::None
+        } else {
+            object.fade()
+        };
         instruction.arrangement = Some(arrangement(
             count,
-            object.color_cycle(),
+            &color_cycle,
+            fade,
             ResolvedArrangement {
                 owner: saved_owner(object.origin()),
                 first_instance_ordinal: 0,
@@ -920,9 +940,60 @@ fn saved_dimensions(
     })
 }
 
+/// The same row numbered from its other end. Its marks keep their places,
+/// because a row's marks are centered on its anchor (DDL 23).
+fn reversed_row(recipe: ResolvedPlacementRecipe) -> ResolvedPlacementRecipe {
+    // `0.0 - value` never writes a negative zero.
+    match recipe {
+        ResolvedPlacementRecipe::HorizontalLine { cell_width } => {
+            ResolvedPlacementRecipe::DiagonalLine {
+                step: Point::new(0.0 - cell_width, 0.0),
+            }
+        }
+        ResolvedPlacementRecipe::VerticalLine { cell_height } => {
+            ResolvedPlacementRecipe::DiagonalLine {
+                step: Point::new(0.0, 0.0 - cell_height),
+            }
+        }
+        ResolvedPlacementRecipe::DiagonalLine { step } => ResolvedPlacementRecipe::DiagonalLine {
+            step: Point::new(0.0 - step.x, 0.0 - step.y),
+        },
+        other => other,
+    }
+}
+
+/// The Score's color cycle for the marks (DDL 23). Colors that shift give each
+/// run of marks one color, in the written order from the first mark; a row
+/// numbered from its other end takes its colors as the unreversed row has them.
+fn marks_color_cycle(
+    colors: &[inku_score::Color],
+    shift: bool,
+    count: u32,
+    reversed: bool,
+) -> Vec<inku_score::Color> {
+    if colors.is_empty() || !(shift || reversed) {
+        return colors.to_vec();
+    }
+    let marks = count as usize;
+    let mut per_mark = (0..marks)
+        .map(|mark| {
+            if shift {
+                colors[(mark * colors.len() / marks).min(colors.len() - 1)]
+            } else {
+                colors[mark % colors.len()]
+            }
+        })
+        .collect::<Vec<_>>();
+    if reversed {
+        per_mark.reverse();
+    }
+    per_mark
+}
+
 fn arrangement(
     count: u32,
     color_cycle: &[inku_score::Color],
+    fade: Fade,
     resolved: ResolvedArrangement,
 ) -> Arrangement {
     Arrangement {
@@ -939,7 +1010,7 @@ fn arrangement(
         radius: None,
         density: Density::None,
         cluster_count: None,
-        fade: Fade::None,
+        fade,
         preserve_space: false,
         rhythm_spacing: RhythmSpacing::None,
         resolved: Some(resolved),

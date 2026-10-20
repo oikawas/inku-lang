@@ -118,6 +118,28 @@ test('a numeric range the author got wrong is said in words, whichever tag carri
 	assert.doesNotMatch(unsupported, /diagnostic/);
 });
 
+test('a fade and colors that shift are said in words, in each language', () => {
+	for (const [kind, japanese, english] of [
+		['conflicting_fades', /薄れ（〜へ薄れさせて）が二つ書かれています。/, /Two fades \(fading …\) are written in one sentence\./],
+		['shift_needs_colors', /段々に移せるのは色の列だけです。/, /Only colors shift through in order\./],
+	] as const) {
+		const upstream = { channel: 'upstream' as const, value: { issue_kind: kind } };
+		assert.match(formatPipelineDiagnostic(upstream, ja), japanese);
+		assert.match(formatPipelineDiagnostic(upstream, en), english);
+	}
+	for (const [type, japanese, english] of [
+		['unsupported_fade', /2個以上を並べる列にだけ/, /only for a row of two or more marks/],
+		['fade_direction_off_axis', /薄れの向きが列の向きに合いません。/, /does not run along its row/],
+		['unsupported_color_shift', /並べる列と敷き詰めだけです。/, /only for marks that line up or a tile/],
+		['color_shift_longer_than_count', /痕の数より多くなっています。/, /than there are marks/],
+	] as const) {
+		const downstream = { channel: 'downstream' as const, value: { reason: { type } } };
+		assert.match(formatPipelineDiagnostic(downstream, ja), japanese);
+		assert.match(formatPipelineDiagnostic(downstream, en), english);
+		assert.doesNotMatch(formatPipelineDiagnostic(downstream, en), /Reason:/);
+	}
+});
+
 test('two points written in numbers are said in words, in each language', () => {
 	const invalid = { channel: 'upstream' as const, value: { issue_kind: 'invalid_numeric_segment' } };
 	assert.match(formatPipelineDiagnostic(invalid, ja), /数値で書いた二つの点（〜から〜まで）が正しくありません。/);

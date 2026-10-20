@@ -5322,7 +5322,7 @@ fn edit_rebuilt(
                     .insert(WorkPlanSlot::Color, mark.color.as_str().to_owned());
             }
         }
-        [first, second] if first != second => numeric.cycle = Some([*first, *second]),
+        [first, second] if first != second => numeric.cycle = Some(vec![*first, *second]),
         _ => return None,
     }
     if pattern {

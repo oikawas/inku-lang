@@ -416,6 +416,8 @@ pub fn geometry_resolution_policy_canonical_bytes() -> &'static [u8] {
                     "\"tile_named_anchor\":\"stay_in_named_domain_no_centroid_translation\",",
                     "\"scatter\":\"uniform_xy_then_translate_sample_centroid_at_materialization\",",
                     "\"scatter_seed\":\"existing_performance_seed_owner_instance_ordinal\",",
+                    "\"fade\":{\"directional\":\"line_up_of_two_or_more_numbered_from_the_named_end_places_kept\",\"outward\":\"line_up_or_scatter_of_two_or_more\",\"off_axis\":\"gap\",\"other\":\"gap\",\"colors\":\"in_the_unreversed_row_order\"},",
+                    "\"color_shift\":\"line_up_or_tile_mark_k_takes_item_floor_k_times_items_over_count\",",
                     "\"fill\":{\"omitted_target\":\"canvas\",\"target\":\"area_not_anchor\",\"distribution\":\"independent_uniform_in_target\",\"boundary\":\"clip_to_same_target_contour\",\"target_transform\":\"with_contents\",\"centroid_translation\":false,\"omitted_count\":\"max_1_ceil_reference_area_over_reference_extent_squared\",\"explicit_count_size\":\"preserved\",\"count_appearance_dependency\":false,\"cloudform_count_area\":\"declared_envelope\",\"crescent_count_area\":\"shared_cubic_analytic_integral\",\"numeric_motif_position\":\"invalid_not_area\",\"all_counts\":\"same_region_clip\",\"mixed_omission\":\"max_k_ceil_k_times_nonnegative_remaining_area_over_sum_omitted_extent_squared\",\"mixed_explicit_area\":\"sum_count_times_extent_squared\",\"mixed_allocation\":\"equal_omitted_counts_source_order_remainder_minimum_one\",\"macro_reference_extent\":\"max_declared_center_envelope_axis_span_plus_twice_max_primitive_reference_radius\",\"macro_reference_transform\":\"rotate_centers_scale_radius_by_max_absolute_axis\",\"macro_reference_positions\":\"declared_numeric_or_named_center_and_internal_recipe_envelope\",\"macro_reference_exclusions\":[\"outer_count\",\"ink_bounds\",\"instruction_angle\",\"performance_seed\",\"performed_relation_movement\"]},",
                     "\"non_grid_domain\":{\"named_scatter\":\"range_extent_group_centroid_at_range_center\",\"named_line_up\":\"canvas_axes_row_centroid_at_range_center\",\"numeric\":\"canvas_axes_group_centroid_at_numeric_anchor\"},",
                     "\"overlap\":\"allowed_no_resize_no_fit_no_count_change\",",
@@ -475,6 +477,8 @@ pub enum GeometryKeyword {
     NumericSegment,
     /// A whole numeric angle (degrees), read again from its source span.
     NumericAngle,
+    /// A whole fade (DDL 23), read again from its source span.
+    Fade,
 }
 
 impl GeometryKeyword {
@@ -495,6 +499,7 @@ impl GeometryKeyword {
             Self::NumericRange => "numeric_range",
             Self::NumericSegment => "numeric_segment",
             Self::NumericAngle => "numeric_angle",
+            Self::Fade => "fade",
         }
     }
 }
@@ -670,6 +675,19 @@ impl SemanticNumericAngle {
     }
 }
 
+/// The way the marks of a row or a scatter fade, written in words (DDL 23).
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SemanticFade {
+    pub direction: crate::FadeDirection,
+    pub provenance: SourceOccurrence,
+}
+
+impl SemanticFade {
+    pub const fn source(&self) -> &SourceOccurrence {
+        &self.provenance
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum GeometrySyntaxIssueKind {
     IncompleteGeometry,
@@ -696,6 +714,7 @@ pub(crate) struct ClauseGeometryAnalysis {
     pub ranges: Vec<SemanticNumericRange>,
     pub segments: Vec<SemanticNumericSegment>,
     pub angles: Vec<SemanticNumericAngle>,
+    pub fades: Vec<SemanticFade>,
     pub consumed_numeric_spans: BTreeSet<(usize, usize)>,
     pub issues: Vec<GeometrySyntaxIssue>,
 }
@@ -949,6 +968,22 @@ pub(crate) fn analyze_clause_geometry(
                         index,
                         index + 1,
                     )),
+                }
+            }
+            GeometryKeyword::Fade => {
+                let span = atoms[index].span();
+                // The parser selected the lexeme, so it reads again from its span.
+                if let Some(lexeme) = crate::numeric_range::fade_at(
+                    document.source(),
+                    span.start_byte,
+                    document.language(),
+                )
+                .filter(|lexeme| lexeme.span == span)
+                {
+                    result.fades.push(SemanticFade {
+                        direction: lexeme.direction,
+                        provenance: occurrence(document, span, region_index, clause_index, index),
+                    });
                 }
             }
             GeometryKeyword::Canvas | GeometryKeyword::Position => {}
@@ -1313,8 +1348,16 @@ mod tests {
             "clockwise_canvas_y_down"
         );
         assert_eq!(
+            payload["object_placement"]["fade"]["directional"],
+            "line_up_of_two_or_more_numbered_from_the_named_end_places_kept"
+        );
+        assert_eq!(
+            payload["object_placement"]["color_shift"],
+            "line_up_or_tile_mark_k_takes_item_floor_k_times_items_over_count"
+        );
+        assert_eq!(
             geometry_resolution_policy_digest(),
-            "180161298cc072dcf13182bc5a8641cd2c9d63c00745e357397877d2a149f615"
+            "320ec78f7a3d0025d881b85de475268ba71bb3eb149aeadcf3e4961f75a445fb"
         );
         assert_eq!(
             payload["object_placement"]["layout_direction"]["vertical"],

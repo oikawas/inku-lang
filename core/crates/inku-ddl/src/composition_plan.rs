@@ -424,6 +424,13 @@ pub struct ObjectPlacementPlan {
     pub(crate) relative_scale: Option<CoreModifierValue>,
     pub(crate) appearance: ResolvedObjectAppearance,
     pub(crate) color_cycle: Vec<Color>,
+    /// The colors shift once through the marks instead of repeating (DDL 23).
+    pub(crate) color_shift: bool,
+    /// The way the marks fade (DDL 23).
+    pub(crate) fade: inku_score::Fade,
+    /// The row's marks are numbered from its other end, so that a fade runs
+    /// the way its words say; the marks keep their places.
+    pub(crate) reversed: bool,
     pub(crate) angle: Option<f64>,
     pub(crate) layout_direction: Option<ResolvedLayoutDirection>,
     pub(crate) line_axis: [i8; 2],
@@ -494,6 +501,17 @@ impl ObjectPlacementPlan {
     }
     pub fn color_cycle(&self) -> &[Color] {
         &self.color_cycle
+    }
+    /// Whether the colors shift once through the marks instead of repeating.
+    pub fn color_shift(&self) -> bool {
+        self.color_shift
+    }
+    pub fn fade(&self) -> inku_score::Fade {
+        self.fade
+    }
+    /// Whether the row's marks are numbered from its other end.
+    pub fn reversed(&self) -> bool {
+        self.reversed
     }
     pub fn angle(&self) -> Option<f64> {
         self.angle

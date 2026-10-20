@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-10-20 — Another composition and the color words
+
+With DDL now writing fades and colors that shift through the marks, and Another composition choosing again a sentence with color words, its paragraph in Creating Images says that a sentence whose colors alternate, repeat or shift in order, or whose marks fade, keeps those words and has only its range chosen again.
+
 ## 2026-10-20 — Another composition and the laws' layers
 
 With Another composition now choosing again the works the laws stage drew, its paragraph in Creating Images is revised: the layers the laws placed stay and only the others are chosen again, the reason shown when the laws placed every layer, what happens when you rewrite a laws sentence, and works from before 2026-10-20.

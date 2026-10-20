@@ -16,7 +16,7 @@ use crate::{
 };
 
 /// Stable identity for the neutral parser foundation.
-pub const NEUTRAL_LEXEME_PARSER_SCHEMA_ID: &str = "inku.neutral-lexeme-parser.v15";
+pub const NEUTRAL_LEXEME_PARSER_SCHEMA_ID: &str = "inku.neutral-lexeme-parser.v16";
 
 /// A half-open UTF-8 byte span into the source document.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -447,6 +447,15 @@ fn selection_at(
             end_byte: angle.span.end_byte,
             kind: NeutralTokenKind::GeometryKeyword {
                 keyword: GeometryKeyword::NumericAngle,
+            },
+        });
+    }
+    // A fade is one lexeme, so the place words inside it are not read alone.
+    if let Some(fade) = crate::numeric_range::fade_at(source, start_byte, language) {
+        return Some(Selection::Token {
+            end_byte: fade.span.end_byte,
+            kind: NeutralTokenKind::GeometryKeyword {
+                keyword: GeometryKeyword::Fade,
             },
         });
     }
@@ -1345,8 +1354,9 @@ fn left_candidate_ends(edition: SaijikiEdition, source: &str) -> Rc<LeftCandidat
             ResolvedInstructionLanguage::Ja,
             false,
         );
-        // A numeric range, segment or angle is one recognized lexeme, so the
-        // particle after it (`…の範囲に`, `…）に`, `回転30度の`) is recognized too.
+        // A numeric range, segment or angle and a fade are each one recognized
+        // lexeme, so the particle after it (`…の範囲に`, `…）に`, `回転30度の`) is
+        // recognized too.
         let range = crate::numeric_range::numeric_range_at(
             source,
             candidate_start,
@@ -1362,12 +1372,15 @@ fn left_candidate_ends(edition: SaijikiEdition, source: &str) -> Rc<LeftCandidat
             candidate_start,
             ResolvedInstructionLanguage::Ja,
         );
+        let fade =
+            crate::numeric_range::fade_at(source, candidate_start, ResolvedInstructionLanguage::Ja);
         for end_byte in candidates
             .iter()
             .map(|candidate| candidate.end_byte)
             .chain(range.map(|range| range.span.end_byte))
             .chain(segment.map(|segment| segment.span.end_byte))
             .chain(angle.map(|angle| angle.span.end_byte))
+            .chain(fade.map(|fade| fade.span.end_byte))
         {
             earliest_start.entry(end_byte).or_insert(candidate_start);
         }

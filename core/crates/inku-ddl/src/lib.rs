@@ -32,7 +32,8 @@ pub mod macro_seed;
 pub mod noun_phrase;
 pub mod numeric_range;
 pub use numeric_range::{
-    ExactFraction, NumericAngleLexeme, NumericRangeLexeme, NumericSegmentLexeme,
+    ExactFraction, FadeDirection, FadeLexeme, NumericAngleLexeme, NumericRangeLexeme,
+    NumericSegmentLexeme,
 };
 pub mod opaque_head;
 pub mod parser;
@@ -128,8 +129,8 @@ pub use execution_diagnostics::{
 };
 pub use geometry::{
     ExactGeometry, ExactPosition, GEOMETRY_RESOLUTION_POLICY_ID, GeometryKeyword,
-    SemanticExactDecimal, SemanticExplicitGeometry, SemanticGeometryValue, SemanticNumericAngle,
-    SemanticNumericPosition, SemanticNumericRange, SemanticNumericSegment,
+    SemanticExactDecimal, SemanticExplicitGeometry, SemanticFade, SemanticGeometryValue,
+    SemanticNumericAngle, SemanticNumericPosition, SemanticNumericRange, SemanticNumericSegment,
     geometry_resolution_policy_canonical_bytes, geometry_resolution_policy_digest,
 };
 
@@ -241,8 +242,8 @@ pub use semantic_association::{
     SemanticMacroParameterBinding, SemanticMacroParameterValue, SemanticPreviousReference,
     SemanticProportion, SemanticQuantity, SemanticRelationKind, SemanticRelativeScale,
     SemanticSequence, SemanticSequenceField, SemanticSequenceIssue, SemanticSequenceIssueKind,
-    SemanticSequenceKind, SemanticSequenceUnit, SemanticSurface, SemanticTerm,
-    SemanticTermProvenance, SemanticThinness, SemanticUpstreamCausalRelation,
+    SemanticSequenceKind, SemanticSequenceProgression, SemanticSequenceUnit, SemanticSurface,
+    SemanticTerm, SemanticTermProvenance, SemanticThinness, SemanticUpstreamCausalRelation,
     SemanticUpstreamDiagnosticCause, SourceOccurrence, associate_semantic_entities,
     associate_semantic_entities_with_macro_binding,
 };

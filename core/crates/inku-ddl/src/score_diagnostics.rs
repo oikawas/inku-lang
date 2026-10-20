@@ -97,6 +97,18 @@ pub enum ScoreFieldGap {
     /// Two points written in numbers together with a word they already
     /// decide: a line's length, size or direction, or a row's direction.
     NumericSegmentConflict,
+    /// A fade on marks that cannot fade so (DDL 23): a direction needs a row of
+    /// two or more marks, and outward a row or a scatter of two or more; one
+    /// mark, a bundle at one place, a tile or a fill takes none.
+    UnsupportedFade,
+    /// A fade whose direction does not run along its row: left or right on a
+    /// vertical row, up or down on a horizontal row (DDL 23).
+    FadeDirectionOffAxis,
+    /// Colors shifting through in order on marks that are not a row or a tile
+    /// (DDL 23).
+    UnsupportedColorShift,
+    /// Colors shifting through in order on fewer marks than colors (DDL 23).
+    ColorShiftLongerThanCount,
     UnsupportedInstructionMeaning,
     UnsupportedRelation {
         kind: SemanticRelationKind,

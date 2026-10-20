@@ -1075,6 +1075,7 @@ fn apply_continuation_occurrence(
             instruction.entity.angle.is_none()
                 && set_if_empty(&mut instruction.entity.numeric_angle, value)
         }
+        OwnedSemanticOccurrence::Fade(value) => set_if_empty(&mut instruction.entity.fade, value),
         OwnedSemanticOccurrence::Surface(term) => {
             match (term.identity.category.as_str(), term.identity.id.as_str()) {
                 (
@@ -1273,6 +1274,7 @@ fn has_continuation_predicate(instruction: &SemanticInstruction) -> bool {
         || entity.numeric_range.is_some()
         || entity.numeric_segment.is_some()
         || entity.numeric_angle.is_some()
+        || entity.fade.is_some()
         || entity.proportion.aspect.is_some()
         || entity.proportion.width_extent.is_some()
         || entity.proportion.arc_form.is_some()
@@ -1338,6 +1340,7 @@ fn predicate_is_compatible(
         // An angle word and a numeric angle cannot turn the same mark together.
         && !(left.angle.is_some() && right.numeric_angle.is_some())
         && !(left.numeric_angle.is_some() && right.angle.is_some())
+        && option_is_mergeable(&left.fade, &right.fade)
         && option_is_mergeable(&left.surface.quality, &right.surface.quality)
         && option_is_mergeable(&left.surface.intensity, &right.surface.intensity)
         && option_is_mergeable(&left.fluctuation.amplitude, &right.fluctuation.amplitude)
@@ -1409,6 +1412,7 @@ fn merge_predicate(target: &mut SemanticInstruction, continuation: &SemanticInst
         &mut target.entity.numeric_angle,
         &continuation.entity.numeric_angle,
     );
+    merge_option(&mut target.entity.fade, &continuation.entity.fade);
     merge_option(
         &mut target.entity.surface.quality,
         &continuation.entity.surface.quality,

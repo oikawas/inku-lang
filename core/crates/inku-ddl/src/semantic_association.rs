@@ -178,6 +178,17 @@ pub struct SemanticSequence {
     pub units: Vec<SemanticSequenceUnit>,
     pub quantity: Option<SemanticQuantity>,
     pub markers: Vec<SourceOccurrence>,
+    pub progression: SemanticSequenceProgression,
+}
+
+/// How a sequence runs over the marks: repeating from the first item again, or
+/// shifting once through its items from one end of the marks to the other
+/// (DDL 23: `A・B・Cの順に段々に移して`, `shifting through A, B, and C in order`).
+/// Only a color sequence in order shifts.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SemanticSequenceProgression {
+    Repeat,
+    Shift,
 }
 
 /// Closed sequence payload. Color retains its established compact wire path;
@@ -250,6 +261,9 @@ pub enum SemanticSequenceIssueKind {
     MixedFields,
     InvalidUnitSyntax,
     MissingQuantityOwner,
+    /// Shapes, groups or other fields written to shift (`段々に移して`,
+    /// `shifting through`): only colors shift (DDL 23).
+    ShiftNeedsColors,
 }
 
 impl SemanticSequenceIssueKind {
@@ -263,6 +277,7 @@ impl SemanticSequenceIssueKind {
             Self::MixedFields => "mixed_sequence_fields",
             Self::InvalidUnitSyntax => "invalid_sequence_unit_syntax",
             Self::MissingQuantityOwner => "missing_sequence_quantity_owner",
+            Self::ShiftNeedsColors => "shift_needs_colors",
         }
     }
 }
@@ -471,6 +486,8 @@ pub struct SemanticEntity {
     /// The degrees the marks turn, written in numbers (stage B-4a); exclusive
     /// with `angle`.
     pub numeric_angle: Option<crate::SemanticNumericAngle>,
+    /// The way the marks fade, written in words (DDL 23).
+    pub fade: Option<crate::SemanticFade>,
     pub surface: SemanticSurface,
     pub fluctuation: SemanticFluctuation,
     pub proportion: SemanticProportion,
@@ -502,6 +519,7 @@ pub enum OwnedSemanticOccurrence {
     Continuity(SemanticTerm),
     Angle(SemanticTerm),
     NumericAngle(crate::SemanticNumericAngle),
+    Fade(crate::SemanticFade),
     Surface(SemanticTerm),
     Fluctuation(SemanticTerm),
     Proportion(SemanticTerm),
@@ -529,6 +547,7 @@ impl OwnedSemanticOccurrence {
             Self::NumericRange(range) => range.source(),
             Self::NumericSegment(segment) => segment.source(),
             Self::NumericAngle(angle) => angle.source(),
+            Self::Fade(fade) => fade.source(),
         }
     }
 
@@ -549,6 +568,7 @@ impl OwnedSemanticOccurrence {
             | Self::Continuity(_)
             | Self::Angle(_)
             | Self::NumericAngle(_)
+            | Self::Fade(_)
             | Self::Surface(_)
             | Self::Fluctuation(_)
             | Self::Proportion(_) => 1,
@@ -578,6 +598,7 @@ pub enum SemanticAssociationIssueKind {
     ConflictingTouches,
     ConflictingContinuities,
     ConflictingAngles,
+    ConflictingFades,
     ConflictingSurfaceQualities,
     ConflictingSurfaceIntensities,
     UnknownSurfaceDimension,
@@ -620,6 +641,7 @@ impl SemanticAssociationIssueKind {
             Self::ConflictingTouches => "conflicting_touches",
             Self::ConflictingContinuities => "conflicting_continuities",
             Self::ConflictingAngles => "conflicting_angles",
+            Self::ConflictingFades => "conflicting_fades",
             Self::ConflictingSurfaceQualities => "conflicting_surface_qualities",
             Self::ConflictingSurfaceIntensities => "conflicting_surface_intensities",
             Self::UnknownSurfaceDimension => "unknown_surface_dimension",
@@ -940,6 +962,8 @@ fn collect_semantic_sequences(
             } else {
                 None
             };
+            let progression =
+                sequence_progression(document.language(), clause, operator_index, &color_indices);
             let sequence = SemanticSequence {
                 kind: SemanticSequenceKind::Color,
                 operator,
@@ -947,6 +971,7 @@ fn collect_semantic_sequences(
                 units: Vec::new(),
                 quantity: None,
                 markers,
+                progression,
             };
             if let Some(kind) = issue {
                 issues.push(SemanticSequenceIssue {
@@ -1109,6 +1134,14 @@ fn collect_semantic_member_sequences(
                     || fields.iter().any(|candidate| Some(*candidate) != field)
                 {
                     Some(SemanticSequenceIssueKind::MixedFields)
+                } else if sequence_progression(
+                    document.language(),
+                    clause,
+                    operator_index,
+                    &field_indices,
+                ) == SemanticSequenceProgression::Shift
+                {
+                    Some(SemanticSequenceIssueKind::ShiftNeedsColors)
                 } else if operator.identity.id == "alternating" && items.len() != 2 {
                     Some(SemanticSequenceIssueKind::InvalidAlternatingCardinality)
                 } else if !sequence_connectors_are_valid(
@@ -1139,6 +1172,7 @@ fn collect_semantic_member_sequences(
                     units: Vec::new(),
                     quantity,
                     markers,
+                    progression: SemanticSequenceProgression::Repeat,
                 };
                 if let Some(kind) = issue {
                     issues.push(SemanticSequenceIssue {
@@ -1177,6 +1211,10 @@ fn collect_semantic_member_sequences(
         );
         let issue = if unit_head_indices.is_empty() || unit_head_indices.iter().any(Vec::is_empty) {
             Some(SemanticSequenceIssueKind::InvalidUnitSyntax)
+        } else if sequence_progression(document.language(), clause, operator_index, &head_indices)
+            == SemanticSequenceProgression::Shift
+        {
+            Some(SemanticSequenceIssueKind::ShiftNeedsColors)
         } else if operator.identity.id == "alternating" && flat_item_count != 2 {
             Some(SemanticSequenceIssueKind::InvalidAlternatingCardinality)
         } else if quantity_indices.len() > 1 {
@@ -1203,6 +1241,7 @@ fn collect_semantic_member_sequences(
             units: Vec::new(),
             quantity,
             markers,
+            progression: SemanticSequenceProgression::Repeat,
         };
         if let Some(kind) = issue {
             issues.push(SemanticSequenceIssue {
@@ -1468,21 +1507,67 @@ fn member_sequence_markers(
         .collect()
 }
 
+/// The English marker that leads the items of a sequence in order:
+/// `repeating`, or `shifting through` (DDL 23).
+fn is_english_in_order_lead(atom: &ClauseAtom) -> bool {
+    matches!(
+        atom,
+        ClauseAtom::GrammarMarker {
+            marker_id: MarkerId::EnRepeating | MarkerId::EnShiftingThrough,
+            ..
+        }
+    )
+}
+
+/// Whether a color sequence shifts once through its items (`段々に移して`
+/// after `順に`, or `shifting through` before the items) or repeats them.
+fn sequence_progression(
+    language: ResolvedInstructionLanguage,
+    clause: &crate::ClauseSegment,
+    operator_index: usize,
+    color_indices: &[usize],
+) -> SemanticSequenceProgression {
+    let shifting = match language {
+        ResolvedInstructionLanguage::Ja => matches!(
+            clause.atoms.get(operator_index + 1),
+            Some(ClauseAtom::GrammarMarker {
+                marker_id: MarkerId::JaShift,
+                ..
+            })
+        ),
+        ResolvedInstructionLanguage::En => color_indices
+            .first()
+            .and_then(|&first| {
+                clause.atoms[..first]
+                    .iter()
+                    .rposition(is_english_in_order_lead)
+            })
+            .is_some_and(|lead| {
+                matches!(
+                    clause.atoms[lead],
+                    ClauseAtom::GrammarMarker {
+                        marker_id: MarkerId::EnShiftingThrough,
+                        ..
+                    }
+                )
+            }),
+    };
+    if shifting {
+        SemanticSequenceProgression::Shift
+    } else {
+        SemanticSequenceProgression::Repeat
+    }
+}
+
 fn sequence_color_indices(
     language: ResolvedInstructionLanguage,
     clause: &crate::ClauseSegment,
     operator_index: usize,
     operator_id: &str,
 ) -> Vec<usize> {
-    let repeating_index = clause.atoms[..operator_index].iter().rposition(|atom| {
-        matches!(
-            atom,
-            ClauseAtom::GrammarMarker {
-                marker_id: MarkerId::EnRepeating,
-                ..
-            }
-        )
-    });
+    let repeating_index = clause.atoms[..operator_index]
+        .iter()
+        .rposition(is_english_in_order_lead);
     clause
         .atoms
         .iter()
@@ -1536,21 +1621,16 @@ fn sequence_marker_indices(
                                 && matches!(
                                     atom,
                                     ClauseAtom::GrammarMarker {
-                                        marker_id: MarkerId::JaSequenceTe | MarkerId::JaRepeat,
+                                        marker_id: MarkerId::JaSequenceTe
+                                            | MarkerId::JaRepeat
+                                            | MarkerId::JaShift,
                                         ..
                                     }
                                 )))
                 }
                 ResolvedInstructionLanguage::En => {
                     (first <= index && index <= last)
-                        || (operator_id == "in_order"
-                            && matches!(
-                                atom,
-                                ClauseAtom::GrammarMarker {
-                                    marker_id: MarkerId::EnRepeating,
-                                    ..
-                                }
-                            ))
+                        || (operator_id == "in_order" && is_english_in_order_lead(atom))
                 }
             };
             (sequence_marker
@@ -1590,7 +1670,8 @@ fn sequence_connectors_are_valid(
                 return false;
             };
             exact_markers(&[MarkerId::JaNo], last + 1, operator_index)
-                && sequence_suffix_is_exact(clause, operator_index, MarkerId::JaRepeat)
+                && (sequence_suffix_is_exact(clause, operator_index, MarkerId::JaRepeat)
+                    || sequence_suffix_is_exact(clause, operator_index, MarkerId::JaShift))
                 && color_indices.windows(2).all(|pair| {
                     exact_markers(&[], pair[0] + 1, pair[1])
                         && document.source()[clause.atoms[pair[0]].span().end_byte
@@ -1608,15 +1689,10 @@ fn sequence_connectors_are_valid(
             let Some(&first) = color_indices.first() else {
                 return false;
             };
-            let Some(repeating_index) = clause.atoms[..first].iter().rposition(|atom| {
-                matches!(
-                    atom,
-                    ClauseAtom::GrammarMarker {
-                        marker_id: MarkerId::EnRepeating,
-                        ..
-                    }
-                )
-            }) else {
+            let Some(repeating_index) = clause.atoms[..first]
+                .iter()
+                .rposition(is_english_in_order_lead)
+            else {
                 return false;
             };
             exact_markers(&[], repeating_index + 1, first)
@@ -1735,6 +1811,7 @@ struct AssociationRegion {
     continuities: Vec<SemanticTerm>,
     angles: Vec<SemanticTerm>,
     numeric_angles: Vec<crate::SemanticNumericAngle>,
+    fades: Vec<crate::SemanticFade>,
     surface_qualities: Vec<SemanticTerm>,
     surface_intensities: Vec<SemanticTerm>,
     unclassified_surfaces: Vec<SemanticTerm>,
@@ -2294,6 +2371,7 @@ fn build_semantic_entities(
         owned_occurrence_count += geometry_analysis.ranges.len();
         owned_occurrence_count += geometry_analysis.segments.len();
         owned_occurrence_count += geometry_analysis.angles.len();
+        owned_occurrence_count += geometry_analysis.fades.len();
         regions
             .entry(region_index)
             .or_default()
@@ -2319,6 +2397,11 @@ fn build_semantic_entities(
             .or_default()
             .numeric_angles
             .extend(geometry_analysis.angles);
+        regions
+            .entry(region_index)
+            .or_default()
+            .fades
+            .extend(geometry_analysis.fades);
         for geometry_issue in geometry_analysis.issues {
             let kind = match geometry_issue.kind {
                 GeometrySyntaxIssueKind::IncompleteGeometry => {
@@ -2861,6 +2944,11 @@ fn associate_fill_geometry_ownership(
                     ownership.insert(head.source().span, angle.source().span);
                 }
             }
+            for fade in &region.fades {
+                if within(fade.source().span) {
+                    ownership.insert(head.source().span, fade.source().span);
+                }
+            }
         }
     }
 }
@@ -3311,6 +3399,7 @@ fn associate_region(
                     .drain(..)
                     .map(OwnedSemanticOccurrence::NumericAngle),
             )
+            .chain(region.fades.drain(..).map(OwnedSemanticOccurrence::Fade))
             .chain(surface_occurrences)
             .chain(fluctuation_occurrences)
             .chain(proportion_occurrences)
@@ -3399,6 +3488,7 @@ fn associate_region(
                     .drain(..)
                     .map(OwnedSemanticOccurrence::NumericAngle),
             )
+            .chain(region.fades.drain(..).map(OwnedSemanticOccurrence::Fade))
             .chain(surface_occurrences)
             .chain(fluctuation_occurrences)
             .chain(proportion_occurrences)
@@ -3436,6 +3526,8 @@ fn associate_region(
     owned_region
         .numeric_angles
         .append(&mut region.numeric_angles);
+    // A fade belongs to the one shape of its sentence wherever it is written.
+    owned_region.fades.append(&mut region.fades);
     let occurrences = take_all_modifier_occurrences(&mut region);
     if !occurrences.is_empty() {
         issues.push(SemanticAssociationIssue {
@@ -3576,6 +3668,23 @@ fn associate_region(
         region_index,
         issues,
     );
+    // One fade is allowed, and any second one is a conflict.
+    let fade = if owned_region.fades.len() > 1 {
+        issues.push(SemanticAssociationIssue {
+            kind: SemanticAssociationIssueKind::ConflictingFades,
+            region_index,
+            occurrences: owned_region
+                .fades
+                .into_iter()
+                .map(OwnedSemanticOccurrence::Fade)
+                .collect(),
+            causal_provenance: SemanticIssueCausalProvenance::Unattributed,
+            upstream_diagnostic: None,
+        });
+        None
+    } else {
+        owned_region.fades.pop()
+    };
     // An angle word and an angle written in numbers each turn the marks, so one
     // of either is allowed and any second one is a conflict.
     let (angle, numeric_angle) = if owned_region.numeric_angles.is_empty() {
@@ -3726,6 +3835,7 @@ fn associate_region(
         continuity,
         angle,
         numeric_angle,
+        fade,
         surface: SemanticSurface { quality, intensity },
         fluctuation: SemanticFluctuation {
             spread,
@@ -3812,6 +3922,7 @@ fn take_all_modifier_occurrences(region: &mut AssociationRegion) -> Vec<OwnedSem
                 .drain(..)
                 .map(OwnedSemanticOccurrence::NumericAngle),
         )
+        .chain(region.fades.drain(..).map(OwnedSemanticOccurrence::Fade))
         .chain(surface_occurrences)
         .chain(fluctuation_occurrences)
         .chain(proportion_occurrences)
@@ -3873,6 +3984,13 @@ fn take_pre_head_region(
                 .into_iter()
                 .partition(|angle| ownership.owns(&head, angle.source().span));
             region.numeric_angles = remaining;
+            owned
+        },
+        fades: {
+            let (owned, remaining) = std::mem::take(&mut region.fades)
+                .into_iter()
+                .partition(|fade| ownership.owns(&head, fade.source().span));
+            region.fades = remaining;
             owned
         },
         surface_qualities: take_owned_terms(&mut region.surface_qualities, &head, ownership),
@@ -4276,6 +4394,7 @@ fn entity_occurrence_count(entity: &SemanticEntity) -> usize {
         + usize::from(entity.continuity.is_some())
         + usize::from(entity.angle.is_some())
         + usize::from(entity.numeric_angle.is_some())
+        + usize::from(entity.fade.is_some())
         + usize::from(entity.surface.quality.is_some())
         + usize::from(entity.surface.intensity.is_some())
         + usize::from(entity.fluctuation.amplitude.is_some())
@@ -4327,7 +4446,11 @@ pub(crate) fn semantic_sequence_value(
                 .iter()
                 .map(|item| semantic_identity_value(&item.identity))
                 .collect::<Vec<_>>(),
-            "kind": "cycle",
+            // A shift is new in DDL 23, so a repeating sequence keeps its bytes.
+            "kind": match sequence.progression {
+                SemanticSequenceProgression::Repeat => "cycle",
+                SemanticSequenceProgression::Shift => "shift",
+            },
             "operator": semantic_identity_value(&sequence.operator.identity),
             "target_instruction_index": target_instruction_index,
         }),
@@ -4471,6 +4594,10 @@ pub(crate) fn semantic_entity_value(entity: &SemanticEntity) -> Value {
             "numeric_angle".to_owned(),
             semantic_numeric_angle_value(angle),
         );
+    }
+    // Absent from older records, so an entity without a fade keeps its bytes.
+    if let Some(fade) = &entity.fade {
+        record.insert("fade".to_owned(), semantic_fade_value(fade));
     }
     record.insert(
         "proportion".to_owned(),
@@ -4671,6 +4798,11 @@ pub(crate) fn semantic_numeric_angle_value(angle: &crate::SemanticNumericAngle) 
     );
     record.insert("sense".to_owned(), Value::String("clockwise".to_owned()));
     Value::Object(record.into_iter().collect())
+}
+
+/// The meaning of a fade: the way the marks fade.
+pub(crate) fn semantic_fade_value(fade: &crate::SemanticFade) -> Value {
+    serde_json::json!({ "direction": fade.direction.as_str() })
 }
 
 fn semantic_decimal_value(decimal: crate::ExactDecimal) -> Value {

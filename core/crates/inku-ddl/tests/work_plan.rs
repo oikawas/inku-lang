@@ -546,8 +546,14 @@ fn numeric_places_and_sizes_print_where_the_compiler_reads_them() {
             (ResolvedInstructionLanguage::Ja, ja),
             (ResolvedInstructionLanguage::En, en),
         ] {
-            let source =
-                print_work_plan_with_numbers(&plan, language, &[], &[], &[], &[Some(written)]);
+            let source = print_work_plan_with_numbers(
+                &plan,
+                language,
+                &[],
+                &[],
+                &[],
+                &[Some(written.clone())],
+            );
             assert_eq!(source, expected, "{language:?}");
             assert!(
                 work_plan_source_compiles_cleanly(&source, language),
@@ -667,7 +673,7 @@ fn numeric_turns_cycles_and_polygons_print_where_the_compiler_reads_them() {
             NumericWriting {
                 place: range([0.0, 0.0, 1.0, 1.0]),
                 size: Some(NumericSize::Side { side: 0.142_857 }),
-                cycle: Some([inku_score::Color::White, inku_score::Color::Blue]),
+                cycle: Some(vec![inku_score::Color::White, inku_score::Color::Blue]),
                 ..NumericWriting::default()
             },
             "画面の横0〜1、縦0〜1の範囲に、白と青を交互にして、一辺0.142857の塗りの四角を49個敷き詰める。",
@@ -725,8 +731,14 @@ fn numeric_turns_cycles_and_polygons_print_where_the_compiler_reads_them() {
             (ResolvedInstructionLanguage::Ja, ja),
             (ResolvedInstructionLanguage::En, en),
         ] {
-            let source =
-                print_work_plan_with_numbers(&plan, language, &[], &[], &[], &[Some(written)]);
+            let source = print_work_plan_with_numbers(
+                &plan,
+                language,
+                &[],
+                &[],
+                &[],
+                &[Some(written.clone())],
+            );
             assert_eq!(source, expected, "{language:?}");
             assert!(
                 work_plan_source_compiles_cleanly(&source, language),
@@ -735,10 +747,10 @@ fn numeric_turns_cycles_and_polygons_print_where_the_compiler_reads_them() {
             let score = printed_score(&source, language);
             let instruction = &score.instructions[0];
             assert_eq!(instruction.rotation, written.turn, "{source}");
-            if let Some(cycle) = written.cycle {
+            if let Some(cycle) = &written.cycle {
                 assert_eq!(
-                    instruction.arrangement.as_ref().unwrap().color_cycle,
-                    cycle.to_vec(),
+                    &instruction.arrangement.as_ref().unwrap().color_cycle,
+                    cycle,
                     "{source}"
                 );
             }
@@ -746,6 +758,133 @@ fn numeric_turns_cycles_and_polygons_print_where_the_compiler_reads_them() {
                 assert_eq!(instruction.primitive, inku_score::Primitive::Polygon);
                 assert_eq!(instruction.sides, Some(sides), "{source}");
             }
+            scores.push(score);
+        }
+        assert_eq!(scores[0].instructions, scores[1].instructions, "{ja}");
+    }
+}
+
+/// The color stage writes colors of any number in turn, colors that shift and
+/// fades (DDL 23): two colors alternate, three or more repeat in order, colors
+/// that shift run once through the marks, and a fade follows the colors in
+/// Japanese and ends the English sentence. Each form compiles back to the
+/// Score's color cycle and fade in both languages.
+#[test]
+fn numeric_colors_and_fades_print_where_the_compiler_reads_them() {
+    use inku_ddl::FadeDirection;
+    use inku_score::Color::{Blue, Orange, Red, White, Yellow};
+    use inku_score::Fade;
+    let row = Some(NumericPlace::Segment {
+        from: [0.1, 0.5],
+        to: [0.9, 0.5],
+    });
+    let radius = Some(NumericSize::Radius { radius: 0.03 });
+    let circles =
+        |attributes: &[(WorkPlanSlot, &str)]| numeric_layer("circle", "line_up", 9, attributes);
+    let empty = [(WorkPlanSlot::Surface, "empty")];
+    let cases = [
+        (
+            circles(&empty),
+            NumericWriting {
+                place: row,
+                size: radius,
+                cycle: Some(vec![Red, Orange, Yellow]),
+                ..NumericWriting::default()
+            },
+            "画面の横0.1、縦0.5から横0.9、縦0.5まで、赤・橙・黄の順に繰り返して、半径0.03の空の円を9個並べる。",
+            "Line up 9 empty circles radius 0.03 from horizontal 0.1, vertical 0.5 to horizontal 0.9, vertical 0.5, repeating red, orange, and yellow in order.",
+            vec![Red, Orange, Yellow],
+            Fade::None,
+        ),
+        (
+            circles(&empty),
+            NumericWriting {
+                place: row,
+                size: radius,
+                cycle: Some(vec![Yellow, Orange, Red]),
+                shift: true,
+                ..NumericWriting::default()
+            },
+            "画面の横0.1、縦0.5から横0.9、縦0.5まで、黄・橙・赤の順に段々に移して、半径0.03の空の円を9個並べる。",
+            "Line up 9 empty circles radius 0.03 from horizontal 0.1, vertical 0.5 to horizontal 0.9, vertical 0.5, shifting through yellow, orange, and red in order.",
+            vec![
+                Yellow, Yellow, Yellow, Orange, Orange, Orange, Red, Red, Red,
+            ],
+            Fade::None,
+        ),
+        (
+            circles(&[
+                (WorkPlanSlot::Color, "red"),
+                (WorkPlanSlot::Surface, "empty"),
+            ]),
+            NumericWriting {
+                place: row,
+                size: radius,
+                fade: Some(FadeDirection::LeftToRight),
+                ..NumericWriting::default()
+            },
+            "画面の横0.1、縦0.5から横0.9、縦0.5まで、左から右へ薄れさせて、半径0.03の赤の空の円を9個並べる。",
+            "Line up 9 red empty circles radius 0.03 from horizontal 0.1, vertical 0.5 to horizontal 0.9, vertical 0.5, fading from left to right.",
+            Vec::new(),
+            Fade::Directional,
+        ),
+        (
+            circles(&empty),
+            NumericWriting {
+                place: row,
+                size: radius,
+                cycle: Some(vec![White, Blue]),
+                fade: Some(FadeDirection::Outward),
+                ..NumericWriting::default()
+            },
+            "画面の横0.1、縦0.5から横0.9、縦0.5まで、白と青を交互にして、中心から外へ薄れさせて、半径0.03の空の円を9個並べる。",
+            "Line up 9 empty circles radius 0.03 from horizontal 0.1, vertical 0.5 to horizontal 0.9, vertical 0.5, alternating white and blue, fading outward from the center.",
+            vec![White, Blue],
+            Fade::Outward,
+        ),
+        (
+            numeric_layer("point", "scatter", 30, &[]),
+            NumericWriting {
+                place: Some(NumericPlace::Range {
+                    bounds: [0.0, 0.0, 1.0, 1.0],
+                }),
+                cycle: Some(vec![Red, Orange, Yellow]),
+                fade: Some(FadeDirection::Outward),
+                ..NumericWriting::default()
+            },
+            "画面の横0〜1、縦0〜1の範囲に、赤・橙・黄の順に繰り返して、中心から外へ薄れさせて、点を30個散らす。",
+            "Scatter 30 points in the range horizontal 0 to 1, vertical 0 to 1, repeating red, orange, and yellow in order, fading outward from the center.",
+            vec![Red, Orange, Yellow],
+            Fade::Outward,
+        ),
+    ];
+    for (layer, written, ja, en, cycle, fade) in cases {
+        let plan = WorkPlan {
+            layers: vec![layer],
+            ..WorkPlan::default()
+        };
+        let mut scores = Vec::new();
+        for (language, expected) in [
+            (ResolvedInstructionLanguage::Ja, ja),
+            (ResolvedInstructionLanguage::En, en),
+        ] {
+            let source = print_work_plan_with_numbers(
+                &plan,
+                language,
+                &[],
+                &[],
+                &[],
+                &[Some(written.clone())],
+            );
+            assert_eq!(source, expected, "{language:?}");
+            assert!(
+                work_plan_source_compiles_cleanly(&source, language),
+                "{language:?}: {source}"
+            );
+            let score = printed_score(&source, language);
+            let arrangement = score.instructions[0].arrangement.as_ref().unwrap();
+            assert_eq!(arrangement.color_cycle, cycle, "{source}");
+            assert_eq!(arrangement.fade, fade, "{source}");
             scores.push(score);
         }
         assert_eq!(scores[0].instructions, scores[1].instructions, "{ja}");

@@ -1396,6 +1396,59 @@ impl ComposedPlan {
     }
 }
 
+/// The direction the AI refinement gives the laws stage of a saved work
+/// (2026-10-20): the laws it leaves out (the parent's, so that the child takes
+/// other laws), whether the cards are offered, and the author's sentence. Empty,
+/// the request is the one a description run sends.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LawsDirection {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exclude: Vec<String>,
+    #[serde(default, skip_serializing_if = "CardsOffer::is_as_usual")]
+    pub cards: CardsOffer,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+}
+
+/// Whether a refinement's request offers the cards (C1 to C6).
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CardsOffer {
+    /// As a description run offers them.
+    #[default]
+    AsUsual,
+    /// Offered, and the request invites one as the main law.
+    Invite,
+    /// Not offered.
+    None,
+}
+
+impl CardsOffer {
+    fn is_as_usual(&self) -> bool {
+        *self == Self::AsUsual
+    }
+}
+
+/// The longest direction sentence, in characters.
+pub const DIRECTION_NOTE_LIMIT: usize = 1000;
+
+impl LawsDirection {
+    /// Whether every law named is one of the laws and the sentence is within
+    /// [`DIRECTION_NOTE_LIMIT`]; `Err` names what is wrong.
+    pub fn validate(&self) -> Result<(), &'static str> {
+        if self.exclude.iter().any(|law| !LAWS.contains(&law.as_str())) {
+            return Err("unknown_law");
+        }
+        if self.note.as_ref().is_some_and(|note| {
+            note.trim().is_empty() || note.chars().count() > DIRECTION_NOTE_LIMIT
+        }) {
+            return Err("note");
+        }
+        Ok(())
+    }
+}
+
 /// What a work's layers allow, read from the composed document's Score.
 #[derive(Clone, Debug)]
 pub struct LawsContext {
@@ -1408,6 +1461,8 @@ pub struct LawsContext {
     summaries: Vec<LayerSummary>,
     /// The layer index of the plan's first layer: plugin sentences come first.
     first_plan_layer: usize,
+    /// The refinement's direction; empty in a description run.
+    direction: LawsDirection,
 }
 
 /// One of the nine colors as the request shows it: the lightness the
@@ -1513,7 +1568,22 @@ impl LawsContext {
             colors,
             summaries,
             first_plan_layer,
+            direction: LawsDirection::default(),
         })
+    }
+
+    /// The context with a refinement's direction: the laws it leaves out take
+    /// no layer, and the request says so.
+    #[must_use]
+    pub fn with_direction(mut self, direction: LawsDirection) -> Self {
+        self.direction = direction;
+        self
+    }
+
+    /// Whether the refinement's direction leaves a law out.
+    fn excluded(&self, law: &str) -> bool {
+        self.direction.exclude.iter().any(|left| left == law)
+            || (self.direction.cards == CardsOffer::None && REBUILD.contains(&law))
     }
 
     #[must_use]
@@ -1544,6 +1614,9 @@ impl LawsContext {
 
     /// The layers each law may take in this work (the prototype's narrowing).
     fn candidates(&self, law: &str) -> Vec<usize> {
+        if self.excluded(law) {
+            return Vec::new();
+        }
         let movable = self.movable();
         match law {
             "B1" | "B2" | "B3" | "B4" | "B7" | "B8" => movable,
@@ -2072,6 +2145,18 @@ const COUNT_RULE: [&str; 2] = [
     "## The rule of this answer (V2)\nChoose only one or two laws that support the main law. laws holds two or three laws, the main law included.",
 ];
 
+const ABSENT_MARK: [&str; 2] = [
+    "（この作品では当てる層が無い）",
+    " (no layer of this work can take it)",
+];
+const EXCLUDED_MARK: [&str; 2] = ["（この推敲では使わない）", " (not used in this refinement)"];
+const DIRECTION_HEAD: [&str; 2] = ["## 推敲の向き", "## The direction of this refinement"];
+const CARDS_INVITED: [&str; 2] = [
+    "カード（C1〜C6）を主の法則に選ぶことを考える。カードは層を作り直し、画を大きく変える。",
+    "Consider a card (C1 to C6) as the main law. A card rebuilds a layer and changes the picture a lot.",
+];
+const NOTE_HEAD: [&str; 2] = ["## 作者の方向性", "## The author's direction"];
+
 pub(crate) fn language_index(language: ResolvedInstructionLanguage) -> usize {
     match language {
         ResolvedInstructionLanguage::Ja => 0,
@@ -2106,6 +2191,20 @@ fn message(
     lines.push(heads[0].to_owned());
     lines.push(description.to_owned());
     lines.push(String::new());
+    // A refinement's direction (2026-10-20); a description run has none.
+    let offered = context.offered();
+    if context.direction.cards == CardsOffer::Invite
+        && REBUILD.iter().any(|card| offered.contains(card))
+    {
+        lines.push(DIRECTION_HEAD[at].to_owned());
+        lines.push(CARDS_INVITED[at].to_owned());
+        lines.push(String::new());
+    }
+    if let Some(note) = &context.direction.note {
+        lines.push(NOTE_HEAD[at].to_owned());
+        lines.push(note.trim().to_owned());
+        lines.push(String::new());
+    }
     lines.push(heads[1].to_owned());
     lines.push(LAYER_NOTE[at].to_owned());
     for summary in &context.summaries {
@@ -2124,30 +2223,21 @@ fn message(
     }
     lines.push(heads[3].to_owned());
     lines.push(AT_NOTE[at].to_owned());
-    let offered = context.offered();
     for (law, text) in &LAW_TEXTS {
-        let absent = !offered.contains(law);
+        let mark = if context.excluded(law) {
+            EXCLUDED_MARK[at]
+        } else if !offered.contains(law) {
+            ABSENT_MARK[at]
+        } else {
+            ""
+        };
         lines.push(match language {
-            ResolvedInstructionLanguage::Ja => format!(
-                "### {law} {}（{}）{}",
-                text.name[0],
-                text.family[0],
-                if absent {
-                    "（この作品では当てる層が無い）"
-                } else {
-                    ""
-                }
-            ),
-            ResolvedInstructionLanguage::En => format!(
-                "### {law} {} ({}){}",
-                text.name[1],
-                text.family[1],
-                if absent {
-                    " (no layer of this work can take it)"
-                } else {
-                    ""
-                }
-            ),
+            ResolvedInstructionLanguage::Ja => {
+                format!("### {law} {}（{}）{mark}", text.name[0], text.family[0])
+            }
+            ResolvedInstructionLanguage::En => {
+                format!("### {law} {} ({}){mark}", text.name[1], text.family[1])
+            }
         });
         let labels = match language {
             ResolvedInstructionLanguage::Ja => ["典拠: ", "法則: ", "選ぶもの: ", "例: "],
@@ -2716,7 +2806,12 @@ struct Answer {
     laws: BTreeMap<&'static str, Value>,
     /// The layers whose count the description itself writes.
     fixed: BTreeSet<usize>,
+    /// The reader's reason, kept to [`REASON_LIMIT`] characters.
+    reason: String,
 }
+
+/// The most characters of the reader's reason a work keeps.
+const REASON_LIMIT: usize = 2000;
 
 /// Read an answer and check it against the schema and the prototype's rules.
 /// `count_rule` checks that the laws are two or three (the request's V2 rule).
@@ -2733,6 +2828,13 @@ fn check(answer: &Value, context: &LawsContext, count_rule: bool) -> Result<Answ
                 format!("{law} in laws is not in the list of laws"),
             ));
         };
+        if context.excluded(known) {
+            return Err(refusal(
+                "excluded_law",
+                format!("{law} はこの推敲では使わない"),
+                format!("{law} is not used in this refinement"),
+            ));
+        }
         if !offered.contains(&known) {
             return Err(refusal(
                 "law_without_layer",
@@ -2966,6 +3068,12 @@ fn check(answer: &Value, context: &LawsContext, count_rule: bool) -> Result<Answ
         main_law,
         laws,
         fixed,
+        reason: answer["reason"]
+            .as_str()
+            .unwrap_or_default()
+            .chars()
+            .take(REASON_LIMIT)
+            .collect(),
     })
 }
 
@@ -4710,6 +4818,10 @@ pub struct Chosen {
     pub print: LawsPrint,
     /// The laws that name each layer of the Score.
     pub named: BTreeMap<usize, Vec<&'static str>>,
+    /// The values the answer gave each of its laws, as it wrote them.
+    pub values: BTreeMap<&'static str, Value>,
+    /// The reader's reason.
+    pub reason: String,
 }
 
 /// The record a work keeps of the layers its laws placed (2026-10-20): each
@@ -5559,6 +5671,8 @@ fn apply(
         notes: applied.notes,
         print,
         named,
+        values: answer.laws.clone(),
+        reason: answer.reason.clone(),
     })
 }
 

@@ -295,7 +295,7 @@ fn shown(text: &str, language: ResolvedInstructionLanguage) -> String {
 /// The joint a sentence's relation is, when it is one the composition writes: one
 /// of the five relations that join a shape to the previous one, to the previous
 /// shape itself (no end or path of it).
-fn written_joint(relation: &SemanticRelation) -> Option<JointKind> {
+pub(crate) fn written_joint(relation: &SemanticRelation) -> Option<JointKind> {
     if relation.reference != SemanticPreviousReference::PreviousOne
         || relation.target_endpoint.is_some()
         || relation.target_path_selection.is_some()

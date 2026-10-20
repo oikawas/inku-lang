@@ -12,6 +12,10 @@
 //! while every one of its sentences is in the instructions as written. A
 //! sentence the author changed is no longer the laws', and a work without a
 //! record is recomposed as before. The compiler never reads the record.
+//!
+//! Beside it a work keeps the basis of its laws ([`LawsBasis`], 2026-10-20):
+//! the composed document the laws were applied to and the answer, so that the
+//! AI refinement can apply other laws to the same composition.
 
 use serde::{Deserialize, Serialize};
 
@@ -83,6 +87,89 @@ impl TryFrom<RecordWire> for LawsLayerRecord {
         }
         Ok(Self {
             layers: wire.layers,
+        })
+    }
+}
+
+pub const LAWS_BASIS_SCHEMA_ID: &str = "inku.laws-basis.v1";
+
+/// What a work's laws were applied to and what they were (the AI refinement's
+/// laws move, 2026-10-20): the composed document before the laws, the digest
+/// of the document the run committed (after the color stage when it ran, the
+/// machine's `source_digest`), and the answer the laws were applied by. A host
+/// keeps it with the work beside the layers record and brings it back with a
+/// run from that work. The laws stage from a saved work reads the composed
+/// document only while the work's DDL is still the committed one.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(try_from = "BasisWire", into = "BasisWire")]
+pub struct LawsBasis {
+    pub composed: String,
+    pub committed_digest: String,
+    pub main_layer: usize,
+    pub main_law: String,
+    /// The laws of the answer and their values, as the answer wrote them.
+    pub laws: serde_json::Map<String, serde_json::Value>,
+    pub reason: String,
+}
+
+impl LawsBasis {
+    /// The laws the answer applied, the main one first.
+    #[must_use]
+    pub fn law_names(&self) -> Vec<&str> {
+        let mut names = vec![self.main_law.as_str()];
+        names.extend(
+            self.laws
+                .keys()
+                .map(String::as_str)
+                .filter(|law| *law != self.main_law),
+        );
+        names
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct BasisWire {
+    schema: String,
+    composed: String,
+    committed_digest: String,
+    main_layer: usize,
+    main_law: String,
+    laws: serde_json::Map<String, serde_json::Value>,
+    reason: String,
+}
+
+impl From<LawsBasis> for BasisWire {
+    fn from(basis: LawsBasis) -> Self {
+        Self {
+            schema: LAWS_BASIS_SCHEMA_ID.to_owned(),
+            composed: basis.composed,
+            committed_digest: basis.committed_digest,
+            main_layer: basis.main_layer,
+            main_law: basis.main_law,
+            laws: basis.laws,
+            reason: basis.reason,
+        }
+    }
+}
+
+impl TryFrom<BasisWire> for LawsBasis {
+    type Error = String;
+
+    fn try_from(wire: BasisWire) -> Result<Self, Self::Error> {
+        if wire.schema != LAWS_BASIS_SCHEMA_ID {
+            return Err(format!("unknown laws basis schema {}", wire.schema));
+        }
+        if wire.composed.trim().is_empty() || wire.main_law.is_empty() {
+            return Err("a laws basis has no composed document or main law".to_owned());
+        }
+        Ok(Self {
+            composed: wire.composed,
+            committed_digest: wire.committed_digest,
+            main_layer: wire.main_layer,
+            main_law: wire.main_law,
+            laws: wire.laws,
+            reason: wire.reason,
         })
     }
 }

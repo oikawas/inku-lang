@@ -94,8 +94,17 @@ colors to the tool takes the combination that recolors the main layer, then the
 most harmonious one. It prints the layers the colors change (a color, colors in turn
 or shifting, a fade, a handling, a numeric size, a kasane's lower colors before
 the layer) and compiles the printed document as the run compiles it before it
-is committed; the record of the laws follows the sentences printed again. Each result
-echoes action ID, attempt, and request
+is committed; the record of the laws follows the sentences printed again. A run
+that applies its laws keeps their basis in its snapshot (`laws_basis`: the
+composed document, the digest of the committed document, the answer), which a
+host saves with the work. The start `saved_laws` runs the laws stage from a
+saved work (the AI refinement's laws move): `laws_entry` reads the composed
+document the work keeps, or the DDL of a work without laws, back as the plan it
+was printed from, the run checks that the plan compiles to the same Score, asks
+for the laws with the refinement's direction (laws left out, the cards, the
+author's sentence), keeps the work's own lines where the laws changed nothing,
+and commits as a DDL edit; it stops with a reason rather than commit its base.
+Each result echoes action ID, attempt, and request
 digest. Retries preserve the logical action ID and increase its attempt; a new
 action receives a new identity. Corrective Stage 1 normalization is a new action
 because compiler feedback changes its payload and request digest. The host
@@ -113,6 +122,7 @@ provider attempt, but not a delay already accounted for by the core.
 | Laws answer refused by the core's rules | Request the laws again with the original message and the reason, using a new logical action within the same laws `max_attempts` and `total_timeout_ms` budget |
 | Laws answer whose printed mark at a numeric point leaves the canvas | Request the laws again with the reason that names the layer and its laws, within the same budget |
 | Laws exhausted, or a laws document that compiles to no Score or to more diagnostics or omissions than the composed document | Commit the composed document as the composition printed it (`laws_fallback`) |
+| The laws stage from a saved work cannot start, is exhausted, or prints a document that fails its check | Fail with the reason (`laws_basis_stale`, `laws_without_basis`, `not_faithful`, `no_law`, `laws_refused`, `laws_compile`, `laws_unavailable` and the others of SPEC §12.6.4); never commit the base unchanged |
 | Colors answer refused by the core's rules (its schema, a law it cannot take, a color not seen when drawn) | Request the colors again with the original message and the reason, using a new logical action within the same colors `max_attempts` and `total_timeout_ms` budget |
 | Colors exhausted, no law the work can take as the main one, or a colors document that does not compile to the colors chosen or compiles to more diagnostics or omissions than the document the laws left | Commit the document the laws left (`colors_fallback`) |
 | Hole completion exhausted or rejected | Keep committed DDL and require user editing |

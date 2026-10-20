@@ -1213,11 +1213,11 @@ fn english_series(words: &[String]) -> String {
 }
 
 /// The plan words a printed value came from, keyed by the semantic ID the
-/// compiler reads back, for the slots an alternate composition reads.
+/// compiler reads back, for the slots a plan writes in Saijiki words.
 fn plan_ids_by_semantic_id() -> &'static BTreeMap<WorkPlanSlot, BTreeMap<String, String>> {
     static TABLES: OnceLock<BTreeMap<WorkPlanSlot, BTreeMap<String, String>>> = OnceLock::new();
     TABLES.get_or_init(|| {
-        let mut tables = BTreeMap::new();
+        let mut tables: BTreeMap<WorkPlanSlot, BTreeMap<String, String>> = BTreeMap::new();
         for (slot, key) in [
             (WorkPlanSlot::Shape, "katachi"),
             (WorkPlanSlot::Proportion, "wariai"),
@@ -1226,11 +1226,26 @@ fn plan_ids_by_semantic_id() -> &'static BTreeMap<WorkPlanSlot, BTreeMap<String,
             (WorkPlanSlot::Color, "iro"),
             (WorkPlanSlot::Surface, "omote"),
             (WorkPlanSlot::LineUpDirection, "katamuki"),
+            (WorkPlanSlot::Tool, "tezawari"),
+            (WorkPlanSlot::Continuity, "tsuranari"),
+            (WorkPlanSlot::Angle, "katamuki"),
+            (WorkPlanSlot::Handling, "sabaki"),
+            (WorkPlanSlot::Ground, "ji"),
         ] {
-            let table: &mut BTreeMap<String, String> = tables.entry(slot).or_default();
+            let table = tables.entry(slot).or_default();
             for (canonical, term) in saijiki_terms(key) {
                 table.insert(canonical, term.id);
             }
+        }
+        for (canonical, term) in saijiki_terms("yuragi") {
+            let slot = match classify_fluctuation_dimension(&canonical) {
+                Some(FluctuationDimension::Amplitude) => WorkPlanSlot::MotionAmplitude,
+                Some(FluctuationDimension::Frequency) => WorkPlanSlot::MotionSpacing,
+                Some(FluctuationDimension::Quality) => WorkPlanSlot::MotionQuality,
+                Some(FluctuationDimension::Spread) => WorkPlanSlot::Bleeding,
+                None => continue,
+            };
+            tables.entry(slot).or_default().insert(canonical, term.id);
         }
         tables
     })
@@ -1256,6 +1271,74 @@ fn plan_size_id(value: CoreModifierValue) -> Option<String> {
                 .iter()
                 .any(|term| term.id == *id)
         })
+}
+
+/// The plan's thinness word for a parsed thinness (its English surface).
+fn plan_thinness_id(value: CoreModifierValue) -> Option<String> {
+    core_modifier_surface_forms(ResolvedInstructionLanguage::En)
+        .thinness
+        .iter()
+        .find(|(_, candidate)| *candidate == value)
+        .map(|(surface, _)| canonical_wire_id(surface))
+        .filter(|id| {
+            work_plan_vocabulary()
+                .terms(WorkPlanSlot::Thinness)
+                .iter()
+                .any(|term| term.id == *id)
+        })
+}
+
+/// The layer a compiled instruction was printed from, with every word a plan
+/// writes: [`composition_layer`]'s, and the tool, thinness, continuity,
+/// handling, angle, motion and bleeding words. The laws stage reads a saved
+/// work's instructions back with it (2026-10-20), so that a layer it changes
+/// is printed again with all of its words. `None` for an instruction a plan
+/// does not write, also one with a numeric size.
+#[must_use]
+pub fn plan_layer(instruction: &crate::SemanticInstruction) -> Option<WorkPlanLayer> {
+    let entity = &instruction.entity;
+    if entity.explicit_geometry.is_some()
+        || !entity.additional_explicit_geometries.is_empty()
+        || !entity.additional_width_extents.is_empty()
+    {
+        return None;
+    }
+    let mut layer = composition_layer(instruction)?;
+    for (slot, term) in [
+        (WorkPlanSlot::Tool, entity.touch.as_ref()),
+        (WorkPlanSlot::Continuity, entity.continuity.as_ref()),
+        (WorkPlanSlot::Angle, entity.angle.as_ref()),
+        (WorkPlanSlot::Handling, entity.surface.intensity.as_ref()),
+        (
+            WorkPlanSlot::MotionQuality,
+            entity.fluctuation.quality.as_ref(),
+        ),
+        (
+            WorkPlanSlot::MotionAmplitude,
+            entity.fluctuation.amplitude.as_ref(),
+        ),
+        (
+            WorkPlanSlot::MotionSpacing,
+            entity.fluctuation.frequency.as_ref(),
+        ),
+        (WorkPlanSlot::Bleeding, entity.fluctuation.spread.as_ref()),
+    ] {
+        if let Some(term) = term {
+            layer.attributes.insert(slot, plan_id(slot, term)?);
+        }
+    }
+    if let Some(thinness) = &entity.thinness {
+        layer
+            .attributes
+            .insert(WorkPlanSlot::Thinness, plan_thinness_id(thinness.value)?);
+    }
+    Some(layer)
+}
+
+/// The plan's ground word for a compiled ground sentence.
+#[must_use]
+pub fn plan_ground(ground: &crate::SemanticTerm) -> Option<String> {
+    plan_id(WorkPlanSlot::Ground, ground)
 }
 
 /// The layer a compiled instruction was printed from, limited to what the

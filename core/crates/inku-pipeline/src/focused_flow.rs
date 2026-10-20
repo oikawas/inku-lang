@@ -212,6 +212,7 @@ fn canonical_macro_crosses_owned_start_and_commit() {
                 source: "Example.Circle.".into(),
                 completion_ranges: None,
                 laws_layers: None,
+                laws_basis: None,
             },
         },
     );
@@ -239,6 +240,7 @@ fn a_saved_unit_of_the_retired_saijiki_waits_for_its_host_to_migrate_it() {
                 source: "place one red circle at center.".into(),
                 completion_ranges: None,
                 laws_layers: None,
+                laws_basis: None,
             },
         },
     );
@@ -306,6 +308,7 @@ fn a_saved_unit_of_the_retired_saijiki_waits_for_its_host_to_migrate_it() {
                     source: "Saved.Sway.".into(),
                     completion_ranges: None,
                     laws_layers: None,
+                    laws_basis: None,
                 },
             },
         );
@@ -332,6 +335,7 @@ fn unresolved_qualified_macro_blocks_without_stage2_completion() {
                 source: "Nature.若葉 を置く".into(),
                 completion_ranges: None,
                 laws_layers: None,
+                laws_basis: None,
             },
         },
     );
@@ -766,6 +770,7 @@ fn committed_ddl_and_approved_hole_patch_share_one_replayable_path() {
                 source: source.into(),
                 completion_ranges: None,
                 laws_layers: None,
+                laws_basis: None,
             },
         },
     );
@@ -1125,6 +1130,7 @@ fn committed_hole_with_local_diagnostics_still_requests_bounded_completion() {
                 source: "出力: 黒い背景に、粗筆の黒い四角を中心に置く。面: 粗く塗りつぶす。".into(),
                 completion_ranges: None,
                 laws_layers: None,
+                laws_basis: None,
             },
         },
     );
@@ -1176,6 +1182,7 @@ fn independent_hole_results_keep_valid_subset_without_retry_after_ack() {
                     source: source.into(),
                     completion_ranges: None,
                     laws_layers: None,
+                    laws_basis: None,
                 },
             },
         );
@@ -1608,6 +1615,7 @@ fn a_range_whose_words_changed_is_completed_again_and_recorded() {
                 source: completed.replace("the bottom right", "the top left"),
                 completion_ranges: Some(record.clone()),
                 laws_layers: None,
+                laws_basis: None,
             },
         },
     );
@@ -1694,6 +1702,7 @@ fn a_renamed_range_that_keeps_its_numbers_settles_without_approval() {
                 source: edited.clone(),
                 completion_ranges: Some(record),
                 laws_layers: None,
+                laws_basis: None,
             },
         },
     );
@@ -1786,6 +1795,7 @@ fn started_direct_ddl_in(
                 source: source.into(),
                 completion_ranges: None,
                 laws_layers: None,
+                laws_basis: None,
             },
         },
     );
@@ -3435,4 +3445,315 @@ fn the_colors_may_recolor_a_distant_layer_in_its_order() {
         .find(|line| line.contains(" squares side length "))
         .expect("the row of squares");
     assert!(row.contains("yellow"), "{source}");
+}
+
+/// A run of the laws stage from a saved work (the AI refinement's laws move,
+/// 2026-10-20) with the configuration of [`laws_start`].
+fn saved_laws_start(
+    source: &str,
+    direction: crate::laws::LawsDirection,
+    basis: Option<crate::laws_record::LawsBasis>,
+    record: Option<crate::laws_record::LawsLayerRecord>,
+) -> StepOutput {
+    let mut pipeline_config = config();
+    pipeline_config.composition = Some(CompositionConfig { read: false });
+    pipeline_config.laws = Some(LawsConfig {});
+    let start = envelope(
+        None,
+        PipelineInput::Start {
+            variation_id: "laws-move".into(),
+            authoring_nonce: "laws-move-1".into(),
+            config: Box::new(pipeline_config),
+            authority: VariationAuthorityState::new_direct_ddl(),
+            authoring: AuthoringInput::SavedLaws {
+                source: source.into(),
+                description: COMPOSED_DESCRIPTION.into(),
+                completion_ranges: None,
+                laws_layers: record,
+                laws_basis: basis,
+                direction,
+            },
+        },
+    );
+    run(None, &start)
+}
+
+/// The circle (the composed plan's layer 1) on a crossing of the thirds.
+fn thirds() -> serde_json::Value {
+    json!({"main_layer": 1, "main_law": "B3", "description_counts": [],
+           "laws": {"B3": {"targets": [{"layer": 1, "at": "point_lr"}]},
+                    "B21": {"targets": [{"layer": 1, "hand": "still"}]}},
+           "reason": "The circle rests on a crossing of the thirds."})
+}
+
+fn failed_reason(state: &PipelineSnapshot) -> &str {
+    match &state.phase {
+        PipelinePhase::Failed { reason } => reason,
+        phase => panic!("not failed: {phase:?}"),
+    }
+}
+
+#[test]
+fn the_laws_from_a_saved_work_print_what_a_description_run_printed() {
+    // A work without laws keeps the composed document as its DDL.
+    let asked = plan_answer(&laws_start(Some(LawsConfig {}))).snapshot;
+    let composed = asked.laws.as_ref().unwrap().document.source.clone();
+    let described = laws_answer(&asked, &two_laws());
+    let from_work =
+        saved_laws_start(&composed, crate::laws::LawsDirection::default(), None, None).snapshot;
+    let action = from_work.action.as_ref().unwrap();
+    assert_eq!(action.tag, "choose_laws");
+    // Without a direction the request is the description run's.
+    assert_eq!(
+        action.payload["prompt"],
+        asked.action.as_ref().unwrap().payload["prompt"]
+    );
+    let moved = laws_answer(&from_work, &two_laws());
+    assert_eq!(
+        committed_source(&moved.snapshot),
+        committed_source(&described.snapshot)
+    );
+    assert_eq!(moved.snapshot.laws_layers, described.snapshot.laws_layers);
+    // Both keep what the laws were applied to, and the move commits as a DDL edit.
+    for state in [&moved.snapshot, &described.snapshot] {
+        let basis = state.laws_basis.as_ref().expect("a laws basis");
+        assert_eq!(basis.composed, composed);
+        assert_eq!(basis.law_names(), vec!["B1", "B15"]);
+        let PipelinePhase::AwaitingVisibleDdlCommit { document, .. } = &state.phase else {
+            panic!("not committing: {:?}", state.phase);
+        };
+        assert_eq!(basis.committed_digest, document.source_digest());
+    }
+    assert_eq!(
+        event(&moved, "laws_chosen").unwrap()["reason"],
+        "“A red circle” leads the picture."
+    );
+    let PipelinePhase::AwaitingVisibleDdlCommit { authority, .. } = &moved.snapshot.phase else {
+        unreachable!();
+    };
+    assert_eq!(
+        authority.next_state.authority(),
+        AuthoringAuthority::DdlAuthoritative
+    );
+}
+
+#[test]
+fn the_laws_a_refinement_leaves_out_are_not_offered() {
+    let asked = plan_answer(&laws_start(Some(LawsConfig {}))).snapshot;
+    let composed = asked.laws.as_ref().unwrap().document.source.clone();
+    let direction = crate::laws::LawsDirection {
+        exclude: vec!["B15".into()],
+        cards: crate::laws::CardsOffer::None,
+        note: Some("Let the circle lead.".into()),
+    };
+    let from_work = saved_laws_start(&composed, direction, None, None).snapshot;
+    let prompt = &from_work.action.as_ref().unwrap().payload["prompt"];
+    let schema = &prompt["response_schema"]["properties"];
+    for law in ["B15", "C1", "C2"] {
+        assert!(schema["laws"]["properties"].get(law).is_none(), "{law}");
+        assert!(
+            !schema["main_law"]["enum"]
+                .as_array()
+                .unwrap()
+                .contains(&json!(law)),
+            "{law}"
+        );
+    }
+    let message = prompt["message"].as_str().unwrap();
+    assert!(
+        message.contains("## The author's direction\nLet the circle lead.\n"),
+        "{message}"
+    );
+    for law in ["B15", "C2"] {
+        let head = message
+            .lines()
+            .find(|line| line.starts_with(&format!("### {law} ")))
+            .unwrap();
+        assert!(head.ends_with(" (not used in this refinement)"), "{head}");
+    }
+    // An answer that names a law left out is asked again with the reason.
+    let refused = laws_answer(&from_work, &two_laws());
+    assert_eq!(
+        event(&refused, "retry_scheduled").expect("a retry")["detail"],
+        "excluded_law"
+    );
+}
+
+#[test]
+fn a_work_with_laws_takes_other_laws_on_the_composition_it_keeps() {
+    let asked = plan_answer(&laws_start(Some(LawsConfig {}))).snapshot;
+    let composed = asked.laws.as_ref().unwrap().document.source.clone();
+    let described = laws_answer(&asked, &two_laws());
+    let work = committed_source(&described.snapshot);
+    let saved = run(
+        Some(&described.snapshot),
+        &envelope(Some(&described.snapshot), ack(&described.snapshot)),
+    )
+    .snapshot;
+    let basis = saved.laws_basis.clone().expect("a laws basis");
+    let record = saved.laws_layers.clone();
+    assert!(record.is_some());
+    let direction = crate::laws::LawsDirection {
+        exclude: basis.law_names().into_iter().map(str::to_owned).collect(),
+        ..crate::laws::LawsDirection::default()
+    };
+    let from_work = saved_laws_start(
+        &work,
+        direction.clone(),
+        Some(basis.clone()),
+        record.clone(),
+    )
+    .snapshot;
+    // The laws are applied to the composed document, not to the work's DDL.
+    assert_eq!(from_work.laws.as_ref().unwrap().document.source, composed);
+    let moved = laws_answer(&from_work, &thirds());
+    let child = moved
+        .snapshot
+        .laws_basis
+        .clone()
+        .expect("the child's basis");
+    assert_eq!(child.composed, composed);
+    assert_eq!(child.main_law, "B3");
+    assert_ne!(committed_source(&moved.snapshot), work);
+    // A DDL changed after the laws (an edit, another layout) stops before a request.
+    let edited = saved_laws_start(&format!("{work}\n"), direction, Some(basis), record).snapshot;
+    assert_eq!(failed_reason(&edited), "laws_basis_stale");
+    assert!(edited.action.is_none());
+}
+
+#[test]
+fn a_work_with_laws_but_no_composition_kept_stops_with_the_reason() {
+    let asked = plan_answer(&laws_start(Some(LawsConfig {}))).snapshot;
+    let described = laws_answer(&asked, &two_laws());
+    let work = committed_source(&described.snapshot);
+    let stopped = saved_laws_start(
+        &work,
+        crate::laws::LawsDirection::default(),
+        None,
+        described.snapshot.laws_layers.clone(),
+    );
+    assert_eq!(failed_reason(&stopped.snapshot), "laws_without_basis");
+    assert!(stopped.snapshot.action.is_none());
+    assert_eq!(
+        event(&stopped, "failed").unwrap()["reason"],
+        "laws_without_basis"
+    );
+}
+
+#[test]
+fn a_saved_layer_reads_back_with_every_word_a_plan_writes() {
+    use inku_ddl::work_plan::{
+        WorkPlan, WorkPlanLayer, WorkPlanSlot, print_work_plan_composed_with_joints,
+        work_plan_vocabulary,
+    };
+    let word = |slot: WorkPlanSlot, at: usize| work_plan_vocabulary().terms(slot)[at].id.clone();
+    let mut layer = WorkPlanLayer {
+        shape: "line".into(),
+        proportion: None,
+        action: "draw".into(),
+        count: 3,
+        attributes: std::collections::BTreeMap::new(),
+    };
+    for slot in [
+        WorkPlanSlot::Color,
+        WorkPlanSlot::Tool,
+        WorkPlanSlot::Thinness,
+        WorkPlanSlot::Continuity,
+        WorkPlanSlot::Handling,
+        WorkPlanSlot::MotionQuality,
+        WorkPlanSlot::MotionAmplitude,
+        WorkPlanSlot::MotionSpacing,
+        WorkPlanSlot::Bleeding,
+    ] {
+        layer.attributes.insert(slot, word(slot, 0));
+    }
+    let limits = config().compiler.macro_limits().unwrap();
+    for language in [
+        inku_ddl::ResolvedInstructionLanguage::En,
+        inku_ddl::ResolvedInstructionLanguage::Ja,
+    ] {
+        let plan = WorkPlan {
+            ground: Some(word(WorkPlanSlot::Ground, 0)),
+            background: Some("white".into()),
+            plugins: Vec::new(),
+            layers: vec![layer.clone()],
+        };
+        let source = print_work_plan_composed_with_joints(&plan, language, &[], &[None], &[None]);
+        let read = crate::laws_entry::composed_plan_of(&source, language, &[], limits, &[])
+            .unwrap_or_else(|reason| panic!("{reason}: {source}"));
+        assert_eq!(read.plan, plan, "{source}");
+        assert_eq!(read.source(language, &[]), source);
+    }
+}
+
+#[test]
+fn the_lines_the_laws_did_not_change_keep_the_saved_words() {
+    let print = crate::laws::LawsPrint {
+        plan: inku_ddl::work_plan::WorkPlan::default(),
+        ranges: Vec::new(),
+        joints: Vec::new(),
+        numeric: Vec::new(),
+        changed: vec![1],
+        composed: vec![0, 1, 1, 2],
+    };
+    // The base writes its first and last layers in older words than the plan prints.
+    let base = "Fill the background with white.\nOld zero.\nOld one.\nOld two.";
+    let composed = "Fill the background with white.\nZero.\nOne.\nTwo.";
+    let printed = "Fill the background with white.\nZero.\nOne at a point.\nOne at another.\nTwo.";
+    assert_eq!(
+        crate::laws_entry::spliced(base, composed, 3, printed, &print).as_deref(),
+        Some(
+            "Fill the background with white.\nOld zero.\nOne at a point.\nOne at another.\nOld two."
+        )
+    );
+    // A line the laws did not change must be the plan's line of its layer.
+    let drifted =
+        "Fill the background with white.\nZero again.\nOne at a point.\nOne at another.\nTwo.";
+    assert_eq!(
+        crate::laws_entry::spliced(base, composed, 3, drifted, &print),
+        None
+    );
+}
+
+#[test]
+fn refused_laws_from_a_saved_work_stop_without_a_commit() {
+    let asked = plan_answer(&laws_start(Some(LawsConfig {}))).snapshot;
+    let composed = asked.laws.as_ref().unwrap().document.source.clone();
+    let mut state =
+        saved_laws_start(&composed, crate::laws::LawsDirection::default(), None, None).snapshot;
+    let mut last = None;
+    for _ in 0..2 {
+        let output = laws_answer(&state, &one_law());
+        state = output.snapshot.clone();
+        last = Some(output);
+    }
+    assert_eq!(failed_reason(&state), "laws_refused");
+    assert!(state.action.is_none() && state.laws_basis.is_none());
+    assert_eq!(
+        event(&last.unwrap(), "failed").unwrap()["detail"],
+        "law_count"
+    );
+}
+
+#[test]
+fn a_direct_ddl_run_gives_back_the_laws_basis_it_was_given() {
+    let asked = plan_answer(&laws_start(Some(LawsConfig {}))).snapshot;
+    let described = laws_answer(&asked, &two_laws());
+    let basis = described.snapshot.laws_basis.clone().expect("a laws basis");
+    let start = envelope(
+        None,
+        PipelineInput::Start {
+            variation_id: "layout".into(),
+            authoring_nonce: "layout-1".into(),
+            config: Box::new(config()),
+            authority: VariationAuthorityState::new_direct_ddl(),
+            authoring: AuthoringInput::DirectDdl {
+                source: committed_source(&described.snapshot),
+                completion_ranges: None,
+                laws_layers: described.snapshot.laws_layers.clone(),
+                laws_basis: Some(basis.clone()),
+            },
+        },
+    );
+    assert_eq!(run(None, &start).snapshot.laws_basis, Some(basis));
 }

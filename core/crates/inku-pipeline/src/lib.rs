@@ -15,6 +15,7 @@ mod hole_completion;
 pub mod identity;
 pub mod juxtaposition;
 pub mod laws;
+pub mod laws_entry;
 pub mod laws_record;
 pub mod machine;
 pub mod prompts;

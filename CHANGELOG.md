@@ -8,6 +8,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-20 — Android: choose whether a model is used for LLM or Vision in the settings
+
+As in Server's model administration, a connection's Model selection now has LLM and Vision toggles for each published model. The drawing model chooser and model inspection offer only the models used for LLM, and the Vision chooser of Juxtapose and Autonomous refinement only those used for Vision. A connection card shows its published models in an LLM row and a Vision row. A purpose a model gave no response to when measured cannot be chosen.
+
+### 2026-10-20 — Android: add Juxtapose to the work-editing menu
+
+Web's Juxtapose now reaches Android. It follows Change model in the work-editing menu: the AI picks four sentences from the descriptions of your other works, and choosing one adds it after this description and draws a child of the work. Which sentences are offered, the prompt, how an answer is checked and how the sentence is joined come from the shared core, so they follow the same rules as Web and Server. A work with no description does not offer it, and a work drawn from its DDL shows it disabled. The Vision model that picks is the one Autonomous refinement uses, and both now choose it as Web does: cards grouped by connection, with Vision stars and LLM and Vision purpose badges, and a model that cannot be chosen shown greyed.
+
 ### 2026-10-20 — macOS: Juxtapose in the work edit menu
 
 Web's Juxtapose comes to macOS as the last item of the Redraw from the description group: a Vision model picks four sentences from the author's other works, and the one chosen is added after the description to draw a child. Gathering the candidates, the prompt, checking the answer and joining the sentence call the shared core's `juxtaposition`, as Web and Server do; Swift keeps no copy. The candidates come from the macOS works (leaving out the trash, works kept only in a lineage, the DDL and demo labels, works whose comment holds `test data`, works held by their DDL and the work itself), at most Server's default of 400. The child's lineage record is Web's `juxtaposition` field, so the same sentence is not offered again further down the lineage. The bundled `ui-reference.json` is regenerated from Build 1294 (the history filter labels Starred, Revision and Shared now match Web).

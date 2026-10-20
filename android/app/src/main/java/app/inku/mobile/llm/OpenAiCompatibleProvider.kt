@@ -56,7 +56,7 @@ class OpenAiCompatibleProvider(
 internal object ProviderWireTransport {
     fun build(kind: String, providerId: String, baseUrl: String, request: ModelRequest): JSONObject {
         ProviderUrlValidator.validateRemoteBaseUrl(baseUrl)
-        val textRequest = request.pipelineAction == null || request.pipelineAction == REFINEMENT_VISION_ACTION
+        val textRequest = request.pipelineAction == null || isVisionTextAction(request.pipelineAction)
         val model = OpenAiCompatibleProvider.modelForRequest(providerId, request.modelId)
         val connection = JSONObject()
             .put("id", providerId)
@@ -119,7 +119,7 @@ internal object ProviderWireTransport {
                 connection.disconnect()
             }
             val response = SharedProviderWire.call(JSONObject()
-                .put("action", if (request.pipelineAction == null || request.pipelineAction == REFINEMENT_VISION_ACTION)
+                .put("action", if (request.pipelineAction == null || isVisionTextAction(request.pipelineAction))
                     "text_response" else "pipeline_response")
                 .put("format", built.getString("format"))
                 .put("status", http.status)

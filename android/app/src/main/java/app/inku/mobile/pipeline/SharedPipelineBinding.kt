@@ -28,6 +28,10 @@ interface SharedPipelineBinding {
     fun savedVariants(inputBytes: ByteArray): ByteArray =
         """{"error":"unavailable"}""".encodeToByteArray()
 
+    /** Juxtaposition's candidates, prompt and answer check are owned by the shared core. */
+    fun juxtaposition(inputBytes: ByteArray): ByteArray =
+        """{"error":"unavailable"}""".encodeToByteArray()
+
     /** Provider request and response semantics are owned by the shared core. */
     fun providerWire(inputBytes: ByteArray): ByteArray =
         """{"error":"unavailable"}""".encodeToByteArray()

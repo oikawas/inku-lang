@@ -10,6 +10,13 @@ import app.inku.mobile.ui.i18n.InkuStrings
 import app.inku.mobile.ui.i18n.UiLanguage
 import app.inku.mobile.ui.i18n.inkuError
 import app.inku.mobile.ui.i18n.messageFor
+import app.inku.mobile.ui.i18n.juxtaposeStrings
+import app.inku.mobile.data.refinement.SharedJuxtaposition
+import app.inku.mobile.data.refinement.juxtapositionMetadata
+import app.inku.mobile.llm.JuxtapositionException
+import app.inku.mobile.llm.JuxtapositionRequest
+import app.inku.mobile.llm.RefinementVisionImage
+import app.inku.mobile.pipeline.NativePipelineBridge
 import app.inku.mobile.ui.i18n.stringsFor
 import app.inku.mobile.data.InkuRepository
 import app.inku.mobile.data.db.HistoryItemEntity
@@ -105,6 +112,9 @@ const val DemoHistoryInputPrefix = "[demo] "
 internal fun sourceTextOf(item: HistoryItemEntity): String =
     (item.sourceText ?: item.originalInput).trim()
 
+/** 取り合わせ's child: the joined description, what its edge records, and the parent's 暴れる. */
+internal data class JuxtaposedDraw(val text: String, val metadata: Map<String, Any?>, val wild: Boolean)
+
 const val SETTING_KEY_MASCOT_KIND = "mascot_kind"
 const val SETTING_KEY_UI_LANGUAGE = "ui_lang"
 const val SETTING_KEY_UI_TEXT_SCALE = "ui_text_scale"
@@ -121,6 +131,24 @@ const val SETTING_KEY_DISPLAY_SAFE_MARGINS = "display_safe_margins"
  * `inku-wild` and states it on every fresh paint (`features/wild/render.ts`).
  */
 const val SETTING_KEY_RENDER_WILD = "render_wild"
+
+/**
+ * The purposes the author ticked per published model, as Server's
+ * `model_purposes`: `{"<connection>": {"<model id>": ["llm", "vision"]}}`.
+ */
+const val SETTING_KEY_MODEL_PURPOSES = "model_purposes"
+
+/** [SETTING_KEY_MODEL_PURPOSES] read back; anything unreadable is no tick at all. */
+internal fun parseModelPurposes(json: String?): Map<String, Map<String, List<String>>> = runCatching {
+    val root = JSONObject(json ?: "{}")
+    root.keys().asSequence().associateWith { provider ->
+        val models = root.getJSONObject(provider)
+        models.keys().asSequence().associateWith { model ->
+            val array = models.getJSONArray(model)
+            (0 until array.length()).map(array::getString).filter { it == "llm" || it == "vision" }
+        }
+    }
+}.getOrDefault(emptyMap())
 /** Said by every generating entry point that refuses while candidates are drawn. */
 val REFINEMENT_IN_PROGRESS: (InkuStrings) -> String = { it.refinementInProgress }
 /** Up to four explicitly chosen models, each used for both stages (SPEC §7.8). */
@@ -260,6 +288,8 @@ data class InkuUiState(
     /** Contextual work operations never replace the new-work draft. */
     val workContextId: String? = null,
     val workActionsTarget: HistoryItemEntity? = null,
+    /** Whether [workActionsTarget] is held by its DDL; null while it is read. */
+    val workActionsDescriptionLocked: Boolean? = null,
     val workSketchTarget: HistoryItemEntity? = null,
     val ddlEditorOpen: Boolean = false,
     val cameraCaptureState: CameraCaptureState = CameraCaptureState.Idle,
@@ -336,6 +366,9 @@ data class InkuUiState(
     val autonomousParent: HistoryItemEntity? = null,
     val autonomousSettings: AutonomousRefinementSettings = AutonomousRefinementSettings(),
     val autonomousStatus: AutonomousRefinementStatus = AutonomousRefinementStatus(),
+    val juxtaposition: JuxtapositionDialogState? = null,
+    /** [SETTING_KEY_MODEL_PURPOSES]: which published models serve LLM and which Vision. */
+    val modelPurposes: Map<String, Map<String, List<String>>> = emptyMap(),
 ) {
     /**
      * Whether any operation is running.
@@ -347,7 +380,8 @@ data class InkuUiState(
      * DDL editor's draw; `refinementBusy` covers the lineage's refinement and
      * the model and language comparisons.
      */
-    val isRunning: Boolean get() = isDrawing || refinementBusy || replayBusy || replaySaving || autonomousStatus.busy || cameraCaptureState.locksCameraInteraction
+    val isRunning: Boolean get() = isDrawing || refinementBusy || replayBusy || replaySaving || autonomousStatus.busy ||
+        juxtaposition?.busy == true || cameraCaptureState.locksCameraInteraction
 }
 
 private data class CameraDrawRunInput(
@@ -515,6 +549,7 @@ class InkuViewModel @JvmOverloads constructor(
     private var canvasSearchJob: Job? = null
     private var replayJob: Job? = null
     private var autonomousJob: Job? = null
+    private var juxtapositionJob: Job? = null
     private var refinementSaving = false
     private var replaySerial = 0L
     private var canvasSearchSerial = 0L
@@ -1611,7 +1646,14 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun openWorkActions(item: HistoryItemEntity) {
         if (state.value.isRunning || item.trashed) return
-        localState.value = localState.value.copy(workActionsTarget = item)
+        localState.value = localState.value.copy(workActionsTarget = item, workActionsDescriptionLocked = null)
+        // 取り合わせ is held while the lock is read, so a DDL-led work never offers it.
+        viewModelScope.launch {
+            val locked = runCatching { withContext(Dispatchers.IO) { repository.isDescriptionLocked(item) } }.getOrNull()
+            if (localState.value.workActionsTarget?.id == item.id) {
+                localState.value = localState.value.copy(workActionsDescriptionLocked = locked)
+            }
+        }
     }
 
     fun closeWorkActions() {
@@ -2282,14 +2324,16 @@ class InkuViewModel @JvmOverloads constructor(
         startSketchRedraw(item, SketchMode.On, supplied)
     }
 
-    private fun startSketchRedraw(item: HistoryItemEntity, mode: SketchMode, suppliedText: String?) {
+    /** Also draws 取り合わせ's child: [juxtaposed] carries its longer description. */
+    private fun startSketchRedraw(item: HistoryItemEntity, mode: SketchMode, suppliedText: String?,
+                                  juxtaposed: JuxtaposedDraw? = null) {
         val description = sourceTextOf(item)
         if (item.lineageNodeId.isNullOrEmpty() || description.isBlank()) return
         val before = state.value
         if (before.isDrawing || before.refinementBusy) return
         applyHistorySelection(item, AppTab.Lineage)
         val current = localState.value.copy(
-            prompt = description,
+            prompt = juxtaposed?.text ?: description,
             sketchMode = mode,
             selectedCatalogId = item.colorCatalogId,
             selectedCanvasAspect = item.canvasAspect,
@@ -2305,7 +2349,7 @@ class InkuViewModel @JvmOverloads constructor(
             localState.value = current.copy(message = message)
             return
         }
-        runSubmit(current, sketchRedraw = true, suppliedSketchText = suppliedText)
+        runSubmit(current, sketchRedraw = true, suppliedSketchText = suppliedText, juxtaposed = juxtaposed)
     }
 
     /**
@@ -2707,7 +2751,8 @@ class InkuViewModel @JvmOverloads constructor(
         return text != sourceTextOf(parent)
     }
 
-    private fun runSubmit(current: InkuUiState, cameraProvenance: CameraInputProvenance? = null, sketchRedraw: Boolean = false, suppliedSketchText: String? = null) {
+    private fun runSubmit(current: InkuUiState, cameraProvenance: CameraInputProvenance? = null, sketchRedraw: Boolean = false,
+                          suppliedSketchText: String? = null, juxtaposed: JuxtaposedDraw? = null) {
         if (current.autonomousStatus.busy || current.replayBusy || current.replaySaving) return
         if (current.descriptionLocked && !current.historyAuthorityLoading) {
             // Said rather than ignored: the button looks the same either way.
@@ -2726,6 +2771,16 @@ class InkuViewModel @JvmOverloads constructor(
         // Read before the coroutine starts: the first thing it does is clear
         // `selectedHistory` (below), so a parent read from inside would be gone.
         val declared = when {
+            juxtaposed != null -> {
+                val parent = requireNotNull(lineageParent(current))
+                LineageDeclaration(
+                    parentNodeId = parent.lineageNodeId,
+                    derivationKind = SubmitDerivationKind.DESCRIPTION_EDIT,
+                    // Web's description edit with `juxtapositionMetadata`: the
+                    // lineage reads `sentence` back to leave it out next time.
+                    derivationMetadata = mapOf("edited_from_history_id" to parent.id) + juxtaposed.metadata,
+                )
+            }
             sketchRedraw -> {
                 val parent = requireNotNull(lineageParent(current))
                 LineageDeclaration(
@@ -2743,6 +2798,8 @@ class InkuViewModel @JvmOverloads constructor(
         }
         val sketchInput = when {
             suppliedSketchText != null -> SketchInput(text = suppliedSketchText)
+            // The description changed, so its 写生 is asked for again at the parent's mode.
+            juxtaposed != null -> describeSketchInput(current, forceFresh = true)
             cameraProvenance == null -> describeSketchInput(current, forceFresh = sketchRedraw)
             // A camera description is a new root; it follows the 写生 setting.
             else -> SketchInput(requested = current.sketchMode == SketchMode.On)
@@ -2811,7 +2868,8 @@ class InkuViewModel @JvmOverloads constructor(
                         sketch = sketchInput,
                         parentHistoryId = descriptionParent?.id,
                         inputProvenance = cameraProvenance,
-                        renderWild = current.renderWild,
+                        // 取り合わせ follows its parent work's 暴れる, as on Web.
+                        renderWild = juxtaposed?.wild ?: current.renderWild,
                         onPerformanceSaved = {
                             withContext(Dispatchers.Main.immediate) { descriptionPerformanceSaved(runId) }
                         },
@@ -3920,6 +3978,117 @@ class InkuViewModel @JvmOverloads constructor(
         }
     }
 
+    /**
+     * 取り合わせ (SPEC §7.8). The Vision model is the autonomous refinement's:
+     * choosing one here chooses it there too, as Web saves the settings' Vision
+     * model. Android keeps no such setting, so it lasts while the app runs.
+     */
+    fun openJuxtaposition(item: HistoryItemEntity) {
+        val current = localState.value
+        if (state.value.isRunning || item.trashed || sourceTextOf(item).isBlank() ||
+            current.workActionsDescriptionLocked != false) return
+        val models = autonomousVisionModelIds(state.value)
+        val settings = current.autonomousSettings
+        localState.value = current.copy(
+            workActionsTarget = null,
+            juxtaposition = JuxtapositionDialogState(item),
+            autonomousSettings = if (settings.modelId in models || models.isEmpty()) settings
+                else settings.copy(modelId = models.first()),
+        )
+    }
+
+    fun selectJuxtapositionModel(modelId: String) {
+        if (localState.value.juxtaposition?.busy != false) return
+        localState.value = localState.value.copy(autonomousSettings = localState.value.autonomousSettings.copy(modelId = modelId))
+    }
+
+    fun chooseJuxtaposition(index: Int) {
+        val dialog = localState.value.juxtaposition ?: return
+        if (dialog.busy || dialog.result?.choices?.getOrNull(index) == null) return
+        localState.value = localState.value.copy(juxtaposition = dialog.copy(chosen = index))
+    }
+
+    fun stopJuxtaposition() {
+        juxtapositionJob?.cancel()
+    }
+
+    fun closeJuxtaposition() {
+        if (localState.value.juxtaposition?.busy == true) return
+        localState.value = localState.value.copy(juxtaposition = null)
+    }
+
+    /**
+     * Four sentences from the author's other works (Server's `api_juxtaposition`).
+     * 選び直す asks again leaving out every sentence this dialog has shown.
+     */
+    fun askJuxtaposition() {
+        val current = localState.value
+        val dialog = current.juxtaposition ?: return
+        if (state.value.isRunning) return
+        val item = dialog.target
+        val modelId = current.autonomousSettings.modelId
+        if (modelId !in autonomousVisionModelIds(state.value)) return
+        val texts = juxtaposeStrings(current.uiLanguage)
+        val language = current.uiLanguage.code
+        localState.value = current.copy(juxtaposition = dialog.copy(busy = true, startedAtMs = System.currentTimeMillis(), error = null))
+        juxtapositionJob = viewModelScope.launch {
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    val inputs = repository.juxtapositionInputs(item)
+                    // The model reads the description without its labels; the
+                    // child keeps them, so each pick is joined to the stored text.
+                    val written = sourceTextOf(item)
+                    val description = NativePipelineBridge.pipelineDescription(written).trim()
+                    require(description.isNotEmpty()) { "juxtaposition source has no description" }
+                    val candidates = SharedJuxtaposition.gather(inputs.sources, description, inputs.lineage,
+                        inputs.added, dialog.shown, kotlin.random.Random.nextLong().toULong())
+                    if (candidates.length() < SharedJuxtaposition.CHOICES) {
+                        throw JuxtapositionException("not enough candidate sentences", tooFew = true)
+                    }
+                    val png = RefinementVisionImage.fromSvg(item.displaySvg)
+                    currentCoroutineContext().ensureActive()
+                    repository.juxtapose(JuxtapositionRequest(
+                        modelId = modelId, description = description, written = written, lineage = inputs.lineage,
+                        candidates = candidates, languageCode = language, imagePng = png))
+                }
+                currentCoroutineContext().ensureActive()
+                val latest = localState.value.juxtaposition ?: return@launch
+                localState.value = localState.value.copy(juxtaposition = latest.copy(
+                    result = result, chosen = null, shown = latest.shown + result.choices.map { it.sentence }))
+            } catch (error: Exception) {
+                val message = when {
+                    error is CancellationException -> strings().statusStopped
+                    error is JuxtapositionException && error.tooFew -> texts.tooFew
+                    error is JuxtapositionException -> texts.unusable(error.message.orEmpty())
+                    else -> messageFor(error, strings(), texts.failed)
+                }
+                localState.value.juxtaposition?.let {
+                    localState.value = localState.value.copy(juxtaposition = it.copy(error = message))
+                }
+            } finally {
+                localState.value.juxtaposition?.let {
+                    localState.value = localState.value.copy(juxtaposition = it.copy(busy = false))
+                }
+            }
+        }
+    }
+
+    /**
+     * Draws the chosen description as a child of the work, as the sketch
+     * redraw does: the dialog closes and the lineage shows the run and its stop.
+     */
+    fun drawJuxtaposition() {
+        val dialog = localState.value.juxtaposition ?: return
+        if (dialog.busy || state.value.isRunning) return
+        val choice = dialog.choice ?: return
+        val result = dialog.result ?: return
+        val item = dialog.target
+        localState.value = localState.value.copy(juxtaposition = null)
+        enterWorkContext(item)
+        startSketchRedraw(item, Sketches.modeOfWork(item.sketchState, item.sketchGrain), suppliedText = null,
+            juxtaposed = JuxtaposedDraw(choice.joined, juxtapositionMetadata(choice, result), item.drawnWild))
+    }
+
     /** Puts a candidate on the canvas without saving it. */
     fun previewRefinementCandidate(candidateId: String) {
         val current = localState.value
@@ -4387,6 +4556,7 @@ class InkuViewModel @JvmOverloads constructor(
             batchPromptHistory = batchHistory,
             batchRetryLimit = settings["batch_retry_limit"]?.let { JSONObject(it).optInt("value", 0).coerceIn(0, 5) } ?: 0,
             refinementElement = refinementElement,
+            modelPurposes = parseModelPurposes(settings[SETTING_KEY_MODEL_PURPOSES]),
             includeThinking = thinking,
             selectedModelId = restoredUnifiedModel,
             selectedStage2ModelId = restoredUnifiedModel,
@@ -4435,6 +4605,22 @@ class InkuViewModel @JvmOverloads constructor(
      * message written after the switch come out in the new language.
      */
     private fun strings(): InkuStrings = stringsFor(localState.value.uiLanguage)
+
+    /**
+     * The purposes ticked in a connection's model picker (Server's
+     * `model_purposes`). They replace that connection's earlier ticks; a model
+     * with neither ticked is not published, so it is not kept here.
+     */
+    fun saveModelPurposes(providerId: String, purposes: Map<String, List<String>>) {
+        val kept = purposes.filterValues { it.isNotEmpty() }
+        val next = localState.value.modelPurposes - providerId + (providerId to kept)
+        localState.value = localState.value.copy(modelPurposes = next)
+        val json = JSONObject()
+        next.forEach { (provider, models) ->
+            json.put(provider, JSONObject().apply { models.forEach { (model, list) -> put(model, JSONArray(list)) } })
+        }
+        persistSetting(SETTING_KEY_MODEL_PURPOSES, json.toString())
+    }
 
     private fun persistSetting(key: String, valueJson: String) {
         viewModelScope.launch {

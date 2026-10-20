@@ -4,7 +4,29 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-10-18.
+Last updated: 2026-10-20.
+
+## 2026-10-20 Choosing LLM and Vision use in the model settings
+
+At the author's instruction, as in Server's model administration, each connection's Model selection now lets the author choose whether a published model is used for LLM, for Vision, or both.
+
+- Each model row in Model selection has LLM and Vision toggles. They start at the purposes chosen before, or the catalog's when none were chosen. A purpose the model gave no response to when measured cannot be pressed, and the reason shows below. Turning both off unpublishes the model and turning one on publishes it (Web's `toggleModelPurpose`); checking a model whose purposes are empty restores the catalog's.
+- The choice is kept in the app setting `model_purposes` (`{"<connection>": {"<model id>": ["llm", "vision"]}}`); the database schema is unchanged. The ChatGPT plan's published models are kept the same way under `chatgpt`.
+- A connection card shows its published models in an LLM row and a Vision row, as Server's summary does; a model used for both appears in both. The on-device connection keeps its single row.
+- The purposes shape the lists: the drawing model chooser and model inspection offer the models used for LLM (Server's `drawing_catalog`), and the Vision chooser of Juxtapose and Autonomous refinement the models used for Vision (`vision_catalog`); the Vision cards' purpose badges follow the same choice. The camera's model chooser reads photos and stays unfiltered. On-device models carry no purposes and are unchanged.
+
+## 2026-10-20 Juxtapose in the work-editing menu
+
+At Serverセッション-claude's request, Web's Juxtapose (root `SPEC.md` §7.8) now reaches Android. It waited, by the author's decision, until its rules were in the shared core (plan `android-task/juxtapose-20261019`). Which sentences are offered, the prompt, how an answer is checked and how the chosen sentence is joined belong to the core's `inku.juxtaposition.v1` (`inku-pipeline/src/juxtaposition.rs`). Android decides which works lend a sentence, sends the work's image to Vision and draws the child.
+
+- Menu: Juxtapose follows Change model in the work-editing menu. A work with an empty description (drawn straight from DDL) does not show it. A work drawn from its DDL (description-locked) shows it disabled with the reason below; the lock is read when the menu opens, and the entry stays disabled until it is known.
+- Sources: the device's works, leaving out those in the trash, those kept only in a lineage, those with an empty description, those starting with `[demo] `, description-locked ones and the work itself. Labels (a leading number and a bracketed note) are removed by the shared `pipelineDescription`. Android keeps no display label or comment, so Server's "DDL" label is the empty description, its "[demo]" label is the input's prefix, and no "test data" comment is read. The lineage's descriptions from its root to the work and the sentences its edges record (`juxtaposition.sentence`) go along for the core to leave out. At most 400 (Server's default) are offered, with no setting. The seed is a fresh 64-bit random number per request, sent as a decimal string.
+- Asking: the work's image becomes a 768×768 PNG and goes to Vision with the core's prompt (temperature 0.35, at most 1200 tokens, action `juxtaposition_vision`). An answer the core refuses is sent back once with the reason; a second refusal is an error. Fewer than four candidates send nothing. The answer is checked against the stored description with its labels, so that the child keeps the author's labels.
+- Dialog: laid out as on Web: the description, the Vision model that picks, "Four picked from {count} sentences" with each sentence and reason, and, once one is chosen, the description with the sentence. While waiting it shows the elapsed time and Stop. Pick again asks again leaving out every sentence the dialog has shown. The Vision model is the one Autonomous refinement uses; choosing it in either place changes both, and it lasts while the app runs. The wording is Web's `juxtapose*` keys in both languages.
+- Vision model chooser: Juxtapose and Autonomous refinement use a chooser shaped like Web's `ModelCardPicker` (`purpose="vision"`), replacing the plain drop-down at the author's instruction. The button names the chosen model and its connection, or says "Not in the list". Opening it lists cards under each connection's heading: selectable models first, then by Vision recommendation, then by name. Each card shows the Vision stars, the model's labels, the LLM and Vision purpose badges (a purpose it cannot be chosen for, not offered or measured not to answer, greyed out) and the catalog's figures. A model with a label that keeps it from publication, or one that answers neither purpose, is shown greyed and cannot be chosen. The models are the published ones offered for Vision, as Server's `vision_catalog`; on-device models are not among them.
+- Drawing: Draw with this description closes the dialog and draws the child with the lineage on screen, as the sketch redraw does; the lineage's running row shows the progress and Stop. Web keeps its dialog open while it draws. `derivation_kind` is `description_edit`; the metadata is `edited_from_history_id` and the same `juxtaposition` field as Web's `juxtapositionMetadata` (`sentence`, `history_ids`, `rank`, `reason`, `position`, `candidates`, `model`). Wildness, colour catalog, canvas and sketch state are the parent's; the description changed, so its sketch is asked for again.
+- Tests: the shared table `server/tests/data/juxtaposition-cases.json` — its 36 same, join, gather, check and prompt rows — crosses Android's call into the production core. Its 13 first_sentence and language rows have no action of their own; the core uses them inside gather.
+- The database schema is unchanged.
 
 ## 2026-10-18 Random autonomous refinement retired
 

@@ -5,6 +5,11 @@ import org.json.JSONException
 import org.json.JSONObject
 
 internal const val REFINEMENT_VISION_ACTION = "refinement_vision_advice"
+internal const val JUXTAPOSITION_VISION_ACTION = "juxtaposition_vision"
+
+/** The requests that show a Vision model the work's PNG and read back plain text. */
+internal fun isVisionTextAction(action: String?): Boolean =
+    action == REFINEMENT_VISION_ACTION || action == JUXTAPOSITION_VISION_ACTION
 
 data class RefinementVisionRequest(
     val modelId: String,

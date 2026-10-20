@@ -42,7 +42,7 @@ internal data class ModelImage(val bytes: ByteArray, val mimeType: String)
 /** Select one image with its actual wire type; camera JPEG remains unchanged. */
 internal fun ModelRequest.imagePayload(): ModelImage? {
     require(imageJpeg == null || imagePng == null) { "Only one model image is allowed" }
-    if (pipelineAction == REFINEMENT_VISION_ACTION) {
+    if (isVisionTextAction(pipelineAction)) {
         val png = requireNotNull(imagePng) { "Refinement advice needs a PNG." }
         RefinementVisionImage.requirePng768(png)
         return ModelImage(png, "image/png")

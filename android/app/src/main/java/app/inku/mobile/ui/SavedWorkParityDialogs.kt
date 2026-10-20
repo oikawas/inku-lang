@@ -21,8 +21,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
@@ -33,10 +31,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
@@ -213,7 +208,7 @@ private fun ReplayComparisonPane(svg: String, title: String, version: String?, u
 internal fun AutonomousRefinementDialog(
     settings: AutonomousRefinementSettings,
     status: AutonomousRefinementStatus,
-    models: List<ParityModelChoice>,
+    models: List<VisionModelGroup>,
     language: UiLanguage,
     onSettings: (AutonomousRefinementSettings) -> Unit,
     onStart: () -> Unit,
@@ -223,8 +218,7 @@ internal fun AutonomousRefinementDialog(
     val s = savedWorkParityStrings(language)
     val busy = status.busy
     val canStart = !busy && settings.generations in 1..10 && settings.allowedKinds.isNotEmpty() &&
-        models.any { it.id == settings.modelId }
-    var modelMenuOpen by remember { mutableStateOf(false) }
+        models.any { group -> group.models.any { it.id == settings.modelId && !isModelUnselectable(it.catalog) } }
     Dialog(
         onDismissRequest = { if (!busy) onDismiss() },
         properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = !busy, dismissOnClickOutside = !busy),
@@ -245,23 +239,9 @@ internal fun AutonomousRefinementDialog(
                     Text(s.vision, style = MaterialTheme.typography.titleSmall)
                     Text(s.visionHint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     run {
-                        Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
-                            Text(s.visionModel,
-                                style = MaterialTheme.typography.labelMedium)
-                            OutlinedButton(onClick = { modelMenuOpen = true }, enabled = !busy && models.isNotEmpty(),
-                                modifier = Modifier.fillMaxWidth().testTag("AutonomousVisionModel")) {
-                                Text(models.firstOrNull { it.id == settings.modelId }?.let { "${it.label} · ${it.provider}" }
-                                    ?: s.chooseModel, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            }
-                            DropdownMenu(expanded = modelMenuOpen && !busy, onDismissRequest = { modelMenuOpen = false }) {
-                                models.forEach { model ->
-                                    DropdownMenuItem(text = { Text("${model.label} · ${model.provider}") }, onClick = {
-                                        modelMenuOpen = false
-                                        onSettings(settings.copy(modelId = model.id))
-                                    })
-                                }
-                            }
-                        }
+                        VisionModelPicker(label = s.visionModel, selectedModelId = settings.modelId, groups = models,
+                            enabled = !busy, onSelect = { onSettings(settings.copy(modelId = it)) },
+                            modifier = Modifier.testTag("AutonomousVisionModel"))
                         OutlinedTextField(value = settings.direction, onValueChange = { onSettings(settings.copy(direction = it.take(160))) },
                             label = { Text(s.directionLabel) },
                             placeholder = { Text(s.directionPlaceholder) },

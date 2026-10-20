@@ -255,6 +255,9 @@ def _recompose(
         "config": config, "source": source, "mode": mode, "seed": str(seed),
         "work_id": "sha256:" + hashlib.sha256(source.encode("utf-8")).hexdigest(),
     }
+    if source_work.get("laws_layers") is not None:
+        # The layers the work's laws stage placed stay; the others move (2026-10-20).
+        request["laws_layers"] = source_work["laws_layers"]
     try:
         output = native(json.dumps(request, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
     except Exception:

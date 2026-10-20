@@ -36,17 +36,19 @@ use inku_ddl::work_plan::{
     composition_layer,
 };
 use inku_ddl::{
-    CompilerLockState, MacroDefinition, MacroExpansionLimits, MacroLock, NormalizedDdlDocument,
-    ResolvedInstructionLanguage, SemanticHead, SemanticInstruction, SemanticPreviousReference,
+    CompilerLockState, ExactFraction, MacroDefinition, MacroExpansionLimits, MacroLock,
+    NormalizedDdlDocument, ResolvedInstructionLanguage, SemanticExplicitGeometry,
+    SemanticGeometryValue, SemanticHead, SemanticInstruction, SemanticPreviousReference,
     SemanticRelation, SemanticRelationKind, compile_typed_ddl,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::composition::{
     self, Joint, JointKind, OtherAnswer, chance_answer, chance_joined_answer, check_joints,
-    corner_place, default_reading, fixed_region, is_composition_range, other_answer,
-    other_joined_answer, region_key, region_of_bounds, written_range,
+    corner_place, default_reading, fixed_region, is_composition_range, mark_side, other_answer,
+    other_joined_answer, pinned_answer, region_key, region_of_bounds, written_range,
 };
+use crate::laws_record::{LawsLayerRecord, applying};
 
 pub const RECOMPOSITION_SCHEMA_ID: &str = "inku.composition-recompose.v1";
 
@@ -99,6 +101,110 @@ struct ReadLayer {
     current: Option<usize>,
     /// The bounds its range writes (left, top, right, bottom), when it has one.
     bounds: Option<[(u64, u64); 4]>,
+    /// The boxes its marks are in, when it stays where it is drawn: a layer the
+    /// laws placed, a partner a law placed another layer by, or a layer joined
+    /// to one of them.
+    pinned: Option<Vec<[(u64, u64); 4]>>,
+}
+
+/// The grid a pinned box is laid on: the solver's ranges are twelfths, and its
+/// exact sums stay small on a grid they divide.
+const GRID: u64 = 720;
+
+/// A fraction of the canvas on the grid, toward the outside of the box.
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_precision_loss
+)]
+fn on_grid(value: f64, up: bool) -> (u64, u64) {
+    let scaled = value.clamp(0.0, 1.0) * GRID as f64;
+    let steps = if up { scaled.ceil() } else { scaled.floor() };
+    (steps as u64, GRID)
+}
+
+/// A box (left, top, right, bottom) on the grid, grown to hold it.
+fn grid_box([left, top, right, bottom]: [f64; 4]) -> [(u64, u64); 4] {
+    [
+        on_grid(left, false),
+        on_grid(top, false),
+        on_grid(right, true),
+        on_grid(bottom, true),
+    ]
+}
+
+#[allow(clippy::cast_precision_loss)]
+fn fraction(value: ExactFraction) -> f64 {
+    value.numerator() as f64 / value.denominator() as f64
+}
+
+/// A sentence the laws wrote read as the layer it draws: its shape, action and
+/// words without the numbers that say where (a numeric point, ends or angle) and
+/// without the clauses only the laws write there.
+fn pinned_layer(instruction: &SemanticInstruction) -> Option<WorkPlanLayer> {
+    let mut entity = instruction.entity.clone();
+    entity.numeric_position = None;
+    entity.numeric_segment = None;
+    entity.numeric_angle = None;
+    entity.additional_relative_scales.clear();
+    composition_layer(&SemanticInstruction {
+        entity,
+        relation: None,
+        sequence: None,
+        fill_target: None,
+        ..instruction.clone()
+    })
+}
+
+/// Half the width and half the height a mark of a sentence covers: its numeric
+/// size, else the square its size word is taken to cover.
+fn half_extent(instruction: &SemanticInstruction, layer: &WorkPlanLayer) -> (f64, f64) {
+    let value = |value: &SemanticGeometryValue| value.decimal.value.to_f64().ok();
+    let written = match &instruction.entity.explicit_geometry {
+        Some(SemanticExplicitGeometry::Radius(radius)) => value(radius).map(|r| (r, r)),
+        Some(
+            SemanticExplicitGeometry::Diameter(side)
+            | SemanticExplicitGeometry::Side(side)
+            | SemanticExplicitGeometry::Length(side),
+        ) => value(side).map(|side| (side / 2.0, side / 2.0)),
+        Some(SemanticExplicitGeometry::WidthHeight { width, height }) => value(width)
+            .zip(value(height))
+            .map(|(width, height)| (width / 2.0, height / 2.0)),
+        Some(SemanticExplicitGeometry::ChordSagitta { chord, sagitta }) => value(chord)
+            .zip(value(sagitta))
+            .map(|(chord, sagitta)| (chord / 2.0, sagitta)),
+        None => None,
+    };
+    written.unwrap_or_else(|| {
+        let half = mark_side(layer) / 2.0;
+        (half, half)
+    })
+}
+
+/// The box a pinned sentence's marks are in: its numeric range, else its numeric
+/// ends or point grown by the size of a mark.
+fn pinned_box(instruction: &SemanticInstruction, layer: &WorkPlanLayer) -> Option<[(u64, u64); 4]> {
+    let entity = &instruction.entity;
+    if let Some(range) = &entity.numeric_range {
+        return Some(grid_box(range.bounds.map(fraction)));
+    }
+    let (left, top, right, bottom) = if let Some(segment) = &entity.numeric_segment {
+        let [x1, y1, x2, y2] = segment.ends.map(fraction);
+        (x1.min(x2), y1.min(y2), x1.max(x2), y1.max(y2))
+    } else if let Some(point) = &entity.numeric_position {
+        let x = point.x.decimal.value.to_f64().ok()?;
+        let y = point.y.decimal.value.to_f64().ok()?;
+        (x, y, x, y)
+    } else {
+        return None;
+    };
+    let (half_width, half_height) = half_extent(instruction, layer);
+    Some(grid_box([
+        left - half_width,
+        top - half_height,
+        right + half_width,
+        bottom + half_height,
+    ]))
 }
 
 /// The visible source as a document, with the locks of the definitions the
@@ -190,6 +296,7 @@ fn written_joint(relation: &SemanticRelation) -> Option<JointKind> {
 fn read_layers(
     source: &str,
     ast: &inku_ddl::SemanticDocumentAst,
+    pins: &[(usize, std::ops::Range<usize>)],
 ) -> Result<(Vec<ReadLayer>, Vec<Joint>), &'static str> {
     if !ast.coordinated_head_groups.is_empty()
         || !ast.group_predicates.is_empty()
@@ -197,12 +304,55 @@ fn read_layers(
     {
         return Err("unsupported_sentence");
     }
-    let mut read = Vec::new();
+    let mut read: Vec<ReadLayer> = Vec::new();
     let mut joints = Vec::new();
     // Whether the sentence before was read as a layer, the partner a joint needs.
     let mut after_layer = false;
+    // The recorded layer the sentence before belongs to, when it is pinned.
+    let mut pinned_group: Option<usize> = None;
     for instruction in &ast.instructions {
         let range = instruction.entity.numeric_range.as_ref();
+        let at = instruction.entity.head.source().span.start_byte;
+        if let Some(group) = pins
+            .iter()
+            .find(|(_, sentence)| sentence.contains(&at))
+            .map(|(group, _)| *group)
+        {
+            // A sentence of a recorded laws layer stays as it is drawn; the
+            // sentences of a layer opened into marks are one layer.
+            let layer = pinned_layer(instruction).ok_or("unsupported_sentence")?;
+            let boxed = pinned_box(instruction, &layer);
+            if pinned_group == Some(group)
+                && let (Some(last), Some(boxed)) = (read.last_mut(), boxed)
+                && let Some(boxes) = last.pinned.as_mut()
+            {
+                boxes.push(boxed);
+                continue;
+            }
+            read.push(match boxed {
+                Some(boxed) => ReadLayer {
+                    layer,
+                    moving: None,
+                    current: None,
+                    bounds: None,
+                    pinned: Some(vec![boxed]),
+                },
+                // A place word keeps its place already.
+                None if layer.attributes.contains_key(&WorkPlanSlot::Position) => ReadLayer {
+                    layer,
+                    moving: None,
+                    current: None,
+                    bounds: None,
+                    pinned: None,
+                },
+                None => return Err("unsupported_sentence"),
+            });
+            pinned_group = Some(group);
+            after_layer = true;
+            continue;
+        }
+        pinned_group = None;
+        let after_pinned = read.last().is_some_and(|last| last.pinned.is_some());
         if matches!(instruction.entity.head, SemanticHead::MacroInvocation(_)) {
             // A plugin word is not a plan layer and the composition never places it.
             if range.is_some() || instruction.position.is_some() {
@@ -229,6 +379,18 @@ fn read_layers(
         };
         let mut layer = layer.ok_or("unsupported_sentence")?;
         after_layer = true;
+        if joint.is_some() && after_pinned {
+            // Joined to a layer that stays, it stays too, in the range it writes.
+            let boxed = pinned_box(instruction, &layer).ok_or("unsupported_sentence")?;
+            read.push(ReadLayer {
+                layer,
+                moving: None,
+                current: None,
+                bounds: None,
+                pinned: Some(vec![boxed]),
+            });
+            continue;
+        }
         if let Some(kind) = joint {
             joints.push(Joint {
                 kind,
@@ -243,6 +405,7 @@ fn read_layers(
                     moving: None,
                     current: None,
                     bounds: None,
+                    pinned: None,
                 });
                 continue;
             }
@@ -266,6 +429,7 @@ fn read_layers(
                 moving: None,
                 current: region,
                 bounds: Some(bounds),
+                pinned: None,
             });
             continue;
         }
@@ -276,6 +440,7 @@ fn read_layers(
             moving: joint.is_none().then_some(span.start_byte..span.end_byte),
             current: region.filter(|index| is_composition_range(*index)),
             bounds: Some(bounds),
+            pinned: None,
         });
     }
     Ok((read, joints))
@@ -297,7 +462,7 @@ pub fn composition_layers(
         .semantic_document
         .as_ref()
         .ok_or("not_canonical")?;
-    let (read, _) = read_layers(source, &semantic.ast)?;
+    let (read, _) = read_layers(source, &semantic.ast, &[])?;
     let background = semantic
         .ast
         .background
@@ -321,19 +486,64 @@ pub fn recompose(
     seed: u64,
     work_id: &str,
 ) -> Recomposition {
+    recompose_with_laws(
+        source,
+        language,
+        definitions,
+        limits,
+        mode,
+        seed,
+        work_id,
+        None,
+    )
+}
+
+/// [`recompose`] with the record of the layers the work's laws stage placed: the
+/// recorded layers whose sentences are all in the instructions stay where they
+/// are drawn, with the layers joined to them, and the others are placed again
+/// around them (the author's decisions of 2026-10-20).
+#[must_use]
+#[allow(clippy::too_many_arguments)]
+pub fn recompose_with_laws(
+    source: &str,
+    language: ResolvedInstructionLanguage,
+    definitions: &[MacroDefinition],
+    limits: MacroExpansionLimits,
+    mode: RecomposeMode,
+    seed: u64,
+    work_id: &str,
+    laws: Option<&LawsLayerRecord>,
+) -> Recomposition {
     let unchanged = |reason| Recomposition::Unchanged { reason };
+    let pins: Vec<(usize, std::ops::Range<usize>)> = laws
+        .map(|record| {
+            applying(record, source)
+                .into_iter()
+                .flat_map(|(group, sentences)| {
+                    sentences.into_iter().map(move |sentence| (group, sentence))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
     let Some(compilation) = canonical(source, language, definitions, limits) else {
         return unchanged("not_canonical");
     };
     let Some(semantic) = compilation.semantic_document.as_ref() else {
         return unchanged("not_canonical");
     };
-    let (read, joints) = match read_layers(source, &semantic.ast) {
+    let (read, joints) = match read_layers(source, &semantic.ast, &pins) {
         Ok(read) => read,
         Err(reason) => return unchanged(reason),
     };
     let layers: Vec<WorkPlanLayer> = read.iter().map(|layer| layer.layer.clone()).collect();
     let mut reading = default_reading(&layers);
+    reading.pinned = read
+        .iter()
+        .enumerate()
+        .filter_map(|(index, layer)| layer.pinned.clone().map(|boxes| (index, boxes)))
+        .collect();
+    let pinned = reading.pinned.clone();
+    reading.fixed.retain(|index, _| !pinned.contains_key(index));
     if !joints.is_empty() {
         // A joint the composition would not write (on a stated place, a
         // connection a shape cannot start) is a sentence it cannot recompose.
@@ -343,7 +553,12 @@ pub fn recompose(
         reading.joints = joints;
     }
     if !read.iter().any(|layer| layer.moving.is_some()) {
-        return unchanged("nothing_to_move");
+        // Only layers the laws placed, and places the description states, are left.
+        return unchanged(if read.iter().any(|layer| layer.pinned.is_some()) {
+            "laws_placed"
+        } else {
+            "nothing_to_move"
+        });
     }
     let background = semantic
         .ast
@@ -363,7 +578,9 @@ pub fn recompose(
                 .iter()
                 .map(|index| {
                     let layer = &read[*index];
-                    if layer.moving.is_some() {
+                    if layer.pinned.is_some() {
+                        Some(pinned_answer())
+                    } else if layer.moving.is_some() {
                         layer.current
                     } else {
                         reading
@@ -405,7 +622,7 @@ pub fn recompose(
         }
         RecomposeMode::Chance => {
             let chosen = if reading.joints.is_empty() {
-                chance_answer(&layers, &reading.fixed, seed, work_id)
+                chance_answer(&layers, &reading, seed, work_id)
             } else {
                 chance_joined_answer(&layers, &reading, &background, &bounds, seed, work_id)
             };
@@ -472,6 +689,9 @@ pub struct RecomposeRequest {
     pub mode: RecomposeMode,
     pub seed: crate::protocol::DecimalU64,
     pub work_id: String,
+    /// The layers the work's laws stage placed, when the work keeps a record.
+    #[serde(default)]
+    pub laws_layers: Option<LawsLayerRecord>,
 }
 
 #[derive(Serialize)]
@@ -491,7 +711,7 @@ pub fn recompose_json(input: &[u8]) -> Vec<u8> {
     let Ok(limits) = request.config.compiler.macro_limits() else {
         return br#"{"error":"invalid_request"}"#.to_vec();
     };
-    let result = recompose(
+    let result = recompose_with_laws(
         &request.source,
         request.config.language,
         &request.config.definitions,
@@ -499,6 +719,7 @@ pub fn recompose_json(input: &[u8]) -> Vec<u8> {
         request.mode,
         request.seed.get(),
         &request.work_id,
+        request.laws_layers.as_ref(),
     );
     serde_json::to_vec(&RecomposeResponse {
         schema: RECOMPOSITION_SCHEMA_ID,

@@ -208,6 +208,7 @@ fn canonical_macro_crosses_owned_start_and_commit() {
             authoring: AuthoringInput::DirectDdl {
                 source: "Example.Circle.".into(),
                 completion_ranges: None,
+                laws_layers: None,
             },
         },
     );
@@ -234,6 +235,7 @@ fn a_saved_unit_of_the_retired_saijiki_waits_for_its_host_to_migrate_it() {
             authoring: AuthoringInput::DirectDdl {
                 source: "place one red circle at center.".into(),
                 completion_ranges: None,
+                laws_layers: None,
             },
         },
     );
@@ -300,6 +302,7 @@ fn a_saved_unit_of_the_retired_saijiki_waits_for_its_host_to_migrate_it() {
                 authoring: AuthoringInput::DirectDdl {
                     source: "Saved.Sway.".into(),
                     completion_ranges: None,
+                    laws_layers: None,
                 },
             },
         );
@@ -325,6 +328,7 @@ fn unresolved_qualified_macro_blocks_without_stage2_completion() {
             authoring: AuthoringInput::DirectDdl {
                 source: "Nature.若葉 を置く".into(),
                 completion_ranges: None,
+                laws_layers: None,
             },
         },
     );
@@ -758,6 +762,7 @@ fn committed_ddl_and_approved_hole_patch_share_one_replayable_path() {
             authoring: AuthoringInput::DirectDdl {
                 source: source.into(),
                 completion_ranges: None,
+                laws_layers: None,
             },
         },
     );
@@ -1116,6 +1121,7 @@ fn committed_hole_with_local_diagnostics_still_requests_bounded_completion() {
             authoring: AuthoringInput::DirectDdl {
                 source: "出力: 黒い背景に、粗筆の黒い四角を中心に置く。面: 粗く塗りつぶす。".into(),
                 completion_ranges: None,
+                laws_layers: None,
             },
         },
     );
@@ -1166,6 +1172,7 @@ fn independent_hole_results_keep_valid_subset_without_retry_after_ack() {
                 authoring: AuthoringInput::DirectDdl {
                     source: source.into(),
                     completion_ranges: None,
+                    laws_layers: None,
                 },
             },
         );
@@ -1597,6 +1604,7 @@ fn a_range_whose_words_changed_is_completed_again_and_recorded() {
             authoring: AuthoringInput::DirectDdl {
                 source: completed.replace("the bottom right", "the top left"),
                 completion_ranges: Some(record.clone()),
+                laws_layers: None,
             },
         },
     );
@@ -1682,6 +1690,7 @@ fn a_renamed_range_that_keeps_its_numbers_settles_without_approval() {
             authoring: AuthoringInput::DirectDdl {
                 source: edited.clone(),
                 completion_ranges: Some(record),
+                laws_layers: None,
             },
         },
     );
@@ -1773,6 +1782,7 @@ fn started_direct_ddl_in(
             authoring: AuthoringInput::DirectDdl {
                 source: source.into(),
                 completion_ranges: None,
+                laws_layers: None,
             },
         },
     );
@@ -2704,6 +2714,16 @@ fn a_run_with_laws_asks_for_them_and_commits_what_they_print() {
     assert!(lines[4].contains(" radius "), "{source}");
     assert!(lines[4].ends_with(" at the bottom."), "{source}");
     assert!(chosen.snapshot.laws.is_none());
+    // The work keeps the record of the circle the laws placed; the dots, made
+    // smaller, keep the place the description states (2026-10-20).
+    let record = chosen
+        .snapshot
+        .laws_layers
+        .clone()
+        .expect("a laws layers record");
+    assert_eq!(record.layers.len(), 1, "{record:?}");
+    assert_eq!(record.layers[0].sentences, vec![lines[3].trim().to_owned()]);
+    assert_eq!(record.layers[0].laws, vec!["B1".to_owned()]);
     let committed = run(
         Some(&chosen.snapshot),
         &envelope(Some(&chosen.snapshot), ack(&chosen.snapshot)),
@@ -2714,6 +2734,7 @@ fn a_run_with_laws_asks_for_them_and_commits_what_they_print() {
         "{:?}",
         committed.phase
     );
+    assert_eq!(committed.laws_layers, Some(record));
 }
 
 #[test]

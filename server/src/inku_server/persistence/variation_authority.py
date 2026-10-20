@@ -171,6 +171,8 @@ class LinkedHistoryForkRecord:
     macro_catalog: dict[str, object]
     pipeline_diagnostics: dict[str, object] | None
     completion_ranges: object | None = None
+    # The layers the laws stage placed, which "change the layout" keeps (2026-10-20).
+    laws_layers: object | None = None
 
 
 @dataclass(frozen=True)
@@ -657,6 +659,8 @@ def _history_fork_context_bytes(
     }
     if snapshot.get("completion_ranges") is not None:
         payload["completion_ranges"] = snapshot["completion_ranges"]
+    if snapshot.get("laws_layers") is not None:
+        payload["laws_layers"] = snapshot["laws_layers"]
     encoded = _canonical_json(payload, sort_keys=True).encode("utf-8")
     return encoded, hashlib.sha256(encoded).hexdigest()
 
@@ -726,8 +730,8 @@ def _decode_history_fork_context_payload(
         pipeline_diagnostics = None
     elif protocol in {_DIAGNOSTICS_HISTORY_FORK_CONTEXT_PROTOCOL, HISTORY_FORK_CONTEXT_PROTOCOL}:
         expected_keys = legacy_keys | {"pipeline_diagnostics"}
-        if protocol == HISTORY_FORK_CONTEXT_PROTOCOL and "completion_ranges" in payload:
-            expected_keys |= {"completion_ranges"}
+        if protocol == HISTORY_FORK_CONTEXT_PROTOCOL:
+            expected_keys |= {"completion_ranges", "laws_layers"} & set(payload)
         pipeline_diagnostics = _validate_pipeline_diagnostics(
             payload.get("pipeline_diagnostics")
         )
@@ -783,6 +787,7 @@ def _decode_history_fork_context(
         macro_catalog=payload["macro_catalog"],
         pipeline_diagnostics=pipeline_diagnostics,
         completion_ranges=payload.get("completion_ranges"),
+        laws_layers=payload.get("laws_layers"),
     )
 
 

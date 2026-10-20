@@ -4710,6 +4710,83 @@ pub struct Chosen {
     pub named: BTreeMap<usize, Vec<&'static str>>,
 }
 
+/// The record a work keeps of the layers its laws placed (2026-10-20): each
+/// printed layer of a composed layer a law places or arranges (B1 to B5, B7 to
+/// B10, B12, C1 to C6) or that the laws wrote at a numeric point, ends or angle,
+/// and of the main layer when a law places other layers by it (B6, B7), as the
+/// sentences `source` prints it with (one line each, the line of its
+/// instruction in `compilation`). A layer the laws changed only in size, hand
+/// or colour keeps its range and moves with the others. `None` when the printed
+/// layers and the instructions do not match one to one.
+#[must_use]
+pub fn layers_record(
+    chosen: &Chosen,
+    source: &str,
+    compilation: &inku_ddl::TypedDdlCompilation,
+) -> Option<crate::laws_record::LawsLayerRecord> {
+    use crate::laws_record::{LawsLayer, LawsLayerKind, LawsLayerRecord};
+    let instructions = &compilation.semantic_document.as_ref()?.ast.instructions;
+    let print = &chosen.print;
+    if instructions.len() != print.composed.len() {
+        return None;
+    }
+    let line_of = |at: usize| -> Option<&str> {
+        let start = source.get(..at)?.rfind('\n').map_or(0, |i| i + 1);
+        let end = source
+            .get(at..)?
+            .find('\n')
+            .map_or(source.len(), |i| at + i);
+        Some(source[start..end].trim()).filter(|line| !line.is_empty())
+    };
+    let partner = chosen
+        .laws
+        .iter()
+        .any(|law| matches!(*law, "B6" | "B7"))
+        .then_some(chosen.main_layer);
+    let mut layers: Vec<(usize, LawsLayer)> = Vec::new();
+    for (instruction, composed) in instructions.iter().zip(&print.composed) {
+        let placing = chosen.named.get(composed).is_some_and(|laws| {
+            laws.iter().any(|law| {
+                PLACEMENT.contains(law) || ARRANGEMENT.contains(law) || REBUILD.contains(law)
+            })
+        });
+        let entity = &instruction.entity;
+        let numeric = entity.numeric_position.is_some()
+            || entity.numeric_segment.is_some()
+            || entity.numeric_angle.is_some();
+        let kind = if print.changed.contains(composed) && (placing || numeric) {
+            LawsLayerKind::Laws
+        } else if partner == Some(*composed) {
+            LawsLayerKind::Partner
+        } else {
+            continue;
+        };
+        let sentence = line_of(instruction.entity.head.source().span.start_byte)?.to_owned();
+        match layers.last_mut() {
+            Some((last, layer)) if *last == *composed => {
+                if !layer.sentences.contains(&sentence) {
+                    layer.sentences.push(sentence);
+                }
+            }
+            _ => layers.push((
+                *composed,
+                LawsLayer {
+                    sentences: vec![sentence],
+                    kind,
+                    laws: chosen
+                        .named
+                        .get(composed)
+                        .map(|laws| laws.iter().map(|law| (*law).to_owned()).collect())
+                        .unwrap_or_default(),
+                },
+            )),
+        }
+    }
+    Some(LawsLayerRecord {
+        layers: layers.into_iter().map(|(_, layer)| layer).collect(),
+    })
+}
+
 /// The composed plan as the laws print it: the layers they changed are edited
 /// and carry what they write in numbers, a layer for each composed layer and
 /// one for each mark of a layer opened into marks.

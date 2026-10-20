@@ -813,6 +813,13 @@ pub struct CheckedReading {
     /// stored form.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub joints: Vec<Joint>,
+    /// Layers that stay where they are drawn, by layer: the boxes their marks
+    /// are in, as exact bounds (left, top, right, bottom). A recomposition pins
+    /// the layers the laws placed and the partners of the laws that place one
+    /// layer by another (2026-10-20): each takes no range, and the others weigh
+    /// with it where it is.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub pinned: BTreeMap<usize, Vec<[(u64, u64); 4]>>,
 }
 
 /// What the check dropped, changed or kept, and why (by code).
@@ -1265,6 +1272,7 @@ pub fn check(
             tension,
             fixed,
             joints,
+            pinned: BTreeMap::new(),
         },
         findings,
     ))
@@ -1381,6 +1389,7 @@ pub fn default_reading(layers: &[WorkPlanLayer]) -> CheckedReading {
         tension: BTreeMap::new(),
         fixed,
         joints: Vec::new(),
+        pinned: BTreeMap::new(),
     }
 }
 
@@ -1611,10 +1620,23 @@ pub fn composed_plan(plan: &WorkPlan, chosen: &[usize]) -> (WorkPlan, Vec<Option
     (plan, ranges)
 }
 
-/// The key of a range (`cell-22`, `named-bottom`, ...).
+/// The key a pinned layer's only answer goes by: it takes no range.
+pub const PINNED_KEY: &str = "pinned";
+
+/// The answer a pinned layer takes, past the ranges: it stays where it is.
+#[must_use]
+pub fn pinned_answer() -> usize {
+    regions().all.len()
+}
+
+/// The key of a range (`cell-22`, `named-bottom`, ...), or [`PINNED_KEY`] for
+/// the answer a pinned layer takes.
 #[must_use]
 pub fn region_key(index: usize) -> &'static str {
-    &regions().all[index].key
+    regions()
+        .all
+        .get(index)
+        .map_or(PINNED_KEY, |region| region.key.as_str())
 }
 
 /// The range a written range is, by its exact bounds (left, top, right, bottom):
@@ -1773,10 +1795,7 @@ fn other_of<'a>(
     };
     let work = work()?;
     let sizes: Vec<usize> = work.options.iter().map(Vec::len).collect();
-    let table = regions();
-    let keys = |choice: &[usize]| -> Vec<&str> {
-        choice.iter().map(|i| table.all[*i].key.as_str()).collect()
-    };
+    let keys = |choice: &[usize]| -> Vec<&str> { choice.iter().map(|i| region_key(*i)).collect() };
     let mut best: Option<(f64, Vec<usize>)> = None;
     let mut terms = Terms::default();
     let mut digits = vec![0_usize; sizes.len()];
@@ -1815,7 +1834,7 @@ fn other_of<'a>(
 /// and the layer. A fixed layer keeps its range.
 pub fn chance_answer(
     layers: &[WorkPlanLayer],
-    fixed: &BTreeMap<usize, String>,
+    reading: &CheckedReading,
     seed: u64,
     work_id: &str,
 ) -> Result<Vec<usize>, Unsolved> {
@@ -1823,8 +1842,12 @@ pub fn chance_answer(
         .iter()
         .enumerate()
         .map(|(index, layer)| {
+            if reading.pinned.contains_key(&index) {
+                return Ok(pinned_answer());
+            }
             // Without joints no layer is on either side of one.
-            let options = one_per_center(layer, chance_options(layer, fixed, index, false)?);
+            let options =
+                one_per_center(layer, chance_options(layer, &reading.fixed, index, false)?);
             Ok(chance_pick(&options, seed, work_id, index))
         })
         .collect()
@@ -1911,6 +1934,9 @@ pub fn chance_joined_answer(
         .zip(&group.joined)
         .zip(&group.edge_joints)
         .map(|((index, joined), edge_joint)| {
+            if reading.pinned.contains_key(index) {
+                return Ok(pinned_answer());
+            }
             let mut options = chance_options(&layers[*index], &reading.fixed, *index, *edge_joint)?;
             if joined.is_empty() {
                 options = one_per_center(&layers[*index], options);
@@ -2177,6 +2203,13 @@ fn size_area(size: Option<&str>) -> f64 {
         Some("huge") => 0.5,
         _ => 0.03,
     }
+}
+
+/// The side of the square a mark of `layer` is taken to cover, from its size
+/// word (the area the solver weighs it by).
+#[must_use]
+pub fn mark_side(layer: &WorkPlanLayer) -> f64 {
+    size_area(attribute(layer, WorkPlanSlot::Size)).sqrt()
 }
 
 fn lightness(color: Option<&str>, default: f64) -> f64 {
@@ -2590,6 +2623,28 @@ impl<'a> Work<'a> {
             work.tone.push(tone);
             work.surface.push(surface);
             work.fixed_weight.push(fixed);
+            if let Some(boxes) = reading.pinned.get(&i) {
+                // A pinned layer weighs where its marks are drawn and takes no range.
+                let cover: Vec<Rect> = boxes
+                    .iter()
+                    .map(|bounds| rect_of_bounds(*bounds))
+                    .collect::<Option<_>>()
+                    .filter(|cover: &Vec<Rect>| !cover.is_empty())
+                    .ok_or(Unsolved::NoRanges)?;
+                let extent = cover.iter().skip(1).fold(cover[0], |box_, rect| {
+                    [
+                        box_[0].min(rect[0]),
+                        box_[1].min(rect[1]),
+                        box_[2].max(rect[2]),
+                        box_[3].max(rect[3]),
+                    ]
+                });
+                work.options.push(vec![table.all.len()]);
+                let mut prints = vec![Vec::new(); table.all.len()];
+                prints.push(vec![Footprint { extent, cover }]);
+                work.footprints.push(prints);
+                continue;
+            }
             let options = candidates(
                 layer,
                 reading.roles[i],
@@ -3252,11 +3307,10 @@ fn search_work(work: &Work<'_>) -> Result<Searched, Unsolved> {
         }
         advance(&mut digits, &sizes);
     }
-    let table = regions();
     near.sort_by(|x, y| {
         x.iter()
-            .map(|i| table.all[*i].key.as_str())
-            .cmp(y.iter().map(|i| table.all[*i].key.as_str()))
+            .map(|i| region_key(*i))
+            .cmp(y.iter().map(|i| region_key(*i)))
     });
     Ok(Searched {
         best,
@@ -3510,6 +3564,11 @@ fn reduce_reading(reading: &CheckedReading, keep: &[usize]) -> CheckedReading {
             .filter_map(|(index, place)| Some((*position.get(index)?, place.clone())))
             .collect(),
         joints: Vec::new(),
+        pinned: reading
+            .pinned
+            .iter()
+            .filter_map(|(index, boxes)| Some((*position.get(index)?, boxes.clone())))
+            .collect(),
     }
 }
 
@@ -3827,7 +3886,7 @@ mod tests {
                 .expect("chosen");
             assert_eq!(joined.len(), 1, "seed {seed}");
             assert!(!at_top(joined[0]), "seed {seed}: {}", region_key(joined[0]));
-            let alone = chance_answer(&layers, &reading.fixed, seed, "work").expect("chosen");
+            let alone = chance_answer(&layers, &reading, seed, "work").expect("chosen");
             if at_top(alone[0]) {
                 alone_at_top += 1;
             }

@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-20 — An entry to the laws stage from a saved work, and the laws basis (the AI refinement's laws move)
+
+For the AI refinement's laws move, the shared core gains a run of the laws stage alone from a saved work (the start `saved_laws`). It reads the saved DDL of a work without laws, or the composed document before the laws of a work with laws, back as the work plan it was printed from, checks that it compiles to the same Score, and applies laws with the request, checks, application and asking again of a description run; the lines of the layers the laws did not change keep the saved words. The refinement's direction (laws left out, whether the cards are offered, the author's direction sentence) enters the request and the response schema. A description run that applies its laws and commits keeps in its snapshot the laws basis (`inku.laws-basis.v1`): the composed document before the laws, the committed document's digest, and the answer's laws, values and reason. A work with laws that keeps no composed document, and one whose DDL changed after its laws, take no laws again and stop with the reason. Of the 1,220 works of Build 1100 and later in the 10/17 export, 1,177 reached the laws request, and on the 21 works of the 5173 trial it printed the document and the laws layers record the description run printed. The Server saves the basis and drives the refinement later, so the screens and drawing do not change now. No version moved.
+
 ### 2026-10-20 — Android: choose whether a model is used for LLM or Vision in the settings
 
 As in Server's model administration, a connection's Model selection now has LLM and Vision toggles for each published model. The drawing model chooser and model inspection offer only the models used for LLM, and the Vision chooser of Juxtapose and Autonomous refinement only those used for Vision. A connection card shows its published models in an LLM row and a Vision row. A purpose a model gave no response to when measured cannot be chosen.

@@ -27,8 +27,8 @@ use crate::composition_reading::{
 };
 use crate::core_boundary::CatalogMode;
 use crate::core_boundary::{CompiledDelivery, CompilerOptions, ResolvedHostOptions};
-use crate::laws::{self, ComposedPlan, LawsContext};
-use crate::laws_record::LawsLayerRecord;
+use crate::laws::{self, ComposedPlan, LawsContext, LawsDirection};
+use crate::laws_record::{LawsBasis, LawsLayerRecord};
 use crate::prompts::{
     DescriptionCatalogEntry, HOLE_COMPLETION_PROMPT_ID, HoleCompletionResult,
     HolePatchEditResponse, HolePatchResponse, LEGACY_HOLE_COMPLETION_PROMPT_ID, LlmPrompt,
@@ -280,6 +280,15 @@ pub struct PendingLaws {
     pub reason: String,
 }
 
+/// A saved work as the laws stage from it reads it (2026-10-20).
+struct SavedWork {
+    source: String,
+    description: String,
+    completion_ranges: Option<CompletionRangeRecord>,
+    laws_layers: Option<LawsLayerRecord>,
+    laws_basis: Option<LawsBasis>,
+}
+
 /// Whether a description run sketches before Stage 1. The sketch only
 /// supplements place and light beside the description; it runs only when the
 /// author asks for it, never waits for approval, and never stops a run.
@@ -366,6 +375,28 @@ pub enum AuthoringInput {
         /// has none.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         laws_layers: Option<LawsLayerRecord>,
+        /// What the laws of the work this DDL comes from were applied to
+        /// (2026-10-20), kept with the work beside the record and given back
+        /// unchanged with the snapshot.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        laws_basis: Option<LawsBasis>,
+    },
+    /// The laws stage from a saved work (the AI refinement's laws move,
+    /// 2026-10-20): the work's DDL and description, the records kept with it,
+    /// and the refinement's direction. The laws are applied to the composed
+    /// document the work keeps, or to its DDL when it has no laws, and the
+    /// run stops with a reason rather than commit a child like its parent.
+    SavedLaws {
+        source: String,
+        description: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        completion_ranges: Option<CompletionRangeRecord>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        laws_layers: Option<LawsLayerRecord>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        laws_basis: Option<LawsBasis>,
+        #[serde(default)]
+        direction: LawsDirection,
     },
     Description {
         description: String,
@@ -540,7 +571,26 @@ pub struct PipelineSnapshot {
     /// Absent when there is none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub laws_layers: Option<LawsLayerRecord>,
+    /// What this work's laws were applied to (2026-10-20): made when the laws
+    /// stage applies its laws, its digest filled when the run commits, and
+    /// given back as it came by a direct DDL run. A host keeps it with each
+    /// saved work beside the layers record.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub laws_basis: Option<LawsBasis>,
+    /// Present in a run of the laws stage from a saved work: the refinement's
+    /// direction, which the laws read, and the mark that the run commits as a
+    /// DDL edit and stops rather than commit its base unchanged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub laws_move: Option<LawsMove>,
     pub snapshot_digest: String,
+}
+
+/// A run of the laws stage from a saved work (2026-10-20).
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LawsMove {
+    #[serde(default)]
+    pub direction: LawsDirection,
 }
 
 /// The provider attempt a host is running, for showing retry progress.
@@ -1398,11 +1448,22 @@ impl PipelineSnapshot {
         reason: &str,
         events: &mut Vec<PipelineEvent>,
     ) -> Result<(), ProtocolError> {
-        let next = proposal(
+        if let Some(basis) = self
+            .laws_basis
+            .as_mut()
+            .filter(|basis| basis.committed_digest.is_empty())
+        {
+            basis.committed_digest = document.source_digest();
+        }
+        // The laws stage from a saved work edits a DDL, as "change the layout" does.
+        let outcome = if self.laws_move.is_some() {
             self.authority
-                .propose_stage1_result_commit(self.authority.revision()),
-        )?
-        .ok_or(ProtocolError::InternalInvariant)?;
+                .propose_committed_user_ddl_mutation(self.authority.revision(), true)
+        } else {
+            self.authority
+                .propose_stage1_result_commit(self.authority.revision())
+        };
+        let next = proposal(outcome)?.ok_or(ProtocolError::InternalInvariant)?;
         self.commit_document(document, next, reason, events)
     }
 
@@ -1551,9 +1612,115 @@ impl PipelineSnapshot {
         Ok((document, composed))
     }
 
+    /// Start the laws stage from a saved work (the AI refinement's laws move,
+    /// 2026-10-20). Its base is the composed document the work keeps, while the
+    /// work's DDL is still the one that run committed, else its DDL when it has
+    /// no laws. The base is read back as the plan it was printed from, which
+    /// must draw what the base draws, and the laws are asked for as a
+    /// description run asks for them, with the refinement's direction. A work
+    /// that cannot take them stops with the reason, before any request.
+    fn saved_laws(
+        &mut self,
+        work: SavedWork,
+        direction: LawsDirection,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<(), ProtocolError> {
+        if matches!(
+            self.config.compiler.host.catalog_mode(),
+            CatalogMode::AutoSelected | CatalogMode::AutoFallbackDefault
+        ) {
+            return Err(ProtocolError::InvalidPolicy);
+        }
+        direction
+            .validate()
+            .map_err(|_| ProtocolError::SchemaViolation)?;
+        self.completion_ranges = work.completion_ranges.filter(|record| !record.is_empty());
+        self.laws_move = Some(LawsMove { direction });
+        if work.description.trim().is_empty() {
+            return self.fail_laws_move("no_description", None, events);
+        }
+        let recorded = work.laws_layers.filter(|record| !record.is_empty());
+        let base = match (work.laws_basis, recorded) {
+            (Some(basis), _) => {
+                if self.new_document(work.source)?.source_digest() != basis.committed_digest {
+                    return self.fail_laws_move("laws_basis_stale", None, events);
+                }
+                basis.composed
+            }
+            (None, Some(_)) => return self.fail_laws_move("laws_without_basis", None, events),
+            (None, None) => work.source,
+        };
+        let document = self.new_document(base)?;
+        let plugins = crate::prompts::work_plan_plugins(&self.config.definitions);
+        let limits = self
+            .config
+            .compiler
+            .macro_limits()
+            .map_err(|_| ProtocolError::InvalidPolicy)?;
+        let composed = match crate::laws_entry::composed_plan_of(
+            &document.source,
+            self.config.language,
+            &self.config.definitions,
+            limits,
+            &plugins,
+        ) {
+            Ok(composed) => composed,
+            Err(reason) => return self.fail_laws_move(reason, None, events),
+        };
+        if !self.draws_alike(&document, composed.source(self.config.language, &plugins)) {
+            return self.fail_laws_move("not_faithful", None, events);
+        }
+        self.ask_laws(
+            document,
+            composed,
+            "saved_laws",
+            Some(work.description),
+            events,
+        )
+    }
+
+    /// Whether a plan's print draws what the base draws: the same text, or the
+    /// same Score as the run compiles both.
+    fn draws_alike(&self, base: &VisibleDocument, printed: String) -> bool {
+        if base.source == printed {
+            return true;
+        }
+        let Ok(printed) = self.new_document(printed) else {
+            return false;
+        };
+        match (self.compile_for_run(base), self.compile_for_run(&printed)) {
+            (Some(base), Some(printed)) => {
+                base.score().is_some() && base.score() == printed.score()
+            }
+            _ => false,
+        }
+    }
+
+    /// Stop the laws stage from a saved work with its reason: such a run
+    /// commits only a document its laws printed, never its base unchanged.
+    fn fail_laws_move(
+        &mut self,
+        reason: &str,
+        detail: Option<&str>,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<(), ProtocolError> {
+        self.action = None;
+        self.laws = None;
+        self.laws_basis = None;
+        self.phase = PipelinePhase::Failed {
+            reason: reason.to_owned(),
+        };
+        let mut payload = json!({"stage": LlmStage::ChooseLaws, "reason": reason});
+        if let Some(detail) = detail {
+            payload["detail"] = json!(detail);
+        }
+        self.event(events, "failed", payload)
+    }
+
     /// Ask for the laws of a composed document (stage B-2c). When the request
     /// cannot be built (no description, a Score the laws cannot read, no law
-    /// that takes a layer of the work), the composed document is committed.
+    /// that takes a layer of the work), the composed document is committed;
+    /// the laws stage from a saved work stops instead.
     fn ask_laws(
         &mut self,
         document: VisibleDocument,
@@ -1562,17 +1729,32 @@ impl PipelineSnapshot {
         description: Option<String>,
         events: &mut Vec<PipelineEvent>,
     ) -> Result<(), ProtocolError> {
-        let prompt = description.as_deref().and_then(|description| {
-            let (context, _) = self.laws_context(&document, &composed)?;
-            laws::build_laws_prompt(
-                description,
-                &context,
-                self.config.language,
-                self.config.prompt_limits,
-            )
-            .ok()
-        });
+        let context = description
+            .as_ref()
+            .and_then(|_| self.laws_context(&document, &composed))
+            .map(|(context, _)| context);
+        let prompt =
+            description
+                .as_deref()
+                .zip(context.as_ref())
+                .and_then(|(description, context)| {
+                    laws::build_laws_prompt(
+                        description,
+                        context,
+                        self.config.language,
+                        self.config.prompt_limits,
+                    )
+                    .ok()
+                });
         let Some(prompt) = prompt else {
+            if self.laws_move.is_some() {
+                let reason = if context.is_none() {
+                    "laws_context"
+                } else {
+                    "no_law"
+                };
+                return self.fail_laws_move(reason, None, events);
+            }
             self.event(events, "laws_fallback", json!({"failure": "prompt"}))?;
             let printed = PrintedPlan::composed(&composed);
             return self.after_laws(
@@ -1606,6 +1788,10 @@ impl PipelineSnapshot {
             self.config.compiler.host.palette(),
             self.config.compiler.host.canvas_format_id(),
         )?;
+        let context = match &self.laws_move {
+            Some(laws_move) => context.with_direction(laws_move.direction.clone()),
+            None => context,
+        };
         Some((context, shortfalls(&compiled)))
     }
 
@@ -1654,8 +1840,21 @@ impl PipelineSnapshot {
             }
         };
         let plugins = crate::prompts::work_plan_plugins(&self.config.definitions);
-        let Some((document, compiled)) =
-            self.laws_document(chosen.print.source(self.config.language, &plugins))
+        let printed = chosen.print.source(self.config.language, &plugins);
+        let composed = pending.composed.source(self.config.language, &plugins);
+        // A saved work keeps its own words on the lines the laws did not change.
+        let printed = if self.laws_move.is_some() && composed != pending.document.source {
+            crate::laws_entry::spliced(
+                &pending.document.source,
+                &composed,
+                pending.composed.plan.layers.len(),
+                &printed,
+                &chosen.print,
+            )
+        } else {
+            Some(printed)
+        };
+        let Some((document, compiled)) = printed.and_then(|source| self.laws_document(source))
         else {
             return self.laws_fallback(json!({"failure": "compile"}), events);
         };
@@ -1679,9 +1878,23 @@ impl PipelineSnapshot {
                 "main_law": chosen.main_law,
                 "main_layer": chosen.main_layer,
                 "notes": chosen.notes,
+                "reason": chosen.reason,
             }),
         )?;
         self.laws_layers = record.filter(|record| !record.is_empty());
+        // What the laws were applied to; its digest is the committed document's.
+        self.laws_basis = Some(LawsBasis {
+            composed: pending.document.source.clone(),
+            committed_digest: String::new(),
+            main_layer: chosen.main_layer,
+            main_law: chosen.main_law.clone(),
+            laws: chosen
+                .values
+                .iter()
+                .map(|(law, value)| ((*law).to_owned(), value.clone()))
+                .collect(),
+            reason: chosen.reason.clone(),
+        });
         let printed = PrintedPlan::laws(&chosen.print);
         let handoff = LawsHandoff::of(&chosen, pending.composed.plan.plugins.len());
         self.after_laws(
@@ -1789,12 +2002,27 @@ impl PipelineSnapshot {
             .then_some((document, compiled))
     }
 
-    /// Commit the composed document without laws and say why.
+    /// Commit the composed document without laws and say why. The laws stage
+    /// from a saved work stops with a reason instead: its answers refused
+    /// within the budget (`laws_refused`), a print that does not compile
+    /// (`laws_compile`), or a provider that could not answer
+    /// (`laws_unavailable`).
     fn laws_fallback(
         &mut self,
         payload: serde_json::Value,
         events: &mut Vec<PipelineEvent>,
     ) -> Result<(), ProtocolError> {
+        if self.laws_move.is_some() {
+            let failure = payload["failure"].as_str().unwrap_or_default();
+            let reason = match failure {
+                "compile" => "laws_compile",
+                "context" => "laws_context",
+                "schema_violation" | "semantic_violation" => "laws_refused",
+                _ => "laws_unavailable",
+            };
+            let detail = payload["detail"].as_str().unwrap_or(failure).to_owned();
+            return self.fail_laws_move(reason, Some(&detail), events);
+        }
         self.action = None;
         let pending = self.laws.take().ok_or(ProtocolError::InternalInvariant)?;
         let description = match &self.phase {
@@ -3313,7 +3541,7 @@ fn advance_impl(
             &json!({
                 "variation_id": variation_id, "nonce": authoring_nonce,
                 "config": config, "authority": authority,
-                "request_kind": match &authoring { AuthoringInput::DirectDdl { .. } => "direct_ddl", AuthoringInput::Description { .. } => "description" },
+                "request_kind": match &authoring { AuthoringInput::DirectDdl { .. } => "direct_ddl", AuthoringInput::SavedLaws { .. } => "saved_laws", AuthoringInput::Description { .. } => "description" },
             }),
         )?;
         let mut state = PipelineSnapshot {
@@ -3339,6 +3567,8 @@ fn advance_impl(
             colors: None,
             completion_ranges: None,
             laws_layers: None,
+            laws_basis: None,
+            laws_move: None,
             snapshot_digest: String::new(),
         };
         state.event(
@@ -3351,9 +3581,11 @@ fn advance_impl(
                 source,
                 completion_ranges,
                 laws_layers,
+                laws_basis,
             } => {
                 state.completion_ranges = completion_ranges.filter(|record| !record.is_empty());
                 state.laws_layers = laws_layers.filter(|record| !record.is_empty());
+                state.laws_basis = laws_basis;
                 if matches!(
                     state.config.compiler.host.catalog_mode(),
                     CatalogMode::AutoSelected | CatalogMode::AutoFallbackDefault
@@ -3369,6 +3601,24 @@ fn advance_impl(
                 .ok_or(ProtocolError::InternalInvariant)?;
                 state.commit_document(document, next, "direct_ddl", &mut events)?;
             }
+            AuthoringInput::SavedLaws {
+                source,
+                description,
+                completion_ranges,
+                laws_layers,
+                laws_basis,
+                direction,
+            } => state.saved_laws(
+                SavedWork {
+                    source,
+                    description,
+                    completion_ranges,
+                    laws_layers,
+                    laws_basis,
+                },
+                direction,
+                &mut events,
+            )?,
             AuthoringInput::Description {
                 description,
                 auto_catalog,

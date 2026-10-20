@@ -36,7 +36,13 @@ import app.inku.mobile.ui.theme.ActiveRowTint
 import app.inku.mobile.ui.theme.Dimens
 
 /** One Vision model offered by a connection, with its catalog record. */
-internal data class VisionModelOption(val id: String, val label: String, val catalog: CatalogModel)
+internal data class VisionModelOption(
+    val id: String,
+    val label: String,
+    val catalog: CatalogModel,
+    /** What the model serves: the author's ticks in the model picker, else the catalog's. */
+    val purposes: List<String> = modelPurposes(catalog),
+)
 
 /** One connection's Vision models, as a group of Web's `vision_catalog`. */
 internal data class VisionModelGroup(val id: String, val label: String, val models: List<VisionModelOption>)
@@ -132,7 +138,7 @@ private fun VisionModelCard(model: VisionModelOption, selected: Boolean, onClick
                 ModelRecommendationStars(model.catalog, "vision")
             }
             Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
-                modelPurposeBadges(model.catalog).forEach { (badge, selectable) ->
+                modelPurposeBadges(model.catalog, model.purposes).forEach { (badge, selectable) ->
                     Surface(shape = RoundedCornerShape(Dimens.radiusPill),
                         border = BorderStroke(Dimens.hairline, MaterialTheme.colorScheme.outline),
                         modifier = Modifier.alpha(if (selectable) 1f else 0.45f)

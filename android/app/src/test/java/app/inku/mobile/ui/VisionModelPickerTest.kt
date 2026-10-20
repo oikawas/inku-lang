@@ -54,6 +54,47 @@ class VisionModelPickerTest {
     }
 
     @Test
+    fun theAuthorsTicksDecideThePurposesButNotOneTheModelDoesNotAnswer() {
+        val both = model("a", """{"purposes":["llm","vision"]}""")
+        assertEquals(listOf("llm", "vision"), modelPurposes(both))
+        assertEquals(listOf("vision"), modelPurposes(both, listOf("vision")))
+        assertEquals(emptyList<String>(), modelPurposes(both, emptyList()))
+        // Ticked or not, a purpose measured not to answer is not served (Server, 2026-10-13).
+        val mute = model("b", """{"purposes":["llm"],"unsupported_purposes":["vision"]}""")
+        assertEquals(listOf("llm"), modelPurposes(mute, listOf("llm", "vision")))
+        assertEquals(listOf("LLM" to true, "Vision" to false), modelPurposeBadges(mute, listOf("llm", "vision")))
+        // A catalog row that names no purpose serves LLM, as Server normalises it.
+        assertEquals(listOf("llm"), modelPurposes(model("c", """{"purposes":[]}""")))
+        assertEquals(listOf("LLM" to false, "Vision" to true), modelPurposeBadges(both, listOf("vision")))
+    }
+
+    @Test
+    fun theTicksReadBackPerConnectionAndAnythingElseIsNoTick() {
+        assertEquals(mapOf("openai" to mapOf("gpt-vision" to listOf("vision"), "gpt-text" to listOf("llm", "vision"))),
+            parseModelPurposes("""{"openai":{"gpt-vision":["vision","other"],"gpt-text":["llm","vision"]}}"""))
+        assertEquals(emptyMap<String, Map<String, List<String>>>(), parseModelPurposes("not json"))
+        assertEquals(emptyMap<String, Map<String, List<String>>>(), parseModelPurposes(null))
+    }
+
+    @Test
+    fun theSettingsPickerTicksPurposesAndTheListsFollowThem() {
+        fun source(name: String): String {
+            val relative = "app/src/main/java/app/inku/mobile/ui/$name"
+            val candidates = listOf(File(relative), File(relative.removePrefix("app/")), File("android", relative))
+            return (candidates.firstOrNull(File::isFile) ?: candidates.first()).readText()
+        }
+        val app = source("InkuApp.kt")
+        val picker = app.substring(app.indexOf("private fun ProviderModelPickerDialog("), app.indexOf("private fun LocalModelManagementDialog("))
+        assertTrue(picker.contains("purposes = purposes,"))
+        assertTrue(picker.contains("selected = if (next.isNotEmpty()) selected + id else selected - id"))
+        assertTrue(picker.contains("onSave(published, published.associateWith { purposes[it].orEmpty() })"))
+        assertEquals(2, Regex("saveModelPurposes\\(").findAll(app).count())
+        assertTrue(app.contains("provider != \"local-litert-lm\" && \"vision\" in servedPurposes(state, provider, choice.id)"))
+        assertTrue(app.contains("state.modelSelectionForCamera || \"llm\" in servedPurposes(state, providerId, it)"))
+        assertTrue(app.contains("testTag(\"PublishedPurpose:\${provider.providerId}:\$purpose\")"))
+    }
+
+    @Test
     fun bothVisionDialogsUseTheOneChooserFedFromTheGroupedCatalog() {
         fun source(name: String): String {
             val relative = "app/src/main/java/app/inku/mobile/ui/$name"

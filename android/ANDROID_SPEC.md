@@ -6,6 +6,15 @@ secrets must remain outside tracked files.
 
 Last updated: 2026-10-20.
 
+## 2026-10-20 Choosing LLM and Vision use in the model settings
+
+At the author's instruction, as in Server's model administration, each connection's Model selection now lets the author choose whether a published model is used for LLM, for Vision, or both.
+
+- Each model row in Model selection has LLM and Vision toggles. They start at the purposes chosen before, or the catalog's when none were chosen. A purpose the model gave no response to when measured cannot be pressed, and the reason shows below. Turning both off unpublishes the model and turning one on publishes it (Web's `toggleModelPurpose`); checking a model whose purposes are empty restores the catalog's.
+- The choice is kept in the app setting `model_purposes` (`{"<connection>": {"<model id>": ["llm", "vision"]}}`); the database schema is unchanged. The ChatGPT plan's published models are kept the same way under `chatgpt`.
+- A connection card shows its published models in an LLM row and a Vision row, as Server's summary does; a model used for both appears in both. The on-device connection keeps its single row.
+- The purposes shape the lists: the drawing model chooser and model inspection offer the models used for LLM (Server's `drawing_catalog`), and the Vision chooser of Juxtapose and Autonomous refinement the models used for Vision (`vision_catalog`); the Vision cards' purpose badges follow the same choice. The camera's model chooser reads photos and stays unfiltered. On-device models carry no purposes and are unchanged.
+
 ## 2026-10-20 Juxtapose in the work-editing menu
 
 At Serverセッション-claude's request, Web's Juxtapose (root `SPEC.md` §7.8) now reaches Android. It waited, by the author's decision, until its rules were in the shared core (plan `android-task/juxtapose-20261019`). Which sentences are offered, the prompt, how an answer is checked and how the chosen sentence is joined belong to the core's `inku.juxtaposition.v1` (`inku-pipeline/src/juxtaposition.rs`). Android decides which works lend a sentence, sends the work's image to Vision and draws the child.

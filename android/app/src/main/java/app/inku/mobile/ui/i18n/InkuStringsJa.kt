@@ -456,6 +456,7 @@ object InkuStringsJa : InkuStrings {
     override val modelSelection = "モデル選択"
     override val modelPickerNotInList = "一覧にない"
     override val modelPurposeNotSelectable = "（選べません）"
+    override val modelPurposeNoResponse = "薄い用途は、計測で応答が無かったため選べません"
     override val publishedModels = "ユーザーに公開するモデル"
     override val licenseAndDownload = "ライセンス/ダウンロード"
     override val licenseAndDownloaded = "ライセンス/取得済み"

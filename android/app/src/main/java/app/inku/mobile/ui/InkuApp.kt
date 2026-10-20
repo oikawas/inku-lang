@@ -4296,7 +4296,11 @@ private fun RefinementAdjustControls(
  */
 @Composable
 private fun ModelInspectionControls(state: InkuUiState, viewModel: InkuViewModel) {
-    val choices = modelChoicesFor(state.copy(modelSelectionForCamera = false), includeChatGpt = true)
+    // Drawing models only: those that serve LLM, as on the drawing model chooser.
+    val choices = modelChoicesFor(state.copy(modelSelectionForCamera = false), includeChatGpt = true).filter { choice ->
+        val provider = providerOfModelId(choice.id, state)
+        provider == "local-litert-lm" || "llm" in servedPurposes(state, provider, choice.id)
+    }
     Text(S.modelsToCompare(MAX_COMPARE_SELECTION), style = MaterialTheme.typography.labelMedium)
     WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
         choices.forEach { choice ->
@@ -5014,7 +5018,11 @@ private fun ChatGptModelCard(state: InkuUiState, viewModel: InkuViewModel) {
             candidateLabels = plan.models?.associate { it.id to it.label }.orEmpty(),
             onDismiss = { picker = false }, onFetchModels = { viewModel.fetchProviderModels("chatgpt") },
             fetchState = state.providerModelFetchStates["chatgpt"],
-            onSave = { models -> picker = false; viewModel.publishChatGptModels(session, models) },
+            onSave = { models, purposes ->
+                picker = false
+                viewModel.publishChatGptModels(session, models)
+                viewModel.saveModelPurposes("chatgpt", purposes)
+            },
         )
     }
 }
@@ -5042,6 +5050,7 @@ private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mod
                     candidateModelIds = state.providerModelCandidates[provider.providerId],
                     modelAssets = state.modelAssets,
                     onSave = viewModel::saveProviderSetting,
+                    onSavePurposes = { viewModel.saveModelPurposes(provider.providerId, it) },
                     onClearApiKey = { viewModel.clearProviderApiKey(provider.providerId) },
                     onDelete = { viewModel.deleteProvider(provider.providerId) },
                     onFetchModels = { viewModel.fetchProviderModels(provider.providerId) },
@@ -5071,6 +5080,7 @@ private fun ProviderConnectionCard(
     candidateModelIds: List<String>?,
     modelAssets: List<app.inku.mobile.data.db.ModelAssetEntity>,
     onSave: (String, String, String, String, String, String, (String?) -> Unit) -> Unit,
+    onSavePurposes: (Map<String, List<String>>) -> Unit,
     onClearApiKey: () -> Unit,
     onDelete: () -> Unit,
     onFetchModels: () -> Unit,
@@ -5156,10 +5166,22 @@ private fun ProviderConnectionCard(
                 }
                 if (publishedModelIds.isEmpty()) {
                     Text(S.noPublishedModels, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                } else {
+                } else if (provider.isDefaultLocal) {
                     WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
                         publishedModelIds.forEach { modelId ->
                             PublishedModelChip(modelDisplayName(modelId))
+                        }
+                    }
+                } else {
+                    // One row per purpose, as Server's summary: the purpose is read once, not on every model.
+                    listOf("llm" to "LLM", "vision" to "Vision").forEach { (purpose, label) ->
+                        val models = publishedModelIds.filter { purpose in servedPurposes(state, provider.providerId, it) }
+                        if (models.isNotEmpty()) Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
+                            modifier = Modifier.testTag("PublishedPurpose:${provider.providerId}:$purpose")) {
+                            Text("$label ${models.size}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
+                                models.forEach { modelId -> PublishedModelChip(modelDisplayName(modelId)) }
+                            }
                         }
                     }
                 }
@@ -5245,9 +5267,10 @@ private fun ProviderConnectionCard(
                 onFetchModels = onFetchModels,
                 fetchState = fetchState,
                 onCheckAccess = onCheckAccess,
-                onSave = { selected ->
+                onSave = { selected, purposes ->
                     modelPickerOpen = false
                     save(displayName, baseUrl, "", selected.joinToString("\n"))
+                    onSavePurposes(purposes)
                 },
             )
         }
@@ -5360,7 +5383,8 @@ private fun ProviderModelPickerDialog(
     fetchState: ProviderModelFetchState?,
     candidateLabels: Map<String, String> = emptyMap(),
     onCheckAccess: ((String) -> Unit)? = null,
-    onSave: (List<String>) -> Unit,
+    /** Saves the published models and, as Server's `model_purposes`, what each is used for. */
+    onSave: (List<String>, Map<String, List<String>>) -> Unit,
 ) {
     var search by remember(provider.providerId) { mutableStateOf("") }
     val normalizedSelection = selectedModels.map { app.inku.mobile.data.ModelCatalog.rawId(provider.providerId, it) }.toSet()
@@ -5372,7 +5396,11 @@ private fun ProviderModelPickerDialog(
         .map { catalog.resolve(provider.providerId, it, candidateModelIds?.toSet(), observation?.access?.get(it)) }
     val offeredForSelection = if (provider.providerId == "chatgpt") candidateModelIds.orEmpty().toSet() else null
     val candidateIds = candidateModels.filter { it.publishable && (offeredForSelection == null || it.id in offeredForSelection) }.map { it.id }.toSet()
-    val selectionChanged = selected != normalizedSelection
+    // Server's picker starts each model at its saved purposes, or the catalog's.
+    val savedPurposes = state.modelPurposes[provider.providerId].orEmpty()
+    val initialPurposes = candidateModels.associate { it.id to modelPurposes(it, savedPurposes[it.id]) }
+    var purposes by remember(provider.providerId, provider.publishedModelsJson, savedPurposes) { mutableStateOf(initialPurposes) }
+    val selectionChanged = selected != normalizedSelection || purposes != initialPurposes
     val fetching = fetchState?.loading == true
     val filtered = candidateModels.filter { model ->
         val query = search.trim().lowercase()
@@ -5408,10 +5436,23 @@ private fun ProviderModelPickerDialog(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
                 )
                 ModelCatalogRows(catalog, filtered, selected, S,
-                    onSelect = { id, checked -> selected = if (checked) selected + id else selected - id },
+                    onSelect = { id, checked ->
+                        selected = if (checked) selected + id else selected - id
+                        // Published with neither purpose, it would appear nowhere: take the catalog's back.
+                        val model = candidateModels.firstOrNull { it.id == id }
+                        if (checked && model != null && purposes[id].isNullOrEmpty()) purposes = purposes + (id to modelPurposes(model))
+                    },
                     modifier = Modifier.fillMaxWidth().weight(1f), enabled = !fetching, names = candidateLabels,
                     offeredForSelection = offeredForSelection,
-                    onCheckAccess = if (provider.providerId == "ollama-cloud" && !provider.encryptedApiKey.isNullOrBlank()) onCheckAccess else null)
+                    onCheckAccess = if (provider.providerId == "ollama-cloud" && !provider.encryptedApiKey.isNullOrBlank()) onCheckAccess else null,
+                    purposes = purposes,
+                    onTogglePurpose = { id, purpose ->
+                        // Web `toggleModelPurpose`: a model with no purpose left is not published.
+                        val current = purposes[id].orEmpty()
+                        val next = if (purpose in current) current - purpose else listOf("llm", "vision").filter { it in current || it == purpose }
+                        purposes = purposes + (id to next)
+                        selected = if (next.isNotEmpty()) selected + id else selected - id
+                    })
                 fetchState?.let {
                     Text(
                         it.message,
@@ -5425,7 +5466,10 @@ private fun ProviderModelPickerDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(selected.filter { it in candidateIds }) }, enabled = !fetching) { Text(S.save) }
+            TextButton(onClick = {
+                val published = selected.filter { it in candidateIds }
+                onSave(published, published.associateWith { purposes[it].orEmpty() })
+            }, enabled = !fetching) { Text(S.save) }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(S.cancel) }
@@ -5841,20 +5885,22 @@ private fun modelChoicesFor(state: InkuUiState, includeChatGpt: Boolean = true):
 private fun visionModelChoicesFor(state: InkuUiState): List<ModelChoice> = modelChoicesFor(
     state.copy(modelSelectionForCamera = false), includeChatGpt = true,
 ).filter { choice ->
+    // Server's `vision_catalog`: the published models that serve Vision.
     val provider = providerOfModelId(choice.id, state)
-    if (provider == "local-litert-lm") return@filter false
-    val record = catalogModelFor(state, provider, choice.id).record
-    val purposes = record.optJSONArray("purposes") ?: return@filter false
-    val unsupported = record.optJSONArray("unsupported_purposes")
-    (0 until purposes.length()).any { purposes.optString(it) == "vision" } &&
-        (unsupported == null || (0 until unsupported.length()).none { unsupported.optString(it) == "vision" })
+    provider != "local-litert-lm" && "vision" in servedPurposes(state, provider, choice.id)
 }
+
+/** The purposes a published model serves: the author's ticks (Server's `model_purposes`), else the catalog's. */
+private fun servedPurposes(state: InkuUiState, providerId: String, modelId: String): List<String> =
+    modelPurposes(catalogModelFor(state, providerId, modelId),
+        state.modelPurposes[providerId]?.get(app.inku.mobile.data.ModelCatalog.rawId(providerId, modelId)))
 
 /** [visionModelChoicesFor] grouped by connection, as Web's `vision_catalog` reaches `ModelCardPicker`. */
 private fun visionModelGroupsFor(state: InkuUiState): List<VisionModelGroup> =
     visionModelChoicesFor(state).groupBy { providerOfModelId(it.id, state) }.map { (provider, choices) ->
-        VisionModelGroup(provider, choices.first().providerName,
-            choices.map { VisionModelOption(it.id, it.label, catalogModelFor(state, provider, it.id)) })
+        VisionModelGroup(provider, choices.first().providerName, choices.map {
+            VisionModelOption(it.id, it.label, catalogModelFor(state, provider, it.id), servedPurposes(state, provider, it.id))
+        })
     }
 
 /** The same catalog-filtered IDs shown by the autonomous Vision picker. */
@@ -5884,7 +5930,11 @@ private fun modelOptionsForProvider(state: InkuUiState, providerId: String, stri
         }
     }
     val provider = state.providerSettings.firstOrNull { it.providerId == providerId } ?: return emptyList()
-    return availablePublishedModels(provider, state).map { id ->
+    // The drawing models are Server's `drawing_catalog`: those that serve LLM.
+    // The camera's description reads the photo, so its list is left whole.
+    return availablePublishedModels(provider, state)
+        .filter { state.modelSelectionForCamera || "llm" in servedPurposes(state, providerId, it) }
+        .map { id ->
         ModelOptionChoice(
             rawId = id,
             qualifiedId = qualifyModelId(provider.providerId, id),

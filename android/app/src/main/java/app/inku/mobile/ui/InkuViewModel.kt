@@ -131,6 +131,24 @@ const val SETTING_KEY_DISPLAY_SAFE_MARGINS = "display_safe_margins"
  * `inku-wild` and states it on every fresh paint (`features/wild/render.ts`).
  */
 const val SETTING_KEY_RENDER_WILD = "render_wild"
+
+/**
+ * The purposes the author ticked per published model, as Server's
+ * `model_purposes`: `{"<connection>": {"<model id>": ["llm", "vision"]}}`.
+ */
+const val SETTING_KEY_MODEL_PURPOSES = "model_purposes"
+
+/** [SETTING_KEY_MODEL_PURPOSES] read back; anything unreadable is no tick at all. */
+internal fun parseModelPurposes(json: String?): Map<String, Map<String, List<String>>> = runCatching {
+    val root = JSONObject(json ?: "{}")
+    root.keys().asSequence().associateWith { provider ->
+        val models = root.getJSONObject(provider)
+        models.keys().asSequence().associateWith { model ->
+            val array = models.getJSONArray(model)
+            (0 until array.length()).map(array::getString).filter { it == "llm" || it == "vision" }
+        }
+    }
+}.getOrDefault(emptyMap())
 /** Said by every generating entry point that refuses while candidates are drawn. */
 val REFINEMENT_IN_PROGRESS: (InkuStrings) -> String = { it.refinementInProgress }
 /** Up to four explicitly chosen models, each used for both stages (SPEC §7.8). */
@@ -349,6 +367,8 @@ data class InkuUiState(
     val autonomousSettings: AutonomousRefinementSettings = AutonomousRefinementSettings(),
     val autonomousStatus: AutonomousRefinementStatus = AutonomousRefinementStatus(),
     val juxtaposition: JuxtapositionDialogState? = null,
+    /** [SETTING_KEY_MODEL_PURPOSES]: which published models serve LLM and which Vision. */
+    val modelPurposes: Map<String, Map<String, List<String>>> = emptyMap(),
 ) {
     /**
      * Whether any operation is running.
@@ -4536,6 +4556,7 @@ class InkuViewModel @JvmOverloads constructor(
             batchPromptHistory = batchHistory,
             batchRetryLimit = settings["batch_retry_limit"]?.let { JSONObject(it).optInt("value", 0).coerceIn(0, 5) } ?: 0,
             refinementElement = refinementElement,
+            modelPurposes = parseModelPurposes(settings[SETTING_KEY_MODEL_PURPOSES]),
             includeThinking = thinking,
             selectedModelId = restoredUnifiedModel,
             selectedStage2ModelId = restoredUnifiedModel,
@@ -4584,6 +4605,22 @@ class InkuViewModel @JvmOverloads constructor(
      * message written after the switch come out in the new language.
      */
     private fun strings(): InkuStrings = stringsFor(localState.value.uiLanguage)
+
+    /**
+     * The purposes ticked in a connection's model picker (Server's
+     * `model_purposes`). They replace that connection's earlier ticks; a model
+     * with neither ticked is not published, so it is not kept here.
+     */
+    fun saveModelPurposes(providerId: String, purposes: Map<String, List<String>>) {
+        val kept = purposes.filterValues { it.isNotEmpty() }
+        val next = localState.value.modelPurposes - providerId + (providerId to kept)
+        localState.value = localState.value.copy(modelPurposes = next)
+        val json = JSONObject()
+        next.forEach { (provider, models) ->
+            json.put(provider, JSONObject().apply { models.forEach { (model, list) -> put(model, JSONArray(list)) } })
+        }
+        persistSetting(SETTING_KEY_MODEL_PURPOSES, json.toString())
+    }
 
     private fun persistSetting(key: String, valueJson: String) {
         viewModelScope.launch {

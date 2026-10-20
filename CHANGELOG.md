@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-20 — Android: choose whether a model is used for LLM or Vision in the settings
+
+As in Server's model administration, a connection's Model selection now has LLM and Vision toggles for each published model. The drawing model chooser and model inspection offer only the models used for LLM, and the Vision chooser of Juxtapose and Autonomous refinement only those used for Vision. A connection card shows its published models in an LLM row and a Vision row. A purpose a model gave no response to when measured cannot be chosen.
+
 ### 2026-10-20 — Android: add Juxtapose to the work-editing menu
 
 Web's Juxtapose now reaches Android. It follows Change model in the work-editing menu: the AI picks four sentences from the descriptions of your other works, and choosing one adds it after this description and draws a child of the work. Which sentences are offered, the prompt, how an answer is checked and how the sentence is joined come from the shared core, so they follow the same rules as Web and Server. A work with no description does not offer it, and a work drawn from its DDL shows it disabled. The Vision model that picks is the one Autonomous refinement uses, and both now choose it as Web does: cards grouped by connection, with Vision stars and LLM and Vision purpose badges, and a model that cannot be chosen shown greyed.

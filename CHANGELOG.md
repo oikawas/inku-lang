@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-21 — The AI refinement's visible-difference gate takes its share of the drawn cells
+
+The shared core's gate for the autonomous refinement (a child drawn by an AI move is kept only when it looks different from its parent) divided the changed cells by all the cells of the square (48×48). A drawing of dots or thin lines alone could move everything it drew and stay under a fifth (of the 51 laws-move children of the drawing trial, 14 passed). By the author's decision it now divides by the cells drawn in the before or the after drawing, still at a fifth. The ground colour is read from the cells along the edge of the before drawing, and neither the margin of a drawing that is not square nor a half-covered row at its edge counts as drawn. A cell that stays close to the ground in both drawings does not count even when it changes. The `measure` answer's `different` becomes `changed` (the drawn cells that changed) and gains `drawn` (the drawn cells). On the same 51 children, 48 pass. No app uses this gate yet, so the screens and drawings do not change.
+
 ### 2026-10-20 — Android: choose whether a model is used for LLM or Vision in the settings
 
 As in Server's model administration, a connection's Model selection now has LLM and Vision toggles for each published model. The drawing model chooser and model inspection offer only the models used for LLM, and the Vision chooser of Juxtapose and Autonomous refinement only those used for Vision. A connection card shows its published models in an LLM row and a Vision row. A purpose a model gave no response to when measured cannot be chosen.

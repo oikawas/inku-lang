@@ -205,9 +205,9 @@ pub fn rasterize_svg_region(
     .unwrap_or(Err(RasterFailure::InternalInvariant))
 }
 
-/// `measure` of the autonomous refinement (stage 1b's visible-difference gate),
-/// or `None` for its other actions, which the pipeline answers. Both drawings
-/// are made here, with the shared rasterizer, so that the three apps count the
+/// `measure` of the autonomous refinement (the visible-difference gate), or
+/// `None` for its other actions, which the pipeline answers. Both drawings are
+/// made here, with the shared rasterizer, so that the three apps count the
 /// same pixels.
 pub(crate) fn measure_visible_difference(input: &[u8]) -> Option<Vec<u8>> {
     use inku_pipeline::autonomous_refine::{

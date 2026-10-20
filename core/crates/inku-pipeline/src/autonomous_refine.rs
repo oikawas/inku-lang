@@ -17,7 +17,8 @@
 //!     used, is followed once by the other move from the same parent, or by
 //!     the same move with what it used left out when the other cannot start.
 //!   - Two turns in a row that keep nothing stop the run.
-//! - [`visible_count`]: stage 1b's visible-difference gate on two drawings.
+//! - [`visible_count`]: the visible-difference gate on two drawings, the share
+//!   of the drawn cells that changed.
 //! - [`record`]: the `ai_move` a child keeps on its lineage edge.
 //!
 //! One JSON request with an `action`, one JSON answer
@@ -47,11 +48,15 @@ const JUXTAPOSITION_CHOICES: usize = 4;
 /// (2026-10-19), and a card rebuilds its layer.
 const LAWS_CARDS: &str = "invite";
 
-/// Stage 1b's gate (2026-10-19): each drawing fitted into a white square of
-/// `GATE_SIZE` pixels and averaged into `GATE_GRID`² cells. A cell differs when
-/// one of its colour channels moves by `GATE_LEVEL` or more, and the change is
-/// visible when a fifth of the cells differ. The level was read from the
-/// author's marks on stage 1's 48 cards; the fifth is the author's choice.
+/// The visible-difference gate: each drawing fitted into a white square of
+/// `GATE_SIZE` pixels and averaged into `GATE_GRID`² cells. A cell changed when
+/// one of its colour channels moves by `GATE_LEVEL` or more, and is drawn when
+/// either drawing stands that far from the bare ground there. The change is
+/// visible when a fifth of the drawn cells changed. Stage 1b (2026-10-19) read
+/// the level from the author's marks on stage 1's 48 cards, and the author
+/// chose a fifth, then of all the cells. A sparse drawing could move all it
+/// drew and stay under a fifth of the square, so the author made it a fifth of
+/// the drawn cells (2026-10-21).
 pub const GATE_SIZE: u32 = 384;
 pub const GATE_GRID: u32 = 48;
 pub const GATE_LEVEL: u8 = 12;
@@ -481,29 +486,53 @@ fn next_json(next: &Next) -> Value {
 // The visible-difference gate
 // ---------------------------------------------------------------------------
 
-/// What stage 1b's gate counts on two drawings.
+/// What the gate counts on two drawings.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct GateCount {
-    pub different: u32,
+    /// Drawn cells that changed.
+    pub changed: u32,
+    /// Cells drawn in the before or the after drawing.
+    pub drawn: u32,
+    /// All the cells of the square.
     pub cells: u32,
 }
 
 impl GateCount {
-    /// The share of cells that differ, to four places.
+    /// The share of the drawn cells that changed, to four places; 0 when
+    /// nothing is drawn.
     #[must_use]
     pub fn share(self) -> f64 {
-        (f64::from(self.different) / f64::from(self.cells) * 10_000.0).round() / 10_000.0
+        if self.drawn == 0 {
+            return 0.0;
+        }
+        (f64::from(self.changed) / f64::from(self.drawn) * 10_000.0).round() / 10_000.0
     }
 
-    /// Whether a fifth of the cells differ.
+    /// Whether a fifth of the drawn cells changed.
     #[must_use]
     pub const fn passes(self) -> bool {
-        self.different as u64 * GATE_SHARE_DENOMINATOR >= self.cells as u64 * GATE_SHARE_NUMERATOR
+        self.drawn > 0
+            && self.changed as u64 * GATE_SHARE_DENOMINATOR
+                >= self.drawn as u64 * GATE_SHARE_NUMERATOR
     }
 }
 
+/// A drawing as the gate reads it, in a white square.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GateDrawing {
+    /// The drawing laid over white and centred, as RGB8 (row-major).
+    pub rgb: Vec<u8>,
+    /// How much the drawing covers each pixel (its alpha); 0 outside it.
+    pub cover: Vec<u8>,
+    /// Where the drawing lies in the square.
+    pub left: u32,
+    pub top: u32,
+    pub width: u32,
+    pub height: u32,
+}
+
 /// A drawing as the gate reads it: premultiplied RGBA8 (`stride` bytes a row)
-/// laid over white and centred in a white square of `side` pixels, as RGB8.
+/// laid over white and centred in a white square of `side` pixels.
 /// `None` when the drawing does not fit the square or the buffer is short.
 #[must_use]
 pub fn gate_square(
@@ -512,7 +541,7 @@ pub fn gate_square(
     stride: u32,
     pixels: &[u8],
     side: u32,
-) -> Option<Vec<u8>> {
+) -> Option<GateDrawing> {
     let (width, height, stride, side) = (
         width as usize,
         height as usize,
@@ -525,64 +554,130 @@ pub fn gate_square(
     if height > 0 && pixels.len() < stride * (height - 1) + width * 4 {
         return None;
     }
-    let mut square = vec![u8::MAX; side * side * 3];
+    let mut rgb = vec![u8::MAX; side * side * 3];
+    let mut cover = vec![0; side * side];
     let (left, top) = ((side - width) / 2, (side - height) / 2);
     for y in 0..height {
         for x in 0..width {
             let from = y * stride + x * 4;
-            let to = ((top + y) * side + left + x) * 3;
+            let at = (top + y) * side + left + x;
+            cover[at] = pixels[from + 3];
             let uncovered = u8::MAX - pixels[from + 3];
             for channel in 0..3 {
                 // A premultiplied colour over white: c + (255 − α).
-                square[to + channel] = pixels[from + channel].saturating_add(uncovered);
+                rgb[at * 3 + channel] = pixels[from + channel].saturating_add(uncovered);
             }
         }
     }
-    Some(square)
+    Some(GateDrawing {
+        rgb,
+        cover,
+        left: u32::try_from(left).ok()?,
+        top: u32::try_from(top).ok()?,
+        width: u32::try_from(width).ok()?,
+        height: u32::try_from(height).ok()?,
+    })
 }
 
-/// Stage 1b's gate on two opaque RGB8 squares of `side` pixels (row-major,
-/// three bytes a pixel, `side` a multiple of `GATE_GRID`). Each square is
-/// averaged into `GATE_GRID`² cells, a cell's mean rounded half up, and a cell
-/// differs when one channel's means are `GATE_LEVEL` or more apart. `None` when
-/// the buffers do not have that shape.
+/// The gate on two drawings from [`gate_square`] of `side` pixels (`side` a
+/// multiple of `GATE_GRID`). Each square is averaged into `GATE_GRID`² cells,
+/// a cell's mean rounded half up. A cell changed when one channel's means are
+/// `GATE_LEVEL` or more apart, and is drawn when the before or the after
+/// drawing's mean is that far from the bare ground's. The bare ground is the
+/// ground colour laid over white as the before drawing covers each pixel, so
+/// the white margin of a drawing that is not square, and its half-covered
+/// edge, stay bare. The ground colour is the median, channel by channel, of
+/// the before drawing's cells that lie whole inside it along its edge (the
+/// lower of the two middle values), or white when no cell lies whole inside
+/// it. `None` when the drawings do not have that shape.
 #[must_use]
-pub fn visible_count(before: &[u8], after: &[u8], side: u32) -> Option<GateCount> {
+pub fn visible_count(before: &GateDrawing, after: &GateDrawing, side: u32) -> Option<GateCount> {
     if side == 0 || !side.is_multiple_of(GATE_GRID) {
         return None;
     }
     let side = side as usize;
-    let expected = side * side * 3;
-    if before.len() != expected || after.len() != expected {
-        return None;
+    for drawing in [before, after] {
+        if drawing.rgb.len() != side * side * 3 || drawing.cover.len() != side * side {
+            return None;
+        }
     }
     let grid = GATE_GRID as usize;
     let block = side / grid;
     let area = u32::try_from(block * block).ok()?;
-    let mean = |sum: u32| (sum + area / 2) / area;
-    let mut different = 0;
-    for cell_y in 0..grid {
-        for cell_x in 0..grid {
-            let mut sums = [[0_u32; 3]; 2];
-            for y in cell_y * block..(cell_y + 1) * block {
-                for x in cell_x * block..(cell_x + 1) * block {
-                    let at = (y * side + x) * 3;
-                    for channel in 0..3 {
-                        sums[0][channel] += u32::from(before[at + channel]);
-                        sums[1][channel] += u32::from(after[at + channel]);
-                    }
-                }
-            }
-            if (0..3).any(|channel| {
-                mean(sums[0][channel]).abs_diff(mean(sums[1][channel])) >= u32::from(GATE_LEVEL)
-            }) {
-                different += 1;
+    let before_means = cell_means(&before.rgb, side, block, area);
+    let ground = ground_colour(&before_means, before, block);
+    let mut bare = vec![0; side * side * 3];
+    for (at, &alpha) in before.cover.iter().enumerate() {
+        for channel in 0..3 {
+            // The ground premultiplied by the cover, over white.
+            let premultiplied =
+                u8::try_from((ground[channel] * u32::from(alpha) + 127) / 255).ok()?;
+            bare[at * 3 + channel] = premultiplied.saturating_add(u8::MAX - alpha);
+        }
+    }
+    let bare = cell_means(&bare, side, block, area);
+    let (before, after) = (before_means, cell_means(&after.rgb, side, block, area));
+    let apart = |one: &[u32; 3], other: &[u32; 3]| {
+        (0..3).any(|channel| one[channel].abs_diff(other[channel]) >= u32::from(GATE_LEVEL))
+    };
+    let (mut changed, mut drawn) = (0, 0);
+    for cell in 0..grid * grid {
+        if apart(&before[cell], &bare[cell]) || apart(&after[cell], &bare[cell]) {
+            drawn += 1;
+            if apart(&before[cell], &after[cell]) {
+                changed += 1;
             }
         }
     }
     Some(GateCount {
-        different,
+        changed,
+        drawn,
         cells: GATE_GRID * GATE_GRID,
+    })
+}
+
+/// The cells' means of an RGB8 square, row by row, rounded half up.
+fn cell_means(rgb: &[u8], side: usize, block: usize, area: u32) -> Vec<[u32; 3]> {
+    let grid = side / block;
+    let mut sums = vec![[0_u32; 3]; grid * grid];
+    for y in 0..side {
+        for x in 0..side {
+            let at = (y * side + x) * 3;
+            let cell = &mut sums[(y / block) * grid + x / block];
+            for channel in 0..3 {
+                cell[channel] += u32::from(rgb[at + channel]);
+            }
+        }
+    }
+    sums.into_iter()
+        .map(|cell| cell.map(|sum| (sum + area / 2) / area))
+        .collect()
+}
+
+/// The median, channel by channel, of the cells along the edge of those that
+/// lie whole inside the drawing; white when no cell does.
+fn ground_colour(means: &[[u32; 3]], drawing: &GateDrawing, block: usize) -> [u32; 3] {
+    let grid = GATE_GRID as usize;
+    let (left, top) = (drawing.left as usize, drawing.top as usize);
+    let (first_x, first_y) = (left.div_ceil(block), top.div_ceil(block));
+    let end_x = (left + drawing.width as usize) / block;
+    let end_y = (top + drawing.height as usize) / block;
+    if first_x >= end_x || first_y >= end_y {
+        return [u32::from(u8::MAX); 3];
+    }
+    let mut channels: [Vec<u32>; 3] = Default::default();
+    for y in first_y..end_y {
+        for x in first_x..end_x {
+            if y == first_y || y + 1 == end_y || x == first_x || x + 1 == end_x {
+                for (channel, values) in channels.iter_mut().enumerate() {
+                    values.push(means[y * grid + x][channel]);
+                }
+            }
+        }
+    }
+    channels.map(|mut values| {
+        values.sort_unstable();
+        values[(values.len() - 1) / 2]
     })
 }
 
@@ -592,7 +687,8 @@ pub fn measure_answer(count: GateCount) -> Vec<u8> {
     envelope(Ok(json!({
         "share": count.share(),
         "passes": count.passes(),
-        "different": count.different,
+        "changed": count.changed,
+        "drawn": count.drawn,
         "cells": count.cells,
         "level": GATE_LEVEL,
         "threshold": GATE_THRESHOLD,
@@ -1009,81 +1105,73 @@ mod tests {
         }
     }
 
+    /// A square drawing that covers all of the gate's square.
+    fn opaque(rgb: Vec<u8>) -> GateDrawing {
+        GateDrawing {
+            cover: vec![u8::MAX; rgb.len() / 3],
+            rgb,
+            left: 0,
+            top: 0,
+            width: GATE_SIZE,
+            height: GATE_SIZE,
+        }
+    }
+
     #[test]
-    fn the_gate_counts_the_cells_a_drawing_moves() {
+    fn the_gate_counts_the_drawn_cells_that_changed() {
         let side = GATE_SIZE as usize;
-        let white = vec![u8::MAX; side * side * 3];
+        let white = opaque(vec![u8::MAX; side * side * 3]);
+        let nothing = visible_count(&white, &white, GATE_SIZE).unwrap();
         assert_eq!(
-            visible_count(&white, &white, GATE_SIZE),
-            Some(GateCount {
-                different: 0,
+            nothing,
+            GateCount {
+                changed: 0,
+                drawn: 0,
                 cells: 2304
-            })
-        );
-        // The top 80 rows turned black: ten whole rows of cells.
-        let mut after = white.clone();
-        for y in 0..80 {
-            for x in 0..side {
-                let at = (y * side + x) * 3;
-                after[at..at + 3].copy_from_slice(&[0, 0, 0]);
             }
-        }
-        let count = visible_count(&white, &after, GATE_SIZE).unwrap();
-        assert_eq!(count.different, 10 * 48);
-        assert_eq!(count.share(), 0.2083);
-        assert!(count.passes());
-        // A change of 11 in one channel is below the level; 12 reaches it.
-        let mut faint = white.clone();
-        for value in faint.iter_mut().step_by(3) {
-            *value = u8::MAX - 11;
-        }
+        );
+        assert_eq!(nothing.share(), 0.0);
+        assert!(!nothing.passes());
+        // A black band of 16 rows (two rows of cells) moves from the top to the
+        // bottom: all it drew changed, though under a tenth of the square did.
+        let band = |from: usize| {
+            let mut rgb = vec![u8::MAX; side * side * 3];
+            rgb[from * side * 3..(from + 16) * side * 3].fill(0);
+            opaque(rgb)
+        };
+        let moved = visible_count(&band(0), &band(side - 16), GATE_SIZE).unwrap();
+        assert_eq!((moved.changed, moved.drawn), (4 * 48, 4 * 48));
+        assert_eq!(moved.share(), 1.0);
+        assert!(moved.passes());
+        // A change of 11 in one channel is not drawn; 12 is drawn and changed.
+        let faint = |by: u8| {
+            let mut rgb = vec![u8::MAX; side * side * 3];
+            rgb.iter_mut().step_by(3).for_each(|value| *value -= by);
+            opaque(rgb)
+        };
         assert_eq!(
-            visible_count(&white, &faint, GATE_SIZE).unwrap().different,
+            visible_count(&white, &faint(11), GATE_SIZE).unwrap().drawn,
             0
         );
-        for value in faint.iter_mut().step_by(3) {
-            *value = u8::MAX - 12;
-        }
-        assert_eq!(
-            visible_count(&white, &faint, GATE_SIZE).unwrap().different,
-            2304
-        );
-        assert_eq!(visible_count(&white, &white[1..], GATE_SIZE), None);
+        let level = visible_count(&white, &faint(12), GATE_SIZE).unwrap();
+        assert_eq!((level.changed, level.drawn), (2304, 2304));
+        let short = opaque(vec![u8::MAX; side * side * 3 - 3]);
+        assert_eq!(visible_count(&white, &short, GATE_SIZE), None);
         assert_eq!(visible_count(&white, &white, 383), None);
     }
 
     #[test]
-    fn the_gate_passes_from_a_fifth_of_the_cells() {
-        assert!(
-            !GateCount {
-                different: 460,
-                cells: 2304
-            }
-            .passes()
-        );
-        assert!(
-            GateCount {
-                different: 461,
-                cells: 2304
-            }
-            .passes()
-        );
-        assert_eq!(
-            GateCount {
-                different: 460,
-                cells: 2304
-            }
-            .share(),
-            0.1997
-        );
-        assert_eq!(
-            GateCount {
-                different: 461,
-                cells: 2304
-            }
-            .share(),
-            0.2001
-        );
+    fn the_gate_passes_from_a_fifth_of_the_drawn_cells() {
+        let count = |changed, drawn| GateCount {
+            changed,
+            drawn,
+            cells: 2304,
+        };
+        assert!(!count(95, 480).passes());
+        assert_eq!(count(95, 480).share(), 0.1979);
+        assert!(count(96, 480).passes());
+        assert_eq!(count(96, 480).share(), 0.2);
+        assert!(!count(0, 0).passes());
     }
 
     #[test]
@@ -1091,11 +1179,19 @@ mod tests {
         // Two pixels: opaque red, and black at half cover (premultiplied).
         let pixels = [255, 0, 0, 255, 0, 0, 0, 128];
         let square = gate_square(2, 1, 8, &pixels, 4).unwrap();
-        assert_eq!(square.len(), 4 * 4 * 3);
+        assert_eq!(square.rgb.len(), 4 * 4 * 3);
         // Row 1 (the drawing's one row is centred at top 1), columns 1 and 2.
-        assert_eq!(&square[(4 + 1) * 3..(4 + 1) * 3 + 3], &[255, 0, 0]);
-        assert_eq!(&square[(4 + 2) * 3..(4 + 2) * 3 + 3], &[127, 127, 127]);
-        assert_eq!(&square[0..3], &[255, 255, 255]);
+        assert_eq!(&square.rgb[(4 + 1) * 3..(4 + 1) * 3 + 3], &[255, 0, 0]);
+        assert_eq!(&square.rgb[(4 + 2) * 3..(4 + 2) * 3 + 3], &[127, 127, 127]);
+        assert_eq!(&square.rgb[0..3], &[255, 255, 255]);
+        assert_eq!(
+            (square.cover[4 + 1], square.cover[4 + 2], square.cover[0]),
+            (255, 128, 0)
+        );
+        assert_eq!(
+            (square.left, square.top, square.width, square.height),
+            (1, 1, 2, 1)
+        );
         assert_eq!(gate_square(5, 1, 20, &[0; 20], 4), None);
         assert_eq!(gate_square(2, 2, 8, &pixels, 4), None);
     }

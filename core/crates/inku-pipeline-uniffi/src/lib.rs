@@ -193,9 +193,9 @@ pub fn juxtaposition(input_bytes: Vec<u8>) -> Vec<u8> {
 
 /// The autonomous refinement (AI自動推敲): one JSON request with an `action`
 /// (`next`, `record`, `measure`), one JSON answer (`inku.autonomous-refine.v1`).
-/// `measure` draws its two SVGs here with the shared rasterizer and counts stage
-/// 1b's visible-difference gate on them. The host sends, draws and saves the
-/// moves. A panic answers `{"error": "internal_invariant"}`.
+/// `measure` draws its two SVGs here with the shared rasterizer and counts the
+/// visible-difference gate on them. The host sends, draws and saves the moves.
+/// A panic answers `{"error": "internal_invariant"}`.
 #[uniffi::export]
 pub fn autonomous_refine(input_bytes: Vec<u8>) -> Vec<u8> {
     catch_unwind(AssertUnwindSafe(|| {

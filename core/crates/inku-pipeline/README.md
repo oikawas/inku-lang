@@ -85,11 +85,13 @@ chooses one or two of the eighteen color laws (B11, B13, B14, B16 to B20, C7 to
 C9, D1 to D7) for the work, shown its layers as the core estimates them drawn
 (each layer's drawn contrast and chroma and the colors it would not be seen in,
 from the renderer's editable SVG) and its paints' places on Itten's wheel. The
-core keeps the colors the description states, the colors the laws stage decided
-(aerial perspective, a pattern), plugged-in layers and the ground, checks the
-laws of lightness by the drawn lightness, and where a law leaves the colors to
-the tool takes the combination that recolors the main layer, then the most
-harmonious one. It prints the layers the colors change (a color, colors in turn
+core keeps the colors the description states, plugged-in layers and the
+ground, recolors a layer the laws stage colored (aerial perspective, a pattern)
+only in colors that keep its law, checks the laws of lightness by the drawn
+lightness and D2 once every law is applied, fades only a layer of three marks
+or more, refuses an answer that changes nothing, and where a law leaves the
+colors to the tool takes the combination that recolors the main layer, then the
+most harmonious one. It prints the layers the colors change (a color, colors in turn
 or shifting, a fade, a handling, a numeric size, a kasane's lower colors before
 the layer) and compiles the printed document as the run compiles it before it
 is committed; the record of the laws follows the sentences printed again. Each result

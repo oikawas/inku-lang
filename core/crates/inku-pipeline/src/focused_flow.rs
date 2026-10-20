@@ -3278,3 +3278,161 @@ fn the_laws_record_follows_the_sentences_the_colors_print_again() {
     );
     assert_eq!(committed.laws_layers, Some(record));
 }
+
+/// The tool's reason for refusing an answer, as the request asks again.
+fn refusal_reason(output: &StepOutput) -> &str {
+    let again = output.snapshot.action.as_ref().expect("the request again");
+    assert_eq!(again.tag, "choose_colors");
+    let message = again.payload["prompt"]["message"].as_str().unwrap();
+    message
+        .rsplit_once("The previous answer could not be used: ")
+        .map_or("", |(_, reason)| reason)
+}
+
+#[test]
+fn d2_holds_once_the_law_that_supports_it_is_applied() {
+    // D4 lays the circle in the vivid blue the field takes, so the field is
+    // no longer twice as vivid as every other layer.
+    let asked = plan_answer(&colors_start(UNCOLORED_DESCRIPTION, None)).snapshot;
+    let refused = colors_answer(
+        &asked,
+        &json!({"main_law": "D2", "laws": {"D2": {"vivid": "blue"}, "D4": {"color": "blue",
+                "layers": [{"layer": 0, "handling": "dense"}, {"layer": 1, "handling": "temperate"}]}},
+                "reason": "“A circle” in one blue."}),
+    );
+    let retried = event(&refused, "retry_scheduled").expect("a retry");
+    assert_eq!(retried["detail"], "d2_not_held");
+    let reason = refusal_reason(&refused);
+    assert!(
+        reason.starts_with("D2: the main layer 0, drawn, has a chroma of "),
+        "{reason}"
+    );
+    assert!(
+        reason.ends_with(" of layer 1\nReturn a corrected answer."),
+        "{reason}"
+    );
+}
+
+#[test]
+fn d2_counts_the_vivid_layers_the_colors_keep() {
+    // The description states both reds: D2 can only keep the main circle red,
+    // and the red row it cannot change stays as vivid.
+    let plan = json!({"ground": "paper", "background": "white", "plugins": [], "layers": [
+        plan_layer("place", "circle", 1, "center", "small", "red"),
+        plan_layer("line_up", "circle", 3, "bottom", "small", "red"),
+        plan_layer("fill", "square", 1, "unspecified", "large", "gray"),
+    ]});
+    let start = colors_start("A red circle above red marks at the bottom", None);
+    let asked = plan_answer_with(&start, &plan).snapshot;
+    let schema = &asked.action.as_ref().unwrap().payload["prompt"]["response_schema"];
+    assert_eq!(
+        schema["properties"]["laws"]["properties"]["D2"]["properties"]["vivid"]["enum"],
+        json!(["red"])
+    );
+    let refused = colors_answer(
+        &asked,
+        &json!({"main_law": "D2", "laws": {"D2": {"vivid": "red"}}, "reason": "“A red circle”."}),
+    );
+    assert_eq!(
+        event(&refused, "retry_scheduled").expect("a retry")["detail"],
+        "d2_not_held"
+    );
+}
+
+#[test]
+fn a_gradation_runs_through_three_marks_or_more() {
+    let mut lines = plan_layer("line_up", "line", 3, "middle", "small", "gray");
+    lines["thinness"] = json!("thin");
+    let plan = json!({"ground": "paper", "background": "white", "plugins": [], "layers": [
+        plan_layer("fill", "square", 1, "unspecified", "large", "gray"),
+        plan_layer("line_up", "circle", 2, "top", "small", "blue"),
+        lines,
+    ]});
+    let asked = plan_answer_with(&colors_start(UNCOLORED_DESCRIPTION, None), &plan).snapshot;
+    let laws = &asked.action.as_ref().unwrap().payload["prompt"]["response_schema"]["properties"]["laws"]
+        ["properties"];
+    assert_eq!(
+        laws["B14"]["properties"]["layers"]["items"]["enum"],
+        json!([2])
+    );
+    assert_eq!(
+        laws["B13"]["properties"]["targets"]["items"]["properties"]["layer"]["enum"],
+        json!([2])
+    );
+    // The two circles cannot fade from the center: both lie as far from it.
+    let refused = colors_answer(
+        &asked,
+        &json!({"main_law": "B14", "laws": {"B14": {"layers": [1]}}, "reason": "A fading pair."}),
+    );
+    assert_eq!(
+        event(&refused, "retry_scheduled").expect("a retry")["detail"],
+        "not_a_choice"
+    );
+    let chosen = colors_answer(
+        &refused.snapshot,
+        &json!({"main_law": "B14", "laws": {"B14": {"layers": [2]}}, "reason": "A fading row."}),
+    );
+    assert!(
+        event(&chosen, "colors_chosen").is_some(),
+        "{:?}",
+        tags(&chosen)
+    );
+    let source = committed_source(&chosen.snapshot);
+    assert!(
+        source.contains(", fading outward from the center"),
+        "{source}"
+    );
+}
+
+#[test]
+fn the_colors_may_recolor_a_distant_layer_in_its_order() {
+    // The laws' aerial perspective sends the row of squares away in gray; the
+    // circle is the main layer.
+    let plan = json!({"ground": "paper", "background": "white", "plugins": [], "layers": [
+        plan_layer("fill", "square", 1, "unspecified", "large", "gray"),
+        plan_layer("place", "circle", 1, "center", "small", "red"),
+        plan_layer("line_up", "square", 3, "bottom", "medium", "black"),
+    ]});
+    let asked = plan_answer_with(
+        &colors_start(UNCOLORED_DESCRIPTION, Some(LawsConfig {})),
+        &plan,
+    )
+    .snapshot;
+    let after_laws = laws_answer(&asked, &two_laws()).snapshot;
+    let action = after_laws.action.as_ref().unwrap();
+    let message = action.payload["prompt"]["message"].as_str().unwrap();
+    assert!(message.contains(r#""fixed":"B15""#), "{message}");
+    assert_eq!(
+        action.payload["prompt"]["response_schema"]["properties"]["laws"]["properties"]["B11"]["properties"]
+            ["targets"]["items"]["properties"]["layer"]["enum"],
+        json!([2])
+    );
+    let alternate = |colors: [&str; 2]| {
+        json!({"main_law": "B11", "laws": {"B11": {"targets": [{"layer": 2, "colors": colors}]}},
+               "reason": "A distant row in turn."})
+    };
+    // Black stands farther from the ground than the main circle.
+    let refused = colors_answer(&after_laws, &alternate(["black", "gray"]));
+    assert_eq!(
+        event(&refused, "retry_scheduled").expect("a retry")["detail"],
+        "aerial_order"
+    );
+    let reason = refusal_reason(&refused);
+    assert!(
+        reason.starts_with("B15: the distant layer 2 stands 0.2 or more from the ground"),
+        "{reason}"
+    );
+    // Yellow and gray stay nearer the ground than the circle.
+    let chosen = colors_answer(&refused.snapshot, &alternate(["yellow", "gray"]));
+    assert!(
+        event(&chosen, "colors_chosen").is_some(),
+        "{:?}",
+        tags(&chosen)
+    );
+    let source = committed_source(&chosen.snapshot);
+    let row = source
+        .lines()
+        .find(|line| line.contains(" squares side length "))
+        .expect("the row of squares");
+    assert!(row.contains("yellow"), "{source}");
+}

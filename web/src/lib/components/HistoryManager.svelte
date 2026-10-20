@@ -1532,6 +1532,7 @@
 	.history-filter-btn {
 		display: inline-flex;
 		align-items: center;
+		justify-content: center;
 		gap: 2px;
 		padding: 4px 3px;
 		background: color-mix(in srgb, var(--panel) 88%, var(--fg2));
@@ -1562,6 +1563,12 @@
 		visibility: hidden;
 	}
 	.history-filter-check.visible { visibility: visible; }
+	/* As wide as the check, so the label sits in the button's centre. */
+	.history-filter-btn::after {
+		content: '';
+		flex: none;
+		inline-size: 1em;
+	}
 	.history-mode-tabs { flex-shrink: 0; }
 	.history-manager-count {
 		font-size: var(--ui-font-size-12);

@@ -433,6 +433,7 @@
 	.history-filter-btn {
 		display: inline-flex;
 		align-items: center;
+		justify-content: center;
 		gap: 2px;
 		min-width: 76px;
 		height: 28px;
@@ -465,6 +466,12 @@
 		visibility: hidden;
 	}
 	.history-filter-check.visible { visibility: visible; }
+	/* As wide as the check, so the label sits in the button's centre. */
+	.history-filter-btn::after {
+		content: '';
+		flex: none;
+		inline-size: 1em;
+	}
 	.history-collapse-btn {
 		width: 28px;
 		min-width: 28px;

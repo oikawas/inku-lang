@@ -8,10 +8,6 @@
 
 ## 未リリース
 
-### 2026-10-20 — 取り合わせの決まりを共有coreへ移す
-
-取り合わせの候補の集め方（最初の一文、同じ文の見分け、言語、除く文、並びを混ぜることと上限）、Visionモデルへ頼む文、答えの確かめと1回の頼み直し、記述への一文の足し方を、ServerのPythonとWebから共有coreの`juxtaposition`（応答schema `inku.juxtaposition.v1`）へ移した。macOS・Androidが取り合わせを作るときに同じ決まりを呼ぶためである（作者の判断、2026-10-19）。並びを混ぜる種はhostが要求ごとに渡す。Serverの`POST /api/refine/juxtaposition`は答えの各案に、作品が保存する記述（札を残したもの）にその一文を足した記述`joined`を添え、Webは自分で足さずにそれを描く。前のPythonとWebの決まりで作った共通の表`server/tests/data/juxtaposition-cases.json`（49件）と、10-17の書き出しの5146作品の記述で、残す文と作品の組が前と同じことを確かめた。候補の並びは乱数の作り方が変わったので前と同じではない。
-
 ### 2026-10-19 — Androidの3Dで保存したPNG・GLBに、Webと同じ名前を付ける
 
 Androidの3D表示（実験）でPNG・GLBを保存すると、共有シートへ渡すファイルの名前が`<UUID>.png`・`<UUID>.bin`になり、GLBは種類の分からないファイルとして渡っていた。WebViewのダウンロードの知らせにはリンクの名前が届かないためで、中身の先頭から形式を読み、Webと同じ`inku-3d-<digestの頭12文字>.png`・`.glb`の名前と、`image/png`・`model/gltf-binary`の型で渡すようにした。
@@ -178,6 +174,12 @@ macOSの`dh1`・`rh3`と正準JSON、指示言語の判定、記述ラベルの�
 Anthropicの対象Claudeモデルは通常描画とVisionでも思考用8,192 tokenを出力枠に加え、pipeline応答が `max_tokens` で切れたときは内容が読めても拒否して診断を残す。
 
 保存作品からランダムまたはVisionの自律推敲を開始できる。世代数、色・配置の対象、Wildを指定し、直前の作品を親として各世代を保存する。途中の世代は系譜専用、最終世代は通常の作品一覧にも表示する。Visionは作品画像への限定された助言を使い、観察と次の方向を表示する。画像の送信はこの専用助言requestに限り、既存の接続・ChatGPTプランのsession pinを保つ。
+
+## v2.15.218（2026-10-20 / Build 1294）
+
+### 2026-10-20 — 取り合わせの決まりを共有coreへ移す
+
+取り合わせの候補の集め方（最初の一文、同じ文の見分け、言語、除く文、並びを混ぜることと上限）、Visionモデルへ頼む文、答えの確かめと1回の頼み直し、記述への一文の足し方を、ServerのPythonとWebから共有coreの`juxtaposition`（応答schema `inku.juxtaposition.v1`）へ移した。macOS・Androidが取り合わせを作るときに同じ決まりを呼ぶためである（作者の判断、2026-10-19）。並びを混ぜる種はhostが要求ごとに渡す。Serverの`POST /api/refine/juxtaposition`は答えの各案に、作品が保存する記述（札を残したもの）にその一文を足した記述`joined`を添え、Webは自分で足さずにそれを描く。前のPythonとWebの決まりで作った共通の表`server/tests/data/juxtaposition-cases.json`（49件）と、10-17の書き出しの5146作品の記述で、残す文と作品の組が前と同じことを確かめた。候補の並びは乱数の作り方が変わったので前と同じではない。
 
 ## v2.15.217（2026-10-20 / Build 1293）
 

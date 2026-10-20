@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-20 — Juxtapose's rules move to the shared core
-
-How Juxtapose gathers its candidates (the first sentence, telling one sentence from another, the language, the sentences left out, the shuffle and the limit), the request to the Vision model, checking its answer with one resend, and adding the sentence to the description moved from the Server's Python and from Web to the shared core's `juxtaposition` (response schema `inku.juxtaposition.v1`), so that macOS and Android call the same rules when they make Juxtapose (the author's decision, 2026-10-19). The host passes the seed that shuffles the list with each request. The Server's `POST /api/refine/juxtaposition` gives each of the four the description the work keeps (labels and all) with the sentence added, as `joined`, and Web draws that instead of adding the sentence itself. A shared table made from the former Python and Web rules, `server/tests/data/juxtaposition-cases.json` (49 cases), and the descriptions of 5,146 works from the 10-17 export keep the same sentences with the same works as before. The candidates' order is not the same as before, because it is drawn by another generator.
-
 ### 2026-10-19 — Android: 3D PNG and GLB saves carry Web's file name
 
 In the Android experimental 3D view, a saved PNG or GLB reached the share sheet as `<UUID>.png` or `<UUID>.bin`, and the GLB went with no known type: the web view's download notice never carries the link's name. The app now reads the format from the file's first bytes and hands it on as `inku-3d-<first 12 of the digest>.png` or `.glb`, typed `image/png` or `model/gltf-binary`, as Web names it.
@@ -178,6 +174,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.218 (2026-10-20 / Build 1294)
+
+### 2026-10-20 — Juxtapose's rules move to the shared core
+
+How Juxtapose gathers its candidates (the first sentence, telling one sentence from another, the language, the sentences left out, the shuffle and the limit), the request to the Vision model, checking its answer with one resend, and adding the sentence to the description moved from the Server's Python and from Web to the shared core's `juxtaposition` (response schema `inku.juxtaposition.v1`), so that macOS and Android call the same rules when they make Juxtapose (the author's decision, 2026-10-19). The host passes the seed that shuffles the list with each request. The Server's `POST /api/refine/juxtaposition` gives each of the four the description the work keeps (labels and all) with the sentence added, as `joined`, and Web draws that instead of adding the sentence itself. A shared table made from the former Python and Web rules, `server/tests/data/juxtaposition-cases.json` (49 cases), and the descriptions of 5,146 works from the 10-17 export keep the same sentences with the same works as before. The candidates' order is not the same as before, because it is drawn by another generator.
 
 ## v2.15.217 (2026-10-20 / Build 1293)
 

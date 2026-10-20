@@ -2582,12 +2582,15 @@ pub fn build_laws_prompt(
 
 /// The request again with the tool's reply to the answer it refused: the
 /// original message, the refused answer as it was written and the latest
-/// reason only. An answer too long to read is not repeated; without an answer
-/// (the color stage) the reply is the reason only, as the prototype resent it.
+/// reason, then the reasons the answers before it were refused with (from the
+/// third request on, 2026-10-21), each once and not the latest again. An
+/// answer too long to read is not repeated; without an answer (the color
+/// stage) the reply is the reason only, as the prototype resent it.
 pub(crate) fn with_laws_feedback(
     mut prompt: LlmPrompt,
     refusal: &Refusal,
     answer: Option<&str>,
+    earlier: &[RefusedReason],
     limits: PromptLimits,
 ) -> Result<LlmPrompt, PromptError> {
     let answer = answer.filter(|_| refusal.code != "too_long");
@@ -2598,14 +2601,24 @@ pub(crate) fn with_laws_feedback(
     };
     let reply = match prompt.instruction_language {
         ResolvedInstructionLanguage::Ja => format!(
-            "\n\n## 前の答えへの道具の返事\n{}前の答えは使えなかった: {}\n直した答えを返す。",
+            "\n\n## 前の答えへの道具の返事\n{}前の答えは使えなかった: {}\n{}直した答えを返す。",
             shown("前の答え:"),
-            refusal.ja
+            refusal.ja,
+            earlier_reasons(
+                "それより前の答えも、次の理由で使えなかった（同じ誤りをくり返さない）:",
+                earlier.iter().map(|reason| reason.ja.as_str()),
+                &refusal.ja
+            )
         ),
         ResolvedInstructionLanguage::En => format!(
-            "\n\n## The tool's reply to the previous answer\n{}The previous answer could not be used: {}\nReturn a corrected answer.",
+            "\n\n## The tool's reply to the previous answer\n{}The previous answer could not be used: {}\n{}Return a corrected answer.",
             shown("The previous answer:"),
-            refusal.en
+            refusal.en,
+            earlier_reasons(
+                "The answers before it could not be used either, for these reasons (do not repeat them):",
+                earlier.iter().map(|reason| reason.en.as_str()),
+                &refusal.en
+            )
         ),
     };
     prompt.message.push_str(&reply);
@@ -2631,6 +2644,50 @@ pub struct Refusal {
 
 pub(crate) fn refusal(code: &'static str, ja: String, en: String) -> Refusal {
     Refusal { code, ja, en }
+}
+
+/// A reason the laws stage refused an earlier answer of the run with, in both
+/// languages, which its later requests list (2026-10-21).
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RefusedReason {
+    pub ja: String,
+    pub en: String,
+}
+
+impl From<&Refusal> for RefusedReason {
+    fn from(refusal: &Refusal) -> Self {
+        Self {
+            ja: refusal.ja.clone(),
+            en: refusal.en.clone(),
+        }
+    }
+}
+
+/// The reasons the answers before the latest were refused with, under their
+/// heading, one a line: each once, and not the latest reason again. Nothing
+/// when no other reason is left.
+fn earlier_reasons<'a>(
+    heading: &str,
+    reasons: impl Iterator<Item = &'a str>,
+    latest: &str,
+) -> String {
+    let mut listed: Vec<&str> = Vec::new();
+    for reason in reasons {
+        if reason != latest && !listed.contains(&reason) {
+            listed.push(reason);
+        }
+    }
+    if listed.is_empty() {
+        return String::new();
+    }
+    let mut block = format!("{heading}\n");
+    for reason in listed {
+        block.push_str("- ");
+        block.push_str(reason);
+        block.push('\n');
+    }
+    block
 }
 
 pub(crate) fn shown(value: &Value) -> String {

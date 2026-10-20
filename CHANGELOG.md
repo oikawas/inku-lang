@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-21 — The laws stage's third request on also lists the reasons it refused the earlier answers with
+
+When the laws stage asked again for an answer it refused, it added only the latest answer and its reason. The model then often went back, while fixing the latest reason, to a mistake refused two answers before (such as C4 on a layer it cannot hold), and spent the budget. From the third request on, the request also lists the reasons the answers before were refused with (each reason once, and not the latest one again). The second request and the color stage's retries do not change.
+
 ### 2026-10-21 — Android: the camera's model chooser follows the model purposes, and Juxtapose's held reason matches Web
 
 At the author's decision, the camera's model chooser offers only the models set to be used for both LLM and Vision. The camera reads the photo and draws with the same model, so a model with only one of the two purposes stops partway. If the chosen model has only one, it has to be chosen again. Also, in the work-editing menu of a description-locked work, the reason under Juxtapose is now Web's "This work's DDL was edited. Drawing it from the description would lose the edits, so this is not offered. …". As the way to start again from the description, Android names Change the description in the same menu.

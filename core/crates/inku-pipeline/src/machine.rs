@@ -278,6 +278,10 @@ pub struct PendingLaws {
     pub composed: ComposedPlan,
     pub document: VisibleDocument,
     pub reason: String,
+    /// The reasons the stage refused the run's answers with, in order, which a
+    /// request from the third on lists after the latest (2026-10-21).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub refused: Vec<laws::RefusedReason>,
 }
 
 /// A saved work as the laws stage from it reads it (2026-10-20).
@@ -1770,6 +1774,7 @@ impl PipelineSnapshot {
             composed,
             document,
             reason: reason.to_owned(),
+            refused: Vec::new(),
         });
         self.begin_llm(prompt, description, Vec::new(), events)
     }
@@ -1922,8 +1927,9 @@ impl PipelineSnapshot {
     }
 
     /// Ask for the laws again with the refused answer and the tool's reason for
-    /// refusing it, as the next attempt of the stage's budget; when it is
-    /// spent, commit the composed document.
+    /// refusing it, and the reasons the answers before it were refused with, as
+    /// the next attempt of the stage's budget; when it is spent, commit the
+    /// composed document.
     fn ask_laws_again(
         &mut self,
         context: &LawsContext,
@@ -1969,6 +1975,11 @@ impl PipelineSnapshot {
         let next = self
             .retry_policy(LlmStage::ChooseLaws)
             .next_budgeted_attempt(attempt, total);
+        let earlier = &self
+            .laws
+            .as_ref()
+            .ok_or(ProtocolError::InternalInvariant)?
+            .refused;
         let prompt = next.and_then(|_| {
             laws::build_laws_prompt(
                 &description,
@@ -1977,7 +1988,13 @@ impl PipelineSnapshot {
                 self.config.prompt_limits,
             )
             .and_then(|prompt| {
-                laws::with_laws_feedback(prompt, refusal, Some(answer), self.config.prompt_limits)
+                laws::with_laws_feedback(
+                    prompt,
+                    refusal,
+                    Some(answer),
+                    earlier,
+                    self.config.prompt_limits,
+                )
             })
             .ok()
         });
@@ -1992,6 +2009,11 @@ impl PipelineSnapshot {
             next,
             events,
         )?;
+        self.laws
+            .as_mut()
+            .ok_or(ProtocolError::InternalInvariant)?
+            .refused
+            .push(refusal.into());
         self.event(
             events,
             "retry_scheduled",

@@ -2794,6 +2794,53 @@ fn a_law_a_layer_cannot_take_is_refused_with_the_way_out() {
 }
 
 #[test]
+fn a_request_from_the_third_lists_the_reasons_refused_before() {
+    // B6, then C4, then B6 again: the third request lists B6's reason after
+    // C4's, the fourth C4's after B6's, and B6's only once.
+    let b6 = json!({"main_layer": 1, "main_law": "B6", "description_counts": [],
+                    "laws": {"B6": {"secondary": [2]}, "B15": {"layers": [2]}},
+                    "reason": "“A red circle” leads the picture."});
+    let c4 = json!({"main_layer": 1, "main_law": "C4", "description_counts": [1],
+                    "laws": {"C4": {"layer": 1, "repeats": 3, "sequence": ["echo"], "path": "row"},
+                             "B15": {"layers": [2]}},
+                    "reason": "“A red circle” leads the picture."});
+    let b6_reason = "besides the main layer 1, no layer (a closed shape or an arc) can be B6's \
+                     secondary or accent; drop B6 or change the main layer";
+    let c4_reason = "layer 1 keeps the count the description writes, 1, but C4 repeats three times \
+                     at least, so C4 cannot take this layer; drop C4 or put it on another layer";
+    let mut pipeline_config = config();
+    pipeline_config.composition = Some(CompositionConfig { read: false });
+    pipeline_config.laws = Some(LawsConfig {});
+    pipeline_config.laws_retry = Some(RetryPolicy {
+        max_attempts: 4,
+        ..pipeline_config.catalog_retry
+    });
+    let asked = plan_answer(&started_description(pipeline_config)).snapshot;
+    let ending = |output: &StepOutput, latest: &str, before: Option<&str>| {
+        let message = output.snapshot.action.as_ref().unwrap().payload["prompt"]["message"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        let listed = before.map_or(String::new(), |reason| {
+            format!(
+                "The answers before it could not be used either, for these reasons (do not \
+                 repeat them):\n- {reason}\n"
+            )
+        });
+        let expected = format!(
+            "The previous answer could not be used: {latest}\n{listed}Return a corrected answer."
+        );
+        assert!(message.ends_with(&expected), "{message}");
+    };
+    let second = laws_answer(&asked, &b6);
+    ending(&second, b6_reason, None);
+    let third = laws_answer(&second.snapshot, &c4);
+    ending(&third, c4_reason, Some(b6_reason));
+    let fourth = laws_answer(&third.snapshot, &b6);
+    ending(&fourth, b6_reason, Some(c4_reason));
+}
+
+#[test]
 fn a_refused_answer_is_asked_again_with_the_reason() {
     let asked = plan_answer(&laws_start(Some(LawsConfig {}))).snapshot;
     let first = asked.action.as_ref().unwrap().identity.clone();

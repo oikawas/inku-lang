@@ -2489,7 +2489,7 @@ pub(crate) fn with_colors_feedback(
     refusal: &Refusal,
     limits: PromptLimits,
 ) -> Result<LlmPrompt, PromptError> {
-    laws::with_laws_feedback(prompt, refusal, None, limits)
+    laws::with_laws_feedback(prompt, refusal, None, &[], limits)
 }
 
 // --- the answer --------------------------------------------------------------------------------

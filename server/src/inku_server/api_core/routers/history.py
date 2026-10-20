@@ -17,6 +17,7 @@ from ... import thumbs_db as _thumbs_db
 from ..common import DESCRIPTION_LOCKED_DETAIL, _unexpected_http_error
 from ...persistence.description_lock import DESCRIPTION_READING_KINDS
 from ...persistence.schema import LineageNodeRow
+from ...persistence.variation_authority import LAWS_RECORD_KEYS
 from ..deps import _current_user
 from ..models import HistoryItem, HistoryListResponse, HistoryPostBody
 from ..rendering import _COMPACT_SCORE_VERSIONS, _capture_history_coerce_observability, _effective_limits, _add_history_item, _output_save_settings, _render_metadata, _render_score_svg, _render_with_metadata, _resolved_catalog_id, _save_history_artifacts, _score_canvas_aspect_value, _score_with_canvas, _validated_canvas_aspect_override, _validated_svg_profile
@@ -407,6 +408,17 @@ def _invalid_score_detail(error: ValidationError) -> str:
     return f"score is invalid: {'; '.join(problems[:3])}{more}"
 
 
+def _parent_laws_records(owner_id: str, parent_node_id: str) -> dict:
+    """The laws records of the owner's work at one lineage node, or none."""
+    from ...persistence.variation_authority import VariationAuthorityStore
+    from ...pipeline_api import laws_records_of
+
+    with _db.SessionLocal() as session:
+        node = session.get(LineageNodeRow, parent_node_id)
+        parent_id = node.history_id if node else None
+    return laws_records_of(VariationAuthorityStore(_db.engine), owner_id, parent_id) if parent_id else {}
+
+
 @router.post("/api/history", response_model=HistoryItem, response_model_exclude_none=True)
 def api_history_post(
     body: HistoryPostBody,
@@ -414,12 +426,19 @@ def api_history_post(
     actor: dict = Depends(_current_user),
 ) -> HistoryItem:
     replay_link = None
-    # A sender never names a laws record: the Server writes one only on the edges
+    # A sender never names a laws record: the Server writes them only on the edges
     # of the children it draws from their parent (color arrangement, support,
-    # touches, redraw), and reads it only there (2026-10-20).
-    if "laws_layers" in body.derivation_metadata:
+    # touches, redraw) and of a layout child, and reads them only there (2026-10-20).
+    if any(key in body.derivation_metadata for key in LAWS_RECORD_KEYS):
         body = body.model_copy(update={"derivation_metadata": {
-            key: value for key, value in body.derivation_metadata.items() if key != "laws_layers"}})
+            key: value for key, value in body.derivation_metadata.items() if key not in LAWS_RECORD_KEYS}})
+    if body.derivation_kind == "layout_change" and body.lineage_parent_node_id:
+        # "Change the layout" keeps the layers the laws placed, and the screen saves
+        # its child as drawn: the child keeps its parent's records, so that the
+        # layout can change again. The core reads each only while the child's
+        # instructions still match it (2026-10-20).
+        body = body.model_copy(update={"derivation_metadata": {
+            **body.derivation_metadata, **_parent_laws_records(actor["id"], body.lineage_parent_node_id)}})
     # A work read again from the description (model or language comparison
     # and the like) cannot descend from a work its DDL holds.
     if (
@@ -488,13 +507,11 @@ def api_history_post(
         }
         replay_record = {}
         if replay_link is None:
-            # A linked source gives its record through the link below; a work drawn
-            # from its parent without a run gives the one on its own edge.
+            # A linked source gives its records through the link below; a work drawn
+            # from its parent without a run gives the ones on its own edge.
             from ...persistence.variation_authority import VariationAuthorityStore
 
-            source_record = VariationAuthorityStore(_db.engine).read_derived_laws_layers(actor["id"], parent["id"])
-            if source_record is not None:
-                replay_record = {"laws_layers": source_record}
+            replay_record = VariationAuthorityStore(_db.engine).read_derived_laws_records(actor["id"], parent["id"])
         body = body.model_copy(update={"derivation_metadata": {
             "replay_work_id": parent["id"], "replay_render_hash": replayed["render_hash"],
             "replay_svg_sha256": replayed["svg_sha256"],
@@ -538,17 +555,18 @@ def api_history_post(
             raise HTTPException(status_code=404, detail="unknown work")
         parent = _work_for_color_snapshot(actor, parent_id)
         from ...persistence.variation_authority import VariationAuthorityStore
-        from ...pipeline_api import laws_layers_of
+        from ...pipeline_api import laws_records_of
 
         # The child is drawn without a run, so nothing links it: it keeps the
-        # parent's laws record on its edge, which "change the layout" reads (2026-10-20).
-        laws_layers = laws_layers_of(VariationAuthorityStore(_db.engine), actor["id"], parent_id)
+        # parent's laws records on its edge, which "change the layout" and the
+        # laws move read (2026-10-20).
+        laws_records = laws_records_of(VariationAuthorityStore(_db.engine), actor["id"], parent_id)
         if body.derivation_kind == "color_arrangement_change":
-            replayed = _render_color_arrangement_for_work(actor, parent, index, laws_layers).model_dump(exclude_none=True, by_alias=True)
+            replayed = _render_color_arrangement_for_work(actor, parent, index, laws_records).model_dump(exclude_none=True, by_alias=True)
         elif body.derivation_kind == "ground_change":
-            replayed = _render_ground_variant_for_work(actor, parent, material, laws_layers).model_dump(exclude_none=True, by_alias=True)
+            replayed = _render_ground_variant_for_work(actor, parent, material, laws_records).model_dump(exclude_none=True, by_alias=True)
         else:
-            replayed = _render_tool_variant_for_work(actor, parent, tool_mode, tools, laws_layers).model_dump(exclude_none=True, by_alias=True)
+            replayed = _render_tool_variant_for_work(actor, parent, tool_mode, tools, laws_records).model_dump(exclude_none=True, by_alias=True)
         # Only the parent and the server-derived index decide this child. Sent
         # Score, map, seeds and limits cannot rewrite the work being recolored.
         inherited = {key: parent.get(key) for key in (
@@ -700,8 +718,8 @@ def api_history_post(
                 "variation_id": linked.variation_id, "authority": {"revision": linked.revision},
                 "document": {"source": body.ddl}, "delivery": {"source_digest": linked.ddl_digest},
                 "config": linked.saved_config, "completion_ranges": linked.completion_ranges,
-                # The same instructions, so the source's laws record holds (2026-10-20).
-                "laws_layers": linked.laws_layers,
+                # The same instructions, so the source's laws records hold (2026-10-20).
+                "laws_layers": linked.laws_layers, "laws_basis": linked.laws_basis,
             }, context={"host_options": linked.host_options, "macro_catalog": linked.macro_catalog},
             pipeline_diagnostics=diagnostics)
         item_dict = _db.get_items(actor["id"], [item_dict["id"]])[0]

@@ -1,7 +1,8 @@
-"""The laws layers record a work keeps (2026-10-20), without native drawing or model calls.
+"""The laws records a work keeps (2026-10-20), without native drawing or model calls.
 
-The laws stage leaves the record in the snapshot; the Server keeps it in the work's fork context, gives it back to
-a direct-DDL fork of the work, and adds it to the request of "change the layout", whose `laws_placed` answer reads.
+The laws stage leaves the layers record and the basis (the composed document and answer the laws were applied by)
+in the snapshot; the Server keeps them in the work's fork context and gives them back to a direct-DDL fork of the
+work. "Change the layout" adds the layers record to its request, whose `laws_placed` answer reads.
 """
 
 from __future__ import annotations
@@ -28,6 +29,10 @@ LAWS = {"schema": "inku.laws-layers.v1", "layers": [{
     "kind": "laws", "laws": ["B1"],
 }]}
 SOURCE = "背景を白で埋める。\n画面の横0.618034、縦0.618034の位置に、灰の細い細筆の程よい空の縦長の小さな楕円を1個置く。\n"
+BASIS = {"schema": "inku.laws-basis.v1",
+         "composed": "背景を白で埋める。\n画面の中ほどに、灰の細い細筆の程よい空の縦長の小さな楕円を1個置く。\n",
+         "committed_digest": hashlib.sha256(SOURCE.encode()).hexdigest(), "main_layer": 0, "main_law": "B1",
+         "laws": {"B1": {"targets": [{"layer": 0, "at": "point_lr"}]}}, "reason": "The grey ellipse leads."}
 CONFIG = {"saved_setting": "this performance"}
 DIAGNOSTICS = {"upstream_diagnostics": [], "downstream_diagnostics": [],
                "resource_omissions": [], "relation_omissions": [],
@@ -49,7 +54,7 @@ def saved_work(tmp_path):
     snapshot = {"variation_id": "variation-1", "authority": {"revision": "1"},
                 "document": {"source": SOURCE}, "config": CONFIG,
                 "delivery": {"source_digest": hashlib.sha256(SOURCE.encode()).hexdigest()},
-                "phase": {"tag": "score_ready"}, "laws_layers": deepcopy(LAWS)}
+                "phase": {"tag": "score_ready"}, "laws_layers": deepcopy(LAWS), "laws_basis": deepcopy(BASIS)}
     store.link_history("owner", "work", "variation-1", "1", snapshot["delivery"]["source_digest"],
                        snapshot=snapshot, context={"host_options": {"render_seed": 7}, "macro_catalog": {}},
                        pipeline_diagnostics=DIAGNOSTICS)
@@ -57,24 +62,25 @@ def saved_work(tmp_path):
     engine.dispose()
 
 
-def test_the_fork_context_keeps_the_record_and_a_context_without_it_reads_none(saved_work):
+def test_the_fork_context_keeps_the_records_and_a_context_without_them_reads_none(saved_work):
     store = saved_work
-    assert store.read_linked_history("owner", "work").laws_layers == LAWS
+    linked = store.read_linked_history("owner", "work")
+    assert (linked.laws_layers, linked.laws_basis) == (LAWS, BASIS)
     with store.engine.connect() as connection:
         row = connection.execute(select(PipelineHistoryLinkRow)).mappings().one()
         payload = json.loads(bytes(row["fork_context_bytes"]))
-    assert payload["laws_layers"] == LAWS
-    del payload["laws_layers"]
+    assert (payload["laws_layers"], payload["laws_basis"]) == (LAWS, BASIS)
+    del payload["laws_layers"], payload["laws_basis"]
     encoded = json.dumps(payload, ensure_ascii=False).encode()
     with store.engine.begin() as connection:
         connection.execute(PipelineHistoryLinkRow.__table__.update().values(
             fork_context_bytes=encoded, fork_context_digest=hashlib.sha256(encoded).hexdigest()))
     linked = store.read_linked_history("owner", "work")
-    assert linked.laws_layers is None
+    assert (linked.laws_layers, linked.laws_basis) == (None, None)
     assert linked.saved_config == CONFIG
 
 
-def test_a_fork_and_change_the_layout_carry_the_record(saved_work, monkeypatch):
+def test_a_fork_and_change_the_layout_carry_the_records(saved_work, monkeypatch):
     store = saved_work
     starts, requests = [], []
 
@@ -114,9 +120,10 @@ def test_a_fork_and_change_the_layout_carry_the_record(saved_work, monkeypatch):
     composed = pipeline_compat.compose("owner", {"work_id": "work", "ddl": SOURCE, "recompose_mode": "principled"})
     assert requests[-1]["laws_layers"] == LAWS
     assert requests[-1]["source"] == SOURCE
+    assert "laws_basis" not in requests[-1]
     assert composed["recomposition"]["reason"] == "laws_placed"
-    # The run that draws the answer keeps the record for the next fork.
-    assert starts[-1] == {"tag": "direct_ddl", "source": SOURCE, "laws_layers": LAWS}
+    # The run that draws the answer keeps the records for the next fork.
+    assert starts[-1] == {"tag": "direct_ddl", "source": SOURCE, "laws_layers": LAWS, "laws_basis": BASIS}
     service.start("owner", "direct_ddl", SOURCE)
-    assert "laws_layers" not in starts[-1]
+    assert starts[-1] == {"tag": "direct_ddl", "source": SOURCE}
     service.close()

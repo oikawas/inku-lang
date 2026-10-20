@@ -19,6 +19,7 @@ from .description_labels import pipeline_description
 from .pipeline_candidate import CandidateExecution, CandidateHostError, PipelineBinding
 from .pipeline_settings import select_canvas
 from .persistence.variation_authority import (
+    LAWS_RECORD_KEYS,
     ExecutionSnapshotConflict,
     VariationAuthorityAdapterError,
 )
@@ -245,6 +246,8 @@ class PipelineService:
                 authoring["completion_ranges"] = deepcopy(source_work["completion_ranges"])
             if kind == "direct_ddl" and source_work and source_work.get("laws_layers") is not None:
                 authoring["laws_layers"] = deepcopy(source_work["laws_layers"])
+            if kind == "direct_ddl" and source_work and source_work.get("laws_basis") is not None:
+                authoring["laws_basis"] = deepcopy(source_work["laws_basis"])
             sketch = context.get("sketch_request") or {"mode": "off"}
             if kind == "description" and sketch["mode"] != "off":
                 authoring["sketch"] = sketch
@@ -303,6 +306,8 @@ class PipelineService:
             source_work["completion_ranges"] = run.snapshot()["completion_ranges"]
         if run.snapshot().get("laws_layers") is not None:
             source_work["laws_layers"] = run.snapshot()["laws_layers"]
+        if run.snapshot().get("laws_basis") is not None:
+            source_work["laws_basis"] = run.snapshot()["laws_basis"]
         return self.start(
             owner, "direct_ddl", body.source,
             parent={"kind": "variation", "id": previous["variation_id"]},
@@ -634,6 +639,7 @@ def linked_source_work(linked) -> dict:
         "macro_catalog": linked.macro_catalog,
         **({"completion_ranges": linked.completion_ranges} if linked.completion_ranges is not None else {}),
         **({"laws_layers": linked.laws_layers} if linked.laws_layers is not None else {}),
+        **({"laws_basis": linked.laws_basis} if linked.laws_basis is not None else {}),
         "result": {"lineage_node_id": history["metadata"].get("lineage_node_id")},
     }
 
@@ -658,27 +664,23 @@ def saved_work_parent(store, owner: str, history_id: str) -> tuple[dict, dict]:
 
 
 def legacy_source_work(store, owner: str, work) -> dict:
-    """An older work as a fork reads it: its history row, and the laws record a
+    """An older work as a fork reads it: its history row, and the laws records a
     work drawn from its parent without a run keeps on its lineage edge, which
     "change the layout" and a direct-DDL fork take as a linked work's (2026-10-20)."""
-    source_work = asdict(work)
-    laws_layers = store.read_derived_laws_layers(owner, work.history_id)
-    if laws_layers is not None:
-        source_work["laws_layers"] = laws_layers
-    return source_work
+    return {**asdict(work), **store.read_derived_laws_records(owner, work.history_id)}
 
 
-def laws_layers_of(store, owner: str, history_id: str) -> object | None:
-    """The laws record of one saved work, linked or drawn from its parent without
-    a run, or ``None``. A context that cannot be read gives no record: the child
-    is then saved as before, without one."""
+def laws_records_of(store, owner: str, history_id: str) -> dict[str, object]:
+    """The laws records of one saved work, linked or drawn from its parent without
+    a run, by key. A context that cannot be read gives none: the child is then
+    saved as before, without them."""
     try:
         linked = store.read_linked_history(owner, history_id)
     except VariationAuthorityAdapterError:
-        return None
+        return {}
     if linked is not None:
-        return linked.laws_layers
-    return store.read_derived_laws_layers(owner, history_id)
+        return {key: getattr(linked, key) for key in LAWS_RECORD_KEYS if getattr(linked, key) is not None}
+    return store.read_derived_laws_records(owner, history_id)
 
 
 def pipeline_router(service: PipelineService | Callable[[], PipelineService], actor_dependency: Callable,

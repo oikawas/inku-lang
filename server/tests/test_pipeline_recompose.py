@@ -192,10 +192,10 @@ class SavedWorks:
         assert owner == "author"
         return {"linked": self.linked.history, "legacy": self.legacy}.get(history_id)
 
-    def read_derived_laws_layers(self, owner, history_id):
+    def read_derived_laws_records(self, owner, history_id):
         # Neither work was drawn from a parent without a run (2026-10-20).
         assert owner == "author"
-        return None
+        return {}
 
 
 def test_a_recomposition_of_a_saved_work_forks_from_it(monkeypatch):

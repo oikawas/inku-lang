@@ -45,10 +45,15 @@ HISTORY_FORK_CONTEXT_PROTOCOL = "inku.pipeline-history-fork-context.v3"
 # The derivations the Server draws from the parent without a run to link: the
 # color arrangement, the support, the touches, and a redraw of such a work. Their
 # child keeps the parent's laws record on its lineage edge (2026-10-20). The
-# Server writes these edges' metadata itself, so only they are read for it.
+# Server writes these edges' metadata itself, so only they are read for it. A
+# layout child is saved as the screen drew it, and the Server writes its records.
 LAWS_RECORD_DERIVATIONS = frozenset(
-    {"color_arrangement_change", "ground_change", "tool_change", "replay"}
+    {"color_arrangement_change", "ground_change", "tool_change", "replay", "layout_change"}
 )
+# The laws records a work keeps: the layers the laws placed, and the composed
+# document and answer they were applied by, from which the AI refinement's laws
+# move applies other laws (2026-10-20).
+LAWS_RECORD_KEYS = ("laws_layers", "laws_basis")
 _PIPELINE_DIAGNOSTIC_KEYS = frozenset(
     {
         "upstream_diagnostics",
@@ -181,6 +186,8 @@ class LinkedHistoryForkRecord:
     completion_ranges: object | None = None
     # The layers the laws stage placed, which "change the layout" keeps (2026-10-20).
     laws_layers: object | None = None
+    # The composed document and answer the laws were applied by (2026-10-20).
+    laws_basis: object | None = None
 
 
 @dataclass(frozen=True)
@@ -665,10 +672,9 @@ def _history_fork_context_bytes(
             pipeline_diagnostics
         ),
     }
-    if snapshot.get("completion_ranges") is not None:
-        payload["completion_ranges"] = snapshot["completion_ranges"]
-    if snapshot.get("laws_layers") is not None:
-        payload["laws_layers"] = snapshot["laws_layers"]
+    for key in ("completion_ranges", *LAWS_RECORD_KEYS):
+        if snapshot.get(key) is not None:
+            payload[key] = snapshot[key]
     encoded = _canonical_json(payload, sort_keys=True).encode("utf-8")
     return encoded, hashlib.sha256(encoded).hexdigest()
 
@@ -739,7 +745,7 @@ def _decode_history_fork_context_payload(
     elif protocol in {_DIAGNOSTICS_HISTORY_FORK_CONTEXT_PROTOCOL, HISTORY_FORK_CONTEXT_PROTOCOL}:
         expected_keys = legacy_keys | {"pipeline_diagnostics"}
         if protocol == HISTORY_FORK_CONTEXT_PROTOCOL:
-            expected_keys |= {"completion_ranges", "laws_layers"} & set(payload)
+            expected_keys |= {"completion_ranges", *LAWS_RECORD_KEYS} & set(payload)
         pipeline_diagnostics = _validate_pipeline_diagnostics(
             payload.get("pipeline_diagnostics")
         )
@@ -796,6 +802,7 @@ def _decode_history_fork_context(
         pipeline_diagnostics=pipeline_diagnostics,
         completion_ranges=payload.get("completion_ranges"),
         laws_layers=payload.get("laws_layers"),
+        laws_basis=payload.get("laws_basis"),
     )
 
 
@@ -933,11 +940,11 @@ class VariationAuthorityStore:
             metadata=metadata,
         )
 
-    def read_derived_laws_layers(
+    def read_derived_laws_records(
         self, owner_id: str, history_id: str
-    ) -> object | None:
-        """The laws record a work drawn from its parent without a run keeps on
-        its lineage edge, or ``None`` (2026-10-20)."""
+    ) -> dict[str, dict]:
+        """The laws records a work drawn from its parent without a run keeps on
+        its lineage edge, by key, or none (2026-10-20)."""
         with self.engine.connect() as connection:
             row = connection.execute(
                 select(LineageEdgeRow.derivation_kind, LineageEdgeRow.metadata_json)
@@ -949,13 +956,14 @@ class VariationAuthorityStore:
                 )
             ).one_or_none()
         if row is None or row.derivation_kind not in LAWS_RECORD_DERIVATIONS:
-            return None
+            return {}
         try:
             metadata = json.loads(row.metadata_json or "{}")
         except json.JSONDecodeError:
-            return None
-        record = metadata.get("laws_layers") if isinstance(metadata, dict) else None
-        return record if isinstance(record, dict) else None
+            return {}
+        if not isinstance(metadata, dict):
+            return {}
+        return {key: metadata[key] for key in LAWS_RECORD_KEYS if isinstance(metadata.get(key), dict)}
 
     def inventory(self) -> VariationAuthorityInventory:
         """Count compatible state without reading any authored text."""

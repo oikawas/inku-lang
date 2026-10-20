@@ -10,6 +10,7 @@ use inku_ddl::{
 };
 use inku_render::checked_performance::resolve_checked_performance_with_resources;
 use inku_render::performance::PerformanceRequest;
+use inku_render::types::CanvasSize;
 use inku_score::{
     Color, GroupLayout, HardResourcePolicy, OperationalResourceBudget, Point, Primitive,
     ResolvedPlacementRecipe, ResourceBudget, ResourceDemand, Score,
@@ -50,6 +51,10 @@ fn hard_policy() -> HardResourcePolicy {
 }
 
 fn execute(source: &str) -> CompilerResourceExecutionResult {
+    execute_on(source, "square")
+}
+
+fn execute_on(source: &str, canvas: &str) -> CompilerResourceExecutionResult {
     let package: Value = serde_json::from_str(ASSET).expect("Nature package must be JSON");
     let definitions = package["entries"]
         .as_array()
@@ -76,7 +81,7 @@ fn execute(source: &str) -> CompilerResourceExecutionResult {
         &definitions,
         Some(37),
         LIMITS,
-        ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+        ScoreLoweringContext::resolve(canvas, Color::White).unwrap(),
         ScoreErrorPolicy::OmitAndContinue,
         hard_policy(),
         OperationalResourceBudget(budget()),
@@ -225,5 +230,45 @@ fn performed_copies_of_a_maple_leaf_take_separate_cells() {
             let (dx, dy) = ((stem.x - other.x).abs(), (stem.y - other.y).abs());
             assert!(dx > 0.25 || dy > 0.4, "{stem:?} and {other:?} share a cell");
         }
+    }
+}
+
+#[test]
+fn copies_on_a_wide_canvas_take_cells_on_it() {
+    let source = "Nature.紅葉を3枚置く。";
+    let score = complete_score(source, &execute_on(source, "wide"));
+    let plan = resolve_checked_performance_with_resources(
+        PerformanceRequest {
+            score: &score,
+            performance_seed: Some(71),
+            composition_seed: Some(37),
+            canvas: Some(CanvasSize::new(2.35, 1.0)),
+        },
+        ScoreErrorPolicy::Stop,
+        &hard_policy(),
+        OperationalResourceBudget(budget()),
+    )
+    .unwrap();
+    // The cells cover the whole canvas, so every copy's stem ends on it (a
+    // shifted origin carried the last cell past the right edge). Transforms
+    // act in short-side units, where the wide canvas is 2.35 by 1.
+    let transforms = plan.instruction_transforms();
+    let ends = plan
+        .score
+        .instructions
+        .iter()
+        .enumerate()
+        .filter(|(_, instruction)| instruction.primitive == Primitive::Line)
+        .flat_map(|(index, instruction)| {
+            [instruction.from_.unwrap(), instruction.to.unwrap()]
+                .map(|point| transforms[index].apply(Point::new(point.x * 2.35, point.y)))
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(ends.len(), 6);
+    for end in &ends {
+        assert!(
+            (0.0..=2.35).contains(&end.x) && (0.0..=1.0).contains(&end.y),
+            "{end:?} is off the wide canvas: {ends:?}"
+        );
     }
 }

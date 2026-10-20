@@ -258,3 +258,12 @@ pub fn region_in_short_side_units(region: [f64; 4], canvas: Option<CanvasSize>) 
         center.y + half.y * scale.y,
     ]
 }
+
+/// A region's own top-left corner on the canvas's short side. A tile or a
+/// cells group lays its domain, which the compiler measures over the whole
+/// region, from this corner, not from the corner of the region kept
+/// proportional above.
+#[must_use]
+pub fn region_origin_in_short_side_units(region: [f64; 4], canvas: Option<CanvasSize>) -> Point {
+    crate::geometry::point_to_short_side_units(Point::new(region[0], region[1]), canvas)
+}

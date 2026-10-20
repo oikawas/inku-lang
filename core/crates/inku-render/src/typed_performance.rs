@@ -1346,10 +1346,10 @@ fn recipe_centers(
             ResolvedPlacementAnchor::Named { region },
             _,
         ) => {
-            let [x0, y0, _, _] = named_region_in_short_side_units(*region, canvas);
+            let origin = crate::placement::region_origin_in_short_side_units(*region, canvas);
             for center in &mut centers {
-                center.x += x0;
-                center.y += y0;
+                center.x += origin.x;
+                center.y += origin.y;
             }
         }
         (_, ResolvedPlacementAnchor::EnclosingGroup, _) => {}
@@ -2148,6 +2148,96 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![inku_score::Color::Red, inku_score::Color::Red]
         );
+    }
+
+    #[test]
+    fn compact_grid_fills_its_named_region_on_non_square_canvases() {
+        let policy = hard(100);
+        let region = [0.0, 0.0, 1.0, 2.0 / 3.0];
+        let (columns, rows) = (4_u64, 2_u64);
+        for (canvas, width, height) in [("wide", 2.35, 1.0), ("a4", 1.0, 1.414)] {
+            // The compiler measures a tile's domain over its whole region.
+            let domain = Point::new(
+                (region[2] - region[0]) * width,
+                (region[3] - region[1]) * height,
+            );
+            let mut tiled = instruction(
+                json!({"kind": "source_instruction", "instruction_index": 0}),
+                false,
+            );
+            let arrangement = tiled.arrangement.as_mut().unwrap();
+            arrangement.count = 8;
+            arrangement.jitter = 0.0;
+            let resolved = arrangement.resolved.as_mut().unwrap();
+            resolved.domain = domain;
+            resolved.anchor = ResolvedPlacementAnchor::Named { region };
+            resolved.recipe = ResolvedPlacementRecipe::Grid {
+                columns,
+                rows,
+                filled_count: 8,
+                cell_width: domain.x / 4.0,
+                cell_height: domain.y / 2.0,
+                centroid: Point::new(domain.x / 2.0, domain.y / 2.0),
+                translate_to_numeric_anchor: false,
+            };
+            let score = Score {
+                version: "0.10.0".into(),
+                canvas: inku_score::Canvas::Id(canvas.into()),
+                background: inku_score::Color::Black,
+                presence: None,
+                instructions: vec![tiled],
+                anchors: Vec::new(),
+                transform_groups: Vec::new(),
+                placement_groups: Vec::new(),
+                repetition_groups: Vec::new(),
+                fill_groups: Vec::new(),
+                mirror_relations: Vec::new(),
+                resource_policy: Some(ScoreResourcePolicy {
+                    accounting_id: inku_score::RESOURCE_ACCOUNTING_ID.into(),
+                    hard_policy: policy.clone(),
+                    operational_budget: OperationalResourceBudget(budget(100)),
+                }),
+            };
+            let performed = crate::checked_performance::resolve_checked_performance_with_resources(
+                PerformanceRequest {
+                    score: &score,
+                    performance_seed: Some(7),
+                    composition_seed: Some(11),
+                    canvas: Some(crate::types::CanvasSize::new(width, height)),
+                },
+                ScoreErrorPolicy::OmitAndContinue,
+                &policy,
+                OperationalResourceBudget(budget(100)),
+            )
+            .unwrap();
+            let centers = performed
+                .score
+                .instructions
+                .iter()
+                .map(|instruction| instruction.center.unwrap())
+                .collect::<Vec<_>>();
+            // Each cell of the region, from its own top-left corner.
+            let expected = (0..8_u64)
+                .map(|index| {
+                    Point::new(
+                        region[0]
+                            + ((index % columns) as f64 + 0.5) * (region[2] - region[0])
+                                / columns as f64,
+                        region[1]
+                            + ((index / columns) as f64 + 0.5) * (region[3] - region[1])
+                                / rows as f64,
+                    )
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(centers.len(), expected.len(), "{canvas}");
+            for (center, expected) in centers.iter().zip(&expected) {
+                assert!(
+                    (center.x - expected.x).abs() < 1.0e-9
+                        && (center.y - expected.y).abs() < 1.0e-9,
+                    "{canvas}: {center:?} is not the cell at {expected:?}"
+                );
+            }
+        }
     }
 
     #[test]

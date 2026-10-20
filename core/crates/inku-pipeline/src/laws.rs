@@ -23,8 +23,8 @@
 //! come after the fit to spacing and rebuild their layers, which are printed
 //! one sentence per instruction, with the departures the DDL needs: a pattern's
 //! cells are exact squares on the canvas's micro-lattice (so the core tiles the
-//! printed range as counted), seigaiha's grids stay inside their range, kikko
-//! is printed as rows, one grid draws at most what one instruction may, each
+//! printed range as counted), seigaiha's grids and kikko's one-row tiles stay
+//! inside their range, one grid draws at most what one instruction may, each
 //! polyrhythm voice is drawn where its layer is, and a jo-ha-kyu row keeps its
 //! direction. A pair B8 opens whose marks turn is printed as two marks with
 //! their mirrored turns. On a square canvas it is otherwise the prototype's to
@@ -880,12 +880,10 @@ fn total_marks(instructions: &[Instruction]) -> u64 {
         .sum()
 }
 
-/// One part of a pattern: a grid over a range, or (kikko) a row of hexagons or
-/// one hexagon.
+/// One part of a pattern: a grid over a range, or (kikko) one hexagon.
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Part {
     Grid([f64; 4], u64, u64),
-    Row([f64; 2], [f64; 2], u32),
     Point([f64; 2]),
 }
 
@@ -893,7 +891,6 @@ impl Part {
     fn marks(self) -> u64 {
         match self {
             Self::Grid(_, columns, rows) => columns * rows,
-            Self::Row(_, _, count) => u64::from(count),
             Self::Point(_) => 1,
         }
     }
@@ -911,10 +908,18 @@ fn centered(middle: f64, length: i64) -> i64 {
     (middle * 1e6 - length as f64 / 2.0 + 1e-6).floor() as i64
 }
 
+/// An even number of lattice steps whose square cell is no wider than `side`
+/// short-edge units (2 at least).
+#[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
+fn square_side(side: f64, physical: i64) -> i64 {
+    (2 * ((side * 1e6 / (2.0 * physical as f64) + 1e-9).floor() as i64)).max(2)
+}
+
 /// The parts of a pattern over a region and the physical side of its cell: the
-/// prototype's count of columns and rows (`lattice`); kikko's rows at the
-/// prototype's places, and otherwise exact square cells on the canvas's
-/// micro-lattice, centered in the region (seigaiha's grids inside it).
+/// prototype's count of columns and rows, and exact square cells on the
+/// canvas's micro-lattice (`lattice`), centered in the region. Seigaiha's two
+/// grids stay inside it, and so do kikko's one-row tiles (a row's marks would
+/// take the brush's member sway, which a tile does not).
 #[allow(
     clippy::cast_possible_truncation,
     clippy::cast_possible_wrap,
@@ -931,45 +936,54 @@ fn pattern_plan(region: [f64; 4], unit: f64, pattern: &str, units: Units) -> (Ve
     };
     let mut columns = ((w * units.x / unit).round_ties_even() as i64).max(1);
     let rows = ((h * units.y / (unit * row_factor)).round_ties_even() as i64).max(1);
+    let (xs, ys, physical) = units.lattice();
+    let (xs, ys, physical) = (xs as i64, ys as i64, physical as i64);
+    let (middle_x, middle_y) = ((x0 + x1) / 2.0, (y0 + y1) / 2.0);
     if pattern == "kikko" {
-        let (cw, ch) = (w / columns as f64, h / rows as f64);
+        let t = square_side(py_min(w * units.x / columns as f64, h * units.y), physical);
+        let (sx, sy) = (t * xs, t * ys);
+        let pitch = sy as f64 * HALF_SQRT_3;
+        let fit = ((h * 1e6 - sy as f64) / pitch + 1e-9).floor() as i64 + 1;
+        let kept = rows.min(fit).max(1);
+        let width = columns * sx;
+        let left = centered(middle_x, width);
+        let top = centered(
+            middle_y,
+            sy + ((kept - 1) as f64 * pitch).round_ties_even() as i64,
+        );
         let mut parts = Vec::new();
         for parity in [0_i64, 1] {
             if parity == 1 && columns <= 1 {
                 continue;
             }
+            let (a, b) = (left + parity * sx / 2, left + width - parity * sx / 2);
             let mut k = parity;
-            while k < rows {
-                let y = y0 + (k as f64 + 0.5) * ch;
-                let n = columns - parity;
-                let first = [x0 + (0.5 + 0.5 * parity as f64) * cw, y];
-                if n == 1 {
-                    parts.push(Part::Point(first));
+            while k < kept {
+                let y = top + (k as f64 * pitch).round_ties_even() as i64;
+                if columns - parity == 1 {
+                    parts.push(Part::Point([micro((a + b) / 2), micro(y + sy / 2)]));
                 } else {
-                    let last = [x0 + (columns as f64 - 0.5 - 0.5 * parity as f64) * cw, y];
-                    parts.push(Part::Row(first, last, n as u32));
+                    let row = [micro(a), micro(y), micro(b), micro(y + sy)];
+                    parts.push(Part::Grid(row, (columns - parity) as u64, 1));
                 }
                 k += 2;
             }
         }
-        return (parts, cw * units.x);
+        return (parts, micro(t * physical));
     }
-    let (xs, ys, physical) = units.lattice();
-    let (xs, ys, physical) = (xs as i64, ys as i64, physical as i64);
     let (cw, ch) = (w * units.x / columns as f64, h * units.y / rows as f64);
     let side = if pattern == "seigaiha" {
         py_min(cw, 2.0 * ch)
     } else {
         py_min(cw, ch)
     };
-    let t = (2 * ((side * 1e6 / (2.0 * physical as f64) + 1e-9).floor() as i64)).max(2);
+    let t = square_side(side, physical);
     let (sx, sy) = (t * xs, t * ys);
     let side = micro(t * physical);
     if matches!(pattern, "ichimatsu" | "uroko") && columns % 2 == 0 && columns > 1 {
         // A color cycle in reading order alternates both ways only over an odd row length.
         columns -= 1;
     }
-    let (middle_x, middle_y) = ((x0 + x1) / 2.0, (y0 + y1) / 2.0);
     if pattern != "seigaiha" {
         let (width, height) = (columns * sx, rows * sy);
         let (left, top) = (centered(middle_x, width), centered(middle_y, height));
@@ -4196,7 +4210,6 @@ impl Compiler<'_> {
                             mark.color = cycle[0];
                         }
                     }
-                    Part::Row(from, to, _) => apply_row(&mut mark, from, to, units),
                     Part::Point([x, y]) => {
                         if let Some(resolved) = resolved_mut(&mut mark) {
                             resolved.recipe = ResolvedPlacementRecipe::Place;

@@ -1192,8 +1192,10 @@ public final class AppModel {
     }
 
     /// A saved-work edit starts a child from its pinned configuration, independently of editor restoration.
+    /// `metadata` adds fields to a description edit's record (a juxtaposition's `juxtaposition`).
     public func makeSavedWorkEditRequest(work: SavedWork, mode: WorkEditMode, description: String,
-                                        sketchMode: String = "off", wildOverride: Bool? = nil) async throws -> GenerationRequest {
+                                        sketchMode: String = "off", wildOverride: Bool? = nil,
+                                        metadata: [String: ExactJSON] = [:]) async throws -> GenerationRequest {
         guard !isBusy, !isPreview, database != nil else { throw HostError("authoring_busy_or_unavailable") }
         let drawing = nextGenerationHostSettings
         guard hasNextDrawingModel else { throw HostError("model_reference_missing") }
@@ -1228,13 +1230,64 @@ public final class AppModel {
             renderColorMaps: [catalog: options["resolved_color_map"].data], description: text,
             parentWorkID: work.id, derivationKind: mode == .description ? "description_edit" : "sketch_grain_change",
             derivationMetadata: ExactJSON.object(mode == .description
-                ? ["edited_from_history_id": .string(work.id)]
+                ? metadata.merging(["edited_from_history_id": .string(work.id)]) { _, edited in edited }
                 : ["edited_from_history_id": .string(work.id), "from_sketch_state": work.sketchState.map(ExactJSON.string) ?? .null,
                    "to_sketch_mode": .string(sketchMode)]).data)
         try Task.checkCancellation()
         let pinned = try await pinPersonalPlanRequests([request])[0]
         try Task.checkCancellation()
         return pinned
+    }
+
+    /// SPEC §7.8 juxtaposition: what the shared core reads for this work (Server `api_juxtaposition`). `written` is the
+    /// description as the work keeps it, labels and all; the others are read without labels. The sources are the
+    /// author's other works that may lend a sentence: not in the trash or kept only in a lineage, not labelled DDL or
+    /// demo, no `test data` comment, a description, and not held by their DDL (the menu's own judgement).
+    public func juxtapositionInputs(work: SavedWork) async throws -> JuxtapositionInputs {
+        guard let database, let host else { throw HostError("pipeline_unavailable") }
+        _ = try await savedWorkEditContext(work)
+        let written = work.effectiveSourceText
+        let description = Self.unlabelled(written)
+        guard !description.isEmpty else { throw HostError("juxtaposition_source_has_no_description") }
+        guard !work.svg.isEmpty else { throw HostError("juxtaposition_source_has_no_image") }
+        var lineage: [String] = []
+        var added: [String] = []
+        if let nodeID = work.lineageNodeID, let branch = try await database.lineage(focusNodeID: nodeID, pathOnly: true) {
+            for node in branch.nodes {
+                let text = Self.unlabelled(node.work?.effectiveSourceText ?? "")
+                if !text.isEmpty, lineage.last != text { lineage.append(text) }
+            }
+            for edge in branch.edges {
+                let recorded = (try? ExactJSON(data: Data(edge.metadataJSON.utf8)))?["juxtaposition"]["sentence"].string
+                let sentence = recorded?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                if !sentence.isEmpty { added.append(sentence) }
+            }
+        }
+        try Task.checkCancellation()
+        let rows = try await database.juxtapositionSources()
+        let ids = rows.map(\.id)
+        let summaries = try await host.savedAuthoringSummaries(workIDs: ids)
+        let labels = try await host.savedDisplayLabels(workIDs: ids)
+        let sources = Self.juxtapositionSources(rows: rows, labels: labels, summaries: summaries, excluding: work.id)
+        return JuxtapositionInputs(description: description, written: written, lineage: lineage, added: added, sources: sources)
+    }
+
+    /// The stored works that may lend a sentence, labels removed (Server `owned_description_sources` and the
+    /// current work left out). A work counts as held by its DDL by the menu's own judgement of its saved authority.
+    nonisolated public static func juxtapositionSources(rows: [(id: String, text: String, note: String?)], labels: [String: String],
+                                            summaries: [String: SavedAuthoringSummary],
+                                            excluding workID: String) -> [(id: String, text: String)] {
+        rows.compactMap { row in
+            let label = labels[row.id]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard row.id != workID, !["DDL", "[demo]"].contains(label), !(row.note ?? "").lowercased().contains("test data"),
+                  !row.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, let summary = summaries[row.id],
+                  SavedWorkActionState(origin: summary.origin, authority: summary.authority) == .description else { return nil }
+            return (row.id, InkuCore.descriptionWithoutLabels(row.text))
+        }
+    }
+
+    private static func unlabelled(_ text: String) -> String {
+        InkuCore.descriptionWithoutLabels(text).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Menu availability is read from saved authority, never inferred from a model label or DDL contents.

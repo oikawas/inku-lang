@@ -62,6 +62,8 @@ struct InkuDialogSize: Equatable {
     static let replay = InkuDialogSize(width: 1120, height: 880)
     /// WorkEditDialog.svelte:134 (`min(780px, 96vw)`, `max-height: 92vh`)
     static let workEdit = InkuDialogSize(width: 780, widthInset: 0, widthFraction: 0.96, height: 760, heightInset: 0, heightFraction: 0.92)
+    /// JuxtaposeDialog.svelte:177 (`min(780px, 96vw)`, `max-height: 92vh`)
+    static let juxtapose = InkuDialogSize(width: 780, widthInset: 0, widthFraction: 0.96, height: 760, heightInset: 0, heightFraction: 0.92)
     /// LineagePanel.svelte:1029 okugaki-dialog and AIRefineModal (`min(760px, 96vw)`, `max-height: 90vh`)
     static let auxiliary = InkuDialogSize(width: 760, widthInset: 0, widthFraction: 0.96, height: 820, heightInset: 0, heightFraction: 0.9)
     /// refinement-workspace.css:13 menu-modal: a 24-point inset from each side of the window.

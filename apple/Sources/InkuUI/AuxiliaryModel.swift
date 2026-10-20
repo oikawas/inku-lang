@@ -71,15 +71,7 @@ public final class AuxiliaryModel {
         sourceWork = work
         let settings = await app.hostSettings()
         let savedReference = mode == .colophon ? app.display.preferences.colophonModelReference : app.display.preferences.visionModelReference
-        if modelReference.isEmpty {
-            if let savedReference, SettingsModel.isRegisteredModelAvailable(savedReference, purpose: "vision", settings: settings) {
-                modelReference = savedReference
-            } else {
-                modelReference = settings.providers.lazy.compactMap { provider in
-                    SettingsModel.registeredModels(for: provider, purpose: "vision").first(where: \.isSelectable).map { provider.id + ":" + $0.id }
-                }.first ?? ""
-            }
-        }
+        if modelReference.isEmpty { modelReference = Self.defaultVisionModel(saved: savedReference, settings: settings) }
         language = app.display.preferences.language
         enabledKinds.formIntersection(AuxiliaryProvider.allowedKinds)
         do { database = try app.auxiliaryDatabase() }
@@ -96,6 +88,14 @@ public final class AuxiliaryModel {
         guard sourceWorkID == work?.id else { return }
         if mode == .colophon { await refreshColophonPath() }
         await reloadStored(app: app)
+    }
+
+    /// The saved Vision model while it is still registered, else the first selectable Vision model.
+    static func defaultVisionModel(saved: String?, settings: HostSettings) -> String {
+        if let saved, SettingsModel.isRegisteredModelAvailable(saved, purpose: "vision", settings: settings) { return saved }
+        return settings.providers.lazy.compactMap { provider in
+            SettingsModel.registeredModels(for: provider, purpose: "vision").first(where: \.isSelectable).map { provider.id + ":" + $0.id }
+        }.first ?? ""
     }
 
     /// Match the Web textarea's UTF-16 maximum without splitting a visible character.
@@ -415,7 +415,7 @@ public final class AuxiliaryModel {
     }
 
     /// The thumbnail is an observation input; the saved SVG is never rewritten.
-    nonisolated private static func png(svgs: [String], visionAdvice: Bool = false) async throws -> Data? {
+    nonisolated static func png(svgs: [String], visionAdvice: Bool = false) async throws -> Data? {
         let clean = svgs.filter { !$0.isEmpty }
         guard !clean.isEmpty else { return nil }
         return try await Task.detached {

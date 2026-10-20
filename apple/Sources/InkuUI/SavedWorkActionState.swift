@@ -69,6 +69,9 @@ struct SavedWorkRefinementActions: View {
                         .disabled(state?.canReadDescription != true).help(state?.canReadDescription == true ? model.display.tooltip("写生なし／ありで描き直す") : reason))
                     llm(Button(model.display.localized("モデルを変える"), systemImage: "cpu") { onAction(work, "model") }
                         .disabled(state?.canReadDescription != true).help(state?.canReadDescription == true ? model.display.tooltip("モデルを変える") : reason))
+                    // WorkActionMenu.svelte:147: a sentence from another work, added after the description.
+                    llm(Button(model.display.webCopy("workActionJuxtapose", "取り合わせ"), systemImage: "text.badge.plus") { onAction(work, "juxtapose") }
+                        .disabled(state?.canReadDescription != true).help(state?.canReadDescription == true ? "" : reason))
                     if state?.canReadDescription != true { Text(reason) }
                 }
             }

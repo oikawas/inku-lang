@@ -99,6 +99,19 @@ public actor InkuDatabase {
         }
     }
 
+    /// The works a juxtaposition may borrow a sentence from (Server `owned_description_sources`): not in the trash, not
+    /// kept only in a lineage, with the stored description (labels and all) and the comment. The host leaves out the
+    /// labelled (DDL, demo), `test data` and DDL-held works, which this store does not judge.
+    public func juxtapositionSources() throws -> [(id: String, text: String, note: String?)] {
+        try queue.read { db in
+            try Row.fetchAll(db, sql: """
+                SELECT h.id, COALESCE(h.source_text, h.input) AS text, a.note FROM history h
+                LEFT JOIN library_annotations a ON a.history_id = h.id
+                WHERE h.trashed = 0 AND h.history_visibility = 'normal' ORDER BY h.at ASC, h.id ASC
+                """).map { (id: $0["id"], text: $0["text"] ?? "", note: $0["note"]) }
+        }
+    }
+
     /// The stored SVG of each id, for baking thumbnails in batches (one SVG can be megabytes).
     public func svgs(ids: [String]) throws -> [String: String] {
         guard !ids.isEmpty else { return [:] }

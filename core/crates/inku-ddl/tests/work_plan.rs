@@ -778,6 +778,10 @@ fn numeric_colors_and_fades_print_where_the_compiler_reads_them() {
         from: [0.1, 0.5],
         to: [0.9, 0.5],
     });
+    let column = Some(NumericPlace::Segment {
+        from: [0.5, 0.1],
+        to: [0.5, 0.9],
+    });
     let radius = Some(NumericSize::Radius { radius: 0.03 });
     let circles =
         |attributes: &[(WorkPlanSlot, &str)]| numeric_layer("circle", "line_up", 9, attributes);
@@ -856,6 +860,95 @@ fn numeric_colors_and_fades_print_where_the_compiler_reads_them() {
             "Scatter 30 points in the range horizontal 0 to 1, vertical 0 to 1, repeating red, orange, and yellow in order, fading outward from the center.",
             vec![Red, Orange, Yellow],
             Fade::Outward,
+        ),
+        (
+            circles(&empty),
+            NumericWriting {
+                place: row,
+                size: radius,
+                cycle: Some(vec![Red, Orange, Yellow, White]),
+                ..NumericWriting::default()
+            },
+            "画面の横0.1、縦0.5から横0.9、縦0.5まで、赤・橙・黄・白の順に繰り返して、半径0.03の空の円を9個並べる。",
+            "Line up 9 empty circles radius 0.03 from horizontal 0.1, vertical 0.5 to horizontal 0.9, vertical 0.5, repeating red, orange, yellow, and white in order.",
+            vec![Red, Orange, Yellow, White],
+            Fade::None,
+        ),
+        (
+            circles(&empty),
+            NumericWriting {
+                place: row,
+                size: radius,
+                cycle: Some(vec![Red, Yellow]),
+                shift: true,
+                ..NumericWriting::default()
+            },
+            "画面の横0.1、縦0.5から横0.9、縦0.5まで、赤・黄の順に段々に移して、半径0.03の空の円を9個並べる。",
+            "Line up 9 empty circles radius 0.03 from horizontal 0.1, vertical 0.5 to horizontal 0.9, vertical 0.5, shifting through red and yellow in order.",
+            vec![Red, Red, Red, Red, Red, Yellow, Yellow, Yellow, Yellow],
+            Fade::None,
+        ),
+        (
+            circles(&empty),
+            NumericWriting {
+                place: row,
+                size: radius,
+                cycle: Some(vec![Red, Orange, Yellow, White]),
+                shift: true,
+                ..NumericWriting::default()
+            },
+            "画面の横0.1、縦0.5から横0.9、縦0.5まで、赤・橙・黄・白の順に段々に移して、半径0.03の空の円を9個並べる。",
+            "Line up 9 empty circles radius 0.03 from horizontal 0.1, vertical 0.5 to horizontal 0.9, vertical 0.5, shifting through red, orange, yellow, and white in order.",
+            vec![Red, Red, Red, Orange, Orange, Yellow, Yellow, White, White],
+            Fade::None,
+        ),
+        (
+            circles(&[
+                (WorkPlanSlot::Color, "red"),
+                (WorkPlanSlot::Surface, "empty"),
+            ]),
+            NumericWriting {
+                place: row,
+                size: radius,
+                fade: Some(FadeDirection::RightToLeft),
+                ..NumericWriting::default()
+            },
+            "画面の横0.1、縦0.5から横0.9、縦0.5まで、右から左へ薄れさせて、半径0.03の赤の空の円を9個並べる。",
+            "Line up 9 red empty circles radius 0.03 from horizontal 0.1, vertical 0.5 to horizontal 0.9, vertical 0.5, fading from right to left.",
+            Vec::new(),
+            Fade::Directional,
+        ),
+        (
+            circles(&[
+                (WorkPlanSlot::Color, "red"),
+                (WorkPlanSlot::Surface, "empty"),
+            ]),
+            NumericWriting {
+                place: column,
+                size: radius,
+                fade: Some(FadeDirection::TopToBottom),
+                ..NumericWriting::default()
+            },
+            "画面の横0.5、縦0.1から横0.5、縦0.9まで、上から下へ薄れさせて、半径0.03の赤の空の円を9個並べる。",
+            "Line up 9 red empty circles radius 0.03 from horizontal 0.5, vertical 0.1 to horizontal 0.5, vertical 0.9, fading from top to bottom.",
+            Vec::new(),
+            Fade::Directional,
+        ),
+        (
+            circles(&[
+                (WorkPlanSlot::Color, "red"),
+                (WorkPlanSlot::Surface, "empty"),
+            ]),
+            NumericWriting {
+                place: column,
+                size: radius,
+                fade: Some(FadeDirection::BottomToTop),
+                ..NumericWriting::default()
+            },
+            "画面の横0.5、縦0.1から横0.5、縦0.9まで、下から上へ薄れさせて、半径0.03の赤の空の円を9個並べる。",
+            "Line up 9 red empty circles radius 0.03 from horizontal 0.5, vertical 0.1 to horizontal 0.5, vertical 0.9, fading from bottom to top.",
+            Vec::new(),
+            Fade::Directional,
         ),
     ];
     for (layer, written, ja, en, cycle, fade) in cases {

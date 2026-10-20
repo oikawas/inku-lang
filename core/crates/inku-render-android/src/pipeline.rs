@@ -226,6 +226,16 @@ pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_juxtap
 
 #[unsafe(no_mangle)]
 #[allow(non_snake_case)]
+pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_autonomousRefine(
+    env: JNIEnv<'_>,
+    _receiver: JObject<'_>,
+    input: JByteArray<'_>,
+) -> jbyteArray {
+    unary_bytes(env, input, inku_pipeline_uniffi::autonomous_refine)
+}
+
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
 pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_providerWire(
     env: JNIEnv<'_>,
     _receiver: JObject<'_>,

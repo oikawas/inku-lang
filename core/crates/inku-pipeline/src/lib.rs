@@ -4,6 +4,7 @@
 
 pub mod appearance;
 pub mod authority;
+pub mod autonomous_refine;
 pub mod byte_envelope;
 pub mod colors;
 pub mod completion_ranges;

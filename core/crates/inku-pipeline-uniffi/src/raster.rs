@@ -204,3 +204,63 @@ pub fn rasterize_svg_region(
     }))
     .unwrap_or(Err(RasterFailure::InternalInvariant))
 }
+
+/// `measure` of the autonomous refinement (stage 1b's visible-difference gate),
+/// or `None` for its other actions, which the pipeline answers. Both drawings
+/// are made here, with the shared rasterizer, so that the three apps count the
+/// same pixels.
+pub(crate) fn measure_visible_difference(input: &[u8]) -> Option<Vec<u8>> {
+    use inku_pipeline::autonomous_refine::{
+        GATE_SIZE, gate_square, measure_answer, measure_refusal, visible_count,
+    };
+
+    #[derive(serde::Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Measure {
+        #[allow(dead_code)]
+        action: String,
+        before: String,
+        after: String,
+    }
+
+    let request: serde_json::Value = serde_json::from_slice(input).ok()?;
+    if request.get("action").and_then(serde_json::Value::as_str) != Some("measure") {
+        return None;
+    }
+    let Ok(measure) = serde_json::from_value::<Measure>(request) else {
+        return Some(br#"{"error":"invalid_request"}"#.to_vec());
+    };
+    let draw = |svg: &str, which: &str| {
+        let output = inku_svg_raster::rasterize(
+            svg,
+            RasterOptions {
+                target_width: Some(GATE_SIZE),
+                target_height: Some(GATE_SIZE),
+            },
+        )
+        .map_err(|error| format!("{which}: {error}"))?;
+        gate_square(
+            output.width,
+            output.height,
+            output.stride,
+            &output.pixels,
+            GATE_SIZE,
+        )
+        .ok_or_else(|| format!("{which}: the drawing does not fit the gate's square"))
+    };
+    Some(
+        match (
+            draw(&measure.before, "before"),
+            draw(&measure.after, "after"),
+        ) {
+            (Ok(before), Ok(after)) => match visible_count(&before, &after, GATE_SIZE) {
+                Some(count) => measure_answer(count),
+                None => measure_refusal(
+                    "not_drawable",
+                    "the drawings do not fill the gate's square".to_owned(),
+                ),
+            },
+            (Err(detail), _) | (_, Err(detail)) => measure_refusal("not_drawable", detail),
+        },
+    )
+}

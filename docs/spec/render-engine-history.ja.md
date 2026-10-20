@@ -164,9 +164,9 @@ Stage 2 の LLM が挟まる。したがって「DDL から Score まで」を 1
 | `ddl_version` | DDL 言語仕様そのもの（文法・キーワード） | `23` | **語彙の追加・変更・廃止、または文法の追加・変更・廃止**（2026-07-30 作者裁定で明文化。v2 は太さの語で、v3 は黄・橙・紫で上げた） |
 | Score の `version` | JSON Score のスキーマ | `0.21.0` | スキーマの構造変更 |
 | `MODEL_CONFIG_VERSION` | モデルカタログ（`model_catalog.json`）の中身 | `3.0.0+<中身の hash>` | **正本のファイルが変わるたびに自ずと変わる**（2026-10-13 から。`version` に中身の hash を足す。それまでは手で上げていた）。変わると保存済みのモデルの同じ id へ正本のモデル情報を丸ごと重ね直す（保存済みのモデル一覧・公開の選択・その環境の名前と有料プラン限定の印は残る） |
-| `APP_VERSION` | アプリの版 | v2.15.214 | 採番のたび。**正本は `web/APP_VERSION` の 1 ファイル**で、UI・`/api/info` の `version`・CLI が同じ値を読む |
+| `APP_VERSION` | アプリの版 | v2.15.215 | 採番のたび。**正本は `web/APP_VERSION` の 1 ファイル**で、UI・`/api/info` の `version`・CLI が同じ値を読む |
 | `server/pyproject.toml` | 配布物の版 | 2.15.33 | **リリースのタグを打つときだけ**。`/api/info` の `release_version` が返す。リリース保留中はアプリの版から遅れる |
-| `web/BUILD_NUMBER` | ビルド通し番号 | 1290 | **UI の変更でも動く。ブランチごとの値ではなく共有の連番なので、番号は飛びうる。v2.9.23 以降は `.gitattributes` の merge driver が大きいほうを採るので、両側が採番しても競合しない**（`scripts/git/setup.sh` を clone ごとに 1 回） |
+| `web/BUILD_NUMBER` | ビルド通し番号 | 1291 | **UI の変更でも動く。ブランチごとの値ではなく共有の連番なので、番号は飛びうる。v2.9.23 以降は `.gitattributes` の merge driver が大きいほうを採るので、両側が採番しても競合しない**（`scripts/git/setup.sh` を clone ごとに 1 回） |
 
 **「現在」の列は書いた時点の値である。** 版を上げたら、この列も同じ commit で直す。
 

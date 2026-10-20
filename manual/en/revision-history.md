@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-10-20 — Another composition and the laws' layers
+
+With Another composition now choosing again the works the laws stage drew, its paragraph in Creating Images is revised: the layers the laws placed stay and only the others are chosen again, the reason shown when the laws placed every layer, what happens when you rewrite a laws sentence, and works from before 2026-10-20.
+
 ## 2026-10-20 — The laws stage after the composition
 
 With the laws stage added after the composition for works the Server draws, the flow at the start of Creating Images now includes it, and a new paragraph explains how the laws are chosen and how the layers they change are rewritten in numbers. The waiting indicator (`Choosing the laws…`), the laws stage in the Prompts tab, and that `Another composition` does not choose again a work with a sentence the laws wrote in numbers are described too.

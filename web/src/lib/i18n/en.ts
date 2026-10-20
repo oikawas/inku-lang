@@ -464,6 +464,7 @@ export const en: LangPack = {
 	recomposeByChance: 'By chance',
 	recomposeReason: (reason) => ({
 		nothing_to_move: 'This work has no composition ranges.',
+		laws_placed: 'Every layer was placed by the laws or at a place the description states, so no layer can move.',
 		not_canonical: 'The instructions have unresolved parts, so the composition cannot move.',
 		unsupported_sentence: 'These instructions include a sentence that cannot change composition.',
 		unplaced_sentence: 'A sentence states no range or place, so the ranges in the instructions cannot be chosen again.',

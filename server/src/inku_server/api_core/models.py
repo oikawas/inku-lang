@@ -61,7 +61,7 @@ class RecompositionResult(BaseModel):
     outcome: Literal["recomposed", "unchanged"]
     moves: list[CompositionMove] = Field(default_factory=list)
     reason: Literal[
-        "nothing_to_move", "not_canonical", "unsupported_sentence", "unplaced_sentence",
+        "nothing_to_move", "laws_placed", "not_canonical", "unsupported_sentence", "unplaced_sentence",
         "author_range", "no_other_answer", "same_ranges", "unsolved", "not_canonical_after",
         "binding_unavailable", "invalid_request", "internal_invariant", "internal",
         "invalid_response", "recompose_failed",

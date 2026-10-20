@@ -462,6 +462,7 @@ export const ja: LangPack = {
 	recomposeByChance: '偶然に委ねる',
 	recomposeReason: (reason) => ({
 		nothing_to_move: 'この作品には構図の範囲が無い。',
+		laws_placed: '法則が置いた層と、記述が場所を言った層だけなので、動かせる層が無い。',
 		not_canonical: '指示書に未確定の部分があるため、構図を動かせない。',
 		unsupported_sentence: 'この指示書には構図の変更に対応していない文がある。',
 		unplaced_sentence: '範囲も場所も書かれていない文があるため、指示書の範囲は選び直せない。',

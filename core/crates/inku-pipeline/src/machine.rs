@@ -27,6 +27,7 @@ use crate::composition_reading::{
 use crate::core_boundary::CatalogMode;
 use crate::core_boundary::{CompiledDelivery, CompilerOptions, ResolvedHostOptions};
 use crate::laws::{self, ComposedPlan, LawsContext};
+use crate::laws_record::LawsLayerRecord;
 use crate::prompts::{
     DescriptionCatalogEntry, HOLE_COMPLETION_PROMPT_ID, HoleCompletionResult,
     HolePatchEditResponse, HolePatchResponse, LEGACY_HOLE_COMPLETION_PROMPT_ID, LlmPrompt,
@@ -327,6 +328,11 @@ pub enum AuthoringInput {
         /// has none.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         completion_ranges: Option<CompletionRangeRecord>,
+        /// The record of the layers the laws placed, kept with the work this
+        /// DDL comes from (2026-10-20). A text alone, or a work without laws,
+        /// has none.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        laws_layers: Option<LawsLayerRecord>,
     },
     Description {
         description: String,
@@ -492,6 +498,12 @@ pub struct PipelineSnapshot {
     /// DDL from that work. Absent when there is none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub completion_ranges: Option<CompletionRangeRecord>,
+    /// The record of the layers the laws stage placed in this work's DDL
+    /// (2026-10-20): a host keeps it with each saved work, brings it back with
+    /// a direct DDL from that work, and gives it to "change the layout".
+    /// Absent when there is none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub laws_layers: Option<LawsLayerRecord>,
     pub snapshot_digest: String,
 }
 
@@ -1575,6 +1587,7 @@ impl PipelineSnapshot {
         else {
             return self.laws_fallback(json!({"failure": "compile"}), events);
         };
+        let record = laws::layers_record(&chosen, &document.source, compiled.compilation());
         if let Some(refusal) = off_canvas_instruction(&compiled)
             .and_then(|instruction| laws::off_canvas(&chosen, &context, instruction))
         {
@@ -1596,6 +1609,7 @@ impl PipelineSnapshot {
                 "notes": chosen.notes,
             }),
         )?;
+        self.laws_layers = record.filter(|record| !record.is_empty());
         self.commit_stage1(document, &pending.reason, events)
     }
 
@@ -2983,6 +2997,7 @@ fn advance_impl(
             composition: None,
             laws: None,
             completion_ranges: None,
+            laws_layers: None,
             snapshot_digest: String::new(),
         };
         state.event(
@@ -2994,8 +3009,10 @@ fn advance_impl(
             AuthoringInput::DirectDdl {
                 source,
                 completion_ranges,
+                laws_layers,
             } => {
                 state.completion_ranges = completion_ranges.filter(|record| !record.is_empty());
+                state.laws_layers = laws_layers.filter(|record| !record.is_empty());
                 if matches!(
                     state.config.compiler.host.catalog_mode(),
                     CatalogMode::AutoSelected | CatalogMode::AutoFallbackDefault

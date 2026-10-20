@@ -243,6 +243,8 @@ class PipelineService:
             authoring = {"tag": "description", "description": drawn, "auto_catalog": context.get("auto_catalog", self.auto_catalog)} if kind == "description" else {"tag": "direct_ddl", "source": text}
             if kind == "direct_ddl" and source_work and source_work.get("completion_ranges") is not None:
                 authoring["completion_ranges"] = deepcopy(source_work["completion_ranges"])
+            if kind == "direct_ddl" and source_work and source_work.get("laws_layers") is not None:
+                authoring["laws_layers"] = deepcopy(source_work["laws_layers"])
             sketch = context.get("sketch_request") or {"mode": "off"}
             if kind == "description" and sketch["mode"] != "off":
                 authoring["sketch"] = sketch
@@ -299,6 +301,8 @@ class PipelineService:
         # intact; the new direct-DDL variation starts with DDL authority.
         if run.snapshot().get("completion_ranges") is not None:
             source_work["completion_ranges"] = run.snapshot()["completion_ranges"]
+        if run.snapshot().get("laws_layers") is not None:
+            source_work["laws_layers"] = run.snapshot()["laws_layers"]
         return self.start(
             owner, "direct_ddl", body.source,
             parent={"kind": "variation", "id": previous["variation_id"]},
@@ -628,6 +632,7 @@ def linked_source_work(linked) -> dict:
         "host_options": linked.host_options,
         "macro_catalog": linked.macro_catalog,
         **({"completion_ranges": linked.completion_ranges} if linked.completion_ranges is not None else {}),
+        **({"laws_layers": linked.laws_layers} if linked.laws_layers is not None else {}),
         "result": {"lineage_node_id": history["metadata"].get("lineage_node_id")},
     }
 

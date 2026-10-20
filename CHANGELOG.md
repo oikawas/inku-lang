@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-20 — History strip and Library filters read Starred, Revision, Shared
+
+The Web history strip and Library filter buttons now read `Starred`, `Revision`, and `Shared` instead of `Starred only`, `Revision marks only`, and `Group shared only` (Japanese: スター, 推敲, 共有). The filters work as before.
+
 ### 2026-10-19 — Android: 3D PNG and GLB saves carry Web's file name
 
 In the Android experimental 3D view, a saved PNG or GLB reached the share sheet as `<UUID>.png` or `<UUID>.bin`, and the GLB went with no known type: the web view's download notice never carries the link's name. The app now reads the format from the file's first bytes and hands it on as `inku-3d-<first 12 of the digest>.png` or `.glb`, typed `image/png` or `model/gltf-binary`, as Web names it.

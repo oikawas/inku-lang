@@ -4347,7 +4347,7 @@ ordinary operation.  The server reports whether the mode is on through the same
 public response that carries the version and build number.
 
 In single-user mode, Web hides group-sharing buttons, the sharing dialog,
-sharing filters and sharing-status marks, including `Group shared only` in the
+sharing filters and sharing-status marks, including the `Shared` filter in the
 history strip and Library. Group and permission administration remain available.
 
 In single-user mode, browser requests resolve to the recorded owner regardless

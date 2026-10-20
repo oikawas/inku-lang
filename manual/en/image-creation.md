@@ -432,7 +432,7 @@ Combine `Thumbnails` with `By lineage` to show lineages with at least two works 
 **What is printed under each thumbnail is chosen under `Display and operation` in `Settings`** (`Facts under the history thumbnails`). Choose **up to three** of generation, model, engine version and file size; **choose none and the strip shows only the pictures**. A fourth choice is refused rather than allowed to evict an existing one, and the limit is shown. **File size is the size the server reports for the stored work.**
 
 - Search descriptions, DDL, Stage 1/2 models, color catalogs, whole hashes, hash beginnings or last four characters, and whole work IDs (UUIDs) or their beginnings. Find the UUID under `Identity` in Provenance. Searches are case-insensitive
-- Filters for starred only, for revision only, and shared only. Used together, only works matching every one of them remain
+- The `Starred`, `Revision`, and `Shared` filters. Used together, only works matching every one of them remain
 - Switching between ordinary history and trash
 - Thumbnail view and list view. The list compares hash, timestamp, model, elapsed time, and color catalog
 - Move to trash, restore, and permanent delete, singly or by multiple selection
@@ -448,9 +448,9 @@ In multi-user mode, the share mark is a third one. Raise it with `Share with gro
 
 **Lowering the mark keeps the destination.** Marking the same work again returns it to the same recipients. **What this mark widens is reading only, never writing** — a work shared to you cannot be starred or moved to trash by you. Lineage nodes follow the mark, but **the colophon does not**.
 
-Both the history strip and `Library` carry a `Group shared only` filter, so the marked works can be listed on their own.
+Both the history strip and `Library` carry a `Shared` filter, so the marked works can be listed on their own.
 
-In single-user mode, group-sharing buttons, the sharing dialog, sharing filters such as `Group shared only`, and sharing-status marks are hidden. Group and permission administration remain available.
+In single-user mode, group-sharing buttons, the sharing dialog, sharing filters such as `Shared`, and sharing-status marks are hidden. Group and permission administration remain available.
 
 `Replay` compares the saved SVG with a performance of the stored Score and conditions on the current engine. An engine-version difference is reported. Old works without a recorded render seed can also be compared using provisional seed 0; this does not guarantee exact recovery of their original performance.
 

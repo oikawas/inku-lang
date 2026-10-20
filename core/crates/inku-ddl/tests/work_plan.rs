@@ -476,6 +476,30 @@ fn numeric_places_and_sizes_print_where_the_compiler_reads_them() {
             "画面の横0.2〜0.8、縦0.3〜0.6の範囲に、白の点を12個散らす。",
             "Scatter 12 white points in the range horizontal 0.2 to 0.8, vertical 0.3 to 0.6.",
         ),
+        // An English sentence that ends in its place's whole number writes it
+        // with one decimal, which the reader does not take for a decimal point.
+        (
+            numeric_layer("point", "scatter", 12, &[(WorkPlanSlot::Color, "white")]),
+            NumericWriting {
+                place: Some(NumericPlace::Range {
+                    bounds: [0.2, 0.333_333, 0.8, 1.0],
+                }),
+                size: None,
+                ..NumericWriting::default()
+            },
+            "画面の横0.2〜0.8、縦0.333333〜1の範囲に、白の点を12個散らす。",
+            "Scatter 12 white points in the range horizontal 0.2 to 0.8, vertical 0.333333 to 1.0.",
+        ),
+        (
+            numeric_layer("line", "draw", 1, &[]),
+            NumericWriting {
+                place: segment(0.0, 0.5, 1.0, 1.0),
+                size: None,
+                ..NumericWriting::default()
+            },
+            "画面の横0、縦0.5から横1、縦1まで、線を1個引く。",
+            "Draw one line from horizontal 0, vertical 0.5 to horizontal 1, vertical 1.0.",
+        ),
         (
             numeric_layer("ellipse", "place", 1, &[]),
             NumericWriting {

@@ -1233,8 +1233,24 @@ fn print_layer_en(
         out.push_str(", ");
         out.push_str(fade.written_en());
     }
+    // The numeric range reader takes a period right after a whole number for a
+    // decimal point (`vertical 1.`): a sentence that ends in its numeric place's
+    // whole number writes it with one decimal (`vertical 1.0.`).
+    let ends_in_place = cycle.is_none()
+        && numeric.is_some_and(|numeric| numeric.place.is_some() && numeric.fade.is_none());
+    if ends_in_place && ends_in_whole_number(&out) {
+        out.push_str(".0");
+    }
     out.push('.');
     out
+}
+
+/// Whether a sentence ends in a whole number (`vertical 1`), not in a decimal
+/// (`0.5`) or a fraction.
+fn ends_in_whole_number(text: &str) -> bool {
+    text.rsplit(' ')
+        .next()
+        .is_some_and(|word| !word.is_empty() && word.bytes().all(|byte| byte.is_ascii_digit()))
 }
 
 /// English items in a series: `a and b`, or `a, b, and c`.

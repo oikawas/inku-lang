@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-21 — The English print no longer ends a sentence in a whole number the reader cannot read
+
+When the laws and color stages printed an English sentence in numbers, a numeric range or the ends of a line or row reaching the canvas edge could end the sentence in a whole number (`… vertical 0.333333 to 1.`). The numeric range reader takes a period right after a whole number for a decimal point, so the sentence did not read: a description run committed its composed document without laws, and the laws move stopped with `laws_compile`. A sentence that ends in its place's whole number now writes it with one decimal (`vertical 1.0.`). Prints that read today and the Japanese print do not change.
+
 ### 2026-10-21 — Android: the camera's model chooser follows the model purposes, and Juxtapose's held reason matches Web
 
 At the author's decision, the camera's model chooser offers only the models set to be used for both LLM and Vision. The camera reads the photo and draws with the same model, so a model with only one of the two purposes stops partway. If the chosen model has only one, it has to be chosen again. Also, in the work-editing menu of a description-locked work, the reason under Juxtapose is now Web's "This work's DDL was edited. Drawing it from the description would lose the edits, so this is not offered. …". As the way to start again from the description, Android names Change the description in the same menu.

@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-21 — Android: the camera's model chooser follows the model purposes, and Juxtapose's held reason matches Web
+
+At the author's decision, the camera's model chooser offers only the models set to be used for both LLM and Vision. The camera reads the photo and draws with the same model, so a model with only one of the two purposes stops partway. If the chosen model has only one, it has to be chosen again. Also, in the work-editing menu of a description-locked work, the reason under Juxtapose is now Web's "This work's DDL was edited. Drawing it from the description would lose the edits, so this is not offered. …". As the way to start again from the description, Android names Change the description in the same menu.
+
 ### 2026-10-21 — The AI refinement's visible-difference gate takes its share of the drawn cells
 
 The shared core's gate for the autonomous refinement (a child drawn by an AI move is kept only when it looks different from its parent) divided the changed cells by all the cells of the square (48×48). A drawing of dots or thin lines alone could move everything it drew and stay under a fifth (of the 51 laws-move children of the drawing trial, 14 passed). By the author's decision it now divides by the cells drawn in the before or the after drawing, still at a fifth. The ground colour is read from the cells along the edge of the before drawing, and neither the margin of a drawing that is not square nor a half-covered row at its edge counts as drawn. A cell that stays close to the ground in both drawings does not count even when it changes. The `measure` answer's `different` becomes `changed` (the drawn cells that changed) and gains `drawn` (the drawn cells). On the same 51 children, 48 pass. No app uses this gate yet, so the screens and drawings do not change.

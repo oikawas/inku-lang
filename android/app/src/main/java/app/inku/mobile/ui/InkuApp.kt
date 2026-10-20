@@ -776,7 +776,7 @@ private fun WorkActionsDialog(item: HistoryItemEntity, descriptionLocked: Boolea
                 if (sourceTextOf(item).isNotBlank()) {
                     TextButton(onClick = { viewModel.openJuxtaposition(item) }, enabled = descriptionLocked == false,
                         modifier = Modifier.fillMaxWidth().testTag(JUXTAPOSE_ENTRY_TAG)) { Text(juxtaposeStrings(LocalUiLanguage.current).action) }
-                    if (descriptionLocked == true) Text(S.pipelineDdlAuthority, style = MaterialTheme.typography.labelSmall,
+                    if (descriptionLocked == true) Text(juxtaposeStrings(LocalUiLanguage.current).heldReason(S.descriptionEditAction), style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 TextButton(onClick = { viewModel.openAutonomousRefinement(item) }, modifier = Modifier.fillMaxWidth().testTag("autonomous-entry")) { Text(savedWorkParityStrings(LocalUiLanguage.current).autonomousTitle) }
@@ -5931,9 +5931,12 @@ private fun modelOptionsForProvider(state: InkuUiState, providerId: String, stri
     }
     val provider = state.providerSettings.firstOrNull { it.providerId == providerId } ?: return emptyList()
     // The drawing models are Server's `drawing_catalog`: those that serve LLM.
-    // The camera's description reads the photo, so its list is left whole.
+    // The camera reads the photo and draws with the same model, so it needs both.
     return availablePublishedModels(provider, state)
-        .filter { state.modelSelectionForCamera || "llm" in servedPurposes(state, providerId, it) }
+        .filter { id ->
+            val purposes = servedPurposes(state, providerId, id)
+            "llm" in purposes && (!state.modelSelectionForCamera || "vision" in purposes)
+        }
         .map { id ->
         ModelOptionChoice(
             rawId = id,

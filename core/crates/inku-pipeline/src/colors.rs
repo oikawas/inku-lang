@@ -64,6 +64,11 @@ const CHROMATIC: f64 = 15.0;
 const VIVID_CHROMA: f64 = 25.0;
 /// D2: another colored layer's chroma at most this share of the vivid one.
 const MUTED_SHARE: f64 = 0.5;
+/// B15: a distant layer the colors change stands at least this far from the
+/// ground in drawn lightness (and less far than the main layer).
+const AERIAL_FAR: f64 = 0.2;
+/// B13, B14: a gradation runs through at least this many marks.
+const GRADED_MARKS: u64 = 3;
 /// D6: a scattered layer of at least this many marks, each at most this wide.
 const MIX_COUNT: u64 = 6;
 const MIX_SIZE: f64 = 0.08;
@@ -882,6 +887,8 @@ pub struct ColorsContext {
     painter: Painter,
     colorable: Vec<usize>,
     multi: Vec<usize>,
+    /// The layers of enough marks for a gradation to run through them.
+    graded: Vec<usize>,
     deterministic: Vec<usize>,
     scatter_small: Vec<usize>,
     pairs: Vec<(usize, usize)>,
@@ -966,14 +973,12 @@ impl ColorsContext {
             .main_layer
             .filter(|layer| found.contains(layer) && !plugins.contains(layer))
             .unwrap_or(first);
+        // The layers whose color the laws stage decided may be recolored as
+        // long as its laws still hold (the author's answer, 2026-10-20).
         let colorable: Vec<usize> = found
             .iter()
             .copied()
-            .filter(|layer| {
-                !fixed.contains_key(layer)
-                    && !stated.contains_key(layer)
-                    && !plugins.contains(layer)
-            })
+            .filter(|layer| !stated.contains_key(layer) && !plugins.contains(layer))
             .collect();
         let mut shares = Shares::default();
         let now = painter.drawing(&score, &mut shares)?;
@@ -999,6 +1004,11 @@ impl ColorsContext {
             .copied()
             .filter(|layer| movable(layer) && by(*layer).is_some_and(|summary| summary.count >= 2))
             .collect();
+        let graded: Vec<usize> = multi
+            .iter()
+            .copied()
+            .filter(|layer| by(*layer).is_some_and(|summary| summary.count >= GRADED_MARKS))
+            .collect();
         let deterministic: Vec<usize> = colorable
             .iter()
             .copied()
@@ -1018,13 +1028,8 @@ impl ColorsContext {
                 })
             })
             .collect();
-        let strong: Vec<usize> = found
-            .iter()
-            .copied()
-            .filter(|layer| !fixed.contains_key(layer))
-            .collect();
         let mut pairs: Vec<(usize, usize)> = Vec::new();
-        for a in &strong {
+        for a in &found {
             for b in &colorable {
                 if a != b && now.neighbors.get(a).is_some_and(|near| near.contains(b)) {
                     pairs.push((*a, *b));
@@ -1051,6 +1056,7 @@ impl ColorsContext {
             painter,
             colorable,
             multi,
+            graded,
             deterministic,
             scatter_small,
             pairs,
@@ -1182,11 +1188,9 @@ impl ColorsContext {
                 .map(|position| &self.score.instructions[*position])
         };
         // The prototype read these over every layer the laws stage left open,
-        // the stated ones included.
-        let open: Vec<usize> = self
-            .layers()
-            .filter(|layer| !self.fixed.contains_key(layer))
-            .collect();
+        // the stated ones included; the layers whose color the laws stage
+        // decided are open too, since the colors may change them.
+        let open: Vec<usize> = self.layers().collect();
         let marked = |test: &dyn Fn(&Instruction) -> bool| {
             open.iter().any(|layer| instructions(layer).any(test))
         };
@@ -1460,8 +1464,8 @@ const LAW_TEXTS: [(&str, LawText); 18] = [
             family: GRADATION,
             source: ["Dow の Transition", "Dow's transition"],
             law: [
-                "列の物を、一方の端から他方へ、濃さを順に下げる。格子・1個の層・一つずつに開いた層には使えない。",
-                "The marks of a row lose density in order from one end to the other. A grid, a single mark and a layer opened into marks cannot take it.",
+                "列の物を、一方の端から他方へ、濃さを順に下げる。痕が3つ以上の列に使う。格子・1個の層・一つずつに開いた層には使えない。",
+                "The marks of a row lose density in order from one end to the other. A row of three marks or more takes it; a grid, a single mark and a layer opened into marks cannot.",
             ],
             choose: [
                 "列の層ごとに、薄れる向き。",
@@ -1480,8 +1484,8 @@ const LAW_TEXTS: [(&str, LawText); 18] = [
                 "Leonardo, Treatise on Painting: shading",
             ],
             law: [
-                "散らした物か列の物を、中心から外へ薄れさせる。",
-                "Scattered marks or the marks of a row fade from the center outward.",
+                "散らした物か列の物を、中心から外へ薄れさせる。痕が3つ以上の層に使う。",
+                "Scattered marks or the marks of a row fade from the center outward. A layer of three marks or more takes it.",
             ],
             choose: ["散らす層か列の層。", "A scattered layer or a row layer."],
             example: both(r#"{"layers":[2]}"#),
@@ -1676,8 +1680,8 @@ const LAW_TEXTS: [(&str, LawText); 18] = [
                 "Itten, The Art of Color (1961): contrast of saturation",
             ],
             law: [
-                "主の層だけを最も鮮やかな色にし、ほかの色の層をくすんだ色か無彩にする。くすんだ色の中に置くと、鮮やかな色がいっそう鮮やかに見える。",
-                "Only the main layer takes the most vivid color; the other colored layers turn dull or achromatic. Among dull colors a vivid one looks more vivid still.",
+                "主の層だけを最も鮮やかな色にし、ほかの色の層をくすんだ色か無彩にする。くすんだ色の中に置くと、鮮やかな色がいっそう鮮やかに見える。全ての法則を当てた後に、主の層の描いた鮮やかさが、ほかの全ての層（記述の色の層など、替えない層も含む）の2倍以上であること。",
+                "Only the main layer takes the most vivid color; the other colored layers turn dull or achromatic. Among dull colors a vivid one looks more vivid still. Once every law is applied, the main layer, drawn, is at least twice as vivid as every other layer (a layer that keeps a stated color included).",
             ],
             choose: [
                 "主の層の色。選べるのは、この作品の有彩色のうち表の chroma が 25 以上の色だけ（白・黒・灰は選べない）。ほかの層のうち、その色の半分より鮮やかな層は、道具が白・灰・黒のうち、描いて地から見え、組み合わせの調和の高いものに替える。",
@@ -1798,10 +1802,10 @@ const SYSTEM_JA: &str = "あなたは、作品の配色を決める係です。
 配色の法則の一覧（18）から、この作品に使う法則を選び、法則ごとの値を選択肢から選んでください。明るさ・面積・濃さの計算と、決まりの検査は、道具がします。
 
 決まり:
-1. 主の配色の法則（main_law）を一つ決めます。画を見た人が最初に感じ取る、色の骨組みになる法則です。主を支える法則は 0 か 1 つにします（laws は主を含めて 1〜2）。この画ですでに成り立っている法則（一覧に印がある）は、主には選べません。支えには使えます。主には、画の色を変える法則を選びます。
+1. 主の配色の法則（main_law）を一つ決めます。画を見た人が最初に感じ取る、色の骨組みになる法則です。主を支える法則は 0 か 1 つにします（laws は主を含めて 1〜2）。この画ですでに成り立っている法則（一覧に印がある）は、主には選べません。支えには使えます。主には、画の色を変える法則を選びます。画を何も変えない答えは退けられます。
 2. 主の層は、前の段が決めた層です（「主の層」に書いた番号）。変えません。
 3. 記述が色の言葉で言った層と地は、道具が決めました（「記述の色」に書いたもの）。その色は、どの法則でも替えません（替える答えは退けられます）。
-4. 層の要約に fixed がある層（空気遠近 B15・文様 C2 の層）は、前の段が色を決めたので、名指して色を替えません。差し込みの形の層（arranged が plugin）も、色を替えられません。
+4. 層の要約に fixed がある層は、前の段が色を決めた層です。色を替えてかまいませんが、空気遠近 B15 の遠い層は、地との描いた明るさの差を 0.2 以上で、主の層より小さく保ちます（遠い物ほど地に溶けます）。文様 C2 の層は、地から見えるように保ちます。差し込みの形の層（arranged が plugin）は、色を替えられません。
 5. 色の元は一つです: colors（各層の色。B17〜B20 のどれかを使う時だけ書く）か、C8 か、どちらも無し（楽譜の色のまま）。D1・D5・D7 は値を一つ選ぶだけで、ほかの層の色は道具が色相環の位置と描いた明るさで決めます。その上に、B11・B13・B14・B16・C7・C9・D2・D3・D4・D6 が重なります。
 6. 地（背景）は画面の大部分を占め、画の色の印象をほとんど決めます（「画面」に割合を書きました）。地の色は今のままです。層の色は、この地の上で選びます。
 7. 色の表の looks（見え方）と wheel・place（色相環の位置）は、その名が実際に描く絵具のものです。名と違う色に見える絵具があります（暗い黄がオリーブに見える、など）。補色・類似色・色相の対比・色の和音・寒暖は、名でなく、この位置で決まります。二つの名が同じ絵具の時は、一つの色と数えます。
@@ -1815,10 +1819,10 @@ The work is a Score made from the description (the author's words). The previous
 From the list of color laws (18), choose the laws this work uses and, for each law, its values from the choices. The tool computes lightness, area and handling and checks the rules.
 
 Rules:
-1. Choose one main color law (main_law): the color framework a viewer feels first. Choose zero or one law that supports it (laws holds one or two, the main law included). A law that already holds in this picture (marked in the list) cannot be the main law; it can support. As the main law, choose a law that changes the picture's colors.
+1. Choose one main color law (main_law): the color framework a viewer feels first. Choose zero or one law that supports it (laws holds one or two, the main law included). A law that already holds in this picture (marked in the list) cannot be the main law; it can support. As the main law, choose a law that changes the picture's colors. An answer that changes nothing in the picture is refused.
 2. The main layer is the one the previous stage decided (the number under “Main layer”). Keep it.
 3. The tool has decided the layers and the ground whose colors the description states in color words (listed under “Stated colors”). No law changes those colors; an answer that does is refused.
-4. A layer with fixed in its summary (aerial perspective B15, pattern C2) got its color from the previous stage: do not name it to recolor it. A plugged-in layer (arranged plugin) cannot change its color either.
+4. A layer with fixed in its summary got its color from the previous stage. It may be recolored, but a distant layer of aerial perspective B15 keeps a drawn lightness difference from the ground of 0.2 or more and less than the main layer's (distant things melt into the ground), and a pattern layer of C2 stays seen against the ground. A plugged-in layer (arranged plugin) cannot change its color.
 5. The colors come from one source: colors (each layer's color, written only with one of B17 to B20), or C8, or neither (the Score's colors stay). D1, D5 and D7 take one value, and the tool decides the other layers' colors by their places on the color wheel and their drawn lightness. B11, B13, B14, B16, C7, C9, D2, D3, D4 and D6 come on top.
 6. The ground (the background) covers most of the canvas and decides most of the picture's impression of color (its share is under “Canvas”). The ground keeps its color; choose the layers' colors on it.
 7. In the color table, looks (how it looks) and wheel and place (its place on the color wheel) describe the paint the name actually draws. Some paints look like another color than their name (a dark yellow looks olive, for one). Complements, analogous colors, hue contrast, chords and warm and cool go by these places, not by the names. Two names that draw one paint count as one color.
@@ -1833,8 +1837,8 @@ const LAYER_NOTE: [&str; 2] = [
 ];
 
 const FACTS_NOTE: [&str; 2] = [
-    "handling は濃さ（さばき: dense 濃い・temperate 程よい・faint 薄い）。area は層の痕が画面に占める割合（%）。contrast は今の色で描いた層の痕と地の明るさの差（0〜1）、chroma はその鮮やかさ。unseen は、その層をその色で描くと地から見えない色。neighbors は痕が接する層。fixed は前の段が色を決めた層（B15 空気遠近・C2 文様）。stated は記述が色を言った層。",
-    "handling is how densely the marks are laid (dense, temperate, faint). area is the share of the canvas the layer's marks cover (%). contrast is the lightness difference of the layer's marks from the ground, drawn in its current color (0 to 1), and chroma their vividness. unseen lists the colors in which the layer, drawn, would not be seen against the ground. neighbors are the layers its marks touch. fixed is a layer whose color the previous stage decided (B15 aerial perspective, C2 pattern). stated is a layer whose color the description states.",
+    "handling は濃さ（さばき: dense 濃い・temperate 程よい・faint 薄い）。area は層の痕が画面に占める割合（%）。contrast は今の色で描いた層の痕と地の明るさの差（0〜1）、chroma はその鮮やかさ。unseen は、その層をその色で描くと地から見えない色。neighbors は痕が接する層。fixed は前の段が色を決めた層（B15 空気遠近・C2 文様。決まり4）。stated は記述が色を言った層。",
+    "handling is how densely the marks are laid (dense, temperate, faint). area is the share of the canvas the layer's marks cover (%). contrast is the lightness difference of the layer's marks from the ground, drawn in its current color (0 to 1), and chroma their vividness. unseen lists the colors in which the layer, drawn, would not be seen against the ground. neighbors are the layers its marks touch. fixed is a layer whose color the previous stage decided (B15 aerial perspective, C2 pattern; rule 4). stated is a layer whose color the description states.",
 ];
 
 const TABLE_NOTE: [&str; 2] = [
@@ -1894,6 +1898,7 @@ impl ColorsContext {
         let color = color_enum();
         let colors = |least: usize, most: usize| json!({"type": "array", "minItems": least, "maxItems": most, "items": color_enum()});
         let multi = (!self.multi.is_empty()).then(|| layer_enum(&self.multi));
+        let graded = (!self.graded.is_empty()).then(|| layer_enum(&self.graded));
         Some(match law {
             "B11" | "B16" => {
                 let (least, most) = if law == "B11" { (2, 2) } else { (2, 4) };
@@ -1912,7 +1917,7 @@ impl ColorsContext {
                 "properties": {"targets": targets(json!({
                     "type": "object",
                     "properties": {
-                        "layer": multi?,
+                        "layer": graded?,
                         "direction": {"type": "string", "enum": ["left_to_right", "right_to_left", "top_to_bottom", "bottom_to_top"]}
                     },
                     "required": ["layer", "direction"]
@@ -1921,7 +1926,7 @@ impl ColorsContext {
             }),
             "B14" => json!({
                 "type": "object",
-                "properties": {"layers": {"type": "array", "minItems": 1, "items": multi?}},
+                "properties": {"layers": {"type": "array", "minItems": 1, "items": graded?}},
                 "required": ["layers"]
             }),
             "B17" => {
@@ -2600,18 +2605,25 @@ fn kept_because(context: &ColorsContext, layer: usize) -> Option<(String, String
             format!("in a color the description states (“{word}”)"),
         ));
     }
-    if context.fixed.contains_key(&layer) {
-        return Some((
-            "法則の段が決めた色（空気遠近・文様）".to_owned(),
-            "in a color the laws stage decided (aerial perspective, pattern)".to_owned(),
-        ));
-    }
     context.plugins.contains(&layer).then(|| {
         (
             "差し込みの形の色".to_owned(),
             "a plugged-in shape whose color cannot change".to_owned(),
         )
     })
+}
+
+/// A gradation (B13, B14) runs through three marks or more.
+fn few_marks(law: &str, layer: usize, instruction: &Instruction) -> Result<(), Refusal> {
+    let count = count_of(instruction);
+    if u64::from(count) >= GRADED_MARKS {
+        return Ok(());
+    }
+    Err(refusal(
+        "few_marks",
+        format!("{law}: layer {layer} の痕は {count} 個。薄れの推移には3個以上の痕が要る"),
+        format!("{law}: layer {layer} has {count} marks; a gradation needs three or more"),
+    ))
 }
 
 /// Read an answer and check it against the schema and the prototype's rules.
@@ -2795,8 +2807,10 @@ struct Painting<'a> {
     out: Painted,
     tool_assigned: BTreeSet<usize>,
     chosen_by_answer: BTreeSet<usize>,
-    /// The layers whose handling, size or surface changed, drawn again.
+    /// The layers whose handling, size or surface changed, drawn again, and
+    /// the first color of each layer it was drawn with.
     redrawn: Option<Drawing>,
+    redrawn_first: BTreeMap<usize, Color>,
 }
 
 impl<'a> Painting<'a> {
@@ -2819,6 +2833,7 @@ impl<'a> Painting<'a> {
             tool_assigned: BTreeSet::new(),
             chosen_by_answer: BTreeSet::new(),
             redrawn: None,
+            redrawn_first: BTreeMap::new(),
         }
     }
 
@@ -2881,19 +2896,37 @@ impl<'a> Painting<'a> {
         }
     }
 
+    /// Whether a layer's handling, size or surface changed, so that it is
+    /// drawn again. A faded layer is not: the estimate reads a layer's marks
+    /// by one opacity, which a fade's faintest marks would set.
+    fn reshaped(&self, layer: usize) -> bool {
+        self.out.handled.contains(&layer)
+            || self.out.resized.contains(&layer)
+            || self.out.filled.contains(&layer)
+    }
+
+    /// Draw the Score as painted so far, for the layers it reshaped.
+    fn redraw(&mut self) {
+        let mut shares = Shares::default();
+        self.redrawn = self.context.painter.drawing(&self.out.score, &mut shares);
+        self.redrawn_first = self.colors_now();
+    }
+
+    /// How a layer drawn again looks in a color: when it was reshaped and the
+    /// color is the one it was drawn again in.
+    fn redrawn_look(&self, layer: usize, color: Color) -> Option<&Look> {
+        if !self.reshaped(layer) || self.redrawn_first.get(&layer) != Some(&color) {
+            return None;
+        }
+        self.redrawn
+            .as_ref()
+            .and_then(|drawing| drawing.looks.get(&layer))
+    }
+
     /// How far a layer drawn in a color stands from the ground: drawn again
     /// when its handling, size or surface changed.
     fn seen(&self, layer: usize, color: Color) -> f64 {
-        let changed = self.out.handled.contains(&layer)
-            || self.out.resized.contains(&layer)
-            || self.out.filled.contains(&layer);
-        if changed
-            && self.first_color(layer) == Some(color)
-            && let Some(look) = self
-                .redrawn
-                .as_ref()
-                .and_then(|drawing| drawing.looks.get(&layer))
-        {
+        if let Some(look) = self.redrawn_look(layer, color) {
             return if look.read { look.contrast } else { 1.0 };
         }
         self.context.seen(layer, color)
@@ -2905,6 +2938,18 @@ impl<'a> Painting<'a> {
             Some(look) if look.read => look.chroma,
             _ => self.context.paint(color).chroma,
         }
+    }
+
+    /// The drawn chroma of a layer's most vivid color, from the picture drawn
+    /// again when the layer was.
+    fn drawn_chroma(&self, layer: usize) -> f64 {
+        self.colors_of(layer)
+            .into_iter()
+            .map(|color| match self.redrawn_look(layer, color) {
+                Some(look) if look.read => look.chroma,
+                _ => self.chroma(layer, color),
+            })
+            .fold(0.0, f64::max)
     }
 
     fn ground(&self) -> Color {
@@ -2932,18 +2977,33 @@ impl<'a> Painting<'a> {
         self.gradation()?;
         self.color()?;
         self.d_laws()?;
-        if !self.trial
-            && (!self.out.handled.is_empty()
-                || !self.out.resized.is_empty()
-                || !self.out.filled.is_empty())
-        {
-            let mut shares = Shares::default();
-            self.redrawn = self.context.painter.drawing(&self.out.score, &mut shares);
+        let layers: Vec<usize> = self.context.layers().collect();
+        if !self.trial && layers.iter().any(|layer| self.reshaped(*layer)) {
+            self.redraw();
         }
         self.visible_fix()?;
+        // A reshaped layer the tool recolored to be seen is drawn again in
+        // its new color before the checks read it.
+        if self.redrawn.is_some()
+            && layers.iter().any(|layer| {
+                self.reshaped(*layer)
+                    && self.redrawn_first.get(layer) != self.first_color(*layer).as_ref()
+            })
+        {
+            self.redraw();
+        }
         self.check_kept()?;
         self.check_colors()?;
+        self.check_aerial()?;
+        self.check_d2()?;
         self.check_limits()?;
+        if !self.trial && self.out.score == self.context.score {
+            return Err(refusal(
+                "no_change",
+                "答えは画を何も変えない。画の色か濃さを変える法則と値にする".to_owned(),
+                "the answer changes nothing in the picture; choose laws and values that change its colors or handling".to_owned(),
+            ));
+        }
         Ok(self.out)
     }
 
@@ -2968,6 +3028,7 @@ impl<'a> Painting<'a> {
                         ),
                     ));
                 }
+                few_marks("B13", layer, instruction)?;
                 let centers = laws::mark_centers(instruction, units).unwrap_or_default();
                 let (Some(first), Some(last)) = (centers.first(), centers.last()) else {
                     return Err(refusal(
@@ -3018,6 +3079,7 @@ impl<'a> Painting<'a> {
                         format!("B14: layer {layer} is neither a scattered layer nor a row"),
                     ));
                 }
+                few_marks("B14", layer, instruction)?;
                 if let Some(arrangement) =
                     self.out.score.instructions[position].arrangement.as_mut()
                 {
@@ -3533,17 +3595,43 @@ impl<'a> Painting<'a> {
                 {
                     continue;
                 }
-                let choices: Vec<Color> = NEUTRAL
+                let seen: Vec<Color> = NEUTRAL
                     .iter()
                     .copied()
                     .filter(|neutral| self.seen(layer, *neutral) >= VISIBLE)
                     .collect();
-                if choices.is_empty() {
+                if seen.is_empty() {
                     return Err(refusal(
                         "no_neutral",
                         format!("D2: layer {layer} を無彩にすると、描いた時に地から見えない"),
                         format!(
                             "D2: layer {layer} would not be seen against the ground in any neutral"
+                        ),
+                    ));
+                }
+                // A distant layer of the laws stage's aerial perspective keeps
+                // its order (B15).
+                let all: BTreeMap<usize, Vec<Color>> = self
+                    .context
+                    .layers()
+                    .map(|other| (other, self.colors_of(other)))
+                    .collect();
+                let choices: Vec<Color> = seen
+                    .into_iter()
+                    .filter(|neutral| {
+                        let mut trial = all.clone();
+                        trial.insert(layer, vec![*neutral]);
+                        self.aerial_broken(&trial).is_none()
+                    })
+                    .collect();
+                if choices.is_empty() {
+                    return Err(refusal(
+                        "aerial_order",
+                        format!(
+                            "D2: 遠い layer {layer} を無彩にすると、空気遠近（B15）の明るさの順（地との差 {AERIAL_FAR} 以上で主の層より小さい）が崩れる"
+                        ),
+                        format!(
+                            "D2: turning the distant layer {layer} neutral breaks the aerial perspective's order (B15: {AERIAL_FAR} or more from the ground and less than the main layer)"
                         ),
                     ));
                 }
@@ -3817,7 +3905,7 @@ impl<'a> Painting<'a> {
             for (layer, color) in chosen {
                 colors.insert(*layer, vec![*color]);
             }
-            if !self.tool_predicate(&colors) {
+            if !self.tool_predicate(&colors) || self.aerial_broken(&colors).is_some() {
                 return None;
             }
             let mut all = before.clone();
@@ -4100,6 +4188,109 @@ impl<'a> Painting<'a> {
                     format!(
                         "layer {layer} is in a color the description states (“{word}”) and its color changed ({})",
                         names.join(", ")
+                    ),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// The colors each layer had before the colors.
+    fn colors_before(&self, layer: usize) -> Vec<Color> {
+        let positions = laws::layers(&self.context.score);
+        layer_colors(
+            &self.context.score,
+            positions.get(&layer).map_or(&[][..], Vec::as_slice),
+        )
+        .into_iter()
+        .filter_map(color_named)
+        .collect()
+    }
+
+    /// The first distant layer of the laws stage's aerial perspective (B15)
+    /// these colors take out of its order, with its drawn difference from
+    /// the ground and the main layer's: a distant layer stands 0.2 or more
+    /// from the ground and less far than the main layer. Only a distant
+    /// layer whose colors or the main layer's colors changed is read, and a
+    /// layer the estimate does not read is not.
+    fn aerial_broken(&self, colors: &BTreeMap<usize, Vec<Color>>) -> Option<(usize, f64, f64)> {
+        let main = self.context.main;
+        let main_colors = colors.get(&main)?;
+        let main_changed = *main_colors != self.colors_before(main);
+        let near = main_colors
+            .iter()
+            .map(|color| self.seen(main, *color))
+            .fold(f64::INFINITY, f64::min);
+        for (layer, law) in &self.context.fixed {
+            if law != "B15" || *layer == main {
+                continue;
+            }
+            let Some(found) = colors.get(layer) else {
+                continue;
+            };
+            if !main_changed && *found == self.colors_before(*layer) {
+                continue;
+            }
+            for color in found {
+                if !self
+                    .context
+                    .look(*layer, *color)
+                    .is_some_and(|look| look.read)
+                {
+                    continue;
+                }
+                let far = self.seen(*layer, *color);
+                if far < AERIAL_FAR || far >= near {
+                    return Some((*layer, far, near));
+                }
+            }
+        }
+        None
+    }
+
+    /// The laws stage's aerial perspective still holds where the colors
+    /// changed a distant layer or the main layer (the author's answer,
+    /// 2026-10-20).
+    fn check_aerial(&self) -> Result<(), Refusal> {
+        let main = self.context.main;
+        let colors: BTreeMap<usize, Vec<Color>> = self
+            .context
+            .layers()
+            .map(|layer| (layer, self.colors_of(layer)))
+            .collect();
+        match self.aerial_broken(&colors) {
+            None => Ok(()),
+            Some((layer, far, near)) => Err(refusal(
+                "aerial_order",
+                format!(
+                    "B15: 遠い layer {layer} は、地との描いた明るさの差を {AERIAL_FAR} 以上で、主の layer {main}（{near:.2}）より小さくする（今は {far:.2}）"
+                ),
+                format!(
+                    "B15: the distant layer {layer} stands {AERIAL_FAR} or more from the ground in drawn lightness and less than the main layer {main} ({near:.2}); it stands {far:.2}"
+                ),
+            )),
+        }
+    }
+
+    /// D2 once every law is applied: the main layer, drawn, at least twice as
+    /// vivid as every other layer, a kept one included (the prototype's
+    /// measure of D2).
+    fn check_d2(&self) -> Result<(), Refusal> {
+        if self.law("D2").is_none() {
+            return Ok(());
+        }
+        let main = self.context.main;
+        let mine = self.drawn_chroma(main);
+        for layer in self.context.layers() {
+            let theirs = self.drawn_chroma(layer);
+            if layer != main && theirs > MUTED_SHARE * mine {
+                return Err(refusal(
+                    "d2_not_held",
+                    format!(
+                        "D2: 主の layer {main} の描いた彩度 {mine:.0} が、layer {layer} の {theirs:.0} の2倍に届かない"
+                    ),
+                    format!(
+                        "D2: the main layer {main}, drawn, has a chroma of {mine:.0}, not twice the {theirs:.0} of layer {layer}"
                     ),
                 ));
             }

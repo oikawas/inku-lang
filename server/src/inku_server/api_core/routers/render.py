@@ -455,7 +455,18 @@ def api_color_arrangement_plan(req: ColorArrangementPlanRequest, actor: dict = D
     return {key: page[key] for key in ("entries", "next_cursor", "total")}
 
 
-def _render_color_arrangement_for_work(actor: dict, work: dict, index: int) -> RenderScoreResponse:
+def _with_laws_layers(metadata: dict, laws_layers: object | None) -> dict:
+    """The child's derivation record with the laws record it keeps (2026-10-20).
+
+    Only the save of the child passes one: these children are drawn from the
+    parent without a run to link, so their lineage edge carries the record that
+    "change the layout" reads, as a linked work's fork context does."""
+    return metadata if laws_layers is None else {**metadata, "laws_layers": laws_layers}
+
+
+def _render_color_arrangement_for_work(
+    actor: dict, work: dict, index: int, laws_layers: object | None = None,
+) -> RenderScoreResponse:
     color_map, catalog_id = _saved_color_map(work)
     try:
         recolored = _variants("color_render", **_color_request(work, color_map), index=index, catalog_id=catalog_id)
@@ -472,7 +483,8 @@ def _render_color_arrangement_for_work(actor: dict, work: dict, index: int) -> R
         wild=bool(work.get("render_wild")),
     ), actor, snapshot)
     result.render_color_source = "color_arrangement"
-    result.derivation_metadata = recolored["derivation_metadata"]
+    # The instructions are the parent's, so its laws record holds as it is.
+    result.derivation_metadata = _with_laws_layers(recolored["derivation_metadata"], laws_layers)
     return result
 
 
@@ -504,7 +516,9 @@ def api_ground_variant_plan(req: GroundVariantPlanRequest, actor: dict = Depends
     return {key: plan[key] for key in ("current", "current_label_ja", "current_label_en", "entries")}
 
 
-def _render_ground_variant_for_work(actor: dict, work: dict, material: str) -> GroundVariantResponse:
+def _render_ground_variant_for_work(
+    actor: dict, work: dict, material: str, laws_layers: object | None = None,
+) -> GroundVariantResponse:
     score = work.get("score")
     try:
         changed = _variants("ground_render", score=score, source=work.get("ddl") or "", material=material,
@@ -522,7 +536,8 @@ def _render_ground_variant_for_work(actor: dict, work: dict, material: str) -> G
         render_seed=render_seed, composition_seed=work.get("composition_seed"),
         wild=bool(work.get("render_wild")),
     ), actor, work)
-    result.derivation_metadata = changed["derivation_metadata"]
+    # Only the ground sentence changes, and the record names no ground.
+    result.derivation_metadata = _with_laws_layers(changed["derivation_metadata"], laws_layers)
     return GroundVariantResponse(**result.model_dump(), ddl=ddl)
 
 
@@ -571,12 +586,16 @@ def api_tool_variant_plan(req: ToolVariantPlanRequest, actor: dict = Depends(_cu
     return {"mode": plan["mode"], "tools": labels, "sentences": plan["sentences"], "entries": plan["entries"]}
 
 
-def _render_tool_variant_for_work(actor: dict, work: dict, mode: str, asked: dict[str, str]) -> ToolVariantResponse:
+def _render_tool_variant_for_work(
+    actor: dict, work: dict, mode: str, asked: dict[str, str], laws_layers: object | None = None,
+) -> ToolVariantResponse:
     render_seed = work.get("render_seed")
     if render_seed is None:
         raise HTTPException(status_code=422, detail="saved work has no performance seed to preserve its drawing")
+    # A tool word written into a recorded sentence is written into the record by the core.
+    record = {} if laws_layers is None else {"laws_layers": laws_layers}
     try:
-        changed = _variants("tool_render", **_touch_request(actor, work), mode=mode, tools=asked)
+        changed = _variants("tool_render", **_touch_request(actor, work), mode=mode, tools=asked, **record)
     except SavedVariantRefused as error:
         raise HTTPException(status_code=422, detail=error.detail) from error
     ddl = changed["ddl"]
@@ -587,7 +606,7 @@ def _render_tool_variant_for_work(actor: dict, work: dict, mode: str, asked: dic
         render_seed=render_seed, composition_seed=work.get("composition_seed"),
         wild=bool(work.get("render_wild")),
     ), actor, work)
-    result.derivation_metadata = changed["derivation_metadata"]
+    result.derivation_metadata = _with_laws_layers(changed["derivation_metadata"], changed.get("laws_layers"))
     return ToolVariantResponse(**result.model_dump(), ddl=ddl)
 
 

@@ -533,7 +533,7 @@ class PipelineService:
         work = self.store.read_legacy_history(owner, history_id)
         if work is None:
             raise HTTPException(404, "history_not_found")
-        return asdict(work)
+        return legacy_source_work(self.store, owner, work)
 
     def fork_legacy(self, owner: str, history_id: str, kind: str, text: str, **choices) -> dict:
         work = self.legacy(owner, history_id)
@@ -654,7 +654,31 @@ def saved_work_parent(store, owner: str, history_id: str) -> tuple[dict, dict]:
     work = store.read_legacy_history(owner, history_id)
     if work is None:
         raise HTTPException(404, "history_not_found")
-    return {"kind": "legacy_history", "id": history_id}, asdict(work)
+    return {"kind": "legacy_history", "id": history_id}, legacy_source_work(store, owner, work)
+
+
+def legacy_source_work(store, owner: str, work) -> dict:
+    """An older work as a fork reads it: its history row, and the laws record a
+    work drawn from its parent without a run keeps on its lineage edge, which
+    "change the layout" and a direct-DDL fork take as a linked work's (2026-10-20)."""
+    source_work = asdict(work)
+    laws_layers = store.read_derived_laws_layers(owner, work.history_id)
+    if laws_layers is not None:
+        source_work["laws_layers"] = laws_layers
+    return source_work
+
+
+def laws_layers_of(store, owner: str, history_id: str) -> object | None:
+    """The laws record of one saved work, linked or drawn from its parent without
+    a run, or ``None``. A context that cannot be read gives no record: the child
+    is then saved as before, without one."""
+    try:
+        linked = store.read_linked_history(owner, history_id)
+    except VariationAuthorityAdapterError:
+        return None
+    if linked is not None:
+        return linked.laws_layers
+    return store.read_derived_laws_layers(owner, history_id)
 
 
 def pipeline_router(service: PipelineService | Callable[[], PipelineService], actor_dependency: Callable,

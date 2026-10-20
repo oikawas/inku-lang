@@ -13,6 +13,7 @@
 //! child's instructions, so the drawing changes only where the tools changed.
 
 use std::collections::BTreeMap;
+use std::ops::Range;
 
 use inku_ddl::{
     MacroDefinition, MacroExpansionLimits, ResolvedInstructionLanguage, SemanticHead,
@@ -20,6 +21,7 @@ use inku_ddl::{
 };
 use serde::{Deserialize, Serialize};
 
+use crate::laws_record::{LawsLayerRecord, applying};
 use crate::recompose::canonical;
 
 pub const RETOUCH_SCHEMA_ID: &str = "inku.touch-change.v1";
@@ -130,7 +132,89 @@ pub fn retouch(
     limits: MacroExpansionLimits,
     asked: &BTreeMap<usize, String>,
 ) -> Retouch {
-    let unchanged = |reason| Retouch::Unchanged { reason };
+    retouch_with_edits(source, language, definitions, limits, asked).0
+}
+
+/// [`retouch`], with the record of the layers a work's laws placed written for
+/// the retouched source (2026-10-20). The record names its layers by their
+/// sentences, so a tool word changed in a recorded sentence is changed in the
+/// record too; otherwise the child's record no longer meets its own source, and
+/// "change the layout" moves the laws' layers or refuses. A layer the source
+/// does not hold, and every layer when nothing was retouched, stays as it was.
+#[must_use]
+pub fn retouch_with_record(
+    source: &str,
+    language: ResolvedInstructionLanguage,
+    definitions: &[MacroDefinition],
+    limits: MacroExpansionLimits,
+    asked: &BTreeMap<usize, String>,
+    record: &LawsLayerRecord,
+) -> (Retouch, LawsLayerRecord) {
+    let (answer, edits) = retouch_with_edits(source, language, definitions, limits, asked);
+    let record = match &answer {
+        Retouch::Retouched {
+            source: changed, ..
+        } => rewritten(record, source, changed, &edits),
+        _ => record.clone(),
+    };
+    (answer, record)
+}
+
+/// One rewrite of the source: the bytes `start..end` replaced by the text.
+type Edit = (usize, usize, String);
+
+/// Each recorded sentence the source holds, read again where the edits moved it.
+fn rewritten(
+    record: &LawsLayerRecord,
+    before: &str,
+    after: &str,
+    edits: &[Edit],
+) -> LawsLayerRecord {
+    let mut layers = record.layers.clone();
+    for (index, ranges) in applying(record, before) {
+        let sentences: Option<Vec<String>> = ranges
+            .iter()
+            .map(|range| {
+                moved(range, edits)
+                    .and_then(|range| after.get(range))
+                    .map(str::to_owned)
+            })
+            .collect();
+        if let Some(sentences) = sentences {
+            layers[index].sentences = sentences;
+        }
+    }
+    LawsLayerRecord { layers }
+}
+
+/// Where a sentence's bytes are after the edits: an edit before it shifts it,
+/// and one inside it (a tool word, or one written before its shape) changes its
+/// length. An edit across its edge has no answer.
+fn moved(range: &Range<usize>, edits: &[Edit]) -> Option<Range<usize>> {
+    let (mut shift, mut grow) = (0_isize, 0_isize);
+    for (start, end, text) in edits {
+        let delta = isize::try_from(text.len()).ok()? - isize::try_from(end - start).ok()?;
+        if *end <= range.start && *start < range.start {
+            shift += delta;
+        } else if *start >= range.start && *start < range.end && *end <= range.end {
+            grow += delta;
+        } else if *start < range.end {
+            return None;
+        }
+    }
+    let start = range.start.checked_add_signed(shift)?;
+    let end = range.end.checked_add_signed(shift + grow)?;
+    Some(start..end)
+}
+
+fn retouch_with_edits(
+    source: &str,
+    language: ResolvedInstructionLanguage,
+    definitions: &[MacroDefinition],
+    limits: MacroExpansionLimits,
+    asked: &BTreeMap<usize, String>,
+) -> (Retouch, Vec<Edit>) {
+    let unchanged = |reason| (Retouch::Unchanged { reason }, Vec::new());
     let Some(compilation) = canonical(source, language, definitions, limits) else {
         return unchanged("not_canonical");
     };
@@ -140,7 +224,7 @@ pub fn retouch(
     let instructions = &semantic.ast.instructions;
     let sentences = read(instructions);
     if asked.is_empty() {
-        return Retouch::Read { sentences };
+        return (Retouch::Read { sentences }, Vec::new());
     }
     let tools = tools();
     let mut edits = Vec::new();
@@ -175,11 +259,11 @@ pub fn retouch(
     }
     edits.sort_by_key(|(start, _, _)| std::cmp::Reverse(*start));
     let mut changed = source.to_owned();
-    for (start, end, text) in edits {
-        if !changed.is_char_boundary(start) || !changed.is_char_boundary(end) {
+    for (start, end, text) in &edits {
+        if !changed.is_char_boundary(*start) || !changed.is_char_boundary(*end) {
             return unchanged("unverified");
         }
-        changed.replace_range(start..end, &text);
+        changed.replace_range(*start..*end, text);
     }
     // Read the new source back: each asked sentence names its tool, and every
     // other sentence keeps its shape and its tool.
@@ -204,10 +288,13 @@ pub fn retouch(
     if now != expected {
         return unchanged("unverified");
     }
-    Retouch::Retouched {
-        sentences,
-        source: changed,
-    }
+    (
+        Retouch::Retouched {
+            sentences,
+            source: changed,
+        },
+        edits,
+    )
 }
 
 /// The host request: the pipeline configuration the host draws the work with, the

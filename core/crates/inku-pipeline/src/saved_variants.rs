@@ -22,7 +22,8 @@ use serde_json::{Map, Value, json};
 use sha2::{Digest, Sha256};
 
 use crate::identity::python_strip;
-use crate::retouch::{Retouch, retouch, tools};
+use crate::laws_record::LawsLayerRecord;
+use crate::retouch::{Retouch, retouch, retouch_with_record, tools};
 
 pub const SAVED_VARIANTS_SCHEMA_ID: &str = "inku.saved-variants.v1";
 
@@ -237,19 +238,37 @@ struct TouchWork<'a> {
 }
 
 impl TouchWork<'_> {
-    fn retouch(&self, asked: &BTreeMap<usize, String>) -> Result<Retouch, Refusal> {
-        let limits = self.config.compiler.macro_limits().map_err(|_| {
+    fn limits(&self) -> Result<inku_ddl::MacroExpansionLimits, Refusal> {
+        self.config.compiler.macro_limits().map_err(|_| {
             refuse(
                 "touch_cannot_change",
                 "touch cannot change: invalid_request",
             )
-        })?;
+        })
+    }
+
+    fn retouch(&self, asked: &BTreeMap<usize, String>) -> Result<Retouch, Refusal> {
         Ok(retouch(
             self.source,
             self.config.language,
             &self.config.definitions,
-            limits,
+            self.limits()?,
             asked,
+        ))
+    }
+
+    fn retouch_with_record(
+        &self,
+        asked: &BTreeMap<usize, String>,
+        record: &LawsLayerRecord,
+    ) -> Result<(Retouch, LawsLayerRecord), Refusal> {
+        Ok(retouch_with_record(
+            self.source,
+            self.config.language,
+            &self.config.definitions,
+            self.limits()?,
+            asked,
+            record,
         ))
     }
 
@@ -309,6 +328,7 @@ fn tool_render(
     work: &TouchWork<'_>,
     mode: &str,
     asked: &BTreeMap<String, String>,
+    record: Option<&LawsLayerRecord>,
 ) -> Result<Value, Refusal> {
     check_mode(mode)?;
     let drawn = work.drawn()?;
@@ -347,7 +367,14 @@ fn tool_render(
             "tools must change at least one sentence",
         ));
     }
-    let source = match work.retouch(&tools_asked)? {
+    let (answer, record) = match record {
+        Some(record) => {
+            let (answer, record) = work.retouch_with_record(&tools_asked, record)?;
+            (answer, Some(record))
+        }
+        None => (work.retouch(&tools_asked)?, None),
+    };
+    let source = match answer {
         Retouch::Retouched { source, .. } => source,
         Retouch::Unchanged { reason } => {
             return Err(refuse(
@@ -362,7 +389,7 @@ fn tool_render(
             ));
         }
     };
-    Ok(json!({
+    let mut answer = json!({
         "score": score_with_tools(work.score, &tools_asked),
         "ddl": source,
         "derivation_metadata": {
@@ -370,7 +397,12 @@ fn tool_render(
             "tools": keyed(&tools_asked),
             "changes": changes(&drawn, &tools_asked),
         },
-    }))
+    });
+    // A host that keeps the parent's laws record keeps the child's (2026-10-20).
+    if let Some(record) = record {
+        answer["laws_layers"] = json!(record);
+    }
+    Ok(answer)
 }
 
 fn check_mode(mode: &str) -> Result<(), Refusal> {
@@ -847,6 +879,9 @@ enum Request {
         score: Value,
         mode: String,
         tools: BTreeMap<String, String>,
+        /// The parent's laws record, when the host keeps one.
+        #[serde(default)]
+        laws_layers: Option<LawsLayerRecord>,
     },
     GroundPlan {
         score: Value,
@@ -896,6 +931,7 @@ fn answer(request: Request) -> Result<Value, Refusal> {
             score,
             mode,
             tools,
+            laws_layers,
         } => tool_render(
             &TouchWork {
                 config: &config,
@@ -904,6 +940,7 @@ fn answer(request: Request) -> Result<Value, Refusal> {
             },
             &mode,
             &tools,
+            laws_layers.as_ref(),
         ),
         Request::GroundPlan { score } => Ok(ground_plan(&score)),
         Request::GroundRender {
@@ -1100,6 +1137,50 @@ mod tests {
             negative["detail"],
             "tools must name changeable sentences and known tools"
         );
+    }
+
+    #[test]
+    fn a_touch_change_writes_the_laws_record_for_the_child_source() {
+        let mut config = crate::focused_flow::config();
+        config.language = ResolvedInstructionLanguage::Ja;
+        let source = "背景を白で埋める。\n青の細筆の線を3個引く。\n赤の大きな円を1個置く。";
+        let score = json!({"instructions": [
+            {"weight": "brush_thin", "arrangement": {"resolved": {"owner": {"kind": "source_instruction", "instruction_index": 0}}}},
+            {"arrangement": {"resolved": {"owner": {"kind": "source_instruction", "instruction_index": 1}}}},
+        ]});
+        // The second layer is no longer in the source (an author's edit): it stays as recorded.
+        let record = json!({"schema": "inku.laws-layers.v1", "layers": [
+            {"sentences": ["赤の大きな円を1個置く。"], "kind": "laws", "laws": ["B1"]},
+            {"sentences": ["緑の点を1個置く。"], "kind": "partner"},
+        ]});
+        let drawn = ask(
+            json!({"action": "tool_render", "config": config, "source": source, "score": score,
+            "mode": "per_sentence", "tools": {"0": "chalk", "1": "oil_paint"}, "laws_layers": record}),
+        );
+        assert_eq!(drawn["outcome"], "ok", "{drawn}");
+        assert_eq!(
+            drawn["ddl"],
+            "背景を白で埋める。\n青のチョークの線を3個引く。\n赤の大きな油彩の円を1個置く。"
+        );
+        assert_eq!(
+            drawn["laws_layers"],
+            json!({"schema": "inku.laws-layers.v1", "layers": [
+                {"sentences": ["赤の大きな油彩の円を1個置く。"], "kind": "laws", "laws": ["B1"]},
+                {"sentences": ["緑の点を1個置く。"], "kind": "partner"},
+            ]})
+        );
+        // A tool changed only before the recorded sentence moves it without changing it.
+        let before = ask(
+            json!({"action": "tool_render", "config": config, "source": source, "score": score,
+            "mode": "per_sentence", "tools": {"0": "chalk"}, "laws_layers": record}),
+        );
+        assert_eq!(before["laws_layers"], record, "{before}");
+        // Without a record the answer is as before.
+        let plain = ask(
+            json!({"action": "tool_render", "config": config, "source": source, "score": score,
+            "mode": "per_sentence", "tools": {"1": "oil_paint"}}),
+        );
+        assert!(plain.get("laws_layers").is_none(), "{plain}");
     }
 
     #[test]

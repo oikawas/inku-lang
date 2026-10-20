@@ -414,6 +414,12 @@ def api_history_post(
     actor: dict = Depends(_current_user),
 ) -> HistoryItem:
     replay_link = None
+    # A sender never names a laws record: the Server writes one only on the edges
+    # of the children it draws from their parent (color arrangement, support,
+    # touches, redraw), and reads it only there (2026-10-20).
+    if "laws_layers" in body.derivation_metadata:
+        body = body.model_copy(update={"derivation_metadata": {
+            key: value for key, value in body.derivation_metadata.items() if key != "laws_layers"}})
     # A work read again from the description (model or language comparison
     # and the like) cannot descend from a work its DDL holds.
     if (
@@ -480,10 +486,19 @@ def api_history_post(
                 "instruction_lang_requested", "instruction_lang_resolved", "ui_lang", "interpretation_seed",
             )},
         }
+        replay_record = {}
+        if replay_link is None:
+            # A linked source gives its record through the link below; a work drawn
+            # from its parent without a run gives the one on its own edge.
+            from ...persistence.variation_authority import VariationAuthorityStore
+
+            source_record = VariationAuthorityStore(_db.engine).read_derived_laws_layers(actor["id"], parent["id"])
+            if source_record is not None:
+                replay_record = {"laws_layers": source_record}
         body = body.model_copy(update={"derivation_metadata": {
             "replay_work_id": parent["id"], "replay_render_hash": replayed["render_hash"],
             "replay_svg_sha256": replayed["svg_sha256"],
-            "provisional_render_seed": provisional_seed,
+            "provisional_render_seed": provisional_seed, **replay_record,
         }})
         if replay_link is not None:
             diagnostics = dict(linked.pipeline_diagnostics or {
@@ -522,12 +537,18 @@ def api_history_post(
         if not parent_id:
             raise HTTPException(status_code=404, detail="unknown work")
         parent = _work_for_color_snapshot(actor, parent_id)
+        from ...persistence.variation_authority import VariationAuthorityStore
+        from ...pipeline_api import laws_layers_of
+
+        # The child is drawn without a run, so nothing links it: it keeps the
+        # parent's laws record on its edge, which "change the layout" reads (2026-10-20).
+        laws_layers = laws_layers_of(VariationAuthorityStore(_db.engine), actor["id"], parent_id)
         if body.derivation_kind == "color_arrangement_change":
-            replayed = _render_color_arrangement_for_work(actor, parent, index).model_dump(exclude_none=True, by_alias=True)
+            replayed = _render_color_arrangement_for_work(actor, parent, index, laws_layers).model_dump(exclude_none=True, by_alias=True)
         elif body.derivation_kind == "ground_change":
-            replayed = _render_ground_variant_for_work(actor, parent, material).model_dump(exclude_none=True, by_alias=True)
+            replayed = _render_ground_variant_for_work(actor, parent, material, laws_layers).model_dump(exclude_none=True, by_alias=True)
         else:
-            replayed = _render_tool_variant_for_work(actor, parent, tool_mode, tools).model_dump(exclude_none=True, by_alias=True)
+            replayed = _render_tool_variant_for_work(actor, parent, tool_mode, tools, laws_layers).model_dump(exclude_none=True, by_alias=True)
         # Only the parent and the server-derived index decide this child. Sent
         # Score, map, seeds and limits cannot rewrite the work being recolored.
         inherited = {key: parent.get(key) for key in (
@@ -679,6 +700,8 @@ def api_history_post(
                 "variation_id": linked.variation_id, "authority": {"revision": linked.revision},
                 "document": {"source": body.ddl}, "delivery": {"source_digest": linked.ddl_digest},
                 "config": linked.saved_config, "completion_ranges": linked.completion_ranges,
+                # The same instructions, so the source's laws record holds (2026-10-20).
+                "laws_layers": linked.laws_layers,
             }, context={"host_options": linked.host_options, "macro_catalog": linked.macro_catalog},
             pipeline_diagnostics=diagnostics)
         item_dict = _db.get_items(actor["id"], [item_dict["id"]])[0]

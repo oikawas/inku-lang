@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-20 — Another composition chooses again for the refinement children of a laws work
+
+A child of a laws work made by changing its color arrangement, support or touches, and a redraw of one, could not be composed again: Another composition could not read the laws' numeric sentences and answered `unsupported_sentence`. These children are drawn from the parent without a run, so they did not keep the laws record. A child now keeps its parent's record on its lineage edge (a redraw of a work with a fork context, in its fork context), and Another composition keeps the laws' layers and chooses the others again, as for the parent. When a touch change rewrites the tool word of a recorded sentence, the shared core rewrites the record too. A record named in a save request is not read.
+
 ### 2026-10-19 — Android: 3D PNG and GLB saves carry Web's file name
 
 In the Android experimental 3D view, a saved PNG or GLB reached the share sheet as `<UUID>.png` or `<UUID>.bin`, and the GLB went with no known type: the web view's download notice never carries the link's name. The app now reads the format from the file's first bytes and hands it on as `inku-3d-<first 12 of the digest>.png` or `.glb`, typed `image/png` or `model/gltf-binary`, as Web names it.

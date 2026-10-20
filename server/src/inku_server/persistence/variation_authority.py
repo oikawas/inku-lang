@@ -28,6 +28,7 @@ from sqlalchemy.exc import IntegrityError
 from .schema import (
     Base,
     HistoryRow,
+    LineageEdgeRow,
     PipelineCandidateExecutionRow,
     PipelineHistoryLinkRow,
     ProviderObservationRow,
@@ -41,6 +42,13 @@ COMMIT_ACTION_TAG = "commit_visible_normalized_ddl"
 _LEGACY_HISTORY_FORK_CONTEXT_PROTOCOL = "inku.pipeline-history-fork-context.v1"
 _DIAGNOSTICS_HISTORY_FORK_CONTEXT_PROTOCOL = "inku.pipeline-history-fork-context.v2"
 HISTORY_FORK_CONTEXT_PROTOCOL = "inku.pipeline-history-fork-context.v3"
+# The derivations the Server draws from the parent without a run to link: the
+# color arrangement, the support, the touches, and a redraw of such a work. Their
+# child keeps the parent's laws record on its lineage edge (2026-10-20). The
+# Server writes these edges' metadata itself, so only they are read for it.
+LAWS_RECORD_DERIVATIONS = frozenset(
+    {"color_arrangement_change", "ground_change", "tool_change", "replay"}
+)
 _PIPELINE_DIAGNOSTIC_KEYS = frozenset(
     {
         "upstream_diagnostics",
@@ -924,6 +932,30 @@ class VariationAuthorityStore:
             authority="legacy_unknown",
             metadata=metadata,
         )
+
+    def read_derived_laws_layers(
+        self, owner_id: str, history_id: str
+    ) -> object | None:
+        """The laws record a work drawn from its parent without a run keeps on
+        its lineage edge, or ``None`` (2026-10-20)."""
+        with self.engine.connect() as connection:
+            row = connection.execute(
+                select(LineageEdgeRow.derivation_kind, LineageEdgeRow.metadata_json)
+                .join(HistoryRow, HistoryRow.lineage_node_id == LineageEdgeRow.child_node_id)
+                .where(
+                    HistoryRow.id == history_id,
+                    HistoryRow.user_id == owner_id,
+                    LineageEdgeRow.user_id == owner_id,
+                )
+            ).one_or_none()
+        if row is None or row.derivation_kind not in LAWS_RECORD_DERIVATIONS:
+            return None
+        try:
+            metadata = json.loads(row.metadata_json or "{}")
+        except json.JSONDecodeError:
+            return None
+        record = metadata.get("laws_layers") if isinstance(metadata, dict) else None
+        return record if isinstance(record, dict) else None
 
     def inventory(self) -> VariationAuthorityInventory:
         """Count compatible state without reading any authored text."""

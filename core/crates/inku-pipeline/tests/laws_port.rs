@@ -1,14 +1,16 @@
-//! The laws stage (stages B-2c and B-3 of the laws port) answers as its
+//! The laws stage (stages B-2c, B-3 and B-4b of the laws port) answers as its
 //! prototype did.
 //!
 //! The fixture holds, for each work of a replayed run, the run's compiler
 //! options and the composed plan the laws stage waits with, the colour-stripped
 //! answer narrowed to this stage's laws and the DDL the Python reference printed
 //! from it; made cases for the forms the works do not have (a moved grid or
-//! scatter, a pair, a triangle, a joint dropped, beat groups, a progression of
-//! sizes, a grid the core tiles otherwise than the prototype counted); and wide
-//! cases on the wide canvas. The requests are the reference's, in both
-//! languages. It holds no description text and no reason.
+//! scatter, a pair and a turned pair, a triangle, a joint dropped, beat groups,
+//! a progression of sizes, a grid the core tiles otherwise than the prototype
+//! counted, and each card: the five patterns, dense places, voices, motifs,
+//! jo-ha-kyu and shin-gyo-so); and wide cases on the wide canvas. The requests
+//! are the reference's, in both languages. It holds no description text and no
+//! reason.
 
 mod common;
 
@@ -187,9 +189,9 @@ fn the_laws_print_as_the_prototype_printed_them() {
         .iter()
         .filter(|case| case.answer.is_some())
         .collect();
-    assert_eq!(cases.len(), 41);
-    assert_eq!(cases.iter().filter(|case| case.kind == "made").count(), 14);
-    assert_eq!(cases.iter().filter(|case| case.kind == "wide").count(), 4);
+    assert_eq!(cases.len(), 68);
+    assert_eq!(cases.iter().filter(|case| case.kind == "made").count(), 35);
+    assert_eq!(cases.iter().filter(|case| case.kind == "wide").count(), 10);
     let failures: Vec<String> = common::par_map(&cases, |case| {
         let (context, plugins, _) = context(case, None, &definitions);
         let answer = case.answer.as_ref().expect("an answer");
@@ -273,7 +275,7 @@ fn a_print_the_canvas_cannot_hold_names_the_requested_layer() {
         .iter()
         .filter(|case| case.off_canvas.is_some())
         .collect();
-    assert_eq!(cases.len(), 1);
+    assert_eq!(cases.len(), 3);
     for case in cases {
         let (context, plugins, compiler) = context(case, None, &definitions);
         let chosen = apply_laws_without_count_rule(
@@ -602,5 +604,170 @@ fn the_tool_refuses_arrangements_it_cannot_lay() {
     assert_eq!(
         refusal.ja,
         "指示が 71 になり上限 60 を超える。数や回数を小さくするか法則を減らす"
+    );
+}
+
+/// The cards' refusals, with the prototype's reasons: the recorded answer of
+/// ja-01, whose pattern color the black ground hides; a card sharing its layer
+/// with another placement, arrangement or card law; a hand on C6's layer; a
+/// count the description writes changed by a pattern or voices or by C1; C1's
+/// six times; C4's repeats; a value past its schema's bound; and a layer of
+/// more marks than C6 opens.
+#[test]
+fn the_tool_refuses_cards_it_cannot_lay() {
+    let fixture = fixture();
+    let definitions = definitions();
+    let answer = |laws: Value, main_law: &str, main_layer: u64, counts: Value| {
+        json!({"main_layer": main_layer, "main_law": main_law, "description_counts": counts,
+               "laws": laws, "reason": "（理由）"})
+        .to_string()
+    };
+    let case = |id: &str| {
+        fixture
+            .cases
+            .iter()
+            .find(|case| case.id == id)
+            .expect("the case")
+            .clone()
+    };
+    let refused = |case: &Case, response: String| {
+        let (context, _, _) = context(case, None, &definitions);
+        choose_laws(&response, &context, &case.composed, LIMITS)
+            .expect_err(&format!("{response} is refused"))
+    };
+    let ichimatsu = json!({"layer": 0, "pattern": "ichimatsu", "area": "whole", "unit": "1/8",
+                           "colors": ["white", "blue"]});
+    let still = |layer: u64| json!({"targets": [{"layer": layer, "hand": "still"}]});
+    let spiral = |layer: u64, repeats: u64| json!({"layer": layer, "repeats": repeats, "sequence": ["rotate"], "path": "golden_spiral"});
+    for (id, response, code, ja) in [
+        (
+            "ja-01",
+            answer(
+                json!({"C2": ichimatsu,
+                       "B21": {"targets": [{"layer": 1, "hand": "keep"}, {"layer": 2, "hand": "fine"}]}}),
+                "C2",
+                0,
+                json!([]),
+            ),
+            "invisible_color",
+            "文様の色 blue は地 black と明るさが 0.15 未満しか違わず見えない".to_owned(),
+        ),
+        (
+            "ja-12",
+            answer(
+                json!({"C2": {"layer": 0, "pattern": "shippo", "area": "whole", "unit": "1/8", "colors": ["white"]},
+                       "B9": {"targets": [{"layer": 0, "form": "grid"}]}}),
+                "C2",
+                0,
+                json!([]),
+            ),
+            "rebuild_shared",
+            "layer 0 は C1〜C6 が置き場と並びを作り直すので、ほかの置き場・並びの法則や C1〜C6 と重ねられない（B9・C2）".to_owned(),
+        ),
+        (
+            "ja-12",
+            answer(
+                json!({"C6": {"layer": 0, "split": "three_bands", "order": "shin_gyo_so", "so_degree": "small"},
+                       "B21": still(0)}),
+                "C6",
+                0,
+                json!([]),
+            ),
+            "hand_on_c6",
+            "C6 の層の手は C6 が決めるので、B21 を重ねない".to_owned(),
+        ),
+        (
+            "ja-13",
+            answer(
+                json!({"C3": {"voices": [0, 1], "ratio": "2:3", "base": 4, "axis": "horizontal", "band": "0.5"},
+                       "B15": {"layers": [1]}}),
+                "C3",
+                0,
+                json!([0]),
+            ),
+            "counted_layer",
+            "layer 0 は記述が数を書いた物なので、数の変わる声部にできない".to_owned(),
+        ),
+        (
+            "ja-08",
+            answer(
+                json!({"C1": {"targets": [{"layer": 2, "count": 30}], "spot": "center", "extent": "0.25"},
+                       "B21": still(0)}),
+                "C1",
+                2,
+                json!([2]),
+            ),
+            "count_kept",
+            "layer 2 は記述が数を書いた物なので 24 のまま".to_owned(),
+        ),
+        (
+            "ja-08",
+            answer(
+                json!({"C1": {"targets": [{"layer": 2, "count": 200}], "spot": "center", "extent": "0.25"},
+                       "B21": still(0)}),
+                "C1",
+                2,
+                json!([]),
+            ),
+            "count_six_times",
+            "layer 2 の数は今の6倍（144）まで".to_owned(),
+        ),
+        (
+            "ja-12",
+            answer(json!({"C4": spiral(1, 5), "B21": still(0)}), "C4", 1, json!([1])),
+            "repeats_kept",
+            "layer 1 の数は記述が書いた数 9 のままにする".to_owned(),
+        ),
+        (
+            "ja-12",
+            answer(json!({"C4": spiral(1, 12), "B21": still(0)}), "C4", 1, json!([])),
+            "repeats_most",
+            "layer 1 の回数は 9 まで（今の数と 9 の大きいほう）".to_owned(),
+        ),
+        (
+            "ja-12",
+            answer(json!({"C4": spiral(0, 10), "B21": still(1)}), "C4", 0, json!([])),
+            "repeats_least",
+            "layer 0 は今 16 個。記述が数を書いていない層は減らさない（回数は 16〜16）".to_owned(),
+        ),
+        (
+            "ja-13",
+            answer(
+                json!({"C3": {"voices": [0, 1], "ratio": "2:3", "base": 9, "axis": "horizontal", "band": "0.5"},
+                       "B15": {"layers": [1]}}),
+                "C3",
+                0,
+                json!([]),
+            ),
+            "out_of_range",
+            "answer.laws.C3.base = 9 は 2〜8 の外".to_owned(),
+        ),
+    ] {
+        let refusal = refused(&case(id), response.clone());
+        assert_eq!(refusal.code, code, "{id} {response}: {refusal:?}");
+        assert_eq!(refusal.ja, ja, "{id} {response}");
+        assert!(!refusal.en.is_empty());
+    }
+    // Sixty squares tiled are more than C6 opens one by one.
+    let mut many = case("ja-12");
+    assert_eq!(many.source.matches("四角を16個敷き詰める").count(), 1);
+    many.source = many
+        .source
+        .replace("四角を16個敷き詰める", "四角を60個敷き詰める");
+    many.composed.plan.layers[0].count = 60;
+    let refusal = refused(
+        &many,
+        answer(
+            json!({"C6": {"layer": 0, "split": "sequence", "order": "so_gyo_shin", "so_degree": "large"},
+                   "B21": still(1)}),
+            "C6",
+            0,
+            json!([]),
+        ),
+    );
+    assert_eq!(refusal.code, "c6_unopenable", "{refusal:?}");
+    assert_eq!(
+        refusal.ja,
+        "layer 0 は並べ方（散らす・60 個）のため一つずつに分けられない。別の層を選ぶか C6 を外す"
     );
 }

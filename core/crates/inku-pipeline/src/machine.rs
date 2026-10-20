@@ -1631,6 +1631,7 @@ impl PipelineSnapshot {
                 | "not_string"
                 | "not_boolean"
                 | "not_a_choice"
+                | "out_of_range"
         ) {
             ProviderFailure::SchemaViolation
         } else {

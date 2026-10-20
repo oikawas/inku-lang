@@ -2995,18 +2995,39 @@ fn colors_start(description: &str, laws: Option<LawsConfig>) -> PipelineSnapshot
     started_with(pipeline_config, description)
 }
 
-fn colors_answer(state: &PipelineSnapshot, answer: &serde_json::Value) -> StepOutput {
-    let action = state.action.as_ref().unwrap();
-    assert_eq!(action.tag, "choose_colors");
-    let result = EffectResult::ColorsChosen {
-        identity: action.identity.clone(),
-        response: answer.to_string(),
-        elapsed_ms: DecimalU64::new(40),
-    };
+fn colors_reply(state: &PipelineSnapshot, result: EffectResult) -> StepOutput {
+    assert_eq!(state.action.as_ref().unwrap().tag, "choose_colors");
     run(
         Some(state),
         &envelope(Some(state), PipelineInput::EffectResult { result }),
     )
+}
+
+fn colors_answer(state: &PipelineSnapshot, answer: &serde_json::Value) -> StepOutput {
+    let identity = state.action.as_ref().unwrap().identity.clone();
+    colors_reply(
+        state,
+        EffectResult::ColorsChosen {
+            identity,
+            response: answer.to_string(),
+            elapsed_ms: DecimalU64::new(40),
+        },
+    )
+}
+
+/// D2: the main layer in the vivid blue.
+fn vivid_blue() -> serde_json::Value {
+    json!({"main_law": "D2", "laws": {"D2": {"vivid": "blue"}},
+           "reason": "“A circle” stands out."})
+}
+
+/// The request the state waits for, failed as the provider limits its rate.
+fn rate_limited(state: &PipelineSnapshot) -> EffectResult {
+    EffectResult::ProviderFailed {
+        identity: state.action.as_ref().unwrap().identity.clone(),
+        failure: ProviderFailure::RateLimited,
+        elapsed_ms: DecimalU64::new(10),
+    }
 }
 
 #[test]
@@ -3016,11 +3037,7 @@ fn a_run_with_colors_asks_for_them_and_commits_what_they_print() {
     assert!(asked.colors.is_some());
     // The field is the main layer (no laws chose one); D2 makes it the vivid
     // blue and turns the red circle, more vivid than half of it, neutral.
-    let chosen = colors_answer(
-        &asked,
-        &json!({"main_law": "D2", "laws": {"D2": {"vivid": "blue"}},
-                "reason": "“A circle” stands out."}),
-    );
+    let chosen = colors_answer(&asked, &vivid_blue());
     let payload = event(&chosen, "colors_chosen").expect("colors chosen");
     assert_eq!(payload["laws"], json!(["D2"]));
     let source = committed_source(&chosen.snapshot);
@@ -3056,4 +3073,208 @@ fn the_colors_come_after_the_laws_with_what_the_laws_decided() {
     );
     assert!(message.contains("- layer 1: “red” (red)"), "{message}");
     assert!(message.contains(r#""fixed":"B15""#), "{message}");
+}
+
+/// B20 with the stated red circle (layer 1) recolored blue.
+fn recolored_circle() -> serde_json::Value {
+    json!({"main_law": "B20", "laws": {"B20": {"accent_layer": 0}},
+           "colors": {"layers": [{"layer": 0, "color": "orange"}, {"layer": 1, "color": "blue"}]},
+           "reason": "A warm field under a cool circle."})
+}
+
+#[test]
+fn the_colors_keep_the_stated_colors_and_the_ground() {
+    // The description states the red circle and the black dots, so the answer
+    // may recolor the field only.
+    let asked = plan_answer(&colors_start(COMPOSED_DESCRIPTION, None)).snapshot;
+    let left = asked.colors.as_ref().unwrap().document.source.clone();
+    let first = asked.action.as_ref().unwrap().identity.clone();
+    let message = asked.action.as_ref().unwrap().payload["prompt"]["message"]
+        .as_str()
+        .unwrap();
+    assert!(message.contains("- layer 1: “red” (red)"), "{message}");
+    assert!(message.contains("- layer 2: “black” (black)"), "{message}");
+    let refused = colors_answer(&asked, &recolored_circle());
+    let retried = event(&refused, "retry_scheduled").expect("a retry");
+    assert_eq!(retried["failure"], "schema_violation");
+    assert_eq!(retried["detail"], "not_a_choice");
+    let again = refused.snapshot.action.as_ref().unwrap();
+    assert_eq!(again.tag, "choose_colors");
+    assert_eq!(again.identity.attempt, 2);
+    assert_ne!(again.identity.action_id, first.action_id);
+    let message = again.payload["prompt"]["message"].as_str().unwrap();
+    assert!(
+        message.ends_with(
+            "## The tool's reply to the previous answer\nThe previous answer could not be used: \
+             answer.colors.layers[1].layer = 1 is not one of 0\nReturn a corrected answer."
+        ),
+        "{message}"
+    );
+    // D5 gives the field, the main layer, the blue and the other layers
+    // colors near it, which leaves the stated circle and dots as they are.
+    let chosen = colors_answer(
+        &refused.snapshot,
+        &json!({"main_law": "D5", "laws": {"D5": {"hue": "blue"}},
+                "reason": "A quiet continuity."}),
+    );
+    assert!(
+        event(&chosen, "colors_chosen").is_some(),
+        "{:?}",
+        tags(&chosen)
+    );
+    let source = committed_source(&chosen.snapshot);
+    let lines: Vec<&str> = source.lines().collect();
+    let before: Vec<&str> = left.lines().collect();
+    // The ground and the background, the field, the circle and the dots.
+    assert_eq!(lines[..2], before[..2], "{source}");
+    assert!(lines[2].starts_with("Fill one blue pen "), "{source}");
+    assert_eq!(lines[3..], before[3..], "{source}");
+}
+
+#[test]
+fn refused_colors_that_spend_the_budget_commit_the_document_the_laws_left() {
+    let asked = plan_answer(&colors_start(COMPOSED_DESCRIPTION, Some(LawsConfig {}))).snapshot;
+    let mut state = laws_answer(&asked, &two_laws()).snapshot;
+    let left = state.colors.as_ref().unwrap().document.source.clone();
+    let record = state.laws_layers.clone();
+    assert!(record.is_some());
+    let mut last = None;
+    for _ in 0..2 {
+        let output = colors_answer(&state, &recolored_circle());
+        state = output.snapshot.clone();
+        last = Some(output);
+    }
+    assert_eq!(
+        event(&last.unwrap(), "colors_fallback"),
+        Some(&json!({"failure": "schema_violation", "detail": "not_a_choice"}))
+    );
+    // The laws' print, with the record of the circle they placed.
+    assert!(
+        left.contains(" at horizontal 0.381966, vertical 0.381966."),
+        "{left}"
+    );
+    assert_eq!(committed_source(&state), left);
+    assert_eq!(state.laws_layers, record);
+    assert!(state.colors.is_none());
+}
+
+#[test]
+fn a_failed_colors_request_commits_the_document_the_laws_left() {
+    let mut state = plan_answer(&colors_start(UNCOLORED_DESCRIPTION, None)).snapshot;
+    let left = state.colors.as_ref().unwrap().document.source.clone();
+    let mut last = None;
+    for _ in 0..2 {
+        let output = colors_reply(&state, rate_limited(&state));
+        state = output.snapshot.clone();
+        last = Some(output);
+    }
+    assert_eq!(
+        event(&last.unwrap(), "colors_fallback"),
+        Some(&json!({"failure": "rate_limited"}))
+    );
+    assert_eq!(committed_source(&state), left);
+}
+
+#[test]
+fn printed_colors_the_run_cannot_take_commit_the_document_the_laws_left() {
+    let asked = plan_answer(&colors_start(UNCOLORED_DESCRIPTION, None)).snapshot;
+    let left = asked.colors.as_ref().unwrap().document.source.clone();
+    let printed = committed_source(&colors_answer(&asked, &vivid_blue()).snapshot);
+    // “gray” for the circle's “red” makes the printed document longer.
+    assert!(printed.len() > left.len(), "{printed}");
+    let mut pipeline_config = observed_config(inku_ddl::ResolvedInstructionLanguage::En);
+    pipeline_config.composition = Some(CompositionConfig { read: false });
+    pipeline_config.colors = Some(ColorsConfig::default());
+    pipeline_config.prompt_limits.max_source_bytes = left.len();
+    let asked = plan_answer(&started_with(pipeline_config, UNCOLORED_DESCRIPTION)).snapshot;
+    let output = colors_answer(&asked, &vivid_blue());
+    assert_eq!(
+        event(&output, "colors_fallback"),
+        Some(&json!({"failure": "compile"})),
+        "{:?}",
+        tags(&output)
+    );
+    assert_eq!(committed_source(&output.snapshot), left);
+    assert!(output.snapshot.colors.is_none());
+}
+
+#[test]
+fn the_colors_are_asked_also_when_the_laws_fell_back() {
+    let mut state = plan_answer(&colors_start(UNCOLORED_DESCRIPTION, Some(LawsConfig {}))).snapshot;
+    let composed = state.laws.as_ref().unwrap().document.source.clone();
+    let mut last = None;
+    for _ in 0..2 {
+        let output = laws_reply(&state, rate_limited(&state));
+        state = output.snapshot.clone();
+        last = Some(output);
+    }
+    assert_eq!(
+        event(&last.unwrap(), "laws_fallback"),
+        Some(&json!({"failure": "rate_limited"}))
+    );
+    let action = state.action.as_ref().unwrap();
+    assert_eq!(action.tag, "choose_colors");
+    assert_eq!(state.colors.as_ref().unwrap().document.source, composed);
+    // Without the laws, the main layer is the plan's first, the field.
+    let message = action.payload["prompt"]["message"].as_str().unwrap();
+    assert!(
+        message.contains("## Main layer (decided by the previous stage): layer 0"),
+        "{message}"
+    );
+    let chosen = colors_answer(&state, &vivid_blue());
+    let source = committed_source(&chosen.snapshot);
+    assert!(
+        source
+            .lines()
+            .nth(2)
+            .unwrap()
+            .starts_with("Fill one blue pen "),
+        "{source}"
+    );
+    assert!(chosen.snapshot.laws_layers.is_none());
+}
+
+#[test]
+fn the_laws_record_follows_the_sentences_the_colors_print_again() {
+    let asked = plan_answer(&colors_start(UNCOLORED_DESCRIPTION, Some(LawsConfig {}))).snapshot;
+    let after_laws = laws_answer(&asked, &two_laws()).snapshot;
+    let placed = after_laws
+        .laws_layers
+        .clone()
+        .expect("a laws layers record");
+    assert!(
+        placed.layers[0].sentences[0].contains(" red "),
+        "{placed:?}"
+    );
+    // D5 gives the circle, the laws' main layer, the blue.
+    let chosen = colors_answer(
+        &after_laws,
+        &json!({"main_law": "D5", "laws": {"D5": {"hue": "blue"}},
+                "reason": "A quiet continuity."}),
+    );
+    let source = committed_source(&chosen.snapshot);
+    let circle = source
+        .lines()
+        .find(|line| line.ends_with(" at horizontal 0.381966, vertical 0.381966."))
+        .expect("the circle the laws placed");
+    assert!(circle.contains(" blue "), "{source}");
+    let record = chosen
+        .snapshot
+        .laws_layers
+        .clone()
+        .expect("a laws layers record");
+    assert_eq!(record.layers.len(), 1, "{record:?}");
+    assert_eq!(record.layers[0].sentences, vec![circle.trim().to_owned()]);
+    assert_eq!(record.layers[0].laws, vec!["B1".to_owned()]);
+    let committed = run(
+        Some(&chosen.snapshot),
+        &envelope(Some(&chosen.snapshot), ack(&chosen.snapshot)),
+    )
+    .snapshot;
+    assert!(
+        matches!(committed.phase, PipelinePhase::ScoreReady),
+        "{:?}",
+        committed.phase
+    );
+    assert_eq!(committed.laws_layers, Some(record));
 }

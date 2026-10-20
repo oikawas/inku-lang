@@ -120,13 +120,15 @@ class TextSSEDecoder(SSEDecoder):
 async def catalog(owner: str, profile_id: str, generation: int, deadline: float, cancel=None, *, force: bool = False, _wire_held: bool = False) -> list[dict]:
     def check():
         return check_session(owner, profile_id, generation, cancel)
-    if not _wire_held:
-        with CredentialStore().lock("wire:" + owner + ":" + profile_id, deadline, check):
-            return await catalog(owner, profile_id, generation, deadline, cancel, force=force, _wire_held=True)
     profile = check()
     cache = profile.get("catalog")
     if not force and cache and cache["expires_at"] > time.time():
         return publication(profile, cache["models"])["models"]
+    # A current, validated catalog is local data. Only a refresh needs the
+    # wire slot held by inference; recheck both session and cache after waiting.
+    if not _wire_held:
+        with CredentialStore().lock("wire:" + owner + ":" + profile_id, deadline, check):
+            return await catalog(owner, profile_id, generation, deadline, cancel, force=force, _wire_held=True)
     token = await access_token(owner, profile_id, generation, deadline, cancel)
     async with httpx.AsyncClient(follow_redirects=False) as client:
         stream = client.stream("GET", RESOURCE + "/models", headers={"Authorization": "Bearer " + token},
@@ -246,5 +248,7 @@ def offered(owner: str, model: str, *, profile_id: str | None = None, generation
             profile_id, generation = pin(owner)
         models = asyncio.run(catalog(owner, profile_id, generation, time.monotonic() + 15))
         return any(entry["id"] == model and entry["enabled"] and purpose in entry["purposes"] for entry in models)
-    except (ChatGPTError, httpx.HTTPError, TimeoutError, ValueError, KeyError):
-        return False
+    except (httpx.HTTPError, TimeoutError, ValueError, KeyError, TypeError):
+        # Unable to check is not evidence that a model is absent. Preserve
+        # explicit registration/provider refusals; let the host report them.
+        raise ChatGPTError("chatgpt_transport_unavailable") from None

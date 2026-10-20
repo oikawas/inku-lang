@@ -348,20 +348,23 @@ class ProductPipelineEffects:
         # which completes its holes.
         model_settings = db.get_model_settings()
         from .model_settings import provider_for_model
+        from .chatgpt_store import ChatGPTError
         selected.pop("chatgpt_profile", None)
         selected.pop("chatgpt_generation", None)
-        if provider_for_model(model, stage="stage1", settings=model_settings)[0] == "chatgpt":
-            from .chatgpt_provider import pin
-            from .chatgpt_store import ChatGPTError
-            try:
+        try:
+            if provider_for_model(model, stage="stage1", settings=model_settings)[0] == "chatgpt":
+                from .chatgpt_provider import pin
                 selected["chatgpt_profile"], selected["chatgpt_generation"] = pin(owner)
-            except ChatGPTError as error:
-                raise CandidateHostError(error.code) from None
-        for stage in ("stage1", "stage2") if kind == "description" else ("stage2",):
-            if not _model_offered_to(
-                actor, selected[f"{stage}_model"], stage=stage, purpose="llm", settings=model_settings, operation="pipeline"
-            ):
-                raise CandidateHostError("model_not_offered")
+                model_settings = {**model_settings, "chatgpt_profile_id": selected["chatgpt_profile"],
+                                  "chatgpt_generation": selected["chatgpt_generation"]}
+            for stage in ("stage1", "stage2") if kind == "description" else ("stage2",):
+                if not _model_offered_to(
+                    actor, selected[f"{stage}_model"], stage=stage, purpose="llm", settings=model_settings, operation="pipeline"
+                ):
+                    raise CandidateHostError("model_not_offered")
+        except ChatGPTError as error:
+            code = "chatgpt_transport_unavailable" if error.failure in {"transport_unavailable", "transport_timeout"} else error.code
+            raise CandidateHostError(code) from None
         selected["developer_disable_llm_retries"] = options.get("developer_disable_llm_retries") is True
         selected["developer_capture_provider_io"] = options.get("developer_capture_provider_io") is True
         # Present from the start, so a work whose stage never called a model

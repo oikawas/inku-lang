@@ -44,6 +44,111 @@ def seed(store, value):
         store.save_profile("owner", value)
 
 
+def test_cached_model_admission_ignores_busy_wire_without_allowing_another_send(isolated, monkeypatch):
+    from inku_server import chatgpt_provider as provider
+
+    value = profile(published_models=["gpt-6-luna"], catalog={
+        "expires_at": time.time() + 300, "models": [{"id": "gpt-6-luna"}],
+    })
+    seed(isolated, value)
+    original_catalog = provider.catalog
+
+    async def bounded_catalog(owner, profile_id, generation, deadline, *args, **kwargs):
+        return await original_catalog(owner, profile_id, generation,
+                                      min(deadline, time.monotonic() + 0.15), *args, **kwargs)
+
+    monkeypatch.setattr(provider, "catalog", bounded_catalog)
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **_kwargs: pytest.fail("unexpected provider communication"))
+    with isolated.lock("wire:owner:" + value["id"], time.monotonic() + 5):
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            checks = [pool.submit(provider.offered, "owner", "gpt-6-luna") for _ in range(4)]
+            assert [check.result(timeout=2) for check in checks] == [True] * 4
+        assert not provider.offered("owner", "not-published")
+        with pytest.raises(ChatGPTError, match="chatgpt_session_changed"):
+            provider.offered("owner", "gpt-6-luna", profile_id=value["id"], generation=2)
+        # Refresh and inference still need the occupied wire slot.
+        with pytest.raises(TimeoutError):
+            asyncio.run(provider.catalog("owner", value["id"], 1, time.monotonic() + 0.05, force=True))
+        with pytest.raises(TimeoutError):
+            asyncio.run(provider.request("owner", value["id"], 1, "gpt-6-luna",
+                                         {"tag": "generate_normalized_ddl"}, time.monotonic() + 0.05, 1024))
+
+
+@pytest.mark.parametrize("case, status, code", [
+    ("missing-cache", 503, "chatgpt_transport_unavailable"),
+    ("expired-cache", 503, "chatgpt_transport_unavailable"),
+    ("transport", 503, "chatgpt_transport_unavailable"),
+    ("catalog-unavailable", 503, "chatgpt_transport_unavailable"),
+    ("not-offered", 403, "model_not_offered"),
+    ("quota", 403, "chatgpt_quota"),
+])
+def test_pipeline_admission_distinguishes_catalog_failure_from_refusal(isolated, monkeypatch, tmp_path, case, status, code):
+    from contextlib import nullcontext
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from inku_server import chatgpt_provider as provider, db
+    from inku_server.persistence.schema import Base
+    from inku_server.pipeline_api import PipelineService, pipeline_router, register_pipeline_errors
+    from inku_server.pipeline_candidate import PipelineBinding
+    from inku_server.pipeline_defaults import default_manifest
+    from inku_server.pipeline_product import ProductPipelineEffects
+
+    value = profile(published_models=["gpt-6-luna"])
+    if case != "missing-cache":
+        value["catalog"] = {"expires_at": time.time() + (-1 if case in {"expired-cache", "transport", "catalog-unavailable"} else 300),
+                            "models": [{"id": "gpt-6-luna"}]}
+    if case == "quota":
+        value["state"] = "quota"
+    seed(isolated, value)
+    engine = create_engine(f"sqlite:///{tmp_path / 'admission.db'}")
+    Base.metadata.create_all(engine)
+    monkeypatch.setattr(db, "engine", engine)
+    monkeypatch.setattr(db, "SessionLocal", sessionmaker(bind=engine))
+    original_catalog = provider.catalog
+
+    async def bounded_catalog(owner, profile_id, generation, deadline, *args, **kwargs):
+        return await original_catalog(owner, profile_id, generation,
+                                      min(deadline, time.monotonic() + 0.15), *args, **kwargs)
+
+    monkeypatch.setattr(provider, "catalog", bounded_catalog)
+    requests = []
+
+    def unavailable(request):
+        requests.append(request)
+        assert request.method == "GET" and request.url.path.endswith("/models")
+        if case == "catalog-unavailable":
+            return httpx.Response(503, json={"error": {"code": "subscription_sharing_usage_unavailable"}})
+        raise httpx.ConnectError("fixture transport failure")
+
+    real_client = httpx.AsyncClient
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: real_client(transport=httpx.MockTransport(unavailable), **kwargs))
+    binding = PipelineBinding()
+    effects = ProductPipelineEffects(binding, default_manifest(binding))
+    service = PipelineService(binding, None, config_for=lambda *_: {},
+                              provider_for=lambda *_: pytest.fail("unexpected inference"), render_for=None,
+                              prepare_for=effects.prepare, max_workers=1, max_effect_steps=1, max_retained_runs=2)
+    app = FastAPI()
+    register_pipeline_errors(app)
+    app.include_router(pipeline_router(service, lambda: {"id": "owner"}))
+    slot = isolated.lock("wire:owner:" + value["id"], time.monotonic() + 5) if case in {"missing-cache", "expired-cache"} else nullcontext()
+    try:
+        with TestClient(app) as client, slot:
+            response = client.post("/api/pipeline/variations", json={
+                "kind": "description", "text": "One quiet blue circle", "options": {
+                    "stage1_model": "chatgpt:not-published" if case == "not-offered" else "chatgpt:gpt-6-luna",
+                    "catalog_id": "default", "render_seed": "1",
+                },
+            })
+        assert response.status_code == status, response.text
+        assert response.json()["detail"]["code"] == code
+        assert len(requests) == (1 if case in {"transport", "catalog-unavailable"} else 0)
+    finally:
+        service.close()
+        engine.dispose()
+
+
 def test_cli_opens_only_the_selected_brave_and_passes_japanese_to_callback(monkeypatch, capsys):
     from inku_server import chatgpt_cli as cli
     from unittest.mock import Mock

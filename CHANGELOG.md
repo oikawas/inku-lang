@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-21 — A law a layer cannot hold is refused with the way out: drop it or change its layer
+
+The laws stage refused an answer that put B6 (subordination) or C4 (motif and variation) where it could not hold by naming the response schema's choices only (`answer.laws.B6.secondary[0] = 0 is not one of 2`). B6 needs a closed shape or an arc besides its main layer, and C4 cannot take a layer whose count of one or two the description writes (it repeats three times at least). The model often kept the law, changed its values and was refused again until the budget ran out. Such an answer is now refused before the schema check, saying to drop B6 or change the main layer, which layers besides the main one B6 may take, or to drop C4 or put it on another layer. This holds for the laws stage of a description run and for the laws move of the AI refinement.
+
 ### 2026-10-21 — Android: the camera's model chooser follows the model purposes, and Juxtapose's held reason matches Web
 
 At the author's decision, the camera's model chooser offers only the models set to be used for both LLM and Vision. The camera reads the photo and draws with the same model, so a model with only one of the two purposes stops partway. If the chosen model has only one, it has to be chosen again. Also, in the work-editing menu of a description-locked work, the reason under Juxtapose is now Web's "This work's DDL was edited. Drawing it from the description would lose the edits, so this is not offered. …". As the way to start again from the description, Android names Change the description in the same menu.

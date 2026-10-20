@@ -2824,9 +2824,86 @@ struct Answer {
 /// The most characters of the reader's reason a work keeps.
 const REASON_LIMIT: usize = 2000;
 
+/// A law the answer puts on a layer that cannot hold it, refused with the way
+/// out before the schema names its choices: B6 sizes the closed shapes and arcs
+/// other than its main layer, and C4 repeats three times at least, so it cannot
+/// keep a count of one or two that the description writes. Values that do not
+/// read are left to the schema.
+fn untakeable(answer: &Value, context: &LawsContext) -> Result<(), Refusal> {
+    let laws = &answer["laws"];
+    if let (Some(value), Some(main)) = (
+        laws.get("B6"),
+        answer["main_layer"]
+            .as_u64()
+            .and_then(|main| usize::try_from(main).ok()),
+    ) {
+        let candidates = context.candidates("B6");
+        if candidates.contains(&main) {
+            let usable: Vec<usize> = candidates
+                .into_iter()
+                .filter(|layer| *layer != main)
+                .collect();
+            if usable.is_empty() {
+                return Err(refusal(
+                    "subordination_none",
+                    format!(
+                        "主の層 {main} のほかに、B6 の従・添えにできる層（閉じた形か弧）が無い。B6 を外すか、主の層を変える"
+                    ),
+                    format!(
+                        "besides the main layer {main}, no layer (a closed shape or an arc) can be B6's secondary or accent; drop B6 or change the main layer"
+                    ),
+                ));
+            }
+            let mut named = ["secondary", "accent"]
+                .into_iter()
+                .flat_map(|key| value[key].as_array().into_iter().flatten())
+                .filter_map(|layer| layer.as_u64().and_then(|layer| usize::try_from(layer).ok()));
+            if named.any(|layer| !usable.contains(&layer)) {
+                let names: Vec<String> = usable.iter().map(ToString::to_string).collect();
+                return Err(refusal(
+                    "subordination_layers",
+                    format!(
+                        "B6 の従・添えにできるのは、主の層 {main} のほかの閉じた形か弧の層（{}）だけ",
+                        names.join("・")
+                    ),
+                    format!(
+                        "B6's secondary and accent can only be the closed shapes and arcs besides the main layer {main} ({})",
+                        names.join(", ")
+                    ),
+                ));
+            }
+        }
+    }
+    if let Some(layer) = laws
+        .get("C4")
+        .and_then(|value| value["layer"].as_u64())
+        .filter(|layer| {
+            answer["description_counts"]
+                .as_array()
+                .is_some_and(|fixed| fixed.iter().any(|item| item.as_u64() == Some(*layer)))
+        })
+        && let Ok(index) = usize::try_from(layer)
+        && context.candidates("C4").contains(&index)
+        && let count = context.count(index)
+        && count < 3
+    {
+        return Err(refusal(
+            "repeats_cannot_keep",
+            format!(
+                "layer {layer} の数は記述が書いた数 {count} のままにするが、C4 の回数は 3 以上なので、C4 はこの層に当てられない。C4 を外すか、ほかの層に当てる"
+            ),
+            format!(
+                "layer {layer} keeps the count the description writes, {count}, but C4 repeats three times at least, so C4 cannot take this layer; drop C4 or put it on another layer"
+            ),
+        ));
+    }
+    Ok(())
+}
+
 /// Read an answer and check it against the schema and the prototype's rules.
 /// `count_rule` checks that the laws are two or three (the request's V2 rule).
 fn check(answer: &Value, context: &LawsContext, count_rule: bool) -> Result<Answer, Refusal> {
+    untakeable(answer, context)?;
     conform(answer, &laws_response_schema(context), "answer")?;
     let offered = context.offered();
     let laws_value = answer["laws"].as_object().cloned().unwrap_or_default();

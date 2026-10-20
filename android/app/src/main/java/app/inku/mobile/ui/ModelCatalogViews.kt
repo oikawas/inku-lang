@@ -28,6 +28,18 @@ import java.util.Locale
 
 /** Matches the Web picker: purpose first, then the legacy score for old catalog rows. */
 internal fun modelRecommendationStars(model: CatalogModel, purpose: String? = null, stage: String? = null): String {
+    val raw = modelRecommendationLevel(model, purpose, stage)
+    val tier = when {
+        raw >= 4.0 -> 3
+        raw >= 3.0 -> 2
+        raw >= 1.0 -> 1
+        else -> 0
+    }
+    return if (tier == 0) "—" else "★".repeat(tier) + "☆".repeat(3 - tier)
+}
+
+/** Web `modelRecommendationLevel`: the stored 0-5 level that also orders the cards. */
+internal fun modelRecommendationLevel(model: CatalogModel, purpose: String? = null, stage: String? = null): Double {
     val record = model.record
     fun score(key: String): Double? = if (record.has(key) && !record.isNull(key))
         record.optDouble(key).takeIf(Double::isFinite) else null
@@ -43,19 +55,37 @@ internal fun modelRecommendationStars(model: CatalogModel, purpose: String? = nu
     val purposes = record.optJSONArray("purposes")?.let { array ->
         (0 until array.length()).map(array::optString)
     } ?: listOf("llm")
-    val raw = when (purpose) {
+    return when (purpose) {
         "llm" -> stagedLlm
         "vision" -> vision
         else -> maxOf(if ("llm" in purposes) stagedLlm else 0.0, if ("vision" in purposes) vision else 0.0)
     }.coerceIn(0.0, 5.0)
-    val tier = when {
-        raw >= 4.0 -> 3
-        raw >= 3.0 -> 2
-        raw >= 1.0 -> 1
-        else -> 0
-    }
-    return if (tier == 0) "—" else "★".repeat(tier) + "☆".repeat(3 - tier)
 }
+
+private fun CatalogModel.listed(key: String): List<String> =
+    record.optJSONArray(key)?.let { array -> (0 until array.length()).map(array::optString) }.orEmpty()
+
+/**
+ * Web `modelPurposeBadges`: LLM and Vision side by side, each selectable only
+ * when the model is offered for it and was not measured not to answer it.
+ */
+internal fun modelPurposeBadges(model: CatalogModel): List<Pair<String, Boolean>> {
+    val purposes = model.record.optJSONArray("purposes")?.let { model.listed("purposes") } ?: listOf("llm")
+    val unsupported = model.listed("unsupported_purposes")
+    return listOf("llm" to "LLM", "vision" to "Vision").map { (purpose, label) ->
+        label to (purpose in purposes && purpose !in unsupported)
+    }
+}
+
+/** Web `isModelUnselectable`: a label that keeps it from publication, or no purpose it answers. */
+internal fun isModelUnselectable(model: CatalogModel): Boolean =
+    !model.publishable || model.listed("unsupported_purposes").containsAll(listOf("llm", "vision"))
+
+/** Web `sortModels`: selectable first, then by the purpose's level, then by name. */
+internal fun <T> sortModels(models: List<T>, purpose: String, catalog: (T) -> CatalogModel, name: (T) -> String): List<T> =
+    models.sortedWith(compareBy<T> { isModelUnselectable(catalog(it)) }
+        .thenByDescending { modelRecommendationLevel(catalog(it), purpose) }
+        .thenBy { name(it) })
 
 /** Place beside ModelLabelWithSupportMark in a model choice heading. */
 @Composable

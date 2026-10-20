@@ -56,8 +56,6 @@ data class AutonomousRefinementStatus(
     val error: String? = null,
 )
 
-data class ParityModelChoice(val id: String, val label: String, val provider: String)
-
 /**
  * The 取り合わせ dialog for one work. [shown] holds every sentence offered so
  * far, so that 選び直す leaves them out; [chosen] indexes [result]'s choices.

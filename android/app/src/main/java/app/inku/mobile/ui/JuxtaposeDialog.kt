@@ -12,8 +12,6 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -25,14 +23,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import app.inku.mobile.ui.i18n.UiLanguage
@@ -49,7 +45,7 @@ import kotlinx.coroutines.delay
 internal fun JuxtaposeDialog(
     dialog: JuxtapositionDialogState,
     modelId: String,
-    models: List<ParityModelChoice>,
+    models: List<VisionModelGroup>,
     language: UiLanguage,
     onModel: (String) -> Unit,
     onAsk: () -> Unit,
@@ -60,8 +56,7 @@ internal fun JuxtaposeDialog(
 ) {
     val s = juxtaposeStrings(language)
     val busy = dialog.busy
-    val canAsk = !busy && models.any { it.id == modelId }
-    var modelMenuOpen by remember { mutableStateOf(false) }
+    val canAsk = !busy && models.any { group -> group.models.any { it.id == modelId && !isModelUnselectable(it.catalog) } }
     var elapsedMs by remember(dialog.startedAtMs) { mutableLongStateOf(0L) }
     LaunchedEffect(busy, dialog.startedAtMs) {
         while (busy) {
@@ -87,22 +82,8 @@ internal fun JuxtaposeDialog(
                     Text(s.help, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(s.description, style = MaterialTheme.typography.labelMedium)
                     JuxtaposeText(sourceTextOf(dialog.target))
-                    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
-                        Text(s.model, style = MaterialTheme.typography.labelMedium)
-                        OutlinedButton(onClick = { modelMenuOpen = true }, enabled = !busy && models.isNotEmpty(),
-                            modifier = Modifier.fillMaxWidth().testTag(JUXTAPOSE_MODEL_TAG)) {
-                            Text(models.firstOrNull { it.id == modelId }?.let { "${it.label} · ${it.provider}" } ?: s.chooseModel,
-                                maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                        DropdownMenu(expanded = modelMenuOpen && !busy, onDismissRequest = { modelMenuOpen = false }) {
-                            models.forEach { model ->
-                                DropdownMenuItem(text = { Text("${model.label} · ${model.provider}") }, onClick = {
-                                    modelMenuOpen = false
-                                    onModel(model.id)
-                                })
-                            }
-                        }
-                    }
+                    VisionModelPicker(label = s.model, selectedModelId = modelId, groups = models, enabled = !busy,
+                        onSelect = onModel, modifier = Modifier.testTag(JUXTAPOSE_MODEL_TAG))
                     dialog.result?.let { result ->
                         Text(s.choices(result.candidates), style = MaterialTheme.typography.labelMedium)
                         result.choices.forEachIndexed { index, item ->

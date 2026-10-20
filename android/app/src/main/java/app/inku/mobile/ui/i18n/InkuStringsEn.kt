@@ -479,6 +479,8 @@ object InkuStringsEn : InkuStrings {
     override val modelSearch = "Search models"
     override val modelSettings = "Model settings"
     override val modelSelection = "Model selection"
+    override val modelPickerNotInList = "Not in the list"
+    override val modelPurposeNotSelectable = " (not selectable)"
     override val publishedModels = "Models offered to the reader"
     override val licenseAndDownload = "License / download"
     override val licenseAndDownloaded = "License / downloaded"

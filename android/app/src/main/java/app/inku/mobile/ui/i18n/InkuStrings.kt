@@ -346,6 +346,10 @@ interface InkuStrings {
     val modelSearch: String
     val modelSettings: String
     val modelSelection: String
+    /** Web `modelPickerNotInList`: the chosen model is not among those offered. */
+    val modelPickerNotInList: String
+    /** Read after a purpose badge the model cannot be chosen for (Web `ModelPurposeBadges`). */
+    val modelPurposeNotSelectable: String
     val publishedModels: String
     val licenseAndDownload: String
     val licenseAndDownloaded: String

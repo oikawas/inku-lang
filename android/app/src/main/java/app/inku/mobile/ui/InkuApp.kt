@@ -637,7 +637,7 @@ fun InkuApp(viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.view
                 state.juxtaposition?.let { dialog ->
                     JuxtaposeDialog(
                         dialog = dialog, modelId = state.autonomousSettings.modelId,
-                        models = visionModelChoicesFor(state).map { ParityModelChoice(it.id, it.label, it.providerName) },
+                        models = visionModelGroupsFor(state),
                         language = state.uiLanguage, onModel = viewModel::selectJuxtapositionModel,
                         onAsk = viewModel::askJuxtaposition, onChoose = viewModel::chooseJuxtaposition,
                         onDraw = viewModel::drawJuxtaposition, onStop = viewModel::stopJuxtaposition,
@@ -680,7 +680,7 @@ fun InkuApp(viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.view
                 if (state.autonomousOpen) {
                     AutonomousRefinementDialog(
                         settings = state.autonomousSettings, status = state.autonomousStatus,
-                        models = visionModelChoicesFor(state).map { ParityModelChoice(it.id, it.label, it.providerName) },
+                        models = visionModelGroupsFor(state),
                         language = state.uiLanguage, onSettings = viewModel::updateAutonomousRefinementSettings,
                         onStart = viewModel::startAutonomousRefinement, onStop = viewModel::stopAutonomousRefinement,
                         onDismiss = viewModel::closeAutonomousRefinement,
@@ -5849,6 +5849,13 @@ private fun visionModelChoicesFor(state: InkuUiState): List<ModelChoice> = model
     (0 until purposes.length()).any { purposes.optString(it) == "vision" } &&
         (unsupported == null || (0 until unsupported.length()).none { unsupported.optString(it) == "vision" })
 }
+
+/** [visionModelChoicesFor] grouped by connection, as Web's `vision_catalog` reaches `ModelCardPicker`. */
+private fun visionModelGroupsFor(state: InkuUiState): List<VisionModelGroup> =
+    visionModelChoicesFor(state).groupBy { providerOfModelId(it.id, state) }.map { (provider, choices) ->
+        VisionModelGroup(provider, choices.first().providerName,
+            choices.map { VisionModelOption(it.id, it.label, catalogModelFor(state, provider, it.id)) })
+    }
 
 /** The same catalog-filtered IDs shown by the autonomous Vision picker. */
 internal fun autonomousVisionModelIds(state: InkuUiState): Set<String> =

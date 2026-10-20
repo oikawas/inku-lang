@@ -3,6 +3,7 @@
 from ._native import (
     core_api_version,
     default_color_map_json,
+    pipeline_autonomous_refine,
     pipeline_canonical_json,
     pipeline_canvas_registry,
     pipeline_completion_range_states,
@@ -40,6 +41,7 @@ from ._native import (
 __all__ = (
     "core_api_version",
     "default_color_map_json",
+    "pipeline_autonomous_refine",
     "pipeline_canonical_json",
     "pipeline_canvas_registry",
     "pipeline_completion_range_states",

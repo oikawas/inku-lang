@@ -319,6 +319,17 @@ fn pipeline_saved_variants<'py>(
     PyBytes::new(py, &output)
 }
 
+/// The juxtaposition (取り合わせ) from the shared core: gather, prompt, check, join, same.
+#[pyfunction]
+fn pipeline_juxtaposition<'py>(
+    py: Python<'py>,
+    input_bytes: &Bound<'py, PyBytes>,
+) -> Bound<'py, PyBytes> {
+    let input = input_bytes.as_bytes().to_vec();
+    let output = py.detach(|| inku_pipeline_uniffi::juxtaposition(input));
+    PyBytes::new(py, &output)
+}
+
 /// A provider request's bytes and what its answer says, from the shared core.
 #[pyfunction]
 fn pipeline_provider_wire<'py>(
@@ -414,6 +425,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(pipeline_completion_range_states, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_canonical_json, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_saved_variants, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_juxtaposition, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_provider_wire, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_description_hash, module)?)?;
     module.add_function(wrap_pyfunction!(

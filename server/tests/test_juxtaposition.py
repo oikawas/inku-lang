@@ -144,7 +144,8 @@ def test_the_route_refuses_a_held_work_and_keeps_the_lineage_out_of_the_candidat
     def suggest(**kwargs):
         seen.update(kwargs)
         return {"choices": [{"sentence": c["sentence"], "reason": "r", "history_ids": c["history_ids"], "rank": n,
-                             "position": 0.0} for n, c in enumerate(kwargs["candidates"][:4], start=1)],
+                             "position": 0.0, "joined": kwargs["description"] + c["sentence"]}
+                            for n, c in enumerate(kwargs["candidates"][:4], start=1)],
                 "candidates": len(kwargs["candidates"]), "model": kwargs["model"]}
 
     monkeypatch.setattr(render, "suggest_juxtaposition", suggest)
@@ -170,7 +171,8 @@ def test_the_route_offers_the_model_no_more_sentences_than_the_administrators_li
     def suggest(**kwargs):
         seen.update(kwargs)
         return {"choices": [{"sentence": c["sentence"], "reason": "r", "history_ids": c["history_ids"], "rank": n,
-                             "position": 0.0} for n, c in enumerate(kwargs["candidates"][:4], start=1)],
+                             "position": 0.0, "joined": kwargs["description"] + c["sentence"]}
+                            for n, c in enumerate(kwargs["candidates"][:4], start=1)],
                 "candidates": len(kwargs["candidates"]), "model": kwargs["model"]}
 
     monkeypatch.setattr(render, "suggest_juxtaposition", suggest)
@@ -206,3 +208,14 @@ def test_the_prompt_lists_every_candidate_with_its_id_and_the_image(monkeypatch)
     assert calls[0]["image"].startswith("data:image/png;base64,")
     assert "Return JSON only" in calls[0]["system"]
     assert juxtaposition.CHOICES == 4
+
+
+def test_the_sentence_follows_the_description_as_the_work_keeps_it():
+    # Failure: the child is drawn from the description without the author's labels (a batch number,
+    # a [comment] naming the poem's source), which Web kept when it joined the sentence itself.
+    candidates = _candidates(4)
+    answer = json.dumps({"choices": [{"id": c["id"], "reason": "r"} for c in candidates]})
+    result = suggest_juxtaposition(svg=SVG, description="ちはやぶる神代も聞かず", lineage=[], candidates=candidates,
+                                   model="test:vision", language="ja", settings={}, reader=lambda **_: answer,
+                                   written="1. ちはやぶる神代も聞かず [古今和歌集]")
+    assert result["choices"][0]["joined"] == "1. ちはやぶる神代も聞かず [古今和歌集]。一文1。"

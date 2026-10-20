@@ -645,6 +645,8 @@ class JuxtapositionChoice(BaseModel):
     history_ids: list[str]
     rank: int
     position: float
+    # The description with the sentence after it, joined by the shared core's rule (2026-10-20).
+    joined: str
 
 
 class JuxtapositionResponse(BaseModel):
@@ -982,6 +984,8 @@ def api_juxtaposition(
             model=model,
             language=body.language,
             settings=settings,
+            # The child keeps the author's labels: the sentence follows the stored text.
+            written=work.get("source_text") or work.get("input") or "",
         )
     except ChatGPTError as exc:
         raise chatgpt_vision_error(exc) from None

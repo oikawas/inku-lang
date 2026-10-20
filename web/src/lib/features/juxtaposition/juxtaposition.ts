@@ -11,23 +11,12 @@ export type JuxtapositionChoice = {
 	rank: number;
 	/** Where the sentence stood in the shuffled list the model read: 0 the head, 1 the tail. */
 	position: number;
+	/** The work's description with the sentence after it, joined by the shared core's rule
+	 *  (a description that ends without a stop gets one), labels and all. */
+	joined: string;
 };
 
 export type JuxtapositionResult = { choices: JuxtapositionChoice[]; candidates: number; model: string };
-
-const SENTENCE_END = /[。！？」』.!?]$/;
-const JAPANESE = /[぀-ヿ㐀-鿿]/;
-
-/** The description with the sentence after it. A description that ends without a
- *  stop -- a poem, or one ending in a label -- gets one, so the two do not run on. */
-export function joinJuxtaposition(text: string, sentence: string): string {
-	const base = text.trim();
-	const added = sentence.trim();
-	if (!base || !added) return base || added;
-	const japanese = JAPANESE.test(base);
-	if (SENTENCE_END.test(base)) return japanese ? base + added : `${base} ${added}`;
-	return japanese ? `${base}。${added}` : `${base}. ${added}`;
-}
 
 /** What the child records. The server reads `sentence` back from the lineage so
  *  that the same sentence is not offered again further down it. */

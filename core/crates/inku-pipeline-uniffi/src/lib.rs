@@ -179,6 +179,18 @@ pub fn saved_variants(input_bytes: Vec<u8>) -> Vec<u8> {
     .unwrap_or_else(|_| br#"{"error":"internal_invariant"}"#.to_vec())
 }
 
+/// The juxtaposition (取り合わせ): one JSON request with an `action` (`gather`,
+/// `prompt`, `check`, `join`, `same`), one JSON answer (`inku.juxtaposition.v1`).
+/// The host collects the sources, sends the prompt with the image and draws the
+/// child. A panic answers `{"error": "internal_invariant"}`.
+#[uniffi::export]
+pub fn juxtaposition(input_bytes: Vec<u8>) -> Vec<u8> {
+    catch_unwind(AssertUnwindSafe(|| {
+        inku_pipeline::juxtaposition::juxtaposition_json(&input_bytes)
+    }))
+    .unwrap_or_else(|_| br#"{"error":"internal_invariant"}"#.to_vec())
+}
+
 /// A provider request's bytes and what its answer says: one JSON request with
 /// an `action` (`pipeline_request`, `pipeline_response`, `text_request`,
 /// `text_response`), one JSON answer (`inku.provider-wire.v1`). The host adds

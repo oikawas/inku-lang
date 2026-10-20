@@ -149,7 +149,8 @@ pub fn score_with_tools(score: &Value, asked: &BTreeMap<usize, String>) -> Value
 
 /// A small seeded generator (SplitMix64): the host passes a new seed each time
 /// the author asks for options, so the options change from one press to the next.
-struct Draw(u64);
+/// The juxtaposition's shuffle draws from it too.
+pub(crate) struct Draw(pub(crate) u64);
 
 impl Draw {
     fn next(&mut self) -> u64 {
@@ -160,9 +161,9 @@ impl Draw {
         value ^ (value >> 31)
     }
 
-    fn below(&mut self, bound: usize) -> usize {
-        // Bounds here are a dozen tools; the modulo bias is far below a
-        // difference anyone could see between offered options.
+    pub(crate) fn below(&mut self, bound: usize) -> usize {
+        // Bounds here are a dozen tools, or a few thousand sentences; the modulo
+        // bias is far below a difference anyone could see between offered options.
         (self.next() % bound as u64) as usize
     }
 }

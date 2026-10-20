@@ -1,0 +1,1414 @@
+{
+ "note": "Generated from server/src/inku_server/juxtaposition.py and web/src/lib/features/juxtaposition/juxtaposition.ts as they stood before the core held them (product 55872e136), by local/evidence/server/juxtaposition-core-20261020/tools/gen_cases.py. Read by core/crates/inku-pipeline/src/juxtaposition.rs, server/tests/test_juxtaposition_core.py and the host checks. The candidates' order comes from the host's seed and is not in the table.",
+ "choices": 4,
+ "same": [
+  {
+   "why": "the same poem with spaces and with kana for a kanji",
+   "a": "ちはやぶる　神代も聞かず　竜田川　からくれなゐに　水くくるとは",
+   "b": "ちはやぶる神代もきかず竜田川からくれなゐに水くくるとは",
+   "same": true
+  },
+  {
+   "why": "the (AI) mark",
+   "a": "満月の夜、塩田は一面の鏡になった。(AI)",
+   "b": "満月の夜、塩田は一面の鏡になった。",
+   "same": true
+  },
+  {
+   "why": "the full-width （AI） mark",
+   "a": "港の灯台。（AI）",
+   "b": "港の灯台。",
+   "same": true
+  },
+  {
+   "why": "spacing in English",
+   "a": "A quiet  harbour.",
+   "b": "A quiet harbour.",
+   "same": true
+  },
+  {
+   "why": "two sentences that open alike",
+   "a": "満月の夜、塩田は鏡になったが、月も人も映らなかった。",
+   "b": "満月の夜、塩田は一面の鏡になり、歩く人はみな空を渡る人になった。",
+   "same": false
+  },
+  {
+   "why": "a number before the sentence",
+   "a": "#5 雪原を渡るオオカミの群れ。",
+   "b": "雪原を渡るオオカミの群れ。",
+   "same": true
+  },
+  {
+   "why": "one character, the same",
+   "a": "雪",
+   "b": "雪",
+   "same": true
+  },
+  {
+   "why": "one character, another",
+   "a": "雪",
+   "b": "月",
+   "same": false
+  }
+ ],
+ "first_sentence": [
+  {
+   "why": "a Japanese stop",
+   "text": "夜の港で、灯台の光が波を数えていた。続きの文。",
+   "sentence": "夜の港で、灯台の光が波を数えていた。"
+  },
+  {
+   "why": "an English stop before a space",
+   "text": "A quiet harbour. A train never came.",
+   "sentence": "A quiet harbour."
+  },
+  {
+   "why": "a period inside a word is not a stop",
+   "text": "e.g.x is not a stop. Next.",
+   "sentence": "e.g.x is not a stop."
+  },
+  {
+   "why": "no stop: the text itself",
+   "text": "ちはやぶる　神代も聞かず",
+   "sentence": "ちはやぶる　神代も聞かず"
+  },
+  {
+   "why": "no stop on the first line: the text itself",
+   "text": "一行目\n二行目。",
+   "sentence": "一行目\n二行目。"
+  },
+  {
+   "why": "spaces around",
+   "text": "  前後に空白。  ",
+   "sentence": "前後に空白。"
+  },
+  {
+   "why": "a stop as the first character does not end the sentence",
+   "text": "。始めの句点。続き。",
+   "sentence": "。始めの句点。"
+  },
+  {
+   "why": "an exclamation mark inside a word",
+   "text": "Hello!World. Next",
+   "sentence": "Hello!World."
+  }
+ ],
+ "language": [
+  {
+   "text": "漢字だけ",
+   "language": "ja"
+  },
+  {
+   "text": "かなだけ",
+   "language": "ja"
+  },
+  {
+   "text": "カタカナ",
+   "language": "ja"
+  },
+  {
+   "text": "English only",
+   "language": "en"
+  },
+  {
+   "text": "한국어",
+   "language": "en"
+  }
+ ],
+ "join": [
+  {
+   "description": "夜の港で、灯台の光が波を数えていた。",
+   "sentence": "廃駅に時刻表が残った。",
+   "joined": "夜の港で、灯台の光が波を数えていた。廃駅に時刻表が残った。"
+  },
+  {
+   "description": "ちはやぶる　神代も聞かず　竜田川 ",
+   "sentence": "廃駅に時刻表が残った。",
+   "joined": "ちはやぶる　神代も聞かず　竜田川。廃駅に時刻表が残った。"
+  },
+  {
+   "description": "A quiet harbour",
+   "sentence": "A train never came.",
+   "joined": "A quiet harbour. A train never came."
+  },
+  {
+   "description": "A quiet harbour.",
+   "sentence": "A train never came.",
+   "joined": "A quiet harbour. A train never came."
+  },
+  {
+   "description": "彼は言った「行こう」",
+   "sentence": "その後の一文。",
+   "joined": "彼は言った「行こう」その後の一文。"
+  },
+  {
+   "description": "本の題『雪国』",
+   "sentence": "次の一文。",
+   "joined": "本の題『雪国』次の一文。"
+  },
+  {
+   "description": "え！",
+   "sentence": "一文。",
+   "joined": "え！一文。"
+  },
+  {
+   "description": "なぜ？",
+   "sentence": "一文。",
+   "joined": "なぜ？一文。"
+  },
+  {
+   "description": "Go!",
+   "sentence": "Next.",
+   "joined": "Go! Next."
+  },
+  {
+   "description": "Why?",
+   "sentence": "Next.",
+   "joined": "Why? Next."
+  },
+  {
+   "description": "",
+   "sentence": "一文。",
+   "joined": "一文。"
+  },
+  {
+   "description": "記述",
+   "sentence": "",
+   "joined": "記述"
+  },
+  {
+   "description": "Mixed English 日本語",
+   "sentence": "next",
+   "joined": "Mixed English 日本語。next"
+  }
+ ],
+ "gather": [
+  {
+   "why": "one poem in two spellings, a number, the (AI) mark, the lineage, a sentence added before, another language",
+   "request": {
+    "sources": [
+     {
+      "id": "a",
+      "text": "ちはやぶる　神代も聞かず　竜田川　からくれなゐに　水くくるとは"
+     },
+     {
+      "id": "b",
+      "text": "ちはやぶる神代もきかず竜田川からくれなゐに水くくるとは"
+     },
+     {
+      "id": "c",
+      "text": "廃駅のホームに時刻表だけが残り、来ない列車の時間を正確に告げ続けた。続きの文。"
+     },
+     {
+      "id": "d",
+      "text": "満月の夜、塩田は一面の鏡になり、歩く人はみな空を渡る人になった。(AI)"
+     },
+     {
+      "id": "e",
+      "text": "雪原を渡るオオカミの群れ。"
+     },
+     {
+      "id": "f",
+      "text": "#5 雪原を渡るオオカミの群れ。"
+     },
+     {
+      "id": "g",
+      "text": "A sentence in English."
+     },
+     {
+      "id": "h",
+      "text": "夜の港で、灯台の光だけが、黒い波を一本ずつ数えていた。続き。"
+     },
+     {
+      "id": "i",
+      "text": "港の灯台が、霧の中で一度だけ瞬いた。"
+     },
+     {
+      "id": "j",
+      "text": "港の灯台が、霧の中で一度だけ瞬いた。(AI)"
+     }
+    ],
+    "description": "満月の夜、塩田は一面の鏡になり、歩く人はみな空を渡る人になった。",
+    "lineage": [
+     "夜の港で、灯台の光だけが、黒い波を一本ずつ数えていた。続き。"
+    ],
+    "added": [
+     "廃駅のホームに時刻表だけが残り、来ない列車の時間を正確に告げ続けた。"
+    ],
+    "exclude": [],
+    "limit": 10
+   },
+   "count": 3,
+   "kept": {
+    "ちはやぶる　神代も聞かず　竜田川　からくれなゐに　水くくるとは": [
+     "a",
+     "b"
+    ],
+    "雪原を渡るオオカミの群れ。": [
+     "e",
+     "f"
+    ],
+    "港の灯台が、霧の中で一度だけ瞬いた。": [
+     "i",
+     "j"
+    ]
+   }
+  },
+  {
+   "why": "a sentence shown before is left out",
+   "request": {
+    "sources": [
+     {
+      "id": "a",
+      "text": "ちはやぶる　神代も聞かず　竜田川　からくれなゐに　水くくるとは"
+     },
+     {
+      "id": "b",
+      "text": "ちはやぶる神代もきかず竜田川からくれなゐに水くくるとは"
+     },
+     {
+      "id": "c",
+      "text": "廃駅のホームに時刻表だけが残り、来ない列車の時間を正確に告げ続けた。続きの文。"
+     },
+     {
+      "id": "d",
+      "text": "満月の夜、塩田は一面の鏡になり、歩く人はみな空を渡る人になった。(AI)"
+     },
+     {
+      "id": "e",
+      "text": "雪原を渡るオオカミの群れ。"
+     },
+     {
+      "id": "f",
+      "text": "#5 雪原を渡るオオカミの群れ。"
+     },
+     {
+      "id": "g",
+      "text": "A sentence in English."
+     },
+     {
+      "id": "h",
+      "text": "夜の港で、灯台の光だけが、黒い波を一本ずつ数えていた。続き。"
+     },
+     {
+      "id": "i",
+      "text": "港の灯台が、霧の中で一度だけ瞬いた。"
+     },
+     {
+      "id": "j",
+      "text": "港の灯台が、霧の中で一度だけ瞬いた。(AI)"
+     }
+    ],
+    "description": "満月の夜、塩田は一面の鏡になった。",
+    "lineage": [],
+    "added": [],
+    "exclude": [
+     "雪原を渡るオオカミの群れ。"
+    ],
+    "limit": 10
+   },
+   "count": 5,
+   "kept": {
+    "廃駅のホームに時刻表だけが残り、来ない列車の時間を正確に告げ続けた。": [
+     "c"
+    ],
+    "夜の港で、灯台の光だけが、黒い波を一本ずつ数えていた。": [
+     "h"
+    ],
+    "ちはやぶる　神代も聞かず　竜田川　からくれなゐに　水くくるとは": [
+     "a",
+     "b"
+    ],
+    "満月の夜、塩田は一面の鏡になり、歩く人はみな空を渡る人になった。": [
+     "d"
+    ],
+    "港の灯台が、霧の中で一度だけ瞬いた。": [
+     "i",
+     "j"
+    ]
+   }
+  },
+  {
+   "why": "more sentences than the limit",
+   "request": {
+    "sources": [
+     {
+      "id": "w00",
+      "text": "一丁丂七の文。"
+     },
+     {
+      "id": "w01",
+      "text": "丅丆万丈の文。"
+     },
+     {
+      "id": "w02",
+      "text": "上下丌不の文。"
+     },
+     {
+      "id": "w03",
+      "text": "丏丐丑丒の文。"
+     },
+     {
+      "id": "w04",
+      "text": "且丕世丗の文。"
+     },
+     {
+      "id": "w05",
+      "text": "丙业丛东の文。"
+     },
+     {
+      "id": "w06",
+      "text": "丞丟丠両の文。"
+     },
+     {
+      "id": "w07",
+      "text": "丣两严並の文。"
+     },
+     {
+      "id": "w08",
+      "text": "丨丩个丫の文。"
+     },
+     {
+      "id": "w09",
+      "text": "中丮丯丰の文。"
+     },
+     {
+      "id": "w10",
+      "text": "串丳临丵の文。"
+     },
+     {
+      "id": "w11",
+      "text": "丷丸丹为の文。"
+     },
+     {
+      "id": "w12",
+      "text": "丼丽举丿の文。"
+     },
+     {
+      "id": "w13",
+      "text": "乁乂乃乄の文。"
+     },
+     {
+      "id": "w14",
+      "text": "乆乇么义の文。"
+     },
+     {
+      "id": "w15",
+      "text": "之乌乍乎の文。"
+     },
+     {
+      "id": "w16",
+      "text": "乐乑乒乓の文。"
+     },
+     {
+      "id": "w17",
+      "text": "乕乖乗乘の文。"
+     },
+     {
+      "id": "w18",
+      "text": "乚乛乜九の文。"
+     },
+     {
+      "id": "w19",
+      "text": "也习乡乢の文。"
+     },
+     {
+      "id": "w20",
+      "text": "乤乥书乧の文。"
+     },
+     {
+      "id": "w21",
+      "text": "乩乪乫乬の文。"
+     },
+     {
+      "id": "w22",
+      "text": "乮乯买乱の文。"
+     },
+     {
+      "id": "w23",
+      "text": "乳乴乵乶の文。"
+     },
+     {
+      "id": "w24",
+      "text": "乸乹乺乻の文。"
+     },
+     {
+      "id": "w25",
+      "text": "乽乾乿亀の文。"
+     },
+     {
+      "id": "w26",
+      "text": "亂亃亄亅の文。"
+     },
+     {
+      "id": "w27",
+      "text": "亇予争亊の文。"
+     },
+     {
+      "id": "w28",
+      "text": "二亍于亏の文。"
+     },
+     {
+      "id": "w29",
+      "text": "云互亓五の文。"
+     }
+    ],
+    "description": "今の記述。",
+    "lineage": [],
+    "added": [],
+    "exclude": [],
+    "limit": 10
+   },
+   "count": 10,
+   "kept": {
+    "丏丐丑丒の文。": [
+     "w03"
+    ],
+    "串丳临丵の文。": [
+     "w10"
+    ],
+    "乚乛乜九の文。": [
+     "w18"
+    ],
+    "乕乖乗乘の文。": [
+     "w17"
+    ],
+    "丙业丛东の文。": [
+     "w05"
+    ],
+    "一丁丂七の文。": [
+     "w00"
+    ],
+    "丣两严並の文。": [
+     "w07"
+    ],
+    "亂亃亄亅の文。": [
+     "w26"
+    ],
+    "云互亓五の文。": [
+     "w29"
+    ],
+    "乆乇么义の文。": [
+     "w14"
+    ],
+    "乤乥书乧の文。": [
+     "w20"
+    ],
+    "乽乾乿亀の文。": [
+     "w25"
+    ],
+    "乩乪乫乬の文。": [
+     "w21"
+    ],
+    "上下丌不の文。": [
+     "w02"
+    ],
+    "也习乡乢の文。": [
+     "w19"
+    ],
+    "且丕世丗の文。": [
+     "w04"
+    ],
+    "乳乴乵乶の文。": [
+     "w23"
+    ],
+    "丞丟丠両の文。": [
+     "w06"
+    ],
+    "丷丸丹为の文。": [
+     "w11"
+    ],
+    "乮乯买乱の文。": [
+     "w22"
+    ],
+    "中丮丯丰の文。": [
+     "w09"
+    ],
+    "二亍于亏の文。": [
+     "w28"
+    ],
+    "之乌乍乎の文。": [
+     "w15"
+    ],
+    "乐乑乒乓の文。": [
+     "w16"
+    ],
+    "丨丩个丫の文。": [
+     "w08"
+    ],
+    "丅丆万丈の文。": [
+     "w01"
+    ],
+    "乁乂乃乄の文。": [
+     "w13"
+    ],
+    "乸乹乺乻の文。": [
+     "w24"
+    ],
+    "丼丽举丿の文。": [
+     "w12"
+    ],
+    "亇予争亊の文。": [
+     "w27"
+    ]
+   }
+  },
+  {
+   "why": "an English description takes English sentences",
+   "request": {
+    "sources": [
+     {
+      "id": "x1",
+      "text": "A harbour at night. More."
+     },
+     {
+      "id": "x2",
+      "text": "A harbour at night."
+     },
+     {
+      "id": "x3",
+      "text": "Snow on the field."
+     },
+     {
+      "id": "x4",
+      "text": "雪の野。"
+     },
+     {
+      "id": "x5",
+      "text": "A train that never came."
+     },
+     {
+      "id": "x6",
+      "text": "The moon in the salt pan."
+     }
+    ],
+    "description": "A quiet harbour.",
+    "lineage": [],
+    "added": [],
+    "exclude": [],
+    "limit": 10
+   },
+   "count": 4,
+   "kept": {
+    "Snow on the field.": [
+     "x3"
+    ],
+    "A harbour at night.": [
+     "x1",
+     "x2"
+    ],
+    "A train that never came.": [
+     "x5"
+    ],
+    "The moon in the salt pan.": [
+     "x6"
+    ]
+   }
+  },
+  {
+   "why": "a limit of none",
+   "request": {
+    "sources": [
+     {
+      "id": "w00",
+      "text": "一丁丂七の文。"
+     },
+     {
+      "id": "w01",
+      "text": "丅丆万丈の文。"
+     },
+     {
+      "id": "w02",
+      "text": "上下丌不の文。"
+     },
+     {
+      "id": "w03",
+      "text": "丏丐丑丒の文。"
+     },
+     {
+      "id": "w04",
+      "text": "且丕世丗の文。"
+     },
+     {
+      "id": "w05",
+      "text": "丙业丛东の文。"
+     },
+     {
+      "id": "w06",
+      "text": "丞丟丠両の文。"
+     },
+     {
+      "id": "w07",
+      "text": "丣两严並の文。"
+     },
+     {
+      "id": "w08",
+      "text": "丨丩个丫の文。"
+     },
+     {
+      "id": "w09",
+      "text": "中丮丯丰の文。"
+     },
+     {
+      "id": "w10",
+      "text": "串丳临丵の文。"
+     },
+     {
+      "id": "w11",
+      "text": "丷丸丹为の文。"
+     },
+     {
+      "id": "w12",
+      "text": "丼丽举丿の文。"
+     },
+     {
+      "id": "w13",
+      "text": "乁乂乃乄の文。"
+     },
+     {
+      "id": "w14",
+      "text": "乆乇么义の文。"
+     },
+     {
+      "id": "w15",
+      "text": "之乌乍乎の文。"
+     },
+     {
+      "id": "w16",
+      "text": "乐乑乒乓の文。"
+     },
+     {
+      "id": "w17",
+      "text": "乕乖乗乘の文。"
+     },
+     {
+      "id": "w18",
+      "text": "乚乛乜九の文。"
+     },
+     {
+      "id": "w19",
+      "text": "也习乡乢の文。"
+     },
+     {
+      "id": "w20",
+      "text": "乤乥书乧の文。"
+     },
+     {
+      "id": "w21",
+      "text": "乩乪乫乬の文。"
+     },
+     {
+      "id": "w22",
+      "text": "乮乯买乱の文。"
+     },
+     {
+      "id": "w23",
+      "text": "乳乴乵乶の文。"
+     },
+     {
+      "id": "w24",
+      "text": "乸乹乺乻の文。"
+     },
+     {
+      "id": "w25",
+      "text": "乽乾乿亀の文。"
+     },
+     {
+      "id": "w26",
+      "text": "亂亃亄亅の文。"
+     },
+     {
+      "id": "w27",
+      "text": "亇予争亊の文。"
+     },
+     {
+      "id": "w28",
+      "text": "二亍于亏の文。"
+     },
+     {
+      "id": "w29",
+      "text": "云互亓五の文。"
+     }
+    ],
+    "description": "今の記述。",
+    "lineage": [],
+    "added": [],
+    "exclude": [],
+    "limit": 0
+   },
+   "count": 0,
+   "kept": {
+    "丏丐丑丒の文。": [
+     "w03"
+    ],
+    "串丳临丵の文。": [
+     "w10"
+    ],
+    "乚乛乜九の文。": [
+     "w18"
+    ],
+    "乕乖乗乘の文。": [
+     "w17"
+    ],
+    "丙业丛东の文。": [
+     "w05"
+    ],
+    "一丁丂七の文。": [
+     "w00"
+    ],
+    "丣两严並の文。": [
+     "w07"
+    ],
+    "亂亃亄亅の文。": [
+     "w26"
+    ],
+    "云互亓五の文。": [
+     "w29"
+    ],
+    "乆乇么义の文。": [
+     "w14"
+    ],
+    "乤乥书乧の文。": [
+     "w20"
+    ],
+    "乽乾乿亀の文。": [
+     "w25"
+    ],
+    "乩乪乫乬の文。": [
+     "w21"
+    ],
+    "上下丌不の文。": [
+     "w02"
+    ],
+    "也习乡乢の文。": [
+     "w19"
+    ],
+    "且丕世丗の文。": [
+     "w04"
+    ],
+    "乳乴乵乶の文。": [
+     "w23"
+    ],
+    "丞丟丠両の文。": [
+     "w06"
+    ],
+    "丷丸丹为の文。": [
+     "w11"
+    ],
+    "乮乯买乱の文。": [
+     "w22"
+    ],
+    "中丮丯丰の文。": [
+     "w09"
+    ],
+    "二亍于亏の文。": [
+     "w28"
+    ],
+    "之乌乍乎の文。": [
+     "w15"
+    ],
+    "乐乑乒乓の文。": [
+     "w16"
+    ],
+    "丨丩个丫の文。": [
+     "w08"
+    ],
+    "丅丆万丈の文。": [
+     "w01"
+    ],
+    "乁乂乃乄の文。": [
+     "w13"
+    ],
+    "乸乹乺乻の文。": [
+     "w24"
+    ],
+    "丼丽举丿の文。": [
+     "w12"
+    ],
+    "亇予争亊の文。": [
+     "w27"
+    ]
+   }
+  }
+ ],
+ "check": [
+  {
+   "why": "a fenced answer in another order",
+   "request": {
+    "language": "ja",
+    "answer": "```json\n{\"choices\": [{\"id\": \"c0003\", \"reason\": \"三つ目\"}, {\"id\": \"c0001\", \"reason\": \"一つ目\"}, {\"id\": \"c0006\", \"reason\": \"六つ目\"}, {\"id\": \"c0002\", \"reason\": \"二つ目\"}]}\n```",
+    "candidates": [
+     {
+      "id": "c0001",
+      "sentence": "一文1。",
+      "history_ids": [
+       "w1"
+      ]
+     },
+     {
+      "id": "c0002",
+      "sentence": "一文2。",
+      "history_ids": [
+       "w2"
+      ]
+     },
+     {
+      "id": "c0003",
+      "sentence": "一文3。",
+      "history_ids": [
+       "w3"
+      ]
+     },
+     {
+      "id": "c0004",
+      "sentence": "一文4。",
+      "history_ids": [
+       "w4"
+      ]
+     },
+     {
+      "id": "c0005",
+      "sentence": "一文5。",
+      "history_ids": [
+       "w5"
+      ]
+     },
+     {
+      "id": "c0006",
+      "sentence": "一文6。",
+      "history_ids": [
+       "w6"
+      ]
+     }
+    ],
+    "description": "今の記述。"
+   },
+   "choices": [
+    {
+     "sentence": "一文3。",
+     "reason": "三つ目",
+     "history_ids": [
+      "w3"
+     ],
+     "rank": 1,
+     "position": 0.4,
+     "joined": "今の記述。一文3。"
+    },
+    {
+     "sentence": "一文1。",
+     "reason": "一つ目",
+     "history_ids": [
+      "w1"
+     ],
+     "rank": 2,
+     "position": 0.0,
+     "joined": "今の記述。一文1。"
+    },
+    {
+     "sentence": "一文6。",
+     "reason": "六つ目",
+     "history_ids": [
+      "w6"
+     ],
+     "rank": 3,
+     "position": 1.0,
+     "joined": "今の記述。一文6。"
+    },
+    {
+     "sentence": "一文2。",
+     "reason": "二つ目",
+     "history_ids": [
+      "w2"
+     ],
+     "rank": 4,
+     "position": 0.2,
+     "joined": "今の記述。一文2。"
+    }
+   ]
+  },
+  {
+   "why": "an English answer",
+   "request": {
+    "language": "en",
+    "answer": "{\"choices\": [{\"id\": \"c0001\", \"reason\": \"r\"}, {\"id\": \"c0002\", \"reason\": \"r\"}, {\"id\": \"c0003\", \"reason\": \"r\"}, {\"id\": \"c0004\", \"reason\": \"r\"}]}",
+    "candidates": [
+     {
+      "id": "c0001",
+      "sentence": "一文1。",
+      "history_ids": [
+       "w1"
+      ]
+     },
+     {
+      "id": "c0002",
+      "sentence": "一文2。",
+      "history_ids": [
+       "w2"
+      ]
+     },
+     {
+      "id": "c0003",
+      "sentence": "一文3。",
+      "history_ids": [
+       "w3"
+      ]
+     },
+     {
+      "id": "c0004",
+      "sentence": "一文4。",
+      "history_ids": [
+       "w4"
+      ]
+     }
+    ],
+    "description": "A quiet harbour"
+   },
+   "choices": [
+    {
+     "sentence": "一文1。",
+     "reason": "r",
+     "history_ids": [
+      "w1"
+     ],
+     "rank": 1,
+     "position": 0.0,
+     "joined": "A quiet harbour. 一文1。"
+    },
+    {
+     "sentence": "一文2。",
+     "reason": "r",
+     "history_ids": [
+      "w2"
+     ],
+     "rank": 2,
+     "position": 0.333,
+     "joined": "A quiet harbour. 一文2。"
+    },
+    {
+     "sentence": "一文3。",
+     "reason": "r",
+     "history_ids": [
+      "w3"
+     ],
+     "rank": 3,
+     "position": 0.667,
+     "joined": "A quiet harbour. 一文3。"
+    },
+    {
+     "sentence": "一文4。",
+     "reason": "r",
+     "history_ids": [
+      "w4"
+     ],
+     "rank": 4,
+     "position": 1.0,
+     "joined": "A quiet harbour. 一文4。"
+    }
+   ]
+  },
+  {
+   "why": "not JSON",
+   "request": {
+    "language": "ja",
+    "answer": "四つ選びました。",
+    "candidates": [
+     {
+      "id": "c0001",
+      "sentence": "一文1。",
+      "history_ids": [
+       "w1"
+      ]
+     },
+     {
+      "id": "c0002",
+      "sentence": "一文2。",
+      "history_ids": [
+       "w2"
+      ]
+     },
+     {
+      "id": "c0003",
+      "sentence": "一文3。",
+      "history_ids": [
+       "w3"
+      ]
+     },
+     {
+      "id": "c0004",
+      "sentence": "一文4。",
+      "history_ids": [
+       "w4"
+      ]
+     },
+     {
+      "id": "c0005",
+      "sentence": "一文5。",
+      "history_ids": [
+       "w5"
+      ]
+     },
+     {
+      "id": "c0006",
+      "sentence": "一文6。",
+      "history_ids": [
+       "w6"
+      ]
+     }
+    ],
+    "description": "今の記述。"
+   },
+   "detail": "答えが JSON でない"
+  },
+  {
+   "why": "not JSON, in English",
+   "request": {
+    "language": "en",
+    "answer": "{choices: [",
+    "candidates": [
+     {
+      "id": "c0001",
+      "sentence": "一文1。",
+      "history_ids": [
+       "w1"
+      ]
+     },
+     {
+      "id": "c0002",
+      "sentence": "一文2。",
+      "history_ids": [
+       "w2"
+      ]
+     },
+     {
+      "id": "c0003",
+      "sentence": "一文3。",
+      "history_ids": [
+       "w3"
+      ]
+     },
+     {
+      "id": "c0004",
+      "sentence": "一文4。",
+      "history_ids": [
+       "w4"
+      ]
+     },
+     {
+      "id": "c0005",
+      "sentence": "一文5。",
+      "history_ids": [
+       "w5"
+      ]
+     },
+     {
+      "id": "c0006",
+      "sentence": "一文6。",
+      "history_ids": [
+       "w6"
+      ]
+     }
+    ],
+    "description": "A description."
+   },
+   "detail": "the answer is not JSON"
+  },
+  {
+   "why": "three choices",
+   "request": {
+    "language": "en",
+    "answer": "{\"choices\": [{\"id\": \"c0001\", \"reason\": \"r\"}, {\"id\": \"c0002\", \"reason\": \"r\"}, {\"id\": \"c0003\", \"reason\": \"r\"}]}",
+    "candidates": [
+     {
+      "id": "c0001",
+      "sentence": "一文1。",
+      "history_ids": [
+       "w1"
+      ]
+     },
+     {
+      "id": "c0002",
+      "sentence": "一文2。",
+      "history_ids": [
+       "w2"
+      ]
+     },
+     {
+      "id": "c0003",
+      "sentence": "一文3。",
+      "history_ids": [
+       "w3"
+      ]
+     },
+     {
+      "id": "c0004",
+      "sentence": "一文4。",
+      "history_ids": [
+       "w4"
+      ]
+     },
+     {
+      "id": "c0005",
+      "sentence": "一文5。",
+      "history_ids": [
+       "w5"
+      ]
+     },
+     {
+      "id": "c0006",
+      "sentence": "一文6。",
+      "history_ids": [
+       "w6"
+      ]
+     }
+    ],
+    "description": "A description."
+   },
+   "detail": "choices does not hold exactly 4 items"
+  },
+  {
+   "why": "an id not offered and an empty id",
+   "request": {
+    "language": "ja",
+    "answer": "{\"choices\": [{\"id\": \"c9999\", \"reason\": \"r\"}, {\"id\": \"\", \"reason\": \"r\"}, {\"id\": \"c0001\", \"reason\": \"r\"}, {\"id\": \"c0002\", \"reason\": \"r\"}]}",
+    "candidates": [
+     {
+      "id": "c0001",
+      "sentence": "一文1。",
+      "history_ids": [
+       "w1"
+      ]
+     },
+     {
+      "id": "c0002",
+      "sentence": "一文2。",
+      "history_ids": [
+       "w2"
+      ]
+     },
+     {
+      "id": "c0003",
+      "sentence": "一文3。",
+      "history_ids": [
+       "w3"
+      ]
+     },
+     {
+      "id": "c0004",
+      "sentence": "一文4。",
+      "history_ids": [
+       "w4"
+      ]
+     },
+     {
+      "id": "c0005",
+      "sentence": "一文5。",
+      "history_ids": [
+       "w5"
+      ]
+     },
+     {
+      "id": "c0006",
+      "sentence": "一文6。",
+      "history_ids": [
+       "w6"
+      ]
+     }
+    ],
+    "description": "今の記述。"
+   },
+   "detail": "候補に無い番号（c9999・—。行の頭の番号をそのまま写す）"
+  },
+  {
+   "why": "one id four times",
+   "request": {
+    "language": "ja",
+    "answer": "{\"choices\": [{\"id\": \"c0001\", \"reason\": \"r\"}, {\"id\": \"c0001\", \"reason\": \"r\"}, {\"id\": \"c0001\", \"reason\": \"r\"}, {\"id\": \"c0001\", \"reason\": \"r\"}]}",
+    "candidates": [
+     {
+      "id": "c0001",
+      "sentence": "一文1。",
+      "history_ids": [
+       "w1"
+      ]
+     },
+     {
+      "id": "c0002",
+      "sentence": "一文2。",
+      "history_ids": [
+       "w2"
+      ]
+     },
+     {
+      "id": "c0003",
+      "sentence": "一文3。",
+      "history_ids": [
+       "w3"
+      ]
+     },
+     {
+      "id": "c0004",
+      "sentence": "一文4。",
+      "history_ids": [
+       "w4"
+      ]
+     },
+     {
+      "id": "c0005",
+      "sentence": "一文5。",
+      "history_ids": [
+       "w5"
+      ]
+     },
+     {
+      "id": "c0006",
+      "sentence": "一文6。",
+      "history_ids": [
+       "w6"
+      ]
+     }
+    ],
+    "description": "今の記述。"
+   },
+   "detail": "同じ番号が2回以上ある（4つは互いに違う番号にする）"
+  },
+  {
+   "why": "an empty reason",
+   "request": {
+    "language": "en",
+    "answer": "{\"choices\": [{\"id\": \"c0001\", \"reason\": \" \"}, {\"id\": \"c0002\", \"reason\": \"r\"}, {\"id\": \"c0003\", \"reason\": \"r\"}, {\"id\": \"c0004\", \"reason\": \"r\"}]}",
+    "candidates": [
+     {
+      "id": "c0001",
+      "sentence": "一文1。",
+      "history_ids": [
+       "w1"
+      ]
+     },
+     {
+      "id": "c0002",
+      "sentence": "一文2。",
+      "history_ids": [
+       "w2"
+      ]
+     },
+     {
+      "id": "c0003",
+      "sentence": "一文3。",
+      "history_ids": [
+       "w3"
+      ]
+     },
+     {
+      "id": "c0004",
+      "sentence": "一文4。",
+      "history_ids": [
+       "w4"
+      ]
+     },
+     {
+      "id": "c0005",
+      "sentence": "一文5。",
+      "history_ids": [
+       "w5"
+      ]
+     },
+     {
+      "id": "c0006",
+      "sentence": "一文6。",
+      "history_ids": [
+       "w6"
+      ]
+     }
+    ],
+    "description": "A description."
+   },
+   "detail": "a reason is empty"
+  }
+ ],
+ "prompt": [
+  {
+   "why": "Japanese, with a lineage and a resend",
+   "request": {
+    "language": "ja",
+    "description": "今の記述。",
+    "lineage": [
+     "根の記述。",
+     "今の記述。"
+    ],
+    "candidates": [
+     {
+      "id": "c0001",
+      "sentence": "一文1。",
+      "history_ids": [
+       "w1"
+      ]
+     },
+     {
+      "id": "c0002",
+      "sentence": "一文2。",
+      "history_ids": [
+       "w2"
+      ]
+     },
+     {
+      "id": "c0003",
+      "sentence": "一文3。",
+      "history_ids": [
+       "w3"
+      ]
+     },
+     {
+      "id": "c0004",
+      "sentence": "一文4。",
+      "history_ids": [
+       "w4"
+      ]
+     }
+    ],
+    "resend": "候補に無い番号（c9999。行の頭の番号をそのまま写す）"
+   },
+   "system": "あなたは、作者が自分の作品をさらに深めるのを手伝う助手です。創作の主体は作者で、あなたの手はすべて提案です。良し悪し・点数・好み・称賛・否定は書きません。「良くなる」「改善」「美しい」「魅力的」「バランスが良い」などの評価の語を使いません。目的は「揺さぶり」です。作者は、この作品で煮詰まっています。作者のほかの作品の記述から一文を選び、この作品の記述の後ろに、そのまま足します。元の記述も、選んだ一文も書き換えません。二つのものを並べて新しい意味を生む「取り合わせ」として、作者が自分では思いつかない方向へ、作品の考えそのものを動かす一文を選びます。候補から4つを、選びたい順に並べます。それぞれに、足すと作品の考えがどう動くかを1文で書きます。答えは JSON だけを返します：{\"choices\": [{\"id\": \"…\", \"reason\": \"…\"}]}（choices はちょうど4つ）。",
+   "text": "## 今の画\n添えた画像のとおり。\n\n## 今の記述\n今の記述。\n\n## 系譜の記述（根から今の作品まで）\n1. 根の記述。\n2. 今の記述。\n\n## 候補の一文（作者のほかの作品の記述の、最初の一文。4件。行の頭は番号）\nc0001：一文1。\nc0002：一文2。\nc0003：一文3。\nc0004：一文4。\n\n## 答えること\n- choices：4つ。選びたい順に並べる。各項に次を書く。\n  - id：候補の番号（行の頭の番号をそのまま写す）。\n  - reason：この一文を足すと、作品の考えがどう動くか（1文。評価の語を使わない）。\n- 4つの id は互いに違う。\n\n## 前の答えについて\n前の答えは使えなかった：候補に無い番号（c9999。行の頭の番号をそのまま写す）。上の決まりどおりに答え直してください。"
+  },
+  {
+   "why": "English, a work that is its own root",
+   "request": {
+    "language": "en",
+    "description": "A quiet harbour.",
+    "lineage": [],
+    "candidates": [
+     {
+      "id": "c0001",
+      "sentence": "一文1。",
+      "history_ids": [
+       "w1"
+      ]
+     },
+     {
+      "id": "c0002",
+      "sentence": "一文2。",
+      "history_ids": [
+       "w2"
+      ]
+     },
+     {
+      "id": "c0003",
+      "sentence": "一文3。",
+      "history_ids": [
+       "w3"
+      ]
+     },
+     {
+      "id": "c0004",
+      "sentence": "一文4。",
+      "history_ids": [
+       "w4"
+      ]
+     }
+    ]
+   },
+   "system": "You help an author take their own work further. The author creates; everything you offer is a proposal. You never score, praise or condemn, and never use evaluative words such as better, improved, beautiful, appealing or balanced. The aim is to shake the work loose: the author is stuck with it. Choose a sentence from the author's other works to be added, unchanged, after this work's description. Neither the description nor the chosen sentence is rewritten. As a juxtaposition, two things set side by side to make a new meaning, choose a sentence that moves the idea of the work itself in a direction the author would not think of. Choose four candidates in the order you would pick them, and for each write in one sentence how adding it moves the idea of the work. Return JSON only: {\"choices\": [{\"id\": \"...\", \"reason\": \"...\"}]} with exactly four items.",
+   "text": "## The picture\nThe attached image.\n\n## The description\nA quiet harbour.\n\n## The lineage's descriptions (root to this work)\n(the work is its own root)\n\n## Candidate sentences (the first sentence of the author's other works; 4; each line starts with its id)\nc0001: 一文1。\nc0002: 一文2。\nc0003: 一文3。\nc0004: 一文4。\n\n## Answer\n- choices: four, in the order you would pick them. For each:\n  - id: the candidate's id, copied from the head of its line.\n  - reason: how adding this sentence moves the idea of the work (one sentence, no evaluative words).\n- The four ids differ."
+  }
+ ]
+}

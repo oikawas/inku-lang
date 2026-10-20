@@ -6,7 +6,7 @@
 	import RunStatus from './RunStatus.svelte';
 	import type { LineageNode } from '$lib/features/history/types';
 	import type { ProviderAttemptCount } from '$lib/paintStream';
-	import { joinJuxtaposition, juxtapositionMetadata, type JuxtapositionResult } from '$lib/features/juxtaposition/juxtaposition';
+	import { juxtapositionMetadata, type JuxtapositionResult } from '$lib/features/juxtaposition/juxtaposition';
 	import { restoreWorkActionFocus } from './WorkActionMenu.svelte';
 
 	type Props = {
@@ -41,7 +41,7 @@
 	let fallbackFocus: HTMLElement | null = null;
 	const description = $derived(node.history?.source_text ?? node.history?.input ?? '');
 	const choice = $derived(result && chosen !== null ? result.choices[chosen] ?? null : null);
-	const joined = $derived(choice ? joinJuxtaposition(description, choice.sentence) : '');
+	const joined = $derived(choice ? choice.joined : '');
 	const busy = $derived(asking || drawing);
 
 	onMount(() => {

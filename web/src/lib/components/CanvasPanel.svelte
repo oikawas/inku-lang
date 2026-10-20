@@ -16,6 +16,7 @@
 	import CanvasPresentationOverlay from '$lib/features/canvas/CanvasPresentationOverlay.svelte';
 	import CanvasRefinementWorkspace from '$lib/features/canvas/CanvasRefinementWorkspace.svelte';
 	import type { LineageGraph, LineageNode } from '$lib/features/history/types';
+	import type { HistoryMutations } from '$lib/features/history/mutations';
 	import type { SketchMode } from '$lib/sketch';
 	import type { LineageBrowsingState } from '$lib/features/history/lineage-state.svelte';
 	import { measureSvgWeight } from '$lib/svgWeight';
@@ -116,6 +117,7 @@
 		onCopyPromptText: (kind: 'sketch' | 'stage1' | 'composition' | 'laws' | 'colors' | 'stage2' | 'score', text: string | null | undefined) => void | Promise<void>;
 		onCopyStatusHash: () => void | Promise<void>;
 		onCopyWorkId: (workId: string) => void | Promise<void>;
+		onSaveNote: HistoryMutations['saveNote'];
 		onToggleStar: (item: HistoryItem | null | undefined, event?: Event) => void | Promise<void>;
 		/** The revision mark of the work on screen, the same flag the history
 		    manager's pencil toggles. */
@@ -259,6 +261,7 @@
 		onCopyPromptText,
 		onCopyStatusHash,
 		onCopyWorkId,
+		onSaveNote,
 		onToggleStar,
 		onToggleForRevision,
 		onToggleForShare = null,
@@ -961,6 +964,7 @@
 		{result}
 		{statusHistoryItem}
 		workId={unsavedRefinementPreview ? null : currentHistoryId}
+		{interactionLocked}
 		{isJapanese}
 		{developerMode}
 		{statusTenkei}
@@ -985,6 +989,7 @@
 		{scoreJsonHighlighted}
 		{scoreJsonSeparatorLine}
 		onClose={closeGenerationInfo}
+		{onSaveNote}
 		{onCopyWorkId}
 		{onCopyStatusHash}
 		{onCopyPromptText}

@@ -4,6 +4,7 @@
 	import { colorMapEntries, colorWordLabel, type ColorMap } from '$lib/colors';
 	import type { ComposeFallbackState } from '$lib/composeFallback';
 	import { derivationKindLabel } from '$lib/derivation';
+	import type { HistoryMutations } from '$lib/features/history/mutations';
 	import type { DrawerTab } from '$lib/drawerScroll';
 	import { formatByteSize, groupDigits } from '$lib/formatNumber';
 	import { hashDigest, hashRowLabel } from '$lib/hashIdentity';
@@ -14,6 +15,8 @@
 
 	export type GenerationInfoWork = {
 		note?: string | null;
+		starred?: boolean;
+		shared?: boolean;
 		description_hash?: string | null;
 		render_hash?: string | null;
 		render_build_number?: string | null;
@@ -63,6 +66,7 @@
 		result: GenerationInfoWork | null;
 		statusHistoryItem: GenerationInfoWork | null;
 		workId: string | null;
+		interactionLocked: boolean;
 		isJapanese: boolean;
 		developerMode: boolean;
 		statusTenkei: string | null;
@@ -87,6 +91,7 @@
 		scoreJsonHighlighted: string;
 		scoreJsonSeparatorLine: number | null;
 		onClose: () => void;
+		onSaveNote: HistoryMutations['saveNote'];
 		onCopyWorkId: (workId: string) => void | Promise<void>;
 		onCopyStatusHash: () => void | Promise<void>;
 		onCopyPromptText: (kind: 'sketch' | 'stage1' | 'composition' | 'laws' | 'colors' | 'stage2' | 'score', text: string | null | undefined) => void | Promise<void>;
@@ -101,6 +106,7 @@
 		result,
 		statusHistoryItem,
 		workId,
+		interactionLocked,
 		isJapanese,
 		developerMode,
 		statusTenkei,
@@ -125,6 +131,7 @@
 		scoreJsonHighlighted,
 		scoreJsonSeparatorLine,
 		onClose,
+		onSaveNote,
 		onCopyWorkId,
 		onCopyStatusHash,
 		onCopyPromptText
@@ -224,15 +231,39 @@
 	const detailDerivationKind = $derived(statusHistoryItem?.derivation_kind ?? result?.derivation_kind ?? null);
 	const detailBatchRunId = $derived(statusHistoryItem?.batch_run_id ?? '');
 	const detailBatchLine = $derived(statusHistoryItem?.batch_line_number ?? null);
-	const detailNote = $derived((statusHistoryItem?.note ?? '').trim());
+	// An unsaved preview must not display or edit its parent's comment.
+	const detailNote = $derived(workId ? (statusHistoryItem?.note ?? result?.note ?? '') : '');
+	const canEditNote = $derived(!!workId && !(statusHistoryItem?.shared ?? result?.shared));
+	let noteDrafts = $state<Record<string, string>>({});
+	let noteSavingId = $state<string | null>(null);
+	let noteSaveFailedId = $state<string | null>(null);
+	const noteText = $derived(workId ? (noteDrafts[workId] ?? detailNote) : '');
+	const noteChanged = $derived(noteText.trim() !== detailNote.trim());
+
+	async function saveNote(): Promise<void> {
+		const id = workId;
+		if (!id || !canEditNote || interactionLocked || noteSavingId || !noteChanged) return;
+		const item = { id, starred: !!(statusHistoryItem?.starred ?? result?.starred) };
+		noteSavingId = id;
+		noteSaveFailedId = null;
+		try {
+			await onSaveNote(item, noteText);
+			// Keep drafts for other works when navigation changes during a save.
+			delete noteDrafts[id];
+		} catch {
+			noteSaveFailedId = id;
+		} finally {
+			noteSavingId = null;
+		}
+	}
 	const variationAmplitudeLabel = (amplitude: string) =>
 		amplitude === 'small' ? t().retiredVariationSmall
 		: amplitude === 'medium' ? t().retiredVariationMedium
 		: amplitude === 'large' ? t().retiredVariationLarge
 		: amplitude;
-	// Hide provenance when the work has no lineage, derivation, batch, or note.
+	// Comments have their own section, independent of the work's provenance.
 	const hasOriginDetails = $derived(
-		statusGeneration != null || detailDerivationKind != null || !!detailBatchRunId || !!detailNote
+		statusGeneration != null || detailDerivationKind != null || !!detailBatchRunId
 	);
 </script>
 
@@ -258,6 +289,28 @@
 				<dt><Tooltip placement="right" text={hint}><span>{label}</span></Tooltip></dt>
 			{/snippet}
 			<div class="generation-details" bind:this={detailsScrollEl}>
+				<section class="detail-group">
+					<h4 id="generation-info-comment-heading">{t().historyPreviewCommentLabel}</h4>
+					{#if canEditNote}
+						<textarea
+							aria-labelledby="generation-info-comment-heading"
+							maxlength="240"
+							rows="3"
+							value={noteText}
+							disabled={interactionLocked || noteSavingId !== null}
+							oninput={(event) => {
+								if (workId) noteDrafts[workId] = event.currentTarget.value;
+								noteSaveFailedId = null;
+							}}
+						></textarea>
+						<div class="detail-note-actions">
+							{#if workId && noteSaveFailedId === workId}<span class="detail-note-error" role="alert">{t().historyPreviewCommentSaveFailed}</span>{/if}
+							<button type="button" disabled={interactionLocked || noteSavingId !== null || !noteChanged} onclick={() => void saveNote()}>{workId && noteSavingId === workId ? t().historyPreviewCommentSaving : t().historyPreviewCommentSave}</button>
+						</div>
+					{:else}
+						<p class="detail-note">{detailNote || (hasSketchDetails && !workId ? t().provenanceWorkNotSaved : '-')}</p>
+					{/if}
+				</section>
 				{#if hasSketchDetails}
 					<section class="detail-group">
 						<h4>{t().sketchLabel}</h4>
@@ -353,9 +406,6 @@
 							{#if detailBatchLine != null}
 								{@render term(t().provenanceLabelBatchLine, t().provenanceHintBatchLine)}<dd>{detailBatchLine}</dd>
 							{/if}
-							{#if detailNote}
-								{@render term(t().provenanceLabelComment, t().provenanceHintComment)}<dd class="detail-note">{detailNote}</dd>
-							{/if}
 						</dl>
 					</section>
 				{/if}
@@ -427,7 +477,13 @@
 	.generation-details dl { display: grid; grid-template-columns: minmax(120px, auto) minmax(0, 1fr); gap: 10px 16px; margin: 0; font-size: var(--ui-font-size-12); }
 	.generation-details dt { min-width: 0; color: var(--fg3); }
 	.generation-details dt :global(.tooltip-wrap) { max-width: 100%; }
-	.detail-note { white-space: pre-wrap; }
+	.detail-note { margin: 0; white-space: pre-wrap; font-size: var(--ui-font-size-12); }
+	.detail-group textarea { display: block; box-sizing: border-box; width: 100%; min-height: 72px; resize: vertical; padding: 8px; border: 1px solid var(--border2); border-radius: var(--r); background: var(--panel); color: var(--fg); font: inherit; font-size: var(--ui-font-size-12); }
+	.detail-note-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+	.detail-note-actions button { flex: 0 0 auto; padding: var(--btn-sm-padding); border: 1px solid var(--border2); border-radius: var(--btn-sm-radius); background: var(--panel); color: var(--fg); font: inherit; font-size: var(--btn-sm-font-size); cursor: pointer; }
+	.detail-note-actions button:hover:not(:disabled) { background: var(--bg2); }
+	.detail-note-actions button:disabled { opacity: .45; cursor: default; }
+	.detail-note-error { color: var(--danger); font-size: var(--ui-font-size-12); }
 	/* The recorded color words are displayed as chip-and-word pairs, so each chip
 	   travels with its label instead of reading as an unrelated run of swatches. */
 	.detail-color-map { display: flex; flex-wrap: wrap; gap: 4px 10px; }

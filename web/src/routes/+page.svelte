@@ -3055,6 +3055,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 
 			<CanvasPanel
 				bind:this={canvasPanelHandle}
+				onSaveNote={historyMutations.saveNote}
 				{singleUserMode}
 				{savedWorkExportActions}
 				{catalogName}

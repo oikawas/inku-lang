@@ -744,4 +744,5 @@ def test_each_provider_action_is_recorded_under_its_stage():
     assert provider_stage_record("generate_normalized_ddl") == "stage1"
     assert provider_stage_record("read_composition") == "composition"
     assert provider_stage_record("choose_laws") == "laws"
+    assert provider_stage_record("choose_colors") == "colors"
     assert provider_stage_record("complete_visible_ddl_holes") == "stage2"

@@ -214,3 +214,25 @@ test('the laws stage names itself while it runs', () => {
 	assert.equal(ja.stageChoosingLaws, '法則の選択中…');
 	assert.equal(en.stageChoosingLaws, 'Choosing the laws…');
 });
+
+test('the color stage names itself while it runs', () => {
+	// The color stage runs after the laws stage and before the commit, with no
+	// layer event of its own either (2026-10-20).
+	for (const strings of [ja, en] as LangPack[]) {
+		const colors = { action: 'choose_colors', attempt: 1, max_attempts: 4 };
+		assert.equal(runningStageLabel(strings.stageInterpreting, colors, strings), strings.stageChoosingColors);
+		assert.equal(runningStageLabel(strings.stageDdlGenerating, colors, strings), strings.stageChoosingColors);
+		const others = [
+			strings.stageSketching,
+			strings.stageInterpreting,
+			strings.stageStructuring(''),
+			strings.stagePerforming,
+			strings.stageDdlGenerating,
+			strings.stageReadingComposition,
+			strings.stageChoosingLaws
+		];
+		assert.ok(!others.includes(strings.stageChoosingColors), `${strings.code}: the color stage shares another stage's words`);
+	}
+	assert.equal(ja.stageChoosingColors, '配色の選択中…');
+	assert.equal(en.stageChoosingColors, 'Choosing the colors…');
+});

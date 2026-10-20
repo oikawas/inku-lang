@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-10-20 — The color stage after the laws (a trial)
+
+With a color stage, which chooses a work's colors by laws of color after the laws stage, now open to trial, the laws paragraph in Creating Images says that the stage exists and that the default drawing does not take it yet. The waiting indicator in a run that tries it (`Choosing the colors…`) and the color stage in the Prompts tab are described too.
+
 ## 2026-10-20 — Another composition and the color words
 
 With DDL now writing fades and colors that shift through the marks, and Another composition choosing again a sentence with color words, its paragraph in Creating Images says that a sentence whose colors alternate, repeat or shift in order, or whose marks fade, keeps those words and has only its range chosen again.

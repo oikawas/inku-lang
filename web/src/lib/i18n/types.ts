@@ -258,6 +258,8 @@ export interface LangPack {
 	stageReadingComposition: string;
 	/** While the laws stage's model call runs (2026-10-20). */
 	stageChoosingLaws: string;
+	/** While the color stage's model call runs (2026-10-20). */
+	stageChoosingColors: string;
 	batchProgress: (current: number, total: number) => string;
 	batchRetryProgress: (current: number, total: number, round: number) => string;
 	settingsBatchRetryLabel: string;
@@ -556,6 +558,8 @@ export interface LangPack {
 	promptCompositionSystem: string;
 	promptLawsInput: string;
 	promptLawsSystem: string;
+	promptColorsInput: string;
+	promptColorsSystem: string;
 	promptStage2Input: string;
 	promptStage1System: string;
 	promptStage2System: string;

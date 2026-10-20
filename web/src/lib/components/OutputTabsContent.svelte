@@ -2,7 +2,7 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import type { PromptStage, SentSystemPrompt, SystemPromptsState } from '$lib/features/canvas/system-prompts';
 
-	type CopyKind = 'sketch' | 'stage1' | 'composition' | 'laws' | 'stage2' | 'score';
+	type CopyKind = 'sketch' | 'stage1' | 'composition' | 'laws' | 'colors' | 'stage2' | 'score';
 	type Props = {
 		outputTab: 'prompts' | 'score';
 		/** The pane that scrolls in whichever tab is showing. The drawer that
@@ -40,11 +40,13 @@
 	let stage1SystemExpanded = $state(false);
 	let compositionSystemExpanded = $state(false);
 	let lawsSystemExpanded = $state(false);
+	let colorsSystemExpanded = $state(false);
 	let stage2SystemExpanded = $state(false);
 	const sketchSystem = $derived(systemPrompts.state === 'recorded' ? systemPrompts.sketch : null);
 	const stage1System = $derived(systemPrompts.state === 'recorded' ? systemPrompts.stage1 : null);
 	const compositionSystem = $derived(systemPrompts.state === 'recorded' ? systemPrompts.composition : null);
 	const lawsSystem = $derived(systemPrompts.state === 'recorded' ? systemPrompts.laws : null);
+	const colorsSystem = $derived(systemPrompts.state === 'recorded' ? systemPrompts.colors : null);
 	const stage2System = $derived(systemPrompts.state === 'recorded' ? systemPrompts.stage2 : null);
 	// Said in place of a stage's system prompt when there is none to show: a
 	// stage the execution kept called no model; one it did not keep was drawn
@@ -61,9 +63,9 @@
 					: t().promptSystemUnavailable;
 </script>
 
-<!-- The sketch, the composition reading and the laws stage: what each was given, then its system prompt. -->
+<!-- The sketch, the composition reading, the laws stage and the color stage: what each was given, then its system prompt. -->
 {#snippet sentStage(
-	kind: 'sketch' | 'composition' | 'laws',
+	kind: 'sketch' | 'composition' | 'laws' | 'colors',
 	inputLabel: string,
 	systemLabel: string,
 	sent: SentSystemPrompt | null,
@@ -141,6 +143,7 @@
 		{/if}
 		{@render sentStage('composition', t().promptCompositionInput, t().promptCompositionSystem, compositionSystem, compositionSystemExpanded, () => (compositionSystemExpanded = !compositionSystemExpanded))}
 		{@render sentStage('laws', t().promptLawsInput, t().promptLawsSystem, lawsSystem, lawsSystemExpanded, () => (lawsSystemExpanded = !lawsSystemExpanded))}
+		{@render sentStage('colors', t().promptColorsInput, t().promptColorsSystem, colorsSystem, colorsSystemExpanded, () => (colorsSystemExpanded = !colorsSystemExpanded))}
 		{#if ddl}
 			<div class="prompt-head">
 				<p class="prompt-label">{t().promptStage2Input}</p>

@@ -41,13 +41,29 @@ def _performance_idempotency(settings: dict, snapshot: dict, render_hash: str) -
 
 def _apply_developer_options(config: dict, options: dict, *, developer_mode: bool) -> None:
     requested = any(options.get(name) is True for name in (
-        "developer_disable_llm_retries", "developer_capture_provider_io",
+        "developer_disable_llm_retries", "developer_capture_provider_io", "developer_colors_stage",
     ))
     if requested and not developer_mode:
         raise CandidateHostError("developer_mode_required")
     if options.get("developer_disable_llm_retries") is True:
         for name in ("catalog_retry", "stage1_retry", "hole_retry"):
             config[name]["max_attempts"] = 1
+    # The color stage is tried before it is a default (2026-10-20): the run
+    # chooses its colors once the laws stage ends.
+    if options.get("developer_colors_stage") is True:
+        config["colors"] = {}
+
+
+def _paint_names(catalog: dict, palette: dict, language: str) -> list[str | None]:
+    """The catalog's names of the palette's observed paints, in their order.
+
+    The color stage shows each of the nine colors by the paint it draws; a
+    paint the catalog does not name is null.
+    """
+    key = "name_ja" if language == "ja" else "name"
+    named = {entry["code"].lower(): entry.get(key) or entry["name"] for entry in catalog["palette"]}
+    return [named.get("#{:02x}{:02x}{:02x}".format(*observation["concrete_rgb"]))
+            for observation in palette.get("observations") or []]
 
 
 def _safe_compiler_log_atom(value: object) -> str | None:
@@ -132,6 +148,7 @@ class RunOptions(BaseModel):
     request_idempotency_key: str | None = Field(default=None, max_length=200)
     developer_disable_llm_retries: StrictBool | None = None
     developer_capture_provider_io: StrictBool | None = None
+    developer_colors_stage: StrictBool | None = None
     # Plugin definitions carried by an imported DDL export. They are used for
     # this new work only and are never installed.
     imported_plugins: list[ImportedPlugin] | None = Field(default=None, max_length=64)
@@ -169,12 +186,13 @@ _SYSTEM_PROMPT_STAGES = {
     "generate_normalized_ddl": "stage1",
     "read_composition": "composition",
     "choose_laws": "laws",
+    "choose_colors": "colors",
     "complete_visible_ddl_holes": "stage2",
 }
 # The stages whose message the tab shows as sent too (2026-10-13): no other
-# view shows what the sketch, the composition reading and the laws stage were
-# given.
-_MESSAGE_STAGES = {"sketch", "composition", "laws"}
+# view shows what the sketch, the composition reading, the laws stage and the
+# color stage were given.
+_MESSAGE_STAGES = {"sketch", "composition", "laws", "colors"}
 # The stages an execution saved before 2026-10-13 kept.
 _EARLIER_STAGES = ["stage1", "stage2"]
 
@@ -183,8 +201,9 @@ def record_system_prompt(context: dict, action: dict) -> None:
     """Keep the system prompt this action sends, as it is sent.
 
     The last attempt of a stage replaces an earlier one, so a retry that
-    carried compiler feedback is what the work shows. The sketch and the
-    composition reading keep the message they sent as well. The record lives
+    carried compiler feedback is what the work shows. The sketch, the
+    composition reading, the laws stage and the color stage keep the message
+    they sent as well. The record lives
     in the execution's saved context and is read only by its owner.
     """
     stage = _SYSTEM_PROMPT_STAGES.get(action["tag"])
@@ -215,7 +234,7 @@ def system_prompts_view(context: dict) -> dict:
     prompts = context.get("system_prompts")
     if not isinstance(prompts, dict):
         return {"recorded": False, "stages": [], "sketch": None, "stage1": None, "composition": None, "laws": None,
-                "stage2": None}
+                "colors": None, "stage2": None}
     return {
         "recorded": True,
         "stages": list(context.get("system_prompt_stages", _EARLIER_STAGES)),
@@ -296,6 +315,10 @@ class ProductPipelineEffects:
             config = select_canvas(config, self.binding.canvas_registry, selected["canvas_aspect"])
         seed = selected.get("render_seed")
         seed = new_render_seed() if seed is None else int(seed)
+        # The color stage estimates the drawing with the seed the work is drawn
+        # with, so that a scatter's marks lie where the picture puts them.
+        if "colors" in config:
+            config["colors"] = {**config["colors"], "render_seed": str(seed)}
         composition_seed = selected.get("composition_seed")
         config["compiler"]["composition_seed"] = None if composition_seed is None else str(int(composition_seed))
         # Remove the retired option only from this execution's copy; saved
@@ -323,6 +346,8 @@ class ProductPipelineEffects:
             })))
             if "error" in palette:
                 raise CandidateHostError(palette["error"])
+            if "colors" in config:
+                palette["paints"] = _paint_names(catalog, palette, language)
             resolved[identity] = {**template_host, "resolved_catalog_id": identity, "catalog_mode": "explicit", "palette": palette}
         config["compiler"]["host"] = resolved[catalog_id]
         if catalog_id == "default":
@@ -367,6 +392,7 @@ class ProductPipelineEffects:
             raise CandidateHostError(code) from None
         selected["developer_disable_llm_retries"] = options.get("developer_disable_llm_retries") is True
         selected["developer_capture_provider_io"] = options.get("developer_capture_provider_io") is True
+        selected["developer_colors_stage"] = options.get("developer_colors_stage") is True
         # Present from the start, so a work whose stage never called a model
         # reads as "not sent" and one drawn before the record as "not recorded".
         return config, {"host_options": selected, "color_maps": color_maps, "macro_catalog": catalog_context,
@@ -383,7 +409,7 @@ class ProductPipelineEffects:
         def perform(action):
             from .chatgpt_runtime import execution_cancel
             stage = "stage2" if action["tag"] == "complete_visible_ddl_holes" else "stage1"
-            # The reading and the laws stage use Stage 1's limits and are timed apart from it.
+            # The reading, the laws stage and the color stage use Stage 1's limits and are timed apart from it.
             recorded = provider_stage_record(action["tag"])
             transport = SingleAttemptProvider(ProviderOptions(
                 settings=db.get_model_settings(), stage1_model=options.get("stage1_model", configured["stage1_model"]),

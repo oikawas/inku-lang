@@ -37,6 +37,7 @@ _ACTION_STAGES = {
     "generate_normalized_ddl": "stage1",
     "read_composition": "composition",
     "choose_laws": "laws",
+    "choose_colors": "colors",
     "complete_visible_ddl_holes": "stage2",
 }
 

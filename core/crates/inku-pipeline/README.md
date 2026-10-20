@@ -54,8 +54,8 @@ digests, not authenticated bearer tokens for an untrusted client.
 
 ## Effects and commit authority
 
-The seven effect tags are `select_description_catalog`, `generate_sketch`,
-`generate_normalized_ddl`, `read_composition`, `choose_laws`,
+The eight effect tags are `select_description_catalog`, `generate_sketch`,
+`generate_normalized_ddl`, `read_composition`, `choose_laws`, `choose_colors`,
 `commit_visible_normalized_ddl`, and `complete_visible_ddl_holes`.
 `generate_sketch` runs only when the start or a
 regeneration asks for a sketch; its failure continues Stage 1 with the
@@ -78,7 +78,21 @@ arranged layer's marks are fitted to their spacing, but a layer that would shrin
 below the floor keeps its size. The printed document is compiled as the run
 compiles it before it is committed. An answer the core refuses is asked again
 with the reason as a new action within the same budget, also when a mark it
-places at a numeric point does not lie wholly on the canvas. Each result
+places at a numeric point does not lie wholly on the canvas. `choose_colors`
+runs only when the configuration has `colors`, once the laws stage ends for a
+composed plan (also when the laws fell back or the run has none): a reader
+chooses one or two of the eighteen color laws (B11, B13, B14, B16 to B20, C7 to
+C9, D1 to D7) for the work, shown its layers as the core estimates them drawn
+(each layer's drawn contrast and chroma and the colors it would not be seen in,
+from the renderer's editable SVG) and its paints' places on Itten's wheel. The
+core keeps the colors the description states, the colors the laws stage decided
+(aerial perspective, a pattern), plugged-in layers and the ground, checks the
+laws of lightness by the drawn lightness, and where a law leaves the colors to
+the tool takes the combination that recolors the main layer, then the most
+harmonious one. It prints the layers the colors change (a color, colors in turn
+or shifting, a fade, a handling, a numeric size, a kasane's lower colors before
+the layer) and compiles the printed document as the run compiles it before it
+is committed; the record of the laws follows the sentences printed again. Each result
 echoes action ID, attempt, and request
 digest. Retries preserve the logical action ID and increase its attempt; a new
 action receives a new identity. Corrective Stage 1 normalization is a new action
@@ -97,6 +111,8 @@ provider attempt, but not a delay already accounted for by the core.
 | Laws answer refused by the core's rules | Request the laws again with the original message and the reason, using a new logical action within the same laws `max_attempts` and `total_timeout_ms` budget |
 | Laws answer whose printed mark at a numeric point leaves the canvas | Request the laws again with the reason that names the layer and its laws, within the same budget |
 | Laws exhausted, or a laws document that compiles to no Score or to more diagnostics or omissions than the composed document | Commit the composed document as the composition printed it (`laws_fallback`) |
+| Colors answer refused by the core's rules (its schema, a law it cannot take, a color not seen when drawn) | Request the colors again with the original message and the reason, using a new logical action within the same colors `max_attempts` and `total_timeout_ms` budget |
+| Colors exhausted, no law the work can take as the main one, or a colors document that does not compile to the colors chosen or compiles to more diagnostics or omissions than the document the laws left | Commit the document the laws left (`colors_fallback`) |
 | Hole completion exhausted or rejected | Keep committed DDL and require user editing |
 | Host commit failure | Fail and retain the last acknowledged document and authority |
 | Cancellation | Invalidate the outstanding action; later results are stale |

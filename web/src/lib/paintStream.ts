@@ -173,7 +173,7 @@ export function paintStageLabel(
  * (`解釈中…` in the stream, `DDL生成` for a single draw). The running call's
  * action names it; every other call keeps the label the run already shows
  * (2026-10-13). The laws stage, between the composition and the commit, names
- * itself the same way (2026-10-20).
+ * itself the same way, and so does the color stage after it (2026-10-20).
  */
 export function runningStageLabel(
 	label: string,
@@ -181,6 +181,7 @@ export function runningStageLabel(
 	strings: LangPack
 ): string {
 	if (attempt?.action === 'read_composition') return strings.stageReadingComposition;
+	if (attempt?.action === 'choose_colors') return strings.stageChoosingColors;
 	return attempt?.action === 'choose_laws' ? strings.stageChoosingLaws : label;
 }
 

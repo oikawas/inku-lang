@@ -4603,12 +4603,30 @@ pub fn choose_colors(
     apply_colors(&answer, context)
 }
 
-/// Apply a conformed answer value (the recorded answers' replay reads the
-/// prototype's answers this way).
-pub fn apply_colors(answer: &Value, context: &ColorsContext) -> Result<ColorsChosen, Refusal> {
+/// Check an answer value and paint the Score with it.
+fn painted(answer: &Value, context: &ColorsContext) -> Result<(Answer, Painted), Refusal> {
     let (answer, mut notes) = check(answer, context)?;
-    let painted = Painting::new(context, &answer, false).run()?;
-    notes.extend(painted.notes.iter().cloned());
+    let mut painted = Painting::new(context, &answer, false).run()?;
+    notes.append(&mut painted.notes);
+    painted.notes = notes;
+    Ok((answer, painted))
+}
+
+/// The Score an answer value paints, before it is printed, and the tool's
+/// notes (the recorded answers' replay compares it with the prototype's
+/// Score).
+pub fn paint_colors(
+    answer: &Value,
+    context: &ColorsContext,
+) -> Result<(Score, Vec<ColorNote>), Refusal> {
+    let (_, painted) = painted(answer, context)?;
+    Ok((painted.score, painted.notes))
+}
+
+/// Apply an answer value and print what it changed.
+pub fn apply_colors(answer: &Value, context: &ColorsContext) -> Result<ColorsChosen, Refusal> {
+    let (answer, painted) = painted(answer, context)?;
+    let notes = painted.notes.clone();
     let print = print_colors(context, &painted).ok_or_else(|| {
         refusal(
             "unprintable",

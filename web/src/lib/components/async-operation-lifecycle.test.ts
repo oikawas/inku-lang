@@ -4,12 +4,14 @@ import { test } from 'node:test';
 
 const read = (name: string): string => readFileSync(new URL(`./${name}`, import.meta.url), 'utf8');
 
-test('AI refinement aborts work and stops its elapsed owner when destroyed', () => {
+test('AI refinement stops reading its run when destroyed; the run goes on in the Server', () => {
 	const source = read('AIRefineModal.svelte');
 	assert.match(
 		source,
-		/onDestroy\(\(\) => \{[\s\S]*?abortController\?\.abort\(\);[\s\S]*?refineElapsed\.stop\(\);[\s\S]*?\}\);/
+		/onDestroy\(\(\) => \{[\s\S]*?closed = true;[\s\S]*?clearTimeout\(poll\);[\s\S]*?controller\?\.abort\(\);[\s\S]*?\}\);/
 	);
+	// Nothing stops the run on the way out: only the stop button asks the Server.
+	assert.doesNotMatch(source.match(/onDestroy\(\(\) => \{[\s\S]*?\}\);/)?.[0] ?? '', /autonomousRuns\.stop/);
 });
 
 test('the DDL editor aborts its active draw when destroyed', () => {

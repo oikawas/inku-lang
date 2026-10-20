@@ -2,7 +2,6 @@ import type { LangPack } from '../../i18n/types.ts';
 import type { Seed } from '../run/current-work.ts';
 import type { PaintResult } from '../run/current-work.ts';
 import type { ApiFetch } from '../../transport/api-fetch.ts';
-import type { PaintOptions } from '../run/current-work.ts';
 
 export type RecomposeMode = 'principled' | 'chance';
 export type Recomposition = {
@@ -13,20 +12,6 @@ export type Recomposition = {
 	answer?: 'near' | 'next' | 'chance' | null;
 };
 
-export type LayoutParent = {
-	id: string;
-	ddl: string;
-	catalogId: string | null;
-	renderSeed: Seed | null;
-	compositionSeed: Seed | null;
-	canvasAspectId: string | null;
-	stage1Model: string | null;
-	instructionLang: string | null;
-	ddlSourceOrigin: 'legacy_expanded' | null;
-};
-
-export type ComposeLayoutGeneration = (parent: LayoutParent, text: string, options: PaintOptions) => Promise<PaintResult & { ddl: string; thinking: string | null; source_text: string }>;
-
 export type LayoutComposeResponse = Partial<PaintResult> & {
 	ddl?: string;
 	score: PaintResult['score'];
@@ -36,7 +21,7 @@ export type LayoutComposeResponse = Partial<PaintResult> & {
 	tokens_out?: number | null;
 };
 
-/** Both manual options and autonomous layout generations draw the saved DDL. */
+/** The layout options draw the saved DDL. */
 export async function requestLayoutComposition(
 	payload: Record<string, unknown>,
 	mode: RecomposeMode,

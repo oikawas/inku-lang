@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-10-21 — The Server takes the autonomous refinement
+
+With the autonomous refinement taken by the Server, and its moves now the laws move and the juxtaposition move, section 9 of Creating Images was rewritten: the two moves, how turns go and when the refinement stops, that only a child that looks different from its parent is kept, the dialog's fields, how the progress shows, how to stop it, that it goes on after the dialog is closed, and how to open the last kept child. That a work whose description is held takes laws moves only was written in the held-work list of section 6. The color-catalog and composition rounds and the Vision observations were removed.
+
 ## 2026-10-20 — The color stage as a default
 
 With the color stage now a default of drawing from a description, the laws paragraph in Creating Images no longer says that it is being tried: it says which colors the stage keeps, which it chooses again, how a work is settled when no colors can be laid, and that a refinement drawn from a work saved before the default does not take it. The waiting indicator `Choosing the colors…` is no longer described as one of a trial run.

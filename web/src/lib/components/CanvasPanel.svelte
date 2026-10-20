@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { ComposeLayoutGeneration } from '$lib/features/canvas/recomposition';
+	import type { AutonomousRunsApi } from '$lib/features/autonomous/runs';
 	import { tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
@@ -194,9 +194,10 @@
 		onDetachLineage: () => void;
 		onLoadLineageOverview: () => void | Promise<void>;
 		onLoadLineageBranch: (nodeId: string) => void | Promise<void>;
-		onPaintDdl: (parent: { id: string; pipeline_variation_id?: string | null }, ddl: string, options: any) => Promise<any>;
-		onComposeLayout: ComposeLayoutGeneration;
-		onVisionAdvice: (historyId: string, model: string, instruction: string, direction: string, enabledKinds: string[], signal: AbortSignal) => Promise<any>;
+		/** The AI refinement's runs, which the Server takes (2026-10-21). */
+		autonomousRuns: AutonomousRunsApi;
+		/** Open a child an AI refinement run kept. */
+		onOpenAutonomousChild: (historyId: string, nodeId: string | null) => void | Promise<void>;
 		onJuxtapose: (historyId: string, model: string, exclude: string[], signal: AbortSignal) => Promise<JuxtapositionResult>;
 	};
 
@@ -320,9 +321,8 @@
 		onDetachLineage,
 		onLoadLineageOverview,
 		onLoadLineageBranch,
-		onPaintDdl,
-		onComposeLayout,
-		onVisionAdvice,
+		autonomousRuns,
+		onOpenAutonomousChild,
 		onJuxtapose
 	}: Props = $props();
 
@@ -444,7 +444,6 @@
 	let directEditMode = $state<'description' | 'sketch-grain' | null>(null);
 	let directAIRefineNode = $state<LineageNode | null>(null);
 	let directJuxtaposeNode = $state<LineageNode | null>(null);
-	let directAIRefineSaved = $state(false);
 	const statusGenerationValue = $derived(
 		statusGeneration
 			? (isJapanese ? `第${statusGeneration}世代` : `Gen. ${statusGeneration}`)
@@ -523,10 +522,7 @@
 				startDirectRefinement(node, 'compare');
 				break;
 			case 'juxtapose': directJuxtaposeNode = node; break;
-			case 'autonomous':
-				directAIRefineNode = node;
-				directAIRefineSaved = false;
-				break;
+			case 'autonomous': directAIRefineNode = node; break;
 		}
 	}
 
@@ -927,7 +923,7 @@
 						stage2ModelLabel={runStage2ModelLabel} {runTokensIn} {runTokensOut} {runAttempt} onSaveOkugakiModel={onSaveOkugakiModel}
 						{onSaveVisionModel} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote}
 						onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview}
-						onLoadBranch={onLoadLineageBranch} {onPaintDdl} {onComposeLayout} {onVisionAdvice} {onJuxtapose} {visionModel} {okugakiModel}
+						onLoadBranch={onLoadLineageBranch} {autonomousRuns} {onOpenAutonomousChild} {onJuxtapose} {visionModel} {okugakiModel}
 						{visionProviderGroups} {animationExportSettings} {pngTemplates}
 						onDownloadSavedWorkSVG={savedWorkExportActions.onDownloadSVG}
 						onDownloadSavedWorkPNG={savedWorkExportActions.onDownloadPNG}
@@ -1036,16 +1032,12 @@
 	{#await import('./AIRefineModal.svelte') then { default: AIRefineModal }}
 		<AIRefineModal
 			node={directAIRefineNode}
-			onClose={() => { directAIRefineNode = null; if (directAIRefineSaved) outputTab = 'lineage'; }}
-			{onPaintDdl}
-			{onComposeLayout}
-			{onVisionAdvice}
+			onClose={() => (directAIRefineNode = null)}
+			{autonomousRuns}
+			onOpenChild={onOpenAutonomousChild}
 			{onSaveVisionModel}
 			{visionModel}
 			{visionProviderGroups}
-			stage1ModelLabel={statusStage1Model}
-			stage2ModelLabel={statusStage2Model}
-			onLoadBranch={async (nodeId) => { directAIRefineSaved = true; await onLoadLineageBranch(nodeId); }}
 		/>
 	{/await}
 {/if}

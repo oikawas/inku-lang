@@ -20,6 +20,7 @@ import type { CanvasAspectId } from '$lib/plugins/system/canvas-aspect';
 import type { HistoryItem, Score } from '$lib/historyManagerState.svelte';
 import type { ReplayComparison } from '$lib/features/history/replay';
 import type { JuxtapositionResult } from '$lib/features/juxtaposition/juxtaposition';
+import type { AutonomousRun, AutonomousRunsApi } from '$lib/features/autonomous/runs';
 import type { SessionState } from '$lib/features/session/state.svelte';
 import { BatchState } from '$lib/features/batch/state.svelte';
 import { DemoState } from '$lib/features/demo/state.svelte';
@@ -448,19 +449,29 @@ export function createWorkState(deps: WorkStateDeps) {
 		if (_timerHandle !== null) { clearInterval(_timerHandle); _timerHandle = null; }
 	}
 
-	async function requestVisionRefineAdvice(historyId: string, model: string, instruction: string, direction: string, enabledKinds: string[], signal: AbortSignal) {
-		const r = await apiFetch('/api/refine/vision-advice', {
-			method: 'POST',
-			signal,
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ history_id: historyId, model, instruction, direction, enabled_kinds: enabledKinds, language: getLang() })
-		});
+	async function autonomousRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+		const r = await apiFetch(path, init);
 		if (!r.ok) {
 			const data = await r.json().catch(() => ({})) as { detail?: unknown; };
 			throw new Error(describeApiError(data.detail, r.status));
 		}
-		return await r.json() as { observation: string; next_direction: string; suggested_kind: string; model: string; };
+		return await r.json() as T;
 	}
+
+	/** The AI refinement's runs, which the Server takes (2026-10-21). The juxtaposition
+	 *  asks in the page's language, as the juxtaposition dialog does. */
+	const autonomousRuns: AutonomousRunsApi = {
+		start: (request) => autonomousRequest<AutonomousRun>('/api/refine/autonomous', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ ...request, language: getLang() })
+		}),
+		read: (runId, signal) => autonomousRequest<AutonomousRun>(`/api/refine/autonomous/${encodeURIComponent(runId)}`, { signal }),
+		stop: (runId) => autonomousRequest<AutonomousRun>(`/api/refine/autonomous/${encodeURIComponent(runId)}/stop`, { method: 'POST' }),
+		forHistory: async (historyId, signal) => (await autonomousRequest<{ runs: AutonomousRun[] }>(
+			`/api/refine/autonomous?history_id=${encodeURIComponent(historyId)}`, { signal }
+		)).runs
+	};
 
 	/** Four sentences from the author's other works that a model would add after this work's description. */
 	async function requestJuxtaposition(historyId: string, model: string, exclude: string[], signal: AbortSignal): Promise<JuxtapositionResult> {
@@ -1088,7 +1099,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		paintTokensOut,
 		startTimer,
 		stopTimer,
-		requestVisionRefineAdvice,
+		autonomousRuns,
 		requestJuxtaposition,
 		paintOne,
 		pipelineCompatibilityError,

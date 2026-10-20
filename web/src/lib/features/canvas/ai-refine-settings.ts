@@ -1,25 +1,33 @@
 // The autonomous refinement dialog opens with the choices the author made last
 // time (author's request, 2026-09-28). Kept in this browser, like the export
-// settings; the Vision model is not here -- it is an account setting already.
+// settings; the model is not here -- it is an account setting already.
 // The wild switch is not kept: it follows the work being refined.
-// There is no method to keep: random refinement was removed (the author,
-// 2026-10-18), and a method kept from before is dropped like any unknown field.
+// Since the Server takes the runs (2026-10-21) the choices are the moves to take,
+// which moves, and the direction the laws move is given. The generations kept
+// before are read as the moves; the colour and layout elements and the Vision
+// direction went with the browser's loop, and are dropped like any unknown field.
+
+import { AUTONOMOUS_MOVES_DEFAULT, AUTONOMOUS_NOTE_LIMIT } from '../autonomous/runs.ts';
 
 export type AiRefineSettings = {
-	generations: number;
-	color: boolean;
-	layout: boolean;
-	direction: string;
+	moves: number;
+	laws: boolean;
+	juxtaposition: boolean;
+	note: string;
 };
 
 export const DEFAULT_AI_REFINE_SETTINGS: AiRefineSettings = {
-	generations: 5,
-	color: true,
-	layout: true,
-	direction: ''
+	moves: AUTONOMOUS_MOVES_DEFAULT,
+	laws: true,
+	juxtaposition: true,
+	note: ''
 };
 
 const KEY = 'inku-ai-refine-settings';
+
+function movesOf(value: unknown): number | null {
+	return Number.isInteger(value) && (value as number) >= 1 && (value as number) <= 10 ? value as number : null;
+}
 
 /** Whatever was stored, each field checked on its own; anything unreadable is the default. */
 export function parseAiRefineSettings(raw: string | null): AiRefineSettings {
@@ -31,13 +39,12 @@ export function parseAiRefineSettings(raw: string | null): AiRefineSettings {
 		/* a damaged entry reads as nothing stored */
 	}
 	const d = DEFAULT_AI_REFINE_SETTINGS;
-	const flag = (key: keyof AiRefineSettings, fallback: boolean) => (typeof stored[key] === 'boolean' ? stored[key] as boolean : fallback);
-	const generations = stored.generations;
+	const flag = (key: 'laws' | 'juxtaposition') => (typeof stored[key] === 'boolean' ? stored[key] as boolean : d[key]);
 	return {
-		generations: Number.isInteger(generations) && (generations as number) >= 1 && (generations as number) <= 10 ? generations as number : d.generations,
-		color: flag('color', d.color),
-		layout: flag('layout', d.layout),
-		direction: typeof stored.direction === 'string' ? stored.direction : d.direction
+		moves: movesOf(stored.moves) ?? movesOf(stored.generations) ?? d.moves,
+		laws: flag('laws'),
+		juxtaposition: flag('juxtaposition'),
+		note: typeof stored.note === 'string' ? stored.note.slice(0, AUTONOMOUS_NOTE_LIMIT) : d.note
 	};
 }
 

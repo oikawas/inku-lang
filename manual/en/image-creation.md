@@ -230,7 +230,7 @@ A work whose instructions (DDL) were edited follows its DDL, not its description
 - In the work's edit menu, `Change the description`, `Redraw with or without sketch from life` and `Change the model` are shown but not offered, with the reason.
 - A child made by layout or color (or by touch, before it was removed) carries the DDL and is held as well. A child made by reading the description again is not.
 - The history strip shows a lock mark, and a lineage card shows `Held (DDL edited)`.
-- Autonomous refinement draws each color or layout round from the DDL. The Vision method is offered too: its advice only picks the element to change and is not added to the drawing.
+- Autonomous refinement takes laws moves only (a juxtaposition move adds a sentence to the description, so it cannot be taken).
 
 ## 7. Choose Model, Color Catalog, Sketch, Wild, and Canvas
 
@@ -347,19 +347,20 @@ Only sentences in the language of the current description are candidates: a desc
 
 ## 9. Autonomous Refinement
 
-From `Autonomous refinement process` in the work-editing menu (`Refine` on the Work tab, or `…` on each work in the Lineage tab), the application can build generations on its own. Vision observes each generation's picture and chooses the element the next generation changes (color catalog or composition). Random autonomous refinement, which chose the element at random, was retired on 2026-10-18.
+From `Autonomous refinement process` in the work-editing menu (`Refine` on the Work tab, or `…` on each work in the Lineage tab), the AI can take moves on a work one after another. The Server takes the refinement, so it goes on after the dialog is closed (since 2026-10-21; before, the browser took it and Vision chose between the color catalog and the composition).
 
-You choose the Vision model, the number of generations and which refinement elements to use (color catalog and composition). The direction field is material for Vision's advice; it is not added to the drawing. For a work drawn straight from DDL (a work without a description), Vision is shown its instructions in place of the description.
+The AI takes two moves.
 
-A color generation draws its parent's saved instructions in another color catalog, without reading the description again (until 2026-10-14 a work drawn from a description was drawn again from Stage 1).
+- **Laws move**: the work's laws stage again. The laws its parent used are left out so that others are chosen, and a card is invited as the main law. The child is drawn from the saved instructions, so its description is held. Its lineage edge reads `Laws`.
+- **Juxtaposition move**: as `Juxtapose` in the work-editing menu, a sentence is chosen from the descriptions of your other works and added after the description. A sentence the same refinement has shown, or one the lineage already added, is not offered again. It cannot be taken from a work whose description is held or from a DDL-authored work.
 
-A composition generation rebuilds its parent's saved instructions `By principle`. A manual choice of `By chance` does not change this default. Choosing the composition ranges calls no LLM.
+A turn makes at most two tries. The first turn starts with the juxtaposition move, and each later turn first tries the move its last kept child was not made by (a laws move's child takes no juxtaposition). A child is kept, and becomes the next turn's parent, only when it looks different from its parent (when a fifth or more of what is drawn changed). A child with too little change stays in the lineage too. The refinement stops when its moves are done, when neither move can start, and when two turns in a row keep no child.
 
-**The Vision model you choose is used to draw each generation, not only to observe it** (the running display names the model it is drawing with).
+In the dialog you choose the model for the refinement, the moves to take, the number of moves (1 to 10, 5 by default), Wild and a direction. **The model you choose picks the sentences, takes the laws stage and draws the children.** The direction (up to 1,000 characters) reaches the laws move only, not the juxtaposition move's request. The dialog remembers the number of moves, the moves to take and the direction you chose last time, and opens with them next time (kept in this browser). The wild switch is not remembered; it starts from the work being refined.
 
-The dialog remembers the number of generations, refinement elements and direction you chose last time, and opens with them next time (kept in this browser). The wild switch is not remembered; it starts from the work being refined.
+After `Start refining`, the progress appears every few seconds: for each turn, the move taken, its outcome (Kept, Too little change, Could not start, Not usable), how much changed, the sentence added or the law chosen, and a thumbnail of the child. `Stop` cancels the child being drawn and keeps the children so far. Closing the dialog does not stop the refinement, and opening the work again shows its progress. One refinement of yours runs at a time.
 
-The next generation is drawn from the parent's saved instructions without running the sketch again. The direction guides Vision's advice and choice of the next element to change; observations and the next direction are recorded, not appended to the drawing text. The sketch setting on the `Describe` tab is not used.
+When the refinement ends (or is stopped), its last kept child enters the history and opens with `Open the last kept child`. The children before it stay in the lineage only. A refinement cut off by a Server restart reads as cut off.
 
 ## 10. Change the Model
 

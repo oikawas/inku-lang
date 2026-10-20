@@ -1749,17 +1749,6 @@ async function drawLineageSketchGrain(node: LineageNode, mode: SketchMode, signa
 	await showNewLineageChild(rendered.history_id, rendered.lineage_node_id);
 }
 
-/** One autonomous refinement generation of a work its edited DDL holds: drawn
- *  from the parent's DDL as its child, never from the description. */
-async function paintFromParentDdl(parent: { id: string; pipeline_variation_id?: string | null }, ddl: string, options: PaintOptions & { signal?: AbortSignal }) {
-	if (!parent.id || !ddl.trim()) throw new Error(t().pipelineRequestFailed);
-	if (!(await work.selectHistoryAuthority(parent.id, parent.pipeline_variation_id ?? null, options.signal))) {
-		throw new DOMException('superseded', 'AbortError');
-	}
-	const view = await work.authorDdl(ddl, options, options.signal);
-	return { ...view.result, ddl: view.document?.source ?? ddl, pipeline_variation_id: view.variation_id, source_text: view.description };
-}
-
 async function drawLineageDdlEdit(node: LineageNode, editedDdl: string, signal?: AbortSignal): Promise<void> {
 	const nextDdl = editedDdl.trim();
 	if (!nextDdl || !node.history?.id) return;
@@ -3184,9 +3173,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onDetachLineage={detachLineage}
 				onLoadLineageOverview={() => lineageState.loadOverview(currentLineageNodeId)}
 				onLoadLineageBranch={lineageState.loadBranch}
-				onPaintDdl={paintFromParentDdl}
-				onComposeLayout={refinement.composeLayoutGeneration}
-				onVisionAdvice={work.requestVisionRefineAdvice}
+				autonomousRuns={work.autonomousRuns}
+				onOpenAutonomousChild={showNewLineageChild}
 				onJuxtapose={work.requestJuxtaposition}
 				pngTemplates={exportTemplates}
 				animationExportSettings={exportSettings.animation}

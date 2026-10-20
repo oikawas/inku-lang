@@ -31,38 +31,23 @@ test('T-164  paintOne takes a model for one run, and prefers it over the page se
 	assert.match(PAGE, /stage2Model: qualifiedModelId\(stage2Provider, stage2Model\)/);
 });
 
-test('T-165  the refinement sends the picked model with every generation it draws', () => {
-	// The override rides in the same options bag as the run's other conditions,
-	// so it cannot be attached to the advice call and forgotten on the paint.
-	assert.match(
-		MODAL,
-		/\.\.\.\(paintModelOverride \? \{ stage1Model: paintModelOverride, stage2Model: paintModelOverride \} : \{\}\),/
-	);
-	// And it is still the model the advice call is given, which was already true.
-	assert.match(MODAL, /onVisionAdvice\(historyId, selectedVisionModel,/);
+test('T-165  the run the Server takes is started with the picked model', () => {
+	// Since the Server takes the run (2026-10-21) the one model chooses the
+	// sentence, takes the laws stage and draws every child; it reaches the Server
+	// in the request that starts the run, or nowhere.
+	assert.match(MODAL, /autonomousRuns\.start\(\{[\s\S]*?model: selectedModel,[\s\S]*?\}\)/);
 });
 
-test('T-166  the run status names the model the run is drawing with', () => {
-	// Naming the page's model while drawing with another is how this looked from
-	// the outside before it was true, so the label follows the same value.
-	assert.match(MODAL, /stage1Model=\{paintModelOverride \? selectedVisionLabel : stage1ModelLabel\}/);
-	assert.match(MODAL, /stage2Model=\{paintModelOverride \? selectedVisionLabel : stage2ModelLabel\}/);
-});
-
-test('T-167  the picker is always offered, and the run draws with the model it names', () => {
-	// Random refinement was removed (the author, 2026-10-18): Vision is the only
-	// method, so the picker is no longer behind a method choice.
-	assert.match(MODAL, /const paintModelOverride = \$derived\(selectedVisionModel \|\| null\);/);
-	assert.match(MODAL, /\n\s*<ModelCardPicker label=\{t\(\)\.aiRefineVisionModel\}/);
+test('T-167  the picker is always offered', () => {
+	assert.match(MODAL, /\n\s*<ModelCardPicker label=\{t\(\)\.aiRefineModel\}/);
 	assert.doesNotMatch(MODAL, /\{#if mode === 'vision'\}/);
 });
 
-test('a work its edited DDL holds offers the Vision method too (the author, 2026-10-14)', () => {
-	// Every generation is drawn from the parent's DDL and Vision only picks the
-	// element, so holding the description is no reason to withhold Vision. With
-	// no method to choose, the hold only adds its note and disables nothing.
-	assert.match(MODAL, /\{#if held\}<p class="held-note">\{t\(\)\.aiRefineHeldNote\}<\/p>\{\/if\}/);
-	const start = MODAL.match(/<button class="confirm-action"[^>]*>/)?.[0] ?? '';
+test('a work its edited DDL holds is offered the run too, with a note (2026-10-21)', () => {
+	// It takes no sentence, so its run takes laws moves; the hold only adds its
+	// note and disables nothing.
+	assert.match(MODAL, /\{#if held\}<p class="ai-refine-note">\{t\(\)\.aiRefineHeldNote\}<\/p>\{\/if\}/);
+	const start = MODAL.match(/<button type="button" class="ai-refine-primary" disabled=\{starting[^>]*>/)?.[0] ?? '';
 	assert.ok(start, 'the start button was not found');
 	assert.doesNotMatch(start, /held/);
 });

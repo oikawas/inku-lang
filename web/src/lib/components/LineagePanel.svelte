@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { ComposeLayoutGeneration } from '$lib/features/canvas/recomposition';
+	import type { AutonomousRunsApi } from '$lib/features/autonomous/runs';
 	import { hashDigest, hashSchemeLabel } from '$lib/hashIdentity';
 	import { onMount, tick, untrack } from 'svelte';
 	import type { HistoryItem } from '$lib/historyManagerState.svelte';
@@ -53,11 +53,12 @@
 		onDetach: () => void;
 		onLoadOverview: () => void | Promise<void>;
 		onLoadBranch: (nodeId: string) => void | Promise<void>;
-		onPaintDdl: (parent: { id: string; pipeline_variation_id?: string | null }, ddl: string, options: any) => Promise<any>;
-		onComposeLayout: ComposeLayoutGeneration;
+		/** The AI refinement's runs, which the Server takes (2026-10-21). */
+		autonomousRuns: AutonomousRunsApi;
+		/** Open a child an AI refinement run kept. */
+		onOpenAutonomousChild: (historyId: string, nodeId: string | null) => void | Promise<void>;
 		/** Redraw a work with the sketch off or on, as its child. */
 		onDrawSketchGrain: (node: LineageNode, mode: SketchMode, signal?: AbortSignal) => Promise<void>;
-		onVisionAdvice: (historyId: string, model: string, instruction: string, direction: string, enabledKinds: string[], signal: AbortSignal) => Promise<any>;
 		onJuxtapose: (historyId: string, model: string, exclude: string[], signal: AbortSignal) => Promise<JuxtapositionResult>;
 		onSaveVisionModel: (provider: Provider, model: string) => void | Promise<void>;
 		visionModel: string;
@@ -86,7 +87,7 @@
 	}
 
 	type ArrowPath = { id: string; path: string; tombstone: boolean };
-	let { graph, loading, focusRequest = 0, error, isJapanese, onOpenNode, onOpenNodeInCanvas, onToggleStar, onToggleForRevision, onOpenRefinement, onDrawDescription, onOpenDdlEditor, onDrawSketchGrain, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, runAttempt = null, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintDdl, onComposeLayout, onVisionAdvice, onJuxtapose, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, pngTemplates = [], onDownloadSavedWorkSVG, onDownloadSavedWorkPNG, onDownloadSavedWorkCard, onDownloadSavedWorkDdl, onDownloadSavedWorkAnimation, onDownloadSavedWorkContactSheet, onValidateSavedWorkExport, browsingState }: Props = $props();
+	let { graph, loading, focusRequest = 0, error, isJapanese, onOpenNode, onOpenNodeInCanvas, onToggleStar, onToggleForRevision, onOpenRefinement, onDrawDescription, onOpenDdlEditor, onDrawSketchGrain, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, runAttempt = null, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, autonomousRuns, onOpenAutonomousChild, onJuxtapose, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, pngTemplates = [], onDownloadSavedWorkSVG, onDownloadSavedWorkPNG, onDownloadSavedWorkCard, onDownloadSavedWorkDdl, onDownloadSavedWorkAnimation, onDownloadSavedWorkContactSheet, onValidateSavedWorkExport, browsingState }: Props = $props();
 
 	let handledFocusRequest = 0;
 	$effect(() => {
@@ -987,15 +988,11 @@ $effect(() => {
 		<AIRefineModal
 			node={activeAIRefineNode}
 			onClose={() => (activeAIRefineNode = null)}
-			{onPaintDdl}
-			{onComposeLayout}
-			{onVisionAdvice}
+			{autonomousRuns}
+			onOpenChild={onOpenAutonomousChild}
 			{onSaveVisionModel}
 			{visionModel}
 			{visionProviderGroups}
-			{stage1ModelLabel}
-			{stage2ModelLabel}
-			onLoadBranch={onLoadBranch}
 		/>
 	{/await}
 {/if}

@@ -58,7 +58,6 @@ const RESTRICTED = [
 	{
 		word: 'generat', re: /generat/i, instead: 'the sense "produce a work" is paint / perform / make',
 		keys: [
-			'aiRefineVisionModeHint', 'aiRefineDirectionRandomHint', 'aiRefineGensLabel',
 			'settingsDbBackupMaxGenerations', 'okugakiDescription', 'okugakiBranchConfirm',
 			'okugakiProgress', 'svgExportDisplayUse', 'svgExportEditableFeature', 'svgExportCompatFeature',
 			'provenanceLabelGeneration', 'provenanceHintGeneration', 'historyGenerationTitle',
@@ -85,7 +84,7 @@ const RESTRICTED = [
 	},
 	{
 		word: 'image', re: /\bimages?\b/i, instead: 'use "work" or "picture"',
-		keys: ['appInfoConceptBody', 'modelSelectionVisionHint', 'aiRefineVisionModeHint', 'aiRefineVisionReading', 'aiRefineVisionSourceError'],
+		keys: ['appInfoConceptBody', 'modelSelectionVisionHint'],
 		texts: [],
 	},
 	{

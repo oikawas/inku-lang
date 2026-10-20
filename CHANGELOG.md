@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-20 — A laws stage after the composition in the core (off by setting; drawings unchanged)
+
+The shared core's pipeline gains a laws stage (effect `choose_laws`; stages B-2c and B-3) after the composition places the layers and before the commit. A reading model chooses laws of painting, design and music for the work and their values; the core applies them to a copy of the composed document's Score and writes again in numbers (a numeric point, numeric ends, a numeric range, a numeric size) only the layers the laws changed. The core computes the coordinates, not the model. It holds 13 laws today: the placement laws golden section, silver section, rule of thirds, harmonic ratio, armature, steelyard balance and symmetrical balance; subordination for size; equal repetition, progression and beat groups for arrangement; aerial perspective; and unity and variety for the hand. An answer that breaks the rules, or whose rewritten marks would leave the canvas, is asked again with the reason. A rewritten document that compiles worse than the composed one is not used, and the composed document is committed. The stage runs only when a run's configuration has `laws`, and no configuration of Server, Web, Android or macOS has it, so drawings, saved works and screens do not change. DDL, DDL engine, render engine and the Score format do not change.
+
 ### 2026-10-19 — Android: 3D PNG and GLB saves carry Web's file name
 
 In the Android experimental 3D view, a saved PNG or GLB reached the share sheet as `<UUID>.png` or `<UUID>.bin`, and the GLB went with no known type: the web view's download notice never carries the link's name. The app now reads the format from the file's first bytes and hands it on as `inku-3d-<first 12 of the digest>.png` or `.glb`, typed `image/png` or `model/gltf-binary`, as Web names it.

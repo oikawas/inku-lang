@@ -103,6 +103,9 @@ def default_manifest(binding: PipelineBinding) -> dict:
             # Place the layers whose place the description does not state, from a
             # reading of the description (COMPOSITION-PRODUCT-DESIGN).
             "composition": {"read": True},
+            # Then lay the laws a reader chooses for the composed plan, printed in
+            # numbers before the commit (SPEC 12.6.4). Its budget is the catalog's.
+            "laws": {},
         },
         "render": {
             "options": {"canvas": {"width": CANVAS_BASE_PX, "height": CANVAS_BASE_PX}, "svg_profile": "display"},

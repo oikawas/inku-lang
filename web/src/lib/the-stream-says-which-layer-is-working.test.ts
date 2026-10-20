@@ -193,3 +193,24 @@ test('the composition reading names itself while it runs', () => {
 	assert.equal(ja.stageReadingComposition, '構図の読み中…');
 	assert.equal(en.stageReadingComposition, 'Reading the composition…');
 });
+
+test('the laws stage names itself while it runs', () => {
+	// The laws stage runs after the composition and before the commit, with no
+	// layer event of its own either (stage B-5, 2026-10-20).
+	for (const strings of [ja, en] as LangPack[]) {
+		const laws = { action: 'choose_laws', attempt: 2, max_attempts: 4 };
+		assert.equal(runningStageLabel(strings.stageInterpreting, laws, strings), strings.stageChoosingLaws);
+		assert.equal(runningStageLabel(strings.stageDdlGenerating, laws, strings), strings.stageChoosingLaws);
+		const others = [
+			strings.stageSketching,
+			strings.stageInterpreting,
+			strings.stageStructuring(''),
+			strings.stagePerforming,
+			strings.stageDdlGenerating,
+			strings.stageReadingComposition
+		];
+		assert.ok(!others.includes(strings.stageChoosingLaws), `${strings.code}: the laws stage shares another stage's words`);
+	}
+	assert.equal(ja.stageChoosingLaws, '法則の選択中…');
+	assert.equal(en.stageChoosingLaws, 'Choosing the laws…');
+});

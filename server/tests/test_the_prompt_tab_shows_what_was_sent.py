@@ -7,7 +7,7 @@ join Stage 1, and relation grammar joins Stage 2 only when the DDL needs it --
 so the host keeps the one it sent, on the execution, for its owner to read.
 The sketch and the composition reading joined the tab on 2026-10-13, with what
 they were given; `stages` tells a stage that called no model from one drawn
-before its record began.
+before its record began. The laws stage joined it the same way on 2026-10-20.
 """
 
 from __future__ import annotations
@@ -88,11 +88,12 @@ def test_a_drawing_shows_the_stage_1_system_prompt_it_sent(author, sent):
         "instruction_language": prompt["instruction_language"],
         "attempt": 1,
     }
-    # No hole was left, so Stage 2 never called a model; nor did a sketch or a
-    # reading. The execution kept every stage, so each reads as not sent.
+    # No hole was left, so Stage 2 never called a model; nor did a sketch, a
+    # reading or the laws stage. The execution kept every stage, so each reads
+    # as not sent.
     assert body["stage2"] is None
-    assert body["sketch"] is None and body["composition"] is None
-    assert body["stages"] == ["sketch", "stage1", "composition", "stage2"]
+    assert body["sketch"] is None and body["composition"] is None and body["laws"] is None
+    assert body["stages"] == ["sketch", "stage1", "composition", "laws", "stage2"]
 
 
 def _action(tag: str, attempt: int, system: str) -> dict:
@@ -118,6 +119,7 @@ def test_the_last_attempt_of_each_stage_is_kept_and_other_actions_are_not():
     record_system_prompt(context, _action("generate_normalized_ddl", 1, "first"))
     record_system_prompt(context, _action("generate_normalized_ddl", 2, "with feedback"))
     record_system_prompt(context, _action("read_composition", 1, "reading"))
+    record_system_prompt(context, _action("choose_laws", 1, "laws"))
     record_system_prompt(context, _action("complete_visible_ddl_holes", 1, "holes"))
 
     prompts = context["system_prompts"]
@@ -126,11 +128,14 @@ def test_the_last_attempt_of_each_stage_is_kept_and_other_actions_are_not():
     assert prompts["stage2"]["system"] == "holes"
     assert prompts["sketch"]["system"] == "sketch"
     assert prompts["composition"]["system"] == "reading"
+    assert prompts["laws"]["system"] == "laws"
     # The catalog choice is not shown.
-    assert set(prompts) == {"sketch", "stage1", "composition", "stage2"}
-    # The sketch and the reading keep what they were given; Stage 1 and Stage 2 as before.
+    assert set(prompts) == {"sketch", "stage1", "composition", "laws", "stage2"}
+    # The sketch, the reading and the laws stage keep what they were given;
+    # Stage 1 and Stage 2 as before.
     assert prompts["sketch"]["message"] == "generate_sketch message"
     assert prompts["composition"]["message"] == "read_composition message"
+    assert prompts["laws"]["message"] == "choose_laws message"
     assert set(prompts["stage1"]) == set(prompts["stage2"]) == {
         "system", "prompt_id", "prompt_digest", "instruction_language", "attempt"
     }
@@ -154,6 +159,7 @@ def test_an_execution_from_before_the_sketch_and_the_reading_kept_stage_1_and_st
         "sketch": None,
         "stage1": {"system": "planner"},
         "composition": None,
+        "laws": None,
         "stage2": None,
     }
     # Saved before the record began at all.

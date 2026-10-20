@@ -1022,7 +1022,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		set loading(value) { loading = value; },
 		get activeRunMode() { return activeRunMode; },
 		set activeRunMode(value) { activeRunMode = value; },
-		// The composition reading names itself while it runs, on both drawing paths.
+		// The composition reading and the laws stage name themselves while they run, on both drawing paths.
 		get stageLabel() { return runningStageLabel(stageLabel, activeRunAttempt, t()); },
 		set stageLabel(value) { stageLabel = value; },
 		get error() { return error; },

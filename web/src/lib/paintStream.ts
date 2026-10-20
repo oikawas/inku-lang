@@ -58,7 +58,7 @@ export type PaintAttemptEvent = {
 /**
  * What the running indicator counts: this attempt of at most so many. The
  * call's action, when the run reports it, lets the indicator name the
- * composition reading (`runningStageLabel`).
+ * composition reading and the laws stage (`runningStageLabel`).
  */
 export type ProviderAttemptCount = Pick<PipelineProviderAttempt, 'attempt' | 'max_attempts' | 'asked_again'> &
 	Partial<Pick<PipelineProviderAttempt, 'action'>>;
@@ -172,14 +172,16 @@ export function paintStageLabel(
  * committed -- so it used to wait under the label of the layer before it
  * (`解釈中…` in the stream, `DDL生成` for a single draw). The running call's
  * action names it; every other call keeps the label the run already shows
- * (2026-10-13).
+ * (2026-10-13). The laws stage, between the composition and the commit, names
+ * itself the same way (2026-10-20).
  */
 export function runningStageLabel(
 	label: string,
 	attempt: ProviderAttemptCount | null | undefined,
 	strings: LangPack
 ): string {
-	return attempt?.action === 'read_composition' ? strings.stageReadingComposition : label;
+	if (attempt?.action === 'read_composition') return strings.stageReadingComposition;
+	return attempt?.action === 'choose_laws' ? strings.stageChoosingLaws : label;
 }
 
 /**

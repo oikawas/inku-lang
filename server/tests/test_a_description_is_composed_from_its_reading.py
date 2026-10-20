@@ -3,7 +3,9 @@
 Stage 1 places a layer only where the description states its place. The shared
 pipeline then asks for a reading of the description and places the other layers
 on numeric ranges of the thirds grid. The reading is sent
-with Stage 1's model and timed apart from it.
+with Stage 1's model and timed apart from it. The laws stage that follows
+(stage B-5) refuses here, so the work keeps the document the composition
+printed.
 """
 
 from __future__ import annotations
@@ -49,6 +51,12 @@ READING = {
 }
 
 
+def _laws_refused(action: dict) -> dict:
+    # A refusal is not asked again: the run commits the composed document.
+    return {"tag": "provider_failed", "identity": action["identity"],
+            "failure": "provider_rejected", "elapsed_ms": "0"}
+
+
 @pytest.fixture
 def author():
     suffix = uuid.uuid4().hex[:8]
@@ -81,6 +89,8 @@ def sent(monkeypatch):
 
         def __call__(self, action):
             actions.append(action)
+            if action["tag"] == "choose_laws":
+                return _laws_refused(action)
             tag, answer, elapsed = answers[action["tag"]]
             return {"tag": tag, "identity": action["identity"],
                     "response": json.dumps(answer, ensure_ascii=False), "elapsed_ms": elapsed}
@@ -98,7 +108,7 @@ def test_a_description_is_composed_from_its_reading(author, sent):
         "description": DESCRIPTION, "stage1_model": "nvidia:poolside/laguna-xs-2.1",
     }, headers=author)
     assert painted.status_code == 200, painted.text
-    assert [action["tag"] for action in sent] == ["generate_normalized_ddl", "read_composition"]
+    assert [action["tag"] for action in sent] == ["generate_normalized_ddl", "read_composition", "choose_laws"]
     reading = sent[1]["payload"]["prompt"]
     assert reading["message"].startswith("記述:\n" + DESCRIPTION + "\n")
     assert "〔下絵が付けた場所: 下〕" in reading["message"]
@@ -141,6 +151,8 @@ def test_a_free_line_is_written_in_the_direction_its_reading_moves_it(author, mo
             pass
 
         def __call__(self, action):
+            if action["tag"] == "choose_laws":
+                return _laws_refused(action)
             tag, answer, elapsed = answers[action["tag"]]
             return {"tag": tag, "identity": action["identity"],
                     "response": json.dumps(answer, ensure_ascii=False), "elapsed_ms": elapsed}

@@ -168,11 +168,13 @@ _SYSTEM_PROMPT_STAGES = {
     "generate_sketch": "sketch",
     "generate_normalized_ddl": "stage1",
     "read_composition": "composition",
+    "choose_laws": "laws",
     "complete_visible_ddl_holes": "stage2",
 }
 # The stages whose message the tab shows as sent too (2026-10-13): no other
-# view shows what the sketch and the composition reading were given.
-_MESSAGE_STAGES = {"sketch", "composition"}
+# view shows what the sketch, the composition reading and the laws stage were
+# given.
+_MESSAGE_STAGES = {"sketch", "composition", "laws"}
 # The stages an execution saved before 2026-10-13 kept.
 _EARLIER_STAGES = ["stage1", "stage2"]
 
@@ -212,7 +214,8 @@ def system_prompts_view(context: dict) -> dict:
     """
     prompts = context.get("system_prompts")
     if not isinstance(prompts, dict):
-        return {"recorded": False, "stages": [], "sketch": None, "stage1": None, "composition": None, "stage2": None}
+        return {"recorded": False, "stages": [], "sketch": None, "stage1": None, "composition": None, "laws": None,
+                "stage2": None}
     return {
         "recorded": True,
         "stages": list(context.get("system_prompt_stages", _EARLIER_STAGES)),
@@ -377,7 +380,7 @@ class ProductPipelineEffects:
         def perform(action):
             from .chatgpt_runtime import execution_cancel
             stage = "stage2" if action["tag"] == "complete_visible_ddl_holes" else "stage1"
-            # The reading uses Stage 1's limits and is timed apart from it.
+            # The reading and the laws stage use Stage 1's limits and are timed apart from it.
             recorded = provider_stage_record(action["tag"])
             transport = SingleAttemptProvider(ProviderOptions(
                 settings=db.get_model_settings(), stage1_model=options.get("stage1_model", configured["stage1_model"]),

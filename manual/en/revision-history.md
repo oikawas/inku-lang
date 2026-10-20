@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-10-20 — The laws stage after the composition
+
+With the laws stage added after the composition for works the Server draws, the flow at the start of Creating Images now includes it, and a new paragraph explains how the laws are chosen and how the layers they change are rewritten in numbers. The waiting indicator (`Choosing the laws…`), the laws stage in the Prompts tab, and that `Another composition` does not choose again a work with a sentence the laws wrote in numbers are described too.
+
 ## 2026-10-15 — The free line among the shapes
 
 With the free line added to the shapes (an instruction word from v2.15.147, and chosen from descriptions from v2.15.149), section 3 of Creating Images lists it in the table and adds a paragraph on how its path is decided, its default length, when it is chosen from a description, and the angle the composition writes. The table now also lists point and cloudform, which it had left out. Joint phrases in section 6 now say that a free line takes only the relations connected and touching.

@@ -464,8 +464,8 @@ class PipelineService:
 
     def system_prompts(self, owner: str, variation_id: str) -> dict:
         """The system prompts this variation actually sent: the sketch, Stage 1,
-        the composition reading and Stage 2, with what the sketch and the
-        reading were given.
+        the composition reading, the laws stage and Stage 2, with what the
+        sketch, the reading and the laws stage were given.
 
         Read from saved state only. `recorded` is false for an execution saved
         before the record existed, `stages` names the stages it kept, and a kept

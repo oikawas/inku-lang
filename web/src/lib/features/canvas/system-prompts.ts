@@ -5,12 +5,12 @@ export type SentSystemPrompt = {
 	prompt_digest: string;
 	instruction_language: string;
 	attempt: number;
-	/** What the stage was given, kept for the sketch and the composition reading. */
+	/** What the stage was given, kept for the sketch, the composition reading and the laws stage. */
 	message?: string;
 };
 
 /** The stages whose prompts the tab shows, in the order a work calls them. */
-export const PROMPT_STAGES = ['sketch', 'stage1', 'composition', 'stage2'] as const;
+export const PROMPT_STAGES = ['sketch', 'stage1', 'composition', 'laws', 'stage2'] as const;
 export type PromptStage = (typeof PROMPT_STAGES)[number];
 
 /** The stages an execution saved before 2026-10-13 kept. */
@@ -60,6 +60,7 @@ export async function loadSystemPrompts(
 			sketch: sentPrompt(body.sketch),
 			stage1: sentPrompt(body.stage1),
 			composition: sentPrompt(body.composition),
+			laws: sentPrompt(body.laws),
 			stage2: sentPrompt(body.stage2)
 		};
 	} catch {

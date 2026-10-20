@@ -649,6 +649,45 @@ def test_the_composition_reading_is_sent_as_stage1_with_the_schema_order(monkeyp
     assert json.loads(sent[0].content)["temperature"] == 0.3
 
 
+def _laws_action() -> dict:
+    action = _action()
+    action["tag"] = "choose_laws"
+    action["payload"]["prompt"]["action_name"] = "choose_laws"
+    return action
+
+
+def test_the_laws_stage_is_sent_with_stage1_s_model_and_sampling(monkeypatch):
+    """The laws stage (stage B-5) goes out as its prototype was answered: with
+    Stage 1's model and the 0.3 the shared core gives Stage 1's sampled actions,
+    and its answer comes back as `laws_chosen`."""
+    models = []
+
+    def provider_for_model(model_ref, **kwargs):
+        models.append((model_ref, kwargs.get("stage")))
+        return "fixture", "fixture-model"
+
+    monkeypatch.setattr("inku_server.pipeline_provider.provider_for_model", provider_for_model)
+    monkeypatch.setattr("inku_server.pipeline_provider.connection_for", lambda *args: {
+        "id": "fixture", "kind": "openai_compatible", "base_url": "https://provider.invalid/v1",
+        "api_key": "test-only", "requires_api_key": True,
+    })
+    sent = []
+
+    async def request(value):
+        sent.append(value)
+        return httpx.Response(200, json={"choices": [{"message": {"content": None, "tool_calls": [{
+            "type": "function", "function": {"name": "submit_pipeline_response", "arguments": "{}"},
+        }]}}]})
+
+    provider = SingleAttemptProvider(
+        ProviderOptions({}, "fixture:stage1-model", "fixture:stage2-model", 256, 8192),
+        transport=httpx.MockTransport(request),
+    )
+    assert provider(_laws_action())["tag"] == "laws_chosen"
+    assert models == [("fixture:stage1-model", "stage1")]
+    assert json.loads(sent[0].content)["temperature"] == 0.3
+
+
 @pytest.mark.parametrize(("connection", "sent_schema"), [
     ({"id": "fixture", "kind": "openai_compatible", "base_url": "https://provider.invalid/v1"},
      lambda body: body["tools"][0]["function"]["parameters"]),
@@ -704,4 +743,5 @@ def test_each_provider_action_is_recorded_under_its_stage():
 
     assert provider_stage_record("generate_normalized_ddl") == "stage1"
     assert provider_stage_record("read_composition") == "composition"
+    assert provider_stage_record("choose_laws") == "laws"
     assert provider_stage_record("complete_visible_ddl_holes") == "stage2"

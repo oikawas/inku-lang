@@ -28,13 +28,15 @@ _logger = logging.getLogger(__name__)
 def provider_stage_record(tag: str) -> str:
     """The stage a provider action is timed and recorded under.
 
-    Hole completion is Stage 2. The composition reading is recorded apart from
-    Stage 1, whose model it uses, so neither time hides the other.
+    Hole completion is Stage 2. The composition reading and the laws stage are
+    recorded apart from Stage 1, whose model they use, so no time hides another.
     """
     if tag == "complete_visible_ddl_holes":
         return "stage2"
     if tag == "read_composition":
         return "composition"
+    if tag == "choose_laws":
+        return "laws"
     return "stage1"
 
 
@@ -90,6 +92,7 @@ class SingleAttemptProvider:
             "select_description_catalog": "description_catalog_selected",
             "generate_normalized_ddl": "normalized_ddl_generated",
             "read_composition": "composition_read",
+            "choose_laws": "laws_chosen",
             "complete_visible_ddl_holes": "visible_ddl_hole_patch_generated",
         }
         if action["tag"] not in tags:

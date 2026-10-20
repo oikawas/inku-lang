@@ -24,7 +24,8 @@ from . import provider_wire
 
 logger = logging.getLogger(__name__)
 
-EFFECTS = {"generate_sketch", "select_description_catalog", "generate_normalized_ddl", "read_composition", "complete_visible_ddl_holes"}
+EFFECTS = {"generate_sketch", "select_description_catalog", "generate_normalized_ddl", "read_composition", "choose_laws",
+           "complete_visible_ddl_holes"}
 # The codes a stored diagnostic may keep (pipeline_candidate). The shared core
 # classifies failures with the same list.
 PUBLIC_CODES = {

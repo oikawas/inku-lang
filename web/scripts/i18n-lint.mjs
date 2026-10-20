@@ -71,7 +71,7 @@ const RESTRICTED = [
 		word: 'prompt', re: /prompt/i, instead: 'the author\'s text is a "description"',
 		keys: [
 			'tabPrompts', 'tooltipCanvasTabPrompts', 'promptStage1System', 'promptStage2System',
-			'promptSketchSystem', 'promptCompositionSystem',
+			'promptSketchSystem', 'promptCompositionSystem', 'promptLawsSystem',
 			'provenanceLabelStage1PromptDigest', 'provenanceLabelStage1PromptBaseDigest',
 			'provenanceLabelStage2PromptDigest', 'provenanceHintStage1PromptDigest',
 			'provenanceHintStage1PromptBaseDigest', 'provenanceHintStage2PromptDigest',

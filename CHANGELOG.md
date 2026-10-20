@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-20 — The color stage becomes a default of drawing from a description
-
-The color stage after the laws stage is now a default of the Server's description runs (the author's decision); before, a run took it only when a developer-mode request asked for it with `developer_colors_stage`. On 5173 after the fix (Build 1295), 25 works drawn with gpt-6-luna had colors laid on 16, no answer changed a color the description named, and the laws of 12 of the 16 answers held in the drawn picture. A refinement drawn from a saved work follows the configuration the work was saved with, so a child of a work saved before the default does not take the stage. The developer-mode option `developer_colors_stage` stays, adding the stage to a run whose configuration has none. macOS and Android do not use the color stage. No version moved (render engine 87, DDL 23, DDL engine 67).
-
 ### 2026-10-20 — macOS: Juxtapose in the work edit menu
 
 Web's Juxtapose comes to macOS as the last item of the Redraw from the description group: a Vision model picks four sentences from the author's other works, and the one chosen is added after the description to draw a child. Gathering the candidates, the prompt, checking the answer and joining the sentence call the shared core's `juxtaposition`, as Web and Server do; Swift keeps no copy. The candidates come from the macOS works (leaving out the trash, works kept only in a lineage, the DDL and demo labels, works whose comment holds `test data`, works held by their DDL and the work itself), at most Server's default of 400. The child's lineage record is Web's `juxtaposition` field, so the same sentence is not offered again further down the lineage. The bundled `ui-reference.json` is regenerated from Build 1294 (the history filter labels Starred, Revision and Shared now match Web).
@@ -182,6 +178,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.220 (2026-10-20 / Build 1296)
+
+### 2026-10-20 — The color stage becomes a default of drawing from a description
+
+The color stage after the laws stage is now a default of the Server's description runs (the author's decision); before, a run took it only when a developer-mode request asked for it with `developer_colors_stage`. On 5173 after the fix (Build 1295), 25 works drawn with gpt-6-luna had colors laid on 16, no answer changed a color the description named, and the laws of 12 of the 16 answers held in the drawn picture. A refinement drawn from a saved work follows the configuration the work was saved with, so a child of a work saved before the default does not take the stage. The developer-mode option `developer_colors_stage` stays, adding the stage to a run whose configuration has none. macOS and Android do not use the color stage. No version moved (render engine 87, DDL 23, DDL engine 67).
 
 ## v2.15.219 (2026-10-20 / Build 1295)
 

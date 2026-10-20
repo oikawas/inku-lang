@@ -2751,6 +2751,48 @@ fn a_run_with_laws_asks_for_them_and_commits_what_they_print() {
     assert_eq!(committed.laws_layers, Some(record));
 }
 
+/// A law the work cannot hold where the answer puts it is refused with the way
+/// out, not with the schema's choices alone: the circle is the only closed
+/// shape B6 could size, and C4 cannot keep the one circle the description writes.
+#[test]
+fn a_law_a_layer_cannot_take_is_refused_with_the_way_out() {
+    let cases = [
+        (
+            json!({"main_layer": 1, "main_law": "B6", "description_counts": [],
+                   "laws": {"B6": {"secondary": [2]}, "B15": {"layers": [2]}},
+                   "reason": "“A red circle” leads the picture."}),
+            "subordination_none",
+            "besides the main layer 1, no layer (a closed shape or an arc) can be B6's \
+             secondary or accent; drop B6 or change the main layer",
+        ),
+        (
+            json!({"main_layer": 1, "main_law": "C4", "description_counts": [1],
+                   "laws": {"C4": {"layer": 1, "repeats": 3, "sequence": ["echo"], "path": "row"},
+                            "B15": {"layers": [2]}},
+                   "reason": "“A red circle” leads the picture."}),
+            "repeats_cannot_keep",
+            "layer 1 keeps the count the description writes, 1, but C4 repeats three times at \
+             least, so C4 cannot take this layer; drop C4 or put it on another layer",
+        ),
+    ];
+    for (answer, detail, reason) in cases {
+        let asked = plan_answer(&laws_start(Some(LawsConfig {}))).snapshot;
+        let refused = laws_answer(&asked, &answer);
+        let retried = event(&refused, "retry_scheduled").expect("a retry");
+        assert_eq!(retried["failure"], "semantic_violation");
+        assert_eq!(retried["detail"], detail);
+        let message = refused.snapshot.action.as_ref().unwrap().payload["prompt"]["message"]
+            .as_str()
+            .unwrap();
+        assert!(
+            message.ends_with(&format!(
+                "The previous answer could not be used: {reason}\nReturn a corrected answer."
+            )),
+            "{message}"
+        );
+    }
+}
+
 #[test]
 fn a_refused_answer_is_asked_again_with_the_reason() {
     let asked = plan_answer(&laws_start(Some(LawsConfig {}))).snapshot;

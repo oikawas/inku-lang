@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-21 — A law a layer cannot hold is refused with the way out: drop it or change its layer
+
+The laws stage refused an answer that put B6 (subordination) or C4 (motif and variation) where it could not hold by naming the response schema's choices only (`answer.laws.B6.secondary[0] = 0 is not one of 2`). B6 needs a closed shape or an arc besides its main layer, and C4 cannot take a layer whose count of one or two the description writes (it repeats three times at least). The model often kept the law, changed its values and was refused again until the budget ran out. Such an answer is now refused before the schema check, saying to drop B6 or change the main layer, which layers besides the main one B6 may take, or to drop C4 or put it on another layer. This holds for the laws stage of a description run and for the laws move of the AI refinement.
+
 ### 2026-10-21 — The English print no longer ends a sentence in a whole number the reader cannot read
 
 When the laws and color stages printed an English sentence in numbers, a numeric range or the ends of a line or row reaching the canvas edge could end the sentence in a whole number (`… vertical 0.333333 to 1.`). The numeric range reader takes a period right after a whole number for a decimal point, so the sentence did not read: a description run committed its composed document without laws, and the laws move stopped with `laws_compile`. A sentence that ends in its place's whole number now writes it with one decimal (`vertical 1.0.`). Prints that read today and the Japanese print do not change.

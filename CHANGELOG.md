@@ -8,6 +8,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-21 — The laws stage's retries carry the refused answer, and a semicircle no longer drops out of the print
+
+When the laws stage refuses an answer and asks again, the request now carries the refused answer as it was written along with the reason. Before, it carried the reason only, and the model mostly wrote a new answer that was often refused somewhere else. An answer too long to read is not repeated. This holds for the laws stage of a description run and for the laws move of the AI refinement; the color stage's retries still carry the reason only.
+
+When the laws or color stage printed a semicircle's size in numbers, its chord and sagitta were rounded apart, so the sagitta could pass half the chord by a hair and the compile dropped the arc (card C4's shrink, for one). The sagitta is now written at most half the written chord. Before, a description run committed its composed document without laws there, and the laws move stopped with `laws_compile`.
+
 ### 2026-10-21 — Android: the camera's model chooser follows the model purposes, and Juxtapose's held reason matches Web
 
 At the author's decision, the camera's model chooser offers only the models set to be used for both LLM and Vision. The camera reads the photo and draws with the same model, so a model with only one of the two purposes stops partway. If the chosen model has only one, it has to be chosen again. Also, in the work-editing menu of a description-locked work, the reason under Juxtapose is now Web's "This work's DDL was edited. Drawing it from the description would lose the edits, so this is not offered. …". As the way to start again from the description, Android names Change the description in the same menu.

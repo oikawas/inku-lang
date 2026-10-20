@@ -2482,13 +2482,14 @@ pub fn build_colors_prompt(
 }
 
 /// The request again with the tool's reply to the answer it refused: the
-/// original message and the latest reason only, as the prototype resent it.
+/// original message and the latest reason only, as the prototype resent it
+/// (the laws stage also repeats the refused answer; this stage does not).
 pub(crate) fn with_colors_feedback(
     prompt: LlmPrompt,
     refusal: &Refusal,
     limits: PromptLimits,
 ) -> Result<LlmPrompt, PromptError> {
-    laws::with_laws_feedback(prompt, refusal, limits)
+    laws::with_laws_feedback(prompt, refusal, None, limits)
 }
 
 // --- the answer --------------------------------------------------------------------------------

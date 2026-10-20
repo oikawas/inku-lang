@@ -342,7 +342,7 @@ requires-dist = [
 
 [[package]]
 name = "inku-server"
-version = "2.15.155"
+version = "2.15.209"
 source = { editable = "." }
 dependencies = [
     { name = "cryptography" },

@@ -2,6 +2,7 @@ package app.inku.mobile.data
 
 import app.inku.mobile.ui.export.PngExportSize
 import app.inku.mobile.ui.i18n.inkuError
+import app.inku.mobile.ui.DemoHistoryInputPrefix
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -43,6 +44,7 @@ import app.inku.mobile.data.refinement.GroundVariants
 import app.inku.mobile.data.refinement.ReplayComparison
 import app.inku.mobile.data.refinement.SavedColorArrangements
 import app.inku.mobile.data.refinement.SentPrompts
+import app.inku.mobile.data.refinement.SharedJuxtaposition
 import app.inku.mobile.data.refinement.sentPromptsFromHistoryRecord
 import app.inku.mobile.llm.DefaultModelDownloads
 import app.inku.mobile.llm.CameraDescriptionRequest
@@ -275,6 +277,51 @@ class InkuRepository(
             activeModelProvider,
             chatGptSession = chatGptPlan.state.value.activeSession,
         ).advise(request)
+
+    /**
+     * What juxtaposition gathers from for [item] (Server's `api_juxtaposition`):
+     * the other works that may lend a sentence, and the lineage from its root
+     * to [item]. Android decides which works lend: the list already leaves out
+     * the trash and works kept only in a lineage; here go the works with no
+     * description (drawn straight from DDL), demo works, works held by their
+     * DDL and [item] itself. Android keeps no display label or comment, so
+     * Server's "DDL" label is the empty description, its "[demo]" label is the
+     * input's prefix, and no "test data" comment is read. Labels are removed
+     * by the one shared rule.
+     */
+    internal suspend fun juxtapositionInputs(item: HistoryItemEntity): JuxtapositionInputs {
+        val describe = NativePipelineBridge::pipelineDescription
+        val entries = canvasSearchEntries()
+        val locked = juxtapositionSources(entries, item.id, emptySet()) { it }.map { it.id }
+            .chunked(JUXTAPOSITION_LOCK_BATCH)
+            .flatMapTo(mutableSetOf()) { DescriptionLock.lockedHistoryIds(descriptionLockStore, it) }
+        val sources = juxtapositionSources(entries, item.id, locked, describe)
+
+        // Root to the work, one primary parent at a time; the set of seen
+        // edges stops a cycle, as in `loadLineage`.
+        val dao = database.lineageDao()
+        val path = mutableListOf<LineageEdgeEntity>()
+        var cursor = item.lineageNodeId
+        while (cursor != null) {
+            val edge = dao.getEdgeByChildId(cursor)
+            if (edge == null || path.any { it.id == edge.id }) break
+            path.add(0, edge)
+            cursor = edge.parentNodeId
+        }
+        val nodeIds = (path.map { it.parentNodeId } + listOfNotNull(item.lineageNodeId)).distinct()
+        val historyOfNode = dao.getNodesByIds(nodeIds).associate { it.id to it.historyId }
+        val descriptions = nodeIds.mapNotNull { nodeId ->
+            historyOfNode[nodeId]?.let { database.historyDao().getById(it) }
+                ?.let { describe(it.sourceText ?: it.originalInput) }
+        }
+        return JuxtapositionInputs(sources, juxtapositionLineage(descriptions), juxtapositionAdded(path.map { it.metadataJson }))
+    }
+
+    suspend fun juxtapose(request: app.inku.mobile.llm.JuxtapositionRequest): app.inku.mobile.data.refinement.JuxtapositionResult =
+        app.inku.mobile.llm.JuxtapositionAdviser(
+            activeModelProvider,
+            chatGptSession = chatGptPlan.state.value.activeSession,
+        ).suggest(request)
 
     fun pipelineCommitStore(): PipelineCommitStore = sharedPipelineStore
 
@@ -1710,6 +1757,45 @@ internal fun refinementColorSnapshot(parent: RefinementParent, plan: RefinementP
 
 /** `plugin_settings` key of the bundled plugin package switch. */
 private const val BUNDLED_PLUGIN_SETTING_KEY = "bundled:$BUNDLED_PLUGIN_PACKAGE:enabled"
+
+/** What juxtaposition gathers from: other works' descriptions, the lineage's, and the sentences it added. */
+internal data class JuxtapositionInputs(
+    val sources: List<SharedJuxtaposition.Source>,
+    val lineage: List<String>,
+    val added: List<String>,
+)
+
+/** Works whose description lock is read in one pass, as Server's `_LOCK_BATCH`. */
+private const val JUXTAPOSITION_LOCK_BATCH = 500
+
+/**
+ * The works that may lend a sentence to [workId]'s juxtaposition, from the
+ * list that already leaves out the trash and works kept only in a lineage.
+ * Left out here: [workId], demo works, works with no description and [locked]
+ * ones. Each text is the description as kept, through [describe].
+ */
+internal fun juxtapositionSources(
+    entries: List<app.inku.mobile.data.db.CanvasSearchEntry>,
+    workId: String,
+    locked: Set<String>,
+    describe: (String) -> String,
+): List<SharedJuxtaposition.Source> = entries.mapNotNull { entry ->
+    val text = entry.sourceText ?: entry.originalInput
+    entry.takeIf {
+        it.id != workId && it.id !in locked && !it.originalInput.startsWith(DemoHistoryInputPrefix) && text.isNotBlank()
+    }?.let { SharedJuxtaposition.Source(it.id, describe(text)) }
+}
+
+/** The lineage's descriptions, root to the work, labels removed: one kept where the same runs on. */
+internal fun juxtapositionLineage(descriptions: List<String>): List<String> =
+    descriptions.map { it.trim() }.filter { it.isNotEmpty() }
+        .fold(mutableListOf()) { kept, text -> if (kept.lastOrNull() != text) kept.add(text); kept }
+
+/** The sentences the lineage's edges record as added (`juxtaposition.sentence`). */
+internal fun juxtapositionAdded(edgeMetadata: List<String>): List<String> = edgeMetadata.mapNotNull { json ->
+    runCatching { JSONObject(json.ifEmpty { "{}" }).optJSONObject("juxtaposition") }.getOrNull()
+        ?.optString("sentence")?.trim()?.takeIf { it.isNotEmpty() }
+}
 
 /**
  * Thumbnail files of an earlier format that no row points at and that were

@@ -242,6 +242,7 @@ import app.inku.mobile.ui.i18n.LocalUiLanguage
 import app.inku.mobile.ui.i18n.stringsFor
 import app.inku.mobile.ui.i18n.UiLanguage
 import app.inku.mobile.ui.i18n.savedWorkParityStrings
+import app.inku.mobile.ui.i18n.juxtaposeStrings
 import app.inku.mobile.ui.camera.CameraCaptureState
 import app.inku.mobile.ui.camera.CameraDevelopmentEffect
 import app.inku.mobile.ui.camera.CameraFailure
@@ -632,7 +633,17 @@ fun InkuApp(viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.view
                 if (state.canvasSelectionOpen) {
                     CanvasAspectSelectionDialog(state, viewModel)
                 }
-                state.workActionsTarget?.let { WorkActionsDialog(it, viewModel) }
+                state.workActionsTarget?.let { WorkActionsDialog(it, state.workActionsDescriptionLocked, viewModel) }
+                state.juxtaposition?.let { dialog ->
+                    JuxtaposeDialog(
+                        dialog = dialog, modelId = state.autonomousSettings.modelId,
+                        models = visionModelChoicesFor(state).map { ParityModelChoice(it.id, it.label, it.providerName) },
+                        language = state.uiLanguage, onModel = viewModel::selectJuxtapositionModel,
+                        onAsk = viewModel::askJuxtaposition, onChoose = viewModel::chooseJuxtaposition,
+                        onDraw = viewModel::drawJuxtaposition, onStop = viewModel::stopJuxtaposition,
+                        onDismiss = viewModel::closeJuxtaposition,
+                    )
+                }
                 if (state.toolChangeOpen) ToolChangeDialog(state, viewModel, S)
                 // After the dialogs it may be asked from, so it is drawn over them.
                 state.discardConfirm?.let { DiscardConfirmDialog(it, viewModel) }
@@ -743,7 +754,7 @@ private fun DdlOverwriteDialog(viewModel: InkuViewModel) {
 
 /** All saved-work entrances share this menu and the same immutable target. */
 @Composable
-private fun WorkActionsDialog(item: HistoryItemEntity, viewModel: InkuViewModel) {
+private fun WorkActionsDialog(item: HistoryItemEntity, descriptionLocked: Boolean?, viewModel: InkuViewModel) {
     var confirmTrash by remember(item.id) { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = viewModel::closeWorkActions,
@@ -760,6 +771,14 @@ private fun WorkActionsDialog(item: HistoryItemEntity, viewModel: InkuViewModel)
                 TextButton(onClick = { viewModel.editWorkInstructions(item) }, modifier = Modifier.fillMaxWidth().testTag(DDL_ENTRY_TAG)) { Text(S.instructionEditAction) }
                 TextButton(onClick = { viewModel.showWorkSketch(item) }, modifier = Modifier.fillMaxWidth()) { Text(S.workActionSketchRedraw) }
                 TextButton(onClick = { viewModel.refineWork(item, RefinementSubview.Model) }, modifier = Modifier.fillMaxWidth().testTag(MODEL_ENTRY_TAG)) { Text(S.modelEditAction) }
+                // A work drawn straight from DDL has no description to add to
+                // (SPEC §7.8); one held by its DDL says why it is not offered.
+                if (sourceTextOf(item).isNotBlank()) {
+                    TextButton(onClick = { viewModel.openJuxtaposition(item) }, enabled = descriptionLocked == false,
+                        modifier = Modifier.fillMaxWidth().testTag(JUXTAPOSE_ENTRY_TAG)) { Text(juxtaposeStrings(LocalUiLanguage.current).action) }
+                    if (descriptionLocked == true) Text(S.pipelineDdlAuthority, style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 TextButton(onClick = { viewModel.openAutonomousRefinement(item) }, modifier = Modifier.fillMaxWidth().testTag("autonomous-entry")) { Text(savedWorkParityStrings(LocalUiLanguage.current).autonomousTitle) }
                 HorizontalDivider()
                 TextButton(onClick = { viewModel.openReplayComparison(item) }, modifier = Modifier.fillMaxWidth().testTag("replay-entry")) { Text(savedWorkParityStrings(LocalUiLanguage.current).replayAction) }
@@ -2572,6 +2591,7 @@ internal fun RunStatusRow(state: InkuUiState, viewModel: InkuViewModel) {
                 text = S.stop,
                 onClick = when {
                     state.autonomousStatus.busy -> viewModel::stopAutonomousRefinement
+                    state.juxtaposition?.busy == true -> viewModel::stopJuxtaposition
                     state.refinementBusy -> viewModel::abortRefinementCandidates
                     else -> viewModel::stopDrawing
                 },
@@ -3917,6 +3937,9 @@ internal const val REFINE_GENERATE_TAG = "refine_generate"
 
 /** The model comparison entry on a lineage card, beside 描画要素 (SPEC `:618`). */
 internal const val MODEL_ENTRY_TAG = "model_entry"
+
+/** 取り合わせ in the work-actions menu (SPEC §7.8). */
+internal const val JUXTAPOSE_ENTRY_TAG = "juxtapose_entry"
 
 /** Tags for the sub-view chips and the model selection grid. */
 internal fun refinementSubviewTag(subview: RefinementSubview): String = "refine_subview_${subview.id}"
@@ -5919,7 +5942,7 @@ private fun modelDisplayName(modelId: String): String {
     }
 }
 
-private fun formatDuration(ms: Long): String {
+internal fun formatDuration(ms: Long): String {
     return "${"%.1f".format(ms / 1000.0)}s"
 }
 

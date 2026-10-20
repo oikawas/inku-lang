@@ -57,3 +57,20 @@ data class AutonomousRefinementStatus(
 )
 
 data class ParityModelChoice(val id: String, val label: String, val provider: String)
+
+/**
+ * The 取り合わせ dialog for one work. [shown] holds every sentence offered so
+ * far, so that 選び直す leaves them out; [chosen] indexes [result]'s choices.
+ */
+data class JuxtapositionDialogState(
+    val target: app.inku.mobile.data.db.HistoryItemEntity,
+    val busy: Boolean = false,
+    val startedAtMs: Long = 0L,
+    val result: app.inku.mobile.data.refinement.JuxtapositionResult? = null,
+    val shown: List<String> = emptyList(),
+    val chosen: Int? = null,
+    val error: String? = null,
+) {
+    val choice: app.inku.mobile.data.refinement.JuxtapositionChoice?
+        get() = chosen?.let { result?.choices?.getOrNull(it) }
+}

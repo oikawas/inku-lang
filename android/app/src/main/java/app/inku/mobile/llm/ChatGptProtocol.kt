@@ -163,7 +163,7 @@ internal fun chatGptRequest(request: ModelRequest): ChatGptRequest {
         throw ChatGptException("chatgpt_operation_not_supported")
     }
     val model = request.modelId.removePrefix("chatgpt:")
-    if (request.pipelineAction == REFINEMENT_VISION_ACTION) {
+    if (isVisionTextAction(request.pipelineAction)) {
         val image = request.imagePng
         if (image == null || image.isEmpty() || request.imageJpeg != null || request.tool != null) {
             throw ChatGptException("chatgpt_operation_not_supported")

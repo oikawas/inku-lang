@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod appearance;
 pub mod authority;
 pub mod byte_envelope;
 pub mod completion_ranges;

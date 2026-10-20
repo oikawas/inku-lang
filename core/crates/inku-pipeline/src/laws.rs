@@ -226,14 +226,14 @@ impl Units {
 
 /// How an instruction belongs to its layer.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum Belongs {
+pub(crate) enum Belongs {
     Source,
     Plugin,
 }
 
 /// The source layer an instruction draws: its own sentence, or the sentence of
 /// the plugin word that emitted it.
-fn layer_of(instruction: &Instruction) -> Option<(usize, Belongs)> {
+pub(crate) fn layer_of(instruction: &Instruction) -> Option<(usize, Belongs)> {
     match &resolved(instruction)?.owner {
         ScoreSourceOwner::MacroEmit {
             source_instruction_index,
@@ -247,7 +247,7 @@ fn layer_of(instruction: &Instruction) -> Option<(usize, Belongs)> {
 }
 
 /// Layer index to the positions of its instructions, in drawing order.
-fn layers(score: &Score) -> BTreeMap<usize, Vec<usize>> {
+pub(crate) fn layers(score: &Score) -> BTreeMap<usize, Vec<usize>> {
     let mut found: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
     for (position, instruction) in score.instructions.iter().enumerate() {
         if let Some((index, _)) = layer_of(instruction) {

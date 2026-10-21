@@ -64,6 +64,7 @@ public struct AutonomousRefinementView: View {
         }
         .frame(minWidth: 560, idealWidth: 720, minHeight: 440, idealHeight: 600)
         .task { await refinement.initialize(app: model, work: work) }
+        .onDisappear { refinement.didClose() }
         .onChange(of: choices) { _, _ in if !refinement.running { refinement.remember(app: model) } }
         .sheet(isPresented: $showModels) {
             BatchModelPickerView(model: model, initialReference: refinement.modelReference, immediateSelection: true,
@@ -118,13 +119,16 @@ public struct AutonomousRefinementView: View {
     private func attemptHeading(turn: Int, attempt: ExactJSON) -> String {
         let outcomes = ["kept": "aiRefineOutcomeKept", "not_visible": "aiRefineOutcomeNotVisible", "unavailable": "aiRefineOutcomeUnavailable", "failed": "aiRefineOutcomeFailed"]
         var text = format("aiRefineTurn", [String(turn)]) + " · " + kindLabel(attempt["kind"].string ?? "") + " · " + copy(outcomes[attempt["outcome"].string ?? ""] ?? "aiRefineOutcomeFailed")
-        if let share = attempt["share"].number.flatMap(Double.init) { text += " · " + format("aiRefineShare", [String(format: "%.1f", share * 100)]) }
+        if let share = attempt["share"].number.flatMap(Double.init) { text += " · " + format("aiRefineShare", [String(Int((share * 100).rounded()))]) }
         return text
     }
     private func status(_ run: AutonomousRun) -> String {
         if refinement.running {
             if refinement.stopping { return copy("aiRefineStopping") }
-            if let current = run.current { return format("aiRefineTaking", [current["turn"].number ?? "", kindLabel(current["kind"].string ?? "")]) }
+            if let current = run.current {
+                let kind = kindLabel(current["kind"].string ?? "")
+                return format("aiRefineTaking", [current["turn"].number ?? "", model.display.preferences.language == "en" ? kind.lowercased() : kind])
+            }
             return model.display.localized("処理中")
         }
         let keys = ["moves_done": "aiRefineEndedMovesDone", "nothing_available": "aiRefineEndedNothingAvailable", "stalled": "aiRefineEndedStalled",

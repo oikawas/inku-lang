@@ -80,7 +80,11 @@ func runAuxiliaryProvenanceChecks() async throws {
     // Juxtaposition uses other normal works, then the same one model draws its child.
     for text in ["夜の港に灯台が立つ。", "古い駅に時計が残る。", "森の奥で水が光る。", "遠い街で窓が開く。", "雪の庭に足跡が続く。", "秋の川に橋が架かる。"] { _ = try await parent(text) }
     await transport.changeDrawing(true)
+    runner.inheritWild = false
     await runner.initialize(app: app, work: first)
+    guard runner.run == nil, runner.moves == 1, runner.enabledKinds == ["laws"], runner.note == "  余白を動かす  ", runner.inheritWild else {
+        throw CheckFailure.message("Reopening a finished run must restore choices and offer a new run, with wild inherited")
+    }
     runner.moves = 1; runner.enabledKinds = ["juxtaposition"]; runner.note = ""
     await runner.start(app: app)
     guard let juxtaposeRun = runner.run, juxtaposeRun.stopReason == "moves_done", juxtaposeRun.error == nil,
@@ -123,6 +127,12 @@ func runAuxiliaryProvenanceChecks() async throws {
           try await database.work(id: last)?.historyVisibility == "lineage_only" else {
         task.cancel(); await runner.stop(app: app)
         throw CheckFailure.message("Stop fixture never reached a second laws request: \(runner.run?.error ?? "nil")")
+    }
+    runner.didClose()
+    await runner.initialize(app: app, work: first)
+    await runner.start(app: app)
+    guard runner.running, runner.run?.id == interrupted.id else {
+        throw CheckFailure.message("Closing/reopening the sheet cancelled or replaced the active run")
     }
     let recoveredURL = folder.appendingPathComponent("recovered.sqlite")
     try await database.backup(to: recoveredURL)

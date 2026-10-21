@@ -28,6 +28,7 @@ public struct AutonomousRun: Codable, Sendable, Identifiable {
     public var pendingChildID: String?
     public var lastKeptID: String?
     public var error: String?
+    public var acknowledged: Bool?
 
     public init(sourceID: String, moves: Int, kinds: [String], note: String?, model: String, language: String, wild: Bool?) {
         self.sourceID = sourceID; self.moves = moves; self.kinds = kinds; self.note = note
@@ -111,7 +112,8 @@ public final class AutonomousRefinementModel {
             sourceLocked = false
             inheritWild = true; wild = source?.renderWild ?? false
             if let source { sourceLocked = try await app.savedConfiguration(workID: source.id).authority == "ddl_authoritative" }
-            run = runs.last { $0.sourceID == source?.id }
+            let latest = runs.last { $0.sourceID == source?.id }
+            run = latest?.state == "interrupted" && latest?.acknowledged != true ? latest : nil
             children = [:]
             if let run {
                 for turn in run.turns {
@@ -211,7 +213,7 @@ public final class AutonomousRefinementModel {
                                 try Task.checkCancellation()
                                 var answer: Juxtaposition.Result?
                                 ownsAppOperation = true
-                                let ran = await app.performSerialized(status: "一文を選んでいます…") { _ in
+                                let ran = await app.performSerialized(status: "一文を選んでいます…", allowsBrowsing: true) { _ in
                                     answer = try await provider.juxtaposition(description: inputs.description, written: inputs.written,
                                         lineage: inputs.lineage, candidates: candidates, png: png, modelReference: current.model,
                                         language: current.language, settings: settings)
@@ -303,6 +305,16 @@ public final class AutonomousRefinementModel {
     public func openLast(app: AppModel) async {
         guard !running, let id = run?.lastKeptID, let database, let work = try? await database.work(id: id) else { return }
         await app.selectWork(work)
+    }
+
+    /// Web reopens a completed work with the controls for a new run. A recovered interruption is shown once.
+    public func didClose() {
+        guard !running else { return }
+        if run?.state == "interrupted" {
+            run?.acknowledged = true
+            do { try checkpoint() } catch { errorText = error.localizedDescription; return }
+        }
+        run = nil
     }
 
     private func finish(reason: String, app: AppModel) async throws {

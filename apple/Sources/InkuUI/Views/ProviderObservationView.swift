@@ -154,7 +154,9 @@ public struct ProviderObservationView: View {
     }
 
     private func title(_ stage: ProviderObservationStage) -> String {
-        switch stage { case .stage1: "解釈"; case .composition: "構図の読み"; case .stage2: "指示書の補完" }
+        switch stage {
+        case .stage1: "解釈"; case .composition: "構図の読み"; case .laws: "法則の段"; case .colors: "配色の段"; case .stage2: "指示書の補完"
+        }
     }
     private func outcome(_ outcome: ProviderAttemptOutcome) -> String {
         switch outcome { case .requestSaved: "応答未確定"; case .completed: "完了"; case .failed: "失敗"; case .cancelled: "停止済み" }

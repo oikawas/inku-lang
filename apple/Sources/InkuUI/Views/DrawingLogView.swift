@@ -200,6 +200,8 @@ struct DrawingLogView: View {
         case "generate_sketch": "写生"
         case "generate_normalized_ddl": "記述からのDDL生成"
         case "read_composition": "構図の読み"
+        case "choose_laws": "法則の段"
+        case "choose_colors": "配色の段"
         case "complete_visible_ddl_holes": "指示書の補完"
         default: value
         }

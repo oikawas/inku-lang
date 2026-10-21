@@ -175,6 +175,10 @@ struct CreationWorkInfoView: View {
                 systemPrompt("generate_normalized_ddl", stage: "stage1", title: copy("promptStage1System", "Stage 1 システムプロンプト"))
                 sentStage("read_composition", stage: "composition", input: copy("promptCompositionInput", "構図の読み 送った入力"),
                           system: copy("promptCompositionSystem", "構図の読み システムプロンプト"))
+                sentStage("choose_laws", stage: "laws", input: copy("promptLawsInput", "法則の段 送った入力"),
+                          system: copy("promptLawsSystem", "法則の段 システムプロンプト"))
+                sentStage("choose_colors", stage: "colors", input: copy("promptColorsInput", "配色の段 送った入力"),
+                          system: copy("promptColorsSystem", "配色の段 システムプロンプト"))
                 if let ddl = work.ddl, !ddl.isEmpty { promptText(copy("promptStage2Input", "Stage 2 ユーザー入力 (正規化DDL)"), ddl, id: "stage2-input") }
                 systemPrompt("complete_visible_ddl_holes", stage: "stage2", title: copy("promptStage2System", "Stage 2 システムプロンプト"))
             }.padding(14)

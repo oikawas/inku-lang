@@ -99,6 +99,8 @@ enum DrawingFailureMessage {
         "select_description_catalog": ("配色選択処理", "Catalog selection processing"),
         "generate_normalized_ddl": ("指示書生成処理", "DDL generation processing"),
         "read_composition": ("構図読み取り処理", "Composition reading processing"),
+        "choose_laws": ("法則の段の処理", "Laws stage processing"),
+        "choose_colors": ("配色の段の処理", "Color stage processing"),
         "complete_visible_ddl_holes": ("指示書補完処理", "DDL hole-completion processing"),
     ]
     /// Web ja.ts/en.ts pipelineAttentionReason for the phase a failed action stops.

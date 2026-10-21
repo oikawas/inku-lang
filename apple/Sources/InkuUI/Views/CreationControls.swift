@@ -256,7 +256,7 @@ struct CreationResultLog: View {
             }
             switch metric.action {
             case "complete_visible_ddl_holes": add(&stage2)
-            case "read_composition": break
+            case "read_composition", "choose_laws", "choose_colors": break
             default: add(&stage1)
             }
             add(&total)

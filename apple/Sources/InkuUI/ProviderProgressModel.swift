@@ -5,13 +5,15 @@ import InkuHost
 public struct ProviderProgressSnapshot: Sendable, Equatable {
     public enum Outcome: Sendable, Equatable { case running, succeeded, failed, cancelled, awaitingReview }
     public enum Stage: Sendable, Equatable {
-        case sketch, catalog, interpretation, composition, completion
+        case sketch, catalog, interpretation, composition, laws, colors, completion
         init?(action: String) {
             switch action {
             case "generate_sketch": self = .sketch
             case "select_description_catalog": self = .catalog
             case "generate_normalized_ddl": self = .interpretation
             case "read_composition": self = .composition
+            case "choose_laws": self = .laws
+            case "choose_colors": self = .colors
             case "complete_visible_ddl_holes": self = .completion
             default: return nil
             }
@@ -22,6 +24,8 @@ public struct ProviderProgressSnapshot: Sendable, Equatable {
             case .catalog: "色カタログの選択"
             case .interpretation: "解釈"
             case .composition: "構図の読み"
+            case .laws: "法則の選択"
+            case .colors: "配色の選択"
             case .completion: "指示書の補完"
             }
         }
@@ -69,7 +73,8 @@ public struct ProviderProgressSnapshot: Sendable, Equatable {
         let reference: String?
         switch stage {
         case .some(.completion): reference = models?.stage2Model
-        case .some(.sketch), .some(.catalog), .some(.interpretation), .some(.composition): reference = models?.stage1Model
+        case .some(.sketch), .some(.catalog), .some(.interpretation), .some(.composition), .some(.laws), .some(.colors):
+            reference = models?.stage1Model
         case .none: reference = nil
         }
         var snapshot = Self(executionID: executionID, action: action, stage: stage, attempt: attempt, maxAttempts: maximum,

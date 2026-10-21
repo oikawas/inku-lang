@@ -157,7 +157,8 @@ public actor PipelineHost {
             document: context["document"].object == nil ? nil : context["document"].data,
             authority: try context["authority"].requiredString("authority"),
             origin: try context["authority"].requiredString("origin"), revision: try context["authority"].requiredString("revision"), authorityJSON: context["authority"].data,
-            completionRanges: context["completion_ranges"].object == nil ? nil : context["completion_ranges"].data)
+            completionRanges: context["completion_ranges"].object == nil ? nil : context["completion_ranges"].data,
+            lawsRecords: LawsRecords.of(context)?.data)
     }
 
     public func savedAuthoringSummaries(workIDs: [String]) async throws -> [String: SavedAuthoringSummary] {
@@ -286,18 +287,24 @@ public actor PipelineHost {
             "action": .string("tool_plan"), "seed": .integer(UInt64.random(in: .min ... .max))]) { _, new in new }))
         let labels = try JSONDecoder().decode([TouchTool].self, from: offered["tool_labels"].data)
         var plans: [ToolVariantPlan] = []
+        // Server `render.py`: the core writes the parent's laws record for the touched source; the basis stays the
+        // parent's, so a laws move stops on the new DDL.
+        var render = arguments.merging(["action": .string("tool_render")]) { _, new in new }
+        if context["laws_layers"].object != nil { render["laws_layers"] = context["laws_layers"] }
         for entry in offered["entries"].array ?? [] {
             try Task.checkCancellation()
-            let written = try SavedVariants.response(.object(arguments.merging([
-                "action": .string("tool_render"), "tools": entry["tools"]]) { _, new in new }))
+            let written = try SavedVariants.response(.object(render.merging(["tools": entry["tools"]]) { _, new in new }))
             let metadata = try written.requiredObject("derivation_metadata")
             let tools = try JSONDecoder().decode([String: String].self, from: metadata["tools"].data)
             let changes = try JSONDecoder().decode([ToolChange].self, from: metadata["changes"].data)
             let ddl = try written.requiredString("ddl")
-            var render = try ExactJSON(data: base.renderRequest)
-            render["request"]["score"] = try written.requiredObject("score")
-            var replay = SavedScoreReplayPlan(work: base.work, parentNode: base.parentNode, context: base.context,
-                renderRequest: render.data, derivationKind: "tool_change", derivationMetadata: metadata.data,
+            var request = try ExactJSON(data: base.renderRequest)
+            request["request"]["score"] = try written.requiredObject("score")
+            var child = context.object ?? [:]
+            child.removeValue(forKey: "laws_layers")
+            if written["laws_layers"].object != nil { child["laws_layers"] = written["laws_layers"] }
+            var replay = SavedScoreReplayPlan(work: base.work, parentNode: base.parentNode, context: ExactJSON.object(child).data,
+                renderRequest: request.data, derivationKind: "tool_change", derivationMetadata: metadata.data,
                 variationAmplitude: nil, variationSeed: nil)
             replay.retouchedSource = ddl
             plans.append(ToolVariantPlan(mode: mode, tools: tools, changes: changes, source: ddl, labels: labels, replay: replay))
@@ -477,6 +484,8 @@ public actor PipelineHost {
         context["configuration"] = config; context["document"] = document; context["authority"] = authority
         // Server fork: a changed performance of a saved work keeps the parent's completion range record.
         if let record = request.completionRanges { context["completion_ranges"] = try ExactJSON(data: record) }
+        // Server: the child drawn from its parent without a run keeps the parent's laws records.
+        try LawsRecords.write(request.lawsRecords, into: &context)
         context["presentation"] = try SavedPresentation.capture(delivery: delivery, rendered: rendered,
             prompts: nil, events: Data("[]".utf8), configuration: config, document: document,
             disabledPluginNames: request.disabledPluginNames ?? [], provenance: request.provenance)
@@ -650,10 +659,11 @@ private actor ExecutionDriver {
         self.state = stored; self.snapshot = snapshot; self.databaseRevision = record.revision; self.restored = true
     }
 
-    /// Server `start`: a direct DDL drawn from a saved work carries that work's completion range record.
+    /// Server `start`: a direct DDL drawn from a saved work carries that work's completion range and laws records.
     private func authoring(_ request: GenerationRequest) throws -> ExactJSON {
         var authoring = request.authoring.json
         if request.authoring.isDirect, let record = request.completionRanges { authoring["completion_ranges"] = try ExactJSON(data: record) }
+        if request.authoring.isDirect { try LawsRecords.write(request.lawsRecords, into: &authoring) }
         return authoring
     }
 
@@ -760,7 +770,8 @@ private actor ExecutionDriver {
                 if tag == "commit_visible_normalized_ddl" {
                     do { try await commitVisibleDDL(action); progress(.changed(try makeView())); await gate.unlock() }
                     catch { await gate.unlock(); throw error }
-                } else if ["generate_sketch", "select_description_catalog", "generate_normalized_ddl", "read_composition", "complete_visible_ddl_holes"].contains(tag) {
+                } else if ["generate_sketch", "select_description_catalog", "generate_normalized_ddl", "read_composition",
+                           "choose_laws", "choose_colors", "complete_visible_ddl_holes"].contains(tag) {
                     if !allowProvider {
                         restored = true; driving = false
                         do {
@@ -1089,6 +1100,8 @@ private actor ExecutionDriver {
         performance["document"] = snapshot["document"]
         performance["authority"] = snapshot["authority"]
         if snapshot["completion_ranges"].object != nil { performance["completion_ranges"] = snapshot["completion_ranges"] }
+        // Core README: a run that applies its laws keeps their basis in its snapshot, which a host saves with the work.
+        try LawsRecords.write(LawsRecords.of(snapshot)?.data, into: &performance)
         performance["presentation"] = try SavedPresentation.capture(delivery: delivery, rendered: rendered,
             prompts: state.prompts, events: state.events, configuration: snapshot["config"], document: snapshot["document"],
             disabledPluginNames: state.disabledPluginNames ?? [], provenance: state.provenance)

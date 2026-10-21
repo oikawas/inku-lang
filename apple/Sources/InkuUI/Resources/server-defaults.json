@@ -5700,6 +5700,7 @@
       "total_timeout_ms": "120000"
     },
     "catalogs": [],
+    "colors": {},
     "compiler": {
       "composition_seed": null,
       "error_policy": "omit_and_continue",
@@ -5767,6 +5768,7 @@
       "total_timeout_ms": "120000"
     },
     "language": "en",
+    "laws": {},
     "macro_summaries": [],
     "prompt_limits": {
       "max_catalog_entries": 64,

@@ -62,6 +62,7 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
         let tag = try effect.requiredString("tag")
         let results = ["generate_sketch": "sketch_generated", "select_description_catalog": "description_catalog_selected",
                        "generate_normalized_ddl": "normalized_ddl_generated", "read_composition": "composition_read",
+                       "choose_laws": "laws_chosen", "choose_colors": "colors_chosen",
                        "complete_visible_ddl_holes": "visible_ddl_hole_patch_generated"]
         guard let resultTag = results[tag],
               let timeoutMS = UInt64(try effect.requiredString("timeout_ms")),

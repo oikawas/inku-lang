@@ -177,6 +177,25 @@ struct Bootstrap {
         return map
     }
 
+    /// Server `_paint_names`: the catalog's names of the palette's observed paints, in their order; a paint the
+    /// catalog does not name is null.
+    static func withPaintNames(_ palette: Any?, record: [String: Any], language: String) -> Any? {
+        guard var palette = palette as? [String: Any] else { return palette }
+        let key = language == "ja" ? "name_ja" : "name"
+        var named: [String: String] = [:]
+        for entry in record["palette"] as? [[String: Any]] ?? [] {
+            guard let code = entry["code"] as? String else { continue }
+            let name = (entry[key] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? entry["name"] as? String
+            named[code.lowercased()] = name
+        }
+        palette["paints"] = (palette["observations"] as? [[String: Any]] ?? []).map { observation -> Any in
+            let rgb = (observation["concrete_rgb"] as? [Any] ?? []).compactMap { ($0 as? NSNumber)?.intValue }
+            guard rgb.count == 3 else { return NSNull() }
+            return named[String(format: "#%02x%02x%02x", rgb[0], rgb[1], rgb[2])] ?? NSNull()
+        }
+        return palette
+    }
+
     func request(inputMode: String, source: String, description: String, language: String,
                  catalogID: String, canvasID: String, seed: String, wild: Bool,
                  settings: HostSettings, parentWorkID: String? = nil, derivationKind: String = "new",
@@ -226,6 +245,14 @@ struct Bootstrap {
             "color_map": colorMap, "catalog_id": selectedID, "render_seed": actualSeed,
             "background": host["background"] ?? "white",
         ])))
+        // Server `pipeline_product.py`: the color stage estimates the drawing with the seed the work is drawn with,
+        // and shows each of the nine colors by the paint it draws.
+        let colorStage = config["colors"] as? [String: Any]
+        if var colors = colorStage {
+            colors["render_seed"] = actualSeed
+            config["colors"] = colors
+            host["palette"] = Self.withPaintNames(host["palette"], record: record, language: language)
+        }
         compiler["host"] = host
         compiler["composition_seed"] = compositionSeed.map { $0 as Any } ?? NSNull()
         if saved == nil, let selectedLimits = settings.operationalLimits {
@@ -273,6 +300,7 @@ struct Bootstrap {
                 resolved["palette"] = try Self.object(InkuCore.resolvePalette(Self.bytes([
                     "color_map": map, "catalog_id": id, "render_seed": actualSeed, "background": host["background"] ?? "white",
                 ])))
+                if colorStage != nil { resolved["palette"] = Self.withPaintNames(resolved["palette"], record: record, language: language) }
                 return ["prompt": ["catalog_id": id, "label": name,
                                     "description": record[language == "ja" ? "sub_ja" : "sub"] ?? ""], "resolved": resolved]
             }

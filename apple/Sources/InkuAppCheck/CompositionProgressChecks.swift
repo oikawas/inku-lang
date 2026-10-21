@@ -51,16 +51,16 @@ func runCompositionProgressChecks() async throws {
     await generation.value
     guard firstFacts, retryFacts, app.errorText == nil, let work = app.selectedWork,
           work.ddl?.contains("(horizontal ") == true, let finished = app.providerProgress,
-          finished.stage == .composition, finished.outcome == .succeeded, !finished.clockRunning,
+          finished.stage == .colors, finished.outcome == .succeeded, !finished.clockRunning,
           let endedAt = finished.stageEndedAt,
           finished.stageElapsed(at: endedAt) == finished.stageElapsed(at: endedAt.addingTimeInterval(60)),
           finished.tokensIn == nil, finished.tokensOut == nil,
-          await provider.models == ["check:pinned", "check:pinned", "check:pinned"] else {
+          await provider.models == Array(repeating: "check:pinned", count: 5) else {
         throw CheckFailure.message("Composition progress lost native stage/model/retry/time facts or did not complete: \(app.errorText ?? app.status)")
     }
     let prompts = try ExactJSON(data: Data(app.promptJSON.utf8))
     guard let entries = prompts.array,
-          Set(entries.compactMap { $0["action"].string }) == ["generate_normalized_ddl", "read_composition"],
+          Set(entries.compactMap { $0["action"].string }) == ["generate_normalized_ddl", "read_composition", "choose_laws", "choose_colors"],
           app.promptJSON.contains("inku.composition-reading-prompt.v3") else {
         throw CheckFailure.message("The prompt presentation lost the composition reading")
     }
@@ -78,7 +78,7 @@ func runCompositionProgressChecks() async throws {
     }
     guard replayed, try await database.work(id: work.id) == work,
           try await app.savedConfiguration(workID: work.id).configuration == context.configuration,
-          await provider.models.count == 3 else { throw CheckFailure.message("Saved-work replay changed its condition or called composition") }
+          await provider.models.count == 5 else { throw CheckFailure.message("Saved-work replay changed its condition or called composition") }
 
     // Failure: comparison used Stage 2/current picker for composition or accepted bytes after Stop.
     var request = try app.requestForCurrentInput()
@@ -109,7 +109,7 @@ func runCompositionProgressChecks() async throws {
           app.providerProgress == frozen, !frozen.clockRunning,
           frozen.stageElapsed(at: frozenAt) == frozen.stageElapsed(at: frozenAt.addingTimeInterval(60)),
           app.selectedWork == work, app.currentSVG == svg, app.visibleDDL == ddl, try await database.list() == rows,
-          await provider.models == ["check:pinned", "check:pinned", "check:pinned", "check:comparison-stage1", "check:comparison-stage1"] else {
+          await provider.models == Array(repeating: "check:pinned", count: 5) + ["check:comparison-stage1", "check:comparison-stage1"] else {
         throw CheckFailure.message("Composition comparison mixed models, admitted a late event or changed saved/displayed state")
     }
     app.newWork()
@@ -169,6 +169,11 @@ private actor CompositionProgressProvider: ProviderTransport {
                     "balance": .string("unspecified"), "symmetry": .string("unspecified"), "void": .string("unspecified")]),
                 "stated_places": .array([.object(["layer": .number("2"), "words": .string("at the bottom"), "place": .string("bottom")])])])
             resultTag = "composition_read"
+        case "choose_laws", "choose_colors":
+            // The laws and the colors after the reading (Server defaults since 2026-10-20) fall back at once here;
+            // --laws-colors-host-only checks their answers.
+            return ExactJSON.object(["tag": .string("provider_failed"), "identity": input["identity"],
+                "failure": .string("provider_rejected"), "elapsed_ms": .string("1")]).data
         default: throw HostError("unexpected_composition_progress_effect")
         }
         return ExactJSON.object(["tag": .string(resultTag), "identity": input["identity"],

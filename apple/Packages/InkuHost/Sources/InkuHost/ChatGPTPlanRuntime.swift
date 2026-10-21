@@ -302,7 +302,8 @@ public actor ChatGPTPlanRuntime {
                                 argumentLimit: Int, recorder: ProviderAttemptRecorder?, willSend: @escaping ProviderObservationHandler,
                                 onBytes: @escaping @Sendable (Int) -> Void) async throws -> String {
         let effect = try ExactJSON(data: action), tag = try effect.requiredString("tag")
-        guard ["generate_sketch", "select_description_catalog", "generate_normalized_ddl", "read_composition", "complete_visible_ddl_holes"].contains(tag) else {
+        guard ["generate_sketch", "select_description_catalog", "generate_normalized_ddl", "read_composition",
+               "choose_laws", "choose_colors", "complete_visible_ddl_holes"].contains(tag) else {
             throw HostError("chatgpt_operation_not_supported")
         }
         guard let timeout = Double(try effect.requiredString("timeout_ms")), timeout.isFinite,

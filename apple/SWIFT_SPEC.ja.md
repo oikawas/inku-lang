@@ -727,7 +727,11 @@ DB指定は`--database`、任意のbundle設定`InkuDatabasePath`、従来のApp
 
 構図は独立した進行段階として表示し、下絵から切り替えた時に段階時計を開始し直す。通常生成と比較候補の両方で固定Stage 1 model、試行、経過時間を表示する。保存`elapsedMS`は構図待ちを含む実行全体の経過時間であり、個々のprovider呼出し時間とは区別する。
 
-通常APIとPersonal ChatGPTは、action identityごとの実呼出し時間、実usage、要求model／応答model、HTTP statusと結果を記録する。段階はServerと同じく`read_composition`を`composition`、補完を`stage2`、そのほかのprovider actionを`stage1`へ分ける。通常の生成情報は本文を持たない`ProviderAttemptMetric`だけとし、作品保存時のperformance contextへ固定する。後のexecution更新で過去作品の記録を置き換えない。保存作品の再表示と読出し専用の再演奏比較は保存時の記録を読み、provider要求を追加しない。古いsnapshot／作品で記録が欠落していても読める。これはSwiftの型付きrecord形式であり、Serverの`metrics.composition`と物理JSON形式を同一とするものではない。
+新規生成の設定は、構図の読みの後に法則の段（`laws: {}`）と配色の段（`colors: {}`）も持つ（Serverの既定、2026-10-20）。`colors`がある実行では、hostが`colors.render_seed`にその実行のrender seedを10進の文字列で入れ、各カタログの解決済み`palette`に`paints`（観測した絵具のカタログでの名前を観測の順に並べたもの。jaは`name_ja`、ほかは`name`、カタログに無い絵具はnull）を足す。共通Rustが構図を読んだ計画にだけ要求する`choose_laws`・`choose_colors`を、構図の読みと同じく通常API／Personal ChatGPTへ渡し、同じaction identityの`laws_chosen`・`colors_chosen`を返す。2つの段はStage 1 modelと上限で送り、頼む文・答えの確かめ・送り直し・退きは共通Rustが所有する。保存設定に段の無い作品には段を足さない。進行の段階は「法則の選択」「配色の選択」、状態欄はWebと同じ「法則の選択中…」「配色の選択中…」と表示する。プロンプトtabは、構図の読みの後・Stage 2の前に、法則の段と配色の段の送った入力とシステムプロンプトを出す。
+
+法則を当てた実行のsnapshotの`laws_layers`・`laws_basis`は、`completion_ranges`と同じく作品のperformance contextへ保存する。保存作品からの直接DDL（DDLの編集・描き直し・配置の変更）は2つを共通Rustの`direct_ddl`へ渡し、実行の無い子（配色の並べ替え・地の変更・再演奏）は親の記録を持つ。タッチの変更は親の`laws_layers`を`tool_render`へ渡して返った記録に置き換え、配置の変更は`recompose`へ渡して法則が置いた層を動かさない。2つの記録は今は画面で使わない（自動推敲の法則の手の土台）。`InkuAppCheck --laws-colors-host-only`が、偽の送り口と一時SQLiteで、送りの並び・配色の段の一度の断り・答えた配色・頼む文の記録・観測の段・記録の保存と受け継ぎを確かめる。
+
+通常APIとPersonal ChatGPTは、action identityごとの実呼出し時間、実usage、要求model／応答model、HTTP statusと結果を記録する。段階はServerと同じく`read_composition`を`composition`、`choose_laws`を`laws`、`choose_colors`を`colors`、補完を`stage2`、そのほかのprovider actionを`stage1`へ分ける。通常の生成情報は本文を持たない`ProviderAttemptMetric`だけとし、作品保存時のperformance contextへ固定する。後のexecution更新で過去作品の記録を置き換えない。保存作品の再表示と読出し専用の再演奏比較は保存時の記録を読み、provider要求を追加しない。古いsnapshot／作品で記録が欠落していても読める。これはSwiftの型付きrecord形式であり、Serverの`metrics.composition`と物理JSON形式を同一とするものではない。
 
 通信本文は、`INKU_DEVELOPER_MODE=1`で起動し、設定の「生成時の送受信を記録」を有効にした場合だけ端末内へ保存する。独立したdefault-offの設定を開始時requestへ固定し、通常環境での明示要求と記録に対応しないtransportは送信前に拒否する。実request本文の耐久記録を送信前にSQLiteへ保存し、保存失敗時はHTTP要求を出さない。送信後の記録失敗を成功や通常のprovider retryへ読み替えない。共通coreのprompt／schema／有限retry／fallbackと結果のidentityを変更しない。
 

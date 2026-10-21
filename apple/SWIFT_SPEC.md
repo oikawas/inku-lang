@@ -18,6 +18,12 @@ Options and replacements for Change the touches, Change the ground and Change th
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-21 Laws and colors without a main layer, and a chosen ground
+
+The shared core owns the laws and colors response schemas and meanings. macOS adds no main layer to a laws answer and sends the color laws' chosen layers and optional `ground` back as response JSON. The core decides whether the description states the ground, checks visibility on a new ground and prints the background sentence. The host saves and replays that completed document.
+
+New works keep `main_layer: null` in `laws_chosen`, `colors_chosen` and `laws_basis`. `colors_chosen.ground` is null when the ground stays as it was. Autonomous refinement passes the basis's JSON value to `record` and preserves null in the edge's `ai_move.laws.main_layer`. It combines the edge's existing provenance with the new blocks and saves that complete JSON object; null is a value, not a deletion. An older numbered basis remains readable without rewriting its parent's record. `--laws-colors-host-only`, `--saved-laws-stages-only` and `--auxiliary-provenance-only` check those transfers. `--colors-ground-host-only` checks that the core's document and Score with a chosen ground survive save and replay. Host checks hold no expected core coordinates or color theory results.
+
 ## 2026-10-21 Check composition prompt presentation independently of its version
 
 `--composition-progress-only` checks that the prompt journal has a `read_composition` entry whose message and system text match what the provider was sent. Swift holds no expected core prompt ID, wording or composition theory. The check covers the host's presentation and persistence boundary across prompt revisions.

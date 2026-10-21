@@ -18,6 +18,9 @@ struct AppCheck {
         if CommandLine.arguments.contains("--saved-laws-stages-only") {
             try await runSavedLawsStageChecks(); return
         }
+        if CommandLine.arguments.contains("--colors-ground-host-only") {
+            try await runColorsGroundHostCheck(); return
+        }
         if let index = CommandLine.arguments.firstIndex(of: "--provider-wire-ui-fixture") {
             guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Expected a fresh provider-wire fixture folder") }
             try await makeProviderWireUIFixture(folder: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return

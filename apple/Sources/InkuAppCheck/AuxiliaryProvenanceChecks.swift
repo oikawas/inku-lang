@@ -125,14 +125,17 @@ func runAuxiliaryProvenanceChecks() async throws {
     }
     let lawsMetadata = try ExactJSON(data: Data(lawsEdge.metadataJSON.utf8))
     let lawsContext = try await app.savedConfiguration(workID: keptID)
-    guard lawsContext.authority == "ddl_authoritative", lawsContext.lawsRecords != nil,
+    guard lawsContext.authority == "ddl_authoritative",
+          let lawsRecords = try lawsContext.lawsRecords.map(ExactJSON.init(data:)),
+          lawsRecords["laws_basis"].object?["main_layer"] == ExactJSON.null,
+          lawsMetadata["ai_move"]["laws"].object?["main_layer"] == ExactJSON.null,
           lawsMetadata["ai_move"]["kind"].string == "laws", lawsMetadata["ai_move"]["outcome"].string == "kept",
           lawsMetadata["ai_move"]["model"].string == "auto-check:one", lawsMetadata["ai_move"]["note"].string == "余白を動かす",
           lawsMetadata["autonomous_refine_mode"] == .null,
           await transport.lawsModels == ["auto-check:one"],
           try await database.work(id: first.id) == first,
           try await app.savedConfiguration(workID: first.id).configuration == before.configuration else {
-        throw CheckFailure.message("Laws child lost saved_laws authority, basis, run record or pinned model: \(lawsMetadata.text)")
+        throw CheckFailure.message("Laws child lost saved_laws authority, basis/null main_layer, run record or pinned model: \(lawsMetadata.text)")
     }
 
     // Juxtaposition uses other normal works, then the same one model draws its child.
@@ -207,7 +210,7 @@ func runAuxiliaryProvenanceChecks() async throws {
           try await database.work(id: last)?.historyVisibility == "normal" else {
         throw CheckFailure.message("Stopped run did not cancel and promote its last kept child")
     }
-    print("Autonomous host passed: saved_laws + laws_change + basis + ai_move; juxtaposition + description_edit + both records; one pinned model; invisible children stay lineage-only and never parent; stop cancels, restart interrupts, both promote last kept. Fake providers and temporary SQLite only.")
+    print("Autonomous host passed: saved_laws + laws_change + basis + ai_move with explicit null main_layer through the run's record; juxtaposition + description_edit + both records; one pinned model; invisible children stay lineage-only and never parent; stop cancels, restart interrupts, both promote last kept. Fake providers and temporary SQLite only.")
 }
 
 private actor AutonomousCheckCredentials: CredentialStore {

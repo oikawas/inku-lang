@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-21 — macOS keeps laws and colors records without a main layer and with a chosen ground
+
+AppCheck's laws answer drops `main_layer`, and its D5 answer names the target layer. The checks preserve explicit `main_layer: null` in new events, bases and autonomous refinement edges, and keep an older basis's number. Adding an autonomous move's record to an edge used to treat null as a deletion. It now combines the existing provenance and the core's record before saving the complete JSON object. A new check verifies save and replay of the core's completed document and Score when a color answer chooses an optional `ground`. Host tests do not duplicate coordinate or color results.
+
 ### 2026-10-21 — The laws and the color laws name the layers they work on, and the color stage may choose the ground's color
 
 The laws stage no longer chooses a main layer. Subordination (B6) names the layer it sizes by, and steelyard balance (B7) the layer it balances against, in their values. The color stage takes no main layer either: area of the strong color (C9), contrast of hue (D1), contrast of saturation (D2) and harmony of analogous colors (D5) name the layer they work on, light-dark contrast (B19) the layers it sets far from the ground, and warm-cool contrast (B20) the base layer for an achromatic ground. Where the description does not name the ground's color, the color stage may choose it too. An answer with a new ground is checked on the estimate drawn again on it, and one that would hide a layer in a named color or a plugged-in shape is asked again. The instructions then carry the new ground's "Fill the background with …" sentence. The ground and the colors the description names stay, as before. A saved work's laws record still reads.

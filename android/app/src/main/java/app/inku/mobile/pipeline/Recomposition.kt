@@ -27,6 +27,8 @@ internal fun recomposeDdl(
     mode: RecomposeMode,
     workId: String,
     seed: Long,
+    /** The layers the work's laws placed, which keep their place (server `pipeline_compat.py`). */
+    lawsLayersJson: String? = null,
 ): RecomposedDdl {
     fun unchanged(reason: String) = RecomposedDdl(source, RecompositionInfo(unchangedReason = reason))
     try {
@@ -36,6 +38,7 @@ internal fun recomposeDdl(
             .put("mode", mode.id)
             .put("seed", java.lang.Long.toUnsignedString(seed))
             .put("work_id", workId)
+            .also { request -> lawsLayersJson?.let { request.put("laws_layers", JSONObject(it)) } }
         val output = JSONObject(binding.recompose(input.toString().encodeToByteArray()).toString(Charsets.UTF_8))
         if (output.has("error") || output.optString("schema") != "inku.composition-recompose.v1") {
             return unchanged("unavailable")

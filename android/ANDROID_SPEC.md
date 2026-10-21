@@ -4,7 +4,19 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-10-20.
+Last updated: 2026-10-21.
+
+## 2026-10-21 The laws stage and the color stage of drawing from a description
+
+At the Draw Claude session's request (the author's "support the current drawing engine"), drawing from a description now passes, after the composition reading, through the laws stage (`choose_laws`, root `SPEC.md` §12.6.4) and the color stage (`choose_colors`, §12.6.5), as on Server. The shared core owns the two stages' prompts, answer checks, re-requests and fallbacks; Android owns only the host side.
+
+- Configuration: a new work's configuration gains `laws` (empty) and `colors` (the run's render seed as a decimal string), as Server's `default_manifest`. They are added only when the configuration reads the composition, so an on-device model is never asked for them. A run from a saved work keeps its saved configuration; when it has `colors`, only the seed becomes the run's. A child of an older work without the stages does not gain them.
+- Paint names: when the configuration has `colors`, each color catalog's resolved `palette` gains `paints`: the catalog's names of the observed paints in their order, Japanese when the instruction language is ja and English otherwise, null for a paint the catalog does not name (Server's `_paint_names`).
+- Sending: both stages go to Stage 1's model; their answers are tagged `laws_chosen` and `colors_chosen`. The ChatGPT plan sends them too. Their time and failures are recorded under the `laws` and `colors` stages, apart from Stage 1.
+- Sent prompts: a run records the stages `sketch, stage1, composition, laws, colors, stage2`, and the laws and color stages keep the message they sent. The work information's sent-prompt view shows "Laws stage" and "Color stage" after Composition and before Effects, in the same form (system prompt and sent message).
+- Running label: "Choosing the laws…" during the laws stage and "Choosing the colors…" during the color stage (Web's `stageChoosingLaws` and `stageChoosingColors`).
+- Laws records: a run that applied laws saves its `laws_layers` and `laws_basis` in the work information, as `completion_ranges` is saved. A child drawn without a run (color arrangement, support, touches, redraw) keeps its parent's records. A child drawn from DDL (a DDL edit, Change the layout) hands its parent's records to the run it starts, as on Server, and Change the layout passes `laws_layers` to the core's `recompose`. No screen reads the records yet.
+- The AI refinement and its laws move (`saved_laws`) are not on Android.
 
 ## 2026-10-20 Choosing LLM and Vision use in the model settings
 
@@ -485,7 +497,7 @@ Multiple registrations retain separate publication preferences and labels identi
 
 OAuth opens a temporary `127.0.0.1` listener before the browser, using dynamic registration, PKCE S256, state and nonce. ID token signatures are verified against OpenAI JWKS, with issuer, audience and expiration checks. A host UUID stays in app storage and the issued client ID is reused for authorization and refresh. Refresh is serialized, retaining rotated refresh tokens and `earliest_refresh_at`. Tokens, identity and personal publications are encrypted through Android Keystore in an AtomicFile under `noBackupFilesDir`. URLs and tokens do not enter Logcat, work JSON or Room. Room14 and existing work data are unchanged.
 
-The five shared-pipeline effects use dedicated Responses/SSE requests with `store:false`, `stream:true` and one required `inku.submit_pipeline_response` function. The shared core owns prompts, response schemas, composition reading, retry and fallback. There is no automatic API-key or device-model switch. Empty, null or missing terminal output can use a finalized function item; deltas or assistant text alone cannot. Only registration ID/generation is saved with an execution, preventing old results from surviving account switching, reauthorization or sign-out. A DDL without holes can render while disconnected when no model call is needed.
+The seven shared-pipeline effects (the laws and color stages were added on 2026-10-21) use dedicated Responses/SSE requests with `store:false`, `stream:true` and one required `inku.submit_pipeline_response` function. The shared core owns prompts, response schemas, composition reading, retry and fallback. There is no automatic API-key or device-model switch. Empty, null or missing terminal output can use a finalized function item; deltas or assistant text alone cannot. Only registration ID/generation is saved with an execution, preventing old results from surviving account switching, reauthorization or sign-out. A DDL without holes can render while disconnected when no model call is needed.
 
 The connection follows the official [sign-in](https://developers.openai.com/siwc/token-sharing-open-source/sign-in), [models and inference](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference) and [profiles and sessions](https://developers.openai.com/siwc/token-sharing-open-source/profiles-and-sessions) contracts. Real OpenAI acceptance requires the user's Chrome authorization and remains distinct from local checks.
 

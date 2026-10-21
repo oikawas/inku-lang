@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-21 — Android: the laws stage and the color stage of drawing from a description
+
+As on Server, drawing from a description on Android now passes through the laws stage and the color stage after the composition reading. The shared core decides both, asked of Stage 1's model. While they run the app says "Choosing the laws…" and "Choosing the colors…", and the work information's sent-prompt view shows the message and system prompt each was sent under "Laws stage" and "Color stage". The color stage's request names the catalog's paint for each color. A work drawn with laws keeps the layers they placed and their basis (`laws_layers`, `laws_basis`) and hands them to a child drawn without a run or from its DDL; Change the layout leaves the layers the laws placed where they are. An on-device model is not asked for the two stages. The AI refinement and its laws move are not included.
+
 ### 2026-10-21 — Android: the camera's model chooser follows the model purposes, and Juxtapose's held reason matches Web
 
 At the author's decision, the camera's model chooser offers only the models set to be used for both LLM and Vision. The camera reads the photo and draws with the same model, so a model with only one of the two purposes stops partway. If the chosen model has only one, it has to be chosen again. Also, in the work-editing menu of a description-locked work, the reason under Juxtapose is now Web's "This work's DDL was edited. Drawing it from the description would lose the edits, so this is not offered. …". As the way to start again from the description, Android names Change the description in the same menu.

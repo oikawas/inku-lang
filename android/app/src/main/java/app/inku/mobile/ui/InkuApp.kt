@@ -2529,7 +2529,14 @@ internal fun RunStatusRow(state: InkuUiState, viewModel: InkuViewModel) {
     val attempt by viewModel.providerAttempt.collectAsState()
     // A drawing's own row; refinement candidates are made several at once.
     val attemptText = if (state.isDrawing) providerAttemptText(attempt, S) else ""
-    val readingComposition = attempt?.action == "read_composition" && state.isDrawing
+    val parityStrings = savedWorkParityStrings(state.uiLanguage)
+    // Web `runningStageLabel`: the stages after Stage 1 say what is being asked.
+    val stageLabel = if (!state.isDrawing) null else when (attempt?.action) {
+        "read_composition" -> parityStrings.readingComposition
+        "choose_laws" -> parityStrings.choosingLaws
+        "choose_colors" -> parityStrings.choosingColors
+        else -> null
+    }
     val retryColor = MaterialTheme.colorScheme.primary
     val startedAt = remember(state.isDrawing, state.refinementBusy) { System.currentTimeMillis() }
     var elapsedMs by remember(startedAt) { mutableStateOf(0L) }
@@ -2554,8 +2561,7 @@ internal fun RunStatusRow(state: InkuUiState, viewModel: InkuViewModel) {
             MascotWidget(mascotKind = state.mascotKind)
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
                 Text(
-                    if (readingComposition) savedWorkParityStrings(state.uiLanguage).readingComposition
-                    else state.message?.takeIf { it.isNotBlank() } ?: S.drawing,
+                    stageLabel ?: state.message?.takeIf { it.isNotBlank() } ?: S.drawing,
                     style = MaterialTheme.typography.labelMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

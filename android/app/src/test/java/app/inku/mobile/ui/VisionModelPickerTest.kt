@@ -90,7 +90,8 @@ class VisionModelPickerTest {
         assertTrue(picker.contains("onSave(published, published.associateWith { purposes[it].orEmpty() })"))
         assertEquals(2, Regex("saveModelPurposes\\(").findAll(app).count())
         assertTrue(app.contains("provider != \"local-litert-lm\" && \"vision\" in servedPurposes(state, provider, choice.id)"))
-        assertTrue(app.contains("state.modelSelectionForCamera || \"llm\" in servedPurposes(state, providerId, it)"))
+        // The camera reads the photo and draws with one model, so it offers those used for both (2026-10-21).
+        assertTrue(app.contains("\"llm\" in purposes && (!state.modelSelectionForCamera || \"vision\" in purposes)"))
         assertTrue(app.contains("testTag(\"PublishedPurpose:\${provider.providerId}:\$purpose\")"))
     }
 

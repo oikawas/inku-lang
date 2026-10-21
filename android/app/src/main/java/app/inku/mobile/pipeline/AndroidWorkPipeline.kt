@@ -173,6 +173,7 @@ class AndroidWorkPipeline(
                     instructionLang = stored.resultOptions.optionalString("instruction_lang_requested"),
                     uiLang = stored.resultOptions.optionalString("ui_lang"),
                     completionRangesJson = current.completionRangesJson,
+                    lawsRecordsJson = current.lawsRecordsJson,
                 ),
             )
             return composePrepared(ddl, fork, request.recomposeMode)
@@ -235,6 +236,7 @@ class AndroidWorkPipeline(
                 workId = "sha256:" + sha256(ddl),
                 seed = run.request.config.compositionSeed ?: run.request.renderSeed
                     ?: throw PipelineHostException("render_seed_required"),
+                lawsLayersJson = run.request.lawsRecordsJson?.let { JSONObject(it).optJSONObject("laws_layers")?.toString() },
             )
         }
         val request = run.request.copy(text = selected?.source ?: ddl)
@@ -622,6 +624,9 @@ class AndroidWorkPipeline(
         loggedRenderWarnings(metadata, "pipeline performance")?.let { diagnostics.put("render_warnings", it) }
         metadata.put("pipeline_diagnostics", diagnostics)
         snapshot.optJSONObject("completion_ranges")?.let { metadata.put("completion_ranges", it) }
+        // The work keeps the layers its laws placed and their basis, as the
+        // server keeps them in the work's fork context.
+        putLawsRecords(metadata, lawsRecordsOf(snapshot))
         val renderHash = renderHash(delivery.requiredObject("score"), metadata, catalogId)
         metadata.put("render_hash", renderHash).put("render_hash_short", renderHash.takeLast(4).uppercase())
         return PaintResult(
@@ -667,6 +672,9 @@ class AndroidWorkPipeline(
     ): PaintResult {
         source?.history?.renderMetadataJson?.let { JSONObject(it).optJSONObject("completion_ranges") }
             ?.let { metadata.put("completion_ranges", it) }
+        // Drawn without a run, the child keeps its parent's laws records, as the
+        // server keeps them on its edge.
+        putLawsRecords(metadata, source?.history?.renderMetadataJson?.let { lawsRecordsOf(JSONObject(it)) })
         val hash = renderHash(JSONObject(scoreJson), metadata, metadata.optString("catalog_id", "default"))
         metadata.put("render_hash", hash).put("render_hash_short", hash.takeLast(4).uppercase())
         return PaintResult(
@@ -859,6 +867,11 @@ class AndroidWorkPipeline(
                     inherited != null -> inherited.completionRangesJson
                     else -> parentMetadata?.optJSONObject("completion_ranges")?.toString()?.takeIf { saved != null }
                 },
+                lawsRecordsJson = when {
+                    descriptionFlow -> null
+                    inherited != null -> inherited.lawsRecordsJson
+                    else -> lawsRecordsOf(parentMetadata)?.takeIf { saved != null }
+                },
             ),
             instructionLangRequested = requestedLang,
             instructionLangResolved = resolvedLang,
@@ -919,6 +932,7 @@ class AndroidWorkPipeline(
                 binding.resolvePalette(paletteInput.toString().encodeToByteArray()).toString(Charsets.UTF_8),
             )
             if (palette.has("error")) throw PipelineHostException(palette.requiredString("error"))
+            if (config.has("colors")) palette.put("paints", paintNames(ColorCatalogs.get(catalogId), palette, language))
             return JSONObject()
                 .put("canvas_format_id", request.canvasAspect)
                 .put("canvas_format_registry_id", registry.requiredString("schema"))
@@ -933,6 +947,9 @@ class AndroidWorkPipeline(
         if (config.has("composition")) {
             config.put("composition", compositionForModel(request.drawingModel))
         }
+        // The saved configuration decides whether the run has a color stage, as
+        // on the server; only its seed is this run's, which the drawing uses.
+        config.optJSONObject("colors")?.put("render_seed", java.lang.Long.toUnsignedString(renderSeed))
         compiler
             .put("host", resolvedHost(selectedCatalogId))
             .put(
@@ -1163,6 +1180,7 @@ class AndroidWorkPipeline(
         val instructionLang: String?,
         val uiLang: String?,
         val completionRangesJson: String? = null,
+        val lawsRecordsJson: String? = null,
     )
 
     private data class RestoredRun(

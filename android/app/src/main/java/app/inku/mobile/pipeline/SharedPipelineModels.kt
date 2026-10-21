@@ -46,7 +46,11 @@ sealed interface PipelineAuthoring {
         val autoCatalog: Boolean,
         val sketch: PipelineSketchRequest = PipelineSketchRequest.Off,
     ) : PipelineAuthoring
-    data class DirectDdl(val source: String, val completionRangesJson: String? = null) : PipelineAuthoring
+    data class DirectDdl(
+        val source: String,
+        val completionRangesJson: String? = null,
+        val lawsRecordsJson: String? = null,
+    ) : PipelineAuthoring
 }
 
 data class PipelineStartRequest(
@@ -170,7 +174,29 @@ data class PipelineView(
     val holeCompletionResults: List<HoleCompletionResult> = emptyList(),
     /** Opaque core record; a host never invents records for an older work. */
     val completionRangesJson: String? = null,
+    /** The run's laws records ([lawsRecordsOf]), kept with the work it saves. */
+    val lawsRecordsJson: String? = null,
 )
+
+/**
+ * The server's `LAWS_RECORD_KEYS` (`persistence/variation_authority.py`): the
+ * layers a work's laws placed and the basis they were applied by. A work keeps
+ * them, and a child drawn from it carries them on (2026-10-20).
+ */
+internal val LAWS_RECORD_KEYS = listOf("laws_layers", "laws_basis")
+
+/** The laws records [source] keeps, as one object, or null when it keeps none. */
+internal fun lawsRecordsOf(source: JSONObject?): String? {
+    val records = JSONObject()
+    LAWS_RECORD_KEYS.forEach { key -> source?.optJSONObject(key)?.let { records.put(key, it) } }
+    return records.takeIf { it.length() > 0 }?.toString()
+}
+
+/** Puts each of [lawsRecordsJson]'s records into [target]. */
+internal fun putLawsRecords(target: JSONObject, lawsRecordsJson: String?) {
+    val records = lawsRecordsJson?.let { JSONObject(it) } ?: return
+    LAWS_RECORD_KEYS.forEach { key -> records.optJSONObject(key)?.let { target.put(key, it) } }
+}
 
 class PipelineHostException(
     val code: String,

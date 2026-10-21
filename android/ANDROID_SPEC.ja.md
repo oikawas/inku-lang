@@ -3,7 +3,19 @@
 このディレクトリは、ネイティブ単体 Android アプリのワークスペースであり、Git 管理対象とする。
 ローカル専用成果物、端末ID、ダウンロード済みモデル、ログ、秘密情報は追跡対象に含めない。
 
-最終更新: 2026-10-20。
+最終更新: 2026-10-21。
+
+## 2026-10-21 「記述から描く」の法則の段・配色の段
+
+描画セッション-claudeの依頼（作者の「現行描画エンジンへの対応」）で、Serverの「記述から描く」と同じく、構図の読みの後に法則の段（`choose_laws`、root `SPEC.ja.md` §12.6.4）と配色の段（`choose_colors`、§12.6.5）を通す。2つの段の頼む文、答えの確かめ、送り直し、退きは共通coreが持ち、Androidはhostの側だけを持つ。
+
+- 設定：新しい作品の設定に`laws`（空）と`colors`（その実行のrender seedを10進の文字列で）を足す（Serverの`default_manifest`）。構図を読む設定のときだけ足すので、端末の中で動くモデルには2つの段を頼まない。保存した作品から走る実行は保存した設定のまま走り、`colors`があればseedだけをその実行のものにする。2つの段の無い古い作品の子には足さない。
+- 絵具の名前：設定に`colors`があるときは、各カタログの解決済みのpaletteに`paints`を足す。観測した絵具のカタログでの名前を観測の順に並べ、指示の言語がjaなら日本語名、そうでなければ英語名、カタログに無い絵具はnull（Serverの`_paint_names`）。
+- 送り：2つの段はStage 1と同じモデルへ送る。答えのtagは`laws_chosen`・`colors_chosen`。ChatGPTプランでも送る。時間と失敗は`laws`・`colors`の段に、Stage 1と分けて記録する。
+- 送信プロンプト：実行は`sketch, stage1, composition, laws, colors, stage2`の段を記録し、法則の段・配色の段も送ったメッセージを残す。作品の情報の送信プロンプトの欄は、「構図」の後、「効果」の前に「法則の段」「配色の段」を同じ形（システムプロンプトと送信メッセージ）で出す。
+- 描いている間の札：法則の段は「法則の選択中…」、配色の段は「配色の選択中…」（Webの`stageChoosingLaws`・`stageChoosingColors`）。
+- 法則の記録：法則を当てた実行の`laws_layers`・`laws_basis`は、`completion_ranges`と同じく作品の情報に保存する。実行の無い子（配色・支持体・てざわり・描き直し）は親の記録を受け継ぐ。DDLから描く子（DDLの編集、配置を変える）は、Serverと同じく親の記録を実行の始まりに渡し、配置を変えるときは`laws_layers`をcoreの`recompose`に渡す。記録は今の画面では使わない。
+- 自動推敲とその法則の手（`saved_laws`）はAndroidに入れていない。
 
 ## 2026-10-20 設定のモデル選択で、LLMとVisionの用途を選ぶ
 
@@ -451,7 +463,7 @@ Androidは端末で本人が使うsingle-user hostとして、Serverを介さず
 
 OAuthは端末の`127.0.0.1`の一時listenerを先に開き、dynamic registration、PKCE S256、state、nonce、OpenAIのJWKSによるID token署名とissuer/audience/期限の照合を行う。host UUIDはアプリの保存領域で固定し、発行されたclient IDを再認証・refreshに使う。refreshは直列化し、更新されたrefresh tokenと`earliest_refresh_at`を保持する。token・本人情報・本人の公開モデルはAndroid Keystoreで暗号化した`noBackupFilesDir`内のAtomicFileへ保存する。URLやtokenをLogcat、作品JSON、Roomへ書かない。Room14と既存の作品データは変更しない。
 
-描画は五つの共有pipeline effectを専用のResponses/SSEへ送り、`store:false`・`stream:true`と、一つの`inku.submit_pipeline_response`関数を要求する。promptと応答の型、構図の読み、retryとfallbackは共有coreに委ねる。APIキーや端末モデルへ自動で切り替えない。完了イベントのoutputが空・NULL・省略なら完了itemの関数を採用するが、途中のdeltaやassistant本文だけでは採用しない。実行に保存するのは登録ID/generationだけで、アカウント切替・再認証・切断後に古い実行の応答を採用しない。DDLに穴がなくmodel呼出しが不要な描画は、プランの切断中も行える。
+描画は七つの共有pipeline effect（2026-10-21に法則の段・配色の段を足した）を専用のResponses/SSEへ送り、`store:false`・`stream:true`と、一つの`inku.submit_pipeline_response`関数を要求する。promptと応答の型、構図の読み、retryとfallbackは共有coreに委ねる。APIキーや端末モデルへ自動で切り替えない。完了イベントのoutputが空・NULL・省略なら完了itemの関数を採用するが、途中のdeltaやassistant本文だけでは採用しない。実行に保存するのは登録ID/generationだけで、アカウント切替・再認証・切断後に古い実行の応答を採用しない。DDLに穴がなくmodel呼出しが不要な描画は、プランの切断中も行える。
 
 公式の[認証](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)、[モデル一覧と推論](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference)、[登録とsession](https://developers.openai.com/siwc/token-sharing-open-source/profiles-and-sessions)の契約に沿う。実際のOpenAIへの接続には本人のChromeでの認可が必要で、局所の試験成功とは区別する。
 

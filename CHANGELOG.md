@@ -16,10 +16,6 @@ Android's test answers no longer choose a main layer for laws, and D5 names its 
 
 AppCheck's laws answer drops `main_layer`, and its D5 answer names the target layer. The checks preserve explicit `main_layer: null` in new events, bases and autonomous refinement edges, and keep an older basis's number. Adding an autonomous move's record to an edge used to treat null as a deletion. It now combines the existing provenance and the core's record before saving the complete JSON object. A new check verifies save and replay of the core's completed document and Score when a color answer chooses an optional `ground`. Host tests do not duplicate coordinate or color results.
 
-### 2026-10-21 — The laws and the color laws name the layers they work on, and the color stage may choose the ground's color
-
-The laws stage no longer chooses a main layer. Subordination (B6) names the layer it sizes by, and steelyard balance (B7) the layer it balances against, in their values. The color stage takes no main layer either: area of the strong color (C9), contrast of hue (D1), contrast of saturation (D2) and harmony of analogous colors (D5) name the layer they work on, light-dark contrast (B19) the layers it sets far from the ground, and warm-cool contrast (B20) the base layer for an achromatic ground. Where the description does not name the ground's color, the color stage may choose it too. An answer with a new ground is checked on the estimate drawn again on it, and one that would hide a layer in a named color or a plugged-in shape is asked again. The instructions then carry the new ground's "Fill the background with …" sentence. The ground and the colors the description names stay, as before. A saved work's laws record still reads.
-
 ### 2026-10-21 — Remove the on-device model's eight-layer limit on Android
 
 Following the author's decision to leave the underdrawing's layer count unbounded, Android no longer adds an eight-layer limit to the response schema sent to LiteRT-LM. It passes the shared core's schema unchanged, with no Android layer limit. The 4096-token window and existing sampling stay in place. The test now checks that the SDK receives the exact schema, instead of reading and copying a core constant.
@@ -228,6 +224,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.231 (2026-10-21 / Build 1307)
+
+### 2026-10-21 — The laws and the color laws name the layers they work on, and the color stage may choose the ground's color
+
+The laws stage no longer chooses a main layer. Subordination (B6) names the layer it sizes by, and steelyard balance (B7) the layer it balances against, in their values. The color stage takes no main layer either: area of the strong color (C9), contrast of hue (D1), contrast of saturation (D2) and harmony of analogous colors (D5) name the layer they work on, light-dark contrast (B19) the layers it sets far from the ground, and warm-cool contrast (B20) the base layer for an achromatic ground. Where the description does not name the ground's color, the color stage may choose it too. An answer with a new ground is checked on the estimate drawn again on it, and one that would hide a layer in a named color or a plugged-in shape is asked again. The instructions then carry the new ground's "Fill the background with …" sentence. The ground and the colors the description names stay, as before. A saved work's laws record still reads.
 
 ## v2.15.230 (2026-10-21 / Build 1306)
 

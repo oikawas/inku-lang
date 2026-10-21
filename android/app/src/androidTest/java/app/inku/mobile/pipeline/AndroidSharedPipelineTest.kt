@@ -338,14 +338,17 @@ class AndroidSharedPipelineTest {
         assertTrue(provider.requests.isEmpty())
     }
 
-    /** A saved-Score replay tests compatibility without reintroducing touch refinement. */
+    /**
+     * A saved-Score replay tests compatibility without reintroducing touch
+     * refinement. It is saved as a `replay` (再描画), a kind the lineage records.
+     */
     private fun savedScoreReplay(parent: RefinementParent) = app.inku.mobile.data.refinement.RefinementPlan(
         element = null,
         route = app.inku.mobile.data.refinement.RefinementRoute.RenderFromScore,
         catalogId = parent.catalogId,
         canvasAspect = parent.canvasAspect,
         seeds = parent.seeds,
-        derivationKind = "variation_replay",
+        derivationKind = "replay",
         derivationMetadata = emptyMap(),
     )
 

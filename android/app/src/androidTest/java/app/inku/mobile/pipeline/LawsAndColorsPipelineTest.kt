@@ -106,7 +106,7 @@ class LawsAndColorsPipelineTest {
             catalogId = saved.catalogId,
             canvasAspect = saved.canvasAspect,
             seeds = saved.seeds,
-            derivationKind = "variation_replay",
+            derivationKind = "replay",
             derivationMetadata = emptyMap(),
         ))
 

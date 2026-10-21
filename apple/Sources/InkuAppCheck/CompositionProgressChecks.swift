@@ -61,7 +61,10 @@ func runCompositionProgressChecks() async throws {
     let prompts = try ExactJSON(data: Data(app.promptJSON.utf8))
     guard let entries = prompts.array,
           Set(entries.compactMap { $0["action"].string }) == ["generate_normalized_ddl", "read_composition", "choose_laws", "choose_colors"],
-          app.promptJSON.contains("inku.composition-reading-prompt.v3") else {
+          let composition = entries.last(where: { $0["action"].string == "read_composition" }),
+          let sent = await provider.lastCompositionPrompt,
+          sent["message"].string?.isEmpty == false, sent["system"].string?.isEmpty == false,
+          composition["prompt"]["message"] == sent["message"], composition["prompt"]["system"] == sent["system"] else {
         throw CheckFailure.message("The prompt presentation lost the composition reading")
     }
     let context = try await app.savedConfiguration(workID: work.id)
@@ -133,6 +136,7 @@ private actor CompositionProgressProvider: ProviderTransport {
     let stage1: CompositionProgressPause
     let composition: [CompositionProgressPause]
     private(set) var models: [String] = []
+    private(set) var lastCompositionPrompt: ExactJSON?
     private var stage1Calls = 0
     private var compositionCalls = 0
     private var byteCallbacks: [Int: @Sendable (Int) -> Void] = [:]
@@ -151,6 +155,7 @@ private actor CompositionProgressProvider: ProviderTransport {
             if stage1Calls == 1 { await stage1.wait() }
             response = compositionProgressPlan(); resultTag = "normalized_ddl_generated"
         case "read_composition":
+            lastCompositionPrompt = input["payload"]["prompt"]
             compositionCalls += 1
             let attempt = compositionCalls
             guard attempt <= composition.count else { throw HostError("unexpected_composition_progress_call") }

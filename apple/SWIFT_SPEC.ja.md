@@ -18,6 +18,10 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-10-21 構図の読みの提示を版の字に依存せず確かめる
+
+`--composition-progress-only`は、プロンプト履歴に`read_composition`の項があり、そのmessage・systemがproviderへ送ったものと一致することを確かめる。coreの指示の名や文面・構図理論をSwiftの期待値に持たない。指示の改訂に追随しても、構図の読みを表示・保存するhostの境目を確認できる。
+
 ## 2026-10-21 AI自動推敲を共有coreの法則の手・取り合わせの手にする
 
 - AI自動推敲プロセスは、UniFFIの`autonomous_refine`（`inku.autonomous-refine.v1`）を呼ぶ。`next`が手番と終端、`measure`が親子のSVGの見える差、`record`が子の辺の`ai_move`を決める。端末は送信・描画・保存・画面だけを担当し、Server APIは呼ばない。

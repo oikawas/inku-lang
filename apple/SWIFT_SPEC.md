@@ -18,6 +18,10 @@ Options and replacements for Change the touches, Change the ground and Change th
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-21 Check composition prompt presentation independently of its version
+
+`--composition-progress-only` checks that the prompt journal has a `read_composition` entry whose message and system text match what the provider was sent. Swift holds no expected core prompt ID, wording or composition theory. The check covers the host's presentation and persistence boundary across prompt revisions.
+
 ## 2026-10-21 Autonomous refinement uses the shared core's laws and juxtaposition moves
 
 - The process calls UniFFI's `autonomous_refine` (`inku.autonomous-refine.v1`). `next` decides turns and endings, `measure` compares the parent and child SVGs, and `record` writes the child's `ai_move`. The app handles requests, drawing, persistence and the screen; it does not call Server's API.

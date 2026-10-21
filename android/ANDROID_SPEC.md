@@ -513,11 +513,11 @@ The seven shared-pipeline effects (the laws and color stages were added on 2026-
 
 The connection follows the official [sign-in](https://developers.openai.com/siwc/token-sharing-open-source/sign-in), [models and inference](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference) and [profiles and sessions](https://developers.openai.com/siwc/token-sharing-open-source/profiles-and-sessions) contracts. Real OpenAI acceptance requires the user's Chrome authorization and remains distinct from local checks.
 
-## 2026-10-03 Constrain on-device responses to their JSON schema (I-713, updated 2026-10-04)
+## 2026-10-03 Constrain on-device responses to their JSON schema (I-713, updated 2026-10-21)
 
 LiteRT-LM uses version 0.17.1. The on-device provider passes `ModelRequest.tool.parametersJson` to `ResponseFormat.json(schema)`. Only requests with a response schema enable the conversation's `enableResponseFormat` and the message's `responseFormat` together, using the SDK's JSON Schema constraint. Plain-text requests and photo observations leave this constraint disabled.
 
-The author's decision on 2026-10-04 adds `maxItems` to `properties.layers` in a copied SDK schema only for the on-device `generate_normalized_ddl` request. The adapter's value, 8, mirrors the core's `MAX_WORK_PLAN_LAYERS`, with a JVM test guarding their equality. The original ModelRequest, shared core schema and other request schemas, including composition reading, remain unchanged. Cloud providers receive no bound because Gemini rejects it.
+Following the author's decision on 2026-10-21 to remove the core's underdrawing layer limit, the on-device `generate_normalized_ddl` schema no longer gains `properties.layers.maxItems` or a copied limit of eight. Stage 1 and composition reading pass the shared core's schema to the SDK unchanged, with no Android layer limit. This replaces the 2026-10-04 decision to copy the core's limit of eight into the on-device schema.
 
 The shared core supplies the prompt/schema and decides retries. GPU, the 4096-token window and existing sampling settings, including temperature 0.0, remain in place. On-device Gemma 4 E2B composition keeps `read: false` and uses the default reading.
 

@@ -727,7 +727,7 @@ DB指定は`--database`、任意のbundle設定`InkuDatabasePath`、従来のApp
 
 構図は独立した進行段階として表示し、下絵から切り替えた時に段階時計を開始し直す。通常生成と比較候補の両方で固定Stage 1 model、試行、経過時間を表示する。保存`elapsedMS`は構図待ちを含む実行全体の経過時間であり、個々のprovider呼出し時間とは区別する。
 
-新規生成の設定は、構図の読みの後に法則の段（`laws: {}`）と配色の段（`colors: {}`）も持つ（Serverの既定、2026-10-20）。`colors`がある実行では、hostが`colors.render_seed`にその実行のrender seedを10進の文字列で入れ、各カタログの解決済みpaletteに`paints`（観測した絵具のカタログでの名前を観測の順に並べたもの。jaは`name_ja`、ほかは`name`、カタログに無い絵具はnull）を足す。共通Rustが構図を読んだ計画にだけ要求する`choose_laws`・`choose_colors`を、構図の読みと同じく通常API／Personal ChatGPTへ渡し、同じaction identityの`laws_chosen`・`colors_chosen`を返す。2つの段はStage 1 modelと上限で送り、頼む文・答えの確かめ・送り直し・退きは共通Rustが所有する。保存設定に段の無い作品には段を足さない。進行の段階は「法則の選択」「配色の選択」、状態欄はWebと同じ「法則の選択中…」「配色の選択中…」と表示する。プロンプトtabは、構図の読みの後・Stage 2の前に、法則の段と配色の段の送った入力とシステムプロンプトを出す。
+新規生成の設定は、構図の読みの後に法則の段（`laws: {}`）と配色の段（`colors: {}`）も持つ（Serverの既定、2026-10-20）。`colors`がある実行では、hostが`colors.render_seed`にその実行のrender seedを10進の文字列で入れ、各カタログの解決済み`palette`に`paints`（観測した絵具のカタログでの名前を観測の順に並べたもの。jaは`name_ja`、ほかは`name`、カタログに無い絵具はnull）を足す。共通Rustが構図を読んだ計画にだけ要求する`choose_laws`・`choose_colors`を、構図の読みと同じく通常API／Personal ChatGPTへ渡し、同じaction identityの`laws_chosen`・`colors_chosen`を返す。2つの段はStage 1 modelと上限で送り、頼む文・答えの確かめ・送り直し・退きは共通Rustが所有する。保存設定に段の無い作品には段を足さない。進行の段階は「法則の選択」「配色の選択」、状態欄はWebと同じ「法則の選択中…」「配色の選択中…」と表示する。プロンプトtabは、構図の読みの後・Stage 2の前に、法則の段と配色の段の送った入力とシステムプロンプトを出す。
 
 法則を当てた実行のsnapshotの`laws_layers`・`laws_basis`は、`completion_ranges`と同じく作品のperformance contextへ保存する。保存作品からの直接DDL（DDLの編集・描き直し・配置の変更）は2つを共通Rustの`direct_ddl`へ渡し、実行の無い子（配色の並べ替え・地の変更・再演奏）は親の記録を持つ。タッチの変更は親の`laws_layers`を`tool_render`へ渡して返った記録に置き換え、配置の変更は`recompose`へ渡して法則が置いた層を動かさない。2つの記録は今は画面で使わない（自動推敲の法則の手の土台）。`InkuAppCheck --laws-colors-host-only`が、偽の送り口と一時SQLiteで、送りの並び・配色の段の一度の断り・答えた配色・頼む文の記録・観測の段・記録の保存と受け継ぎを確かめる。
 

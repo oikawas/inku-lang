@@ -13,7 +13,11 @@ pub const SEGMENT_COUNT_MIN: usize = 32;
 pub const SEGMENT_COUNT_MAX: usize = 200;
 pub const STROKE_SAMPLE_TARGET_RATIO: f64 = 1.0 / 49.0;
 pub const STROKE_SAMPLE_MIN: usize = 17;
-pub const STROKE_SAMPLE_MAX: usize = 129;
+/// A long stroke keeps its sample spacing up to 257 samples (render engine 88; 129 before).
+pub const STROKE_SAMPLE_MAX: usize = 257;
+/// Stroke events and paper responses arrive at their tool's rate per this many
+/// samples (about 0.8 of the short side), not per stroke (render engine 88).
+pub(crate) const IRREGULARITY_REFERENCE_SAMPLES: f64 = 40.0;
 
 pub(crate) fn frequency_cycles(frequency: Frequency) -> f64 {
     match frequency {

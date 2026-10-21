@@ -569,6 +569,8 @@ fn render_impl(
             crate::types::Weight::Chalk,
             crate::types::Weight::BrushThick,
             crate::types::Weight::Drypoint,
+            crate::types::Weight::BrushThin,
+            crate::types::Weight::Pen,
         ] {
             if performance
                 .score

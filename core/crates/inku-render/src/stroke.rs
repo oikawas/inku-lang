@@ -3,7 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::determinism::{SaltedStream, seed_salt_index_digest};
-use crate::geometry::centerline_normals;
+use crate::geometry::{IRREGULARITY_REFERENCE_SAMPLES, centerline_normals};
 use crate::support::{DEFAULT_SUPPORT, Support, support_response};
 use crate::types::{Point, Seed, Weight};
 
@@ -388,7 +388,10 @@ fn loaded_profile(t: f64) -> f64 {
 
 fn event_map(seed: Seed, rate: f64, count: usize) -> BTreeMap<usize, StrokeEvent> {
     let mut events = BTreeMap::new();
-    let probability = (rate / count.saturating_sub(2).max(1) as f64).min(0.12);
+    // Events arrive per length, so a long stroke catches more often than a
+    // short one (render engine 88; before, about `rate` events per stroke).
+    let probability = (rate / IRREGULARITY_REFERENCE_SAMPLES).min(0.12);
+    let cap = (count / 12).max(2);
     let arrivals = SaltedStream::new(seed, "event-arrival");
     for index in 3..count.saturating_sub(3) {
         if stream_unit(&arrivals, index as i64) < probability {
@@ -401,7 +404,7 @@ fn event_map(seed: Seed, rate: f64, count: usize) -> BTreeMap<usize, StrokeEvent
                     StrokeEvent::Correction,
                 ][kind],
             );
-            if events.len() >= 2 {
+            if events.len() >= cap {
                 break;
             }
         }

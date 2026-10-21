@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-22 — A stronger drawing hand (render engine 88)
+
+The drawing hand takes the four parts the author chose on the prototype sheets, which redrew the Scores of the author's batch (Build 1304, 180 works) unchanged. A thick or fine brush fill keeps its 0.92 floor and lays darker bands of the same colour over it, turned 35°. White darkens less, so a white face stays white and still shows its bands. A closed shape with a texture word and no fill lays a thin wash of its own colour under its texture (0.12 in normal), and stipple and aquatint marks follow its area up to 400. Stroke events and paper responses follow a line's length, and a stroke keeps up to 257 samples. The fine brush and the pen also roughen their edges with a texture filter. The DDL, DDL engine, and Score versions do not change. Saved works keep their saved SVG. Redrawing the 180 works matches the prototype engine byte for byte, apart from two placeholder class names in the prototype.
+
 ### 2026-10-21 — Align Android's laws and color checks with the shared core without a main layer
 
 Android's test answers no longer choose a main layer for laws, and D5 names its target layer in the color answer. The checks ensure a null main layer remains present through the laws records and autonomous refinement's edge record. The shared core owns these decisions, including choosing a ground when the description names no ground color. Existing records keep their stored layer numbers.

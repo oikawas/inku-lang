@@ -498,6 +498,23 @@ fn texture_spec(weight: Weight) -> Option<TextureSpec> {
             displacement: None,
             blur: Some(1.8),
         }),
+        // The fine brush and the pen get a small rough edge (render engine 88).
+        Weight::BrushThin => Some(TextureSpec {
+            margin: 12,
+            base_frequency: Some(0.45),
+            octaves: 2,
+            noise_seed: 37,
+            displacement: Some(0.6),
+            blur: None,
+        }),
+        Weight::Pen => Some(TextureSpec {
+            margin: 10,
+            base_frequency: Some(0.8),
+            octaves: 2,
+            noise_seed: 41,
+            displacement: Some(0.35),
+            blur: None,
+        }),
         _ => None,
     }
 }
@@ -510,6 +527,8 @@ pub fn texture_filter_id(weight: Weight) -> Option<&'static str> {
         Weight::Chalk => Some("texture-chalk"),
         Weight::BrushThick => Some("texture-brush_thick"),
         Weight::Drypoint => Some("texture-drypoint"),
+        Weight::BrushThin => Some("texture-brush_thin"),
+        Weight::Pen => Some("texture-pen"),
         _ => None,
     }
 }

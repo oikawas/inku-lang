@@ -18,10 +18,17 @@ use crate::surface_geometry::{
 };
 use crate::svg::{Element, format_number};
 use crate::types::{
-    Instruction, Point, Primitive, Seed, SurfaceDirection, SurfaceSpacingGradient, SurfaceTexture,
+    Instruction, Point, Primitive, Seed, SurfaceDirection, SurfaceIntensity,
+    SurfaceSpacingGradient, SurfaceTexture,
 };
 
-const SURFACE_MARK_MAX: usize = 90;
+/// Stipple and aquatint marks follow a shape's area up to eight times the
+/// reference area, at most 400 (render engine 88; 90 and 1.8 before).
+const SURFACE_MARK_MAX: usize = 400;
+const SURFACE_AREA_FACTOR_MAX: f64 = 8.0;
+/// The thin wash under a named texture of a closed shape without a fill
+/// (render engine 88): normal, dense, faint.
+const SURFACE_BASE_WASH: [f64; 3] = [0.12, 0.18, 0.072];
 const HATCH_SPAN_SEED_STRIDE: i64 = 1_048_576;
 const SURFACE_DAB_SAMPLES: usize = 5;
 const SURFACE_WASH_LAYERS: usize = 2;
@@ -392,7 +399,8 @@ fn render_vectors(
     let opacity = (surface.opacity * intensity_factor(instruction.surface_intensity)).min(0.75);
     let density = surface.density.max(0.02);
     let scale = surface.scale.max(0.04);
-    let area_factor = ((width * height) / (context.canvas.unit().powi(2) * 0.18)).clamp(0.2, 1.8);
+    let area_factor = ((width * height) / (context.canvas.unit().powi(2) * 0.18))
+        .clamp(0.2, SURFACE_AREA_FACTOR_MAX);
     match surface.texture {
         SurfaceTexture::Stipple | SurfaceTexture::PaperGrain => {
             let count = SURFACE_MARK_MAX.min(((22.0 + density * 120.0) * area_factor) as usize);
@@ -650,6 +658,23 @@ pub(crate) fn render_surface(
             surface.texture.as_str()
         ),
     );
+    // A named texture without a fill sits on a thin wash of its own colour,
+    // so the shape reads as a face (render engine 88).
+    if !instruction.filled {
+        let wash = SURFACE_BASE_WASH[match instruction.surface_intensity {
+            SurfaceIntensity::Normal => 0,
+            SurfaceIntensity::Dense => 1,
+            SurfaceIntensity::Faint => 2,
+        }];
+        group.push(
+            Element::new("path")
+                .attr("d", closed_path(&contour))
+                .attr("fill", surface_color(instruction, context))
+                .attr("fill-opacity", format_number(wash))
+                .attr("stroke", "none")
+                .attr("class", "surface-base-wash-v1"),
+        );
+    }
     let mut definitions = Vec::new();
     if surface.texture == SurfaceTexture::Grain {
         let pattern_id = format!(

@@ -91,14 +91,34 @@ fn brush_fills_share_one_band_tile_and_rotate_it_per_mark() {
     assert_eq!(svg.matches("id=\"brush-tile-brush_thin\"").count(), 1);
     assert_eq!(svg.matches("id=\"brush-tile-brush_thick\"").count(), 1);
     assert!(!svg.contains("feTurbulence type=\"fractalNoise\" baseFrequency=\"0.11 0.002\""));
-    assert_eq!(svg.matches("href=\"#brush-tile-brush_thin\"").count(), 2);
-    assert_eq!(svg.matches("href=\"#brush-tile-brush_thick\"").count(), 1);
+    // Each fill refers to the tile twice: its bands, and the darker bands
+    // turned 35° with a mask of their own (render engine 88).
+    assert_eq!(svg.matches("href=\"#brush-tile-brush_thin\"").count(), 4);
+    assert_eq!(svg.matches("href=\"#brush-tile-brush_thick\"").count(), 2);
     let rotations: BTreeSet<_> = values(&svg, "patternTransform").into_iter().collect();
-    assert_eq!(rotations.len(), 3);
+    assert_eq!(rotations.len(), 6);
+    assert_eq!(svg.matches("class=\"brush-dark-bands-v1\"").count(), 3);
+    for mark in ["tool-fill-0-0", "tool-fill-1-0", "tool-fill-2-0"] {
+        assert!(svg.contains(&format!("mask=\"url(#{mark}-dark-mask)\"")));
+    }
+    // A dark colour darkens to 0.72; white only to 0.94, so it keeps reading white.
+    assert!(svg.contains("fill=\"#1a4b7c\""));
+    let mut white = request.clone();
+    white.options.resolved_color_map = BTreeMap::from([("blue".to_owned(), "#ffffff".to_owned())]);
+    assert_eq!(
+        render(white)
+            .unwrap()
+            .svg
+            .matches("fill=\"#f0f0f0\"")
+            .count(),
+        3
+    );
     assert_eq!(svg, render(request.clone()).unwrap().svg);
     let mut compat = request;
     compat.options.svg_profile = SvgProfile::Compat;
-    assert!(!render(compat).unwrap().svg.contains("brush-tile-"));
+    let compat = render(compat).unwrap().svg;
+    assert!(!compat.contains("brush-tile-"));
+    assert!(!compat.contains("brush-dark-bands-v1"));
 }
 
 /// The text of the element that opens at `start`, through its matching end.

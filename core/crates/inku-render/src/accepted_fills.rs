@@ -236,7 +236,70 @@ fn interior_for_closed_contour(
             )
             .attr("stroke", "none"),
     );
+    // A brush fill lays a darker deposit through a second band set, turned
+    // 35° from the first, over the unchanged 0.92 floor (render engine 88).
+    if matches!(instruction.weight, Weight::BrushThin | Weight::BrushThick)
+        && context.profile != SvgProfile::Compat
+    {
+        fill.push(
+            Element::new("path")
+                .attr("d", polygon_path(contour))
+                .attr("class", "brush-dark-bands-v1")
+                .attr("fill", darker(&style.color, darkening_for(&style.color)))
+                .attr(
+                    "fill-opacity",
+                    format_number(
+                        BRUSH_DARK_BAND_OPACITY
+                            * style.fill_opacity.unwrap_or(style.stroke_opacity),
+                    ),
+                )
+                .attr("mask", format!("url(#{}-dark-mask)", identifier(context)))
+                .attr("stroke", "none"),
+        );
+    }
     Some(fill)
+}
+
+const BRUSH_DARK_BAND_OPACITY: f64 = 0.6;
+const BRUSH_DARK_BAND_TURN_DEGREES: f64 = 35.0;
+
+fn hex_channels(color: &str) -> Option<Vec<u8>> {
+    let hex = color.strip_prefix('#').filter(|hex| hex.len() == 6)?;
+    (0..3)
+        .map(|index| u8::from_str_radix(&hex[index * 2..index * 2 + 2], 16).ok())
+        .collect::<Option<Vec<_>>>()
+}
+
+/// How far the darker band scales a colour: 0.72 up to relative luminance
+/// 0.45, 0.94 from 0.95, and a straight line between, so a white fill keeps
+/// reading white.
+fn darkening_for(color: &str) -> f64 {
+    let Some(channels) = hex_channels(color) else {
+        return 0.72;
+    };
+    let linear = |channel: u8| {
+        let value = f64::from(channel) / 255.0;
+        if value <= 0.04045 {
+            value / 12.92
+        } else {
+            ((value + 0.055) / 1.055).powf(2.4)
+        }
+    };
+    let luminance =
+        0.2126 * linear(channels[0]) + 0.7152 * linear(channels[1]) + 0.0722 * linear(channels[2]);
+    0.72 + (0.94 - 0.72) * ((luminance - 0.45) / (0.95 - 0.45)).clamp(0.0, 1.0)
+}
+
+/// Each sRGB channel scaled by `factor`; a colour that is not `#rrggbb` stays as it is.
+fn darker(color: &str, factor: f64) -> String {
+    let Some(channels) = hex_channels(color) else {
+        return color.to_owned();
+    };
+    let scaled = channels
+        .iter()
+        .map(|channel| (f64::from(*channel) * factor).round().clamp(0.0, 255.0) as u8)
+        .collect::<Vec<_>>();
+    format!("#{:02x}{:02x}{:02x}", scaled[0], scaled[1], scaled[2])
 }
 
 struct Grain {
@@ -997,7 +1060,8 @@ fn brush_mark_unit(name: &str, slot: usize, context: MarkContext<'_>) -> f64 {
     ))
 }
 
-/// Per-mark mask: an even deposit floor plus the shared tile, rotated about the mark.
+/// Per-mark masks: an even deposit floor plus the shared tile, rotated about
+/// the mark, and the same tile turned again for the darker deposit alone.
 fn brush_mask(
     instruction: &Instruction,
     geometry: MarkGeometry,
@@ -1014,26 +1078,31 @@ fn brush_mask(
         context.canvas.width,
         context.canvas.height,
     ));
+    let band_set = |pattern_id: String, angle: f64, slots: [usize; 2]| {
+        let shift = slots.map(|slot| (brush_mark_unit(name, slot, context) * size).round());
+        Element::new("pattern")
+            .attr("id", pattern_id)
+            .attr("href", format!("#{}", brush_tile_id(name)))
+            .attr(
+                "patternTransform",
+                format!(
+                    "translate({} {}) rotate({}) scale({}) translate({} {})",
+                    format_number(x + width / 2.0),
+                    format_number(y + height / 2.0),
+                    format_number((angle * 10.0).round() / 10.0),
+                    format_number(unit),
+                    format_number(shift[0]),
+                    format_number(shift[1])
+                ),
+            )
+    };
     let angle = (2.0 * brush_mark_unit(name, 0, context) - 1.0) * 60.0;
-    let shift = [
-        (brush_mark_unit(name, 1, context) * size).round(),
-        (brush_mark_unit(name, 2, context) * size).round(),
-    ];
-    let bands = Element::new("pattern")
-        .attr("id", format!("{id}-bands"))
-        .attr("href", format!("#{}", brush_tile_id(name)))
-        .attr(
-            "patternTransform",
-            format!(
-                "translate({} {}) rotate({}) scale({}) translate({} {})",
-                format_number(x + width / 2.0),
-                format_number(y + height / 2.0),
-                format_number((angle * 10.0).round() / 10.0),
-                format_number(unit),
-                format_number(shift[0]),
-                format_number(shift[1])
-            ),
-        );
+    let bands = band_set(format!("{id}-bands"), angle, [1, 2]);
+    let dark_bands = band_set(
+        format!("{id}-dark-bands"),
+        angle + BRUSH_DARK_BAND_TURN_DEGREES,
+        [3, 4],
+    );
     // Normal keeps an 8% lift between bands; dense closes it further; faint thins the whole deposit.
     let (floor, deposit) = match instruction.surface_intensity {
         SurfaceIntensity::Normal => (0.92, 1.0),
@@ -1062,7 +1131,12 @@ fn brush_mask(
         .attr("id", format!("{id}-mask"))
         .attr("maskUnits", "userSpaceOnUse");
     mask.push(deposit_group);
-    vec![bands, mask]
+    // The darker deposit has no floor: it shows only through its own bands.
+    let mut dark_mask = region(Element::new("mask"))
+        .attr("id", format!("{id}-dark-mask"))
+        .attr("maskUnits", "userSpaceOnUse");
+    dark_mask.push(region(Element::new("rect")).attr("fill", format!("url(#{id}-dark-bands)")));
+    vec![bands, mask, dark_bands, dark_mask]
 }
 
 pub(crate) fn definitions(

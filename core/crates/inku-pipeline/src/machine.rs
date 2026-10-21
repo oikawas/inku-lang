@@ -2216,7 +2216,8 @@ impl PipelineSnapshot {
         self.action = None;
         let pending = self.colors.take().ok_or(ProtocolError::InternalInvariant)?;
         // The color laws name their layers in their values (2026-10-21); the
-        // event keeps the main layer's field, empty.
+        // event keeps the main layer's field, empty, and names the ground the
+        // colors chose (null when they kept it).
         self.event(
             events,
             "colors_chosen",
@@ -2224,6 +2225,7 @@ impl PipelineSnapshot {
                 "laws": chosen.laws,
                 "main_law": chosen.main_law,
                 "main_layer": null,
+                "ground": chosen.ground.map(inku_score::Color::as_str),
                 "notes": chosen.notes,
             }),
         )?;

@@ -89,14 +89,18 @@ composed plan (also when the laws fell back or the run has none): a reader
 chooses color laws among the eighteen (B11, B13, B14, B16 to B20, C7 to C9, D1
 to D7) for the work, their number not fixed, shown its layers as the core estimates them drawn
 (each layer's drawn contrast and chroma and the colors it would not be seen in,
-from the renderer's editable SVG) and its paints' places on Itten's wheel. The
-core keeps the colors the description states, plugged-in layers and the
-ground, recolors a layer the laws stage colored (aerial perspective, a pattern)
-only in colors that keep its law, checks the laws of lightness by the drawn
-lightness and D2 once every law is applied, fades only a layer of three marks
-or more, refuses an answer that changes nothing, and where a law leaves the
-colors to the tool takes the combination that recolors the main layer, then the
-most harmonious one. It prints the layers the colors change (a color, colors in turn
+from the renderer's editable SVG) and its paints' places on Itten's wheel. A
+law that works on a layer names it in its values (C9, D1, D2 and D5 `layer`,
+B19 `layers`, B20 the base `layer`), and an answer may choose a ground the
+description does not state; such an answer is checked and painted on the Score
+drawn again on that ground, and the background sentence is printed with it. The
+core keeps the colors the description states, plugged-in layers and a stated
+ground, refuses a new ground that hides a layer it keeps, recolors a layer the
+laws stage colored (aerial perspective, a pattern) only in colors that keep its
+law, checks the laws of lightness by the drawn lightness and D2 once every law
+is applied, fades only a layer of three marks or more, refuses an answer that
+changes nothing, and where a law leaves the colors to the tool takes the most
+harmonious combination. It prints the layers the colors change (a color, colors in turn
 or shifting, a fade, a handling, a numeric size, a kasane's lower colors before
 the layer) and compiles the printed document as the run compiles it before it
 is committed; the record of the laws follows the sentences printed again. A run

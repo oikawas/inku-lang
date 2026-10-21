@@ -898,6 +898,50 @@ pub struct ColorsContext {
     feasible: BTreeMap<&'static str, Vec<&'static str>>,
     /// The layers each hue of D1 and D5 can be put on, by the law and the hue.
     hue_layers: BTreeMap<(&'static str, &'static str), Vec<usize>>,
+    /// The ground the work had, when this is the work on the ground an answer
+    /// chose (2026-10-21).
+    ground_from: Option<Color>,
+}
+
+/// How a Score is drawn, and how each layer is drawn in each of the nine
+/// colors (the layers that may be recolored drawn in it, the others as they
+/// are).
+fn drawings(
+    painter: &Painter,
+    score: &Score,
+    colorable: &[usize],
+) -> Option<(Drawing, Vec<Drawing>)> {
+    let mut shares = Shares::default();
+    let now = painter.drawing(score, &mut shares)?;
+    let positions = laws::layers(score);
+    let by_color = COLORS
+        .iter()
+        .map(|color| {
+            let mut recolored = score.clone();
+            for layer in colorable {
+                for position in positions.get(layer).into_iter().flatten() {
+                    paint_instruction(&mut recolored.instructions[*position], *color);
+                }
+            }
+            painter.drawing(&recolored, &mut shares)
+        })
+        .collect::<Option<Vec<Drawing>>>()?;
+    Some((now, by_color))
+}
+
+/// The pairs of touching layers D3 may take: a layer and a neighbour the
+/// stage may recolor.
+fn touching(layers: &[usize], colorable: &[usize], now: &Drawing) -> Vec<(usize, usize)> {
+    let mut pairs: Vec<(usize, usize)> = Vec::new();
+    for a in layers {
+        for b in colorable {
+            if a != b && now.neighbors.get(a).is_some_and(|near| near.contains(b)) {
+                pairs.push((*a, *b));
+            }
+        }
+    }
+    pairs.sort_unstable();
+    pairs
 }
 
 /// What the color stage reads to build its context.
@@ -978,21 +1022,7 @@ impl ColorsContext {
             .copied()
             .filter(|layer| !stated.contains_key(layer) && !plugins.contains(layer))
             .collect();
-        let mut shares = Shares::default();
-        let now = painter.drawing(&score, &mut shares)?;
-        let positions = laws::layers(&score);
-        let by_color = COLORS
-            .iter()
-            .map(|color| {
-                let mut recolored = score.clone();
-                for layer in &colorable {
-                    for position in positions.get(layer).into_iter().flatten() {
-                        paint_instruction(&mut recolored.instructions[*position], *color);
-                    }
-                }
-                painter.drawing(&recolored, &mut shares)
-            })
-            .collect::<Option<Vec<Drawing>>>()?;
+        let (now, by_color) = drawings(&painter, &score, &colorable)?;
         let by = |layer: usize| summaries.iter().find(|summary| summary.layer == layer);
         let movable = |layer: &usize| {
             by(*layer).is_some_and(|summary| !matches!(summary.arranged, Some("plugin" | "fill")))
@@ -1026,15 +1056,7 @@ impl ColorsContext {
                 })
             })
             .collect();
-        let mut pairs: Vec<(usize, usize)> = Vec::new();
-        for a in &found {
-            for b in &colorable {
-                if a != b && now.neighbors.get(a).is_some_and(|near| near.contains(b)) {
-                    pairs.push((*a, *b));
-                }
-            }
-        }
-        pairs.sort_unstable();
+        let pairs = touching(&found, &colorable, &now);
         let mut ranked: Vec<&Paint> = paints.iter().collect();
         ranked.sort_by_key(|paint| -laws::round_int(paint.chroma));
         let vivid: Vec<Color> = ranked.iter().take(3).map(|paint| paint.color).collect();
@@ -1061,10 +1083,33 @@ impl ColorsContext {
             already: BTreeSet::new(),
             feasible: BTreeMap::new(),
             hue_layers: BTreeMap::new(),
+            ground_from: None,
         };
         context.already = context.find_already();
         (context.feasible, context.hue_layers) = context.find_feasible();
         Some(context)
+    }
+
+    /// The work on another ground (2026-10-21): the Score drawn again on it,
+    /// and the laws that hold and the values the tool can realize read again
+    /// there. `None` when the renderer does not draw it.
+    fn regrounded(&self, ground: Color) -> Option<Self> {
+        let mut context = self.clone();
+        context.score.background = ground;
+        (context.now, context.by_color) =
+            drawings(&context.painter, &context.score, &context.colorable)?;
+        let layers: Vec<usize> = context.layers().collect();
+        context.pairs = touching(&layers, &context.colorable, &context.now);
+        context.ground_from = Some(self.ground());
+        context.already = context.find_already();
+        (context.feasible, context.hue_layers) = context.find_feasible();
+        Some(context)
+    }
+
+    /// Whether an answer may choose the ground: the description does not
+    /// state it.
+    fn ground_free(&self) -> bool {
+        self.stated_ground.is_none()
     }
 
     fn first_plan_layer(&self) -> usize {
@@ -1546,8 +1591,8 @@ const LAW_TEXTS: [(&str, LawText); 18] = [
                 "The ground is the dominant color, the layers not in it the subordinate one, and the layer of the smallest area takes the accent color; three colors at most, the ground included.",
             ],
             choose: [
-                "強調の色（各層の色は colors に書く。地は今のまま。二つの名が同じ絵具なら一つの色と数える）。",
-                "The accent color (each layer's color goes in colors; the ground stays as it is; two names that draw one paint count as one color).",
+                "強調の色（各層の色は colors に書く。地を選べる時は、主調にする色を ground に選べる。二つの名が同じ絵具なら一つの色と数える）。",
+                "The accent color (each layer's color goes in colors; when the ground may be chosen, the dominant color may be chosen for it in ground; two names that draw one paint count as one color).",
             ],
             example: both(r#"{"accent":"orange"}"#),
         },
@@ -1583,8 +1628,8 @@ const LAW_TEXTS: [(&str, LawText); 18] = [
                 "The chosen layers (layers) stand far from the ground in lightness (a drawn difference of 0.35 or more), and every other layer 0.15 or more.",
             ],
             choose: [
-                "地から大きく離す層（layers。一つ以上。各層の色は colors に書く。地は今のまま。描いた明るさで確かめる）。",
-                "The layers to stand far from the ground (layers: one or more; each layer's color goes in colors; the ground stays as it is; it is checked by the drawn lightness).",
+                "地から大きく離す層（layers。一つ以上。各層の色は colors に書く。地を替えた時は新しい地との、描いた明るさの差で確かめる）。",
+                "The layers to stand far from the ground (layers: one or more; each layer's color goes in colors; it is checked by the drawn lightness difference, from the new ground when the ground changes).",
             ],
             example: both(r#"{"layers":[1]}"#),
         },
@@ -1643,8 +1688,8 @@ const LAW_TEXTS: [(&str, LawText); 18] = [
                 "Colors evenly spaced on the wheel (two complements, a triad of three, a tetrad of four) go on the ground and the layers. Look at place in the color table (the place on the wheel). It is a source of colors, so it does not go with colors.",
             ],
             choose: [
-                "和音の型と、層の色（地と描いた明るさの差が 0.15 以上）。地は今のままで、和音に数える。",
-                "The chord, and the layers' colors (each 0.15 or more from the ground in drawn lightness). The ground stays as it is and counts in the chord.",
+                "和音の型と、層の色（地と描いた明るさの差が 0.15 以上）。地は和音に数える。地を選べる時は、地の色も和音から ground に選べる。",
+                "The chord, and the layers' colors (each 0.15 or more from the ground in drawn lightness). The ground counts in the chord; when the ground may be chosen, its color may be one of the chord's, in ground.",
             ],
             example: both(
                 r#"{"chord":"triad","assignments":[{"layer":0,"color":"orange"},{"layer":1,"color":"blue"}]}"#,
@@ -1810,8 +1855,8 @@ const LAW_TEXTS: [(&str, LawText); 18] = [
                 "The ground and the layers come together in three levels of lightness, light, middle and dark, so that the canvas is built of a few large masses of light and dark.",
             ],
             choose: [
-                "いちばん大きな面積（地）の段（level。light 明・middle 中・dark 暗）を一つ選ぶ。地は今のまま。道具が、各層の色の描いた明るさを、地と合わせてちょうど三つの段（隣の段とは 0.25 以上、同じ段の中は 0.10 以内）に分け、地がその段に入るようにする。",
-                "The level of the largest area, the ground (level: light, middle, dark). The ground stays as it is. The tool chooses the layers' colors so that their drawn lightness and the ground's fall in exactly three levels (0.25 or more apart from the next, within 0.10 inside one), with the ground in that level.",
+                "いちばん大きな面積（地）の段（level。light 明・middle 中・dark 暗）を一つ選ぶ。地を選べる時は、その段に合う地の色を ground に選べる。道具が、各層の色の描いた明るさを、地と合わせてちょうど三つの段（隣の段とは 0.25 以上、同じ段の中は 0.10 以内）に分け、地がその段に入るようにする。",
+                "The level of the largest area, the ground (level: light, middle, dark). When the ground may be chosen, a ground color that fits the level may be chosen in ground. The tool chooses the layers' colors so that their drawn lightness and the ground's fall in exactly three levels (0.25 or more apart from the next, within 0.10 inside one), with the ground in that level.",
             ],
             example: both(r#"{"level":"dark"}"#),
         },
@@ -1828,7 +1873,7 @@ const SYSTEM_JA: &str = "あなたは、作品の配色を決める係です。
 3. 記述が色の言葉で言った層と地は、道具が決めました（「記述の色」に書いたもの）。その色は、どの法則でも替えません（替える答えは退けられます）。
 4. 層の要約に fixed がある層は、前の段が色を決めた層です。色を替えてかまいませんが、空気遠近 B15 の遠い層は、地との描いた明るさの差を 0.2 以上で、遠くない層のうち地との差がいちばん大きい層より小さく保ちます（遠い物ほど地に溶けます）。文様 C2 の層は、地から見えるように保ちます。差し込みの形の層（arranged が plugin）は、色を替えられません。
 5. 色の元は一つです: colors（各層の色。B17〜B20 のどれかを使う時だけ書く）か、C8 か、どちらも無し（楽譜の色のまま）。D1・D5・D7 は値を一つ選ぶだけで、ほかの層の色は道具が色相環の位置と描いた明るさで決めます。その上に、B11・B13・B14・B16・C7・C9・D2・D3・D4・D6 が重なります。
-6. 地（背景）は画面の大部分を占め、画の色の印象をほとんど決めます（「画面」に割合を書きました）。地の色は今のままです。層の色は、この地の上で選びます。
+6. 地（背景）は画面の大部分を占め、画の色の印象をほとんど決めます（「画面」に割合を書きました）。記述が地の色を言っていない時は、地の色も選べます（ground）。地を替えると、道具が全ての層を新しい地の上で見て確かめます。
 7. 色の表の looks（見え方）と wheel・place（色相環の位置）は、その名が実際に描く絵具のものです。名と違う色に見える絵具があります（暗い黄がオリーブに見える、など）。補色・類似色・色相の対比・色の和音・寒暖は、名でなく、この位置で決まります。二つの名が同じ絵具の時は、一つの色と数えます。
 8. 描いた痕は、表の色より地に近く見えます。細い線ほど、明るさの差も鮮やかさも消えます。層の要約の contrast と chroma は、その層を今の色で描いた時の、地との明るさの差と鮮やかさです。unseen は、その層をその色で描くと地から見えない（描いた明るさの差が 0.15 未満の）色です。答えが名指した層の色が見えない時は、退けられます。名指さない層が見えない時は、道具が、主の法則の色の考えに合う、見える色に替えます。
 9. 道具は、濃さ（B13・B14）→ 色（colors か C8 → B11・B16・C9・C7・B18）→ D1〜D7 → 見え方 → 検査 の順に当てます。明るさの決まり（B19・D7）は、描いた明るさで確かめます。決まりに合わない答えは、理由を添えて返されます。
@@ -1845,7 +1890,7 @@ Rules:
 3. The tool has decided the layers and the ground whose colors the description states in color words (listed under “Stated colors”). No law changes those colors; an answer that does is refused.
 4. A layer with fixed in its summary got its color from the previous stage. It may be recolored, but a distant layer of aerial perspective B15 keeps a drawn lightness difference from the ground of 0.2 or more and less than that of the layer, among the ones not distant, farthest from the ground (distant things melt into the ground), and a pattern layer of C2 stays seen against the ground. A plugged-in layer (arranged plugin) cannot change its color.
 5. The colors come from one source: colors (each layer's color, written only with one of B17 to B20), or C8, or neither (the Score's colors stay). D1, D5 and D7 take one value, and the tool decides the other layers' colors by their places on the color wheel and their drawn lightness. B11, B13, B14, B16, C7, C9, D2, D3, D4 and D6 come on top.
-6. The ground (the background) covers most of the canvas and decides most of the picture's impression of color (its share is under “Canvas”). The ground keeps its color; choose the layers' colors on it.
+6. The ground (the background) covers most of the canvas and decides most of the picture's impression of color (its share is under “Canvas”). When the description does not state the ground's color, the ground's color may be chosen too (ground). On a new ground, the tool looks at every layer on it again and checks them.
 7. In the color table, looks (how it looks) and wheel and place (its place on the color wheel) describe the paint the name actually draws. Some paints look like another color than their name (a dark yellow looks olive, for one). Complements, analogous colors, hue contrast, chords and warm and cool go by these places, not by the names. Two names that draw one paint count as one color.
 8. A drawn mark looks closer to the ground than the table says; the thinner the line, the more of its lightness difference and vividness it loses. In a layer's summary, contrast and chroma are the drawn lightness difference from the ground and the drawn vividness of the layer in its current color; unseen lists the colors in which the layer, drawn, would not be seen against the ground (a drawn lightness difference under 0.15). An answer that names a layer in a color that is not seen is refused. A layer the answer does not name that is not seen is recolored by the tool, to a seen color that keeps to the main law's idea of color.
 9. The tool applies handling (B13, B14), then color (colors or C8, then B11, B16, C9, C7, B18), then D1 to D7, then what is seen, then the checks. The lightness laws (B19, D7) are checked by the drawn lightness. An answer that breaks the rules comes back with the reason.
@@ -2449,7 +2494,8 @@ impl ColorsContext {
 }
 
 /// The answer's schema for this work: the main law among the laws that do not
-/// already hold, the laws, the layers' colors for B17 to B20 and the reason.
+/// already hold, the laws, the ground when the description does not state it,
+/// the layers' colors for B17 to B20 and the reason.
 #[must_use]
 pub fn colors_response_schema(context: &ColorsContext) -> Value {
     let mut laws = Map::new();
@@ -2475,6 +2521,11 @@ pub fn colors_response_schema(context: &ColorsContext) -> Value {
         json!({"type": "object", "propertyOrdering": order, "properties": laws}),
     );
     let mut ordering = vec!["main_law", "laws"];
+    // The ground a description does not state may be chosen (2026-10-21).
+    if context.ground_free() {
+        properties.insert("ground".to_owned(), color_enum());
+        ordering.push("ground");
+    }
     if order.iter().any(|law| SOURCE_LAWS.contains(law)) {
         properties.insert(
             "colors".to_owned(),
@@ -2718,15 +2769,24 @@ fn hue_on_layer(
             .map_or(&[][..], Vec::as_slice);
         if !fit.contains(&layer) {
             let names: Vec<String> = fit.iter().map(ToString::to_string).collect();
+            let (ja, en) = if names.is_empty() {
+                (
+                    format!("この地では {hue} はどの層にも置けない"),
+                    format!("on this ground {hue} fits no layer"),
+                )
+            } else {
+                (
+                    format!("{hue} を置ける層は {}", names.join("・")),
+                    format!("the layers that can take {hue} are {}", names.join(", ")),
+                )
+            };
             return Err(refusal(
                 "hue_layer",
                 format!(
-                    "{law}: 主の色相 {hue} を layer {layer} に置くと、決まりを満たし、どの層も地から見える色の組が無い。{hue} を置ける層は {}",
-                    names.join("・")
+                    "{law}: 主の色相 {hue} を layer {layer} に置くと、決まりを満たし、どの層も地から見える色の組が無い。{ja}"
                 ),
                 format!(
-                    "{law}: with the main hue {hue} on layer {layer}, no combination keeps the rule with every layer seen; the layers that can take {hue} are {}",
-                    names.join(", ")
+                    "{law}: with the main hue {hue} on layer {layer}, no combination keeps the rule with every layer seen; {en}"
                 ),
             ));
         }
@@ -2765,8 +2825,84 @@ fn vivid_on_layer(
     ))
 }
 
-/// Read an answer and check it against the schema and the prototype's rules.
-fn check(answer: &Value, context: &ColorsContext) -> Result<(Answer, Vec<ColorNote>), Refusal> {
+/// The ground an answer changes the work to, `None` when it keeps the ground
+/// (2026-10-21). A ground the description states does not change.
+fn chosen_ground(answer: &Value, context: &ColorsContext) -> Result<Option<Color>, Refusal> {
+    let Some(ground) = answer.get("ground").and_then(color_of) else {
+        return Ok(None);
+    };
+    if ground == context.ground() {
+        return Ok(None);
+    }
+    if let Some(word) = &context.stated_ground {
+        return Err(refusal(
+            "ground_stated",
+            format!("地は記述が言った色（「{word}」）なので替えない。ground を外す"),
+            format!(
+                "the ground is in a color the description states (“{word}”), so it does not change; leave ground out"
+            ),
+        ));
+    }
+    Ok(Some(ground))
+}
+
+/// A new ground that hides a layer seen on the work's ground (2026-10-21): a
+/// layer the stage may not recolor (a stated color, a plugged-in shape), or a
+/// pattern (C2) the answer does not recolor, would stay unseen.
+fn ground_hides(
+    context: &ColorsContext,
+    on: &ColorsContext,
+    answer: &Answer,
+) -> Result<(), Refusal> {
+    let Some(from) = on.ground_from else {
+        return Ok(());
+    };
+    let named = named(answer);
+    let positions = laws::layers(&context.score);
+    for layer in context.layers() {
+        let pattern = context.fixed.get(&layer).is_some_and(|law| law == "C2");
+        let reason = match kept_because(context, layer) {
+            Some(reason) => reason,
+            None if pattern && !named.contains_key(&layer) => {
+                ("文様（C2）".to_owned(), "a pattern (C2)".to_owned())
+            }
+            None => continue,
+        };
+        let colors = layer_colors(
+            &context.score,
+            positions.get(&layer).map_or(&[][..], Vec::as_slice),
+        );
+        for color in colors.into_iter().filter_map(color_named) {
+            let was = context.seen(layer, color);
+            let now = on.seen(layer, color);
+            if was >= VISIBLE && now < VISIBLE {
+                let (ground, before) = (on.ground().as_str(), from.as_str());
+                return Err(refusal(
+                    "ground_hides",
+                    format!(
+                        "地を {ground} にすると、layer {layer}（{}、{}）が地から見えなくなる（描いた明るさの差 {before} の上で {was:.2}、{ground} の上で {now:.2}）。この層は色を替えられないので、別の地にするか地を替えない",
+                        reason.0,
+                        color.as_str()
+                    ),
+                    format!(
+                        "on a {ground} ground, layer {layer} ({}, {}) would not be seen (a drawn lightness difference of {was:.2} on {before}, {now:.2} on {ground}); its color cannot change, so take another ground or keep it",
+                        reason.1,
+                        color.as_str()
+                    ),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Read an answer and check it against the request's schema (`context`) and
+/// the prototype's rules on the work as the answer leaves its ground (`on`).
+fn check(
+    answer: &Value,
+    context: &ColorsContext,
+    on: &ColorsContext,
+) -> Result<(Answer, Vec<ColorNote>), Refusal> {
     let schema = colors_response_schema(context);
     conform(answer, &schema, "answer")?;
     let allowed = &schema["properties"]["laws"]["properties"];
@@ -2859,8 +2995,8 @@ fn check(answer: &Value, context: &ColorsContext) -> Result<(Answer, Vec<ColorNo
             "D1 and D5 name different main hues or layers for it; the main hue and its layer are one".to_owned(),
         ));
     }
-    hue_on_layer(&laws, context)?;
-    vivid_on_layer(&laws, context)?;
+    hue_on_layer(&laws, on)?;
+    vivid_on_layer(&laws, on)?;
     let answer = Answer {
         main_law,
         laws,
@@ -3139,7 +3275,9 @@ impl<'a> Painting<'a> {
         self.check_aerial()?;
         self.check_d2()?;
         self.check_limits()?;
-        if !self.trial && self.out.score == self.context.score {
+        // A new ground changes the picture by itself.
+        if !self.trial && self.out.score == self.context.score && self.context.ground_from.is_none()
+        {
             return Err(refusal(
                 "no_change",
                 "答えは画を何も変えない。画の色か濃さを変える法則と値にする".to_owned(),
@@ -3798,12 +3936,12 @@ impl<'a> Painting<'a> {
                 return Err(refusal(
                     "ground_vivid",
                     format!(
-                        "D2: 地 {} が {} の半分より鮮やか。地は替えないので、もっと鮮やかな色にする",
+                        "D2: 地 {} が {} の半分より鮮やか。もっと鮮やかな色にするか、記述が地を言っていない時は地を替える",
                         self.ground().as_str(),
                         vivid.as_str()
                     ),
                     format!(
-                        "D2: the ground {} is more vivid than half of {}; the ground stays, so take a more vivid color",
+                        "D2: the ground {} is more vivid than half of {}; take a more vivid color or, when the description does not state the ground, another ground",
                         self.ground().as_str(),
                         vivid.as_str()
                     ),
@@ -4380,10 +4518,12 @@ impl<'a> Painting<'a> {
             return None;
         }
         let (main, near) = self.aerial_near(colors)?;
+        // On a new ground every distant layer is read again.
         #[allow(clippy::float_cmp)]
-        let near_changed = self
-            .aerial_near(&self.before)
-            .is_none_or(|(_, was)| was != near);
+        let near_changed = self.context.ground_from.is_some()
+            || self
+                .aerial_near(&self.before)
+                .is_none_or(|(_, was)| was != near);
         for (layer, law) in &self.context.fixed {
             if law != "B15" {
                 continue;
@@ -4895,6 +5035,8 @@ fn print_colors(context: &ColorsContext, painted: &Painted) -> Option<ColorsPrin
 pub struct ColorsChosen {
     pub laws: Vec<&'static str>,
     pub main_law: String,
+    /// The ground the colors chose, when they changed it.
+    pub ground: Option<Color>,
     pub notes: Vec<ColorNote>,
     pub print: ColorsPrint,
     /// For each printed layer of the plan after the colors, the colors its
@@ -4904,9 +5046,12 @@ pub struct ColorsChosen {
 
 impl ColorsChosen {
     /// Whether a compiled Score of the printed document draws what the colors
-    /// chose: each printed layer's colors and fade.
+    /// chose: the ground they chose, and each printed layer's colors and fade.
     #[must_use]
     pub fn compiled_as_chosen(&self, score: &Score) -> bool {
+        if self.ground.is_some_and(|ground| score.background != ground) {
+            return false;
+        }
         let layers = laws::layers(score);
         let first = self.print.printed.first_plan_layer();
         self.expected.iter().enumerate().all(|(k, (colors, fade))| {
@@ -4956,12 +5101,33 @@ pub fn choose_colors(
 }
 
 /// Check an answer value and paint the Score with it.
-fn painted(answer: &Value, context: &ColorsContext) -> Result<(Answer, Painted), Refusal> {
-    let (answer, mut notes) = check(answer, context)?;
-    let mut painted = Painting::new(context, &answer, false).run()?;
+///
+/// An answer that changes the ground is checked and painted on the work on
+/// that ground, which comes back with it (2026-10-21).
+fn painted(
+    answer: &Value,
+    context: &ColorsContext,
+) -> Result<(Answer, Painted, Option<ColorsContext>), Refusal> {
+    let regrounded = match chosen_ground(answer, context)? {
+        Some(ground) => Some(context.regrounded(ground).ok_or_else(|| {
+            refusal(
+                "ground_undrawn",
+                format!("地を {} にした画を描けない", ground.as_str()),
+                format!(
+                    "the picture cannot be drawn on a {} ground",
+                    ground.as_str()
+                ),
+            )
+        })?),
+        None => None,
+    };
+    let on = regrounded.as_ref().unwrap_or(context);
+    let (answer, mut notes) = check(answer, context, on)?;
+    ground_hides(context, on, &answer)?;
+    let mut painted = Painting::new(on, &answer, false).run()?;
     notes.append(&mut painted.notes);
     painted.notes = notes;
-    Ok((answer, painted))
+    Ok((answer, painted, regrounded))
 }
 
 /// The Score an answer value paints, before it is printed, and the tool's
@@ -4971,21 +5137,27 @@ pub fn paint_colors(
     answer: &Value,
     context: &ColorsContext,
 ) -> Result<(Score, Vec<ColorNote>), Refusal> {
-    let (_, painted) = painted(answer, context)?;
+    let (_, painted, _) = painted(answer, context)?;
     Ok((painted.score, painted.notes))
 }
 
-/// Apply an answer value and print what it changed.
+/// Apply an answer value and print what it changed, the ground it chose in
+/// the background sentence (added when the plan had none).
 pub fn apply_colors(answer: &Value, context: &ColorsContext) -> Result<ColorsChosen, Refusal> {
-    let (answer, painted) = painted(answer, context)?;
+    let (answer, painted, regrounded) = painted(answer, context)?;
+    let on = regrounded.as_ref().unwrap_or(context);
     let notes = painted.notes.clone();
-    let print = print_colors(context, &painted).ok_or_else(|| {
+    let mut print = print_colors(on, &painted).ok_or_else(|| {
         refusal(
             "unprintable",
             "配色が変えた層を書けない".to_owned(),
             "a layer the colors changed cannot be written".to_owned(),
         )
     })?;
+    let ground = on.ground_from.map(|_| on.ground());
+    if let Some(ground) = ground {
+        print.printed.plan.background = Some(ground.as_str().to_owned());
+    }
     let first = context.first_plan_layer();
     let after = laws::layers(&painted.score);
     let mut expected = Vec::new();
@@ -5027,6 +5199,7 @@ pub fn apply_colors(answer: &Value, context: &ColorsContext) -> Result<ColorsCho
     Ok(ColorsChosen {
         laws,
         main_law: answer.main_law.clone(),
+        ground,
         notes,
         print,
         expected,

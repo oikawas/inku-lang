@@ -3254,7 +3254,7 @@ fn recolored_circle() -> serde_json::Value {
 }
 
 #[test]
-fn the_colors_keep_the_stated_colors_and_the_ground() {
+fn the_colors_keep_the_stated_colors() {
     // The description states the red circle and the black dots, so the answer
     // may recolor the field only.
     let asked = plan_answer(&colors_start(COMPOSED_DESCRIPTION, None)).snapshot;
@@ -3599,6 +3599,70 @@ fn the_laws_basis_writes_no_main_layer_and_reads_a_saved_one() {
     written["main_layer"] = json!(1);
     let saved: crate::laws_record::LawsBasis = serde_json::from_value(written).unwrap();
     assert_eq!(saved.main_layer, Some(1));
+}
+
+/// A ground the description does not state may be chosen (2026-10-21): the
+/// colors are checked on it, the event names it, and the printed document
+/// fills the background with it.
+#[test]
+fn the_colors_may_choose_a_ground_the_description_does_not_state() {
+    let asked = plan_answer(&colors_start(UNCOLORED_DESCRIPTION, None)).snapshot;
+    let schema = &asked.action.as_ref().unwrap().payload["prompt"]["response_schema"];
+    assert!(schema["properties"]["ground"].is_object(), "{schema}");
+    let chosen = colors_answer(
+        &asked,
+        &json!({"main_law": "D5", "laws": {"D5": {"hue": "blue", "layer": 0}}, "ground": "black",
+                "reason": "A night of blues."}),
+    );
+    let payload = event(&chosen, "colors_chosen").expect("colors chosen");
+    assert_eq!(payload["ground"], "black");
+    let source = committed_source(&chosen.snapshot);
+    assert!(
+        source
+            .lines()
+            .any(|line| line == "Fill the background with black."),
+        "{source}"
+    );
+    // The black dots, not seen on black, are recolored to be seen.
+    assert!(!source.contains("black pen"), "{source}");
+}
+
+/// A ground the description states does not change, and a new ground that
+/// hides a layer whose color cannot change is refused (2026-10-21).
+#[test]
+fn the_colors_keep_a_stated_ground_and_the_layers_it_shows() {
+    let stated = plan_answer(&colors_start(
+        "A circle above dots scattered on a white ground",
+        None,
+    ))
+    .snapshot;
+    let schema = &stated.action.as_ref().unwrap().payload["prompt"]["response_schema"];
+    assert!(schema["properties"]["ground"].is_null(), "{schema}");
+    let refused = colors_answer(
+        &stated,
+        &json!({"main_law": "D5", "laws": {"D5": {"hue": "blue", "layer": 0}}, "ground": "black",
+                "reason": "A night of blues."}),
+    );
+    assert_eq!(
+        event(&refused, "retry_scheduled").expect("a retry")["detail"],
+        "ground_stated"
+    );
+    // The description states the black dots, which a black ground would hide.
+    let asked = plan_answer(&colors_start(COMPOSED_DESCRIPTION, None)).snapshot;
+    let refused = colors_answer(
+        &asked,
+        &json!({"main_law": "D5", "laws": {"D5": {"hue": "blue", "layer": 0}}, "ground": "black",
+                "reason": "A night of blues."}),
+    );
+    assert_eq!(
+        event(&refused, "retry_scheduled").expect("a retry")["detail"],
+        "ground_hides"
+    );
+    let reason = refusal_reason(&refused);
+    assert!(
+        reason.starts_with("on a black ground, layer 2 (in a color the description states (“black”), black) would not be seen"),
+        "{reason}"
+    );
 }
 
 #[test]

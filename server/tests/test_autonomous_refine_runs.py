@@ -30,8 +30,8 @@ client = TestClient(app)
 MODEL = "nvidia:poolside/laguna-xs-2.1"
 # The circle moves from the golden section's upper left crossing (the parent's
 # B1) to the thirds' lower right one, and the dots recede; B1 and B21 are left
-# out, as the move asks. An answer names two or three laws.
-MOVED = {"main_layer": 1, "main_law": "B3", "description_counts": [{"layer": 1, "words": "赤い円がひとつ"}],
+# out, as the move asks.
+MOVED = {"main_law": "B3", "description_counts": [{"layer": 1, "words": "赤い円がひとつ"}],
          "laws": {"B3": {"targets": [{"layer": 1, "at": "point_lr"}]}, "B15": {"layers": [2]}},
          "reason": "円を三分割の右下の交点へ移し、点を遠くに置く。"}
 SENTENCE = "廃駅のホームに時刻表だけが残る。"
@@ -155,7 +155,9 @@ def test_a_laws_child_keeps_the_basis_the_next_laws_move_reads(author, answers):
     owner = author["user"]["id"]
     parent_id = _laws_work(author)["history_id"]
     store = get_service().store
-    assert laws_records_of(store, owner, parent_id)["laws_basis"]["main_law"] == "B1"
+    parent_basis = laws_records_of(store, owner, parent_id)["laws_basis"]
+    assert parent_basis["main_law"] == "B1"
+    assert parent_basis["main_layer"] is None
     answers["queues"]["choose_laws"][:] = [MOVED]
     runner = autonomous_refine.get_runner()
     run = _run(owner, kinds=("laws",))
@@ -172,8 +174,10 @@ def test_a_laws_child_keeps_the_basis_the_next_laws_move_reads(author, answers):
     assert child["derivation_metadata"]["ai_move"]["kind"] == "laws"
     assert child["derivation_metadata"]["ai_move"]["visible"]["share"] == taken["share"]
     assert child["derivation_metadata"]["ai_move"]["laws"]["excluded"] == ["B1", "B21"]
+    assert child["derivation_metadata"]["ai_move"]["laws"]["main_layer"] is None
     basis = laws_records_of(store, owner, taken["history_id"])["laws_basis"]
     assert basis["main_law"] == "B3"
+    assert basis["main_layer"] is None
     # The next laws move starts from the child's own basis.
     answers["queues"]["choose_laws"][:] = [LAWS]
     again = runner._laws(run, runner._work(owner, taken["history_id"]),

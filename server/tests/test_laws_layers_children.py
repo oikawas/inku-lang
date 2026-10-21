@@ -34,14 +34,15 @@ SOURCE = f"背景を白で埋める。\n{RECORDED}\n上半分（横0〜1、縦0�
 LAWS = {"schema": "inku.laws-layers.v1", "layers": [{"sentences": [RECORDED], "kind": "laws", "laws": ["B1"]}]}
 BASIS = {"schema": "inku.laws-basis.v1",
          "composed": SOURCE.replace("画面の横0.618034、縦0.618034の位置に", "画面の中ほどに"),
-         "committed_digest": hashlib.sha256(SOURCE.encode()).hexdigest(), "main_layer": 0, "main_law": "B1",
+         "committed_digest": hashlib.sha256(SOURCE.encode()).hexdigest(), "main_layer": None, "main_law": "B1",
          "laws": {"B1": {"targets": [{"layer": 0, "at": "point_lr"}]}}, "reason": "The grey ellipse leads."}
 DIAGNOSTICS = {"upstream_diagnostics": [], "downstream_diagnostics": [],
                "resource_omissions": [], "relation_omissions": [],
                "render_diagnostics": None, "resource_execution": None}
 
 
-def test_children_drawn_from_a_laws_work_keep_its_record(monkeypatch):
+@pytest.mark.parametrize("main_layer", [None, 0], ids=["no-main-layer", "saved-main-layer"])
+def test_children_drawn_from_a_laws_work_keep_its_record(monkeypatch, main_layer):
     from inku_server.api_core import common, rendering
 
     monkeypatch.setattr(rendering, "_submit_thumbnail_build", lambda _item: None)
@@ -55,6 +56,7 @@ def test_children_drawn_from_a_laws_work_keep_its_record(monkeypatch):
     headers = {"Authorization": f"Bearer {token}"}
     client = TestClient(app)
     store = VariationAuthorityStore(db.engine)
+    basis = {**BASIS, "main_layer": main_layer}
     try:
         binding = PipelineBinding()
         effects = ProductPipelineEffects(binding, default_manifest(binding))
@@ -64,11 +66,11 @@ def test_children_drawn_from_a_laws_work_keep_its_record(monkeypatch):
         run = CandidateExecution(binding, store, owner_id=user["id"], config=config, context=context,
                                  provider=lambda _action: pytest.fail("no model is asked"))
         # A direct-DDL run takes the records as a fork of a laws work does, and keeps them.
-        run.start_new({"tag": "direct_ddl", "source": SOURCE, "laws_layers": LAWS, "laws_basis": BASIS})
+        run.start_new({"tag": "direct_ddl", "source": SOURCE, "laws_layers": LAWS, "laws_basis": basis})
         run.run_effect()
         snapshot = run.snapshot()
         assert snapshot["phase"]["tag"] == "score_ready"
-        assert (snapshot["laws_layers"], snapshot["laws_basis"]) == (LAWS, BASIS)
+        assert (snapshot["laws_layers"], snapshot["laws_basis"]) == (LAWS, basis)
         source, score = snapshot["document"]["source"], snapshot["delivery"]["score"]
         initial = {"id": str(uuid.uuid4()), "user_id": user["id"], "at": 1, "input": "a grey ellipse",
                    "ddl": source, "score": score, "svg": "<svg/>", "render_color_map": render_color_map_for_catalog("default"),
@@ -114,7 +116,7 @@ def test_children_drawn_from_a_laws_work_keep_its_record(monkeypatch):
 
         # The child 5173 refused: the same instructions, and now the record.
         colored = save(parent["lineage_node_id"], "color_arrangement_change", {"color_arrangement_index": 0}, 2)
-        assert colored["ddl"] == source and record_of(colored["id"]) == LAWS and basis_of(colored["id"]) == BASIS
+        assert colored["ddl"] == source and record_of(colored["id"]) == LAWS and basis_of(colored["id"]) == basis
         layout = client.post("/api/compose", json={"work_id": colored["id"], "ddl": colored["ddl"],
                              "recompose_mode": "principled"}, headers=headers)
         assert layout.status_code == 200, layout.text
@@ -131,7 +133,7 @@ def test_children_drawn_from_a_laws_work_keep_its_record(monkeypatch):
             "derivation_metadata": {"composition_seed": 17, "recompose_mode": "principled"},
         }, headers=headers)
         assert laid.status_code == 200, laid.text
-        assert record_of(laid.json()["id"]) == LAWS and basis_of(laid.json()["id"]) == BASIS
+        assert record_of(laid.json()["id"]) == LAWS and basis_of(laid.json()["id"]) == basis
         again = client.post("/api/compose", json={"work_id": laid.json()["id"], "ddl": laid.json()["ddl"],
                             "recompose_mode": "principled"}, headers=headers)
         assert again.status_code == 200, again.text
@@ -139,24 +141,24 @@ def test_children_drawn_from_a_laws_work_keep_its_record(monkeypatch):
 
         # The basis keeps the parent's digest, by which the laws move stops on the new DDL.
         grounded = save(parent["lineage_node_id"], "ground_change", {"ground_material": "washi"}, 3)
-        assert RECORDED in grounded["ddl"] and record_of(grounded["id"]) == LAWS and basis_of(grounded["id"]) == BASIS
+        assert RECORDED in grounded["ddl"] and record_of(grounded["id"]) == LAWS and basis_of(grounded["id"]) == basis
 
         # The touch written into the recorded sentence is written into the record.
         touched = save(parent["lineage_node_id"], "tool_change", {"tool_mode": "per_sentence", "tools": {"0": "chalk"}}, 4)
         rewritten = RECORDED.replace("細筆", "チョーク")
         assert rewritten in touched["ddl"]
         assert record_of(touched["id"]) == {**LAWS, "layers": [{**LAWS["layers"][0], "sentences": [rewritten]}]}
-        assert basis_of(touched["id"]) == BASIS
+        assert basis_of(touched["id"]) == basis
 
         # A child of such a child reads the records on its parent's edge.
         regrounded = save(colored["lineage_node_id"], "ground_change", {"ground_material": "washi"}, 5)
-        assert record_of(regrounded["id"]) == LAWS and basis_of(regrounded["id"]) == BASIS
+        assert record_of(regrounded["id"]) == LAWS and basis_of(regrounded["id"]) == basis
 
         # A redraw keeps them: in its link for a linked work, on its edge for the others.
         relinked = store.read_linked_history(user["id"], redraw(parent, 6)["id"])
-        assert (relinked.laws_layers, relinked.laws_basis) == (LAWS, BASIS)
+        assert (relinked.laws_layers, relinked.laws_basis) == (LAWS, basis)
         redrawn = redraw(colored, 7)
-        assert record_of(redrawn["id"]) == LAWS and basis_of(redrawn["id"]) == BASIS
+        assert record_of(redrawn["id"]) == LAWS and basis_of(redrawn["id"]) == basis
 
         # A catalog change draws the parent's Score in another catalog, as the screen does
         # (/api/render-score, then the save with that Score). The instructions are the same,
@@ -175,7 +177,7 @@ def test_children_drawn_from_a_laws_work_keep_its_record(monkeypatch):
                                     "laws_layers": {**LAWS, "layers": []}},
         }, headers=headers)
         assert cataloged.status_code == 200, cataloged.text
-        assert record_of(cataloged.json()["id"]) == LAWS and basis_of(cataloged.json()["id"]) == BASIS
+        assert record_of(cataloged.json()["id"]) == LAWS and basis_of(cataloged.json()["id"]) == basis
         recataloged = client.post("/api/compose", json={"work_id": cataloged.json()["id"],
                                   "ddl": cataloged.json()["ddl"], "recompose_mode": "principled"}, headers=headers)
         assert recataloged.status_code == 200, recataloged.text
@@ -188,7 +190,7 @@ def test_children_drawn_from_a_laws_work_keep_its_record(monkeypatch):
             "input": "", "ddl": source, "score": score, "at": 8, "save_artifacts": False,
             "render_seed": 77, "composition_seed": 17, "catalog_id": "default",
             "lineage_parent_node_id": parent["lineage_node_id"], "derivation_kind": "replay",
-            "derivation_metadata": {"laws_layers": LAWS, "laws_basis": BASIS},
+            "derivation_metadata": {"laws_layers": LAWS, "laws_basis": basis},
         }, headers=headers)
         assert named.status_code == 200, named.text
         assert not {"laws_layers", "laws_basis"} & set(named.json()["derivation_metadata"])

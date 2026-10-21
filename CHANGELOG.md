@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-21 — Remove the on-device model's eight-layer limit on Android
+
+Following the author's decision to leave the underdrawing's layer count unbounded, Android no longer adds an eight-layer limit to the response schema sent to LiteRT-LM. It passes the shared core's schema unchanged, with no Android layer limit. The 4096-token window and existing sampling stay in place. The test now checks that the SDK receives the exact schema, instead of reading and copying a core constant.
+
 ### 2026-10-21 — macOS checks composition prompt presentation independently of the core prompt version
 
 The composition AppCheck now checks that its prompt journal contains the composition reading with the message and system text that were sent, rather than holding an expected core prompt ID. It checks the host's presentation and persistence boundary without copying revisions of composition theory into the host test. App behavior is unchanged.

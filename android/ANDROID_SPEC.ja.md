@@ -479,11 +479,11 @@ OAuthは端末の`127.0.0.1`の一時listenerを先に開き、dynamic registrat
 
 公式の[認証](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)、[モデル一覧と推論](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference)、[登録とsession](https://developers.openai.com/siwc/token-sharing-open-source/profiles-and-sessions)の契約に沿う。実際のOpenAIへの接続には本人のChromeでの認可が必要で、局所の試験成功とは区別する。
 
-## 2026-10-03 端末モデルの応答をJSONの型へ沿わせる（I-713、2026-10-04更新）
+## 2026-10-03 端末モデルの応答をJSONの型へ沿わせる（I-713、2026-10-21更新）
 
 LiteRT-LMは0.17.1を使う。端末providerは `ModelRequest.tool.parametersJson` を `ResponseFormat.json(schema)` へ渡す。応答の型を持つ要求だけ、会話の `enableResponseFormat` と送信時の `responseFormat` を同時に設定して、SDKのJSON Schema制約を使う。型の無い文章の要求と写真の観察文ではこの制約を有効にしない。
 
-2026-10-04の作者裁定により、端末の `generate_normalized_ddl` だけ、SDKへ渡す型のコピーの `properties.layers` に `maxItems` を付ける。値8はcoreの `MAX_WORK_PLAN_LAYERS` の写しであり、JVM試験で正本との一致を守る。元のModelRequestと共有coreの型、構図読みなど他の要求の型は変更しない。Geminiがこの上限を拒むため、雲providerへは付けない。
+2026-10-21の作者裁定によるcoreの下絵の層数制限の廃止に合わせ、端末の `generate_normalized_ddl` の型に足していた `properties.layers.maxItems` と値8の写しを外した。Stage 1も構図の読みも、共有coreから受けた型を加工せずSDKへ渡し、端末独自の層数上限は置かない。これは2026-10-04の、coreの8層の上限を端末だけに写す裁定を置き換える。
 
 共有coreのprompt/schemaと再試行の判断を使い、GPU、4096 tokenの窓、temperature0.0を含む既存sampling設定を維持する。端末Gemma 4 E2Bの構図は `read: false` のままで、既定の読みを使う。
 

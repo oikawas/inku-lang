@@ -1,9 +1,7 @@
 package app.inku.mobile.llm
 
-import app.inku.mobile.data.db.productFile
 import com.google.ai.edge.litertlm.Content
 import com.google.ai.edge.litertlm.ResponseFormat
-import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -41,21 +39,15 @@ class LocalLiteRtLmGenerationConfigTest {
     }
 
     @Test
-    fun stageOneLayerLimitMatchesCoreWithoutChangingSharedOrOtherSchemas() {
-        val coreSource = productFile("core/crates/inku-ddl/src/work_plan.rs").readText()
-        val coreLimit = Regex("""(?m)^\s*pub\s+const\s+MAX_WORK_PLAN_LAYERS\s*:\s*usize\s*=\s*(\d+)\s*;""")
-            .findAll(coreSource).single().groupValues[1].toInt()
-        assertEquals(coreLimit, LITERT_STAGE1_MAX_LAYERS)
-        val schema = """{"type":"object","properties":{"layers":{"type":"array","items":{"type":"object","properties":{"plugins":{"type":"array","items":{"type":"string"}}}}}},"required":["layers"]}"""
+    fun stageOnePassesItsExactSchemaWithoutAddingALayerLimitOrChangingOtherConstraints() {
+        val schema = """{ "type":"object", "properties":{"layers":{"type":"array","items":{"type":"object","properties":{"count":{"type":"integer","maximum":240},"plugins":{"type":"array","maxItems":2,"items":{"type":"string"}}}}}}, "required":["layers"] }"""
         val request = ModelRequest(modelId = "local-litert-lm:gemma-4-e2b", prompt = "Draw a circle",
             temperature = 0.0, maxTokens = 2048, tool = ModelTool("submit_pipeline_response", "Submit", schema),
             pipelineAction = "generate_normalized_ddl")
-        val bounded = JSONObject(checkNotNull(localLiteRtLmGenerationConfig(request).responseFormat).schemaOrPattern)
-        val layers = bounded.getJSONObject("properties").getJSONObject("layers")
-        assertEquals(coreLimit, layers.getInt("maxItems"))
-        assertFalse(layers.getJSONObject("items").getJSONObject("properties").getJSONObject("plugins").has("maxItems"))
-        layers.remove("maxItems")
-        assertEquals(JSONObject(schema).toString(), bounded.toString())
+        val config = localLiteRtLmGenerationConfig(request)
+        assertTrue(config.conversationConfig.enableResponseFormat)
+        assertEquals(ResponseFormat.Type.JSON_OBJECT, config.responseFormat?.type)
+        assertEquals(schema, config.responseFormat?.schemaOrPattern)
         assertEquals(schema, checkNotNull(request.tool).parametersJson)
         assertEquals(schema, localLiteRtLmGenerationConfig(request.copy(pipelineAction = "read_composition")).responseFormat?.schemaOrPattern)
         assertEquals(schema, localLiteRtLmGenerationConfig(request.copy(pipelineAction = null)).responseFormat?.schemaOrPattern)

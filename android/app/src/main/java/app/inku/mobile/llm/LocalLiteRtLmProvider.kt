@@ -269,23 +269,9 @@ internal data class LocalLiteRtLmGenerationConfig(
     val responseFormat: ResponseFormat?,
 )
 
-// Keep this adapter-only limit equal to inku_ddl::work_plan::MAX_WORK_PLAN_LAYERS.
-internal const val LITERT_STAGE1_MAX_LAYERS = 8
-
 /** Enable the conversation constraint and its per-message schema together. */
 internal fun localLiteRtLmGenerationConfig(request: ModelRequest): LocalLiteRtLmGenerationConfig {
-    val responseFormat = request.tool?.let {
-        val schema = if (request.pipelineAction == "generate_normalized_ddl") {
-            // Gemini rejects maxItems, so leave the shared request schema untouched.
-            JSONObject(it.parametersJson).apply {
-                getJSONObject("properties").getJSONObject("layers")
-                    .put("maxItems", LITERT_STAGE1_MAX_LAYERS)
-            }.toString()
-        } else {
-            it.parametersJson
-        }
-        ResponseFormat.json(schema)
-    }
+    val responseFormat = request.tool?.let { ResponseFormat.json(it.parametersJson) }
     return LocalLiteRtLmGenerationConfig(
         conversationConfig = ConversationConfig(
             systemInstruction = request.systemInstruction

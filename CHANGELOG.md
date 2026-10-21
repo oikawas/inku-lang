@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-21 — The laws stage's answer names each layer the description counts with the description's words
-
-The laws stage's answer listed the layers of the things whose count the description itself writes ("one heron", "three times") as a list of layer numbers (description_counts). The model often read the list as each layer's count (`[0, 3, 0]`) and left the counted layer out of it, so a law that changes such a count could pass unrefused. Each item is now a layer number with the part of the description that writes the count, quoted verbatim, and the request asks for the counted layers only. The tool looks for the words in the description, with the quote marks around them taken off, and refuses words it does not hold and a layer named twice. An item with empty words reads as a layer whose count the description does not write. A layer a refused answer named with the description's words keeps its count, though a later answer leaves it out. This holds for the laws stage of a description run and for the laws move of the AI refinement.
-
 ### 2026-10-21 — Android: the camera's model chooser follows the model purposes, and Juxtapose's held reason matches Web
 
 At the author's decision, the camera's model chooser offers only the models set to be used for both LLM and Vision. The camera reads the photo and draws with the same model, so a model with only one of the two purposes stops partway. If the chosen model has only one, it has to be chosen again. Also, in the work-editing menu of a description-locked work, the reason under Juxtapose is now Web's "This work's DDL was edited. Drawing it from the description would lose the edits, so this is not offered. …". As the way to start again from the description, Android names Change the description in the same menu.
@@ -194,6 +190,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.227 (2026-10-21 / Build 1303)
+
+### 2026-10-21 — The laws stage's answer names each layer the description counts with the description's words
+
+The laws stage's answer listed the layers of the things whose count the description itself writes ("one heron", "three times") as a list of layer numbers (description_counts). The model often read the list as each layer's count (`[0, 3, 0]`) and left the counted layer out of it, so a law that changes such a count could pass unrefused. Each item is now a layer number with the part of the description that writes the count, quoted verbatim, and the request asks for the counted layers only. The tool looks for the words in the description, with the quote marks around them taken off, and refuses words it does not hold and a layer named twice. An item with empty words reads as a layer whose count the description does not write. A layer a refused answer named with the description's words keeps its count, though a later answer leaves it out. This holds for the laws stage of a description run and for the laws move of the AI refinement.
 
 ## v2.15.226 (2026-10-21 / Build 1302)
 

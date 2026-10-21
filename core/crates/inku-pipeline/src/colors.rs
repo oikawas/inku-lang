@@ -1802,7 +1802,7 @@ const SYSTEM_JA: &str = "あなたは、作品の配色を決める係です。
 配色の法則の一覧（18）から、この作品に使う法則を選び、法則ごとの値を選択肢から選んでください。明るさ・面積・濃さの計算と、決まりの検査は、道具がします。
 
 決まり:
-1. 主の配色の法則（main_law）を一つ決めます。画を見た人が最初に感じ取る、色の骨組みになる法則です。主を支える法則は 0 か 1 つにします（laws は主を含めて 1〜2）。この画ですでに成り立っている法則（一覧に印がある）は、主には選べません。支えには使えます。主には、画の色を変える法則を選びます。画を何も変えない答えは退けられます。
+1. 主の配色の法則（main_law）を一つ決めます。画を見た人が最初に感じ取る、色の骨組みになる法則です。支える法則の数は決めません。この画ですでに成り立っている法則（一覧に印がある）は、主には選べません。支えには使えます。主には、画の色を変える法則を選びます。画を何も変えない答えは退けられます。
 2. 主の層は、前の段が決めた層です（「主の層」に書いた番号）。変えません。
 3. 記述が色の言葉で言った層と地は、道具が決めました（「記述の色」に書いたもの）。その色は、どの法則でも替えません（替える答えは退けられます）。
 4. 層の要約に fixed がある層は、前の段が色を決めた層です。色を替えてかまいませんが、空気遠近 B15 の遠い層は、地との描いた明るさの差を 0.2 以上で、主の層より小さく保ちます（遠い物ほど地に溶けます）。文様 C2 の層は、地から見えるように保ちます。差し込みの形の層（arranged が plugin）は、色を替えられません。
@@ -1819,7 +1819,7 @@ The work is a Score made from the description (the author's words). The previous
 From the list of color laws (18), choose the laws this work uses and, for each law, its values from the choices. The tool computes lightness, area and handling and checks the rules.
 
 Rules:
-1. Choose one main color law (main_law): the color framework a viewer feels first. Choose zero or one law that supports it (laws holds one or two, the main law included). A law that already holds in this picture (marked in the list) cannot be the main law; it can support. As the main law, choose a law that changes the picture's colors. An answer that changes nothing in the picture is refused.
+1. Choose one main color law (main_law): the color framework a viewer feels first. The number of laws that support it is not fixed. A law that already holds in this picture (marked in the list) cannot be the main law; it can support. As the main law, choose a law that changes the picture's colors. An answer that changes nothing in the picture is refused.
 2. The main layer is the one the previous stage decided (the number under “Main layer”). Keep it.
 3. The tool has decided the layers and the ground whose colors the description states in color words (listed under “Stated colors”). No law changes those colors; an answer that does is refused.
 4. A layer with fixed in its summary got its color from the previous stage. It may be recolored, but a distant layer of aerial perspective B15 keeps a drawn lightness difference from the ground of 0.2 or more and less than the main layer's (distant things melt into the ground), and a pattern layer of C2 stays seen against the ground. A plugged-in layer (arranged plugin) cannot change its color.
@@ -1871,8 +1871,8 @@ const EXAMPLE_ANSWER: [&str; 2] = [
 ];
 
 const RULE: [&str; 2] = [
-    "## この答えの決まり\n主の配色の法則を1つと、支える法則を0か1つ選ぶ。laws は主を含めて1〜2にする（上の例は2つ）。主には、「この画ですでに成り立っている」の印の無い法則を選ぶ。",
-    "## The rule of this answer\nChoose one main color law and zero or one law that supports it. laws holds one or two laws, the main law included (the example holds two). As the main law, choose a law without the mark “already holds in this picture”.",
+    "## この答えの決まり\n主の配色の法則を1つと、それを支える法則を選ぶ（数は決めない）。主には、「この画ですでに成り立っている」の印の無い法則を選ぶ。",
+    "## The rule of this answer\nChoose one main color law and the laws that support it (their number is not fixed). As the main law, choose a law without the mark “already holds in this picture”.",
 ];
 
 fn color_enum() -> Value {
@@ -2656,22 +2656,6 @@ fn check(answer: &Value, context: &ColorsContext) -> Result<(Answer, Vec<ColorNo
             ));
         };
         laws.insert(key, value.clone());
-    }
-    if !(1..=2).contains(&laws.len()) {
-        let listed: Vec<&str> = given.keys().map(String::as_str).collect();
-        return Err(refusal(
-            "law_count",
-            format!(
-                "配色の法則は主を含めて1〜2（今は {}: {}）",
-                laws.len(),
-                listed.join(", ")
-            ),
-            format!(
-                "one or two color laws, the main one included (now {}: {})",
-                laws.len(),
-                listed.join(", ")
-            ),
-        ));
     }
     if !laws.keys().any(|law| *law == main_law) {
         return Err(refusal(

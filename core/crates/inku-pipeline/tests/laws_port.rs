@@ -469,7 +469,6 @@ fn the_tool_refuses_answers_that_break_the_rules() {
             answer(json!({"B5": diagonal, "B21": still}), "B21", 0),
             "not_a_choice",
         ),
-        (answer(json!({"B5": diagonal}), "B5", 0), "law_count"),
         (
             answer(
                 json!({"B5": diagonal, "B21": still, "B1": {"targets": [{"layer": 0, "at": "line_left"}]}}),
@@ -517,6 +516,14 @@ fn the_tool_refuses_answers_that_break_the_rules() {
     assert_eq!(chosen.laws, ["B5", "B21"]);
     // Layer 1 has no fluctuation to still, so only the row the armature lays changes.
     assert_eq!(chosen.print.changed, [0]);
+    // The number of laws is not fixed (2026-10-21): the main law alone is chosen too.
+    let alone = choose(
+        &answer(json!({"B5": diagonal}), "B5", 0),
+        &context,
+        &case.composed,
+    )
+    .expect("one law is chosen");
+    assert_eq!(alone.laws, ["B5"]);
 }
 
 /// The arrangement laws' refusals, with the prototype's reasons: two of them on

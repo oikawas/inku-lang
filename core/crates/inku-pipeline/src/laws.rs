@@ -2083,7 +2083,7 @@ const SYSTEM_JA: &str = "あなたは、絵画・意匠・音楽の法則を組�
 
 決まり:
 1. 主の法則（main_law）を一つ決めます。画を見た人が最初に読み取る、画の骨組みになる法則です。B21 は主にしません。主の層（main_layer）も一つ決めます。
-2. 法則の数は、送る文の最後の「この答えの決まり」に従います。法則は、層をいくつに当てても1つと数えます。
+2. 法則の数は決めません。記述と画に合わせて選びます。法則は、層をいくつに当てても1つと数えます。
 3. 一つの層に、置き場の法則（B1〜B5・B7・B8）は一つ、並びの法則（B9・B10・B12）は一つまで。C1〜C6 は置き場と並びを作り直すので、同じ層に、ほかの置き場・並びの法則や、ほかの C1〜C6 を重ねません。大きさの法則（B6・B10・B12・B15・C4）は掛け合わせます。
 4. 記述が名指した物の種類と道具は変えません。記述そのものが数を書いた物（「一羽」「三度」など）は数を変えません。そのような層だけを、層の番号（layer）と、数を書いた記述の部分をそのまま短く引いた語（words）の組で description_counts に入れます。数を書いていない層は入れません。そのような層が無ければ、description_counts は空の配列 [] にします。
 5. 道具は、置き場 → 大きさ → 並び → C1〜C6 → 空気遠近 → 手 の順に当てます。決まりに合わない答えは、理由を添えて返されます。
@@ -2097,7 +2097,7 @@ From the list of laws (19), choose the laws this work uses and, for each law, it
 
 Rules:
 1. Choose one main law (main_law): the law a viewer reads first, the framework of the picture. B21 is never the main law. Choose one main layer (main_layer) too.
-2. The number of laws follows \"The rule of this answer\" at the end of the message. A law counts as one however many layers it takes.
+2. The number of laws is not fixed; choose them to fit the description and the picture. A law counts as one however many layers it takes.
 3. A layer takes one placement law (B1 to B5, B7, B8) and one arrangement law (B9, B10, B12) at most. C1 to C6 rebuild a layer's place and arrangement, so a layer that takes one of them takes no other placement or arrangement law and no other of C1 to C6. The size laws (B6, B10, B12, B15, C4) multiply.
 4. Keep the kinds of things and the tools the description names. Keep the count of a thing the description itself counts (\"one heron\", \"three times\"). Put in description_counts only such layers, each as its number (layer) and the part of the description that writes the count, quoted short and verbatim (words). Leave out every layer whose count the description does not write; when there is none, description_counts is the empty list [].
 5. The tool applies placement, then size, then arrangement, then C1 to C6, then aerial perspective, then the hand. An answer that breaks the rules comes back with the reason.
@@ -2141,9 +2141,11 @@ const COLOR_HEAD: [&str; 2] = [
     "## The colors of this work's catalog (the nine color names and the colors they draw; lightness is the lightness from 0 to 1, chroma the vividness and hue the hue angle)",
 ];
 
-const COUNT_RULE: [&str; 2] = [
-    "## この答えの決まり（V2）\n主の法則を支える法則を1つか2つだけ選ぶ。laws は主を含めて2〜3にする。",
-    "## The rule of this answer (V2)\nChoose only one or two laws that support the main law. laws holds two or three laws, the main law included.",
+/// The rule at the end of the message; the number of laws is not fixed
+/// (2026-10-21).
+const ANSWER_RULE: [&str; 2] = [
+    "## この答えの決まり\n主の法則を一つと、それを支える法則を選ぶ（数は決めない）。",
+    "## The rule of this answer\nChoose one main law and the laws that support it (their number is not fixed).",
 ];
 
 const ABSENT_MARK: [&str; 2] = [
@@ -2260,7 +2262,7 @@ fn message(
     lines.extend(EXAMPLE_LAYERS.iter().map(|layer| (*layer).to_owned()));
     lines.push(format!("{}{}", labels[2], EXAMPLE_ANSWER[at]));
     lines.push(String::new());
-    lines.push(COUNT_RULE[at].to_owned());
+    lines.push(ANSWER_RULE[at].to_owned());
     lines.join("\n")
 }
 
@@ -2893,9 +2895,9 @@ const REASON_LIMIT: usize = 2000;
 
 /// How an answer is checked.
 enum Rules<'a> {
-    /// The request's rules: two or three laws, and a description_counts whose
-    /// words the description holds. `counted` are the layers the run's earlier
-    /// answers named with the description's words.
+    /// The request's rules: a description_counts whose words the description
+    /// holds. `counted` are the layers the run's earlier answers named with the
+    /// description's words.
     Request {
         description: &'a str,
         counted: &'a BTreeSet<usize>,
@@ -3079,8 +3081,8 @@ fn untakeable(
 }
 
 /// Read an answer and check it against the schema and the prototype's rules,
-/// under the request's `rules` (the laws are two or three, its V2 rule, and
-/// description_counts quotes the description) or the prototype's.
+/// under the request's `rules` (description_counts quotes the description) or
+/// the prototype's.
 fn check(answer: &Value, context: &LawsContext, rules: &Rules) -> Result<Answer, Refusal> {
     let fixed = kept_counts(answer, rules);
     untakeable(answer, context, &fixed)?;
@@ -3135,22 +3137,6 @@ fn check(answer: &Value, context: &LawsContext, rules: &Rules) -> Result<Answer,
             "hand_as_main",
             "B21 は主の法則にしない".to_owned(),
             "B21 is never the main law".to_owned(),
-        ));
-    }
-    if matches!(rules, Rules::Request { .. }) && !(2..=3).contains(&laws.len()) {
-        let names: Vec<&str> = laws.keys().copied().collect();
-        return Err(refusal(
-            "law_count",
-            format!(
-                "V2 では法則は主を含めて2〜3（今は {}: {}）",
-                laws.len(),
-                names.join(", ")
-            ),
-            format!(
-                "V2 takes two or three laws with the main law (now {}: {})",
-                laws.len(),
-                names.join(", ")
-            ),
         ));
     }
     let mut placed: BTreeMap<usize, Vec<&str>> = BTreeMap::new();

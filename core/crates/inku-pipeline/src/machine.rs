@@ -1561,7 +1561,6 @@ impl PipelineSnapshot {
         let searched =
             composition::search(&plan.layers, reading, background).map_err(|unsolved| {
                 match unsolved {
-                    composition::Unsolved::Combinations(_) => "combinations",
                     composition::Unsolved::NoRanges => "no_ranges",
                     composition::Unsolved::UnknownPlace(_) => "unknown_place",
                 }

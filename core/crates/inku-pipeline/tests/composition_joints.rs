@@ -150,10 +150,15 @@ fn a_work_without_joints_is_placed_and_printed_as_before() {
 #[test]
 fn a_group_resting_on_a_band_is_printed_after_it_with_room_above_it() {
     let layers = vec![band(), lines(), circles()];
-    let reading = reading(
+    let mut reading = reading(
         vec![Role::Field, Role::Secondary, Role::Scattered],
         vec![joint(JointKind::RestsOn, 2, 0)],
     );
+    // Wide empty space (the composition's default until 2026-10-21) keeps the
+    // circles' range low enough for the band to leave room above it.
+    reading
+        .tension
+        .insert("void".to_owned(), "strong".to_owned());
     let jointed = place(&layers, &reading);
     assert_eq!(jointed.order, vec![0, 2, 1]);
     assert_eq!(jointed.joints, vec![None, None, Some(JointKind::RestsOn)]);

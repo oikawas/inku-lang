@@ -212,7 +212,7 @@ fn normalization_turns_unusable_values_into_diagnostics_without_stopping() {
     assert!(!arc.attributes.contains_key(&WorkPlanSlot::MotionAmplitude));
     let point = &plan.layers[1];
     assert_ne!(point.action, "draw");
-    assert_eq!(point.count, 60);
+    assert_eq!(point.count, 240);
     assert!(!point.attributes.contains_key(&WorkPlanSlot::Angle));
     let reasons: Vec<&str> = diagnostics.iter().map(|item| item.reason).collect();
     for reason in [

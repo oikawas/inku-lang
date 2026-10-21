@@ -27,8 +27,9 @@ pub const WORK_PLAN_CAPABILITIES_ASSET_ID: &str = "inku.work-plan-capabilities.v
 pub const WORK_PLAN_CAPABILITIES_ASSET_BYTES: &[u8] =
     include_bytes!("../assets/work-plan-capabilities-v2.json");
 pub const UNSPECIFIED: &str = "unspecified";
-pub const MAX_WORK_PLAN_LAYERS: usize = 8;
-pub const MAX_WORK_PLAN_COUNT: u32 = 60;
+/// One layer draws this many marks at most (the shipping hard policy's marks
+/// per instruction).
+pub const MAX_WORK_PLAN_COUNT: u32 = 240;
 pub const MAX_WORK_PLAN_PLUGINS: usize = 4;
 
 /// One closed plan slot. Slot names are the plan's JSON field names, and each
@@ -601,10 +602,6 @@ pub fn normalize_work_plan_with_plugins(
         .cloned()
         .unwrap_or_default();
     for (index, layer) in layers.iter().enumerate() {
-        if plan.layers.len() >= MAX_WORK_PLAN_LAYERS {
-            note(Some(index), "layers", String::new(), "over_layer_limit");
-            continue;
-        }
         let Some(shape) =
             text(layer.get("shape")).filter(|shape| capabilities.forms.contains_key(shape))
         else {

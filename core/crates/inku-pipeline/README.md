@@ -86,8 +86,8 @@ in the answers after it. An arc's sagitta is printed at most half its
 printed chord. `choose_colors`
 runs only when the configuration has `colors`, once the laws stage ends for a
 composed plan (also when the laws fell back or the run has none): a reader
-chooses one or two of the eighteen color laws (B11, B13, B14, B16 to B20, C7 to
-C9, D1 to D7) for the work, shown its layers as the core estimates them drawn
+chooses color laws among the eighteen (B11, B13, B14, B16 to B20, C7 to C9, D1
+to D7) for the work, their number not fixed, shown its layers as the core estimates them drawn
 (each layer's drawn contrast and chroma and the colors it would not be seen in,
 from the renderer's editable SVG) and its paints' places on Itten's wheel. The
 core keeps the colors the description states, plugged-in layers and the

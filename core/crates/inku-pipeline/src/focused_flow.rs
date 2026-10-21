@@ -2599,7 +2599,7 @@ fn a_run_without_composition_commits_the_plan_as_printed() {
     let pending = composition_start(None);
     // Without the step Stage 1 keeps the principle that spreads the layers itself.
     let system = stage1_system(&pending);
-    assert!(system.contains("8. Empty space is part of the composition. Do not gather"));
+    assert!(system.contains("8. Do not gather every layer at the center"));
     assert!(!system.contains("8. Choose a place only"));
     let output = plan_answer(&pending);
     let source = committed_source(&output.snapshot);
@@ -2670,6 +2670,13 @@ fn two_laws() -> serde_json::Value {
 fn one_law() -> serde_json::Value {
     json!({"main_layer": 1, "main_law": "B1", "description_counts": [],
            "laws": {"B1": {"targets": [{"layer": 1, "at": "point_ul"}]}},
+           "reason": "“A red circle” leads the picture."})
+}
+
+/// An answer the tool refuses: its main law is not among its laws.
+fn main_law_missing() -> serde_json::Value {
+    json!({"main_layer": 1, "main_law": "B1", "description_counts": [],
+           "laws": {"B15": {"layers": [2]}},
            "reason": "“A red circle” leads the picture."})
 }
 
@@ -2888,10 +2895,10 @@ fn a_layer_a_refused_answer_quoted_keeps_its_count_after_it() {
 fn a_refused_answer_is_asked_again_with_the_reason() {
     let asked = plan_answer(&laws_start(Some(LawsConfig {}))).snapshot;
     let first = asked.action.as_ref().unwrap().identity.clone();
-    let refused = laws_answer(&asked, &one_law());
+    let refused = laws_answer(&asked, &main_law_missing());
     let retried = event(&refused, "retry_scheduled").expect("a retry");
     assert_eq!(retried["failure"], "semantic_violation");
-    assert_eq!(retried["detail"], "law_count");
+    assert_eq!(retried["detail"], "main_law_missing");
     let again = refused.snapshot.action.as_ref().unwrap();
     assert_eq!(again.tag, "choose_laws");
     assert_eq!(again.identity.attempt, 2);
@@ -2901,11 +2908,12 @@ fn a_refused_answer_is_asked_again_with_the_reason() {
     let reply = format!(
         "## The tool's reply to the previous answer\nThe previous answer:\n{}\n\
          The previous answer could not be used: \
-         V2 takes two or three laws with the main law (now 1: B1)\nReturn a corrected answer.",
-        one_law()
+         the main law B1 is not in laws\nReturn a corrected answer.",
+        main_law_missing()
     );
     assert!(message.ends_with(&reply), "{message}");
-    let chosen = laws_answer(&refused.snapshot, &two_laws());
+    // The number of laws is not fixed (2026-10-21): the main law alone is chosen.
+    let chosen = laws_answer(&refused.snapshot, &one_law());
     assert!(
         event(&chosen, "laws_chosen").is_some(),
         "{:?}",
@@ -2920,14 +2928,14 @@ fn refused_answers_that_spend_the_budget_commit_the_composed_document() {
     let composed = state.laws.as_ref().unwrap().document.source.clone();
     let mut last = None;
     for _ in 0..2 {
-        let output = laws_answer(&state, &one_law());
+        let output = laws_answer(&state, &main_law_missing());
         state = output.snapshot.clone();
         last = Some(output);
     }
     let last = last.unwrap();
     assert_eq!(
         event(&last, "laws_fallback"),
-        Some(&json!({"failure": "semantic_violation", "detail": "law_count"}))
+        Some(&json!({"failure": "semantic_violation", "detail": "main_law_missing"}))
     );
     assert_eq!(committed_source(&state), composed);
     assert!(state.laws.is_none());
@@ -3857,7 +3865,7 @@ fn refused_laws_from_a_saved_work_stop_without_a_commit() {
         saved_laws_start(&composed, crate::laws::LawsDirection::default(), None, None).snapshot;
     let mut last = None;
     for _ in 0..2 {
-        let output = laws_answer(&state, &one_law());
+        let output = laws_answer(&state, &main_law_missing());
         state = output.snapshot.clone();
         last = Some(output);
     }
@@ -3865,7 +3873,7 @@ fn refused_laws_from_a_saved_work_stop_without_a_commit() {
     assert!(state.action.is_none() && state.laws_basis.is_none());
     assert_eq!(
         event(&last.unwrap(), "failed").unwrap()["detail"],
-        "law_count"
+        "main_law_missing"
     );
 }
 

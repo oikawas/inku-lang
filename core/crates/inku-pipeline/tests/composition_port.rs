@@ -13,7 +13,6 @@ use std::collections::BTreeMap;
 use inku_ddl::work_plan::WorkPlanLayer;
 use inku_pipeline::composition::{
     self, CheckedReading, RawReading, RawRelation, RawStatedPlace, Relation, Role, Searched,
-    Unsolved,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -141,11 +140,59 @@ fn checked_reading(case: &Case) -> Result<(CheckedReading, Vec<String>), String>
         .map_err(|error| format!("check failed: {error:?}"))
 }
 
+/// The roles and findings the product's check gives: the prototype's, except
+/// that every layer the reading calls focal stays focal (2026-10-21), where the
+/// prototype kept the most prominent and made the others secondary (finding
+/// `one_focal`).
+fn expected_roles(case: &Case) -> (Vec<Role>, Vec<String>) {
+    let expected = &case.checked;
+    let Some(reading) = case
+        .reading
+        .as_ref()
+        .filter(|_| expected.findings.iter().any(|code| code == "one_focal"))
+    else {
+        return (expected.roles.clone(), expected.findings.clone());
+    };
+    let roles = expected
+        .roles
+        .iter()
+        .zip(&reading.roles)
+        .map(|(checked, read)| {
+            if read == "focal" {
+                Role::Focal
+            } else {
+                *checked
+            }
+        })
+        .collect();
+    let findings = expected
+        .findings
+        .iter()
+        .filter(|code| *code != "one_focal")
+        .cloned()
+        .collect();
+    (roles, findings)
+}
+
+/// The reading the prototype solved: its roles (one focal layer) and its
+/// default of strong empty space where the reading does not say (the product
+/// has no default for empty space since 2026-10-21).
+fn prototype_reading(case: &Case, checked: &CheckedReading) -> CheckedReading {
+    let mut reading = checked.clone();
+    reading.roles.clone_from(&case.checked.roles);
+    reading
+        .tension
+        .entry("void".to_owned())
+        .or_insert_with(|| "strong".to_owned());
+    reading
+}
+
 fn compare_check(case: &Case, checked: &CheckedReading, findings: &[String]) -> Vec<String> {
     let mut differences = Vec::new();
     let expected = &case.checked;
-    if checked.roles != expected.roles {
-        differences.push(format!("roles {:?} != {:?}", checked.roles, expected.roles));
+    let (roles, expected_findings) = expected_roles(case);
+    if checked.roles != roles {
+        differences.push(format!("roles {:?} != {roles:?}", checked.roles));
     }
     if checked.relations != expected.relations {
         differences.push(format!(
@@ -167,8 +214,8 @@ fn compare_check(case: &Case, checked: &CheckedReading, findings: &[String]) -> 
     if fixed != expected.fixed {
         differences.push(format!("fixed {fixed:?} != {:?}", expected.fixed));
     }
-    if findings != expected.findings.as_slice() {
-        differences.push(format!("findings {findings:?} != {:?}", expected.findings));
+    if findings != expected_findings.as_slice() {
+        differences.push(format!("findings {findings:?} != {expected_findings:?}"));
     }
     differences
 }
@@ -279,24 +326,27 @@ fn run_case(case: &Case, limit: Option<u64>) -> CaseOutcome {
     outcome.checked = true;
     // Larger works are searched only by the full run: an unoptimised exhaustive
     // search of every work takes minutes.
-    if case.solve.skipped.is_none()
-        && limit.is_some_and(|limit| case.solve.combinations.unwrap_or(0) > limit)
-    {
+    if limit.is_some_and(|limit| case.solve.combinations.unwrap_or(0) > limit) {
         outcome.left_for_the_full_run = true;
         if !differences.is_empty() {
             outcome.failure = Some(format!("{}: {}", case.id, differences.join("; ")));
         }
         return outcome;
     }
+    let checked = prototype_reading(case, &checked);
     match (
         &case.solve.skipped,
         composition::search(&case.layers, &checked, &case.background),
     ) {
-        (Some(reason), Err(Unsolved::Combinations(n))) if reason == "combinations" => {
-            if Some(n) == case.solve.combinations {
+        // The product places such a work layer by layer (2026-10-21).
+        (Some(reason), Ok(searched)) if reason == "combinations" => {
+            if Some(searched.combinations) == case.solve.combinations {
                 outcome.skipped_as_expected = true;
             } else {
-                differences.push(format!("combinations {n} != {:?}", case.solve.combinations));
+                differences.push(format!(
+                    "combinations {} != {:?}",
+                    searched.combinations, case.solve.combinations
+                ));
             }
         }
         (None, Ok(searched)) => {
@@ -325,7 +375,7 @@ fn run_case(case: &Case, limit: Option<u64>) -> CaseOutcome {
 
 fn report(outcome: &Outcome) -> String {
     format!(
-        "{} cases, {} checked, {} solved, {} skipped as the prototype skipped them (too many combinations), {} left for the full run, {} differ:\n{}",
+        "{} cases, {} checked, {} solved, {} placed layer by layer where the prototype skipped them (too many combinations), {} left for the full run, {} differ:\n{}",
         outcome.cases,
         outcome.checked,
         outcome.solved,

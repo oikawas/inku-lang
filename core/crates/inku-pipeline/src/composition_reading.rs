@@ -6,7 +6,8 @@
 //! the product asks what the prototype measured. The joints paragraph and its two
 //! rules are the ones I-711 stage C measured with each reader before they were
 //! built in, kept byte for byte too. No description or reading example is put in
-//! the prompt.
+//! the prompt. Edition 4 (2026-10-21, the author's decision) drops the theory's
+//! one focal thing and its empty space that counts the white as ink.
 
 use inku_ddl::ResolvedInstructionLanguage;
 use inku_ddl::work_plan::{WorkPlan, WorkPlanPlugin, WorkPlanSlot, print_work_plan_with_plugins};
@@ -16,7 +17,7 @@ use crate::composition::{self, LayerKind, PLACES, RawReading, RawRelation, RawSt
 use crate::prompts::{LlmPrompt, LlmStage, PromptError, PromptLimits};
 
 /// Distinct composition reading prompt edition.
-pub const COMPOSITION_READING_PROMPT_ID: &str = "inku.composition-reading-prompt.v3";
+pub const COMPOSITION_READING_PROMPT_ID: &str = "inku.composition-reading-prompt.v4";
 
 const UNSPECIFIED: &str = "unspecified";
 
@@ -25,9 +26,9 @@ const SYSTEM_JA: &str = r#"あなたは、言葉から絵を作るアプリinku�
 # 構図の理論
 画面は中立ではない。場所には性格がある。上は軽く自由、下は重く凝縮。中心と縦横の軸と対角線は安定し、そこから外れた場所と縁の近くは緊張する。左右には性格の差を持たせない。
 重さは、大きさ・数・濃さ・面の密度・孤立で決まる。均衡は重さの釣り合いで、対称は静、等しくない量の対置は動く均衡、意図した不均衡は不安を語る。
-主は一つ。場・主・従・散在・添えの役割と、大小と疎密の対比で画を立てる。
+場・主・従・散在・添えの役割と、大小と疎密の対比で画を立てる。
 向きは動きを作る。水平は静、垂直は高さ、斜めは動き。動くものは、進む先に空きを持つ。
-余白は空きではなく働く場所。白も墨として数える。主を片隅や片側に寄せて広く空ける（一角・半辺）、全面に均して中心を消す（all-over）、横の帯を重ねる、場を分ける線、格子、群れと一つの逸脱、不等辺の三角（主・従・添え）。
+画の型には、主を片隅や片側に寄せて広く空ける（一角・半辺）、全面に均して中心を消す（all-over）、横の帯を重ねる、場を分ける線、格子、群れと一つの逸脱、不等辺の三角（主・従・添え）がある。
 規則には小さな揺らぎを。秩序だけでも乱雑だけでも画は痩せる。
 
 # 層の種類（下絵の描き方で決まる）
@@ -40,7 +41,7 @@ const SYSTEM_JA: &str = r#"あなたは、言葉から絵を作るアプリinku�
 thesis（最初に書く）: 構図の命題。この記述の絵を、画面の上でどう組むかを言う1文。記述と同じ言語で書く。記述を写したり言い換えたりしない。
 roles（層ごとに1つ、層の番号の順）:
 - field（場）: ほかの層を受けとめる地。大きな面、または画面を横切る列・線。
-- focal（主）: 目が最初に行く、ただ一つのもの。主は多くても1つ。
+- focal（主）: 目が最初に行くもの。
 - secondary（従）: 主を支える、二番目のもの。
 - scattered（散在）: 範囲に散らばる多くの小さなもの。散らす・敷き詰めるの層に限る。
 - accent（添え）: 主と従に添える、小さなもの。
@@ -95,9 +96,9 @@ const SYSTEM_EN: &str = r#"You are the composition reader of inku, an app that m
 # Composition theory
 The canvas is not neutral; every place has a character. The top is light and free, the bottom heavy and condensed. The center, the vertical and horizontal axes and the diagonals are stable; places off them and near the edges are tense. Left and right have no difference of character.
 Weight comes from size, number, darkness, density of surface and isolation. Balance is the equilibrium of weights: symmetry is still, unequal weights set against each other make a dynamic balance, and intended imbalance speaks of unease.
-There is one focal thing. Build the picture with the roles of field, focal, secondary, scattered and accent, and with contrasts of large and small, sparse and dense.
+Build the picture with the roles of field, focal, secondary, scattered and accent, and with contrasts of large and small, sparse and dense.
 Direction makes movement: horizontal is still, vertical is height, diagonal is motion. A moving thing has open space ahead of it.
-Empty space is not a gap but a working place; count the white as ink. Push the focal thing into a corner or to one side and leave wide space (one corner, half side), spread evenly and erase the center (all-over), stack horizontal bands, divide the field with a line, a grid, a flock and one that strays, an unequal triangle of focal, secondary and accent.
+Pictures take forms such as: push the focal thing into a corner or to one side and leave wide space (one corner, half side), spread evenly and erase the center (all-over), stack horizontal bands, divide the field with a line, a grid, a flock and one that strays, an unequal triangle of focal, secondary and accent.
 Give the rules a small wavering. Order alone, or disorder alone, makes a thin picture.
 
 # Kinds of layer (fixed by how the plan draws)
@@ -110,7 +111,7 @@ Give the rules a small wavering. Order alone, or disorder alone, makes a thin pi
 thesis (write it first): the composition's proposition, one sentence on how this picture is built on the canvas, in the description's language. Do not copy or paraphrase the description.
 roles (one per layer, in layer order):
 - field: The ground that holds the others: a large area, or a row or line across the canvas.
-- focal: The one thing the eye goes to first. At most one layer.
+- focal: What the eye goes to first.
 - secondary: Supports the focal thing.
 - scattered: Many small marks spread over a range. Only for scatter or tile layers.
 - accent: A small touch that completes the focal and secondary things.

@@ -7,7 +7,7 @@
 //! between layers, the tension of the whole picture and the places the
 //! description states. It never names a place the description does not state:
 //! the solver chooses every other range from the reading and the author's
-//! defaults (dynamic balance, generous empty space, left and right alike).
+//! defaults (dynamic balance, left and right alike).
 //!
 //! Ranges are exact fractions and become floating point exactly where the solver
 //! weighs them. Sums, distances and the count weight follow fixed procedures (a
@@ -26,8 +26,17 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
-/// Beyond this many combinations of ranges the exhaustive search does not solve.
+/// Up to this many combinations of ranges the search scores every one; a work
+/// with more is placed layer by layer (2026-10-21).
 pub const MAX_COMBINATIONS: u64 = 3_000_000;
+
+/// A work placed layer by layer scores every combination of its first layers
+/// up to this many.
+const HEAD_COMBINATIONS: u64 = 200_000;
+
+/// A work placed layer by layer looks at every layer again at most this many
+/// times.
+const ROUNDS: usize = 8;
 
 // ---------------------------------------------------------------------------
 // Exact fractions and ranges
@@ -1042,21 +1051,6 @@ pub fn check(
             ));
         }
         roles.push(role);
-    }
-    let focal: Vec<usize> = (0..count).filter(|i| roles[*i] == Role::Focal).collect();
-    if focal.len() > 1 {
-        let mut keep = focal[0];
-        for &i in &focal[1..] {
-            if prominence(&layers[i]) > prominence(&layers[keep]) {
-                keep = i;
-            }
-        }
-        for &i in &focal {
-            if i != keep {
-                roles[i] = Role::Secondary;
-            }
-        }
-        findings.push(finding("one_focal", "roles".to_owned(), "changed"));
     }
 
     let mut relations: Vec<Relation> = Vec::new();
@@ -2553,8 +2547,6 @@ fn weight_parts(layer: &WorkPlanLayer, background_lightness: f64) -> (f64, f64, 
 pub enum Unsolved {
     /// A stated place the solver does not know.
     UnknownPlace(String),
-    /// Too many combinations for the exhaustive search.
-    Combinations(u64),
     /// A layer has no range to choose from.
     NoRanges,
 }
@@ -2594,10 +2586,8 @@ impl<'a> Work<'a> {
             return Err(Unsolved::UnknownPlace(place.clone()));
         }
         let background_lightness = lightness(Some(background), 0.99);
-        let mut tension: BTreeMap<String, String> = [("balance", "dynamic"), ("void", "strong")]
-            .into_iter()
-            .map(|(k, v)| (k.to_owned(), v.to_owned()))
-            .collect();
+        let mut tension: BTreeMap<String, String> =
+            BTreeMap::from([("balance".to_owned(), "dynamic".to_owned())]);
         tension.extend(reading.tension.clone());
         let balance = tension
             .get("balance")
@@ -2668,8 +2658,36 @@ impl<'a> Work<'a> {
         Ok(work)
     }
 
+    /// The number of combinations of ranges, at most `u64::MAX`.
     fn combinations(&self) -> u64 {
-        self.options.iter().map(|o| o.len() as u64).product()
+        self.options
+            .iter()
+            .fold(1, |product, o| product.saturating_mul(o.len() as u64))
+    }
+
+    /// The work of the layers `keep` only, in that order, with the relations
+    /// among them (`layers` and `reading` from [`part_of`]): how a placement of
+    /// those layers scores while the other layers are not placed.
+    fn part<'b>(
+        &self,
+        keep: &[usize],
+        layers: &'b [WorkPlanLayer],
+        reading: &'b CheckedReading,
+    ) -> Work<'b> {
+        Work {
+            layers,
+            reading,
+            kinds: keep.iter().map(|i| self.kinds[*i]).collect(),
+            sparse: keep.iter().map(|i| self.sparse[*i]).collect(),
+            fixed_weight: keep.iter().map(|i| self.fixed_weight[*i]).collect(),
+            tone: keep.iter().map(|i| self.tone[*i]).collect(),
+            surface: keep.iter().map(|i| self.surface[*i]).collect(),
+            balance: self.balance.clone(),
+            tension: self.tension.clone(),
+            options: keep.iter().map(|i| self.options[*i].clone()).collect(),
+            joined: keep.iter().map(|i| self.joined[*i].clone()).collect(),
+            footprints: keep.iter().map(|i| self.footprints[*i].clone()).collect(),
+        }
     }
 
     /// Keep the layers joined to each layer: a layer with joined layers keeps
@@ -3263,7 +3281,8 @@ fn advance(digits: &mut [usize], sizes: &[usize]) -> bool {
     false
 }
 
-/// Score every combination once; seeds then choose among the near-best.
+/// Score every combination once, or place a work with more combinations than
+/// [`MAX_COMBINATIONS`] layer by layer; seeds then choose among the near-best.
 pub fn search(
     layers: &[WorkPlanLayer],
     reading: &CheckedReading,
@@ -3278,7 +3297,7 @@ fn search_work(work: &Work<'_>) -> Result<Searched, Unsolved> {
         return Err(Unsolved::NoRanges);
     }
     if combinations > MAX_COMBINATIONS {
-        return Err(Unsolved::Combinations(combinations));
+        return Ok(search_by_layers(work, combinations));
     }
     let sizes: Vec<usize> = work.options.iter().map(Vec::len).collect();
     let choice_of = |digits: &[usize]| -> Vec<usize> {
@@ -3317,6 +3336,205 @@ fn search_work(work: &Work<'_>) -> Result<Searched, Unsolved> {
         near,
         combinations,
     })
+}
+
+/// The layers `keep` of a plan and its reading of them, numbered in that
+/// order: the relations among them only, and no joints (a work's joints are
+/// already in its ranges).
+fn part_of(
+    layers: &[WorkPlanLayer],
+    reading: &CheckedReading,
+    keep: &[usize],
+) -> (Vec<WorkPlanLayer>, CheckedReading) {
+    let number = |layer: usize| keep.iter().position(|kept| *kept == layer);
+    let renumbered = |layer: Option<usize>| match layer {
+        Some(layer) => number(layer).map(Some),
+        None => Some(None),
+    };
+    let relations = reading
+        .relations
+        .iter()
+        .filter_map(|relation| {
+            Some(Relation {
+                kind: relation.kind,
+                a: number(relation.a)?,
+                b: renumbered(relation.b)?,
+                c: renumbered(relation.c)?,
+                side: relation.side.clone(),
+                toward: relation.toward.clone(),
+            })
+        })
+        .collect();
+    let part = CheckedReading {
+        roles: keep.iter().map(|i| reading.roles[*i]).collect(),
+        relations,
+        tension: reading.tension.clone(),
+        fixed: reading
+            .fixed
+            .iter()
+            .filter_map(|(layer, place)| Some((number(*layer)?, place.clone())))
+            .collect(),
+        joints: Vec::new(),
+        pinned: reading
+            .pinned
+            .iter()
+            .filter_map(|(layer, boxes)| Some((number(*layer)?, boxes.clone())))
+            .collect(),
+    };
+    (keep.iter().map(|i| layers[*i].clone()).collect(), part)
+}
+
+/// The order a work is placed in layer by layer: the layers whose place is
+/// stated or pinned, the field, the focal layers, the secondary layers and the
+/// accents, then the scattered layers; the heavier first within each, then by
+/// number.
+fn placing_order(work: &Work<'_>) -> Vec<usize> {
+    let rank = |i: usize| {
+        if work.reading.fixed.contains_key(&i) || work.reading.pinned.contains_key(&i) {
+            return 0;
+        }
+        match work.reading.roles[i] {
+            Role::Field => 1,
+            Role::Focal => 2,
+            Role::Secondary | Role::Accent => 3,
+            Role::Scattered => 4,
+        }
+    };
+    let mut order: Vec<usize> = (0..work.layers.len()).collect();
+    order.sort_by(|x, y| {
+        rank(*x)
+            .cmp(&rank(*y))
+            .then(work.weight(*y, &WHOLE).total_cmp(&work.weight(*x, &WHOLE)))
+            .then(x.cmp(y))
+    });
+    order
+}
+
+/// The combination of a work's ranges with the lowest score: among equals, the
+/// first in the order the exhaustive search scores them in.
+fn best_combination(work: &Work<'_>) -> Vec<usize> {
+    let sizes: Vec<usize> = work.options.iter().map(Vec::len).collect();
+    let mut terms = Terms::default();
+    let mut digits = vec![0_usize; sizes.len()];
+    let mut best: Option<(f64, Vec<usize>)> = None;
+    loop {
+        let choice: Vec<usize> = digits
+            .iter()
+            .enumerate()
+            .map(|(layer, digit)| work.options[layer][*digit])
+            .collect();
+        let total = work.score(&choice, &mut terms).total;
+        if best.as_ref().is_none_or(|(lowest, _)| total < *lowest) {
+            best = Some((total, choice));
+        }
+        if !advance(&mut digits, &sizes) {
+            break;
+        }
+    }
+    best.map(|(_, choice)| choice).unwrap_or_default()
+}
+
+/// Put `layer` at its range with the lowest score while the other layers keep
+/// theirs in `choice` (the first of its options among equals), and return
+/// that score.
+fn best_range(work: &Work<'_>, choice: &mut [usize], layer: usize, terms: &mut Terms) -> f64 {
+    let mut best: Option<(f64, usize)> = None;
+    for &option in &work.options[layer] {
+        choice[layer] = option;
+        let total = work.score(choice, terms).total;
+        if best.is_none_or(|(lowest, _)| total < lowest) {
+            best = Some((total, option));
+        }
+    }
+    let (total, option) = best.expect("a work's layers have ranges");
+    choice[layer] = option;
+    total
+}
+
+/// Place a work with more combinations than [`MAX_COMBINATIONS`] layer by
+/// layer (2026-10-21). In [`placing_order`], the first layers whose
+/// combinations stay within [`HEAD_COMBINATIONS`] take their best
+/// combination, and each further layer its best range for the layers placed
+/// before it. Then each layer in turn takes a range that scores better while
+/// the others keep theirs, until none changes or after [`ROUNDS`] rounds. The
+/// near-best are that placement and the placements that change one layer of
+/// it, within the margin of the exhaustive search. The search does not seek
+/// the best of every placement, and a plan, reading and seed still give one
+/// answer on every host.
+fn search_by_layers(work: &Work<'_>, combinations: u64) -> Searched {
+    let order = placing_order(work);
+    let mut head = 1;
+    let mut product = work.options[order[0]].len() as u64;
+    while head < order.len() {
+        let next = product.saturating_mul(work.options[order[head]].len() as u64);
+        if next > HEAD_COMBINATIONS {
+            break;
+        }
+        product = next;
+        head += 1;
+    }
+    let mut placement = vec![0_usize; order.len()];
+    let mut terms = Terms::default();
+    for end in head..=order.len() {
+        let keep = &order[..end];
+        let (layers, reading) = part_of(work.layers, work.reading, keep);
+        let part = work.part(keep, &layers, &reading);
+        if end == head {
+            for (layer, region) in keep.iter().zip(best_combination(&part)) {
+                placement[*layer] = region;
+            }
+        } else {
+            let mut choice: Vec<usize> = keep.iter().map(|layer| placement[*layer]).collect();
+            best_range(&part, &mut choice, end - 1, &mut terms);
+            placement[keep[end - 1]] = choice[end - 1];
+        }
+    }
+    let mut total = work.score(&placement, &mut terms).total;
+    for _ in 0..ROUNDS {
+        let mut changed = false;
+        for &layer in &order {
+            let mut choice = placement.clone();
+            let lowest = best_range(work, &mut choice, layer, &mut terms);
+            if lowest < total {
+                placement = choice;
+                total = lowest;
+                changed = true;
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+    let mut scored = vec![(total, placement.clone())];
+    for &layer in &order {
+        for &option in &work.options[layer] {
+            if option != placement[layer] {
+                let mut other = placement.clone();
+                other[layer] = option;
+                scored.push((work.score(&other, &mut terms).total, other));
+            }
+        }
+    }
+    let best = scored
+        .iter()
+        .map(|(total, _)| *total)
+        .fold(f64::INFINITY, f64::min);
+    let threshold = best * 1.03 + 0.02;
+    let mut near: Vec<Vec<usize>> = scored
+        .into_iter()
+        .filter(|(total, _)| *total <= threshold)
+        .map(|(_, placement)| placement)
+        .collect();
+    near.sort_by(|x, y| {
+        x.iter()
+            .map(|i| region_key(*i))
+            .cmp(y.iter().map(|i| region_key(*i)))
+    });
+    Searched {
+        best,
+        near,
+        combinations,
+    }
 }
 
 /// The answer a seed picks among `count`: the work's digest says where to start,

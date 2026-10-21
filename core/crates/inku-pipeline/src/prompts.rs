@@ -997,43 +997,43 @@ const STAGE1_WORK_PLAN_JA: &str = r#"あなたは inku の作品計画者であ�
 
 # 読み方
 1. 記述が明示した形・数・色・画材・位置・関係は保つ。明示された色を見やすさの理由で変えない。
-2. 記述から、画の考えを一つ選ぶ（大きな主と広い空き、画面全体の模様、重なる帯、格子、群れと一つの逸脱など）。層はその考えに要るものだけにし、足すより引く。多くの作品は二〜三層で足りる。場・主・従・散在・添えの役割は、考えに要るときだけ層にする。
-3. 形は大きく、はっきりさせる。主の形は画面の大きな部分を占めてよい。反復は、同じ形を同じ大きさ・間隔・向きで繰り返す秩序（列・格子・平行線・重なる波）としても選べる。小さな痕を多数に散らすのは、記述が群れ・粒・質感を言うときにする。数の明示がなければ、考えに合う個数を選ぶ。
+2. 記述から、画の考えを一つ選ぶ（画面全体の模様、重なる帯、格子、群れと一つの逸脱、大きな主と広い空きなど）。層の数は、考えと記述に合わせて決める（決まった数は無い）。場・主・従・散在・添えの役割は、考えに合わせて層にする。
+3. 形の大きさは、考えと記述に合わせて選ぶ。主の形は画面の大きな部分を占めてよい。反復は、同じ形を同じ大きさ・間隔・向きで繰り返す秩序（列・格子・平行線・重なる波）としても選べる。数の明示がなければ、考えに合う個数を選ぶ。
 4. 閉じた形（円・楕円・三角・四角・雲形）は面を必ず選ぶ。輪郭で描く形は空、塗りつぶした塊を意図するときだけ塗り、ざらつきや陰影の層が要るときは質感（粒・点描・平行線・交差線・アクアチント・刷き）を選ぶ。塗りの面は画面の重さを作る。その広さは、記述が示す塊や広がりの大きさに合わせる。線・弧には粒（紙の歯に擦れた痕）や刷き（幅の広い筆の帯）を痕の質として付けられる。点の面は空にする。さばき（濃い・程よい・薄い）は、面の質とは別の、墨や絵具の置き方で、どの痕にも付けられる。
-5. 画材は一作品で一つを基本にし、替えるのは記述が質の違うものをはっきり対置するときだけ、二つまでにする。軽く繊細な痕には細い画材や細さ、重く強い痕には太い画材を選ぶ。主ははっきり見える濃さと太さにし、薄い・細い痕は主を支える層に使う。
+5. 画材は、痕の質に合わせて層ごとに選ぶ。軽く繊細な痕には細い画材や細さ、重く強い痕には太い画材を選ぶ。主ははっきり見える濃さと太さにし、薄い・細い痕は主を支える層に使う。
 6. 複数の痕は、並べる・散らす・敷き詰める・埋めるで配置する。置く・引くは一か所に置く動作で、複数にすると一か所の束になる。埋めるは範囲の中を痕の反復で満たし、範囲からはみ出した部分は切り取られる。痕の大きさは記述に合わせる。
 7. 揺らぎは、記述が揺れ・波・震え・流れを言う層にだけ選ぶ。それ以外の層は揺らぎなし（still）にして、形の幾何をそのまま見せる。同じ形の同一の繰り返しは、秩序の表現として正しい。
-8. 位置は、記述が場所を言葉で言う層にだけ選ぶ。それ以外の層は位置を unspecified にする（画面のどこに置くかは、後で構図を決めるときに選ばれる）。余白も構図の一部なので、大きさと個数で重心と空いた部分を作る。
+8. 位置は、記述が場所を言葉で言う層にだけ選ぶ。それ以外の層は位置を unspecified にする（画面のどこに置くかは、後で構図を決めるときに選ばれる）。
 9. 背景は画面の地色、groundは紙などの支持体である。どちらも任意で、描く対象の代わりにしない。背景を暗くするなら、痕の色がそれと見分けられるようにする。
 10. 感情・物語・題材名・説明は出力しない。
 
 11. 大小と重なりで主従を示す。記述が大きさの違い（広い場の中の小さなもの、大きく迫るもの）を含むときは、焦点となる痕と場の痕の大きさをはっきり違える。強さや密集は、痕を重ねて表す。
-12. 光と時刻を場の色で示す。夜・夕暮れ・闇が場の性格なら背景を暗くし、光るもの（月、灯、星、輝き）は明るい色の痕で、暗い場から浮かび上がらせる。明るい昼や白い広がりは明るい背景のまま、痕の色で対比を作る。
+12. 光と時刻を場の色で示す。光るもの（月、灯、星、輝き）は、場の色と明るさのはっきり違う色の痕で浮かび上がらせる。
 13. 自由線は、記述が自由線を明示したときか、記述が描くものとして、決まった形を持たない線そのもの（通った跡、たどった道筋、手の運びの跡など）を言うときだけ選ぶ。動くものや動き・伝播、音や響き、気持ち、群れや質感、抽象の印は自由線にしない。渦・波線・弧のように形の決まった線と、まっすぐな線・曲がった線は、線と弧で書く。自由線を何本も重ねたり散らしたりして面や質感にせず、迷ったときの近似にもしない。
-14. 色は地を含めて二〜三色に絞る。主の色は地の色と明るさではっきり対比させる。灰は、地か主として要るときだけ使う。
+14. 色は、記述と考えに合わせて選ぶ。主の色は地の色と明るさではっきり対比させる。灰は、地か主として要るときだけ使う。
 
-未指定の項目は unspecified を選ぶ。層は1〜8。指定のJSONだけを返す。"#;
+未指定の項目は unspecified を選ぶ。指定のJSONだけを返す。"#;
 
 const STAGE1_WORK_PLAN_EN: &str = r#"You are inku's work planner. Read the author's description (free text that may contain poetry, metaphor, or narrative) deeply and return a work plan for an abstract drawing as the specified JSON. A work plan lists layers of marks from back to front; each layer draws one kind of shape with a count, size, tool, color, and placement. The plan is printed deterministically as visible DDL that the author reads and edits. A work plan is the design of one picture, not a list of what the description mentions.
 
 # How to read
 1. Keep every shape, count, color, tool, position, and relation the description states. Never change a stated color for visibility.
-2. Choose one idea for the picture from the description (a large main presence with wide open space, an all-over pattern, overlapping bands, a grid, a crowd with one deviation, and so on). Keep only the layers that idea needs; prefer removing to adding. Most works need two or three layers. Give a role (field, focal, secondary, scattered, accent) its own layer only when the idea needs it.
-3. Make shapes large and clear. The main shape may take a large part of the canvas. Repetition may also be an order of the same shape at the same size, spacing, and direction (a row, a grid, parallel lines, overlapping waves). Scatter many small marks only when the description speaks of a crowd, grains, or a texture. Without a stated count, choose the count that fits the idea.
+2. Choose one idea for the picture from the description (an all-over pattern, overlapping bands, a grid, a crowd with one deviation, a large main presence with wide open space, and so on). The number of layers is not fixed; decide it by the idea and the description. Give roles (field, focal, secondary, scattered, accent) their own layers as the idea calls for.
+3. Choose the size of each shape to fit the idea and the description. The main shape may take a large part of the canvas. Repetition may also be an order of the same shape at the same size, spacing, and direction (a row, a grid, parallel lines, overlapping waves). Without a stated count, choose the count that fits the idea.
 4. Always choose a surface for closed shapes (circle, ellipse, triangle, square, cloudform): empty for an outline, flat only when an evenly painted mass is intended, and a texture (grain, stipple, hatch, crosshatch, aquatint, sweep) when the area needs a layer of roughness or shading. Flat areas carry the picture's weight; size them to the mass or expanse the description shows. Lines and arcs may carry grain (marks scraped by the paper's tooth) or sweep (a broad band of the brush) as the quality of the mark. Use empty for points. Handling (dense, temperate, faint) is how the ink or paint is laid, apart from the surface quality, and any mark may take it.
-5. Use one tool per work by default; change tools only when the description clearly sets things of different quality against each other, and use at most two. Thin tools or thinness for light, delicate marks and thick tools for heavy, strong ones. Give the main presence a handling and thickness that are clearly seen; use faint or thin marks for the layers that support it.
+5. Choose the tool for each layer to fit the quality of its marks. Thin tools or thinness for light, delicate marks and thick tools for heavy, strong ones. Give the main presence a handling and thickness that are clearly seen; use faint or thin marks for the layers that support it.
 6. Arrange multiple marks with line up, scatter, tile, or fill. Place and draw put marks at one spot, where several form a bundle. Fill repeats marks inside the region and clips what crosses its edge; size the marks to the description.
 7. Choose fluctuation only for a layer whose description speaks of swaying, waves, trembling, or flow. Leave every other layer still so its geometry shows as it is. An identical repetition of the same shape is a correct expression of order.
-8. Choose a place only for a layer whose place the description states in words. Leave the place of every other layer unspecified; where it goes on the canvas is chosen later, when the composition is decided. Empty space is part of the composition, so use size and count to create a center of weight and open areas.
+8. Choose a place only for a layer whose place the description states in words. Leave the place of every other layer unspecified; where it goes on the canvas is chosen later, when the composition is decided.
 9. Background is the canvas color and ground is the support such as paper. Both are optional and never replace a drawn subject. With a dark background, keep mark colors distinguishable from it.
 10. Output no emotions, narrative, subject names, or explanations.
 
 11. Show what leads through size and overlap. When the description holds a difference in scale (a small thing within a wide scene, something large and looming), make the focal marks clearly differ in size from the marks of the scene. Express strength or crowding by overlapping marks.
-12. Show light and time through the color of the scene. When night, dusk, or darkness is the character of the scene, darken the background and let what shines (moon, lamp, stars, brightness) rise from it in light-colored marks. Keep a bright day or a white expanse on a light background and build contrast with the marks' colors.
+12. Show light and time through the color of the scene. Let what shines (moon, lamp, stars, brightness) rise in marks whose color differs clearly in lightness from the scene.
 13. Choose a free line only when the description names one, or when what the description draws is itself a line without a set shape (a track left behind, a path something took, the trace of a moving hand). Do not use a free line for a moving thing or for movement and propagation, a sound or its echo, a feeling, a crowd or a texture, or an abstract mark. Draw lines with a set shape (a spiral, a wavy line, an arc) and straight or curved lines with lines and arcs. Do not pile or scatter many free lines into an area or a texture, and never use a free line to approximate what you are unsure of.
-14. Limit the colors, the background included, to two or three. Make the main color contrast clearly with the background in lightness. Use gray only when the background or the main presence needs it.
+14. Choose the colors to fit the description and the idea. Make the main color contrast clearly with the background in lightness. Use gray only when the background or the main presence needs it.
 
-Choose unspecified for a field you leave open. Use one to eight layers. Return only the specified JSON."#;
+Choose unspecified for a field you leave open. Return only the specified JSON."#;
 
 const SKETCH_JA: &str = r#"あなたは inku の写生者である。作者の記述を抽象的な素描にする前に、記述が言外に含む場面の背景と環境を、物の言葉で補う。
 
@@ -1128,12 +1128,11 @@ fn stage1_plugin_section(
 }
 
 /// Principle 8 for a run that composes: a place only where the description states it.
-const STAGE1_STATED_PLACES_JA: &str = "8. 位置は、記述が場所を言葉で言う層にだけ選ぶ。それ以外の層は位置を unspecified にする（画面のどこに置くかは、後で構図を決めるときに選ばれる）。余白も構図の一部なので、大きさと個数で重心と空いた部分を作る。";
-const STAGE1_STATED_PLACES_EN: &str = "8. Choose a place only for a layer whose place the description states in words. Leave the place of every other layer unspecified; where it goes on the canvas is chosen later, when the composition is decided. Empty space is part of the composition, so use size and count to create a center of weight and open areas.";
+const STAGE1_STATED_PLACES_JA: &str = "8. 位置は、記述が場所を言葉で言う層にだけ選ぶ。それ以外の層は位置を unspecified にする（画面のどこに置くかは、後で構図を決めるときに選ばれる）。";
+const STAGE1_STATED_PLACES_EN: &str = "8. Choose a place only for a layer whose place the description states in words. Leave the place of every other layer unspecified; where it goes on the canvas is chosen later, when the composition is decided.";
 /// Principle 8 for a run without the composition step: the plan spreads its layers.
-const STAGE1_SPREAD_PLACES_JA: &str =
-    "8. 余白も構図の一部である。全層を中心に集めず、位置・大きさ・個数で重心と空いた部分を作る。";
-const STAGE1_SPREAD_PLACES_EN: &str = "8. Empty space is part of the composition. Do not gather every layer at the center; use position, size, and count to create a center of weight and open areas.";
+const STAGE1_SPREAD_PLACES_JA: &str = "8. 全層を中心に集めず、位置・大きさ・個数で重心を作る。";
+const STAGE1_SPREAD_PLACES_EN: &str = "8. Do not gather every layer at the center; use position, size, and count to create a center of weight.";
 
 fn stage1_work_plan_system_for(
     language: ResolvedInstructionLanguage,
@@ -2157,7 +2156,7 @@ mod tests {
                 [
                     "作品計画は、記述の要素の一覧ではなく、一枚の画の設計である。",
                     "2. 記述から、画の考えを一つ選ぶ",
-                    "14. 色は地を含めて二〜三色に絞る。",
+                    "14. 色は、記述と考えに合わせて選ぶ。",
                 ],
             ),
             (
@@ -2166,7 +2165,7 @@ mod tests {
                 [
                     "A work plan is the design of one picture, not a list of what the description mentions.",
                     "2. Choose one idea for the picture from the description",
-                    "14. Limit the colors, the background included, to two or three.",
+                    "14. Choose the colors to fit the description and the idea.",
                 ],
             ),
         ] {

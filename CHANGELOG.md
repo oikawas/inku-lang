@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-21 — Align Android's laws and color checks with the shared core without a main layer
+
+Android's test answers no longer choose a main layer for laws, and D5 names its target layer in the color answer. The checks ensure a null main layer remains present through the laws records and autonomous refinement's edge record. The shared core owns these decisions, including choosing a ground when the description names no ground color. Existing records keep their stored layer numbers.
+
 ### 2026-10-21 — macOS keeps laws and colors records without a main layer and with a chosen ground
 
 AppCheck's laws answer drops `main_layer`, and its D5 answer names the target layer. The checks preserve explicit `main_layer: null` in new events, bases and autonomous refinement edges, and keep an older basis's number. Adding an autonomous move's record to an edge used to treat null as a deletion. It now combines the existing provenance and the core's record before saving the complete JSON object. A new check verifies save and replay of the core's completed document and Score when a color answer chooses an optional `ground`. Host tests do not duplicate coordinate or color results.

@@ -61,6 +61,16 @@ class SharedAuthoringPipeline(
         return complete(request.ownerId, view, request.config, request.renderSeed, request.wild)
     }
 
+    suspend fun startSavedLaws(request: SharedPipelineRunRequest, directionJson: String): PipelineRunOutcome {
+        val view = host.start(PipelineStartRequest(
+            ownerId = request.ownerId, configJson = request.config.configJson,
+            authoring = PipelineAuthoring.SavedLaws(request.text, request.context.description,
+                directionJson, request.completionRangesJson, request.lawsRecordsJson),
+            models = request.models, context = request.context, hostContextJson = durableHostContext(request),
+        ))
+        return complete(request.ownerId, view, request.config, request.renderSeed, request.wild)
+    }
+
     suspend fun startDirectDdlView(request: SharedPipelineRunRequest): PipelineView =
         host.start(
             PipelineStartRequest(

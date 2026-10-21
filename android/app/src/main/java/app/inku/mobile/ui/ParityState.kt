@@ -26,35 +26,47 @@ internal fun failedBatchLines(snapshot: BatchSnapshot, failures: List<BatchFailu
 internal fun batchRetryAllowed(failures: List<BatchFailure>, completedRounds: Int, limit: Int, interrupted: Boolean): Boolean =
     !interrupted && failures.isNotEmpty() && completedRounds < limit.coerceIn(0, 5)
 
-/**
- * Vision is the only method: the random one, which drew each generation's
- * element by chance, was removed (the author, 2026-10-18). Generations made
- * with it keep `autonomous_refine_mode: random` and stay readable.
- */
-data class AutonomousRefinementSettings(
-    val generations: Int = 3,
-    val changeColor: Boolean = true,
-    val changeLayout: Boolean = true,
-    val modelId: String = "",
-    val direction: String = "",
-    val wildOverride: Boolean? = null,
-) {
-    val allowedKinds: List<String>
-        get() = buildList {
-            if (changeColor) add("catalog_change")
-            if (changeLayout) add("layout_change")
-        }
-}
+/** Settings for the shared core's laws and juxtaposition moves. */
+typealias AutonomousRefinementSettings = app.inku.mobile.data.refinement.AutonomousSettings
+
+data class AutonomousRefinementAttempt(
+    val turn: Int, val kind: String, val outcome: String, val share: Double?,
+    val historyId: String?, val detail: String?, val reason: String?,
+)
 
 data class AutonomousRefinementStatus(
     val busy: Boolean = false,
+    val stopping: Boolean = false,
+    val runId: String? = null,
     val step: Int = 0,
-    val total: Int = 0,
-    val observation: String? = null,
-    val nextDirection: String? = null,
-    val message: String? = null,
+    val kind: String? = null,
+    val stopReason: String? = null,
+    val attempts: List<AutonomousRefinementAttempt> = emptyList(),
+    val lastKeptHistoryId: String? = null,
     val error: String? = null,
-)
+) {
+    companion object {
+        fun fromRun(run: org.json.JSONObject): AutonomousRefinementStatus {
+            val turns = run.getJSONArray("turns")
+            val attempts = buildList {
+                for (turn in 0 until turns.length()) {
+                    val rows = turns.getJSONObject(turn).getJSONArray("attempts")
+                    for (index in 0 until rows.length()) {
+                        val row = rows.getJSONObject(index)
+                        add(AutonomousRefinementAttempt(turn + 1, row.getString("kind"), row.getString("outcome"),
+                            (row.opt("share") as? Number)?.toDouble(), row.opt("history_id") as? String,
+                            row.opt("sentence") as? String ?: row.opt("main_law") as? String, row.opt("reason") as? String))
+                    }
+                }
+            }
+            val current = run.optJSONObject("current")
+            return AutonomousRefinementStatus(run.getString("state") == "running", run.optBoolean("stopping"),
+                run.getString("id"), current?.optInt("turn") ?: 0, current?.optString("kind"),
+                run.opt("stop_reason") as? String, attempts, run.opt("last_kept_history_id") as? String,
+                run.opt("error") as? String)
+        }
+    }
+}
 
 /**
  * The 取り合わせ dialog for one work. [shown] holds every sentence offered so

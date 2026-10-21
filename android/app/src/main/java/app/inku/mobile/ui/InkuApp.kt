@@ -681,8 +681,15 @@ fun InkuApp(viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.view
                     AutonomousRefinementDialog(
                         settings = state.autonomousSettings, status = state.autonomousStatus,
                         models = visionModelGroupsFor(state),
+                        held = state.autonomousHeld,
+                        thumbnail = { id ->
+                            val child by remember(id) { viewModel.autonomousChild(id) }.collectAsState(initial = null)
+                            child?.let { ArtworkThumbnail(it.id, it.renderHash, it.thumbnailPath,
+                                Modifier.size(Dimens.lineageThumbSize)) }
+                        },
                         language = state.uiLanguage, onSettings = viewModel::updateAutonomousRefinementSettings,
                         onStart = viewModel::startAutonomousRefinement, onStop = viewModel::stopAutonomousRefinement,
+                        onOpenLast = viewModel::openLastAutonomousChild,
                         onDismiss = viewModel::closeAutonomousRefinement,
                     )
                 }
@@ -2593,6 +2600,10 @@ internal fun RunStatusRow(state: InkuUiState, viewModel: InkuViewModel) {
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+            if (state.autonomousStatus.busy) MiniPill(
+                text = savedWorkParityStrings(state.uiLanguage).autonomousTitle,
+                onClick = viewModel::reopenAutonomousRefinement,
+            )
             MiniPill(
                 text = S.stop,
                 onClick = when {

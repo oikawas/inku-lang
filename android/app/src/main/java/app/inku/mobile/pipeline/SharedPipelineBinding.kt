@@ -32,6 +32,10 @@ interface SharedPipelineBinding {
     fun juxtaposition(inputBytes: ByteArray): ByteArray =
         """{"error":"unavailable"}""".encodeToByteArray()
 
+    /** Move selection, the visible-difference gate and move provenance belong to the shared core. */
+    fun autonomousRefine(inputBytes: ByteArray): ByteArray =
+        """{"error":"unavailable"}""".encodeToByteArray()
+
     /** Provider request and response semantics are owned by the shared core. */
     fun providerWire(inputBytes: ByteArray): ByteArray =
         """{"error":"unavailable"}""".encodeToByteArray()

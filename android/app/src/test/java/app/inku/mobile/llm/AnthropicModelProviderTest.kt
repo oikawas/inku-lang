@@ -196,7 +196,7 @@ class AnthropicModelProviderTest {
     fun refinementAdviceSendsPngWithItsMimeType() {
         val request = ModelRequest(
             modelId = "anthropic:claude-sonnet-5-5", prompt = "Observe", temperature = 0.35,
-            maxTokens = 320, pipelineAction = REFINEMENT_VISION_ACTION,
+            maxTokens = 320, pipelineAction = JUXTAPOSITION_VISION_ACTION,
             imagePng = refinementPngHeader(),
         )
         val content = AnthropicModelProvider.userContent(request) as org.json.JSONArray

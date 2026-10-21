@@ -296,6 +296,7 @@ object InkuStringsEn : InkuStrings {
             "hacho_change" -> "Hacho"
             "language_comparison" -> "Language"
             "layout_change" -> "Layout"
+            "laws_change" -> "Laws"
             "model_comparison" -> "Model"
             "reinterpretation" -> "Reading"
             "render_engine_change" -> "Render engine"

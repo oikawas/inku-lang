@@ -221,8 +221,8 @@ class ChatGptPlanBoundaryTest {
     }
 
     @Test
-    fun onlyPinnedRefinementVisionAdviceSendsAnImageAndReadsCompletedAssistantText() = runBlocking {
-        val text = """{"observation":"A circle sits low.","next_direction":"Move it up.","suggested_kind":"layout_change"}"""
+    fun onlyPinnedJuxtapositionSendsAnImageAndReadsCompletedAssistantText() = runBlocking {
+        val text = "A sentence from another work."
         withPlan({ completedVisionStream(text) }) { manager, ref, http ->
             var wire = ""
             http.handler = { url, token, body ->
@@ -237,13 +237,11 @@ class ChatGptPlanBoundaryTest {
                     else -> error("Unexpected provider endpoint")
                 }
             }
-            val visionRequest = RefinementVisionRequest(
-                modelId = "chatgpt:personal-model", instruction = "a circle", direction = "leave space",
-                enabledKinds = listOf("layout_change"), languageCode = "en", imagePng = refinementPngHeader(),
+            val visionRequest = ModelRequest(
+                modelId = "chatgpt:personal-model", prompt = "Choose sentences", temperature = 0.35, maxTokens = 1200,
+                pipelineAction = JUXTAPOSITION_VISION_ACTION, imagePng = refinementPngHeader(), chatGptSession = ref,
             )
-            val advice = RefinementVisionAdviser(manager, ref).advise(visionRequest)
-            assertEquals("A circle sits low.", advice.observation)
-            assertEquals("Move it up.", advice.nextDirection)
+            assertEquals(text, manager.generate(visionRequest).text)
             val sent = JSONObject(wire)
             assertFalse(sent.getBoolean("store"))
             assertTrue(sent.getBoolean("stream"))
@@ -265,10 +263,10 @@ class ChatGptPlanBoundaryTest {
                 chatGptRequest(request(ref).copy(pipelineAction = null, imageJpeg = byteArrayOf(1, 2, 3)))
             }
             rejected("chatgpt_operation_not_supported") {
-                chatGptRequest(request(ref).copy(pipelineAction = REFINEMENT_VISION_ACTION, imageJpeg = byteArrayOf(1)))
+                chatGptRequest(request(ref).copy(pipelineAction = JUXTAPOSITION_VISION_ACTION, imageJpeg = byteArrayOf(1)))
             }
             try {
-                RefinementVisionAdviser(manager, ref.copy(generation = ref.generation - 1)).advise(visionRequest)
+                manager.generate(visionRequest.copy(chatGptSession = ref.copy(generation = ref.generation - 1)))
                 fail("An old profile generation must not advise")
             } catch (error: ChatGptException) {
                 assertEquals("chatgpt_session_changed", error.code)

@@ -6,6 +6,11 @@ import app.inku.mobile.pipeline.NativePipelineBridge
 import app.inku.mobile.pipeline.SharedPipelineBinding
 import org.json.JSONArray
 
+internal const val JUXTAPOSITION_VISION_ACTION = "juxtaposition_vision"
+
+/** Only juxtaposition sends an image and asks for plain assistant text. */
+internal fun isVisionTextAction(action: String?): Boolean = action == JUXTAPOSITION_VISION_ACTION
+
 data class JuxtapositionRequest(
     val modelId: String,
     /** The work's description with its labels removed: what the model reads. */

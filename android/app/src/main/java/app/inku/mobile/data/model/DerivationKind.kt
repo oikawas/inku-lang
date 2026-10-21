@@ -25,6 +25,7 @@ object DerivationKindRegistry {
         "ground_change",
         "hacho_change",
         "language_comparison",
+        "laws_change",
         "layout_change",
         "model_comparison",
         "reinterpretation",

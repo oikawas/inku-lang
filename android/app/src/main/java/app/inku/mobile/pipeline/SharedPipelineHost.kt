@@ -57,7 +57,7 @@ class SharedPipelineHost(
                     .put("revision", "0")
                     .put(
                         "origin",
-                        if (request.authoring is PipelineAuthoring.DirectDdl) {
+                        if (request.authoring !is PipelineAuthoring.Description) {
                             "user_authored_ddl"
                         } else {
                             "stage1_generated"
@@ -65,7 +65,7 @@ class SharedPipelineHost(
                     )
                     .put(
                         "authority",
-                        if (request.authoring is PipelineAuthoring.DirectDdl) {
+                        if (request.authoring !is PipelineAuthoring.Description) {
                             "ddl_authoritative"
                         } else {
                             "description_authoritative"
@@ -85,6 +85,13 @@ class SharedPipelineHost(
                         .put("source", authoring.source)
                         .also { value -> authoring.completionRangesJson?.let { value.put("completion_ranges", JSONObject(it)) } }
                         // The server's direct-DDL start (`pipeline_api.py`): the parent's laws records go on.
+                        .also { value -> putLawsRecords(value, authoring.lawsRecordsJson) }
+                    is PipelineAuthoring.SavedLaws -> JSONObject()
+                        .put("tag", "saved_laws")
+                        .put("source", authoring.source)
+                        .put("description", authoring.description)
+                        .put("direction", JSONObject(authoring.directionJson))
+                        .also { value -> authoring.completionRangesJson?.let { value.put("completion_ranges", JSONObject(it)) } }
                         .also { value -> putLawsRecords(value, authoring.lawsRecordsJson) }
                 },
             )

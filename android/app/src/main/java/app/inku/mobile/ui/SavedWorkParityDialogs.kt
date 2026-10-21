@@ -209,89 +209,106 @@ internal fun AutonomousRefinementDialog(
     settings: AutonomousRefinementSettings,
     status: AutonomousRefinementStatus,
     models: List<VisionModelGroup>,
+    held: Boolean?,
     language: UiLanguage,
+    thumbnail: @Composable (String) -> Unit,
     onSettings: (AutonomousRefinementSettings) -> Unit,
     onStart: () -> Unit,
     onStop: () -> Unit,
+    onOpenLast: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val s = savedWorkParityStrings(language)
-    val busy = status.busy
-    val canStart = !busy && settings.generations in 1..10 && settings.allowedKinds.isNotEmpty() &&
+    val s = app.inku.mobile.ui.i18n.AiRefineStrings(language.isEnglish)
+    val common = savedWorkParityStrings(language)
+    val hasRun = status.runId != null || status.busy
+    val canStart = !hasRun && held != null && settings.allowedKinds.isNotEmpty() &&
         models.any { group -> group.models.any { it.id == settings.modelId && !isModelUnselectable(it.catalog) } }
-    Dialog(
-        onDismissRequest = { if (!busy) onDismiss() },
-        properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = !busy, dismissOnClickOutside = !busy),
-    ) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(
             modifier = Modifier.fillMaxWidth(0.94f).fillMaxHeight(0.9f).imePadding().testTag("AutonomousRefinementDialog"),
             shape = RoundedCornerShape(Dimens.radiusCard), color = MaterialTheme.colorScheme.surface,
         ) {
             Column(Modifier.padding(Dimens.spaceL), verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(s.autonomousTitle, modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.titleMedium)
-                    TextButton(onClick = onDismiss, enabled = !busy) { Text(s.close) }
+                    Text(s["aiRefineTitle"], modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                    TextButton(onClick = onDismiss) { Text(common.close) }
                 }
-                Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(Dimens.spaceL)) {
-                    // Vision is the only method (2026-10-18): its model and the
-                    // direction are always asked for.
-                    Text(s.vision, style = MaterialTheme.typography.titleSmall)
-                    Text(s.visionHint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    run {
-                        VisionModelPicker(label = s.visionModel, selectedModelId = settings.modelId, groups = models,
-                            enabled = !busy, onSelect = { onSettings(settings.copy(modelId = it)) },
-                            modifier = Modifier.testTag("AutonomousVisionModel"))
-                        OutlinedTextField(value = settings.direction, onValueChange = { onSettings(settings.copy(direction = it.take(160))) },
-                            label = { Text(s.directionLabel) },
-                            placeholder = { Text(s.directionPlaceholder) },
-                            enabled = !busy, minLines = 2, maxLines = 3, modifier = Modifier.fillMaxWidth().testTag("AutonomousDirection"))
-                    }
-                    Text(s.generations, style = MaterialTheme.typography.titleSmall)
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-                        OutlinedButton(onClick = { onSettings(settings.copy(generations = (settings.generations - 1).coerceAtLeast(1))) },
-                            enabled = !busy && settings.generations > 1, modifier = Modifier.testTag("AutonomousGenerationsDecrease")) { Text("−") }
-                        Text(settings.generations.coerceIn(1, 10).toString(), style = MaterialTheme.typography.titleMedium)
-                        OutlinedButton(onClick = { onSettings(settings.copy(generations = (settings.generations + 1).coerceAtMost(10))) },
-                            enabled = !busy && settings.generations < 10, modifier = Modifier.testTag("AutonomousGenerationsIncrease")) { Text("+") }
-                    }
-                    Text(s.elements, style = MaterialTheme.typography.titleSmall)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = settings.changeColor, onCheckedChange = { onSettings(settings.copy(changeColor = it)) }, enabled = !busy)
-                        Text(s.color)
-                        Checkbox(checked = settings.changeLayout, onCheckedChange = { onSettings(settings.copy(changeLayout = it)) }, enabled = !busy)
-                        Text(s.layout)
-                    }
-                    Text(s.wild, style = MaterialTheme.typography.titleSmall)
-                    Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
-                        listOf(null to s.inherit, true to s.on, false to s.off).forEach { (value, label) ->
-                            FilterChip(selected = settings.wildOverride == value,
-                                onClick = { onSettings(settings.copy(wildOverride = value)) }, enabled = !busy,
-                                label = { Text(label) })
+                Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+                    Text(s["aiRefineHelp"], style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (hasRun) {
+                        val message = when {
+                            status.stopping -> s["aiRefineStopping"]
+                            status.busy && status.kind != null -> s.taking(status.step, status.kind)
+                            status.busy -> s["aiRefineStartButton"]
+                            else -> s.ended(status.stopReason) +
+                                if (status.lastKeptHistoryId == null) s["aiRefineNoneKept"] else ""
                         }
+                        Text(message, style = MaterialTheme.typography.titleSmall)
+                        status.attempts.forEach { attempt ->
+                            Surface(shape = RoundedCornerShape(Dimens.radiusCard),
+                                color = MaterialTheme.colorScheme.surfaceContainer) {
+                                Row(Modifier.fillMaxWidth().padding(Dimens.spaceXs), horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
+                                    attempt.historyId?.let { thumbnail(it) }
+                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
+                                        Text(listOfNotNull(s.turn(attempt.turn), s.kind(attempt.kind), s.outcome(attempt.outcome),
+                                            attempt.share?.let(s::share)).joinToString(" · "), style = MaterialTheme.typography.labelSmall)
+                                        attempt.detail?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                                        if (attempt.outcome in listOf("unavailable", "failed")) {
+                                            attempt.reason?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if (status.busy) {
+                            LinearProgressIndicator(Modifier.fillMaxWidth())
+                            Text(s["aiRefineGoesOn"], style = MaterialTheme.typography.bodySmall)
+                        }
+                    } else {
+                        if (held == true) Text(s["aiRefineHeldNote"], style = MaterialTheme.typography.bodySmall)
+                        VisionModelPicker(label = s["aiRefineModel"], selectedModelId = settings.modelId, groups = models,
+                            enabled = held != null, onSelect = { onSettings(settings.copy(modelId = it)) },
+                            modifier = Modifier.testTag("AutonomousModel"))
+                        Text(s["aiRefineKindsLabel"], style = MaterialTheme.typography.titleSmall)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = settings.useLaws, onCheckedChange = { onSettings(settings.copy(useLaws = it)) })
+                            Text(s["aiRefineKindLaws"])
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = settings.useJuxtaposition, onCheckedChange = { onSettings(settings.copy(useJuxtaposition = it)) })
+                            Text(s["aiRefineKindJuxtaposition"])
+                        }
+                        Text(s["aiRefineMovesLabel"], style = MaterialTheme.typography.titleSmall)
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+                            OutlinedButton(onClick = { onSettings(settings.copy(moves = settings.moves - 1)) },
+                                enabled = settings.moves > 1, modifier = Modifier.testTag("AutonomousMovesDecrease")) { Text("−") }
+                            Text(settings.moves.toString(), style = MaterialTheme.typography.titleMedium)
+                            OutlinedButton(onClick = { onSettings(settings.copy(moves = settings.moves + 1)) },
+                                enabled = settings.moves < 10, modifier = Modifier.testTag("AutonomousMovesIncrease")) { Text("＋") }
+                        }
+                        Text(common.wild, style = MaterialTheme.typography.titleSmall)
+                        Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
+                            listOf(null to common.inherit, true to common.on, false to common.off).forEach { (value, label) ->
+                                FilterChip(selected = settings.wildOverride == value,
+                                    onClick = { onSettings(settings.copy(wildOverride = value)) }, label = { Text(label) })
+                            }
+                        }
+                        OutlinedTextField(value = settings.direction, onValueChange = { onSettings(settings.copy(direction = it)) },
+                            label = { Text(s["aiRefineDirectionLabel"]) }, placeholder = { Text(s["aiRefineDirectionPlaceholder"]) },
+                            minLines = 3, modifier = Modifier.fillMaxWidth().testTag("AutonomousDirection"))
                     }
-                    if (busy) {
-                        LinearProgressIndicator(Modifier.fillMaxWidth())
-                        Text(s.generationStatus(status.step.coerceAtLeast(1), status.total.coerceAtLeast(1)),
-                            style = MaterialTheme.typography.bodySmall)
-                    }
-                    status.message?.takeIf(String::isNotBlank)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-                    status.observation?.takeIf(String::isNotBlank)?.let {
-                        Text(s.visionObservation, style = MaterialTheme.typography.titleSmall)
-                        Text(it, style = MaterialTheme.typography.bodySmall)
-                    }
-                    status.nextDirection?.takeIf(String::isNotBlank)?.let {
-                        Text(s.nextDirection, style = MaterialTheme.typography.titleSmall)
-                        Text(it, style = MaterialTheme.typography.bodySmall)
-                    }
-                    status.error?.takeIf(String::isNotBlank)?.let {
-                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-                    }
+                    status.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
                 }
-                if (busy) OutlinedButton(onClick = onStop, modifier = Modifier.fillMaxWidth().testTag("AutonomousStop")) {
-                    Text(s.stop)
-                } else Button(onClick = onStart, enabled = canStart, modifier = Modifier.fillMaxWidth().testTag("AutonomousStart")) {
-                    Text(s.start)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
+                    TextButton(onClick = onDismiss) { Text(common.close) }
+                    if (status.busy) {
+                        OutlinedButton(onClick = onStop, enabled = !status.stopping,
+                            modifier = Modifier.testTag("AutonomousStop")) { Text(s["aiRefineStop"]) }
+                    } else if (hasRun) {
+                        if (status.lastKeptHistoryId != null) Button(onClick = onOpenLast,
+                            modifier = Modifier.testTag("AutonomousOpenLast")) { Text(s["aiRefineOpenLast"]) }
+                    } else Button(onClick = onStart, enabled = canStart,
+                        modifier = Modifier.testTag("AutonomousStart")) { Text(s["aiRefineStartButton"]) }
                 }
             }
         }

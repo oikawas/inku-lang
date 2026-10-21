@@ -20,6 +20,12 @@ interface LineageDao {
     @Query("SELECT * FROM lineage_edges WHERE child_node_id = :childId")
     suspend fun getEdgeByChildId(childId: String): LineageEdgeEntity?
 
+    @Query("UPDATE lineage_edges SET metadata_json = :metadata WHERE child_node_id = :childId")
+    suspend fun setEdgeMetadata(childId: String, metadata: String)
+
+    @Query("UPDATE lineage_nodes SET state = 'active' WHERE id = :nodeId AND state = 'lineage_only'")
+    suspend fun promoteNode(nodeId: String)
+
     @Query("SELECT * FROM lineage_edges WHERE parent_node_id = :parentId")
     suspend fun getEdgesByParentId(parentId: String): List<LineageEdgeEntity>
 

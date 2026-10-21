@@ -364,6 +364,7 @@ data class InkuUiState(
     val replayComparison: app.inku.mobile.data.refinement.ReplayComparison? = null,
     val autonomousOpen: Boolean = false,
     val autonomousParent: HistoryItemEntity? = null,
+    val autonomousHeld: Boolean? = null,
     val autonomousSettings: AutonomousRefinementSettings = AutonomousRefinementSettings(),
     val autonomousStatus: AutonomousRefinementStatus = AutonomousRefinementStatus(),
     val juxtaposition: JuxtapositionDialogState? = null,
@@ -548,7 +549,7 @@ class InkuViewModel @JvmOverloads constructor(
     private var refinementJob: Job? = null
     private var canvasSearchJob: Job? = null
     private var replayJob: Job? = null
-    private var autonomousJob: Job? = null
+    private var autonomousStartJob: Job? = null
     private var juxtapositionJob: Job? = null
     private var refinementSaving = false
     private var replaySerial = 0L
@@ -619,10 +620,19 @@ class InkuViewModel @JvmOverloads constructor(
 
     init {
         viewModelScope.launch {
+            repository.autonomousRefinement.updates.collect { json ->
+                if (json != null) {
+                    localState.value = localState.value.copy(autonomousStatus = AutonomousRefinementStatus.fromRun(JSONObject(json)))
+                    if (!localState.value.autonomousStatus.busy) refreshLineage()
+                }
+            }
+        }
+        viewModelScope.launch {
             repository.ensureDefaultModelAssets()
             repository.ensureDefaultProviderSettings()
             repository.ensureDefaultExportTemplates()
             restorePersistedSettings()
+            withContext(Dispatchers.IO) { repository.autonomousRefinement.recover() }
             runCatching { withContext(Dispatchers.IO) { repository.restoreActivePipeline() } }
                 .onSuccess { view ->
                     // The latest execution is read after the settings above,
@@ -670,7 +680,6 @@ class InkuViewModel @JvmOverloads constructor(
         refinementJob?.cancel()
         replayJob?.cancel()
         canvasSearchJob?.cancel()
-        autonomousJob?.cancel()
         modelDownloadJob?.cancel()
         litertWarmupJob?.cancel()
         cameraRunSerial += 1
@@ -1900,7 +1909,7 @@ class InkuViewModel @JvmOverloads constructor(
         colorArrangementExhausted = source.colorArrangementExhausted, groundCurrentLabel = source.groundCurrentLabel,
         replayOpen = false, replayBusy = false, replaySaving = false, replayComparison = null,
         replaySavedHistoryId = null, replayError = null, canvasSearchOpen = false,
-        autonomousOpen = false, autonomousParent = null, autonomousStatus = AutonomousRefinementStatus(),
+        autonomousOpen = false, autonomousParent = null, autonomousStatus = localState.value.autonomousStatus,
     )
 
     fun setSettingsPane(panel: SettingsPane) {
@@ -3872,108 +3881,81 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     fun openAutonomousRefinement(item: HistoryItemEntity) {
-        if (state.value.isRunning || item.trashed) return
-        enterWorkContext(item)
+        if ((state.value.isRunning && !state.value.autonomousStatus.busy) || item.trashed) return
+        val active = repository.autonomousRefinement.updates.value?.let(::JSONObject)
+            ?.takeIf { it.optString("state") == "running" }
+        val sourceId = active?.getString("history_id") ?: item.id
         closeRefinement()
-        localState.value = localState.value.copy(
-            autonomousOpen = true, autonomousParent = item,
-            autonomousSettings = localState.value.autonomousSettings.copy(wildOverride = null),
-            autonomousStatus = AutonomousRefinementStatus(),
-        )
+        localState.value = localState.value.copy(autonomousOpen = true, autonomousParent = item,
+            autonomousHeld = null, autonomousSettings = localState.value.autonomousSettings.copy(wildOverride = null))
+        viewModelScope.launch {
+            try {
+                val source = withContext(Dispatchers.IO) { repository.getHistoryById(sourceId) } ?: return@launch
+                val run = withContext(Dispatchers.IO) { repository.autonomousRefinement.forHistory(sourceId) }
+                val held = withContext(Dispatchers.IO) { repository.isDescriptionLocked(source) }
+                if (!localState.value.autonomousOpen) return@launch
+                val models = autonomousVisionModelIds(state.value)
+                val settings = localState.value.autonomousSettings
+                localState.value = localState.value.copy(autonomousParent = source, autonomousHeld = held,
+                    autonomousSettings = if (settings.modelId in models || models.isEmpty()) settings else settings.copy(modelId = models.first()),
+                    autonomousStatus = run?.let(AutonomousRefinementStatus::fromRun) ?: AutonomousRefinementStatus())
+            } catch (error: Exception) {
+                localState.value = localState.value.copy(autonomousStatus = AutonomousRefinementStatus(error = error.message))
+            }
+        }
     }
 
     fun updateAutonomousRefinementSettings(settings: AutonomousRefinementSettings) {
         if (localState.value.autonomousStatus.busy) return
-        localState.value = localState.value.copy(autonomousSettings = settings.copy(
-            generations = settings.generations.coerceIn(1, 10), direction = settings.direction.take(160)))
+        val direction = settings.direction.take(settings.direction.offsetByCodePoints(0,
+            settings.direction.codePointCount(0, settings.direction.length).coerceAtMost(1000)))
+        val normalized = settings.copy(moves = settings.moves.coerceIn(1, 10), direction = direction)
+        localState.value = localState.value.copy(autonomousSettings = normalized)
+        persistSetting("autonomous_refinement_settings", normalized.toJson(localState.value.uiLanguage.code).toString())
     }
 
     fun closeAutonomousRefinement() {
-        if (localState.value.autonomousStatus.busy) return
-        localState.value = localState.value.copy(autonomousOpen = false, autonomousParent = null)
+        localState.value = localState.value.copy(autonomousOpen = false)
+    }
+
+    fun reopenAutonomousRefinement() {
+        val id = repository.autonomousRefinement.updates.value?.let(::JSONObject)?.optString("history_id") ?: return
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { repository.getHistoryById(id) }?.let(::openAutonomousRefinement)
+        }
     }
 
     fun stopAutonomousRefinement() {
-        autonomousJob?.cancel()
+        autonomousStartJob?.cancel()
+        viewModelScope.launch { repository.autonomousRefinement.stop() }
     }
+
+    fun openLastAutonomousChild() {
+        val id = localState.value.autonomousStatus.lastKeptHistoryId ?: return
+        closeAutonomousRefinement()
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { repository.getHistoryById(id) }?.let { selectHistory(it) }
+        }
+    }
+
+    fun autonomousChild(id: String): kotlinx.coroutines.flow.Flow<HistoryItemEntity?> = repository.observeHistoryById(id)
 
     fun startAutonomousRefinement() {
         val current = localState.value
-        if (state.value.isRunning || !current.autonomousOpen) return
+        if (state.value.isRunning || !current.autonomousOpen || current.autonomousHeld == null) return
         val original = current.autonomousParent ?: return
         val settings = current.autonomousSettings
-        if (settings.allowedKinds.isEmpty() || !DdlSource.hasBody(original.normalizedDdl) ||
-            settings.modelId !in autonomousVisionModelIds(state.value)) {
-            localState.value = current.copy(autonomousStatus = AutonomousRefinementStatus(error = strings().refinementNoneToGenerate))
-            return
-        }
-        localState.value = current.copy(autonomousStatus = AutonomousRefinementStatus(busy = true, total = settings.generations))
-        autonomousJob = viewModelScope.launch {
-            var item = original
-            var advice: app.inku.mobile.llm.RefinementVisionAdvice? = null
-            suspend fun observe() {
-                val png = withContext(Dispatchers.IO) {
-                    app.inku.mobile.llm.RefinementVisionImage.fromSvg(item.displaySvg)
-                }
-                advice = withContext(Dispatchers.IO) { repository.refineVisionAdvice(app.inku.mobile.llm.RefinementVisionRequest(
-                    // A work drawn straight from DDL has no description; Vision is
-                    // shown its instructions instead, as on Web and macOS.
-                    modelId = settings.modelId, instruction = sourceTextOf(item).ifBlank { item.normalizedDdl.orEmpty() },
-                    direction = settings.direction,
-                    enabledKinds = settings.allowedKinds, languageCode = current.uiLanguage.code, imagePng = png)) }
-                currentCoroutineContext().ensureActive()
-                localState.value = localState.value.copy(autonomousStatus = localState.value.autonomousStatus.copy(
-                    observation = advice?.observation, nextDirection = advice?.nextDirection))
-            }
+        if (settings.allowedKinds.isEmpty() || original.displaySvg.isBlank() ||
+            settings.modelId !in autonomousVisionModelIds(state.value)) return
+        localState.value = current.copy(autonomousStatus = AutonomousRefinementStatus(busy = true))
+        autonomousStartJob = viewModelScope.launch {
             try {
-                observe()
-                repeat(settings.generations) { index ->
-                    currentCoroutineContext().ensureActive()
-                    val parent = RefinementParent.of(item, sourceTextOf(item))
-                    // Vision's advice names the element; one outside the allowed
-                    // ones falls back to the first allowed. Nothing draws it at random.
-                    val kind = advice?.suggestedKind?.takeIf { it in settings.allowedKinds } ?: settings.allowedKinds.first()
-                    val element = if (kind == "catalog_change") RefinementElement.Color else RefinementElement.Layout
-                    val catalog = if (element == RefinementElement.Color)
-                        RefinementPlanner.catalogCandidateIds(parent.catalogId, ColorCatalogs.all.map { it.id }).random() else null
-                    val base = RefinementPlanner.plan(element, parent, catalog, RecomposeMode.Principled)
-                    // Both modes follow the current parent's DDL. Advice selects
-                    // an allowed intervention and is metadata, never new prose.
-                    val plan = base.copy(
-                        route = app.inku.mobile.data.refinement.RefinementRoute.ComposeFromDdl,
-                        stage1Model = settings.modelId,
-                        stage2Model = settings.modelId,
-                        renderWildOverride = settings.wildOverride,
-                        derivationMetadata = base.derivationMetadata + mapOf("autonomous_refine_mode" to "vision") +
-                            (advice?.let { mapOf("vision_model" to it.model, "vision_observation" to it.observation,
-                                "vision_next_direction" to it.nextDirection) } ?: emptyMap()),
-                    )
-                    localState.value = localState.value.copy(autonomousStatus = localState.value.autonomousStatus.copy(
-                        step = index + 1, message = strings().refinementElementLabel(element.id)))
-                    val started = System.currentTimeMillis()
-                    val result = withContext(Dispatchers.IO) { repository.renderRefinementCandidate(parent, plan) }
-                    currentCoroutineContext().ensureActive()
-                    item = withContext(Dispatchers.IO) {
-                        repository.saveRefinementCandidate(result, plan, item.lineageNodeId,
-                            System.currentTimeMillis() - started,
-                            historyVisibility = if (index == settings.generations - 1) "normal" else "lineage_only",
-                            stage1ModelId = plan.stage1Model ?: parent.stage1Model,
-                            stage2ModelId = plan.stage2Model ?: parent.stage2Model, sourceText = parent.description)
-                    }
-                    refreshLineage()
-                    if (index < settings.generations - 1) observe()
-                }
-                localState.value = localState.value.copy(autonomousStatus = localState.value.autonomousStatus.copy(
-                    message = strings().statusSaved(item.renderHashShort)))
+                withContext(Dispatchers.IO) { repository.autonomousRefinement.start(original.id, settings, current.uiLanguage.code) }
             } catch (error: Exception) {
-                if (error is PipelineInteractionRequired) withContext(NonCancellable + Dispatchers.IO) {
-                    runCatching { repository.cancelPipeline(error.view.executionId) }
+                if (repository.autonomousRefinement.updates.value?.let(::JSONObject)?.optString("state") != "running") {
+                    localState.value = localState.value.copy(autonomousStatus = AutonomousRefinementStatus(
+                        error = if (error is CancellationException) strings().statusStopped else error.message))
                 }
-                localState.value = localState.value.copy(autonomousStatus = localState.value.autonomousStatus.copy(
-                    error = if (error is CancellationException) strings().statusStopped else messageFor(error, strings(), strings().refinementFailed)))
-            } finally {
-                localState.value = localState.value.copy(autonomousStatus = localState.value.autonomousStatus.copy(busy = false))
-                refreshLineage()
             }
         }
     }
@@ -3999,7 +3981,7 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun selectJuxtapositionModel(modelId: String) {
         if (localState.value.juxtaposition?.busy != false) return
-        localState.value = localState.value.copy(autonomousSettings = localState.value.autonomousSettings.copy(modelId = modelId))
+        updateAutonomousRefinementSettings(localState.value.autonomousSettings.copy(modelId = modelId))
     }
 
     fun chooseJuxtaposition(index: Int) {
@@ -4483,6 +4465,11 @@ class InkuViewModel @JvmOverloads constructor(
 
     private suspend fun restorePersistedSettings() {
         val settings = repository.getSettingsMap()
+        settings["autonomous_refinement_settings"]?.let { saved ->
+            runCatching { AutonomousRefinementSettings.fromJson(JSONObject(saved)) }.getOrNull()?.let {
+                localState.value = localState.value.copy(autonomousSettings = it)
+            }
+        }
         val bundledPluginsEnabled = repository.isBundledPluginPackageEnabled()
         val bundledPluginWords = withContext(Dispatchers.IO) {
             runCatching { repository.bundledPluginWords(japanese = true) to repository.bundledPluginWords(japanese = false) }

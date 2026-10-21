@@ -40,6 +40,10 @@ interface HistoryDao {
     @Query("SELECT * FROM history_items WHERE id = :id LIMIT 1")
     suspend fun getById(id: String): HistoryItemEntity?
 
+    /** Includes lineage-only children; their thumbnail can arrive after their save. */
+    @Query("SELECT * FROM history_items WHERE id = :id LIMIT 1")
+    fun observeById(id: String): Flow<HistoryItemEntity?>
+
     @Query("SELECT * FROM history_items WHERE render_hash = :hash OR render_hash_short = :hash LIMIT 1")
     suspend fun getByHash(hash: String): HistoryItemEntity?
 

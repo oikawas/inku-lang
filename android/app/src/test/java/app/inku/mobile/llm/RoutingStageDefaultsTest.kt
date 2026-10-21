@@ -16,7 +16,7 @@ class RoutingStageDefaultsTest {
     @Test
     fun stageOneCompositionAndStageTwoUseTheirConfiguredProviders() {
         val selection = JSONObject().put("stage1_provider", "gemini").put("stage2_provider", "ollama")
-        for (action in listOf(null, "generate_normalized_ddl", "generate_sketch", "read_composition", REFINEMENT_VISION_ACTION)) {
+        for (action in listOf(null, "generate_normalized_ddl", "generate_sketch", "read_composition", JUXTAPOSITION_VISION_ACTION)) {
             val fallback = RoutingModelProvider.configuredStageProvider(providers, selection, action)
             assertEquals("gemini", fallback)
             assertSame(cloud, RoutingModelProvider.resolveProviderForRouting(providers, "unknown", fallback))

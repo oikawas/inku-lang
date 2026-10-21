@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-21 — A child of Another catalog keeps a laws work's records
-
-A child drawn from a laws work with Another catalog did not keep its parent's laws layers record and laws basis. The child only draws the parent's Score in another catalog, with the parent's instructions, yet its Another composition could not read the numeric sentences the laws wrote and moved no layer (`unsupported_sentence`), and the AI refinement's laws move could not start from it for the same reason (reproduced on 5173 Build 1303). As for the children whose color arrangement, support or touches change, the Server now writes the parent's records on the child's lineage edge. Catalog children saved before are not changed.
-
 ### 2026-10-21 — Android: the camera's model chooser follows the model purposes, and Juxtapose's held reason matches Web
 
 At the author's decision, the camera's model chooser offers only the models set to be used for both LLM and Vision. The camera reads the photo and draws with the same model, so a model with only one of the two purposes stops partway. If the chosen model has only one, it has to be chosen again. Also, in the work-editing menu of a description-locked work, the reason under Juxtapose is now Web's "This work's DDL was edited. Drawing it from the description would lose the edits, so this is not offered. …". As the way to start again from the description, Android names Change the description in the same menu.
@@ -194,6 +190,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.228 (2026-10-21 / Build 1304)
+
+### 2026-10-21 — A child of Another catalog keeps a laws work's records
+
+A child drawn from a laws work with Another catalog did not keep its parent's laws layers record and laws basis. The child only draws the parent's Score in another catalog, with the parent's instructions, yet its Another composition could not read the numeric sentences the laws wrote and moved no layer (`unsupported_sentence`), and the AI refinement's laws move could not start from it for the same reason (reproduced on 5173 Build 1303). As for the children whose color arrangement, support or touches change, the Server now writes the parent's records on the child's lineage edge. Catalog children saved before are not changed.
 
 ## v2.15.227 (2026-10-21 / Build 1303)
 

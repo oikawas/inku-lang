@@ -56,13 +56,13 @@ READING = {
 }
 
 # The circle goes to the golden section's upper left crossing.
-LAWS = {"main_layer": 1, "main_law": "B1", "description_counts": [{"layer": 1, "words": "円がひとつ"}],
+LAWS = {"main_law": "B1", "description_counts": [{"layer": 1, "words": "円がひとつ"}],
         "laws": {"B1": {"targets": [{"layer": 1, "at": "point_ul"}]},
                  "B21": {"targets": [{"layer": 2, "hand": "still"}]}},
         "reason": "円を黄金分割の左上の交点に置く。"}
 
-# The circle, the laws' main layer, takes the blue.
-COLORS = {"main_law": "D5", "laws": {"D5": {"hue": "blue"}}, "reason": "青を軸に近い色でまとめる。"}
+# The color law names the circle as the layer that takes the blue.
+COLORS = {"main_law": "D5", "laws": {"D5": {"hue": "blue", "layer": 1}}, "reason": "青を軸に近い色でまとめる。"}
 
 
 @pytest.fixture
@@ -83,14 +83,14 @@ def author():
 
 
 @pytest.fixture
-def sent(monkeypatch):
+def sent(monkeypatch, ground):
     """Stage 1, the reader, the laws and the colors each answering once, keeping each action."""
     actions: list[dict] = []
     answers = {
         "generate_normalized_ddl": ("normalized_ddl_generated", PLAN, "3"),
         "read_composition": ("composition_read", READING, "5"),
         "choose_laws": ("laws_chosen", LAWS, "7"),
-        "choose_colors": ("colors_chosen", COLORS, "11"),
+        "choose_colors": ("colors_chosen", {**COLORS, **({"ground": ground} if ground else {})}, "11"),
     }
 
     class Provider:
@@ -126,7 +126,8 @@ def _settled(headers: dict[str, str], view: dict) -> dict:
     return view
 
 
-def test_a_run_asked_for_its_colors_prints_the_colors_its_reader_chose(author, sent, monkeypatch):
+@pytest.mark.parametrize("ground", [None, "black"], ids=["kept-ground", "chosen-ground"])
+def test_a_run_asked_for_its_colors_prints_the_colors_its_reader_chose(author, sent, monkeypatch, ground):
     owner, headers = author
     monkeypatch.setenv("INKU_DEVELOPER_MODE", "1")
     started = _start(headers, {"developer_colors_stage": True})
@@ -139,13 +140,18 @@ def test_a_run_asked_for_its_colors_prints_the_colors_its_reader_chose(author, s
     assert DESCRIPTION in colors["message"]
     # The color table names the paint each of the nine colors draws.
     assert '"name":"black","paint":"黒"' in colors["message"], colors["message"]
+    assert "## 主の層（前の段が決めた）" not in colors["message"]
+    assert "主の層: layer 1" not in colors["message"]
     # The circle the laws placed is printed in the blue.
     assert "画面の横0.381966、縦0.381966の位置に、青のペンの濃い塗りの小さな円を1個置く。" in \
         view["document"]["source"].splitlines(), view["document"]["source"]
+    assert f"背景を{'黒' if ground else '白'}で埋める。" in view["document"]["source"].splitlines(), \
+        view["document"]["source"]
 
     state = json.loads(VariationAuthorityStore(db.engine).read_execution(owner, view["execution_id"]).state_bytes)
     # The estimate draws with the work's seed; the colors are timed apart from Stage 1.
     assert state["snapshot"]["config"]["colors"] == {"render_seed": "7"}
+    assert state["snapshot"]["laws_basis"]["main_layer"] is None
     assert state["context"]["metrics"] == {"stage1": 3, "composition": 5, "laws": 7, "colors": 11}
 
     prompts = client.get(f"/api/pipeline/variations/{view['variation_id']}/system-prompts", headers=headers)

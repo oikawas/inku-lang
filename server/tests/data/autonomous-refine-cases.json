@@ -967,7 +967,7 @@
     "share": 0.3125,
     "laws": {
      "main_law": " B1 ",
-     "main_layer": 2,
+     "main_layer": null,
      "laws": [
       {
        "law": "B1",
@@ -1005,7 +1005,7 @@
       },
       "laws": {
        "main_law": "B1",
-       "main_layer": 2,
+       "main_layer": null,
        "laws": [
         {
          "law": "B1",
@@ -1111,7 +1111,7 @@
     "share": 0.1997,
     "laws": {
      "main_law": " B1 ",
-     "main_layer": 2,
+     "main_layer": null,
      "laws": [
       {
        "law": "B1",
@@ -1149,7 +1149,7 @@
       },
       "laws": {
        "main_law": "B1",
-       "main_layer": 2,
+       "main_layer": null,
        "laws": [
         {
          "law": "B1",
@@ -1181,7 +1181,7 @@
     "share": 0.123456,
     "laws": {
      "main_law": " B1 ",
-     "main_layer": 2,
+     "main_layer": null,
      "laws": [
       {
        "law": "B1",
@@ -1219,7 +1219,7 @@
       },
       "laws": {
        "main_law": "B1",
-       "main_layer": 2,
+       "main_layer": null,
        "laws": [
         {
          "law": "B1",
@@ -1251,7 +1251,7 @@
     "share": 0.3125,
     "laws": {
      "main_law": " B1 ",
-     "main_layer": 2,
+     "main_layer": null,
      "laws": [
       {
        "law": "B1",
@@ -1289,7 +1289,7 @@
       },
       "laws": {
        "main_law": "B1",
-       "main_layer": 2,
+       "main_layer": null,
        "laws": [
         {
          "law": "B1",
@@ -1321,7 +1321,7 @@
     "share": 0.3125,
     "laws": {
      "main_law": " B1 ",
-     "main_layer": 2,
+     "main_layer": null,
      "laws": [
       {
        "law": "B1",
@@ -1360,7 +1360,7 @@
       },
       "laws": {
        "main_law": "B1",
-       "main_layer": 2,
+       "main_layer": null,
        "laws": [
         {
          "law": "B1",
@@ -1733,7 +1733,7 @@
     "share": 0.1997,
     "laws": {
      "main_law": " B1 ",
-     "main_layer": 2,
+     "main_layer": null,
      "laws": [
       {
        "law": "B1",
@@ -1768,7 +1768,7 @@
     "share": 0.2001,
     "laws": {
      "main_law": " B1 ",
-     "main_layer": 2,
+     "main_layer": null,
      "laws": [
       {
        "law": "B1",
@@ -1803,7 +1803,7 @@
     "share": 0.0,
     "laws": {
      "main_law": " B1 ",
-     "main_layer": 2,
+     "main_layer": null,
      "laws": [
       {
        "law": "B1",
@@ -1838,7 +1838,7 @@
     "share": 0.3125,
     "laws": {
      "main_law": " B1 ",
-     "main_layer": 2,
+     "main_layer": null,
      "laws": [
       {
        "law": "B1",
@@ -1914,7 +1914,7 @@
     "share": 0.3125,
     "laws": {
      "main_law": " B1 ",
-     "main_layer": 2,
+     "main_layer": null,
      "laws": [
       {
        "law": "B1",
@@ -1949,7 +1949,7 @@
     "share": 0.3125,
     "laws": {
      "main_law": " B1 ",
-     "main_layer": 2,
+     "main_layer": null,
      "laws": [
       {
        "law": "B1",
@@ -1984,7 +1984,7 @@
     "share": -0.1,
     "laws": {
      "main_law": " B1 ",
-     "main_layer": 2,
+     "main_layer": null,
      "laws": [
       {
        "law": "B1",
@@ -2019,7 +2019,7 @@
     "share": 0.3125,
     "laws": {
      "main_law": " B1 ",
-     "main_layer": 2,
+     "main_layer": null,
      "laws": [
       {
        "law": "B1",

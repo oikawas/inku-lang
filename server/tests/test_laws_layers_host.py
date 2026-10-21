@@ -31,7 +31,7 @@ LAWS = {"schema": "inku.laws-layers.v1", "layers": [{
 SOURCE = "背景を白で埋める。\n画面の横0.618034、縦0.618034の位置に、灰の細い細筆の程よい空の縦長の小さな楕円を1個置く。\n"
 BASIS = {"schema": "inku.laws-basis.v1",
          "composed": "背景を白で埋める。\n画面の中ほどに、灰の細い細筆の程よい空の縦長の小さな楕円を1個置く。\n",
-         "committed_digest": hashlib.sha256(SOURCE.encode()).hexdigest(), "main_layer": 0, "main_law": "B1",
+         "committed_digest": hashlib.sha256(SOURCE.encode()).hexdigest(), "main_layer": None, "main_law": "B1",
          "laws": {"B1": {"targets": [{"layer": 0, "at": "point_lr"}]}}, "reason": "The grey ellipse leads."}
 CONFIG = {"saved_setting": "this performance"}
 DIAGNOSTICS = {"upstream_diagnostics": [], "downstream_diagnostics": [],
@@ -39,8 +39,9 @@ DIAGNOSTICS = {"upstream_diagnostics": [], "downstream_diagnostics": [],
                "render_diagnostics": None, "resource_execution": None}
 
 
-@pytest.fixture
-def saved_work(tmp_path):
+@pytest.fixture(params=[None, 0], ids=["no-main-layer", "saved-main-layer"])
+def saved_work(tmp_path, request):
+    basis = {**BASIS, "main_layer": request.param}
     engine = create_engine(f"sqlite:///{tmp_path / 'laws.db'}")
     Base.metadata.create_all(engine)
     store = VariationAuthorityStore(engine)
@@ -54,22 +55,22 @@ def saved_work(tmp_path):
     snapshot = {"variation_id": "variation-1", "authority": {"revision": "1"},
                 "document": {"source": SOURCE}, "config": CONFIG,
                 "delivery": {"source_digest": hashlib.sha256(SOURCE.encode()).hexdigest()},
-                "phase": {"tag": "score_ready"}, "laws_layers": deepcopy(LAWS), "laws_basis": deepcopy(BASIS)}
+                "phase": {"tag": "score_ready"}, "laws_layers": deepcopy(LAWS), "laws_basis": deepcopy(basis)}
     store.link_history("owner", "work", "variation-1", "1", snapshot["delivery"]["source_digest"],
                        snapshot=snapshot, context={"host_options": {"render_seed": 7}, "macro_catalog": {}},
                        pipeline_diagnostics=DIAGNOSTICS)
-    yield store
+    yield store, basis
     engine.dispose()
 
 
 def test_the_fork_context_keeps_the_records_and_a_context_without_them_reads_none(saved_work):
-    store = saved_work
+    store, basis = saved_work
     linked = store.read_linked_history("owner", "work")
-    assert (linked.laws_layers, linked.laws_basis) == (LAWS, BASIS)
+    assert (linked.laws_layers, linked.laws_basis) == (LAWS, basis)
     with store.engine.connect() as connection:
         row = connection.execute(select(PipelineHistoryLinkRow)).mappings().one()
         payload = json.loads(bytes(row["fork_context_bytes"]))
-    assert (payload["laws_layers"], payload["laws_basis"]) == (LAWS, BASIS)
+    assert (payload["laws_layers"], payload["laws_basis"]) == (LAWS, basis)
     del payload["laws_layers"], payload["laws_basis"]
     encoded = json.dumps(payload, ensure_ascii=False).encode()
     with store.engine.begin() as connection:
@@ -81,7 +82,7 @@ def test_the_fork_context_keeps_the_records_and_a_context_without_them_reads_non
 
 
 def test_a_fork_and_change_the_layout_carry_the_records(saved_work, monkeypatch):
-    store = saved_work
+    store, basis = saved_work
     starts, requests = [], []
 
     def recompose(request_bytes):
@@ -123,7 +124,7 @@ def test_a_fork_and_change_the_layout_carry_the_records(saved_work, monkeypatch)
     assert "laws_basis" not in requests[-1]
     assert composed["recomposition"]["reason"] == "laws_placed"
     # The run that draws the answer keeps the records for the next fork.
-    assert starts[-1] == {"tag": "direct_ddl", "source": SOURCE, "laws_layers": LAWS, "laws_basis": BASIS}
+    assert starts[-1] == {"tag": "direct_ddl", "source": SOURCE, "laws_layers": LAWS, "laws_basis": basis}
     service.start("owner", "direct_ddl", SOURCE)
     assert starts[-1] == {"tag": "direct_ddl", "source": SOURCE}
     service.close()

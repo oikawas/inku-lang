@@ -26,6 +26,64 @@ func runSharedAutonomousRefineChecks(casesURL: URL) throws {
     print("Shared autonomous refinement passed: \(count) next/record/refused/invalid/measure rows through UniFFI")
 }
 
+/// Failure: saved_laws drops the parent's colors stage or sends Stage 1 / composition again.
+@MainActor
+func runSavedLawsStageChecks() async throws {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-saved-laws-stages-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let service = ProviderSettings(id: "laws-check", baseURL: URL(string: "http://127.0.0.1:1/v1")!, requiresAPIKey: false,
+        models: [.init(id: "parent"), .init(id: "pinned")])
+    let drawing = HostSettings(providers: [service], models: .init(stage1Model: "laws-check:pinned", stage2Model: "laws-check:pinned"))
+    let next = try ExactJSON(data: InkuCore.autonomousRefine(ExactJSON.object([
+        "action": .string("next"), "moves": .integer(1), "kinds": .array([.string("laws")]),
+        "parent": .object(["description_locked": .bool(false), "ddl_work": .bool(false), "laws": .array([])])
+    ]).data))
+    guard next["next"]["kind"].string == "laws" else { throw CheckFailure.message("Missing laws step: \(next.text)") }
+    for hasColors in [false, true] {
+        let transport = LawsColorsCheckProvider(refuseColors: true)
+        let app = AppModel(databaseURL: folder.appendingPathComponent("colors-\(hasColors).sqlite"), transport: transport)
+        await app.initialize()
+        try await app.updateHostSettings(HostSettings(providers: [service], models: .init(stage1Model: "laws-check:parent", stage2Model: "laws-check:parent")))
+        app.inputMode = "description"; app.language = "ja"; app.seedText = "7"; app.sketchMode = "off"
+        app.descriptionText = "円がひとつ浮かび、下に点が散らばる"
+        var parentRequest = try app.requestForCurrentInput()
+        var config = try ExactJSON(data: parentRequest.configuration)
+        // A composed parent without laws records can take its first laws move without excluding the fixture's law.
+        if var fields = config.object {
+            fields.removeValue(forKey: "laws")
+            if !hasColors { fields.removeValue(forKey: "colors") }
+            config = .object(fields)
+        }
+        parentRequest.configuration = config.data
+        guard let parent = await app.runAutomation(request: parentRequest) else {
+            throw CheckFailure.message("Saved laws stage parent: \(app.errorText ?? app.status)")
+        }
+        let saved = try await app.savedConfiguration(workID: parent.id)
+        let savedColors = try ExactJSON(data: saved.configuration)["colors"]
+        guard (savedColors != .null) == hasColors else { throw CheckFailure.message("Parent colors fixture was not saved") }
+        let request = try await app.makeSavedLawsRequest(work: parent, direction: next["next"]["direction"], settings: drawing, wild: nil)
+        guard try ExactJSON(data: request.configuration)["colors"] == savedColors else {
+            throw CheckFailure.message("The saved_laws request changed the parent's colors configuration")
+        }
+        // Keep the parent's original colors, so the child's D5 answer is still an available choice.
+        await transport.allowColors()
+        let sentBefore = await transport.actions.count
+        _ = try await app.runAutonomousMove(request: request)
+        let sent = await transport.actions.dropFirst(sentBefore).map { $0["tag"].string ?? "" }
+        let selectedModels = await transport.selectedModels.dropFirst(sentBefore).map { $0 }
+        let expected = hasColors ? ["choose_laws", "choose_colors"] : ["choose_laws"]
+        guard sent == expected,
+              selectedModels == Array(repeating: "laws-check:pinned", count: expected.count) else {
+            let corrections = await transport.actions.dropFirst(sentBefore).filter { $0["tag"].string == "choose_colors" }
+                .map { String(($0["payload"]["prompt"]["message"].string ?? "").suffix(900)) }
+            throw CheckFailure.message("Saved laws colors=\(hasColors): sent \(sent), expected \(expected); Stage 1 and composition must not be sent again; colors prompts: \(corrections)")
+        }
+        print("Saved laws colors=\(hasColors): \(sent); parent colors preserved, chosen model pinned, no Stage 1 or composition request")
+    }
+    print("Saved laws stages passed: both saved-configuration branches through the macOS request helper and real core. Fake provider and temporary SQLite only.")
+}
+
 /// Failure: a move uses the old Vision path, loses its record, promotes a rejected child, or fails to recover.
 @MainActor
 func runAuxiliaryProvenanceChecks() async throws {

@@ -107,10 +107,11 @@ private func lawsColorsEventTags(_ view: PipelineView) -> [String] {
 }
 
 actor LawsColorsCheckProvider: ObservedProviderTransport {
-    let refuseColors: Bool
+    private var refuseColors: Bool
     private(set) var actions: [ExactJSON] = []
     private(set) var selectedModels: [String] = []
     init(refuseColors: Bool) { self.refuseColors = refuseColors }
+    func allowColors() { refuseColors = false }
     /// Records each attempt under the stage the host names for its action, as the native transport does.
     func performObserved(action: Data, models: ModelSelection, providers: [ProviderSettings], credentials: any CredentialStore,
                          observation: ProviderObservationOptions, willSend: @escaping ProviderObservationHandler,

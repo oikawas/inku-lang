@@ -10,15 +10,18 @@ public struct AuxiliaryView: View {
     @State private var auxiliary = AuxiliaryModel()
     @State private var deleteRecordID: String?
     @State private var showModels = false
-    @State private var observedGeneration: SavedWork?
-    @State private var refineChoicesRestored = false
     @Environment(\.dismiss) private var dismiss
 
     public init(model: AppModel, mode: AuxiliaryMode = .advice, work: SavedWork? = nil) { self.model = model; self.mode = mode; self.work = work }
 
     public var body: some View {
+        if mode == .advice { AutonomousRefinementView(model: model, work: work) }
+        else { colophonBody }
+    }
+
+    private var colophonBody: some View {
         @Bindable var auxiliary = auxiliary
-        ScrollView {
+        return ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 HStack {
                     Text(model.display.localized(mode == .colophon ? "系譜の奥書" : "AI自動推敲プロセス")).inkuFont(16, weight: .semibold)
@@ -42,13 +45,9 @@ public struct AuxiliaryView: View {
                 } else {
                     ContentUnavailableView(model.display.localized("保存作品を選択"), systemImage: "photo", description: Text(model.display.localized("ライブラリか制作画面で元の作品を選択してください。")))
                 }
-                if mode == .colophon { visionSelection; colophonControls }
-                else { refinementControls }
-                if auxiliary.running && auxiliary.refining {
-                    // AIRefineModal.svelte:252: autonomous refinement draws, so it shows the drawing indicator.
-                    RunStatusView(display: model.display, label: auxiliary.status, stopping: auxiliary.stopping,
-                                  onStop: { Task { await auxiliary.stop(app: model) } }) { ProviderProgressView(model: model) }
-                } else if auxiliary.running {
+                visionSelection
+                colophonControls
+                if auxiliary.running {
                     HStack {
                         ProgressView().controlSize(.small)
                         Text(model.display.message(auxiliary.status))
@@ -59,17 +58,12 @@ public struct AuxiliaryView: View {
                 } else if !auxiliary.status.isEmpty { Text(model.display.message(auxiliary.status)).inkuFont(13).foregroundStyle(.secondary) }
                 if let error = auxiliary.errorText { Text(model.display.message(error)).foregroundStyle(.red).textSelection(.enabled) }
                 if !auxiliary.draftText.isEmpty { draftEditor }
-                if !auxiliary.generatedWorks.isEmpty { generations }
                 if mode == .colophon { savedColophons }
             }.padding(20)
         }
         .frame(minWidth: 460, idealWidth: 700, minHeight: 520)
         .task(id: work?.id ?? model.selectedWorkID) {
-            if mode == .advice && !refineChoicesRestored { restoreRefineChoices() }
             await auxiliary.initialize(app: model, work: work, mode: mode)
-        }
-        .onChange(of: refineChoices) { _, choices in
-            if mode == .advice, refineChoicesRestored { model.display.preferences.aiRefine = choices }
         }
         .sheet(isPresented: $showModels) {
             BatchModelPickerView(model: model, initialReference: auxiliary.modelReference, immediateSelection: true,
@@ -95,66 +89,6 @@ public struct AuxiliaryView: View {
                 InkuSegmentedButtons(options: [("ja", model.display.localized("日本語")), ("en", "English")], selection: $auxiliary.language)
             }.accessibilityElement(children: .contain).accessibilityLabel(model.display.localized("応答の言語"))
         }.disabled(auxiliary.running || auxiliary.selectingSource || model.isBusy)
-    }
-
-    /// Web `inku-ai-refine-settings`: generations, the two dimensions and the Vision direction, not the wild switch.
-    private var refineChoices: AIRefineChoices {
-        AIRefineChoices(generations: auxiliary.generations,
-                        kinds: AuxiliaryProvider.allowedKinds.filter(auxiliary.enabledKinds.contains), direction: auxiliary.direction)
-    }
-    private func restoreRefineChoices() {
-        refineChoicesRestored = true
-        guard let saved = model.display.preferences.aiRefine else { return }
-        if (1...10).contains(saved.generations) { auxiliary.generations = saved.generations }
-        auxiliary.enabledKinds = Set(saved.kinds.filter(AuxiliaryProvider.allowedKinds.contains))
-        auxiliary.direction = saved.direction
-    }
-
-    private var refinementControls: some View {
-        @Bindable var auxiliary = auxiliary
-        return GroupBox(model.display.localized("世代を限定した自律推敲")) {
-            VStack(alignment: .leading, spacing: 12) {
-                // AIRefineModal.svelte: the only method is Vision, so its hint opens the dialog (2026-10-18).
-                Text(model.display.webCopy("aiRefineVisionModeHint", "画像を観察し、次の世代で変える要素（色カタログか配置）を選びます。"))
-                    .inkuFont(12).foregroundStyle(.secondary)
-                if auxiliary.sourceIsLocked {
-                    Text(model.display.webCopy("aiRefineHeldNote", "DDLを編集した作品です。色・配置の世代を、この作品のDDLから描きます。"))
-                        .inkuFont(12).foregroundStyle(.secondary)
-                }
-                visionSelection
-                TextField(model.display.localized("AI に伝える方向性"), text: $auxiliary.direction, axis: .vertical).lineLimit(2...4)
-                    .disabled(auxiliary.running || auxiliary.selectingSource || model.isBusy)
-                    .inkuTooltip(model.display.tooltip("AIへ伝える方針は160文字までです。"), focus: .text)
-                Text("\(auxiliary.direction.utf16.count) / \(AuxiliaryModel.directionLimit)").inkuFont(12).foregroundStyle(.secondary)
-                Text(model.display.localized("上のモデルが観察し、同じモデルで各世代を描きます。"))
-                    .inkuFont(12).foregroundStyle(.secondary)
-                Stepper(model.display.localizedFormat("生成する世代数: %ld", auxiliary.generations), value: $auxiliary.generations, in: 1...10)
-                HStack {
-                    ForEach(AuxiliaryProvider.allowedKinds, id: \.self) { kind in
-                        Toggle(model.display.localized(AuxiliaryModel.kindLabel(kind)), isOn: Binding(
-                            get: { auxiliary.enabledKinds.contains(kind) },
-                            set: { if $0 { auxiliary.enabledKinds.insert(kind) } else { auxiliary.enabledKinds.remove(kind) } }))
-                            .toggleStyle(.button)
-                            .inkuTooltip(kindTooltip(kind), placement: .bottom)
-                    }
-                }
-                HStack {
-                    Toggle(model.display.localized("元のワイルド設定を引き継ぐ"), isOn: $auxiliary.inheritWild)
-                    if !auxiliary.inheritWild { Toggle(model.display.localized("ワイルド"), isOn: $auxiliary.wildOverride) }
-                }
-                Button(model.display.localizedFormat("%ld 世代の推敲を開始", auxiliary.generations), systemImage: "play") { Task { await auxiliary.startRefinement(app: model) } }
-                    .disabled(auxiliary.sourceWork == nil || auxiliary.enabledKinds.isEmpty || auxiliary.modelReference.isEmpty)
-            }.frame(maxWidth: .infinity, alignment: .leading).padding(6)
-        }.disabled(auxiliary.running || auxiliary.selectingSource || model.isBusy)
-    }
-
-    /// AIRefineModal.svelte:260: what the color and layout elements cost.
-    private func kindTooltip(_ kind: String) -> String {
-        switch kind {
-        case "catalog_change": return model.display.tooltip("超高速（LLM不要）", serverKey: "refineCostColor")
-        case "layout_change": return model.display.tooltip("高速（補完の穴があるときだけLLM）", serverKey: "refineCostLayout")
-        default: return ""
-        }
     }
 
     private var colophonControls: some View {
@@ -199,42 +133,6 @@ public struct AuxiliaryView: View {
                             .disabled(auxiliary.sourceIsLocked)
                     }
                 }.disabled(auxiliary.running || auxiliary.selectingSource || model.isBusy)
-            }.padding(6)
-        }
-    }
-
-    private var generations: some View {
-        GroupBox(model.display.localizedFormat("保存した世代 (%ld)", auxiliary.completedGenerations)) {
-            VStack(alignment: .leading, spacing: 12) {
-                ScrollView(.horizontal) {
-                    HStack(alignment: .top, spacing: 12) {
-                        ForEach(auxiliary.generatedWorks, id: \.id) { work in
-                            Button { observedGeneration = work } label: {
-                                VStack {
-                                    ArtworkThumbnail(work: work, thumbnails: model.thumbnails).frame(width: 130, height: 115)
-                                    Text(work.effectiveSourceText).inkuFont(12).lineLimit(2).frame(width: 130)
-                                }.padding(6)
-                                    .background(observedGeneration?.id == work.id ? Color.accentColor.opacity(0.12) : Color.clear,
-                                                in: RoundedRectangle(cornerRadius: 6))
-                            }.buttonStyle(.plain).disabled(auxiliary.running || auxiliary.selectingSource || model.isBusy)
-                        }
-                    }
-                }
-                if let work = observedGeneration, auxiliary.generatedWorks.contains(where: { $0.id == work.id }) {
-                    Text(model.display.localized("観察する作品")).inkuFont(12, weight: .semibold)
-                    ArtworkCanvas(svg: work.svg, renderer: model.displayRenderer, caption: work.effectiveSourceText)
-                        .frame(height: 260)
-                    HStack {
-                        Button(model.display.localized("観察を閉じる")) { observedGeneration = nil }
-                        Spacer()
-                        if auxiliary.selectingSource {
-                            ProgressView(model.display.localized("保存された世代の読込中")).controlSize(.small)
-                        }
-                        Button(model.display.localized("この作品から再開")) {
-                            Task { if await auxiliary.selectRefinementSource(work, app: model) { observedGeneration = nil } }
-                        }.disabled(auxiliary.running || auxiliary.stopping || auxiliary.selectingSource || model.isBusy || work.trashed)
-                    }
-                }
             }.padding(6)
         }
     }

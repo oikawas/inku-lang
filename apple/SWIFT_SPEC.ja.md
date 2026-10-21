@@ -2,7 +2,7 @@
 
 このディレクトリは、macOS先行のnative SwiftUIクライアントとApple向け共通packageのworkspaceである。本書をSwift host固有の仕様正本とし、[SWIFT_SPEC.md](SWIFT_SPEC.md)を対応英語版とする。共有DDL、Score、prompt、authoring authority、pipeline状態遷移、seed、描画の意味は[製品仕様](../SPEC.ja.md)を正本とし、Serverを開発上のprimaryとして同じRust coreへ追随する。Swift側に意味処理を複製しない。
 
-最終更新: 2026-10-20。
+最終更新: 2026-10-21。
 
 binding／protocolの版は同梱Rust coreのversion report、描画層の版はrender metadataと[Serverの層定義](../server/src/inku_server/layer_versions.py)を参照する。本書へ共通engineの版定数を複製しない。macOSアプリの版は`apple/VERSION`と`apple/BUILD_NUMBER`を正本とする独自の版で、Server／Webの版とは別に採番する（初回は1.0.0／Build 1）。対応するServerの版はアプリの「inkuについて」と変更履歴に併記する。共有層の版が一致しても、host機能とnative UIの移植が完了したことにはならない。
 
@@ -17,6 +17,17 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 確定した実装変更と残る範囲は本書の日付付き節へ記し、製品の変更履歴は共通の[CHANGELOG.ja.md](../CHANGELOG.ja.md)／[CHANGELOG.md](../CHANGELOG.md)へ同期して記す。Swift専用CHANGELOGを分けない。
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
+
+## 2026-10-21 AI自動推敲を共有coreの法則の手・取り合わせの手にする
+
+- AI自動推敲プロセスは、UniFFIの`autonomous_refine`（`inku.autonomous-refine.v1`）を呼ぶ。`next`が手番と終端、`measure`が親子のSVGの見える差、`record`が子の辺の`ai_move`を決める。端末は送信・描画・保存・画面だけを担当し、Server APIは呼ばない。
+- 手数は1〜10（既定5）、使う手は法則・取り合わせの1つ以上、方向性は前後を除いて1,000 UTF-16単位以内。モデルは既存の取り合わせと同じVision用途のpickerで1つ選び、一文の選択・Stage 1・Stage 2・法則の段をそのモデルに固定する。言語は画面の言語。暴れるは指定しなければ親のまま。手数・使う手・方向性を`interface.json`の`autonomousRefine`に覚える。
+- 法則の手は親の指示書・記述・completion_ranges・laws_layers・laws_basisを共有pipelineの`saved_laws`へ渡す。親の保存条件・種・palette・キャンバス・限りを使い、子は記述固定で`laws_change`（札は「法則」／Laws）になる。取り合わせの手は既存の`juxtaposition`を使い、coreの`rank`・`reuse`・除外文と系譜ですでに足した文を尊重して`joined`から描く。子は`description_edit`で、辺に`edited_from_history_id`・`juxtaposition`とcoreの`ai_move`を残す。
+- 子はすべて`lineage_only`で保存する。`kept`だけを次の親にし、差が小さい子も系譜に残す。終端は`moves_done`・`nothing_available`・`stalled`・`stopped`・`interrupted`・`failed`。停止時は進行中の送信・描画を取り消す。終端では最後の`kept`だけを通常履歴に出す。可視差は品質・順位・採否の判定ではなく、スター等は作者が決める。
+- runはAppModelが1つずつ回し、画面を閉じても続く。進み具合は作品DBと別の、DB名に対応する`.autonomous-runs.json`へatomic writeで残す。作品の正本は作品と辺の記録。次の起動で走行中のrunを`interrupted`にし、最後の`kept`を履歴へ出す。自動でLLM送信を再開しない。
+- 画面はWebと同じ順に、題・説明・固定注記・モデル・使う手・手数と暴れる・方向性・開始を出す。実行中は試みごとの小さな画・手番・手・結果・見える差・一文か主の法則・理由、終端後は終わり方と最後の子を開くボタンを出す。Webの`aiRefine*`を同梱し直し、常駐先の文だけ「サーバー」から「アプリ」へ適応する。
+- 旧Vision方式の自動実行と`aiRefine`の設定は廃止する。前の作品の`autonomous_refine_mode`（vision／random）や`vision_*`はそのまま読める。10-18節の自動推敲の方式・確認は、その時点の履歴である。
+- `--shared-autonomous-refine-only <cases>`は`server/tests/data/autonomous-refine-cases.json`の全行をUniFFI経由で照合する。`--auxiliary-provenance-only`は偽providerと一時SQLiteで両方の手・辺・可視差・履歴昇格・停止・再起動を確かめる。実providerと作者の画面受入は別に確認する。
 
 ## 2026-10-20 作品編集メニューの「取り合わせ」
 

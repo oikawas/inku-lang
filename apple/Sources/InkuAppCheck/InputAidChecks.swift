@@ -28,7 +28,7 @@ func runInputAidChecks() async throws {
     fresh.preferences.libraryLayout = "list"
     fresh.preferences.libraryGrouped = true
     fresh.preferences.comparisonModels = ["a:one", "b:two"]
-    fresh.preferences.aiRefine = AIRefineChoices(generations: 7, kinds: ["layout_change"], direction: "夜へ")
+    fresh.preferences.autonomousRefine = AutonomousRefineChoices(moves: 7, kinds: ["laws"], note: "夜へ")
     let reread = DisplaySettings()
     reread.connect(directory: folder)
     guard reread.preferences == fresh.preferences else {
@@ -41,16 +41,16 @@ func runInputAidChecks() async throws {
     let existing = DisplaySettings()
     existing.connect(directory: older)
     guard existing.preferences.theme == "system", existing.preferences.language == "en",
-          existing.preferences.nextCatalogID == nil, existing.preferences.aiRefine == nil,
+          existing.preferences.nextCatalogID == nil, existing.preferences.autonomousRefine == nil,
           existing.preferences.historyStripFields == ["generation", "model", "engine"] else {
         throw CheckFailure.message("An older interface.json must keep its values, add no choices, and print fields in the Web order")
     }
 
-    // Failure: a method kept before random refinement was removed (2026-10-18) breaks the saved choices.
+    // Old Vision choices must not become laws/juxtaposition choices.
     let keptMethod = try DisplayPreferences.decodeInterfaceFile(
         Data(#"{"aiRefine":{"visionMode":false,"generations":3,"kinds":["layout_change"],"direction":"夜へ"}}"#.utf8))
-    guard keptMethod.aiRefine == AIRefineChoices(generations: 3, kinds: ["layout_change"], direction: "夜へ") else {
-        throw CheckFailure.message("A kept refinement method must be dropped without losing the other choices")
+    guard keptMethod.autonomousRefine == nil else {
+        throw CheckFailure.message("Old Vision choices must be discarded")
     }
 
     // Failure: a catalog or paper that no longer exists was restored as the next condition.

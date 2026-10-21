@@ -2,7 +2,7 @@
 
 This directory contains the native SwiftUI client, developed for macOS first, and the shared Apple packages. [SWIFT_SPEC.ja.md](SWIFT_SPEC.ja.md) is the canonical specification for Swift host behavior; this document is its maintained English version. The [product specification](../SPEC.md) defines shared DDL, Score, prompts, authoring authority, pipeline transitions, seeds, and rendering semantics. Server remains the primary development host, and Swift follows the same Rust core without duplicating semantic processing.
 
-Last updated: 2026-10-20.
+Last updated: 2026-10-21.
 
 Binding and protocol identities come from the bundled Rust core's version report; rendering layer identities use render metadata and the [Server layer definitions](../server/src/inku_server/layer_versions.py). Do not duplicate shared engine version constants in this document. The macOS app has its own version, defined by `apple/VERSION` and `apple/BUILD_NUMBER` and allocated separately from the Server and Web versions (the first release is 1.0.0, Build 1). The corresponding Server version is shown in the app's About inku window and in the changelog. Matching shared layer versions does not establish that host features and the native UI port are complete.
 
@@ -17,6 +17,17 @@ Options and replacements for Change the touches, Change the ground and Change th
 - Record confirmed implementation changes and remaining scope in dated sections of this specification. Maintain product history in the shared [CHANGELOG.ja.md](../CHANGELOG.ja.md) and [CHANGELOG.md](../CHANGELOG.md). Do not create a separate Swift changelog.
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
+
+## 2026-10-21 Autonomous refinement uses the shared core's laws and juxtaposition moves
+
+- The process calls UniFFI's `autonomous_refine` (`inku.autonomous-refine.v1`). `next` decides turns and endings, `measure` compares the parent and child SVGs, and `record` writes the child's `ai_move`. The app handles requests, drawing, persistence and the screen; it does not call Server's API.
+- Choose 1–10 moves (default 5), one or both move kinds, and a trimmed direction of up to 1,000 UTF-16 units. The existing Juxtapose picker offers Vision models. The one chosen model selects sentences and draws every stage, including laws. The screen supplies the language. Wild follows the parent unless overridden. `interface.json` keeps moves, kinds and direction under `autonomousRefine`.
+- A laws move passes the parent's instructions, description, completion ranges and laws records to `saved_laws`, keeping its saved conditions, seeds, resolved colors, canvas and limits. Its DDL holds the child, whose edge is `laws_change` (Laws). A juxtaposition move uses the existing shared `juxtaposition`, its rank, reuse and exclusions, including sentences already added in the lineage. It draws `joined` as a `description_edit` child, recording `edited_from_history_id`, `juxtaposition` and the core's `ai_move`.
+- Every child is saved as `lineage_only`. Only a `kept` child becomes the next parent; a child with too little visible change stays in the lineage. Endings are `moves_done`, `nothing_available`, `stalled`, `stopped`, `interrupted` and `failed`. Stop cancels the request or drawing in progress. Every ending promotes only the last kept child to normal history. The gate judges neither quality nor rank; stars and choices remain the author's.
+- AppModel owns one run at a time, so closing the sheet leaves it running. Operational state is written atomically to a separate `.autonomous-runs.json` file named after the works database. Works and lineage edges remain the canonical records. On the next launch, a running journal becomes `interrupted` and its last kept child is promoted. No model request resumes automatically.
+- The screen follows Web's order: title, help, held note, model, kinds, moves and Wild, direction, start. While running it shows each try's thumbnail, turn, kind, outcome, visible share, sentence or main law, and reason. Afterward it shows the ending and opens the last kept child. Web's `aiRefine*` copy is exported again; only its process-location wording is adapted from Server to app.
+- The old Vision-driven automatic loop and its `aiRefine` preferences are removed. Earlier works' `autonomous_refine_mode` (vision/random) and `vision_*` records remain readable. The October 18 section describes the method and checks at that time.
+- `--shared-autonomous-refine-only <cases>` compares every row of `server/tests/data/autonomous-refine-cases.json` through UniFFI. `--auxiliary-provenance-only` uses fake providers and temporary SQLite for both moves, edges, the gate, promotion, stop and restart. Real-provider and author screen acceptance are separate.
 
 ## 2026-10-20 Juxtapose in the work edit menu
 

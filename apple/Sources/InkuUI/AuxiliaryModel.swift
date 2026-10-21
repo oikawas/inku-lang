@@ -24,7 +24,6 @@ public final class AuxiliaryModel {
         get { directionValue }
         set { directionValue = Self.boundedDirection(newValue) }
     }
-    public var generations = 5
     public var amplitude = "medium"
     public var inheritWild = true
     public var wildOverride = false
@@ -34,11 +33,7 @@ public final class AuxiliaryModel {
     public private(set) var colophonDraft: ColophonDraft?
     public private(set) var storedColophons: [ColophonDraft] = []
     public private(set) var running = false
-    /// The running operation draws generations (autonomous refinement), rather than reading advice or a colophon.
-    public private(set) var refining = false
     public private(set) var stopping = false
-    public private(set) var completedGenerations = 0
-    public private(set) var generatedWorks: [SavedWork] = []
     public private(set) var status = ""
     public private(set) var errorText: String?
     public private(set) var sourceIsLocked = false
@@ -220,129 +215,6 @@ public final class AuxiliaryModel {
             if result == nil { errorText = app.errorText ?? "子の作品を生成できませんでした。" }
             else { status = "この方針で子の作品を保存しました。" }
         } catch { errorText = error.localizedDescription }
-    }
-
-    public func startRefinement(app: AppModel) async {
-        guard let provider else { errorText = "補助モデルの接続がありません。"; return }
-        guard let first = sourceWork, !first.trashed, !running, !selectingSource, !app.isBusy else { return }
-        let count = min(10, max(1, generations))
-        enabledKinds.formIntersection(AuxiliaryProvider.allowedKinds)
-        let kinds = orderedKinds
-        guard !kinds.isEmpty else { errorText = "少なくとも1つの推敲要素を選んでください。"; return }
-        let model = modelReference
-        if !SettingsModel.isRegisteredModelAvailable(model, purpose: "vision", settings: await app.hostSettings()) {
-            errorText = "画像を扱える登録モデルを選択してください。"; return
-        }
-        let language = language
-        let userDirection = direction
-        let amplitude = amplitude
-        let wild = inheritWild ? nil : wildOverride
-        let runToken = UUID()
-        token = runToken; running = true; refining = true; stopping = false; errorText = nil
-        completedGenerations = 0; generatedWorks = []
-        let operation = Task { @MainActor [weak self] in
-            guard let self else { return }
-            var parent = first
-            var runPin: ChatGPTPlanSession? = nil
-            do {
-                let settings = await app.nextGenerationSettings()
-                for index in 0..<count {
-                    try Task.checkCancellation()
-                    guard self.token == runToken else { return }
-                    var nextAdvice: AuxiliaryAdvice?
-                    // Vision picks each generation's element; nothing draws it at random (the author, 2026-10-18).
-                    do {
-                        self.status = "\(index + 1) / \(count) 世代: モデルが観察しています"
-                        let didRead = await app.performSerialized(status: self.status) { [self] _ in
-                            guard let png = try await Self.png(svgs: [parent.svg], visionAdvice: true) else {
-                                throw HostError("refinement_source_has_no_image")
-                            }
-                            let answer = try await provider.refineAdvice(instruction: Self.adviceInstruction(parent),
-                                direction: userDirection, enabledKinds: kinds, png: png, modelReference: model,
-                                language: language, settings: settings)
-                            try Task.checkCancellation()
-                            guard self.token == runToken else { return }
-                            nextAdvice = answer; self.advice = answer
-                        }
-                        try Task.checkCancellation()
-                        guard didRead, let answer = nextAdvice else { throw HostError("refinement_advice_failed") }
-                        self.advice = answer
-                    }
-                    guard let kind = nextAdvice?.suggestedKind else { throw HostError("refinement_advice_failed") }
-                    self.status = "\(index + 1) / \(count) 世代: \(Self.kindLabel(kind))を生成中"
-                    let catalog = kind == "catalog_change" ? self.randomCatalog(app: app, parent: parent) : nil
-                    var request = try await app.makeRefinementRequest(work: parent, kind: kind,
-                        amplitude: amplitude,
-                        modelReference: !model.isEmpty ? model : nil,
-                        catalogIDOverride: catalog,
-                        wildOverride: wild)
-                    request.models = settings.models
-                    request.providers = settings.providers
-                    if !model.isEmpty { request.models.stage1Model = model; request.models.stage2Model = model }
-                    var metadata = try request.derivationMetadata.map { try ExactJSON(data: $0) } ?? .object([:])
-                    metadata["autonomous_refine_mode"] = .string("vision")
-                    if let answer = nextAdvice {
-                        metadata["vision_model"] = .string(answer.model)
-                        metadata["vision_observation"] = .string(answer.observation)
-                        metadata["vision_next_direction"] = .string(answer.nextDirection)
-                    }
-                    request.derivationMetadata = metadata.data
-                    request.historyVisibility = index == count - 1 ? "normal" : "lineage_only"
-                    if index == 0 {
-                        request = try await app.pinPersonalPlanRequests([request])[0]
-                        runPin = request.chatGPTSession
-                    } else {
-                        request.chatGPTSession = runPin
-                        if runPin != nil { request = try await app.pinPersonalPlanRequests([request])[0] }
-                    }
-                    try Task.checkCancellation()
-                    guard self.token == runToken else { return }
-                    guard let work = await app.runAutomation(request: request) else {
-                        try Task.checkCancellation(); throw HostError(app.errorText ?? "refinement_generation_failed")
-                    }
-                    try Task.checkCancellation()
-                    guard self.token == runToken else { return }
-                    parent = work; self.generatedWorks.append(work); self.completedGenerations += 1
-                }
-                if self.token == runToken { self.status = "\(count) 世代の推敲を完了しました。作品の選択は利用者が行います。" }
-            } catch is CancellationError {
-                if self.token == runToken { self.status = "停止しました。保存済みの世代は系譜に残ります。" }
-            } catch {
-                if self.token == runToken && !Task.isCancelled { self.errorText = error.localizedDescription; self.status = "推敲を完了できませんでした。" }
-            }
-        }
-        task = operation
-        await operation.value
-        if token == runToken { token = nil; running = false; refining = false; stopping = false; task = nil }
-    }
-
-    /// Explicitly choose a saved generation as the next parent without changing the main canvas.
-    @discardableResult public func selectRefinementSource(_ work: SavedWork, app: AppModel) async -> Bool {
-        guard !running, !stopping, !selectingSource, !app.isBusy,
-              generatedWorks.contains(where: { $0.id == work.id }) else { return false }
-        selectingSource = true
-        defer { selectingSource = false }
-        let previousSourceID = sourceWorkID
-        do {
-            let database = try app.auxiliaryDatabase()
-            guard let saved = try await database.work(id: work.id), !saved.trashed, saved.lineageNodeID != nil else {
-                throw HostError("保存された世代を読み込めません。")
-            }
-            let context = try await app.savedConfiguration(workID: saved.id)
-            guard !Task.isCancelled, !running, !stopping, !app.isBusy, sourceWorkID == previousSourceID else { return false }
-            sourceWork = saved; sourceWorkID = saved.id
-            sourceIsLocked = context.authority == "ddl_authoritative"
-            advice = nil; colophonDraft = nil; draftText = ""; direction = ""
-            inheritWild = true; wildOverride = saved.renderWild ?? false
-            colophonPathToken = UUID(); colophonPath = nil; colophonPathCount = nil; loadingColophonPath = false
-            storedColophons = []
-            enabledKinds.formIntersection(AuxiliaryProvider.allowedKinds)
-            errorText = nil; status = "自律推敲の親作品を変更しました。"
-            return true
-        } catch {
-            if !Task.isCancelled, sourceWorkID == previousSourceID { errorText = error.localizedDescription }
-            return false
-        }
     }
 
     public func saveColophon(app: AppModel) async {

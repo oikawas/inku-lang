@@ -1,155 +1,189 @@
 import Foundation
+import InkuCore
 import InkuHost
 import InkuPersistence
 import InkuUI
 
-@MainActor
-func runAuxiliaryProvenanceChecks() async throws {
-    guard AuxiliaryProvider.allowedKinds == ["catalog_change", "layout_change"] else {
-        throw CheckFailure.message("Vision advice still offers a retired refinement kind")
-    }
-    // Failure: autonomous refinements reread a description or append directions instead of drawing the saved DDL.
-    // This same controller-to-SQLite check also preserves each generation's observation and excludes retired kinds.
-    let folder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-auxiliary-provenance-\(UUID().uuidString)")
-    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-    defer { try? FileManager.default.removeItem(at: folder) }
-    let databaseURL = folder.appendingPathComponent("inku.sqlite")
-    let transport = AuxiliaryProvenanceProvider()
-    let app = AppModel(databaseURL: databaseURL, transport: transport)
-    await app.initialize()
-    // Only the initial parent fixture uses Stage 1; later generations must retain its saved DDL.
-    let service = ProviderSettings(id: "check", baseURL: URL(string: "http://localhost:1/v1")!, requiresAPIKey: false,
-                                   models: [.init(id: "generation"), .init(id: "vision", purposes: ["llm", "vision"])])
-    try await app.updateHostSettings(HostSettings(providers: [service],
-        models: ModelSelection(stage1Model: "check:generation", stage2Model: "check:generation")))
-    app.inputMode = "description"; app.descriptionText = "a red circle"; app.seedText = "42"
-    guard let parent = await app.runAutomation(request: try app.requestForCurrentInput()),
-          let parentNodeID = parent.lineageNodeID else {
-        throw CheckFailure.message("Auxiliary provenance parent failed: \(app.errorText ?? app.status)")
-    }
-    let database = try InkuDatabase(url: databaseURL)
-    let parentContext = try await app.savedConfiguration(workID: parent.id)
-    guard parentContext.authority == "description_authoritative", await transport.generationModels == ["check:generation"] else {
-        throw CheckFailure.message("Auxiliary fixture must start with one description-authoritative Stage 1 call")
-    }
-    let auxiliary = AuxiliaryModel(provider: AuxiliaryProvider(transport: transport, credentials: AuxiliaryProvenanceCredentials()))
-    await auxiliary.initialize(app: app)
-    // Obsolete stored reading and touch selections must never reach Vision or generation.
-    auxiliary.enabledKinds = ["reinterpretation", "touch_change", "catalog_change"]
-    auxiliary.generations = 2
-    auxiliary.modelReference = "check:vision"; auxiliary.direction = "keep the circle"
-    await auxiliary.startRefinement(app: app)
-    guard auxiliary.errorText == nil, auxiliary.completedGenerations == 2,
-          auxiliary.generatedWorks.count == 2, auxiliary.enabledKinds == ["catalog_change"],
-          !auxiliary.running, !app.isBusy else {
-        throw CheckFailure.message("Vision provenance run failed: \(auxiliary.errorText ?? auxiliary.status)")
-    }
-    let visionChildren = auxiliary.generatedWorks
-    var previousNodeID = parentNodeID
-    for (index, child) in visionChildren.enumerated() {
-        guard let nodeID = child.lineageNodeID, let edge = try await database.edge(childNodeID: nodeID),
-              edge.parentNodeID == previousNodeID, edge.derivationKind == "catalog_change",
-              let stored = try await database.work(id: child.id), stored == child,
-              stored.ddl == parent.ddl, stored.effectiveSourceText == parent.effectiveSourceText,
-              stored.historyVisibility == (index == 0 ? "lineage_only" : "normal") else {
-            throw CheckFailure.message("Vision child did not persist its parent edge or history visibility")
-        }
-        let metadata = try ExactJSON(data: Data(edge.metadataJSON.utf8))
-        guard metadata["autonomous_refine_mode"].string == "vision",
-              metadata["vision_model"].string == "check:vision",
-              metadata["vision_observation"].string == "observation \(index + 1)",
-              metadata["vision_next_direction"].string == "direction \(index + 1)" else {
-            throw CheckFailure.message("Saved Vision edge lost its mode or used another generation's advice")
-        }
-        previousNodeID = nodeID
-    }
-
-    // Random refinement is gone (the author, 2026-10-18): no run draws an element at random, so the only
-    // runs left are Vision's. The adoption below still starts from the chosen source with only layout enabled.
-    auxiliary.enabledKinds = ["layout_change"]
-    // The displayed Vision advice suggests color, but a later adoption has only layout enabled. Its edited
-    // draft is observation material and must never become drawing source text through the fallback path.
-    let rowsBeforeAdoption = try await database.list().count
-    auxiliary.modelReference = "check:generation"
-    auxiliary.draftText = "do not append this edited advice to the drawing"
-    await auxiliary.adoptAdvice(app: app)
-    let adoptedWorks = try await database.list()
-    guard auxiliary.errorText == nil, adoptedWorks.count == rowsBeforeAdoption + 1,
-          let adopted = adoptedWorks.first(where: { work in
-              work.id != parent.id && !visionChildren.contains(where: { $0.id == work.id })
-          }), let adoptedNodeID = adopted.lineageNodeID,
-          let adoptedEdge = try await database.edge(childNodeID: adoptedNodeID),
-          adoptedEdge.parentNodeID == parentNodeID, adoptedEdge.derivationKind == "layout_change",
-          adopted.ddl == parent.ddl, adopted.effectiveSourceText == parent.effectiveSourceText,
-          await transport.generationModels == ["check:generation"], await transport.visionModels == ["check:vision", "check:vision"],
-          try await database.work(id: parent.id) == parent,
-          try await app.savedConfiguration(workID: parent.id).configuration == parentContext.configuration,
-          try await app.savedConfiguration(workID: parent.id).document == parentContext.document else {
-        throw CheckFailure.message("Adopted advice reread, appended its draft, ignored the allowed fallback or changed the parent")
-    }
-    // Failure: a DDL/held parent draws from its description instead of the saved instructions.
-    await app.selectWork(parent)
-    app.ddlText = "place one blue circle at center."
-    await app.commitDDL()
-    guard let held = app.selectedWork, app.sourceLocked else { throw CheckFailure.message("Held Vision fixture failed") }
-    guard await app.drawNewDDL("Place 1 green circle."), let direct = app.selectedWork else { throw CheckFailure.message("Direct Vision fixture failed") }
-    for source in [held, direct] {
-        await transport.expectInstruction(source.effectiveSourceText.isEmpty ? (source.ddl ?? "") : source.effectiveSourceText)
-        let vision = AuxiliaryModel(provider: AuxiliaryProvider(transport: transport, credentials: AuxiliaryProvenanceCredentials()))
-        await vision.initialize(app: app, work: source)
-        guard vision.sourceIsLocked else { throw CheckFailure.message("Held/DDL initialization did not lock the source") }
-        vision.generations = 1; vision.modelReference = "check:vision"
-        vision.enabledKinds = ["catalog_change"]; vision.direction = "keep the circle"
-        await vision.startRefinement(app: app)
-        guard vision.errorText == nil, vision.completedGenerations == 1, let next = vision.generatedWorks.first,
-              next.ddl == source.ddl, next.effectiveSourceText == source.effectiveSourceText,
-              let nextNode = next.lineageNodeID, let nextEdge = try await database.edge(childNodeID: nextNode),
-              nextEdge.parentNodeID == source.lineageNodeID,
-              try ExactJSON(data: Data(nextEdge.metadataJSON.utf8))["autonomous_refine_mode"].string == "vision" else {
-            throw CheckFailure.message("Vision did not draw the held/DDL parent's saved instructions: \(vision.errorText ?? vision.status); app=\(app.errorText ?? "none"); mock=\(await transport.lastMismatch)")
+/// Failure: the native binding returns a different next move, gate or edge record from the shared table.
+func runSharedAutonomousRefineChecks(casesURL: URL) throws {
+    let table = try ExactJSON(data: Data(contentsOf: casesURL))
+    var count = 0
+    for section in ["next", "record", "refused", "invalid", "measure"] {
+        guard let rows = table[section].array, !rows.isEmpty else { throw CheckFailure.message("Missing autonomous section \(section)") }
+        for row in rows {
+            var answer = try ExactJSON(data: InkuCore.autonomousRefine(row["request"].data))
+            // The table omits refusal prose; Server's table check also requires and removes it.
+            if answer["outcome"].string == "refused" {
+                guard answer["detail"].string?.isEmpty == false else { throw CheckFailure.message("Missing refusal detail") }
+                if var fields = answer.object { fields.removeValue(forKey: "detail"); answer = .object(fields) }
+            }
+            guard answer == row["answer"] else {
+                throw CheckFailure.message("Shared autonomous \(section): \(row["why"].string ?? ""): \(answer.text), expected \(row["answer"].text)")
+            }
+            count += 1
         }
     }
-    guard await transport.visionModels.count == 4, await transport.generationModels == ["check:generation"] else {
-        throw CheckFailure.message("Held/DDL Vision reread descriptions or failed to ask Vision")
-    }
-    print("Auxiliary provenance passed: color Vision x2 + advice adoption use saved DDL; no method draws an element at random; held-description and direct-DDL Vision each draw one catalog child without Stage 1; retired reading/touch excluded; directions remain observation metadata. Isolated SQLite + mock transports + real Rust only.")
+    print("Shared autonomous refinement passed: \(count) next/record/refused/invalid/measure rows through UniFFI")
 }
 
-private actor AuxiliaryProvenanceCredentials: CredentialStore {
+/// Failure: a move uses the old Vision path, loses its record, promotes a rejected child, or fails to recover.
+@MainActor
+func runAuxiliaryProvenanceChecks() async throws {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-autonomous-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let databaseURL = folder.appendingPathComponent("works.sqlite")
+    let transport = AutonomousCheckProvider()
+    let app = AppModel(databaseURL: databaseURL, transport: transport)
+    await app.initialize()
+    let service = ProviderSettings(id: "auto-check", baseURL: URL(string: "http://127.0.0.1:1/v1")!, requiresAPIKey: false,
+        models: [.init(id: "parent"), .init(id: "one", purposes: ["llm", "vision"])])
+    try await app.updateHostSettings(HostSettings(providers: [service], models: .init(stage1Model: "auto-check:parent", stage2Model: "auto-check:parent")))
+    let database = try app.auxiliaryDatabase()
+    app.inputMode = "description"; app.language = "ja"; app.seedText = "7"; app.sketchMode = "off"
+
+    func parent(_ text: String) async throws -> SavedWork {
+        app.descriptionText = text
+        var request = try app.requestForCurrentInput()
+        // A legacy composed parent lets saved_laws choose its first law without an exclusion.
+        var config = try ExactJSON(data: request.configuration)
+        if var fields = config.object { fields.removeValue(forKey: "laws"); fields.removeValue(forKey: "colors"); config = .object(fields) }
+        request.configuration = config.data
+        guard let work = await app.runAutomation(request: request) else { throw CheckFailure.message("Autonomous fixture: \(app.errorText ?? app.status)") }
+        return work
+    }
+    let first = try await parent("円がひとつ浮かび、下に点が散らばる")
+    let before = try await app.savedConfiguration(workID: first.id)
+    let runner = AutonomousRefinementModel(provider: AuxiliaryProvider(transport: transport, credentials: AutonomousCheckCredentials()))
+    await runner.initialize(app: app, work: first)
+    runner.moves = 1; runner.enabledKinds = ["laws"]; runner.modelReference = "auto-check:one"; runner.note = "  余白を動かす  "
+    await runner.start(app: app)
+    guard let lawsRun = runner.run, lawsRun.stopReason == "moves_done", lawsRun.error == nil,
+          let keptID = lawsRun.lastKeptID, let kept = try await database.work(id: keptID),
+          kept.historyVisibility == "normal", let keptNode = kept.lineageNodeID,
+          let lawsEdge = try await database.edge(childNodeID: keptNode), lawsEdge.derivationKind == "laws_change",
+          lawsEdge.parentNodeID == first.lineageNodeID else {
+        throw CheckFailure.message("Laws move: \(runner.run?.stopReason ?? "nil") / \(runner.run?.error ?? runner.errorText ?? "nil") / \(runner.run?.turns.map(\.text) ?? [])")
+    }
+    let lawsMetadata = try ExactJSON(data: Data(lawsEdge.metadataJSON.utf8))
+    let lawsContext = try await app.savedConfiguration(workID: keptID)
+    guard lawsContext.authority == "ddl_authoritative", lawsContext.lawsRecords != nil,
+          lawsMetadata["ai_move"]["kind"].string == "laws", lawsMetadata["ai_move"]["outcome"].string == "kept",
+          lawsMetadata["ai_move"]["model"].string == "auto-check:one", lawsMetadata["ai_move"]["note"].string == "余白を動かす",
+          lawsMetadata["autonomous_refine_mode"] == .null,
+          await transport.lawsModels == ["auto-check:one"],
+          try await database.work(id: first.id) == first,
+          try await app.savedConfiguration(workID: first.id).configuration == before.configuration else {
+        throw CheckFailure.message("Laws child lost saved_laws authority, basis, run record or pinned model: \(lawsMetadata.text)")
+    }
+
+    // Juxtaposition uses other normal works, then the same one model draws its child.
+    for text in ["夜の港に灯台が立つ。", "古い駅に時計が残る。", "森の奥で水が光る。", "遠い街で窓が開く。", "雪の庭に足跡が続く。", "秋の川に橋が架かる。"] { _ = try await parent(text) }
+    await transport.changeDrawing(true)
+    await runner.initialize(app: app, work: first)
+    runner.moves = 1; runner.enabledKinds = ["juxtaposition"]; runner.note = ""
+    await runner.start(app: app)
+    guard let juxtaposeRun = runner.run, juxtaposeRun.stopReason == "moves_done", juxtaposeRun.error == nil,
+          let childID = juxtaposeRun.lastKeptID, let child = try await database.work(id: childID),
+          child.historyVisibility == "normal", let childNode = child.lineageNodeID,
+          let edge = try await database.edge(childNodeID: childNode), edge.derivationKind == "description_edit" else {
+        throw CheckFailure.message("Juxtaposition move: \(runner.run?.error ?? runner.errorText ?? "nil") / \(runner.run?.turns.map(\.text) ?? [])")
+    }
+    let moved = try ExactJSON(data: Data(edge.metadataJSON.utf8))
+    guard moved["ai_move"]["kind"].string == "juxtaposition", moved["ai_move"]["outcome"].string == "kept",
+          moved["juxtaposition"]["sentence"].string != nil, moved["juxtaposition"]["model"].string == "auto-check:one",
+          moved["edited_from_history_id"].string == first.id,
+          child.effectiveSourceText.hasPrefix(first.effectiveSourceText),
+          await transport.auxiliaryModels == ["auto-check:one"], await transport.lastDrawingModel == "auto-check:one" else {
+        throw CheckFailure.message("Juxtaposition child lost its sentence, ai_move or model: \(moved.text)")
+    }
+    // An identical draw stays only in the lineage and never becomes the next parent.
+    await runner.initialize(app: app, work: child)
+    runner.moves = 1; runner.enabledKinds = ["juxtaposition"]
+    await runner.start(app: app)
+    guard runner.run?.lastKeptID == nil, !runner.children.isEmpty else { throw CheckFailure.message("Identical draw fixture: \(runner.run?.turns.map(\.text) ?? []) / \(runner.run?.error ?? "nil")") }
+    for generated in runner.children.values {
+        guard try await database.work(id: generated.id)?.historyVisibility == "lineage_only",
+              let node = generated.lineageNodeID, let edge = try await database.edge(childNodeID: node),
+              edge.parentNodeID == childNode,
+              try ExactJSON(data: Data(edge.metadataJSON.utf8))["ai_move"]["outcome"].string == "not_visible" else {
+            throw CheckFailure.message("Not-visible child was promoted or became a parent")
+        }
+    }
+
+    // The second laws request waits, so stop and crash recovery both have a kept, still-hidden first child.
+    await transport.changeDrawing(false)
+    await transport.pauseLaws(after: 1)
+    await runner.initialize(app: app, work: first)
+    runner.moves = 2; runner.enabledKinds = ["laws"]
+    let task = Task { await runner.start(app: app) }
+    let deadline = ContinuousClock.now.advanced(by: .seconds(10))
+    while !(await transport.waiting) && ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(10)) }
+    guard await transport.waiting, let interrupted = runner.run, let last = interrupted.lastKeptID,
+          try await database.work(id: last)?.historyVisibility == "lineage_only" else {
+        task.cancel(); await runner.stop(app: app)
+        throw CheckFailure.message("Stop fixture never reached a second laws request: \(runner.run?.error ?? "nil")")
+    }
+    let recoveredURL = folder.appendingPathComponent("recovered.sqlite")
+    try await database.backup(to: recoveredURL)
+    try JSONEncoder().encode([interrupted]).write(to: recoveredURL.deletingPathExtension().appendingPathExtension("autonomous-runs.json"), options: .atomic)
+    let recoveredDatabase = try InkuDatabase(url: recoveredURL)
+    let recovered = AutonomousRefinementModel()
+    try await recovered.connect(database: recoveredDatabase)
+    let recoveryJournal = try JSONDecoder().decode([AutonomousRun].self, from: Data(contentsOf: recoveredURL.deletingPathExtension().appendingPathExtension("autonomous-runs.json")))
+    guard recoveryJournal.first?.stopReason == "interrupted", try await recoveredDatabase.work(id: last)?.historyVisibility == "normal" else {
+        throw CheckFailure.message("Interrupted run did not promote its last kept child")
+    }
+    await runner.stop(app: app); await task.value
+    guard runner.run?.stopReason == "stopped", !runner.running, !app.isBusy,
+          try await database.work(id: last)?.historyVisibility == "normal" else {
+        throw CheckFailure.message("Stopped run did not cancel and promote its last kept child")
+    }
+    print("Autonomous host passed: saved_laws + laws_change + basis + ai_move; juxtaposition + description_edit + both records; one pinned model; invisible children stay lineage-only and never parent; stop cancels, restart interrupts, both promote last kept. Fake providers and temporary SQLite only.")
+}
+
+private actor AutonomousCheckCredentials: CredentialStore {
     func key(for credentialID: String) -> String? { nil }
 }
 
-private actor AuxiliaryProvenanceProvider: ProviderTransport, AuxiliaryTransport {
-    private(set) var generationModels: [String] = []
-    private(set) var visionModels: [String] = []
-    private var expectedInstruction = "a red circle"
-    private(set) var lastMismatch = "none"
-    func expectInstruction(_ text: String) { expectedInstruction = text }
+private actor AutonomousCheckProvider: ProviderTransport, AuxiliaryTransport {
+    let base = LawsColorsCheckProvider(refuseColors: true)
+    private var changed = false
+    private var lawsCount = 0
+    private var pauseAfter: Int?
+    private(set) var waiting = false
+    private(set) var lawsModels: [String] = []
+    private(set) var auxiliaryModels: [String] = []
+    private(set) var lastDrawingModel = ""
+    func changeDrawing(_ value: Bool) { changed = value }
+    func pauseLaws(after count: Int) { pauseAfter = count; lawsCount = 0 }
 
     func perform(action: Data, models: ModelSelection, providers: [ProviderSettings], credentials: any CredentialStore,
                  onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {
-        generationModels.append(models.stage1Model)
         let input = try ExactJSON(data: action)
-        return ExactJSON.object(["tag": .string("normalized_ddl_generated"), "identity": input["identity"],
-            "response": .string(#"{"normalized_ddl":"place one red circle at center."}"#), "elapsed_ms": .string("1")]).data
+        if input["tag"].string == "choose_laws" {
+            lawsCount += 1; lawsModels.append(models.stage1Model)
+            if let pauseAfter, lawsCount > pauseAfter {
+                waiting = true
+                defer { waiting = false }
+                try await Task.sleep(for: .seconds(30))
+            }
+        }
+        lastDrawingModel = models.stage1Model
+        var answer = try ExactJSON(data: await base.perform(action: action, models: models, providers: providers, credentials: credentials, onBytes: onBytes))
+        if input["tag"].string == "generate_normalized_ddl", let response = answer["response"].string {
+            let large = response.replacingOccurrences(of: "\"size\":\"small\"", with: "\"size\":\"large\"")
+            answer["response"] = .string(changed ? large.replacingOccurrences(of: "circle", with: "square").replacingOccurrences(of: "red", with: "blue") : large)
+        }
+        return answer.data
     }
-
     func performAuxiliary(prompt: AuxiliaryPrompt, modelReference: String, settings: HostSettings,
                           credentials: any CredentialStore, onBytes: @escaping @Sendable (Int) -> Void) async throws -> String {
-        guard prompt.images.count == 1, prompt.maximumTokens == 320 else {
-            lastMismatch = "image count / advice budget"
-            throw CheckFailure.message("Autonomous Vision changed its existing observation budget")
+        auxiliaryModels.append(modelReference)
+        let ids = prompt.message.split(separator: "\n").compactMap { line -> String? in
+            guard line.hasPrefix("c"), let colon = line.firstIndex(of: "：") else { return nil }
+            return String(line[..<colon])
         }
-        guard let start = prompt.message.firstIndex(of: "{") else { throw CheckFailure.message("Vision prompt has no context") }
-        let payload = try ExactJSON(data: Data(prompt.message[start...].utf8))
-        guard payload["allowed_suggested_kinds"].array?.compactMap(\.string) == ["catalog_change"],
-              payload["user_direction"].string == "keep the circle",
-              payload["instruction"].string == expectedInstruction else {
-            lastMismatch = "kinds=\(payload["allowed_suggested_kinds"].text); direction=\(payload["user_direction"].string ?? "nil"); instruction=\(payload["instruction"].string ?? "nil"); expected=\(expectedInstruction)"
-            throw CheckFailure.message("Vision received retired kinds or direction text leaked into the parent description")
-        }
-        visionModels.append(modelReference)
-        return ExactJSON.object(["observation": .string("observation \(visionModels.count)"),
-            "next_direction": .string("direction \(visionModels.count)"), "suggested_kind": .string("catalog_change")]).text
+        return ExactJSON.object(["choices": .array(ids.prefix(4).map { .object(["id": .string($0), "reason": .string("理由 \($0)")]) })]).text
     }
 }

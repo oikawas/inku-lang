@@ -106,7 +106,7 @@ private func lawsColorsEventTags(_ view: PipelineView) -> [String] {
     (try? ExactJSON(data: view.eventsJSON).array?.compactMap { $0["tag"].string }) ?? []
 }
 
-private actor LawsColorsCheckProvider: ObservedProviderTransport {
+actor LawsColorsCheckProvider: ObservedProviderTransport {
     let refuseColors: Bool
     private(set) var actions: [ExactJSON] = []
     private(set) var selectedModels: [String] = []

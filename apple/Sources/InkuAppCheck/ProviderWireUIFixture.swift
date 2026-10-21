@@ -24,7 +24,7 @@ func makeProviderWireUIFixture(folder: URL) async throws {
     app.language = "ja"
     app.display.preferences.uiMode = "full"
     app.display.preferences.visionModelReference = reference
-    app.display.preferences.aiRefine = AIRefineChoices(generations: 1,
-        kinds: ["catalog_change"], direction: "赤い円と余白の関係を観察してください。")
-    print("Provider-wire GUI fixture ready: empty isolated DB; Gemini API / gemma-4-31b-it for both stages and Vision; 1 Vision generation, color catalog only. Existing Keychain is used only when the app sends. Preparation HTTP=0.")
+    app.display.preferences.autonomousRefine = AutonomousRefineChoices(moves: 1,
+        kinds: ["laws"], note: "赤い円と余白の関係を変えてください。")
+    print("Provider-wire GUI fixture ready: empty isolated DB; Gemini API / gemma-4-31b-it; one laws move. Existing Keychain is used only when the app sends. Preparation HTTP=0.")
 }

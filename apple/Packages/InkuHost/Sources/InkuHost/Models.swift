@@ -103,6 +103,8 @@ public struct GenerationRequest: Codable, Sendable {
     public var completionRanges: Data?
     /// The parent work's laws records (`laws_layers`, `laws_basis`), carried into a child drawn from it.
     public var lawsRecords: Data?
+    /// Start the shared pipeline at `saved_laws`, using the parent's saved instructions and records.
+    public var savedLawsDirection: Data?
     public init(authoring: GenerationAuthoring, configuration: Data, renderOptions: Data, clipPolicy: Data,
                 models: ModelSelection = .init(), providers: [ProviderSettings] = [],
                 renderColorMaps: [String: Data] = [:],

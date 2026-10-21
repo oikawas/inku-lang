@@ -84,6 +84,8 @@ class SharedPipelineHost(
                         .put("tag", "direct_ddl")
                         .put("source", authoring.source)
                         .also { value -> authoring.completionRangesJson?.let { value.put("completion_ranges", JSONObject(it)) } }
+                        // The server's direct-DDL start (`pipeline_api.py`): the parent's laws records go on.
+                        .also { value -> putLawsRecords(value, authoring.lawsRecordsJson) }
                 },
             )
         val messageId = newId()
@@ -100,7 +102,7 @@ class SharedPipelineHost(
             context = request.context,
             hostContextJson = JSONObject(request.hostContextJson)
                 .put("system_prompts", JSONObject())
-                .put("system_prompt_stages", JSONArray(listOf("sketch", "stage1", "composition", "stage2")))
+                .put("system_prompt_stages", JSONArray(SYSTEM_PROMPT_STAGES))
                 .toString(),
             fresh = true,
             renderedJson = output.renderedJson,
@@ -300,6 +302,8 @@ class SharedPipelineHost(
                 "generate_sketch",
                 "generate_normalized_ddl",
                 "read_composition",
+                "choose_laws",
+                "choose_colors",
                 -> if (!runProviderEffect(session, action)) return view(session)
                 else -> throw PipelineHostException("unsupported_pipeline_effect")
             }
@@ -380,7 +384,7 @@ class SharedPipelineHost(
     /** Keep the last attempted prompt of each sent stage in this execution's sidecar. */
     private fun recordSentPrompt(session: Session, action: JSONObject) {
         val stage = ACTION_STAGES[action.requiredString("tag")]
-        if (stage !in setOf("sketch", "stage1", "composition", "stage2")) return
+        if (stage !in SYSTEM_PROMPT_STAGES) return
         val prompt = action.optJSONObject("payload")?.optJSONObject("prompt") ?: return
         // A malformed or older action must not turn a completed model call into
         // a pipeline failure merely because its observational record is absent.
@@ -393,7 +397,7 @@ class SharedPipelineHost(
             .put("prompt_digest", prompt.requiredString("prompt_digest"))
             .put("instruction_language", prompt.requiredString("instruction_language"))
             .put("attempt", attempt)
-        if (stage == "sketch" || stage == "composition") {
+        if (stage in MESSAGE_STAGES) {
             prompt.optString("message").takeIf(String::isNotEmpty)?.let { record.put("message", it) }
         }
         val context = JSONObject(session.hostContextJson)
@@ -613,6 +617,7 @@ class SharedPipelineHost(
             providerFailure = session.providerFailure,
             holeCompletionResults = HoleCompletionResult.fromCheck(snapshot.optJSONObject("hole_completion_check")),
             completionRangesJson = snapshot.optJSONObject("completion_ranges")?.toString(),
+            lawsRecordsJson = lawsRecordsOf(snapshot),
         )
     }
 
@@ -818,7 +823,13 @@ class SharedPipelineHost(
             "select_description_catalog" to "catalog",
             "generate_normalized_ddl" to "stage1",
             "read_composition" to "composition",
+            "choose_laws" to "laws",
+            "choose_colors" to "colors",
             "complete_visible_ddl_holes" to "stage2",
         )
+        /** The server's `_SYSTEM_PROMPT_STAGES` (`pipeline_product.py`), in the order a work calls them. */
+        val SYSTEM_PROMPT_STAGES = listOf("sketch", "stage1", "composition", "laws", "colors", "stage2")
+        /** The server's `_MESSAGE_STAGES`: the stages whose sent message is kept too. */
+        val MESSAGE_STAGES = setOf("sketch", "composition", "laws", "colors")
     }
 }

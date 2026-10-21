@@ -138,7 +138,8 @@ private fun ecdsaDer(raw: ByteArray): ByteArray {
     return byteArrayOf(0x30, (r.size + s.size + 4).toByte(), 0x02, r.size.toByte()) + r + byteArrayOf(0x02, s.size.toByte()) + s
 }
 
-internal val CHATGPT_EFFECTS = setOf("generate_sketch", "select_description_catalog", "generate_normalized_ddl", "read_composition", "complete_visible_ddl_holes")
+internal val CHATGPT_EFFECTS = setOf("generate_sketch", "select_description_catalog", "generate_normalized_ddl", "read_composition",
+    "choose_laws", "choose_colors", "complete_visible_ddl_holes")
 
 /** Server `request_vision`: the assistant text read up to 512 KiB. */
 private const val CHATGPT_VISION_ANSWER_LIMIT = 512 * 1024

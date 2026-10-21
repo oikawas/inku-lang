@@ -11,6 +11,25 @@ import org.json.JSONObject
 internal fun compositionForModel(modelId: String): JSONObject =
     JSONObject().put("read", !isLocalVisionModel(modelId))
 
+/**
+ * The server's `_paint_names` (`pipeline_product.py`): the catalog's names of
+ * the palette's observed paints, in their order, for the color stage's table.
+ * A paint the catalog does not name is null.
+ */
+internal fun paintNames(catalog: ColorCatalog, palette: JSONObject, language: String): JSONArray {
+    val names = ColorCatalogs.paletteFor(catalog.id).entries.mapIndexed { index, (name, code) ->
+        code.lowercase() to if (language == "ja") catalog.paletteNamesJa.getOrNull(index) ?: name else name
+    }.toMap()
+    val observations = palette.optJSONArray("observations") ?: JSONArray()
+    return JSONArray().also { paints ->
+        (0 until observations.length()).forEach { index ->
+            val rgb = observations.getJSONObject(index).getJSONArray("concrete_rgb")
+            val code = "#%02x%02x%02x".format(rgb.getInt(0), rgb.getInt(1), rgb.getInt(2))
+            paints.put(names[code] ?: JSONObject.NULL)
+        }
+    }
+}
+
 /** One definition carried by an `inku.ddl-export.v1` file, offered to a new work only. */
 data class ImportedPluginDefinition(
     val definitionJson: String,
@@ -94,6 +113,12 @@ class SharedPipelineConfigBuilder(
             catalogs.firstOrNull { it.id == request.catalogSelectionId }
         } ?: throw PipelineHostException("unknown_color_catalog")
 
+        // The laws and color stages (SPEC §12.6.4-5) follow the composition
+        // reading, as the server's `default_manifest`; the core applies them only
+        // to a plan the reading composed, so an on-device model is never asked.
+        // The color stage estimates the drawing with the seed it is drawn with.
+        val composition = compositionForModel(request.drawingModelId)
+        val colorsStage = composition.getBoolean("read") && request.renderSeed != null
         val resolvedHosts = catalogs.associate { catalog ->
             catalog.id to resolvedHost(
                 catalog = catalog,
@@ -102,6 +127,7 @@ class SharedPipelineConfigBuilder(
                 registryDigest = registryDigest,
                 renderSeed = request.renderSeed,
                 catalogMode = if (catalog.id == "default") "default" else "explicit",
+                paintLanguage = request.resolvedLanguage.takeIf { colorsStage },
             )
         }
         val selectedHost = JSONObject(resolvedHosts.getValue(selectedCatalog.id).toString())
@@ -140,7 +166,13 @@ class SharedPipelineConfigBuilder(
                     .put("max_output_bytes", policy.maxOutputBytes),
             )
             .put("language", request.resolvedLanguage)
-            .put("composition", compositionForModel(request.drawingModelId))
+            .put("composition", composition)
+            .also { config ->
+                if (colorsStage) {
+                    config.put("laws", JSONObject())
+                    config.put("colors", JSONObject().put("render_seed", request.renderSeed.wireUnsignedOrNull()))
+                }
+            }
             .put("compiler", compiler)
             .put("definitions", JSONArray().also { output ->
                 entries.objects().forEach { output.put(it.requiredObject("definition")) }
@@ -402,6 +434,8 @@ class SharedPipelineConfigBuilder(
         registryDigest: String,
         renderSeed: Long?,
         catalogMode: String,
+        /** The instruction language when the run has a color stage, which names the paints. */
+        paintLanguage: String? = null,
     ): JSONObject {
         val input = JSONObject()
             .put("color_map", JSONObject(catalog.renderMap))
@@ -412,6 +446,7 @@ class SharedPipelineConfigBuilder(
             binding.resolvePalette(input.toString().encodeToByteArray()).toString(Charsets.UTF_8),
         )
         if (palette.has("error")) throw PipelineHostException(palette.requiredString("error"))
+        paintLanguage?.let { palette.put("paints", paintNames(catalog, palette, it)) }
         return JSONObject()
             .put("canvas_format_id", canvasFormatId)
             .put("canvas_format_registry_id", registryId)

@@ -21,6 +21,8 @@ data class SharedPipelineRunRequest(
     val parentHistoryId: String? = null,
     val inputProvenanceJson: String? = null,
     val completionRangesJson: String? = null,
+    /** The parent's laws records a direct-DDL run carries on ([lawsRecordsOf]). */
+    val lawsRecordsJson: String? = null,
 )
 
 sealed interface PipelineRunOutcome {
@@ -64,7 +66,7 @@ class SharedAuthoringPipeline(
             PipelineStartRequest(
                 ownerId = request.ownerId,
                 configJson = request.config.configJson,
-                authoring = PipelineAuthoring.DirectDdl(request.text, request.completionRangesJson),
+                authoring = PipelineAuthoring.DirectDdl(request.text, request.completionRangesJson, request.lawsRecordsJson),
                 models = request.models,
                 context = request.context,
                 hostContextJson = durableHostContext(request),

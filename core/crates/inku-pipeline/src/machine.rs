@@ -1895,13 +1895,16 @@ impl PipelineSnapshot {
         }
         self.action = None;
         let pending = self.laws.take().ok_or(ProtocolError::InternalInvariant)?;
+        // The laws stage no longer chooses a main layer (2026-10-21): the
+        // event and the basis keep the field, empty, for the hosts that read
+        // it by name.
         self.event(
             events,
             "laws_chosen",
             json!({
                 "laws": chosen.laws,
                 "main_law": chosen.main_law,
-                "main_layer": chosen.main_layer,
+                "main_layer": null,
                 "notes": chosen.notes,
                 "reason": chosen.reason,
             }),
@@ -1911,7 +1914,7 @@ impl PipelineSnapshot {
         self.laws_basis = Some(LawsBasis {
             composed: pending.document.source.clone(),
             committed_digest: String::new(),
-            main_layer: chosen.main_layer,
+            main_layer: None,
             main_law: chosen.main_law.clone(),
             laws: chosen
                 .values
@@ -2212,13 +2215,15 @@ impl PipelineSnapshot {
         }
         self.action = None;
         let pending = self.colors.take().ok_or(ProtocolError::InternalInvariant)?;
+        // The color laws name their layers in their values (2026-10-21); the
+        // event keeps the main layer's field, empty.
         self.event(
             events,
             "colors_chosen",
             json!({
                 "laws": chosen.laws,
                 "main_law": chosen.main_law,
-                "main_layer": chosen.main_layer,
+                "main_layer": null,
                 "notes": chosen.notes,
             }),
         )?;

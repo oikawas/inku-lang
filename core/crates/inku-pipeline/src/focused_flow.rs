@@ -2662,20 +2662,20 @@ fn laws_answer(state: &PipelineSnapshot, answer: &serde_json::Value) -> StepOutp
 /// The red circle on the golden section's upper left crossing, the dots far
 /// away in aerial perspective (the composed plan's layers 1 and 2).
 fn two_laws() -> serde_json::Value {
-    json!({"main_layer": 1, "main_law": "B1", "description_counts": [],
+    json!({"main_law": "B1", "description_counts": [],
            "laws": {"B1": {"targets": [{"layer": 1, "at": "point_ul"}]}, "B15": {"layers": [2]}},
            "reason": "“A red circle” leads the picture."})
 }
 
 fn one_law() -> serde_json::Value {
-    json!({"main_layer": 1, "main_law": "B1", "description_counts": [],
+    json!({"main_law": "B1", "description_counts": [],
            "laws": {"B1": {"targets": [{"layer": 1, "at": "point_ul"}]}},
            "reason": "“A red circle” leads the picture."})
 }
 
 /// An answer the tool refuses: its main law is not among its laws.
 fn main_law_missing() -> serde_json::Value {
-    json!({"main_layer": 1, "main_law": "B1", "description_counts": [],
+    json!({"main_law": "B1", "description_counts": [],
            "laws": {"B15": {"layers": [2]}},
            "reason": "“A red circle” leads the picture."})
 }
@@ -2690,7 +2690,7 @@ fn bottom_circle_plan_response() -> serde_json::Value {
 
 /// The circle (the composed plan's layer 1) placed by the golden section.
 fn golden(at: &str) -> serde_json::Value {
-    json!({"main_layer": 1, "main_law": "B1", "description_counts": [],
+    json!({"main_law": "B1", "description_counts": [],
            "laws": {"B1": {"targets": [{"layer": 1, "at": at}]},
                     "B21": {"targets": [{"layer": 1, "hand": "still"}]}},
            "reason": "“A red circle” leads the picture."})
@@ -2765,15 +2765,15 @@ fn a_run_with_laws_asks_for_them_and_commits_what_they_print() {
 fn a_law_a_layer_cannot_take_is_refused_with_the_way_out() {
     let cases = [
         (
-            json!({"main_layer": 1, "main_law": "B6", "description_counts": [],
-                   "laws": {"B6": {"secondary": [2]}, "B15": {"layers": [2]}},
+            json!({"main_law": "B6", "description_counts": [],
+                   "laws": {"B6": {"main": 1, "secondary": [2]}, "B15": {"layers": [2]}},
                    "reason": "“A red circle” leads the picture."}),
             "subordination_none",
-            "besides the main layer 1, no layer (a closed shape or an arc) can be B6's \
-             secondary or accent; drop B6 or change the main layer",
+            "besides B6's base layer 1, no layer (a closed shape or an arc) can be its \
+             secondary or accent; drop B6",
         ),
         (
-            json!({"main_layer": 1, "main_law": "C4",
+            json!({"main_law": "C4",
                    "description_counts": [{"layer": 1, "words": "A red circle"}],
                    "laws": {"C4": {"layer": 1, "repeats": 3, "sequence": ["echo"], "path": "row"},
                             "B15": {"layers": [2]}},
@@ -2805,16 +2805,16 @@ fn a_law_a_layer_cannot_take_is_refused_with_the_way_out() {
 fn a_request_from_the_third_lists_the_reasons_refused_before() {
     // B6, then C4, then B6 again: the third request lists B6's reason after
     // C4's, the fourth C4's after B6's, and B6's only once.
-    let b6 = json!({"main_layer": 1, "main_law": "B6", "description_counts": [],
-                    "laws": {"B6": {"secondary": [2]}, "B15": {"layers": [2]}},
+    let b6 = json!({"main_law": "B6", "description_counts": [],
+                    "laws": {"B6": {"main": 1, "secondary": [2]}, "B15": {"layers": [2]}},
                     "reason": "“A red circle” leads the picture."});
-    let c4 = json!({"main_layer": 1, "main_law": "C4",
+    let c4 = json!({"main_law": "C4",
                     "description_counts": [{"layer": 1, "words": "A red circle"}],
                     "laws": {"C4": {"layer": 1, "repeats": 3, "sequence": ["echo"], "path": "row"},
                              "B15": {"layers": [2]}},
                     "reason": "“A red circle” leads the picture."});
-    let b6_reason = "besides the main layer 1, no layer (a closed shape or an arc) can be B6's \
-                     secondary or accent; drop B6 or change the main layer";
+    let b6_reason = "besides B6's base layer 1, no layer (a closed shape or an arc) can be its \
+                     secondary or accent; drop B6";
     let c4_reason = "layer 1 keeps the count the description writes, 1, but C4 repeats three times \
                      at least, so C4 cannot take this layer; drop C4 or put it on another layer";
     let mut pipeline_config = config();
@@ -2855,7 +2855,7 @@ fn a_request_from_the_third_lists_the_reasons_refused_before() {
 #[test]
 fn a_layer_a_refused_answer_quoted_keeps_its_count_after_it() {
     let c4 = |counts: serde_json::Value| {
-        json!({"main_layer": 1, "main_law": "C4", "description_counts": counts,
+        json!({"main_law": "C4", "description_counts": counts,
                "laws": {"C4": {"layer": 1, "repeats": 3, "sequence": ["echo"], "path": "row"},
                         "B15": {"layers": [2]}},
                "reason": "“A red circle” leads the picture."})
@@ -3022,7 +3022,7 @@ fn dots_then_circle_plan_response() -> serde_json::Value {
 /// The dots (the composed plan's layer 0) in beat groups of three, and the
 /// circle (its layer 1) placed by the golden section.
 fn beats_and_golden(at: &str) -> serde_json::Value {
-    json!({"main_layer": 1, "main_law": "B1", "description_counts": [],
+    json!({"main_law": "B1", "description_counts": [],
            "laws": {"B1": {"targets": [{"layer": 1, "at": at}]},
                     "B12": {"targets": [{"layer": 0, "group": "3", "strong": "first"}]}},
            "reason": "“A red circle” leads the picture."})
@@ -3119,6 +3119,23 @@ fn a_run_without_laws_commits_the_composed_document_without_asking() {
 /// A description without color words, so that the tool keeps no layer's color.
 const UNCOLORED_DESCRIPTION: &str = "A circle above dots scattered at the bottom";
 
+/// The composed plan with a green field: the red circle is not the one vivid
+/// layer, so D2 does not already hold (on the gray field it would, by the
+/// circle, 2026-10-21).
+fn green_field_plan_response() -> serde_json::Value {
+    json!({"ground": "paper", "background": "white", "plugins": [], "layers": [
+        plan_layer("fill", "square", 1, "unspecified", "large", "green"),
+        plan_layer("place", "circle", 1, "center", "small", "red"),
+        plan_layer("scatter", "point", 12, "bottom", "very_small", "black"),
+    ]})
+}
+
+/// D5: the field (layer 0) in blue, the other layers near it.
+fn analogous_blue() -> serde_json::Value {
+    json!({"main_law": "D5", "laws": {"D5": {"hue": "blue", "layer": 0}},
+           "reason": "A quiet continuity."})
+}
+
 fn started_with(pipeline_config: PipelineConfig, description: &str) -> PipelineSnapshot {
     let start = envelope(
         None,
@@ -3167,9 +3184,9 @@ fn colors_answer(state: &PipelineSnapshot, answer: &serde_json::Value) -> StepOu
     )
 }
 
-/// D2: the main layer in the vivid blue.
+/// D2: the field (layer 0) in the vivid blue.
 fn vivid_blue() -> serde_json::Value {
-    json!({"main_law": "D2", "laws": {"D2": {"vivid": "blue"}},
+    json!({"main_law": "D2", "laws": {"D2": {"vivid": "blue", "layer": 0}},
            "reason": "“A circle” stands out."})
 }
 
@@ -3184,11 +3201,15 @@ fn rate_limited(state: &PipelineSnapshot) -> EffectResult {
 
 #[test]
 fn a_run_with_colors_asks_for_them_and_commits_what_they_print() {
-    let asked = plan_answer(&colors_start(UNCOLORED_DESCRIPTION, None)).snapshot;
+    let asked = plan_answer_with(
+        &colors_start(UNCOLORED_DESCRIPTION, None),
+        &green_field_plan_response(),
+    )
+    .snapshot;
     assert_eq!(asked.action.as_ref().unwrap().tag, "choose_colors");
     assert!(asked.colors.is_some());
-    // The field is the main layer (no laws chose one); D2 makes it the vivid
-    // blue and turns the red circle, more vivid than half of it, neutral.
+    // D2 makes the green field the vivid blue and turns the red circle, more
+    // vivid than half of it, neutral.
     let chosen = colors_answer(&asked, &vivid_blue());
     let payload = event(&chosen, "colors_chosen").expect("colors chosen");
     assert_eq!(payload["laws"], json!(["D2"]));
@@ -3217,19 +3238,17 @@ fn the_colors_come_after_the_laws_with_what_the_laws_decided() {
     let action = after_laws.action.as_ref().unwrap();
     assert_eq!(action.tag, "choose_colors");
     let message = action.payload["prompt"]["message"].as_str().unwrap();
-    // The laws' main layer, the stated red circle and the dots in aerial
-    // perspective, whose color the laws decided.
-    assert!(
-        message.contains("## Main layer (decided by the previous stage): layer 1"),
-        "{message}"
-    );
+    // No main layer (the laws stage no longer chooses one, 2026-10-21), the
+    // stated red circle and the dots in aerial perspective, whose color the
+    // laws decided.
+    assert!(!message.contains("Main layer"), "{message}");
     assert!(message.contains("- layer 1: “red” (red)"), "{message}");
     assert!(message.contains(r#""fixed":"B15""#), "{message}");
 }
 
 /// B20 with the stated red circle (layer 1) recolored blue.
 fn recolored_circle() -> serde_json::Value {
-    json!({"main_law": "B20", "laws": {"B20": {"accent_layer": 0}},
+    json!({"main_law": "B20", "laws": {"B20": {"accent_layer": 0, "layer": 1}},
            "colors": {"layers": [{"layer": 0, "color": "orange"}, {"layer": 1, "color": "blue"}]},
            "reason": "A warm field under a cool circle."})
 }
@@ -3262,11 +3281,11 @@ fn the_colors_keep_the_stated_colors_and_the_ground() {
         ),
         "{message}"
     );
-    // D5 gives the field, the main layer, the blue and the other layers
-    // colors near it, which leaves the stated circle and dots as they are.
+    // D5 gives the field the blue and the other layers colors near it,
+    // which leaves the stated circle and dots as they are.
     let chosen = colors_answer(
         &refused.snapshot,
-        &json!({"main_law": "D5", "laws": {"D5": {"hue": "blue"}},
+        &json!({"main_law": "D5", "laws": {"D5": {"hue": "blue", "layer": 0}},
                 "reason": "A quiet continuity."}),
     );
     assert!(
@@ -3331,15 +3350,19 @@ fn a_failed_colors_request_commits_the_document_the_laws_left() {
 fn printed_colors_the_run_cannot_take_commit_the_document_the_laws_left() {
     let asked = plan_answer(&colors_start(UNCOLORED_DESCRIPTION, None)).snapshot;
     let left = asked.colors.as_ref().unwrap().document.source.clone();
-    let printed = committed_source(&colors_answer(&asked, &vivid_blue()).snapshot);
-    // “gray” for the circle's “red” makes the printed document longer.
+    // B20: the field in a cool blue, the circle the warm accent.
+    let warm_accent = json!({"main_law": "B20", "laws": {"B20": {"accent_layer": 1, "layer": 0}},
+                             "colors": {"layers": [{"layer": 0, "color": "blue"}, {"layer": 1, "color": "orange"}]},
+                             "reason": "A warm circle on a cool field."});
+    let printed = committed_source(&colors_answer(&asked, &warm_accent).snapshot);
+    // “orange” for the circle's “red” makes the printed document longer.
     assert!(printed.len() > left.len(), "{printed}");
     let mut pipeline_config = observed_config(inku_ddl::ResolvedInstructionLanguage::En);
     pipeline_config.composition = Some(CompositionConfig { read: false });
     pipeline_config.colors = Some(ColorsConfig::default());
     pipeline_config.prompt_limits.max_source_bytes = left.len();
     let asked = plan_answer(&started_with(pipeline_config, UNCOLORED_DESCRIPTION)).snapshot;
-    let output = colors_answer(&asked, &vivid_blue());
+    let output = colors_answer(&asked, &warm_accent);
     assert_eq!(
         event(&output, "colors_fallback"),
         Some(&json!({"failure": "compile"})),
@@ -3367,13 +3390,10 @@ fn the_colors_are_asked_also_when_the_laws_fell_back() {
     let action = state.action.as_ref().unwrap();
     assert_eq!(action.tag, "choose_colors");
     assert_eq!(state.colors.as_ref().unwrap().document.source, composed);
-    // Without the laws, the main layer is the plan's first, the field.
+    // No main layer is handed on, with the laws or without them.
     let message = action.payload["prompt"]["message"].as_str().unwrap();
-    assert!(
-        message.contains("## Main layer (decided by the previous stage): layer 0"),
-        "{message}"
-    );
-    let chosen = colors_answer(&state, &vivid_blue());
+    assert!(!message.contains("Main layer"), "{message}");
+    let chosen = colors_answer(&state, &analogous_blue());
     let source = committed_source(&chosen.snapshot);
     assert!(
         source
@@ -3398,10 +3418,10 @@ fn the_laws_record_follows_the_sentences_the_colors_print_again() {
         placed.layers[0].sentences[0].contains(" red "),
         "{placed:?}"
     );
-    // D5 gives the circle, the laws' main layer, the blue.
+    // D5 gives the circle (layer 1) the blue.
     let chosen = colors_answer(
         &after_laws,
-        &json!({"main_law": "D5", "laws": {"D5": {"hue": "blue"}},
+        &json!({"main_law": "D5", "laws": {"D5": {"hue": "blue", "layer": 1}},
                 "reason": "A quiet continuity."}),
     );
     let source = committed_source(&chosen.snapshot);
@@ -3445,10 +3465,14 @@ fn refusal_reason(output: &StepOutput) -> &str {
 fn d2_holds_once_the_law_that_supports_it_is_applied() {
     // D4 lays the circle in the vivid blue the field takes, so the field is
     // no longer twice as vivid as every other layer.
-    let asked = plan_answer(&colors_start(UNCOLORED_DESCRIPTION, None)).snapshot;
+    let asked = plan_answer_with(
+        &colors_start(UNCOLORED_DESCRIPTION, None),
+        &green_field_plan_response(),
+    )
+    .snapshot;
     let refused = colors_answer(
         &asked,
-        &json!({"main_law": "D2", "laws": {"D2": {"vivid": "blue"}, "D4": {"color": "blue",
+        &json!({"main_law": "D2", "laws": {"D2": {"vivid": "blue", "layer": 0}, "D4": {"color": "blue",
                 "layers": [{"layer": 0, "handling": "dense"}, {"layer": 1, "handling": "temperate"}]}},
                 "reason": "“A circle” in one blue."}),
     );
@@ -3456,7 +3480,7 @@ fn d2_holds_once_the_law_that_supports_it_is_applied() {
     assert_eq!(retried["detail"], "d2_not_held");
     let reason = refusal_reason(&refused);
     assert!(
-        reason.starts_with("D2: the main layer 0, drawn, has a chroma of "),
+        reason.starts_with("D2: layer 0, drawn, has a chroma of "),
         "{reason}"
     );
     assert!(
@@ -3467,8 +3491,8 @@ fn d2_holds_once_the_law_that_supports_it_is_applied() {
 
 #[test]
 fn d2_counts_the_vivid_layers_the_colors_keep() {
-    // The description states both reds: D2 can only keep the main circle red,
-    // and the red row it cannot change stays as vivid.
+    // The description states both reds: D2 can only keep the circle red, and
+    // the red row it cannot change stays as vivid.
     let plan = json!({"ground": "paper", "background": "white", "plugins": [], "layers": [
         plan_layer("place", "circle", 1, "center", "small", "red"),
         plan_layer("line_up", "circle", 3, "bottom", "small", "red"),
@@ -3483,12 +3507,98 @@ fn d2_counts_the_vivid_layers_the_colors_keep() {
     );
     let refused = colors_answer(
         &asked,
-        &json!({"main_law": "D2", "laws": {"D2": {"vivid": "red"}}, "reason": "“A red circle”."}),
+        &json!({"main_law": "D2", "laws": {"D2": {"vivid": "red", "layer": 0}}, "reason": "“A red circle”."}),
     );
     assert_eq!(
         event(&refused, "retry_scheduled").expect("a retry")["detail"],
         "d2_not_held"
     );
+}
+
+/// D2 already holds where some layer is twice as vivid as every other, which
+/// ever it is (2026-10-21): on the gray field the red circle is, so D2 may
+/// support but not lead; beside a green field it may lead.
+#[test]
+fn d2_already_holds_by_any_layer() {
+    let main_laws = |state: &PipelineSnapshot| {
+        let schema = &state.action.as_ref().unwrap().payload["prompt"]["response_schema"];
+        assert!(schema["properties"]["laws"]["properties"]["D2"].is_object());
+        schema["properties"]["main_law"]["enum"].clone()
+    };
+    let gray = plan_answer(&colors_start(UNCOLORED_DESCRIPTION, None)).snapshot;
+    let main = main_laws(&gray);
+    assert!(!main.as_array().unwrap().contains(&json!("D2")), "{main}");
+    let green = plan_answer_with(
+        &colors_start(UNCOLORED_DESCRIPTION, None),
+        &green_field_plan_response(),
+    )
+    .snapshot;
+    let main = main_laws(&green);
+    assert!(main.as_array().unwrap().contains(&json!("D2")), "{main}");
+}
+
+/// The color laws name the layers they work on (2026-10-21): D2 makes the
+/// stated red circle the most vivid only in its red, and D5 puts its hue only
+/// on a layer the tool found a combination for, which the reason names.
+#[test]
+fn the_color_laws_name_their_layers() {
+    let asked = plan_answer_with(
+        &colors_start("A red circle above dots scattered at the bottom", None),
+        &green_field_plan_response(),
+    )
+    .snapshot;
+    let refused = colors_answer(
+        &asked,
+        &json!({"main_law": "D2", "laws": {"D2": {"vivid": "blue", "layer": 1}},
+                "reason": "“A red circle”."}),
+    );
+    assert_eq!(
+        event(&refused, "retry_scheduled").expect("a retry")["detail"],
+        "d2_layer"
+    );
+    let reason = refusal_reason(&refused);
+    assert!(
+        reason.starts_with("D2: layer 1 cannot take blue (a layer whose color the description states, only that color); layer 1 can take red"),
+        "{reason}"
+    );
+    let refused = colors_answer(
+        &asked,
+        &json!({"main_law": "D5", "laws": {"D5": {"hue": "orange", "layer": 1}},
+                "reason": "A quiet continuity."}),
+    );
+    assert_eq!(
+        event(&refused, "retry_scheduled").expect("a retry")["detail"],
+        "hue_layer"
+    );
+    let reason = refusal_reason(&refused);
+    assert!(
+        reason.starts_with("D5: with the main hue orange on layer 1, no combination keeps the rule with every layer seen; the layers that can take orange are "),
+        "{reason}"
+    );
+    assert!(
+        !reason.contains("are 1") && !reason.contains(", 1"),
+        "{reason}"
+    );
+}
+
+/// The laws stage no longer chooses a main layer (2026-10-21): its event and
+/// basis write the field empty, for the hosts that read it by name, and a
+/// saved work's basis still reads with its number.
+#[test]
+fn the_laws_basis_writes_no_main_layer_and_reads_a_saved_one() {
+    let asked = plan_answer(&laws_start(Some(LawsConfig {}))).snapshot;
+    let chosen = laws_answer(&asked, &two_laws());
+    assert_eq!(
+        event(&chosen, "laws_chosen").expect("laws chosen")["main_layer"],
+        serde_json::Value::Null
+    );
+    let basis = chosen.snapshot.laws_basis.clone().expect("a laws basis");
+    assert_eq!(basis.main_layer, None);
+    let mut written = serde_json::to_value(&basis).unwrap();
+    assert_eq!(written["main_layer"], serde_json::Value::Null);
+    written["main_layer"] = json!(1);
+    let saved: crate::laws_record::LawsBasis = serde_json::from_value(written).unwrap();
+    assert_eq!(saved.main_layer, Some(1));
 }
 
 #[test]
@@ -3622,7 +3732,7 @@ fn saved_laws_start(
 
 /// The circle (the composed plan's layer 1) on a crossing of the thirds.
 fn thirds() -> serde_json::Value {
-    json!({"main_layer": 1, "main_law": "B3", "description_counts": [],
+    json!({"main_law": "B3", "description_counts": [],
            "laws": {"B3": {"targets": [{"layer": 1, "at": "point_lr"}]},
                     "B21": {"targets": [{"layer": 1, "hand": "still"}]}},
            "reason": "The circle rests on a crossing of the thirds."})

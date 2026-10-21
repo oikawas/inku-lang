@@ -16,7 +16,7 @@ mod common;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use inku_ddl::work_plan::WorkPlanPlugin;
+use inku_ddl::work_plan::{NumericSize, WorkPlanPlugin};
 use inku_ddl::{
     MacroDefinition, MacroLock, NATURE_LEAVES_V1_JSON, NormalizedDdlDocument,
     ResolvedInstructionLanguage, ScoreLoweringOutcome,
@@ -455,49 +455,52 @@ fn the_tool_refuses_answers_that_break_the_rules() {
         .find(|case| case.id == "ja-11")
         .expect("ja-11");
     let (context, _, _) = context(case, None, &definitions);
-    let answer = |laws: Value, main_law: &str, main_layer: u64| {
-        json!({"main_layer": main_layer, "main_law": main_law, "description_counts": [],
-               "laws": laws, "reason": "（理由）"})
-        .to_string()
+    let answer = |laws: Value, main_law: &str| {
+        json!({"main_law": main_law, "description_counts": [], "laws": laws, "reason": "（理由）"})
+            .to_string()
     };
     let diagonal = json!({"targets": [{"layer": 0, "path": "diagonal_down"}]});
     let still = json!({"targets": [{"layer": 1, "hand": "still"}]});
     for (response, code) in [
         ("not json".to_owned(), "not_json"),
-        (json!({"main_layer": 0}).to_string(), "missing"),
+        (json!({"main_law": "B5"}).to_string(), "missing"),
         (
-            answer(json!({"B5": diagonal, "B21": still}), "B21", 0),
+            answer(json!({"B5": diagonal, "B21": still}), "B21"),
             "not_a_choice",
         ),
         (
             answer(
                 json!({"B5": diagonal, "B21": still, "B1": {"targets": [{"layer": 0, "at": "line_left"}]}}),
                 "B5",
-                0,
             ),
             "two_placements",
         ),
+        // B6's base is the line of layer 0, which has no size to lead by.
         (
-            answer(json!({"B5": diagonal, "B6": {"secondary": [1]}}), "B5", 0),
+            answer(
+                json!({"B5": diagonal, "B6": {"main": 0, "secondary": [1]}}),
+                "B5",
+            ),
             "subordination_main",
         ),
         (
             answer(
                 json!({"B5": diagonal, "B11": {"targets": [{"layer": 0, "colors": ["white", "orange"]}]}}),
                 "B5",
-                0,
             ),
             "unknown_law",
         ),
         (
-            answer(json!({"B5": diagonal, "B7": {"layer": 1}}), "B5", 1),
+            answer(
+                json!({"B5": diagonal, "B7": {"layer": 1, "against": 1}}),
+                "B5",
+            ),
             "balance_main",
         ),
         (
             answer(
                 json!({"B5": {"targets": [{"layer": 7, "path": "diagonal_down"}]}, "B21": still}),
                 "B5",
-                0,
             ),
             "not_a_choice",
         ),
@@ -508,7 +511,7 @@ fn the_tool_refuses_answers_that_break_the_rules() {
         assert!(!refusal.ja.is_empty() && !refusal.en.is_empty());
     }
     let chosen = choose(
-        &answer(json!({"B5": diagonal, "B21": still}), "B5", 0),
+        &answer(json!({"B5": diagonal, "B21": still}), "B5"),
         &context,
         &case.composed,
     )
@@ -518,12 +521,50 @@ fn the_tool_refuses_answers_that_break_the_rules() {
     assert_eq!(chosen.print.changed, [0]);
     // The number of laws is not fixed (2026-10-21): the main law alone is chosen too.
     let alone = choose(
-        &answer(json!({"B5": diagonal}), "B5", 0),
+        &answer(json!({"B5": diagonal}), "B5"),
         &context,
         &case.composed,
     )
     .expect("one law is chosen");
     assert_eq!(alone.laws, ["B5"]);
+}
+
+/// B6's base and B7's partner need not be one layer (2026-10-21): B7 sizes its
+/// layer by its partner as B6 left it, so the center circle balanced against
+/// the small circle B6 subordinated to the arcs is 0.382 of that circle as
+/// printed.
+#[test]
+fn b7_sizes_by_its_partner_as_b6_left_it() {
+    let fixture = fixture();
+    let definitions = definitions();
+    let case = fixture
+        .cases
+        .iter()
+        .find(|case| case.id == "ja-10")
+        .expect("ja-10");
+    let (context, _, _) = context(case, None, &definitions);
+    let answer = json!({"main_law": "B6", "description_counts": [],
+                        "laws": {"B6": {"main": 2, "secondary": [3]}, "B7": {"layer": 1, "against": 3}},
+                        "reason": "（理由）"})
+    .to_string();
+    let chosen = choose(&answer, &context, &case.composed).expect("B6 and B7 are chosen");
+    let radius = |layer: usize| {
+        let printed = chosen
+            .print
+            .composed
+            .iter()
+            .position(|composed| *composed == layer)
+            .expect("a printed layer");
+        match chosen.print.numeric[printed]
+            .as_ref()
+            .and_then(|numeric| numeric.size)
+        {
+            Some(NumericSize::Radius { radius }) => radius,
+            other => panic!("layer {layer}: {other:?}"),
+        }
+    };
+    let ratio = radius(1) / radius(3);
+    assert!((ratio - 0.381_966).abs() < 1e-3, "{ratio}");
 }
 
 /// The arrangement laws' refusals, with the prototype's reasons: two of them on
@@ -534,10 +575,9 @@ fn the_tool_refuses_answers_that_break_the_rules() {
 fn the_tool_refuses_arrangements_it_cannot_lay() {
     let fixture = fixture();
     let definitions = definitions();
-    let answer = |laws: Value, main_law: &str, main_layer: u64| {
-        json!({"main_layer": main_layer, "main_law": main_law, "description_counts": [],
-               "laws": laws, "reason": "（理由）"})
-        .to_string()
+    let answer = |laws: Value, main_law: &str| {
+        json!({"main_law": main_law, "description_counts": [], "laws": laws, "reason": "（理由）"})
+            .to_string()
     };
     let case = fixture
         .cases
@@ -552,7 +592,6 @@ fn the_tool_refuses_arrangements_it_cannot_lay() {
                 json!({"B9": {"targets": [{"layer": 1, "form": "row"}]},
                        "B12": {"targets": [{"layer": 1, "group": "3", "strong": "first"}]}}),
                 "B9",
-                1,
             ),
             "arrangement_twice",
             "layer 1 に並びの法則が二つ（B9・B12）。一つにする",
@@ -562,7 +601,6 @@ fn the_tool_refuses_arrangements_it_cannot_lay() {
                 json!({"B10": {"targets": [{"layer": 1, "change": "size", "ratio": "0.618", "toward": "left"}]},
                        "B21": still}),
                 "B10",
-                1,
             ),
             "row_direction",
             "B10: 列の向きに left が無い（横の列には left・right、縦の列には top・bottom）",
@@ -572,7 +610,6 @@ fn the_tool_refuses_arrangements_it_cannot_lay() {
                 json!({"B10": {"targets": [{"layer": 0, "change": "spacing", "ratio": "0.618", "toward": "right"}]},
                        "B21": still}),
                 "B10",
-                0,
             ),
             "progression_count",
             "B10: layer 0 は 2 個で、間隔の漸進には3個以上要る",
@@ -582,7 +619,6 @@ fn the_tool_refuses_arrangements_it_cannot_lay() {
                 json!({"B12": {"targets": [{"layer": 0, "group": "2", "strong": "first"}]},
                        "B21": still}),
                 "B12",
-                0,
             ),
             "beat_count",
             "B12: layer 0 は 2 個で、2 個ずつの群が二つできない",
@@ -592,7 +628,6 @@ fn the_tool_refuses_arrangements_it_cannot_lay() {
                 json!({"B8": {"targets": [{"layer": 0, "axis": "vertical"}]},
                        "B9": {"targets": [{"layer": 0, "form": "row"}]}}),
                 "B8",
-                0,
             ),
             "layer_split",
             "B9: layer 0 はすでに 2 個の指示に分かれていて、この法則を当てられない",
@@ -620,7 +655,6 @@ fn the_tool_refuses_arrangements_it_cannot_lay() {
             json!({"B10": {"targets": [{"layer": 1, "change": "spacing", "ratio": "0.618", "toward": "right"}]},
                    "B21": {"targets": [{"layer": 1, "hand": "still"}]}}),
             "B10",
-            1,
         ),
         &crowded,
         &many.composed,
@@ -643,10 +677,9 @@ fn the_tool_refuses_arrangements_it_cannot_lay() {
 fn the_tool_refuses_cards_it_cannot_lay() {
     let fixture = fixture();
     let definitions = definitions();
-    let answer = |laws: Value, main_law: &str, main_layer: u64, counts: Value| {
-        json!({"main_layer": main_layer, "main_law": main_law, "description_counts": counts,
-               "laws": laws, "reason": "（理由）"})
-        .to_string()
+    let answer = |laws: Value, main_law: &str, counts: Value| {
+        json!({"main_law": main_law, "description_counts": counts, "laws": laws, "reason": "（理由）"})
+            .to_string()
     };
     let case = |id: &str| {
         fixture
@@ -671,7 +704,6 @@ fn the_tool_refuses_cards_it_cannot_lay() {
                 json!({"C2": ichimatsu,
                        "B21": {"targets": [{"layer": 1, "hand": "keep"}, {"layer": 2, "hand": "fine"}]}}),
                 "C2",
-                0,
                 json!([]),
             ),
             "invisible_color",
@@ -683,7 +715,6 @@ fn the_tool_refuses_cards_it_cannot_lay() {
                 json!({"C2": {"layer": 0, "pattern": "shippo", "area": "whole", "unit": "1/8", "colors": ["white"]},
                        "B9": {"targets": [{"layer": 0, "form": "grid"}]}}),
                 "C2",
-                0,
                 json!([]),
             ),
             "rebuild_shared",
@@ -695,7 +726,6 @@ fn the_tool_refuses_cards_it_cannot_lay() {
                 json!({"C6": {"layer": 0, "split": "three_bands", "order": "shin_gyo_so", "so_degree": "small"},
                        "B21": still(0)}),
                 "C6",
-                0,
                 json!([]),
             ),
             "hand_on_c6",
@@ -707,7 +737,6 @@ fn the_tool_refuses_cards_it_cannot_lay() {
                 json!({"C3": {"voices": [0, 1], "ratio": "2:3", "base": 4, "axis": "horizontal", "band": "0.5"},
                        "B15": {"layers": [1]}}),
                 "C3",
-                0,
                 json!([{"layer": 0, "words": "八つの白い弧"}]),
             ),
             "counted_layer",
@@ -719,7 +748,6 @@ fn the_tool_refuses_cards_it_cannot_lay() {
                 json!({"C1": {"targets": [{"layer": 2, "count": 30}], "spot": "center", "extent": "0.25"},
                        "B21": still(0)}),
                 "C1",
-                2,
                 json!([{"layer": 2, "words": "二十四の黄の点"}]),
             ),
             "count_kept",
@@ -731,7 +759,6 @@ fn the_tool_refuses_cards_it_cannot_lay() {
                 json!({"C1": {"targets": [{"layer": 2, "count": 200}], "spot": "center", "extent": "0.25"},
                        "B21": still(0)}),
                 "C1",
-                2,
                 json!([]),
             ),
             "count_six_times",
@@ -742,7 +769,6 @@ fn the_tool_refuses_cards_it_cannot_lay() {
             answer(
                 json!({"C4": spiral(1, 5), "B21": still(0)}),
                 "C4",
-                1,
                 json!([{"layer": 1, "words": "九つの黄の四角"}]),
             ),
             "repeats_kept",
@@ -750,13 +776,13 @@ fn the_tool_refuses_cards_it_cannot_lay() {
         ),
         (
             "ja-12",
-            answer(json!({"C4": spiral(1, 12), "B21": still(0)}), "C4", 1, json!([])),
+            answer(json!({"C4": spiral(1, 12), "B21": still(0)}), "C4", json!([])),
             "repeats_most",
             "layer 1 の回数は 9 まで（今の数と 9 の大きいほう）".to_owned(),
         ),
         (
             "ja-12",
-            answer(json!({"C4": spiral(0, 10), "B21": still(1)}), "C4", 0, json!([])),
+            answer(json!({"C4": spiral(0, 10), "B21": still(1)}), "C4", json!([])),
             "repeats_least",
             "layer 0 は今 16 個。記述が数を書いていない層は減らさない（回数は 16〜16）".to_owned(),
         ),
@@ -766,7 +792,6 @@ fn the_tool_refuses_cards_it_cannot_lay() {
                 json!({"C3": {"voices": [0, 1], "ratio": "2:3", "base": 9, "axis": "horizontal", "band": "0.5"},
                        "B15": {"layers": [1]}}),
                 "C3",
-                0,
                 json!([]),
             ),
             "out_of_range",
@@ -791,7 +816,6 @@ fn the_tool_refuses_cards_it_cannot_lay() {
             json!({"C6": {"layer": 0, "split": "sequence", "order": "so_gyo_shin", "so_degree": "large"},
                    "B21": still(1)}),
             "C6",
-            0,
             json!([]),
         ),
     );

@@ -1814,14 +1814,14 @@ const LAW_TEXTS: [(&str, LawText); 19] = [
                 "Dow, Composition (1899): Subordination",
             ],
             law: [
-                "主は一つ。従と添えの痕の大きさを、主を 1 として 0.618・0.382 にする（主は今の大きさ）。",
-                "One thing is main. The marks of the secondary and accent layers are 0.618 and 0.382 of the main's (the main keeps its size).",
+                "基準の層（main）を一つ選び、従と添えの痕の大きさを、基準を 1 として 0.618・0.382 にする（基準は今の大きさ）。",
+                "Choose one base layer (main); the marks of the secondary and accent layers are 0.618 and 0.382 of the base's (the base keeps its size).",
             ],
             choose: [
-                "従の層と添えの層（閉じた形か弧の層。主の層 main_layer も閉じた形か弧でなければ使えない）。",
-                "the secondary layers and the accent layers (layers of closed shapes or arcs; usable only when the main layer main_layer is a closed shape or an arc too).",
+                "基準の層 main と、従の層と添えの層（どれも閉じた形か弧の層）。",
+                "the base layer main, and the secondary layers and the accent layers (all of them layers of closed shapes or arcs).",
             ],
-            example: r#"{"secondary":[1],"accent":[2]}"#,
+            example: r#"{"main":0,"secondary":[1],"accent":[2]}"#,
         },
     ),
     (
@@ -1834,14 +1834,14 @@ const LAW_TEXTS: [(&str, LawText); 19] = [
                 "Poore, Pictorial Composition (1903): the steelyard; Arnheim, Art and Visual Perception (1954)",
             ],
             law: [
-                "大きな主は中心寄りに、小さな従は中心をはさんだ反対側の遠くに置き、重さ×距離を釣り合わせる。道具が、主の反対側に主の 2.618 倍遠く置き、閉じた形なら主の 0.382 の大きさ（主従があればその比）にする。",
-                "Keep a large main near the center and place a small secondary far away on the other side of the center, balancing weight × distance. The tool places it opposite the main, 2.618 times as far from the center, and, for a closed shape, at 0.382 of the main's size (subordination's ratio when it is used).",
+                "大きな相手は中心寄りに、小さな層は中心をはさんだ反対側の遠くに置き、重さ×距離を釣り合わせる。道具が、相手の反対側に相手の 2.618 倍遠く置き、閉じた形なら相手の 0.382 の大きさ（主従があればその比）にする。",
+                "Keep a large partner near the center and place a small layer far away on the other side of the center, balancing weight × distance. The tool places it opposite the partner, 2.618 times as far from the center, and, for a closed shape, at 0.382 of the partner's size (subordination's ratio when it is used).",
             ],
             choose: [
-                "釣り合わせる層（主でない層。主が中心にある時は使えない）。",
-                "the layer to balance (not the main layer; not usable when the main is at the center).",
+                "釣り合わせる層 layer と、その相手の層 against（別の層。相手が中心にある時は使えない）。",
+                "the layer to balance (layer) and its partner (against: another layer; not usable when the partner is at the center).",
             ],
-            example: r#"{"layer":1}"#,
+            example: r#"{"layer":1,"against":0}"#,
         },
     ),
     (
@@ -2082,7 +2082,7 @@ const SYSTEM_JA: &str = "あなたは、絵画・意匠・音楽の法則を組�
 法則の一覧（19）から、この作品に使う法則を選び、法則ごとの値を選択肢から選んでください。座標は書きません。座標と大きさは、道具が法則から計算します。
 
 決まり:
-1. 主の法則（main_law）を一つ決めます。画を見た人が最初に読み取る、画の骨組みになる法則です。B21 は主にしません。主の層（main_layer）も一つ決めます。
+1. 主の法則（main_law）を一つ決めます。画を見た人が最初に読み取る、画の骨組みになる法則です。B21 は主にしません。
 2. 法則の数は決めません。記述と画に合わせて選びます。法則は、層をいくつに当てても1つと数えます。
 3. 一つの層に、置き場の法則（B1〜B5・B7・B8）は一つ、並びの法則（B9・B10・B12）は一つまで。C1〜C6 は置き場と並びを作り直すので、同じ層に、ほかの置き場・並びの法則や、ほかの C1〜C6 を重ねません。大きさの法則（B6・B10・B12・B15・C4）は掛け合わせます。
 4. 記述が名指した物の種類と道具は変えません。記述そのものが数を書いた物（「一羽」「三度」など）は数を変えません。そのような層だけを、層の番号（layer）と、数を書いた記述の部分をそのまま短く引いた語（words）の組で description_counts に入れます。数を書いていない層は入れません。そのような層が無ければ、description_counts は空の配列 [] にします。
@@ -2096,7 +2096,7 @@ The work is a Score made from the description (the author's words). The Score's 
 From the list of laws (19), choose the laws this work uses and, for each law, its values from the choices. Write no coordinates: the tool computes coordinates and sizes from the laws.
 
 Rules:
-1. Choose one main law (main_law): the law a viewer reads first, the framework of the picture. B21 is never the main law. Choose one main layer (main_layer) too.
+1. Choose one main law (main_law): the law a viewer reads first, the framework of the picture. B21 is never the main law.
 2. The number of laws is not fixed; choose them to fit the description and the picture. A law counts as one however many layers it takes.
 3. A layer takes one placement law (B1 to B5, B7, B8) and one arrangement law (B9, B10, B12) at most. C1 to C6 rebuild a layer's place and arrangement, so a layer that takes one of them takes no other placement or arrangement law and no other of C1 to C6. The size laws (B6, B10, B12, B15, C4) multiply.
 4. Keep the kinds of things and the tools the description names. Keep the count of a thing the description itself counts (\"one heron\", \"three times\"). Put in description_counts only such layers, each as its number (layer) and the part of the description that writes the count, quoted short and verbatim (words). Leave out every layer whose count the description does not write; when there is none, description_counts is the empty list [].
@@ -2130,8 +2130,8 @@ const EXAMPLE_LAYERS: [&str; 3] = [
 /// The prototype's example answer with the laws of this stage only, its
 /// description_counts quoting the example's words (2026-10-21).
 const EXAMPLE_ANSWER: [&str; 2] = [
-    r#"{"main_layer":0,"main_law":"B1","description_counts":[{"layer":0,"words":"一本の木"}],"laws":{"B1":{"targets":[{"layer":0,"at":"line_left","span":"full"}]},"C1":{"targets":[{"layer":1,"count":21}],"spot":"golden_ul","extent":"0.15"},"B21":{"targets":[{"layer":2,"hand":"fine"}]}},"reason":"「一本の木が立っていた」の木を画の骨にするため、幹を黄金分割の左の線に全幅で立てた。"}"#,
-    r#"{"main_layer":0,"main_law":"B1","description_counts":[{"layer":0,"words":"a single tree"}],"laws":{"B1":{"targets":[{"layer":0,"at":"line_left","span":"full"}]},"C1":{"targets":[{"layer":1,"count":21}],"spot":"golden_ul","extent":"0.15"},"B21":{"targets":[{"layer":2,"hand":"fine"}]}},"reason":"To make the tree of “a single tree … stood” the bone of the picture, its trunk stands at full length on the golden section's left line."}"#,
+    r#"{"main_law":"B1","description_counts":[{"layer":0,"words":"一本の木"}],"laws":{"B1":{"targets":[{"layer":0,"at":"line_left","span":"full"}]},"C1":{"targets":[{"layer":1,"count":21}],"spot":"golden_ul","extent":"0.15"},"B21":{"targets":[{"layer":2,"hand":"fine"}]}},"reason":"「一本の木が立っていた」の木を画の骨にするため、幹を黄金分割の左の線に全幅で立てた。"}"#,
+    r#"{"main_law":"B1","description_counts":[{"layer":0,"words":"a single tree"}],"laws":{"B1":{"targets":[{"layer":0,"at":"line_left","span":"full"}]},"C1":{"targets":[{"layer":1,"count":21}],"spot":"golden_ul","extent":"0.15"},"B21":{"targets":[{"layer":2,"hand":"fine"}]}},"reason":"To make the tree of “a single tree … stood” the bone of the picture, its trunk stands at full length on the golden section's left line."}"#,
 ];
 
 /// The head of the table of the work's nine colors, shown when the run's
@@ -2324,17 +2324,24 @@ fn law_schema(law: &str, context: &LawsContext) -> Option<Value> {
         }),
         "B6" => json!({
             "type": "object",
-            "propertyOrdering": ["secondary", "accent"],
+            "propertyOrdering": ["main", "secondary", "accent"],
             "properties": {
+                "main": layer,
                 "secondary": {"type": "array", "items": layer},
                 "accent": {"type": "array", "items": layer}
-            }
+            },
+            "required": ["main"]
         }),
+        // The partner is any layer of the work, as the main layer was before
+        // the laws chose it (2026-10-21).
         "B7" => json!({
             "type": "object",
-            "propertyOrdering": ["layer"],
-            "properties": {"layer": layer},
-            "required": ["layer"]
+            "propertyOrdering": ["layer", "against"],
+            "properties": {
+                "layer": layer,
+                "against": layer_enum(&context.summaries.iter().map(|summary| summary.layer).collect::<Vec<_>>())
+            },
+            "required": ["layer", "against"]
         }),
         "B8" => json!({
             "type": "object",
@@ -2543,15 +2550,14 @@ pub fn laws_response_schema(context: &LawsContext) -> Value {
     });
     json!({
         "type": "object",
-        "propertyOrdering": ["main_layer", "main_law", "description_counts", "laws", "reason"],
+        "propertyOrdering": ["main_law", "description_counts", "laws", "reason"],
         "properties": {
-            "main_layer": layer,
             "main_law": {"type": "string", "enum": main},
             "description_counts": {"type": "array", "items": counted},
             "laws": {"type": "object", "propertyOrdering": order, "properties": laws},
             "reason": {"type": "string"}
         },
-        "required": ["main_layer", "main_law", "description_counts", "laws", "reason"]
+        "required": ["main_law", "description_counts", "laws", "reason"]
     })
 }
 
@@ -2880,7 +2886,6 @@ fn law_targets(law: &str, value: &Value) -> Vec<usize> {
 
 /// A conformed answer: the laws in the order this stage applies them.
 struct Answer {
-    main_layer: usize,
     main_law: String,
     laws: BTreeMap<&'static str, Value>,
     /// The layers whose count the description itself writes, as [`kept_counts`]
@@ -3007,57 +3012,72 @@ pub fn quoted_layers(answer: &str, description: &str) -> BTreeSet<usize> {
 }
 
 /// A law the answer puts on a layer that cannot hold it, refused with the way
-/// out before the schema names its choices: B6 sizes the closed shapes and arcs
-/// other than its main layer, and C4 repeats three times at least, so it cannot
-/// keep a count of one or two that the description writes (`fixed`, the layers
-/// [`kept_counts`] reads). Values that do not read are left to the schema.
+/// out before the schema names its choices: B6 sizes by a base layer (`main`)
+/// that is a closed shape or an arc it can size, the other ones, and C4 repeats
+/// three times at least, so it cannot keep a count of one or two that the
+/// description writes (`fixed`, the layers [`kept_counts`] reads). Values that
+/// do not read are left to the schema.
 fn untakeable(
     answer: &Value,
     context: &LawsContext,
     fixed: &BTreeSet<usize>,
 ) -> Result<(), Refusal> {
     let laws = &answer["laws"];
-    if let (Some(value), Some(main)) = (
-        laws.get("B6"),
-        answer["main_layer"]
+    // An excluded B6 and a base the work does not have are left to the check
+    // and the schema.
+    if let Some(value) = laws.get("B6")
+        && !context.excluded("B6")
+        && let Some(main) = value["main"]
             .as_u64()
-            .and_then(|main| usize::try_from(main).ok()),
-    ) {
+            .and_then(|main| usize::try_from(main).ok())
+        && context.summary(main).is_some()
+    {
         let candidates = context.candidates("B6");
-        if candidates.contains(&main) {
-            let usable: Vec<usize> = candidates
-                .into_iter()
-                .filter(|layer| *layer != main)
-                .collect();
-            if usable.is_empty() {
-                return Err(refusal(
-                    "subordination_none",
-                    format!(
-                        "主の層 {main} のほかに、B6 の従・添えにできる層（閉じた形か弧）が無い。B6 を外すか、主の層を変える"
-                    ),
-                    format!(
-                        "besides the main layer {main}, no layer (a closed shape or an arc) can be B6's secondary or accent; drop B6 or change the main layer"
-                    ),
-                ));
-            }
-            let mut named = ["secondary", "accent"]
-                .into_iter()
-                .flat_map(|key| value[key].as_array().into_iter().flatten())
-                .filter_map(|layer| layer.as_u64().and_then(|layer| usize::try_from(layer).ok()));
-            if named.any(|layer| !usable.contains(&layer)) {
-                let names: Vec<String> = usable.iter().map(ToString::to_string).collect();
-                return Err(refusal(
-                    "subordination_layers",
-                    format!(
-                        "B6 の従・添えにできるのは、主の層 {main} のほかの閉じた形か弧の層（{}）だけ",
-                        names.join("・")
-                    ),
-                    format!(
-                        "B6's secondary and accent can only be the closed shapes and arcs besides the main layer {main} ({})",
-                        names.join(", ")
-                    ),
-                ));
-            }
+        if !candidates.contains(&main) {
+            let shape = context.shape(main).map_or("", Primitive::as_str);
+            let arranged = context.arranged(main).unwrap_or_default();
+            return Err(refusal(
+                "subordination_main",
+                format!(
+                    "B6 の基準の層 {main} は {shape}（{arranged}）で、大きさの主従の基にならない。B6 を外すか、閉じた形か弧の層を基準にする"
+                ),
+                format!(
+                    "B6's base layer {main} is {shape} ({arranged}) and cannot lead subordination; drop B6 or take a layer of closed shapes or arcs as its base"
+                ),
+            ));
+        }
+        let usable: Vec<usize> = candidates
+            .into_iter()
+            .filter(|layer| *layer != main)
+            .collect();
+        if usable.is_empty() {
+            return Err(refusal(
+                "subordination_none",
+                format!(
+                    "B6 の基準の層 {main} のほかに、従・添えにできる層（閉じた形か弧）が無い。B6 を外す"
+                ),
+                format!(
+                    "besides B6's base layer {main}, no layer (a closed shape or an arc) can be its secondary or accent; drop B6"
+                ),
+            ));
+        }
+        let mut named = ["secondary", "accent"]
+            .into_iter()
+            .flat_map(|key| value[key].as_array().into_iter().flatten())
+            .filter_map(|layer| layer.as_u64().and_then(|layer| usize::try_from(layer).ok()));
+        if named.any(|layer| !usable.contains(&layer)) {
+            let names: Vec<String> = usable.iter().map(ToString::to_string).collect();
+            return Err(refusal(
+                "subordination_layers",
+                format!(
+                    "B6 の従・添えにできるのは、基準の層 {main} のほかの閉じた形か弧の層（{}）だけ",
+                    names.join("・")
+                ),
+                format!(
+                    "B6's secondary and accent can only be the closed shapes and arcs besides its base layer {main} ({})",
+                    names.join(", ")
+                ),
+            ));
         }
     }
     if let Some(layer) = laws.get("C4").and_then(|value| value["layer"].as_u64())
@@ -3219,30 +3239,13 @@ fn check(answer: &Value, context: &LawsContext, rules: &Rules) -> Result<Answer,
             ));
         }
     }
-    let main_layer = layer_number(&answer["main_layer"]);
     if let Some(value) = laws.get("B6") {
-        let shape = context.shape(main_layer);
-        if !shape.is_some_and(|shape| SIZED.contains(&shape))
-            || !context.movable().contains(&main_layer)
-        {
-            let shape = shape.map_or("", Primitive::as_str);
-            let arranged = context.arranged(main_layer).unwrap_or_default();
-            return Err(refusal(
-                "subordination_main",
-                format!(
-                    "主の層 {main_layer} は {shape}（{arranged}）で、大きさの主従の基にならない。B6 を外すか主の層を変える"
-                ),
-                format!(
-                    "the main layer {main_layer} is {shape} ({arranged}) and cannot lead subordination; drop B6 or change the main layer"
-                ),
-            ));
-        }
         let named = law_targets("B6", value);
-        if named.contains(&main_layer) {
+        if named.contains(&layer_number(&value["main"])) {
             return Err(refusal(
                 "subordination_of_main",
-                "B6 の従・添えに主の層を入れない".to_owned(),
-                "B6 does not take the main layer as secondary or accent".to_owned(),
+                "B6 の従・添えに基準の層を入れない".to_owned(),
+                "B6 does not take its base layer as secondary or accent".to_owned(),
             ));
         }
         if named.is_empty() {
@@ -3254,12 +3257,12 @@ fn check(answer: &Value, context: &LawsContext, rules: &Rules) -> Result<Answer,
         }
     }
     if let Some(value) = laws.get("B7")
-        && layer_number(&value["layer"]) == main_layer
+        && layer_number(&value["layer"]) == layer_number(&value["against"])
     {
         return Err(refusal(
             "balance_main",
-            "B7 は主でない層を釣り合わせる".to_owned(),
-            "B7 balances a layer that is not the main layer".to_owned(),
+            "B7 は相手と別の層を釣り合わせる".to_owned(),
+            "B7 balances a layer other than its partner".to_owned(),
         ));
     }
     if let (Some(hands), Some(c6)) = (laws.get("B21"), laws.get("C6"))
@@ -3315,7 +3318,6 @@ fn check(answer: &Value, context: &LawsContext, rules: &Rules) -> Result<Answer,
         }
     }
     Ok(Answer {
-        main_layer,
         main_law,
         laws,
         fixed,
@@ -3360,7 +3362,6 @@ struct Compiler<'a> {
     context: &'a LawsContext,
     score: Score,
     laws: &'a BTreeMap<&'static str, Value>,
-    main: usize,
     notes: Vec<Note>,
     /// The layers a law arranged, in the order the laws arranged them.
     arranged: Vec<(usize, Arranged)>,
@@ -3673,18 +3674,17 @@ impl Compiler<'_> {
     fn balance(&mut self) -> Result<(), Refusal> {
         let units = self.units();
         let layer = layer_number(&self.laws["B7"]["layer"]);
-        let main = self.layer_center(self.main);
-        let (dx, dy) = (main[0] - 0.5, main[1] - 0.5);
+        let against = layer_number(&self.laws["B7"]["against"]);
+        let partner = self.layer_center(against);
+        let (dx, dy) = (partner[0] - 0.5, partner[1] - 0.5);
         if hypot(dx, dy) < 0.05 {
             return Err(refusal(
                 "balance_main_centered",
                 format!(
-                    "主の層 {} が画面の中心にあり、天秤の反対側が決まらない。主を置き場の法則で中心から外すか B7 を外す",
-                    self.main
+                    "B7 の相手の層 {against} が画面の中心にあり、天秤の反対側が決まらない。相手を置き場の法則で中心から外すか、ほかの層を相手にするか、B7 を外す"
                 ),
                 format!(
-                    "the main layer {} is at the canvas's center, so the balance has no other side; move the main off the center with a placement law or drop B7",
-                    self.main
+                    "B7's partner layer {against} is at the canvas's center, so the balance has no other side; move the partner off the center with a placement law, take another layer as the partner or drop B7"
                 ),
             ));
         }
@@ -3720,37 +3720,44 @@ impl Compiler<'_> {
         }
     }
 
+    /// B6 sizes its secondary and accent layers by its base layer, which keeps
+    /// its size; then B7 sizes a closed shape by its partner as B6 left it,
+    /// unless B6 sizes the layer or keeps it as its base.
     fn sizes(&mut self) {
-        let mut ratios: Vec<(usize, f64)> = Vec::new();
+        let mut base = None;
+        let mut subordinated = BTreeSet::new();
         if let Some(value) = self.laws.get("B6") {
-            for layer in value["secondary"].as_array().into_iter().flatten() {
-                ratios.push((layer_number(layer), INVERSE_PHI));
-            }
-            for layer in value["accent"].as_array().into_iter().flatten() {
-                ratios.push((layer_number(layer), GOLDEN));
+            let main = layer_number(&value["main"]);
+            base = Some(main);
+            let reference = self.mark_size(main);
+            for (key, ratio) in [("secondary", INVERSE_PHI), ("accent", GOLDEN)] {
+                for layer in value[key].as_array().into_iter().flatten() {
+                    let layer = layer_number(layer);
+                    subordinated.insert(layer);
+                    self.resize(layer, ratio * reference);
+                }
             }
         }
         if let Some(value) = self.laws.get("B7") {
             let layer = layer_number(&value["layer"]);
-            if !ratios.iter().any(|(found, _)| *found == layer) {
+            let against = layer_number(&value["against"]);
+            if !subordinated.contains(&layer) {
                 let sized = |layer: usize| {
                     self.context
                         .shape(layer)
                         .is_some_and(|shape| SIZED.contains(&shape))
                 };
-                if sized(layer) && sized(self.main) && self.context.movable().contains(&self.main) {
-                    ratios.push((layer, GOLDEN));
+                if sized(layer)
+                    && sized(against)
+                    && self.context.movable().contains(&against)
+                    && base != Some(layer)
+                {
+                    let reference = self.mark_size(against);
+                    self.resize(layer, GOLDEN * reference);
                 } else {
                     self.note("balance_size_kept", Some(layer), None);
                 }
             }
-        }
-        if ratios.is_empty() {
-            return;
-        }
-        let reference = self.mark_size(self.main);
-        for (layer, ratio) in ratios {
-            self.resize(layer, ratio * reference);
         }
     }
 
@@ -5064,7 +5071,6 @@ enum Guide {
 pub struct Chosen {
     pub laws: Vec<&'static str>,
     pub main_law: String,
-    pub main_layer: usize,
     pub notes: Vec<Note>,
     pub print: LawsPrint,
     /// The laws that name each layer of the Score.
@@ -5078,7 +5084,8 @@ pub struct Chosen {
 /// The record a work keeps of the layers its laws placed (2026-10-20): each
 /// printed layer of a composed layer a law places or arranges (B1 to B5, B7 to
 /// B10, B12, C1 to C6) or that the laws wrote at a numeric point, ends or angle,
-/// and of the main layer when a law places other layers by it (B6, B7), as the
+/// and of the layer a law places or sizes other layers by (B6's base, B7's
+/// partner), as the
 /// sentences `source` prints it with (one line each, the line of its
 /// instruction in `compilation`). A layer the laws changed only in size, hand
 /// or colour keeps its range and moves with the others. `None` when the printed
@@ -5103,11 +5110,16 @@ pub fn layers_record(
             .map_or(source.len(), |i| at + i);
         Some(source[start..end].trim()).filter(|line| !line.is_empty())
     };
-    let partner = chosen
-        .laws
-        .iter()
-        .any(|law| matches!(*law, "B6" | "B7"))
-        .then_some(chosen.main_layer);
+    // The layers the laws place or size others by: B6's base and B7's partner.
+    let partners: BTreeSet<usize> = [("B6", "main"), ("B7", "against")]
+        .into_iter()
+        .filter_map(|(law, key)| {
+            chosen
+                .values
+                .get(law)
+                .map(|value| layer_number(&value[key]))
+        })
+        .collect();
     let mut layers: Vec<(usize, LawsLayer)> = Vec::new();
     for (instruction, composed) in instructions.iter().zip(&print.composed) {
         let placing = chosen.named.get(composed).is_some_and(|laws| {
@@ -5121,7 +5133,7 @@ pub fn layers_record(
             || entity.numeric_angle.is_some();
         let kind = if print.changed.contains(composed) && (placing || numeric) {
             LawsLayerKind::Laws
-        } else if partner == Some(*composed) {
+        } else if partners.contains(composed) {
             LawsLayerKind::Partner
         } else {
             continue;
@@ -5874,7 +5886,6 @@ fn apply(
         context,
         score: context.score.clone(),
         laws: &answer.laws,
-        main: answer.main_layer,
         notes: Vec::new(),
         arranged: Vec::new(),
         arranged_by: BTreeMap::new(),
@@ -5918,7 +5929,6 @@ fn apply(
     Ok(Chosen {
         laws,
         main_law: answer.main_law.clone(),
-        main_layer: answer.main_layer,
         notes: applied.notes,
         print,
         named,

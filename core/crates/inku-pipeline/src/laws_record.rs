@@ -100,12 +100,15 @@ pub const LAWS_BASIS_SCHEMA_ID: &str = "inku.laws-basis.v1";
 /// keeps it with the work beside the layers record and brings it back with a
 /// run from that work. The laws stage from a saved work reads the composed
 /// document only while the work's DDL is still the committed one.
+/// `main_layer` is the main layer a work's answer chose before the laws stage
+/// stopped choosing one (2026-10-21): `None` for a new work, written as null so
+/// that a host reading the field by name finds it.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(try_from = "BasisWire", into = "BasisWire")]
 pub struct LawsBasis {
     pub composed: String,
     pub committed_digest: String,
-    pub main_layer: usize,
+    pub main_layer: Option<usize>,
     pub main_law: String,
     /// The laws of the answer and their values, as the answer wrote them.
     pub laws: serde_json::Map<String, serde_json::Value>,
@@ -133,7 +136,8 @@ struct BasisWire {
     schema: String,
     composed: String,
     committed_digest: String,
-    main_layer: usize,
+    #[serde(default)]
+    main_layer: Option<usize>,
     main_law: String,
     laws: serde_json::Map<String, serde_json::Value>,
     reason: String,

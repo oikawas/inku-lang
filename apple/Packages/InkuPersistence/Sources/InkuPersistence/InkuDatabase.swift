@@ -508,14 +508,14 @@ public actor InkuDatabase {
         try validateJSONObject(record.factSheetJSON)
     }
 
-    /// Merge a measured move's metadata into its existing parent edge, preserving the other provenance.
+    /// Store the complete metadata object prepared by the caller, preserving JSON null as a value.
     public func setLineageEdgeMetadata(childNodeID: String, metadata: Data) throws {
         let object = try JSONSerialization.jsonObject(with: metadata)
         guard object is [String: Any], let text = String(data: metadata, encoding: .utf8) else {
             throw PersistenceError.invalidRecord("invalid edge metadata")
         }
         try queue.write { db in
-            try db.execute(sql: "UPDATE lineage_edges SET metadata_json = json_patch(metadata_json, ?) WHERE child_node_id = ?",
+            try db.execute(sql: "UPDATE lineage_edges SET metadata_json = ? WHERE child_node_id = ?",
                            arguments: [text, childNodeID])
             guard db.changesCount == 1 else { throw PersistenceError.invalidRecord("edge not found") }
         }

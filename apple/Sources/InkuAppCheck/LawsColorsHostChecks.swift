@@ -43,11 +43,13 @@ import InkuUI
         let asked = sent.filter { $0["tag"].string == "choose_laws" }.dropFirst().map { String(($0["payload"]["prompt"]["message"].string ?? "").suffix(400)) }
         throw CheckFailure.message("P2: the sends were \(sent.map { $0["tag"].string ?? "" }) in phase \(refused.phase); asked again with:\n\(asked.joined(separator: "\n---\n"))")
     }
-    let refusedLines = refused.visibleDDL?.components(separatedBy: "\n") ?? []
     let colorsMessage = sent[3]["payload"]["prompt"]["message"].string ?? ""
-    guard refusedLines.contains("画面の横0.381966、縦0.381966の位置に、赤のペンの濃い塗りの小さな円を1個置く。"),
+    guard let lawsEvent = try lawsColorsEvent(refused, tag: "laws_chosen"),
+          lawsEvent.object?["main_layer"] == ExactJSON.null,
+          let refusedDDL = refused.visibleDDL, !refusedDDL.isEmpty,
+          try await host.restoreSavedWork(workID: refusedID).ddl == refusedDDL,
           colorsMessage.contains(#""name":"black","paint":"黒""#) else {
-        throw CheckFailure.message("P3: the laws document or the color table was not as Server prints them:\n\(refused.visibleDDL ?? "")")
+        throw CheckFailure.message("P3: the host lost the laws event's null main_layer, the core's document or the color table")
     }
     report.append("P3 events \(lawsColorsEventTags(refused).filter { $0.hasPrefix("laws") || $0.hasPrefix("colors") })")
 
@@ -68,8 +70,9 @@ import InkuUI
     // P6: the work keeps its laws records, and a child drawn without a run keeps the parent's.
     let saved = try await host.savedAuthoringContext(workID: refusedID)
     guard let records = try saved.lawsRecords.map(ExactJSON.init(data:)),
-          records["laws_layers"].object != nil, records["laws_basis"].object != nil else {
-        throw CheckFailure.message("P6: the saved work lacks laws_layers or laws_basis")
+          records["laws_layers"].object != nil,
+          records["laws_basis"].object?["main_layer"] == ExactJSON.null else {
+        throw CheckFailure.message("P6: the saved work lacks laws_layers or its basis's explicit null main_layer")
     }
     let page = try await host.makeColorArrangementPage(workID: refusedID, cursor: 0)
     guard let arrangement = page.plans.first else { throw CheckFailure.message("P6: no color arrangement was offered") }
@@ -88,18 +91,69 @@ import InkuUI
           kept["laws_layers"] == records["laws_layers"], await refusing.actions.count == 4 else {
         throw CheckFailure.message("The direct DDL child did not keep its parent's laws_layers, or it sent to a model")
     }
+    // Older works keep their numbered basis; loading one does not rewrite the saved parent's record.
+    var oldRecords = records
+    oldRecords["laws_basis"]["main_layer"] = .integer(1)
+    var oldRedraw = redraw; oldRedraw.lawsRecords = oldRecords.data
+    let oldChild = try await host.generate(oldRedraw)
+    guard oldChild.phase == "completed", let oldChildID = oldChild.savedWorkID,
+          let oldKept = try await host.savedAuthoringContext(workID: oldChildID).lawsRecords.map(ExactJSON.init(data:)),
+          oldKept["laws_basis"]["main_layer"] == .integer(1),
+          try await host.savedAuthoringContext(workID: refusedID).lawsRecords.map(ExactJSON.init(data:)) == records,
+          await refusing.actions.count == 4 else {
+        throw CheckFailure.message("The old numbered basis was lost, its parent changed, or a direct child sent to a model")
+    }
 
-    // (b) The color stage answers: the circle the laws placed takes the blue.
+    // (b) The color stage answers with its own target layer; the host keeps the core's result.
     app.descriptionText = "円がひとつ浮かび、下に点が散らばる"
     let answering = LawsColorsCheckProvider(refuseColors: false)
     let answeringHost = PipelineHost(database: database, transport: answering, credentials: credentials)
     let colored = try await answeringHost.generate(try app.requestForCurrentInput())
-    guard colored.phase == "completed",
+    guard colored.phase == "completed", let coloredID = colored.savedWorkID,
           await answering.actions.map({ $0["tag"].string ?? "" }) == ["generate_normalized_ddl", "read_composition", "choose_laws", "choose_colors"],
-          (colored.visibleDDL?.components(separatedBy: "\n") ?? []).contains("画面の横0.381966、縦0.381966の位置に、青のペンの濃い塗りの小さな円を1個置く。") else {
-        throw CheckFailure.message("P4: the colors document was not as Server prints it:\n\(colored.visibleDDL ?? "")")
+          let colorsEvent = try lawsColorsEvent(colored, tag: "colors_chosen"),
+          colorsEvent.object?["main_layer"] == ExactJSON.null, colorsEvent.object?["ground"] == ExactJSON.null,
+          let coloredDDL = colored.visibleDDL, !coloredDDL.isEmpty,
+          try await answeringHost.restoreSavedWork(workID: coloredID).ddl == coloredDDL else {
+        throw CheckFailure.message("P4: the host lost the colors event's null fields or the core's saved document: \(colored.visibleDDL ?? "")")
     }
-    print("Laws/colors host passed: \(report.joined(separator: "; ")); real core Stage 1 -> read -> laws -> colors with Stage 1's model; a refused color stage commits the laws document and an answered one recolors it; prompt tab and metrics keep laws and colors apart; laws records saved, kept by a color arrangement child and carried by a direct DDL child. Temporary DB only.")
+    print("Laws/colors host passed: \(report.joined(separator: "; ")); real core Stage 1 -> read -> laws -> colors with Stage 1's model; fallback and answered documents saved; prompt tab and metrics keep laws and colors apart; explicit null main_layer in events and basis, null ground when unchanged; records carried by color arrangement and direct DDL children; old numbered basis and saved parent preserved without sends. Temporary DB only.")
+}
+
+/// Failure: the colors' ground or the core's resulting document is lost at the host/save/replay boundary.
+@MainActor func runColorsGroundHostCheck() async throws {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-colors-ground-host-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let provider = LawsColorsCheckProvider(refuseColors: false, ground: "black")
+    let app = AppModel(databaseURL: folder.appendingPathComponent("bootstrap.sqlite"), transport: provider)
+    await app.initialize()
+    let service = ProviderSettings(id: "laws-check", baseURL: URL(string: "http://127.0.0.1:1/v1")!, requiresAPIKey: false,
+        models: [.init(id: "pinned")])
+    try await app.updateHostSettings(HostSettings(providers: [service], models: .init(stage1Model: "laws-check:pinned", stage2Model: "laws-check:pinned")))
+    app.inputMode = "description"; app.descriptionText = "円がひとつ浮かび、下に点が散らばる"
+    app.language = "ja"; app.seedText = "7"; app.sketchMode = "off"
+    let database = try InkuDatabase(url: folder.appendingPathComponent("works.sqlite"))
+    let host = PipelineHost(database: database, transport: provider, credentials: LawsColorsEmptyCredentials())
+    let colored = try await host.generate(try app.requestForCurrentInput())
+    guard colored.phase == "completed", let id = colored.savedWorkID, let ddl = colored.visibleDDL, !ddl.isEmpty,
+          let event = try lawsColorsEvent(colored, tag: "colors_chosen"), event["ground"].string == "black",
+          event.object?["main_layer"] == ExactJSON.null,
+          await provider.actions.map({ $0["tag"].string ?? "" }) == ["generate_normalized_ddl", "read_composition", "choose_laws", "choose_colors"] else {
+        throw CheckFailure.message("The chosen ground did not reach the host: \(String(decoding: colored.eventsJSON, as: UTF8.self).suffix(2000))")
+    }
+    let saved = try await host.restoreSavedWork(workID: id)
+    let replayed = try await host.replay(workID: id)
+    guard saved.ddl == ddl, replayed.ddl == ddl, replayed.score == saved.score,
+          try await host.restoreSavedWork(workID: id) == saved, await provider.actions.count == 4 else {
+        throw CheckFailure.message("The ground's core document or Score changed during save/replay, or replay called a provider")
+    }
+    print("Colors ground host passed: optional ground=black accepted; colors_chosen keeps ground and explicit null main_layer; core document and Score saved and replayed unchanged; replay sends=0. Fake provider and temporary SQLite only.")
+}
+
+private func lawsColorsEvent(_ view: PipelineView, tag: String) throws -> ExactJSON? {
+    let events = try ExactJSON(data: view.eventsJSON).array ?? []
+    return events.first(where: { $0["tag"].string == tag })?["payload"]
 }
 
 private func lawsColorsEventTags(_ view: PipelineView) -> [String] {
@@ -108,9 +162,10 @@ private func lawsColorsEventTags(_ view: PipelineView) -> [String] {
 
 actor LawsColorsCheckProvider: ObservedProviderTransport {
     private var refuseColors: Bool
+    private let ground: String?
     private(set) var actions: [ExactJSON] = []
     private(set) var selectedModels: [String] = []
-    init(refuseColors: Bool) { self.refuseColors = refuseColors }
+    init(refuseColors: Bool, ground: String? = nil) { self.refuseColors = refuseColors; self.ground = ground }
     func allowColors() { refuseColors = false }
     /// Records each attempt under the stage the host names for its action, as the native transport does.
     func performObserved(action: Data, models: ModelSelection, providers: [ProviderSettings], credentials: any CredentialStore,
@@ -143,8 +198,10 @@ actor LawsColorsCheckProvider: ObservedProviderTransport {
                 "failure": .string("provider_rejected"), "elapsed_ms": .string("0")]).data
         }
         guard let (resultTag, response) = answers[tag] else { throw HostError("unexpected_laws_colors_check_effect") }
+        var answer = response
+        if tag == "choose_colors", let ground { answer["ground"] = .string(ground) }
         return ExactJSON.object(["tag": .string(resultTag), "identity": action["identity"],
-            "response": .string(response.text), "elapsed_ms": .string("10")]).data
+            "response": .string(answer.text), "elapsed_ms": .string("10")]).data
     }
     private static func layer(_ action: String, _ shape: String, _ count: Int, _ position: String, _ size: String, _ color: String) -> ExactJSON {
         var fields = Dictionary(uniqueKeysWithValues: ["angle", "bleeding", "continuity", "line_up_direction", "motion_amplitude", "motion_quality", "proportion", "thinness"].map { ($0, ExactJSON.string("unspecified")) })
@@ -164,13 +221,13 @@ actor LawsColorsCheckProvider: ObservedProviderTransport {
             "balance": .string("unspecified"), "symmetry": .string("unspecified"), "void": .string("unspecified")]),
         "stated_places": .array([.object(["layer": .integer(2), "words": .string("下に"), "place": .string("bottom")])])])
     // The circle goes to the golden section's upper left crossing; the dots keep their hand.
-    private static let laws: ExactJSON = .object(["main_layer": .integer(1), "main_law": .string("B1"),
+    private static let laws: ExactJSON = .object(["main_law": .string("B1"),
         "description_counts": .array([.object(["layer": .integer(1), "words": .string("円がひとつ")])]),
         "laws": .object(["B1": .object(["targets": .array([.object(["layer": .integer(1), "at": .string("point_ul")])])]),
                          "B21": .object(["targets": .array([.object(["layer": .integer(2), "hand": .string("still")])])])]),
         "reason": .string("円を黄金分割の左上の交点に置く。")])
-    // The circle, the laws' main layer, takes the blue.
-    private static let colors: ExactJSON = .object(["main_law": .string("D5"), "laws": .object(["D5": .object(["hue": .string("blue")])]),
+    // D5 names the circle's layer itself; the laws stage no longer supplies a main layer.
+    private static let colors: ExactJSON = .object(["main_law": .string("D5"), "laws": .object(["D5": .object(["hue": .string("blue"), "layer": .integer(1)])]),
         "reason": .string("青を軸に近い色でまとめる。")])
 }
 

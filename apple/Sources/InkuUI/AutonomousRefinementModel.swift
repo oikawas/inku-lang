@@ -258,8 +258,13 @@ public final class AutonomousRefinementModel {
                         record["kind"] = .string(kind); record["model"] = .string(current.model); record["outcome"] = .string(outcome)
                         record["share"] = measured["share"]; record["note"] = current.note.map(ExactJSON.string) ?? .null
                         let recorded = try await Self.core(record)
-                        guard let node = child.lineageNodeID, let database else { throw HostError("autonomous_child_without_edge") }
-                        var metadata = moved.object ?? [:]
+                        guard let node = child.lineageNodeID, let database,
+                              let edge = try await database.edge(childNodeID: node),
+                              var metadata = try ExactJSON(data: Data(edge.metadataJSON.utf8)).object else {
+                            throw HostError("autonomous_child_without_edge")
+                        }
+                        // Merge complete blocks before storing; JSON Merge Patch would delete their null fields.
+                        metadata.merge(moved.object ?? [:]) { _, new in new }
                         metadata.merge(recorded["metadata"].object ?? [:]) { _, new in new }
                         try await database.setLineageEdgeMetadata(childNodeID: node, metadata: ExactJSON.object(metadata).data)
                         attempt["history_id"] = .string(child.id); attempt["lineage_node_id"] = .string(node)

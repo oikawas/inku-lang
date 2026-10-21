@@ -18,6 +18,12 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-10-21 主の層を持たない法則・配色と、選べる地への追随
+
+法則・配色の答えの型と意味は共有coreが持つ。macOSは、法則の答えに主の層を補わず、配色の法則が選んだ層と任意の`ground`を回答JSONのままcoreへ返す。記述が地の色を言ったかの判定・新しい地で見えるかの確認・背景の文の印字もcoreに任せ、その完成文書を保存・再演奏する。
+
+新しい作品の`laws_chosen`・`colors_chosen`・`laws_basis`の`main_layer`は欄を残した`null`で、`colors_chosen.ground`は地を替えなければ`null`。自動推敲はbasisの`main_layer`をJSON値のまま`record`へ渡し、辺の`ai_move.laws.main_layer`にも`null`を保存する。辺の既存の履歴情報と追加分を合わせた完成JSONを保存し、nullを削除の指示とは扱わない。古いbasisの番号は読め、その親の記録を上書きしない。`--laws-colors-host-only`・`--saved-laws-stages-only`・`--auxiliary-provenance-only`はこの受け渡しを確認し、`--colors-ground-host-only`は地を選んだcoreの文書とScoreが保存・再演奏で保たれることを確認する。hostの試験にcoreの座標や配色理論の答えを持たない。
+
 ## 2026-10-21 構図の読みの提示を版の字に依存せず確かめる
 
 `--composition-progress-only`は、プロンプト履歴に`read_composition`の項があり、そのmessage・systemがproviderへ送ったものと一致することを確かめる。coreの指示の名や文面・構図理論をSwiftの期待値に持たない。指示の改訂に追随しても、構図の読みを表示・保存するhostの境目を確認できる。

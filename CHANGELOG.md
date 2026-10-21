@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-21 — Align Android autonomous refinement with the shared core's laws and juxtaposition moves
+
+Autonomous refinement now takes the same laws and juxtaposition moves as Server and Web, replacing Vision's choice of color or layout. Choose a move count, kinds, direction and one model; only a visibly different child becomes the next parent. Children stay in the lineage, and the last kept child appears in history after completion, stop or interruption. Closing the dialog leaves the run going; reopening shows progress or its ending, with child thumbnails and visible differences. Runs cut off by the app are shown at startup. Works and records made with the old Vision method remain unchanged.
+
 ### 2026-10-21 — macOS autonomous refinement takes laws and juxtaposition moves
 
 Autonomous refinement now calls the shared core's `autonomous_refine`. One chosen model takes a laws move from saved instructions or adds a sentence from another work through Juxtapose. Only a visibly different child becomes the next parent. Every child stays in the lineage; only the last kept child appears in normal history, including after stopping or interruption on restart. Closing the sheet leaves the run going in the app. The screen follows Web and remembers moves, kinds and direction. The old Vision loop and its settings are removed; earlier works' records remain readable. The shared core, Server and Web are unchanged.

@@ -51,6 +51,13 @@ sealed interface PipelineAuthoring {
         val completionRangesJson: String? = null,
         val lawsRecordsJson: String? = null,
     ) : PipelineAuthoring
+    data class SavedLaws(
+        val source: String,
+        val description: String,
+        val directionJson: String,
+        val completionRangesJson: String?,
+        val lawsRecordsJson: String?,
+    ) : PipelineAuthoring
 }
 
 data class PipelineStartRequest(

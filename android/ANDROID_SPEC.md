@@ -6,6 +6,18 @@ secrets must remain outside tracked files.
 
 Last updated: 2026-10-21.
 
+## 2026-10-21 Move autonomous refinement to the shared core's laws and juxtaposition moves
+
+Autonomous refinement in the work menu uses the same `inku.autonomous-refine.v1` as Server and Web, through JNI `autonomousRefine`. Android sends, draws and saves locally, without calling the Server API. Only the shared core chooses the next move, when to stop, the visible-difference gate and the child's edge record. This replaces the Vision method described under October 18 and 17 below.
+
+- Choose 1–10 moves (default 5), at least one of laws and juxtaposition, and a direction of at most 1,000 characters after trimming. Choose one model with Juxtapose's Vision-purpose model picker; sentence selection, Stage 1, Stage 2 and the laws stage all use it. The interface language is the run's language. Wild follows each parent unless overridden. A parent without a drawing cannot start a run.
+- A laws move sends the saved parent's DDL and description, configuration, seeds, colors, aspect and limits, and its `completion_ranges`, `laws_layers` and `laws_basis`, to the shared pipeline's `saved_laws` start. Stage 1 and the composition reading are not repeated. If the parent's saved configuration has `colors`, the color stage follows the laws stage; otherwise it does not (author decision, 2026-10-21). Direction is passed unchanged from the core. The child is description-locked, with kind `laws_change` (label "Laws"). The post-send reasons `laws_refused`, `laws_compile` and `laws_unavailable` are failed attempts; other refusals are unavailable attempts reported to the core.
+- A juxtaposition move uses the existing juxtaposition to choose four sentences. It excludes the core's exclude list and sentences already added in the lineage, reuses the turn's answer when reuse is true, and draws from the joined description at rank. Kind is `description_edit`; the edge keeps `edited_from_history_id` and `juxtaposition`.
+- The core measures the child's SVG against its parent and writes `ai_move` (and `juxtaposition` for that move). Only a kept child becomes the next parent. Every child is saved in the lineage only. On completion, stop, failure or interruption, only the last kept child is shown in ordinary history. A stop overlapping a save finishes the saved child's record before stopping.
+- Only one run can run at once. Auxiliary progress is written atomically to the app-private `autonomous-refinement-runs.json`. The work database and lineage edges remain the work's authority; its schema is unchanged. Closing the dialog leaves the run going. On startup a remaining running run becomes interrupted and its last kept child is shown in history.
+- The dialog follows Web's order: title and help, held-work note, model, moves to take, move count, Wild, direction, Start. While running it shows the turn, attempts with a thumbnail, kind, outcome, visible difference, sentence or main law and refusal reason, plus the continuation note and Stop. Afterward it shows the ending and Open the last kept child. The existing setting `autonomous_refinement_settings` remembers the previous count, kinds, direction and model.
+- The old Vision-driven choice of color catalog or layout, its wording and settings are removed. Historical edges with `autonomous_refine_mode`, `vision_model`, `vision_observation` and `vision_next_direction` remain readable and unchanged. The visible-difference gate judges no quality: saving, starring and choosing remain the author's decisions.
+
 ## 2026-10-21 The laws stage and the color stage of drawing from a description
 
 At the Draw Claude session's request (the author's "support the current drawing engine"), drawing from a description now passes, after the composition reading, through the laws stage (`choose_laws`, root `SPEC.md` §12.6.4) and the color stage (`choose_colors`, §12.6.5), as on Server. The shared core owns the two stages' prompts, answer checks, re-requests and fallbacks; Android owns only the host side.
@@ -16,7 +28,7 @@ At the Draw Claude session's request (the author's "support the current drawing 
 - Sent prompts: a run records the stages `sketch, stage1, composition, laws, colors, stage2`, and the laws and color stages keep the message they sent. The work information's sent-prompt view shows "Laws stage" and "Color stage" after Composition and before Effects, in the same form (system prompt and sent message).
 - Running label: "Choosing the laws…" during the laws stage and "Choosing the colors…" during the color stage (Web's `stageChoosingLaws` and `stageChoosingColors`).
 - Laws records: a run that applied laws saves its `laws_layers` and `laws_basis` in the work information, as `completion_ranges` is saved. A child drawn without a run (color arrangement, support, touches, redraw) keeps its parent's records. A child drawn from DDL (a DDL edit, Change the layout) hands its parent's records to the run it starts, as on Server, and Change the layout passes `laws_layers` to the core's `recompose`. No screen reads the records yet.
-- The AI refinement and its laws move (`saved_laws`) are not on Android.
+- Autonomous refinement and its laws move (`saved_laws`) follow the section above dated the same day.
 
 ## 2026-10-20 Choosing LLM and Vision use in the model settings
 

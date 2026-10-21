@@ -30,7 +30,7 @@ class DerivationKindTest {
     fun derivationKindRegistry_isTheServersNineteenKindsAndTheRetiredVariation() {
         val kinds = serverKinds()
 
-        assertEquals(19, kinds.size)
+        assertEquals(20, kinds.size)
         assertEquals((kinds + "variation").sorted(), DerivationKindRegistry.KINDS)
     }
 
@@ -50,7 +50,7 @@ class DerivationKindTest {
                 )
             }
         }
-        assertEquals(20, DerivationKindRegistry.ALL_INFOS.size)
+        assertEquals(21, DerivationKindRegistry.ALL_INFOS.size)
 
         // Active kinds keep their wording; the retired kind remains readable.
         assertEquals("タッチ", InkuStringsJa.derivationLabel("touch_change"))

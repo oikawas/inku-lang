@@ -88,6 +88,7 @@ import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -182,6 +183,112 @@ class InkuRepository(
     }
     private val modelDownloader = LocalModelDownloader(context.applicationContext, database.modelAssetDao())
     private val thumbnailScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val autonomousScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val autonomousRefinement by lazy {
+        app.inku.mobile.data.refinement.AutonomousRefinementRunner(
+            autonomousHost,
+            app.inku.mobile.data.refinement.AutonomousRunFile(File(context.filesDir, "autonomous-refinement-runs.json")),
+            autonomousScope,
+        )
+    }
+
+    private val autonomousHost = object : app.inku.mobile.data.refinement.AutonomousHost {
+        private suspend fun item(id: String) = getHistoryById(id)?.takeUnless { it.trashed }
+            ?: throw app.inku.mobile.data.refinement.AutonomousMoveFailure("unavailable", "autonomous_source_not_found")
+
+        override suspend fun work(id: String): app.inku.mobile.data.refinement.AutonomousWork {
+            val item = item(id)
+            val basis = JSONObject(item.renderMetadataJson).optJSONObject("laws_basis")
+            val names = buildList {
+                (basis?.opt("main_law") as? String)?.let(::add)
+                basis?.optJSONObject("laws")?.keys()?.forEach { if (it !in this) add(it) }
+            }
+            val description = NativePipelineBridge.pipelineDescription(item.sourceText ?: item.originalInput).trim()
+            val facts = JSONObject().put("description_locked", isDescriptionLocked(item))
+                .put("ddl_work", description.isEmpty()).put("laws", JSONArray(names))
+            basis?.opt("main_law")?.let { facts.put("main_law", it) }
+            return app.inku.mobile.data.refinement.AutonomousWork(id, item.displaySvg, facts, basis)
+        }
+
+        override suspend fun laws(parent: String, settings: app.inku.mobile.data.refinement.AutonomousSettings,
+            language: String, direction: JSONObject, onSaved: suspend (app.inku.mobile.data.refinement.AutonomousWork) -> Unit) =
+            draw(parent, settings, language, "laws_change", null, emptyMap(), direction, onSaved)
+
+        override suspend fun juxtapose(parent: String, settings: app.inku.mobile.data.refinement.AutonomousSettings,
+            language: String, exclude: List<String>): app.inku.mobile.data.refinement.JuxtapositionResult {
+            val item = item(parent)
+            val inputs = juxtapositionInputs(item)
+            val written = item.sourceText ?: item.originalInput
+            val description = NativePipelineBridge.pipelineDescription(written).trim()
+            val candidates = SharedJuxtaposition.gather(inputs.sources, description, inputs.lineage, inputs.added,
+                exclude, kotlin.random.Random.nextLong().toULong())
+            if (candidates.length() < SharedJuxtaposition.CHOICES) {
+                throw app.inku.mobile.data.refinement.AutonomousMoveFailure("unavailable", "juxtaposition_too_few")
+            }
+            return try {
+                juxtapose(app.inku.mobile.llm.JuxtapositionRequest(settings.modelId, description, written, inputs.lineage,
+                    candidates, language, app.inku.mobile.llm.RefinementVisionImage.fromSvg(item.displaySvg)))
+            } catch (error: CancellationException) { throw error
+            } catch (error: Exception) {
+                throw app.inku.mobile.data.refinement.AutonomousMoveFailure("failed", error.message ?: "juxtaposition_failed")
+            }
+        }
+
+        override suspend fun drawJuxtaposition(parent: String, settings: app.inku.mobile.data.refinement.AutonomousSettings,
+            language: String, choice: app.inku.mobile.data.refinement.JuxtapositionChoice,
+            result: app.inku.mobile.data.refinement.JuxtapositionResult,
+            onSaved: suspend (app.inku.mobile.data.refinement.AutonomousWork) -> Unit) =
+            draw(parent, settings, language, "description_edit", choice.joined,
+                mapOf("edited_from_history_id" to parent) + app.inku.mobile.data.refinement.juxtapositionMetadata(choice, result), null, onSaved)
+
+        private suspend fun draw(id: String, settings: app.inku.mobile.data.refinement.AutonomousSettings,
+            language: String, kind: String, joined: String?, metadata: Map<String, Any?>,
+            direction: JSONObject?, onSaved: suspend (app.inku.mobile.data.refinement.AutonomousWork) -> Unit) {
+            val item = item(id)
+            val parent = RefinementParent.of(item, item.sourceText ?: item.originalInput)
+            val plan = RefinementPlan(null, RefinementRoute.Paint, parent.catalogId, parent.canvasAspect,
+                parent.seeds, kind, metadata, stage1Model = settings.modelId, stage2Model = settings.modelId,
+                renderWildOverride = settings.wildOverride)
+            val request = refinementRequest(parent, plan).copy(description = joined ?: parent.description,
+                originalText = joined ?: parent.description, uiLang = language)
+            val started = System.currentTimeMillis()
+            val result = try {
+                if (direction != null) pipeline.savedLaws(request, parent.ddl, direction.toString()) else pipeline.paint(request)
+            } catch (error: CancellationException) { throw error
+            } catch (error: app.inku.mobile.pipeline.PipelineInteractionRequired) {
+                val reason = error.view.phaseReason ?: error.view.phaseTag
+                withContext(NonCancellable) { pipeline.cancel(error.view.executionId) }
+                val outcome = if (direction != null && reason !in setOf("laws_refused", "laws_compile", "laws_unavailable"))
+                    "unavailable" else "failed"
+                throw app.inku.mobile.data.refinement.AutonomousMoveFailure(outcome, reason)
+            } catch (error: Exception) {
+                throw app.inku.mobile.data.refinement.AutonomousMoveFailure(
+                    if (direction != null) "unavailable" else "failed", error.message ?: "pipeline_failed")
+            }
+            withContext(NonCancellable) {
+                val child = saveResult(result, parent.catalogId, parent.canvasAspect, settings.modelId, settings.modelId,
+                    System.currentTimeMillis() - started,
+                    lineage = LineageDeclaration(parentNodeId = requireNotNull(item.lineageNodeId),
+                        derivationKind = kind, derivationMetadata = metadata), historyVisibility = "lineage_only",
+                    sourceText = joined ?: parent.description)
+                onSaved(work(child.id))
+            }
+        }
+
+        override suspend fun annotate(child: String, metadata: JSONObject) {
+            database.withTransaction {
+                val node = requireNotNull(item(child).lineageNodeId)
+                val edge = requireNotNull(database.lineageDao().getEdgeByChildId(node))
+                val merged = JSONObject(edge.metadataJson)
+                metadata.keys().forEach { merged.put(it, metadata.get(it)) }
+                database.lineageDao().setEdgeMetadata(node, LineagePlanner.canonicalJson(merged))
+            }
+        }
+
+        override suspend fun promote(child: String) {
+            getHistoryById(child)?.takeUnless { it.trashed }?.lineageNodeId?.let { database.lineageDao().promoteNode(it) }
+        }
+    }
     private val originalPhotos = app.inku.mobile.ui.camera.CameraOriginalPhotoStore(context.filesDir)
 
     /**
@@ -262,6 +369,8 @@ class InkuRepository(
      * database.
      */
     suspend fun close() {
+        autonomousScope.coroutineContext.job.cancel()
+        autonomousScope.coroutineContext.job.children.toList().joinAll()
         thumbnailScope.coroutineContext.job.children.toList().joinAll()
         thumbnailScope.cancel()
         localLiteRtProvider.close()
@@ -269,14 +378,10 @@ class InkuRepository(
 
     suspend fun getHistoryById(id: String): HistoryItemEntity? = database.historyDao().getById(id)
 
+    fun observeHistoryById(id: String): Flow<HistoryItemEntity?> = database.historyDao().observeById(id)
+
     suspend fun canvasSearchEntries(): List<app.inku.mobile.data.db.CanvasSearchEntry> =
         database.historyDao().canvasSearchEntries()
-
-    suspend fun refineVisionAdvice(request: app.inku.mobile.llm.RefinementVisionRequest): app.inku.mobile.llm.RefinementVisionAdvice =
-        app.inku.mobile.llm.RefinementVisionAdviser(
-            activeModelProvider,
-            chatGptSession = chatGptPlan.state.value.activeSession,
-        ).advise(request)
 
     /**
      * What juxtaposition gathers from for [item] (Server's `api_juxtaposition`):
@@ -369,6 +474,10 @@ class InkuRepository(
     suspend fun restoreActivePipeline(): PipelineView? {
         val execution = database.sharedPipelineDao().latestExecution(AndroidWorkPipeline.OWNER_ID) ?: return null
         val view = pipeline.restore(execution.executionId)
+        if (JSONObject(view.hostContextJson).optJSONObject("result_options")?.optBoolean("save_history", true) == false) {
+            if (!view.terminal) pipeline.cancel(view.executionId)
+            return null
+        }
         if (view.phaseReason == "svg_output_too_large") return view
         if (view.phaseTag == "completed") {
             return view.takeIf { database.historyDao().getById(pipelineHistoryId(view)) == null }

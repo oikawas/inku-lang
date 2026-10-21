@@ -48,7 +48,7 @@ class OpenAiCompatibleRequestBodyTest {
             temperature = 0.35,
             maxTokens = 320,
             systemInstruction = "Return bounded advice",
-            pipelineAction = REFINEMENT_VISION_ACTION,
+            pipelineAction = JUXTAPOSITION_VISION_ACTION,
             imagePng = refinementPngHeader(),
         )
         val body = OpenAiCompatibleProvider.requestBody("openai", request, OPENAI_URL)

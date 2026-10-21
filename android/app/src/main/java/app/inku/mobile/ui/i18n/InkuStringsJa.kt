@@ -280,6 +280,7 @@ object InkuStringsJa : InkuStrings {
             "hacho_change" -> "破調"
             "language_comparison" -> "言語"
             "layout_change" -> "構図"
+            "laws_change" -> "法則"
             "model_comparison" -> "モデル"
             "reinterpretation" -> "解釈"
             "render_engine_change" -> "描画エンジン"

@@ -101,13 +101,13 @@ class JuxtapositionAdviserTest {
     }
 
     @Test
-    fun onlyTheTwoVisionActionsCarryAPng() {
+    fun onlyJuxtapositionCarriesAPng() {
         val png = refinementPngHeader()
         val juxtaposition = ModelRequest(modelId = "m", prompt = "p", temperature = 0.35, maxTokens = 1200,
             pipelineAction = JUXTAPOSITION_VISION_ACTION, imagePng = png)
         assertEquals("image/png", juxtaposition.imagePayload()!!.mimeType)
         assertTrue(isVisionTextAction(JUXTAPOSITION_VISION_ACTION))
-        assertTrue(isVisionTextAction(REFINEMENT_VISION_ACTION))
+        assertEquals(false, isVisionTextAction("refinement_vision_advice"))
         assertEquals(false, isVisionTextAction("generate_normalized_ddl"))
         assertThrows(IllegalArgumentException::class.java) {
             ModelRequest(modelId = "m", prompt = "p", temperature = 0.35, maxTokens = 1200,

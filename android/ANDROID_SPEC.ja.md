@@ -5,6 +5,18 @@
 
 最終更新: 2026-10-21。
 
+## 2026-10-21 AI自動推敲を共通coreの法則の手・取り合わせの手に移す
+
+作品編集メニューの自律推敲は、Server・Webと同じ`inku.autonomous-refine.v1`（JNIの`autonomousRefine`）を使う。AndroidはServer APIを呼ばず、端末の中で送り・描き・保存する。次の手と止め時、見える差のゲート、子の辺の記録は共通coreだけが決める。以下は、10月18日と17日に記したVisionの方式を置き換える。
+
+- 手数は1〜10、既定5。法則・取り合わせの手を1つ以上選ぶ。方向性は前後の空白を除いて1,000字まで。モデルは取り合わせと同じVision用途のモデル選びで1つ選び、一文の選択、Stage 1・Stage 2・法則の段にそのモデルを使う。言語は画面の言語、暴れるは指定しなければ各親のまま。画の無い親からは始めない。
+- 法則の手は、保存した親の指示書と記述、設定・種・色・比・限り、`completion_ranges`・`laws_layers`・`laws_basis`を共有pipelineの`saved_laws`へ渡す。Stage 1と構図の読みはやり直さず、親の保存した設定に`colors`があれば法則の段の後に配色の段も行い、無ければ行わない（作者裁定、2026-10-21）。`direction`はcoreの答えのまま。子は記述固定で、派生は`laws_change`（札は「法則」）。送った後の`laws_refused`・`laws_compile`・`laws_unavailable`はfailed、ほかの断りはunavailableとしてcoreへ返す。
+- 取り合わせの手は、既存の取り合わせで一文を4つ選ぶ。coreのexcludeと同じ系譜で足した一文を除き、reuseなら同じ手番の答えを使い、rankの一文のjoinedから子を描く。派生は`description_edit`。辺には`edited_from_history_id`と`juxtaposition`を残す。
+- 子のSVGを親と比べるmeasureと、辺の`ai_move`（取り合わせなら`juxtaposition`も）はcoreの答えを保存する。keptの子だけを次の親にする。すべての子は系譜だけに保存し、runが終わる・止まる・失敗する・途切れると、最後のkeptだけを通常履歴へ出す。停止と保存が重なっても、保存した子の記録を終えてから止める。
+- runは同時に1つ。補助の進捗はアプリ専用`autonomous-refinement-runs.json`に原子的に保存する。作品の正本は作品DBと系譜の辺で、DBのschemaは変えない。ダイアログを閉じてもrunは続く。起動時に残ったrunningはinterruptedへ変え、最後のkeptを履歴へ出す。
+- 画面はWebと同じ順（題と説明、記述固定の注記、モデル、使う手、手数、暴れる、方向性、開始）。実行中は手番・試みの小画・手・結果・差・一文または主の法則・断りの理由、継続の注記と停止を出す。終了後は終わり方と「最後に残った子を開く」を出す。前回の手数・手・方向性とモデルは既存の設定`autonomous_refinement_settings`に覚える。
+- Visionが色カタログか配置を選ぶ旧実行・文言・設定は削除する。過去の`autonomous_refine_mode`、`vision_model`・`vision_observation`・`vision_next_direction`の辺は変更せず読めるままにする。差のゲートは品質の判定ではなく、保存・スター・採否は作者が決める。
+
 ## 2026-10-21 「記述から描く」の法則の段・配色の段
 
 描画セッション-claudeの依頼（作者の「現行描画エンジンへの対応」）で、Serverの「記述から描く」と同じく、構図の読みの後に法則の段（`choose_laws`、root `SPEC.ja.md` §12.6.4）と配色の段（`choose_colors`、§12.6.5）を通す。2つの段の頼む文、答えの確かめ、送り直し、退きは共通coreが持ち、Androidはhostの側だけを持つ。
@@ -15,7 +27,7 @@
 - 送信プロンプト：実行は`sketch, stage1, composition, laws, colors, stage2`の段を記録し、法則の段・配色の段も送ったメッセージを残す。作品の情報の送信プロンプトの欄は、「構図」の後、「効果」の前に「法則の段」「配色の段」を同じ形（システムプロンプトと送信メッセージ）で出す。
 - 描いている間の札：法則の段は「法則の選択中…」、配色の段は「配色の選択中…」（Webの`stageChoosingLaws`・`stageChoosingColors`）。
 - 法則の記録：法則を当てた実行の`laws_layers`・`laws_basis`は、`completion_ranges`と同じく作品の情報に保存する。実行の無い子（配色・支持体・てざわり・描き直し）は親の記録を受け継ぐ。DDLから描く子（DDLの編集、配置を変える）は、Serverと同じく親の記録を実行の始まりに渡し、配置を変えるときは`laws_layers`をcoreの`recompose`に渡す。記録は今の画面では使わない。
-- 自動推敲とその法則の手（`saved_laws`）はAndroidに入れていない。
+- 自動推敲とその法則の手（`saved_laws`）は上の同日付の節に従う。
 
 ## 2026-10-20 設定のモデル選択で、LLMとVisionの用途を選ぶ
 

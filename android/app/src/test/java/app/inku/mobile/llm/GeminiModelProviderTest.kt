@@ -172,7 +172,7 @@ class GeminiVisionRequestTest {
         }
         provider.generate(ModelRequest(
             modelId = "gemini:gemma-4-31b-it", prompt = "Observe", temperature = 0.35,
-            maxTokens = 320, pipelineAction = REFINEMENT_VISION_ACTION,
+            maxTokens = 320, pipelineAction = JUXTAPOSITION_VISION_ACTION,
             imagePng = refinementPngHeader(),
         ))
         val parts = JSONObject(connection.body.toString(Charsets.UTF_8.name()))

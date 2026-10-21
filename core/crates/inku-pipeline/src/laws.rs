@@ -2085,7 +2085,7 @@ const SYSTEM_JA: &str = "あなたは、絵画・意匠・音楽の法則を組�
 1. 主の法則（main_law）を一つ決めます。画を見た人が最初に読み取る、画の骨組みになる法則です。B21 は主にしません。主の層（main_layer）も一つ決めます。
 2. 法則の数は、送る文の最後の「この答えの決まり」に従います。法則は、層をいくつに当てても1つと数えます。
 3. 一つの層に、置き場の法則（B1〜B5・B7・B8）は一つ、並びの法則（B9・B10・B12）は一つまで。C1〜C6 は置き場と並びを作り直すので、同じ層に、ほかの置き場・並びの法則や、ほかの C1〜C6 を重ねません。大きさの法則（B6・B10・B12・B15・C4）は掛け合わせます。
-4. 記述が名指した物の種類と道具は変えません。記述そのものが数を書いた物（「一羽」「三度」など）は数を変えません。そのような層ごとに、層の番号（layer）と、数を書いた記述の部分をそのまま短く引いた語（words）を description_counts に入れます。記述が数を書いていなければ空にします。
+4. 記述が名指した物の種類と道具は変えません。記述そのものが数を書いた物（「一羽」「三度」など）は数を変えません。そのような層だけを、層の番号（layer）と、数を書いた記述の部分をそのまま短く引いた語（words）の組で description_counts に入れます。数を書いていない層は入れません。そのような層が無ければ、description_counts は空の配列 [] にします。
 5. 道具は、置き場 → 大きさ → 並び → C1〜C6 → 空気遠近 → 手 の順に当てます。決まりに合わない答えは、理由を添えて返されます。
 6. 1作品の痕は 380、指示は 60 までです。
 7. reason には、記述の言葉を「」で引いて、主の法則を選んだ理由を1〜2行で書きます。
@@ -2099,7 +2099,7 @@ Rules:
 1. Choose one main law (main_law): the law a viewer reads first, the framework of the picture. B21 is never the main law. Choose one main layer (main_layer) too.
 2. The number of laws follows \"The rule of this answer\" at the end of the message. A law counts as one however many layers it takes.
 3. A layer takes one placement law (B1 to B5, B7, B8) and one arrangement law (B9, B10, B12) at most. C1 to C6 rebuild a layer's place and arrangement, so a layer that takes one of them takes no other placement or arrangement law and no other of C1 to C6. The size laws (B6, B10, B12, B15, C4) multiply.
-4. Keep the kinds of things and the tools the description names. Keep the count of a thing the description itself counts (\"one heron\", \"three times\"). For each such layer, put in description_counts its number (layer) and the part of the description that writes the count, quoted short and verbatim (words). Leave it empty when the description counts nothing.
+4. Keep the kinds of things and the tools the description names. Keep the count of a thing the description itself counts (\"one heron\", \"three times\"). Put in description_counts only such layers, each as its number (layer) and the part of the description that writes the count, quoted short and verbatim (words). Leave out every layer whose count the description does not write; when there is none, description_counts is the empty list [].
 5. The tool applies placement, then size, then arrangement, then C1 to C6, then aerial perspective, then the hand. An answer that breaks the rules comes back with the reason.
 6. A work holds 380 marks and 60 instructions at most.
 7. In reason, quote the description's words in “ ” and say in one or two lines why you chose the main law.
@@ -2905,17 +2905,23 @@ enum Rules<'a> {
     Prototype,
 }
 
-/// The layers whose count stays: those the answer's description_counts names,
-/// and those the run's earlier answers named with the description's words
-/// (2026-10-21), which an answer that drops them cannot change. Items that do
-/// not read are left to the schema.
-fn kept_counts(answer: &Value, counted: &BTreeSet<usize>) -> BTreeSet<usize> {
-    let mut kept = counted.clone();
+/// The layers whose count stays: those the answer's description_counts names
+/// with words, and those the run's earlier answers named with the description's
+/// words (2026-10-21), which an answer that drops them cannot change. An item
+/// of the request's answer whose words are empty names a layer the description
+/// does not count; the prototype's items carry no words and all count. Items
+/// that do not read are left to the schema.
+fn kept_counts(answer: &Value, rules: &Rules) -> BTreeSet<usize> {
+    let (mut kept, worded) = match rules {
+        Rules::Request { counted, .. } => ((*counted).clone(), true),
+        Rules::Prototype => (BTreeSet::new(), false),
+    };
     kept.extend(
         answer["description_counts"]
             .as_array()
             .into_iter()
             .flatten()
+            .filter(|item| !worded || !item_words(item).is_empty())
             .filter_map(|item| item["layer"].as_u64())
             .filter_map(|layer| usize::try_from(layer).ok()),
     );
@@ -2927,9 +2933,20 @@ fn evened(text: &str) -> String {
     text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
+/// The quote marks a reader may put around the words it quotes.
+const QUOTE_MARKS: &[char] = &['“', '”', '「', '」', '『', '』', '"', '\'', '‘', '’'];
+
+/// An item's words as they are looked for in the description: the white space
+/// evened out and the quote marks around them taken off (2026-10-21).
+fn item_words(item: &Value) -> String {
+    let words = evened(item["words"].as_str().unwrap_or_default());
+    evened(words.trim_matches(QUOTE_MARKS))
+}
+
 /// The items of a conformed description_counts against the description: each
-/// quotes words the description holds (white space evened out on both sides),
-/// and names its layer once (2026-10-21).
+/// item with words quotes words the description holds (white space evened out
+/// on both sides), and names its layer once; an item with empty words names a
+/// layer the description does not count, and is passed over (2026-10-21).
 fn quoted(answer: &Value, description: &str) -> Result<(), Refusal> {
     let text = evened(description);
     let mut seen = BTreeSet::new();
@@ -2938,16 +2955,19 @@ fn quoted(answer: &Value, description: &str) -> Result<(), Refusal> {
         .into_iter()
         .flatten()
     {
+        let words = item_words(item);
+        if words.is_empty() {
+            continue;
+        }
         let layer = layer_number(&item["layer"]);
-        let words = evened(item["words"].as_str().unwrap_or_default());
-        if words.is_empty() || !text.contains(&words) {
+        if !text.contains(&words) {
             return Err(refusal(
                 "counts_unquoted",
                 format!(
-                    "description_counts の layer {layer} の words「{words}」は記述に無い。記述の字をそのまま短く引く"
+                    "description_counts の layer {layer} の words「{words}」は記述に無い。記述が数を書いた部分をそのまま短く引くか、記述がこの層の数を書いていなければ、この項目を外す"
                 ),
                 format!(
-                    "the words “{words}” of layer {layer} in description_counts are not in the description; quote the description's own words, short and verbatim"
+                    "the words “{words}” of layer {layer} in description_counts are not in the description; quote the part of the description that writes the count, short and verbatim, or leave the item out if the description does not write this layer's count"
                 ),
             ));
         }
@@ -2976,10 +2996,8 @@ pub fn quoted_layers(answer: &str, description: &str) -> BTreeSet<usize> {
         .into_iter()
         .flatten()
         .filter(|item| {
-            item["words"]
-                .as_str()
-                .map(evened)
-                .is_some_and(|words| !words.is_empty() && text.contains(&words))
+            let words = item_words(item);
+            !words.is_empty() && text.contains(&words)
         })
         .filter_map(|item| item["layer"].as_u64())
         .filter_map(|layer| usize::try_from(layer).ok())
@@ -3064,12 +3082,7 @@ fn untakeable(
 /// under the request's `rules` (the laws are two or three, its V2 rule, and
 /// description_counts quotes the description) or the prototype's.
 fn check(answer: &Value, context: &LawsContext, rules: &Rules) -> Result<Answer, Refusal> {
-    let none = BTreeSet::new();
-    let counted = match rules {
-        Rules::Request { counted, .. } => counted,
-        Rules::Prototype => &none,
-    };
-    let fixed = kept_counts(answer, counted);
+    let fixed = kept_counts(answer, rules);
     untakeable(answer, context, &fixed)?;
     conform(answer, &laws_response_schema(context), "answer")?;
     if let Rules::Request { description, .. } = rules {
@@ -6102,8 +6115,9 @@ mod tests {
     }
 
     /// The words of description_counts are the description's, its white space
-    /// evened out on both sides, and each item names its layer once
-    /// (2026-10-21).
+    /// evened out on both sides and the quote marks around them taken off, and
+    /// each item names its layer once; an item with empty words names a layer
+    /// the description does not count (2026-10-21).
     #[test]
     fn description_counts_quotes_the_description() {
         let description = "冬の朝、雪の野に、赤い実をつけた\n一本の　木が立っていた。Two  herons.";
@@ -6113,6 +6127,9 @@ mod tests {
             json!([{"layer": 0, "words": "一本の　木"}]),
             json!([{"layer": 0, "words": "つけた 一本の 木"}]),
             json!([{"layer": 0, "words": "一本の 木"}, {"layer": 1, "words": " Two herons "}]),
+            json!([{"layer": 0, "words": "「一本の 木」"}, {"layer": 1, "words": "“Two herons”"}]),
+            json!([{"layer": 0, "words": ""}, {"layer": 1, "words": " 　\n"}, {"layer": 2, "words": "“”"}]),
+            json!([{"layer": 0, "words": "一本の 木"}, {"layer": 0, "words": ""}]),
         ] {
             assert_eq!(
                 quoted(&answer(items.clone()), description),
@@ -6129,8 +6146,10 @@ mod tests {
                 json!([{"layer": 0, "words": "一本の木"}]),
                 "counts_unquoted",
             ),
-            (json!([{"layer": 0, "words": " 　\n"}]), "counts_unquoted"),
-            (json!([{"layer": 0, "words": ""}]), "counts_unquoted"),
+            (
+                json!([{"layer": 1, "words": ""}, {"layer": 0, "words": "five"}]),
+                "counts_unquoted",
+            ),
             (
                 json!([{"layer": 0, "words": "一本の 木"}, {"layer": 0, "words": "赤い実"}]),
                 "counts_twice",
@@ -6144,18 +6163,37 @@ mod tests {
             quoted(&answer(json!([{"layer": 2, "words": "三羽"}])), description)
                 .unwrap_err()
                 .ja,
-            "description_counts の layer 2 の words「三羽」は記述に無い。記述の字をそのまま短く引く"
+            "description_counts の layer 2 の words「三羽」は記述に無い。記述が数を書いた部分をそのまま短く引くか、記述がこの層の数を書いていなければ、この項目を外す"
+        );
+        // An item with empty words keeps no count; the prototype's items carry
+        // no words and all keep theirs.
+        let counted = BTreeSet::from([5]);
+        let request = Rules::Request {
+            description,
+            counted: &counted,
+        };
+        let items = answer(json!([
+            {"layer": 0, "words": "「一本の 木」"},
+            {"layer": 1, "words": "“”"},
+            {"layer": 2, "words": "三羽"}
+        ]));
+        assert_eq!(kept_counts(&items, &request), BTreeSet::from([0, 2, 5]));
+        let prototype = answer(json!([{"layer": 0, "words": ""}, {"layer": 1, "words": ""}]));
+        assert_eq!(
+            kept_counts(&prototype, &Rules::Prototype),
+            BTreeSet::from([0, 1])
         );
         // A refused answer's layers that quote the description keep their count.
         let refused = answer(json!([
             {"layer": 0, "words": "一本の\u{3000}木"},
             {"layer": 1, "words": "三羽"},
             {"layer": 2, "words": ""},
+            {"layer": 3, "words": "“Two herons”"},
             3
         ]));
         assert_eq!(
             quoted_layers(&refused.to_string(), description),
-            BTreeSet::from([0])
+            BTreeSet::from([0, 3])
         );
         assert!(quoted_layers("not json", description).is_empty());
     }

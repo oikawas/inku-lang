@@ -100,15 +100,19 @@ class AutonomousMovesPipelineTest {
         assertEquals(parent.normalizedDdl, authoring.getString("source"))
         assertEquals(DESCRIPTION, authoring.getString("description"))
         assertEquals("B1", authoring.getJSONObject("laws_basis").getString("main_law"))
+        assertEquals(JSONObject.NULL, authoring.getJSONObject("laws_basis").get("main_layer"))
         assertEquals("ddl_authoritative", start.getJSONObject("authority").getString("authority"))
         assertEquals(CoreIdentityJson.canonical(JSONObject(fixture.saved!!.forkContextJson!!).getJSONObject("config")),
             CoreIdentityJson.canonical(start.getJSONObject("config")))
         val basis = JSONObject(child.renderMetadataJson).getJSONObject("laws_basis")
         assertEquals("B3", basis.getString("main_law"))
+        assertEquals(JSONObject.NULL, basis.get("main_layer"))
         val laws = JSONObject().put("excluded", direction.getJSONArray("exclude")).put("cards", "invite")
         listOf("main_law", "main_layer", "laws", "reason").forEach { laws.put(it, basis.get(it)) }
         val record = record("laws", parent, child).put("laws", laws)
-        assertEquals("laws", SharedAutonomousRefinement.call("record", record).getJSONObject("metadata").getJSONObject("ai_move").getString("kind"))
+        val move = SharedAutonomousRefinement.call("record", record).getJSONObject("metadata").getJSONObject("ai_move")
+        assertEquals("laws", move.getString("kind"))
+        assertEquals(JSONObject.NULL, move.getJSONObject("laws").get("main_layer"))
         // Neither saved configuration asks Stage 1 or the composition reader again.
         assertEquals(if (withColors) listOf("choose_laws", "choose_colors") else listOf("choose_laws"),
             fixture.requests.map { it.pipelineAction })
@@ -155,7 +159,7 @@ class AutonomousMovesPipelineTest {
                 .put(layer("place", "circle", 1, "center", "small", "red"))
                 .put(layer("scatter", "point", 12, "bottom", "very_small", "black"))).toString()
         private const val READING = """{"thesis":"ひとつの円が点の床の上に浮かぶ","roles":["field","focal","scattered"],"relations":[{"type":"above","layers":[1,2],"side":"unspecified","toward":"unspecified"}],"tension":{"motion":"still","focus":"unspecified","vertical":"unspecified","balance":"unspecified","symmetry":"unspecified","void":"unspecified"},"stated_places":[{"layer":2,"words":"下に","place":"bottom"}]}"""
-        private const val LAWS = """{"main_layer":1,"main_law":"B1","description_counts":[{"layer":1,"words":"円がひとつ"}],"laws":{"B1":{"targets":[{"layer":1,"at":"point_ul"}]},"B21":{"targets":[{"layer":2,"hand":"still"}]}},"reason":"円を黄金分割の左上へ置く。"}"""
-        private const val MOVED = """{"main_layer":1,"main_law":"B3","description_counts":[{"layer":1,"words":"円がひとつ"}],"laws":{"B3":{"targets":[{"layer":1,"at":"point_lr"}]},"B15":{"layers":[2]}},"reason":"円を三分割の右下へ移し、点を遠くに置く。"}"""
+        private const val LAWS = """{"main_law":"B1","description_counts":[{"layer":1,"words":"円がひとつ"}],"laws":{"B1":{"targets":[{"layer":1,"at":"point_ul"}]},"B21":{"targets":[{"layer":2,"hand":"still"}]}},"reason":"円を黄金分割の左上へ置く。"}"""
+        private const val MOVED = """{"main_law":"B3","description_counts":[{"layer":1,"words":"円がひとつ"}],"laws":{"B3":{"targets":[{"layer":1,"at":"point_lr"}]},"B15":{"layers":[2]}},"reason":"円を三分割の右下へ移し、点を遠くに置く。"}"""
     }
 }

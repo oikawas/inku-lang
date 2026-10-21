@@ -28,7 +28,7 @@ class AutonomousRefinementRunnerTest {
         var lawsUnavailable = false
         var choosing = 0
         var drawn = 0
-        val basis = JSONObject("""{"main_law":"B2","main_layer":0,"laws":{"B2":{"targets":[{"layer":0,"at":"point_ul"}]}},"reason":"置く"}""")
+        val basis = JSONObject("""{"main_law":"B2","main_layer":null,"laws":{"B2":{"targets":[{"layer":0,"at":"point_ul"}]}},"reason":"置く"}""")
         val white = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><rect width=\"100\" height=\"100\" fill=\"white\"/></svg>"
         val black = white.replace("white", "black")
         override suspend fun work(id: String) = AutonomousWork(id, if (id == "parent") white else black,
@@ -78,6 +78,7 @@ class AutonomousRefinementRunnerTest {
             assertEquals("kept", record.getString("outcome"))
             assertEquals("fixture:model", record.getString("model"))
             assertEquals("涼しげに", record.getString("note"))
+            assertEquals(JSONObject.NULL, record.getJSONObject("laws").get("main_layer"))
         } finally { scope.cancel() }
     }
 

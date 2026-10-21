@@ -67,6 +67,7 @@ class LawsAndColorsPipelineTest {
         assertEquals(colors.systemInstruction, sent.getJSONObject("colors").getString("system"))
         assertNotNull(metadata.optJSONObject("laws_layers"))
         assertNotNull(metadata.optJSONObject("laws_basis"))
+        assertEquals(JSONObject.NULL, metadata.getJSONObject("laws_basis").get("main_layer"))
 
         // The estimate draws with the work's seed.
         val managed = repo.readManagedHistory(AndroidWorkPipeline.OWNER_ID, work.id)!!
@@ -180,9 +181,9 @@ class LawsAndColorsPipelineTest {
         const val READING = """{"thesis":"ひとつの円が点の床の上に浮かぶ","roles":["field","focal","scattered"],"relations":[{"type":"above","layers":[1,2],"side":"unspecified","toward":"unspecified"}],"tension":{"motion":"still","focus":"unspecified","vertical":"unspecified","balance":"unspecified","symmetry":"unspecified","void":"unspecified"},"stated_places":[{"layer":2,"words":"下に","place":"bottom"}]}"""
 
         // The circle goes to the golden section's upper left crossing.
-        const val LAWS = """{"main_layer":1,"main_law":"B1","description_counts":[{"layer":1,"words":"円がひとつ"}],"laws":{"B1":{"targets":[{"layer":1,"at":"point_ul"}]},"B21":{"targets":[{"layer":2,"hand":"still"}]}},"reason":"円を黄金分割の左上の交点に置く。"}"""
+        const val LAWS = """{"main_law":"B1","description_counts":[{"layer":1,"words":"円がひとつ"}],"laws":{"B1":{"targets":[{"layer":1,"at":"point_ul"}]},"B21":{"targets":[{"layer":2,"hand":"still"}]}},"reason":"円を黄金分割の左上の交点に置く。"}"""
 
-        // The circle, the laws' main layer, takes the blue.
-        const val COLORS = """{"main_law":"D5","laws":{"D5":{"hue":"blue"}},"reason":"青を軸に近い色でまとめる。"}"""
+        // The answer names the circle as D5's target layer.
+        const val COLORS = """{"main_law":"D5","laws":{"D5":{"hue":"blue","layer":1}},"reason":"青を軸に近い色でまとめる。"}"""
     }
 }

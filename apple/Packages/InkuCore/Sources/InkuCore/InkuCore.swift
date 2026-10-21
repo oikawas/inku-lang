@@ -262,6 +262,11 @@ public enum InkuCore {
         InkuCoreBindings.juxtaposition(inputBytes: input)
     }
 
+    /// Shared autonomous refinement: next move, visible difference and lineage record.
+    public static func autonomousRefine(_ input: Data) -> Data {
+        InkuCoreBindings.autonomousRefine(inputBytes: input)
+    }
+
     /// The experimental 3D viewer's input (`inku.ddl3d.v1`, Web `snapshot()`), shared with Android:
     /// `{"score": "<stored Score text>", "metadata": "<render metadata object text>"}` in, `{"json": "<input>"}` or
     /// `{"error": "<reason>"}` out.

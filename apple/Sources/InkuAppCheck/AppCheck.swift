@@ -11,6 +11,13 @@ struct AppCheck {
         if CommandLine.arguments.contains("--core-version-only") {
             print(InkuCore.versionReport); return
         }
+        if let index = CommandLine.arguments.firstIndex(of: "--shared-autonomous-refine-only") {
+            guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Expected the shared autonomous refinement cases") }
+            try runSharedAutonomousRefineChecks(casesURL: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return
+        }
+        if CommandLine.arguments.contains("--saved-laws-stages-only") {
+            try await runSavedLawsStageChecks(); return
+        }
         if let index = CommandLine.arguments.firstIndex(of: "--provider-wire-ui-fixture") {
             guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Expected a fresh provider-wire fixture folder") }
             try await makeProviderWireUIFixture(folder: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return

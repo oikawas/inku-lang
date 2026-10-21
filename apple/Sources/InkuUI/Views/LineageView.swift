@@ -622,6 +622,7 @@ struct LineageView: View {
     }
 
     private func operation(_ kind: String?) -> String {
+        if kind == "laws_change" { return model.display.preferences.language == "en" ? "Laws" : "法則" }
         if model.display.preferences.language == "en" {
             if kind == nil { return "Origin" }
             let labels = ["touch_change": "Touch", "layout_change": "Layout", "catalog_change": "Color",

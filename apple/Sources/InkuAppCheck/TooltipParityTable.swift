@@ -9,6 +9,7 @@
 // frame's `title=`, are added with the app's 3D view: 170 sites.
 // 2026-10-20 (Web Build1294, fb2414e18): the juxtaposition menu item's `title=` (the held reason) is added with the
 // app's juxtaposition: 171 sites.
+// 2026-10-21: autonomous refinement no longer has color/layout cost tooltips: 169 sites.
 
 /// One Web tooltip site and the Swift source that carries it, or why the single-user app has none.
 struct TooltipParityEntry {
@@ -30,9 +31,6 @@ let tooltipParityTable: [TooltipParityEntry] = [
     .init(web: "+page.svelte:3260", swift: "Views/AboutInkuView.swift", marker: "\"appInfoHintDdlEngine\""),
     .init(web: "+page.svelte:3262", swift: "Views/AboutInkuView.swift", marker: "\"appInfoHintRenderEngine\""),
     .init(web: "+page.svelte:3264", swift: "Views/AboutInkuView.swift", marker: "\"appInfoHintBindingProtocol\""),
-    .init(web: "AIRefineModal.svelte:255", excluded: "Webでも段落の文（held-note）でツールチップではない。Swiftも段落で出す"),
-    .init(web: "AIRefineModal.svelte:260", swift: "Views/AuxiliaryView.swift", marker: "serverKey: \"refineCostColor\""),
-    .init(web: "AIRefineModal.svelte:260", swift: "Views/AuxiliaryView.swift", marker: "serverKey: \"refineCostLayout\""),
     .init(web: "AppRail.svelte:81", swift: "Views/AppRailView.swift", marker: "serverKey: \"tooltipAppRailToggle\""),
     .init(web: "AppRail.svelte:94", swift: "Views/AppRailView.swift", marker: "serverKey: \"tooltipAppRailLogo\""),
     .init(web: "AppRail.svelte:108", excluded: "単一利用者アプリに利用者メニュー・プロフィールが無い"),

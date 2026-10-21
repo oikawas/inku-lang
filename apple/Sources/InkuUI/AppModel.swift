@@ -45,6 +45,7 @@ public struct DrawingAdjustmentPlan: Sendable {
 @MainActor
 @Observable
 public final class AppModel {
+    public let autonomousRefinement = AutonomousRefinementModel()
     public var inputMode = "description"
     public var descriptionText = ""
     public var ddlText = ""
@@ -272,6 +273,7 @@ public final class AppModel {
             let bootstrap = try Bootstrap()
             let settings = try await store.load(installingDefaults: BundledProviderDefaults.loadBundled())
             self.database = database
+            await autonomousRefinement.restore(database: database)
             // A derived store: without it thumbnails are drawn and kept in memory, and nothing else stops.
             await thumbnails.connect(store: try? ThumbnailStore(url: ThumbnailStore.url(besideDatabase: url)), database: database)
             await thumbnails.synchronize()
@@ -1203,10 +1205,10 @@ public final class AppModel {
     /// `metadata` adds fields to a description edit's record (a juxtaposition's `juxtaposition`).
     public func makeSavedWorkEditRequest(work: SavedWork, mode: WorkEditMode, description: String,
                                         sketchMode: String = "off", wildOverride: Bool? = nil,
-                                        metadata: [String: ExactJSON] = [:]) async throws -> GenerationRequest {
+                                        metadata: [String: ExactJSON] = [:], drawingSettings: HostSettings? = nil) async throws -> GenerationRequest {
         guard !isBusy, !isPreview, database != nil else { throw HostError("authoring_busy_or_unavailable") }
-        let drawing = nextGenerationHostSettings
-        guard hasNextDrawingModel else { throw HostError("model_reference_missing") }
+        let drawing = drawingSettings ?? nextGenerationHostSettings
+        guard drawingSettings != nil || hasNextDrawingModel else { throw HostError("model_reference_missing") }
         let saved = try await savedWorkEditContext(work)
         let text = (mode == .description ? description : work.effectiveSourceText).trimmingCharacters(in: .whitespacesAndNewlines)
         let selectedLanguage = instructionLanguage(for: text)
@@ -1221,6 +1223,7 @@ public final class AppModel {
         // The Server applies Stage 1.5 only when this operation explicitly asks for it.
         configuration["compiler"]["stage15_variation"] = .null
         configuration["catalogs"] = .array([])
+        if drawingSettings != nil { configuration["compiler"]["host"]["catalog_mode"] = .string(catalog == "default" ? "default" : "explicit") }
         options["wild"] = .bool(mode == .description ? wildOverride ?? work.renderWild ?? options["wild"].bool ?? false
                                                     : work.renderWild ?? options["wild"].bool ?? false)
         options["svg_profile"] = .string("display")
@@ -1245,6 +1248,53 @@ public final class AppModel {
         let pinned = try await pinPersonalPlanRequests([request])[0]
         try Task.checkCancellation()
         return pinned
+    }
+
+    /// Only the start payload differs from a saved DDL child. The shared pipeline decides whether its laws can run.
+    public func makeSavedLawsRequest(work: SavedWork, direction: ExactJSON, settings: HostSettings,
+                                     wild: Bool?) async throws -> GenerationRequest {
+        let saved = try await savedConfiguration(workID: work.id)
+        var configuration = try ExactJSON(data: saved.configuration)
+        var options = try ExactJSON(data: saved.renderOptions)
+        if let wild { options["wild"] = .bool(wild) }
+        let catalog = try options.requiredString("catalog_id")
+        configuration["compiler"]["host"]["catalog_mode"] = .string(catalog == "default" ? "default" : "explicit")
+        configuration["catalogs"] = .array([])
+        var request = GenerationRequest(authoring: .directDDL(work.ddl ?? ""), configuration: configuration.data,
+            renderOptions: options.data, clipPolicy: saved.clipPolicy, models: settings.models, providers: settings.providers,
+            renderColorMaps: [catalog: options["resolved_color_map"].data], description: work.effectiveSourceText,
+            parentWorkID: work.id, derivationKind: "laws_change", historyVisibility: "lineage_only")
+        request.savedLawsDirection = direction.data
+        request.completionRanges = saved.completionRanges
+        request.lawsRecords = saved.lawsRecords
+        return try await pinPersonalPlanRequests([request])[0]
+    }
+
+    /// A run owns this serialized operation, but does not replace the canvas with each lineage-only attempt.
+    public func runAutonomousMove(request: GenerationRequest) async throws -> SavedWork {
+        guard let host, let database else { throw HostError("pipeline_unavailable") }
+        var child: SavedWork?
+        var failure: Error?
+        let ran = await performSerialized(status: "生成中", allowsBrowsing: true) { [self] token in
+            do {
+                try await validatePinnedRequest(request)
+                let view = try await host.generate(request) { [weak self] progress in
+                    Task { @MainActor in self?.receive(progress, token: token, models: request.models) }
+                }
+                if let id = view.savedWorkID { child = try await database.work(id: id) }
+                if child == nil {
+                    let events = try ExactJSON(data: view.eventsJSON).array ?? []
+                    let reason = events.last { $0["tag"].string == "failed" }?["payload"]["reason"].string
+                    throw HostError(reason ?? "autonomous_generation_failed")
+                }
+                await notifyCommittedWork(view)
+                try await reloadWorks()
+            } catch { failure = error; throw error }
+        }
+        if let child { return child }
+        try Task.checkCancellation()
+        if let failure { throw failure }
+        throw HostError(ran ? "autonomous_generation_failed" : "authoring_busy_or_unavailable")
     }
 
     /// SPEC §7.8 juxtaposition: what the shared core reads for this work (Server `api_juxtaposition`). `written` is the

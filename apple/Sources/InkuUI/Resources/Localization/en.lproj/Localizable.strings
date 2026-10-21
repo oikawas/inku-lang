@@ -890,6 +890,14 @@
 "比較候補の構図を読んでいます" = "Reading the comparison option's composition";
 "構図の応答を受信中" = "Receiving the composition reply";
 "比較候補の構図の応答を受信中" = "Receiving the comparison option's composition reply";
+"法則の選択" = "Choosing the laws";
+"配色の選択" = "Choosing the colors";
+"法則の選択中…" = "Choosing the laws…";
+"配色の選択中…" = "Choosing the colors…";
+"比較候補の法則の選択中…" = "Choosing the comparison option's laws…";
+"比較候補の配色の選択中…" = "Choosing the comparison option's colors…";
+"法則の段" = "Laws stage";
+"配色の段" = "Color stage";
 "開発用の応答記録" = "Developer response records";
 "生成時の送受信を記録" = "Record provider input and output when drawing";
 "モデルへ送った本文と受け取った応答を端末内に保存します。接続先・ヘッダー・認証情報は記録しません。" = "Store sent bodies and received replies on this device. Endpoints, headers, and credentials are excluded.";
@@ -1389,6 +1397,10 @@
 "写生（Stage 0.5） システムプロンプト" = "Sketch (Stage 0.5) system prompt";
 "構図の読み 送った入力" = "Composition reading input as sent";
 "構図の読み システムプロンプト" = "Composition reading system prompt";
+"法則の段 送った入力" = "Laws stage input as sent";
+"法則の段 システムプロンプト" = "Laws stage system prompt";
+"配色の段 送った入力" = "Color stage input as sent";
+"配色の段 システムプロンプト" = "Color stage system prompt";
 "Stage 2 ユーザー入力 (正規化DDL)" = "Stage 2 user input (normalized DDL)";
 "Stage 2 システムプロンプト" = "Stage 2 system prompt";
 "色の対応" = "Color map";

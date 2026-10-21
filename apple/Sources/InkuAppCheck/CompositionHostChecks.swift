@@ -26,6 +26,10 @@ import InkuUI
     guard config["composition"]["read"].bool == true else {
         throw CheckFailure.message("The generated Server manifest omitted the new composition read=true default")
     }
+    // This check ends at the reading; --laws-colors-host-only checks the laws and the colors that follow it.
+    var fields = config.object ?? [:]
+    fields.removeValue(forKey: "laws"); fields.removeValue(forKey: "colors")
+    config = .object(fields); request.configuration = config.data
     let database = try InkuDatabase(url: folder.appendingPathComponent("works.sqlite"))
     let credentials = CompositionEmptyCredentials()
     let provider = CompositionCheckProvider()
@@ -49,7 +53,7 @@ import InkuUI
     guard prompts.map({ $0["action"].string ?? "" }) == ["generate_normalized_ddl", "read_composition"],
           savedPrompts.map({ $0["action"].string ?? "" }) == ["generate_normalized_ddl", "read_composition"],
           savedPrompts.last?["prompt"]["message"].string?.isEmpty == false,
-          presentation.promptStages == ["sketch", "stage1", "composition", "stage2"] else {
+          presentation.promptStages == ["sketch", "stage1", "composition", "laws", "colors", "stage2"] else {
         throw CheckFailure.message("The prompt journal or the saved work lost the composition reading or its stages")
     }
     let saved = try await host.restoreSavedWork(workID: composedID)

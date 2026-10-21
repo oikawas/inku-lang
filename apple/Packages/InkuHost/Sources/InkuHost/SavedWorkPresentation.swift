@@ -41,7 +41,8 @@ enum SavedPresentation {
     /// Server `_SYSTEM_PROMPT_STAGES`: the actions the prompt tab shows, in the order a work calls them.
     /// The catalog choice is not shown.
     static let promptStages = [("generate_sketch", "sketch"), ("generate_normalized_ddl", "stage1"),
-                               ("read_composition", "composition"), ("complete_visible_ddl_holes", "stage2")]
+                               ("read_composition", "composition"), ("choose_laws", "laws"), ("choose_colors", "colors"),
+                               ("complete_visible_ddl_holes", "stage2")]
     /// A work saved before 2026-10-13 kept Stage 1 and Stage 2 only.
     static let earlierPromptStages = ["stage1", "stage2"]
 

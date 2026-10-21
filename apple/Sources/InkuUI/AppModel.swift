@@ -877,7 +877,10 @@ public final class AppModel {
             importedPlugins: mode == "ddl" && parentWorkID == nil ? importedDDL?.plugins ?? [] : [])
         request.captureProviderIO = developerModeEnabled && display.preferences.captureProviderIO == true
         // Server `start`: a direct DDL drawn from the selected saved work carries its completion range record.
-        if mode == "ddl", parentWorkID != nil, parentWorkID == selectedWorkID { request.completionRanges = selectedContext?.completionRanges }
+        if mode == "ddl", parentWorkID != nil, parentWorkID == selectedWorkID {
+            request.completionRanges = selectedContext?.completionRanges
+            request.lawsRecords = selectedContext?.lawsRecords
+        }
         return request
     }
 
@@ -941,6 +944,7 @@ public final class AppModel {
                 renderColorMaps: [catalog: options["resolved_color_map"].data], description: work.effectiveSourceText,
                 parentWorkID: work.id, derivationKind: "ddl_edit")
             request.completionRanges = saved.completionRanges
+            request.lawsRecords = saved.lawsRecords
             request = try await pinPersonalPlanRequests([request])[0]
             return await runAutomation(request: request) != nil
         } catch { report(error); return false }
@@ -1043,7 +1047,8 @@ public final class AppModel {
                 configuration["compiler"]["composition_seed"] = .string(String(seed))
                 options["composition_seed"] = .string(String(seed))
                 // Server compose: the numeric ranges are chosen again with this option's exact configuration.
-                recomposition = Recomposition.choose(configuration: configuration, source: ddl, mode: recomposeMode, seed: String(seed))
+                recomposition = Recomposition.choose(configuration: configuration, source: ddl, mode: recomposeMode, seed: String(seed),
+                                                     lawsRecords: saved.lawsRecords)
                 metadata = .object(["composition_seed": .number(String(seed)), "recompose_mode": .string(recomposeMode.rawValue)])
             }
             // A recomposed option is a new direct DDL from the saved work; unchanged ranges keep its document.
@@ -1057,8 +1062,9 @@ public final class AppModel {
                 retainedDocument: retains ? document : nil, retainedAuthority: retains ? saved.authorityJSON : nil,
                 derivationMetadata: metadata.data))
             recompositions.append(recomposition)
-            // A redraw of the saved DDL keeps the parent's completion range record (Server fork).
+            // A redraw of the saved DDL keeps the parent's completion range and laws records (Server fork).
             requests[requests.count - 1].completionRanges = saved.completionRanges
+            requests[requests.count - 1].lawsRecords = saved.lawsRecords
         }
         requests = try await pinPersonalPlanRequests(requests)
         try Task.checkCancellation()
@@ -1171,7 +1177,8 @@ public final class AppModel {
         // Web composeLayoutGeneration: the AI process chooses the ranges again by principle.
         var recomposed: String?
         if kind == "layout_change", !reading, let ddl = work.ddl {
-            let recomposition = Recomposition.choose(configuration: nextConfig, source: ddl, mode: .principled, seed: fresh)
+            let recomposition = Recomposition.choose(configuration: nextConfig, source: ddl, mode: .principled, seed: fresh,
+                                                     lawsRecords: saved.lawsRecords)
             recomposed = recomposition.source
             if let chosen = recomposed { request.authoring = .directDDL(chosen) }
             var metadata = (try? request.derivationMetadata.map { try ExactJSON(data: $0) } ?? nil) ?? .object([:])
@@ -1187,6 +1194,7 @@ public final class AppModel {
             guard let document = saved.document else { throw HostError("saved_document_unavailable") }
             if recomposed == nil { request.retainedDocument = document; request.retainedAuthority = saved.authorityJSON }
             request.completionRanges = saved.completionRanges
+            request.lawsRecords = saved.lawsRecords
         }
         return request
     }
@@ -1970,6 +1978,14 @@ public final class AppModel {
         // A separate task makes the committed snapshot independent of later caller cancellation.
         await Task { @MainActor in await callback(work) }.value
     }
+    /// Web `runningStageLabel`: the laws stage and the color stage name themselves while they wait and receive.
+    private func choosingStatus(comparison: Bool) -> String? {
+        switch providerProgress?.stage {
+        case .some(.laws): comparison ? "比較候補の法則の選択中…" : "法則の選択中…"
+        case .some(.colors): comparison ? "比較候補の配色の選択中…" : "配色の選択中…"
+        default: nil
+        }
+    }
     private func receive(_ progress: PipelineProgress, token: UUID, models: ModelSelection? = nil) {
         recordDrawingProgress(progress)
         guard generationToken == token, !stopping else { return }
@@ -1979,9 +1995,11 @@ public final class AppModel {
             if backgroundDrawing { status = statusText(for: view) }
             else { apply(view) }
         case .providerAttempt(_, _, _, let deadline):
-            status = providerProgress?.stage == .composition ? "構図を読んでいます" : "モデルの応答待ち（期限 \(deadline.formatted(date: .omitted, time: .standard))）"
+            if let choosing = choosingStatus(comparison: false) { status = choosing }
+            else { status = providerProgress?.stage == .composition ? "構図を読んでいます" : "モデルの応答待ち（期限 \(deadline.formatted(date: .omitted, time: .standard))）" }
         case .transportBytes(_, let count):
-            status = providerProgress?.stage == .composition ? "構図の応答を受信中" : "応答を受信中（\(count) bytes）"
+            if let choosing = choosingStatus(comparison: false) { status = choosing }
+            else { status = providerProgress?.stage == .composition ? "構図の応答を受信中" : "応答を受信中（\(count) bytes）" }
         case .providerDiagnostic(let id, let diagnostic): receive(diagnostic, executionID: id)
         case .providerMetric: break
         case .saved(_, _): status = "作品を保存しました"
@@ -1994,10 +2012,12 @@ public final class AppModel {
         switch progress {
         case .changed(let view): currentExecutionID = view.executionID
         case .providerAttempt(_, _, _, let deadline):
-            if providerProgress?.stage == .composition { status = comparison ? "比較候補の構図を読んでいます" : "構図を読んでいます" }
+            if let choosing = choosingStatus(comparison: comparison) { status = choosing }
+            else if providerProgress?.stage == .composition { status = comparison ? "比較候補の構図を読んでいます" : "構図を読んでいます" }
             else { status = comparison ? "比較候補のモデル応答待ち（期限 \(deadline.formatted(date: .omitted, time: .standard))）" : "モデルの応答待ち（期限 \(deadline.formatted(date: .omitted, time: .standard))）" }
         case .transportBytes(_, let count):
-            if providerProgress?.stage == .composition { status = comparison ? "比較候補の構図の応答を受信中" : "構図の応答を受信中" }
+            if let choosing = choosingStatus(comparison: comparison) { status = choosing }
+            else if providerProgress?.stage == .composition { status = comparison ? "比較候補の構図の応答を受信中" : "構図の応答を受信中" }
             else { status = comparison ? "比較候補を受信中（\(count) bytes）" : "応答を受信中（\(count) bytes）" }
         case .providerDiagnostic(let id, let diagnostic): receive(diagnostic, executionID: id)
         case .providerMetric: break

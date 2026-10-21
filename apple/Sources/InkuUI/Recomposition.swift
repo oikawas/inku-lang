@@ -23,10 +23,14 @@ public struct Recomposition: Sendable, Equatable {
     }
 
     /// Asks the shared core with the run's exact configuration; a failure keeps the ranges, as Server does.
-    static func choose(configuration: ExactJSON, source: String, mode: Mode, seed: String) -> Self {
+    /// The layers a work's laws placed stay where they are; the others move (`lawsRecords`, 2026-10-20).
+    static func choose(configuration: ExactJSON, source: String, mode: Mode, seed: String, lawsRecords: Data? = nil) -> Self {
         let digest = SHA256.hash(data: Data(source.utf8)).map { String(format: "%02x", $0) }.joined()
-        let request: ExactJSON = .object(["config": configuration, "source": .string(source), "mode": .string(mode.rawValue),
+        var request: ExactJSON = .object(["config": configuration, "source": .string(source), "mode": .string(mode.rawValue),
                                           "seed": .string(seed), "work_id": .string("sha256:" + digest)])
+        if let records = lawsRecords.flatMap({ try? ExactJSON(data: $0) }), records["laws_layers"].object != nil {
+            request["laws_layers"] = records["laws_layers"]
+        }
         guard let value = try? ExactJSON(data: InkuCore.recompose(request.data)) else { return .unchanged(mode, "recompose_failed") }
         if let error = value["error"].string {
             return ["invalid_request", "internal_invariant", "internal"].contains(error) ? .unchanged(mode, error) : .unchanged(mode, "invalid_response")

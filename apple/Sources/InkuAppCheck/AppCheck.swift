@@ -259,6 +259,10 @@ struct AppCheck {
             try await runCompositionPersonalPlanGateChecks()
             return
         }
+        if CommandLine.arguments.contains("--laws-colors-host-only") {
+            try await runLawsColorsHostChecks()
+            return
+        }
         if CommandLine.arguments.contains("--composition-progress-only") {
             try await runCompositionProgressChecks()
             return

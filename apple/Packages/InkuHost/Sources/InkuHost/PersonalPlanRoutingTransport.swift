@@ -85,6 +85,7 @@ public final class PersonalPlanRoutingTransport: ObservedProviderTransport, Obse
         var result: ExactJSON = .object(["identity": try effect.requiredObject("identity")])
         let results = ["generate_sketch": "sketch_generated", "select_description_catalog": "description_catalog_selected",
             "generate_normalized_ddl": "normalized_ddl_generated", "read_composition": "composition_read",
+            "choose_laws": "laws_chosen", "choose_colors": "colors_chosen",
             "complete_visible_ddl_holes": "visible_ddl_hole_patch_generated"]
         guard let resultTag = results[try effect.requiredString("tag")] else { throw HostError("chatgpt_operation_not_supported") }
         let recorder = try observation.map { try ProviderAttemptRecorder(action: action, reference: reference, options: $0) }

@@ -101,6 +101,8 @@ public struct GenerationRequest: Codable, Sendable {
     public var provenance: GenerationProvenance?
     /// The parent work's completion range record (`inku.completion-ranges.v1`), carried into a child drawn from it.
     public var completionRanges: Data?
+    /// The parent work's laws records (`laws_layers`, `laws_basis`), carried into a child drawn from it.
+    public var lawsRecords: Data?
     public init(authoring: GenerationAuthoring, configuration: Data, renderOptions: Data, clipPolicy: Data,
                 models: ModelSelection = .init(), providers: [ProviderSettings] = [],
                 renderColorMaps: [String: Data] = [:],
@@ -285,7 +287,28 @@ public struct SavedAuthoringContext: Sendable {
     public let authorityJSON: Data
     /// The completion range record saved with the work (absent for works without one or saved earlier).
     public var completionRanges: Data?
+    /// The laws records saved with the work, as one object (absent for a work without laws).
+    public var lawsRecords: Data?
     public var originKind: AuthoringOrigin? { AuthoringOrigin(rawValue: origin) }
+}
+
+/// Server `LAWS_RECORD_KEYS`: what a run that applies its laws keeps with the work (2026-10-20). The laws stage
+/// records the layers it placed and what its laws were applied to; a child drawn from the work carries them.
+public enum LawsRecords {
+    public static let keys = ["laws_layers", "laws_basis"]
+    /// The records `value` holds, as one object, or nil when it holds none.
+    public static func of(_ value: ExactJSON) -> ExactJSON? {
+        let fields = keys.reduce(into: [String: ExactJSON]()) { fields, key in
+            if value[key].object != nil { fields[key] = value[key] }
+        }
+        return fields.isEmpty ? nil : .object(fields)
+    }
+    /// `target` with the records of `records` written over its own.
+    public static func write(_ records: Data?, into target: inout ExactJSON) throws {
+        guard let records else { return }
+        let value = try ExactJSON(data: records)
+        for key in keys where value[key].object != nil { target[key] = value[key] }
+    }
 }
 
 public struct ReplayOptions: Sendable {

@@ -5,7 +5,9 @@ parent and save it without a run, so nothing linked the child to its parent's la
 the layout" then read the laws' numeric sentences without the record and refused the child
 (`unsupported_sentence`, seen on 5173 Build 1292). The child now keeps the record on its lineage
 edge (a redraw of a linked work, in its link), a touch written into a recorded sentence is written
-into the record too, and a sender cannot name a record.
+into the record too, and a sender cannot name a record. A catalog change child, which the screen
+saves as drawn with its parent's instructions, keeps the records too (2026-10-21; until then it
+kept none, and its layout and laws move answered `unsupported_sentence` on 5173 Build 1303).
 
 The basis of the laws (the composed document and answer they were applied by) goes the same way,
 so that the AI refinement's laws move reads it from any of them; a direct-DDL run gives it back
@@ -20,7 +22,7 @@ from fastapi.testclient import TestClient
 
 from inku_server import db
 from inku_server.api import app
-from inku_server.color_catalogs import render_color_map_for_catalog
+from inku_server.color_catalogs import color_catalogs, render_color_map_for_catalog
 from inku_server.persistence.variation_authority import VariationAuthorityStore
 from inku_server.pipeline_api import saved_work_parent
 from inku_server.pipeline_candidate import CandidateExecution, PipelineBinding
@@ -155,6 +157,31 @@ def test_children_drawn_from_a_laws_work_keep_its_record(monkeypatch):
         assert (relinked.laws_layers, relinked.laws_basis) == (LAWS, BASIS)
         redrawn = redraw(colored, 7)
         assert record_of(redrawn["id"]) == LAWS and basis_of(redrawn["id"]) == BASIS
+
+        # A catalog change draws the parent's Score in another catalog, as the screen does
+        # (/api/render-score, then the save with that Score). The instructions are the same,
+        # so the parent's records hold, in place of any the sender names.
+        other = next(entry["id"] for entry in color_catalogs() if entry["id"] != "default")
+        recolored = client.post("/api/render-score", json={
+            "input": "a grey ellipse", "ddl": source, "score": score, "canvas_aspect": "hd_monitor",
+            "render_seed": 77, "composition_seed": 17, "catalog_id": other,
+        }, headers=headers)
+        assert recolored.status_code == 200, recolored.text
+        cataloged = client.post("/api/history", json={
+            "input": "a grey ellipse", "ddl": source, "score": recolored.json()["score"], "at": 10,
+            "save_artifacts": False, "render_seed": 77, "composition_seed": 17, "catalog_id": other,
+            "lineage_parent_node_id": parent["lineage_node_id"], "derivation_kind": "catalog_change",
+            "derivation_metadata": {"catalog_id_from": "default", "catalog_id_to": other,
+                                    "laws_layers": {**LAWS, "layers": []}},
+        }, headers=headers)
+        assert cataloged.status_code == 200, cataloged.text
+        assert record_of(cataloged.json()["id"]) == LAWS and basis_of(cataloged.json()["id"]) == BASIS
+        recataloged = client.post("/api/compose", json={"work_id": cataloged.json()["id"],
+                                  "ddl": cataloged.json()["ddl"], "recompose_mode": "principled"}, headers=headers)
+        assert recataloged.status_code == 200, recataloged.text
+        recomposition = recataloged.json()["recomposition"]
+        assert recomposition.get("reason") != "unsupported_sentence", recomposition
+        assert all(move["layer"] != 0 for move in recomposition["moves"]), recomposition
 
         # A sender cannot name one, even on a kind whose edge carries it.
         named = client.post("/api/history", json={

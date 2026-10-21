@@ -46,9 +46,10 @@ HISTORY_FORK_CONTEXT_PROTOCOL = "inku.pipeline-history-fork-context.v3"
 # color arrangement, the support, the touches, and a redraw of such a work. Their
 # child keeps the parent's laws record on its lineage edge (2026-10-20). The
 # Server writes these edges' metadata itself, so only they are read for it. A
-# layout child is saved as the screen drew it, and the Server writes its records.
+# layout child and a catalog change child are saved as the screen drew them, and
+# the Server writes their records (the catalog change from 2026-10-21).
 LAWS_RECORD_DERIVATIONS = frozenset(
-    {"color_arrangement_change", "ground_change", "tool_change", "replay", "layout_change"}
+    {"color_arrangement_change", "ground_change", "tool_change", "replay", "layout_change", "catalog_change"}
 )
 # The laws records a work keeps: the layers the laws placed, and the composed
 # document and answer they were applied by, from which the AI refinement's laws

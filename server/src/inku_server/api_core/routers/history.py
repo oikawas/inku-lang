@@ -428,15 +428,19 @@ def api_history_post(
     replay_link = None
     # A sender never names a laws record: the Server writes them only on the edges
     # of the children it draws from their parent (color arrangement, support,
-    # touches, redraw) and of a layout child, and reads them only there (2026-10-20).
+    # touches, redraw) and of a layout or catalog change child, and reads them only
+    # there (2026-10-20).
     if any(key in body.derivation_metadata for key in LAWS_RECORD_KEYS):
         body = body.model_copy(update={"derivation_metadata": {
             key: value for key, value in body.derivation_metadata.items() if key not in LAWS_RECORD_KEYS}})
-    if body.derivation_kind == "layout_change" and body.lineage_parent_node_id:
+    if body.derivation_kind in ("layout_change", "catalog_change") and body.lineage_parent_node_id:
         # "Change the layout" keeps the layers the laws placed, and the screen saves
         # its child as drawn: the child keeps its parent's records, so that the
-        # layout can change again. The core reads each only while the child's
-        # instructions still match it (2026-10-20).
+        # layout can change again. A catalog change draws the parent's Score in
+        # another catalog with the same instructions, so its child keeps them for
+        # the layout and the laws move (2026-10-21; until then it kept none, and
+        # both answered unsupported_sentence on 5173 Build 1303). The core reads
+        # each only while the child's instructions still match it (2026-10-20).
         body = body.model_copy(update={"derivation_metadata": {
             **body.derivation_metadata, **_parent_laws_records(actor["id"], body.lineage_parent_node_id)}})
     # A work read again from the description (model or language comparison

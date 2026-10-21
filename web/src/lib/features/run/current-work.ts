@@ -12,6 +12,7 @@ import {
 import type { CanvasAspectId } from '../../plugins/system/canvas-aspect/index.ts';
 import { type SketchMode } from '../../sketch.ts';
 import type { ApiFetch } from '../../transport/api-fetch.ts';
+import { ConnectionFailure, GATEWAY_STATUSES, isAbort } from '../../transport/connection-failure.ts';
 import type { RenderOverrides } from '../render-payload.ts';
 import type { Recomposition } from '../canvas/recomposition.ts';
 import { pipelineViewFromErrorDetail, type PipelineView } from '../pipeline/api.ts';
@@ -183,42 +184,54 @@ export async function runCurrentWork(
 	// layer that will follow it.
 	capabilities.setStageLabel(paintStageLabel('requested', defaults.strings, { sketchOn }));
 
-	const response = await capabilities.apiFetch('/api/paint/stream', {
-		method: 'POST',
-		signal: options.signal,
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({
-			description: text,
-			sketch: sketchOn,
-			...(options.sketchText ? { sketch_text: options.sketchText } : {}),
-			stage1_model: resolvedStage1Model,
-			stage2_model: resolvedStage2Model,
-			include_thinking: defaults.includeThinking,
-			instruction_lang: defaults.instructionLang,
-			ui_lang: defaults.uiLang,
-			canvas_aspect: options.canvasAspectId ?? defaults.canvasAspectId,
-			render_seed: options.renderSeed,
-			composition_seed: options.compositionSeed,
-			save_history: options.saveHistory ?? true,
-			save_artifacts: options.saveArtifacts ?? true,
-			count_generation: options.countGeneration ?? true,
-			history_input: historyInput,
-			history_source_text: options.sourceText ?? text,
-			history_display_label: options.displayLabel ?? null,
-			batch_line_number: options.batchLineNumber ?? null,
-			batch_run_id: options.batchRunId ?? null,
-			history_visibility: options.historyVisibility ?? 'normal',
-			lineage_parent_node_id: options.lineageParentNodeId ?? null,
-			derivation_kind: options.derivationKind ?? null,
-			derivation_metadata: options.derivationMetadata ?? {},
-			...defaults.renderPayload
-		})
-	});
+	let response: Response;
+	try {
+		response = await capabilities.apiFetch('/api/paint/stream', {
+			method: 'POST',
+			signal: options.signal,
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				description: text,
+				sketch: sketchOn,
+				...(options.sketchText ? { sketch_text: options.sketchText } : {}),
+				stage1_model: resolvedStage1Model,
+				stage2_model: resolvedStage2Model,
+				include_thinking: defaults.includeThinking,
+				instruction_lang: defaults.instructionLang,
+				ui_lang: defaults.uiLang,
+				canvas_aspect: options.canvasAspectId ?? defaults.canvasAspectId,
+				render_seed: options.renderSeed,
+				composition_seed: options.compositionSeed,
+				save_history: options.saveHistory ?? true,
+				save_artifacts: options.saveArtifacts ?? true,
+				count_generation: options.countGeneration ?? true,
+				history_input: historyInput,
+				history_source_text: options.sourceText ?? text,
+				history_display_label: options.displayLabel ?? null,
+				batch_line_number: options.batchLineNumber ?? null,
+				batch_run_id: options.batchRunId ?? null,
+				history_visibility: options.historyVisibility ?? 'normal',
+				lineage_parent_node_id: options.lineageParentNodeId ?? null,
+				derivation_kind: options.derivationKind ?? null,
+				derivation_metadata: options.derivationMetadata ?? {},
+				...defaults.renderPayload
+			})
+		});
+	} catch (cause) {
+		// A request that never reached the Server cut the connection, unless the caller stopped it.
+		if (isAbort(cause, options.signal)) throw cause;
+		throw new ConnectionFailure('unreachable', cause instanceof Error ? cause.message : String(cause), { cause });
+	}
 	if (!response.ok) {
 		const data = await response.json().catch(() => ({})) as { detail?: unknown };
 		const pipelineView = pipelineViewFromErrorDetail(data.detail);
 		if (pipelineView) capabilities.adoptPipelineView?.(pipelineView);
-		throw new Error(capabilities.describeApiError(data.detail, response.status));
+		const message = capabilities.describeApiError(data.detail, response.status);
+		// A gateway answering for a Server that is away carries no detail of the Server's own.
+		if (GATEWAY_STATUSES.has(response.status) && data.detail === undefined) {
+			throw new ConnectionFailure('gateway', message);
+		}
+		throw new Error(message);
 	}
 
 	let result: CurrentWorkResult;

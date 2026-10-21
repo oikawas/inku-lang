@@ -9,6 +9,7 @@ runeHost.$state = stateShim;
 runeHost.$derived = identity;
 
 const { BatchState } = await import('./state.svelte.ts');
+const { ConnectionFailure } = await import('../../transport/connection-failure.ts');
 
 type PendingResult = {
 	resolve: (value: ReturnType<typeof result>) => void;
@@ -456,4 +457,143 @@ test('T-811: failed ancillary refreshes neither retry a saved line nor hide an i
 	assert.deepEqual(state.failures, []);
 	assert.equal(state.canResume, true);
 	assert.deepEqual(state.resumeInfo, { nextLine: 2, pending: 1, total: 2 });
+});
+
+// A Server that goes away while a batch draws (a deploy restarted 5173's API under
+// a batch on 2026-10-21, and every line sent while it was down stayed a failure).
+// /api/info answers 502 while it is down, and it comes back at the probe `upAfter`.
+function outageState(upAfter: number, options: { limitMs?: number; onSleep?: () => void } = {}) {
+	const server = { down: false, probes: 0, saved: [] as Array<Record<string, unknown>> };
+	let clock = 0;
+	const reports: unknown[] = [];
+	const state = new BatchState({
+		apiFetch: async (path) => {
+			if (path.startsWith('/api/info')) {
+				server.probes += 1;
+				if (server.down && server.probes >= upAfter) server.down = false;
+				return server.down ? new Response('', { status: 502 }) : jsonResponse({ name: 'inku-server' });
+			}
+			if (server.down) return new Response('', { status: 502 });
+			return jsonResponse({ items: path.startsWith('/api/history') ? server.saved : [] });
+		},
+		signedIn: () => true,
+		paintable: (text) => text.trim().length > 0,
+		setFailureReport: (report) => reports.push(report),
+		createRunId: () => 'run-fixed',
+		sleep: async (ms: number) => { clock += ms; options.onSleep?.(); },
+		now: () => clock,
+		serverWait: { limitMs: options.limitMs ?? 300_000, firstPhaseMs: 30_000, firstIntervalMs: 2_000, laterIntervalMs: 5_000 },
+	});
+	return { state, reports, server };
+}
+
+const quietRun = { canvasAspectId: 'square' as const, maxRetries: 0,
+	onLatestResult: () => {}, refreshAfterServerSave: async () => {}, refreshAfterRun: async () => {} };
+
+test('a batch waits for the Server through a restart and sends the cut lines again, failing none (Q1, Q2)', async () => {
+	const { state, server } = outageState(3);
+	state.input = 'one\ntwo\nthree\nfour\nfive';
+	const calls: number[] = [];
+	await state.run({ ...quietRun, paintLine: async (_text, options) => {
+		const line = options.batchLineNumber!;
+		calls.push(line);
+		if (line === 2 && calls.filter((call) => call === 2).length === 1) {
+			server.down = true;
+			throw new ConnectionFailure('cut', 'paint stream ended before completion');
+		}
+		if (server.down) throw new ConnectionFailure('gateway', 'HTTP 502');
+		return result(line);
+	} });
+	assert.deepEqual(state.failures, []);
+	assert.deepEqual(calls, [1, 2, 2, 3, 4, 5]);
+	assert.equal(state.success, 5);
+	assert.equal(state.interrupted, false);
+	assert.equal(server.probes, 3);
+	assert.equal(state.waitingForServer, null);
+});
+
+test('a line the Server saved before its stream was cut is not drawn again (Q3)', async () => {
+	const { state, server } = outageState(2);
+	state.input = 'one\ntwo\nthree';
+	const calls: number[] = [];
+	await state.run({ ...quietRun, paintLine: async (_text, options) => {
+		const line = options.batchLineNumber!;
+		calls.push(line);
+		if (line === 2) {
+			server.saved.push({ id: 'work-2', batch_run_id: 'run-fixed', batch_line_number: 2 });
+			server.down = true;
+			throw new ConnectionFailure('cut', 'paint stream ended before completion');
+		}
+		return result(line);
+	} });
+	assert.deepEqual(calls, [1, 2, 3]);
+	assert.deepEqual(state.failures, []);
+	assert.equal(state.success, 3);
+});
+
+test('a Server that does not come back within the wait interrupts the batch, which resumes from that line (Q4)', async () => {
+	const { state, server } = outageState(Number.POSITIVE_INFINITY, { limitMs: 60_000 });
+	state.input = 'one\ntwo\nthree';
+	const calls: number[] = [];
+	await state.run({ ...quietRun, paintLine: async (_text, options) => {
+		const line = options.batchLineNumber!;
+		calls.push(line);
+		if (line === 2) {
+			server.down = true;
+			throw new ConnectionFailure('unreachable', 'Failed to fetch');
+		}
+		return result(line);
+	} });
+	assert.deepEqual(calls, [1, 2]);
+	assert.deepEqual(state.failures, []);
+	assert.equal(state.interrupted, true);
+	assert.equal(state.serverLost, true);
+	assert.deepEqual(state.resume?.pending?.map((line) => line.line), [2, 3]);
+});
+
+test('a failure the Server answered is counted as before, without waiting (Q5)', async () => {
+	const { state, server } = outageState(1);
+	state.input = 'one\ntwo';
+	await state.run({ ...quietRun, paintLine: async (_text, options) => {
+		if (options.batchLineNumber === 1) throw new Error('503: provider down');
+		return result(2);
+	} });
+	assert.deepEqual(state.failures.map((failure) => [failure.line, failure.message]), [[1, '503: provider down']]);
+	assert.equal(server.probes, 0);
+	assert.equal(state.serverLost, false);
+});
+
+test('stopping while the batch waits for the Server interrupts it at once (Q6)', async () => {
+	let stop = () => {};
+	const { state, server } = outageState(Number.POSITIVE_INFINITY, { onSleep: () => stop() });
+	stop = () => state.stop();
+	state.input = 'one\ntwo\nthree';
+	const calls: number[] = [];
+	await state.run({ ...quietRun, paintLine: async (_text, options) => {
+		const line = options.batchLineNumber!;
+		calls.push(line);
+		if (line === 2) {
+			server.down = true;
+			throw new ConnectionFailure('gateway', 'HTTP 502');
+		}
+		return result(line);
+	} });
+	assert.deepEqual(calls, [1, 2]);
+	assert.deepEqual(state.failures, []);
+	assert.equal(state.interrupted, true);
+	assert.equal(state.serverLost, false);
+	assert.equal(server.probes, 1);
+});
+
+test('a line cut three times in a row while the Server answers is counted as a failure', async () => {
+	const { state, server } = outageState(1);
+	state.input = 'one';
+	const calls: number[] = [];
+	await state.run({ ...quietRun, paintLine: async (_text, options) => {
+		calls.push(options.batchLineNumber!);
+		throw new ConnectionFailure('cut', 'paint stream ended before completion');
+	} });
+	assert.deepEqual(calls, [1, 1, 1]);
+	assert.deepEqual(state.failures.map((failure) => [failure.line, failure.message]), [[1, 'paint stream ended before completion']]);
+	assert.equal(server.probes, 2);
 });

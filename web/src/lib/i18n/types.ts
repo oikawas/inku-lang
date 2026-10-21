@@ -173,6 +173,8 @@ export interface LangPack {
 	batchHistoryApply: string;
 	batchResumeBtn: string;
 	batchInterruptedLabel: string;
+	/** A batch stopped because the Server did not come back after a cut connection (2026-10-21). */
+	batchServerLost: string;
 	batchNextConditionsLabel: string;
 	batchResumeScanning: string;
 	batchResumeTitle: string;
@@ -262,6 +264,8 @@ export interface LangPack {
 	stageChoosingColors: string;
 	batchProgress: (current: number, total: number) => string;
 	batchRetryProgress: (current: number, total: number, round: number) => string;
+	/** While a batch waits for the Server to answer again before sending a cut line once more (2026-10-21). */
+	batchWaitingForServer: (line: number) => string;
 	settingsBatchRetryLabel: string;
 	settingsBatchRetryDescription: string;
 	settingsBatchRetryCount: string;

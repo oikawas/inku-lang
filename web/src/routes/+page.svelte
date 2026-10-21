@@ -2823,6 +2823,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						batchResumeInfo={batch.resumeInfo}
 						batchResuming={batch.resuming}
 						batchInterrupted={batch.interrupted}
+						batchWaitingLine={batch.waitingForServer}
+						batchServerLost={batch.serverLost}
 						batchSuccess={batch.success}
 						onResumeBatch={() => void resumeInterruptedBatch()}
 						onRetryBatchFailures={() => void retryFailedBatch()}

@@ -4105,6 +4105,20 @@ resume after reload.** When reload recovery can restore conditions, it reads the
 last saved work; a condition without a record is not invented, because absence
 means "older than the record," not "off."
 
+**A line a restart of the Server cut short is not a failure** (2026-10-21). A
+line whose request cannot connect, whose gateway answers 502, 503 or 504 for
+the Server (with no `detail` of the Server's own), or whose paint stream ends
+before `done` has its connection cut. The batch waits until `/api/info` answers
+(every 2 seconds for the first 30 seconds, then every 5 seconds, for 5 minutes)
+and shows that it is waiting for the server. When the server is back, the
+newest works are read for the line's work (by run ID and line number): a saved
+line counts as a success, and an unsaved one is sent again. This sending again
+is not a retry round. A line cut three times in a row while the server answers
+is a failure. A server that does not come back within 5 minutes interrupts the
+batch, which resumes from that line (no failure is counted). A failure the
+server answers with its `detail` (such as a busy 503) and a stream's `error`
+count as failures as before.
+
 Letting the server choose a color catalog by reading each line is **not a batch
 option but the catalog selection itself** (below). **Until v2.9.39 the batch tab
 carried its own checkbox for it, and until v2.9.22 that checkbox drew a catalog

@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 import type { LangPack } from '../../i18n/types.ts';
+import { ConnectionFailure } from '../../transport/connection-failure.ts';
 import { runCurrentWork } from './current-work.ts';
 
 const strings = {
@@ -214,6 +215,57 @@ test('T-260: an HTTP failure uses the page-provided error wording', async () => 
 		),
 		/503: provider down/
 	);
+});
+
+function runWith(apiFetch: (path: string, init?: RequestInit) => Promise<Response>, options: { signal?: AbortSignal } = {}) {
+	return runCurrentWork(
+		'circle',
+		options,
+		{
+			uiLang: 'en',
+			strings,
+			stage1Model: 'default/stage-1',
+			stage2Model: 'default/stage-2',
+			includeThinking: false,
+			instructionLang: 'en',
+			canvasAspectId: 'square',
+			ddlAutoRepairEnabled: false,
+			sketchMode: 'off',
+			renderPayload: {}
+		},
+		{
+			apiFetch,
+			describeApiError: (detail, status) => `${status}: ${String(detail)}`,
+			setStage1UserPrompt: () => undefined,
+			setStageLabel: () => undefined,
+			setActiveRunTokens: () => undefined,
+			attachSavedLineage: () => undefined,
+			updateGenerationCount: () => undefined
+		}
+	);
+}
+
+test('a cut connection is told apart from a failure the Server answered (2026-10-21)', async () => {
+	// A gateway answering for a Server that is away carries no detail of the Server's own.
+	await assert.rejects(runWith(async () => new Response('', { status: 502 })),
+		(error) => error instanceof ConnectionFailure && error.kind === 'gateway' && error.message === '502: undefined');
+	// The Server's own 503 keeps its detail and stays a failure.
+	await assert.rejects(runWith(async () => new Response(JSON.stringify({ detail: 'provider down' }), { status: 503 })),
+		(error) => !(error instanceof ConnectionFailure) && /503: provider down/.test(String(error)));
+	await assert.rejects(runWith(async () => { throw new TypeError('Failed to fetch'); }),
+		(error) => error instanceof ConnectionFailure && error.kind === 'unreachable');
+	// A stream that ends before its done event was cut; the Server ends a failed run with `error`.
+	await assert.rejects(runWith(async () => paintStream([{ event: 'stage1', tokens_in: 1, tokens_out: 1 }])),
+		(error) => error instanceof ConnectionFailure && error.kind === 'cut');
+	await assert.rejects(runWith(async () => paintStream([{ event: 'error', detail: 'stage 1 failed', status: 500 }])),
+		(error) => !(error instanceof ConnectionFailure) && /500: stage 1 failed/.test(String(error)));
+});
+
+test('a request the caller stopped stays the caller\'s, not a cut connection', async () => {
+	const controller = new AbortController();
+	controller.abort();
+	await assert.rejects(runWith(async () => { throw new DOMException('aborted', 'AbortError'); }, { signal: controller.signal }),
+		(error) => !(error instanceof ConnectionFailure) && (error as Error).name === 'AbortError');
 });
 
 test('T-263/T-264: the operation stays stateless and Work keeps outer-run ownership', () => {

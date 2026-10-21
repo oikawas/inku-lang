@@ -16,6 +16,7 @@
 
 import type { LangPack } from './i18n/types.ts';
 import type { PipelineProviderAttempt } from './features/pipeline/api.ts';
+import { ConnectionFailure, isAbort } from './transport/connection-failure.ts';
 
 export type PaintSketchEvent = {
 	event: 'sketch';
@@ -119,7 +120,14 @@ export async function readPaintStream<T>(
 	};
 
 	for (;;) {
-		const chunk = await reader.read();
+		let chunk: ReadableStreamReadResult<Uint8Array>;
+		try {
+			chunk = await reader.read();
+		} catch (cause) {
+			// A stopped request is the caller's; anything else cut the stream short.
+			if (isAbort(cause)) throw cause;
+			throw new ConnectionFailure('cut', cause instanceof Error ? cause.message : String(cause), { cause });
+		}
 		if (chunk.value) buffer += decoder.decode(chunk.value, { stream: true });
 		// TextDecoder can retain an incomplete multibyte sequence. Flush it before
 		// consuming the final unterminated NDJSON record at EOF.
@@ -136,7 +144,8 @@ export async function readPaintStream<T>(
 			break;
 		}
 	}
-	if (!done) throw new Error('paint stream ended before completion');
+	// The Server writes `error` when a run fails, so a stream that just ends was cut.
+	if (!done) throw new ConnectionFailure('cut', 'paint stream ended before completion');
 	return done;
 }
 

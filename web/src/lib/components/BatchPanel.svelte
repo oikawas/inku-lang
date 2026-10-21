@@ -53,6 +53,10 @@
 		batchResuming?: boolean;
 		/** The last batch was explicitly stopped before it reached its end. */
 		batchInterrupted?: boolean;
+		/** The line waiting for the Server to answer again after its connection was cut. */
+		batchWaitingLine?: number | null;
+		/** The last batch stopped because the Server did not come back after a cut connection. */
+		batchServerLost?: boolean;
 		/** Completed works from the most recent batch, including a stopped one. */
 		batchSuccess?: number;
 		onResumeBatch: () => void;
@@ -99,6 +103,8 @@
 		batchResumeInfo = null,
 		batchResuming = false,
 		batchInterrupted = false,
+		batchWaitingLine = null,
+		batchServerLost = false,
 		batchSuccess = 0,
 		onResumeBatch,
 		onRetryBatchFailures,
@@ -278,9 +284,11 @@
 {#if batchRunning && batchTotal > 0}
 	<div class="batch-progress-wrap">
 		<RunStatus
-			label={batchRetryRound > 0
-				? t().batchRetryProgress(batchCurrent, batchTotal, batchRetryRound)
-				: t().batchProgress(batchCurrent, batchTotal)}
+			label={batchWaitingLine !== null
+				? t().batchWaitingForServer(batchWaitingLine)
+				: batchRetryRound > 0
+					? t().batchRetryProgress(batchCurrent, batchTotal, batchRetryRound)
+					: t().batchProgress(batchCurrent, batchTotal)}
 			stage1Model={stage1ModelLabel}
 			stage2Model={stage2ModelLabel}
 			elapsedMs={liveMs}
@@ -298,6 +306,7 @@
 {/if}
 
 {#if error}<p class="error-text">{error}</p>{/if}
+{#if batchServerLost && !batchRunning}<p class="batch-info">{t().batchServerLost}</p>{/if}
 <!-- Sketch from life (Stage 0.5), read-only here. Above the instructions because it comes
      before them, the same order the describe tab keeps. Written when a line
      returns, so it is the prose of the work the observer below is showing. -->

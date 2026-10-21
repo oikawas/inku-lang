@@ -1,4 +1,5 @@
 import type { ApiFetch } from '../../transport/api-fetch.ts';
+import { isConnectionFailure, type ConnectionFailure } from '../../transport/connection-failure.ts';
 import type { PaintOptions, PaintResult } from '../run/current-work.ts';
 import type { BatchFailure, BatchFailureReport } from './failure-report.svelte.ts';
 import { dropFailedLine, planRetryRound } from './retry.ts';
@@ -24,6 +25,31 @@ export const BATCH_PROMPT_HISTORY_MAX_TEXT = 20_000;
 const BATCH_RESUME_PROBE_LIMIT = 20;
 const BATCH_RESUME_SCAN_PAGE = 100;
 const BATCH_RESUME_SCAN_MAX = 500;
+
+// A line whose connection was cut (a restart of the Server, 2026-10-21) waits
+// for the Server and is sent again, not counted as a failure: every 2s for the
+// first 30s, then every 5s, for 5 minutes. A Server still away then interrupts
+// the batch, which resumes from that line. A line cut three times in a row while
+// the Server answers is a failure, so a cut that keeps coming cannot loop.
+export type BatchServerWait = { limitMs: number; firstPhaseMs: number; firstIntervalMs: number; laterIntervalMs: number };
+const BATCH_SERVER_WAIT: BatchServerWait = { limitMs: 300_000, firstPhaseMs: 30_000, firstIntervalMs: 2_000, laterIntervalMs: 5_000 };
+const BATCH_CUTS_PER_LINE = 3;
+
+function abortableDelay(ms: number, signal: AbortSignal): Promise<void> {
+	return new Promise((resolve) => {
+		if (signal.aborted) {
+			resolve();
+			return;
+		}
+		const done = () => {
+			clearTimeout(timer);
+			signal.removeEventListener('abort', done);
+			resolve();
+		};
+		const timer = setTimeout(done, ms);
+		signal.addEventListener('abort', done, { once: true });
+	});
+}
 
 export type BatchLineResult = Pick<PaintResult,
 	| 'sketch_text'
@@ -68,6 +94,10 @@ export type BatchStateDependencies = {
 	describeApiError?: (detail: unknown, status: number) => string;
 	createRunId?: () => string;
 	warn?: (message: string, cause: unknown) => void;
+	/** The wait for the Server after a cut connection, and its clock; tests shorten them. */
+	serverWait?: BatchServerWait;
+	sleep?: (ms: number, signal: AbortSignal) => Promise<void>;
+	now?: () => number;
 };
 
 export type BatchRunOptions<TResult extends BatchLineResult> = {
@@ -132,6 +162,10 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 	latestThinking = $state<string | null>(null);
 	latestPrompt = $state('');
 	autoFollowLatest = $state(false);
+	/** The line waiting for the Server to answer again after its connection was cut. */
+	waitingForServer = $state<number | null>(null);
+	/** The batch stopped because the Server did not come back within the wait. */
+	serverLost = $state(false);
 
 	private readonly deps: BatchStateDependencies;
 	private runIdentity = 0;
@@ -434,6 +468,41 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 
 		/** true = painted, string = failure message, null = interrupted or stale. */
 		const paintBatchLine = async (item: NumberedLine): Promise<true | string | null> => {
+			// A connection a restart of the Server cut is not the line's failure: wait
+			// for the Server, and send the line again unless it was saved before the cut.
+			for (let cuts = 1; ; cuts += 1) {
+				const outcome = await paintBatchAttempt(item);
+				if (!isConnectionFailure(outcome)) return outcome;
+				if (cuts >= BATCH_CUTS_PER_LINE) return outcome.message;
+				const back = await this.waitForServer(item.line, isCurrent, abortController.signal);
+				if (back === null) return null;
+				if (!back) {
+					this.serverLost = true;
+					return null;
+				}
+				let savedWork: TWork | null;
+				try {
+					savedWork = await this.savedLineWork(batchRunId, item.line);
+				} catch (cause) {
+					this.warn('failed to check whether a cut batch line was saved', cause);
+					return outcome.message;
+				}
+				if (!isCurrent()) return null;
+				if (savedWork) {
+					this.markSnapshotCompleted(snapshot, item);
+					this.success += 1;
+					try {
+						await options.refreshAfterServerSave();
+					} catch (cause) {
+						this.warn('failed to refresh history after saved batch work', cause);
+					}
+					return isCurrent() ? true : null;
+				}
+			}
+		};
+
+		/** One send of a line; a cut connection comes back as its failure for the caller to wait on. */
+		const paintBatchAttempt = async (item: NumberedLine): Promise<true | string | null | ConnectionFailure> => {
 			if (!isCurrent()) return null;
 			this.activeLine = item.line;
 			let saved = false;
@@ -478,6 +547,7 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 					return true;
 				}
 				if (!isCurrent()) return null;
+				if (isConnectionFailure(cause)) return cause;
 				return cause instanceof Error ? cause.message : String(cause);
 			}
 		};
@@ -601,6 +671,8 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 		this.latestThinking = null;
 		this.latestPrompt = '';
 		this.autoFollowLatest = true;
+		this.waitingForServer = null;
+		this.serverLost = false;
 		this.deps.setFailureReport(null);
 	}
 
@@ -659,6 +731,47 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 		if (!response.ok) throw new Error(`HTTP ${response.status}`);
 		const data = await response.json() as { items?: TWork[] };
 		return Array.isArray(data.items) ? data.items : [];
+	}
+
+	/**
+	 * Wait for the Server to answer again after a cut connection: true when it
+	 * does, false when the wait runs out, null when the batch stopped meanwhile.
+	 */
+	private async waitForServer(line: number, isCurrent: () => boolean, signal: AbortSignal): Promise<boolean | null> {
+		const wait = this.deps.serverWait ?? BATCH_SERVER_WAIT;
+		const sleep = this.deps.sleep ?? abortableDelay;
+		const now = this.deps.now ?? Date.now;
+		const started = now();
+		if (!isCurrent()) return null;
+		this.waitingForServer = line;
+		try {
+			for (;;) {
+				const answers = await this.serverAnswers(signal);
+				if (!isCurrent()) return null;
+				if (answers) return true;
+				const waited = now() - started;
+				if (waited >= wait.limitMs) return false;
+				await sleep(waited < wait.firstPhaseMs ? wait.firstIntervalMs : wait.laterIntervalMs, signal);
+				if (!isCurrent()) return null;
+			}
+		} finally {
+			if (this.waitingForServer === line) this.waitingForServer = null;
+		}
+	}
+
+	private async serverAnswers(signal: AbortSignal): Promise<boolean> {
+		try {
+			const response = await this.deps.apiFetch('/api/info', { cache: 'no-store', signal });
+			return response.ok;
+		} catch {
+			return false;
+		}
+	}
+
+	/** The work a batch line saved, looked up among the newest works as resume does. */
+	private async savedLineWork(runId: string, line: number): Promise<TWork | null> {
+		const works = await this.fetchWorksPage(0, BATCH_RESUME_PROBE_LIMIT);
+		return works.find((work) => (work.batch_run_id ?? null) === runId && work.batch_line_number === line) ?? null;
 	}
 
 	/** Walk backward only until this run has been passed or enough works exist. */

@@ -64,6 +64,8 @@
 		batchResumeInfo: { nextLine: number | null; pending: number | null; total: number } | null;
 		batchResuming: boolean;
 		batchInterrupted: boolean;
+		batchWaitingLine?: number | null;
+		batchServerLost?: boolean;
 		batchSuccess: number;
 		onResumeBatch: () => void;
 		onRetryBatchFailures: () => void;
@@ -130,6 +132,8 @@
 		batchResumeInfo,
 		batchResuming,
 		batchInterrupted,
+		batchWaitingLine = null,
+		batchServerLost = false,
 		batchSuccess,
 		onResumeBatch,
 		onRetryBatchFailures,
@@ -386,6 +390,8 @@
 			{batchResumeInfo}
 			{batchResuming}
 			{batchInterrupted}
+			{batchWaitingLine}
+			{batchServerLost}
 			{batchSuccess}
 			{onResumeBatch}
 			{onRetryBatchFailures}

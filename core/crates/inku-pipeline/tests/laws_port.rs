@@ -9,12 +9,12 @@
 //! a progression of sizes, a grid the core tiles otherwise than the prototype
 //! counted, and each card: the five patterns, dense places, voices, motifs,
 //! jo-ha-kyu and shin-gyo-so); and wide cases on the wide canvas. The requests
-//! are the reference's, in both languages. It holds no description text and no
-//! reason.
+//! are the reference's, in both languages, but for the items of
+//! description_counts (2026-10-21). It holds no description text and no reason.
 
 mod common;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use inku_ddl::work_plan::WorkPlanPlugin;
 use inku_ddl::{
@@ -23,8 +23,8 @@ use inku_ddl::{
 };
 use inku_pipeline::core_boundary::{CompilerOptions, compile_committed};
 use inku_pipeline::laws::{
-    ComposedPlan, LAWS_PROMPT_ID, LawsContext, apply_laws_without_count_rule, build_laws_prompt,
-    choose_laws, off_canvas,
+    Chosen, ComposedPlan, LAWS_PROMPT_ID, LawsContext, Refusal, apply_laws_without_count_rule,
+    build_laws_prompt, choose_laws, off_canvas,
 };
 use inku_pipeline::prompts::{LlmStage, PromptLimits, work_plan_plugins};
 use serde::Deserialize;
@@ -39,6 +39,26 @@ const LIMITS: PromptLimits = PromptLimits {
     max_source_bytes: 400_000,
     max_response_bytes: 1024 * 1024,
 };
+
+/// The description the answers made here quote the counts from (ja-13's white
+/// arcs, ja-08's dots and ja-12's yellow squares): the fixture holds none.
+const DESCRIPTION: &str = "八つの白い弧、二十四の黄の点、九つの黄の四角";
+
+/// Choose the laws of an answer made here, with no layer counted before it.
+fn choose(
+    response: &str,
+    context: &LawsContext,
+    composed: &ComposedPlan,
+) -> Result<Chosen, Refusal> {
+    choose_laws(
+        response,
+        DESCRIPTION,
+        &BTreeSet::new(),
+        context,
+        composed,
+        LIMITS,
+    )
+}
 
 #[derive(Deserialize)]
 struct Fixture {
@@ -334,7 +354,8 @@ fn a_print_the_canvas_cannot_hold_names_the_requested_layer() {
 }
 
 /// The request is the prototype's: its system text and message in both
-/// languages (the description a placeholder) and its schema.
+/// languages (the description a placeholder) and its schema, but for the items
+/// of description_counts, a layer and the description's words (2026-10-21).
 #[test]
 fn the_laws_request_is_built_as_the_prototype_builds_it() {
     let fixture = fixture();
@@ -482,16 +503,15 @@ fn the_tool_refuses_answers_that_break_the_rules() {
             "not_a_choice",
         ),
     ] {
-        let refusal = choose_laws(&response, &context, &case.composed, LIMITS)
+        let refusal = choose(&response, &context, &case.composed)
             .expect_err(&format!("{response} is refused"));
         assert_eq!(refusal.code, code, "{response}: {refusal:?}");
         assert!(!refusal.ja.is_empty() && !refusal.en.is_empty());
     }
-    let chosen = choose_laws(
+    let chosen = choose(
         &answer(json!({"B5": diagonal, "B21": still}), "B5", 0),
         &context,
         &case.composed,
-        LIMITS,
     )
     .expect("two laws are chosen");
     assert_eq!(chosen.laws, ["B5", "B21"]);
@@ -571,7 +591,7 @@ fn the_tool_refuses_arrangements_it_cannot_lay() {
             "B9: layer 0 はすでに 2 個の指示に分かれていて、この法則を当てられない",
         ),
     ] {
-        let refusal = choose_laws(&response, &context, &case.composed, LIMITS)
+        let refusal = choose(&response, &context, &case.composed)
             .expect_err(&format!("{response} is refused"));
         assert_eq!(refusal.code, code, "{response}: {refusal:?}");
         assert_eq!(refusal.ja, ja, "{response}");
@@ -588,7 +608,7 @@ fn the_tool_refuses_arrangements_it_cannot_lay() {
     many.source = many.source.replace("点を24個散らす", "点を70個散らす");
     many.composed.plan.layers[1].count = 70;
     let (crowded, _, _) = self::context(&many, None, &definitions);
-    let refusal = choose_laws(
+    let refusal = choose(
         &answer(
             json!({"B10": {"targets": [{"layer": 1, "change": "spacing", "ratio": "0.618", "toward": "right"}]},
                    "B21": {"targets": [{"layer": 1, "hand": "still"}]}}),
@@ -597,7 +617,6 @@ fn the_tool_refuses_arrangements_it_cannot_lay() {
         ),
         &crowded,
         &many.composed,
-        LIMITS,
     )
     .expect_err("seventy-one instructions are refused");
     assert_eq!(refusal.code, "too_many_instructions", "{refusal:?}");
@@ -632,8 +651,7 @@ fn the_tool_refuses_cards_it_cannot_lay() {
     };
     let refused = |case: &Case, response: String| {
         let (context, _, _) = context(case, None, &definitions);
-        choose_laws(&response, &context, &case.composed, LIMITS)
-            .expect_err(&format!("{response} is refused"))
+        choose(&response, &context, &case.composed).expect_err(&format!("{response} is refused"))
     };
     let ichimatsu = json!({"layer": 0, "pattern": "ichimatsu", "area": "whole", "unit": "1/8",
                            "colors": ["white", "blue"]});
@@ -683,7 +701,7 @@ fn the_tool_refuses_cards_it_cannot_lay() {
                        "B15": {"layers": [1]}}),
                 "C3",
                 0,
-                json!([0]),
+                json!([{"layer": 0, "words": "八つの白い弧"}]),
             ),
             "counted_layer",
             "layer 0 は記述が数を書いた物なので、数の変わる声部にできない".to_owned(),
@@ -695,7 +713,7 @@ fn the_tool_refuses_cards_it_cannot_lay() {
                        "B21": still(0)}),
                 "C1",
                 2,
-                json!([2]),
+                json!([{"layer": 2, "words": "二十四の黄の点"}]),
             ),
             "count_kept",
             "layer 2 は記述が数を書いた物なので 24 のまま".to_owned(),
@@ -714,7 +732,12 @@ fn the_tool_refuses_cards_it_cannot_lay() {
         ),
         (
             "ja-12",
-            answer(json!({"C4": spiral(1, 5), "B21": still(0)}), "C4", 1, json!([1])),
+            answer(
+                json!({"C4": spiral(1, 5), "B21": still(0)}),
+                "C4",
+                1,
+                json!([{"layer": 1, "words": "九つの黄の四角"}]),
+            ),
             "repeats_kept",
             "layer 1 の数は記述が書いた数 9 のままにする".to_owned(),
         ),

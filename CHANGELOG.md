@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-21 — The laws stage's answer names each layer the description counts with the description's words
+
+The laws stage's answer listed the layers of the things whose count the description itself writes ("one heron", "three times") as a list of layer numbers (description_counts). The model often read the list as each layer's count (`[0, 3, 0]`) and left the counted layer out of it, so a law that changes such a count could pass unrefused. Each item is now a layer number with the part of the description that writes the count, quoted verbatim, and the tool looks for the words in the description (refusing words it does not hold, and a layer named twice). A layer a refused answer named with the description's words keeps its count, though a later answer leaves it out. This holds for the laws stage of a description run and for the laws move of the AI refinement.
+
 ### 2026-10-21 — Android: the camera's model chooser follows the model purposes, and Juxtapose's held reason matches Web
 
 At the author's decision, the camera's model chooser offers only the models set to be used for both LLM and Vision. The camera reads the photo and draws with the same model, so a model with only one of the two purposes stops partway. If the chosen model has only one, it has to be chosen again. Also, in the work-editing menu of a description-locked work, the reason under Juxtapose is now Web's "This work's DDL was edited. Drawing it from the description would lose the edits, so this is not offered. …". As the way to start again from the description, Android names Change the description in the same menu.

@@ -31,7 +31,7 @@ MODEL = "nvidia:poolside/laguna-xs-2.1"
 # The circle moves from the golden section's upper left crossing (the parent's
 # B1) to the thirds' lower right one, and the dots recede; B1 and B21 are left
 # out, as the move asks. An answer names two or three laws.
-MOVED = {"main_layer": 1, "main_law": "B3", "description_counts": [1],
+MOVED = {"main_layer": 1, "main_law": "B3", "description_counts": [{"layer": 1, "words": "赤い円がひとつ"}],
          "laws": {"B3": {"targets": [{"layer": 1, "at": "point_lr"}]}, "B15": {"layers": [2]}},
          "reason": "円を三分割の右下の交点へ移し、点を遠くに置く。"}
 SENTENCE = "廃駅のホームに時刻表だけが残る。"

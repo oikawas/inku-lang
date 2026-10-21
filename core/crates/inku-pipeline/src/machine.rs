@@ -282,6 +282,10 @@ pub struct PendingLaws {
     /// request from the third on lists after the latest (2026-10-21).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub refused: Vec<laws::RefusedReason>,
+    /// The layers the run's refused answers named with the description's own
+    /// words, whose count the later answers keep (2026-10-21).
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub counted: BTreeSet<usize>,
 }
 
 /// A saved work as the laws stage from it reads it (2026-10-20).
@@ -1775,6 +1779,7 @@ impl PipelineSnapshot {
             document,
             reason: reason.to_owned(),
             refused: Vec::new(),
+            counted: BTreeSet::new(),
         });
         self.begin_llm(prompt, description, Vec::new(), events)
     }
@@ -1827,6 +1832,8 @@ impl PipelineSnapshot {
         events: &mut Vec<PipelineEvent>,
     ) -> Result<(), ProtocolError> {
         let pending = self.laws.as_ref().ok_or(ProtocolError::InternalInvariant)?;
+        // The laws are asked only with a description, which their answers quote.
+        let description = description.ok_or(ProtocolError::InternalInvariant)?;
         let Some((context, composed_shortfalls)) =
             self.laws_context(&pending.document, &pending.composed)
         else {
@@ -1834,13 +1841,14 @@ impl PipelineSnapshot {
         };
         let chosen = match laws::choose_laws(
             response,
+            &description,
+            &pending.counted,
             &context,
             &pending.composed,
             self.config.prompt_limits,
         ) {
             Ok(chosen) => chosen,
             Err(refusal) => {
-                let description = description.ok_or(ProtocolError::InternalInvariant)?;
                 return self.ask_laws_again(
                     &context,
                     &refusal,
@@ -1874,7 +1882,6 @@ impl PipelineSnapshot {
         if let Some(refusal) = off_canvas_instruction(&compiled)
             .and_then(|instruction| laws::off_canvas(&chosen, &context, instruction))
         {
-            let description = description.ok_or(ProtocolError::InternalInvariant)?;
             return self.ask_laws_again(
                 &context,
                 &refusal,
@@ -1921,7 +1928,7 @@ impl PipelineSnapshot {
             printed,
             handoff,
             &pending.reason,
-            description,
+            Some(description),
             events,
         )
     }
@@ -1929,7 +1936,8 @@ impl PipelineSnapshot {
     /// Ask for the laws again with the refused answer and the tool's reason for
     /// refusing it, and the reasons the answers before it were refused with, as
     /// the next attempt of the stage's budget; when it is spent, commit the
-    /// composed document.
+    /// composed document. The layers the refused answer named with the
+    /// description's own words keep their count in the answers after it.
     fn ask_laws_again(
         &mut self,
         context: &LawsContext,
@@ -2001,6 +2009,12 @@ impl PipelineSnapshot {
         let (Some(next), Some(prompt)) = (next, prompt) else {
             return self.laws_fallback(json!({"failure": failure, "detail": refusal.code}), events);
         };
+        // An answer too long to read names no layer.
+        let quoted = if refusal.code == "too_long" {
+            BTreeSet::new()
+        } else {
+            laws::quoted_layers(answer, &description)
+        };
         self.reissue(
             LlmStage::ChooseLaws,
             prompt,
@@ -2009,11 +2023,9 @@ impl PipelineSnapshot {
             next,
             events,
         )?;
-        self.laws
-            .as_mut()
-            .ok_or(ProtocolError::InternalInvariant)?
-            .refused
-            .push(refusal.into());
+        let pending = self.laws.as_mut().ok_or(ProtocolError::InternalInvariant)?;
+        pending.refused.push(refusal.into());
+        pending.counted.extend(quoted);
         self.event(
             events,
             "retry_scheduled",

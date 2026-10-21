@@ -2766,7 +2766,8 @@ fn a_law_a_layer_cannot_take_is_refused_with_the_way_out() {
              secondary or accent; drop B6 or change the main layer",
         ),
         (
-            json!({"main_layer": 1, "main_law": "C4", "description_counts": [1],
+            json!({"main_layer": 1, "main_law": "C4",
+                   "description_counts": [{"layer": 1, "words": "A red circle"}],
                    "laws": {"C4": {"layer": 1, "repeats": 3, "sequence": ["echo"], "path": "row"},
                             "B15": {"layers": [2]}},
                    "reason": "“A red circle” leads the picture."}),
@@ -2800,7 +2801,8 @@ fn a_request_from_the_third_lists_the_reasons_refused_before() {
     let b6 = json!({"main_layer": 1, "main_law": "B6", "description_counts": [],
                     "laws": {"B6": {"secondary": [2]}, "B15": {"layers": [2]}},
                     "reason": "“A red circle” leads the picture."});
-    let c4 = json!({"main_layer": 1, "main_law": "C4", "description_counts": [1],
+    let c4 = json!({"main_layer": 1, "main_law": "C4",
+                    "description_counts": [{"layer": 1, "words": "A red circle"}],
                     "laws": {"C4": {"layer": 1, "repeats": 3, "sequence": ["echo"], "path": "row"},
                              "B15": {"layers": [2]}},
                     "reason": "“A red circle” leads the picture."});
@@ -2838,6 +2840,48 @@ fn a_request_from_the_third_lists_the_reasons_refused_before() {
     ending(&third, c4_reason, Some(b6_reason));
     let fourth = laws_answer(&third.snapshot, &b6);
     ending(&fourth, b6_reason, Some(c4_reason));
+}
+
+/// A layer an answer named with the description's words keeps its count in the
+/// answers after it, though they drop it from description_counts: C4 cannot
+/// take the one red circle again, and another law can (2026-10-21).
+#[test]
+fn a_layer_a_refused_answer_quoted_keeps_its_count_after_it() {
+    let c4 = |counts: serde_json::Value| {
+        json!({"main_layer": 1, "main_law": "C4", "description_counts": counts,
+               "laws": {"C4": {"layer": 1, "repeats": 3, "sequence": ["echo"], "path": "row"},
+                        "B15": {"layers": [2]}},
+               "reason": "“A red circle” leads the picture."})
+    };
+    let mut pipeline_config = config();
+    pipeline_config.composition = Some(CompositionConfig { read: false });
+    pipeline_config.laws = Some(LawsConfig {});
+    pipeline_config.laws_retry = Some(RetryPolicy {
+        max_attempts: 3,
+        ..pipeline_config.catalog_retry
+    });
+    let asked = plan_answer(&started_description(pipeline_config)).snapshot;
+    let first = laws_answer(&asked, &c4(json!([{"layer": 1, "words": "A red circle"}])));
+    assert_eq!(
+        event(&first, "retry_scheduled").expect("a retry")["detail"],
+        "repeats_cannot_keep"
+    );
+    assert_eq!(
+        first.snapshot.laws.as_ref().unwrap().counted,
+        std::collections::BTreeSet::from([1])
+    );
+    let second = laws_answer(&first.snapshot, &c4(json!([])));
+    assert_eq!(
+        event(&second, "retry_scheduled").expect("a retry")["detail"],
+        "repeats_cannot_keep"
+    );
+    let chosen = laws_answer(&second.snapshot, &two_laws());
+    assert_eq!(
+        event(&chosen, "laws_chosen").map(|payload| payload["laws"].clone()),
+        Some(json!(["B1", "B15"])),
+        "{:?}",
+        tags(&chosen)
+    );
 }
 
 #[test]

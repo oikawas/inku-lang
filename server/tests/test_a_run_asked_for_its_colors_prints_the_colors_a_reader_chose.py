@@ -56,7 +56,7 @@ READING = {
 }
 
 # The circle goes to the golden section's upper left crossing.
-LAWS = {"main_layer": 1, "main_law": "B1", "description_counts": [1],
+LAWS = {"main_layer": 1, "main_law": "B1", "description_counts": [{"layer": 1, "words": "円がひとつ"}],
         "laws": {"B1": {"targets": [{"layer": 1, "at": "point_ul"}]},
                  "B21": {"targets": [{"layer": 2, "hand": "still"}]}},
         "reason": "円を黄金分割の左上の交点に置く。"}

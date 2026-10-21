@@ -80,7 +80,9 @@ compiles it before it is committed. An answer the core refuses is asked again
 with that answer and the reason as a new action within the same budget, also
 when a mark it places at a numeric point does not lie wholly on the canvas;
 from the third request on, the request also lists the reasons the answers
-before it were refused with. An arc's sagitta is printed at most half its
+before it were refused with. A layer a refused answer named with the
+description's words as one whose count the description writes keeps that count
+in the answers after it. An arc's sagitta is printed at most half its
 printed chord. `choose_colors`
 runs only when the configuration has `colors`, once the laws stage ends for a
 composed plan (also when the laws fell back or the run has none): a reader

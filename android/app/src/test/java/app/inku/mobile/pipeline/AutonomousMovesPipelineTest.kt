@@ -26,16 +26,19 @@ class AutonomousMovesPipelineTest {
         override suspend fun load(ownerId: String, executionId: String) = bytes[executionId]?.copyOf()
     }
 
-    private class Fixture {
+    private class Fixture(private val withColors: Boolean = true) {
         var saved: ManagedHistoryRead? = null
         var moved = false
         val requests = mutableListOf<ModelRequest>()
         val starts = mutableListOf<JSONObject>()
         val binding = object : SharedPipelineBinding by NativePipelineBridge {
             override fun stepSvgLimited(snapshotBytes: ByteArray, inputEnvelopeBytes: ByteArray, maxSvgBytes: Long): NativeSvgOutput {
-                val payload = JSONObject(inputEnvelopeBytes.toString(Charsets.UTF_8)).getJSONObject("payload")
+                val envelope = JSONObject(inputEnvelopeBytes.toString(Charsets.UTF_8))
+                val payload = envelope.getJSONObject("payload")
+                if (payload.optString("tag") == "start" && !withColors) payload.getJSONObject("config").remove("colors")
                 if (payload.optString("tag") == "start") starts += payload
-                return NativePipelineBridge.stepSvgLimited(snapshotBytes, inputEnvelopeBytes, maxSvgBytes)
+                return NativePipelineBridge.stepSvgLimited(snapshotBytes,
+                    if (withColors) inputEnvelopeBytes else envelope.toString().encodeToByteArray(), maxSvgBytes)
             }
         }
         val provider = object : ModelProvider {
@@ -78,8 +81,13 @@ class AutonomousMovesPipelineTest {
     }
 
     @Test
-    fun aSavedLawsMoveCallsOnlyTheLawsAndKeepsTheParentsConfigurationAndRecords() = runBlocking {
-        val fixture = Fixture()
+    fun aSavedLawsMoveWithAColorStageKeepsThatStageAndTheParentsConfigurationAndRecords() = checkSavedLaws(withColors = true)
+
+    @Test
+    fun aSavedLawsMoveWithoutAColorStageKeepsItAbsentAndTheParentsConfigurationAndRecords() = checkSavedLaws(withColors = false)
+
+    private fun checkSavedLaws(withColors: Boolean) = runBlocking {
+        val fixture = Fixture(withColors)
         val parent = fixture.parent()
         fixture.moved = true
         val direction = JSONObject("""{"exclude":["B1","B21"],"cards":"invite","note":"涼しげに"}""")
@@ -101,7 +109,9 @@ class AutonomousMovesPipelineTest {
         listOf("main_law", "main_layer", "laws", "reason").forEach { laws.put(it, basis.get(it)) }
         val record = record("laws", parent, child).put("laws", laws)
         assertEquals("laws", SharedAutonomousRefinement.call("record", record).getJSONObject("metadata").getJSONObject("ai_move").getString("kind"))
-        assertEquals(listOf("choose_laws"), fixture.requests.map { it.pipelineAction })
+        // Neither saved configuration asks Stage 1 or the composition reader again.
+        assertEquals(if (withColors) listOf("choose_laws", "choose_colors") else listOf("choose_laws"),
+            fixture.requests.map { it.pipelineAction })
     }
 
     @Test

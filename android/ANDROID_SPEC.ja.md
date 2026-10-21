@@ -10,7 +10,7 @@
 作品編集メニューの自律推敲は、Server・Webと同じ`inku.autonomous-refine.v1`（JNIの`autonomousRefine`）を使う。AndroidはServer APIを呼ばず、端末の中で送り・描き・保存する。次の手と止め時、見える差のゲート、子の辺の記録は共通coreだけが決める。以下は、10月18日と17日に記したVisionの方式を置き換える。
 
 - 手数は1〜10、既定5。法則・取り合わせの手を1つ以上選ぶ。方向性は前後の空白を除いて1,000字まで。モデルは取り合わせと同じVision用途のモデル選びで1つ選び、一文の選択、Stage 1・Stage 2・法則の段にそのモデルを使う。言語は画面の言語、暴れるは指定しなければ各親のまま。画の無い親からは始めない。
-- 法則の手は、保存した親の指示書と記述、設定・種・色・比・限り、`completion_ranges`・`laws_layers`・`laws_basis`を共有pipelineの`saved_laws`へ渡す。`direction`はcoreの答えのまま。子は記述固定で、派生は`laws_change`（札は「法則」）。送った後の`laws_refused`・`laws_compile`・`laws_unavailable`はfailed、ほかの断りはunavailableとしてcoreへ返す。
+- 法則の手は、保存した親の指示書と記述、設定・種・色・比・限り、`completion_ranges`・`laws_layers`・`laws_basis`を共有pipelineの`saved_laws`へ渡す。Stage 1と構図の読みはやり直さず、親の保存した設定に`colors`があれば法則の段の後に配色の段も行い、無ければ行わない（作者裁定、2026-10-21）。`direction`はcoreの答えのまま。子は記述固定で、派生は`laws_change`（札は「法則」）。送った後の`laws_refused`・`laws_compile`・`laws_unavailable`はfailed、ほかの断りはunavailableとしてcoreへ返す。
 - 取り合わせの手は、既存の取り合わせで一文を4つ選ぶ。coreのexcludeと同じ系譜で足した一文を除き、reuseなら同じ手番の答えを使い、rankの一文のjoinedから子を描く。派生は`description_edit`。辺には`edited_from_history_id`と`juxtaposition`を残す。
 - 子のSVGを親と比べるmeasureと、辺の`ai_move`（取り合わせなら`juxtaposition`も）はcoreの答えを保存する。keptの子だけを次の親にする。すべての子は系譜だけに保存し、runが終わる・止まる・失敗する・途切れると、最後のkeptだけを通常履歴へ出す。停止と保存が重なっても、保存した子の記録を終えてから止める。
 - runは同時に1つ。補助の進捗はアプリ専用`autonomous-refinement-runs.json`に原子的に保存する。作品の正本は作品DBと系譜の辺で、DBのschemaは変えない。ダイアログを閉じてもrunは続く。起動時に残ったrunningはinterruptedへ変え、最後のkeptを履歴へ出す。

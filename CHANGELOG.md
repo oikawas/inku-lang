@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-22 — Grain without a repeating tile, and sweep blended inside its contour (render engine 90)
-
-Grain repeated the contents of a 0.08-unit tile, so its marks lined up in a lattice. A face now lays its marks at random over one tile as large as the face, at the same count per area (each face makes twelve mark shapes and places them turned). A closed shape's sweep darkened in steps wherever its translucent bands overlapped, the steps' edges read as kelp-like stripes, and the bands' ends crossed the outline. The bands of one pass are now one film of merged paint (at 1.2 times one band's opacity, which keeps the face's mean tone), its edges bleed (3 for the thick brush and 1.5 for the fine brush per 1,000 units of the short side), and the face's contour cuts it. The author chose these on prototype sheets that redrew the 129 works of their Build 1309 batch. Saved wash and paper grain, stipple, hatching and aquatint, brush fills, lines and outlines are unchanged, and saved SVGs keep their pictures.
-
 ### 2026-10-22 — macOS Saijiki adds fineness and underlayer
 
 The bundled vocabulary and Web reference now show fineness (fine-grained, coarse-grained, packed and sparse) and underlayer (underpainted) after handling. Each word includes its preview, explanation and example. Existing groups, word order and previews are preserved.
@@ -236,6 +232,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.234 (2026-10-22 / Build 1310)
+
+### 2026-10-22 — Grain without a repeating tile, and sweep blended inside its contour (render engine 90)
+
+Grain repeated the contents of a 0.08-unit tile, so its marks lined up in a lattice. A face now lays its marks at random over one tile as large as the face, at the same count per area (each face makes twelve mark shapes and places them turned). A closed shape's sweep darkened in steps wherever its translucent bands overlapped, the steps' edges read as kelp-like stripes, and the bands' ends crossed the outline. The bands of one pass are now one film of merged paint (at 1.2 times one band's opacity, which keeps the face's mean tone), its edges bleed (3 for the thick brush and 1.5 for the fine brush per 1,000 units of the short side), and the face's contour cuts it. The author chose these on prototype sheets that redrew the 129 works of their Build 1309 batch. Saved wash and paper grain, stipple, hatching and aquatint, brush fills, lines and outlines are unchanged, and saved SVGs keep their pictures.
 
 ## v2.15.233 (2026-10-22 / Build 1309)
 

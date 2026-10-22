@@ -691,6 +691,7 @@ struct CreationView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
             CreationCanvasControls(model: model, corner: .right, work: workspaceWork, saved: hasSavedWorkspaceWork,
                                    disabled: controlsDisabled, browsingDisabled: browsingDisabled,
+                                   canInsertSaijikiWord: canInsertIntoBox,
                                    generationInfoOpen: ui.generationInfoOpen,
                                    threeDimensional: workspaceWork != nil && Ddl3DInstallation.available ? $ui.canvasThreeDimensional : nil,
                                    onReplayWork: onReplayWork, onWorkAction: onWorkAction, onShowSaijiki: { ui.saijikiOpen.toggle() })

@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-22 — macOS Saijiki hints follow word insertion availability
+
+When the main view's Saijiki can insert words into the instruction draft, its opening button and vocabulary hints explain that clicking inserts a word. Main views without insertion and Settings keep their reference hints. Insertion, undo and saving work as before.
+
 ### 2026-10-22 — macOS Saijiki adds fineness and underlayer
 
 The bundled vocabulary and Web reference now show fineness (fine-grained, coarse-grained, packed and sparse) and underlayer (underpainted) after handling. Each word includes its preview, explanation and example. Existing groups, word order and previews are preserved.

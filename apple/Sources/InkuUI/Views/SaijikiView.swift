@@ -34,7 +34,7 @@ public struct SaijikiView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(copy?.text("saijikiTitle") ?? model.display.localized("歳時記"))
                         .inkuFont(17, weight: .light)
-                    Text(model.display.webCopy("saijikiHint", "語彙を選ぶと、描画への効き方と作例を表示します。"))
+                    Text(hint)
                         .inkuFont(10).foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
@@ -83,7 +83,7 @@ public struct SaijikiView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(copy?.text("saijikiTitle") ?? model.display.localized("歳時記")).inkuFont(12, weight: .semibold)
-                Text(model.display.webCopy("saijikiHint", "語彙を選ぶと、描画への効き方と作例を表示します。"))
+                Text(hint)
                     .inkuFont(11).foregroundStyle(.secondary)
             }.padding(.horizontal, 10).padding(.top, 8)
             Divider()
@@ -140,6 +140,12 @@ public struct SaijikiView: View {
     private var uiLanguage: String { model.display.preferences.language }
     private var offeredLanguage: String { wordLanguage ?? uiLanguage }
     private var copy: ProductReferenceCopy? { model.productReference?.localized(language: uiLanguage) }
+    private var hint: String {
+        if onInsertWord != nil {
+            return model.display.localized("語にマウスを重ねると作例を表示します。クリックすると、挿入できる語を編集中の指示書に入れます。")
+        }
+        return model.display.webCopy("saijikiHint", "語彙を選ぶと、描画への効き方と作例を表示します。")
+    }
 
     private var wordList: some View {
         ScrollView {
@@ -196,7 +202,7 @@ public struct SaijikiView: View {
         .buttonStyle(.plain)
         .focused($focusedSelection, equals: value)
         .onHover { hovering in if hovering { selection = value } }
-        .inkuTooltip(model.display.tooltip("語彙を選ぶと、描画への効き方と作例を表示します。", serverKey: "saijikiHint"))
+        .inkuTooltip(model.display.tooltipValue(hint))
         .accessibilityAddTraits(selection == value ? .isSelected : [])
     }
 

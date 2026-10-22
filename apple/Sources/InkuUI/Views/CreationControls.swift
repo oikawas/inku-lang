@@ -31,6 +31,7 @@ struct CreationCanvasControls: View {
     let saved: Bool
     let disabled: Bool
     var browsingDisabled = false
+    var canInsertSaijikiWord = false
     var generationInfoOpen = false
     /// The 2D/3D switch, present only for a work with a bundled viewer (CanvasPanel `ddl3dViewer && result`).
     var threeDimensional: Binding<Bool>? = nil
@@ -133,7 +134,9 @@ struct CreationCanvasControls: View {
                 Button(action: onShowSaijiki) { Image(systemName: "book") }
                     .disabled(browsingDisabled)
                     .accessibilityLabel(model.display.localized("歳時記を開く"))
-                    .inkuTooltip(model.display.tooltip("歳時記の語と説明を参照します。", serverKey: "tooltipSaijikiToggle"))
+                    .inkuTooltip(canInsertSaijikiWord
+                        ? model.display.tooltip("歳時記で語の作例と説明を確認します。語をクリックすると、編集中の指示書に挿入します。")
+                        : model.display.tooltip("歳時記の語と説明を参照します。", serverKey: "tooltipSaijikiToggle"))
             }
             if model.display.visible("work_tools") {
                 SavedWorkExportMenu(model: model, count: saved ? 1 : 0, symbolOnly: true, onAction: perform)

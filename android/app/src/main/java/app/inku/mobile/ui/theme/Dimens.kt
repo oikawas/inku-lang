@@ -171,6 +171,9 @@ object Dimens {
     /** 328dp. The artwork preview inside the hero card. */
     val heroPreviewMaxHeight: Dp = 328.dp
 
+    /** 600dp. Show the description editor beside the work above this width. */
+    val descriptionSideBySideMinWidth: Dp = 600.dp
+
     /** 360dp. The raw SVG/JSON text view. */
     val renderTextViewHeight: Dp = 360.dp
 

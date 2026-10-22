@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-22 — Edit a description while keeping the work visible on Android
+
+Editing a description now keeps the work and its text together. On narrow screens the work sits outside the editor's scroll and stays visible above the keyboard; wider screens place them side by side. The description remains available after drawing. Returning to Studio keeps the current work and text; New work starts an empty workspace. Back still restores the draft from before a work edit. Description locks and confirmation before replacing edited DDL remain in effect.
+
 ### 2026-10-22 — macOS Saijiki adds fineness and underlayer
 
 The bundled vocabulary and Web reference now show fineness (fine-grained, coarse-grained, packed and sparse) and underlayer (underpainted) after handling. Each word includes its preview, explanation and example. Existing groups, word order and previews are preserved.

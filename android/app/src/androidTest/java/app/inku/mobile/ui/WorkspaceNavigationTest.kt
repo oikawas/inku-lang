@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextReplacement
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
@@ -120,6 +121,7 @@ class WorkspaceNavigationTest {
         compose.onNodeWithText(InkuStringsJa.descriptionEditAction).performClick()
         await { it.descriptionEditing && it.selectedHistory?.id == work.id }
         compose.onNodeWithTag(DESCRIPTION_INPUT_TAG).assertIsDisplayed()
+        compose.onNodeWithTag(DESCRIPTION_ARTWORK_TAG).assertIsDisplayed()
         destination(InkuStringsJa.camera).assertIsDisplayed()
         compose.runOnIdle { vm.setPrompt("作品の赤い円を小さくする") }
 
@@ -142,10 +144,11 @@ class WorkspaceNavigationTest {
         compose.onNodeWithTag(LINEAGE_GRAPH_TAG).assertIsDisplayed()
         compose.onNodeWithText(InkuStringsJa.lineageDisplayed).assertIsDisplayed()
         destination(InkuStringsJa.studioTitle).performClick()
-        await { it.tab == AppTab.Compose && it.workContextId == null }
+        await { it.tab == AppTab.Compose && it.workContextId == work.id }
         compose.onNodeWithTag(DESCRIPTION_INPUT_TAG).assertIsDisplayed()
-        assertNull(vm.state.value.selectedHistory)
-        assertEquals("制作中の青い線の草稿", vm.state.value.prompt)
+        compose.onNodeWithTag(DESCRIPTION_ARTWORK_TAG).assertIsDisplayed()
+        assertEquals(work.id, vm.state.value.selectedHistory?.id)
+        assertEquals(work.originalInput, vm.state.value.prompt)
 
         destination(InkuStringsJa.worksTitle).performClick()
         await { it.tab == AppTab.History }
@@ -155,7 +158,7 @@ class WorkspaceNavigationTest {
         await { !it.canvasPresentationMode }
         await { it.tab == AppTab.Compose && !it.refinementOpen && !it.descriptionEditing }
         compose.onNodeWithTag(DESCRIPTION_INPUT_TAG).assertIsDisplayed()
-        assertEquals("制作中の青い線の草稿", vm.state.value.prompt)
+        assertEquals(work.originalInput, vm.state.value.prompt)
 
         destination(InkuStringsJa.worksTitle).performClick()
         await { it.tab == AppTab.History }
@@ -165,8 +168,25 @@ class WorkspaceNavigationTest {
         compose.onNodeWithTag(LAYOUT_REFINE_ENTRY_TAG).performClick()
         await { it.refinementOpen && it.refinementParent?.id == work.id }
         destination(InkuStringsJa.studioTitle).performClick()
-        await { it.tab == AppTab.Compose && !it.refinementOpen && it.workContextId == null }
+        await { it.tab == AppTab.Compose && !it.refinementOpen && it.workContextId == work.id }
         compose.onNodeWithTag(DESCRIPTION_INPUT_TAG).assertIsDisplayed()
-        assertEquals("leaving refinement returns to the authoring draft", "制作中の青い線の草稿", vm.state.value.prompt)
+        assertEquals("leaving refinement keeps the work being revised", work.originalInput, vm.state.value.prompt)
+    }
+
+    @Test fun editingTheDescriptionKeepsItsArtworkAboveTheKeyboard() {
+        await { it.providerSettings.isNotEmpty() && vm.historyItems.value.isNotEmpty() }
+        compose.runOnIdle { vm.editWorkDescription(work) }
+        await { it.descriptionEditing && !it.historyAuthorityLoading }
+        compose.onNodeWithTag(DESCRIPTION_ARTWORK_TAG).assertIsDisplayed()
+        compose.onNodeWithTag(DESCRIPTION_INPUT_TAG).performClick()
+        await { it.descriptionFocused }
+        compose.waitUntil(10_000) {
+            compose.activity.window.decorView.rootWindowInsets?.isVisible(android.view.WindowInsets.Type.ime()) == true
+        }
+        compose.onNodeWithTag(DESCRIPTION_INPUT_TAG).performTextReplacement("小さな赤い円。")
+        await { it.prompt == "小さな赤い円。" }
+        compose.onNodeWithTag(DESCRIPTION_ARTWORK_TAG).assertIsDisplayed()
+        compose.onNodeWithTag(DESCRIPTION_INPUT_TAG).assertIsDisplayed()
+        assertEquals(work.id, vm.state.value.selectedHistory?.id)
     }
 }

@@ -17,10 +17,10 @@ internal fun composeScreenLayout(state: InkuUiState): ComposeScreenLayout {
     val view = state.pipelineView
     val needsAnswer = view?.patchProposal != null || view?.phaseReason != null ||
         view?.phaseTag == "score_ready" || (view?.phaseTag == "completed" && !savedPipelineRevision(state))
-    val showEditor = state.selectedHistory == null || state.descriptionEditing || state.composeMode == ComposeMode.Batch
+    val showRunStatus = state.selectedHistory == null || state.descriptionEditing || state.composeMode == ComposeMode.Batch
     return ComposeScreenLayout(
-        showEditor = showEditor,
-        showPipelineStatus = showEditor || needsAnswer,
+        showEditor = true,
+        showPipelineStatus = showRunStatus || needsAnswer,
         presentationOnly = state.canvasPresentationMode && !needsAnswer,
     )
 }

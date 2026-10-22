@@ -577,7 +577,7 @@ fun InkuApp(viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.view
                 // カメラ took the failed capture as the state to come back to.
                 if (!state.canvasPresentationMode && !state.descriptionFocused && !state.cameraCaptureState.locksCameraInteraction &&
                     state.cameraCaptureState !is CameraCaptureState.Failed) {
-                    BottomNavigationBar(if (state.workContextId != null && state.tab == AppTab.Compose) null else state.tab, viewModel)
+                    BottomNavigationBar(state.tab, viewModel)
                 }
             },
             containerColor = MaterialTheme.colorScheme.background,
@@ -1773,7 +1773,7 @@ private fun shortCanvasLabel(state: InkuUiState): String {
     }
 }
 
-/** New work starts with writing; saved work starts with the result. */
+/** Writing and looking at the result share one persistent workspace, as on Web. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
@@ -1785,8 +1785,7 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
     val scrollState = rememberScrollState()
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    val editingWork = state.descriptionEditing
-    var resultInterpretationOpen by remember(state.selectedHistory?.id) { mutableStateOf(false) }
+    val editingWork = state.descriptionEditing && state.composeMode == ComposeMode.Write
     // Whether a batch line has the focus. The batch run button sits under the
     // editor, which the keyboard covers, so while the keyboard is up it is
     // pinned above it the way 「描画する」 is for the description.
@@ -1842,131 +1841,108 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
             scrollState.animateScrollTo((scrollState.value + delta).coerceAtLeast(0))
         }
     }
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .onGloballyPositioned { viewportTop = it.positionInWindow().y },
+    DescriptionWorkspace(
+        showArtwork = hasWork,
+        artwork = { height ->
+            // Controls may scroll within the work's own pane; the description
+            // scroll cannot push the work away. IME space belongs to the work
+            // and input, so secondary controls wait until the keyboard closes.
+            CameraRevealCanvasHeroCard(
+                state,
+                viewModel,
+                modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                showControls = !imeVisible,
+                maxPreviewHeight = if (imeVisible) height else
+                    (height - Dimens.buttonHeightSmall * 2).coerceAtLeast(Dimens.controlSizeSmall),
+            )
+        },
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(scrollState)
-                .padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceM),
-            verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
+                .onGloballyPositioned { viewportTop = it.positionInWindow().y },
         ) {
-            StudioHeader(
-                if (editingWork) S.descriptionEditAction else S.studioTitle,
-                viewModel,
-                showTools = state.workContextId == null,
-                onBack = if (state.workContextId != null) viewModel::closeWorkContext else null,
-            )
-            ChatGptDrawingStatus(state, viewModel)
-            RunStatusRow(state, viewModel)
-            // The author answers the run while its safe performance stays visible.
-            if (layout.showPipelineStatus) PipelineStatusSection(state, viewModel)
-            if (editingWork) {
-                state.selectedHistory?.let { item ->
-                    Text(S.editingWorkLabel(item.renderHashShort), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                DrawPanel(state, viewModel, onDescriptionFocusChanged = viewModel::setDescriptionFocused, onDescriptionPositioned = { descriptionTop = it })
-            }
-            if (hasWork && !editingWork) {
-                CameraRevealCanvasHeroCard(state, viewModel)
-                if (!showEditor) {
-                    val inTrash = state.selectedHistory?.trashed == true
-                    if (inTrash) {
-                        Text(S.trashedWorkNote, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState)
+                    .padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceM),
+                verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
+            ) {
+                StudioHeader(
+                    if (editingWork) S.descriptionEditAction else S.studioTitle,
+                    viewModel,
+                    showTools = true,
+                    onBack = if (state.workContextId != null) viewModel::closeWorkContext else null,
+                )
+                ChatGptDrawingStatus(state, viewModel)
+                RunStatusRow(state, viewModel)
+                // The author answers the run while its safe performance stays visible.
+                if (layout.showPipelineStatus) PipelineStatusSection(state, viewModel)
+                if (editingWork) {
+                    state.selectedHistory?.let { item ->
+                        Text(S.editingWorkLabel(item.renderHashShort), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                    DrawPanel(state, viewModel, onDescriptionFocusChanged = viewModel::setDescriptionFocused, onDescriptionPositioned = { descriptionTop = it })
+                }
+                state.selectedHistory?.let { item ->
+                    val inTrash = item.trashed
+                    if (inTrash) Text(S.trashedWorkNote, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
                     Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), modifier = Modifier.fillMaxWidth()) {
-                        // A work in the trash has no edits on offer, as its
-                        // lineage card has none.
-                        // Both are refused while a drawing runs (and 推敲する while
-                        // anything runs); greyed out rather than pressable with
-                        // nothing happening.
-                        PrimarySmallButton(S.reviseWork, onClick = { state.selectedHistory?.let(viewModel::openWorkActions) }, enabled = !inTrash && !state.isRunning, modifier = Modifier.weight(1f))
+                        PrimarySmallButton(S.reviseWork, onClick = { viewModel.openWorkActions(item) }, enabled = !inTrash && !state.isRunning, modifier = Modifier.weight(1f))
                         SecondarySmallButton(S.newWork, onClick = viewModel::clearPrompt, enabled = !state.isDrawing)
                     }
                 }
-                // While the work is revised, the description field below holds
-                // this same text; showing it here too read as two descriptions.
-                val revisingDescription = showEditor && state.composeMode != ComposeMode.Batch
-                state.selectedHistory?.originalInput?.takeIf { it.isNotBlank() && !revisingDescription }?.let { originalInput ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
-                        verticalAlignment = Alignment.Top,
-                    ) {
-                        Text(
-                            originalInput,
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
+                if (showEditor && !editingWork) {
+                    if (!hasWork) Text(S.studioSubtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (state.composeMode == ComposeMode.Batch) {
+                        DrawSettingsRow(state, viewModel)
+                        BatchPanel(state, viewModel, onEditorFocusChanged = { batchEditorFocused = it })
+                    } else {
+                        DrawPanel(
+                            state,
+                            viewModel,
+                            onDescriptionFocusChanged = viewModel::setDescriptionFocused,
+                            onDescriptionPositioned = { descriptionTop = it },
                         )
-                        if (!showEditor) {
-                            CameraOriginalPhotoThumbnail(state.cameraSourcePhotoPath, state.uiLanguage.isEnglish)
-                        }
                     }
                 }
-                if (!showEditor) {
-                    TextButton(onClick = { resultInterpretationOpen = !resultInterpretationOpen }) {
-                        Text(if (resultInterpretationOpen) S.interpretationHide else S.interpretationToggle)
-                    }
-                    if (resultInterpretationOpen) {
-                        DdlHeading(
-                            InstructionLanguages.ofDdl(
-                                ddl = state.ddl,
-                                savedDdl = state.selectedHistory?.normalizedDdl,
-                                savedLang = state.selectedHistory?.instructionLangResolved,
-                                uiLang = state.uiLanguage.code,
-                            ),
-                        )
-                        DdlPreviewBox(state, viewModel, modifier = Modifier.fillMaxWidth())
-                    }
+                if (writeImeBar || batchImeBar) {
+                    Spacer(Modifier.height(with(LocalDensity.current) { imeBarHeightPx.toDp() }))
                 }
             }
-            if (showEditor && !editingWork) {
-                if (!hasWork) Text(S.studioSubtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (state.composeMode == ComposeMode.Batch) {
-                    DrawSettingsRow(state, viewModel)
-                    BatchPanel(state, viewModel, onEditorFocusChanged = { batchEditorFocused = it })
-                } else {
-                    DrawPanel(
-                        state,
-                        viewModel,
-                        onDescriptionFocusChanged = viewModel::setDescriptionFocused,
-                        onDescriptionPositioned = { descriptionTop = it },
-                    )
-                }
+            val barModifier = Modifier.align(Alignment.BottomCenter).onSizeChanged { imeBarHeightPx = it.height }
+            if (writeImeBar) {
+                ImeActionBar(
+                    idleText = "▶  ${drawActionLabel(S)}",
+                    runningText = S.drawingButton,
+                    state = state,
+                    onClick = viewModel::draw,
+                    onStop = viewModel::stopDrawing,
+                    modifier = barModifier,
+                )
+            } else if (batchImeBar) {
+                ImeActionBar(
+                    idleText = S.batchDrawButton,
+                    runningText = S.runningButton,
+                    state = state,
+                    onClick = viewModel::runBatch,
+                    onStop = viewModel::stopDrawing,
+                    modifier = barModifier,
+                )
             }
-            if (writeImeBar || batchImeBar) {
-                Spacer(Modifier.height(with(LocalDensity.current) { imeBarHeightPx.toDp() }))
-            }
-        }
-        val barModifier = Modifier.align(Alignment.BottomCenter).onSizeChanged { imeBarHeightPx = it.height }
-        if (writeImeBar) {
-            ImeActionBar(
-                idleText = "▶  ${drawActionLabel(S)}",
-                runningText = S.drawingButton,
-                state = state,
-                onClick = viewModel::draw,
-                onStop = viewModel::stopDrawing,
-                modifier = barModifier,
-            )
-        } else if (batchImeBar) {
-            ImeActionBar(
-                idleText = S.batchDrawButton,
-                runningText = S.runningButton,
-                state = state,
-                onClick = viewModel::runBatch,
-                onStop = viewModel::stopDrawing,
-                modifier = barModifier,
-            )
         }
     }
 }
 
 @Composable
-private fun CameraRevealCanvasHeroCard(state: InkuUiState, viewModel: InkuViewModel) {
+private fun CameraRevealCanvasHeroCard(
+    state: InkuUiState,
+    viewModel: InkuViewModel,
+    modifier: Modifier = Modifier,
+    showControls: Boolean = true,
+    maxPreviewHeight: Dp = Dimens.heroPreviewMaxHeight,
+) {
     val completedId = (state.cameraCaptureState as? CameraCaptureState.Completed)?.historyId
     var revealed by remember(completedId) { mutableStateOf(completedId == null) }
     LaunchedEffect(completedId) {
@@ -1977,7 +1953,7 @@ private fun CameraRevealCanvasHeroCard(state: InkuUiState, viewModel: InkuViewMo
         animationSpec = tween(durationMillis = 420),
         label = "camera-artwork-reveal",
     )
-    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
         if (completedId != null) {
             Text(
                 cameraDevelopmentPresentation(
@@ -1997,6 +1973,8 @@ private fun CameraRevealCanvasHeroCard(state: InkuUiState, viewModel: InkuViewMo
             state,
             viewModel,
             modifier = Modifier.fillMaxWidth().graphicsLayer(alpha = alpha),
+            showControls = showControls,
+            maxPreviewHeight = maxPreviewHeight,
         )
     }
 }
@@ -3249,6 +3227,10 @@ private fun DrawPanel(
     onDescriptionFocusChanged: (Boolean) -> Unit = {},
     onDescriptionPositioned: (Float) -> Unit = {},
 ) {
+    if (state.selectedHistory?.trashed == true) {
+        Text(state.prompt, style = MaterialTheme.typography.bodyLarge)
+        return
+    }
     var interpretationOpen by remember { mutableStateOf(false) }
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

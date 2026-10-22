@@ -1340,7 +1340,8 @@ fn every_accepted_surface_and_handling_row_belongs_to_exactly_one_closed_dimensi
     let mut quality_ids = HashSet::new();
     let mut intensity_ids = HashSet::new();
     // Surface words name a technique; handling words (さばき) how the medium is laid.
-    for (key, semantic_category, rows) in [("omote", "surface", 8), ("sabaki", "handling", 3)] {
+    // 刷毛目 (DDL 25) is the ninth surface word.
+    for (key, semantic_category, rows) in [("omote", "surface", 9), ("sabaki", "handling", 3)] {
         let category = saijiki_asset()
             .categories
             .iter()
@@ -1389,6 +1390,7 @@ fn every_accepted_surface_and_handling_row_belongs_to_exactly_one_closed_dimensi
             "none",
             "solid",
             "sweep",
+            "brushmarks",
             "grain",
             "stipple",
             "hatch",

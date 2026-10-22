@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 use sha2::{Digest, Sha256};
 
 use crate::determinism::{hash_to_unit, hash01, seed_salt_index_digest};
-use crate::flat_brush::{FlatBandRequest, FlatHold, flat_band, flat_band_element, sweeps_flat};
+use crate::flat_brush::{FlatBandRequest, FlatHold, flat_band, flat_band_element, lays_flat_face};
 use crate::geometry::{centerline_normals, points_center, stroke_sample_count};
 use crate::mark_geometry::MarkGeometry;
 use crate::mark_paths::{contour_stroke_path, grid_step, rotate, uses_hand_stroke};
@@ -37,7 +37,8 @@ const SURFACE_WASH_WIDTH_SPAN: f64 = 0.60;
 const SURFACE_WASH_OPACITY: f64 = 0.22;
 /// One sweep of 刷き: the wash sweeps without their own paleness, at the value the
 /// author chose on the comparison sheet (2026-09-29). 薄い (faint, ×0.55) makes
-/// it 0.275, a little darker than the wash's 0.22.
+/// it 0.275, a little darker than the wash's 0.22. Each band of 刷毛目 carries it
+/// on its own (render engine 91).
 const SURFACE_SWEEP_OPACITY: f64 = 0.5;
 /// The bands of one pass of 刷き are laid wet into each other, as one film
 /// (render engine 90): overlapping bands no longer build up. The film carries
@@ -109,6 +110,15 @@ fn surface_seed(instruction: &Instruction, context: MarkContext<'_>, grain: bool
     // Nor does the underlayer word (下塗り) turn them.
     if is_named_texture(surface.texture) {
         stable.filled = false;
+    }
+    // 刷毛目 lays the bands 刷き lays, each on its own (render engine 91): it
+    // seeds as 刷き, so writing one for the other turns no band.
+    if surface.texture == SurfaceTexture::Brushmarks {
+        stable
+            .surface
+            .as_mut()
+            .expect("surface cloned above")
+            .texture = SurfaceTexture::Sweep;
     }
     let mut key = serde_json::to_vec(&stable).expect("surface seed payload is serializable");
     key.extend_from_slice(
@@ -208,12 +218,13 @@ fn surface_color(instruction: &Instruction, context: MarkContext<'_>) -> String 
     )
 }
 
-/// A texture the DDL can write (刷き・粒・点描・平行線・交差線・アクアチント). Saved
-/// wash, bleed and paper grain keep their own path under a fill.
+/// A texture the DDL can write (刷き・刷毛目・粒・点描・平行線・交差線・アクアチント).
+/// Saved wash, bleed and paper grain keep their own path under a fill.
 pub(crate) fn is_named_texture(texture: SurfaceTexture) -> bool {
     matches!(
         texture,
         SurfaceTexture::Sweep
+            | SurfaceTexture::Brushmarks
             | SurfaceTexture::Grain
             | SurfaceTexture::Stipple
             | SurfaceTexture::Hatch
@@ -433,7 +444,7 @@ fn sweep(
             )
         })
         .collect::<Vec<_>>();
-    if sweeps_flat(instruction) {
+    if lays_flat_face(instruction) {
         // The flat brush passes straight across: its tip stays square to the pass.
         let stroke_seed = salted_seed(seed, "surface-stroke", index);
         let stroke = synthesize_contour(ContourStrokeRequest {
@@ -532,7 +543,7 @@ fn sweep_parts(
             )
         })
         .collect::<Vec<_>>();
-    if sweeps_flat(instruction) {
+    if lays_flat_face(instruction) {
         // The flat brush passes straight across: its tip stays square to the pass.
         let stroke_seed = salted_seed(seed, "surface-stroke", index);
         let stroke = synthesize_contour(ContourStrokeRequest {
@@ -782,11 +793,16 @@ fn render_vectors(
                 ));
             }
         }
-        SurfaceTexture::Wash | SurfaceTexture::Sweep => {
-            let (sweep_opacity, class_name) = if surface.texture == SurfaceTexture::Wash {
-                (SURFACE_WASH_OPACITY, "surface-stroke-v1 surface-wash-sweep")
-            } else {
-                (SURFACE_SWEEP_OPACITY, "surface-stroke-v1 surface-sweep")
+        SurfaceTexture::Wash | SurfaceTexture::Sweep | SurfaceTexture::Brushmarks => {
+            let (sweep_opacity, class_name) = match surface.texture {
+                SurfaceTexture::Wash => {
+                    (SURFACE_WASH_OPACITY, "surface-stroke-v1 surface-wash-sweep")
+                }
+                SurfaceTexture::Brushmarks => (
+                    SURFACE_SWEEP_OPACITY,
+                    "surface-stroke-v1 surface-brushmarks",
+                ),
+                _ => (SURFACE_SWEEP_OPACITY, "surface-stroke-v1 surface-sweep"),
             };
             // The bands lie closer as the density rises (never under 6 px) and
             // wider apart as the scale does, but a band stays one unit wide
@@ -796,7 +812,8 @@ fn render_vectors(
             let base_angle = hash01(0, seed, "fill-angle") * std::f64::consts::PI;
             // The bands of one pass of 刷き are laid wet into each other: opaque
             // inside the pass, with the opacity and the filter once on it
-            // (render engine 90). A saved wash keeps a band per sweep.
+            // (render engine 90). A saved wash keeps a band per sweep, and so
+            // does 刷毛目, whose overlapping bands build up (render engine 91).
             let merge = surface.texture == SurfaceTexture::Sweep;
             let mut stroke_index = 0_i64;
             for layer in 0..SURFACE_WASH_LAYERS {
@@ -1109,13 +1126,25 @@ pub(crate) fn render_surface(
                 .attr("stroke", "none")
                 .attr("class", "surface-grain-carrier-v1"),
         );
-    } else if surface.texture == SurfaceTexture::Sweep {
+    } else if matches!(
+        surface.texture,
+        SurfaceTexture::Sweep | SurfaceTexture::Brushmarks
+    ) {
         // 刷き stays inside its contour, cut as roughly as the tool's own edge
-        // (render engine 90; its bands crossed the outline).
-        if context.use_filters && uses_hand_stroke(instruction.weight) {
+        // (render engine 90; its bands crossed the outline), and so does 刷毛目
+        // (render engine 91), whose bands bleed no further than the tool's.
+        let sweep = surface.texture == SurfaceTexture::Sweep;
+        if sweep && context.use_filters && uses_hand_stroke(instruction.weight) {
             definitions.push(sweep_bleed_filter(instruction, context));
         }
-        let mut inside = Element::new("g").attr("class", "surface-sweep-inside-v1");
+        let mut inside = Element::new("g").attr(
+            "class",
+            if sweep {
+                "surface-sweep-inside-v1"
+            } else {
+                "surface-brushmarks-inside-v1"
+            },
+        );
         render_vectors(&mut inside, instruction, geometry, context, &contour, seed);
         if context.profile != SvgProfile::Compat {
             let mask_id = format!(
@@ -1310,6 +1339,100 @@ mod tests {
         with_class(&compat.group, "surface-sweep-pass-v1", &mut passes);
         assert_eq!(passes.len(), SURFACE_WASH_LAYERS);
         assert!(!format!("{:?}", compat.group).contains("mask"));
+    }
+
+    /// Every drawn line as its ends and width.
+    fn line_places(element: &Element, out: &mut Vec<[String; 5]>) {
+        for child in element.children() {
+            if let crate::svg::Node::Element(child) = child {
+                if child.name() == "line" {
+                    out.push(
+                        ["x1", "y1", "x2", "y2", "stroke-width"]
+                            .map(|name| child.attribute(name).unwrap().to_owned()),
+                    );
+                }
+                line_places(child, out);
+            }
+        }
+    }
+
+    #[test]
+    fn brushmarks_lays_the_bands_of_a_sweep_each_on_its_own() {
+        let colors = BTreeMap::new();
+        let drawn = |texture: &str, weight: &str, profile: SvgProfile, use_filters: bool| {
+            let score: Score = serde_json::from_str(&format!(
+                r#"{{"version":"0.22.0","instructions":[{{"primitive":"square","position":[0.3,0.3],"size":[0.4,0.4],"weight":"{weight}","surface":{{"texture":"{texture}"}}}}]}}"#
+            ))
+            .unwrap();
+            let instruction = &score.instructions[0];
+            let geometry = MarkGeometry::of(instruction).unwrap();
+            render_surface(
+                instruction,
+                geometry,
+                MarkContext {
+                    profile,
+                    use_filters,
+                    ..context(&colors)
+                },
+            )
+            .unwrap()
+        };
+        // Each band carries the sweep's 0.28 × 0.5 of the tool on its own, so
+        // overlapping bands build up; no film is laid over a pass.
+        let brushmarks = drawn("brushmarks", "rotring", SvgProfile::Editable, false);
+        assert_eq!(
+            brushmarks.group.attribute("id"),
+            Some("surface_002_003_brushmarks")
+        );
+        let mut films = Vec::new();
+        with_class(&brushmarks.group, "surface-sweep-pass-v1", &mut films);
+        assert!(films.is_empty());
+        let mut lines = Vec::new();
+        drawn_lines(&brushmarks.group, &mut lines);
+        assert!(lines.len() > 10);
+        assert!(lines.iter().all(|(class, _, opacity)| {
+            class == "surface-stroke-v1 surface-brushmarks"
+                && opacity.is_some_and(|opacity| (opacity - 0.28 * 0.5).abs() < 1e-6)
+        }));
+        // Seeded as the sweep, it lays the same bands in the same places.
+        let sweep = drawn("sweep", "rotring", SvgProfile::Editable, false);
+        let (mut ours, mut theirs) = (Vec::new(), Vec::new());
+        line_places(&brushmarks.group, &mut ours);
+        line_places(&sweep.group, &mut theirs);
+        assert_eq!(ours, theirs);
+        // It stays inside the face by the sweep's contour mask.
+        let mut inside = Vec::new();
+        with_class(
+            &brushmarks.group,
+            "surface-brushmarks-inside-v1",
+            &mut inside,
+        );
+        assert_eq!(inside.len(), 1);
+        assert_eq!(
+            inside[0].attribute("mask"),
+            Some("url(#surface_mask_002_003)")
+        );
+        // The thick brush lays them as flat bands, each with its opacity, and
+        // defines no film blur of its own.
+        let brush = drawn("brushmarks", "brush_thick", SvgProfile::Display, true);
+        let mut flat = Vec::new();
+        with_class(&brush.group, "flat-brush-v1", &mut flat);
+        assert!(!flat.is_empty());
+        assert!(flat.iter().all(|band| band.attribute("opacity").is_some()));
+        let soft = |rendered: &SurfaceRender| {
+            rendered.definitions.iter().any(|definition| {
+                definition
+                    .attribute("id")
+                    .is_some_and(|id| id.starts_with("surface_soft_"))
+            })
+        };
+        assert!(!soft(&brush));
+        assert!(soft(&drawn(
+            "sweep",
+            "brush_thick",
+            SvgProfile::Display,
+            true
+        )));
     }
 
     #[test]

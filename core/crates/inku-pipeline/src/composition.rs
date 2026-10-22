@@ -2225,7 +2225,7 @@ fn surface_weight(surface: Option<&str>) -> f64 {
     match surface {
         Some("solid" | "flat") => 1.5,
         Some("aquatint") => 1.1,
-        Some("grain" | "sweep" | "hatch") => 0.9,
+        Some("grain" | "sweep" | "brushmarks" | "hatch") => 0.9,
         Some("stipple") => 0.8,
         Some("wash") => 0.7,
         Some("none" | "empty") => 0.6,
@@ -3895,6 +3895,16 @@ mod tests {
         assert_eq!(hypot(3.0, 4.0), 5.0);
         assert_eq!(hypot(0.0, 0.0), 0.0);
         assert_eq!(hypot(-0.6, 0.8), 1.0);
+    }
+
+    /// Brushmarks (DDL 25) weighs as the sweep whose bands it lays.
+    #[test]
+    fn brushmarks_weighs_as_a_sweep() {
+        assert_eq!(surface_weight(Some("brushmarks")), 0.9);
+        assert_eq!(
+            surface_weight(Some("brushmarks")),
+            surface_weight(Some("sweep"))
+        );
     }
 
     #[test]

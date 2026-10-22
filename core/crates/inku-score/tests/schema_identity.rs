@@ -3,7 +3,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 const EXPECTED_SCHEMA_DIGEST: &str =
-    "6091c2994ded4fb5c4e346714e2fef02eab1e7bfefd7eff5e01868da01f17e4b";
+    "0009784610a95348c05bf2a2bf4f6c44417fa45b7dd0ddb848f21e4fc7fc9eda";
 
 #[test]
 fn canonical_score_schema_identity_is_stable() {
@@ -113,6 +113,26 @@ fn canonical_score_schema_identity_is_stable() {
         assert!(
             primitives.iter().any(|value| value == primitive.as_str()),
             "{primitive:?}"
+        );
+    }
+    // It names every surface texture too, brushmarks (Score 0.22.0) among
+    // them, and every edition.
+    let textures = schema["$defs"]["SurfaceSpec"]["properties"]["texture"]["enum"]
+        .as_array()
+        .expect("texture enum");
+    for texture in inku_score::SurfaceTexture::ALL {
+        assert!(
+            textures.iter().any(|value| value == texture.as_str()),
+            "{texture:?}"
+        );
+    }
+    let versions = schema["properties"]["version"]["enum"]
+        .as_array()
+        .expect("version enum");
+    for edition in inku_score::ScoreEdition::ALL {
+        assert!(
+            versions.iter().any(|value| value == edition.as_str()),
+            "{edition:?}"
         );
     }
     assert!(

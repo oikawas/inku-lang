@@ -404,6 +404,7 @@ string_enum!(SurfaceTexture {
     Grain => "grain",
     Wash => "wash",
     Sweep => "sweep",
+    Brushmarks => "brushmarks",
     Bleed => "bleed",
     PaperGrain => "paper_grain",
 });
@@ -640,6 +641,17 @@ pub fn instructions_use_free_line(instructions: &[Instruction]) -> bool {
         .any(|instruction| instruction.primitive == Primitive::FreeLine)
 }
 
+/// Whether any instruction lays brushmarks (刷毛目), which needs Score 0.22.0.
+#[must_use]
+pub fn instructions_use_brushmarks(instructions: &[Instruction]) -> bool {
+    instructions.iter().any(|instruction| {
+        instruction
+            .surface
+            .as_ref()
+            .is_some_and(|surface| surface.texture == SurfaceTexture::Brushmarks)
+    })
+}
+
 /// A Score edition, named by `Score::version`.
 ///
 /// Editions accumulate: each keeps every field of the editions before it, so
@@ -668,10 +680,11 @@ pub enum ScoreEdition {
     V0_19,
     V0_20,
     V0_21,
+    V0_22,
 }
 
 impl ScoreEdition {
-    pub const ALL: [Self; 21] = [
+    pub const ALL: [Self; 22] = [
         Self::V0_1,
         Self::V0_2,
         Self::V0_3,
@@ -693,6 +706,7 @@ impl ScoreEdition {
         Self::V0_19,
         Self::V0_20,
         Self::V0_21,
+        Self::V0_22,
     ];
 
     /// The edition a version string names.
@@ -727,6 +741,7 @@ impl ScoreEdition {
             Self::V0_19 => "0.19.0",
             Self::V0_20 => "0.20.0",
             Self::V0_21 => "0.21.0",
+            Self::V0_22 => "0.22.0",
         }
     }
 }
@@ -2622,6 +2637,14 @@ impl Score {
                 && !self.edition_at_least(ScoreEdition::V0_17)
             {
                 return Err("surface texture sweep requires Score version 0.17.0");
+            }
+            if instruction
+                .surface
+                .as_ref()
+                .is_some_and(|surface| surface.texture == SurfaceTexture::Brushmarks)
+                && !self.edition_at_least(ScoreEdition::V0_22)
+            {
+                return Err("surface texture brushmarks requires Score version 0.22.0");
             }
             if instruction.ink_spread.is_some() && !self.edition_at_least(ScoreEdition::V0_12) {
                 return Err("ink_spread requires Score version 0.12.0");

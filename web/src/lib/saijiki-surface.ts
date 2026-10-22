@@ -8,8 +8,9 @@
 // what the category means.
 //
 // These explanatory drawings follow SPEC §3.3 and the shared Rust renderer's
-// surfaces.rs / marks.rs: two sweeps at 0.5, one or two hatch sets, three
-// aquatint steps, and handling relative to the tool's opacity. They are stable
+// surfaces.rs / marks.rs: two sweeps as films at 0.6, brushmarks bands at 0.5
+// each, one or two hatch sets, three aquatint steps, and handling relative to
+// the tool's opacity. They are stable
 // illustrations, not performances of a Score.
 
 import type { ResolvedInstructionLang } from './instructionLang';
@@ -134,16 +135,29 @@ export const SURFACE_PREVIEWS: Record<string, PreviewEntry> = {
 		svg: surfaceSvg(`<rect ${SURFACE_BOX} fill="#2b2b2b"/>`)
 	},
 	刷き: {
-		effect: '少し角度を変えて面を二度掃く。各掃きは道具の不透明度の半分で、薄いを添えると淡くなる。線や弧では幅広い帯を作る。',
+		effect: '少し角度を変えて面を二度掃く。各掃きは、帯が溶け合った一枚の膜で、道具の不透明度の0.6倍。薄いを添えると淡くなる。線や弧では幅広い帯を作る。',
 		example: '刷きの四角を置く',
 		effectEn:
-			'Sweeps the face twice at slightly different angles, each at half the tool opacity. Faint handling makes it paler. On a line or arc it makes a broad band.',
+			'Sweeps the face twice at slightly different angles, each sweep one film of merged bands at 0.6 of the tool opacity. Faint handling makes it paler. On a line or arc it makes a broad band.',
 		exampleEn: 'Place a sweep square',
 		svg: surfaceSvg(
 			'<defs><filter id="surface-sweep"><feGaussianBlur stdDeviation="2.4"/></filter></defs>' +
 				'<g filter="url(#surface-sweep)" stroke="#2b2b2b" stroke-width="15" stroke-linecap="round">' +
-				'<g opacity="0.5"><path d="M44 26 H136"/><path d="M44 39 H136"/><path d="M44 52 H136"/><path d="M44 65 H136"/></g>' +
-				'<g opacity="0.5" transform="rotate(6 90 46)"><path d="M44 22 H136"/><path d="M44 35 H136"/><path d="M44 48 H136"/><path d="M44 61 H136"/><path d="M44 74 H136"/></g>' +
+				'<g opacity="0.6"><path d="M44 26 H136"/><path d="M44 39 H136"/><path d="M44 52 H136"/><path d="M44 65 H136"/></g>' +
+				'<g opacity="0.6" transform="rotate(6 90 46)"><path d="M44 22 H136"/><path d="M44 35 H136"/><path d="M44 48 H136"/><path d="M44 61 H136"/><path d="M44 74 H136"/></g>' +
+				'</g>'
+		)
+	},
+	刷毛目: {
+		effect: '筆の帯を一本ずつ重ね、重なった所が濃い筋になる。少し角度を変えて二度掃き、輪郭の内に収める。閉じた形の面にだけ使える。',
+		example: '刷毛目の四角を置く',
+		effectEn:
+			"Lays the brush's bands one by one, so they darken where they overlap; two passes at slightly different angles, kept inside the contour. Only on the face of a closed shape.",
+		exampleEn: 'Place a brushmarks square',
+		svg: surfaceSvg(
+			'<g stroke="#2b2b2b" stroke-linecap="round">' +
+				'<g><path stroke-width="13" stroke-opacity="0.5" d="M44 24 H136"/><path stroke-width="11" stroke-opacity="0.5" d="M44 33 H136"/><path stroke-width="14" stroke-opacity="0.5" d="M44 42 H136"/><path stroke-width="12" stroke-opacity="0.5" d="M44 51 H136"/><path stroke-width="13" stroke-opacity="0.5" d="M44 60 H136"/><path stroke-width="11" stroke-opacity="0.5" d="M44 69 H136"/></g>' +
+				'<g transform="rotate(6 90 46)"><path stroke-width="12" stroke-opacity="0.5" d="M44 20 H136"/><path stroke-width="14" stroke-opacity="0.5" d="M44 29 H136"/><path stroke-width="11" stroke-opacity="0.5" d="M44 38 H136"/><path stroke-width="13" stroke-opacity="0.5" d="M44 47 H136"/><path stroke-width="12" stroke-opacity="0.5" d="M44 56 H136"/><path stroke-width="14" stroke-opacity="0.5" d="M44 65 H136"/><path stroke-width="11" stroke-opacity="0.5" d="M44 74 H136"/></g>' +
 				'</g>'
 		)
 	},

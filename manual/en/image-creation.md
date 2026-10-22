@@ -110,7 +110,7 @@ Place three small red circles in the upper right.
 | Motion | place, arrange, fill, scatter, draw, tile |
 | Touch | pencil, pen, rotring, crayon, chalk, fine brush, broad brush, burin, drypoint |
 | Continuity | solid, dashed, dotted, dash-dot |
-| Surfaces | empty, flat, sweep, grain, stipple, hatch, crosshatch, aquatint |
+| Surfaces | empty, flat, sweep, brushmarks (on a closed shape), grain, stipple, hatch, crosshatch, aquatint |
 | Handling | dense, temperate, faint |
 | Fineness | fine-grained, coarse-grained, packed, sparse (on the texture of a closed shape) |
 | Underlayer | underpainted (on the texture of a closed shape) |

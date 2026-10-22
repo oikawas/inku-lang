@@ -179,8 +179,10 @@ inside the shape that carries it. The clipping happens in the coordinates before
 so a profile that uses no filters keeps the same shape, and the angle, spacing, and density gradient
 are exactly what they were before the clipping.
 A sweep (and a saved Score's wash) lays each stroke as wide as the pitch or wider, so no paper is left between two sweeps: it
-reads as a field rather than as stripes. Each sweep is correspondingly lighter, and the ink a reader
-sees is the composite of the overlapping layers.
+reads as a field rather than as stripes. A sweep merges the bands of one pass into one film kept inside the contour, and only
+the second, turned pass darkens where it overlaps (render engine 90).
+Brushmarks lays the same bands one by one, so they darken in steps where they overlap and read as streaks (render engine 91).
+A saved Score's wash keeps its band-by-band tone.
 The ground is one of seven supports you can name (paper, washi, ink-wash ground, charcoal ground, canvas, drawing paper, mezzotint): its broad light and dark is drawn once, never tiled, and its fine texture is laid as several `<pattern>` tiles whose sizes never line up.
 **No filter is used at all, so all three profiles emit exactly the same ground.**
 A mark's extents become pixels through the canvas's short edge, so the same description draws the same shape on any aspect (placement still scales with width and height).

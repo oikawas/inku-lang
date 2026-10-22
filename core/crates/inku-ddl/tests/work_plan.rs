@@ -1132,6 +1132,7 @@ fn texture_words_print_and_compile_cleanly_on_every_closed_shape() {
     for shape in ["circle", "ellipse", "triangle", "square", "cloudform"] {
         for texture in [
             "sweep",
+            "brushmarks",
             "grain",
             "stipple",
             "hatch",
@@ -1148,7 +1149,7 @@ fn texture_words_print_and_compile_cleanly_on_every_closed_shape() {
             }
         }
     }
-    assert_eq!(layers.len(), 5 * 6 * 9);
+    assert_eq!(layers.len(), 5 * 7 * 9);
     common::par_map(&layers, |layer| {
         for language in [
             ResolvedInstructionLanguage::Ja,

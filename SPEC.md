@@ -141,7 +141,7 @@ The core vocabulary consists of fifteen Saijiki categories plus relations. Its s
 | forms | かたち | circle, ellipse, triangle, square, line, arc, free line, point, cloudform (free line from DDL 19; Stage 1 chooses one only when the description names one or draws a line without a set shape, §14.10.5) |
 | touches | てざわり | silverpoint, pencil, pen, rotring, crayon, chalk, fine-brush, thick-brush, oil paint, burin, drypoint, computer |
 | continuity | つらなり | solid, dashed, dotted, dash-dot |
-| surfaces | おもて | empty, flat, sweep, grain, stipple, hatch, crosshatch, aquatint |
+| surfaces | おもて | empty, flat, sweep, brushmarks, grain, stipple, hatch, crosshatch, aquatint (brushmarks since DDL 25) |
 | handling | さばき | dense, temperate, faint |
 | fineness | きめ | fine-grained, coarse-grained, packed, sparse (DDL 24) |
 | underlayer | したじ | underpainted (DDL 24) |
@@ -204,8 +204,8 @@ Canvas format is neither vocabulary nor a plugin. It is a resolved host option o
   plugin principle 1
 - **the surfaces category holds state nouns for the techniques of surfaces and
   marks**: use a noun such as "flat", not the act of painting. Its words name the
-  quality only (empty, flat, sweep, grain, stipple, hatch, crosshatch, aquatint);
-  density belongs to handling. Paper grain belongs to the support (the grounds
+  quality only (empty, flat, sweep, brushmarks, grain, stipple, hatch, crosshatch,
+  aquatint); density belongs to handling. Paper grain belongs to the support (the grounds
   category). Grain and sweep remain applicable to lines and arcs: grain raises
   support absorption and tooth, while sweep changes no sheet properties and
   produces a band at three times the width. A sweep has no paleness of its own
@@ -213,13 +213,22 @@ Canvas format is neither vocabulary nor a plugin. It is a resolved host option o
   the values the author chose on the comparison sheet, 2026-09-29; on a closed
   shape the bands of one pass merge into one film at 1.2 times that, render
   engine 90); paleness
-  belongs to the handling word faint. A saved Score's `wash` (v1's pale ink
+  belongs to the handling word faint. Brushmarks (刷毛目, DDL 25, the author's
+  decision of 2026-10-22) goes only on the face of a closed shape: it lays the
+  bands a sweep lays one by one, each at 0.5, so that they darken step by step
+  where they overlap (render engine 89's closed-shape sweep, drawn inside the
+  contour; render engine 91). The sweep's film and the brushmarks' streaks are
+  told apart by how the face looks. Only works with brushmarks use Score 0.22.0
+  (`surface.texture="brushmarks"`). On a line, an arc or a free line only the
+  word is left out with a diagnostic (`unsupported_surface_brushmarks`) and the
+  mark is drawn as it is without it; a point takes no surface word, brushmarks
+  included. A saved Score's `wash` (v1's pale ink
   wash) still draws as the pale band at three times the width and 0.35 of the
   opacity. The migration turns a pale ink wash into a faint sweep, which draws a
   little darker (0.44 and 0.275 against the wash's 0.35 and 0.22). The other six qualities move
   to the preceding closed shape and are dropped when there is none. On a closed
-  shape, an explicit sweep, grain, stipple, hatch, crosshatch, or aquatint is
-  itself the area's performance and adds no flat base fill beneath it (DDL
+  shape, an explicit sweep, brushmarks, grain, stipple, hatch, crosshatch, or
+  aquatint is itself the area's performance and adds no flat base fill beneath it (DDL
   engine 46). A flat fill comes only from an explicit flat surface or the
   omitted-surface default of a closed shape, except that a texture with the
   underlayer word underpainted lays the tool's fill beneath it (DDL 24). Current
@@ -296,8 +305,9 @@ saving or delivering an empty Score with its background as an omitted success.
   0.90); packed and sparse set how closely dots or lines of the same size lie
   (`density` 0.85 and 0.05). Underlayer has one word, underpainted (下塗り),
   which lays the tool's fill beneath the texture (`filled`). Both go only on a
-  named texture (sweep, grain, stipple, hatch, crosshatch, aquatint) of a closed
-  shape (circle, ellipse, triangle, square, polygon, cloudform). On any other
+  named texture (sweep, brushmarks, grain, stipple, hatch, crosshatch, aquatint;
+  brushmarks since DDL 25) of a closed shape (circle, ellipse, triangle, square,
+  polygon, cloudform). On any other
   mark (a line, an arc, a free line, a point) or on empty, flat, or a surface
   with no texture, a diagnostic (`unsupported_surface_fineness`,
   `unsupported_surface_underlayer`) leaves out that word alone, and the rest of
@@ -435,9 +445,11 @@ Saijiki words and the grammar's modifiers are shared by the writer, the reader
 (Stage 1), the compiler, and the renderer. A word is added, moved, or changed
 under these principles (author's ruling, 2026-09-29).
 
-The Web Saijiki previews follow the current categories too. The eight surface
+The Web Saijiki previews follow the current categories too. The nine surface
 words each draw a distinct face inside the same contour; only empty leaves it
-unmarked. Sweep shows two passes, each at 0.5 of the tool opacity. Bilingual
+unmarked. Sweep shows two passes, each one film of merged bands at 0.6 of the
+tool opacity (render engine 90), and brushmarks shows its bands laid one by one
+at 0.5, darker where they overlap (render engine 91). Bilingual
 handling previews compare the same pencil stipple: temperate on the left,
 dense, temperate or faint on the right, relative to that tool. Mark counts and
 positions stay fixed so density is not confused with opacity. The four
@@ -1810,13 +1822,17 @@ the Saijiki asset, the parser's finite modifier forms, the fluctuation
 classifier, and the Score intensity values. A value is its word's English as
 written (spaces and hyphens become `_`), and field names say their meaning
 (`position`, `handling`, `motion_spacing`, and so on; the underdrawing type
-`inku.work-plan.v2`, Saijiki v2). A layer with a named texture (sweep, grain,
-stipple, hatch, crosshatch, aquatint) may carry the optional fields `fineness`
-(`fine_grained`, `coarse_grained`, `packed`, `sparse`) and `underlayer`
-(`underpainted`) (DDL 24). In the capability matrix only the closed-shape rows
-take their values, and validation removes both fields from a layer without a
-named texture (`requires_texture`). Rule 4 of the Stage 1 system prompt states
-what the fineness and underlayer words mean, in Japanese and English. The values each form (with its
+`inku.work-plan.v2`, Saijiki v2). A layer with a named texture (sweep,
+brushmarks, grain, stipple, hatch, crosshatch, aquatint) may carry the optional
+fields `fineness` (`fine_grained`, `coarse_grained`, `packed`, `sparse`) and
+`underlayer` (`underpainted`) (DDL 24). In the capability matrix only the
+closed-shape rows take their values, and validation removes both fields from a
+layer without a named texture (`requires_texture`). The surface value
+`brushmarks` (刷毛目, DDL 25) is also taken only by the closed-shape rows. Rule 4
+of the Stage 1 system prompt states what the fineness and underlayer words
+mean, and how sweep and brushmarks differ (a film of merged bands, and streaks
+that darken where they overlap; brushmarks only on closed shapes), in Japanese
+and English. The values each form (with its
 proportion word) accepts come from the capability matrix
 `inku.work-plan-capabilities.v2`, generated by compiling one sentence per value,
 and shared-Rust validation is authoritative rather than provider-side decoding.
@@ -2637,19 +2653,21 @@ Each brush defines one seamless band tile per document (320 for the fine brush a
 
 The drawing hand no longer draws one shape as one even face and one band (render engine 88; the four parts the author chose on the prototype sheets).
 - **Brush fills in light and dark**: a thick or fine brush fill (outside Compat) keeps its 0.92 floor and lays darker bands of the same colour over it. They use the same tile, turned 35° from the light bands and offset by their own seed, with no floor, at opacity 0.6. The darkening follows the colour's relative luminance Y: 0.72 at 0.45 or below, 0.94 at 0.95 or above, and a straight line between, so a white face stays white and still shows its bands. Overlapping fills no longer melt into one flat mass; each shape shows its own brush direction.
-- **A thin wash under a texture**: a closed shape with a texture word (sweep, grain, stipple, hatch, crosshatch, aquatint and the like) and no fill lays a thin wash of its own colour under its texture marks (0.12 normal, 0.18 dense, 0.072 faint). Stipple and aquatint marks follow the shape's area up to eight times the reference area (1.8 before), at most 400 (90 before).
+- **A thin wash under a texture**: a closed shape with a texture word (sweep, brushmarks, grain, stipple, hatch, crosshatch, aquatint and the like) and no fill lays a thin wash of its own colour under its texture marks (0.12 normal, 0.18 dense, 0.072 faint). Stipple and aquatint marks follow the shape's area up to eight times the reference area (1.8 before), at most 400 (90 before).
 - **Irregularities follow length**: stroke events (catch, fade, correction) and paper responses (bleed swell, tooth skip) arrive at their rate per 40 samples (about 0.8 of the short side), not per stroke. Their caps are 1/12 (at least 2) and 1/8 (at least 3) of the sample count, so a long line has more of them and a short one fewer. A stroke keeps at most 257 samples (129 before).
 - **Fine brush and pen edges**: the fine brush and the pen also have a texture filter that roughens the edge (displacement 0.6 and 0.35, `baseFrequency` 0.45 and 0.8). Reference §6 `texture_filter` is authoritative for which tools have one.
 
-**How a texture is laid (render engine 89, DDL 24).** A named texture (sweep, grain, stipple, hatch, crosshatch, aquatint) reads the Score's `surface.density` and `surface.scale` as their distance Δ from the default, 0.35 for both. The density multiplies its marks: 4 times at 0.85 and a quarter at 0.05, exponential between (4^(Δ/0.5) above the default, 4^(Δ/0.30) below). The scale sizes one mark: twice at 0.90 and half at 0.05 (2^(Δ/0.55), 2^(Δ/0.30)), and divides the count by that factor squared, so the area covered stays the same. In a sweep the density lays the bands closer without changing their width (never under 6 px), and the scale widens the bands and their spacing. In hatching and crosshatching the scale grows the lines thicker and wider apart, and the density lays them closer (never closer than 2.2 line widths). A texture with `filled` (the underlayer word underpainted) lays the tool's fill under it instead of the thin wash, and lays its marks over the fill 45% toward white when the fill's relative luminance is under 0.45 and ×0.62 darker otherwise, twice as strong (up to 0.75). The marks' seed reads the instruction with the density and scale at their defaults and without the fill, so a fineness or underlayer word does not move the marks or turn the bands. Wash, bleed and paper grain, which only saved Scores hold, read their fields and seed as before. A texture at the default fields draws as in render engine 88. Old Scores (DDL engine 45 and before, and works without a recorded engine) draw differently when redrawn where they hold a named texture together with a fill (now underpainted) or at a density or scale off the default (now at the new factors); the saved SVGs do not change.
+**How a texture is laid (render engine 89, DDL 24).** A named texture (sweep, brushmarks, grain, stipple, hatch, crosshatch, aquatint) reads the Score's `surface.density` and `surface.scale` as their distance Δ from the default, 0.35 for both. The density multiplies its marks: 4 times at 0.85 and a quarter at 0.05, exponential between (4^(Δ/0.5) above the default, 4^(Δ/0.30) below). The scale sizes one mark: twice at 0.90 and half at 0.05 (2^(Δ/0.55), 2^(Δ/0.30)), and divides the count by that factor squared, so the area covered stays the same. In a sweep and in brushmarks the density lays the bands closer without changing their width (never under 6 px), and the scale widens the bands and their spacing. In hatching and crosshatching the scale grows the lines thicker and wider apart, and the density lays them closer (never closer than 2.2 line widths). A texture with `filled` (the underlayer word underpainted) lays the tool's fill under it instead of the thin wash, and lays its marks over the fill 45% toward white when the fill's relative luminance is under 0.45 and ×0.62 darker otherwise, twice as strong (up to 0.75). The marks' seed reads the instruction with the density and scale at their defaults and without the fill, so a fineness or underlayer word does not move the marks or turn the bands. Wash, bleed and paper grain, which only saved Scores hold, read their fields and seed as before. A texture at the default fields draws as in render engine 88. Old Scores (DDL engine 45 and before, and works without a recorded engine) draw differently when redrawn where they hold a named texture together with a fill (now underpainted) or at a density or scale off the default (now at the new factors); the saved SVGs do not change.
 
 **Grain and sweep faces (render engine 90).** Grain lays, over one tile as large as the face, the same count of marks per area as the fixed tile did, uniformly at random, and keeps those inside the contour or within the marks' reach of it (marks keep their size of 0.55 to 1.65 and opacity of 0.45 to 1). The 0.08-unit tile before repeated the same arrangement, and the marks lined up in a lattice (the author's remark, 2026-10-22). A closed shape's sweep draws the bands of one pass opaque in one group (the streaks after the bodies) and applies the opacity (the surface opacity × 0.5 × 1.2) and a filter, the tool's displacement with a blur of 3 for the thick brush, 1.5 for the fine brush and 2 for the other tools per 1,000 units of the short side, once to that group. Bands of one pass no longer darken where they overlap; only the overlap with the second, turned pass does. A mask of the face's contour, roughened by the tool's filter, cuts the passes, so they stay inside the outline (Compat adds no mask). Before, each band's opacity built up in steps wherever bands overlapped, the steps' edges read as kelp-like stripes, and the bands' ends and corners and the filter's displacement crossed the outline (the author's remark, 2026-10-22). The factor 1.2 was calibrated on the author's Build 1309 batch to keep the mean tone inside the faces. Saved Scores' wash and paper grain, stipple, hatching, crosshatching and aquatint do not change. The bleed word still wraps the outline and the face and spreads beyond them. Saved SVGs do not change.
+
+**Brushmarks faces (render engine 91, DDL 25).** Brushmarks lays the bands a sweep lays (their shape, spacing, width and direction, two passes at slightly different angles, the flat brush for the fine and thick brushes), each band with its own opacity (the surface opacity × handling × underpainting × 0.5), so that they darken step by step where they overlap: render engine 89's way of drawing a closed shape's sweep. The same contour mask as a sweep's cuts its bands (Compat adds no mask), and the sweep film's blur is not applied. The face's seed reads the instruction with the texture set to sweep, so writing brushmarks for a sweep in the same sentence keeps the bands' directions, places and widths and changes only how they overlap (the author's decision, 2026-10-22). In the SVG the bands (`surface-stroke-v1 surface-brushmarks`) are drawn in a `surface-brushmarks-inside-v1` group inside the face group `surface_<instruction>_<mark>_brushmarks`. Only works with brushmarks use Score 0.22.0; every other work keeps its Score and its picture.
 
 Typed DDL intensity delivery covers solid closed fills. Non-solid textures, unfilled lines and arcs, and explicit Point surfaces retain the existing unsupported diagnostics. Score rendering capability and the delivered typed-DDL subset are distinct. Full typed runtime / UI / save integration remains a later task.
 
 #### The fine and thick brushes' sweep (a flat brush)
 
-A sweep (`sweep`) of the fine or the thick brush is drawn as the mark of a flat brush (render engine 77; its end and its streaks as of render engine 82). This covers sweep lines and arcs and the passes of a closed shape's sweep; a flat fill, a saved Score's `wash` (the retired pale ink), the sweeps of other tools and outlines stay with the round brush. The flat brush changes only the shape of the mark and the streaks inside it: the centerline runs through the same performed points as the round stroke's.
+A sweep (`sweep`) of the fine or the thick brush is drawn as the mark of a flat brush (render engine 77; its end and its streaks as of render engine 82). This covers sweep lines and arcs, the passes of a closed shape's sweep and the bands of brushmarks (render engine 91); a flat fill, a saved Score's `wash` (the retired pale ink), the sweeps of other tools and outlines stay with the round brush. The flat brush changes only the shape of the mark and the streaks inside it: the centerline runs through the same performed points as the round stroke's.
 
 - **Width**: nearly even, with neither the entry nor the end tapered. Pressure moves it by ±10%, and the mark takes a quarter of the paper's response (the swell where it bleeds and the dent of its tooth). Taking all of it, as the round brush does, would swell the mark to 1.42–1.7 times its width where the paper bleeds. A brush's mark is never cut by the paper's tooth.
 - **Hold**: on a curved line or arc the tip stays square to the direction of travel, so the mark keeps its width round the curve (the author's choice). On a straight line and a closed shape's pass it is square to the whole mark's direction.

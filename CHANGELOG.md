@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-22 — macOS Saijiki adds fineness and underlayer
+
+The bundled vocabulary and Web reference now show fineness (fine-grained, coarse-grained, packed and sparse) and underlayer (underpainted) after handling. Each word includes its preview, explanation and example. Existing groups, word order and previews are preserved.
+
 ### 2026-10-21 — Align Android's laws and color checks with the shared core without a main layer
 
 Android's test answers no longer choose a main layer for laws, and D5 names its target layer in the color answer. The checks ensure a null main layer remains present through the laws records and autonomous refinement's edge record. The shared core owns these decisions, including choosing a ground when the description names no ground color. Existing records keep their stored layer numbers.

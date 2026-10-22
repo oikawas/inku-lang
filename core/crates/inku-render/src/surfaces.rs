@@ -10,16 +10,16 @@ use crate::geometry::{centerline_normals, points_center, stroke_sample_count};
 use crate::mark_geometry::MarkGeometry;
 use crate::mark_paths::{contour_stroke_path, grid_step, rotate, uses_hand_stroke};
 use crate::marks::{MarkContext, intensity_factor, mark_width, reaches_canvas, sweep_band_width};
-use crate::materials::with_texture_filter;
+use crate::materials::{texture_filter_id, with_texture_filter};
 use crate::palette::resolve_color;
 use crate::stroke::{ContourStrokeRequest, StrokeTerminal, synthesize_contour};
 use crate::surface_geometry::{
     line_spans, point_in_polygon, scanline_segments, scatter, shape_bbox, surface_contour,
 };
-use crate::svg::{Element, format_number};
+use crate::svg::{Element, Node, format_number};
 use crate::types::{
     Instruction, Point, Primitive, Seed, SurfaceDirection, SurfaceIntensity,
-    SurfaceSpacingGradient, SurfaceTexture,
+    SurfaceSpacingGradient, SurfaceTexture, SvgProfile, Weight,
 };
 
 /// Stipple and aquatint marks follow a shape's area up to eight times the
@@ -39,6 +39,14 @@ const SURFACE_WASH_OPACITY: f64 = 0.22;
 /// author chose on the comparison sheet (2026-09-29). 薄い (faint, ×0.55) makes
 /// it 0.275, a little darker than the wash's 0.22.
 const SURFACE_SWEEP_OPACITY: f64 = 0.5;
+/// The bands of one pass of 刷き are laid wet into each other, as one film
+/// (render engine 90): overlapping bands no longer build up. The film carries
+/// 1.2 of one band's opacity, which keeps a face's mean tone (calibrated on the
+/// author's batch of Build 1309).
+const SURFACE_SWEEP_PASS_FACTOR: f64 = 1.2;
+/// The dab shapes one grain face places, its sizes split evenly over 0.55 to
+/// 1.65 of the grain radius (render engine 90).
+const SURFACE_GRAIN_SHAPES: usize = 12;
 const SURFACE_BLEED_RINGS: usize = 3;
 /// A surface's default density and scale (the Score's `SurfaceSpec`). The
 /// fineness words (DDL 24) move a named texture away from them, and the units'
@@ -125,6 +133,70 @@ fn salted_seed(seed: Seed, label: &str, index: i64) -> Seed {
 
 fn closed_path(points: &[Point]) -> String {
     crate::svg::closed_polyline_path(points)
+}
+
+/// How far a pass of 刷き bleeds at its edges, per 1,000 units of the short
+/// side (render engine 90): the tool's displacement and this blur.
+fn sweep_bleed(weight: Weight) -> f64 {
+    match weight {
+        Weight::BrushThick => 3.0,
+        Weight::BrushThin => 1.5,
+        _ => 2.0,
+    }
+}
+
+fn sweep_bleed_filter_id(context: MarkContext<'_>) -> String {
+    format!(
+        "surface_soft_{:03}_{:03}",
+        context.instruction_index, context.mark_index
+    )
+}
+
+/// The filter of a pass of 刷き: the tool's displacement and a wider blur.
+fn sweep_bleed_filter(instruction: &Instruction, context: MarkContext<'_>) -> Element {
+    let mut filter = Element::new("filter")
+        .attr("id", sweep_bleed_filter_id(context))
+        .attr("x", "-20%")
+        .attr("y", "-20%")
+        .attr("width", "140%")
+        .attr("height", "140%");
+    if let Some(base) = crate::materials::texture_filter(instruction.weight, context.canvas) {
+        for child in base.children() {
+            if let Node::Element(element) = child
+                && matches!(element.name(), "feTurbulence" | "feDisplacementMap")
+            {
+                filter.push(element.clone());
+            }
+        }
+    }
+    filter.push(Element::new("feGaussianBlur").attr(
+        "stdDeviation",
+        format_number(sweep_bleed(instruction.weight) * context.canvas.unit() / 1000.0),
+    ));
+    filter
+}
+
+/// Hundredths are enough for a placed grain point.
+fn hundredths(value: f64) -> String {
+    format_number((value * 100.0).round() / 100.0)
+}
+
+/// Whether a point lies inside the contour or within `reach` of it.
+fn near_inside(point: Point, reach: f64, contour: &[Point]) -> bool {
+    let diagonal = reach * std::f64::consts::FRAC_1_SQRT_2;
+    point_in_polygon(point, contour)
+        || [
+            (reach, 0.0),
+            (-reach, 0.0),
+            (0.0, reach),
+            (0.0, -reach),
+            (diagonal, diagonal),
+            (-diagonal, diagonal),
+            (diagonal, -diagonal),
+            (-diagonal, -diagonal),
+        ]
+        .iter()
+        .any(|(dx, dy)| point_in_polygon(Point::new(point.x + dx, point.y + dy), contour))
 }
 
 fn surface_color(instruction: &Instruction, context: MarkContext<'_>) -> String {
@@ -419,6 +491,113 @@ fn sweep(
     ))
 }
 
+/// One band of a pass of 刷き, opaque and without a filter of its own, as its
+/// body and its streaks: the pass carries the opacity and the filter (render
+/// engine 90).
+#[allow(clippy::too_many_arguments)]
+fn sweep_parts(
+    instruction: &Instruction,
+    context: MarkContext<'_>,
+    start: Point,
+    end: Point,
+    width: f64,
+    color: &str,
+    seed: Seed,
+    index: i64,
+    class_name: &str,
+) -> Option<(Vec<Node>, Vec<Node>)> {
+    let length = (end.x - start.x).hypot(end.y - start.y);
+    if length <= 0.0 {
+        return None;
+    }
+    if !uses_hand_stroke(instruction.weight) {
+        let line = Element::new("line")
+            .attr("x1", format_number(start.x))
+            .attr("y1", format_number(start.y))
+            .attr("x2", format_number(end.x))
+            .attr("y2", format_number(end.y))
+            .attr("stroke", color)
+            .attr("stroke-width", format_number(width))
+            .attr("stroke-linecap", "round")
+            .attr("class", class_name);
+        return Some((vec![line.into()], Vec::new()));
+    }
+    let count = stroke_sample_count(length, context.canvas).max(2);
+    let centerline = (0..count)
+        .map(|sample| {
+            let t = sample as f64 / (count - 1) as f64;
+            Point::new(
+                start.x + (end.x - start.x) * t,
+                start.y + (end.y - start.y) * t,
+            )
+        })
+        .collect::<Vec<_>>();
+    if sweeps_flat(instruction) {
+        // The flat brush passes straight across: its tip stays square to the pass.
+        let stroke_seed = salted_seed(seed, "surface-stroke", index);
+        let stroke = synthesize_contour(ContourStrokeRequest {
+            centerline: &centerline,
+            base_width: width,
+            weight: instruction.weight,
+            seed: stroke_seed,
+            closed: false,
+            anchors: &BTreeSet::new(),
+            grid_step: grid_step(instruction.weight, context.canvas),
+            wild: context.wild,
+            support: context.support,
+            terminal: StrokeTerminal::Taper,
+        });
+        let points = stroke
+            .samples
+            .iter()
+            .map(|sample| sample.point)
+            .collect::<Vec<_>>();
+        let energies = stroke
+            .samples
+            .iter()
+            .map(|sample| sample.energy)
+            .collect::<Vec<_>>();
+        if let Some(band) = flat_band(FlatBandRequest {
+            centerline: &points,
+            energies: &energies,
+            hold: FlatHold::Fixed,
+            base_width: width,
+            weight: instruction.weight,
+            seed: stroke_seed,
+            support: context.support,
+            scale: context.canvas.unit() / 1000.0,
+            brush_size: sweep_band_width(instruction, context.canvas),
+        }) {
+            let element = flat_band_element(&band, color, &format!("{class_name} flat-brush-v1"));
+            let mut children = element.children().to_vec();
+            if children.is_empty() {
+                return None;
+            }
+            let body = children.remove(0);
+            return Some((vec![body], children));
+        }
+    }
+    let body = stroke_element(
+        instruction,
+        context,
+        &centerline,
+        width,
+        color,
+        1.0,
+        salted_seed(seed, "surface-stroke", index),
+        false,
+        class_name,
+        false,
+    );
+    Some((vec![body.into()], Vec::new()))
+}
+
+/// The grain of one face: one tile as large as the face, not repeated, its
+/// points laid at random at the density the 0.08-unit tile once repeated
+/// (render engine 90; the repeating tile showed as a lattice). A finer grain
+/// sets more, smaller points at the same cover, and the density multiplies
+/// them (render engine 89). The face places `SURFACE_GRAIN_SHAPES` dab shapes,
+/// turned, by `use`.
 fn grain_pattern(
     instruction: &Instruction,
     context: MarkContext<'_>,
@@ -426,76 +605,108 @@ fn grain_pattern(
     color: &str,
     opacity: f64,
     pattern_id: &str,
-) -> Element {
+    contour: &[Point],
+) -> Vec<Element> {
     let surface = instruction
         .surface
         .as_ref()
         .expect("surface checked by caller");
     let tile = context.canvas.unit() * 0.08;
-    // A finer grain sets more, smaller points at the same cover, and the
-    // density multiplies them (render engine 89).
     let size = texture_size_factor(surface.scale.max(0.04));
     let radius = (context.canvas.unit() * (0.002 + SURFACE_DEFAULT_SCALE * 0.004)).max(0.45) * size;
     let tile_area = tile * tile;
     let reference_area = context.canvas.unit().powi(2) * 0.18;
     let cover = 1.0 / (size * size);
-    let count = (((22.0 + SURFACE_DEFAULT_DENSITY * 120.0) * tile_area / reference_area
+    let per_tile = (((22.0 + SURFACE_DEFAULT_DENSITY * 120.0) * tile_area / reference_area
         * cover
         * texture_count_ratio(surface.density.max(0.02)))
     .ceil() as usize)
         .max(1);
+    let density = per_tile as f64 / tile_area;
+    let reach = (radius * 1.65 * 2.0).max(mark_width(instruction, context.canvas) * 0.75);
+    let min_x = contour
+        .iter()
+        .map(|point| point.x)
+        .fold(f64::INFINITY, f64::min)
+        - reach;
+    let max_x = contour
+        .iter()
+        .map(|point| point.x)
+        .fold(f64::NEG_INFINITY, f64::max)
+        + reach;
+    let min_y = contour
+        .iter()
+        .map(|point| point.y)
+        .fold(f64::INFINITY, f64::min)
+        - reach;
+    let max_y = contour
+        .iter()
+        .map(|point| point.y)
+        .fold(f64::NEG_INFINITY, f64::max)
+        + reach;
+    let (width, height) = (max_x - min_x, max_y - min_y);
+    let candidates = (density * width * height).round() as usize;
+    let mut definitions = Vec::new();
+    for shape in 0..SURFACE_GRAIN_SHAPES {
+        let factor = 0.55 + 1.1 * (shape as f64 + 0.5) / SURFACE_GRAIN_SHAPES as f64;
+        definitions.push(
+            dab(
+                instruction,
+                context,
+                Point::new(0.0, 0.0),
+                DabSpec {
+                    radius: radius * factor,
+                    color,
+                    opacity,
+                    seed,
+                    index: shape as i64,
+                    class_name: "surface-grain-dab",
+                    use_filters: false,
+                },
+            )
+            .attr("id", format!("{pattern_id}_dab_{shape}")),
+        );
+    }
     let mut pattern = Element::new("pattern")
         .attr("id", pattern_id)
         .attr("patternUnits", "userSpaceOnUse")
-        .attr("width", format_number(tile))
-        .attr("height", format_number(tile));
-    if context.profile != crate::types::SvgProfile::Compat {
-        pattern.set_attr("class", "surface-grain-pattern-v1");
+        .attr("x", format_number(min_x))
+        .attr("y", format_number(min_y))
+        .attr("width", format_number(width))
+        .attr("height", format_number(height));
+    if context.profile != SvgProfile::Compat {
+        pattern.set_attr("class", "surface-grain-pattern-v2");
     }
-    for index in 0..count {
+    for index in 0..candidates {
+        let index = index as i64;
         let point = Point::new(
-            hash01(index as i64, seed, "surface-grain-x") * tile,
-            hash01(index as i64, seed, "surface-grain-y") * tile,
+            min_x + hash01(index, seed, "surface-grain-x") * width,
+            min_y + hash01(index, seed, "surface-grain-y") * height,
         );
-        let mark_radius = radius * (0.55 + hash01(index as i64, seed, "surface-r") * 1.1);
-        let mark_opacity = opacity * (0.45 + hash01(index as i64, seed, "surface-o") * 0.55);
-        let reach = (mark_radius * 2.0).max(mark_width(instruction, context.canvas) * 0.75);
-        let mut x_offsets = vec![0.0];
-        let mut y_offsets = vec![0.0];
-        if point.x < reach {
-            x_offsets.push(tile);
+        if !near_inside(point, reach, contour) {
+            continue;
         }
-        if point.x > tile - reach {
-            x_offsets.push(-tile);
-        }
-        if point.y < reach {
-            y_offsets.push(tile);
-        }
-        if point.y > tile - reach {
-            y_offsets.push(-tile);
-        }
-        let mut logical = Element::new("g").attr("class", "surface-grain-mark");
-        for dx in &x_offsets {
-            for dy in &y_offsets {
-                logical.push(dab(
-                    instruction,
-                    context,
-                    Point::new(point.x + dx, point.y + dy),
-                    DabSpec {
-                        radius: mark_radius,
-                        color,
-                        opacity: mark_opacity,
-                        seed,
-                        index: index as i64,
-                        class_name: "surface-grain-dab",
-                        use_filters: false,
-                    },
-                ));
-            }
-        }
-        pattern.push(logical);
+        let shape = ((hash01(index, seed, "surface-r") * SURFACE_GRAIN_SHAPES as f64) as usize)
+            .min(SURFACE_GRAIN_SHAPES - 1);
+        let turn = hash01(index, seed, "surface-grain-turn") * 360.0;
+        let mark_opacity = 0.45 + hash01(index, seed, "surface-o") * 0.55;
+        pattern.push(
+            Element::new("use")
+                .attr("href", format!("#{pattern_id}_dab_{shape}"))
+                .attr(
+                    "transform",
+                    format!(
+                        "translate({} {}) rotate({})",
+                        hundredths(point.x - min_x),
+                        hundredths(point.y - min_y),
+                        format_number((turn * 10.0).round() / 10.0)
+                    ),
+                )
+                .attr("opacity", hundredths(mark_opacity)),
+        );
     }
-    pattern
+    definitions.push(pattern);
+    definitions
 }
 
 fn line_angle(direction: SurfaceDirection) -> f64 {
@@ -583,11 +794,17 @@ fn render_vectors(
             let band_spacing = (context.canvas.unit() * (0.052 - density * 0.024)).max(10.0) * size;
             let spacing = (band_spacing / count_ratio).max(6.0);
             let base_angle = hash01(0, seed, "fill-angle") * std::f64::consts::PI;
+            // The bands of one pass of 刷き are laid wet into each other: opaque
+            // inside the pass, with the opacity and the filter once on it
+            // (render engine 90). A saved wash keeps a band per sweep.
+            let merge = surface.texture == SurfaceTexture::Sweep;
             let mut stroke_index = 0_i64;
             for layer in 0..SURFACE_WASH_LAYERS {
                 let layer_seed = seed + layer as i128 * 7919;
                 let angle = base_angle
                     + (hash01(layer as i64, seed, "wash-angle") - 0.5) * 16_f64.to_radians();
+                let mut bodies = Vec::new();
+                let mut streaks = Vec::new();
                 for (_, start, end) in scanline_segments(contour, angle, spacing, layer_seed) {
                     let sweep_width = mark_width(instruction, context.canvas).max(
                         band_spacing
@@ -595,8 +812,23 @@ fn render_vectors(
                                 + hash01(stroke_index, seed, "wash-width")
                                     * SURFACE_WASH_WIDTH_SPAN),
                     );
-                    if reaches_canvas(instruction, context, start, end, sweep_width)
-                        && let Some(element) = sweep(
+                    if reaches_canvas(instruction, context, start, end, sweep_width) {
+                        if merge {
+                            if let Some((body, streak)) = sweep_parts(
+                                instruction,
+                                context,
+                                start,
+                                end,
+                                sweep_width,
+                                &color,
+                                seed,
+                                stroke_index,
+                                class_name,
+                            ) {
+                                bodies.extend(body);
+                                streaks.extend(streak);
+                            }
+                        } else if let Some(element) = sweep(
                             instruction,
                             context,
                             start,
@@ -607,11 +839,29 @@ fn render_vectors(
                             seed,
                             stroke_index,
                             class_name,
-                        )
-                    {
-                        group.push(element);
+                        ) {
+                            group.push(element);
+                        }
                     }
                     stroke_index += 1;
+                }
+                if merge && !bodies.is_empty() {
+                    let mut pass = Element::new("g")
+                        .attr("class", "surface-sweep-pass-v1")
+                        .attr(
+                            "opacity",
+                            format_number(
+                                (opacity * sweep_opacity * SURFACE_SWEEP_PASS_FACTOR).min(1.0),
+                            ),
+                        );
+                    if context.use_filters {
+                        pass.set_attr(
+                            "filter",
+                            format!("url(#{})", sweep_bleed_filter_id(context)),
+                        );
+                    }
+                    bodies.extend(streaks);
+                    group.push(pass.with_children(bodies));
                 }
             }
         }
@@ -838,7 +1088,7 @@ pub(crate) fn render_surface(
             context.instruction_index, context.mark_index
         );
         let color = texture_color(instruction, context);
-        definitions.push(grain_pattern(
+        definitions.extend(grain_pattern(
             instruction,
             context,
             seed,
@@ -848,6 +1098,7 @@ pub(crate) fn render_surface(
                 * underpaint_boost(instruction))
             .min(0.75),
             &pattern_id,
+            &contour,
         ));
         group.push(
             Element::new("path")
@@ -856,6 +1107,41 @@ pub(crate) fn render_surface(
                 .attr("stroke", "none")
                 .attr("class", "surface-grain-carrier-v1"),
         );
+    } else if surface.texture == SurfaceTexture::Sweep {
+        // 刷き stays inside its contour, cut as roughly as the tool's own edge
+        // (render engine 90; its bands crossed the outline).
+        if context.use_filters {
+            definitions.push(sweep_bleed_filter(instruction, context));
+        }
+        let mut inside = Element::new("g").attr("class", "surface-sweep-inside-v1");
+        render_vectors(&mut inside, instruction, geometry, context, &contour, seed);
+        if context.profile != SvgProfile::Compat {
+            let mask_id = format!(
+                "surface_mask_{:03}_{:03}",
+                context.instruction_index, context.mark_index
+            );
+            let mut path = Element::new("path")
+                .attr("d", closed_path(&contour))
+                .attr("fill", "white")
+                .attr("stroke", "none");
+            if context.use_filters
+                && instruction.weight != Weight::Drypoint
+                && let Some(id) = texture_filter_id(instruction.weight)
+            {
+                path.set_attr("filter", format!("url(#{id})"));
+            }
+            let mut mask = Element::new("mask")
+                .attr("id", &mask_id)
+                .attr("maskUnits", "userSpaceOnUse")
+                .attr("x", format_number(-context.canvas.width))
+                .attr("y", format_number(-context.canvas.height))
+                .attr("width", format_number(context.canvas.width * 3.0))
+                .attr("height", format_number(context.canvas.height * 3.0));
+            mask.push(path);
+            definitions.push(mask);
+            inside.set_attr("mask", format!("url(#{mask_id})"));
+        }
+        group.push(inside);
     } else {
         render_vectors(&mut group, instruction, geometry, context, &contour, seed);
     }
@@ -914,14 +1200,16 @@ mod tests {
         );
     }
 
-    fn drawn_lines(element: &Element, out: &mut Vec<(String, String, f64)>) {
+    fn drawn_lines(element: &Element, out: &mut Vec<(String, String, Option<f64>)>) {
         for child in element.children() {
             if let crate::svg::Node::Element(child) = child {
                 if child.name() == "line" {
                     out.push((
                         child.attribute("class").unwrap().to_owned(),
                         child.attribute("stroke-width").unwrap().to_owned(),
-                        child.attribute("stroke-opacity").unwrap().parse().unwrap(),
+                        child
+                            .attribute("stroke-opacity")
+                            .map(|value| value.parse().unwrap()),
                     ));
                 }
                 drawn_lines(child, out);
@@ -929,44 +1217,101 @@ mod tests {
         }
     }
 
+    fn with_class<'e>(element: &'e Element, class: &str, out: &mut Vec<&'e Element>) {
+        for child in element.children() {
+            if let crate::svg::Node::Element(child) = child {
+                if child
+                    .attribute("class")
+                    .is_some_and(|value| value.split(' ').any(|name| name == class))
+                {
+                    out.push(child);
+                }
+                with_class(child, class, out);
+            }
+        }
+    }
+
     #[test]
-    fn sweep_lays_the_wash_sweeps_without_their_paleness() {
+    fn sweep_lays_each_pass_as_one_film_inside_its_contour() {
         let colors = BTreeMap::new();
-        let drawn = |texture: &str, intensity: &str| {
+        let drawn = |texture: &str, intensity: &str, profile: SvgProfile| {
             let score: Score = serde_json::from_str(&format!(
                 r#"{{"version":"0.17.0","instructions":[{{"primitive":"square","position":[0.3,0.3],"size":[0.4,0.4],"weight":"rotring","surface_intensity":"{intensity}","surface":{{"texture":"{texture}","seed":7}}}}]}}"#
             ))
             .unwrap();
             let instruction = &score.instructions[0];
             let geometry = MarkGeometry::of(instruction).unwrap();
-            let rendered = render_surface(instruction, geometry, context(&colors)).unwrap();
-            let mut lines = Vec::new();
-            drawn_lines(&rendered.group, &mut lines);
-            lines
+            render_surface(
+                instruction,
+                geometry,
+                MarkContext {
+                    profile,
+                    ..context(&colors)
+                },
+            )
+            .unwrap()
         };
-        let wash = drawn("wash", "normal");
-        let sweep = drawn("sweep", "normal");
-        let faint_sweep = drawn("sweep", "faint");
-        assert!(wash.len() > 10);
-        assert_eq!(wash.len(), sweep.len());
-        assert_eq!(wash.len(), faint_sweep.len());
-        for ((wash_class, wash_width, wash_opacity), (sweep_class, sweep_width, sweep_opacity)) in
-            wash.iter().zip(&sweep)
-        {
-            assert_eq!(wash_class, "surface-stroke-v1 surface-wash-sweep");
-            assert_eq!(sweep_class, "surface-stroke-v1 surface-sweep");
-            assert_eq!(wash_width, sweep_width);
-            assert!((sweep_opacity / wash_opacity - 0.5 / 0.22).abs() < 1e-3);
+        // A saved wash keeps a band per sweep, at its own paleness.
+        let wash = drawn("wash", "normal", SvgProfile::Editable);
+        let mut wash_lines = Vec::new();
+        drawn_lines(&wash.group, &mut wash_lines);
+        assert!(wash_lines.len() > 10);
+        assert!(wash_lines.iter().all(|(class, _, opacity)| {
+            class == "surface-stroke-v1 surface-wash-sweep" && opacity.is_some()
+        }));
+        assert!(wash.definitions.is_empty());
+        // 刷き lays the same bands, opaque inside one film per pass; the film
+        // carries 0.28 × 0.5 × 1.2 of the tool, and 薄い (×0.55) makes it paler.
+        for (intensity, factor) in [("normal", 1.0), ("faint", 0.55)] {
+            let sweep = drawn("sweep", intensity, SvgProfile::Editable);
+            let mut passes = Vec::new();
+            with_class(&sweep.group, "surface-sweep-pass-v1", &mut passes);
+            assert_eq!(passes.len(), SURFACE_WASH_LAYERS);
+            let mut sweep_lines = Vec::new();
+            for pass in &passes {
+                let opacity: f64 = pass.attribute("opacity").unwrap().parse().unwrap();
+                assert!((opacity - 0.28 * 0.5 * 1.2 * factor).abs() < 1e-6);
+                drawn_lines(pass, &mut sweep_lines);
+            }
+            assert_eq!(sweep_lines.len(), wash_lines.len());
+            for ((_, wash_width, _), (class, width, opacity)) in wash_lines.iter().zip(&sweep_lines)
+            {
+                assert_eq!(class, "surface-stroke-v1 surface-sweep");
+                assert_eq!(wash_width, width);
+                assert_eq!(*opacity, None);
+            }
+            // The passes stay inside the face: a mask of its own contour.
+            let mut inside = Vec::new();
+            with_class(&sweep.group, "surface-sweep-inside-v1", &mut inside);
+            assert_eq!(inside.len(), 1);
+            assert_eq!(
+                inside[0].attribute("mask"),
+                Some("url(#surface_mask_002_003)")
+            );
+            let mut washes = Vec::new();
+            with_class(&sweep.group, "surface-base-wash-v1", &mut washes);
+            let contour = washes[0].attribute("d").unwrap();
+            let mask = sweep
+                .definitions
+                .iter()
+                .find(|definition| definition.attribute("id") == Some("surface_mask_002_003"))
+                .unwrap();
+            let Some(crate::svg::Node::Element(path)) = mask.children().first() else {
+                panic!("the mask holds the contour");
+            };
+            assert_eq!(path.attribute("d"), Some(contour));
         }
-        // 薄いを添えた刷き reads a little darker than the retired 薄墨: faint (×0.55)
-        // makes 0.5 into 0.275 against the wash's 0.22.
-        for ((_, _, wash_opacity), (_, _, faint_opacity)) in wash.iter().zip(&faint_sweep) {
-            assert!((faint_opacity / wash_opacity - 0.275 / 0.22).abs() < 1e-3);
-        }
+        // Compat lays the same passes without a mask.
+        let compat = drawn("sweep", "normal", SvgProfile::Compat);
+        assert!(compat.definitions.is_empty());
+        let mut passes = Vec::new();
+        with_class(&compat.group, "surface-sweep-pass-v1", &mut passes);
+        assert_eq!(passes.len(), SURFACE_WASH_LAYERS);
+        assert!(!format!("{:?}", compat.group).contains("mask"));
     }
 
     #[test]
-    fn grain_uses_one_definition_and_a_portable_carrier() {
+    fn grain_lays_one_unrepeated_tile_through_a_portable_carrier() {
         let score: Score = serde_json::from_str(
             r#"{"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.2,"surface":{"texture":"grain"}}]}"#,
         )
@@ -975,7 +1320,22 @@ mod tests {
         let instruction = &score.instructions[0];
         let geometry = MarkGeometry::of(instruction).unwrap();
         let rendered = render_surface(instruction, geometry, context(&colors)).unwrap();
-        assert_eq!(rendered.definitions.len(), 1);
+        // Twelve dab shapes, and the tile that places them.
+        assert_eq!(rendered.definitions.len(), SURFACE_GRAIN_SHAPES + 1);
+        let pattern = rendered.definitions.last().unwrap();
+        assert_eq!(pattern.name(), "pattern");
+        // The tile covers the whole face (400 px across), so nothing repeats.
+        for side in ["width", "height"] {
+            let length: f64 = pattern.attribute(side).unwrap().parse().unwrap();
+            assert!(length >= 400.0);
+        }
+        // About 3 points per 80 px square, as the repeating tile held.
+        let placed = pattern
+            .children()
+            .iter()
+            .filter(|node| matches!(node, Node::Element(element) if element.name() == "use"))
+            .count();
+        assert!((40..=120).contains(&placed));
         let group = format!("{:?}", rendered.group);
         assert!(group.contains("surface-grain-carrier-v1"));
         assert!(!group.contains("clipPath"));

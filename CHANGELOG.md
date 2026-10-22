@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-23 — macOS Saijiki adds brushmarks
+
+The bundled vocabulary and Web examples now show brushmarks after sweep in surfaces, with its illustration, explanation and example. Sweep's explanation and illustration use 0.6 of the tool opacity.
+
 ### 2026-10-22 — macOS Saijiki adds fineness and underlayer
 
 The bundled vocabulary and Web reference now show fineness (fine-grained, coarse-grained, packed and sparse) and underlayer (underpainted) after handling. Each word includes its preview, explanation and example. Existing groups, word order and previews are preserved.

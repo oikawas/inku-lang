@@ -122,9 +122,9 @@ PNGは正本SVGを写す派生出力であり、縮小してもSVGの材質・�
 
 英語の端の語はハイフンで書く（`left-edge`・`right-edge`・`top-edge`・`bottom-edge`）。空白で書いた`left edge`・`right edge`・`top edge`・`bottom edge`も同じ位置の語として読む（DDL 17）。`line-up`に対する`line up`と同じく、空白の書き方はparserだけが読む別の書き方で、Stage 1 promptと歳時記の表示はハイフンの語のままである。
 
-ペン・実線・空・黒は legacy Score / coerce と比較するための historical baseline であり、typed meaningへ挿入する既定値ではない。Visible DDL に該当 field が無ければ typed meaning は `unspecified` のままで、parser / semantic association は補わない。Lock検証済みviewからactual Scoreへ解決する現行subsetだけは、数値位置または`place:center`（画面中央の領域）と、place actionを持つcount1のcircle / square / ellipse / cloudform / triangle / polygonについて、省略countを1、touchをpen、continuityをsolid、閉じた面を塗りとして解決する。色の省略は実際のwork paletteで解決したbackgroundとblack / whiteのOKLCH L差を比較し、大きい側（同差はblack）を選ぶ。背景を覆う地（木炭地・メゾチント）のときは、backgroundの代わりに、地がbackgroundの上に見せる色（地の本体をbackgroundに重ねた色）のOKLab Lと比べる（DDL engine 61）。明示値は項目ごとに優先し、この解決をsource meaningへ書き戻さない。旧Stop / OmitAndContinue入力は互換で受けるが、recoverableなfieldまたは実行単位の不成立は共通の局所回復としてtyped診断つきで省略し、残る描画を続ける。この規則は Renderer 内部の物理 fallbackや既存作品のread compatibilityを遡及変更しない。
+ペン・実線・空・黒は legacy Score / coerce と比較するための historical baseline であり、typed meaningへ挿入する既定値ではない。Visible DDL に該当 field が無ければ typed meaning は `unspecified` のままで、parser / semantic association は補わない。Lock検証済みviewからactual Scoreへ解決する共通経路では、対応する単独図形・反復配置・組・Macro Emitに対し、touchをpen、continuityをsolid、閉じた形と点の面省略を塗り、線・通常弧・自由線の面省略を非塗りとして解決する。個数省略は置く・引くが1、単独の並べる・散らす・敷き詰めるが8で、組・充填は後述の専用規則へ従う。位置省略は置く・引くで中央領域を中心の周りへ2/3に縮めた範囲、分布配置で画面全体とし、明示した数値位置・名前付き領域・数値範囲・二点間の指定を優先する。色の省略は実際のwork paletteで解決したbackgroundとblack / whiteのOKLCH L差を比較し、大きい側（同差はblack）を選ぶ。背景を覆う地（木炭地・メゾチント）のときは、backgroundの代わりに、地がbackgroundの上に見せる色（地の本体をbackgroundに重ねた色）のOKLab Lと比べる（DDL engine 61）。明示値は項目ごとに優先し、この解決をsource meaningへ書き戻さない。旧Stop / OmitAndContinue入力は互換で受けるが、recoverableなfieldまたは実行単位の不成立は共通の局所回復としてtyped診断つきで省略し、残る描画を続ける。この規則は Renderer 内部の物理 fallbackや既存作品のread compatibilityを遡及変更しない。
 
-図形の大小は歳時記語彙ではなく、typed DDL compilerが所有する有限の局所modifierである。現行classは`slightly_small` / `small` / `very_small` / `normal` / `slightly_large` / `large` / `very_large`の7つで、JAの普通・大小表現とENの`normal-sized`、`slightly` / `very`を含む対応表面をsource spanごと保持する。自由なdegree同義語やsource substring後処理へ広げない。
+図形の大小は歳時記語彙ではなく、typed DDL compilerが所有する有限の局所modifierである。現行classは`slightly_small` / `small` / `very_small` / `normal` / `slightly_large` / `large` / `very_large` / `extra_large` / `huge`の9つで、JAの普通・大小表現とENの`normal-sized`、`slightly` / `very`、`特大の` / `extra-large`と`巨大な` / `huge`を含む対応表面をsource spanごと保持する。自由なdegree同義語やsource substring後処理へ広げない。
 
 じゅんは色・画材などの同一属性、図形、組の有限列を指定する。「赤と灰を交互にして、円を五つ並べる。」は赤・灰・赤・灰・赤、「赤い円・青い線・灰の弧の順に繰り返して、八つ並べる。」は円・線・弧・円・線・弧・円・線となる。交互には2項、順には空でない有限列を使い、同じ項の重複も記述順に保つ。順の色の列は、繰り返さずに並べた痕・敷き詰めた痕を一度だけ移すこともできる（「黄・橙・赤の順に段々に移して、」、DDL 23、§18）。並べる・散らす・敷き詰める・埋めるへ接続し、明示個数は列長にかかわらず配置単位の総数とする。順序語のない複数の指定から循環を推測しない。不成立な列は局所診断とし、独立した他の描画を続ける。
 
@@ -142,7 +142,7 @@ PNGは正本SVGを写す派生出力であり、縮小してもSVGの材質・�
 - Actionの語彙設計が特に重要：置く・並べる・埋める——これは提示の動詞
 - **ゆらぎカテゴリは痕の不均一さを言う語彙**：「細かく揺れる」「ゆるやかに波打つ」「にじみ」は許容し、「美しく揺れる」「激しく揺れる」は排除する（詳細は Section 13）。細かく／大きくは揺れの振れ幅を、ゆるやかに／小刻みには波の間隔（波の数）を言う。英語の振れ幅は副詞だけで書き（`narrowly` / `broadly`）、大小の`large`とは別の語である（歳時記 v2、DDL 16）。振れ幅の語は、何が揺れるかを言う語（揺れる・波打つ）とともに書く。揺れの語を伴わない細かく・大きくは揺れを作らず、診断（`fluctuation_amplitude_without_quality`）を出してその語だけを外す（DDL engine 68。それまでは既定の不規則な揺れとして黙って読み、「細かく点描の円」の円が揺れた）。ゆるやかに・小刻みにの読みは変えない
 - **あいだカテゴリは観察可能な関係のみ**：「沿う」「触れない」は外部から観察できる位置関係。「寄り添う」「呼応する」のような意図・擬人の語は排除（詳細は Section 14）。語彙（名詞）ではなく述語（統語）の追加であり、プラグイン原則1と矛盾しない
-- **おもてカテゴリは面や痕の技法を言う状態の名詞**：動作の「塗る」ではなく「塗り」を使う。語は面の質（空・塗り・刷き・刷毛目・粒・点描・平行線・交差線・アクアチント）だけを言い、濃さはさばきが言う。紙目は支持体（じカテゴリ）が引き取る。`粒`と`刷き`は線・弧にも残し、痕の在り方として読む。粒は支持体の吸い方・歯を上げ、刷きは紙の性質を変えず、幅3.0倍の帯を作る。刷きは自らの淡さを持たない（線の帯は道具の不透明度の0.8倍、閉じた面の掃きは0.5。作者が比較シートで選んだ、2026-09-29。閉じた面では、1つの向きの掃きの帯を溶け合った1枚の膜にし、その膜を0.5の1.2倍にする。render engine 90）。淡さはさばきの「薄い」が持つ。刷毛目（DDL 25、2026-10-22 作者決定）は閉じた形の面だけに付く質感で、刷きと同じ帯を一本ずつ0.5の半透明のまま重ね、重なった所が段々に濃くなる筋を見せる（render engine 89 までの閉じた面の刷きの描き方を、輪郭の内で描く。render engine 91）。刷きの膜と刷毛目の筋は、面の見え方で書き分ける。刷毛目を持つ作品だけがScore 0.22.0（`surface.texture="brushmarks"`）になる。線・弧・自由線に書いた刷毛目は、診断（`unsupported_surface_brushmarks`）を出してその語だけを外し、線はその語の無いときと同じに描く。点は、ほかの面の語と同じく刷毛目も受けない。保存済みScoreの`wash`（v1の薄墨）は、幅3.0倍・不透明度0.35倍の淡い帯のまま描く。移行で薄墨は薄い刷きになり、少し濃く描かれる（線0.44・面0.275に対し、薄墨は0.35・0.22）。残る6種は直前の閉じた図形へ移し、対象がなければ落とす。閉じた図形に明示した刷き・刷毛目・粒・点描・平行線・交差線・アクアチントは、それ自体がその面の演奏であり、下に平塗りを重ねない（DDL engine 46）。平塗りは「塗り」を明示した場合と、面を省略した閉じた図形の既定だけに使う。ただし、したじの「下塗り」を添えた質感は、その下に画材の塗りを敷く（DDL 24）。現行のにじみは独立したゆらぎであり、おもての質には含めない。背景を埋める指示は面の指定ではなく、documentの`background`へ届く。
+- **おもてカテゴリは面や痕の技法を言う状態の名詞**：動作の「塗る」ではなく「塗り」を使う。語は面の質（空・塗り・刷き・刷毛目・粒・点描・平行線・交差線・アクアチント）だけを言い、濃さはさばきが言う。紙目は支持体（じカテゴリ）が引き取る。`粒`と`刷き`は線・弧にも残し、痕の在り方として読む。粒は支持体の歯を上げ、刷きは紙の性質を変えず、幅3.0倍の帯を作る。刷きは自らの淡さを持たない（線の帯は道具の不透明度の0.8倍、閉じた面の掃きは0.5。作者が比較シートで選んだ、2026-09-29。閉じた面では、1つの向きの掃きの帯を溶け合った1枚の膜にし、その膜を0.5の1.2倍にする。render engine 90）。淡さはさばきの「薄い」が持つ。刷毛目（DDL 25、2026-10-22 作者決定）は閉じた形の面だけに付く質感で、刷きと同じ帯を一本ずつ0.5の半透明のまま重ね、重なった所が段々に濃くなる筋を見せる（render engine 89 までの閉じた面の刷きの描き方を、輪郭の内で描く。render engine 91）。刷きの膜と刷毛目の筋は、面の見え方で書き分ける。刷毛目を持つ作品だけがScore 0.22.0（`surface.texture="brushmarks"`）になる。線・弧・自由線に書いた刷毛目は、診断（`unsupported_surface_brushmarks`）を出してその語だけを外し、線はその語の無いときと同じに描く。点は、ほかの面の語と同じく刷毛目も受けない。保存済みScoreの`wash`（v1の薄墨）は、幅3.0倍・不透明度0.35倍の淡い帯のまま描く。移行で薄墨は薄い刷きになり、少し濃く描かれる（線0.44・面0.275に対し、薄墨は0.35・0.22）。点描・平行線・交差線・アクアチントも線・通常弧・自由線の当該instructionに受理してScoreへ保持するが、現行Rendererの面描画は閉じた形だけなので、開いた痕にはその質感の面を描かない。直前の閉じた図形へ移す処理はない。閉じた図形に明示した刷き・刷毛目・粒・点描・平行線・交差線・アクアチントは、それ自体がその面の演奏であり、下に平塗りを重ねない（DDL engine 46）。平塗りは「塗り」を明示した場合と、面を省略した閉じた図形の既定だけに使う。ただし、したじの「下塗り」を添えた質感は、その下に画材の塗りを敷く（DDL 24）。現行のにじみは独立したゆらぎであり、おもての質には含めない。背景を埋める指示は面の指定ではなく、documentの`background`へ届く。
 
 現行の `点描` はおもての `stipple`、`にじみ` はゆらぎの `bleeding` である。にじみは `ink_spread:"bleed"` として Wave / Perlin と独立に併用でき、単独では Perlin を加えず、強度語を増やさない通常の広がりを作る。v1 が入力として読んだ旧い語（点描の意味の`点`、`滲む` / `blurring`、`震える` / `trembling` / `trembles`、`中央` / `middle`）は、歳時記 v2 の移行で今の語へ書き換え、v2 は読まない（§3.3）。形の`点`は形の点だけを言う。保存済みScoreの`surface.texture="bleed"`と`variation.quality="pink"`は旧描画の意味を保持する。編集または再生成は新しいvariationへ進む。
 - **さばきカテゴリは墨や絵具の置き方を言う語**（歳時記 v2、2026-09-29）：濃い・程よい・薄いの3語で、面の質とは別の次元として、どの痕（線・弧・質感の面・平らな塗り）にも付けられる。道具ごとの相対指定であり、絶対の濃さではない。程よい（2026-09-30 作者裁定）は道具の本来の濃さで置く語で、さばきの語の無い痕と同じに描く（Score の `normal`）。下絵（Stage 1）は、さばきを層ごとに必ず選ぶ（応答の型の必須の欄、2026-09-30）。任意の欄のままでは読み手が層の半分ほどでさばきを書かず、記述が言った淡さが落ちたためである。筆の運び（速さなど）を言う語は、このカテゴリに加えてよい（§2の5）。
@@ -988,7 +988,7 @@ Continuationはreintroduced head、subject marker / determiner、predicateの正
 
 英語の文法語は字句解析と後段の文法判定を通じてASCIIの大小文字を区別しない。例えば背景の`the / background / with`やfillの`with`は、大文字を含む表記でも小文字と同じ文法的意味を持つ。入力全体を小文字化せず、作者のsource bytes、spanとprovenanceを保持する。Macro名など別のidentityの照合規則は、この規則で変更しない。
 
-既存の文法markerは共有Rustの同梱定数表で認識し、typed identityと入力ごとのsource spanを下流へ渡す。対象はJAの`を / に / で / の / は / が / へ / と / 背景 / 組 / して / 繰り返して`と、ENの`with / in / at / on / to / of / a / an / the / and / background / group of / repeating`である。同じ語の複数の文法的役割はcapabilityと既存の句構造で区別し、下流でsurfaceを再分類しない。意味語彙はSaijiki、句の結合とowner決定は既存compilerが所有する。配置の意味を選ぶ`重ねて / 並べて / overlapping / side by side`はこの表へ含めず、既存の配置構文として扱う。表の追加による新語・別名・描画意味の導入、外部辞書の読込み、保存形式へのregistry版追加は行わない。
+既存の文法markerは共有Rustの同梱定数表で認識し、typed identityと入力ごとのsource spanを下流へ渡す。対象はJAの`を / に / で / の / は / が / へ / と / 背景 / 組 / して / 繰り返して / 段々に移して`と、ENの`with / in / at / on / to / of / a / an / the / and / background / group of / repeating / shifting through`である。同じ語の複数の文法的役割はcapabilityと既存の句構造で区別し、下流でsurfaceを再分類しない。意味語彙はSaijiki、句の結合とowner決定は既存compilerが所有する。配置の意味を選ぶ`重ねて / 並べて / overlapping / side by side`はこの表へ含めず、既存の配置構文として扱う。表の追加による新語・別名・描画意味の導入、外部辞書の読込み、保存形式へのregistry版追加は行わない。
 
 Stage 1、camera projection、hole補完は既存の共有grammar helperを使い、その有限構文で必要なmarkerだけをidentityから参照する。表全体をpromptへ列挙せず、文法表の一元化を理由に推奨構文、Score、renderer、保存済み作品の意味を変えない。
 
@@ -1015,9 +1015,9 @@ Stage 1、camera projection、hole補完は既存の共有grammar helperを使�
 - **記述者の目に触れる前提で設計する**（解釈フィードバックUIで表示される）
 - Stage 1が記述から素材を解釈した場合は、その選択をvisible normalized DDLへ明記する。入力が明示した素材は保持する
 - 記述者がdirect DDLを書いた場合、または生成DDLを編集した場合は、てざわり等の省略を許容してtyped meaningを`unspecified`のまま保持する。Texture / context、primitive type、語順、現行Score defaultからhidden推測または挿入しない
-- 図形の大小は普通 / 小さい / 大きいと弱・標準・強を組み合わせた有限7classの局所modifierとして記し、明示normalと省略を区別する。数値geometryとqualitative sizeの併記、unknown degree、曖昧なownerはtyped conflict / issueにする
+- 図形の大小は普通・大小の段階に特大・巨大を加えた有限9classの局所modifierとして記し、明示normalと省略を区別する。数値geometry・qualitative size・全幅／半幅は独立した寸法候補として保持し、複数候補はtyped診断を出して最小の代表寸法へ相似に回復する。Qualitative sizeを明示数値へ掛け算しない。unknown degreeと曖昧なownerはtyped issueにする
 - ビュランとドライポイントはvisible DDLが明示した場合だけexplicitとなる。Stage 1 few-shotの品質方針とdirect DDL compiler semanticsを混同しない
-- 現行actual Score lowererは、数値位置または`place:center`（画面中央の領域）と、place actionを持つcount1 circle / square / ellipse / cloudformだけで、作者裁定済みのnormal geometry・大小倍率・描画属性省略をresolutionとして適用する。Named経路は寸法を保ったまま名前付きの領域を`at.region`へ置く。旧Stop / OmitAndContinue入力にかかわらず、recoverableな対象外意味やpalette context不足は独立fieldまたはtyped実行単位だけを省略して残存Scoreと診断を返す。両modeとも元meaningを変更せず、この共有Rust経路を通常Server／Web／Androidが使用する
+- 現行actual Score経路は、対応する単独図形のplace / draw、反復するline_up / scatter / tile / fill、組とMacro Emitへ、共有geometry resolverとresource-awareなcompact materializerを適用する。通常寸法・大小倍率・属性と位置の省略解決、および明示数値・名前付き領域・数値範囲・二点間の指定は§18–19の共通規則へ従い、count1または`place:center`だけに限定しない。旧Stop / OmitAndContinue入力にかかわらず、recoverableな対象外意味やpalette context不足は独立fieldまたはtyped実行単位だけを省略して残存Scoreと診断を返す。両modeとも元meaningを変更せず、この共有Rust経路を通常Server／Web／Androidが使用する
 
 ### 12.5 描画とVisionのモデル
 
@@ -1445,7 +1445,7 @@ DDLの揺らぎは、この意味での揺らぎである。
 
 **運動語彙（許容する）:**
 ```
-細かく揺れる、ゆっくり波打つ、ばらつく、かすかに震える、ぶれる、滲む
+細かく揺れる、ゆるやかに波打つ、小刻みに揺れる、にじみ
 ```
 これらは物理的な運動の描写。外部から観察可能な振る舞い。作品そのものではなく、作品の振る舞いの記述。
 
@@ -1473,7 +1473,7 @@ DDLの揺らぎは、この意味での揺らぎである。
   ↓ 記述者が指定すると上書きされる
 
 [運動語彙による揺らぎ指定]（記述者が書ける）
-  細かく、ゆっくり、ばらつく、震える
+  細かく揺れる、ゆるやかに波打つ、小刻みに揺れる、にじみ
   
   ↓ プラグインが明示されるとさらに上書きされる
 
@@ -1590,7 +1590,7 @@ typed identityとして保持し、対応範囲のdirect instructionとflat Macr
 
 **刷毛目の面（render engine 91、DDL 25）**：刷毛目は、刷きと同じ帯（形・間隔・幅・向き・少し角度を変えた二度の掃き。太筆・細筆は平筆）を、帯ごとに透明度（面の不透明度×さばき×下塗り×0.5）を持たせて重ね、重なった所を段々に濃くする。render engine 89 までの閉じた面の刷きの描き方である。帯の群は刷きと同じ輪郭のmaskで切り（Compatはmaskを付けない）、刷きの膜のぼかしは掛けない。面の種は質感を刷きに置いた鍵から作るので、同じ文の刷きを刷毛目に替えても帯の向き・置き場・幅は変わらず、重なり方だけが変わる（2026-10-22 作者決定）。SVGでは、面の群`surface_<命令>_<痕>_brushmarks`の中の`surface-brushmarks-inside-v1`の群に、帯（`surface-stroke-v1 surface-brushmarks`）を描く。刷毛目を持つ作品だけがScore 0.22.0になり、ほかの作品のScoreと絵は変わらない。
 
-Typed DDLの濃淡接続はsolidな閉じた塗りを対象とし、非solidなtexture、塗りのない線・弧、Pointの明示surfaceは既存の未対応診断を維持する。Scoreの描画能力と、typed DDLの意味が接続済みの範囲を混同しない。アプリのtyped runtime／UI／save全面接続は後続工程である。
+Typed DDLのさばきは、対応する図形の塗り・質感・線・弧へ、道具ごとのnormal／dense／faintとして届く。Pointの明示surfaceや開いた痕の刷毛目など、面の未対応組合せはさばきと独立に診断する。開いた痕で受理して保持する質感と、そのRendererの描画効果は§3.1の境界を保つ。通常Server／Web／Androidの共有typed経路がこの意味を使用する。
 
 #### 太筆・細筆の刷き（平筆）
 
@@ -1870,7 +1870,7 @@ Canonical meaningでは、記述に明示された個数をlosslessなsymbolic i
 
 **Renderer:**
 
-JSON Scoreを受け取り、`variation`情報から実際の揺らぎ関数（Perlin、Fine振幅、Medium周波数、既存の線に直交する演奏）を選んでSVGを生成する。同じScoreと同じrender seedは同じ演奏になる。この複数本の記述例は概念例であり、shared compilerのcount1 deliveryが反復allocationまで実装済みという意味ではない。
+JSON Scoreを受け取り、`variation`情報から実際の揺らぎ関数（Perlin、Fine振幅、Medium周波数、既存の線に直交する演奏）を選んでSVGを生成する。同じScoreと同じrender seedは同じ演奏になる。複数本の命令も、現行shared compilerのresource-awareなcompact recipeを通って反復materializationへ届く（§12.11）。
 
 v1.99 で揺らぎの演奏対象を線に加えて弧・閉図形（円・楕円・三角・四角・多角形）へ拡張した。発火条件は quality ∈ {perlin, wave, white} かつ dimensions が position_x / position_y / radius のいずれかを含む場合（line と対称、radius は図形の自然軸）。閉図形は継ぎ目が連続する周期ノイズで輪郭を演奏し、多角形系は辺ごとに演奏して角を固定、弧は両端点を完全固定して touching の接点契約を維持する。pink（滲み）と quality=none の経路は不変。この変更で同一 Score + 同一 seed の演奏結果が変わるため、render engine version を 5 へ更新した（過去作品の再演奏は見た目が変わりうるが、保存済み SVG は不変）。
 
@@ -2243,7 +2243,7 @@ JSON Score は共有lowererが検証済みmeaningから作る機械可読の楽�
 
 **記述が明示した個数は、その後のいかなる読み取りより優先する。** Canonical meaningは値をlosslessなsymbolic intentとして保持する。Step 11のpure ceiling preflightは、展開、配列確保、またはその他のO(count) materializationより前に走る。`u32::MAX`等もclampや代表数へsilent rewriteせず、単独primitiveは予算内のsource順prefixを描画して要求数と実行数を診断する。現行runtimeに残る閾値と代表化はcompatibility behaviorであり、canonical countを別の値へ変えるsemantic authorityではない。
 
-**大きさには三つのauthorityがある。** `unspecified`、`explicit qualitative`、`explicit numeric geometry`を混同しない。現行subsetでは、allocationを持たないcount1のcircle / square / ellipse / cloudform / triangle / polygonについて、normalのdiameter / side / widthをcanvas短辺の`6/25`（0.24）、ellipse / cloudformのheightをwidthの`3/5`とする。Lineのnormal lengthとArcのnormal chordも`6/25`、free_lineのnormal lengthは`11/20`（0.55）で、Arcのsagittaはchordの`1/4`、Pointのnormal diameterは`3/250`（0.012）である。Finite relative factorはsmall側がweak / standard / strong=`3/4` / `1/2` / `3/8`、large側が`5/4` / `3/2` / `7/4`で、その上にstandard・strong smallを反転した`2`（`特大の` / `extra-large`）と`8/3`（`巨大な` / `huge`）がある。normalは`1`で、通常geometryへexact rationalとして一度だけ掛ける。Lineはlength、Arcはchordとsagittaを相似に、Pointはdiameterを拡縮する。既存`small`はstandard-smallであり、`普通の大きさ`というexplicit normalはunspecifiedへ畳まない。Explicit numeric geometryはqualitative sizeで変更せず、両方の併記はconflictにする。このsubset外のunspecified normalは未裁定であり、自由なdegree同義語やhidden LLMで補わない。
+**大きさには三つのauthorityがある。** `unspecified`、`explicit qualitative`、`explicit numeric geometry`を混同しない。現行の単独図形・反復配置で、個数と独立にcircle / square / ellipse / cloudform / triangle / polygonについて、normalのdiameter / side / widthをcanvas短辺の`6/25`（0.24）、ellipse / cloudformのheightをwidthの`3/5`とする。Lineのnormal lengthとArcのnormal chordも`6/25`、free_lineのnormal lengthは`11/20`（0.55）で、Arcのsagittaはchordの`1/4`、Pointのnormal diameterは`3/250`（0.012）である。Finite relative factorはsmall側がweak / standard / strong=`3/4` / `1/2` / `3/8`、large側が`5/4` / `3/2` / `7/4`で、その上にstandard・strong smallを反転した`2`（`特大の` / `extra-large`）と`8/3`（`巨大な` / `huge`）がある。normalは`1`で、通常geometryへexact rationalとして一度だけ掛ける。Lineはlength、Arcはchordとsagittaを相似に、Pointはdiameterを拡縮する。既存`small`はstandard-smallであり、`普通の大きさ`というexplicit normalはunspecifiedへ畳まない。Explicit numeric geometryへqualitative sizeの倍率を掛けない。数値寸法・qualitative size・全幅／半幅を複数指定した場合は、それぞれを独立候補として保持し、`ConflictingSizeSpecifications`に候補と有効値を記録して代表寸法の最小値へ相似に回復する。元の指定と明示した縦横比を保ち、旧Stop / OmitAndContinueの両入力に同じ回復を適用する。自由なdegree同義語やhidden LLMで補わない。
 
 Explicit numeric geometryはdimension、basis、canonical base-10 coefficient / scale、source spelling provenanceを保持する。Scoreの`f64`へ変換するのは一つのdeterministic lowering boundaryだけで、silent clamp / rescaleをしない。過去のcircle `0.038` / ellipse `0.06×0.032`という固定寸法 calibration は現役candidateではなく、context前のcandidateはsymbolic size intentを保持する。値と経緯は CHANGELOG に置く。
 
@@ -2257,7 +2257,7 @@ CircleとPointの回転extentは同じ半径、ellipseは理想楕円、cloudfor
 
 作者A裁定では見切れを許す。Rendererが行うregion extentの短辺換算、performance seedによるanchor選択、基準点のunit-interval clamp（squareのtop-leftを含む）はそのままである。したがって座標補正が一切ない、またはshape全体が常に紙内に収まるという保証ではない。Engine 42では、point座標はcanvas各軸の正規化座標、size / radius / gapはcanvas短辺単位という既存wireを保ったまま、square / triangleのsemantic center、移動、回転pivot、performed bounds、relation、composite offset、arrangement fitを一つの物理短辺座標族で計算して各軸へ戻す。Engine 43ではLineの端点中点、Arcの弦中点、Pointの中心をsemantic anchorとする。Typed Arcは既存optional `position`へ弦中点を運び、field不在の旧Score Arcは円中心anchor・回転を保つ。Canvasを渡さない公開helperは従来の正規化座標互換を保つ。
 
-現行subsetでは、省略countだけを1として解決し、zero / repeated / qualitative countはmaterializeしない。Touch省略はpen、continuity省略はsolid、closed surface省略は塗りで、明示emptyは塗らず明示solidは同じ既存fill経路へ届く。色省略には、Rendererの既存`work_color_assignment` / `resolve_color`と同じ実background / black / whiteのRGB・OKLCH L観測を明示contextとして要求する。`inku-ddl`の単一policyがbackgroundとの差の大きいblack / whiteを選び、同差はblackとする。背景を覆う地（木炭地・メゾチント）では、backgroundの代わりに地が見せる色（地の本体をbackgroundに重ねた色。本体の色と濃さは描画と共有する`inku-score`の表）と比べる（DDL engine 61）。明示色はpalette contextを要求せず、その色を保つ。各instructionの明示値は独立に優先する。旧Stop入力は互換で受けるが、recoverableなrelation意味エラーを全停止には使わない。OmitAndContinueはunsupportedなcolor / touch / continuity / surface quality / intensityを独立fieldとして省略し、実際に使ったcontrast color / pen / solid / fill、または保持した明示qualityを診断する。それ以外はsource instruction、Macro Emit / structural subtree / invocation、Ground、coordinated groupの最小成立単位で省略する。relationは不成立ならerrorとしてrelationだけを外し、図形とgroupを元の変形後配置で残す。Relationのprevious-one / twoは元source indexの意味を保持し、省略後の圧縮indexへ付け替えない。Lowering resultは使ったcanvas / background / resolved palette contextとgeometry policy digest、mode、outcome、gap、owner / span / dispositionを保持するが、元のsemantic document / canonical meaning / provenanceへdefaultやfocusを挿入しない。
+現行共通経路では、置く・引くの省略countを1、単独の並べる・散らす・敷き詰めるを8へ解決し、組と埋めるは専用の省略個数規則を使う。明示countはsymbolic intentとして保持し、resource policyを確認して反復をmaterializeする。zeroは診断し、qualitative countを勝手な整数へ変換しない。Touch省略はpen、continuity省略はsolid、closed surface省略は塗りで、明示emptyは塗らず明示solidは同じ既存fill経路へ届く。色省略には、Rendererの既存`work_color_assignment` / `resolve_color`と同じ実background / black / whiteのRGB・OKLCH L観測を明示contextとして要求する。`inku-ddl`の単一policyがbackgroundとの差の大きいblack / whiteを選び、同差はblackとする。背景を覆う地（木炭地・メゾチント）では、backgroundの代わりに地が見せる色（地の本体をbackgroundに重ねた色。本体の色と濃さは描画と共有する`inku-score`の表）と比べる（DDL engine 61）。明示色はpalette contextを要求せず、その色を保つ。各instructionの明示値は独立に優先する。旧Stop入力は互換で受けるが、recoverableなrelation意味エラーを全停止には使わない。両入力ともunsupportedなcolor / touch / continuity / surface quality / intensityを独立fieldとして省略し、実際に使ったcontrast color / pen / solid / fill、または保持した明示qualityを診断する。それ以外はsource instruction、Macro Emit / structural subtree / invocation、Ground、coordinated groupの最小成立単位で省略する。relationは不成立ならerrorとしてrelationだけを外し、図形とgroupを元の変形後配置で残す。Relationのprevious-one / twoは元source indexの意味を保持し、省略後の圧縮indexへ付け替えない。Lowering resultは使ったcanvas / background / resolved palette contextとgeometry policy digest、mode、outcome、gap、owner / span / dispositionを保持するが、元のsemantic document / canonical meaning / provenanceへdefaultやfocusを挿入しない。
 
 静けさ・膜・記憶の場面のために繰り返しを間引く**静けさの密度 governor は、個数が明示されたグループには効かない** — 静けさは場面の読み取りであり、明示された数は読み取りではないからである。文字どおりのグループが合わせて `max_expanded_primitives`（既定 400）を超えるときは、最大のものから順に代表表現へ移し、次のものが譲る前に予算を測り直す。**読み手が数えられたはずの小さなグループは文字どおりのまま残る。**
 
@@ -2327,7 +2327,7 @@ Canvas selectionはvisible DDLやmacroの意味ではなく、shared coreの`ink
 
 Position座標は`0.0`から`1.0`の正規化のままで、Xはcanvas幅、Yはcanvas高さの割合である。左上は`(0.0,0.0)`、右下は`(1.0,1.0)`、exact centerは`(0.5,0.5)`とする。Named center、qualitative region、exact numeric coordinateは別authorityで、exact coordinateをsilent move / clamp / snapしない。Boundary anchorの妥当性と、shape extentがcanvasからclipする診断は別に扱う。
 
-Direct typed DDLは、JAの`半径N` / `直径N` / `幅N、高さN` / `一辺N`と`画面の横X、縦Yの位置`、数値の範囲・数値の端・数値の角度と薄れ（§18）、対応するENの有限構造、および日英の有限7class size modifierを受け入れる。小数は元のspellingとsource spanをprovenanceに残し、意味では符号付きbase-10係数とscaleへ正規化する。Lock検証済みStage 1.5 v5 viewとhostが明示したcanvas / backgroundを入口とし、color省略時だけ対応するresolved palette contextも要求する。数値位置、またはverified direct instructionの元`place:center`と、place actionが解決済みのcircle、ellipse、cloudform、square、triangle、polygonの独立instruction群は、明示numeric geometryまたは現行normal / qualitative geometryと、省略count=1 / pen / solid / fill / contrast colorをactual `Score`へ変換できる。`none` / `solid` / surface省略の既存fillを保ったまま、`wash` / `grain` / `stipple` / `hatch` / `crosshatch` / `bleed` / `aquatint`は既存Rendererの`SurfaceSpec`へ、検証済みの`paper` / `washi` / `ink_wash` / `charcoal_ground` / `canvas` / `drawing_paper` / `mezzotint`はhost解決済みaspectを持つ`Canvas::Spec`の既存`CanvasGroundSpec`へ届く。数値のtexture / material defaultやseedをcompilerは作らない。solidな閉じた塗りのSurface intensityは道具別のnormal／dense／faintへ届く。非solid・Pointの明示surface等のrecoverableな未対応組合せは、旧Stop / OmitAndContinue入力にかかわらず最小fieldまたは実行単位を診断付きで省略し、残るScoreを返す。Groundだけも描画内容であり、Groundを残す場合も元の省略診断を保つ。整合性不良または全省略はstoppedである。この共有Rust経路を通常Server／Web／Androidが使用する。
+Direct typed DDLは、JAの`半径N` / `直径N` / `幅N、高さN` / `一辺N`と`画面の横X、縦Yの位置`、数値の範囲・数値の端・数値の角度と薄れ（§18）、対応するENの有限構造、および日英の有限9class size modifierを受け入れる。小数は元のspellingとsource spanをprovenanceに残し、意味では符号付きbase-10係数とscaleへ正規化する。Lock検証済みStage 1.5 v5 viewとhostが明示したcanvas / backgroundを入口とし、color省略時だけ対応するresolved palette contextも要求する。対応する単独図形・反復配置・組・Macro Emitは、§18の共通geometry・省略解決・resource-awareなcompact materializationを経てactual `Score`へ届き、数値位置または`place:center`のcount1だけには限定しない。面省略・`none` / `solid`の意味を保ち、現行の`sweep` / `brushmarks` / `grain` / `stipple` / `hatch` / `crosshatch` / `aquatint`を既存Rendererの`SurfaceSpec`へ配送する。`wash` / `bleed`は保存済みScoreの旧質感であり、現行DDLのにじみは独立した`ink_spread`へ届く。検証済みの`paper` / `washi` / `ink_wash` / `charcoal_ground` / `canvas` / `drawing_paper` / `mezzotint`はhost解決済みaspectを持つ`Canvas::Spec`の既存`CanvasGroundSpec`へ届く。Surface intensityは線・弧・面の道具別normal／dense／faintへ届く。Pointの明示surface、開いた痕の刷毛目などrecoverableな未対応組合せは、旧Stop / OmitAndContinue入力にかかわらず最小fieldまたは実行単位を診断付きで省略し、残るScoreを返す。開いた痕に保持された質感の描画効果は§3.1の境界に従う。Groundだけも描画内容であり、Groundを残す場合も元の省略診断を保つ。整合性不良または全省略はstoppedである。この共有Rust経路を通常Server／Web／Androidが使用する。
 
 痕のisotropic size、円・弧の半径、`radial`の環、`at.region`の広がり、clusterの帯、pathの交差軸のずれは、そのallocationまたはcanvas短辺を基準に画素へ直す。Circleをaspect-correctに保ち、ellipseは記述したaspectを保つ。置き場所・region中心・cluster中心は幅と高さに比例し、pathの進行量（`margin` / `span`）と`arrangement.margin`は各軸の割合を保つ。この決定は§18の単一`inku.geometry-resolution-policy.v1` ownerに従う。
 

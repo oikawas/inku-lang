@@ -162,6 +162,8 @@ Plugin words appear in the same row and wear the same face as built-in ones. The
 
 ## 6. Read and Edit the Instructions
 
+To write instructions yourself, see the [DDL Syntax and Vocabulary Reference](./ddl-reference.md). It covers grammar principles, available words, numeric and relation syntax, and 50 complex examples.
+
 After painting, the instructions section on the left shows how Stage 1 read the input.
 
 - description: the words a human wrote

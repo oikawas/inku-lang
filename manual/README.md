@@ -6,6 +6,7 @@ This directory contains the Japanese and English user and operations manuals for
 
 - [日本語マニュアル](./ja/README.md)
 - [画像の作成方法](./ja/image-creation.md)
+- [DDL書式・語彙リファレンス](./ja/ddl-reference.md)
 - [inku-cli リファレンス](./ja/cli-reference.md)
 - [AI自律運転・テスト用リファレンス](./ja/cli-reference-for-ai.md)
 - [アプリケーションインストール](./ja/application-install.md)
@@ -16,6 +17,7 @@ This directory contains the Japanese and English user and operations manuals for
 
 - [English Manual](./en/README.md)
 - [Creating Images](./en/image-creation.md)
+- [DDL Syntax and Vocabulary Reference](./en/ddl-reference.md)
 - [inku-cli Reference](./en/cli-reference.md)
 - [AI Autonomous Operation & Testing Reference](./en/cli-reference-for-ai.md)
 - [Application Installation](./en/application-install.md)

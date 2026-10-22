@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-23 — Add a DDL syntax and vocabulary reference
+
+The Japanese and English manuals now collect grammar principles, introductory examples, a grammar and Saijiki reference, and 50 complex DDL examples from the current shared Rust implementation, so people and AI can write instructions. Japanese is canonical. Outdated descriptions of accepted syntax in SPEC are aligned with the implementation.
+
 ### 2026-10-22 — macOS Saijiki adds fineness and underlayer
 
 The bundled vocabulary and Web reference now show fineness (fine-grained, coarse-grained, packed and sparse) and underlayer (underpainted) after handling. Each word includes its preview, explanation and example. Existing groups, word order and previews are preserved.

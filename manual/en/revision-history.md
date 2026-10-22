@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-10-23 — DDL syntax and vocabulary reference
+
+Added a guide to writing DDL, checked against the current shared Rust implementation. Grammar principles, introductory examples, a grammar and Saijiki reference, and 50 complex examples explain the syntax and constraints people and AI need to assemble instructions. Japanese is canonical; the English version covers the same scope.
+
 ## 2026-10-21 — The Server takes the autonomous refinement
 
 With the autonomous refinement taken by the Server, and its moves now the laws move and the juxtaposition move, section 9 of Creating Images was rewritten: the two moves, how turns go and when the refinement stops, that only a child that looks different from its parent is kept, the dialog's fields, how the progress shows, how to stop it, that it goes on after the dialog is closed, and how to open the last kept child. That a work whose description is held takes laws moves only was written in the held-work list of section 6. The color-catalog and composition rounds and the Vision observations were removed.

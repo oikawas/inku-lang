@@ -10,6 +10,7 @@
 ## ドキュメント構成
 
 1. [画像の作成方法](./image-creation.md)
+   * [DDL書式・語彙リファレンス](./ddl-reference.md) — 文法の原則、入門例、文法と歳時記の一覧、複雑な例50個
 2. [inku-cliリファレンス](./cli-reference.md)
    * [AI自律運転・テスト用リファレンス](./cli-reference-for-ai.md)
 3. [アプリケーションインストール](./application-install.md)

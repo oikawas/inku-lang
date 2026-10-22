@@ -10,6 +10,7 @@ This manual explains how to use and operate inku. It is intended for first-time 
 ## Documents
 
 1. [Creating Images](./image-creation.md)
+   * [DDL Syntax and Vocabulary Reference](./ddl-reference.md) — Grammar principles, introductory examples, grammar and Saijiki reference, and 50 complex examples
 2. [inku-cli Reference](./cli-reference.md)
    * [AI Autonomous Operation & Testing Reference](./cli-reference-for-ai.md)
 3. [Application Installation](./application-install.md)

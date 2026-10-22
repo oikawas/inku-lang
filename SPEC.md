@@ -161,9 +161,9 @@ English writes the edges with a hyphen (`left-edge`, `right-edge`, `top-edge`, `
 
 In v1.92 the words 描く (ja draw) and 髪 / hair were removed from the vocabulary by the author's decision. In v2.7.9, 髪 / hair was replaced by 銀筆 / **silverpoint** — 0.5px, the least wavering line a hand can draw. Saved Scores that still say `hair` are rewritten to `silverpoint` as they load, so they replay unchanged in everything but the seed.
 
-Pen, solid, empty, and black remain historical baselines for comparison with legacy Score / coerce behavior, rather than values inserted into typed meaning. When visible DDL omits a corresponding field, typed meaning remains `unspecified`; neither the parser nor semantic association fills it. The current subset resolves omissions only while lowering a lock-verified view to an actual Score: for count-one circle, square, ellipse, cloudform, triangle, and polygon instructions with a numeric position or `place:center` (the canvas-center region), plus a place action, omitted count becomes one, touch becomes pen, continuity becomes solid, and an omitted closed surface becomes filled. An omitted color compares the actual work color-catalog background against actual black and white by absolute OKLCH L distance, choosing the farther color and black on a tie. On a support that covers the background (the charcoal ground and the mezzotint), it compares the OKLab L of what the support shows there (its body laid over the background) instead of the background (DDL engine 61). Each explicit value wins independently, and these resolutions are not written back into source meaning. Legacy Stop and OmitAndContinue inputs remain accepted, but a recoverable field or execution-unit failure uses shared local recovery: it records a typed diagnostic, omits only that unit, and continues with the remaining drawing. This rule does not retroactively change physical Renderer fallbacks or read compatibility for existing works.
+Pen, solid, empty, and black remain historical baselines for comparison with legacy Score / coerce behavior, rather than values inserted into typed meaning. When visible DDL omits a corresponding field, typed meaning remains `unspecified`; neither the parser nor semantic association fills it. The shared path resolves omissions while lowering a lock-verified view to an actual Score for supported standalone shapes, repeated placements, groups, and Macro Emits. Omitted touch becomes pen, continuity becomes solid, and surface becomes filled for closed shapes and points but unfilled for lines, ordinary arcs, and free lines. Omitted count is one for place and draw and eight for a standalone line-up, scatter, or tile; groups and fills use their dedicated count rules below. An omitted place/draw position uses the center region shrunk to two thirds about its center; a distributed placement uses the whole canvas. Explicit numeric positions, named regions, numeric ranges, and numeric segments take precedence. An omitted color compares the actual work color-catalog background against actual black and white by absolute OKLCH L distance, choosing the farther color and black on a tie. On a support that covers the background (the charcoal ground and the mezzotint), it compares the OKLab L of what the support shows there (its body laid over the background) instead of the background (DDL engine 61). Each explicit value wins independently, and these resolutions are not written back into source meaning. Legacy Stop and OmitAndContinue inputs remain accepted, but a recoverable field or execution-unit failure uses shared local recovery: it records a typed diagnostic, omits only that unit, and continues with the remaining drawing. This rule does not retroactively change physical Renderer fallbacks or read compatibility for existing works.
 
-Shape size is a finite local modifier owned by the typed DDL compiler, not Saijiki vocabulary. The current classes are `slightly_small`, `small`, `very_small`, `normal`, `slightly_large`, `large`, and `very_large`. Their Japanese ordinary/small/large surfaces and the corresponding English `normal-sized`, `slightly`, and `very` forms retain exact source spans. The grammar does not grow free-form degree synonyms or use source-substring post-processing.
+Shape size is a finite local modifier owned by the typed DDL compiler, not Saijiki vocabulary. The current classes are `slightly_small`, `small`, `very_small`, `normal`, `slightly_large`, `large`, `very_large`, `extra_large`, and `huge`. Their Japanese ordinary/small/large surfaces and the corresponding English `normal-sized`, `slightly`, `very`, `extra-large` / `特大の`, and `huge` / `巨大な` forms retain exact source spans. The grammar does not grow free-form degree synonyms or use source-substring post-processing.
 
 Order specifies finite sequences of values of one attribute, such as color or material, or of shapes and groups. `Line up five circles, alternating red and gray.` produces red, gray, red, gray, red. `Line up eight, repeating a red circle, a blue line, and a gray arc in order.` produces circle, line, arc, circle, line, arc, circle, line. Alternating takes two entries; in order takes a nonempty list and preserves ordered duplicates. Colors in order may also shift once through a line-up or a tile instead of repeating (`shifting through yellow, orange, and red in order`, DDL 23, §18). Line-up, scatter, tile, and fill use the explicit count as the total number of placement units, regardless of list length. Multiple entries without an order operator do not imply a cycle. An invalid sequence produces a local diagnostic while independent drawing continues.
 
@@ -207,7 +207,7 @@ Canvas format is neither vocabulary nor a plugin. It is a resolved host option o
   quality only (empty, flat, sweep, brushmarks, grain, stipple, hatch, crosshatch,
   aquatint); density belongs to handling. Paper grain belongs to the support (the grounds
   category). Grain and sweep remain applicable to lines and arcs: grain raises
-  support absorption and tooth, while sweep changes no sheet properties and
+  support tooth, while sweep changes no sheet properties and
   produces a band at three times the width. A sweep has no paleness of its own
   (a line's band at 0.8 of its tool's opacity, a closed shape's sweeps at 0.5,
   the values the author chose on the comparison sheet, 2026-09-29; on a closed
@@ -225,8 +225,7 @@ Canvas format is neither vocabulary nor a plugin. It is a resolved host option o
   included. A saved Score's `wash` (v1's pale ink
   wash) still draws as the pale band at three times the width and 0.35 of the
   opacity. The migration turns a pale ink wash into a faint sweep, which draws a
-  little darker (0.44 and 0.275 against the wash's 0.35 and 0.22). The other six qualities move
-  to the preceding closed shape and are dropped when there is none. On a closed
+  little darker (0.44 and 0.275 against the wash's 0.35 and 0.22). Stipple, hatch, crosshatch, and aquatint are also accepted on their owning line, ordinary arc, or free line and retained in Score, but the current Renderer paints surfaces only on closed shapes, so these open marks receive no texture face. No texture is transferred to a preceding closed shape. On a closed
   shape, an explicit sweep, brushmarks, grain, stipple, hatch, crosshatch, or
   aquatint is itself the area's performance and adds no flat base fill beneath it (DDL
   engine 46). A flat fill comes only from an explicit flat surface or the
@@ -1710,7 +1709,7 @@ For example, `赤い円を中心に置く。` and `円を中心に置く。円�
 
 English grammar words are ASCII case-insensitive in both lexical recognition and downstream grammar matching. For example, background markers `the / background / with` and the fill connector `with` have the same grammatical meaning when written with uppercase letters. This does not lowercase the source: the author's bytes, spans, and provenance are preserved. Matching rules for separate identities, such as Macro names, are unchanged.
 
-Existing grammar markers are recognized by a bundled constant table in shared Rust, which passes typed identities and occurrence-specific source spans downstream. Its scope is Japanese `を / に / で / の / は / が / へ / と / 背景 / 組 / して / 繰り返して` and English `with / in / at / on / to / of / a / an / the / and / background / group of / repeating`. Multiple grammatical roles of one marker use capabilities and existing phrase structure rather than reclassifying surface strings downstream. Saijiki owns semantic vocabulary; existing compiler rules own attachment and owner selection. The layout-bearing forms `重ねて / 並べて / overlapping / side by side` stay outside this table in their existing layout grammar. The table does not introduce new words, aliases, or drawing meanings, load external dictionaries, or add a registry version to saved formats.
+Existing grammar markers are recognized by a bundled constant table in shared Rust, which passes typed identities and occurrence-specific source spans downstream. Its scope is Japanese `を / に / で / の / は / が / へ / と / 背景 / 組 / して / 繰り返して / 段々に移して` and English `with / in / at / on / to / of / a / an / the / and / background / group of / repeating / shifting through`. Multiple grammatical roles of one marker use capabilities and existing phrase structure rather than reclassifying surface strings downstream. Saijiki owns semantic vocabulary; existing compiler rules own attachment and owner selection. The layout-bearing forms `重ねて / 並べて / overlapping / side by side` stay outside this table in their existing layout grammar. The table does not introduce new words, aliases, or drawing meanings, load external dictionaries, or add a registry version to saved formats.
 
 Stage 1, camera projection, and hole completion use the existing shared grammar helper, referring by identity only to markers required by those finite forms. They do not enumerate the whole table in prompts. Centralizing marker recognition does not change recommended forms, Score, the renderer, or the meaning of saved works.
 
@@ -1741,9 +1740,9 @@ Shared standalone grammar makes modifier phrases own their connectors but exclud
   in the interpretation-feedback UI)
 - when Stage 1 interprets a material from the description, writes that choice explicitly into visible normalized DDL; a material the input states explicitly is preserved
 - when an author writes direct DDL or edits generated DDL, permits touch and other fields to be omitted and retains typed meaning as `unspecified`; it does not infer or insert hidden values from texture / context, primitive type, word order, or the current Score default
-- writes shape size as a finite seven-class local modifier combining normal / small / large with mild, standard, and strong steps, while keeping explicit normal distinct from omission. Numeric geometry plus qualitative size, an unknown degree, or ambiguous ownership is a typed conflict or issue
+- writes shape size with nine finite local classes, including extra-large and huge, while keeping explicit normal distinct from omission. Numeric geometry, qualitative size, and full/half width remain independent size candidates; multiple candidates produce a typed diagnostic and recover to the smallest reference extent while preserving aspect. A qualitative factor is not multiplied into an explicit numeric size. An unknown degree or ambiguous ownership remains a typed issue
 - treats burin and drypoint as explicit only when visible DDL states them; Stage 1 few-shot quality policy is not direct-DDL compiler semantics
-- in the current actual-Score lowerer, applies the author-resolved normal geometry, relative factors, and omitted drawing attributes only to count-one circle, square, ellipse, cloudform, triangle, and polygon instructions with a resolved numeric position or `place:center` (the canvas-center region), plus a place action. The named path preserves dimensions and places the named region in `at.region`. Stop rejects the entire Score for unsupported meaning or missing required color-catalog context; explicit OmitAndContinue omits only an independent field or typed execution unit and returns the remaining Score with diagnostics. Neither mode changes original meaning. The normal product runtime uses this Rust path
+- applies the shared geometry resolver and resource-aware compact materializer to supported standalone place/draw commands, repeated line-up/scatter/tile/fill commands, groups, and Macro Emits. Normal geometry, relative factors, attribute and position omissions, explicit numeric positions, named regions, numeric ranges, and numeric segments follow §§18–19 rather than a count-one or center-only subset. Either legacy Stop or OmitAndContinue input recovers locally from recoverable unsupported meaning or missing color context, omitting only the affected field or typed execution unit and returning the remaining Score with diagnostics. Original meaning is unchanged. The normal Server, Web, and Android runtimes use this Rust path
 
 ### 12.5 Drawing and Vision Models
 
@@ -2512,7 +2511,7 @@ strictly apart**.
 **Motion words (allowed):**
 
 ```
-swaying finely, undulating slowly, scattering, trembling faintly, shifting, blurring
+swaying narrowly, undulating loosely, swaying tightly, bleeding
 ```
 
 These describe physical movement. They are behavior observable from outside.
@@ -2548,7 +2547,7 @@ Sway arises from three layers. Priority runs **plugin > motion word > material**
   ↓ overridden when the writer specifies
 
 [sway named by a motion word]  (the writer can write this)
-  finely, slowly, scattering, trembling
+  swaying narrowly, undulating loosely, swaying tightly, bleeding
 
   ↓ overridden again when a plugin is named
 
@@ -2663,7 +2662,7 @@ The drawing hand no longer draws one shape as one even face and one band (render
 
 **Brushmarks faces (render engine 91, DDL 25).** Brushmarks lays the bands a sweep lays (their shape, spacing, width and direction, two passes at slightly different angles, the flat brush for the fine and thick brushes), each band with its own opacity (the surface opacity × handling × underpainting × 0.5), so that they darken step by step where they overlap: render engine 89's way of drawing a closed shape's sweep. The same contour mask as a sweep's cuts its bands (Compat adds no mask), and the sweep film's blur is not applied. The face's seed reads the instruction with the texture set to sweep, so writing brushmarks for a sweep in the same sentence keeps the bands' directions, places and widths and changes only how they overlap (the author's decision, 2026-10-22). In the SVG the bands (`surface-stroke-v1 surface-brushmarks`) are drawn in a `surface-brushmarks-inside-v1` group inside the face group `surface_<instruction>_<mark>_brushmarks`. Only works with brushmarks use Score 0.22.0; every other work keeps its Score and its picture.
 
-Typed DDL intensity delivery covers solid closed fills. Non-solid textures, unfilled lines and arcs, and explicit Point surfaces retain the existing unsupported diagnostics. Score rendering capability and the delivered typed-DDL subset are distinct. Full typed runtime / UI / save integration remains a later task.
+Typed DDL handling reaches supported fills, textures, lines, and arcs as tool-relative normal/dense/faint appearance. Unsupported surface combinations, including an explicit Point surface or brushmarks on an open mark, are diagnosed independently of handling. Acceptance and retention of an open mark's texture are distinct from its Renderer effect, as specified in §3.1. The normal Server, Web, and Android runtimes use this shared typed meaning.
 
 #### The fine and thick brushes' sweep (a flat brush)
 
@@ -3072,8 +3071,7 @@ The description:
 
 It takes the JSON Score and selects Perlin, Fine amplitude, Medium frequency, and the
 existing perpendicular line performance from `variation` to generate SVG. The same Score
-and render seed reproduce the same performance. This multiple-line example is conceptual;
-the shared compiler's count-one delivery does not imply implemented repetition allocation.
+and render seed reproduce the same performance. Multiple-line commands also reach repetition materialization through the current shared compiler's resource-aware compact recipes (§12.11).
 
 The engine bumps that changed this performance are recorded in the [render engine
 version history](docs/spec/render-engine-history.md); the prose below states the
@@ -3838,8 +3836,7 @@ behavior, not semantic authority to change the canonical count into another
 value.
 
 **Size has three authorities.** Unspecified, explicit qualitative, and explicit
-numeric geometry remain distinct. In the current subset, an unallocated
-count-one circle, square, ellipse, cloudform, triangle, or polygon uses `6/25` (0.24) of the canvas
+numeric geometry remain distinct. For standalone and repeated placements, independently of count, a circle, square, ellipse, cloudform, triangle, or polygon uses `6/25` (0.24) of the canvas
 short edge for diameter, side, or width; ellipse and cloudform height is `3/5`
 of width. Normal line length and normal arc chord are also `6/25`, and a free
 line's normal length is `11/20` (0.55); arc sagitta
@@ -3850,10 +3847,7 @@ classes, with two further steps that mirror standard and strong small, `2`
 (`extra-large`, `特大の`) and `8/3` (`huge`, `巨大な`); and `1` for normal. One exact rational factor is applied once to the
 normal geometry: length for line, similar chord and sagitta for arc, and diameter
 for point. Existing `small` means standard-small, while an explicit
-"normal size" remains distinct from unspecified. Explicit numeric geometry is
-unchanged by qualitative size, and stating both is a conflict. Unspecified
-normal outside this subset remains undecided and is not completed through
-free-form degree synonyms or a hidden LLM.
+"normal size" remains distinct from unspecified. A qualitative factor is not multiplied into explicit numeric geometry. When numeric geometry, qualitative size, or full/half width supply multiple candidates, each remains independent. `ConflictingSizeSpecifications` records the candidate and effective extents, and both legacy Stop and OmitAndContinue recover by scaling to the smallest reference extent while retaining the original specifications and explicit aspect. Free-form degree synonyms and hidden LLM completion are not added.
 
 Explicit numeric geometry retains dimension, basis, canonical base-10
 coefficient / scale, and source-spelling provenance. Conversion to Score `f64`
@@ -3913,8 +3907,7 @@ the center for point as semantic anchors. A typed arc carries its chord midpoint
 in the existing optional `position`; an old Score arc with that field absent
 keeps its circle-center anchor and rotation behavior.
 
-Within the current subset, only an omitted count resolves to one; zero,
-repeated, and qualitative counts are not materialized. Omitted touch resolves to
+In the shared path, an omitted count resolves to one for place/draw and eight for a standalone line-up/scatter/tile; groups and fills use dedicated omission rules. Explicit count remains symbolic intent until resource checks permit repetition materialization. Zero is diagnosed, and a qualitative count is not silently assigned an integer. Omitted touch resolves to
 pen, omitted continuity to solid, and an omitted closed surface to filled.
 Explicit empty stays unfilled, while explicit solid reaches the same existing
 fill path. An omitted color requires explicit observations of the actual
@@ -3925,13 +3918,12 @@ background, choosing black on a tie. On a support that covers the background (th
 charcoal ground and the mezzotint), the distance is taken from what the support
 shows instead (its body laid over the background; the body's color and opacity
 come from the `inku-score` table the renderer shares, DDL engine 61). An explicit color needs no color-catalog context
-and remains unchanged. Explicit fields win independently. Stop, the default,
-returns no actual Score when any meaning is unsupported. OmitAndContinue omits
+and remains unchanged. Explicit fields win independently. Legacy Stop and OmitAndContinue inputs share local recovery. Recovery omits
 unsupported color, touch, continuity, surface quality, or intensity as an
 independent field and records the contrast color, pen, solid, fill, or retained
 explicit quality actually used. Other failures omit the smallest source
-instruction, Macro Emit / structural subtree / invocation, Ground, coordinated
-group, or relation-instruction unit. Previous-one / two relation meaning keeps
+instruction, Macro Emit / structural subtree / invocation, Ground, or coordinated
+group. A failed relation is diagnosed and removed on its own, leaving the shape or group at its original transformed placement. Previous-one / two relation meaning keeps
 its original source indices and is never rebound to compressed post-omission
 indices. The lowering result retains canvas, background, resolved color context,
 geometry-policy digest, mode, outcome, gaps, owners, spans, and dispositions,
@@ -4019,30 +4011,7 @@ qualitative region, and an exact numeric coordinate are separate authorities.
 An exact coordinate is never silently moved, clamped, or snapped. Boundary-anchor validity and a diagnostic that the shape's
 extent clips the canvas are separate matters.
 
-Direct typed DDL accepts the finite JA forms `半径N`, `直径N`, `幅N、高さN`,
-`一辺N`, `画面の横X、縦Yの位置`, numeric ranges, numeric segments, numeric angles and fades (§18), their corresponding EN forms, and the finite
-seven-class size modifiers in both languages. A decimal retains its original
-spelling and source span as provenance while its meaning is normalized to a
-signed base-10 coefficient and scale. The entrypoint takes a lock-verified Stage
-1.5 v5 view and explicit host canvas and background, requiring the corresponding
-resolved color-catalog context only when color is omitted. Independent circle,
-ellipse, cloudform, square, line, arc, and point instructions with resolved numeric position or an
-original `place:center` owned by a verified direct instruction target, plus a
-place action, can lower explicit numeric geometry or the current normal / qualitative
-geometry, together with omitted count-one, pen, solid, fill, and contrast color, into an
-actual `Score`. Existing fill behavior for `none`, `solid`, and omitted surface remains;
-`wash`, `grain`, `stipple`, `hatch`, `crosshatch`, `bleed`, and `aquatint` reach the
-existing Renderer `SurfaceSpec`, while verified `paper`, `washi`, `ink_wash`,
-`charcoal_ground`, `canvas`, `drawing_paper`, and `mezzotint` reach the existing
-`CanvasGroundSpec` in a `Canvas::Spec` carrying the host-resolved aspect. The compiler
-does not create texture or material numeric defaults or seeds. Surface intensity on solid closed fills reaches the tool-specific normal / dense / faint appearance.
-For unsupported combinations such as non-solid textures and explicit Point surfaces, Stop stops and Continue omits intensity while retaining quality. Ground alone
-is drawable content, and Continue retaining Ground preserves its original omission
-diagnostics. The default Stop mode rejects the entire Score when the document contains
-unsupported meaning. Explicit OmitAndContinue records the original owner and spans plus
-the actual omitted field or execution unit, and reports a remaining Score only when a
-drawing target survives. Integrity failure or omission of every target is stopped. The
-normal product runtime uses this Rust path.
+Direct typed DDL accepts the finite JA forms `半径N`, `直径N`, `幅N、高さN`, `一辺N`, `画面の横X、縦Yの位置`, numeric ranges, numeric segments, numeric angles and fades (§18), corresponding EN forms, and nine finite size classes in both languages. Decimal meaning retains exact signed base-10 coefficient and scale, with original spelling and source spans as provenance. The entrypoint takes a lock-verified Stage 1.5 v5 view and explicit host canvas/background; the matching resolved color-catalog context is required only when color is omitted. Supported standalone shapes, repeated placements, groups, and Macro Emits reach actual `Score` through the common geometry, omission, and resource-aware compact materialization rules of §18, without a count-one or center-only restriction. Omitted surfaces and `none` / `solid` retain their meanings; current `sweep`, `brushmarks`, `grain`, `stipple`, `hatch`, `crosshatch`, and `aquatint` reach the existing Renderer `SurfaceSpec`. `wash` and `bleed` are legacy saved-Score textures; the current bleeding word reaches independent `ink_spread`. Verified `paper`, `washi`, `ink_wash`, `charcoal_ground`, `canvas`, `drawing_paper`, and `mezzotint` reach `CanvasGroundSpec` in a `Canvas::Spec` with the host-resolved aspect. Surface intensity reaches tool-relative normal/dense/faint appearance for lines, arcs, and faces. Recoverable unsupported combinations, including an explicit Point surface or brushmarks on an open mark, omit only the affected field or execution unit with its owner, spans, and diagnostics under either legacy error-policy input. The effect of textures retained on open marks follows §3.1. Ground alone is drawable content, and retaining it retains the original omission diagnostics. Integrity failure or omission of every target is stopped. The normal Server, Web, and Android runtimes use this Rust path.
 
 Isotropic mark size, circle and arc radii, `radial` rings, `at.region` extent,
 cluster bands, and a path's cross-axis spread become pixels from their allocation

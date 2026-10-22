@@ -185,6 +185,7 @@ PAIRS: tuple[tuple[str, str, str, str | None], ...] = (
     # section, so "shape" is the right level here, as it is for the README.
     ("manual/ja/README.md", "manual/en/README.md", "shape", None),
     ("manual/ja/image-creation.md", "manual/en/image-creation.md", "shape", None),
+    ("manual/ja/ddl-reference.md", "manual/en/ddl-reference.md", "shape", None),
     ("manual/ja/cli-reference.md", "manual/en/cli-reference.md", "shape", None),
     (
         "manual/ja/cli-reference-for-ai.md",

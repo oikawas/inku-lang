@@ -387,7 +387,18 @@
 # `shifting through yellow, orange, and red in order`), each run of marks
 # taking one color. Such sentences were unresolved clauses. No saved work
 # changes (the 5,188 works of the 2026-10-17 5173 export).
-DDL_ENGINE_VERSION = "67"
+# 68: A fineness word (細かい / fine-grained, 粗い / coarse-grained: the
+# texture's scale 0.05 / 0.90; 密な / packed, 疎な / sparse: its density 0.85 /
+# 0.05) and the underlayer word (下塗り / underpainted: filled) lay a named
+# texture of a closed shape. On any other mark only the word is left out
+# (`unsupported_surface_fineness`, `unsupported_surface_underlayer`), and two
+# words of one class conflict. An amplitude word (細かく / narrowly, 大きく /
+# broadly) without a sway word (揺れる / swaying, 波打つ / undulating) makes no
+# sway and is left out (`fluctuation_amplitude_without_quality`); it was read
+# as a sway of its own. No saved work's Score or state changes (the 5,188 works
+# of the 2026-10-17 5173 export): the works that write these characters stop
+# at their holes, and only the unread words of 315 of them change.
+DDL_ENGINE_VERSION = "68"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write
@@ -448,4 +459,8 @@ DDL_ENGINE_VERSION = "67"
 # the center`), and colors in order may shift once through the marks,
 # `A・B・Cの順に段々に移して` and `shifting through A, B, and C in order`. Both
 # are grammar, not Saijiki words.
-DDL_VERSION = "23"
+# 24 (2026-10-22): The categories きめ / fineness (細かい / fine-grained, 粗い /
+# coarse-grained, 密な / packed, 疎な / sparse) and したじ / underlayer (下塗り /
+# underpainted) join the Saijiki, read in DDL, offered to Stage 1 as the plan
+# fields `fineness` and `underlayer`, and listed in the saijiki.
+DDL_VERSION = "24"

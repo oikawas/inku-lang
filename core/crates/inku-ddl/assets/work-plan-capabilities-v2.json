@@ -83,6 +83,8 @@
         "temperate",
         "faint"
       ],
+      "fineness": [],
+      "underlayer": [],
       "angle": [
         "horizontal",
         "vertical",
@@ -187,6 +189,8 @@
         "temperate",
         "faint"
       ],
+      "fineness": [],
+      "underlayer": [],
       "angle": [
         "horizontal",
         "vertical",
@@ -288,6 +292,8 @@
         "temperate",
         "faint"
       ],
+      "fineness": [],
+      "underlayer": [],
       "angle": [
         "horizontal",
         "vertical",
@@ -389,6 +395,8 @@
         "temperate",
         "faint"
       ],
+      "fineness": [],
+      "underlayer": [],
       "angle": [
         "horizontal",
         "vertical",
@@ -500,6 +508,8 @@
         "temperate",
         "faint"
       ],
+      "fineness": [],
+      "underlayer": [],
       "angle": [
         "horizontal",
         "vertical",
@@ -611,6 +621,8 @@
         "temperate",
         "faint"
       ],
+      "fineness": [],
+      "underlayer": [],
       "angle": [
         "horizontal",
         "vertical",
@@ -722,6 +734,8 @@
         "temperate",
         "faint"
       ],
+      "fineness": [],
+      "underlayer": [],
       "angle": [
         "horizontal",
         "vertical",
@@ -832,6 +846,15 @@
         "temperate",
         "faint"
       ],
+      "fineness": [
+        "fine_grained",
+        "coarse_grained",
+        "packed",
+        "sparse"
+      ],
+      "underlayer": [
+        "underpainted"
+      ],
       "angle": [
         "horizontal",
         "vertical",
@@ -932,6 +955,15 @@
         "temperate",
         "faint"
       ],
+      "fineness": [
+        "fine_grained",
+        "coarse_grained",
+        "packed",
+        "sparse"
+      ],
+      "underlayer": [
+        "underpainted"
+      ],
       "angle": [
         "horizontal",
         "vertical",
@@ -1031,6 +1063,15 @@
         "dense",
         "temperate",
         "faint"
+      ],
+      "fineness": [
+        "fine_grained",
+        "coarse_grained",
+        "packed",
+        "sparse"
+      ],
+      "underlayer": [
+        "underpainted"
       ],
       "angle": [
         "horizontal",
@@ -1142,6 +1183,15 @@
         "temperate",
         "faint"
       ],
+      "fineness": [
+        "fine_grained",
+        "coarse_grained",
+        "packed",
+        "sparse"
+      ],
+      "underlayer": [
+        "underpainted"
+      ],
       "angle": [
         "horizontal",
         "vertical",
@@ -1242,6 +1292,15 @@
         "temperate",
         "faint"
       ],
+      "fineness": [
+        "fine_grained",
+        "coarse_grained",
+        "packed",
+        "sparse"
+      ],
+      "underlayer": [
+        "underpainted"
+      ],
       "angle": [
         "horizontal",
         "vertical",
@@ -1341,6 +1400,15 @@
         "dense",
         "temperate",
         "faint"
+      ],
+      "fineness": [
+        "fine_grained",
+        "coarse_grained",
+        "packed",
+        "sparse"
+      ],
+      "underlayer": [
+        "underpainted"
       ],
       "angle": [
         "horizontal",
@@ -1452,6 +1520,15 @@
         "temperate",
         "faint"
       ],
+      "fineness": [
+        "fine_grained",
+        "coarse_grained",
+        "packed",
+        "sparse"
+      ],
+      "underlayer": [
+        "underpainted"
+      ],
       "angle": [
         "horizontal",
         "diagonal",
@@ -1560,6 +1637,15 @@
         "dense",
         "temperate",
         "faint"
+      ],
+      "fineness": [
+        "fine_grained",
+        "coarse_grained",
+        "packed",
+        "sparse"
+      ],
+      "underlayer": [
+        "underpainted"
       ],
       "angle": [
         "horizontal",
@@ -1671,6 +1757,15 @@
         "temperate",
         "faint"
       ],
+      "fineness": [
+        "fine_grained",
+        "coarse_grained",
+        "packed",
+        "sparse"
+      ],
+      "underlayer": [
+        "underpainted"
+      ],
       "angle": [
         "horizontal",
         "vertical",
@@ -1771,6 +1866,15 @@
         "temperate",
         "faint"
       ],
+      "fineness": [
+        "fine_grained",
+        "coarse_grained",
+        "packed",
+        "sparse"
+      ],
+      "underlayer": [
+        "underpainted"
+      ],
       "angle": [
         "horizontal",
         "vertical",
@@ -1870,6 +1974,15 @@
         "dense",
         "temperate",
         "faint"
+      ],
+      "fineness": [
+        "fine_grained",
+        "coarse_grained",
+        "packed",
+        "sparse"
+      ],
+      "underlayer": [
+        "underpainted"
       ],
       "angle": [
         "horizontal",
@@ -1981,6 +2094,15 @@
         "temperate",
         "faint"
       ],
+      "fineness": [
+        "fine_grained",
+        "coarse_grained",
+        "packed",
+        "sparse"
+      ],
+      "underlayer": [
+        "underpainted"
+      ],
       "angle": [
         "horizontal",
         "diagonal",
@@ -2089,6 +2211,15 @@
         "dense",
         "temperate",
         "faint"
+      ],
+      "fineness": [
+        "fine_grained",
+        "coarse_grained",
+        "packed",
+        "sparse"
+      ],
+      "underlayer": [
+        "underpainted"
       ],
       "angle": [
         "horizontal",
@@ -2201,6 +2332,8 @@
         "temperate",
         "faint"
       ],
+      "fineness": [],
+      "underlayer": [],
       "angle": [
         "horizontal",
         "vertical",
@@ -2302,6 +2435,8 @@
         "temperate",
         "faint"
       ],
+      "fineness": [],
+      "underlayer": [],
       "angle": [
         "horizontal",
         "vertical",
@@ -2403,6 +2538,8 @@
         "temperate",
         "faint"
       ],
+      "fineness": [],
+      "underlayer": [],
       "angle": [
         "horizontal",
         "vertical",
@@ -2514,6 +2651,8 @@
         "temperate",
         "faint"
       ],
+      "fineness": [],
+      "underlayer": [],
       "angle": [
         "horizontal",
         "vertical",
@@ -2615,6 +2754,8 @@
         "temperate",
         "faint"
       ],
+      "fineness": [],
+      "underlayer": [],
       "angle": [
         "horizontal",
         "vertical",
@@ -2716,6 +2857,8 @@
         "temperate",
         "faint"
       ],
+      "fineness": [],
+      "underlayer": [],
       "angle": [
         "horizontal",
         "vertical",
@@ -2817,6 +2960,8 @@
         "temperate",
         "faint"
       ],
+      "fineness": [],
+      "underlayer": [],
       "angle": [],
       "line_up_direction": [
         "horizontal",
@@ -2892,6 +3037,8 @@
         "temperate",
         "faint"
       ],
+      "fineness": [],
+      "underlayer": [],
       "angle": [],
       "line_up_direction": [
         "horizontal",
@@ -2967,6 +3114,8 @@
         "temperate",
         "faint"
       ],
+      "fineness": [],
+      "underlayer": [],
       "angle": [],
       "line_up_direction": [
         "horizontal",
@@ -3060,6 +3209,15 @@
         "dense",
         "temperate",
         "faint"
+      ],
+      "fineness": [
+        "fine_grained",
+        "coarse_grained",
+        "packed",
+        "sparse"
+      ],
+      "underlayer": [
+        "underpainted"
       ],
       "angle": [
         "horizontal",
@@ -3161,6 +3319,15 @@
         "temperate",
         "faint"
       ],
+      "fineness": [
+        "fine_grained",
+        "coarse_grained",
+        "packed",
+        "sparse"
+      ],
+      "underlayer": [
+        "underpainted"
+      ],
       "angle": [
         "horizontal",
         "vertical",
@@ -3260,6 +3427,15 @@
         "dense",
         "temperate",
         "faint"
+      ],
+      "fineness": [
+        "fine_grained",
+        "coarse_grained",
+        "packed",
+        "sparse"
+      ],
+      "underlayer": [
+        "underpainted"
       ],
       "angle": [
         "horizontal",
@@ -3371,6 +3547,15 @@
         "temperate",
         "faint"
       ],
+      "fineness": [
+        "fine_grained",
+        "coarse_grained",
+        "packed",
+        "sparse"
+      ],
+      "underlayer": [
+        "underpainted"
+      ],
       "angle": [
         "horizontal",
         "diagonal",
@@ -3479,6 +3664,15 @@
         "dense",
         "temperate",
         "faint"
+      ],
+      "fineness": [
+        "fine_grained",
+        "coarse_grained",
+        "packed",
+        "sparse"
+      ],
+      "underlayer": [
+        "underpainted"
       ],
       "angle": [
         "horizontal",
@@ -3590,6 +3784,15 @@
         "temperate",
         "faint"
       ],
+      "fineness": [
+        "fine_grained",
+        "coarse_grained",
+        "packed",
+        "sparse"
+      ],
+      "underlayer": [
+        "underpainted"
+      ],
       "angle": [
         "horizontal",
         "vertical",
@@ -3690,6 +3893,15 @@
         "temperate",
         "faint"
       ],
+      "fineness": [
+        "fine_grained",
+        "coarse_grained",
+        "packed",
+        "sparse"
+      ],
+      "underlayer": [
+        "underpainted"
+      ],
       "angle": [
         "horizontal",
         "vertical",
@@ -3789,6 +4001,15 @@
         "dense",
         "temperate",
         "faint"
+      ],
+      "fineness": [
+        "fine_grained",
+        "coarse_grained",
+        "packed",
+        "sparse"
+      ],
+      "underlayer": [
+        "underpainted"
       ],
       "angle": [
         "horizontal",
@@ -3900,6 +4121,15 @@
         "temperate",
         "faint"
       ],
+      "fineness": [
+        "fine_grained",
+        "coarse_grained",
+        "packed",
+        "sparse"
+      ],
+      "underlayer": [
+        "underpainted"
+      ],
       "angle": [
         "horizontal",
         "diagonal",
@@ -4008,6 +4238,15 @@
         "dense",
         "temperate",
         "faint"
+      ],
+      "fineness": [
+        "fine_grained",
+        "coarse_grained",
+        "packed",
+        "sparse"
+      ],
+      "underlayer": [
+        "underpainted"
       ],
       "angle": [
         "horizontal",

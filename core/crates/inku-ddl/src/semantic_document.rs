@@ -1086,6 +1086,12 @@ fn apply_continuation_occurrence(
                 ("handling", "dense" | "temperate" | "faint") => {
                     set_if_empty(&mut instruction.entity.surface.intensity, term)
                 }
+                ("fineness", "fine_grained" | "coarse_grained" | "packed" | "sparse") => {
+                    set_if_empty(&mut instruction.entity.surface.fineness, term)
+                }
+                ("underlayer", "underpainted") => {
+                    set_if_empty(&mut instruction.entity.surface.underlayer, term)
+                }
                 _ => false,
             }
         }
@@ -1266,6 +1272,8 @@ fn has_continuation_predicate(instruction: &SemanticInstruction) -> bool {
         || entity.angle.is_some()
         || entity.surface.quality.is_some()
         || entity.surface.intensity.is_some()
+        || entity.surface.fineness.is_some()
+        || entity.surface.underlayer.is_some()
         || entity.fluctuation.amplitude.is_some()
         || entity.fluctuation.frequency.is_some()
         || entity.fluctuation.quality.is_some()
@@ -1343,6 +1351,8 @@ fn predicate_is_compatible(
         && option_is_mergeable(&left.fade, &right.fade)
         && option_is_mergeable(&left.surface.quality, &right.surface.quality)
         && option_is_mergeable(&left.surface.intensity, &right.surface.intensity)
+        && option_is_mergeable(&left.surface.fineness, &right.surface.fineness)
+        && option_is_mergeable(&left.surface.underlayer, &right.surface.underlayer)
         && option_is_mergeable(&left.fluctuation.amplitude, &right.fluctuation.amplitude)
         && option_is_mergeable(&left.fluctuation.frequency, &right.fluctuation.frequency)
         && option_is_mergeable(&left.fluctuation.quality, &right.fluctuation.quality)
@@ -1420,6 +1430,14 @@ fn merge_predicate(target: &mut SemanticInstruction, continuation: &SemanticInst
     merge_option(
         &mut target.entity.surface.intensity,
         &continuation.entity.surface.intensity,
+    );
+    merge_option(
+        &mut target.entity.surface.fineness,
+        &continuation.entity.surface.fineness,
+    );
+    merge_option(
+        &mut target.entity.surface.underlayer,
+        &continuation.entity.surface.underlayer,
     );
     merge_option(
         &mut target.entity.fluctuation.amplitude,

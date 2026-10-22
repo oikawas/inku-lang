@@ -48,6 +48,8 @@ pub enum WorkPlanSlot {
     Continuity,
     Surface,
     Handling,
+    Fineness,
+    Underlayer,
     Angle,
     LineUpDirection,
     MotionQuality,
@@ -58,7 +60,7 @@ pub enum WorkPlanSlot {
 }
 
 impl WorkPlanSlot {
-    pub const LAYER_ATTRIBUTES: [Self; 15] = [
+    pub const LAYER_ATTRIBUTES: [Self; 17] = [
         Self::Position,
         Self::Size,
         Self::Color,
@@ -67,6 +69,8 @@ impl WorkPlanSlot {
         Self::Continuity,
         Self::Surface,
         Self::Handling,
+        Self::Fineness,
+        Self::Underlayer,
         Self::Angle,
         Self::LineUpDirection,
         Self::MotionQuality,
@@ -90,6 +94,8 @@ impl WorkPlanSlot {
             Self::Continuity => "continuity",
             Self::Surface => "surface",
             Self::Handling => "handling",
+            Self::Fineness => "fineness",
+            Self::Underlayer => "underlayer",
             Self::Angle => "angle",
             Self::LineUpDirection => "line_up_direction",
             Self::MotionQuality => "motion_quality",
@@ -232,6 +238,8 @@ pub fn work_plan_vocabulary() -> &'static WorkPlanVocabulary {
             (WorkPlanSlot::Ground, "ji"),
             (WorkPlanSlot::Surface, "omote"),
             (WorkPlanSlot::Handling, "sabaki"),
+            (WorkPlanSlot::Fineness, "kime"),
+            (WorkPlanSlot::Underlayer, "shitaji"),
         ] {
             for (_, term) in saijiki_terms(key) {
                 vocabulary.push(slot, term);
@@ -325,6 +333,16 @@ impl WorkPlanLayer {
     fn attribute(&self, slot: WorkPlanSlot) -> Option<&str> {
         self.attributes.get(&slot).map(String::as_str)
     }
+
+    /// Give the layer a surface that is not a texture (`empty` or `flat`),
+    /// leaving out the fineness and underlayer words that only a named texture
+    /// takes (DDL 24).
+    pub fn set_untextured_surface(&mut self, surface: &str) {
+        self.attributes
+            .insert(WorkPlanSlot::Surface, surface.to_owned());
+        self.attributes.remove(&WorkPlanSlot::Fineness);
+        self.attributes.remove(&WorkPlanSlot::Underlayer);
+    }
 }
 
 /// One installed plugin a plan may choose: its canonical qualified name, its
@@ -408,6 +426,28 @@ pub fn work_plan_ground_material(value: &str) -> Option<inku_score::GroundMateri
         .score_value
         .as_deref()
         .and_then(|score| serde_json::from_value(Value::String(score.to_owned())).ok())
+}
+
+/// The plan's surface values that name a texture: the おもて words whose Score
+/// value is neither empty nor flat (刷き・粒・点描・平行線・交差線・アクアチント).
+/// A fineness or underlayer word (DDL 24) is read only on one of them.
+fn texture_surfaces() -> &'static [String] {
+    static TEXTURES: OnceLock<Vec<String>> = OnceLock::new();
+    TEXTURES.get_or_init(|| {
+        saijiki_asset()
+            .categories
+            .iter()
+            .filter(|category| category.key == "omote")
+            .flat_map(|category| &category.words)
+            .filter(|word| word.prompt)
+            .filter(|word| {
+                word.score_value
+                    .as_deref()
+                    .is_some_and(|value| !matches!(value, "none" | "solid"))
+            })
+            .filter_map(|word| word.surface_en.as_deref().map(canonical_wire_id))
+            .collect()
+    })
 }
 
 /// The provider response schema. It uses only object, array, string enum, and
@@ -697,6 +737,18 @@ pub fn normalize_work_plan_with_plugins(
             for slot in [WorkPlanSlot::MotionAmplitude, WorkPlanSlot::MotionSpacing] {
                 if let Some(value) = out.attributes.remove(&slot) {
                     note(Some(index), slot.field(), value, "requires_motion_quality");
+                }
+            }
+        }
+        // A fineness or underlayer word says how a named texture is laid
+        // (DDL 24), so a layer without one takes neither.
+        if out
+            .attribute(WorkPlanSlot::Surface)
+            .is_none_or(|surface| !texture_surfaces().iter().any(|texture| texture == surface))
+        {
+            for slot in [WorkPlanSlot::Fineness, WorkPlanSlot::Underlayer] {
+                if let Some(value) = out.attributes.remove(&slot) {
+                    note(Some(index), slot.field(), value, "requires_texture");
                 }
             }
         }
@@ -1070,15 +1122,36 @@ fn print_layer_ja(
         out.push_str(&surface(WorkPlanSlot::Bleeding, bleeding, ja));
         out.push_str(no);
     }
-    for slot in [
-        WorkPlanSlot::Color,
-        WorkPlanSlot::Thinness,
-        WorkPlanSlot::Tool,
-        WorkPlanSlot::Continuity,
-        WorkPlanSlot::Handling,
-        WorkPlanSlot::Surface,
-        WorkPlanSlot::Angle,
-    ] {
+    // The fineness and underlayer words (DDL 24) go before the texture they
+    // lay, and the handling then follows the texture (「下塗りの細かい点描の薄い
+    // 円」), so that two attributive adjectives do not stand in a row (「薄い細かい
+    // 点描の」) and the handling is not read as the underlayer's alone.
+    let lays_texture = layer.attribute(WorkPlanSlot::Fineness).is_some()
+        || layer.attribute(WorkPlanSlot::Underlayer).is_some();
+    let order: &[WorkPlanSlot] = if lays_texture {
+        &[
+            WorkPlanSlot::Color,
+            WorkPlanSlot::Thinness,
+            WorkPlanSlot::Tool,
+            WorkPlanSlot::Continuity,
+            WorkPlanSlot::Underlayer,
+            WorkPlanSlot::Fineness,
+            WorkPlanSlot::Surface,
+            WorkPlanSlot::Handling,
+            WorkPlanSlot::Angle,
+        ]
+    } else {
+        &[
+            WorkPlanSlot::Color,
+            WorkPlanSlot::Thinness,
+            WorkPlanSlot::Tool,
+            WorkPlanSlot::Continuity,
+            WorkPlanSlot::Handling,
+            WorkPlanSlot::Surface,
+            WorkPlanSlot::Angle,
+        ]
+    };
+    for &slot in order {
         if slot == WorkPlanSlot::Color && cycle.is_some() {
             continue;
         }
@@ -1131,12 +1204,16 @@ fn print_layer_en(
         words.push(surface(WorkPlanSlot::Bleeding, bleeding, en));
     }
     let cycle = numeric.and_then(|numeric| numeric.cycle.as_deref());
+    // The underlayer and fineness words (DDL 24) stand right before the
+    // texture they lay.
     for slot in [
         WorkPlanSlot::Color,
         WorkPlanSlot::Thinness,
         WorkPlanSlot::Tool,
         WorkPlanSlot::Continuity,
         WorkPlanSlot::Handling,
+        WorkPlanSlot::Underlayer,
+        WorkPlanSlot::Fineness,
         WorkPlanSlot::Surface,
         WorkPlanSlot::Angle,
     ] {
@@ -1278,6 +1355,8 @@ fn plan_ids_by_semantic_id() -> &'static BTreeMap<WorkPlanSlot, BTreeMap<String,
             (WorkPlanSlot::Continuity, "tsuranari"),
             (WorkPlanSlot::Angle, "katamuki"),
             (WorkPlanSlot::Handling, "sabaki"),
+            (WorkPlanSlot::Fineness, "kime"),
+            (WorkPlanSlot::Underlayer, "shitaji"),
             (WorkPlanSlot::Ground, "ji"),
         ] {
             let table = tables.entry(slot).or_default();
@@ -1338,7 +1417,7 @@ fn plan_thinness_id(value: CoreModifierValue) -> Option<String> {
 
 /// The layer a compiled instruction was printed from, with every word a plan
 /// writes: [`composition_layer`]'s, and the tool, thinness, continuity,
-/// handling, angle, motion and bleeding words. The laws stage reads a saved
+/// handling, fineness, underlayer, angle, motion and bleeding words. The laws stage reads a saved
 /// work's instructions back with it (2026-10-20), so that a layer it changes
 /// is printed again with all of its words. `None` for an instruction a plan
 /// does not write, also one with a numeric size.
@@ -1357,6 +1436,8 @@ pub fn plan_layer(instruction: &crate::SemanticInstruction) -> Option<WorkPlanLa
         (WorkPlanSlot::Continuity, entity.continuity.as_ref()),
         (WorkPlanSlot::Angle, entity.angle.as_ref()),
         (WorkPlanSlot::Handling, entity.surface.intensity.as_ref()),
+        (WorkPlanSlot::Fineness, entity.surface.fineness.as_ref()),
+        (WorkPlanSlot::Underlayer, entity.surface.underlayer.as_ref()),
         (
             WorkPlanSlot::MotionQuality,
             entity.fluctuation.quality.as_ref(),
@@ -1811,6 +1892,16 @@ fn derive_shape_capabilities(
                         layer
                             .attributes
                             .insert(WorkPlanSlot::MotionQuality, quality.id.clone());
+                    }
+                    // A fineness or underlayer word lays a named texture
+                    // (DDL 24), so it is asked of a form with one.
+                    if matches!(slot, WorkPlanSlot::Fineness | WorkPlanSlot::Underlayer) {
+                        let Some(texture) = texture_surfaces().first() else {
+                            continue;
+                        };
+                        layer
+                            .attributes
+                            .insert(WorkPlanSlot::Surface, texture.clone());
                     }
                     layer.attributes.insert(slot, term.id.clone());
                 }

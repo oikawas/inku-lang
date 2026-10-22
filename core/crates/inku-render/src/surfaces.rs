@@ -40,6 +40,11 @@ const SURFACE_WASH_OPACITY: f64 = 0.22;
 /// it 0.275, a little darker than the wash's 0.22.
 const SURFACE_SWEEP_OPACITY: f64 = 0.5;
 const SURFACE_BLEED_RINGS: usize = 3;
+/// A surface's default density and scale (the Score's `SurfaceSpec`). The
+/// fineness words (DDL 24) move a named texture away from them, and the units'
+/// own formulas read these (render engine 89).
+const SURFACE_DEFAULT_DENSITY: f64 = 0.35;
+const SURFACE_DEFAULT_SCALE: f64 = 0.35;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct SurfaceRender {
@@ -84,6 +89,18 @@ fn surface_seed(instruction: &Instruction, context: MarkContext<'_>, grain: bool
         stable_surface.density = 0.5;
         stable_surface.scale = 0.5;
         stable_surface.opacity = 0.5;
+    } else if is_named_texture(surface.texture) {
+        // The fineness words (DDL 24) change how a face is laid, not which
+        // face it is: their fields seed as the defaults, so a word does not
+        // turn the face's strokes around (render engine 89). Saved wash, bleed
+        // and paper grain seed from their own fields, as they did.
+        let stable_surface = stable.surface.as_mut().expect("surface cloned above");
+        stable_surface.density = SURFACE_DEFAULT_DENSITY;
+        stable_surface.scale = SURFACE_DEFAULT_SCALE;
+    }
+    // Nor does the underlayer word (下塗り) turn them.
+    if is_named_texture(surface.texture) {
+        stable.filled = false;
     }
     let mut key = serde_json::to_vec(&stable).expect("surface seed payload is serializable");
     key.extend_from_slice(
@@ -117,6 +134,110 @@ fn surface_color(instruction: &Instruction, context: MarkContext<'_>) -> String 
         context.color_map,
         context.work_assignment,
     )
+}
+
+/// A texture the DDL can write (刷き・粒・点描・平行線・交差線・アクアチント). Saved
+/// wash, bleed and paper grain keep their own path under a fill.
+pub(crate) fn is_named_texture(texture: SurfaceTexture) -> bool {
+    matches!(
+        texture,
+        SurfaceTexture::Sweep
+            | SurfaceTexture::Grain
+            | SurfaceTexture::Stipple
+            | SurfaceTexture::Hatch
+            | SurfaceTexture::Crosshatch
+            | SurfaceTexture::Aquatint
+    )
+}
+
+/// A named texture over the tool's paint: a filled closed shape's texture
+/// (下塗り, DDL 24; render engine 89).
+fn underpainted(instruction: &Instruction) -> bool {
+    instruction.filled
+        && instruction
+            .surface
+            .as_ref()
+            .is_some_and(|surface| is_named_texture(surface.texture))
+}
+
+/// The colour a texture is laid in. Over an underpainting it turns against
+/// the fill, so that it shows on it (render engine 89): 45% toward white over
+/// a colour of relative luminance under 0.45, ×0.62 darker over a lighter one.
+fn texture_color(instruction: &Instruction, context: MarkContext<'_>) -> String {
+    let color = surface_color(instruction, context);
+    if !underpainted(instruction) {
+        return color;
+    }
+    match relative_luminance(&color) {
+        Some(luminance) if luminance < 0.45 => toward_white(&color, 0.45),
+        Some(_) => crate::accepted_fills::darker(&color, 0.62),
+        None => color,
+    }
+}
+
+/// A texture over an underpainting is laid twice as strong (render engine 89).
+fn underpaint_boost(instruction: &Instruction) -> f64 {
+    if underpainted(instruction) { 2.0 } else { 1.0 }
+}
+
+fn hex_rgb(color: &str) -> Option<[u8; 3]> {
+    let hex = color.strip_prefix('#').filter(|hex| hex.len() == 6)?;
+    let channel = |index: usize| u8::from_str_radix(&hex[index * 2..index * 2 + 2], 16).ok();
+    Some([channel(0)?, channel(1)?, channel(2)?])
+}
+
+fn relative_luminance(color: &str) -> Option<f64> {
+    let linear = |channel: u8| {
+        let value = f64::from(channel) / 255.0;
+        if value <= 0.04045 {
+            value / 12.92
+        } else {
+            ((value + 0.055) / 1.055).powf(2.4)
+        }
+    };
+    let [r, g, b] = hex_rgb(color)?;
+    Some(0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b))
+}
+
+fn toward_white(color: &str, share: f64) -> String {
+    let Some(channels) = hex_rgb(color) else {
+        return color.to_owned();
+    };
+    let lift = |channel: u8| {
+        (f64::from(channel) + (255.0 - f64::from(channel)) * share)
+            .round()
+            .clamp(0.0, 255.0) as u8
+    };
+    format!(
+        "#{:02x}{:02x}{:02x}",
+        lift(channels[0]),
+        lift(channels[1]),
+        lift(channels[2])
+    )
+}
+
+/// How many texture units the density lays against the default density's
+/// (render engine 89): 1 at 0.35, 4 at 0.85 (密な) and 0.25 at 0.05 (疎な),
+/// exponential between.
+fn texture_count_ratio(density: f64) -> f64 {
+    let delta = density - SURFACE_DEFAULT_DENSITY;
+    if delta >= 0.0 {
+        4_f64.powf(delta / 0.5)
+    } else {
+        4_f64.powf(delta / 0.30)
+    }
+}
+
+/// One texture unit's size against the default scale's (render engine 89): 1
+/// at 0.35, 0.5 at 0.05 (細かい) and 2 at 0.90 (粗い), exponential between. The
+/// units cover the same area, so their count goes by the inverse square.
+fn texture_size_factor(scale: f64) -> f64 {
+    let delta = scale - SURFACE_DEFAULT_SCALE;
+    if delta >= 0.0 {
+        2_f64.powf(delta / 0.55)
+    } else {
+        2_f64.powf(delta / 0.30)
+    }
 }
 
 fn dab(
@@ -311,11 +432,17 @@ fn grain_pattern(
         .as_ref()
         .expect("surface checked by caller");
     let tile = context.canvas.unit() * 0.08;
-    let radius = (context.canvas.unit() * (0.002 + surface.scale.max(0.04) * 0.004)).max(0.45);
+    // A finer grain sets more, smaller points at the same cover, and the
+    // density multiplies them (render engine 89).
+    let size = texture_size_factor(surface.scale.max(0.04));
+    let radius = (context.canvas.unit() * (0.002 + SURFACE_DEFAULT_SCALE * 0.004)).max(0.45) * size;
     let tile_area = tile * tile;
     let reference_area = context.canvas.unit().powi(2) * 0.18;
-    let count = (((22.0 + surface.density.max(0.02) * 120.0) * tile_area / reference_area).ceil()
-        as usize)
+    let cover = 1.0 / (size * size);
+    let count = (((22.0 + SURFACE_DEFAULT_DENSITY * 120.0) * tile_area / reference_area
+        * cover
+        * texture_count_ratio(surface.density.max(0.02)))
+    .ceil() as usize)
         .max(1);
     let mut pattern = Element::new("pattern")
         .attr("id", pattern_id)
@@ -395,16 +522,33 @@ fn render_vectors(
     let Some((x, y, width, height)) = shape_bbox(geometry, instruction, context) else {
         return;
     };
-    let color = surface_color(instruction, context);
-    let opacity = (surface.opacity * intensity_factor(instruction.surface_intensity)).min(0.75);
-    let density = surface.density.max(0.02);
-    let scale = surface.scale.max(0.04);
+    let color = texture_color(instruction, context);
+    let opacity = (surface.opacity
+        * intensity_factor(instruction.surface_intensity)
+        * underpaint_boost(instruction))
+    .min(0.75);
+    // A named texture's units follow their formulas at the default density
+    // and scale, and its own density multiplies them and its scale sizes one
+    // at the same cover (render engine 89). Saved wash and paper grain, which
+    // no DDL word writes, read their own fields in the formulas, as they did.
+    let (density, scale, count_ratio, size) = if is_named_texture(surface.texture) {
+        (
+            SURFACE_DEFAULT_DENSITY,
+            SURFACE_DEFAULT_SCALE,
+            texture_count_ratio(surface.density.max(0.02)),
+            texture_size_factor(surface.scale.max(0.04)),
+        )
+    } else {
+        (surface.density.max(0.02), surface.scale.max(0.04), 1.0, 1.0)
+    };
+    let cover = 1.0 / (size * size);
     let area_factor = ((width * height) / (context.canvas.unit().powi(2) * 0.18))
         .clamp(0.2, SURFACE_AREA_FACTOR_MAX);
     match surface.texture {
         SurfaceTexture::Stipple | SurfaceTexture::PaperGrain => {
-            let count = SURFACE_MARK_MAX.min(((22.0 + density * 120.0) * area_factor) as usize);
-            let radius = (context.canvas.unit() * (0.002 + scale * 0.004)).max(0.45);
+            let count = ((SURFACE_MARK_MAX as f64 * cover * count_ratio) as usize)
+                .min(((22.0 + density * 120.0) * area_factor * cover * count_ratio) as usize);
+            let radius = (context.canvas.unit() * (0.002 + scale * 0.004)).max(0.45) * size;
             for (index, point) in scatter(contour, count, seed).into_iter().enumerate() {
                 // A dab is at most 1.65 `radius` round, and its stroke runs at
                 // most 1.75 of that from its point.
@@ -433,7 +577,11 @@ fn render_vectors(
             } else {
                 (SURFACE_SWEEP_OPACITY, "surface-stroke-v1 surface-sweep")
             };
-            let spacing = (context.canvas.unit() * (0.052 - density * 0.024)).max(10.0);
+            // The bands lie closer as the density rises (never under 6 px) and
+            // wider apart as the scale does, but a band stays one unit wide
+            // however close the density lays them (render engine 89).
+            let band_spacing = (context.canvas.unit() * (0.052 - density * 0.024)).max(10.0) * size;
+            let spacing = (band_spacing / count_ratio).max(6.0);
             let base_angle = hash01(0, seed, "fill-angle") * std::f64::consts::PI;
             let mut stroke_index = 0_i64;
             for layer in 0..SURFACE_WASH_LAYERS {
@@ -442,7 +590,7 @@ fn render_vectors(
                     + (hash01(layer as i64, seed, "wash-angle") - 0.5) * 16_f64.to_radians();
                 for (_, start, end) in scanline_segments(contour, angle, spacing, layer_seed) {
                     let sweep_width = mark_width(instruction, context.canvas).max(
-                        spacing
+                        band_spacing
                             * (SURFACE_WASH_WIDTH_BASE
                                 + hash01(stroke_index, seed, "wash-width")
                                     * SURFACE_WASH_WIDTH_SPAN),
@@ -469,9 +617,17 @@ fn render_vectors(
         }
         SurfaceTexture::Hatch | SurfaceTexture::Crosshatch => {
             let base_angle = line_angle(surface.direction);
-            let spacing = (context.canvas.unit() * (0.010 + (1.0 - density) * 0.025)).max(5.0);
+            // The lines lie closer as the density rises, and grow thicker and
+            // wider apart as the scale does, never closer than 2.2 line widths
+            // (render engine 89).
+            let line_width = ((context.canvas.unit() * 0.0016).max(0.45) * size).max(0.45);
+            let spacing = ((context.canvas.unit() * (0.010 + (1.0 - density) * 0.025)).max(5.0)
+                * size
+                / count_ratio)
+                .max(line_width * 2.2);
             let center = Point::new(x + width / 2.0, y + height / 2.0);
-            let count = ((width.hypot(height) * 1.3 / spacing) as i64).clamp(3, 80);
+            let count = ((width.hypot(height) * 1.3 / spacing) as i64)
+                .clamp(3, (80.0 * (count_ratio / size).max(1.0)) as i64);
             let mut angles = vec![base_angle];
             if surface.texture == SurfaceTexture::Crosshatch {
                 angles
@@ -504,7 +660,6 @@ fn render_vectors(
                             row_point.x + direction.x * end_t,
                             row_point.y + direction.y * end_t,
                         );
-                        let line_width = (context.canvas.unit() * 0.0016).max(0.45);
                         if reaches_canvas(instruction, context, start, end, line_width)
                             && let Some(element) = sweep(
                                 instruction,
@@ -531,9 +686,10 @@ fn render_vectors(
         SurfaceTexture::Aquatint => {
             let steps = usize::from(surface.tone_steps.max(1));
             let band = width / steps as f64;
-            let radius = (context.canvas.unit() * (0.0015 + scale * 0.0025)).max(0.45);
-            let count =
-                SURFACE_MARK_MAX.min((((18.0 + density * 90.0) * area_factor) as usize).max(5));
+            let radius = (context.canvas.unit() * (0.0015 + scale * 0.0025)).max(0.45) * size;
+            let count = ((SURFACE_MARK_MAX as f64 * cover * count_ratio) as usize).min(
+                (((18.0 + density * 90.0) * area_factor * cover * count_ratio) as usize).max(5),
+            );
             for (index, point) in scatter(contour, count, seed).into_iter().enumerate() {
                 let step = if band > 0.0 {
                     (((point.x - x) / band) as isize).clamp(0, steps as isize - 1) as usize
@@ -681,13 +837,16 @@ pub(crate) fn render_surface(
             "surface_pattern_{:03}_{:03}_grain",
             context.instruction_index, context.mark_index
         );
-        let color = surface_color(instruction, context);
+        let color = texture_color(instruction, context);
         definitions.push(grain_pattern(
             instruction,
             context,
             seed,
             &color,
-            (surface.opacity * intensity_factor(instruction.surface_intensity)).min(0.75),
+            (surface.opacity
+                * intensity_factor(instruction.surface_intensity)
+                * underpaint_boost(instruction))
+            .min(0.75),
             &pattern_id,
         ));
         group.push(

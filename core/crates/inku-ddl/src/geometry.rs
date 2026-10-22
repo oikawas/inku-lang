@@ -1161,6 +1161,7 @@ mod tests {
         assert_eq!(fluctuation["words"]["bleeding"]["dimension"], "spread");
         assert_eq!(fluctuation["words"]["swaying"]["dimension"], "quality");
         assert_eq!(fluctuation["absent"], "none");
+        assert_eq!(fluctuation["amplitude_without_quality"], "omitted");
         assert_eq!(
             fluctuation["partial"],
             serde_json::json!({"amplitude":"medium","frequency":"medium","quality":"perlin","dimensions":["position_x","position_y"]})
@@ -1357,7 +1358,7 @@ mod tests {
         );
         assert_eq!(
             geometry_resolution_policy_digest(),
-            "320ec78f7a3d0025d881b85de475268ba71bb3eb149aeadcf3e4961f75a445fb"
+            "5eea7780c4358eeeece030ea713530551005290fb1614effdb741b0117cf308d"
         );
         assert_eq!(
             payload["object_placement"]["layout_direction"]["vertical"],

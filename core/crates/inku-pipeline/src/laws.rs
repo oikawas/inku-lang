@@ -5704,17 +5704,13 @@ fn edit_rebuilt(
     }
     if pattern {
         if !mark.filled {
-            layer
-                .attributes
-                .insert(WorkPlanSlot::Surface, "empty".to_owned());
+            layer.set_untextured_surface("empty");
         } else if layer
             .attributes
             .get(&WorkPlanSlot::Surface)
             .is_none_or(|surface| surface == "empty")
         {
-            layer
-                .attributes
-                .insert(WorkPlanSlot::Surface, "flat".to_owned());
+            layer.set_untextured_surface("flat");
         }
     }
     write_hand(&mut layer, mark.variation.as_ref());

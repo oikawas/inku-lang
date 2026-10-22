@@ -39,6 +39,18 @@ export const GENERATED_SAIJIKI: SaijikiCategory[] = [
 		words: ['濃い', '程よい', '薄い']
 	},
 	{
+		key: 'kime',
+		label: 'きめ',
+		en: 'fineness',
+		words: ['細かい', '粗い', '密な', '疎な']
+	},
+	{
+		key: 'shitaji',
+		label: 'したじ',
+		en: 'underlayer',
+		words: ['下塗り']
+	},
+	{
 		key: 'ji',
 		label: 'じ',
 		en: 'grounds',
@@ -124,6 +136,18 @@ export const GENERATED_SAIJIKI_EN: SaijikiCategory[] = [
 		label: 'さばき',
 		en: 'handling',
 		words: ['dense', 'temperate', 'faint']
+	},
+	{
+		key: 'kime',
+		label: 'きめ',
+		en: 'fineness',
+		words: ['fine-grained', 'coarse-grained', 'packed', 'sparse']
+	},
+	{
+		key: 'shitaji',
+		label: 'したじ',
+		en: 'underlayer',
+		words: ['underpainted']
 	},
 	{
 		key: 'ji',

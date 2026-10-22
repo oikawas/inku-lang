@@ -16,7 +16,7 @@
 	import { pluginWarningsToShow } from '$lib/plugin-names';
 	import { limitNotesToShow } from '$lib/limitNotes';
 	import { hydrateSaijiki, hydrateSaijikiEn } from '$lib/saijiki';
-	import { SURFACE_PREVIEWS, HANDLING_PREVIEWS, localizePreview, shapeSvg, type PreviewEntry } from '$lib/saijiki-surface';
+	import { SURFACE_PREVIEWS, HANDLING_PREVIEWS, FINENESS_PREVIEWS, UNDERLAYER_PREVIEWS, localizePreview, shapeSvg, type PreviewEntry } from '$lib/saijiki-surface';
 	import { instructionLangOf, resolveInstructionLang, type ResolvedInstructionLang } from '$lib/instructionLang';
 	import AppRail from '$lib/components/AppRail.svelte';
 	import AuthPanel from '$lib/components/AuthPanel.svelte';
@@ -377,9 +377,11 @@
 			破線: { effect: '短い線分を間隔を空けて並べる。', example: '破線の弧', effectEn: 'Places short segments with gaps between them.', exampleEn: 'A dashed arc', svg: lineSvg('stroke-dasharray="14 9"') },
 			点線: { effect: '点の連なりとして描く。', example: '点線の円を置く', effectEn: 'Draws as a run of dots.', exampleEn: 'Place a dotted circle', svg: lineSvg('stroke-dasharray="1 12"') },
 			一点鎖線: { effect: '長線と点を交互に並べる。', example: '一点鎖線の線を引く', effectEn: 'Alternates long dashes with dots.', exampleEn: 'Draw a dash-dot line', svg: lineSvg('stroke-dasharray="18 7 2 7"') },
-			// Surface and handling follow the current Saijiki categories.
+			// Surface, handling, fineness and underlayer follow the current Saijiki categories.
 			...SURFACE_PREVIEWS,
 			...HANDLING_PREVIEWS,
+			...FINENESS_PREVIEWS,
+			...UNDERLAYER_PREVIEWS,
 			白: { effect: '白系の色で描く。背景との対比に注意。', example: '白い円', effectEn: 'Draws in a white tone. Mind the contrast against the ground.', exampleEn: 'A white circle', svg: shapeSvg('<rect x="48" y="18" width="84" height="56" fill="#2b2b2b" opacity="0.16"/><circle cx="90" cy="46" r="24" fill="#ffffff" stroke="#c9c2b5" stroke-width="4"/>') },
 			黒: { effect: '黒で描く。最も強い輪郭になる。', example: '黒い円', effectEn: 'Draws in black, giving the strongest contour.', exampleEn: 'A black circle', svg: shapeSvg('<circle cx="90" cy="46" r="25" fill="#2b2b2b"/>') },
 			青: { effect: '青系の色で描く。', example: '青い線', effectEn: 'Draws in a blue tone.', exampleEn: 'A blue line', svg: lineSvg('', 5, 'round', '#2c5fb8') },

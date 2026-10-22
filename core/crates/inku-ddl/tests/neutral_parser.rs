@@ -485,8 +485,8 @@ fn asset_flags_drive_candidate_eligibility_without_losing_semantic_identity() {
     }
 
     // I-715 B2 offers 自由線 to the list and the reader, so three words stay
-    // marker-only.
-    assert_eq!((active, marker_only, disabled), (95, 3, 1));
+    // marker-only. DDL 24 offers the five words of きめ and したじ.
+    assert_eq!((active, marker_only, disabled), (100, 3, 1));
 }
 
 #[test]

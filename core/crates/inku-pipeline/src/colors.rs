@@ -4987,9 +4987,7 @@ fn print_colors(context: &ColorsContext, painted: &Painted) -> Option<ColorsPrin
             edited.proportion = None;
         }
         if painted.filled.contains(&layer) && !before_mark.filled {
-            edited
-                .attributes
-                .insert(WorkPlanSlot::Surface, "flat".to_owned());
+            edited.set_untextured_surface("flat");
         }
         let mut range = printed.ranges[k].clone();
         if painted.moved.contains(&layer) {

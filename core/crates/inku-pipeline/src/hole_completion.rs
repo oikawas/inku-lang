@@ -82,6 +82,7 @@ pub(crate) fn confirmed_bindings(
             (Owner::Color, &entity.color), (Owner::Touch, &entity.touch),
             (Owner::Continuity, &entity.continuity), (Owner::Angle, &entity.angle),
             (Owner::SurfaceQuality, &entity.surface.quality), (Owner::SurfaceIntensity, &entity.surface.intensity),
+            (Owner::SurfaceFineness, &entity.surface.fineness), (Owner::SurfaceUnderlayer, &entity.surface.underlayer),
             (Owner::InkSpread, &entity.fluctuation.spread), (Owner::FluctuationAmplitude, &entity.fluctuation.amplitude),
             (Owner::FluctuationFrequency, &entity.fluctuation.frequency), (Owner::FluctuationQuality, &entity.fluctuation.quality),
             (Owner::ProportionAspect, &entity.proportion.aspect), (Owner::ProportionWidthExtent, &entity.proportion.width_extent),

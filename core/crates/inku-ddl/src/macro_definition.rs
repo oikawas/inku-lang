@@ -26,13 +26,15 @@ pub const MACRO_DEFINITION_DIGEST_DOMAIN: &[u8] = b"inku.macro-definition.v1";
 /// Stable warning attached to every legacy per-macro outcome.
 pub const LEGACY_PLUGIN_FORMAT_WARNING: &str = "legacy_plugin_format";
 
-const SEMANTIC_CATEGORIES: [(&str, &str); 13] = [
+const SEMANTIC_CATEGORIES: [(&str, &str); 15] = [
     ("shape", "katachi"),
     ("angle", "katamuki"),
     ("touch", "tezawari"),
     ("continuity", "tsuranari"),
     ("surface", "omote"),
     ("handling", "sabaki"),
+    ("fineness", "kime"),
+    ("underlayer", "shitaji"),
     ("ground", "ji"),
     ("color", "iro"),
     ("variation", "yuragi"),

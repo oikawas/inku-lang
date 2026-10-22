@@ -85,6 +85,10 @@ pub(crate) fn resolve_fluctuation(
     frequency: Option<&str>,
     quality: Option<&str>,
 ) -> Result<Option<Variation>, ()> {
+    // An amplitude word says how far a sway swings, and a sway word says what
+    // sways: alone it makes no sway (DDL 24). The lowerer reports the word on
+    // the mark that writes it.
+    let amplitude = amplitude.filter(|_| quality.is_some());
     if amplitude.is_none() && frequency.is_none() && quality.is_none() {
         return Ok(None);
     }
@@ -120,5 +124,10 @@ pub(crate) fn policy() -> serde_json::Value {
         }.expect("closed Score enum serializes");
         ((*id).to_owned(), serde_json::json!({"dimension": classify_fluctuation_dimension(id), "value": resolved}))
     }).collect();
-    serde_json::json!({"absent": "none", "partial": defaults(), "words": words})
+    serde_json::json!({
+        "absent": "none",
+        "amplitude_without_quality": "omitted",
+        "partial": defaults(),
+        "words": words
+    })
 }

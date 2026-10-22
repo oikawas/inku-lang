@@ -1,9 +1,11 @@
-// The saijiki previews for surfaces (おもて) and handling (さばき).
+// The saijiki previews for surfaces (おもて), handling (さばき), fineness (きめ)
+// and underlayer (したじ).
 //
-// Surfaces say how a face is; handling says how ink or paint is laid down.
-// So every drawing here is the same rectangle with a different interior. The
-// contour never changes, and hovering across the row shows only the face
-// changing, which is what the category means.
+// Surfaces say how a face is; handling says how ink or paint is laid down;
+// fineness and underlayer say how a texture is laid (DDL 24). So every drawing
+// here is the same rectangle with a different interior. The contour never
+// changes, and hovering across the row shows only the face changing, which is
+// what the category means.
 //
 // These explanatory drawings follow SPEC §3.3 and the shared Rust renderer's
 // surfaces.rs / marks.rs: two sweeps at 0.5, one or two hatch sets, three
@@ -69,7 +71,8 @@ export const surfaceDabs = (
 	opacity: number,
 	salt: number,
 	x0 = 51,
-	x1 = 129
+	x1 = 129,
+	fill = '#2b2b2b'
 ): string => {
 	let marks = '';
 	for (let i = 0; i < count; i += 1) {
@@ -78,7 +81,7 @@ export const surfaceDabs = (
 		const cy = (21 + h(78.233) * 50).toFixed(1);
 		const r = (radius * (0.6 + h(37.719) * 0.8)).toFixed(2);
 		const o = (opacity * (0.5 + h(19.31) * 0.5)).toFixed(2);
-		marks += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#2b2b2b" opacity="${o}"/>`;
+		marks += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" opacity="${o}"/>`;
 	}
 	return marks;
 };
@@ -209,5 +212,72 @@ export const HANDLING_PREVIEWS: Record<string, PreviewEntry> = {
 			'Lays ink or paint more faintly relative to the tool, on lines, arcs, textured faces or flat fills. Left: temperate pencil stipple; right: faint stipple.',
 		exampleEn: 'Place a faint stipple pencil square',
 		svg: surfaceSvg(handlingRelative(0.66 * 0.55))
+	}
+};
+
+/**
+ * Fineness and underlayer (DDL 24) lay a named texture of a closed shape. As
+ * for handling, the left half is the default stipple and the right half the
+ * chosen word, at render engine 89's factors: 細かい halves a dot and lays four
+ * times as many (the same cover), 粗い doubles it and lays a quarter, 密な lays
+ * four times as many of the same dots and 疎な a quarter, and 下塗り paints the
+ * tool's colour under the dots and lays them 45% toward white, twice as strong
+ * (up to the 0.75 cap).
+ */
+const textureRelative = (right: string): string =>
+	surfaceDabs(21, 2.1, 0.66, 4.5, 51, 89) +
+	right +
+	'<path d="M90 20 V72" stroke="#d7d1c4" stroke-width="1.5"/>';
+
+/** Fineness changes a texture's units: their size, or how many lie in it. */
+export const FINENESS_PREVIEWS: Record<string, PreviewEntry> = {
+	細かい: {
+		effect: '質感の点や線を小さくし、その分だけ数を増やす（覆う広さは変えない）。閉じた形の質感の面に添えられる。図は左が既定の点描、右が細かい点描。',
+		example: 'ペンの細かい点描の四角を置く',
+		effectEn:
+			'Makes a texture’s dots or lines smaller and lays more of them, covering the same area. On the textured face of a closed shape. Left: default stipple; right: fine-grained stipple.',
+		exampleEn: 'Place a pen fine-grained stipple square',
+		svg: surfaceSvg(textureRelative(surfaceDabs(84, 2.1 * 0.5, 0.66, 4.5, 91, 129)))
+	},
+	粗い: {
+		effect: '質感の点や線を大きくし、その分だけ数を減らす（覆う広さは変えない）。閉じた形の質感の面に添えられる。図は左が既定の点描、右が粗い点描。',
+		example: 'ペンの粗い点描の四角を置く',
+		effectEn:
+			'Makes a texture’s dots or lines larger and lays fewer of them, covering the same area. On the textured face of a closed shape. Left: default stipple; right: coarse-grained stipple.',
+		exampleEn: 'Place a pen coarse-grained stipple square',
+		svg: surfaceSvg(textureRelative(surfaceDabs(5, 2.1 * 2, 0.66, 4.5, 91, 129)))
+	},
+	密な: {
+		effect: '質感の点や線を詰めて、数を増やして置く。閉じた形の質感の面に添えられる。図は左が既定の点描、右が密な点描。',
+		example: 'ペンの密な点描の四角を置く',
+		effectEn:
+			'Lays a texture’s dots or lines closer together, more of them. On the textured face of a closed shape. Left: default stipple; right: packed stipple.',
+		exampleEn: 'Place a pen packed stipple square',
+		svg: surfaceSvg(textureRelative(surfaceDabs(84, 2.1, 0.66, 4.5, 91, 129)))
+	},
+	疎な: {
+		effect: '質感の点や線の間を空けて、数を減らして置く。閉じた形の質感の面に添えられる。図は左が既定の点描、右が疎な点描。',
+		example: 'ペンの疎な点描の四角を置く',
+		effectEn:
+			'Lays a texture’s dots or lines farther apart, fewer of them. On the textured face of a closed shape. Left: default stipple; right: sparse stipple.',
+		exampleEn: 'Place a pen sparse stipple square',
+		svg: surfaceSvg(textureRelative(surfaceDabs(5, 2.1, 0.66, 4.5, 91, 129)))
+	}
+};
+
+/** Underlayer paints the tool's colour under a texture. */
+export const UNDERLAYER_PREVIEWS: Record<string, PreviewEntry> = {
+	下塗り: {
+		effect: '質感の下に画材の色を塗り、質感を塗りと逆の明るさで重ねる。閉じた形の質感の面に添えられる。図は左が既定の点描、右が下塗りの点描。',
+		example: 'ペンの下塗りの点描の四角を置く',
+		effectEn:
+			'Paints the tool’s colour under a texture and lays the texture over it in the opposite lightness. On the textured face of a closed shape. Left: default stipple; right: underpainted stipple.',
+		exampleEn: 'Place a pen underpainted stipple square',
+		svg: surfaceSvg(
+			textureRelative(
+				'<rect x="91" y="20" width="39" height="52" fill="#2b2b2b"/>' +
+					surfaceDabs(21, 2.1, 0.75, 4.5, 91, 129, '#8a8a8a')
+			)
+		)
 	}
 };

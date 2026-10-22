@@ -4696,7 +4696,13 @@ fn fluctuation_closed_words_defaults_and_six_consumers_reach_score() {
         ("quality", "swaying", "medium", "medium", "perlin"),
         ("quality", "undulating", "medium", "medium", "wave"),
     ] {
-        let definition = fluctuation_definition(&[(dimension, id)], false, "circle");
+        // An amplitude word alone makes no sway (DDL 24), so it rides on
+        // swaying, the default quality.
+        let mut slots = vec![(dimension, id)];
+        if dimension == "amplitude" {
+            slots.push(("quality", "swaying"));
+        }
+        let definition = fluctuation_definition(&slots, false, "circle");
         let result = stage15_locked("Draw.Pair", ResolvedInstructionLanguage::En, &[definition]);
         let lowered = lower_verified_stage15_score(result.verified_effective_view(), context);
         assert_eq!(
@@ -4741,7 +4747,7 @@ fn fluctuation_closed_words_defaults_and_six_consumers_reach_score() {
 #[test]
 fn fluctuation_ordinary_literal_and_declared_macro_share_effective_score_and_owners() {
     let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
-    for (language, ordinary, caller, slots) in [
+    for (language, ordinary, caller, slots, gaps) in [
         (
             ResolvedInstructionLanguage::En,
             "place one red narrowly loosely undulating circle at left-edge.",
@@ -4751,6 +4757,7 @@ fn fluctuation_ordinary_literal_and_declared_macro_share_effective_score_and_own
                 ("frequency", "loosely"),
                 ("quality", "undulating"),
             ],
+            vec![],
         ),
         (
             ResolvedInstructionLanguage::Ja,
@@ -4761,12 +4768,18 @@ fn fluctuation_ordinary_literal_and_declared_macro_share_effective_score_and_own
                 ("frequency", "loosely"),
                 ("quality", "undulating"),
             ],
+            vec![],
         ),
+        // An amplitude word alone makes no sway (DDL 24), on every route.
         (
             ResolvedInstructionLanguage::En,
             "place one red narrowly circle at left-edge.",
             "Draw.Pair narrowly",
             vec![("amplitude", "narrowly")],
+            vec![ScoreFieldGap::FluctuationAmplitudeWithoutQuality {
+                category: "variation".into(),
+                id: "narrowly".into(),
+            }],
         ),
     ] {
         let direct = stage15(ordinary, language);
@@ -4785,10 +4798,15 @@ fn fluctuation_ordinary_literal_and_declared_macro_share_effective_score_and_own
             let lowered = lower_verified_stage15_score(result.verified_effective_view(), context);
             assert_eq!(
                 lowered.outcome(),
-                ScoreLoweringOutcome::Complete,
+                if gaps.is_empty() {
+                    ScoreLoweringOutcome::Complete
+                } else {
+                    ScoreLoweringOutcome::CompleteWithOmissions
+                },
                 "{ordinary}: {:?}",
                 lowered.gaps()
             );
+            assert_eq!(lowered.gaps(), gaps.as_slice(), "{ordinary}");
             assert_eq!(lowered.instruction_origins().len(), 1);
             assert_eq!(
                 matches!(

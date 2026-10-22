@@ -2521,7 +2521,13 @@ fn fitting(layer: &WorkPlanLayer, options: Vec<usize>, joined: &[Joined]) -> Vec
 fn weight_parts(layer: &WorkPlanLayer, background_lightness: f64) -> (f64, f64, Option<f64>) {
     let tone =
         0.3 + (lightness(attribute(layer, WorkPlanSlot::Color), 0.5) - background_lightness).abs();
-    let surface = surface_weight(attribute(layer, WorkPlanSlot::Surface));
+    // An underpainted texture (DDL 24) lays a flat paint under it, so it
+    // weighs as a flat area does.
+    let surface = if attribute(layer, WorkPlanSlot::Underlayer).is_some() {
+        surface_weight(Some("flat"))
+    } else {
+        surface_weight(attribute(layer, WorkPlanSlot::Surface))
+    };
     let fixed = if matches!(layer.action.as_str(), "fill" | "tile") {
         None
     } else {

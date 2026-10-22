@@ -1094,6 +1094,16 @@ fn record_entity_associations(
             nested_field("surface", "intensity"),
         ),
         (
+            "surface_fineness",
+            entity.surface.fineness.as_ref(),
+            nested_field("surface", "fineness"),
+        ),
+        (
+            "surface_underlayer",
+            entity.surface.underlayer.as_ref(),
+            nested_field("surface", "underlayer"),
+        ),
+        (
             "fluctuation_spread",
             entity.fluctuation.spread.as_ref(),
             nested_field("fluctuation", "spread"),

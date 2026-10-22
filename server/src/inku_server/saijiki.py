@@ -228,6 +228,29 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
         ),
     ),
     SaijikiCategory(
+        key="kime",
+        name_ja="きめ",
+        name_en="fineness",
+        # The size or the spacing of a named texture's units on a closed shape
+        # (DDL 24); like おもて it says how a mark is made, so the plugin
+        # closure never quotes it.
+        marker_class=None,
+        words=(
+            _w("細かい", "fine-grained"),
+            _w("粗い", "coarse-grained"),
+            _w("密な", "packed"),
+            _w("疎な", "sparse"),
+        ),
+    ),
+    SaijikiCategory(
+        key="shitaji",
+        name_ja="したじ",
+        name_en="underlayer",
+        # The tool's paint laid under a named texture on a closed shape (DDL 24).
+        marker_class=None,
+        words=(_w("下塗り", "underpainted"),),
+    ),
+    SaijikiCategory(
         key="ji",
         name_ja="じ",
         name_en="grounds",

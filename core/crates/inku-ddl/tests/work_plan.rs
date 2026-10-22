@@ -1036,3 +1036,152 @@ fn numeric_colors_and_fades_print_where_the_compiler_reads_them() {
         assert_eq!(scores[0].instructions, scores[1].instructions, "{ja}");
     }
 }
+
+/// The fineness and underlayer words (DDL 24) are optional plan fields named
+/// as their classes. They are offered on the closed shapes and kept only on a
+/// named texture, as an amplitude is kept only with a sway.
+#[test]
+fn texture_words_are_optional_fields_kept_on_a_named_texture() {
+    let schema = work_plan_response_schema();
+    let layer = &schema["properties"]["layers"]["items"];
+    let required = layer["required"].as_array().unwrap();
+    for (field, words) in [
+        (
+            "fineness",
+            json!([
+                "unspecified",
+                "fine_grained",
+                "coarse_grained",
+                "packed",
+                "sparse"
+            ]),
+        ),
+        ("underlayer", json!(["unspecified", "underpainted"])),
+    ] {
+        assert_eq!(layer["properties"][field]["enum"], words, "{field}");
+        assert!(!required.contains(&json!(field)), "{field}");
+    }
+    let (plan, diagnostics) = normalize_work_plan(&json!({"layers": [
+        {"shape": "circle", "action": "place", "count": 1, "surface": "stipple",
+         "fineness": "fine_grained", "underlayer": "underpainted"},
+        {"shape": "circle", "action": "place", "count": 1, "surface": "flat",
+         "fineness": "packed", "underlayer": "underpainted"},
+        {"shape": "line", "action": "draw", "count": 1, "surface": "sweep",
+         "fineness": "sparse"},
+    ]}));
+    let attribute = |layer: usize, slot: WorkPlanSlot| {
+        plan.layers[layer].attributes.get(&slot).map(String::as_str)
+    };
+    assert_eq!(attribute(0, WorkPlanSlot::Fineness), Some("fine_grained"));
+    assert_eq!(attribute(0, WorkPlanSlot::Underlayer), Some("underpainted"));
+    for (layer, slot) in [
+        (1, WorkPlanSlot::Fineness),
+        (1, WorkPlanSlot::Underlayer),
+        (2, WorkPlanSlot::Fineness),
+    ] {
+        assert_eq!(attribute(layer, slot), None, "{layer} {slot:?}");
+    }
+    let reasons: Vec<(Option<usize>, &str, &str)> = diagnostics
+        .iter()
+        .map(|diagnostic| {
+            (
+                diagnostic.layer,
+                diagnostic.field.as_str(),
+                diagnostic.reason,
+            )
+        })
+        .collect();
+    assert_eq!(
+        reasons,
+        vec![
+            (Some(1), "fineness", "requires_texture"),
+            (Some(1), "underlayer", "requires_texture"),
+            (Some(2), "fineness", "unsupported_for_form"),
+        ]
+    );
+}
+
+/// Every closed shape prints each named texture with each fineness, with the
+/// underlayer and with both, in both languages, and compiles with no
+/// diagnostic. Japanese then writes the handling after the texture, so that
+/// two attributive adjectives do not stand in a row.
+#[test]
+fn texture_words_print_and_compile_cleanly_on_every_closed_shape() {
+    let fineness: Vec<String> = work_plan_vocabulary()
+        .terms(WorkPlanSlot::Fineness)
+        .iter()
+        .map(|term| term.id.clone())
+        .collect();
+    assert_eq!(fineness.len(), 4);
+    let layer_of = |shape: &str, words: &[(WorkPlanSlot, &str)]| WorkPlanLayer {
+        shape: shape.to_owned(),
+        action: "place".to_owned(),
+        count: 1,
+        attributes: [
+            (WorkPlanSlot::Color, "red"),
+            (WorkPlanSlot::Tool, "pen"),
+            (WorkPlanSlot::Handling, "faint"),
+        ]
+        .iter()
+        .chain(words)
+        .map(|(slot, value)| (*slot, (*value).to_owned()))
+        .collect(),
+        ..WorkPlanLayer::default()
+    };
+    let mut layers = Vec::new();
+    for shape in ["circle", "ellipse", "triangle", "square", "cloudform"] {
+        for texture in [
+            "sweep",
+            "grain",
+            "stipple",
+            "hatch",
+            "crosshatch",
+            "aquatint",
+        ] {
+            let surface = (WorkPlanSlot::Surface, texture);
+            let under = (WorkPlanSlot::Underlayer, "underpainted");
+            layers.push(layer_of(shape, &[surface, under]));
+            for word in &fineness {
+                let fine = (WorkPlanSlot::Fineness, word.as_str());
+                layers.push(layer_of(shape, &[surface, fine]));
+                layers.push(layer_of(shape, &[surface, fine, under]));
+            }
+        }
+    }
+    assert_eq!(layers.len(), 5 * 6 * 9);
+    common::par_map(&layers, |layer| {
+        for language in [
+            ResolvedInstructionLanguage::Ja,
+            ResolvedInstructionLanguage::En,
+        ] {
+            let plan = WorkPlan {
+                layers: vec![layer.clone()],
+                ..WorkPlan::default()
+            };
+            let source = print_work_plan(&plan, language);
+            assert!(
+                work_plan_source_compiles_cleanly(&source, language),
+                "{language:?}: {source}"
+            );
+        }
+    });
+    let plan = WorkPlan {
+        layers: vec![layer_of(
+            "circle",
+            &[
+                (WorkPlanSlot::Surface, "stipple"),
+                (WorkPlanSlot::Fineness, "fine_grained"),
+                (WorkPlanSlot::Underlayer, "underpainted"),
+            ],
+        )],
+        ..WorkPlan::default()
+    };
+    assert_eq!(
+        print_work_plan(&plan, ResolvedInstructionLanguage::Ja),
+        "赤のペンの下塗りの細かい点描の薄い円を1個置く。"
+    );
+    assert_eq!(
+        print_work_plan(&plan, ResolvedInstructionLanguage::En),
+        "Place one red pen faint underpainted fine-grained stipple circle."
+    );
+}

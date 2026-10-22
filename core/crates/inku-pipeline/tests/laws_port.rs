@@ -16,7 +16,7 @@ mod common;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use inku_ddl::work_plan::{NumericSize, WorkPlanPlugin};
+use inku_ddl::work_plan::{NumericSize, WorkPlanPlugin, WorkPlanSlot};
 use inku_ddl::{
     MacroDefinition, MacroLock, NATURE_LEAVES_V1_JSON, NormalizedDdlDocument,
     ResolvedInstructionLanguage, ScoreLoweringOutcome,
@@ -824,4 +824,75 @@ fn the_tool_refuses_cards_it_cannot_lay() {
         refusal.ja,
         "layer 0 は並べ方（散らす・60 個）のため一つずつに分けられない。別の層を選ぶか C6 を外す"
     );
+}
+
+/// A pattern (C2) that draws its units empty leaves out the fineness and
+/// underlayer words (DDL 24), which only a named texture takes; one whose
+/// filled units keep the layer's texture keeps them. The printed document
+/// compiles cleanly either way.
+#[test]
+fn a_pattern_keeps_the_texture_words_only_with_the_texture() {
+    let fixture = fixture();
+    let definitions = definitions();
+    for (id, kept) in [("ja-12-shippo", false), ("ja-12-ichimatsu", true)] {
+        let mut case = fixture
+            .cases
+            .iter()
+            .find(|case| case.id == id)
+            .expect("the case")
+            .clone();
+        for (slot, value) in [
+            (WorkPlanSlot::Surface, "stipple"),
+            (WorkPlanSlot::Fineness, "packed"),
+            (WorkPlanSlot::Underlayer, "underpainted"),
+        ] {
+            case.composed.plan.layers[0]
+                .attributes
+                .insert(slot, value.to_owned());
+        }
+        case.source = case
+            .composed
+            .source(language(&case.lang), &work_plan_plugins(&definitions));
+        let (context, plugins, compiler) = context(&case, None, &definitions);
+        let chosen = apply_laws_without_count_rule(
+            case.answer.as_ref().expect("an answer"),
+            &context,
+            &case.composed,
+        )
+        .unwrap_or_else(|refusal| panic!("{id}: refused {refusal:?}"));
+        let rebuilt: Vec<_> = chosen
+            .print
+            .composed
+            .iter()
+            .zip(&chosen.print.plan.layers)
+            .filter(|(composed, _)| **composed == 0)
+            .map(|(_, layer)| layer)
+            .collect();
+        assert!(!rebuilt.is_empty(), "{id}");
+        for layer in rebuilt {
+            let word = |slot| layer.attributes.get(&slot).map(String::as_str);
+            if kept {
+                assert_eq!(word(WorkPlanSlot::Surface), Some("stipple"), "{id}");
+                assert_eq!(word(WorkPlanSlot::Fineness), Some("packed"), "{id}");
+                assert_eq!(word(WorkPlanSlot::Underlayer), Some("underpainted"), "{id}");
+            } else {
+                assert_eq!(word(WorkPlanSlot::Surface), Some("empty"), "{id}");
+                assert_eq!(word(WorkPlanSlot::Fineness), None, "{id}");
+                assert_eq!(word(WorkPlanSlot::Underlayer), None, "{id}");
+            }
+        }
+        let printed = chosen.print.source(language(&case.lang), &plugins);
+        let delivery = compile_committed(
+            document(&printed, language(&case.lang), &definitions),
+            &definitions,
+            &compiler,
+        )
+        .unwrap_or_else(|error| panic!("{id}: {error:?}"));
+        assert!(delivery.score.is_some(), "{id}");
+        assert!(delivery.upstream_diagnostics.is_empty(), "{id}: {printed}");
+        assert!(
+            delivery.downstream_diagnostics.is_empty(),
+            "{id}: {printed}"
+        );
+    }
 }

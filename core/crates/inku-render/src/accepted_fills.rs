@@ -21,6 +21,17 @@ fn level(instruction: &Instruction, values: [f64; 3]) -> f64 {
 }
 
 pub(crate) fn solid_fill(instruction: &Instruction) -> bool {
+    // An underpainting (下塗り, DDL 24): the tool's fill under a filled shape's
+    // named texture (render engine 89). Saved wash, bleed and paper grain keep
+    // their own path.
+    if instruction.filled
+        && instruction
+            .surface
+            .as_ref()
+            .is_some_and(|surface| crate::surfaces::is_named_texture(surface.texture))
+    {
+        return true;
+    }
     instruction.surface.as_ref().is_none_or(|surface| {
         matches!(
             surface.texture,
@@ -291,7 +302,7 @@ fn darkening_for(color: &str) -> f64 {
 }
 
 /// Each sRGB channel scaled by `factor`; a colour that is not `#rrggbb` stays as it is.
-fn darker(color: &str, factor: f64) -> String {
+pub(crate) fn darker(color: &str, factor: f64) -> String {
     let Some(channels) = hex_channels(color) else {
         return color.to_owned();
     };

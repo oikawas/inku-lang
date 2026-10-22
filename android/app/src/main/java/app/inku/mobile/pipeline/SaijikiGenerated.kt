@@ -62,6 +62,20 @@ object SaijikiGenerated {
             wordsEn = listOf("dense", "temperate", "faint"),
         ),
         Category(
+            key = "kime",
+            nameJa = "きめ",
+            nameEn = "fineness",
+            wordsJa = listOf("細かい", "粗い", "密な", "疎な"),
+            wordsEn = listOf("fine-grained", "coarse-grained", "packed", "sparse"),
+        ),
+        Category(
+            key = "shitaji",
+            nameJa = "したじ",
+            nameEn = "underlayer",
+            wordsJa = listOf("下塗り"),
+            wordsEn = listOf("underpainted"),
+        ),
+        Category(
             key = "ji",
             nameJa = "じ",
             nameEn = "grounds",

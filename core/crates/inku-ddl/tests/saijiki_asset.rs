@@ -54,7 +54,7 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
     assert!(angles.words[0].marker_surfaces_ja.is_none());
 
     assert_eq!(asset.languages, ["ja", "en"]);
-    assert_eq!(asset.categories.len(), 13);
+    assert_eq!(asset.categories.len(), 15);
     let shape = asset
         .categories
         .iter()
@@ -77,7 +77,7 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
             .iter()
             .map(|category| category.words.len())
             .sum::<usize>(),
-        96
+        101
     );
     assert_eq!(asset.relations.len(), 11);
     assert_eq!(
@@ -93,6 +93,8 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
             "tsuranari",
             "omote",
             "sabaki",
+            "kime",
+            "shitaji",
             "ji",
             "iro",
             "yuragi",
@@ -185,7 +187,7 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
         .iter()
         .map(|relation| relation.relation_type.as_str())
         .collect::<HashSet<_>>();
-    assert_eq!(category_keys.len(), 13);
+    assert_eq!(category_keys.len(), 15);
     assert_eq!(relation_types.len(), 11);
 
     let aliases = asset

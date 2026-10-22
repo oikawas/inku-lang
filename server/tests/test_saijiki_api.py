@@ -112,6 +112,12 @@ _EXPECTED_PAIRING: dict[str, tuple[tuple[str, str], ...]] = {
     # density, so a reader who must name the handling of every mark need not
     # choose dense or faint where the description says neither.
     "sabaki": (("濃い", "dense"), ("程よい", "temperate"), ("薄い", "faint")),
+    # きめ and したじ (2026-10-22, DDL 24) lay a named texture of a closed shape:
+    # the size or the spacing of its units, and the paint under it.
+    "kime": (
+        ("細かい", "fine-grained"), ("粗い", "coarse-grained"), ("密な", "packed"), ("疎な", "sparse"),
+    ),
+    "shitaji": (("下塗り", "underpainted"),),
     # じ (2026-08-14, ddl-engine 19). Seven supports and no `plain`: asking for
     # no ground is not a word you can say. 「カンバス」 and not 「キャンバス」 --
     # the web already spells the sheet's own proportion キャンバス, and one screen

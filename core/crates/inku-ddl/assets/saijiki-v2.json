@@ -109,6 +109,31 @@
       "marker_order_en": null
     },
     {
+      "key": "kime",
+      "name_ja": "きめ",
+      "name_en": "fineness",
+      "marker_class": null,
+      "words": [
+        {"surface_ja": "細かい", "surface_en": "fine-grained", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "粗い", "surface_en": "coarse-grained", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "密な", "surface_en": "packed", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "疎な", "surface_en": "sparse", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null}
+      ],
+      "marker_order_ja": null,
+      "marker_order_en": null
+    },
+    {
+      "key": "shitaji",
+      "name_ja": "したじ",
+      "name_en": "underlayer",
+      "marker_class": null,
+      "words": [
+        {"surface_ja": "下塗り", "surface_en": "underpainted", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null}
+      ],
+      "marker_order_ja": null,
+      "marker_order_en": null
+    },
+    {
       "key": "ji",
       "name_ja": "じ",
       "name_en": "grounds",

@@ -3461,6 +3461,39 @@ fn refusal_reason(output: &StepOutput) -> &str {
         .map_or("", |(_, reason)| reason)
 }
 
+/// C9 fills the layer it enlarges, so a texture's fineness word (DDL 24),
+/// which only a named texture takes, goes with the texture.
+#[test]
+fn c9_fills_a_textured_layer_without_its_texture_words() {
+    let mut textured = plan_layer("place", "square", 1, "center", "small", "red");
+    textured["surface"] = json!("stipple");
+    textured["fineness"] = json!("packed");
+    let plan = json!({"ground": "paper", "background": "white", "plugins": [], "layers": [
+        plan_layer("fill", "square", 1, "unspecified", "large", "gray"),
+        textured,
+    ]});
+    let asked = plan_answer_with(&colors_start(UNCOLORED_DESCRIPTION, None), &plan).snapshot;
+    let schema = &asked.action.as_ref().unwrap().payload["prompt"]["response_schema"];
+    assert_eq!(
+        schema["properties"]["laws"]["properties"]["C9"]["properties"]["layer"]["enum"],
+        json!([1]),
+        "{schema}"
+    );
+    let chosen = colors_answer(
+        &asked,
+        &json!({"main_law": "C9", "laws": {"C9": {"color": "red", "layer": 1, "area": "15-30",
+                "others": "keep"}}, "reason": "The red takes the canvas."}),
+    );
+    let source = committed_source(&chosen.snapshot);
+    let square = source
+        .lines()
+        .find(|line| line.contains(" red "))
+        .unwrap_or_else(|| panic!("the red square: {source}"));
+    assert!(square.contains(" flat "), "{source}");
+    assert!(!square.contains("packed"), "{source}");
+    assert!(!square.contains("stipple"), "{source}");
+}
+
 #[test]
 fn d2_holds_once_the_law_that_supports_it_is_applied() {
     // D4 lays the circle in the vivid blue the field takes, so the field is
@@ -3999,6 +4032,70 @@ fn a_saved_layer_reads_back_with_every_word_a_plan_writes() {
             .unwrap_or_else(|reason| panic!("{reason}: {source}"));
         assert_eq!(read.plan, plan, "{source}");
         assert_eq!(read.source(language, &[]), source);
+    }
+}
+
+/// A textured layer of a saved work reads back with its fineness and
+/// underlayer words (DDL 24), so the laws stage prints it again with them.
+#[test]
+fn a_saved_textured_layer_reads_back_with_its_texture_words() {
+    use inku_ddl::work_plan::{
+        WorkPlan, WorkPlanLayer, WorkPlanSlot, print_work_plan_composed_with_joints,
+    };
+    let limits = config().compiler.macro_limits().unwrap();
+    for (shape, texture, words) in [
+        (
+            "square",
+            "stipple",
+            vec![(WorkPlanSlot::Fineness, "fine_grained")],
+        ),
+        (
+            "circle",
+            "hatch",
+            vec![
+                (WorkPlanSlot::Fineness, "sparse"),
+                (WorkPlanSlot::Underlayer, "underpainted"),
+            ],
+        ),
+        (
+            "cloudform",
+            "aquatint",
+            vec![(WorkPlanSlot::Underlayer, "underpainted")],
+        ),
+    ] {
+        let layer = WorkPlanLayer {
+            shape: shape.into(),
+            proportion: None,
+            action: "place".into(),
+            count: 1,
+            attributes: [
+                (WorkPlanSlot::Color, "red"),
+                (WorkPlanSlot::Tool, "pen"),
+                (WorkPlanSlot::Handling, "faint"),
+                (WorkPlanSlot::Surface, texture),
+            ]
+            .into_iter()
+            .chain(words)
+            .map(|(slot, value)| (slot, value.to_owned()))
+            .collect(),
+        };
+        for language in [
+            inku_ddl::ResolvedInstructionLanguage::En,
+            inku_ddl::ResolvedInstructionLanguage::Ja,
+        ] {
+            let plan = WorkPlan {
+                ground: None,
+                background: Some("white".into()),
+                plugins: Vec::new(),
+                layers: vec![layer.clone()],
+            };
+            let source =
+                print_work_plan_composed_with_joints(&plan, language, &[], &[None], &[None]);
+            let read = crate::laws_entry::composed_plan_of(&source, language, &[], limits, &[])
+                .unwrap_or_else(|reason| panic!("{reason}: {source}"));
+            assert_eq!(read.plan, plan, "{source}");
+            assert_eq!(read.source(language, &[]), source);
+        }
     }
 }
 

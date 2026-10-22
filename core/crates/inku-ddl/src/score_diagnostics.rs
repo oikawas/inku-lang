@@ -75,6 +75,25 @@ pub enum ScoreFieldGap {
         category: String,
         id: String,
     },
+    /// A fineness word (きめ, DDL 24) where it says nothing: it says how a
+    /// named texture of a closed shape is laid, and the mark has none.
+    UnsupportedSurfaceFineness {
+        category: String,
+        id: String,
+    },
+    /// An underlayer word (したじ, DDL 24) where it says nothing: it lays the
+    /// tool's paint under a named texture of a closed shape, and the mark has
+    /// none.
+    UnsupportedSurfaceUnderlayer {
+        category: String,
+        id: String,
+    },
+    /// An amplitude word (細かく・大きく) without a sway word (揺れる・波打つ)
+    /// to say what sways (DDL 24). It was read as a sway of its own before.
+    FluctuationAmplitudeWithoutQuality {
+        category: String,
+        id: String,
+    },
     UnsupportedActionIdentity {
         category: String,
         id: String,
@@ -184,6 +203,8 @@ pub enum ScoreAppearanceField {
     Continuity,
     SurfaceQuality,
     SurfaceIntensity,
+    SurfaceFineness,
+    SurfaceUnderlayer,
 }
 
 /// One non-appearance instruction field that can be omitted without removing geometry.
@@ -191,6 +212,7 @@ pub enum ScoreAppearanceField {
 #[serde(rename_all = "snake_case")]
 pub enum ScoreInstructionField {
     LayoutDirection,
+    FluctuationAmplitude,
 }
 
 /// One outer macro-invocation field whose meaning is not bound into the exact body.
@@ -210,6 +232,10 @@ pub enum ScoreAppearanceResolution {
     Filled,
     PreserveExplicitSurfaceQuality,
     PreserveGeneratedValue,
+    /// Nothing takes the omitted word's place: the mark is lowered as written
+    /// without it (a fineness or underlayer word on a mark without a named
+    /// texture, DDL 24).
+    Unchanged,
 }
 
 /// Exact source or generated owner for one lowering diagnostic.

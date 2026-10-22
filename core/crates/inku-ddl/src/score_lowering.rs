@@ -251,6 +251,18 @@ fn project_source_instruction<'a>(
             .intensity
             .as_ref()
             .map(|term| (&term.identity).into()),
+        surface_fineness: instruction
+            .entity
+            .surface
+            .fineness
+            .as_ref()
+            .map(|term| (&term.identity).into()),
+        surface_underlayer: instruction
+            .entity
+            .surface
+            .underlayer
+            .as_ref()
+            .map(|term| (&term.identity).into()),
         thinness: instruction
             .entity
             .thinness
@@ -1416,6 +1428,14 @@ fn append_macro_caller_diagnostics(
             ScoreAppearanceField::SurfaceIntensity,
             instruction.entity.surface.intensity.is_some(),
         ),
+        (
+            ScoreAppearanceField::SurfaceFineness,
+            instruction.entity.surface.fineness.is_some(),
+        ),
+        (
+            ScoreAppearanceField::SurfaceUnderlayer,
+            instruction.entity.surface.underlayer.is_some(),
+        ),
     ] {
         if !present {
             continue;
@@ -1759,6 +1779,9 @@ fn project_macro_emit<'a>(
         continuity,
         surface,
         surface_intensity,
+        // A Macro emits no fineness or underlayer (DDL 24).
+        surface_fineness: None,
+        surface_underlayer: None,
         thinness: thinness.map(|identity| match identity.id {
             "fine" => CoreModifierValue::Fine,
             "extra_fine" => CoreModifierValue::ExtraFine,
@@ -4343,6 +4366,12 @@ fn appearance_field_for_gap(gap: &ScoreFieldGap) -> Option<ScoreAppearanceField>
         ScoreFieldGap::UnsupportedSurfaceIntensity { .. } => {
             Some(ScoreAppearanceField::SurfaceIntensity)
         }
+        ScoreFieldGap::UnsupportedSurfaceFineness { .. } => {
+            Some(ScoreAppearanceField::SurfaceFineness)
+        }
+        ScoreFieldGap::UnsupportedSurfaceUnderlayer { .. } => {
+            Some(ScoreAppearanceField::SurfaceUnderlayer)
+        }
         _ => None,
     }
 }
@@ -4351,6 +4380,9 @@ fn instruction_field_for_gap(gap: &ScoreFieldGap) -> Option<ScoreInstructionFiel
     match gap {
         ScoreFieldGap::UnsupportedLayoutDirection { .. } => {
             Some(ScoreInstructionField::LayoutDirection)
+        }
+        ScoreFieldGap::FluctuationAmplitudeWithoutQuality { .. } => {
+            Some(ScoreInstructionField::FluctuationAmplitude)
         }
         _ => None,
     }
@@ -4363,12 +4395,15 @@ fn omit_appearance_field(input: &mut ScoreLoweringInput<'_>, field: ScoreAppeara
         ScoreAppearanceField::Continuity => input.continuity = None,
         ScoreAppearanceField::SurfaceQuality => input.surface = None,
         ScoreAppearanceField::SurfaceIntensity => input.surface_intensity = None,
+        ScoreAppearanceField::SurfaceFineness => input.surface_fineness = None,
+        ScoreAppearanceField::SurfaceUnderlayer => input.surface_underlayer = None,
     }
 }
 
 fn omit_instruction_field(input: &mut ScoreLoweringInput<'_>, field: ScoreInstructionField) {
     match field {
         ScoreInstructionField::LayoutDirection => input.layout_direction = None,
+        ScoreInstructionField::FluctuationAmplitude => input.fluctuation[0] = None,
     }
 }
 
@@ -4385,6 +4420,14 @@ fn default_resolution(
             ScoreAppearanceResolution::PreserveExplicitSurfaceQuality
         }
         ScoreAppearanceField::SurfaceIntensity => ScoreAppearanceResolution::Filled,
+        ScoreAppearanceField::SurfaceFineness | ScoreAppearanceField::SurfaceUnderlayer
+            if surface_quality_survives =>
+        {
+            ScoreAppearanceResolution::PreserveExplicitSurfaceQuality
+        }
+        ScoreAppearanceField::SurfaceFineness | ScoreAppearanceField::SurfaceUnderlayer => {
+            ScoreAppearanceResolution::Unchanged
+        }
     }
 }
 
@@ -4526,6 +4569,12 @@ fn source_span_for_gap(
             .layout_direction
             .as_ref()
             .map(|term| term.provenance.source.span),
+        ScoreFieldGap::FluctuationAmplitudeWithoutQuality { .. } => instruction
+            .entity
+            .fluctuation
+            .amplitude
+            .as_ref()
+            .map(|term| term.provenance.source.span),
         _ => None,
     }
     .unwrap_or(instruction.entity.head.source().span)
@@ -4541,6 +4590,8 @@ fn source_span_for_appearance(
         ScoreAppearanceField::Continuity => instruction.entity.continuity.as_ref(),
         ScoreAppearanceField::SurfaceQuality => instruction.entity.surface.quality.as_ref(),
         ScoreAppearanceField::SurfaceIntensity => instruction.entity.surface.intensity.as_ref(),
+        ScoreAppearanceField::SurfaceFineness => instruction.entity.surface.fineness.as_ref(),
+        ScoreAppearanceField::SurfaceUnderlayer => instruction.entity.surface.underlayer.as_ref(),
     }
     .map(|term| term.provenance.source.span)
 }
@@ -4670,6 +4721,8 @@ fn macro_key_for_appearance(field: ScoreAppearanceField) -> Option<&'static str>
         ScoreAppearanceField::Continuity => Some("continuity"),
         ScoreAppearanceField::SurfaceQuality => Some("surface"),
         ScoreAppearanceField::SurfaceIntensity => Some("surface_intensity"),
+        // A Macro emits no fineness or underlayer (DDL 24).
+        ScoreAppearanceField::SurfaceFineness | ScoreAppearanceField::SurfaceUnderlayer => None,
     }
 }
 
@@ -4777,6 +4830,12 @@ struct ScoreLoweringInput<'a> {
     continuity: Option<SemanticInputIdentity<'a>>,
     surface: Option<SemanticInputIdentity<'a>>,
     surface_intensity: Option<SemanticInputIdentity<'a>>,
+    /// A fineness word (きめ, DDL 24): the size or the spacing of a named
+    /// texture's units on a closed shape.
+    surface_fineness: Option<SemanticInputIdentity<'a>>,
+    /// An underlayer word (したじ, DDL 24): the tool's paint under a named
+    /// texture on a closed shape.
+    surface_underlayer: Option<SemanticInputIdentity<'a>>,
     thinness: Option<CoreModifierValue>,
     action: Option<SemanticInputIdentity<'a>>,
     numeric_position: Option<&'a SemanticNumericPosition>,
@@ -6217,6 +6276,8 @@ fn resolve_complete_object<'a>(
             None => (closes_area, None),
         }
     };
+    let (filled, surface) =
+        lay_texture_words(input, primitive, arc_form, filled, surface, &mut gaps);
     let surface_intensity = match input.surface_intensity {
         None => SurfaceIntensity::Normal,
         Some(identity)
@@ -6402,6 +6463,16 @@ fn resolve_complete_object<'a>(
             None
         }
     };
+    // An amplitude word without a sway word (DDL 24) is left out with its own
+    // reason, and the rest of the mark is lowered again without it.
+    if let Some(amplitude) = input.fluctuation[0]
+        && input.fluctuation[2].is_none()
+    {
+        gaps.push(ScoreFieldGap::FluctuationAmplitudeWithoutQuality {
+            category: amplitude.category.to_owned(),
+            id: amplitude.id.to_owned(),
+        });
+    }
     let variation = if input
         .fluctuation
         .iter()
@@ -6739,6 +6810,88 @@ fn lower_segment_geometry(ends: [Rational; 4]) -> Result<LoweredGeometry, ScoreF
         angle_end: None,
         at: None,
     })
+}
+
+/// What a fineness word (きめ, DDL 24) sets on a named texture: its scale (the
+/// size of each unit, the area it covers kept) or its density (how many units).
+/// The values are the strengths the author chose from the second trial
+/// (2026-10-22).
+enum TextureFineness {
+    Scale(f64),
+    Density(f64),
+}
+
+fn texture_fineness(id: &str) -> Option<TextureFineness> {
+    match id {
+        "fine_grained" => Some(TextureFineness::Scale(0.05)),
+        "coarse_grained" => Some(TextureFineness::Scale(0.90)),
+        "packed" => Some(TextureFineness::Density(0.85)),
+        "sparse" => Some(TextureFineness::Density(0.05)),
+        _ => None,
+    }
+}
+
+/// Lay the fineness and underlayer words (DDL 24) on a named texture of a
+/// closed shape: a fineness sets the texture's scale or density, and an
+/// underlayer lays the tool's paint under it. On any other mark the word says
+/// nothing, so only that word is left out and the mark is drawn as written.
+fn lay_texture_words(
+    input: ScoreLoweringInput<'_>,
+    primitive: Primitive,
+    arc_form: Option<inku_score::ArcForm>,
+    filled: bool,
+    mut surface: Option<SurfaceSpec>,
+    gaps: &mut Vec<ScoreFieldGap>,
+) -> (bool, Option<SurfaceSpec>) {
+    let lays_texture = arc_form.is_none()
+        && matches!(
+            primitive,
+            Primitive::Circle
+                | Primitive::Ellipse
+                | Primitive::Square
+                | Primitive::Triangle
+                | Primitive::Polygon
+                | Primitive::Cloudform
+        )
+        && surface.as_ref().is_some_and(|spec| {
+            matches!(
+                spec.texture,
+                SurfaceTexture::Sweep
+                    | SurfaceTexture::Grain
+                    | SurfaceTexture::Stipple
+                    | SurfaceTexture::Hatch
+                    | SurfaceTexture::Crosshatch
+                    | SurfaceTexture::Aquatint
+            )
+        });
+    if let Some(identity) = input.surface_fineness {
+        match (
+            identity.category,
+            texture_fineness(identity.id),
+            surface.as_mut(),
+        ) {
+            ("fineness", Some(fineness), Some(spec)) if lays_texture => match fineness {
+                TextureFineness::Scale(scale) => spec.scale = scale,
+                TextureFineness::Density(density) => spec.density = density,
+            },
+            _ => gaps.push(ScoreFieldGap::UnsupportedSurfaceFineness {
+                category: identity.category.to_owned(),
+                id: identity.id.to_owned(),
+            }),
+        }
+    }
+    let mut filled = filled;
+    if let Some(identity) = input.surface_underlayer {
+        if lays_texture && identity.category == "underlayer" && identity.id == "underpainted" {
+            filled = true;
+        } else {
+            gaps.push(ScoreFieldGap::UnsupportedSurfaceUnderlayer {
+                category: identity.category.to_owned(),
+                id: identity.id.to_owned(),
+            });
+        }
+    }
+    (filled, surface)
 }
 
 fn surface_spec_from_identity(

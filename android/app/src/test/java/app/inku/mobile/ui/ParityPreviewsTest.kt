@@ -18,6 +18,23 @@ class ParityPreviewsTest {
         assertEquals("鉛筆の薄い点描の四角を置く", enUiJapaneseDdl.example)
         assertNotEquals(saijikiPreview("omote", "粒", "grain", UiLanguage.En, "en").svg,
             saijikiPreview("omote", "点描", "stipple", UiLanguage.En, "en").svg)
+        val textureWords = listOf("細かい" to "fine-grained", "粗い" to "coarse-grained", "密な" to "packed",
+            "疎な" to "sparse", "下塗り" to "underpainted")
+        val diagrams = textureWords.map { (word, english) ->
+            val key = if (word == "下塗り") "shitaji" else "kime"
+            val ja = saijikiPreview(key, word, english, UiLanguage.Ja, "en")
+            val en = saijikiPreview(key, word, word, UiLanguage.En, "ja")
+            assertTrue(ja.effect.contains("質感"))
+            assertEquals("Place a pen $english stipple square", ja.example)
+            assertTrue(en.effect.contains("texture"))
+            val japaneseExample = if (word == "下塗り") "ペンの下塗りの点描の四角を置く" else "ペンの${word}点描の四角を置く"
+            assertEquals(japaneseExample, en.example)
+            assertEquals("the diagram is shared across languages", ja.svg, en.svg)
+            assertTrue("$word has a surface comparison", ja.svg.contains("surface-clip") && ja.svg.contains("M90 20 V72"))
+            ja.svg
+        }
+        assertEquals("each texture word has its own diagram", 5, diagrams.toSet().size)
+        assertTrue("underpainted texture draws light marks over the tool colour", diagrams.last().contains("fill=\"#8a8a8a\""))
     }
 
     @Test fun recommendationUsesPurposeAndFallsBackToLegacyLevel() {

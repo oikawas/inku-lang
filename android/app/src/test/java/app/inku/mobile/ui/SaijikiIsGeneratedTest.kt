@@ -2,6 +2,7 @@ package app.inku.mobile.ui
 
 import app.inku.mobile.pipeline.SaijikiGenerated
 import app.inku.mobile.ui.i18n.UiLanguage
+import app.inku.mobile.ui.theme.*
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -40,16 +41,17 @@ class SaijikiIsGeneratedTest {
      * (fourteen categories and 98 words since Saijiki v2 added さばき and took
      * 濃い and 薄い out of おもて, 102 since DDL 18 added 載る, 中に, 重なる and
      * 横切る to あいだ on 2026-10-12, and 103 since 自由線 joined かたち on
-     * 2026-10-15);
+     * 2026-10-15; sixteen categories and 108 words since DDL 24 added
+     * きめ / fineness and したじ / underlayer on 2026-10-22);
      * they move when the server's table does, and the generator is the check
      * that the Kotlin copy followed.
      */
     @Test
-    fun testScreenShowsFourteenCategoriesAndOneHundredThreeWordsInBothLanguages() {
+    fun testScreenShowsSixteenCategoriesAndOneHundredEightWordsInBothLanguages() {
         for (lang in UiLanguage.entries) {
             val groups = saijikiGroups(lang)
-            assertEquals("$lang: display categories", 14, groups.size)
-            assertEquals("$lang: display words", 103, groups.sumOf { it.words.size })
+            assertEquals("$lang: display categories", 16, groups.size)
+            assertEquals("$lang: display words", 108, groups.sumOf { it.words.size })
         }
     }
 
@@ -63,7 +65,7 @@ class SaijikiIsGeneratedTest {
     fun testTheWordsTheHandCopyCouldNotReachAreOnTheScreen() {
         val ja = saijikiGroups(UiLanguage.Ja)
         val words = ja.flatMap { it.words }
-        for (word in listOf("雲形", "銀筆", "黄", "橙", "紫", "敷き詰める")) {
+        for (word in listOf("雲形", "銀筆", "黄", "橙", "紫", "敷き詰める", "細かい", "粗い", "密な", "疎な", "下塗り")) {
             assertTrue("missing from the screen: $word", word in words)
         }
         val aida = ja.firstOrNull { it.key == "aida" }
@@ -142,7 +144,7 @@ class SaijikiIsGeneratedTest {
             val words = saijikiDetectionWords(lang).map { it.first }.toSet()
             assertTrue("$lang: does not recognise the Japanese 円", "円" in words)
             assertTrue("$lang: does not recognise the English circle", "circle" in words)
-            assertEquals("$lang: detection surfaces", 206, words.size)
+            assertEquals("$lang: detection surfaces", 216, words.size)
         }
     }
 
@@ -158,5 +160,15 @@ class SaijikiIsGeneratedTest {
     fun testEveryCategoryHasItsOwnColour() {
         val colors = SaijikiGenerated.CATEGORIES.indices.map { saijikiGroupColorAt(it) }
         assertEquals("one colour per category", SaijikiGenerated.CATEGORIES.size, colors.toSet().size)
+        val previousColoursAfterHandling = mapOf(
+            "ji" to SaijikiGroupAmber, "iro" to SaijikiGroupSlate,
+            "yuragi" to SaijikiGroupBlossom, "basho" to SaijikiGroupMoss,
+            "ugoki" to SaijikiGroupShell, "jun" to SaijikiGroupMist,
+            "wariai" to SaijikiGroupLemon, "aida" to SaijikiGroupPeach,
+        )
+        for ((key, color) in previousColoursAfterHandling) {
+            val index = SaijikiGenerated.CATEGORIES.indexOfFirst { it.key == key }
+            assertEquals("$key keeps its previous colour", color, saijikiGroupColorAt(index))
+        }
     }
 }

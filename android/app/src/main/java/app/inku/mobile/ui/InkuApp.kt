@@ -419,23 +419,17 @@ private val saijikiGroupColors = listOf(
     SaijikiGroupClay,
     SaijikiGroupIris,
     SaijikiGroupMint,
+    // きめ / fineness and したじ / underlayer follow さばき in the generated table.
+    // Inserting their colours here preserves every existing category's colour.
+    SaijikiGroupLilac,
+    SaijikiGroupFlax,
     SaijikiGroupAmber,
     SaijikiGroupSlate,
     SaijikiGroupBlossom,
     SaijikiGroupMoss,
-    // The eleventh, for おもて / surfaces (ddl-engine 15). The lookup is
-    // `[index % size]`, so a list one short takes the first colour again
-    // instead of failing.
     SaijikiGroupShell,
-    // The twelfth, for じ / grounds (ddl-engine 19). Same reason -- and this is
-    // the case the comment above was written for: the category was added and
-    // the pill for it came out the colour of かたち until this line existed.
     SaijikiGroupMist,
-    // The thirteenth, for あいだ / relations. It was added to the generated
-    // table after the twelfth, and its pills took かたち's colour again.
     SaijikiGroupLemon,
-    // The fourteenth, for さばき / handling (Saijiki v2). It sits after おもて in
-    // the table, so the categories after it move one colour along.
     SaijikiGroupPeach,
 )
 

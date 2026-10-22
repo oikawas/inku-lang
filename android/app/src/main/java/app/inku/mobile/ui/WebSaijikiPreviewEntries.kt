@@ -1,7 +1,32 @@
 package app.inku.mobile.ui
 
-/** Built-in preview copy and SVGs from web/src/routes/+page.svelte's saijikiPreview table. */
+/** Web's saijikiPreview and saijiki-surface.ts copy, with texture SVG recipes in ParityPreviews. */
 internal val webSaijikiPreviewEntries: Map<String, PreviewEntry> = mapOf(
+    "細かい" to PreviewEntry(
+        "質感の点や線を小さくし、その分だけ数を増やす（覆う広さは変えない）。閉じた形の質感の面に添えられる。図は左が既定の点描、右が細かい点描。", "ペンの細かい点描の四角を置く",
+        "Makes a texture’s dots or lines smaller and lays more of them, covering the same area. On the textured face of a closed shape. Left: default stipple; right: fine-grained stipple.", "Place a pen fine-grained stipple square",
+        finenessPreviewSvg(84, 2.1 * 0.5),
+    ),
+    "粗い" to PreviewEntry(
+        "質感の点や線を大きくし、その分だけ数を減らす（覆う広さは変えない）。閉じた形の質感の面に添えられる。図は左が既定の点描、右が粗い点描。", "ペンの粗い点描の四角を置く",
+        "Makes a texture’s dots or lines larger and lays fewer of them, covering the same area. On the textured face of a closed shape. Left: default stipple; right: coarse-grained stipple.", "Place a pen coarse-grained stipple square",
+        finenessPreviewSvg(5, 2.1 * 2),
+    ),
+    "密な" to PreviewEntry(
+        "質感の点や線を詰めて、数を増やして置く。閉じた形の質感の面に添えられる。図は左が既定の点描、右が密な点描。", "ペンの密な点描の四角を置く",
+        "Lays a texture’s dots or lines closer together, more of them. On the textured face of a closed shape. Left: default stipple; right: packed stipple.", "Place a pen packed stipple square",
+        finenessPreviewSvg(84, 2.1),
+    ),
+    "疎な" to PreviewEntry(
+        "質感の点や線の間を空けて、数を減らして置く。閉じた形の質感の面に添えられる。図は左が既定の点描、右が疎な点描。", "ペンの疎な点描の四角を置く",
+        "Lays a texture’s dots or lines farther apart, fewer of them. On the textured face of a closed shape. Left: default stipple; right: sparse stipple.", "Place a pen sparse stipple square",
+        finenessPreviewSvg(5, 2.1),
+    ),
+    "下塗り" to PreviewEntry(
+        "質感の下に画材の色を塗り、質感を塗りと逆の明るさで重ねる。閉じた形の質感の面に添えられる。図は左が既定の点描、右が下塗りの点描。", "ペンの下塗りの点描の四角を置く",
+        "Paints the tool’s colour under a texture and lays the texture over it in the opposite lightness. On the textured face of a closed shape. Left: default stipple; right: underpainted stipple.", "Place a pen underpainted stipple square",
+        underlayerPreviewSvg(),
+    ),
     "円" to PreviewEntry("正円を描く。中心と半径で配置される。", "中心に黒い円を置く", "Draws a true circle, placed by its center and radius.", "Place a black circle at center", "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><circle cx=\"90\" cy=\"46\" r=\"25\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"5\"/></svg>"),
     "楕円" to PreviewEntry("横または縦に伸びた円を描く。", "横長の楕円を置く", "Draws a circle stretched along one axis.", "Place a wide ellipse", "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><ellipse cx=\"90\" cy=\"46\" rx=\"42\" ry=\"22\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"5\"/></svg>"),
     "三角" to PreviewEntry("三つの頂点を持つ形を描く。", "上に三角を置く", "Draws a form with three vertices.", "Place a triangle at the top", "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M90 20 L132 70 L48 70 Z\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"5\" stroke-linejoin=\"round\"/></svg>"),

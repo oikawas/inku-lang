@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-22 — Add fineness and underlayer explanations and previews to Android's Saijiki
+
+Fine-grained, coarse-grained, packed, sparse and underpainted now show Web's Japanese and English explanations, example instructions and comparison drawings. Two group colors follow handling, restoring the earlier color assignments of the groups after it. The screen shows 16 groups and 108 words, and recognizes 216 words across both languages. Drawing semantics stay in the shared core.
+
 ### 2026-10-21 — Align Android's laws and color checks with the shared core without a main layer
 
 Android's test answers no longer choose a main layer for laws, and D5 names its target layer in the color answer. The checks ensure a null main layer remains present through the laws records and autonomous refinement's edge record. The shared core owns these decisions, including choosing a ground when the description names no ground color. Existing records keep their stored layer numbers.

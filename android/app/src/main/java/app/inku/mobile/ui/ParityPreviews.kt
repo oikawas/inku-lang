@@ -52,7 +52,7 @@ private fun surfaceSvg(interior: String): String = shapeSvg(
 )
 
 // The stable scatter is the same index hash as Web's saijiki-surface.ts.
-private fun surfaceDabs(count: Int, radius: Double, opacity: Double, salt: Double, x0: Int = 51, x1: Int = 129): String = buildString {
+private fun surfaceDabs(count: Int, radius: Double, opacity: Double, salt: Double, x0: Int = 51, x1: Int = 129, fill: String = INK): String = buildString {
     fun number(value: Double, places: Int) = String.format(Locale.ROOT, "%.${places}f", value)
     for (i in 0 until count) {
         fun hash(n: Double): Double {
@@ -63,7 +63,7 @@ private fun surfaceDabs(count: Int, radius: Double, opacity: Double, salt: Doubl
         val cy = 21 + hash(78.233) * 50
         val r = radius * (0.6 + hash(37.719) * 0.8)
         val a = opacity * (0.5 + hash(19.31) * 0.5)
-        append("<circle cx=\"${number(cx, 1)}\" cy=\"${number(cy, 1)}\" r=\"${number(r, 2)}\" fill=\"$INK\" opacity=\"${number(a, 2)}\"/>")
+        append("<circle cx=\"${number(cx, 1)}\" cy=\"${number(cy, 1)}\" r=\"${number(r, 2)}\" fill=\"$fill\" opacity=\"${number(a, 2)}\"/>")
     }
 }
 
@@ -79,6 +79,19 @@ private fun handlingRelative(opacity: Double): String =
     surfaceDabs(21, 2.1, 0.66, 4.5, 51, 89) +
         surfaceDabs(21, 2.1, opacity, 4.5, 91, 129) +
         "<path d=\"M90 20 V72\" stroke=\"#d7d1c4\" stroke-width=\"1.5\"/>"
+
+private fun textureRelative(right: String): String =
+    surfaceDabs(21, 2.1, 0.66, 4.5, 51, 89) + right +
+        "<path d=\"M90 20 V72\" stroke=\"#d7d1c4\" stroke-width=\"1.5\"/>"
+
+/** Web's comparison drawings, using the same default stipple on the left. */
+internal fun finenessPreviewSvg(count: Int, radius: Double): String =
+    surfaceSvg(textureRelative(surfaceDabs(count, radius, 0.66, 4.5, 91, 129)))
+
+internal fun underlayerPreviewSvg(): String = surfaceSvg(textureRelative(
+    "<rect x=\"91\" y=\"20\" width=\"39\" height=\"52\" fill=\"$INK\"/>" +
+        surfaceDabs(21, 2.1, 0.75, 4.5, 91, 129, "#8a8a8a"),
+))
 
 /** Exact surface and handling copy and diagram recipes from the Web preview table. */
 private val surfaceAndHandling: Map<String, PreviewEntry> by lazy {

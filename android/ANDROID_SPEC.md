@@ -4,7 +4,11 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-10-21.
+Last updated: 2026-10-22.
+
+## 2026-10-22 Saijiki fineness and underlayer
+
+Following the generated Saijiki's 16 groups and 108 words, the four fineness words (fine-grained, coarse-grained, packed and sparse) and underpainted show Web's Japanese and English explanations, example DDL and comparison drawings. Explanations follow the UI language and examples the DDL language. Each drawing has default stipple on the left and the selected word's effect on the right; underpainted lays light dots over the tool's color. Two group colors are inserted for fineness and underlayer, preserving the earlier colors of the existing groups after handling. Word meanings, targets and rendering follow the shared core's DDL 24 and render engine 89, with no Android semantics or changes to the generated table.
 
 ## 2026-10-21 Move autonomous refinement to the shared core's laws and juxtaposition moves
 

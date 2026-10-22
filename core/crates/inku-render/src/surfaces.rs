@@ -854,7 +854,9 @@ fn render_vectors(
                                 (opacity * sweep_opacity * SURFACE_SWEEP_PASS_FACTOR).min(1.0),
                             ),
                         );
-                    if context.use_filters {
+                    // A mechanical pen lays its passes as lines, which Skia gives no
+                    // bounds for a filter; they stay unfiltered, as its sweeps were.
+                    if context.use_filters && uses_hand_stroke(instruction.weight) {
                         pass.set_attr(
                             "filter",
                             format!("url(#{})", sweep_bleed_filter_id(context)),
@@ -1110,7 +1112,7 @@ pub(crate) fn render_surface(
     } else if surface.texture == SurfaceTexture::Sweep {
         // 刷き stays inside its contour, cut as roughly as the tool's own edge
         // (render engine 90; its bands crossed the outline).
-        if context.use_filters {
+        if context.use_filters && uses_hand_stroke(instruction.weight) {
             definitions.push(sweep_bleed_filter(instruction, context));
         }
         let mut inside = Element::new("g").attr("class", "surface-sweep-inside-v1");

@@ -272,6 +272,8 @@ The reference dictionary is called **Saijiki**（歳時記）— a word borrowed
 | continuity | つらなり | solid, dashed, dotted, dash-dot |
 | surfaces | おもて | empty, flat, sweep, grain, stipple, hatch, crosshatch, aquatint |
 | handling | さばき | dense, temperate, faint |
+| fineness | きめ | fine-grained, coarse-grained, packed, sparse |
+| underlayer | したじ | underpainted |
 | grounds | じ | paper, washi, ink wash ground, charcoal ground, canvas, drawing paper, mezzotint |
 | colors | いろ | white, black, blue, red, green, gray, yellow, orange, purple |
 | movements | ゆらぎ | narrowly, broadly, loosely, tightly, swaying, undulating, bleeding |
@@ -281,7 +283,7 @@ The reference dictionary is called **Saijiki**（歳時記）— a word borrowed
 | proportions | わりあい | tall, wide, full-width, half-width, semicircle, waxing, waning, crescent |
 | relations | あいだ | along, not touching, cutting, between, touching, connected, resting on, inside, overlaps, crossing, mirrored (used as "along the previous line," "resting on the previous shape" or "mirrored with the previous shape") |
 
-Surfaces name the inside of a closed shape or the way a mark sits; handling names how the ink is laid on any mark; grounds name the canvas itself, the support. A ground is written as a sentence of its own, such as "Washi." Words from registered plugins (for the bundled `Nature.leaves`, words such as "YoungLeaves" and "FallenLeaves") appear in the Saijiki in the same way as the core words.
+Surfaces name the inside of a closed shape or the way a mark sits; handling names how the ink is laid on any mark; fineness and underlayer name how the texture of a closed shape is laid (the size and spacing of its dots or lines, and the fill beneath it); grounds name the canvas itself, the support. A ground is written as a sentence of its own, such as "Washi." Words from registered plugins (for the bundled `Nature.leaves`, words such as "YoungLeaves" and "FallenLeaves") appear in the Saijiki in the same way as the core words.
 
 The source of truth for the vocabulary is the Saijiki definition held by the shared core (`core/crates/inku-ddl/assets/saijiki-v2.json`). The table above lists the words the app's Saijiki displays; `inku-cli reference --md` produces a machine-generated listing at any time.
 

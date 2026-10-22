@@ -129,12 +129,12 @@ line behavior, color, weight, and negative space.
 
 ### 3.1 What Belongs in the Core
 
-The core vocabulary is the eleven Saijiki categories plus **relations** (あいだ).
+The core vocabulary is the fifteen Saijiki categories plus **relations** (あいだ).
 The vocabulary dictionary is called Saijiki, following the haiku term for a
 seasonal word dictionary.  In inku, Saijiki is consulted rather than kept open
 at all times.
 
-The core vocabulary consists of thirteen Saijiki categories plus relations. Its source of truth is the shared Rust asset `core/crates/inku-ddl/assets/saijiki-v2.json`; the Server Saijiki table and Web / Android displays follow the same vocabulary. The machine-generated reference dump (`GET /api/reference` / `inku-cli reference`) publishes the current values; the table below is an overview, and reference §1 decides additions and removals.
+The core vocabulary consists of fifteen Saijiki categories plus relations. Its source of truth is the shared Rust asset `core/crates/inku-ddl/assets/saijiki-v2.json`; the Server Saijiki table and Web / Android displays follow the same vocabulary. The machine-generated reference dump (`GET /api/reference` / `inku-cli reference`) publishes the current values; the table below is an overview, and reference §1 decides additions and removals.
 
 | English | Japanese | Vocabulary |
 | --- | --- | --- |
@@ -143,6 +143,8 @@ The core vocabulary consists of thirteen Saijiki categories plus relations. Its 
 | continuity | つらなり | solid, dashed, dotted, dash-dot |
 | surfaces | おもて | empty, flat, sweep, grain, stipple, hatch, crosshatch, aquatint |
 | handling | さばき | dense, temperate, faint |
+| fineness | きめ | fine-grained, coarse-grained, packed, sparse (DDL 24) |
+| underlayer | したじ | underpainted (DDL 24) |
 | grounds | じ | paper, washi, ink-wash ground, charcoal ground, canvas, drawing paper, mezzotint |
 | motions | うごき | place, line-up, draw, scatter, fill, tile |
 | order | じゅん | alternating, in order |
@@ -187,7 +189,13 @@ Canvas format is neither vocabulary nor a plugin. It is a resolved host option o
   "swaying violently" are excluded (§13 has the detail). Narrowly and broadly
   set how far a mark sways, loosely and tightly how far apart its waves are
   (how many waves it has). English amplitude words are adverbs only (`narrowly`,
-  `broadly`), apart from the relative size `large` (Saijiki v2, DDL 16)
+  `broadly`), apart from the relative size `large` (Saijiki v2, DDL 16). An
+  amplitude word goes with a word that says what sways (swaying, undulating):
+  without one, narrowly or broadly makes no sway, and a diagnostic
+  (`fluctuation_amplitude_without_quality`) leaves out that word alone (DDL
+  engine 68; until then it was read silently as the default irregular sway, and
+  the circle of 「細かく点描の円」 swayed). The reading of loosely and tightly
+  does not change
 - **the relations category holds observable relations only**: "along" and "not
   touching" are positional relations an outside observer can verify. Words of
   intent or personification, such as "nestling against" or "answering each
@@ -211,7 +219,8 @@ Canvas format is neither vocabulary nor a plugin. It is a resolved host option o
   shape, an explicit sweep, grain, stipple, hatch, crosshatch, or aquatint is
   itself the area's performance and adds no flat base fill beneath it (DDL
   engine 46). A flat fill comes only from an explicit flat surface or the
-  omitted-surface default of a closed shape. Current
+  omitted-surface default of a closed shape, except that a texture with the
+  underlayer word underpainted lays the tool's fill beneath it (DDL 24). Current
   bleeding is independent movement vocabulary, not a surface quality. An
   instruction to fill the background is not about a surface** either; it goes to
   the document-owned `background` field. The finite form is `fill [the]
@@ -254,7 +263,7 @@ whole canvas as the range of a line-up, scatter, or tile (§18). Explicit
 positions take priority, and an explicit `center` uses the middle cell as its
 range. `inku.geometry-resolution-policy.v1` records omitted
 placement and fill meaning; its current digest is
-`0567c999cfa0c5d25e8bfe65a3bd50808c7cad550273a9bb2461c0e74380d4da`.
+`5eea7780c4358eeeece030ea713530551005290fb1614effdb741b0117cf308d`.
 Single objects, Macros, and coordinated groups share the omitted range: the
 shrunk middle cell for place and draw, and the whole canvas for a line-up,
 scatter, or tile. Fill's omitted target is also the whole canvas. A valid ground alone is
@@ -277,6 +286,24 @@ saving or delivering an empty Score with its background as an omitted success.
   the response type, 2026-09-30): left optional, the reader skipped it on about
   half of the layers and dropped the faintness a description stated. Words for the movement of
   the brush, such as its speed, may join this category (§2 item 5)
+- **the fineness and underlayer categories name how a texture is laid** (DDL
+  24, the author's decision, 2026-10-22): fineness has four words (Japanese
+  細かい, 粗い, 密な, 疎な; English `fine-grained`, `coarse-grained`, `packed`,
+  `sparse`). Fine-grained and coarse-grained set the size of one dot or line of
+  the texture without changing the area it covers (the Score's `scale` 0.05 and
+  0.90); packed and sparse set how closely dots or lines of the same size lie
+  (`density` 0.85 and 0.05). Underlayer has one word, underpainted (下塗り),
+  which lays the tool's fill beneath the texture (`filled`). Both go only on a
+  named texture (sweep, grain, stipple, hatch, crosshatch, aquatint) of a closed
+  shape (circle, ellipse, triangle, square, polygon, cloudform). On any other
+  mark (a line, an arc, a free line, a point) or on empty, flat, or a surface
+  with no texture, a diagnostic (`unsupported_surface_fineness`,
+  `unsupported_surface_underlayer`) leaves out that word alone, and the rest of
+  the sentence draws as it would without it. A mark takes one word of each
+  category; two words of one category conflict and both are left out (as two
+  handling words do). Marks a Macro emits do not take them. No words for the
+  direction of hatching are added, since no natural word avoids the angle words
+  (the author's decision, 2026-10-22)
 - **the grounds category holds the names of supports** (added 2026-08-15, render
   engine 34): **paper, washi, ink-wash ground, charcoal ground, canvas, drawing
   paper, mezzotint** -- the seven values of `canvas.ground.material`. **Where
@@ -411,7 +438,13 @@ words each draw a distinct face inside the same contour; only empty leaves it
 unmarked. Sweep shows two passes, each at 0.5 of the tool opacity. Bilingual
 handling previews compare the same pencil stipple: temperate on the left,
 dense, temperate or faint on the right, relative to that tool. Mark counts and
-positions stay fixed so density is not confused with opacity. These are
+positions stay fixed so density is not confused with opacity. The four
+fineness words and underpainted also compare the same stipple, the default on
+the left (render engine 89's factors): fine-grained lays dots of half the size,
+four times as many, and coarse-grained dots of twice the size, a quarter as
+many (the same cover); packed and sparse lay dots of the same size, four times
+and a quarter as many. Underpainted paints the tool's colour on the right and
+lays the dots over it 45% toward white, twice as strong (up to 0.75). These are
 explanatory drawings and do not change performances of saved Scores.
 
 - **Draw what is written**: every word of the visible DDL is drawn as written.
@@ -1058,8 +1091,8 @@ name.
 
 **Category structure**
 
-Saijiki displays 13 categories — forms, angles, touches, continuity, surfaces,
-grounds, colors, movements, places, motions, order, proportions, relations — together with the qualified
+Saijiki displays 16 categories — forms, angles, touches, continuity, surfaces,
+handling, fineness, underlayer, grounds, colors, movements, places, motions, order, proportions, relations — together with the qualified
 words of any loaded plugin.  The current values of the vocabulary are given by
 the §3.1 table and by reference §1, and the web Saijiki display is served from
 that same saijiki table (v1.92: `GET /api/saijiki` plus a synchronized store over
@@ -1067,8 +1100,8 @@ the snapshot bundled into the build).
 
 The Japanese category names are written in hiragana.  Kanji is stiff; hiragana
 lowers the threshold of writing.  The English category names are forms / angles /
-touches / continuity / **surfaces** / **grounds** / colors / movements / places / motions /
-order / proportions / relations.
+touches / continuity / **surfaces** / handling / fineness / underlayer / **grounds** / colors /
+movements / places / motions / order / proportions / relations.
 
 **Placement policy**
 
@@ -1775,7 +1808,13 @@ the Saijiki asset, the parser's finite modifier forms, the fluctuation
 classifier, and the Score intensity values. A value is its word's English as
 written (spaces and hyphens become `_`), and field names say their meaning
 (`position`, `handling`, `motion_spacing`, and so on; the underdrawing type
-`inku.work-plan.v2`, Saijiki v2). The values each form (with its
+`inku.work-plan.v2`, Saijiki v2). A layer with a named texture (sweep, grain,
+stipple, hatch, crosshatch, aquatint) may carry the optional fields `fineness`
+(`fine_grained`, `coarse_grained`, `packed`, `sparse`) and `underlayer`
+(`underpainted`) (DDL 24). In the capability matrix only the closed-shape rows
+take their values, and validation removes both fields from a layer without a
+named texture (`requires_texture`). Rule 4 of the Stage 1 system prompt states
+what the fineness and underlayer words mean, in Japanese and English. The values each form (with its
 proportion word) accepts come from the capability matrix
 `inku.work-plan-capabilities.v2`, generated by compiling one sentence per value,
 and shared-Rust validation is authoritative rather than provider-side decoding.
@@ -1819,7 +1858,13 @@ the nearest two of the nine colors a catalog sets apart, 0.042 to 0.121).
 
 When printing a Japanese underdrawing, a modifier already ending in `な`, `い`,
 or `の` attaches directly to its shape; other forms receive `の`. The printer
-does not add another `の` to `特大の` and produce `特大のの` (I-709).
+does not add another `の` to `特大の` and produce `特大のの` (I-709). The fineness
+and underlayer words stand before the texture word, and on such a layer the
+Japanese print puts the handling word after the texture (「赤のペンの下塗りの細かい
+点描の薄い円」), so that two adjectives do not stand in a row (「薄い細かい点描の」)
+and the handling is not read as the underlayer's alone. English puts handling,
+underlayer, and fineness before the texture, in that order (`faint underpainted
+fine-grained stipple circle`).
 
 Initial interpretation condenses the whole description's roles, contrasts,
 repetition, density, empty space, and texture into a short visual composition.
@@ -1944,7 +1989,7 @@ In a run with laws, a **laws stage** runs once after the composition (§12.6.2) 
   - The cards (stage B-4b): a card rebuilds its layer. C1 sparse and dense scatters one or two layers in a square of the chosen width (a ratio of the short side) at the chosen place (a crossing of the golden section or the thirds, or the center; a second layer 0.02 off) and takes their counts to 1 to 6 times (a count the description writes stays; past 380 marks the raise shrinks by one ratio). C2 patterns draws a layer again as a lattice of the unit over the top, middle or bottom band (vertical 0 to 0.382, 0.309 to 0.691, 0.618 to 1), the whole canvas, or the layer's current extent widened by one and a half units: seigaiha three concentric semicircles (radii 0.5, 0.33 and 0.165 of the cell, unfilled), shippo circles (unfilled), ichimatsu squares and uroko triangles (filled, alternating two colors, dropping a column from an even count), kikko hexagons (unfilled). The columns and rows are counted as the prototype counted them, and the cell is an exact square on the canvas's micro-lattice (a millionth of its integer ratio) so that the core tiles the printed range with the same columns and rows, centered in the range. Seigaiha's two grids, half a cell apart, stay inside the range, its rows moved down half a row and one row fewer. Kikko is written as one-row tiles (a row's marks take the brush's member sway, a tile's do not): as many rows as fit inside the range, no more than the prototype's, centered in it, the odd rows half a cell along and one fewer. When the marks would pass 380 or one grid would pass 240 (one instruction's marks at most), the unit widens by 1.15 at a time. A pattern color that differs from the ground by less than 0.15 in lightness is refused (`invisible_color`). C3 polyrhythm lines up two voices of the base times each term of the ratio at equal spacing, 0.05 on either side of a band on the axis (horizontal, vertical or diagonal), shrinking a mark wider than 0.8 of its spacing, and splits one layer into the two voices; each voice is drawn where its layer is drawn, and voices past 380 marks are refused. C4 motif and variation places the layer one repeat at a time along its path (a horizontal row, a diagonal, the golden spiral) and applies the variations in turn (grow and shrink by φ^0.5, rotate 30 degrees, mirror 180 degrees, a staggered echo), each turn added to the one before; repeats that crowd more than the origin drew them first lengthen the path and then shrink (no further than 0.25). The repeats keep a count the description writes, and otherwise run from the layer's count to the larger of it and 9; others are refused. C5 jo-ha-kyū makes a layer of six or more into three rows along a direction, jo, ha and kyu (counts by length times density, kyu 2 to 4 times as dense as jo); ha turns 25 degrees, grows 1.45 times or changes color. Every stage shrinks by the tightest one, a stage of one is a mark at its middle, and a stage's row keeps its direction. C6 shin-gyō-sō opens a row or a grid of 3 to 54 one mark each and draws them, by three bands along the long side or along their order, strict (shin, no sway), half loosened (gyo, fine and slow waves, 8 degrees) and free (so, fine, medium or broad sway, 14, 24 or 36 degrees), the turn's sense and size set by the order; a layer of 55 or more is refused (`c6_unopenable`). A card's marks are not moved inside the canvas's edge.
   - Aerial perspective and the hand: aerial perspective makes a distant layer 0.786 times as large and turns it to the cool color or gray (blue, green, purple, gray) closest to the ground in lightness among those that differ from it by 0.2 or more, by the lightness of the run's color observations (without observations the color stays). The hand `still` removes the sway, `fine` makes its amplitude fine and its spacing slow, and `keep` leaves it.
   - Answers that cannot be applied: a layer whose colors changed and differ from the ground by less than 0.15 in lightness (`invisible_color`), a Score left with more than 60 instructions or 380 marks (`too_many_instructions`, `too_many_marks`), and a layer that cannot take its law (a balance with the partner at the center, beat groups too few for two groups, a progression of spacing with fewer than three, a progression toward a side its row does not run toward, and so on) are asked again with the reason, as the check's refusals are. Notes on how the laws were applied (a row stretched, marks shrunk, a dense layer kept at its size, a grid's last row short, a dense place's counts lowered, a pattern's unit widened, a motif's path lengthened, and so on) go to the event.
-- Printing: only the layers the laws changed are printed again in numbers. A shape or a bundle at one spot is written with a numeric point; a row of two or more and an unturned pair with numeric ends (a pair as a row of two); a single line or free line with numeric ends where the canvas shows it; a grid as a sentence tiling a numeric range; a scatter with a numeric range. A pair B8 opens whose marks turn is written as two sentences, each with a numeric point and a numeric angle (a line by its ends), the second turned the mirrored way. A layer whose size changed is written with the numeric size its shape reads (radius, width and height, side length, chord and sagitta, length), without its size and proportion words. Numbers have six decimals at most. An arc's sagitta is written at most half its written chord: when a semicircle's sagitta, rounded apart from its chord, would pass that half, the half is written cut to six decimals. An English sentence that ends in the whole number of its numeric point, ends or range writes that number with one decimal (`vertical 1.0.`), since the numeric range reader takes a period right after a whole number for a decimal point. A layer progression or beat groups opened is printed one sentence per mark (a sentence placing one). A layer a card rebuilt is printed one sentence per instruction, each with its count, its shape (C2's; a hexagon by its noun), a numeric size when its size or shape changed, its color (two alternating colors as 「AとBを交互にして、」 / `, alternating A and B`), C2's surface (empty for an unfilled pattern, the layer's fill or flat for a filled one) and the hand the Score's sway draws (narrowly or broadly, loosely or tightly, swaying or undulating; a medium value is not written). In a layer whose marks a card turned, every sentence but a line written by its ends drops its angle word and writes a numeric angle (§18; none at 0), and an arc written with a numeric angle takes its chord and sagitta without its waxing or waning word. A layer whose hand changed loses its sway words or takes fine and slow ones, and a layer whose color changed has its color word rewritten. A pair, an opened layer and a layer whose relation was dropped are printed without a joint phrase.
+- Printing: only the layers the laws changed are printed again in numbers. A shape or a bundle at one spot is written with a numeric point; a row of two or more and an unturned pair with numeric ends (a pair as a row of two); a single line or free line with numeric ends where the canvas shows it; a grid as a sentence tiling a numeric range; a scatter with a numeric range. A pair B8 opens whose marks turn is written as two sentences, each with a numeric point and a numeric angle (a line by its ends), the second turned the mirrored way. A layer whose size changed is written with the numeric size its shape reads (radius, width and height, side length, chord and sagitta, length), without its size and proportion words. Numbers have six decimals at most. An arc's sagitta is written at most half its written chord: when a semicircle's sagitta, rounded apart from its chord, would pass that half, the half is written cut to six decimals. An English sentence that ends in the whole number of its numeric point, ends or range writes that number with one decimal (`vertical 1.0.`), since the numeric range reader takes a period right after a whole number for a decimal point. A layer progression or beat groups opened is printed one sentence per mark (a sentence placing one). A layer a card rebuilt is printed one sentence per instruction, each with its count, its shape (C2's; a hexagon by its noun), a numeric size when its size or shape changed, its color (two alternating colors as 「AとBを交互にして、」 / `, alternating A and B`), C2's surface (empty for an unfilled pattern, the layer's fill or flat for a filled one; a surface made empty or flat leaves out the fineness and underlayer words, and a textured surface kept keeps them) and the hand the Score's sway draws (narrowly or broadly, loosely or tightly, swaying or undulating; a medium value is not written). In a layer whose marks a card turned, every sentence but a line written by its ends drops its angle word and writes a numeric angle (§18; none at 0), and an arc written with a numeric angle takes its chord and sagitta without its waxing or waning word. A layer whose hand changed loses its sway words or takes fine and slow ones, and a layer whose color changed has its color word rewritten. A pair, an opened layer and a layer whose relation was dropped are printed without a joint phrase.
 - Confirming: the printed document is compiled as the run's commit compiles it. A mark at a numeric point must lie wholly on the canvas (the prototype let the canvas cut it). When a changed layer's mark leaves the canvas, the laws are asked again with a reason naming that layer and the laws on it other than the hand (`off_canvas`). For the same reason a single line is written by the ends the canvas shows, and a pair as a row of two, whose marks the canvas may cut. A document that does not read canonically, compiles to no Score, or has more diagnostics or omissions than the composed document is not used. A document that passes is committed with Stage 1's reason.
 - When the laws are unavailable: when the request cannot be built (no description, a Score that does not read as one layer per sentence, no law but the hand's that a layer can take), when the budget is used up, when refused answers exhaust the retries, or when the printed document fails the confirmation, the composed document is committed without laws (event `laws_fallback`; its `failure` is `prompt`, `context`, `compile` or the kind of the sending failure, and when the retries ran out it carries the refusal code in `detail`).
 - Setting: `PipelineConfig.laws` (`LawsConfig`, with no fields yet: `{}`). Without it there is no laws stage. It runs only when the composed document was built: not in a run without composition, nor in one committed without composition (`composition_skipped`). A run that sends no composition reading (`read: false`) applies the laws to the layers the default reading placed. The Server's default configuration carries `laws: {}` and no `laws_retry` (the catalog choice's budget, as for the composition reading). The Server sends the laws stage with Stage 1's model and limits and records its time and observations as `laws` (counted in `elapsed_total_ms`, not in `elapsed_stage1_ms`).
@@ -1964,7 +2009,7 @@ In a run with colors, a **color stage** runs once after the laws stage (§12.6.4
 - Reading: the shared pipeline effect `choose_colors` (result `colors_chosen`, prompt `inku.colors-prompt.v1`), in the work's language. It sends the description, the colors the description states, the share of the canvas the marks cover, a summary of each layer (number, shape, tool, count, color, fill, arrangement, the rectangle its marks cover, the size of one mark, handling, area, the drawn contrast and chroma of its current color, the colors in which it would not be seen, the layers it touches, and whether its color is stated or fixed by the laws stage), the ground, the work's color table (each name's paint as the catalog names it, how it looks, its hue among Itten's twelve and its place on the wheel in degrees, lightness, chroma, difference from the ground, and the names drawing the same paint), the wheel's relations, the 18 laws (a law the work cannot take is marked, and so is a law that already holds in the picture, which cannot be the main law; B19, D2 and B20 hold when some layer makes them hold, from 2026-10-21, before by the main layer), a whole answer for another description and the rule of this answer (one main color law and the laws that support it, their number not fixed). From 2026-10-21 it sends no main layer (before, the main layer the laws stage decided, without laws the plan's first layer). The answer holds the main law, the laws' values, the ground (only for a work whose description does not state it, from 2026-10-21), the layers' colors for B17 to B20 and the reason. The response schema offers only the layers each law can take: for D1 and D5 the hues the tool can realize on some layer and the layers that take them, for D7 the levels it can realize, and for D2 the vivid colors and the layers that may take them (a layer whose color the description states, only that color). An answer putting a hue on a layer it does not fit is refused with the layers it fits (`hue_layer`), and one giving a layer a vivid color it cannot take with the colors it can (`d2_layer`). The shared core's `provider_wire` sends it with Stage 1's handling of temperature (0.3 for a provider that receives one). Its retry budget is `colors_retry` (the catalog selection budget when absent).
 - Kept colors: a layer whose color the description states (a color word naming all its colors), the ground the description states and a plugged-in shape are not offered for recoloring, and the tool does not recolor them. A ground the description does not state may be chosen by the answer (the author's decision of 2026-10-21; before, it stayed as it was, the author's V1). An answer that changes the ground is checked, applied and confirmed on the estimates of the Score drawn again on the new ground. It is refused when a kept layer (a stated color, a plugged-in shape), or a pattern layer (C2) the answer does not recolor, is seen on the work's ground and would not be on the new one (`ground_hides`), and so is an answer that changes a ground the description states (`ground_stated`). A layer whose color the laws stage decided (B15 aerial perspective, C2 patterns) may be recolored in colors that keep its law (the author's decision, 2026-10-20): where the colors change a distant layer of B15 or the drawn difference of the layer, among the ones not distant, farthest from the ground (every distant layer when the ground changes), the distant layer stays 0.2 or more from the ground in drawn lightness and less far than that layer (from 2026-10-21; before, the main layer), and a pattern layer of C2 stays seen (0.15 or more) as any other layer does.
 - Check and applying: the answer is checked against the schema and the laws' rules, then applied in the prototype's order: the fades (B13, B14), the source of colors (the layers' colors or C8), B11, B16, C9, C7, B18, D2, D3, D4, D6, then D1, D5 and D7, what is seen, and the limits. The laws of lightness (B19: its layers 0.35 or more from the ground and every other layer 0.15 or more; D7's three levels) and whether a layer is seen (0.15) are checked by the drawn lightness, and whether a color is chromatic (C* 15 or more) by the drawn chroma, so a thin line's fading chroma enters the hue relations. A fade (B13, B14) takes only a layer of three marks or more (the response schema offers only those). D2 is checked once every law is applied: its layer's drawn chroma is at least twice every other layer's, a kept one included. An answer that changes nothing in the picture is refused (a new ground changes it). Where a law leaves the colors to the tool (D1, D5 and D7, D2's neutrals, a layer that would not be seen), the tool takes the most harmonious combination (the harmony estimated from the drawn colors), and then the one that changes the most layers (from 2026-10-21; before, the combinations that recolor the main layer came first); past 20,000 combinations it chooses layer by layer. The trials that make the choices (D1's, D5's and D7's values) stop at the first combination that keeps the rules. A Score left with more than 60 instructions or 380 marks is refused. A refused answer is asked again as a new action within the same budget with the latest reason only after the original request (unlike the laws stage, the answer is not repeated); as in the laws stage, one that does not read as JSON or fit the shape counts as a schema violation, one that breaks the rules as a semantic violation.
-- Printing: each layer the colors changed is printed again with its color word, colors in turn (「AとBを交互にして、」 and three or more in order), a shift run once through the marks, a fade (§18), a handling word, or a numeric size. C7's lower colors are printed before the layer, as copies at numeric places, so that they are drawn under it. The numbers the laws stage wrote stay. An answer that changes the ground prints the background sentence with the new ground (added where the plan had none). The printed document is compiled as the run compiles it; a document that does not compile to the colors and the ground chosen, or has more diagnostics or omissions than the document the laws left, is not used. The record of the laws layers (§12.6.3) follows the sentences the colors printed again.
+- Printing: each layer the colors changed is printed again with its color word, colors in turn (「AとBを交互にして、」 and three or more in order), a shift run once through the marks, a fade (§18), a handling word, or a numeric size. A layer C9 fills is written with the flat surface and without the fineness and underlayer words (an underpainted layer already has its fill, so it keeps its surface and words; DDL 24). C7's lower colors are printed before the layer, as copies at numeric places, so that they are drawn under it. The numbers the laws stage wrote stay. An answer that changes the ground prints the background sentence with the new ground (added where the plan had none). The printed document is compiled as the run compiles it; a document that does not compile to the colors and the ground chosen, or has more diagnostics or omissions than the document the laws left, is not used. The record of the laws layers (§12.6.3) follows the sentences the colors printed again.
 - When the colors are unavailable: when the request cannot be built (no description, a Score that does not read as one layer per sentence, no law that can be the main one), when the budget is used up, when refused answers exhaust the retries, or when the printed document fails the confirmation, the document the laws left is committed as it is (event `colors_fallback`; its `failure` is `prompt`, `context`, `compile` or the kind of the sending failure, and when the retries ran out it carries the refusal code in `detail`).
 - Setting: `PipelineConfig.colors` (`ColorsConfig`, whose optional `render_seed` is the seed the host draws the work with, so that the estimate lays a scatter's marks where the picture does). Without it there is no color stage. The host's resolved `palette` may carry `paints`, the color catalog's names of the nine observed paints in their order, which only the color stage reads. The Server's default configuration has `colors`, to which it adds the run's render seed and the paints' names in the work's language. In developer mode, a request with `developer_colors_stage` adds `colors` the same way to a run whose configuration has none (such as a child of a work saved before the default). The Server sends the color stage with Stage 1's model and limits and records its time and observations as `colors` (counted in `elapsed_total_ms`, not in `elapsed_stage1_ms`).
 - The `colors_chosen` event carries the laws chosen (in the list's order), the main law, the main layer (empty, `null`, from 2026-10-21), the ground chosen (from 2026-10-21; `null` when the ground stays) and the notes on applying them (a code, a layer and a color).
@@ -2594,6 +2639,8 @@ The drawing hand no longer draws one shape as one even face and one band (render
 - **Irregularities follow length**: stroke events (catch, fade, correction) and paper responses (bleed swell, tooth skip) arrive at their rate per 40 samples (about 0.8 of the short side), not per stroke. Their caps are 1/12 (at least 2) and 1/8 (at least 3) of the sample count, so a long line has more of them and a short one fewer. A stroke keeps at most 257 samples (129 before).
 - **Fine brush and pen edges**: the fine brush and the pen also have a texture filter that roughens the edge (displacement 0.6 and 0.35, `baseFrequency` 0.45 and 0.8). Reference §6 `texture_filter` is authoritative for which tools have one.
 
+**How a texture is laid (render engine 89, DDL 24).** A named texture (sweep, grain, stipple, hatch, crosshatch, aquatint) reads the Score's `surface.density` and `surface.scale` as their distance Δ from the default, 0.35 for both. The density multiplies its marks: 4 times at 0.85 and a quarter at 0.05, exponential between (4^(Δ/0.5) above the default, 4^(Δ/0.30) below). The scale sizes one mark: twice at 0.90 and half at 0.05 (2^(Δ/0.55), 2^(Δ/0.30)), and divides the count by that factor squared, so the area covered stays the same. In a sweep the density lays the bands closer without changing their width (never under 6 px), and the scale widens the bands and their spacing. In hatching and crosshatching the scale grows the lines thicker and wider apart, and the density lays them closer (never closer than 2.2 line widths). A texture with `filled` (the underlayer word underpainted) lays the tool's fill under it instead of the thin wash, and lays its marks over the fill 45% toward white when the fill's relative luminance is under 0.45 and ×0.62 darker otherwise, twice as strong (up to 0.75). The marks' seed reads the instruction with the density and scale at their defaults and without the fill, so a fineness or underlayer word does not move the marks or turn the bands. Wash, bleed and paper grain, which only saved Scores hold, read their fields and seed as before. A texture at the default fields draws as in render engine 88. Old Scores (DDL engine 45 and before, and works without a recorded engine) draw differently when redrawn where they hold a named texture together with a fill (now underpainted) or at a density or scale off the default (now at the new factors); the saved SVGs do not change.
+
 Typed DDL intensity delivery covers solid closed fills. Non-solid textures, unfilled lines and arcs, and explicit Point surfaces retain the existing unsupported diagnostics. Score rendering capability and the delivered typed-DDL subset are distinct. Full typed runtime / UI / save integration remains a later task.
 
 #### The fine and thick brushes' sweep (a flat brush)
@@ -2648,7 +2695,7 @@ Saijiki v2 migration, and v2 does not read it.
 Scatter in placement is not ゆらぎ. It is carried by うごき (motions, "scatter")
 and by `arrangement` (layout / path / jitter).
 
-In the shared compiler, ordinary DDL and declared flat Macros use one resolver. `narrowly` / `broadly` map to Fine / Broad; `loosely` / `tightly` to Slow / High; `swaying` maps to Perlin; `undulating` maps to Wave; and `bleeding` maps independently to `ink_spread:"bleed"`. v1's words (`fine`, `large`, `slowly`, `quickly`, `trembling`, `blurring`) are rewritten by the Saijiki v2 migration, and v2 does not read them. With all three variation slots absent, `Instruction.variation=None`. When at least one is present, only the missing amplitude, frequency, and quality slots default to Medium, Medium, and Perlin. Ink spread alone does not create variation. Explicit values win and the dimensions are independent: swaying does not imply Fine or High. Defaults do not enter source or typed meaning. The existing geometry-resolution-policy author-resolved omission owner attests this shared definition.
+In the shared compiler, ordinary DDL and declared flat Macros use one resolver. `narrowly` / `broadly` map to Fine / Broad; `loosely` / `tightly` to Slow / High; `swaying` maps to Perlin; `undulating` maps to Wave; and `bleeding` maps independently to `ink_spread:"bleed"`. v1's words (`fine`, `large`, `slowly`, `quickly`, `trembling`, `blurring`) are rewritten by the Saijiki v2 migration, and v2 does not read them. With all three variation slots absent, `Instruction.variation=None`. When at least one is present, only the missing amplitude, frequency, and quality slots default to Medium, Medium, and Perlin. An amplitude without a quality, though, is left out rather than completed, and the lowerer reports `fluctuation_amplitude_without_quality` (the policy's `amplitude_without_quality: omitted`, DDL engine 68). Ink spread alone does not create variation. Explicit values win and the dimensions are independent: swaying does not imply Fine or High. Defaults do not enter source or typed meaning. The existing geometry-resolution-policy author-resolved omission owner attests this shared definition.
 
 ### 13.7 Sway from Phenomena: the Nature Plugin
 

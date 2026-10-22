@@ -164,3 +164,24 @@ test('an angle written in numbers is said in words, in each language', () => {
 	assert.match(formatPipelineDiagnostic(conflict, ja), /数値の角度/);
 	assert.match(formatPipelineDiagnostic(conflict, en), /a numeric angle/);
 });
+
+test('fineness, underlayer and an amplitude alone are said in words, in each language', () => {
+	for (const [kind, japanese, english] of [
+		['conflicting_surface_finenesses', /きめの語（細かい・粗い・密な・疎な）が二つ/, /Two fineness words/],
+		['conflicting_surface_underlayers', /したじの語（下塗り）が二つ/, /written twice on one mark/],
+	] as const) {
+		const upstream = { channel: 'upstream' as const, value: { issue_kind: kind } };
+		assert.match(formatPipelineDiagnostic(upstream, ja), japanese);
+		assert.match(formatPipelineDiagnostic(upstream, en), english);
+	}
+	for (const [type, japanese, english] of [
+		['unsupported_surface_fineness', /きめの語（細かい・粗い・密な・疎な）は、閉じた形の質感/, /A fineness word .* goes only on the texture of a closed shape/],
+		['unsupported_surface_underlayer', /したじの語（下塗り）は、閉じた形の質感/, /The underlayer word .* goes only on the texture of a closed shape/],
+		['fluctuation_amplitude_without_quality', /揺れる・波打つと一緒に書いてください。/, /with swaying or undulating\. Alone it makes no sway\./],
+	] as const) {
+		const downstream = { channel: 'downstream' as const, value: { reason: { type } } };
+		assert.match(formatPipelineDiagnostic(downstream, ja), japanese);
+		assert.match(formatPipelineDiagnostic(downstream, en), english);
+		assert.doesNotMatch(formatPipelineDiagnostic(downstream, en), /Reason:/);
+	}
+});

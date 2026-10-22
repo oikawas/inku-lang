@@ -112,6 +112,8 @@ Place three small red circles in the upper right.
 | Continuity | solid, dashed, dotted, dash-dot |
 | Surfaces | empty, flat, sweep, grain, stipple, hatch, crosshatch, aquatint |
 | Handling | dense, temperate, faint |
+| Fineness | fine-grained, coarse-grained, packed, sparse (on the texture of a closed shape) |
+| Underlayer | underpainted (on the texture of a closed shape) |
 | Grounds | paper, washi, ink-wash ground, charcoal ground, canvas, drawing paper, mezzotint |
 | Sway | narrowly, broadly, loosely, tightly, swaying, undulating, bleeding |
 

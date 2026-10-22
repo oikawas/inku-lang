@@ -86,6 +86,7 @@
         {"surface_ja": "空", "surface_en": "empty", "default": true, "prompt": true, "display": true, "marker": null, "score_value": "none", "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "塗り", "surface_en": "flat", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "solid", "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "刷き", "surface_en": "sweep", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "sweep", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "刷毛目", "surface_en": "brushmarks", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "brushmarks", "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "粒", "surface_en": "grain", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "grain", "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "点描", "surface_en": "stipple", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "stipple", "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "平行線", "surface_en": "hatch", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "hatch", "marker_surfaces_ja": null, "marker_surfaces_en": null},

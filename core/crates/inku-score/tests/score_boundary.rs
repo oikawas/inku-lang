@@ -250,6 +250,37 @@ fn the_sweep_texture_needs_score_0_17() {
 }
 
 #[test]
+fn the_brushmarks_texture_needs_score_0_22() {
+    let instruction = json!({"primitive":"square","surface":{"texture":"brushmarks"}});
+    for older in ["0.17.0", "0.21.0"] {
+        let score: Score =
+            serde_json::from_value(json!({"version":older,"instructions":[instruction.clone()]}))
+                .unwrap();
+        assert_eq!(
+            score.validate_schema_edition(),
+            Err("surface texture brushmarks requires Score version 0.22.0"),
+            "{older}"
+        );
+    }
+    let current: Score =
+        serde_json::from_value(json!({"version":"0.22.0","instructions":[instruction.clone()]}))
+            .unwrap();
+    assert_eq!(current.validate_schema_edition(), Ok(()));
+    assert!(inku_score::instructions_use_brushmarks(
+        &current.instructions
+    ));
+    // A sweep keeps its own edition.
+    let sweep: Score = serde_json::from_value(
+        json!({"version":"0.17.0","instructions":[{"primitive":"square","surface":{"texture":"sweep"}}]}),
+    )
+    .unwrap();
+    assert_eq!(sweep.validate_schema_edition(), Ok(()));
+    assert!(!inku_score::instructions_use_brushmarks(
+        &sweep.instructions
+    ));
+}
+
+#[test]
 fn transform_groups_accept_postorder_and_reject_malformed_structure() {
     let anchor_groups = score(
         r#"{"version":"0.6.0",

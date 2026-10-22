@@ -398,7 +398,12 @@
 # as a sway of its own. No saved work's Score or state changes (the 5,188 works
 # of the 2026-10-17 5173 export): the works that write these characters stop
 # at their holes, and only the unread words of 315 of them change.
-DDL_ENGINE_VERSION = "68"
+# 69: 刷毛目 / brushmarks lays a closed shape's face with the bands of 刷き laid
+# one by one (the Score texture `brushmarks`; Score 0.22.0 for the works that
+# use it). On a line, an open arc or a free line only the word is left out
+# (`unsupported_surface_brushmarks`) and the mark is drawn as written; on a
+# point it is left out as every surface word is.
+DDL_ENGINE_VERSION = "69"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write
@@ -463,4 +468,7 @@ DDL_ENGINE_VERSION = "68"
 # coarse-grained, 密な / packed, 疎な / sparse) and したじ / underlayer (下塗り /
 # underpainted) join the Saijiki, read in DDL, offered to Stage 1 as the plan
 # fields `fineness` and `underlayer`, and listed in the saijiki.
-DDL_VERSION = "24"
+# 25 (2026-10-22): 刷毛目 / brushmarks joins the surface category おもて, read in
+# DDL on a closed shape, offered to Stage 1 as a plan `surface` value, and
+# listed in the saijiki.
+DDL_VERSION = "25"

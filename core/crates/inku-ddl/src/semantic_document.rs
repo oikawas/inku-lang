@@ -1080,8 +1080,8 @@ fn apply_continuation_occurrence(
             match (term.identity.category.as_str(), term.identity.id.as_str()) {
                 (
                     "surface",
-                    "none" | "solid" | "sweep" | "grain" | "stipple" | "hatch" | "crosshatch"
-                    | "bleed" | "aquatint",
+                    "none" | "solid" | "sweep" | "brushmarks" | "grain" | "stipple" | "hatch"
+                    | "crosshatch" | "bleed" | "aquatint",
                 ) => set_if_empty(&mut instruction.entity.surface.quality, term),
                 ("handling", "dense" | "temperate" | "faint") => {
                     set_if_empty(&mut instruction.entity.surface.intensity, term)

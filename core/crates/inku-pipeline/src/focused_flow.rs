@@ -3494,6 +3494,33 @@ fn c9_fills_a_textured_layer_without_its_texture_words() {
     assert!(!square.contains("stipple"), "{source}");
 }
 
+/// C9 fills a brushmarks layer (DDL 25) as it fills any textured layer: the
+/// brushmarks and its fineness word go with the texture.
+#[test]
+fn c9_fills_a_brushmarks_layer_as_any_textured_layer() {
+    let mut textured = plan_layer("place", "square", 1, "center", "small", "red");
+    textured["surface"] = json!("brushmarks");
+    textured["fineness"] = json!("packed");
+    let plan = json!({"ground": "paper", "background": "white", "plugins": [], "layers": [
+        plan_layer("fill", "square", 1, "unspecified", "large", "gray"),
+        textured,
+    ]});
+    let asked = plan_answer_with(&colors_start(UNCOLORED_DESCRIPTION, None), &plan).snapshot;
+    let chosen = colors_answer(
+        &asked,
+        &json!({"main_law": "C9", "laws": {"C9": {"color": "red", "layer": 1, "area": "15-30",
+                "others": "keep"}}, "reason": "The red takes the canvas."}),
+    );
+    let source = committed_source(&chosen.snapshot);
+    let square = source
+        .lines()
+        .find(|line| line.contains(" red "))
+        .unwrap_or_else(|| panic!("the red square: {source}"));
+    assert!(square.contains(" flat "), "{source}");
+    assert!(!square.contains("brushmarks"), "{source}");
+    assert!(!square.contains("packed"), "{source}");
+}
+
 #[test]
 fn d2_holds_once_the_law_that_supports_it_is_applied() {
     // D4 lays the circle in the vivid blue the field takes, so the field is
@@ -4061,6 +4088,13 @@ fn a_saved_textured_layer_reads_back_with_its_texture_words() {
             "cloudform",
             "aquatint",
             vec![(WorkPlanSlot::Underlayer, "underpainted")],
+        ),
+        // Brushmarks (DDL 25) reads back as the texture it is.
+        ("ellipse", "brushmarks", vec![]),
+        (
+            "triangle",
+            "brushmarks",
+            vec![(WorkPlanSlot::Fineness, "packed")],
         ),
     ] {
         let layer = WorkPlanLayer {

@@ -3543,7 +3543,9 @@ fn lower_verified_stage15_shared<'a>(
         ScoreLoweringOutcome::Complete
     };
     let score = (objects.is_none() && outcome != ScoreLoweringOutcome::Stopped).then(|| Score {
-        version: if inku_score::instructions_use_free_line(&instructions) {
+        version: if inku_score::instructions_use_brushmarks(&instructions) {
+            inku_score::ScoreEdition::V0_22.as_str().to_owned()
+        } else if inku_score::instructions_use_free_line(&instructions) {
             inku_score::ScoreEdition::V0_21.as_str().to_owned()
         } else if inku_score::instructions_use_joint_relations(&instructions) {
             inku_score::ScoreEdition::V0_20.as_str().to_owned()
@@ -4174,10 +4176,11 @@ fn resolve_projected_instruction<'a, T>(
     for reason in first_gaps {
         if let Some(field) = appearance_field_for_gap(&reason) {
             omit_appearance_field(&mut projected, field);
+            let resolution = resolution_for_gap(&reason, field, surface_quality_survives);
             appearance_omissions.push(AppearanceOmission {
                 reason,
                 field,
-                resolution: default_resolution(field, surface_quality_survives),
+                resolution,
             });
         } else if let Some(field) = instruction_field_for_gap(&reason) {
             omit_instruction_field(&mut projected, field);
@@ -4360,7 +4363,8 @@ fn appearance_field_for_gap(gap: &ScoreFieldGap) -> Option<ScoreAppearanceField>
         ScoreFieldGap::UnsupportedContinuityIdentity { .. } => {
             Some(ScoreAppearanceField::Continuity)
         }
-        ScoreFieldGap::UnsupportedSurfaceIdentity { .. } => {
+        ScoreFieldGap::UnsupportedSurfaceIdentity { .. }
+        | ScoreFieldGap::UnsupportedSurfaceBrushmarks { .. } => {
             Some(ScoreAppearanceField::SurfaceQuality)
         }
         ScoreFieldGap::UnsupportedSurfaceIntensity { .. } => {
@@ -4428,6 +4432,21 @@ fn default_resolution(
         ScoreAppearanceField::SurfaceFineness | ScoreAppearanceField::SurfaceUnderlayer => {
             ScoreAppearanceResolution::Unchanged
         }
+    }
+}
+
+/// What takes an omitted word's place. The brushmarks word on a mark without a
+/// face (DDL 25) leaves the mark as written, without a surface, where another
+/// omitted surface quality fills a closed shape.
+fn resolution_for_gap(
+    reason: &ScoreFieldGap,
+    field: ScoreAppearanceField,
+    surface_quality_survives: bool,
+) -> ScoreAppearanceResolution {
+    if matches!(reason, ScoreFieldGap::UnsupportedSurfaceBrushmarks { .. }) {
+        ScoreAppearanceResolution::Unchanged
+    } else {
+        default_resolution(field, surface_quality_survives)
     }
 }
 
@@ -4745,9 +4764,9 @@ fn macro_key_for_gap(gap: &ScoreFieldGap) -> Option<String> {
         ScoreFieldGap::UnsupportedContinuityIdentity { .. } | ScoreFieldGap::MissingContinuity => {
             Some("continuity".to_owned())
         }
-        ScoreFieldGap::UnsupportedSurfaceIdentity { .. } | ScoreFieldGap::MissingEmptySurface => {
-            Some("surface".to_owned())
-        }
+        ScoreFieldGap::UnsupportedSurfaceIdentity { .. }
+        | ScoreFieldGap::UnsupportedSurfaceBrushmarks { .. }
+        | ScoreFieldGap::MissingEmptySurface => Some("surface".to_owned()),
         ScoreFieldGap::UnsupportedSurfaceIntensity { .. } => Some("surface_intensity".to_owned()),
         ScoreFieldGap::UnsupportedActionIdentity { .. } | ScoreFieldGap::MissingPlaceAction => {
             Some("movement".to_owned())
@@ -6264,6 +6283,20 @@ fn resolve_complete_object<'a>(
                 // two checked Touching arcs. Keep that intent for performance.
                 (closes_area || primitive == Primitive::Arc, None)
             }
+            // 刷毛目 lays the bands of a closed shape's face one by one (DDL
+            // 25). A line, an open arc or a free line has no face, so only the
+            // word is left out and the mark is drawn as written.
+            Some(identity)
+                if !closes_area
+                    && identity.category == "surface"
+                    && identity.id == "brushmarks" =>
+            {
+                gaps.push(ScoreFieldGap::UnsupportedSurfaceBrushmarks {
+                    category: identity.category.to_owned(),
+                    id: identity.id.to_owned(),
+                });
+                (false, None)
+            }
             // A named surface texture is itself the area's performance. A flat
             // base fill under it would hide the texture entirely.
             Some(identity) => match surface_spec_from_identity(identity) {
@@ -6857,6 +6890,7 @@ fn lay_texture_words(
             matches!(
                 spec.texture,
                 SurfaceTexture::Sweep
+                    | SurfaceTexture::Brushmarks
                     | SurfaceTexture::Grain
                     | SurfaceTexture::Stipple
                     | SurfaceTexture::Hatch
@@ -6900,7 +6934,8 @@ fn surface_spec_from_identity(
     let texture: SurfaceTexture = match (identity.category, identity.id) {
         (
             "surface",
-            "sweep" | "grain" | "stipple" | "hatch" | "crosshatch" | "bleed" | "aquatint",
+            "sweep" | "brushmarks" | "grain" | "stipple" | "hatch" | "crosshatch" | "bleed"
+            | "aquatint",
         ) => serde_json::from_value(serde_json::Value::String(identity.id.to_owned())).map_err(
             |_| ScoreFieldGap::UnsupportedSurfaceIdentity {
                 category: identity.category.to_owned(),

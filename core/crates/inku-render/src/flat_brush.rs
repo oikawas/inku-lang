@@ -81,6 +81,19 @@ pub(crate) fn sweeps_flat(instruction: &Instruction) -> bool {
             .is_some_and(|surface| surface.texture == SurfaceTexture::Sweep)
 }
 
+/// Whether the bands of a closed shape's face are flat: the face's sweep (刷き)
+/// or brushmarks (刷毛目, render engine 91) of the thin or thick brush. A line or
+/// an arc lays its flat band by `sweeps_flat`.
+pub(crate) fn lays_flat_face(instruction: &Instruction) -> bool {
+    flat_weight(instruction.weight)
+        && instruction.surface.as_ref().is_some_and(|surface| {
+            matches!(
+                surface.texture,
+                SurfaceTexture::Sweep | SurfaceTexture::Brushmarks
+            )
+        })
+}
+
 pub(crate) struct FlatBandRequest<'a> {
     /// The performed centerline, in pixels.
     pub centerline: &'a [Point],
@@ -495,6 +508,15 @@ mod tests {
         assert!(!sweeps_flat(&instruction("brush_thick", "grain")));
         assert!(!sweeps_flat(&instruction("oil_paint", "sweep")));
         assert!(!sweeps_flat(&instruction("pen", "sweep")));
+        // A face's bands are flat for brushmarks too (render engine 91); a
+        // line's band is not, since brushmarks goes only on a closed shape.
+        assert!(!sweeps_flat(&instruction("brush_thick", "brushmarks")));
+        assert!(lays_flat_face(&instruction("brush_thin", "brushmarks")));
+        assert!(lays_flat_face(&instruction("brush_thick", "brushmarks")));
+        assert!(lays_flat_face(&instruction("brush_thick", "sweep")));
+        assert!(!lays_flat_face(&instruction("brush_thick", "wash")));
+        assert!(!lays_flat_face(&instruction("pen", "brushmarks")));
+        assert!(!lays_flat_face(&instruction("oil_paint", "brushmarks")));
     }
 
     #[test]

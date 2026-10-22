@@ -144,12 +144,33 @@ test('T-35  aquatint is drawn in three tone steps, the engine default', () => {
 	assert.ok(mean(1) < mean(2), 'the third step is not darker than the second');
 });
 
-test('T-35  刷き sweeps twice at half the tool opacity without a flat underfill', () => {
+test('T-35  刷き sweeps twice, each a film of merged bands at 0.6 of the tool, without a flat underfill', () => {
+	// render engine 90: the bands of one pass merge into one film, 1.2 × 0.5.
 	const svg = SURFACE_PREVIEWS['刷き'].svg;
-	assert.equal([...svg.matchAll(/<g opacity="0\.5"/g)].length, 2);
+	assert.equal([...svg.matchAll(/<g opacity="0\.6"/g)].length, 2);
 	assert.match(svg, /rotate\(6 90 46\)/);
 	assert.doesNotMatch(interior('刷き'), /<rect[^>]*fill="#2b2b2b"/);
 	assert.match(SURFACE_PREVIEWS['刷き'].exampleEn, /\bsweep\b/);
+});
+
+test('T-35  刷毛目 lays each band on its own at half the tool, so overlapping bands darken', () => {
+	// render engine 91: no film over a pass, so the bands build up where they overlap.
+	const svg = SURFACE_PREVIEWS['刷毛目'].svg;
+	assert.doesNotMatch(svg, /<g[^>]* opacity=/);
+	assert.doesNotMatch(svg, /feGaussianBlur/);
+	assert.match(svg, /rotate\(6 90 46\)/);
+	const bands = [...svg.matchAll(/<path stroke-width="(\d+)" stroke-opacity="0\.5" d="M44 (\d+) H136"\/>/g)].map(
+		(match) => ({ width: Number(match[1]), y: Number(match[2]) })
+	);
+	assert.ok(bands.length >= 10, `only ${bands.length} bands`);
+	// Neighbouring bands of one pass overlap: closer than half their widths.
+	const firstPass = bands.slice(0, 6);
+	for (let i = 1; i < firstPass.length; i += 1) {
+		const gap = firstPass[i].y - firstPass[i - 1].y;
+		assert.ok(gap < (firstPass[i].width + firstPass[i - 1].width) / 2, `bands ${i - 1} and ${i} do not overlap`);
+	}
+	assert.doesNotMatch(interior('刷毛目'), /<rect[^>]*fill="#2b2b2b"/);
+	assert.match(SURFACE_PREVIEWS['刷毛目'].exampleEn, /\bbrushmarks\b/);
 });
 
 test('T-35  handling changes opacity relative to the tool and keeps the marks', () => {

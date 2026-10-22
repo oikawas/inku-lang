@@ -1869,8 +1869,8 @@ fn classify_surface_dimension(category: &str, canonical_id: &str) -> Option<Surf
     match (category, canonical_id) {
         (
             "surface",
-            "none" | "solid" | "sweep" | "grain" | "stipple" | "hatch" | "crosshatch" | "bleed"
-            | "aquatint",
+            "none" | "solid" | "sweep" | "brushmarks" | "grain" | "stipple" | "hatch"
+            | "crosshatch" | "bleed" | "aquatint",
         ) => Some(SurfaceDimension::Quality),
         ("handling", "dense" | "temperate" | "faint") => Some(SurfaceDimension::Intensity),
         ("fineness", "fine_grained" | "coarse_grained" | "packed" | "sparse") => {

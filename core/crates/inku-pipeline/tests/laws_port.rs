@@ -828,13 +828,16 @@ fn the_tool_refuses_cards_it_cannot_lay() {
 
 /// A pattern (C2) that draws its units empty leaves out the fineness and
 /// underlayer words (DDL 24), which only a named texture takes; one whose
-/// filled units keep the layer's texture keeps them. The printed document
-/// compiles cleanly either way.
+/// filled units keep the layer's texture keeps them. Brushmarks (DDL 25) goes
+/// and stays as any named texture does. The printed document compiles cleanly
+/// either way.
 #[test]
 fn a_pattern_keeps_the_texture_words_only_with_the_texture() {
     let fixture = fixture();
     let definitions = definitions();
-    for (id, kept) in [("ja-12-shippo", false), ("ja-12-ichimatsu", true)] {
+    for (texture, (id, kept)) in ["stipple", "brushmarks"].into_iter().flat_map(|texture| {
+        [("ja-12-shippo", false), ("ja-12-ichimatsu", true)].map(|case| (texture, case))
+    }) {
         let mut case = fixture
             .cases
             .iter()
@@ -842,7 +845,7 @@ fn a_pattern_keeps_the_texture_words_only_with_the_texture() {
             .expect("the case")
             .clone();
         for (slot, value) in [
-            (WorkPlanSlot::Surface, "stipple"),
+            (WorkPlanSlot::Surface, texture),
             (WorkPlanSlot::Fineness, "packed"),
             (WorkPlanSlot::Underlayer, "underpainted"),
         ] {
@@ -872,13 +875,21 @@ fn a_pattern_keeps_the_texture_words_only_with_the_texture() {
         for layer in rebuilt {
             let word = |slot| layer.attributes.get(&slot).map(String::as_str);
             if kept {
-                assert_eq!(word(WorkPlanSlot::Surface), Some("stipple"), "{id}");
-                assert_eq!(word(WorkPlanSlot::Fineness), Some("packed"), "{id}");
-                assert_eq!(word(WorkPlanSlot::Underlayer), Some("underpainted"), "{id}");
+                assert_eq!(word(WorkPlanSlot::Surface), Some(texture), "{id} {texture}");
+                assert_eq!(
+                    word(WorkPlanSlot::Fineness),
+                    Some("packed"),
+                    "{id} {texture}"
+                );
+                assert_eq!(
+                    word(WorkPlanSlot::Underlayer),
+                    Some("underpainted"),
+                    "{id} {texture}"
+                );
             } else {
-                assert_eq!(word(WorkPlanSlot::Surface), Some("empty"), "{id}");
-                assert_eq!(word(WorkPlanSlot::Fineness), None, "{id}");
-                assert_eq!(word(WorkPlanSlot::Underlayer), None, "{id}");
+                assert_eq!(word(WorkPlanSlot::Surface), Some("empty"), "{id} {texture}");
+                assert_eq!(word(WorkPlanSlot::Fineness), None, "{id} {texture}");
+                assert_eq!(word(WorkPlanSlot::Underlayer), None, "{id} {texture}");
             }
         }
         let printed = chosen.print.source(language(&case.lang), &plugins);

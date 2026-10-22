@@ -103,9 +103,10 @@ _EXPECTED_PAIRING: dict[str, tuple[tuple[str, str], ...]] = {
     # Japanese is the noun 塗り, not the verb 塗る, by the same ruling.
     # Saijiki v2 (2026-09-29): 刷き / sweep is a technique with no paleness of its
     # own, and 濃い / 薄い left おもて for さばき, which says how the ink is laid.
+    # DDL 25 (2026-10-22): 刷毛目 / brushmarks lays the sweep's bands one by one.
     "omote": (
-        ("空", "empty"), ("塗り", "flat"), ("刷き", "sweep"), ("粒", "grain"),
-        ("点描", "stipple"), ("平行線", "hatch"), ("交差線", "crosshatch"),
+        ("空", "empty"), ("塗り", "flat"), ("刷き", "sweep"), ("刷毛目", "brushmarks"),
+        ("粒", "grain"), ("点描", "stipple"), ("平行線", "hatch"), ("交差線", "crosshatch"),
         ("アクアチント", "aquatint"),
     ),
     # さばき (2026-09-30): 程よい / temperate lays the medium at the tool's own

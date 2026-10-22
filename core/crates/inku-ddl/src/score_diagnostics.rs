@@ -88,6 +88,13 @@ pub enum ScoreFieldGap {
         category: String,
         id: String,
     },
+    /// The brushmarks word (刷毛目, DDL 25) on a mark without a face: it lays
+    /// the bands of a closed shape's face one by one, and a line, an open arc
+    /// or a free line has no face to lay them in.
+    UnsupportedSurfaceBrushmarks {
+        category: String,
+        id: String,
+    },
     /// An amplitude word (細かく・大きく) without a sway word (揺れる・波打つ)
     /// to say what sways (DDL 24). It was read as a sway of its own before.
     FluctuationAmplitudeWithoutQuality {
@@ -234,7 +241,7 @@ pub enum ScoreAppearanceResolution {
     PreserveGeneratedValue,
     /// Nothing takes the omitted word's place: the mark is lowered as written
     /// without it (a fineness or underlayer word on a mark without a named
-    /// texture, DDL 24).
+    /// texture, DDL 24; the brushmarks word on a mark without a face, DDL 25).
     Unchanged,
 }
 

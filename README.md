@@ -270,7 +270,7 @@ The reference dictionary is called **Saijiki**（歳時記）— a word borrowed
 | angles | かたむき | horizontal, vertical, diagonal, rising, falling, rotated |
 | touches | てざわり | silverpoint, pencil, pen, rotring, crayon, chalk, fine-brush, thick-brush, oil paint, burin, drypoint, computer |
 | continuity | つらなり | solid, dashed, dotted, dash-dot |
-| surfaces | おもて | empty, flat, sweep, grain, stipple, hatch, crosshatch, aquatint |
+| surfaces | おもて | empty, flat, sweep, brushmarks, grain, stipple, hatch, crosshatch, aquatint |
 | handling | さばき | dense, temperate, faint |
 | fineness | きめ | fine-grained, coarse-grained, packed, sparse |
 | underlayer | したじ | underpainted |

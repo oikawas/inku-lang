@@ -429,7 +429,7 @@ pub fn work_plan_ground_material(value: &str) -> Option<inku_score::GroundMateri
 }
 
 /// The plan's surface values that name a texture: the おもて words whose Score
-/// value is neither empty nor flat (刷き・粒・点描・平行線・交差線・アクアチント).
+/// value is neither empty nor flat (刷き・刷毛目・粒・点描・平行線・交差線・アクアチント).
 /// A fineness or underlayer word (DDL 24) is read only on one of them.
 fn texture_surfaces() -> &'static [String] {
     static TEXTURES: OnceLock<Vec<String>> = OnceLock::new();

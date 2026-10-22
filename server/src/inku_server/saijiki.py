@@ -207,6 +207,7 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
             _w("空", "empty", default=True, score_value="none"),
             _w("塗り", "flat", score_value="solid"),
             _w("刷き", "sweep", score_value="sweep"),
+            _w("刷毛目", "brushmarks", score_value="brushmarks"),
             _w("粒", "grain", score_value="grain"),
             _w("点描", "stipple", score_value="stipple"),
             _w("平行線", "hatch", score_value="hatch"),

@@ -51,8 +51,8 @@ object SaijikiGenerated {
             key = "omote",
             nameJa = "おもて",
             nameEn = "surfaces",
-            wordsJa = listOf("空", "塗り", "刷き", "粒", "点描", "平行線", "交差線", "アクアチント"),
-            wordsEn = listOf("empty", "flat", "sweep", "grain", "stipple", "hatch", "crosshatch", "aquatint"),
+            wordsJa = listOf("空", "塗り", "刷き", "刷毛目", "粒", "点描", "平行線", "交差線", "アクアチント"),
+            wordsEn = listOf("empty", "flat", "sweep", "brushmarks", "grain", "stipple", "hatch", "crosshatch", "aquatint"),
         ),
         Category(
             key = "sabaki",

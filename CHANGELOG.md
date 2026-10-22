@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-22 — Brushmarks, a surface word told apart from the sweep (DDL 25, render engine 91, Score 0.22.0)
+
+The Saijiki's surfaces gain brushmarks (刷毛目). On the face of a closed shape it lays the bands a sweep lays one by one, each half transparent, so they darken step by step into streaks where they overlap: render engine 89's way of drawing a closed shape's sweep, kept inside the contour as render engine 90's sweep is. Render engine 90 merged the bands of one sweep pass into a film, which left these overlapping streaks with no words to write them (the author's request; the texture of work `15bc0923…`). The face's seed reads as a sweep's, so writing brushmarks for a sweep in the same sentence keeps the bands' directions and places and changes only how they overlap. On a line, an arc or a free line only the word is left out with a diagnostic (`unsupported_surface_brushmarks`), and the mark is drawn as it is without it. The plan's surface value `brushmarks` (taken only by closed shapes in the capability matrix), Stage 1 rule 4 (how sweep and brushmarks differ), the composition weight (as a sweep's), and the Web Saijiki's preview and diagnostic text come with it. The Saijiki's sweep explanation and drawing follow render engine 90's film (0.6 of the tool's opacity). Only works with brushmarks use Score 0.22.0; every other work keeps its Score and its picture.
+
 ### 2026-10-22 — macOS Saijiki adds fineness and underlayer
 
 The bundled vocabulary and Web reference now show fineness (fine-grained, coarse-grained, packed and sparse) and underlayer (underpainted) after handling. Each word includes its preview, explanation and example. Existing groups, word order and previews are preserved.

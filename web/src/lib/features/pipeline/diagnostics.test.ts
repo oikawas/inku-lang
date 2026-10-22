@@ -178,6 +178,7 @@ test('fineness, underlayer and an amplitude alone are said in words, in each lan
 		['unsupported_surface_fineness', /きめの語（細かい・粗い・密な・疎な）は、閉じた形の質感/, /A fineness word .* goes only on the texture of a closed shape/],
 		['unsupported_surface_underlayer', /したじの語（下塗り）は、閉じた形の質感/, /The underlayer word .* goes only on the texture of a closed shape/],
 		['fluctuation_amplitude_without_quality', /揺れる・波打つと一緒に書いてください。/, /with swaying or undulating\. Alone it makes no sway\./],
+		['unsupported_surface_brushmarks', /刷毛目は、閉じた形（円・楕円・三角・四角・多角形・雲形）の面にだけ/, /Brushmarks goes only on the face of a closed shape/],
 	] as const) {
 		const downstream = { channel: 'downstream' as const, value: { reason: { type } } };
 		assert.match(formatPipelineDiagnostic(downstream, ja), japanese);

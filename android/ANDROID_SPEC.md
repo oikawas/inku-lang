@@ -4,7 +4,11 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-10-22.
+Last updated: 2026-10-23.
+
+## 2026-10-23 Saijiki brushmarks and the sweep explanation
+
+Brushmarks follows sweep in the surface group, with Web's Japanese and English explanations, example DDL and preview. The sweep explanation and drawing show each pass as one film at 0.6 of the tool opacity. The brushmarks drawing overlaps individual bands at 0.5 opacity without a filter. Explanations follow the UI language and examples the DDL language. The screen retains 16 groups and now shows 109 words, recognizing 218 across both languages. Group colors stay the same. Word meanings and targets follow the shared core's DDL 25 and render engine 91; Android adds no drawing semantics.
 
 ## 2026-10-22 Saijiki fineness and underlayer
 

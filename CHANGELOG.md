@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-23 — Add brushmarks and update the sweep preview in Android's Saijiki
+
+Brushmarks now follows sweep in the surface group, with Web's Japanese and English explanations, example instructions and preview. Sweep shows each pass as one film at 0.6 opacity; brushmarks overlaps individual bands at 0.5. Checks follow the 16 groups, 109 displayed words and 218 recognized words across both languages. Group colors and shared-core drawing semantics remain unchanged.
+
 ### 2026-10-22 — macOS Saijiki adds fineness and underlayer
 
 The bundled vocabulary and Web reference now show fineness (fine-grained, coarse-grained, packed and sparse) and underlayer (underpainted) after handling. Each word includes its preview, explanation and example. Existing groups, word order and previews are preserved.

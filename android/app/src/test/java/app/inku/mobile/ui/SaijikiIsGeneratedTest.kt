@@ -42,31 +42,37 @@ class SaijikiIsGeneratedTest {
      * 濃い and 薄い out of おもて, 102 since DDL 18 added 載る, 中に, 重なる and
      * 横切る to あいだ on 2026-10-12, and 103 since 自由線 joined かたち on
      * 2026-10-15; sixteen categories and 108 words since DDL 24 added
-     * きめ / fineness and したじ / underlayer on 2026-10-22);
+     * きめ / fineness and したじ / underlayer on 2026-10-22; 109 words since
+     * DDL 25 added 刷毛目 / brushmarks to おもて on 2026-10-23);
      * they move when the server's table does, and the generator is the check
      * that the Kotlin copy followed.
      */
     @Test
-    fun testScreenShowsSixteenCategoriesAndOneHundredEightWordsInBothLanguages() {
+    fun testScreenShowsSixteenCategoriesAndOneHundredNineWordsInBothLanguages() {
         for (lang in UiLanguage.entries) {
             val groups = saijikiGroups(lang)
             assertEquals("$lang: display categories", 16, groups.size)
-            assertEquals("$lang: display words", 108, groups.sumOf { it.words.size })
+            assertEquals("$lang: display words", 109, groups.sumOf { it.words.size })
         }
     }
 
     /**
-     * T2: the eleven words and the category the hand-copy was missing.
+     * T2: the twelve words and the category the hand-copy was missing.
      *
      * Named one by one rather than counted, so that a snapshot which gained
-     * eleven OTHER words would not satisfy the count above and pass.
+     * twelve OTHER words would not satisfy the count above and pass.
      */
     @Test
     fun testTheWordsTheHandCopyCouldNotReachAreOnTheScreen() {
         val ja = saijikiGroups(UiLanguage.Ja)
         val words = ja.flatMap { it.words }
-        for (word in listOf("雲形", "銀筆", "黄", "橙", "紫", "敷き詰める", "細かい", "粗い", "密な", "疎な", "下塗り")) {
+        for (word in listOf("雲形", "銀筆", "黄", "橙", "紫", "敷き詰める", "細かい", "粗い", "密な", "疎な", "下塗り", "刷毛目")) {
             assertTrue("missing from the screen: $word", word in words)
+        }
+        for ((lang, sweep, brushmarks) in listOf(Triple(UiLanguage.Ja, "刷き", "刷毛目"), Triple(UiLanguage.En, "sweep", "brushmarks"))) {
+            val surfaces = saijikiGroups(lang).first { it.key == "omote" }.words
+            assertTrue("$lang: brushmarks is offered", brushmarks in surfaces)
+            assertEquals("$lang: brushmarks follows sweep", surfaces.indexOf(sweep) + 1, surfaces.indexOf(brushmarks))
         }
         val aida = ja.firstOrNull { it.key == "aida" }
         assertTrue("the aida category is absent from the screen", aida != null)
@@ -144,7 +150,9 @@ class SaijikiIsGeneratedTest {
             val words = saijikiDetectionWords(lang).map { it.first }.toSet()
             assertTrue("$lang: does not recognise the Japanese 円", "円" in words)
             assertTrue("$lang: does not recognise the English circle", "circle" in words)
-            assertEquals("$lang: detection surfaces", 216, words.size)
+            assertTrue("$lang: does not recognise 刷毛目", "刷毛目" in words)
+            assertTrue("$lang: does not recognise brushmarks", "brushmarks" in words)
+            assertEquals("$lang: detection surfaces", 218, words.size)
         }
     }
 

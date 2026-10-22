@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-22 — macOS Saijiki adds fineness and underlayer
+
+The bundled vocabulary and Web reference now show fineness (fine-grained, coarse-grained, packed and sparse) and underlayer (underpainted) after handling. Each word includes its preview, explanation and example. Existing groups, word order and previews are preserved.
+
 ### 2026-10-22 — Add fineness and underlayer explanations and previews to Android's Saijiki
 
 Fine-grained, coarse-grained, packed, sparse and underpainted now show Web's Japanese and English explanations, example instructions and comparison drawings. Two group colors follow handling, restoring the earlier color assignments of the groups after it. The screen shows 16 groups and 108 words, and recognizes 216 words across both languages. Drawing semantics stay in the shared core.

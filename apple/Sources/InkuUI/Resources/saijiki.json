@@ -670,6 +670,81 @@
       ]
     },
     {
+      "key": "kime",
+      "marker_class": null,
+      "marker_order_en": null,
+      "marker_order_ja": null,
+      "name_en": "fineness",
+      "name_ja": "きめ",
+      "words": [
+        {
+          "default": false,
+          "display": true,
+          "marker": null,
+          "marker_surfaces_en": null,
+          "marker_surfaces_ja": null,
+          "prompt": true,
+          "score_value": null,
+          "surface_en": "fine-grained",
+          "surface_ja": "細かい"
+        },
+        {
+          "default": false,
+          "display": true,
+          "marker": null,
+          "marker_surfaces_en": null,
+          "marker_surfaces_ja": null,
+          "prompt": true,
+          "score_value": null,
+          "surface_en": "coarse-grained",
+          "surface_ja": "粗い"
+        },
+        {
+          "default": false,
+          "display": true,
+          "marker": null,
+          "marker_surfaces_en": null,
+          "marker_surfaces_ja": null,
+          "prompt": true,
+          "score_value": null,
+          "surface_en": "packed",
+          "surface_ja": "密な"
+        },
+        {
+          "default": false,
+          "display": true,
+          "marker": null,
+          "marker_surfaces_en": null,
+          "marker_surfaces_ja": null,
+          "prompt": true,
+          "score_value": null,
+          "surface_en": "sparse",
+          "surface_ja": "疎な"
+        }
+      ]
+    },
+    {
+      "key": "shitaji",
+      "marker_class": null,
+      "marker_order_en": null,
+      "marker_order_ja": null,
+      "name_en": "underlayer",
+      "name_ja": "したじ",
+      "words": [
+        {
+          "default": false,
+          "display": true,
+          "marker": null,
+          "marker_surfaces_en": null,
+          "marker_surfaces_ja": null,
+          "prompt": true,
+          "score_value": null,
+          "surface_en": "underpainted",
+          "surface_ja": "下塗り"
+        }
+      ]
+    },
+    {
       "key": "ji",
       "marker_class": null,
       "marker_order_en": null,

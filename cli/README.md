@@ -358,7 +358,7 @@ usage: inku-cli paint [-h] [--base-url BASE_URL]
                       [--history-input HISTORY_INPUT]
                       [--catalog-id CATALOG_ID]
                       [--color-catalog COLOR_CATALOG]
-                      [--canvas-aspect {square,golden,a4,b4,pillar,oban,wide,byobu,vertical}]
+                      [--canvas-aspect {square,golden,a4,b4,pillar,oban,wide,byobu,vertical,sd_monitor,hd_monitor}]
                       [--render-seed RENDER_SEED]
                       [--composition-seed COMPOSITION_SEED] [--sketch]
                       [--sketch-grain {fine,coarse}]
@@ -400,7 +400,7 @@ options:
   --color-catalog COLOR_CATALOG
                         server color catalog id for renderer and benchmark
                         tracing
-  --canvas-aspect {square,golden,a4,b4,pillar,oban,wide,byobu,vertical}
+  --canvas-aspect {square,golden,a4,b4,pillar,oban,wide,byobu,vertical,sd_monitor,hd_monitor}
                         canvas aspect id for paint, compose, and history
   --render-seed RENDER_SEED
                         renderer performance seed for reproducible replay
@@ -453,7 +453,7 @@ usage: inku-cli batch [-h] [--base-url BASE_URL]
                       [--history-input HISTORY_INPUT]
                       [--catalog-id CATALOG_ID]
                       [--color-catalog COLOR_CATALOG]
-                      [--canvas-aspect {square,golden,a4,b4,pillar,oban,wide,byobu,vertical}]
+                      [--canvas-aspect {square,golden,a4,b4,pillar,oban,wide,byobu,vertical,sd_monitor,hd_monitor}]
                       [--render-seed RENDER_SEED]
                       [--composition-seed COMPOSITION_SEED] [--sketch]
                       [--sketch-grain {fine,coarse}]
@@ -493,7 +493,7 @@ options:
   --color-catalog COLOR_CATALOG
                         server color catalog id for renderer and benchmark
                         tracing
-  --canvas-aspect {square,golden,a4,b4,pillar,oban,wide,byobu,vertical}
+  --canvas-aspect {square,golden,a4,b4,pillar,oban,wide,byobu,vertical,sd_monitor,hd_monitor}
                         canvas aspect id for paint, compose, and history
   --render-seed RENDER_SEED
                         renderer performance seed for reproducible replay
@@ -602,7 +602,7 @@ usage: inku-cli analyze [-h] [--base-url BASE_URL]
                         [--timeout-seconds TIMEOUT_SECONDS] [--diversity]
                         [--census] [--history] [--output OUTPUT]
                         [--replay REPLAY] [--replay-limit REPLAY_LIMIT]
-                        [--canvas-aspect {square,golden,a4,b4,pillar,oban,wide,byobu,vertical}]
+                        [--canvas-aspect {square,golden,a4,b4,pillar,oban,wide,byobu,vertical,sd_monitor,hd_monitor}]
                         [--catalog-id CATALOG_ID]
                         [--color-catalog COLOR_CATALOG]
                         [input_dir]
@@ -630,7 +630,7 @@ options:
                         other seed
   --replay-limit REPLAY_LIMIT
                         maximum score artifacts to replay
-  --canvas-aspect {square,golden,a4,b4,pillar,oban,wide,byobu,vertical}
+  --canvas-aspect {square,golden,a4,b4,pillar,oban,wide,byobu,vertical,sd_monitor,hd_monitor}
   --catalog-id CATALOG_ID
                         color catalog id (legacy alias)
   --color-catalog COLOR_CATALOG

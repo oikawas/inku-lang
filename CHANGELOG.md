@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-23 — The CLI takes all eleven canvases
+
+`inku-cli --canvas-aspect` took only nine canvases, without `sd_monitor` (4:3) and `hd_monitor` (16:9). The CLI's ratio table gains both, and the help in `cli/README.md` and the CLI reference (ja/en) are regenerated. The canvas table of "Creating Images" §7 lists all eleven too.
+
 ### 2026-10-23 — The aspect ratio declaration and fitting (DDL 26, render engine 93)
 
 The author retired the rule that a DDL carries no ratio: a DDL now declares the ratio it was laid out in with `Aspect ratio W:H.` / 「画面比W:H。」. The app writes the paper's ratio first into a new DDL (one drawn from a description and one newly written), and an edit or a redraw adds none. The declaration makes no instruction, takes no sentence number and is no seed material, so a declared DDL's Score is the undeclared one's but for `canvas.declared_ratio` (checked on the 5,157 DDLs of the 10/17 export). Drawn on a paper of another ratio, the app asks whether to fit it in or to draw it to the paper. Fitted, the composition keeps its ratio in a frame in the middle of the paper, background and ground cover the paper, and marks are not cut at the frame but reach the paper's edges. A saved work is fitted from its saved Score and saved as the new derivation "Fit". A saved work without a declaration is drawn as before, its ratio taken from the paper it was drawn on. The Saijiki screens show the display-only category がめん / aspect. The prompts to a model are unchanged. A Score may carry `canvas.declared_ratio` and `canvas.fit` (a Score without them is written as before). DDL 25 → 26, DDL engine 69 → 70, render engine 92 → 93.

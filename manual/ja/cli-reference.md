@@ -84,7 +84,7 @@ JSON成果物は、その絵を描いたDDL層の版を `ddl_version` と `ddl_e
 | `--catalog-id ID` | `--color-catalog` の旧名 |
 | `--catalog-mode {fixed,auto,random}` | `fixed` は `--color-catalog` を使う、`auto` はサーバーが記述を読んで選ぶ、`random` は `--color-catalog` 以外から引く |
 | `--from-work WORK_ID` | `render-score` 専用。**その作品が描かれた当時の色と制限値で描く**（カタログの今日の定義でも今日の設定でもなく、作品の行に記録された値を使う）。**改名・引退したカタログの作品も描ける。**`--color-catalog` / `--catalog-id` とは併用できない |
-| `--canvas-aspect {square,golden,a4,b4,pillar,oban,wide,byobu,vertical}` | キャンバスの比率 |
+| `--canvas-aspect {square,golden,a4,b4,pillar,oban,wide,byobu,vertical,sd_monitor,hd_monitor}` | キャンバスの比率 |
 
 ### seed と再現
 

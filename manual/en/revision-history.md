@@ -4,7 +4,7 @@ This file records revisions to user and operations documents under `manual/`. Se
 
 ## 2026-10-23 — The aspect ratio declaration
 
-With DDL 26 a DDL declares the ratio it was laid out in with `Aspect ratio W:H.`, so the DDL reference gains 3.27, and the four places that said a canvas format is not written in DDL now say that the app chooses the paper and the DDL declares the ratio. The category list gains the display-only がめん / aspect. Section 7 of "Creating Images" describes the declaration a new instruction set begins with and the question asked when it is drawn on a paper of another ratio (`Fit it in` / `Draw to this paper`), and the lineage gains the `Fit` derivation. The canvas table of section 7 gains the missing SD Monitor and HD Monitor, eleven in all.
+With DDL 26 a DDL declares the ratio it was laid out in with `Aspect ratio W:H.`, so the DDL reference gains 3.27, and the four places that said a canvas format is not written in DDL now say that the app chooses the paper and the DDL declares the ratio. The category list gains the display-only がめん / aspect. Section 7 of "Creating Images" describes the declaration a new instruction set begins with and the question asked when it is drawn on a paper of another ratio (`Fit it in` / `Draw to this paper`), and the lineage gains the `Fit` derivation. The canvas table of section 7 gains the missing SD Monitor and HD Monitor, eleven in all, and the CLI reference's `--canvas-aspect` follows the CLI, which now takes all eleven.
 
 ## 2026-10-23 — The width of a thick sweep band
 

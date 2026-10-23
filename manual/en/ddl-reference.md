@@ -800,14 +800,13 @@ The `default=true` flags on pen, solid, empty, and black annotate the reference 
 | `sabaki` | さばき | handling | 3 | Public |
 | `kime` | きめ | fineness | 4 | Public |
 | `shitaji` | したじ | underlayer | 1 | Public |
-| `ji` | じ | grounds | 7 | Public |
+| `ji` | じ | grounds | 7 | Public; the aspect ratio declaration (3.27) is also displayed last |
 | `iro` | いろ | colors | 9 | Public |
 | `yuragi` | ゆらぎ | movements | 7 | Public |
 | `basho` | ばしょ | places | 11 | Public; endpoint words belong in relation phrases |
 | `ugoki` | うごき | motions | 7 | Six public, one retired |
 | `jun` | じゅん | order | 2 | Public |
 | `wariai` | わりあい | proportions | 8 | Public |
-| `gamen` | がめん | aspect | 0 | Displays the aspect ratio declaration (3.27); not a Saijiki word |
 | `aida` | あいだ | relations | 11 | Displayed from the separate `relations` table |
 
 ### 4.1. Forms — かたち
@@ -955,6 +954,8 @@ A ground belongs to the whole canvas, separately from a form or its face. Write 
 | カンバス | `canvas` | A woven canvas ground, rather than a canvas format selection. | `カンバス。` / `Canvas.` |
 | 画用紙 | `drawing paper` | A drawing paper ground. | `画用紙。` / `Drawing paper.` |
 | メゾチント | `mezzotint` | A black ground covering the background with a plate's tone. | `メゾチント。` / `Mezzotint.` |
+
+The saijiki screen also shows `aspect ratio` at the end of this category. It sits here because, like a ground, it speaks of the canvas itself, but it is no Saijiki word: it is the declaration of the ratio a DDL was laid out in (3.27, `Aspect ratio 16:9.` / `画面比16:9。`).
 
 ### 4.10. Colors — いろ
 

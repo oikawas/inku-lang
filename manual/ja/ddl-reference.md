@@ -810,14 +810,13 @@ place one red circle radius 0.1 at horizontal 0.5, vertical 0.5.
 | `sabaki` | さばき | handling | 3 | 公開 |
 | `kime` | きめ | fineness | 4 | 公開 |
 | `shitaji` | したじ | underlayer | 1 | 公開 |
-| `ji` | じ | grounds | 7 | 公開 |
+| `ji` | じ | grounds | 7 | 公開。末尾に画面比の宣言（3.27）も表示する |
 | `iro` | いろ | colors | 9 | 公開 |
 | `yuragi` | ゆらぎ | movements | 7 | 公開 |
 | `basho` | ばしょ | places | 11 | 公開。端点語は関係句で使う |
 | `ugoki` | うごき | motions | 7 | 公開6、廃止1 |
 | `jun` | じゅん | order | 2 | 公開 |
 | `wariai` | わりあい | proportions | 8 | 公開 |
-| `gamen` | がめん | aspect | 0 | 画面比の宣言（3.27）を表示する。歳時記の語ではない |
 | `aida` | あいだ | relations | 11 | `relations`別表から表示 |
 
 ### 4.1. かたち — forms
@@ -965,6 +964,8 @@ place one red circle radius 0.1 at horizontal 0.5, vertical 0.5.
 | カンバス | `canvas` | 織りのあるカンバスの地。キャンバス比を選ぶ語ではない。 | `カンバス。` / `Canvas.` |
 | 画用紙 | `drawing paper` | 画用紙の地。 | `画用紙。` / `Drawing paper.` |
 | メゾチント | `mezzotint` | 版で背景を覆う黒い地。 | `メゾチント。` / `Mezzotint.` |
+
+歳時記の画面では、この類の末尾に「画面比」も表示する。地と同じくキャンバスそのものについての文なので並べるが、歳時記の語ではなく、DDL が組んだ比の宣言（3.27、`画面比16:9。` / `Aspect ratio 16:9.`）である。
 
 ### 4.10. いろ — colors
 

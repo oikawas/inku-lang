@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-23 — The saijiki shows the aspect ratio under じ
+
+By the author's judgment, the display-only category がめん / aspect is gone and `aspect ratio` / 画面比 is shown at the end of じ / grounds, since like a ground it speaks of the canvas itself. It stays no Saijiki word (no parser candidate, not in any prompt), and the DDL, DDL engine and render engine versions and the Saijiki asset are unchanged. The saijiki display has sixteen categories again. The web saijiki's example for it is now `Aspect ratio 16:9.` / `画面比16:9。` instead of the unreadable `Use "aspect ratio"`.
+
 ### 2026-10-23 — Correct DDL reference constraints and the crossing example
 
 The Japanese and English reference now states connection and touching targets, one-mark placement, coordinate precision limits, and the exclusion of prior points for resting on and overlapping. Example 5.30 specifies the crossing line's length. SPEC's older descriptions of retention after a failed connection and touching with a current free line are aligned. Implementation and drawing semantics are unchanged.

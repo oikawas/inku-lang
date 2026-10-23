@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-23 — The CLI takes all eleven canvases
+
+`inku-cli --canvas-aspect` took only nine canvases, without `sd_monitor` (4:3) and `hd_monitor` (16:9). The CLI's ratio table gains both, and the help in `cli/README.md` and the CLI reference (ja/en) are regenerated. The canvas table of "Creating Images" §7 lists all eleven too.
+
 ### 2026-10-23 — Correct DDL reference constraints and the crossing example
 
 The Japanese and English reference now states connection and touching targets, one-mark placement, coordinate precision limits, and the exclusion of prior points for resting on and overlapping. Example 5.30 specifies the crossing line's length. SPEC's older descriptions of retention after a failed connection and touching with a current free line are aligned. Implementation and drawing semantics are unchanged.

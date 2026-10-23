@@ -76,6 +76,8 @@ CANVAS_ASPECT_RATIOS = {
     "wide": 2.35,
     "byobu": 2.2,
     "vertical": 9.0 / 16.0,
+    "sd_monitor": 4.0 / 3.0,
+    "hd_monitor": 16.0 / 9.0,
 }
 
 FIGURATIVE_HINT_RE = re.compile(r"\b(body|face|eye|mouth)\b")

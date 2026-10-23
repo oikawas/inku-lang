@@ -84,7 +84,7 @@ Variation is retired. The old amplitude and seed flags are rejected. Saved varia
 | `--catalog-id ID` | Legacy alias for `--color-catalog` |
 | `--catalog-mode {fixed,auto,random}` | `fixed` uses `--color-catalog`, `auto` lets the server read the description and pick, `random` draws one other than `--color-catalog` |
 | `--from-work WORK_ID` | `render-score` only. **Draws in the colors and under the limits that work was drawn in** — the values recorded on the work's own row, not today's definition of its catalog and not today's settings. **A work whose catalog was renamed or retired still draws.** Cannot be combined with `--color-catalog` / `--catalog-id` |
-| `--canvas-aspect {square,golden,a4,b4,pillar,oban,wide,byobu,vertical}` | Canvas aspect ratio |
+| `--canvas-aspect {square,golden,a4,b4,pillar,oban,wide,byobu,vertical,sd_monitor,hd_monitor}` | Canvas aspect ratio |
 
 ### Seeds and replay
 

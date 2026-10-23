@@ -11,6 +11,9 @@ struct AppCheck {
         if CommandLine.arguments.contains("--core-version-only") {
             print(InkuCore.versionReport); return
         }
+        if CommandLine.arguments.contains("--canvas-ratio-authoring-only") {
+            try await runCanvasRatioAuthoringChecks(); return
+        }
         if let index = CommandLine.arguments.firstIndex(of: "--shared-autonomous-refine-only") {
             guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Expected the shared autonomous refinement cases") }
             try runSharedAutonomousRefineChecks(casesURL: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return

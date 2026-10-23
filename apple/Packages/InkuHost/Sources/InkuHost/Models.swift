@@ -105,6 +105,8 @@ public struct GenerationRequest: Codable, Sendable {
     public var lawsRecords: Data?
     /// Start the shared pipeline at `saved_laws`, using the parent's saved instructions and records.
     public var savedLawsDirection: Data?
+    /// Only a parentless direct DDL asks core to record the paper it is authored for.
+    public var declareCanvas: Bool?
     public init(authoring: GenerationAuthoring, configuration: Data, renderOptions: Data, clipPolicy: Data,
                 models: ModelSelection = .init(), providers: [ProviderSettings] = [],
                 renderColorMaps: [String: Data] = [:],
@@ -112,7 +114,7 @@ public struct GenerationRequest: Codable, Sendable {
                 saveHistory: Bool = true, historyVisibility: String = "normal",
                 retainedDocument: Data? = nil, retainedAuthority: Data? = nil, chatGPTSession: ChatGPTPlanSession? = nil,
                 derivationMetadata: Data? = nil, interpretationSeed: String? = nil, captureProviderIO: Bool? = nil,
-                disabledPluginNames: [String]? = nil, provenance: GenerationProvenance? = nil) {
+                disabledPluginNames: [String]? = nil, provenance: GenerationProvenance? = nil, declareCanvas: Bool? = nil) {
         self.authoring = authoring; self.configuration = configuration; self.renderOptions = renderOptions
         self.clipPolicy = clipPolicy; self.models = models; self.providers = providers
         self.renderColorMaps = renderColorMaps
@@ -126,6 +128,7 @@ public struct GenerationRequest: Codable, Sendable {
         self.captureProviderIO = captureProviderIO
         self.disabledPluginNames = disabledPluginNames
         self.provenance = provenance
+        self.declareCanvas = declareCanvas
     }
 }
 

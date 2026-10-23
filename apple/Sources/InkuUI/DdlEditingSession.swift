@@ -51,11 +51,11 @@ public final class DdlEditingSession: Identifiable {
 
     public func commit(to model: AppModel, wildOverride: Bool? = nil) async -> Bool {
         guard canSubmit(to: model) else { return false }
-        if let sourceWork { return await model.drawEditedDDL(work: sourceWork, source: draft, wildOverride: wildOverride) }
+        if let sourceWork { return await model.drawEditedDDL(work: sourceWork, source: draft, wildOverride: wildOverride, presentation: .editor) }
         let previousInput = model.ddlText
         model.ddlText = draft
         guard model.canCommitDDL else { model.ddlText = previousInput; return false }
-        await model.commitDDL(wildOverride: wildOverride)
+        await model.commitDDL(wildOverride: wildOverride, presentation: .editor)
         let committed = model.errorText == nil && model.visibleDDL == draft
         if !committed, model.displayedWork?.id == sourceWorkID, model.authoringRevision == sourceRevision {
             model.ddlText = previousInput

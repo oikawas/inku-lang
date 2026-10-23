@@ -1,4 +1,5 @@
 import Foundation
+import InkuPersistence
 
 public struct GroundMaterial: Decodable, Sendable, Equatable {
     public let value: String
@@ -27,6 +28,35 @@ public struct ColorArrangementPage: Sendable {
 }
 
 extension PipelineHost {
+    /// Core changes the saved Score; the host changes only the target paper in the rendering options.
+    public func fitSavedWork(workID: String, paper: ReplayOptions) async throws -> SavedWork {
+        guard paper.canvasWidth.isFinite, paper.canvasHeight.isFinite,
+              paper.canvasWidth > 0, paper.canvasHeight > 0,
+              paper.canvasWidth <= Double(UInt32.max), paper.canvasHeight <= Double(UInt32.max) else {
+            throw HostError("replay_options_invalid")
+        }
+        let base = try await makeSavedScoreReplayPlan(workID: workID, derivationKind: "canvas_fit")
+        let score = try ExactJSON(data: Data(base.work.score.utf8))
+        let result = try SavedVariants.response(.object([
+            "action": .string("fit_render"), "score": score,
+            "drawn_on": .optional(base.work.renderCanvasAspectID ?? base.work.renderCanvasAspect),
+            "paper": .string(paper.canvasID),
+        ]))
+        var render = try ExactJSON(data: base.renderRequest)
+        render["request"]["score"] = try result.requiredObject("score")
+        render["request"]["options"]["canvas_aspect_id"] = .string(paper.canvasID)
+        render["request"]["options"]["canvas"] = .object([
+            "width": .number(String(Int(paper.canvasWidth))), "height": .number(String(Int(paper.canvasHeight))),
+        ])
+        let plan = SavedScoreReplayPlan(work: base.work, parentNode: base.parentNode, context: base.context,
+            renderRequest: render.data, derivationKind: "canvas_fit",
+            derivationMetadata: try result.requiredObject("derivation_metadata").data,
+            variationAmplitude: nil, variationSeed: nil)
+        let candidate = try await previewSavedScoreReplay(plan)
+        try Task.checkCancellation()
+        return try await saveCandidate(executionID: candidate.executionID)
+    }
+
     public func makeColorArrangementPage(workID: String, cursor: SavedVariantOrdinal) async throws -> ColorArrangementPage {
         let base = try await makeSavedScoreReplayPlan(workID: workID, derivationKind: "color_arrangement_change")
         guard base.work.renderSeed != nil else { throw HostError("saved_refinement_options_unavailable") }

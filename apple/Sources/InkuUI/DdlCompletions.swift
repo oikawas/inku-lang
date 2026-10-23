@@ -13,8 +13,9 @@ public struct DdlCompletions {
             var seen = Set<String>()
             return words.filter { !$0.isEmpty && seen.insert($0).inserted }
         }
-        japanese = unique(saijiki.flatMap { $0.words.map(\.japanese) } + plugins.map { $0.displayName(language: "ja") })
-        english = unique(saijiki.flatMap { $0.words.compactMap(\.english) } + plugins.map { $0.displayName(language: "en") })
+        let words = saijiki.flatMap(\.words).filter { !$0.referenceOnly }
+        japanese = unique(words.map(\.japanese) + plugins.map { $0.displayName(language: "ja") })
+        english = unique(words.compactMap(\.english) + plugins.map { $0.displayName(language: "en") })
         self.language = language
     }
 

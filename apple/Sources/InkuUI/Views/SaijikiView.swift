@@ -63,7 +63,7 @@ public struct SaijikiView: View {
                         .inkuFont(10).foregroundStyle(.secondary)
                 }
                 if !preview.insertable {
-                    Text(model.display.localized("この語は参照のみです。DDLに挿入する定義が同梱されていません。"))
+                    Text(referenceOnlyHint)
                         .inkuFont(10).foregroundStyle(.secondary)
                 }
             } else {
@@ -225,7 +225,7 @@ public struct SaijikiView: View {
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         if !preview.insertable {
-                            Text(model.display.localized("この語は参照のみです。DDLに挿入する定義が同梱されていません。"))
+                            Text(referenceOnlyHint)
                                 .inkuFont(12).foregroundStyle(.secondary)
                         }
                     } else if let copy {
@@ -256,7 +256,7 @@ public struct SaijikiView: View {
             return Preview(id: id, title: name(word),
                 effect: word.preview?.effect(language: uiLanguage) ?? (uiLanguage == "ja" ? word.detail : word.englishDetail ?? ""),
                 example: word.preview?.example(language: offeredLanguage) ?? "", svg: word.preview?.svg,
-                imageURL: nil, insertable: true)
+                imageURL: nil, insertable: !word.referenceOnly)
         case .plugin(let id):
             guard let word = model.pluginWords.first(where: { $0.id == id }) else { return nil }
             return Preview(id: id, title: word.displayName(language: offeredLanguage),
@@ -269,6 +269,12 @@ public struct SaijikiView: View {
 
     private func name(_ word: SaijikiWord) -> String {
         offeredLanguage == "ja" ? word.japanese : word.english ?? word.japanese
+    }
+    private var referenceOnlyHint: String {
+        if case .builtin(let id) = selection, id.hasPrefix("gamen:") {
+            return model.display.localized("画面比の宣言は、比の数を添えてDDLの先頭に書きます。")
+        }
+        return model.display.localized("この語は参照のみです。DDLに挿入する定義が同梱されていません。")
     }
     private func tip(_ key: String) -> String {
         model.display.tooltip(key)

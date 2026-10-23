@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-23 — macOS adds aspect ratio declarations and fitting
+
+New direct instructions ask the core to record their aspect ratio. When the declaration and paper differ, the author can fit the work in, draw to the paper, or cancel while keeping the dialog and input. An unedited saved work uses its saved Score to make a fitted child, preserving its instructions, version, seeds and description authority. Saijiki now shows aspect and relations; the aspect term is reference-only.
+
 ### 2026-10-23 — Correct DDL reference constraints and the crossing example
 
 The Japanese and English reference now states connection and touching targets, one-mark placement, coordinate precision limits, and the exclusion of prior points for resting on and overlapping. Example 5.30 specifies the crossing line's length. SPEC's older descriptions of retention after a failed connection and touching with a current free line are aligned. Implementation and drawing semantics are unchanged.

@@ -70,6 +70,9 @@ pub(crate) struct OilPaintStyle<'a> {
     tolerance: f64,
     /// An open line or arc: its own marks stay wider and longer than a fill pass's.
     line: bool,
+    /// Pixels per unit of a 1,000-unit short side: a line's ridges are counted
+    /// and capped in units (render engine 92).
+    scale: f64,
 }
 
 impl<'a> OilPaintStyle<'a> {
@@ -80,13 +83,15 @@ impl<'a> OilPaintStyle<'a> {
             tone: OilTone::Dense,
             tolerance: 0.0,
             line: false,
+            scale: 1.0,
         }
     }
 
     /// A drawn line, arc or the outline of an unfilled shape.
-    pub fn stroke(color: &'a str, opacity: f64) -> Self {
+    pub fn stroke(color: &'a str, opacity: f64, canvas: CanvasSize) -> Self {
         Self {
             line: true,
+            scale: canvas.unit() / 1000.0,
             ..Self::plain(color, opacity)
         }
     }
@@ -113,6 +118,7 @@ impl<'a> OilPaintStyle<'a> {
             },
             tolerance: if dense { canvas.unit() * 0.00025 } else { 0.0 },
             line: false,
+            scale: canvas.unit() / 1000.0,
         }
     }
 }
@@ -314,11 +320,19 @@ fn simplify_oil_ridge(left: &mut Vec<Point>, right: &mut Vec<Point>, closed: boo
     *right = keep.iter().map(|&index| right[index]).collect();
 }
 
+/// An open oil line or arc carries a mark for every 15 units of its width when
+/// that is more than its own two to five, none wider than 2.5 units (render
+/// engine 92): a broad stroke of a few wide marks read as a small stroke
+/// enlarged (the author, 2026-10-23).
+const OIL_LINE_RIDGE_SPACING: f64 = 15.0;
+const OIL_LINE_RIDGE_WIDEST: f64 = 2.5;
+
 /// Bounded, filter-free bristle marks follow the performed banks in every
 /// profile. A pass carries two to five marks of its own pigment, each a little
 /// darker or lighter, set at seeded places across it and running only part of
 /// its length, so neighbouring passes do not line up into a grain. Where the
 /// pass pinches, a mark thins away instead of meeting the others in a point.
+/// An open line or arc may carry more and narrower marks (above).
 pub(crate) fn oil_paint_stroke(
     path: String,
     left: &[Point],
@@ -356,6 +370,10 @@ pub(crate) fn oil_paint_stroke(
     if closed {
         count = count.min(2);
     }
+    let line = style.line && !closed;
+    if line {
+        count = count.max((median / style.scale / OIL_LINE_RIDGE_SPACING).round() as usize);
+    }
     // One light from the upper left: a pass painted the other way still
     // catches it on the same side of its ridge.
     let middle = left.len() / 2;
@@ -371,13 +389,15 @@ pub(crate) fn oil_paint_stroke(
         let index = streak as i64;
         let center =
             0.06 + bin * (streak as f64 + 0.15 + 0.70 * hash01(index, seed, "oil-streak-position"));
-        let line = style.line && !closed;
         let (narrowest, widest, latest_start, shortest) = if line {
             (0.024, 0.05, 0.15, 0.6)
         } else {
             (0.012, 0.03, 0.35, 0.4)
         };
-        let width = narrowest + (widest - narrowest) * hash01(index, seed, "oil-streak-width");
+        let mut width = narrowest + (widest - narrowest) * hash01(index, seed, "oil-streak-width");
+        if line {
+            width = width.min(OIL_LINE_RIDGE_WIDEST * style.scale / median);
+        }
         let start = latest_start * hash01(index, seed, "oil-streak-start");
         let end =
             start + shortest + (1.0 - shortest - start) * hash01(index, seed, "oil-streak-end");
@@ -533,6 +553,11 @@ pub fn texture_filter_id(weight: Weight) -> Option<&'static str> {
     }
 }
 
+/// A tool's texture filter: its displacement and blur, computed in sRGB like
+/// every other filter of the drawing (render engine 92). Computed in the
+/// default linearRGB at eight bits, a near-black pigment kept a few levels,
+/// and a rasterizer's blur carried a lighter streak's rounding across a black
+/// band as a flat grey stripe (the author's 2026-10-23 example).
 #[must_use]
 pub fn texture_filter(weight: Weight, canvas: CanvasSize) -> Option<Element> {
     let spec = texture_spec(weight)?;
@@ -543,7 +568,8 @@ pub fn texture_filter(weight: Weight, canvas: CanvasSize) -> Option<Element> {
         .attr("x", format!("-{}%", spec.margin))
         .attr("y", format!("-{}%", spec.margin))
         .attr("width", format!("{}%", 100 + u16::from(spec.margin) * 2))
-        .attr("height", format!("{}%", 100 + u16::from(spec.margin) * 2));
+        .attr("height", format!("{}%", 100 + u16::from(spec.margin) * 2))
+        .attr("color-interpolation-filters", "sRGB");
     if let Some(frequency) = spec.base_frequency {
         filter.push(
             Element::new("feTurbulence")
@@ -623,4 +649,69 @@ pub fn performance_touch_filter(seed: Seed, canvas: CanvasSize) -> (String, Elem
             .attr("yChannelSelector", "G"),
     );
     (id, filter)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::svg::Node;
+
+    /// The ridges of a straight oil line `width` units wide, and the widest of
+    /// them in units.
+    fn ridges(width: f64) -> (usize, f64) {
+        let bank = |offset: f64| {
+            (0..=40)
+                .map(|index| Point::new(f64::from(index) * 20.0, 500.0 + offset))
+                .collect::<Vec<_>>()
+        };
+        let (left, right) = (bank(-width / 2.0), bank(width / 2.0));
+        let stroke = oil_paint_stroke(
+            String::new(),
+            &left,
+            &right,
+            OilPaintStyle::stroke("#ffffff", 1.0, CanvasSize::new(1000.0, 1000.0)),
+            91,
+            false,
+        );
+        let mut count = 0;
+        let mut widest = 0.0_f64;
+        for child in stroke.children() {
+            let Node::Element(ridge) = child else {
+                continue;
+            };
+            if !ridge
+                .attribute("class")
+                .is_some_and(|class| class.starts_with("oil-paint-ridge"))
+            {
+                continue;
+            }
+            count += 1;
+            // A ridge's two banks meet the same sample at the same x, so its
+            // width there is the span of its points' y at that x.
+            let mut spans = std::collections::BTreeMap::<i64, (f64, f64)>::new();
+            for point in ridge.attribute("d").unwrap().split(['M', 'L', 'Z']) {
+                let mut values = point.split_whitespace().map(|value| value.parse::<f64>());
+                let (Some(Ok(x)), Some(Ok(y))) = (values.next(), values.next()) else {
+                    continue;
+                };
+                let span = spans.entry((x * 100.0).round() as i64).or_insert((y, y));
+                *span = (span.0.min(y), span.1.max(y));
+            }
+            for (low, high) in spans.values() {
+                widest = widest.max(high - low);
+            }
+        }
+        (count, widest)
+    }
+
+    #[test]
+    fn a_wide_oil_line_carries_a_narrow_ridge_for_every_fifteen_units() {
+        // Render engine 92: a 180-unit line, an extra-thick oil sweep before it.
+        let (count, widest) = ridges(180.0);
+        assert!(count >= 12, "{count}");
+        assert!(widest <= 2.5 + 0.02, "{widest}");
+        // A line of the oil paint's default width keeps its two to five.
+        let (count, _) = ridges(12.0);
+        assert!((2..=6).contains(&count), "{count}");
+    }
 }

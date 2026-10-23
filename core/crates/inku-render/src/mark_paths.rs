@@ -8,12 +8,16 @@ use crate::geometry::{
     ArcGeometry, arc_points, arc_points_with_variation, frequency_cycles, open_line_with_variation,
     point_to_pixels, size_to_pixels, stroke_sample_count,
 };
-use crate::marks::{MarkContext, MarkStyle, apply_style, is_closed, mark_width, sweep_band_width};
+use crate::marks::{
+    MarkContext, MarkStyle, apply_style, is_closed, is_open_band, mark_width, open_band_width,
+    round_width,
+};
 use crate::materials::{OilPaintStyle, oil_paint_stroke, with_texture_filter};
 use crate::planning::instruction_anchor_on_canvas;
 use crate::stroke::{
-    ContourStrokeRequest, ContourStrokeResult, StrokeRequest, StrokeSample, StrokeTerminal,
-    outline_for_centerline, stroke_event_count, synthesize_contour, synthesize_stroke,
+    BandHand, ContourStrokeRequest, ContourStrokeResult, StrokeRequest, StrokeSample,
+    StrokeTerminal, outline_for_centerline, stroke_event_count, synthesize_contour_by,
+    synthesize_stroke_by,
 };
 use crate::support::{Support, support_with_mark_word};
 use crate::svg::{Element, closed_polyline_path, format_number, points_list, write_number};
@@ -481,6 +485,19 @@ fn computer_cells(points: &[(Point, f64)], step: f64, color: &str, closed: bool)
         .collect()
 }
 
+/// The hand a line or an arc is performed with: an open band (a sweep or a
+/// wash) sways by its round tool's width and keeps the octaves its samples
+/// can draw (render engine 92); any other mark keeps the round hand.
+fn band_hand(instruction: &Instruction, style: &MarkStyle, context: MarkContext<'_>) -> BandHand {
+    if !is_open_band(instruction) || style.width <= 0.0 {
+        return BandHand::ROUND;
+    }
+    BandHand {
+        sway_share: round_width(instruction, context.canvas) / style.width,
+        smooth: true,
+    }
+}
+
 pub(crate) fn hand_line(
     instruction: &Instruction,
     start: Point,
@@ -490,6 +507,7 @@ pub(crate) fn hand_line(
     context: MarkContext<'_>,
 ) -> Element {
     let seed = context.seed_for(instruction);
+    let hand = band_hand(instruction, style, context);
     let connected_centerline = connected_centerline.map(|points| {
         points
             .iter()
@@ -541,23 +559,27 @@ pub(crate) fn hand_line(
             seed,
             support,
             scale: context.canvas.unit() / 1000.0,
-            brush_size: sweep_band_width(instruction, context.canvas),
+            brush_size: open_band_width(instruction, context.canvas),
+            fine_streaks: true,
         })
     };
     // Only the computer rounds onto a lattice; its cells follow the path drawn.
     let step = grid_step(instruction.weight, context.canvas);
     let (outline, event_count, band, cells) = if let Some(centerline) = centerline {
-        let varied = synthesize_stroke(StrokeRequest {
-            start,
-            end,
-            base_width: style.width,
-            weight: instruction.weight,
-            seed,
-            sample_count: centerline.len(),
-            wild: context.wild,
-            grid_step: grid_step(instruction.weight, context.canvas),
-            support,
-        });
+        let varied = synthesize_stroke_by(
+            StrokeRequest {
+                start,
+                end,
+                base_width: style.width,
+                weight: instruction.weight,
+                seed,
+                sample_count: centerline.len(),
+                wild: context.wild,
+                grid_step: grid_step(instruction.weight, context.canvas),
+                support,
+            },
+            hand,
+        );
         let event_count = stroke_event_count(instruction.weight, seed, sample_count);
         let band = if flat {
             let energies = varied
@@ -590,17 +612,20 @@ pub(crate) fn hand_line(
             )
         }
     } else {
-        let stroke = synthesize_stroke(StrokeRequest {
-            start,
-            end,
-            base_width: style.width,
-            weight: instruction.weight,
-            seed,
-            sample_count,
-            wild: context.wild,
-            grid_step: grid_step(instruction.weight, context.canvas),
-            support,
-        });
+        let stroke = synthesize_stroke_by(
+            StrokeRequest {
+                start,
+                end,
+                base_width: style.width,
+                weight: instruction.weight,
+                seed,
+                sample_count,
+                wild: context.wild,
+                grid_step: grid_step(instruction.weight, context.canvas),
+                support,
+            },
+            hand,
+        );
         let band = if flat {
             let points = stroke
                 .samples
@@ -640,7 +665,7 @@ pub(crate) fn hand_line(
             polygon_path(&outline),
             &outline[..middle],
             &right,
-            OilPaintStyle::stroke(&style.color, style.stroke_opacity),
+            OilPaintStyle::stroke(&style.color, style.stroke_opacity, context.canvas),
             seed,
             false,
         ));
@@ -683,18 +708,26 @@ pub(crate) fn hand_contour(
     context: MarkContext<'_>,
     closed: bool,
 ) -> Element {
-    let stroke = synthesize_contour(ContourStrokeRequest {
-        centerline,
-        base_width: style.width,
-        weight: instruction.weight,
-        seed: context.seed_for(instruction),
-        closed,
-        anchors,
-        grid_step: grid_step(instruction.weight, context.canvas),
-        wild: context.wild,
-        support: instruction_support(instruction, context.support),
-        terminal: StrokeTerminal::Taper,
-    });
+    let hand = if closed {
+        BandHand::ROUND
+    } else {
+        band_hand(instruction, style, context)
+    };
+    let stroke = synthesize_contour_by(
+        ContourStrokeRequest {
+            centerline,
+            base_width: style.width,
+            weight: instruction.weight,
+            seed: context.seed_for(instruction),
+            closed,
+            anchors,
+            grid_step: grid_step(instruction.weight, context.canvas),
+            wild: context.wild,
+            support: instruction_support(instruction, context.support),
+            terminal: StrokeTerminal::Taper,
+        },
+        hand,
+    );
     if !closed && sweeps_flat(instruction) {
         let points = stroke
             .samples
@@ -715,7 +748,8 @@ pub(crate) fn hand_contour(
             seed: context.seed_for(instruction),
             support: instruction_support(instruction, context.support),
             scale: context.canvas.unit() / 1000.0,
-            brush_size: sweep_band_width(instruction, context.canvas),
+            brush_size: open_band_width(instruction, context.canvas),
+            fine_streaks: true,
         }) {
             let mut group = Element::new("g")
                 .attr(
@@ -744,7 +778,7 @@ pub(crate) fn hand_contour(
                     context.canvas,
                 )
             } else {
-                OilPaintStyle::stroke(&style.color, style.stroke_opacity)
+                OilPaintStyle::stroke(&style.color, style.stroke_opacity, context.canvas)
             },
             context.seed_for(instruction),
             closed,

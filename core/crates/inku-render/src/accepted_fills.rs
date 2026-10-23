@@ -764,7 +764,8 @@ fn engraving(
             .attr("x", "-5%")
             .attr("y", "-20%")
             .attr("width", "110%")
-            .attr("height", "140%");
+            .attr("height", "140%")
+            .attr("color-interpolation-filters", "sRGB");
         burr.push(
             Element::new("feTurbulence")
                 .attr("type", "turbulence")

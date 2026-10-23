@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-10-23 — The width of a thick sweep band
+
+With render engine 92, a thick or extra-thick sweep line's or arc's band adds to three default widths only what the thinness word adds to a round mark, so the DDL reference's sweep table and description now say so (for example, an extra-thick thick-brush sweep is 66 per 1000 of the short side, not 150).
+
 ## 2026-10-23 — Correct DDL reference constraints and examples
 
 Clarified connection and touching targets, default placement for one mark, precision limits for numeric ranges and two-point coordinates, and constraints on relations to a prior point. Complex example 5.30 now specifies the crossing line's length. Older relation descriptions in SPEC were also aligned with the current implementation.

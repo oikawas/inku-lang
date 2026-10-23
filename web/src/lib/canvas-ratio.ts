@@ -3,7 +3,7 @@
  * and the ratio of a canvas format. The core reads the declaration; the screen
  * reads it only to ask whether a work moving to another paper is fitted into it.
  */
-import { getCanvasAspectOption, type CanvasAspectId } from './plugins/system/canvas-aspect';
+import { getCanvasAspectOption, type CanvasAspectId } from '$lib/plugins/system/canvas-aspect';
 
 export type CanvasRatio = { width: number; height: number };
 

@@ -142,6 +142,9 @@ test('the existing replay action reserves one drawing before awaiting its saved 
 		const hasDdlBody = () => true, submitWouldRefine = () => false, resetTargetScopedState = () => {};
 		const currentRefineParent = () => null, confirmFallbackRefine = async () => true;
 		const effectiveCanvasAspectId = () => 'square', startTimer = () => {}, stopTimer = () => {};
+		// A DDL without a ratio to go by is drawn without the fit question (DDL 26).
+		const declaredCanvasRatio = () => null, canvasRatioOfAspect = () => null;
+		const chooseCanvasFit = async () => 'stretch', drawFittedSavedWork = async () => {};
 		const deps = { history: () => ({ clearSelection() {} }) }, t = () => ({ stageStructuring: () => '' });
 		${functions.join('\n')}
 		return replay;

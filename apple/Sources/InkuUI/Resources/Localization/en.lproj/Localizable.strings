@@ -1551,3 +1551,5 @@
 "この作品には記述がありません。" = "This work has no description.";
 "この作品には画がありません。" = "This work has no image.";
 "モデルの答えを2回とも使えませんでした（%@）。" = "The model's choices could not be used, twice (%@).";
+"歳時記で語の作例と説明を確認します。語をクリックすると、編集中の指示書に挿入します。" = "Open Saijiki to see word examples and explanations. Click a word to insert it into the instruction draft.";
+"語にマウスを重ねると作例を表示します。クリックすると、挿入できる語を編集中の指示書に入れます。" = "Hover over a word to see its example. Click to insert the word into the instruction draft if its definition is available.";

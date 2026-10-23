@@ -705,7 +705,7 @@ macOSの入力欄はnative editorを使い、空行を含む元の行番号を�
 
 macOSのキャンバス上の縦ホイールは1回0.15の倍率変更を行い、25–1000%に丸める。pinch・drag・倍率buttonと同じ状態を使い、100%以下では移動を中央へ戻す。処理はキャンバスをhostするnative view内に限定する。保存SVGとraster予算は変更しない。
 
-用紙chooserは名前・形・分類・意図を表示する。候補・順序・比率はRust registryを使用し、表示metadataはreview済みのWeb正本snapshotを同梱し、更新は明示したsource exportで行う。選択は次のcanvasだけへ適用し、閉じる操作と保存作品のcanvasを分ける。歳時記はcompactな語一覧と選んだ1語のpreview・効果・説明・例を表示する。通常は参照のみとし、DDL editorから明示して開いた場合だけeditor draftへ語を挿入する。同梱定義のないplugin語は参照のみとする。
+用紙chooserは名前・形・分類・意図を表示する。候補・順序・比率はRust registryを使用し、表示metadataはreview済みのWeb正本snapshotを同梱し、更新は明示したsource exportで行う。選択は次のcanvasだけへ適用し、閉じる操作と保存作品のcanvasを分ける。歳時記はcompactな語一覧と選んだ1語のpreview・効果・説明・例を表示する。主画面で指示書の箱を編集できるときとDDL editor内では、語のクリックで下書きへ挿入し、入口と語の案内にも挿入を明記する。指示書の箱を編集できない主画面と設定内では参照のみとする。同梱定義のないplugin語は参照のみとする。
 
 対象画面の主要操作へTipsを補い、設定の`showTooltips`とtoolbarの表示切替に従う。「inkuについて」は同じcheckoutのWebの概念説明、5項目の用語表、作者情報とrepositoryリンクを取り込む。製品版・build・build日時とDDL／render層の版を生成resourceから、binding protocolは同梱coreのreportから表示する。
 

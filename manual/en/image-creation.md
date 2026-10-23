@@ -274,6 +274,10 @@ Coordinates stay normalized to 0.0–1.0 whatever the canvas. **A mark's size is
 
 **From v2.13.14 the canvas you choose also reaches the stage that builds the composition (Stage 2).** The composition is told which paper it is for, so the same description is laid out differently on a pillar than on a folding screen. **Only size and placement move with the paper** -- a number the description states is drawn as stated, and a size the description states is not changed to suit the paper.
 
+**From DDL 26 an instruction set begins with the declaration of the paper's ratio it was drawn for** (`Aspect ratio 16:9.` and the like; Japanese `画面比16:9。`). Only a new instruction set gets one: one drawn from a description and one newly written in DDL. Editing an instruction set or redrawing a saved work adds none. The declaration records the ratio the composition was laid out in and does not bind the paper. See [DDL reference 3.27](ddl-reference.md#327-aspect-ratio-declare-the-ratio-the-ddl-was-laid-out-in) for how it is written.
+
+**Drawn on a paper of another ratio than its declaration, the app asks before drawing**: from `Draw` in the DDL tab, from an instruction edit, and from a new DDL. `Fit it in` places the composition, keeping its ratio, in a frame in the middle of the paper, and the ground and background fill the margins; marks reaching out of the frame are drawn to the paper's edges. `Draw to this paper` spreads it to the paper's ratio as before. Cancelling draws nothing. An older work without a declaration is taken to have the ratio of the paper it was drawn on, and a work with no such record is not asked about. A work fitted without an edit is drawn from its saved Score in the frame and kept in the lineage as a `Fit` child.
+
 The conditions of the displayed work and the conditions for the next work are separate. `Conditions of the displayed work` records how the selected saved work was painted; `Conditions for the next work` controls what comes next. Reading a work preview in the library does not change the next conditions. Different values on the two sides are not an error.
 
 ## 8. Refine
@@ -405,7 +409,7 @@ Ordinary Stage 1 generation stops as a failure if its finite retries cannot succ
 
 ## 12. Follow the Lineage
 
-The `Lineage` tab shows which explicit action a work was derived from. Performance, composition, reading, model, language, instruction edits, description edits, repaints, canvas changes, and changes of sketch-from-life grain are recorded as parent-child relations. Works made by an earlier variation keep a "Variation (retired)" edge.
+The `Lineage` tab shows which explicit action a work was derived from. Performance, composition, reading, model, language, instruction edits, description edits, repaints, canvas changes, fits, and changes of sketch-from-life grain are recorded as parent-child relations. Works made by an earlier variation keep a "Variation (retired)" edge.
 
 - Parentage is never inferred from visual similarity, an identical description, or timing alone.
 - Intermediate works stay in the lineage as `lineage_only` and do not appear in ordinary history. Promoting one moves it into ordinary history.

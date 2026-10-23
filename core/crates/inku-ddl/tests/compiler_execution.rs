@@ -23,6 +23,79 @@ const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
 };
 
 #[test]
+fn resource_geometry_omission_preserves_later_drawing_and_original_owner() {
+    let invalid = "place one red rectangle width 1 height 1.2 at horizontal 0.5 vertical 0.5.";
+    let valid = "place one green circle radius 0.05 at center.";
+    let budget = inku_score::ResourceBudget {
+        maximum: inku_score::ResourceDemand {
+            logical_objects: 64,
+            primitive_marks: 64,
+            object_templates: 8,
+            maximum_per_template_primitive_marks: 64,
+            maximum_resolved_count: 64,
+            template_nodes: 8,
+            anchor_instances: 64,
+            transform_instances: 64,
+            placement_instances: 8,
+            fill_instances: 8,
+        },
+    };
+    for policy in [ScoreErrorPolicy::Stop, ScoreErrorPolicy::OmitAndContinue] {
+        for later in ["", valid] {
+            let source = format!("{invalid} {later}");
+            let result = inku_ddl::compile_ddl_to_score_with_resources(
+                document(&source, &[]),
+                &[],
+                Some(23),
+                LIMITS,
+                ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+                policy,
+                inku_score::HardResourcePolicy {
+                    identity: "geometry-recovery-test.v1".to_owned(),
+                    budget,
+                },
+                inku_score::OperationalResourceBudget(budget),
+            );
+            let ordinary = execute(&source, &[], LIMITS, policy);
+            assert!(result.failure().is_none(), "{:?}", result.failure());
+            assert_eq!(result.outcome(), ordinary.outcome());
+            assert_eq!(result.compilation().document.source(), source);
+            assert_eq!(
+                result.downstream_diagnostics(),
+                ordinary.downstream_diagnostics()
+            );
+            assert_eq!(result.downstream_diagnostics().len(), 1);
+            assert_eq!(
+                result.downstream_diagnostics()[0].reason,
+                ScoreFieldGap::GeometryExtentOutOfBounds
+            );
+            if later.is_empty() {
+                assert_eq!(result.outcome(), ScoreLoweringOutcome::Stopped);
+                assert!(result.score().is_none());
+            } else {
+                assert_eq!(
+                    result.outcome(),
+                    ScoreLoweringOutcome::CompleteWithOmissions
+                );
+                let score = result.score().expect("the later circle survives");
+                assert_eq!(score.instructions.len(), 1);
+                assert_eq!(score.instructions[0].primitive, Primitive::Circle);
+                assert_eq!(score.instructions[0].color, Color::Green);
+                let expected = &ordinary.score().unwrap().instructions[0];
+                assert_eq!(score.instructions[0].radius, expected.radius);
+                assert_eq!(score.instructions[0].at, expected.at);
+                assert_eq!(
+                    result.instruction_origins(),
+                    &[ScoreInstructionOrigin::SourceInstruction {
+                        instruction_index: 1
+                    }]
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn exact_decimal_macro_geometry_and_coordinates_share_direct_score_and_recovery() {
     use serde_json::json;
     for (shape, dimensions, direct) in [

@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-23 — Keep valid DDL drawing after invalid numeric placement
+
+The resource-aware compilation path stopped the whole drawing when a numerically placed shape did not fit the canvas. Shape templates are now checked before resource selection so only the invalid instruction is omitted, retaining its original instruction number while the remaining instructions can be drawn. Numeric positions and dimensions are not adjusted; compilation still stops when every instruction is omitted.
+
 ### 2026-10-23 — Correct DDL reference constraints and the crossing example
 
 The Japanese and English reference now states connection and touching targets, one-mark placement, coordinate precision limits, and the exclusion of prior points for resting on and overlapping. Example 5.30 specifies the crossing line's length. SPEC's older descriptions of retention after a failed connection and touching with a current free line are aligned. Implementation and drawing semantics are unchanged.

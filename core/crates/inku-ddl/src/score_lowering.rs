@@ -5203,7 +5203,12 @@ fn resolve_object_plan(
             relation: None,
         })
     };
-    build().map_err(|gap| vec![gap])
+    let object = build().map_err(|gap| vec![gap])?;
+    // Reject invalid template geometry while its source owner can still be
+    // omitted locally. Resource materialization must not turn that recoverable
+    // failure into a global stop. This checks one template, never its copies.
+    lower_resolved_object_template(&object, context).map_err(|gap| vec![gap])?;
+    Ok(object)
 }
 
 /// The fade a row or a scatter takes for a fade written in words, and whether

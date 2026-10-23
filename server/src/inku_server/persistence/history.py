@@ -51,6 +51,9 @@ LINEAGE_DERIVATION_KINDS = {
     "renga_reply",
     "external_seed_change",
     "canvas_aspect_change",
+    # The saved Score fitted into another paper (はめ込み, 2026-10-23). It reads
+    # no description, so a description-locked parent's child stays locked.
+    "canvas_fit",
     # Sketching (Stage 0.5, v2.10). Fires when the grain differs from the parent's,
     # which includes switching the layer on or off (the grain is fine, coarse
     # or absent). The web client has sent this since v2.9.37; until v2.11.3 the

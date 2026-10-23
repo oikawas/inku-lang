@@ -624,13 +624,15 @@ pub fn performance_touch_filter(seed: Seed, canvas: CanvasSize) -> (String, Elem
     let scale = canvas.unit() / 1000.0;
     let frequency = (0.012 + hash01(0, seed, "performance-touch-frequency") * 0.008) / scale;
     let displacement = (1.6 + hash01(1, seed, "performance-touch-scale") * 1.4) * scale;
+    // A fitted frame's region is its paper (render engine 93).
+    let [x0, y0, x1, y1] = canvas.paper();
     let filter = Element::new("filter")
         .attr("id", &id)
         .attr("filterUnits", "userSpaceOnUse")
-        .attr("x", format_number(-0.02 * canvas.width))
-        .attr("y", format_number(-0.02 * canvas.height))
-        .attr("width", format_number(1.04 * canvas.width))
-        .attr("height", format_number(1.04 * canvas.height));
+        .attr("x", format_number(x0 - 0.02 * (x1 - x0)))
+        .attr("y", format_number(y0 - 0.02 * (y1 - y0)))
+        .attr("width", format_number(1.04 * (x1 - x0)))
+        .attr("height", format_number(1.04 * (y1 - y0)));
     let mut filter = filter.attr("color-interpolation-filters", "sRGB");
     filter.push(
         Element::new("feTurbulence")

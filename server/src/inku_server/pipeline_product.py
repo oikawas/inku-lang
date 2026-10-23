@@ -125,6 +125,9 @@ class RunOptions(BaseModel):
     catalog_id: str | None = None
     catalog_mode: Literal["fixed", "auto", "random"] | None = None
     canvas_aspect: str | None = None
+    # The user's choice to fit a DDL that declares another ratio into the
+    # paper (DDL engine 70). A child of a fitted work keeps it.
+    canvas_fit: Literal["contain"] | None = None
     render_seed: int | str | None = None
     composition_seed: int | str | None = None
     wild: bool | None = None
@@ -353,6 +356,8 @@ class ProductPipelineEffects:
         config["compiler"]["host"] = resolved[catalog_id]
         if catalog_id == "default":
             config["compiler"]["host"]["catalog_mode"] = "default"
+        if selected.get("canvas_fit") is not None:
+            config["compiler"]["host"]["canvas_fit"] = selected["canvas_fit"]
         config["catalogs"] = [{"prompt": {"catalog_id": entry["id"], "label": entry["name"],
                                           "description": entry["sub_ja" if language == "ja" else "sub"]},
                                "resolved": resolved[entry["id"]]} for entry in catalogs] if mode == "auto" else []

@@ -49,7 +49,8 @@ HISTORY_FORK_CONTEXT_PROTOCOL = "inku.pipeline-history-fork-context.v3"
 # layout child and a catalog change child are saved as the screen drew them, and
 # the Server writes their records (the catalog change from 2026-10-21).
 LAWS_RECORD_DERIVATIONS = frozenset(
-    {"color_arrangement_change", "ground_change", "tool_change", "replay", "layout_change", "catalog_change"}
+    {"color_arrangement_change", "ground_change", "tool_change", "canvas_fit", "replay", "layout_change",
+     "catalog_change"}
 )
 # The laws records a work keeps: the layers the laws placed, and the composed
 # document and answer they were applied by, from which the AI refinement's laws

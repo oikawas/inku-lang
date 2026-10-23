@@ -1271,7 +1271,7 @@ pub fn saijiki_derived_projection_from_asset(
     core_grammar_markers.extend(operation_markers);
     core_grammar_markers.extend(relation_markers);
 
-    let mut display_categories = Vec::with_capacity(asset.categories.len() + 1);
+    let mut display_categories = Vec::with_capacity(asset.categories.len() + 2);
     for category in &asset.categories {
         let words = category
             .words
@@ -1303,6 +1303,21 @@ pub fn saijiki_derived_projection_from_asset(
                 .map(|relation| relation_surface(relation, language).to_owned())
         })
         .collect::<Result<Vec<_>, _>>()?;
+    // The canvas ratio declaration (DDL 26) is a sentence a host writes, read
+    // before any word, so it is no Saijiki word: shown, never parsed as one
+    // and never offered to a model.
+    display_categories.push(DisplayCategoryProjection {
+        key: "gamen".to_owned(),
+        name_ja: "がめん".to_owned(),
+        name_en: "aspect".to_owned(),
+        words: vec![
+            match language {
+                ResolvedInstructionLanguage::Ja => crate::CANVAS_RATIO_HEAD_JA,
+                ResolvedInstructionLanguage::En => "aspect ratio",
+            }
+            .to_owned(),
+        ],
+    });
     display_categories.push(DisplayCategoryProjection {
         key: "aida".to_owned(),
         name_ja: "あいだ".to_owned(),

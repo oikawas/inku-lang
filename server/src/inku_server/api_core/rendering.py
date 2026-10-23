@@ -596,7 +596,10 @@ def _validated_canvas_aspect_override(value: str | None) -> str | None:
 def _score_with_canvas(score: Score, canvas_aspect: str) -> Score:
     data = score.model_dump(by_alias=True)
     existing = data.get("canvas")
-    if isinstance(existing, dict) and existing.get("ground") is not None:
+    # A declared ratio (DDL 26) stays with its Score, as a ground does.
+    if isinstance(existing, dict) and (
+        existing.get("ground") is not None or existing.get("declared_ratio") is not None
+    ):
         existing["aspect"] = canvas_aspect
     else:
         data["canvas"] = canvas_aspect

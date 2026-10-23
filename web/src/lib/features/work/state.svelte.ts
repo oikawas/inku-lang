@@ -16,7 +16,8 @@ import { batchSettings } from '$lib/features/batch/settings.svelte';
 import { wildOverride } from '$lib/features/wild/render';
 import { wildSettings } from '$lib/features/wild/settings.svelte';
 import type { NumberedLine } from '$lib/features/batch/resume';
-import type { CanvasAspectId } from '$lib/plugins/system/canvas-aspect';
+import { getCanvasAspectOption, type CanvasAspectId } from '$lib/plugins/system/canvas-aspect';
+import { canvasRatioLabel, canvasRatioOfAspect, declaredCanvasRatio, sameCanvasRatio, type CanvasRatio } from '$lib/canvas-ratio';
 import type { HistoryItem, Score } from '$lib/historyManagerState.svelte';
 import type { ReplayComparison } from '$lib/features/history/replay';
 import type { JuxtapositionResult } from '$lib/features/juxtaposition/juxtaposition';
@@ -224,6 +225,7 @@ export function createWorkState(deps: WorkStateDeps) {
 			catalog_id: typeof render.catalog_id === 'string' ? render.catalog_id : colorCatalogSettings.effectiveId,
 			catalog_mode: typeof render.catalog_mode === 'string' ? render.catalog_mode : undefined,
 			canvas_aspect: options.canvasAspectId ?? effectiveCanvasAspectId(),
+			...(options.canvasFit ? { canvas_fit: options.canvasFit } : {}),
 			render_seed: options.renderSeed,
 			composition_seed: options.compositionSeed,
 			wild: typeof render.wild === 'boolean' ? render.wild : undefined,
@@ -905,6 +907,60 @@ export function createWorkState(deps: WorkStateDeps) {
 		try { await replayOnce(); }
 		finally { replayStarting = false; }
 	}
+	/** How a DDL written for another ratio is drawn on this paper (DDL 26):
+	 *  fitted into it, drawn to it as before, or not drawn (null). A DDL with
+	 *  no ratio to go by, or with the paper's, is drawn without asking. */
+	function chooseCanvasFit(basis: CanvasRatio | null, paperId: CanvasAspectId): Promise<'fit' | 'stretch' | null> {
+		const paper = canvasRatioOfAspect(paperId);
+		if (!basis || !paper || sameCanvasRatio(basis, paper)) return Promise.resolve('stretch');
+		const option = getCanvasAspectOption(paperId);
+		return new Promise((resolve) => {
+			deps.requestConfirmation({
+				message: t().canvasFitMessage(canvasRatioLabel(basis), `${option.label} ${option.ratio}`),
+				runLabel: t().canvasFitRun,
+				run: () => resolve('fit'),
+				secondaryLabel: t().canvasFitStretch,
+				secondaryRun: () => resolve('stretch'),
+				cancelRun: () => resolve(null),
+			});
+		});
+	}
+
+	/** The saved work fitted into this paper from its saved Score (はめ込み,
+	 *  2026-10-23): the Server draws it, and it is saved as the work's child.
+	 *  The DDL stays as it is. */
+	async function drawFittedSavedWork(parentNodeId: string, workId: string, paperId: CanvasAspectId, signal: AbortSignal): Promise<void> {
+		const response = await apiFetch('/api/render-canvas-fit', {
+			method: 'POST', signal, headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ work_id: workId, canvas_aspect: paperId }),
+		});
+		if (!response.ok) {
+			const data = await response.json().catch(() => ({})) as { detail?: unknown };
+			throw new Error(describeApiError(data.detail, response.status));
+		}
+		const data = await response.json() as Partial<PaintResult> & Pick<PaintResult, 'svg' | 'score'> & { derivation_metadata?: Record<string, unknown> };
+		const derivationMetadata = data.derivation_metadata ?? { to_canvas_aspect: paperId };
+		const fitted = {
+			...(result ?? {}), ...data,
+			history_id: null, history_at: null, lineage_node_id: null,
+			lineage_parent_node_id: parentNodeId,
+			derivation_kind: 'canvas_fit', derivation_metadata: derivationMetadata,
+		} as PaintResult;
+		result = fitted;
+		const source = input.trim();
+		const saved = await deps.pushHistory({
+			...fitted,
+			input: source, ddl: ddl ?? '', score: fitted.score, svg: fitted.svg, at: Date.now(),
+			elapsed_ms: 0, tokens_in: null, tokens_out: null,
+		} as Iteration, {
+			sourceText: source, countGeneration: true,
+			lineageParentNodeId: parentNodeId, derivationKind: 'canvas_fit', derivationMetadata,
+		});
+		if (saved?.lineage_node_id && result === fitted) {
+			result = { ...fitted, history_id: saved.id, history_at: saved.at, lineage_node_id: saved.lineage_node_id, description_hash: saved.description_hash };
+		}
+	}
+
 	async function replayOnce() {
 		if (!ddl || !hasDdlBody(ddl) || reloading) return;
 		if (submitWouldRefine() && !(await confirmFallbackRefine(currentRefineParent()))) return;
@@ -917,6 +973,34 @@ export function createWorkState(deps: WorkStateDeps) {
 		}
 		const canvasAspectDerivation = pendingCanvasAspectDerivation;
 		const replayParentNodeId = canvasAspectDerivation?.parentNodeId ?? (lineageDetached ? null : (displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null));
+		// A DDL written for another ratio than this paper: its own declaration,
+		// or, for an unedited saved work without one, the paper it was drawn on.
+		// A work that records neither is drawn to the paper as before (DDL 26).
+		const paperId = effectiveCanvasAspectId();
+		const unedited = replayParentNodeId !== null && ddlGeneratedBaseline !== null && ddl === ddlGeneratedBaseline;
+		const parentWorkId = displayedHistoryItem?.id ?? result?.history_id ?? null;
+		const parentAspectId = canvasAspectDerivation?.fromAspectId
+			?? displayedHistoryItem?.render_canvas_aspect_id ?? result?.render_canvas_aspect_id ?? null;
+		const declared = declaredCanvasRatio(ddl);
+		const fitBasis = declared ?? (unedited && parentAspectId ? canvasRatioOfAspect(parentAspectId) : null);
+		const fitChoice = await chooseCanvasFit(fitBasis, paperId);
+		if (fitChoice === null) return;
+		if (fitChoice === 'fit' && unedited && replayParentNodeId && parentWorkId) {
+			const abortController = new AbortController();
+			replayAbortController = abortController;
+			reloading = true; reloadError = null;
+			try {
+				await drawFittedSavedWork(replayParentNodeId, parentWorkId, paperId, abortController.signal);
+				if (canvasAspectDerivation) pendingCanvasAspectDerivation = null;
+				lineageDetached = false;
+			} catch (e) {
+				if (!abortController.signal.aborted) reloadError = e instanceof Error ? e.message : String(e);
+			} finally {
+				if (replayAbortController === abortController) replayAbortController = null;
+				reloading = false;
+			}
+			return;
+		}
 		const replayKind: DerivationKind | null = canvasAspectDerivation
 			? 'canvas_aspect_change'
 			: replayParentNodeId ? (ddlGeneratedBaseline !== null && ddl !== ddlGeneratedBaseline ? 'ddl_edit' : 'replay') : null;
@@ -937,7 +1021,8 @@ export function createWorkState(deps: WorkStateDeps) {
 		try {
 			const view = await authorDdl(ddl, {
 				sourceText: replayInput,
-				canvasAspectId: effectiveCanvasAspectId(),
+				canvasAspectId: paperId,
+				...(fitChoice === 'fit' ? { canvasFit: 'contain' as const } : {}),
 				lineageParentNodeId: replayParentNodeId,
 				derivationKind: replayKind,
 				derivationMetadata: replayDerivationMetadata,
@@ -1094,6 +1179,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		currentRefineParent,
 		submitWouldRefine,
 		confirmFallbackRefine,
+		chooseCanvasFit,
 		addTokens,
 		paintTokensIn,
 		paintTokensOut,

@@ -129,10 +129,12 @@ pub(crate) fn reaches_canvas(
         (start, end)
     };
     let reach = ink_reach(width, context.canvas);
-    start.x.max(end.x) + reach >= 0.0
-        && start.x.min(end.x) - reach <= context.canvas.width
-        && start.y.max(end.y) + reach >= 0.0
-        && start.y.min(end.y) - reach <= context.canvas.height
+    // A fitted frame's strokes reach its paper (render engine 93).
+    let [x0, y0, x1, y1] = context.canvas.paper();
+    start.x.max(end.x) + reach >= x0
+        && start.x.min(end.x) - reach <= x1
+        && start.y.max(end.y) + reach >= y0
+        && start.y.min(end.y) - reach <= y1
 }
 
 /// Applies the instruction's own rotation before its containing Transform groups.

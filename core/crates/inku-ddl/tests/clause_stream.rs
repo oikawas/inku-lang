@@ -115,6 +115,7 @@ fn fixture_preserves_source_order_clauses_separators_and_all_atom_kinds() {
                     kind: match separator.kind {
                         ClauseSeparatorKind::LineBreak => "line_break",
                         ClauseSeparatorKind::SentenceEnd => "sentence_end",
+                        ClauseSeparatorKind::DeclarationEnd => "declaration_end",
                     }
                     .to_owned(),
                     surface: case.source[separator.span.start_byte..separator.span.end_byte]

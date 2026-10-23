@@ -253,6 +253,10 @@ class PipelineService:
                              "description": pipeline_description(description), "direction": deepcopy(direction or {})}
             else:
                 authoring = {"tag": "direct_ddl", "source": text}
+                if parent is None and source_work is None:
+                    # A new work's DDL declares the paper it is drawn on; a
+                    # DDL from a saved work is drawn as written (DDL 26).
+                    authoring["declare_canvas"] = True
             for record in ("completion_ranges", "laws_layers", "laws_basis"):
                 if kind != "description" and source_work and source_work.get(record) is not None:
                     authoring[record] = deepcopy(source_work[record])

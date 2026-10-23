@@ -640,6 +640,16 @@ def display_categories(lang: str) -> list[dict[str, object]]:
                 "words": words,
             }
         )
+    # がめん: 画面比の宣言（「画面比16:9。」、DDL 26）。アプリが書く文で、語より先に
+    # 読まれるので歳時記の語ではない。表示するが、語として読まず、依頼文にも出さない。
+    result.append(
+        {
+            "key": "gamen",
+            "name_ja": "がめん",
+            "name_en": "aspect",
+            "words": ("画面比",) if lang == "ja" else ("aspect ratio",),
+        }
+    )
     aida_by_type = {word.relation_type: word for word in RELATIONS}
     result.append(
         {

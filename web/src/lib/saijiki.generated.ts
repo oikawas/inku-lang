@@ -93,6 +93,12 @@ export const GENERATED_SAIJIKI: SaijikiCategory[] = [
 		words: ['縦長', '横長', '全幅', '半幅', '半円', '上弦', '下弦', '三日月']
 	},
 	{
+		key: 'gamen',
+		label: 'がめん',
+		en: 'aspect',
+		words: ['画面比']
+	},
+	{
 		key: 'aida',
 		label: 'あいだ',
 		en: 'relations',
@@ -190,6 +196,12 @@ export const GENERATED_SAIJIKI_EN: SaijikiCategory[] = [
 		label: 'わりあい',
 		en: 'proportions',
 		words: ['tall', 'wide', 'full-width', 'half-width', 'semicircle', 'waxing', 'waning', 'crescent']
+	},
+	{
+		key: 'gamen',
+		label: 'がめん',
+		en: 'aspect',
+		words: ['aspect ratio']
 	},
 	{
 		key: 'aida',

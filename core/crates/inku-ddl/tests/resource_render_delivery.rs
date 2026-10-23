@@ -81,10 +81,7 @@ fn resource_fill_reaches_svg_and_local_clip_refusal_preserves_later_drawing() {
         options: RenderOptions {
             resolved_color_map: BTreeMap::new(),
             catalog_id: None,
-            canvas: CanvasSize {
-                width: 256.0,
-                height: 256.0,
-            },
+            canvas: CanvasSize::new(256.0, 256.0),
             canvas_aspect_id: "square".into(),
             svg_profile: profile,
             render_seed: Some(666010),

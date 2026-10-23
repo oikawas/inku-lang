@@ -12,11 +12,11 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::Serialize;
 
 use inku_score::{
-    AnchorPoint, AtRegion, Canvas, CanvasFormat, CanvasGroundSpec, CanvasSpec, Color,
-    ConnectedPositionAuthority, GroundMaterial, Instruction, InstructionMode, LineStyle, Point,
-    Primitive, Relation, RelationGap, RelationType, ResolvedPaletteContext, Score,
-    SurfaceIntensity, SurfaceSpec, SurfaceTexture, Thinness, TouchingConstraints, TransformGroup,
-    Weight, lookup_canvas_format, oklab_from_srgb, shown_support,
+    AnchorPoint, AtRegion, Canvas, CanvasFit, CanvasFormat, CanvasGroundSpec, CanvasRatio,
+    CanvasSpec, Color, ConnectedPositionAuthority, GroundMaterial, Instruction, InstructionMode,
+    LineStyle, Point, Primitive, Relation, RelationGap, RelationType, ResolvedPaletteContext,
+    Score, SurfaceIntensity, SurfaceSpec, SurfaceTexture, Thinness, TouchingConstraints,
+    TransformGroup, Weight, lookup_canvas_format, oklab_from_srgb, shown_support,
 };
 
 use crate::geometry::{
@@ -113,6 +113,11 @@ pub struct ScoreLoweringContext {
     /// The document's support, once its ground is read: a support that covers
     /// the background decides an omitted color (DDL engine 61).
     ground: Option<GroundMaterial>,
+    /// The host asks that a declared ratio other than the paper's be fitted
+    /// into the paper (DDL engine 70).
+    canvas_fit: Option<CanvasFit>,
+    /// The document's declared ratio, once read.
+    declared_ratio: Option<CanvasRatio>,
 }
 
 impl ScoreLoweringContext {
@@ -127,7 +132,56 @@ impl ScoreLoweringContext {
             background,
             resolved_palette: None,
             ground: None,
+            canvas_fit: None,
+            declared_ratio: None,
         })
+    }
+
+    /// The host's request to fit a declared ratio into the paper.
+    #[must_use]
+    pub const fn with_canvas_fit(mut self, canvas_fit: Option<CanvasFit>) -> Self {
+        self.canvas_fit = canvas_fit;
+        self
+    }
+
+    /// The context once the document's declaration is read. When the host
+    /// asks for a fit and the declared ratio differs from the paper's, the
+    /// composition is laid out in the declared ratio; the paper keeps its id.
+    /// Otherwise the fit request falls away and nothing but the recorded
+    /// ratio changes.
+    #[must_use]
+    fn with_declared_ratio(mut self, declared_ratio: Option<CanvasRatio>) -> Self {
+        self.declared_ratio = declared_ratio;
+        match declared_ratio {
+            Some(ratio)
+                if self.canvas_fit.is_some()
+                    && (ratio.width_units, ratio.height_units)
+                        != self.canvas_format.integer_ratio() =>
+            {
+                self.canvas_format = CanvasFormat {
+                    width_units: ratio.width_units,
+                    height_units: ratio.height_units,
+                    ..self.canvas_format
+                };
+            }
+            _ => self.canvas_fit = None,
+        }
+        self
+    }
+
+    /// The Score canvas for this context and the document's ground. Without a
+    /// declaration it is the form older Scores have.
+    pub(crate) fn score_canvas(self, ground: Option<CanvasGroundSpec>) -> Canvas {
+        let aspect = self.canvas_format.id.to_owned();
+        match (self.declared_ratio, ground) {
+            (None, None) => Canvas::Id(aspect),
+            (declared_ratio, ground) => Canvas::Spec(CanvasSpec {
+                aspect,
+                ground,
+                declared_ratio,
+                fit: self.canvas_fit,
+            }),
+        }
     }
 
     pub fn resolve_with_palette(
@@ -2257,7 +2311,8 @@ fn lower_verified_stage15_shared<'a>(
     let context = ScoreLoweringContext {
         ground: ground.as_ref().map(|ground| ground.material),
         ..context
-    };
+    }
+    .with_declared_ratio(document.canvas_ratio);
     for (projected_group_index, group) in document.coordinated_head_groups.iter().enumerate() {
         let group_index = candidate
             .verified_effective_view()
@@ -3590,15 +3645,7 @@ fn lower_verified_stage15_shared<'a>(
         } else {
             score_wire_version()
         },
-        canvas: ground.clone().map_or_else(
-            || Canvas::Id(context.canvas_format.id.to_owned()),
-            |ground| {
-                Canvas::Spec(CanvasSpec {
-                    aspect: context.canvas_format.id.to_owned(),
-                    ground: Some(ground),
-                })
-            },
-        ),
+        canvas: context.score_canvas(ground.clone()),
         background: context.background,
         presence: None,
         instructions,
@@ -8367,6 +8414,8 @@ mod tests {
                 background: Color::White,
                 resolved_palette: None,
                 ground: None,
+                canvas_fit: None,
+                declared_ratio: None,
             };
             for (action, count) in [("tile", 8), ("line_up", 4)] {
                 let mut fields = complete_macro_fields();
@@ -8472,6 +8521,8 @@ mod tests {
                 background: Color::White,
                 resolved_palette: None,
                 ground: None,
+                canvas_fit: None,
+                declared_ratio: None,
             };
             for (word, y) in [("縦", 0), ("右上がり", -1), ("右下がり", 1), ("斜め", 2)]
             {

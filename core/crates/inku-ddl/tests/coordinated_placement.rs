@@ -411,10 +411,7 @@ fn coordinated_actions_geometry_uses_shared_layout_and_target() {
                 score,
                 performance_seed: Some(71),
                 composition_seed: Some(19),
-                canvas: wide.then_some(inku_render::types::CanvasSize {
-                    width: 160.0,
-                    height: 90.0,
-                }),
+                canvas: wide.then_some(inku_render::types::CanvasSize::new(160.0, 90.0)),
             },
             ScoreErrorPolicy::Stop,
         )
@@ -428,10 +425,7 @@ fn coordinated_actions_geometry_uses_shared_layout_and_target() {
             .map(|(index, instruction)| {
                 let center = inku_render::geometry::point_to_short_side_units(
                     instruction.center.unwrap(),
-                    wide.then_some(inku_render::types::CanvasSize {
-                        width: 160.0,
-                        height: 90.0,
-                    }),
+                    wide.then_some(inku_render::types::CanvasSize::new(160.0, 90.0)),
                 );
                 performed.instruction_transforms()[index].apply(center)
             })

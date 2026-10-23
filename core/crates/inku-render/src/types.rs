@@ -17,17 +17,54 @@ pub use inku_score::{
 pub struct CanvasSize {
     pub width: f64,
     pub height: f64,
+    /// Paper beyond this canvas on each side, in its units. A fitted frame
+    /// (render engine 93) draws its marks in the frame's own canvas, and its
+    /// filter, mask and stroke-reach regions extend over the margins to the
+    /// paper's edges. Zero otherwise, and then not written.
+    #[serde(default, skip_serializing_if = "Bleed::is_none")]
+    pub bleed: Bleed,
+}
+
+/// Margins of paper around a canvas, the same on opposite sides.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct Bleed {
+    pub x: f64,
+    pub y: f64,
+}
+
+impl Bleed {
+    #[must_use]
+    pub fn is_none(&self) -> bool {
+        self.x == 0.0 && self.y == 0.0
+    }
 }
 
 impl CanvasSize {
     #[must_use]
     pub const fn new(width: f64, height: f64) -> Self {
-        Self { width, height }
+        Self {
+            width,
+            height,
+            bleed: Bleed { x: 0.0, y: 0.0 },
+        }
     }
 
     #[must_use]
     pub fn unit(self) -> f64 {
         self.width.min(self.height)
+    }
+
+    /// The paper's extent in this canvas's units: `[x0, y0, x1, y1]`. Without
+    /// bleed it is `[-0, -0, width, height]`, so a region computed from it
+    /// has the bits a region computed from the canvas had.
+    #[must_use]
+    pub fn paper(self) -> [f64; 4] {
+        [
+            -self.bleed.x,
+            -self.bleed.y,
+            self.width + self.bleed.x,
+            self.height + self.bleed.y,
+        ]
     }
 }
 

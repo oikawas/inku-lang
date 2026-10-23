@@ -23,10 +23,7 @@ const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
 
 const SEEDS: [i128; 4] = [1, 7, 23, 42];
 
-const CANVAS: CanvasSize = CanvasSize {
-    width: 1000.0,
-    height: 1000.0,
-};
+const CANVAS: CanvasSize = CanvasSize::new(1000.0, 1000.0);
 
 fn hard_policy() -> HardResourcePolicy {
     let budget = ResourceBudget {

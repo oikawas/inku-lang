@@ -829,6 +829,56 @@ pub struct CanvasSpec {
     pub aspect: String,
     #[serde(default)]
     pub ground: Option<CanvasGroundSpec>,
+    /// The width:height ratio the DDL says it was written for
+    /// (「画面比W:H。」 / `Aspect ratio W:H.`, DDL 26). `aspect` stays the
+    /// paper the work is drawn on; the two differ when a work moves to
+    /// another paper. Absent fields are not written, so an older Score keeps
+    /// its bytes and digests.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub declared_ratio: Option<CanvasRatio>,
+    /// How the composition sits on a paper of another ratio (render engine 93).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fit: Option<CanvasFit>,
+}
+
+/// A positive integer width:height ratio, reduced by its greatest common divisor.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CanvasRatio {
+    pub width_units: u32,
+    pub height_units: u32,
+}
+
+/// Largest accepted ratio term; the registry's largest is 809.
+pub const CANVAS_RATIO_MAX_UNITS: u32 = 10_000;
+
+impl CanvasRatio {
+    /// The ratio in lowest terms, or `None` when a term is zero or above
+    /// [`CANVAS_RATIO_MAX_UNITS`].
+    #[must_use]
+    pub fn reduced(width_units: u32, height_units: u32) -> Option<Self> {
+        let accepted = 1..=CANVAS_RATIO_MAX_UNITS;
+        if !accepted.contains(&width_units) || !accepted.contains(&height_units) {
+            return None;
+        }
+        let (mut a, mut b) = (width_units, height_units);
+        while b != 0 {
+            (a, b) = (b, a % b);
+        }
+        Some(Self {
+            width_units: width_units / a,
+            height_units: height_units / a,
+        })
+    }
+}
+
+/// Fitting of a declared frame into the paper.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CanvasFit {
+    /// The largest frame of the declared ratio, centred on the paper. Ground
+    /// and background cover the whole paper and marks are not cut at the frame.
+    Contain,
 }
 
 fn default_canvas_aspect() -> String {
@@ -2288,6 +2338,22 @@ impl Score {
             && !unit(ground.density)
         {
             return Err("canvas ground density must be within 0 to 1");
+        }
+        if let Canvas::Spec(CanvasSpec {
+            declared_ratio: Some(ratio),
+            ..
+        }) = &self.canvas
+            && CanvasRatio::reduced(ratio.width_units, ratio.height_units).is_none()
+        {
+            return Err("canvas declared ratio terms must be within 1 to 10000");
+        }
+        if let Canvas::Spec(CanvasSpec {
+            declared_ratio: None,
+            fit: Some(_),
+            ..
+        }) = &self.canvas
+        {
+            return Err("canvas fit requires a declared ratio");
         }
         for instruction in &self.instructions {
             if let Some(surface) = &instruction.surface

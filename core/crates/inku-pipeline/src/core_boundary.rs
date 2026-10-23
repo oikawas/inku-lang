@@ -19,10 +19,10 @@ use inku_render::{
     types::{RenderOptions, RenderOutput, RenderRequest},
 };
 use inku_score::{
-    CANVAS_FORMAT_REGISTRY_ID, Canvas, Color, GroundMaterial, HardResourcePolicy, InstructionMode,
-    OperationalResourceBudget, ResolvedPaletteColor, ResolvedPaletteContext, ResourceDemand, Score,
-    ScoreErrorPolicy, canonical_score_digest, canvas_format_registry_digest, lookup_canvas_format,
-    oklab_difference, shown_support, validate_canvas_format_id,
+    CANVAS_FORMAT_REGISTRY_ID, Canvas, CanvasFit, Color, GroundMaterial, HardResourcePolicy,
+    InstructionMode, OperationalResourceBudget, ResolvedPaletteColor, ResolvedPaletteContext,
+    ResourceDemand, Score, ScoreErrorPolicy, canonical_score_digest, canvas_format_registry_digest,
+    lookup_canvas_format, oklab_difference, shown_support, validate_canvas_format_id,
 };
 use serde::{Deserialize, Deserializer, Serialize, de};
 use serde_json::Value;
@@ -99,6 +99,10 @@ pub struct ResolvedHostOptions {
     catalog_mode: CatalogMode,
     background: Color,
     palette: ResolvedPaletteDto,
+    /// The user's choice to fit a DDL that declares another ratio into this
+    /// paper (DDL engine 70). Absent, it is not written.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    canvas_fit: Option<CanvasFit>,
 }
 
 #[derive(Deserialize)]
@@ -111,6 +115,8 @@ struct UnvalidatedResolvedHostOptions {
     catalog_mode: CatalogMode,
     background: Color,
     palette: ResolvedPaletteDto,
+    #[serde(default)]
+    canvas_fit: Option<CanvasFit>,
 }
 
 impl ResolvedHostOptions {
@@ -132,9 +138,21 @@ impl ResolvedHostOptions {
             catalog_mode,
             background,
             palette,
+            canvas_fit: None,
         };
         result.validate()?;
         Ok(result)
+    }
+
+    /// These options with the user's fit choice.
+    #[must_use]
+    pub const fn with_canvas_fit(mut self, canvas_fit: Option<CanvasFit>) -> Self {
+        self.canvas_fit = canvas_fit;
+        self
+    }
+
+    pub const fn canvas_fit(&self) -> Option<CanvasFit> {
+        self.canvas_fit
     }
 
     pub fn validate(&self) -> Result<(), BoundaryError> {
@@ -176,6 +194,7 @@ impl ResolvedHostOptions {
             self.background,
             self.palette.resolved(),
         )
+        .map(|context| context.with_canvas_fit(self.canvas_fit))
         .map_err(|_| BoundaryError::HostOptions(HostOptionsError::InvalidResolvedPalette))
     }
 
@@ -229,6 +248,7 @@ impl<'de> Deserialize<'de> for ResolvedHostOptions {
             options.background,
             options.palette,
         )
+        .map(|result| result.with_canvas_fit(options.canvas_fit))
         .map_err(de::Error::custom)
     }
 }

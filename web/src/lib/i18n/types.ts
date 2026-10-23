@@ -681,6 +681,10 @@ export interface LangPack {
 	composeFallbackBadge: string;
 	confirmRefineFromFallbackMessage: string;
 	confirmRefineFromFallbackContinue: string;
+	// The DDL was written for another ratio than the paper (DDL 26).
+	canvasFitMessage: (declared: string, paper: string) => string;
+	canvasFitRun: string;
+	canvasFitStretch: string;
 	composeFallbackHint: (reason: string) => string;
 	// Three readings, which is one more than Stage 1's field can make.
 	composeFallbackRecord: (state: ComposeFallbackState) => string;

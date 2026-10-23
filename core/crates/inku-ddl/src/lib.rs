@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 
 pub mod attachment;
+pub mod canvas_ratio;
 pub mod clause;
 pub mod compiler_execution;
 pub mod compiler_lock;
@@ -90,6 +91,11 @@ pub use attachment::{
     AttachmentEvidenceResult, AttachmentMarkerEvidence, AttachmentMarkerKind,
     CoordinationMarkerEvidence, CoordinationMarkerKind, EnglishAttachmentMarkerKind,
     JapaneseAttachmentMarkerKind, collect_attachment_evidence,
+};
+pub use canvas_ratio::{
+    CANVAS_RATIO_HEAD_EN, CANVAS_RATIO_HEAD_JA, CanvasRatioDeclaration, CanvasRatioWriting,
+    canvas_ratio_sentence, declare_canvas_ratio, declared_canvas_ratio, source_canvas_ratio,
+    without_canvas_ratio,
 };
 pub use clause::{
     CLAUSE_STREAM_SCHEMA_ID, ClauseAtom, ClauseSegment, ClauseSeparator, ClauseSeparatorKind,

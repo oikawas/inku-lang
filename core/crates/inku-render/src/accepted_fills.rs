@@ -222,9 +222,17 @@ fn interior_for_closed_contour(
             if blurred && context.profile == SvgProfile::Compat {
                 continue;
             }
-            let mut rect = Element::new("rect")
-                .attr("width", format_number(context.canvas.width))
-                .attr("height", format_number(context.canvas.height))
+            // A fitted frame's rect covers its paper (render engine 93).
+            let [x0, y0, x1, y1] = context.canvas.paper();
+            let mut rect = Element::new("rect");
+            if !context.canvas.bleed.is_none() {
+                rect = rect
+                    .attr("x", format_number(x0))
+                    .attr("y", format_number(y0));
+            }
+            let mut rect = rect
+                .attr("width", format_number(x1 - x0))
+                .attr("height", format_number(y1 - y0))
                 .attr("fill", format!("url(#{id}-{pattern})"))
                 .attr("opacity", format_number(alpha));
             if blurred {
@@ -711,7 +719,10 @@ fn engraving(
                 size.y,
             ))
         })
-        .unwrap_or((0.0, 0.0, context.canvas.width, context.canvas.height));
+        .unwrap_or_else(|| {
+            let [x0, y0, x1, y1] = context.canvas.paper();
+            (x0 + 0.0, y0 + 0.0, x1 - x0, y1 - y0)
+        });
     let field_scale = (width.max(height) / 600.0).max(unit * 0.001);
     let center_x = x + width / 2.0;
     let center_y = y0 + height / 2.0;
@@ -817,18 +828,27 @@ fn engraving(
             .attr("fill", "white"),
     );
     definitions.push(marks);
+    // A fitted frame's mask covers its paper (render engine 93); without
+    // bleed the paper starts at 0 and these are the canvas's own numbers.
+    let [x0, y0, x1, y1] = context.canvas.paper();
     let mut mask = Element::new("mask")
         .attr("id", format!("{id}-mask"))
         .attr("maskUnits", "userSpaceOnUse")
-        .attr("x", "0")
-        .attr("y", "0")
-        .attr("width", format_number(context.canvas.width))
-        .attr("height", format_number(context.canvas.height))
+        .attr("x", format_number(x0))
+        .attr("y", format_number(y0))
+        .attr("width", format_number(x1 - x0))
+        .attr("height", format_number(y1 - y0))
         .attr("style", "mask-type:alpha");
+    let mut floor_rect = Element::new("rect");
+    if !context.canvas.bleed.is_none() {
+        floor_rect = floor_rect
+            .attr("x", format_number(x0))
+            .attr("y", format_number(y0));
+    }
     mask.push(
-        Element::new("rect")
-            .attr("width", format_number(context.canvas.width))
-            .attr("height", format_number(context.canvas.height))
+        floor_rect
+            .attr("width", format_number(x1 - x0))
+            .attr("height", format_number(y1 - y0))
             .attr("fill", "white")
             .attr("opacity", format_number(floor)),
     );
@@ -1084,12 +1104,10 @@ fn brush_mask(
     };
     let id = identifier(context);
     let unit = context.canvas.unit() / 1000.0;
-    let (x, y, width, height) = shape_bbox(geometry, instruction, context).unwrap_or((
-        0.0,
-        0.0,
-        context.canvas.width,
-        context.canvas.height,
-    ));
+    let (x, y, width, height) = shape_bbox(geometry, instruction, context).unwrap_or_else(|| {
+        let [x0, y0, x1, y1] = context.canvas.paper();
+        (x0 + 0.0, y0 + 0.0, x1 - x0, y1 - y0)
+    });
     let band_set = |pattern_id: String, angle: f64, slots: [usize; 2]| {
         let shift = slots.map(|slot| (brush_mark_unit(name, slot, context) * size).round());
         Element::new("pattern")
@@ -1122,12 +1140,14 @@ fn brush_mask(
         SurfaceIntensity::Faint => (0.92, 0.55),
     };
     // Cover the canvas generously: marks may be rotated or displaced after masking.
+    // A fitted frame's canvas is its paper (render engine 93).
+    let [x0, y0, x1, y1] = context.canvas.paper();
     let region = |element: Element| {
         element
-            .attr("x", format_number(-context.canvas.width))
-            .attr("y", format_number(-context.canvas.height))
-            .attr("width", format_number(context.canvas.width * 3.0))
-            .attr("height", format_number(context.canvas.height * 3.0))
+            .attr("x", format_number(x0 - (x1 - x0)))
+            .attr("y", format_number(y0 - (y1 - y0)))
+            .attr("width", format_number((x1 - x0) * 3.0))
+            .attr("height", format_number((y1 - y0) * 3.0))
     };
     let mut deposit_group = Element::new("g");
     if deposit < 1.0 {

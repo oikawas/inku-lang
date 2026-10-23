@@ -34,6 +34,8 @@ web_tree_only = pytest.mark.skipif(not WEB_DERIVATION.is_file(), reason="web/ is
 EXPECTED_KINDS = {
     "age_change",
     "canvas_aspect_change",
+    # The saved Score fitted into another paper (DDL 26, 2026-10-23).
+    "canvas_fit",
     "catalog_change",
     "color_arrangement_change",
     "ddl_edit",

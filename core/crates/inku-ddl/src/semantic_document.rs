@@ -76,6 +76,9 @@ pub struct SemanticContinuationEdge {
 pub struct SemanticDocumentAst {
     pub background: Option<SemanticBackground>,
     pub ground: Option<SemanticTerm>,
+    /// The declared canvas ratio (DDL 26). It is kept out of the canonical
+    /// bytes, so declaring a ratio moves no seed.
+    pub canvas_ratio: Option<inku_score::CanvasRatio>,
     pub instructions: Vec<SemanticInstruction>,
     pub coordinated_head_groups: Vec<crate::SemanticCoordinatedHeadGroup>,
     pub group_predicates: Vec<crate::SemanticGroupPredicateEdge>,
@@ -381,9 +384,15 @@ fn build_semantic_document(
     for edge in &mut group_predicates {
         remap_fill_target(&mut edge.fill_target, &instruction_index_map);
     }
+    let canvas_ratio = instruction_association
+        .association
+        .clause_stream
+        .canvas_ratio_declaration
+        .map(|declaration| declaration.ratio);
     let ast = SemanticDocumentAst {
         background,
         ground,
+        canvas_ratio,
         instructions,
         coordinated_head_groups,
         group_predicates,

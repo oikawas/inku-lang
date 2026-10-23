@@ -531,9 +531,10 @@ def api_history_post(
             diagnostics.pop("render_warnings", None)
             if replayed.get("render_warnings"):
                 diagnostics["render_warnings"] = replayed["render_warnings"]
-    elif body.derivation_kind in ("color_arrangement_change", "ground_change", "tool_change"):
+    elif body.derivation_kind in ("color_arrangement_change", "ground_change", "tool_change", "canvas_fit"):
         from .render import (
-            _render_color_arrangement_for_work, _render_ground_variant_for_work, _render_tool_variant_for_work,
+            _render_canvas_fit_for_work, _render_color_arrangement_for_work, _render_ground_variant_for_work,
+            _render_tool_variant_for_work,
         )
         from ..rendering import _work_for_color_snapshot
 
@@ -541,6 +542,10 @@ def api_history_post(
             index = body.derivation_metadata.get("color_arrangement_index")
             if type(index) is not int or index < 0 or not body.lineage_parent_node_id:
                 raise HTTPException(status_code=422, detail="color arrangement requires a parent and valid index")
+        elif body.derivation_kind == "canvas_fit":
+            paper = body.derivation_metadata.get("to_canvas_aspect")
+            if not isinstance(paper, str) or not body.lineage_parent_node_id:
+                raise HTTPException(status_code=422, detail="canvas fit requires a parent and a paper")
         elif body.derivation_kind == "ground_change":
             material = body.derivation_metadata.get("ground_material")
             if not isinstance(material, str) or not body.lineage_parent_node_id:
@@ -567,6 +572,8 @@ def api_history_post(
         laws_records = laws_records_of(VariationAuthorityStore(_db.engine), actor["id"], parent_id)
         if body.derivation_kind == "color_arrangement_change":
             replayed = _render_color_arrangement_for_work(actor, parent, index, laws_records).model_dump(exclude_none=True, by_alias=True)
+        elif body.derivation_kind == "canvas_fit":
+            replayed = _render_canvas_fit_for_work(actor, parent, paper, laws_records).model_dump(exclude_none=True, by_alias=True)
         elif body.derivation_kind == "ground_change":
             replayed = _render_ground_variant_for_work(actor, parent, material, laws_records).model_dump(exclude_none=True, by_alias=True)
         else:

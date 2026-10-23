@@ -262,7 +262,7 @@ The factor changes line/free-line length, ordinary arc chord and sagitta togethe
 
 ### 3.7 Numeric dimensions
 
-Dimensions use the canvas's short side as one unit. On a 1,000-pixel short side, radius 0.1 is equivalent to 100 pixels. Canvas format and output resolution are host choices, not DDL declarations.
+Dimensions use the canvas's short side as one unit. On a 1,000-pixel short side, radius 0.1 is equivalent to 100 pixels. The paper (canvas format) and output resolution are host choices. A DDL declares only the ratio it was laid out in, with `Aspect ratio W:H.` ([3.27](#327-aspect-ratio-declare-the-ratio-the-ddl-was-laid-out-in)).
 
 | Owner | English | Japanese |
 |---|---|---|
@@ -651,7 +651,7 @@ fill the background with <color>.
 
 Ground and background color may coexist. Background alone is drawing context rather than a shape; if omissions leave nothing but a background, the result does not count as a successful surviving drawing. Filling the canvas with points or circles instead uses §3.12.
 
-Write one of the nine abstract colors and let the work's color catalog resolve it. Arbitrary hex or RGB expressions are not color-name syntax. Catalog ID, catalog mode, canvas format, output size, and seeds are host settings rather than visible DDL grammar.
+Write one of the nine abstract colors and let the work's color catalog resolve it. Arbitrary hex or RGB expressions are not color-name syntax. Catalog ID, catalog mode, canvas format (the paper), output size, and seeds are host settings rather than visible DDL grammar. The ratio a DDL was laid out in is declared with `Aspect ratio W:H.` ([3.27](#327-aspect-ratio-declare-the-ratio-the-ddl-was-laid-out-in)).
 
 ### 3.22 Plugin invocation
 
@@ -753,6 +753,27 @@ Use `--instruction-lang en` for English text. `--input-mode ddl` skips free-desc
 
 `--no-save-artifacts` suppresses the server's derivative-file saving; `-o ./out` selects the CLI's output location. A library history entry is saved only when `--save-history` is supplied. See the [CLI reference](cli-reference.md) for connection, authentication, output, and saving details.
 
+### 3.27 Aspect ratio: declare the ratio the DDL was laid out in
+
+A DDL declares the paper ratio it was laid out in with a sentence of its own (DDL 26).
+
+```ddl-en
+Aspect ratio 16:9.
+place one red circle radius 0.1 at horizontal 0.5, vertical 0.5.
+```
+
+```ddl-ja
+画面比16:9。
+画面の横0.5、縦0.5の位置に、半径0.1の赤い円を1個置く。
+```
+
+- The terms are integers from 1 to 10,000, width first. Japanese also accepts full-width digits and `：`. `Aspect ratio 32:18.` declares the same ratio as `16:9`. A sentence with a decimal, a zero or any other word is not a declaration.
+- The declaration makes no instruction and is not counted among the sentences. Adding or removing it changes how no other sentence is read, and on a paper of the same ratio it changes no drawing.
+- Only the first declaration is read. A later one is left out as an unread sentence, with its diagnostic.
+- The app writes the paper's ratio first into a new DDL (one drawn from a description and one newly written). A declaration the author wrote is kept, and an edit or a redraw adds none.
+- The declaration does not bind the paper. Drawn on a paper of another ratio, the app asks whether to fit it in or to draw it to the paper. Fitted, the composition keeps its ratio in a frame in the middle of the paper, and the ground and background fill the margins. Marks reaching out of the frame are drawn to the paper's edges.
+- A format name (`square` and the like) is not written; the ratio is written in numbers. Golden is `809:500`, and A4 and B4 are `500:707`.
+
 ## 4. Saijiki: complete vocabulary and accepted spellings
 
 Japanese is canonical. Spellings follow `inku.saijiki.v2` in `core/crates/inku-ddl/assets/saijiki-v2.json`. This section covers all 102 rows in its 15 categories and all 11 rows in the separate relations table. The 102 include 98 displayed rows, three hidden rows accepted in direct DDL, and one retired row that is not accepted. The interface shows relations as the sixteenth category.
@@ -786,6 +807,7 @@ The `default=true` flags on pen, solid, empty, and black annotate the reference 
 | `ugoki` | うごき | motions | 7 | Six public, one retired |
 | `jun` | じゅん | order | 2 | Public |
 | `wariai` | わりあい | proportions | 8 | Public |
+| `gamen` | がめん | aspect | 0 | Displays the aspect ratio declaration (3.27); not a Saijiki word |
 | `aida` | あいだ | relations | 11 | Displayed from the separate `relations` table |
 
 ### 4.1. Forms — かたち
@@ -1101,7 +1123,7 @@ The following constructions are available grammar, rather than new rows in the 1
 | Counts and counters | Japanese つ counts one through nine; 十, 10, とお, 本, 個, 枚; English `one`, `five`, and other counts | Quantity belongs to grammar. 少し, 数個, いくつか, たくさん, 多数, 無数, `a few`, `several`, `many`, `numerous`, and `countless` are also parser quantity candidates, rather than Saijiki words or exact counts. |
 | Numeric geometry | Radius, diameter, length, side, width and height, chord and sagitta, numeric position, range, endpoints, and rotation in degrees | Finite constructions connecting numbers to dimensions and owners. Distinguish the rotated word from a numeric angle. |
 | Groups, repetition, fading, color shift | 組, 繰り返して, 左から右へ薄れさせて, 順に段々に移して | Instructions about structure and distribution; no additional category or word chip. |
-| Canvas formats | Host options such as `square`, `a4`, and `wide` | Selected outside the DDL text. Distinct from form and proportion words with the same spelling. |
+| Canvas formats | Host options such as `square`, `a4`, and `wide` | The paper, selected outside the DDL text; a format name is not written in DDL. What a DDL writes is the declaration of the ratio it was laid out in, `Aspect ratio W:H.` (3.27). Distinct from form and proportion words with the same spelling. |
 | Vocabulary Macros | Qualified names such as `Nature.YoungLeaves` | A separate registered vocabulary catalog, outside the core Saijiki's 102 rows. |
 
 ### Sources and verification scope
@@ -1114,7 +1136,7 @@ The reference commit is `97b50a52367554a94e9f364b90dc538d0f6b68bc`. Spellings an
 
 Each example is an independent set of DDL sentences that can be entered on its own. Copy the entire English block, or its corresponding Japanese block. All 50 examples use standard vocabulary and ordinary grammar; they need no registered plugin. Titles and aims are explanations and do not belong in the DDL input.
 
-Numeric positions are fractions of the canvas's horizontal and vertical axes. Dimensions use the canvas's short side as one unit. Choose the canvas format and seeds in the app. Details can vary with those choices. These examples describe new drawings; they are not records of reproducing a saved SVG with the current engine.
+Numeric positions are fractions of the canvas's horizontal and vertical axes. Dimensions use the canvas's short side as one unit. Choose the canvas format (the paper) and seeds in the app. Drawn from the app, a new DDL begins with the paper's ratio declaration (`Aspect ratio 1:1.` and the like). Details can vary with those choices. These examples describe new drawings; they are not records of reproducing a saved SVG with the current engine.
 
 ### 5.01. Three kinds of dimensions
 

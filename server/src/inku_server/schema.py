@@ -276,6 +276,15 @@ class CanvasGroundSpec(BaseModel):
         return v
 
 
+class CanvasRatio(BaseModel):
+    """横:縦の正の整数比。最大公約数で割った形（DDL 26）。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    width_units: int = Field(ge=1, le=10000, description="横の項")
+    height_units: int = Field(ge=1, le=10000, description="縦の項")
+
+
 class CanvasSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -285,6 +294,22 @@ class CanvasSpec(BaseModel):
     ground: Optional[CanvasGroundSpec] = Field(
         default=None, description="キャンバス地の質感"
     )
+    declared_ratio: Optional[CanvasRatio] = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="DDL が宣言した画面比（画面比W:H。DDL 26）。aspect は描いた紙",
+    )
+    fit: Optional[Literal["contain"]] = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="宣言の比の枠を紙の中央にはめ込んで描く（描画エンジン 93）",
+    )
+
+    @model_validator(mode="after")
+    def _fit_requires_declared_ratio(self) -> "CanvasSpec":
+        if self.fit is not None and self.declared_ratio is None:
+            raise ValueError("canvas fit requires a declared ratio")
+        return self
 
 
 Canvas = str | CanvasSpec

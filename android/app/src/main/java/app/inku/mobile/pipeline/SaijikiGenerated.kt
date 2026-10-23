@@ -125,6 +125,13 @@ object SaijikiGenerated {
             wordsEn = listOf("tall", "wide", "full-width", "half-width", "semicircle", "waxing", "waning", "crescent"),
         ),
         Category(
+            key = "gamen",
+            nameJa = "がめん",
+            nameEn = "aspect",
+            wordsJa = listOf("画面比"),
+            wordsEn = listOf("aspect ratio"),
+        ),
+        Category(
             key = "aida",
             nameJa = "あいだ",
             nameEn = "relations",

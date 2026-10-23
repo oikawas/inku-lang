@@ -43,6 +43,7 @@ from ..rendering import (
     _render_with_metadata,
     _score_canvas_aspect_value,
     _score_with_canvas,
+    _validated_canvas_aspect,
     _validated_canvas_aspect_override,
     _work_for_color_snapshot,
 )
@@ -544,6 +545,44 @@ def _render_ground_variant_for_work(
 @router.post("/api/render-ground-variant", response_model=GroundVariantResponse, response_model_exclude_none=True)
 def api_render_ground_variant(req: GroundVariantRenderRequest, actor: dict = Depends(_current_user)) -> GroundVariantResponse:
     return _render_ground_variant_for_work(actor, _work_for_color_snapshot(actor, req.work_id), req.material)
+
+
+class CanvasFitRenderRequest(BaseModel):
+    work_id: str = Field(min_length=1, max_length=200)
+    # The paper the work is fitted into.
+    canvas_aspect: str = Field(min_length=1, max_length=64)
+
+
+def _render_canvas_fit_for_work(
+    actor: dict, work: dict, paper: str, laws_records: dict | None = None,
+) -> RenderScoreResponse:
+    """The saved Score in a centred frame of its ratio on another paper (はめ込み,
+    2026-10-23). The Score is the parent's, its version included; the DDL stays."""
+    paper = _validated_canvas_aspect(paper)
+    try:
+        fitted = _variants(
+            "fit_render", score=work.get("score"),
+            drawn_on=work.get("render_canvas_aspect_id") or work.get("render_canvas_aspect"),
+            paper=paper,
+        )
+    except SavedVariantRefused as error:
+        raise HTTPException(status_code=422, detail=error.detail) from error
+    render_seed = work.get("render_seed")
+    if render_seed is None:
+        raise HTTPException(status_code=422, detail="saved work has no performance seed to preserve its drawing")
+    result = _render_authorized_score(RenderScoreRequest(
+        score=fitted["score"], input=work.get("input") or "", ddl=work.get("ddl") or "",
+        catalog_id=work.get("render_color_catalog_id") or work.get("catalog_id"),
+        canvas_aspect=paper, render_seed=render_seed, composition_seed=work.get("composition_seed"),
+        wild=bool(work.get("render_wild")),
+    ), actor, work)
+    result.derivation_metadata = _with_laws_records(fitted["derivation_metadata"], laws_records)
+    return result
+
+
+@router.post("/api/render-canvas-fit", response_model=RenderScoreResponse, response_model_exclude_none=True)
+def api_render_canvas_fit(req: CanvasFitRenderRequest, actor: dict = Depends(_current_user)) -> RenderScoreResponse:
+    return _render_canvas_fit_for_work(actor, _work_for_color_snapshot(actor, req.work_id), req.canvas_aspect)
 
 
 class ToolVariantPlanRequest(BaseModel):

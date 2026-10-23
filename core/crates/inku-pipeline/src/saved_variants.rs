@@ -613,6 +613,63 @@ fn ground_render(
 }
 
 // ---------------------------------------------------------------------------
+// Fitting into another paper (はめ込み, 2026-10-23)
+// ---------------------------------------------------------------------------
+
+/// The registry ratio of a canvas format, in lowest terms.
+fn format_ratio(format_id: &str) -> Option<inku_score::CanvasRatio> {
+    let format = inku_score::lookup_canvas_format(format_id).ok()?;
+    inku_score::CanvasRatio::reduced(format.width_units, format.height_units)
+}
+
+/// The saved Score fitted into another paper (the author, 2026-10-23): the
+/// composition keeps its ratio in a centred frame, and nothing else of the
+/// Score changes, its version included. The ratio is the Score's declaration
+/// or, for a Score without one, the paper the work was drawn on; a work that
+/// records neither is not fitted.
+fn fit_render(score: &Value, drawn_on: Option<&str>, paper: &str) -> Result<Value, Refusal> {
+    let Some(object) = score.as_object() else {
+        return Err(refuse("no_score", "saved work has no Score to redraw"));
+    };
+    let paper_ratio = format_ratio(paper)
+        .ok_or_else(|| refuse("unknown_canvas_format", "paper must be a canvas format"))?;
+    let canvas = object.get("canvas");
+    let declared = canvas
+        .and_then(|canvas| canvas.get("declared_ratio"))
+        .and_then(|ratio| serde_json::from_value::<inku_score::CanvasRatio>(ratio.clone()).ok())
+        .or_else(|| drawn_on.and_then(format_ratio))
+        .ok_or_else(|| refuse("no_recorded_ratio", "saved work records no ratio to fit"))?;
+    if declared == paper_ratio {
+        return Err(refuse(
+            "same_ratio",
+            "the work's ratio is the paper's; it is drawn as it is",
+        ));
+    }
+    let ground = canvas
+        .and_then(|canvas| canvas.get("ground"))
+        .cloned()
+        .unwrap_or(Value::Null);
+    let mut changed = object.clone();
+    changed.insert(
+        "canvas".to_owned(),
+        json!({
+            "aspect": paper,
+            "ground": ground,
+            "declared_ratio": declared,
+            "fit": inku_score::CanvasFit::Contain,
+        }),
+    );
+    Ok(json!({
+        "score": Value::Object(changed),
+        "derivation_metadata": {
+            "from_canvas_aspect": drawn_on,
+            "to_canvas_aspect": paper,
+            "declared_ratio": declared,
+        },
+    }))
+}
+
+// ---------------------------------------------------------------------------
 // Color arrangement
 // ---------------------------------------------------------------------------
 
@@ -894,6 +951,13 @@ enum Request {
         #[serde(default)]
         language: Option<String>,
     },
+    FitRender {
+        score: Value,
+        /// The paper the work was drawn on (`render_canvas_aspect_id`).
+        #[serde(default)]
+        drawn_on: Option<String>,
+        paper: String,
+    },
     ColorPlan {
         svg: String,
         color_map: Map<String, Value>,
@@ -950,6 +1014,11 @@ fn answer(request: Request) -> Result<Value, Refusal> {
             material,
             language,
         } => ground_render(&score, &source, &material, language.as_deref()),
+        Request::FitRender {
+            score,
+            drawn_on,
+            paper,
+        } => fit_render(&score, drawn_on.as_deref(), &paper),
         Request::ColorPlan {
             svg,
             color_map,
@@ -1280,5 +1349,46 @@ mod tests {
             ask(json!({"action": "ground_plan"}))["error"],
             "invalid_request"
         );
+    }
+
+    #[test]
+    fn a_fitted_work_keeps_its_score_and_version_in_a_frame_of_its_ratio() {
+        let score = json!({"version": "0.9.0", "canvas": {"aspect": "golden", "ground": {"material": "washi"}},
+                           "instructions": [{"primitive": "circle"}]});
+        let fitted = ask(
+            json!({"action": "fit_render", "score": score, "drawn_on": "golden", "paper": "square"}),
+        );
+        assert_eq!(fitted["outcome"], "ok", "{fitted}");
+        let canvas = &fitted["score"]["canvas"];
+        assert_eq!(canvas["aspect"], "square");
+        assert_eq!(canvas["ground"]["material"], "washi");
+        assert_eq!(
+            canvas["declared_ratio"],
+            json!({"width_units": 809, "height_units": 500})
+        );
+        assert_eq!(canvas["fit"], "contain");
+        assert_eq!(fitted["score"]["version"], "0.9.0");
+        assert_eq!(fitted["score"]["instructions"], score["instructions"]);
+        // A declaration is the ratio, before the paper the work was drawn on.
+        let declared = json!({"canvas": {"aspect": "square", "declared_ratio": {"width_units": 16, "height_units": 9}},
+                              "instructions": []});
+        let fitted = ask(
+            json!({"action": "fit_render", "score": declared, "drawn_on": "square", "paper": "vertical"}),
+        );
+        assert_eq!(
+            fitted["score"]["canvas"]["declared_ratio"],
+            json!({"width_units": 16, "height_units": 9})
+        );
+        // Its own paper, or no ratio to go by, is no fit.
+        for (drawn_on, reason) in [
+            (json!("square"), "same_ratio"),
+            (Value::Null, "no_recorded_ratio"),
+        ] {
+            let refused = ask(
+                json!({"action": "fit_render", "score": {"canvas": "square", "instructions": []},
+                                     "drawn_on": drawn_on, "paper": "square"}),
+            );
+            assert_eq!(refused["reason"], reason, "{refused}");
+        }
     }
 }

@@ -779,6 +779,7 @@ mod projection_integrity_tests {
             }],
             separators: Vec::new(),
             delivery_conservation_count: 1,
+            canvas_ratio_declaration: None,
         };
 
         let kind = projection_integrity_failure_kind(&stream)

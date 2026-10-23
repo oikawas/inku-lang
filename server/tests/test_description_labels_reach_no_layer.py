@@ -82,7 +82,10 @@ def test_a_description_of_labels_only_is_refused_before_any_layer(service) -> No
 
 def test_direct_ddl_is_not_cut(service) -> None:
     service.start("author-1", "direct_ddl", "[注記] 黒い円を中心に置く。")
-    assert _Recorder.runs[-1].authoring == {"tag": "direct_ddl", "source": "[注記] 黒い円を中心に置く。"}
+    # A new work's DDL declares its paper (DDL 26); its words are not cut.
+    assert _Recorder.runs[-1].authoring == {
+        "tag": "direct_ddl", "source": "[注記] 黒い円を中心に置く。", "declare_canvas": True,
+    }
 
 
 def test_regenerating_from_a_description_cuts_for_the_core_and_keeps_the_original(service) -> None:

@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-10-23 — The aspect ratio declaration
+
+With DDL 26 a DDL declares the ratio it was laid out in with `Aspect ratio W:H.`, so the DDL reference gains 3.27, and the four places that said a canvas format is not written in DDL now say that the app chooses the paper and the DDL declares the ratio. The category list gains the display-only がめん / aspect.
+
 ## 2026-10-23 — The width of a thick sweep band
 
 With render engine 92, a thick or extra-thick sweep line's or arc's band adds to three default widths only what the thinness word adds to a round mark, so the DDL reference's sweep table and description now say so (for example, an extra-thick thick-brush sweep is 66 per 1000 of the short side, not 150).

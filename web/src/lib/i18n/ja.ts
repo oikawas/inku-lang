@@ -801,6 +801,9 @@ export const ja: LangPack = {
 	composeFallbackBadge: '作曲フォールバック',
 	confirmRefineFromFallbackMessage: 'この作品は記述との対応が切れています。ここから推敲を続けますか。',
 	confirmRefineFromFallbackContinue: '続ける',
+	canvasFitMessage: (declared, paper) => `このDDLは画面比${declared}で書かれています。今の紙（${paper}）にどう描きますか。はめ込むと、構図をそのままの比で紙の中央に置き、余白は地になります。`,
+	canvasFitRun: 'はめ込んで描く',
+	canvasFitStretch: 'この紙に合わせて描く',
 	composeFallbackHint: (reason) => reason === 'stage2_hard_timeout'
 		? 'Stage 2 が時間内に応答しなかったため、定型の楽譜で描画しました。'
 		: reason === 'stage2_empty_output'

@@ -3,10 +3,10 @@
 use std::fmt;
 
 use crate::{
-    CanonicalRelationIdentity, CoreModifierTerm, CoreRoleTerm, ExactDecimal, GeometryKeyword,
-    NeutralDiagnostic, NeutralToken, NeutralTokenKind, NormalizedDdlDocument, RemainingRoleTerm,
-    SourceSpan, UnattachedExactNumber, compose_core_roles, compose_remaining_roles,
-    parse_neutral_lexemes,
+    CanonicalRelationIdentity, CanvasRatioDeclaration, CoreModifierTerm, CoreRoleTerm,
+    ExactDecimal, GeometryKeyword, NeutralDiagnostic, NeutralToken, NeutralTokenKind,
+    NormalizedDdlDocument, RemainingRoleTerm, SourceSpan, UnattachedExactNumber,
+    compose_core_roles, compose_remaining_roles, parse_neutral_lexemes,
 };
 
 /// Stable identity for the clause-stream foundation.
@@ -17,6 +17,10 @@ pub const CLAUSE_STREAM_SCHEMA_ID: &str = "inku.clause-stream.v5";
 pub enum ClauseSeparatorKind {
     LineBreak,
     SentenceEnd,
+    /// The sentence end of a canvas ratio declaration. It ends the clause
+    /// fragment like a sentence end but takes no sentence number, so the
+    /// sentences after a declaration keep their numbers (DDL 26).
+    DeclarationEnd,
 }
 
 /// One exact source separator, including both bytes of a CRLF line ending.
@@ -86,6 +90,10 @@ pub struct ClauseStream {
     pub clauses: Vec<ClauseSegment>,
     pub separators: Vec<ClauseSeparator>,
     pub delivery_conservation_count: usize,
+    /// The document's canvas ratio declaration: the first whole declaration
+    /// sentence. Its fragment holds no clause. A later declaration stays in the
+    /// stream and is read like any unread sentence, with its diagnostic.
+    pub canvas_ratio_declaration: Option<CanvasRatioDeclaration>,
 }
 
 /// Stable source-integrity failures that cannot be silently reordered or dropped.
@@ -177,7 +185,7 @@ pub fn parse_clause_stream(
     document: &NormalizedDdlDocument,
 ) -> Result<ClauseStream, ClauseStreamError> {
     let composition = compose_remaining_roles(compose_core_roles(parse_neutral_lexemes(document)));
-    let delivery_conservation_count = composition.delivery_conservation_count;
+    let mut delivery_conservation_count = composition.delivery_conservation_count;
     let mut atoms = Vec::new();
 
     atoms.extend(composition.core_roles.into_iter().map(ClauseAtom::CoreRole));
@@ -235,7 +243,7 @@ pub fn parse_clause_stream(
         }
     }
 
-    let separators = collect_separators(source)
+    let mut separators = collect_separators(source)
         .into_iter()
         .filter(|separator| {
             !atoms
@@ -243,6 +251,13 @@ pub fn parse_clause_stream(
                 .any(|atom| contains(atom.span(), separator.span))
         })
         .collect::<Vec<_>>();
+    let canvas_ratio_declaration =
+        take_canvas_ratio_declaration(document, &mut atoms, &mut separators).map(
+            |(declaration, removed)| {
+                delivery_conservation_count -= removed;
+                declaration
+            },
+        );
     for atom in &atoms {
         let atom_span = atom.span();
         if let Some(separator) = separators
@@ -304,7 +319,48 @@ pub fn parse_clause_stream(
         clauses,
         separators,
         delivery_conservation_count,
+        canvas_ratio_declaration,
     })
+}
+
+/// Finds the first clause fragment that is a whole canvas ratio declaration,
+/// removes its atoms and turns its sentence end into a declaration end. Returns
+/// the declaration with the number of its removed delivery-conserving atoms.
+fn take_canvas_ratio_declaration(
+    document: &NormalizedDdlDocument,
+    atoms: &mut Vec<ClauseAtom>,
+    separators: &mut [ClauseSeparator],
+) -> Option<(CanvasRatioDeclaration, usize)> {
+    let source = document.source();
+    let (fragment, ratio) = clause_fragments(source.len(), separators)
+        .into_iter()
+        .find_map(|fragment| {
+            crate::declared_canvas_ratio(
+                &source[fragment.start_byte..fragment.end_byte],
+                document.language(),
+            )
+            .map(|ratio| (fragment, ratio))
+        })?;
+    let removed = atoms
+        .iter()
+        .filter(|atom| {
+            contains(fragment, atom.span()) && atom.contributes_to_delivery_conservation()
+        })
+        .count();
+    atoms.retain(|atom| !contains(fragment, atom.span()));
+    if let Some(separator) = separators.iter_mut().find(|separator| {
+        separator.kind == ClauseSeparatorKind::SentenceEnd
+            && separator.span.start_byte == fragment.end_byte
+    }) {
+        separator.kind = ClauseSeparatorKind::DeclarationEnd;
+    }
+    Some((
+        CanvasRatioDeclaration {
+            ratio,
+            span: fragment,
+        },
+        removed,
+    ))
 }
 
 fn atom_from_deferred_token(token: NeutralToken) -> Result<ClauseAtom, ClauseStreamError> {

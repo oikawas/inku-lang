@@ -979,6 +979,7 @@ fn retain_ast(
         SemanticDocumentAst {
             background: ast.background.clone(),
             ground: ast.ground.clone(),
+            canvas_ratio: ast.canvas_ratio,
             instructions,
             coordinated_head_groups,
             group_predicates,

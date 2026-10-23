@@ -125,6 +125,7 @@ def test_a_fork_and_change_the_layout_carry_the_records(saved_work, monkeypatch)
     assert composed["recomposition"]["reason"] == "laws_placed"
     # The run that draws the answer keeps the records for the next fork.
     assert starts[-1] == {"tag": "direct_ddl", "source": SOURCE, "laws_layers": LAWS, "laws_basis": basis}
+    # A new work keeps no records, and declares its paper (DDL 26).
     service.start("owner", "direct_ddl", SOURCE)
-    assert starts[-1] == {"tag": "direct_ddl", "source": SOURCE}
+    assert starts[-1] == {"tag": "direct_ddl", "source": SOURCE, "declare_canvas": True}
     service.close()

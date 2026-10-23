@@ -28,8 +28,9 @@ use crate::surface_geometry::mark_bbox;
 use crate::surfaces::render_surface;
 use crate::svg::{Document, Element, format_number};
 use crate::types::{
-    Canvas, CanvasGroundSpec, Instruction, InstructionMode, Primitive, RenderMetadata,
-    RenderOutput, RenderRequest, Score, SurfaceTexture, SurfaceTextureMetadata, SvgProfile,
+    Bleed, Canvas, CanvasFit, CanvasGroundSpec, CanvasSize, CanvasSpec, Instruction,
+    InstructionMode, Primitive, RenderMetadata, RenderOutput, RenderRequest, Score, SurfaceTexture,
+    SurfaceTextureMetadata, SvgProfile,
 };
 use crate::{RENDER_ENGINE_ID, RENDER_ENGINE_VERSION};
 
@@ -215,14 +216,60 @@ fn background_color(
         .unwrap_or_else(|| default_color(request.score.background).to_owned())
 }
 
-fn background_rect(request: &RenderRequest, color: &str) -> Element {
+fn background_rect(paper: CanvasSize, color: &str) -> Element {
     Element::new("rect")
         .attr("id", "background")
         .attr("x", "0")
         .attr("y", "0")
-        .attr("width", format_number(request.options.canvas.width))
-        .attr("height", format_number(request.options.canvas.height))
+        .attr("width", format_number(paper.width))
+        .attr("height", format_number(paper.height))
         .attr("fill", color)
+}
+
+/// The content canvas of a Score fitted into its paper (render engine 93): the
+/// largest frame of the declared ratio, centred, with the paper's margins as
+/// its bleed. `None` draws on the paper itself, as every other Score does.
+fn fitted_canvas(score: &Score, paper: CanvasSize) -> Option<CanvasSize> {
+    let Canvas::Spec(CanvasSpec {
+        declared_ratio: Some(ratio),
+        fit: Some(CanvasFit::Contain),
+        ..
+    }) = &score.canvas
+    else {
+        return None;
+    };
+    let ratio = f64::from(ratio.width_units) / f64::from(ratio.height_units);
+    let (width, height) = if paper.width > paper.height * ratio {
+        (paper.height * ratio, paper.height)
+    } else {
+        (paper.width, paper.width / ratio)
+    };
+    let bleed = Bleed {
+        x: (paper.width - width) / 2.0,
+        y: (paper.height - height) / 2.0,
+    };
+    (bleed.x > 0.0 || bleed.y > 0.0).then_some(CanvasSize {
+        width,
+        height,
+        bleed,
+    })
+}
+
+/// A fitted Score's content, moved from its frame's origin to the paper's.
+fn on_paper(content: Element, canvas: CanvasSize) -> Element {
+    if canvas.bleed.is_none() {
+        return content;
+    }
+    let mut frame = Element::new("g").attr("id", "inku_fitted_frame").attr(
+        "transform",
+        format!(
+            "translate({} {})",
+            format_number(canvas.bleed.x),
+            format_number(canvas.bleed.y)
+        ),
+    );
+    frame.push(content);
+    frame
 }
 
 fn document_metadata(profile: SvgProfile) -> (String, String) {
@@ -328,10 +375,12 @@ fn check_mark_extent(
 /// several texture and ground passes grows with these values.
 fn validate_request(request: &RenderRequest) -> Result<(), RenderError> {
     let canvas = request.options.canvas;
+    // Only a fitted Score sets a bleed; a host's paper has none.
     if !(canvas.width.is_finite()
         && canvas.height.is_finite()
         && canvas.width > 0.0
-        && canvas.height > 0.0)
+        && canvas.height > 0.0
+        && canvas.bleed.is_none())
     {
         return Err(RenderError::InvalidCanvas);
     }
@@ -506,6 +555,12 @@ fn render_impl(
 ) -> Result<RenderOutput, RenderError> {
     let invalid_colors =
         crate::palette::sanitize_color_map(&mut request.options.resolved_color_map);
+    // The paper keeps the document, background and ground; a fitted Score's
+    // marks are drawn in its frame's canvas from here on.
+    let paper = request.options.canvas;
+    if let Some(frame) = fitted_canvas(&request.score, paper) {
+        request.options.canvas = frame;
+    }
     let source_score = request.score.clone();
     let profile = request.options.svg_profile;
     let assignment = work_color_assignment(
@@ -836,12 +891,14 @@ fn render_impl(
             )
         });
     if is_print && let Some(seed) = request.options.render_seed {
+        // The plate covers a fitted frame's paper (render engine 93).
+        let [x0, y0, x1, y1] = request.options.canvas.paper();
         let mut plate_tone = Element::new("rect")
             .attr("id", "layer_15_plate_tone")
-            .attr("x", "0")
-            .attr("y", "0")
-            .attr("width", format_number(request.options.canvas.width))
-            .attr("height", format_number(request.options.canvas.height))
+            .attr("x", format_number(x0))
+            .attr("y", format_number(y0))
+            .attr("width", format_number(x1 - x0))
+            .attr("height", format_number(y1 - y0))
             .attr("fill", "#111111")
             .attr(
                 "opacity",
@@ -858,15 +915,10 @@ fn render_impl(
         content.push(plate_tone);
     }
     let presence = render_presence_layer(&performance.score, request.options.canvas, &assignment);
-    let ground = ground.as_ref().and_then(|ground| {
-        render_ground(
-            ground,
-            request.options.canvas,
-            &background,
-            request.options.render_seed,
-        )
-    });
-    let mut document = Document::new(request.options.canvas);
+    let ground = ground
+        .as_ref()
+        .and_then(|ground| render_ground(ground, paper, &background, request.options.render_seed));
+    let mut document = Document::new(paper);
     for definition in material_definitions {
         document.push_definition(definition);
     }
@@ -899,27 +951,27 @@ fn render_impl(
         document.push(metadata);
         let mut artboard = Element::new("g").attr("id", "inku_artboard");
         let mut background_layer = Element::new("g").attr("id", "layer_00_background");
-        background_layer.push(background_rect(&request, &background));
+        background_layer.push(background_rect(paper, &background));
         artboard.push(background_layer);
         if let Some(ground) = ground.as_ref() {
             artboard.push(ground.group.clone());
         }
-        artboard.push(content);
+        artboard.push(on_paper(content, request.options.canvas));
         let mut presence_content = Element::new("g").attr("id", "layer_20_presence");
         if let Some(presence) = presence {
             presence_content.push(presence);
         }
-        artboard.push(presence_content);
+        artboard.push(on_paper(presence_content, request.options.canvas));
         document.push(artboard);
     } else {
-        document.push(background_rect(&request, &background));
+        document.push(background_rect(paper, &background));
         if let Some(ground) = ground {
             document.push(ground.group);
         }
         if let Some(presence) = presence {
             content.push(presence);
         }
-        document.push(content);
+        document.push(on_paper(content, request.options.canvas));
     }
     let svg = document.serialize();
     // A non-finite f64 prints as `NaN`, `inf` or `-inf`. No element name, id or

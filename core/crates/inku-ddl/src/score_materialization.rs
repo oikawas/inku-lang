@@ -5,13 +5,12 @@ use std::collections::HashSet;
 use serde::Serialize;
 
 use inku_score::{
-    Arrangement, ArrangementPath, Canvas, CanvasSpec, CountOrigin, Density, Fade, FillBoundary,
-    FillGroup, FillGroupOwner, FillRecipe, FillTarget, FillTargetAnchor, FillTargetGeometry,
-    FillTargetOwner, InstanceOrdinalScheme, Layout, PlacementGroupOwner, PlacementMember, Point,
-    Relation, RepetitionGroup, ResolvedArrangement, ResolvedPlacementAnchor,
-    ResolvedPlacementGroup, ResolvedPlacementRecipe, ResolvedShapeDimensions, RhythmSpacing, Score,
-    ScoreResourcePolicy, ScoreSourceOwner, ScoreSourceSite, SymbolicMember, SymbolicMemberKind,
-    TransformGroup,
+    Arrangement, ArrangementPath, CountOrigin, Density, Fade, FillBoundary, FillGroup,
+    FillGroupOwner, FillRecipe, FillTarget, FillTargetAnchor, FillTargetGeometry, FillTargetOwner,
+    InstanceOrdinalScheme, Layout, PlacementGroupOwner, PlacementMember, Point, Relation,
+    RepetitionGroup, ResolvedArrangement, ResolvedPlacementAnchor, ResolvedPlacementGroup,
+    ResolvedPlacementRecipe, ResolvedShapeDimensions, RhythmSpacing, Score, ScoreResourcePolicy,
+    ScoreSourceOwner, ScoreSourceSite, SymbolicMember, SymbolicMemberKind, TransformGroup,
 };
 
 use crate::{
@@ -523,15 +522,7 @@ pub fn materialize_selected_composition(
         }
         .as_str()
         .to_owned(),
-        canvas: plan.ground().cloned().map_or_else(
-            || Canvas::Id(plan.context().canvas_format().id.to_owned()),
-            |ground| {
-                Canvas::Spec(CanvasSpec {
-                    aspect: plan.context().canvas_format().id.to_owned(),
-                    ground: Some(ground),
-                })
-            },
-        ),
+        canvas: plan.context().score_canvas(plan.ground().cloned()),
         background: plan.context().background(),
         presence: None,
         instructions,

@@ -144,10 +144,7 @@ fn mark_appearance(
     if bounds.iter().any(|v| !v.is_finite()) || bounds[2] <= 0.0 || bounds[3] <= 0.0 {
         return Err("invalid_mark_appearance_bounds".into());
     }
-    let mut document = Document::new(CanvasSize {
-        width: bounds[2],
-        height: bounds[3],
-    });
+    let mut document = Document::new(CanvasSize::new(bounds[2], bounds[3]));
     if context.use_filters {
         if let Some(filter) = crate::materials::texture_filter(instruction.weight, context.canvas) {
             document.push_definition(filter);

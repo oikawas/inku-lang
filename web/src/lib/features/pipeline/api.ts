@@ -84,6 +84,8 @@ export type PipelineOptions = {
 	catalog_id?: string;
 	catalog_mode?: string;
 	canvas_aspect?: CanvasAspectId;
+	/** Fit a DDL that declares another ratio into the paper (DDL engine 70). */
+	canvas_fit?: 'contain';
 	render_seed?: Seed;
 	composition_seed?: Seed;
 	wild?: boolean;

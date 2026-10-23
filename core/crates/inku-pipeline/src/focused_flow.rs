@@ -213,6 +213,7 @@ fn canonical_macro_crosses_owned_start_and_commit() {
                 completion_ranges: None,
                 laws_layers: None,
                 laws_basis: None,
+                declare_canvas: false,
             },
         },
     );
@@ -241,6 +242,7 @@ fn a_saved_unit_of_the_retired_saijiki_waits_for_its_host_to_migrate_it() {
                 completion_ranges: None,
                 laws_layers: None,
                 laws_basis: None,
+                declare_canvas: false,
             },
         },
     );
@@ -309,6 +311,7 @@ fn a_saved_unit_of_the_retired_saijiki_waits_for_its_host_to_migrate_it() {
                     completion_ranges: None,
                     laws_layers: None,
                     laws_basis: None,
+                    declare_canvas: false,
                 },
             },
         );
@@ -336,6 +339,7 @@ fn unresolved_qualified_macro_blocks_without_stage2_completion() {
                 completion_ranges: None,
                 laws_layers: None,
                 laws_basis: None,
+                declare_canvas: false,
             },
         },
     );
@@ -483,10 +487,16 @@ fn stage1_compiler_feedback_retries_before_the_corrected_ddl_commits() {
     assert!(state.delivery.is_none());
     let commit = state.action.as_ref().unwrap();
     assert_eq!(commit.tag, "commit_visible_normalized_ddl");
-    assert_eq!(commit.payload["document"]["source"], corrected_ddl);
+    assert_eq!(
+        commit.payload["document"]["source"],
+        declared(corrected_ddl)
+    );
     let committed = run(Some(&state), &envelope(Some(&state), ack(&state))).snapshot;
     assert!(matches!(committed.phase, PipelinePhase::ScoreReady));
-    assert_eq!(committed.document.as_ref().unwrap().source, corrected_ddl);
+    assert_eq!(
+        committed.document.as_ref().unwrap().source,
+        declared(corrected_ddl)
+    );
     assert!(committed.delivery.as_ref().unwrap().score.is_some());
 }
 
@@ -638,12 +648,15 @@ fn exhausted_stage1_proposes_sealed_residual_only_after_visible_ack() {
     assert!(proposed.document.is_none() && proposed.delivery.is_none());
     let commit = proposed.action.as_ref().expect("residual CAS proposal");
     assert_eq!(commit.tag, "commit_visible_normalized_ddl");
-    assert_eq!(commit.payload["document"]["source"], source);
+    assert_eq!(commit.payload["document"]["source"], declared(source));
     assert_eq!(commit.payload["reason"], "stage1_residual_execution");
 
     let committed = run(Some(&proposed), &envelope(Some(&proposed), ack(&proposed))).snapshot;
     assert!(matches!(committed.phase, PipelinePhase::ScoreReady));
-    assert_eq!(committed.document.as_ref().unwrap().source, source);
+    assert_eq!(
+        committed.document.as_ref().unwrap().source,
+        declared(source)
+    );
     assert!(
         committed.action.is_none(),
         "residual adoption must not open known-hole completion"
@@ -757,8 +770,44 @@ fn stage1_does_not_correct_canonical_ddl_when_macro_expansion_exceeds_its_budget
 }
 
 #[test]
+fn only_a_new_direct_ddl_declares_the_paper_and_an_own_declaration_stays() {
+    let start = |source: &str, declare_canvas: bool| {
+        let state = run(
+            None,
+            &envelope(
+                None,
+                PipelineInput::Start {
+                    variation_id: "direct".into(),
+                    authoring_nonce: "direct-1".into(),
+                    config: Box::new(config()),
+                    authority: VariationAuthorityState::new_direct_ddl(),
+                    authoring: AuthoringInput::DirectDdl {
+                        source: source.into(),
+                        completion_ranges: None,
+                        laws_layers: None,
+                        laws_basis: None,
+                        declare_canvas,
+                    },
+                },
+            ),
+        )
+        .snapshot;
+        committed_source(&state)
+    };
+    let source = "place one black circle at center.";
+    // A new work's DDL declares the square paper (DDL 26).
+    assert_eq!(start(source, true), declared(source));
+    // A DDL from a saved work is drawn as written.
+    assert_eq!(start(source, false), source);
+    // A ratio the author declared stays, whatever the paper.
+    let own = "Aspect ratio 16:9.\nplace one black circle at center.";
+    assert_eq!(start(own, true), own);
+}
+
+#[test]
 fn committed_ddl_and_approved_hole_patch_share_one_replayable_path() {
     let source = "place one black circle at center.";
+    // Both are new works, so both declare the paper (DDL 26).
     let direct_start = envelope(
         None,
         PipelineInput::Start {
@@ -771,6 +820,7 @@ fn committed_ddl_and_approved_hole_patch_share_one_replayable_path() {
                 completion_ranges: None,
                 laws_layers: None,
                 laws_basis: None,
+                declare_canvas: true,
             },
         },
     );
@@ -1131,6 +1181,7 @@ fn committed_hole_with_local_diagnostics_still_requests_bounded_completion() {
                 completion_ranges: None,
                 laws_layers: None,
                 laws_basis: None,
+                declare_canvas: false,
             },
         },
     );
@@ -1183,6 +1234,7 @@ fn independent_hole_results_keep_valid_subset_without_retry_after_ack() {
                     completion_ranges: None,
                     laws_layers: None,
                     laws_basis: None,
+                    declare_canvas: false,
                 },
             },
         );
@@ -1616,6 +1668,7 @@ fn a_range_whose_words_changed_is_completed_again_and_recorded() {
                 completion_ranges: Some(record.clone()),
                 laws_layers: None,
                 laws_basis: None,
+                declare_canvas: false,
             },
         },
     );
@@ -1703,6 +1756,7 @@ fn a_renamed_range_that_keeps_its_numbers_settles_without_approval() {
                 completion_ranges: Some(record),
                 laws_layers: None,
                 laws_basis: None,
+                declare_canvas: false,
             },
         },
     );
@@ -1796,6 +1850,7 @@ fn started_direct_ddl_in(
                 completion_ranges: None,
                 laws_layers: None,
                 laws_basis: None,
+                declare_canvas: false,
             },
         },
     );
@@ -2026,7 +2081,7 @@ fn stage1_returns_the_layers_drawn_only_in_the_background_colour() {
     assert!(state.stage1_fallback.is_none());
     let commit = state.action.as_ref().unwrap();
     assert_eq!(commit.tag, "commit_visible_normalized_ddl");
-    assert_eq!(commit.payload["document"]["source"], answered);
+    assert_eq!(commit.payload["document"]["source"], declared(answered));
     assert_eq!(commit.payload["reason"], "stage1_generated");
     let committed = run(Some(&state), &envelope(Some(&state), ack(&state))).snapshot;
     assert!(matches!(committed.phase, PipelinePhase::ScoreReady));
@@ -2052,7 +2107,10 @@ fn a_failed_return_commits_the_kept_candidate() {
         assert!(state.stage1_fallback.is_none());
         let commit = state.action.as_ref().unwrap();
         assert_eq!(commit.tag, "commit_visible_normalized_ddl");
-        assert_eq!(commit.payload["document"]["source"], WHITE_ON_WHITE);
+        assert_eq!(
+            commit.payload["document"]["source"],
+            declared(WHITE_ON_WHITE)
+        );
         assert_eq!(commit.payload["reason"], "stage1_generated");
         assert!(
             output
@@ -2064,7 +2122,7 @@ fn a_failed_return_commits_the_kept_candidate() {
         assert!(output.events.iter().all(|event| event.tag != "failed"));
         let committed = run(Some(&state), &envelope(Some(&state), ack(&state))).snapshot;
         assert!(matches!(committed.phase, PipelinePhase::ScoreReady));
-        assert_eq!(committed.document.unwrap().source, WHITE_ON_WHITE);
+        assert_eq!(committed.document.unwrap().source, declared(WHITE_ON_WHITE));
     }
     let cancelled = run(
         Some(&returned),
@@ -2092,7 +2150,7 @@ fn the_return_is_asked_once_and_its_answer_is_kept() {
     );
     let commit = output.snapshot.action.as_ref().unwrap();
     assert_eq!(commit.tag, "commit_visible_normalized_ddl");
-    assert_eq!(commit.payload["document"]["source"], still_white);
+    assert_eq!(commit.payload["document"]["source"], declared(still_white));
 }
 
 #[test]
@@ -2114,7 +2172,7 @@ fn stage1_keeps_its_candidate_without_budget_or_where_the_ground_covers_the_back
         assert!(state.stage1_fallback.is_none(), "{source}");
         let commit = state.action.as_ref().unwrap();
         assert_eq!(commit.tag, "commit_visible_normalized_ddl", "{source}");
-        assert_eq!(commit.payload["document"]["source"], source);
+        assert_eq!(commit.payload["document"]["source"], declared(source));
         let wire = serde_json::to_value(&state).unwrap();
         assert!(wire.get("stage1_fallback").is_none(), "{source}");
     }
@@ -2244,7 +2302,7 @@ fn stage1_keeps_a_covering_ground_whose_marks_show() {
         );
         let commit = output.snapshot.action.as_ref().unwrap();
         assert_eq!(commit.tag, "commit_visible_normalized_ddl", "{source}");
-        assert_eq!(commit.payload["document"]["source"], source);
+        assert_eq!(commit.payload["document"]["source"], declared(source));
     }
 }
 
@@ -2360,6 +2418,27 @@ fn committed_source(state: &PipelineSnapshot) -> String {
         .to_owned()
 }
 
+/// A new DDL as the run commits it: the square paper's ratio declared first
+/// (DDL 26).
+fn declared(source: &str) -> String {
+    inku_ddl::declare_canvas_ratio(
+        source,
+        inku_score::CanvasRatio {
+            width_units: 1,
+            height_units: 1,
+        },
+        inku_ddl::ResolvedInstructionLanguage::En,
+        inku_ddl::CanvasRatioWriting::ReplaceDeclared,
+    )
+}
+
+/// The sentences of a committed new DDL after its declaration.
+fn ddl_lines(source: &str) -> Vec<&str> {
+    let mut lines = source.lines();
+    assert_eq!(lines.next(), Some("Aspect ratio 1:1."), "{source}");
+    lines.collect()
+}
+
 fn tags(output: &StepOutput) -> Vec<&str> {
     output
         .events
@@ -2409,7 +2488,7 @@ fn a_composing_run_reads_the_settled_plan_and_commits_marked_ranges() {
         tags(&read)
     );
     let source = committed_source(&read.snapshot);
-    let lines: Vec<&str> = source.lines().collect();
+    let lines = ddl_lines(&source);
     // The field and the circle are placed by the composition; the dots keep the
     // place the description states.
     assert!(lines[2].contains(" (horizontal "), "{source}");
@@ -2465,7 +2544,7 @@ fn a_composing_run_writes_the_joints_the_reading_returns() {
     // The dots keep the place the description states, so they are not joined.
     assert_eq!(findings, Some(json!(["joint_stated"])));
     let source = committed_source(&read.snapshot);
-    let lines: Vec<&str> = source.lines().collect();
+    let lines = ddl_lines(&source);
     // The circle keeps its range and is printed after the field with its joint.
     assert!(lines[3].contains(" (horizontal "), "{source}");
     assert!(
@@ -2490,7 +2569,7 @@ fn a_run_that_does_not_read_composes_from_the_default_reading() {
     let pending = composition_start(Some(CompositionConfig { read: false }));
     let output = plan_answer(&pending);
     let source = committed_source(&output.snapshot);
-    let lines: Vec<&str> = source.lines().collect();
+    let lines = ddl_lines(&source);
     assert!(lines[2].contains(" (horizontal "), "{source}");
     // Without a reading every place the plan set is kept.
     assert!(lines[3].ends_with(" at the center."), "{source}");
@@ -2724,7 +2803,7 @@ fn a_run_with_laws_asks_for_them_and_commits_what_they_print() {
         tags(&chosen)
     );
     let source = committed_source(&chosen.snapshot);
-    let lines: Vec<&str> = source.lines().collect();
+    let lines = ddl_lines(&source);
     // The field keeps its range; the circle is on the crossing in numbers; the
     // dots are smaller, at the place the description states.
     assert!(lines[2].contains(" (horizontal "), "{source}");
@@ -2937,7 +3016,7 @@ fn refused_answers_that_spend_the_budget_commit_the_composed_document() {
         event(&last, "laws_fallback"),
         Some(&json!({"failure": "semantic_violation", "detail": "main_law_missing"}))
     );
-    assert_eq!(committed_source(&state), composed);
+    assert_eq!(committed_source(&state), declared(&composed));
     assert!(state.laws.is_none());
 }
 
@@ -2963,7 +3042,7 @@ fn a_failed_laws_request_commits_the_composed_document() {
         event(&last.unwrap(), "laws_fallback"),
         Some(&json!({"failure": "rate_limited"}))
     );
-    assert_eq!(committed_source(&state), composed);
+    assert_eq!(committed_source(&state), declared(&composed));
 }
 
 #[test]
@@ -3053,7 +3132,7 @@ fn a_layer_after_an_opened_layer_is_asked_again_by_its_own_number() {
         tags(&chosen)
     );
     let source = committed_source(&chosen.snapshot);
-    let lines: Vec<&str> = source.lines().collect();
+    let lines = ddl_lines(&source);
     // The ground and background, six dots, one circle.
     assert_eq!(lines.len(), 9, "{source}");
     assert!(
@@ -3214,7 +3293,7 @@ fn a_run_with_colors_asks_for_them_and_commits_what_they_print() {
     let payload = event(&chosen, "colors_chosen").expect("colors chosen");
     assert_eq!(payload["laws"], json!(["D2"]));
     let source = committed_source(&chosen.snapshot);
-    let lines: Vec<&str> = source.lines().collect();
+    let lines = ddl_lines(&source);
     assert_eq!(
         lines[2],
         "Fill one blue pen dense flat large square at the whole canvas (horizontal 0 to 1, vertical 0 to 1).",
@@ -3294,7 +3373,7 @@ fn the_colors_keep_the_stated_colors() {
         tags(&chosen)
     );
     let source = committed_source(&chosen.snapshot);
-    let lines: Vec<&str> = source.lines().collect();
+    let lines = ddl_lines(&source);
     let before: Vec<&str> = left.lines().collect();
     // The ground and the background, the field, the circle and the dots.
     assert_eq!(lines[..2], before[..2], "{source}");
@@ -3324,7 +3403,7 @@ fn refused_colors_that_spend_the_budget_commit_the_document_the_laws_left() {
         left.contains(" at horizontal 0.381966, vertical 0.381966."),
         "{left}"
     );
-    assert_eq!(committed_source(&state), left);
+    assert_eq!(committed_source(&state), declared(&left));
     assert_eq!(state.laws_layers, record);
     assert!(state.colors.is_none());
 }
@@ -3343,7 +3422,7 @@ fn a_failed_colors_request_commits_the_document_the_laws_left() {
         event(&last.unwrap(), "colors_fallback"),
         Some(&json!({"failure": "rate_limited"}))
     );
-    assert_eq!(committed_source(&state), left);
+    assert_eq!(committed_source(&state), declared(&left));
 }
 
 #[test]
@@ -3396,11 +3475,7 @@ fn the_colors_are_asked_also_when_the_laws_fell_back() {
     let chosen = colors_answer(&state, &analogous_blue());
     let source = committed_source(&chosen.snapshot);
     assert!(
-        source
-            .lines()
-            .nth(2)
-            .unwrap()
-            .starts_with("Fill one blue pen "),
+        ddl_lines(&source)[2].starts_with("Fill one blue pen "),
         "{source}"
     );
     assert!(chosen.snapshot.laws_layers.is_none());
@@ -3871,12 +3946,19 @@ fn failed_reason(state: &PipelineSnapshot) -> &str {
 
 #[test]
 fn the_laws_from_a_saved_work_print_what_a_description_run_printed() {
-    // A work without laws keeps the composed document as its DDL.
+    // A work without laws keeps the composed document as its DDL, the paper
+    // declared first; the laws read it without the declaration, and the child
+    // declares it again (DDL 26).
     let asked = plan_answer(&laws_start(Some(LawsConfig {}))).snapshot;
     let composed = asked.laws.as_ref().unwrap().document.source.clone();
     let described = laws_answer(&asked, &two_laws());
-    let from_work =
-        saved_laws_start(&composed, crate::laws::LawsDirection::default(), None, None).snapshot;
+    let from_work = saved_laws_start(
+        &declared(&composed),
+        crate::laws::LawsDirection::default(),
+        None,
+        None,
+    )
+    .snapshot;
     let action = from_work.action.as_ref().unwrap();
     assert_eq!(action.tag, "choose_laws");
     // Without a direction the request is the description run's.
@@ -4199,6 +4281,7 @@ fn a_direct_ddl_run_gives_back_the_laws_basis_it_was_given() {
                 completion_ranges: None,
                 laws_layers: described.snapshot.laws_layers.clone(),
                 laws_basis: Some(basis.clone()),
+                declare_canvas: false,
             },
         },
     );

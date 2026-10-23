@@ -120,6 +120,7 @@
 		type CanvasAspectOption,
 		type CanvasFormatRegistryResponse,
 	} from '$lib/plugins/system/canvas-aspect';
+	import { declaredCanvasRatio } from '$lib/canvas-ratio';
 	import {
 		type HistoryItem,
 		type Score
@@ -1757,10 +1758,15 @@ async function drawLineageDdlEdit(node: LineageNode, editedDdl: string, signal?:
 	// Ask before the words are carried into a child (contract § stage 4).
 	if (!(await work.confirmFallbackRefine(node.history))) return;
 	const sourceText = node.history.source_text ?? node.history.input ?? '';
+	// An edited DDL that declares another ratio than the work's paper (DDL 26).
+	const paperId = lineageCanvasAspectId(node);
+	const fit = await work.chooseCanvasFit(declaredCanvasRatio(nextDdl), paperId);
+	if (fit === null) return;
 	if (!(await work.selectHistoryAuthority(node.history.id, node.history.pipeline_variation_id, signal))) return;
 	const view = await work.authorDdl(nextDdl, {
 		sourceText,
-		canvasAspectId: lineageCanvasAspectId(node),
+		canvasAspectId: paperId,
+		...(fit === 'fit' ? { canvasFit: 'contain' as const } : {}),
 		lineageParentNodeId: node.id,
 		derivationKind: 'ddl_edit',
 		derivationMetadata: { edited_from_history_id: node.history.id ?? null },
@@ -1776,9 +1782,15 @@ async function drawLineageDdlEdit(node: LineageNode, editedDdl: string, signal?:
 async function drawNewDdl(rawDdl: string, signal?: AbortSignal, importedPlugins?: ImportedPlugin[]): Promise<void> {
 	const nextDdl = rawDdl.trim();
 	if (!nextDdl) return;
+	// A DDL without a declaration is given the paper's; one written for
+	// another ratio is fitted into the paper or drawn to it (DDL 26).
+	const paperId = effectiveCanvasAspectId();
+	const fit = await work.chooseCanvasFit(declaredCanvasRatio(nextDdl), paperId);
+	if (fit === null) return;
 	work.beginNewAuthoring();
 	await work.authorDdl(nextDdl, {
-		canvasAspectId: effectiveCanvasAspectId(),
+		canvasAspectId: paperId,
+		...(fit === 'fit' ? { canvasFit: 'contain' as const } : {}),
 		displayLabel: 'DDL',
 		...(importedPlugins?.length ? { importedPlugins } : {}),
 	}, signal);

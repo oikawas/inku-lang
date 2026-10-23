@@ -32,17 +32,16 @@ fn filter(
 ) -> Element {
     let scale = context.canvas.unit() / 1000.0;
     let extent = 12.0 * scale;
+    // A fitted frame's region is its paper (render engine 93).
+    let [x0, y0, x1, y1] = context.canvas.paper();
     let mut filter = Element::new("filter")
         .attr("id", identifier)
         .attr("filterUnits", "userSpaceOnUse")
         .attr("primitiveUnits", "userSpaceOnUse")
-        .attr("x", format_number(-extent))
-        .attr("y", format_number(-extent))
-        .attr("width", format_number(context.canvas.width + extent * 2.0))
-        .attr(
-            "height",
-            format_number(context.canvas.height + extent * 2.0),
-        )
+        .attr("x", format_number(x0 - extent))
+        .attr("y", format_number(y0 - extent))
+        .attr("width", format_number((x1 - x0) + extent * 2.0))
+        .attr("height", format_number((y1 - y0) + extent * 2.0))
         .attr("color-interpolation-filters", "sRGB");
     filter.push(
         Element::new("feTurbulence")

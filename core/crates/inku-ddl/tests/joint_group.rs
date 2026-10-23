@@ -86,10 +86,7 @@ fn every_copy_of_a_group_keeps_its_joint() {
                 options: RenderOptions {
                     resolved_color_map: BTreeMap::new(),
                     catalog_id: None,
-                    canvas: CanvasSize {
-                        width: 256.0,
-                        height: 256.0,
-                    },
+                    canvas: CanvasSize::new(256.0, 256.0),
                     canvas_aspect_id: "square".into(),
                     svg_profile: SvgProfile::Display,
                     render_seed: Some(1),

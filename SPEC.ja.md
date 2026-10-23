@@ -68,7 +68,7 @@ DDLは単にグラフィックを記述する言語ではなく、**視覚的な
 1. **記述は人間が読める** — 自然言語と記述言語の中間に位置する
 2. **揺らぎは仕様である** — LLMのアーキテクチャ的揺らぎをバグとして排除しない。揺らぎはミクロ（線の震え・滲み）とマクロ（構図・配置）の二つのスケールを持ち、どちらも演奏（Renderer）で実現される（Section 13.8 / 14.4）
 3. **感情語彙を排除する** — 「美しく」ではなく、数値と物理素材の語彙で記述
-4. **固定した大きさを持たない** — 大きさ、位置は基準辺に対する相対位置で示される。Pixelの絶対値は持たない。サイズはスケール可能で、壁にも画面にも適用可能。**縦横比も固定しない** — 画面の縦横比は作品世界を規定する制約であって、記述が持つ寸法ではない
+4. **固定した大きさを持たない** — 大きさ、位置は基準辺に対する相対位置で示される。Pixelの絶対値は持たない。サイズはスケール可能で、壁にも画面にも適用可能。**縦横比も固定しない** — 画面の縦横比は作品世界を規定する制約である。DDL は、書いたときの比を「画面比W:H。」で宣言する（DDL 26、2026-10-23 作者。それまでの「比は DDL に書かない」決まりは廃止した）。宣言は、その比で組んだという記録であって、紙を縛らない。同じ DDL を別の比の紙にも描け、そのときは、はめ込むか、紙に合わせて描くかを選べる（§19）
 5. **出力は静止画** — 動かさない。見る人が動く。**⚠ 「面がどう在るか」は静止画の状態であって時間の経過ではない**（2026-08-12 作者裁定）。塗り・質感を語彙に持つときは**状態の名詞**で持つ（動詞の「塗る」ではなく名詞の「塗り」）。**動詞で持つと本原則と §3.1 の「配置する動作を中心とする」の両方に衝突する** —— `描く` が v1.92 で剪定されたのと同じ理由による。**ただし、痕の作り方を言う語（歳時記の次の版で加える「さばき」）は、筆の運び（速さなど、描く過程の時間）を言ってよい**（2026-09-29 作者裁定）。運びは痕の状態として静止画に残り、出力は静止画のままである。おもての語は引き続き状態の名詞で持つ
 6. **文章を正規化されたDDLへ変換し、Typed Compilerで検証する設計を採る** — 入力は自由にすることが可能だが、DDLには明確な形式とルールがある。完全な自由形式はユーザーを圧倒する。適度な構造が創造を助ける。通常Server／Webは共有Typed Compilerへ接続し、現在の生成経路は §12 に記す
 7. **エンジンは後戻りしない** — 版木を彫り進めるように、描画エンジンは一方向にしか進まない。過去の版をシステムとして保持せず、選び直せるようにもしない。**残るのは刷り上がった作品（保存済み SVG）であって、彫る前の版木ではない**（§2.1）
@@ -134,7 +134,7 @@ PNGは正本SVGを写す派生出力であり、縮小してもSVGの材質・�
 
 色列は共有Scoreの既存 `Arrangement.color_cycle` を維持する。その他の列は完全なmember templateを既存の配置／fillへ保持し、Score 0.14の`cycle_members.occurrence_count`から順番に選ぶ。各配置の先頭から列を始め、旧作品の必要最小Score版、既存の資源上限、個数省略の規則を保つ。`繰り返して`も組の表記も通常文法であり、別の歳時記語は増やさない。
 
-キャンバス形式は語彙でもpluginでもなく、shared core の `inku.canvas-format-registry.v1` が所有する resolved host option である。11形式は `square` / `golden` / `a4` / `b4` / `pillar` / `oban` / `wide` / `byobu` / `vertical` / `sd_monitor` / `hd_monitor` とし、visible DDL やmacro定義へ書かない（§19）。
+キャンバス形式は語彙でもpluginでもなく、shared core の `inku.canvas-format-registry.v1` が所有する resolved host option である。11形式は `square` / `golden` / `a4` / `b4` / `pillar` / `oban` / `wide` / `byobu` / `vertical` / `sd_monitor` / `hd_monitor` とし、形式の ID は visible DDL やmacro定義へ書かない。形式は描く紙であり、DDL が書くのは、その DDL を組んだ比の宣言「画面比W:H。」である（§19、DDL 26）。
 
 **コアの性質**：
 - 物理素材の語彙のみ（感情語ゼロ）
@@ -228,7 +228,7 @@ Nature plugin（雨・葉・水・風）のような具象語彙をコアに入�
 
 ### 4.4 キャンバスと語彙マクロの所有境界
 
-Canvasのcanonical ownerはshared coreの`inku.canvas-format-registry.v1`であり、語彙pluginやsystem pluginではない。Canvas selectionはresolved host optionとしてvisible DDL本文とMacroInvocation / MacroDefinitionの外に置く。同じDDLを異なるcanvasへ使え、選択が無いhost boundaryでは`square`をhost defaultにできるが、DDL compilerが`square`をsemantic factとして挿入する意味ではない。Hostが選択をScore / render context / historyへ運び、RendererがSVGの`width` / `height` / `viewBox`を解決する（§19）。
+Canvasのcanonical ownerはshared coreの`inku.canvas-format-registry.v1`であり、語彙pluginやsystem pluginではない。Canvas selectionはresolved host optionとしてvisible DDL本文とMacroInvocation / MacroDefinitionの外に置く。同じDDLを異なるcanvasへ使え、選択が無いhost boundaryでは`square`をhost defaultにできるが、DDL compilerが`square`をsemantic factとして挿入する意味ではない。Hostが選択をScore / render context / historyへ運び、RendererがSVGの`width` / `height` / `viewBox`を解決する（§19）。Canvas selection は描く紙であり、DDL が宣言する比（`Score.canvas.declared_ratio`、DDL 26）とは別である。新しい DDL には、アプリが紙の比を最初の文として書き入れる（§19）。
 
 現行runtimeの`plugin_storage["canvas-aspect"]`、`canvas_aspect` request alias、保存済み`Score.canvas` / `render_canvas_aspect*`、system / user plugin directory、plugin status / enable toggleはlegacy互換操作として残る。これらは読み取りと、enable状態の更新、定義を持たないlegacy plugin documentの削除を行える。plugin documentの作成・更新・本文読出しのAPIと設定画面のeditorは廃止した（2026-09-28、I-703）。設定画面は、同梱packageを切り替える文書を「描画に使う」、それ以外を「描画には使われない」と示し、語の一覧（名前・別名・表記・注釈・preview）を読むだけで出す。同梱packageを切り替える文書は削除できない（409）。しかしそのことはsemantic authorityでも、`MacroDefinition`形式の新規authoring / loading APIでもない。保存済み設定とcatalog発見に必要なstorage／API互換を保ち、これらを旧意味決定実装の実行経路にはしない。Stage 2が現行互換経路でcanvasを受け取る場合もhost-resolved composition contextであり、visible DDL metadataではない。DDL sourceの座標、語、canonical meaningを書き換えない。
 
@@ -710,9 +710,7 @@ Web UIは記録された派生関係を系譜として辿る。Scoreの類似度
 
 履歴の表示では、モデル・カタログ・キャンバスの値は取れるかぎり履歴項目から取る。次に描く条件は現在の選択から取る。Canvas パネルのヘッダは、表示中作品の世代・モデル・色カタログ・キャンバス・SVG容量・作成日時を項目名と値のまとまりで簡潔に示す。入力側の色カタログは現在値と変更操作を同じ行に置き、長い名前は折り返して読めるようにする。
 
-設定モーダルの「表示と操作」は**履歴選択時の挙動**の操作を持つ。履歴項目を選んだときに UI の現在のキャンバス比と色カタログをその項目の値へ更新するか、現在の UI の選択を保つかを、それぞれ独立に選べる。この設定は UI の選択状態にしか効かない — 保存済みの履歴 SVG は保存されたまま表示され、描き直されない。
-
-同じ「表示と操作」が**履歴ストリップに添える事実**の選択も持つ。世代・モデル・engine バージョン・ファイル容量の 4 つから**最大 3 つ**を選び、選んだ順ではなく**宣言順**で出す。**「何も選ばない」は既定への差し戻しではなく、保存される答えである** — したがって**未回答（列を持たない口座）と空の選択は別物として扱う**。4 つ目を選ぼうとすると、既存の選択を追い出さずに拒み、上限を画面で示す。**ファイル容量はサーバーが保存済みの作品について報告する量**であり、ブラウザが受け取った SVG を数えたものではない — 帯を埋める一覧は絵を運ばないので、受け取ったものを数えるとすべての作品が 0 と報告される。
+設定モーダルの「表示と操作」が**履歴ストリップに添える事実**の選択を持つ。世代・モデル・engine バージョン・ファイル容量の 4 つから**最大 3 つ**を選び、選んだ順ではなく**宣言順**で出す。**「何も選ばない」は既定への差し戻しではなく、保存される答えである** — したがって**未回答（列を持たない口座）と空の選択は別物として扱う**。4 つ目を選ぼうとすると、既存の選択を追い出さずに拒み、上限を画面で示す。**ファイル容量はサーバーが保存済みの作品について報告する量**であり、ブラウザが受け取った SVG を数えたものではない — 帯を埋める一覧は絵を運ばないので、受け取ったものを数えるとすべての作品が 0 と報告される。
 
 Canvas パネルは鑑賞向けの操作も持つ。描画タブの全画面アイコンはプレゼンテーションモードを開き、現在の SVG を最大化して、履歴の移動・最新項目・スター切替・指示キャプション切替・閉じるの小さな操作バーを出す。Escape で閉じる。描画タブのキャプションアイコンは指示キャプションを切り替える。横書きのキャプションは、通常の Canvas ビューでは描画タブに対して左右 10% の余白を取り、そのタブの内側で切り取られる。プレゼンテーションモードではウィンドウに対して左右 10% の余白を取る。日本語を含む詞書きには、両画面の操作バーに「横書き／縦書き」の選択を表示する。縦書きは上から下・右から左に読み、改行と強調表現を保持する。長い縦書きの詞書きは枠内でスクロールできる。初期値は横書き・左で、日本語を含まない文章は選択値を保持したまま横書きで表示する。設定モーダルの「表示と操作」にある「詞書きの表示位置」で左／右を選び、縦書きの配置と横書きの文字揃えに適用する。**キャプションが表示するのは利用者に向けた元の指示文であって、内部で補強された Stage 1 プロンプトではない** — 感情ヒントやシステムプロンプトの素材をプレゼンテーションのキャプションから締め出すためである。
 
@@ -1199,7 +1197,7 @@ Variationの作成元は`stage1_generated`または`user_authored_ddl`として�
 
 系譜からの編集はhistory rowのownerを判別して対応するlinked forkを選び、旧forkを更新も置換もせず保持する。記述からのfork（`/variations/{id}/fork-description`）の元が最初の保存の前に止めたvariationなら、それを親にせず、その親（それも保存前なら、さらにその親）を親にし、親が無ければ親の無い新しいvariationとして始める（2026-10-13）。止めたvariationは保存したauthorityを持たないので、親にするとforkの最初の保存が断られ、Stage 1の送りを使った後に描画が止まっていた。Activeな`/executions/{id}/author-ddl`はsource、revision、optionsを受ける。同じ設定でsourceが変わる場合はrecord metadataを保存し、既存のCAS、origin、DDL authority lockを保つ。canvas／wildなど設定が変わる場合は、元のsource・config・authorityを変えず親関係を持つDDL authorityのdirect-DDL variationを新設する。sourceが不変でrecord metadataだけが変わる場合も既存resultを捨てずnew editionとして保存する。history sidecar v2はcoreの4診断、renderer診断、`resource_execution`を当該revision／sourceに不変保存し、通常の履歴表示へ戻す。v1には診断記録がない。sidecarが壊れていてもその作品だけにwarningを示し、保存DDL、Score、SVGの表示を続け、latestの推測や再compileをしない。
 
-DDL authorityのvariationの作品、`ddl_edit`で保存した作品、およびそれらから記述を読み直さない派生（タッチ、配置、色、再描画、廃止した変奏など）で作った作品を「記述固定」とし、history itemと系譜nodeの`description_locked`で示す。記述を読み直す派生（`reinterpretation`、`description_edit`、`sketch_grain_change`、`model_comparison`、`language_comparison`、`canvas_aspect_change`）で作った作品は固定しない。`replay`は派生の種別でなくDDLで判定する。親とDDLが違う`replay`は記述を読み直した描き直し（記述タブで記述を変えずに描いた作品は`replay`として保存されてきた）として固定せず、親とDDLが同じ`replay`はDDLを編集せずに描き直したものとして、自分のvariationがDDL authorityでも親が固定のときだけ固定する。記述固定の作品を親とする記述からの描き直しは、`/api/paint`・`/api/paint/stream`、記述を読み直す派生の`POST /api/history`、記述を書き換えたpipelineのforkのいずれも409 `description_locked`で断る。記述をそのまま使う新しいvariationへのforkだけを記述へ戻る道として残す。Webは記述タブを固定の表示にして描画を明示のforkに置き換え、記述を読み直す操作を理由付きで押せなくする。AI自律推敲は、固定の作品からは法則の手だけを打つ（取り合わせの手は記述に一文を足して読み直すので打てない、§自律推敲の方式）。
+DDL authorityのvariationの作品、`ddl_edit`で保存した作品、およびそれらから記述を読み直さない派生（タッチ、配置、色、再描画、はめ込み、廃止した変奏など）で作った作品を「記述固定」とし、history itemと系譜nodeの`description_locked`で示す。記述を読み直す派生（`reinterpretation`、`description_edit`、`sketch_grain_change`、`model_comparison`、`language_comparison`、`canvas_aspect_change`）で作った作品は固定しない。`replay`は派生の種別でなくDDLで判定する。親とDDLが違う`replay`は記述を読み直した描き直し（記述タブで記述を変えずに描いた作品は`replay`として保存されてきた）として固定せず、親とDDLが同じ`replay`はDDLを編集せずに描き直したものとして、自分のvariationがDDL authorityでも親が固定のときだけ固定する。記述固定の作品を親とする記述からの描き直しは、`/api/paint`・`/api/paint/stream`、記述を読み直す派生の`POST /api/history`、記述を書き換えたpipelineのforkのいずれも409 `description_locked`で断る。記述をそのまま使う新しいvariationへのforkだけを記述へ戻る道として残す。Webは記述タブを固定の表示にして描画を明示のforkに置き換え、記述を読み直す操作を理由付きで押せなくする。AI自律推敲は、固定の作品からは法則の手だけを打つ（取り合わせの手は記述に一文を足して読み直すので打てない、§自律推敲の方式）。
 
 Typed Stage 1 requestは、Saijikiから導出した有限語彙、解決済みcatalog/canvas identity、検証済みMacroのqualified name・version・definition digest・parameter・host提供のlocalized summaryだけをbounded projectionとして持ち、応答schemaは§12.6の下絵だけを許し、LLMが可視DDLの文字列を直接書くことはない。保存済みvisible DDLのparseが補完可能なknown holeを検出したら、共通pipelineが補完要求を自動で作る。別のユーザー補完操作は要求せず、holeがなければStage2 LLMを呼ばない。ただし§12.8のStage 1残部採用では追加LLM要求を始めず、保存ACK後に決定的な残部配送へ進む。有限文法外の語を含むclauseでも、compilerがexactな描画head、ground、またはbackground anchorとclause境界を確定できる場合は、そのclauseだけをknown holeにできる。Exactな境界を持たないUnknown、conflict、integrityエラーは補完対象にしない。後続の継続clauseがpatch可能な上流holeだけを原因として未確定なら、その継続診断はpatch後の再compileまで保留し、後続clause自体を書換え対象へ広げない。
 
@@ -2307,7 +2305,7 @@ JSONから解決した描画順と元instruction IDを奥行きの層として�
 
 実験は独立package・iframe・Worker・Rust WASMに分離し、既存coreは既定OFFの形状読取featureだけを提供する。DB・保存・生成API・バックアップへの変更はない。同梱配布物は接続部の `installation.json` で登録し、`VITE_DDL_3D_VIEWER_URL` で同一originの `/experimental/ddl-3d/<build>/index.html` に上書きできる。同設定を `off` にしてWebを再起動／再ビルドすると2Dのみになり、登録・配布物・実験ディレクトリ・接続部を撤去できる。詳細な変換・上限・組込み・撤去は [DDL 3D experiment](experiments/ddl-3d/README.md) を参照。通常の2D描画仕様は以下を維持する。
 
-Canvas selectionはvisible DDLやmacroの意味ではなく、shared coreの`inku.canvas-format-registry.v1`から解決するhost optionである。同じDDLを異なるcanvasへ使え、DDL sourceの座標・語・canonical meaningは変わらない。Registryの形式と正の整数比は次の11組を正とする。
+Canvas selectionはvisible DDLやmacroの意味ではなく、shared coreの`inku.canvas-format-registry.v1`から解決するhost option（描く紙）である。同じDDLを異なるcanvasへ使え、DDL sourceの座標・語・canonical meaningは変わらない。DDL は紙と別に、組んだ比を宣言する（下の「画面比の宣言とはめ込み」）。Registryの形式と正の整数比は次の11組を正とする。
 
 | ID | 比（width / height） |
 | --- | ---: |
@@ -2324,6 +2322,12 @@ Canvas selectionはvisible DDLやmacroの意味ではなく、shared coreの`ink
 | `hd_monitor` | `16 / 9` |
 
 選択が無いhost boundaryでは`square`をhost defaultにできるが、DDL compilerが`square`をsemantic factとして挿入する意味ではない。Hostがresolved selectionをScore / render context / historyへ運び、RendererがSVGの`width` / `height` / `viewBox`を決める。Stage 2が現行互換経路でcanvasを受け取る場合も、これはhost-resolved composition contextであってvisible DDL metadataではない。
+
+**画面比の宣言とはめ込み（DDL 26・描画エンジン 93、2026-10-23 作者）。** DDL は、組んだときの比を「画面比W:H。」（英語は `Aspect ratio W:H.`）で宣言する。W・H は 1〜10000 の整数で、横:縦の順。全角の数字と `：` も受ける。最大公約数で割って `Score.canvas.declared_ratio` に入り、`canvas.aspect` は描いた紙のままである。宣言の文は命令を作らず、文の番号を取らず、種の材料（`canonical_ast_bytes`）にも入らない。そのため、宣言を足した DDL の楽譜は、宣言の無い同じ DDL の楽譜と `declared_ratio` のほかは同じである。宣言は最初のものだけを読み、後ろの宣言は読めない文と同じに診断付きで除く。
+
+- **書き手**: 新しい DDL が生まれる時に、アプリが紙の比を最初の文として書き入れる。Stage 1 が確定した DDL（Stage 1 が書いた宣言はアプリの宣言に置き換える）と、親の無い新しい direct DDL（作者が書いた宣言は残す）である。利用者の編集と、保存済みの DDL の描き直しでは文をそのまま残す。保存作品からの法則の手は、親の DDL の宣言を外して法則を当て、子に同じ宣言を書き直す。宣言を足すと字数の上限を超える DDL には足さない。宣言はモデルへの依頼文に出さない（穴埋めと作品の計画の依頼文は今と同じ）。歳時記の画面には表示だけの類「がめん」として出す。
+- **宣言の無い DDL**: 今のまま紙に合わせて描く。保存済みの作品の前提の比は、作品の `render_canvas_aspect*` から補う。それも無い作品には、はめ込みを出さない。
+- **はめ込み**: 宣言の比（または補った比）と紙の比が違うとき、描く前に利用者に問う。「はめ込んで描く」は、紙の中に宣言の比で入る最大の枠を中央に置き、構図をその枠の中で組んで描く。背景と地は紙全体を覆い、痕は枠で切らず紙の端まで描く。「この紙に合わせて描く」は今までどおりである。保存作品をそのまま描き直すときは、保存した楽譜を、version を変えずに枠に描く（新しい派生「はめ込み」`canvas_fit`、記述を読み直さないので記述固定を受け継ぐ）。編集した DDL や新しい DDL は、宣言の比で compile して枠に描く（`canvas_fit: "contain"` を host option で渡す）。はめ込みは `Score.canvas.fit = "contain"` として楽譜に残り、描き直しは同じ画になる。宣言の比が紙の比と同じなら、はめ込みは起きない。
 
 現行runtimeの`plugin_storage["canvas-aspect"]`、`canvas_aspect` request alias、保存済み`Score.canvas` / `render_canvas_aspect*`、system / user plugin directory、plugin status / enable toggleはread compatibilityとして残る。これらは新規plugin authoring modelではない。保存済み設定とcatalog発見に必要なstorage／API互換を保ち、これらを旧意味決定実装の実行経路にはしない。現行UIで比を変えたときは描画表示を消してplaceholderへ切り替えるが、表示中作品はlineage contextとして保持し、次の保存作品は`canvas_aspect_change`の子として記録できる。
 

@@ -403,7 +403,14 @@
 # use it). On a line, an open arc or a free line only the word is left out
 # (`unsupported_surface_brushmarks`) and the mark is drawn as written; on a
 # point it is left out as every surface word is.
-DDL_ENGINE_VERSION = "69"
+# 70: The canvas ratio declaration (「画面比W:H。」 / `Aspect ratio W:H.`) goes
+# into the Score as `canvas.declared_ratio`; it makes no instruction, takes no
+# sentence number and is not seed material, so every other part of a declared
+# DDL's Score is the undeclared DDL's. A host's `canvas_fit: "contain"` lays a
+# DDL declaring another ratio than the paper's out in its declared ratio, to be
+# fitted into the paper (`canvas.fit`). No undeclared DDL's Score changes (the
+# 5,157 DDLs of the 2026-10-17 5173 export).
+DDL_ENGINE_VERSION = "70"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write
@@ -471,4 +478,8 @@ DDL_ENGINE_VERSION = "69"
 # 25 (2026-10-22): 刷毛目 / brushmarks joins the surface category おもて, read in
 # DDL on a closed shape, offered to Stage 1 as a plan `surface` value, and
 # listed in the saijiki.
-DDL_VERSION = "25"
+# 26 (2026-10-23): A DDL declares the ratio it was laid out in, 「画面比W:H。」 /
+# `Aspect ratio W:H.` (the author retired the rule that a DDL carries no
+# ratio). A host writes the paper's ratio into a new DDL. It is grammar, not a
+# Saijiki word, and is not offered to a model; the saijiki lists it.
+DDL_VERSION = "26"

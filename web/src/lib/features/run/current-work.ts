@@ -105,6 +105,8 @@ export type PaintOptions = {
 	saveArtifacts?: boolean;
 	countGeneration?: boolean;
 	canvasAspectId?: CanvasAspectId;
+	/** Fit a DDL that declares another ratio into the paper (DDL engine 70). */
+	canvasFit?: 'contain';
 	renderSeed?: Seed;
 	/** Per-feature overrides for the render request; built by the features. */
 	renderOverrides?: RenderOverrides;

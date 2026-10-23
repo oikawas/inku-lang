@@ -803,6 +803,9 @@ export const en: LangPack = {
 	composeFallbackBadge: 'Score fallback',
 	confirmRefineFromFallbackMessage: 'This work is not an answer to its description. Refine from it anyway?',
 	confirmRefineFromFallbackContinue: 'Continue',
+	canvasFitMessage: (declared, paper) => `This DDL was written for the aspect ratio ${declared}. How should it be drawn on this paper (${paper})? Fitted, the composition keeps its ratio in the middle of the paper, and the ground fills the margins.`,
+	canvasFitRun: 'Fit it in',
+	canvasFitStretch: 'Draw to this paper',
 	composeFallbackHint: (reason) => reason === 'stage2_hard_timeout'
 		? 'Stage 2 did not answer in time, so a stock score was performed.'
 		: reason === 'stage2_empty_output'

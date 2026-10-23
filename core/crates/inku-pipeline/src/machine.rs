@@ -4,11 +4,11 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use inku_ddl::work_plan::WorkPlan;
 use inku_ddl::{
-    CompilerLockState, CompilerResourceExecutionFailure, CompilerResourceExecutionResult,
-    CompletionRangeRecord, MacroDefinition, MacroLock, NormalizedDdlDocument,
-    RANGE_WORDS_CHANGED_HOLE_KIND, ResolvedInstructionLanguage, SAIJIKI_ASSET_ID,
-    SAIJIKI_V1_ASSET_ID, ScoreDiagnosticOwner, ScoreFieldGap, ScoreInstructionOrigin,
-    ScoreMaterializationError, TypedDdlCompilation, compile_typed_ddl,
+    CanvasRatioWriting, CompilerLockState, CompilerResourceExecutionFailure,
+    CompilerResourceExecutionResult, CompletionRangeRecord, MacroDefinition, MacroLock,
+    NormalizedDdlDocument, RANGE_WORDS_CHANGED_HOLE_KIND, ResolvedInstructionLanguage,
+    SAIJIKI_ASSET_ID, SAIJIKI_V1_ASSET_ID, ScoreDiagnosticOwner, ScoreFieldGap,
+    ScoreInstructionOrigin, ScoreMaterializationError, TypedDdlCompilation, compile_typed_ddl,
     migrate_macro_definition_from_saijiki_v1, record_after_patch, record_keeping_numbers,
     settle_completion_record, validate_visible_ddl_patch, validate_visible_ddl_patch_detailed,
     visible_ddl_patch_available, with_completion_record,
@@ -388,6 +388,11 @@ pub enum AuthoringInput {
         /// unchanged with the snapshot.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         laws_basis: Option<LawsBasis>,
+        /// A new work's DDL: the host asks that the paper's ratio be declared
+        /// first unless the DDL declares one (DDL 26). A DDL from a saved work
+        /// is drawn as written.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        declare_canvas: bool,
     },
     /// The laws stage from a saved work (the AI refinement's laws move,
     /// 2026-10-20): the work's DDL and description, the records kept with it,
@@ -599,6 +604,10 @@ pub struct PipelineSnapshot {
 pub struct LawsMove {
     #[serde(default)]
     pub direction: LawsDirection,
+    /// The ratio the saved work's DDL declares (DDL 26). The laws are applied
+    /// to the DDL without its declaration, and the child declares it again.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvas_ratio: Option<inku_score::CanvasRatio>,
 }
 
 /// The provider attempt a host is running, for showing retry progress.
@@ -1450,12 +1459,55 @@ impl PipelineSnapshot {
         self.compose_and_commit(candidate, plan, reading, reason, description, events)
     }
 
+    /// The document with the paper's ratio declared as its first sentence
+    /// (DDL 26). The verified document keeps its language, locks and edition.
+    fn with_paper_ratio(
+        &self,
+        document: VisibleDocument,
+        writing: CanvasRatioWriting,
+    ) -> Result<VisibleDocument, ProtocolError> {
+        let format = inku_score::lookup_canvas_format(self.config.compiler.host.canvas_format_id())
+            .map_err(|_| ProtocolError::InvalidPolicy)?;
+        let ratio = inku_score::CanvasRatio::reduced(format.width_units, format.height_units)
+            .ok_or(ProtocolError::InternalInvariant)?;
+        self.with_ratio(document, ratio, writing)
+    }
+
+    /// The document with `ratio` declared as its first sentence.
+    fn with_ratio(
+        &self,
+        document: VisibleDocument,
+        ratio: inku_score::CanvasRatio,
+        writing: CanvasRatioWriting,
+    ) -> Result<VisibleDocument, ProtocolError> {
+        let source =
+            inku_ddl::declare_canvas_ratio(&document.source, ratio, document.language, writing);
+        // A DDL the declaration would carry past the source limit is
+        // committed without one, and drawn as an undeclared DDL is.
+        if source == document.source || source.len() > self.config.prompt_limits.max_source_bytes {
+            return Ok(document);
+        }
+        let wire = VisibleDocument { source, ..document };
+        Ok(VisibleDocument::from_document(&wire.document()?))
+    }
+
     fn commit_stage1(
         &mut self,
         document: VisibleDocument,
         reason: &str,
         events: &mut Vec<PipelineEvent>,
     ) -> Result<(), ProtocolError> {
+        // A new DDL declares the paper it is written for. The laws stage from
+        // a saved work declares again the ratio the work's DDL declared, and
+        // a work without a declaration stays without one (DDL 26).
+        let document = match &self.laws_move {
+            None => self.with_paper_ratio(document, CanvasRatioWriting::ReplaceDeclared)?,
+            Some(LawsMove {
+                canvas_ratio: Some(ratio),
+                ..
+            }) => self.with_ratio(document, *ratio, CanvasRatioWriting::ReplaceDeclared)?,
+            Some(_) => document,
+        };
         if let Some(basis) = self
             .laws_basis
             .as_mut()
@@ -1642,7 +1694,13 @@ impl PipelineSnapshot {
             .validate()
             .map_err(|_| ProtocolError::SchemaViolation)?;
         self.completion_ranges = work.completion_ranges.filter(|record| !record.is_empty());
-        self.laws_move = Some(LawsMove { direction });
+        // The laws read the DDL's sentences; its ratio declaration is carried
+        // apart and written again on the child (DDL 26).
+        let canvas_ratio = inku_ddl::source_canvas_ratio(&work.source, self.config.language);
+        self.laws_move = Some(LawsMove {
+            direction,
+            canvas_ratio,
+        });
         if work.description.trim().is_empty() {
             return self.fail_laws_move("no_description", None, events);
         }
@@ -1655,7 +1713,7 @@ impl PipelineSnapshot {
                 basis.composed
             }
             (None, Some(_)) => return self.fail_laws_move("laws_without_basis", None, events),
-            (None, None) => work.source,
+            (None, None) => inku_ddl::without_canvas_ratio(&work.source, self.config.language),
         };
         let document = self.new_document(base)?;
         let plugins = crate::prompts::work_plan_plugins(&self.config.definitions);
@@ -3311,6 +3369,8 @@ impl PipelineSnapshot {
                                 .propose_stage1_result_commit(self.authority.revision()),
                         )?
                         .ok_or(ProtocolError::InternalInvariant)?;
+                        let candidate =
+                            self.with_paper_ratio(candidate, CanvasRatioWriting::ReplaceDeclared)?;
                         return self.commit_document(
                             candidate,
                             next,
@@ -3639,6 +3699,7 @@ fn advance_impl(
                 completion_ranges,
                 laws_layers,
                 laws_basis,
+                declare_canvas,
             } => {
                 state.completion_ranges = completion_ranges.filter(|record| !record.is_empty());
                 state.laws_layers = laws_layers.filter(|record| !record.is_empty());
@@ -3649,7 +3710,11 @@ fn advance_impl(
                 ) {
                     return Err(ProtocolError::InvalidPolicy);
                 }
-                let document = state.new_document(source)?;
+                let mut document = state.new_document(source)?;
+                if declare_canvas {
+                    document =
+                        state.with_paper_ratio(document, CanvasRatioWriting::KeepDeclared)?;
+                }
                 let next = proposal(
                     state
                         .authority

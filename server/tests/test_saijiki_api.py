@@ -151,6 +151,9 @@ _EXPECTED_PAIRING: dict[str, tuple[tuple[str, str], ...]] = {
         ("縦長", "tall"), ("横長", "wide"), ("全幅", "full-width"), ("半幅", "half-width"),
         ("半円", "semicircle"), ("上弦", "waxing"), ("下弦", "waning"), ("三日月", "crescent"),
     ),
+    # がめん (2026-10-23, DDL 26): the canvas ratio declaration a host writes,
+    # shown but no Saijiki word.
+    "gamen": (("画面比", "aspect ratio"),),
     "aida": (
         ("沿う", "along"), ("触れない", "not touching"), ("切る", "cutting"),
         ("間に", "between"), ("触れる", "touching"), ("つながる", "connected"),

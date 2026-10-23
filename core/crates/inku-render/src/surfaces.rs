@@ -1165,13 +1165,15 @@ pub(crate) fn render_surface(
             {
                 path.set_attr("filter", format!("url(#{id})"));
             }
+            // A fitted frame's region covers its paper (render engine 93).
+            let paper = context.canvas.paper();
             let mut mask = Element::new("mask")
                 .attr("id", &mask_id)
                 .attr("maskUnits", "userSpaceOnUse")
-                .attr("x", format_number(-context.canvas.width))
-                .attr("y", format_number(-context.canvas.height))
-                .attr("width", format_number(context.canvas.width * 3.0))
-                .attr("height", format_number(context.canvas.height * 3.0));
+                .attr("x", format_number(paper[0] - (paper[2] - paper[0])))
+                .attr("y", format_number(paper[1] - (paper[3] - paper[1])))
+                .attr("width", format_number((paper[2] - paper[0]) * 3.0))
+                .attr("height", format_number((paper[3] - paper[1]) * 3.0));
             mask.push(path);
             definitions.push(mask);
             inside.set_attr("mask", format!("url(#{mask_id})"));

@@ -287,6 +287,7 @@ object InkuStringsEn : InkuStrings {
         when (kind) {
             "age_change" -> "Age"
             "canvas_aspect_change" -> "Canvas change"
+            "canvas_fit" -> "Fit"
             "catalog_change" -> "Color"
             "color_arrangement_change" -> "Color arrangement"
             "ddl_edit" -> "DDL edit"
@@ -382,6 +383,9 @@ object InkuStringsEn : InkuStrings {
     override val baseUrlChange = "Change the Base URL"
     override val drawFromDdl = "Draw from instructions"
     override val ddlOverwriteTitle = "The edited instructions will be lost"
+    override fun canvasFitMessage(declared: String, paper: String) = "This DDL was written for the aspect ratio $declared. How should it be drawn on this paper ($paper)? Fitted, the composition keeps its ratio in the middle of the paper, and the ground fills the margins."
+    override val canvasFitRun = "Fit it in"
+    override val canvasFitStretch = "Draw to this paper"
     override val ddlOverwriteRedraw = "Redraw from the description"
     override fun chatGptSignOutBody(label: String) = "Sign \"$label\" out of the ChatGPT plan. Using it again takes a new authorization."
     override val discard = "Discard"

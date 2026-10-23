@@ -32,6 +32,9 @@ data class ManagedHistoryReplayInput(
     val pipelineDiagnosticsJson: String,
 )
 
+/** Same DDL authority and saved Score, with only a core-verified fitted canvas. */
+data class ManagedCanvasFitInput(val sourceHistoryId: String, val replay: ManagedHistoryReplayInput?)
+
 /** A verified retouch, independently redrawn from its saved parent at save time. */
 data class ManagedToolChangeInput(
     val replay: ManagedHistoryReplayInput,
@@ -261,6 +264,13 @@ class RoomSharedPipelineStore(
         history: HistoryItemEntity,
         lineage: LineageWrite,
         input: ManagedHistoryReplayInput,
+    ) = saveReplayHistory(history, lineage, input, canvasFit = false)
+
+    private suspend fun saveReplayHistory(
+        history: HistoryItemEntity,
+        lineage: LineageWrite,
+        input: ManagedHistoryReplayInput,
+        canvasFit: Boolean,
     ) {
         database.withTransaction {
             val sourceHistory = database.historyDao().getById(input.sourceHistoryId)
@@ -278,7 +288,7 @@ class RoomSharedPipelineStore(
             require(history.normalizedDdl.orEmpty().sha256() == sourceLink.ddlDigest) {
                 "replay source does not match its committed revision"
             }
-            require(
+            require(canvasFit ||
                 LineagePlanner.canonicalJson(JSONObject(history.scoreJson)) ==
                     LineagePlanner.canonicalJson(JSONObject(sourceHistory.scoreJson)),
             ) { "replay Score changed" }
@@ -316,6 +326,34 @@ class RoomSharedPipelineStore(
             database.lineageDao().insertNode(lineage.node)
             lineage.edge?.let { database.lineageDao().insertEdge(it) }
             dao.insertHistoryLink(link)
+        }
+    }
+
+    suspend fun saveCanvasFitHistory(history: HistoryItemEntity, lineage: LineageWrite, input: ManagedCanvasFitInput) {
+        database.withTransaction {
+            val parent = database.historyDao().getById(input.sourceHistoryId)?.takeUnless { it.trashed }
+                ?: throw SharedPipelinePersistenceException("canvas fit parent was not found")
+            val edge = requireNotNull(lineage.edge)
+            require(edge.parentNodeId == parent.lineageNodeId && edge.derivationKind == "canvas_fit")
+            app.inku.mobile.data.refinement.CanvasFit.verify(parent, history, edge.metadataJson)
+            require(history.originalInput == parent.originalInput && history.sourceText == parent.sourceText) {
+                "canvas fit changed the description"
+            }
+            val priorSeeds = app.inku.mobile.data.refinement.PaintSeeds.of(parent)
+            val childSeeds = app.inku.mobile.data.refinement.PaintSeeds.of(history)
+            require((priorSeeds.renderSeed == null || childSeeds.renderSeed == priorSeeds.renderSeed) &&
+                childSeeds.compositionSeed == priorSeeds.compositionSeed) { "canvas fit changed the saved seeds" }
+            require(history.colorCatalogId == parent.colorCatalogId && history.drawnWild == parent.drawnWild) {
+                "canvas fit changed the saved rendering options"
+            }
+            input.replay?.let { replay ->
+                require(replay.sourceHistoryId == parent.id)
+                saveReplayHistory(history, lineage, replay, canvasFit = true)
+            } ?: run {
+                database.historyDao().insert(history)
+                database.lineageDao().insertNode(lineage.node)
+                database.lineageDao().insertEdge(edge)
+            }
         }
     }
 

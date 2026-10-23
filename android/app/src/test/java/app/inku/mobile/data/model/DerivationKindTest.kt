@@ -27,10 +27,10 @@ class DerivationKindTest {
      * `persistence/history.py` on 2026-10-18; its cases were not.
      */
     @Test
-    fun derivationKindRegistry_isTheServersNineteenKindsAndTheRetiredVariation() {
+    fun derivationKindRegistry_isTheServersKindsAndTheRetiredVariation() {
         val kinds = serverKinds()
 
-        assertEquals(20, kinds.size)
+        assertEquals(21, kinds.size)
         assertEquals((kinds + "variation").sorted(), DerivationKindRegistry.KINDS)
     }
 
@@ -50,7 +50,9 @@ class DerivationKindTest {
                 )
             }
         }
-        assertEquals(21, DerivationKindRegistry.ALL_INFOS.size)
+        assertEquals(22, DerivationKindRegistry.ALL_INFOS.size)
+        assertEquals("はめ込み", InkuStringsJa.derivationLabel("canvas_fit"))
+        assertEquals("Fit", InkuStringsEn.derivationLabel("canvas_fit"))
 
         // Active kinds keep their wording; the retired kind remains readable.
         assertEquals("タッチ", InkuStringsJa.derivationLabel("touch_change"))

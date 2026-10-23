@@ -10,6 +10,15 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ParityPreviewsTest {
+    @Test fun canvasRatioExampleFollowsTheDdlLanguageInTheGroundGroup() {
+        for (uiLanguage in UiLanguage.entries) {
+            for (ddlLanguage in listOf("ja", "en")) {
+                val preview = saijikiPreview("ji", "画面比", if (uiLanguage.isEnglish) "aspect ratio" else "画面比", uiLanguage, ddlLanguage)
+                assertEquals(if (ddlLanguage == "ja") "画面比16:9。" else "Aspect ratio 16:9.", preview.example)
+            }
+        }
+    }
+
     @Test fun saijikiEffectFollowsUiAndExampleFollowsDdl() {
         val jaUiEnglishDdl = saijikiPreview("omote", "刷き", "sweep", UiLanguage.Ja, "en")
         assertTrue(jaUiEnglishDdl.effect.contains("一枚の膜") && jaUiEnglishDdl.effect.contains("0.6倍"))

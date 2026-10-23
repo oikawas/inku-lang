@@ -247,6 +247,9 @@ interface InkuStrings {
     val baseUrlChange: String
     val drawFromDdl: String
     val ddlOverwriteTitle: String
+    fun canvasFitMessage(declared: String, paper: String): String
+    val canvasFitRun: String
+    val canvasFitStretch: String
     val ddlOverwriteRedraw: String
     val cameraChatGptCannotReadPhoto: String
     val discard: String

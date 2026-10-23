@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-23 — Add canvas declarations and fitting on Android
+
+New DDL declares its paper ratio. When the DDL ratio differs from the paper, choose fitting, drawing to the paper or canceling; cancel keeps the editor and text. An untouched saved work is fitted from its saved Score and saved as a Fit child with the same DDL, colors, seeds and description lock. Saijiki follows the 16 groups and 110 words, with aspect ratio last in grounds and the existing group colors preserved. Its example uses a valid declaration sentence.
+
 ### 2026-10-23 — Correct DDL reference constraints and the crossing example
 
 The Japanese and English reference now states connection and touching targets, one-mark placement, coordinate precision limits, and the exclusion of prior points for resting on and overlapping. Example 5.30 specifies the crossing line's length. SPEC's older descriptions of retention after a failed connection and touching with a current free line are aligned. Implementation and drawing semantics are unchanged.

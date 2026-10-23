@@ -43,16 +43,20 @@ class SaijikiIsGeneratedTest {
      * 横切る to あいだ on 2026-10-12, and 103 since 自由線 joined かたち on
      * 2026-10-15; sixteen categories and 108 words since DDL 24 added
      * きめ / fineness and したじ / underlayer on 2026-10-22; 109 words since
-     * DDL 25 added 刷毛目 / brushmarks to おもて on 2026-10-23);
+     * DDL 25 added 刷毛目 / brushmarks to おもて on 2026-10-23; sixteen
+     * categories and 110 words with DDL 26's aspect ratio at the end of grounds);
      * they move when the server's table does, and the generator is the check
      * that the Kotlin copy followed.
      */
     @Test
-    fun testScreenShowsSixteenCategoriesAndOneHundredNineWordsInBothLanguages() {
+    fun testScreenShowsSixteenCategoriesAndOneHundredTenWordsInBothLanguages() {
         for (lang in UiLanguage.entries) {
             val groups = saijikiGroups(lang)
             assertEquals("$lang: display categories", 16, groups.size)
-            assertEquals("$lang: display words", 109, groups.sumOf { it.words.size })
+            assertEquals("$lang: display words", 110, groups.sumOf { it.words.size })
+            val grounds = groups.first { it.key == "ji" }.words
+            assertEquals("$lang: grounds words", 8, grounds.size)
+            assertEquals(if (lang == UiLanguage.Ja) "画面比" else "aspect ratio", grounds.last())
         }
     }
 
@@ -152,7 +156,9 @@ class SaijikiIsGeneratedTest {
             assertTrue("$lang: does not recognise the English circle", "circle" in words)
             assertTrue("$lang: does not recognise 刷毛目", "刷毛目" in words)
             assertTrue("$lang: does not recognise brushmarks", "brushmarks" in words)
-            assertEquals("$lang: detection surfaces", 218, words.size)
+            assertTrue("$lang: does not recognise 画面比", "画面比" in words)
+            assertTrue("$lang: does not recognise aspect ratio", "aspect ratio" in words)
+            assertEquals("$lang: detection surfaces", 220, words.size)
         }
     }
 

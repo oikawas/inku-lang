@@ -194,6 +194,7 @@ data class InkuUiState(
     val ddlRangePreview: DdlRangePreview? = null,
     val ddlEditedAfterGeneration: Boolean = false,
     val confirmDdlOverwrite: Boolean = false,
+    val canvasFitQuestion: app.inku.mobile.data.model.CanvasFitQuestion? = null,
     val pipelineView: PipelineView? = null,
     val historyAuthority: String? = null,
     /**
@@ -2887,23 +2888,56 @@ class InkuViewModel @JvmOverloads constructor(
         }
     }
 
+    private var pendingCanvasFitDraw: InkuUiState? = null
+
+    fun cancelCanvasFit() {
+        pendingCanvasFitDraw = null
+        localState.value = localState.value.copy(canvasFitQuestion = null)
+    }
+
+    fun answerCanvasFit(contain: Boolean) {
+        val pending = pendingCanvasFitDraw ?: return
+        cancelCanvasFit()
+        drawFromDdl(pending, contain)
+    }
+
     fun drawFromDdl() {
         val current = state.value
-        if (current.autonomousStatus.busy || current.replayBusy || current.replaySaving) return
-        val returnToLineage = current.tab == AppTab.Lineage
         if (current.refinementBusy) {
             localState.value = localState.value.copy(message = REFINEMENT_IN_PROGRESS(strings()))
             return
         }
+        if (current.isRunning || current.canvasFitQuestion != null || current.autonomousStatus.busy || current.replayBusy || current.replaySaving) return
         val ddl = current.ddl
         if (!DdlSource.hasBody(ddl)) return
+        val parent = lineageParent(current)
+        val question = app.inku.mobile.data.model.canvasFitQuestion(
+            ddl, parent?.normalizedDdl, parent?.let { app.inku.mobile.data.refinement.recordedCanvasAspect(it) }, current.selectedCanvasAspect,
+        )
+        if (question != null) {
+            pendingCanvasFitDraw = current
+            localState.value = localState.value.copy(canvasFitQuestion = question)
+            return
+        }
+        drawFromDdl(current, contain = false)
+    }
+
+    private fun drawFromDdl(current: InkuUiState, contain: Boolean) {
+        val ddl = current.ddl
+        val returnToLineage = current.tab == AppTab.Lineage
+        // An unsaved refinement preview must first materialize through the
+        // ordinary parent path; it is not the selected saved work's Score.
+        val fittedParent = lineageParent(current)?.takeIf {
+            contain && ddl == it.normalizedDdl && !(current.refinementOpen && current.refinementPreviewId != null)
+        }
         val declared = ddlLineage(current)
         val runId = beginDrawingRun()
+        localState.value = localState.value.copy(ddlEditorOpen = false, canvasFitQuestion = null)
         drawingJob = viewModelScope.launch {
             // A candidate that cannot be kept leaves the declared parent: the
             // drawing is still the author's, and an uncaught failure here
             // would take the app down.
-            val lineage = runCatching { withPreviewParent(current, declared) }.getOrElse { error ->
+            val lineage = if (fittedParent != null) declared else runCatching { withPreviewParent(current, declared) }.getOrElse { error ->
                 if (error is CancellationException) throw error
                 declared
             }
@@ -2911,7 +2945,8 @@ class InkuViewModel @JvmOverloads constructor(
             runCatching {
                 withContext(Dispatchers.IO) {
                     val parentHistoryId = current.selectedHistory?.id?.takeUnless { current.lineageDetached }
-                    repository.composeFromDdl(
+                    if (fittedParent != null) repository.fitSavedWork(fittedParent.id, current.selectedCanvasAspect)
+                    else repository.composeFromDdl(
                         current.prompt, ddl, current.selectedCatalogId, current.selectedCanvasAspect,
                         current.selectedModelId, current.selectedStage2ModelId, lineage = lineage,
                         instructionLang = InstructionLanguages.AUTO, uiLang = current.uiLanguage.code,
@@ -2921,6 +2956,7 @@ class InkuViewModel @JvmOverloads constructor(
                         // A DDL drawn from a work keeps that work's Wild; a new one takes the
                         // switch (web's `targetWild`, +page.svelte:2300).
                         renderWild = current.selectedHistory?.takeUnless { current.lineageDetached }?.drawnWild ?: current.renderWild,
+                        canvasFit = if (contain) "contain" else null,
                     )
                 }
             }.onSuccess { item ->

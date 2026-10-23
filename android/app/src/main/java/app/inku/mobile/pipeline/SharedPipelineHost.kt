@@ -83,6 +83,7 @@ class SharedPipelineHost(
                     is PipelineAuthoring.DirectDdl -> JSONObject()
                         .put("tag", "direct_ddl")
                         .put("source", authoring.source)
+                        .put("declare_canvas", authoring.declareCanvas)
                         .also { value -> authoring.completionRangesJson?.let { value.put("completion_ranges", JSONObject(it)) } }
                         // The server's direct-DDL start (`pipeline_api.py`): the parent's laws records go on.
                         .also { value -> putLawsRecords(value, authoring.lawsRecordsJson) }

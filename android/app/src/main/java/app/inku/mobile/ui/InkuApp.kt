@@ -521,6 +521,7 @@ fun InkuApp(viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.view
     val backTarget: (() -> Unit)? = when {
         state.cameraCaptureState.locksCameraInteraction || state.cameraCaptureState is CameraCaptureState.Failed ->
             viewModel::cancelCameraDevelopment
+        state.canvasFitQuestion != null -> viewModel::cancelCanvasFit
         state.discardConfirm != null -> viewModel::cancelDiscard
         // 3D goes back to 2D before anything else is left (Web's Esc).
         state.canvas3d && (state.canvasPresentationMode || (state.tab == AppTab.Compose && state.selectedHistory != null)) -> ({ viewModel.setCanvas3d(false) })
@@ -618,6 +619,7 @@ fun InkuApp(viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.view
                 if (state.ddlEditorOpen) {
                     DdlEditorDialog(state, viewModel)
                 }
+                state.canvasFitQuestion?.let { CanvasFitDialog(it, viewModel) }
                 if (state.modelSelectionOpen) {
                     ModelSelectionDialog(state, viewModel)
                 }
@@ -726,6 +728,22 @@ private fun DiscardConfirmDialog(confirm: DiscardConfirm, viewModel: InkuViewMod
         text = { Text(if (confirm is DiscardConfirm.Candidates) S.discardCandidatesBody(confirm.count) else S.discardInstructionsBody) },
         confirmButton = { TextButton(onClick = viewModel::confirmDiscard) { Text(S.discard) } },
         dismissButton = { TextButton(onClick = viewModel::cancelDiscard) { Text(S.cancel) } },
+    )
+}
+
+@Composable
+private fun CanvasFitDialog(question: app.inku.mobile.data.model.CanvasFitQuestion, viewModel: InkuViewModel) {
+    val aspect = CanvasAspects.find(question.paperId)
+    AlertDialog(
+        onDismissRequest = viewModel::cancelCanvasFit,
+        text = { Text(S.canvasFitMessage(question.basis.label, "${CanvasAspects.labelFor(question.paperId)} ${aspect?.ratioLabel.orEmpty()}")) },
+        confirmButton = { TextButton(onClick = { viewModel.answerCanvasFit(true) }) { Text(S.canvasFitRun) } },
+        dismissButton = {
+            Column(horizontalAlignment = Alignment.End) {
+                TextButton(onClick = { viewModel.answerCanvasFit(false) }) { Text(S.canvasFitStretch) }
+                TextButton(onClick = viewModel::cancelCanvasFit) { Text(S.cancel) }
+            }
+        },
     )
 }
 
@@ -960,8 +978,8 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
                     }
                     TextButton(
                         onClick = {
-                            // Drawing is what the edit was for; nothing is discarded.
-                            closeEditor(askToDiscard = false)
+                            // Keep the editor open until the fit question is answered.
+                            syncEditor(leaving = true)
                             viewModel.drawFromDdl()
                         },
                         enabled = !state.isDrawing && DdlSource.hasBody(state.ddl),

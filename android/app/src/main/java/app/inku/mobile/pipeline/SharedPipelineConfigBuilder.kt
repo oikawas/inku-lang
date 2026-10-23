@@ -48,6 +48,7 @@ data class SharedPipelineConfigRequest(
     /** Definitions from an imported DDL export; they win their names for this work. */
     val importedPlugins: List<ImportedPluginDefinition> = emptyList(),
     val drawingModelId: String = "",
+    val canvasFit: String? = null,
 )
 
 data class PreparedPipelineConfig(
@@ -92,6 +93,7 @@ class SharedPipelineConfigBuilder(
         requireCompatibleBinding()
         require(request.resolvedLanguage in setOf("ja", "en")) { "resolved pipeline language required" }
         require(request.errorPolicy in setOf("stop", "omit_and_continue")) { "unknown error policy" }
+        require(request.canvasFit == null || request.canvasFit == "contain") { "unknown canvas fit" }
         val registryReport = JSONObject(binding.canvasRegistry())
         val registry = registryReport.requiredObject("registry")
         val registryId = registry.requiredString("schema")
@@ -128,7 +130,7 @@ class SharedPipelineConfigBuilder(
                 renderSeed = request.renderSeed,
                 catalogMode = if (catalog.id == "default") "default" else "explicit",
                 paintLanguage = request.resolvedLanguage.takeIf { colorsStage },
-            )
+            ).also { host -> request.canvasFit?.let { host.put("canvas_fit", it) } }
         }
         val selectedHost = JSONObject(resolvedHosts.getValue(selectedCatalog.id).toString())
         val macroCatalog = resolveMacros(request)

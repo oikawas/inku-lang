@@ -283,9 +283,9 @@ fn the_printed_documents_compile_to_a_score() {
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
-/// A layer opened into marks that leave the canvas is refused with the layer
-/// the request numbered, though the printed document's instruction is one of
-/// the opened layer's marks.
+/// Marks that leave the canvas are omitted without discarding the other marks.
+/// Their diagnostics still identify the layer the request numbered, though the
+/// printed document's instruction is one of the opened layer's marks.
 #[test]
 fn a_print_the_canvas_cannot_hold_names_the_requested_layer() {
     let fixture = fixture();
@@ -311,36 +311,83 @@ fn a_print_the_canvas_cannot_hold_names_the_requested_layer() {
             &compiler,
         )
         .unwrap_or_else(|error| panic!("{}: {error:?}", case.id));
-        assert!(delivery.score.is_none(), "{}", case.id);
-        let failure = delivery.resource_failure.expect("a resource failure");
-        let owner = &failure["value"]["value"]["owner"];
+        assert!(delivery.score.is_some(), "{}", case.id);
         assert_eq!(
-            owner["kind"], "source_instruction",
-            "{}: {failure}",
+            delivery.outcome,
+            ScoreLoweringOutcome::CompleteWithOmissions,
+            "{}",
             case.id
         );
-        let instruction = owner["instruction_index"]
-            .as_u64()
-            .and_then(|index| usize::try_from(index).ok())
-            .expect("an instruction index");
+        assert!(delivery.resource_failure.is_none(), "{}", case.id);
+        assert!(!delivery.downstream_diagnostics.is_empty(), "{}", case.id);
         let layer = case.off_canvas.expect("the refused layer");
-        let refusal = off_canvas(&chosen, &context, instruction)
-            .unwrap_or_else(|| panic!("{}: instruction {instruction} is not refused", case.id));
-        assert_eq!(refusal.code, "off_canvas");
-        assert!(
-            refusal.ja.starts_with(&format!("layer {layer} は")),
-            "{}: {}",
-            case.id,
-            refusal.ja
-        );
-        assert!(
-            refusal
-                .en
-                .starts_with(&format!("layer {layer} does not fit")),
-            "{}: {}",
-            case.id,
-            refusal.en
-        );
+        let mut omitted = BTreeSet::new();
+        for diagnostic in &delivery.downstream_diagnostics {
+            assert_eq!(
+                diagnostic["reason"]["type"], "geometry_extent_out_of_bounds",
+                "{}: {diagnostic}",
+                case.id
+            );
+            let owner = &diagnostic["owner"];
+            assert_eq!(
+                owner["kind"], "source_instruction",
+                "{}: {diagnostic}",
+                case.id
+            );
+            let instruction = owner["instruction_index"]
+                .as_u64()
+                .and_then(|index| usize::try_from(index).ok())
+                .expect("an instruction index");
+            assert_eq!(
+                diagnostic["disposition"],
+                json!({
+                    "kind": "omitted",
+                    "unit": {"kind": "source_instruction", "instruction_index": instruction},
+                    "appearance_resolution": null
+                }),
+                "{}: {diagnostic}",
+                case.id
+            );
+            omitted.insert(instruction);
+            let refusal = off_canvas(&chosen, &context, instruction)
+                .unwrap_or_else(|| panic!("{}: instruction {instruction} is not refused", case.id));
+            assert_eq!(refusal.code, "off_canvas");
+            assert!(
+                refusal.ja.starts_with(&format!("layer {layer} は")),
+                "{}: {}",
+                case.id,
+                refusal.ja
+            );
+            assert!(
+                refusal
+                    .en
+                    .starts_with(&format!("layer {layer} does not fit")),
+                "{}: {}",
+                case.id,
+                refusal.en
+            );
+        }
+        let retained: BTreeSet<usize> = delivery
+            .instruction_origins
+            .iter()
+            .filter(|origin| origin["kind"] == "source_instruction")
+            .map(|origin| {
+                origin["instruction_index"]
+                    .as_u64()
+                    .and_then(|index| usize::try_from(index).ok())
+                    .expect("a retained instruction index")
+            })
+            .collect();
+        assert!(retained.is_disjoint(&omitted), "{}", case.id);
+        let first_plan_layer = case.composed.plan.plugins.len();
+        for instruction in first_plan_layer..first_plan_layer + chosen.print.composed.len() {
+            assert_eq!(
+                retained.contains(&instruction),
+                !omitted.contains(&instruction),
+                "{}: printed instruction {instruction}",
+                case.id
+            );
+        }
         // The refused layer is printed as one sentence per mark.
         let k = layer - case.composed.plan.plugins.len();
         let marks = chosen

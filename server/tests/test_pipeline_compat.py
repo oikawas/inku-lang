@@ -357,7 +357,8 @@ def test_description_pipeline_forces_typed_stage1_transport_and_renders_svg(
         "function": {"name": "submit_pipeline_response"},
     }
     assert result["description"] == description
-    assert result["ddl"] == normalized_ddl
+    # A newly authored DDL records the selected paper's ratio (DDL 26).
+    assert result["ddl"] == "画面比1:1。\n" + normalized_ddl
     assert "source_ddl" not in result
     assert "expanded_ddl" not in result
     assert result["score"]["instructions"]

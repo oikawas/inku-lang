@@ -79,8 +79,8 @@ object SaijikiGenerated {
             key = "ji",
             nameJa = "じ",
             nameEn = "grounds",
-            wordsJa = listOf("紙", "和紙", "薄墨地", "木炭地", "カンバス", "画用紙", "メゾチント"),
-            wordsEn = listOf("paper", "washi", "ink wash ground", "charcoal ground", "canvas", "drawing paper", "mezzotint"),
+            wordsJa = listOf("紙", "和紙", "薄墨地", "木炭地", "カンバス", "画用紙", "メゾチント", "画面比"),
+            wordsEn = listOf("paper", "washi", "ink wash ground", "charcoal ground", "canvas", "drawing paper", "mezzotint", "aspect ratio"),
         ),
         Category(
             key = "iro",
@@ -123,13 +123,6 @@ object SaijikiGenerated {
             nameEn = "proportions",
             wordsJa = listOf("縦長", "横長", "全幅", "半幅", "半円", "上弦", "下弦", "三日月"),
             wordsEn = listOf("tall", "wide", "full-width", "half-width", "semicircle", "waxing", "waning", "crescent"),
-        ),
-        Category(
-            key = "gamen",
-            nameJa = "がめん",
-            nameEn = "aspect",
-            wordsJa = listOf("画面比"),
-            wordsEn = listOf("aspect ratio"),
         ),
         Category(
             key = "aida",

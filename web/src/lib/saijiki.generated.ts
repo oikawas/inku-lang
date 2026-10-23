@@ -54,7 +54,7 @@ export const GENERATED_SAIJIKI: SaijikiCategory[] = [
 		key: 'ji',
 		label: 'じ',
 		en: 'grounds',
-		words: ['紙', '和紙', '薄墨地', '木炭地', 'カンバス', '画用紙', 'メゾチント']
+		words: ['紙', '和紙', '薄墨地', '木炭地', 'カンバス', '画用紙', 'メゾチント', '画面比']
 	},
 	{
 		key: 'iro',
@@ -91,12 +91,6 @@ export const GENERATED_SAIJIKI: SaijikiCategory[] = [
 		label: 'わりあい',
 		en: 'proportions',
 		words: ['縦長', '横長', '全幅', '半幅', '半円', '上弦', '下弦', '三日月']
-	},
-	{
-		key: 'gamen',
-		label: 'がめん',
-		en: 'aspect',
-		words: ['画面比']
 	},
 	{
 		key: 'aida',
@@ -159,7 +153,7 @@ export const GENERATED_SAIJIKI_EN: SaijikiCategory[] = [
 		key: 'ji',
 		label: 'じ',
 		en: 'grounds',
-		words: ['paper', 'washi', 'ink wash ground', 'charcoal ground', 'canvas', 'drawing paper', 'mezzotint']
+		words: ['paper', 'washi', 'ink wash ground', 'charcoal ground', 'canvas', 'drawing paper', 'mezzotint', 'aspect ratio']
 	},
 	{
 		key: 'iro',
@@ -196,12 +190,6 @@ export const GENERATED_SAIJIKI_EN: SaijikiCategory[] = [
 		label: 'わりあい',
 		en: 'proportions',
 		words: ['tall', 'wide', 'full-width', 'half-width', 'semicircle', 'waxing', 'waning', 'crescent']
-	},
-	{
-		key: 'gamen',
-		label: 'がめん',
-		en: 'aspect',
-		words: ['aspect ratio']
 	},
 	{
 		key: 'aida',

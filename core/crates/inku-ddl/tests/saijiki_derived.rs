@@ -199,6 +199,18 @@ fn ordered_marker_relation_reference_and_display_projections_match_asset_semanti
             "mirrored"
         ]
     );
+    // The canvas ratio declaration (DDL 26) is shown last in じ, and only in
+    // the display list: no category of its own, no prompt line.
+    for (projection, head) in [(&ja, "画面比"), (&en, "aspect ratio")] {
+        let ground = projection
+            .display_categories
+            .iter()
+            .find(|category| category.key == "ji")
+            .unwrap();
+        assert_eq!(ground.words.last().map(String::as_str), Some(head));
+        assert_eq!(projection.display_categories.len(), 16);
+        assert!(!projection.prompt_block.contains(head));
+    }
 }
 
 #[test]

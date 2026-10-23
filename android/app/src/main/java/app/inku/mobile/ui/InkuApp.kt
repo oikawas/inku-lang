@@ -430,7 +430,6 @@ private val saijikiGroupColors = listOf(
     SaijikiGroupShell,
     SaijikiGroupMist,
     SaijikiGroupLemon,
-    SaijikiGroupCloud,
     SaijikiGroupPeach,
 )
 

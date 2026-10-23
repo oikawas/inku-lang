@@ -136,6 +136,7 @@ private val fallbackExamples = mapOf(
     "薄墨地" to ("薄墨地。" to "Ink wash ground."), "木炭地" to ("木炭地。" to "Charcoal ground."),
     "カンバス" to ("カンバス。" to "Canvas."), "画用紙" to ("画用紙。" to "Drawing paper."),
     "メゾチント" to ("メゾチント。" to "Mezzotint."),
+    "画面比" to ("画面比16:9。" to "Aspect ratio 16:9."),
     "ゆるやかに" to ("ゆるやかに揺れる線" to "A loosely swaying line"),
     "小刻みに" to ("小刻みに揺れる線" to "A tightly swaying line"),
 )

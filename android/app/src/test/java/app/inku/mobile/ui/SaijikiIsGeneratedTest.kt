@@ -43,20 +43,20 @@ class SaijikiIsGeneratedTest {
      * 横切る to あいだ on 2026-10-12, and 103 since 自由線 joined かたち on
      * 2026-10-15; sixteen categories and 108 words since DDL 24 added
      * きめ / fineness and したじ / underlayer on 2026-10-22; 109 words since
-     * DDL 25 added 刷毛目 / brushmarks to おもて on 2026-10-23; seventeen
-     * categories and 110 words since DDL 26 added がめん / aspect);
+     * DDL 25 added 刷毛目 / brushmarks to おもて on 2026-10-23; sixteen
+     * categories and 110 words with DDL 26's aspect ratio at the end of grounds);
      * they move when the server's table does, and the generator is the check
      * that the Kotlin copy followed.
      */
     @Test
-    fun testScreenShowsSeventeenCategoriesAndOneHundredTenWordsInBothLanguages() {
+    fun testScreenShowsSixteenCategoriesAndOneHundredTenWordsInBothLanguages() {
         for (lang in UiLanguage.entries) {
             val groups = saijikiGroups(lang)
-            assertEquals("$lang: display categories", 17, groups.size)
+            assertEquals("$lang: display categories", 16, groups.size)
             assertEquals("$lang: display words", 110, groups.sumOf { it.words.size })
-            val aspect = groups.first { it.key == "gamen" }
-            assertEquals(listOf(if (lang == UiLanguage.Ja) "画面比" else "aspect ratio"), aspect.words)
-            assertEquals(groups.indexOf(aspect) + 1, groups.indexOfFirst { it.key == "aida" })
+            val grounds = groups.first { it.key == "ji" }.words
+            assertEquals("$lang: grounds words", 8, grounds.size)
+            assertEquals(if (lang == UiLanguage.Ja) "画面比" else "aspect ratio", grounds.last())
         }
     }
 
@@ -156,6 +156,8 @@ class SaijikiIsGeneratedTest {
             assertTrue("$lang: does not recognise the English circle", "circle" in words)
             assertTrue("$lang: does not recognise 刷毛目", "刷毛目" in words)
             assertTrue("$lang: does not recognise brushmarks", "brushmarks" in words)
+            assertTrue("$lang: does not recognise 画面比", "画面比" in words)
+            assertTrue("$lang: does not recognise aspect ratio", "aspect ratio" in words)
             assertEquals("$lang: detection surfaces", 220, words.size)
         }
     }
@@ -172,7 +174,6 @@ class SaijikiIsGeneratedTest {
     fun testEveryCategoryHasItsOwnColour() {
         val colors = SaijikiGenerated.CATEGORIES.indices.map { saijikiGroupColorAt(it) }
         assertEquals("one colour per category", SaijikiGenerated.CATEGORIES.size, colors.toSet().size)
-        assertEquals(SaijikiGroupCloud, saijikiGroupColorAt(SaijikiGenerated.CATEGORIES.indexOfFirst { it.key == "gamen" }))
         val previousColoursAfterHandling = mapOf(
             "ji" to SaijikiGroupAmber, "iro" to SaijikiGroupSlate,
             "yuragi" to SaijikiGroupBlossom, "basho" to SaijikiGroupMoss,

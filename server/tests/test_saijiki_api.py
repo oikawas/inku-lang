@@ -123,10 +123,13 @@ _EXPECTED_PAIRING: dict[str, tuple[tuple[str, str], ...]] = {
     # no ground is not a word you can say. 「カンバス」 and not 「キャンバス」 --
     # the web already spells the sheet's own proportion キャンバス, and one screen
     # must not use one word for two things.
+    # 画面比 (2026-10-23, DDL 26): the canvas ratio declaration a host writes,
+    # shown last in じ because it speaks of the canvas itself, but no Saijiki word.
     "ji": (
         ("紙", "paper"), ("和紙", "washi"), ("薄墨地", "ink wash ground"),
         ("木炭地", "charcoal ground"), ("カンバス", "canvas"),
         ("画用紙", "drawing paper"), ("メゾチント", "mezzotint"),
+        ("画面比", "aspect ratio"),
     ),
     "iro": (
         ("白", "white"), ("黒", "black"), ("青", "blue"),
@@ -151,9 +154,6 @@ _EXPECTED_PAIRING: dict[str, tuple[tuple[str, str], ...]] = {
         ("縦長", "tall"), ("横長", "wide"), ("全幅", "full-width"), ("半幅", "half-width"),
         ("半円", "semicircle"), ("上弦", "waxing"), ("下弦", "waning"), ("三日月", "crescent"),
     ),
-    # がめん (2026-10-23, DDL 26): the canvas ratio declaration a host writes,
-    # shown but no Saijiki word.
-    "gamen": (("画面比", "aspect ratio"),),
     "aida": (
         ("沿う", "along"), ("触れない", "not touching"), ("切る", "cutting"),
         ("間に", "between"), ("触れる", "touching"), ("つながる", "connected"),

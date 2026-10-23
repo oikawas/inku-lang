@@ -177,7 +177,6 @@ val SaijikiGroupMoss = Color(0xFFC3CC91)
 val SaijikiGroupShell = Color(0xFFD8C4B6)
 val SaijikiGroupMist = Color(0xFF9FD3D8)
 val SaijikiGroupLemon = Color(0xFFE6E08F)
-val SaijikiGroupCloud = Color(0xFFC8D7DF)
 val SaijikiGroupPeach = Color(0xFFF4C7A8)
 
 // --- Status -----------------------------------------------------------------

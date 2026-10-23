@@ -10,7 +10,11 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ### 2026-10-23 — Add canvas declarations and fitting on Android
 
-New DDL declares its paper ratio. When the DDL ratio differs from the paper, choose fitting, drawing to the paper or canceling; cancel keeps the editor and text. An untouched saved work is fitted from its saved Score and saved as a Fit child with the same DDL, colors, seeds and description lock. Saijiki follows the 17 groups and 110 words, including aspect, while preserving the relations color.
+New DDL declares its paper ratio. When the DDL ratio differs from the paper, choose fitting, drawing to the paper or canceling; cancel keeps the editor and text. An untouched saved work is fitted from its saved Score and saved as a Fit child with the same DDL, colors, seeds and description lock. Saijiki follows the 16 groups and 110 words, with aspect ratio last in grounds and the existing group colors preserved. Its example uses a valid declaration sentence.
+
+### 2026-10-23 — The saijiki shows the aspect ratio under じ
+
+By the author's judgment, the display-only category がめん / aspect is gone and `aspect ratio` / 画面比 is shown at the end of じ / grounds, since like a ground it speaks of the canvas itself. It stays no Saijiki word (no parser candidate, not in any prompt), and the DDL, DDL engine and render engine versions and the Saijiki asset are unchanged. The saijiki display has sixteen categories again. The web saijiki's example for it is now `Aspect ratio 16:9.` / `画面比16:9。` instead of the unreadable `Use "aspect ratio"`.
 
 ### 2026-10-23 — Correct DDL reference constraints and the crossing example
 

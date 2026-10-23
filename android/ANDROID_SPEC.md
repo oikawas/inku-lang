@@ -14,7 +14,7 @@ Drawing DDL, editing a saved work's DDL and drawing new DDL use Web's question w
 
 Fitting an untouched saved work sends its saved Score, recorded paper and target paper to the shared `saved_variants` action `fit_render`. The returned Score is drawn without changing its version and saved as a `canvas_fit` (Fit) child, preserving the DDL, colors, seeds and Wild setting. No new DDL compilation or model request occurs, and the parent's description lock is inherited. Saving verifies the parent, Score, DDL and derivation record against the core result; the ordinary replay guard still rejects a changed Score.
 
-Saijiki displays the generated aspect group (aspect ratio) before relations, with 17 groups, 110 displayed words and 220 recognized surfaces across both languages. Its new color preserves the existing colors, including relations. Parsing and drawing semantics remain in the shared core.
+Saijiki displays aspect ratio as the eighth and last item of the generated grounds group, with 16 groups, 110 displayed words and 220 recognized surfaces across both languages. It adds no separate group or color, preserving the existing colors, including relations. The example is `Aspect ratio 16:9.` / `画面比16:9。`, following the DDL language. Parsing and drawing semantics remain in the shared core.
 
 ## 2026-10-23 Saijiki brushmarks and the sweep explanation
 

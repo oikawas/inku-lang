@@ -450,6 +450,7 @@
 			カンバス: { example: 'カンバス。', exampleEn: 'Canvas.' },
 			画用紙: { example: '画用紙。', exampleEn: 'Drawing paper.' },
 			メゾチント: { example: 'メゾチント。', exampleEn: 'Mezzotint.' },
+			画面比: { example: '画面比16:9。', exampleEn: 'Aspect ratio 16:9.' },
 			ゆるやかに: { example: 'ゆるやかに揺れる線', exampleEn: 'A loosely swaying line' },
 			小刻みに: { example: '小刻みに揺れる線', exampleEn: 'A tightly swaying line' },
 		};

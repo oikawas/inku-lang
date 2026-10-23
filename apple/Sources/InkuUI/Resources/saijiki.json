@@ -576,6 +576,17 @@
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
           "prompt": true,
+          "score_value": "brushmarks",
+          "surface_en": "brushmarks",
+          "surface_ja": "刷毛目"
+        },
+        {
+          "default": false,
+          "display": true,
+          "marker": null,
+          "marker_surfaces_en": null,
+          "marker_surfaces_ja": null,
+          "prompt": true,
           "score_value": "grain",
           "surface_en": "grain",
           "surface_ja": "粒"

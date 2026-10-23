@@ -1,12 +1,12 @@
 {
   "schema": "inku.apple-ui-reference.v1",
-  "version": "v2.15.233",
-  "build": "1309",
-  "buildDate": "2026-10-22T07:26:17.879Z",
+  "version": "v2.15.235",
+  "build": "1311",
+  "buildDate": "2026-10-22T23:30:01.389Z",
   "versions": {
-    "ddlSpec": "24",
-    "ddlEngine": "68",
-    "renderEngine": "89"
+    "ddlSpec": "25",
+    "ddlEngine": "69",
+    "renderEngine": "91"
   },
   "canvasMetadata": {
     "square": {
@@ -3283,11 +3283,18 @@
       "exampleEn": "Place a flat square"
     },
     "omote:刷き": {
-      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><defs><clipPath id=\"surface-clip\"><rect x=\"50\" y=\"20\" width=\"80\" height=\"52\" rx=\"2\"/></clipPath></defs><g clip-path=\"url(#surface-clip)\"><defs><filter id=\"surface-sweep\"><feGaussianBlur stdDeviation=\"2.4\"/></filter></defs><g filter=\"url(#surface-sweep)\" stroke=\"#2b2b2b\" stroke-width=\"15\" stroke-linecap=\"round\"><g opacity=\"0.5\"><path d=\"M44 26 H136\"/><path d=\"M44 39 H136\"/><path d=\"M44 52 H136\"/><path d=\"M44 65 H136\"/></g><g opacity=\"0.5\" transform=\"rotate(6 90 46)\"><path d=\"M44 22 H136\"/><path d=\"M44 35 H136\"/><path d=\"M44 48 H136\"/><path d=\"M44 61 H136\"/><path d=\"M44 74 H136\"/></g></g></g><rect x=\"50\" y=\"20\" width=\"80\" height=\"52\" rx=\"2\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"4\"/></svg>",
-      "effectJa": "少し角度を変えて面を二度掃く。各掃きは道具の不透明度の半分で、薄いを添えると淡くなる。線や弧では幅広い帯を作る。",
-      "effectEn": "Sweeps the face twice at slightly different angles, each at half the tool opacity. Faint handling makes it paler. On a line or arc it makes a broad band.",
+      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><defs><clipPath id=\"surface-clip\"><rect x=\"50\" y=\"20\" width=\"80\" height=\"52\" rx=\"2\"/></clipPath></defs><g clip-path=\"url(#surface-clip)\"><defs><filter id=\"surface-sweep\"><feGaussianBlur stdDeviation=\"2.4\"/></filter></defs><g filter=\"url(#surface-sweep)\" stroke=\"#2b2b2b\" stroke-width=\"15\" stroke-linecap=\"round\"><g opacity=\"0.6\"><path d=\"M44 26 H136\"/><path d=\"M44 39 H136\"/><path d=\"M44 52 H136\"/><path d=\"M44 65 H136\"/></g><g opacity=\"0.6\" transform=\"rotate(6 90 46)\"><path d=\"M44 22 H136\"/><path d=\"M44 35 H136\"/><path d=\"M44 48 H136\"/><path d=\"M44 61 H136\"/><path d=\"M44 74 H136\"/></g></g></g><rect x=\"50\" y=\"20\" width=\"80\" height=\"52\" rx=\"2\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"4\"/></svg>",
+      "effectJa": "少し角度を変えて面を二度掃く。各掃きは、帯が溶け合った一枚の膜で、道具の不透明度の0.6倍。薄いを添えると淡くなる。線や弧では幅広い帯を作る。",
+      "effectEn": "Sweeps the face twice at slightly different angles, each sweep one film of merged bands at 0.6 of the tool opacity. Faint handling makes it paler. On a line or arc it makes a broad band.",
       "exampleJa": "刷きの四角を置く",
       "exampleEn": "Place a sweep square"
+    },
+    "omote:刷毛目": {
+      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><defs><clipPath id=\"surface-clip\"><rect x=\"50\" y=\"20\" width=\"80\" height=\"52\" rx=\"2\"/></clipPath></defs><g clip-path=\"url(#surface-clip)\"><g stroke=\"#2b2b2b\" stroke-linecap=\"round\"><g><path stroke-width=\"13\" stroke-opacity=\"0.5\" d=\"M44 24 H136\"/><path stroke-width=\"11\" stroke-opacity=\"0.5\" d=\"M44 33 H136\"/><path stroke-width=\"14\" stroke-opacity=\"0.5\" d=\"M44 42 H136\"/><path stroke-width=\"12\" stroke-opacity=\"0.5\" d=\"M44 51 H136\"/><path stroke-width=\"13\" stroke-opacity=\"0.5\" d=\"M44 60 H136\"/><path stroke-width=\"11\" stroke-opacity=\"0.5\" d=\"M44 69 H136\"/></g><g transform=\"rotate(6 90 46)\"><path stroke-width=\"12\" stroke-opacity=\"0.5\" d=\"M44 20 H136\"/><path stroke-width=\"14\" stroke-opacity=\"0.5\" d=\"M44 29 H136\"/><path stroke-width=\"11\" stroke-opacity=\"0.5\" d=\"M44 38 H136\"/><path stroke-width=\"13\" stroke-opacity=\"0.5\" d=\"M44 47 H136\"/><path stroke-width=\"12\" stroke-opacity=\"0.5\" d=\"M44 56 H136\"/><path stroke-width=\"14\" stroke-opacity=\"0.5\" d=\"M44 65 H136\"/><path stroke-width=\"11\" stroke-opacity=\"0.5\" d=\"M44 74 H136\"/></g></g></g><rect x=\"50\" y=\"20\" width=\"80\" height=\"52\" rx=\"2\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"4\"/></svg>",
+      "effectJa": "筆の帯を一本ずつ重ね、重なった所が濃い筋になる。少し角度を変えて二度掃き、輪郭の内に収める。閉じた形の面にだけ使える。",
+      "effectEn": "Lays the brush's bands one by one, so they darken where they overlap; two passes at slightly different angles, kept inside the contour. Only on the face of a closed shape.",
+      "exampleJa": "刷毛目の四角を置く",
+      "exampleEn": "Place a brushmarks square"
     },
     "omote:粒": {
       "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><defs><clipPath id=\"surface-clip\"><rect x=\"50\" y=\"20\" width=\"80\" height=\"52\" rx=\"2\"/></clipPath></defs><g clip-path=\"url(#surface-clip)\"><circle cx=\"119.7\" cy=\"63.6\" r=\"0.89\" fill=\"#2b2b2b\" opacity=\"0.33\"/><circle cx=\"82.4\" cy=\"57.6\" r=\"1.08\" fill=\"#2b2b2b\" opacity=\"0.37\"/><circle cx=\"84.3\" cy=\"45.4\" r=\"1.20\" fill=\"#2b2b2b\" opacity=\"0.33\"/><circle cx=\"120.9\" cy=\"34.0\" r=\"1.32\" fill=\"#2b2b2b\" opacity=\"0.30\"/><circle cx=\"87.8\" cy=\"67.1\" r=\"1.52\" fill=\"#2b2b2b\" opacity=\"0.50\"/><circle cx=\"70.9\" cy=\"65.3\" r=\"0.82\" fill=\"#2b2b2b\" opacity=\"0.46\"/><circle cx=\"102.7\" cy=\"38.5\" r=\"1.40\" fill=\"#2b2b2b\" opacity=\"0.34\"/><circle cx=\"57.2\" cy=\"57.2\" r=\"1.26\" fill=\"#2b2b2b\" opacity=\"0.44\"/><circle cx=\"75.0\" cy=\"60.4\" r=\"1.54\" fill=\"#2b2b2b\" opacity=\"0.41\"/><circle cx=\"118.7\" cy=\"58.5\" r=\"1.31\" fill=\"#2b2b2b\" opacity=\"0.26\"/><circle cx=\"101.9\" cy=\"34.9\" r=\"1.72\" fill=\"#2b2b2b\" opacity=\"0.43\"/><circle cx=\"118.3\" cy=\"50.3\" r=\"0.81\" fill=\"#2b2b2b\" opacity=\"0.45\"/><circle cx=\"79.2\" cy=\"64.0\" r=\"0.79\" fill=\"#2b2b2b\" opacity=\"0.49\"/><circle cx=\"57.2\" cy=\"33.1\" r=\"1.78\" fill=\"#2b2b2b\" opacity=\"0.32\"/><circle cx=\"69.6\" cy=\"60.4\" r=\"0.81\" fill=\"#2b2b2b\" opacity=\"0.40\"/><circle cx=\"92.5\" cy=\"25.8\" r=\"1.13\" fill=\"#2b2b2b\" opacity=\"0.41\"/><circle cx=\"75.0\" cy=\"49.0\" r=\"0.83\" fill=\"#2b2b2b\" opacity=\"0.45\"/><circle cx=\"74.3\" cy=\"47.5\" r=\"1.10\" fill=\"#2b2b2b\" opacity=\"0.49\"/><circle cx=\"68.7\" cy=\"60.6\" r=\"1.06\" fill=\"#2b2b2b\" opacity=\"0.36\"/><circle cx=\"70.2\" cy=\"55.1\" r=\"0.89\" fill=\"#2b2b2b\" opacity=\"0.45\"/><circle cx=\"96.4\" cy=\"28.3\" r=\"1.80\" fill=\"#2b2b2b\" opacity=\"0.34\"/><circle cx=\"58.4\" cy=\"66.2\" r=\"0.86\" fill=\"#2b2b2b\" opacity=\"0.29\"/><circle cx=\"61.6\" cy=\"42.6\" r=\"1.36\" fill=\"#2b2b2b\" opacity=\"0.45\"/><circle cx=\"62.2\" cy=\"59.1\" r=\"1.44\" fill=\"#2b2b2b\" opacity=\"0.39\"/><circle cx=\"77.2\" cy=\"41.6\" r=\"1.29\" fill=\"#2b2b2b\" opacity=\"0.29\"/><circle cx=\"68.1\" cy=\"62.0\" r=\"1.12\" fill=\"#2b2b2b\" opacity=\"0.29\"/><circle cx=\"66.0\" cy=\"36.4\" r=\"1.14\" fill=\"#2b2b2b\" opacity=\"0.49\"/><circle cx=\"123.3\" cy=\"56.6\" r=\"1.56\" fill=\"#2b2b2b\" opacity=\"0.36\"/><circle cx=\"86.0\" cy=\"57.7\" r=\"1.58\" fill=\"#2b2b2b\" opacity=\"0.47\"/><circle cx=\"116.7\" cy=\"60.6\" r=\"1.42\" fill=\"#2b2b2b\" opacity=\"0.38\"/><circle cx=\"84.8\" cy=\"56.3\" r=\"1.32\" fill=\"#2b2b2b\" opacity=\"0.33\"/><circle cx=\"114.5\" cy=\"27.5\" r=\"1.51\" fill=\"#2b2b2b\" opacity=\"0.33\"/><circle cx=\"67.2\" cy=\"57.7\" r=\"1.21\" fill=\"#2b2b2b\" opacity=\"0.49\"/><circle cx=\"108.3\" cy=\"30.2\" r=\"1.70\" fill=\"#2b2b2b\" opacity=\"0.47\"/><circle cx=\"51.3\" cy=\"62.1\" r=\"1.16\" fill=\"#2b2b2b\" opacity=\"0.43\"/><circle cx=\"76.0\" cy=\"54.5\" r=\"0.90\" fill=\"#2b2b2b\" opacity=\"0.29\"/><circle cx=\"72.0\" cy=\"56.5\" r=\"1.16\" fill=\"#2b2b2b\" opacity=\"0.34\"/><circle cx=\"72.7\" cy=\"40.9\" r=\"1.19\" fill=\"#2b2b2b\" opacity=\"0.36\"/><circle cx=\"120.6\" cy=\"50.0\" r=\"1.27\" fill=\"#2b2b2b\" opacity=\"0.30\"/><circle cx=\"70.1\" cy=\"29.0\" r=\"1.66\" fill=\"#2b2b2b\" opacity=\"0.38\"/><circle cx=\"112.3\" cy=\"24.0\" r=\"1.61\" fill=\"#2b2b2b\" opacity=\"0.37\"/><circle cx=\"66.7\" cy=\"30.1\" r=\"1.42\" fill=\"#2b2b2b\" opacity=\"0.33\"/><circle cx=\"63.7\" cy=\"47.4\" r=\"1.36\" fill=\"#2b2b2b\" opacity=\"0.28\"/><circle cx=\"94.9\" cy=\"31.2\" r=\"1.75\" fill=\"#2b2b2b\" opacity=\"0.48\"/><circle cx=\"114.6\" cy=\"59.8\" r=\"0.80\" fill=\"#2b2b2b\" opacity=\"0.42\"/><circle cx=\"55.5\" cy=\"27.9\" r=\"0.89\" fill=\"#2b2b2b\" opacity=\"0.33\"/><circle cx=\"64.6\" cy=\"25.8\" r=\"1.29\" fill=\"#2b2b2b\" opacity=\"0.36\"/><circle cx=\"53.2\" cy=\"49.9\" r=\"1.28\" fill=\"#2b2b2b\" opacity=\"0.28\"/><circle cx=\"87.0\" cy=\"37.4\" r=\"1.16\" fill=\"#2b2b2b\" opacity=\"0.35\"/><circle cx=\"101.5\" cy=\"68.3\" r=\"1.26\" fill=\"#2b2b2b\" opacity=\"0.47\"/><circle cx=\"89.7\" cy=\"67.3\" r=\"0.85\" fill=\"#2b2b2b\" opacity=\"0.49\"/><circle cx=\"85.2\" cy=\"24.2\" r=\"1.30\" fill=\"#2b2b2b\" opacity=\"0.33\"/><circle cx=\"60.1\" cy=\"69.4\" r=\"0.87\" fill=\"#2b2b2b\" opacity=\"0.36\"/><circle cx=\"102.0\" cy=\"69.9\" r=\"0.91\" fill=\"#2b2b2b\" opacity=\"0.28\"/><circle cx=\"59.6\" cy=\"21.2\" r=\"1.76\" fill=\"#2b2b2b\" opacity=\"0.48\"/><circle cx=\"102.8\" cy=\"68.7\" r=\"1.67\" fill=\"#2b2b2b\" opacity=\"0.39\"/><circle cx=\"83.6\" cy=\"34.5\" r=\"0.99\" fill=\"#2b2b2b\" opacity=\"0.28\"/><circle cx=\"116.2\" cy=\"49.8\" r=\"1.10\" fill=\"#2b2b2b\" opacity=\"0.42\"/><circle cx=\"106.3\" cy=\"47.7\" r=\"1.29\" fill=\"#2b2b2b\" opacity=\"0.40\"/><circle cx=\"71.6\" cy=\"49.7\" r=\"0.87\" fill=\"#2b2b2b\" opacity=\"0.40\"/><circle cx=\"98.3\" cy=\"55.8\" r=\"1.22\" fill=\"#2b2b2b\" opacity=\"0.29\"/><circle cx=\"56.1\" cy=\"44.8\" r=\"1.66\" fill=\"#2b2b2b\" opacity=\"0.44\"/><circle cx=\"102.9\" cy=\"44.8\" r=\"1.50\" fill=\"#2b2b2b\" opacity=\"0.45\"/><circle cx=\"58.0\" cy=\"33.3\" r=\"1.08\" fill=\"#2b2b2b\" opacity=\"0.44\"/><circle cx=\"82.1\" cy=\"24.1\" r=\"1.79\" fill=\"#2b2b2b\" opacity=\"0.41\"/><circle cx=\"69.0\" cy=\"23.6\" r=\"0.88\" fill=\"#2b2b2b\" opacity=\"0.33\"/><circle cx=\"121.4\" cy=\"40.1\" r=\"1.81\" fill=\"#2b2b2b\" opacity=\"0.48\"/><circle cx=\"84.8\" cy=\"39.0\" r=\"0.78\" fill=\"#2b2b2b\" opacity=\"0.37\"/><circle cx=\"126.1\" cy=\"57.1\" r=\"1.27\" fill=\"#2b2b2b\" opacity=\"0.28\"/><circle cx=\"70.0\" cy=\"45.1\" r=\"1.55\" fill=\"#2b2b2b\" opacity=\"0.46\"/><circle cx=\"79.1\" cy=\"68.7\" r=\"0.94\" fill=\"#2b2b2b\" opacity=\"0.29\"/><circle cx=\"123.3\" cy=\"50.6\" r=\"0.84\" fill=\"#2b2b2b\" opacity=\"0.37\"/><circle cx=\"93.1\" cy=\"50.9\" r=\"1.61\" fill=\"#2b2b2b\" opacity=\"0.50\"/><circle cx=\"60.1\" cy=\"31.0\" r=\"1.52\" fill=\"#2b2b2b\" opacity=\"0.46\"/><circle cx=\"66.1\" cy=\"43.6\" r=\"0.93\" fill=\"#2b2b2b\" opacity=\"0.35\"/><circle cx=\"127.1\" cy=\"49.2\" r=\"1.25\" fill=\"#2b2b2b\" opacity=\"0.30\"/><circle cx=\"91.7\" cy=\"53.4\" r=\"1.78\" fill=\"#2b2b2b\" opacity=\"0.46\"/><circle cx=\"128.7\" cy=\"64.7\" r=\"0.80\" fill=\"#2b2b2b\" opacity=\"0.49\"/></g><rect x=\"50\" y=\"20\" width=\"80\" height=\"52\" rx=\"2\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"4\"/></svg>",
@@ -3732,18 +3739,18 @@
     }
   },
   "source": {
-    "commit": "7300c1e76b69230ba1d501dd3234e0501981cde2",
+    "commit": "97b50a52367554a94e9f364b90dc538d0f6b68bc",
     "files": {
       "web/src/lib/plugins/system/canvas-aspect/index.ts": "51431fe06ed38cfb11f7e08a87b85b68dacdeda646525242fb561c234cf0c9ff",
       "web/src/routes/+page.svelte": "114fe51a4265a7f915e923517490c75e0a7dc2905d6e86e02e2bafa1758ab42b",
-      "web/src/lib/saijiki-surface.ts": "bf8a2b3abe4ed5e4d5465eaf59c1d715d0f3b3d7ce36a095db821042b63413ae",
+      "web/src/lib/saijiki-surface.ts": "d04c5d559cd1ed0889b7e93da0893c2600c158f81cc81ea1d04b0647982469fd",
       "web/src/lib/instructionLang.ts": "2af540a1b98d4aa688fcf96632de1309b30c3f137137a66596f1285e09f2dcbe",
-      "web/APP_VERSION": "77d162e5c2fb95420285942ea260091e01d34fd113458d1e283d83835dbe39b9",
-      "web/BUILD_NUMBER": "b126b4067385ab59ebe64117457a46419c44f946ad4166020e165b5ee0ffc9d2",
-      "server/src/inku_server/layer_versions.py": "94ec08b7d796fe2a19d76e43c9a02e8885412d123ebdce8ec71b5b1b2e9006ec",
-      "core/crates/inku-render/src/lib.rs": "141bfb05e8a1ce1ea7e010f0708f92b3f05a6424d255630e29318ea3818949ab",
-      "web/src/lib/i18n/ja.ts": "d4b1dc802c5405fc667a62c9902164c61ac760f5d0376a01e29c35ddd931ee5d",
-      "web/src/lib/i18n/en.ts": "da3eefd1c68b43f374ea830f8e23143266a9cd3ce033733a5d407d35bc2c7bc3"
+      "web/APP_VERSION": "39a5d648b28297d15063a22002a2a9172142af80f47dd12e2ab711799b2526c3",
+      "web/BUILD_NUMBER": "36043641189d4ed34f14a422c3f530aeda1d230b34cad7af8b70ea3062833afb",
+      "server/src/inku_server/layer_versions.py": "983df36d1109d22ddf4e2d8edd7b073d61cab652f631319dce157918240f92c9",
+      "core/crates/inku-render/src/lib.rs": "b9e08e6aa9348f1ca9becd1f870899a152e8c8c2d00af582664e98b777c795a7",
+      "web/src/lib/i18n/ja.ts": "261478a53ab30f20e72bb985e71ecb5b5c3e6568f581c7e6e10c3bb8302786aa",
+      "web/src/lib/i18n/en.ts": "42a86e03019d4a6bbe34f47215dc69a1f225ca3110d1c3d8d8aea6b2a8de0b53"
     },
     "tooltipKeys": [
       "tooltipAppRailLang",

@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-23 — macOS Saijiki adds brushmarks
+
+The bundled vocabulary and Web examples now show brushmarks after sweep in surfaces, with its illustration, explanation and example. Sweep's explanation and illustration use 0.6 of the tool opacity.
+
 ### 2026-10-22 — macOS Saijiki hints follow word insertion availability
 
 When the main view's Saijiki can insert words into the instruction draft, its opening button and vocabulary hints explain that clicking inserts a word. Main views without insertion and Settings keep their reference hints. Insertion, undo and saving work as before.

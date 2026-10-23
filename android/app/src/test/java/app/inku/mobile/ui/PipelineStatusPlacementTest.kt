@@ -20,7 +20,7 @@ class PipelineStatusPlacementTest {
             renderHash = "hash", renderHashShort = "hash", colorCatalogId = "default", canvasAspect = "square",
             starred = false, trashed = false, elapsedMs = null, tokenMetadataJson = null)
         val showingWork = InkuUiState(selectedHistory = work, pipelineView = view)
-        assertFalse(composeScreenLayout(showingWork).showEditor)
+        assertTrue(composeScreenLayout(showingWork).showEditor)
         assertTrue(composeScreenLayout(showingWork).showPipelineStatus)
         assertFalse(composeScreenLayout(showingWork.copy(canvasPresentationMode = true)).presentationOnly)
         assertSame(proposal, showingWork.pipelineView!!.patchProposal)
@@ -32,7 +32,7 @@ class PipelineStatusPlacementTest {
 
         val stopped = showingWork.copy(pipelineView = view.copy(phaseTag = "needs_user_edit",
             patchProposal = null, phaseReason = "hole_completion_context_limit"), message = null)
-        assertFalse(composeScreenLayout(stopped).showEditor)
+        assertTrue(composeScreenLayout(stopped).showEditor)
         assertTrue(composeScreenLayout(stopped).showPipelineStatus)
         assertFalse(composeScreenLayout(stopped.copy(canvasPresentationMode = true)).presentationOnly)
         assertEquals("${InkuStringsJa.pipelineNeedsAttention} ${InkuStringsJa.pipelineAttentionReason("hole_completion_context_limit")}",

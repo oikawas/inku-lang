@@ -1595,7 +1595,7 @@ class InkuViewModel @JvmOverloads constructor(
         if (tab == AppTab.Lineage) refreshLineage()
     }
 
-    /** The global Studio action returns to writing, never to a viewed work. */
+    /** Return to the same description and work; only New work clears them. */
     fun openStudio() {
         if (localState.value.cameraCaptureState.locksCameraInteraction) return
         if (askBeforeDroppingCandidates(::openStudio)) return
@@ -1616,36 +1616,11 @@ class InkuViewModel @JvmOverloads constructor(
             return
         }
         closeRefinement()
-        var current = localState.value
-        if (current.workContextId != null) {
-            pausedWorkState = current
-            authoringReturnState?.let { current = current.restoreAuthoring(it) }
-            authoringReturnState = null
-        }
-        // A completed result is viewed from Works. An unfinished new-work
-        // draft survives a trip through another work or Settings.
-        if (current.selectedHistory != null) {
-            current = current.copy(
-                prompt = "", ddl = "", ddlEditedAfterGeneration = false,
-                selectedHistory = null, pipelineView = null, historyAuthority = null, historyDescriptionLocked = null,
-                historyAuthorityLoading = false, descriptionForkRequested = false,
-                cameraSourcePhotoPath = null, cameraCaptureState = CameraCaptureState.Idle,
-            )
-        }
+        val current = localState.value
         lineageJob?.cancel()
         presentationNavigationSerial++
         promptEditedByUser = true
-        localState.value = current.copy(
-            tab = AppTab.Compose, composeMode = ComposeMode.Write,
-            descriptionEditing = false, workContextId = null, descriptionFocused = false,
-            lineageDetached = true, lineageGraph = null, lineageLoading = false,
-            pendingDescriptionParent = null,
-            canvasPresentationMode = false, presentationHistory = null,
-            presentationSequence = emptyList(), workActionsTarget = null, workSketchTarget = null,
-            ddlEditorOpen = false, confirmDdlOverwrite = false,
-            refinementOpen = false, refinementParent = null, refinementCandidates = emptyList(),
-            refinementPreviewId = null, refinementStatus = null, message = null,
-        )
+        localState.value = current.returnToDescriptionWorkspace()
     }
 
     fun closeSettings() {

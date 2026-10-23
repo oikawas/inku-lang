@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-22 — Edit a description while keeping the work visible on Android
+
+Editing a description now keeps the work and its text together. On narrow screens the work sits outside the editor's scroll and stays visible above the keyboard; wider screens place them side by side. The description remains available after drawing. Returning to Studio keeps the current work and text; New work starts an empty workspace. Back still restores the draft from before a work edit. Description locks and confirmation before replacing edited DDL remain in effect.
+
 ### 2026-10-23 — Add a DDL syntax and vocabulary reference
 
 The Japanese and English manuals now collect grammar principles, introductory examples, a grammar and Saijiki reference, and 50 complex DDL examples from the current shared Rust implementation, so people and AI can write instructions. Japanese is canonical. Outdated descriptions of accepted syntax in SPEC are aligned with the implementation.

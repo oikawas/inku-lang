@@ -572,6 +572,12 @@ Drawing and image descriptions call the shared core's `provider_wire.rs` through
 
 Photo-description HTTP errors from remote models log the same redacted refusal used for drawing, from the common description boundary under Logcat tag `InkuProvider` with action `vision`.
 
+## 2026-10-22 Edit a description while looking at the work
+
+Studio keeps the work and its description together as a continuing workspace. Both a saved work's description edit and a newly drawn result retain the work, description field, and conditions for the next drawing. Narrow screens put the work outside the editor's scroll, keeping it visible when the keyboard opens. Wider screens place the work and editor side by side. The existing work display component provides full-screen viewing, generation information, and export. Its secondary controls return when the keyboard closes.
+
+Studio in the bottom bar returns to the current description, displayed work, parent, and drawing conditions. New work explicitly starts an empty workspace. The draft and return destination from before a work edit remain separate; Back restores them. A description held by its DDL remains locked, with the existing explicit action to start a new work from that description. Confirmation before replacing edited DDL, discarding candidates, and lineage records remain in effect. This supersedes the September 30 rules that Studio returns to a separate draft and that description editing puts the input before the work.
+
 ## 2026-09-30 Navigation for writing, viewing, and refinement
 
 Startup opens Studio for writing without automatically selecting a saved work. Recovery of unfinished runs remains available. The global Studio action closes the work context and returns to the authoring draft instead of restoring a completed work into the input. Settings uses a gear icon with a central hole.

@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-10-23 — Correct DDL reference constraints and examples
+
+Clarified connection and touching targets, default placement for one mark, precision limits for numeric ranges and two-point coordinates, and constraints on relations to a prior point. Complex example 5.30 now specifies the crossing line's length. Older relation descriptions in SPEC were also aligned with the current implementation.
+
 ## 2026-10-23 — DDL syntax and vocabulary reference
 
 Added a guide to writing DDL, checked against the current shared Rust implementation. Grammar principles, introductory examples, a grammar and Saijiki reference, and 50 complex examples explain the syntax and constraints people and AI need to assemble instructions. Japanese is canonical; the English version covers the same scope.

@@ -2271,11 +2271,11 @@ Line / Arcはnormal appearanceで非fill、PointはCircleとは別identityの丸
 
 9 つの抽象色（§3.1）では表せないニュアンスは、カタログに基づく描画のために `color_hint` へ残す。
 
-**関係は逐次である。** `along`・`not_touching`・`cutting`・`touching` は直前の 1 命令を指し、`between` は直前の 2 命令を指す。**任意の id も前方参照も、関係のための補修 governor も無い。** 妥当でない関係は検証または coerce が警告を記録して落とし、命令は関係なしで通常どおり描画される。**coerce 層は妥当でない関係を取り除いてよいが、新しい関係を足してはならない。** JSON Score の `relation` は正規化 DDL の明示的な「前の対象」の句のために予約されている — `前の線に沿って` / `along the previous line`、`前の形に触れない` / `not touching the previous shape`、`前の線を切る` / `cutting the previous line`、`前の二つの間に` / `between the previous two`、そして明示の接触句 `前の線に触れる` / `touching the previous line` と `前の弧に両端で触れる` / `touching the previous arc at both ends`。**触れる関係が自発的に足されることはない。** 自然言語の近さ・律動・前後・近い・遠いは、関係ではなく位置・経路・回転・間隔で表す。
+**関係は逐次である。** `along`・`not_touching`・`cutting`・`touching`・`connected` は直前の 1 命令を指し、`between` は直前の 2 命令を指す。**任意の id も前方参照も、関係のための補修 governor も無い。** 妥当でない関係は検証または coerce が警告を記録して落とし、命令は関係なしで通常どおり描画される。回復可能な接続の失敗も関係だけを外し、現在の命令・組・後続を保持する。**coerce 層は妥当でない関係を取り除いてよいが、新しい関係を足してはならない。** JSON Score の `relation` は正規化 DDL の明示的な「前の対象」の句のために予約されている — `前の線に沿って` / `along the previous line`、`前の形に触れない` / `not touching the previous shape`、`前の線を切る` / `cutting the previous line`、`前の二つの間に` / `between the previous two`、明示の接触句 `前の線に触れる` / `touching the previous line` と `前の弧に両端で触れる` / `touching the previous arc at both ends`、そして `前の形につながる` / `connected to the previous shape`。**触れる・つながる関係が自発的に足されることはない。** 自然言語の近さ・律動・前後・近い・遠いは、関係ではなく位置・経路・回転・間隔で表す。
 
 領域（`at`）と関係の両方を持つ命令（プラグインの member による双弧など）は、まず領域で置かれ、次に関係で解決される（v1.94）。触れる関係では**直前の命令の端点が最終位置を決める**ので、領域は連鎖の起点の情報として働く。演奏時に初めて解決不能と分かった関係は落とす。grid layoutがrelationを消費する場合などwarning-classの失敗はstructured warningを記録するが、prior boundsの不足やcanonical-silentな退化幾何のfallbackは警告なしでrelationを落とす。
 
-`touching` では、現在と直前の命令がともに line か arc でなければならない。renderer は直前の命令の**演奏された端点**を取り、現在の端点をそこへ固定する。弦長 `c`・符号つきの演奏された矢高 `b` の弧については `r=c²/(8|b|)+|b|/2` で劣弧を再構成する。中心は膨らみの反対側に在り、直前が弧であれば新しい弧は既定で反対側へ膨らむ。劣弧の巻き方向は SVG の弧描画と同じ共有の約束に従う。揺らぎと筆致の演奏は両端点を固定したまま内部にだけ働く。閉じた形と端点を持たない対象は、警告を記録して**落とすだけ**で拒否する。演奏された幾何が退化した場合も描画時に関係を落とす — **座標の補修も governor も導入しない。**
+通常DDLの`touching`では、現在はline・通常arc・free_line、直前は完全句が名指すlineまたは通常arcである。直前のfree_lineを名指すtouching句はない。renderer は直前の命令の**演奏された端点**を取り、現在の端点をそこへ固定する。弦長 `c`・符号つきの演奏された矢高 `b` の弧については `r=c²/(8|b|)+|b|/2` で劣弧を再構成する。中心は膨らみの反対側に在り、直前が弧であれば新しい弧は既定で反対側へ膨らむ。劣弧の巻き方向は SVG の弧描画と同じ共有の約束に従う。揺らぎと筆致の演奏は両端点を固定したまま内部にだけ働く。閉じた形と端点を持たない対象は、警告を記録して**落とすだけ**で拒否する。演奏された幾何が退化した場合も描画時に関係を落とす — **座標の補修も governor も導入しない。**
 
 端点・接線・矢高の検証は、祖先グループの回転を含むすべての描画変換を合成したあとの**キャンバス座標で**行う。
 

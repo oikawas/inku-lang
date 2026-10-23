@@ -1752,17 +1752,19 @@ async function drawLineageSketchGrain(node: LineageNode, mode: SketchMode, signa
 	await showNewLineageChild(rendered.history_id, rendered.lineage_node_id);
 }
 
-async function drawLineageDdlEdit(node: LineageNode, editedDdl: string, signal?: AbortSignal): Promise<void> {
+/** Draw an edited DDL as the node's child. False when the author cancelled
+ *  the fit question, so the dialog keeps the text (DDL 26). */
+async function drawLineageDdlEdit(node: LineageNode, editedDdl: string, signal?: AbortSignal): Promise<boolean> {
 	const nextDdl = editedDdl.trim();
-	if (!nextDdl || !node.history?.id) return;
+	if (!nextDdl || !node.history?.id) return true;
 	// Ask before the words are carried into a child (contract § stage 4).
-	if (!(await work.confirmFallbackRefine(node.history))) return;
+	if (!(await work.confirmFallbackRefine(node.history))) return true;
 	const sourceText = node.history.source_text ?? node.history.input ?? '';
 	// An edited DDL that declares another ratio than the work's paper (DDL 26).
 	const paperId = lineageCanvasAspectId(node);
 	const fit = await work.chooseCanvasFit(declaredCanvasRatio(nextDdl), paperId);
-	if (fit === null) return;
-	if (!(await work.selectHistoryAuthority(node.history.id, node.history.pipeline_variation_id, signal))) return;
+	if (fit === null) return false;
+	if (!(await work.selectHistoryAuthority(node.history.id, node.history.pipeline_variation_id, signal))) return true;
 	const view = await work.authorDdl(nextDdl, {
 		sourceText,
 		canvasAspectId: paperId,
@@ -1776,17 +1778,19 @@ async function drawLineageDdlEdit(node: LineageNode, editedDdl: string, signal?:
 		},
 	}, signal);
 	await showNewLineageChild(view.result?.history_id, view.result?.lineage_node_id);
+	return true;
 }
 
 // Draw a standalone artwork authored directly in DDL (no instruction, no parent).
-async function drawNewDdl(rawDdl: string, signal?: AbortSignal, importedPlugins?: ImportedPlugin[]): Promise<void> {
+// False when the author cancelled the fit question, so the dialog keeps the text.
+async function drawNewDdl(rawDdl: string, signal?: AbortSignal, importedPlugins?: ImportedPlugin[]): Promise<boolean> {
 	const nextDdl = rawDdl.trim();
-	if (!nextDdl) return;
+	if (!nextDdl) return true;
 	// A DDL without a declaration is given the paper's; one written for
 	// another ratio is fitted into the paper or drawn to it (DDL 26).
 	const paperId = effectiveCanvasAspectId();
 	const fit = await work.chooseCanvasFit(declaredCanvasRatio(nextDdl), paperId);
-	if (fit === null) return;
+	if (fit === null) return false;
 	work.beginNewAuthoring();
 	await work.authorDdl(nextDdl, {
 		canvasAspectId: paperId,
@@ -1794,6 +1798,7 @@ async function drawNewDdl(rawDdl: string, signal?: AbortSignal, importedPlugins?
 		displayLabel: 'DDL',
 		...(importedPlugins?.length ? { importedPlugins } : {}),
 	}, signal);
+	return true;
 }
 
 function openNewDdlDialog(): void {
@@ -1894,12 +1899,13 @@ async function handleDdlDialogDraw(nextDdl: string, signal?: AbortSignal, import
 	const cancelRun = () => work.cancelPipelineRun();
 	signal?.addEventListener('abort', cancelRun, { once: true });
 	try {
-		if (ddlDialogMode === 'edit' && ddlDialogNode) await drawLineageDdlEdit(ddlDialogNode, nextDdl, signal);
-		else await drawNewDdl(nextDdl, signal, importedPlugins);
+		const drawn = ddlDialogMode === 'edit' && ddlDialogNode
+			? await drawLineageDdlEdit(ddlDialogNode, nextDdl, signal)
+			: await drawNewDdl(nextDdl, signal, importedPlugins);
 		// A cancelled run hands back its last view instead of throwing; a stop
-		// keeps the dialog open all the same.
+		// keeps the dialog open all the same, as a cancelled fit question does.
 		signal?.throwIfAborted();
-		ddlDialogOpen = false;
+		if (drawn) ddlDialogOpen = false;
 	} catch (cause) {
 		// Aborted by the dialog stop button: keep the dialog open, no error.
 		if (!(cause instanceof DOMException && cause.name === 'AbortError') && !(cause instanceof Error && cause.name === 'AbortError')) {

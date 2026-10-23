@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
 import { registerHooks } from 'node:module';
 import { test } from 'node:test';
 
@@ -10,7 +11,10 @@ const libRoot = new URL('../../', import.meta.url);
 registerHooks({
 	resolve(specifier, context, nextResolve) {
 		if (specifier.startsWith('$lib/')) {
-			return nextResolve(new URL(`${specifier.slice(5)}.ts`, libRoot).href, context);
+			// A directory module ($lib/plugins/system/canvas-aspect) resolves to its index.
+			const file = new URL(`${specifier.slice(5)}.ts`, libRoot);
+			const target = existsSync(file) ? file : new URL(`${specifier.slice(5)}/index.ts`, libRoot);
+			return nextResolve(target.href, context);
 		}
 		return nextResolve(specifier, context);
 	}

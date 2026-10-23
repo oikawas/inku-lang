@@ -907,60 +907,6 @@ export function createWorkState(deps: WorkStateDeps) {
 		try { await replayOnce(); }
 		finally { replayStarting = false; }
 	}
-	/** How a DDL written for another ratio is drawn on this paper (DDL 26):
-	 *  fitted into it, drawn to it as before, or not drawn (null). A DDL with
-	 *  no ratio to go by, or with the paper's, is drawn without asking. */
-	function chooseCanvasFit(basis: CanvasRatio | null, paperId: CanvasAspectId): Promise<'fit' | 'stretch' | null> {
-		const paper = canvasRatioOfAspect(paperId);
-		if (!basis || !paper || sameCanvasRatio(basis, paper)) return Promise.resolve('stretch');
-		const option = getCanvasAspectOption(paperId);
-		return new Promise((resolve) => {
-			deps.requestConfirmation({
-				message: t().canvasFitMessage(canvasRatioLabel(basis), `${option.label} ${option.ratio}`),
-				runLabel: t().canvasFitRun,
-				run: () => resolve('fit'),
-				secondaryLabel: t().canvasFitStretch,
-				secondaryRun: () => resolve('stretch'),
-				cancelRun: () => resolve(null),
-			});
-		});
-	}
-
-	/** The saved work fitted into this paper from its saved Score (はめ込み,
-	 *  2026-10-23): the Server draws it, and it is saved as the work's child.
-	 *  The DDL stays as it is. */
-	async function drawFittedSavedWork(parentNodeId: string, workId: string, paperId: CanvasAspectId, signal: AbortSignal): Promise<void> {
-		const response = await apiFetch('/api/render-canvas-fit', {
-			method: 'POST', signal, headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ work_id: workId, canvas_aspect: paperId }),
-		});
-		if (!response.ok) {
-			const data = await response.json().catch(() => ({})) as { detail?: unknown };
-			throw new Error(describeApiError(data.detail, response.status));
-		}
-		const data = await response.json() as Partial<PaintResult> & Pick<PaintResult, 'svg' | 'score'> & { derivation_metadata?: Record<string, unknown> };
-		const derivationMetadata = data.derivation_metadata ?? { to_canvas_aspect: paperId };
-		const fitted = {
-			...(result ?? {}), ...data,
-			history_id: null, history_at: null, lineage_node_id: null,
-			lineage_parent_node_id: parentNodeId,
-			derivation_kind: 'canvas_fit', derivation_metadata: derivationMetadata,
-		} as PaintResult;
-		result = fitted;
-		const source = input.trim();
-		const saved = await deps.pushHistory({
-			...fitted,
-			input: source, ddl: ddl ?? '', score: fitted.score, svg: fitted.svg, at: Date.now(),
-			elapsed_ms: 0, tokens_in: null, tokens_out: null,
-		} as Iteration, {
-			sourceText: source, countGeneration: true,
-			lineageParentNodeId: parentNodeId, derivationKind: 'canvas_fit', derivationMetadata,
-		});
-		if (saved?.lineage_node_id && result === fitted) {
-			result = { ...fitted, history_id: saved.id, history_at: saved.at, lineage_node_id: saved.lineage_node_id, description_hash: saved.description_hash };
-		}
-	}
-
 	async function replayOnce() {
 		if (!ddl || !hasDdlBody(ddl) || reloading) return;
 		if (submitWouldRefine() && !(await confirmFallbackRefine(currentRefineParent()))) return;
@@ -1041,6 +987,60 @@ export function createWorkState(deps: WorkStateDeps) {
 			stopTimer();
 			stageLabel = '';
 			reloading = false;
+		}
+	}
+
+	/** How a DDL written for another ratio is drawn on this paper (DDL 26):
+	 *  fitted into it, drawn to it as before, or not drawn (null). A DDL with
+	 *  no ratio to go by, or with the paper's, is drawn without asking. */
+	function chooseCanvasFit(basis: CanvasRatio | null, paperId: CanvasAspectId): Promise<'fit' | 'stretch' | null> {
+		const paper = canvasRatioOfAspect(paperId);
+		if (!basis || !paper || sameCanvasRatio(basis, paper)) return Promise.resolve('stretch');
+		const option = getCanvasAspectOption(paperId);
+		return new Promise((resolve) => {
+			deps.requestConfirmation({
+				message: t().canvasFitMessage(canvasRatioLabel(basis), `${option.label} ${option.ratio}`),
+				runLabel: t().canvasFitRun,
+				run: () => resolve('fit'),
+				secondaryLabel: t().canvasFitStretch,
+				secondaryRun: () => resolve('stretch'),
+				cancelRun: () => resolve(null),
+			});
+		});
+	}
+
+	/** The saved work fitted into this paper from its saved Score (はめ込み,
+	 *  2026-10-23): the Server draws it, and it is saved as the work's child.
+	 *  The DDL stays as it is. */
+	async function drawFittedSavedWork(parentNodeId: string, workId: string, paperId: CanvasAspectId, signal: AbortSignal): Promise<void> {
+		const response = await apiFetch('/api/render-canvas-fit', {
+			method: 'POST', signal, headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ work_id: workId, canvas_aspect: paperId }),
+		});
+		if (!response.ok) {
+			const data = await response.json().catch(() => ({})) as { detail?: unknown };
+			throw new Error(describeApiError(data.detail, response.status));
+		}
+		const data = await response.json() as Partial<PaintResult> & Pick<PaintResult, 'svg' | 'score'> & { derivation_metadata?: Record<string, unknown> };
+		const derivationMetadata = data.derivation_metadata ?? { to_canvas_aspect: paperId };
+		const fitted = {
+			...(result ?? {}), ...data,
+			history_id: null, history_at: null, lineage_node_id: null,
+			lineage_parent_node_id: parentNodeId,
+			derivation_kind: 'canvas_fit', derivation_metadata: derivationMetadata,
+		} as PaintResult;
+		result = fitted;
+		const source = input.trim();
+		const saved = await deps.pushHistory({
+			...fitted,
+			input: source, ddl: ddl ?? '', score: fitted.score, svg: fitted.svg, at: Date.now(),
+			elapsed_ms: 0, tokens_in: null, tokens_out: null,
+		} as Iteration, {
+			sourceText: source, countGeneration: true,
+			lineageParentNodeId: parentNodeId, derivationKind: 'canvas_fit', derivationMetadata,
+		});
+		if (saved?.lineage_node_id && result === fitted) {
+			result = { ...fitted, history_id: saved.id, history_at: saved.at, lineage_node_id: saved.lineage_node_id, description_hash: saved.description_hash };
 		}
 	}
 

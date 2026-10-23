@@ -17,6 +17,7 @@ object DerivationKindRegistry {
     val KINDS: List<String> = listOf(
         "age_change",
         "canvas_aspect_change",
+        "canvas_fit",
         "catalog_change",
         "color_arrangement_change",
         "ddl_edit",

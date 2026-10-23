@@ -1033,7 +1033,7 @@ class InkuRepository(
         )
     }
 
-    suspend fun composeFromDdl(description: String, ddl: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, uiLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput(), inputProvenance: CameraInputProvenance? = null, onProgress: suspend (ComposeFromDdlProgress) -> Unit = {}, beforeSave: suspend () -> Unit = {}, parentHistoryId: String? = null, executionId: String? = null, originalPhoto: File? = null, importedPlugins: List<ImportedPluginDefinition> = emptyList(), renderWild: Boolean? = null): HistoryItemEntity {
+    suspend fun composeFromDdl(description: String, ddl: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, uiLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput(), inputProvenance: CameraInputProvenance? = null, onProgress: suspend (ComposeFromDdlProgress) -> Unit = {}, beforeSave: suspend () -> Unit = {}, parentHistoryId: String? = null, executionId: String? = null, originalPhoto: File? = null, importedPlugins: List<ImportedPluginDefinition> = emptyList(), renderWild: Boolean? = null, canvasFit: String? = null): HistoryItemEntity {
         val started = System.currentTimeMillis()
         val result = pipeline.composeFromDdl(
             ddl,
@@ -1056,6 +1056,7 @@ class InkuRepository(
                 inputProvenance = inputProvenance,
                 importedPlugins = importedPlugins,
                 renderWild = renderWild,
+                canvasFit = canvasFit,
             ),
             onProgress = onProgress,
         )
@@ -1186,6 +1187,24 @@ class InkuRepository(
 
     private suspend fun savedVariantParent(historyId: String): HistoryItemEntity =
         getHistoryById(historyId)?.takeUnless { it.trashed } ?: error("saved variant parent was not found")
+
+    suspend fun fitSavedWork(historyId: String, paper: String): HistoryItemEntity {
+        val parent = savedVariantParent(historyId)
+        val seeds = PaintSeeds.of(parent)
+        val started = System.currentTimeMillis()
+        val (result, metadata) = pipeline.renderCanvasFit(parent.scoreJson, PaintRequest(
+            description = parent.sourceText ?: parent.originalInput, originalText = parent.originalInput,
+            stage1Model = parent.stage1Model.orEmpty(), stage2Model = parent.stage2Model.orEmpty(),
+            colorCatalogId = parent.colorCatalogId, canvasAspect = paper, autoRepair = false,
+            parentHistoryId = parent.id, renderSeed = seeds.renderSeed, compositionSeed = seeds.compositionSeed,
+            workColorSnapshot = savedColorSnapshot(parent), renderWild = parent.drawnWild,
+            sketch = SketchInput(text = parent.sketchText, grain = parent.sketchGrain),
+        ))
+        return saveResult(result, parent.colorCatalogId, paper, parent.stage1Model.orEmpty(), parent.stage2Model.orEmpty(),
+            System.currentTimeMillis() - started, sourceText = parent.sourceText,
+            lineage = LineageDeclaration(parentNodeId = requireNotNull(parent.lineageNodeId),
+                derivationKind = "canvas_fit", derivationMetadata = metadata))
+    }
 
     private fun savedColorSnapshot(item: HistoryItemEntity): WorkColorSnapshot {
         workColorSnapshot(item.renderMetadataJson)?.let { return it }
@@ -1533,6 +1552,7 @@ class InkuRepository(
         val attachedPhoto = originalPhoto?.let { originalPhotos.persist(historyId, it) }
         try {
             when {
+                result.managedCanvasFit != null -> sharedPipelineStore.saveCanvasFitHistory(item, write, result.managedCanvasFit)
                 result.managedHistoryLink != null -> sharedPipelineStore.saveManagedHistory(item, write, result.managedHistoryLink)
                 result.managedToolChange != null -> sharedPipelineStore.saveManagedToolHistory(item, write, result.managedToolChange)
                 result.managedGroundVariant != null -> sharedPipelineStore.saveManagedGroundVariantHistory(item, write, result.managedGroundVariant)

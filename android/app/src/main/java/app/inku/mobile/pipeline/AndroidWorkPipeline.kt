@@ -317,6 +317,30 @@ class AndroidWorkPipeline(
         )
     }
 
+    /** Fit the saved Score without recompiling or creating a new DDL authority. */
+    suspend fun renderCanvasFit(parentScoreJson: String, request: PaintRequest): Pair<PaintResult, Map<String, Any?>> {
+        val parent = replaySource(request.parentHistoryId, parentScoreJson)
+            ?: throw PipelineHostException("canvas_fit_parent_not_found")
+        val source = parent.history
+        val changed = app.inku.mobile.data.refinement.CanvasFit.render(
+            source.scoreJson, app.inku.mobile.data.refinement.recordedCanvasAspect(source), request.canvasAspect, binding,
+        )
+        val seeds = app.inku.mobile.data.refinement.PaintSeeds.of(source)
+        val saved = parent.forkContextJson?.let(::JSONObject)
+        val sourceMetadata = JSONObject(source.renderMetadataJson)
+        val renderSeed = seeds.renderSeed ?: saved?.optJSONObject("host_options")?.optionalUnsignedLong("render_seed")
+            ?: sourceMetadata.optionalUnsignedLong("render_seed")
+            ?: throw PipelineHostException("saved_render_seed_missing")
+        val compositionSeed = seeds.compositionSeed ?: saved?.optJSONObject("config")?.optJSONObject("compiler")
+            ?.optionalUnsignedLong("composition_seed") ?: sourceMetadata.optionalUnsignedLong("composition_seed")
+        val result = renderScoreWithSource(changed.scoreJson, request.copy(renderSeed = renderSeed, compositionSeed = compositionSeed), parent)
+        return result.copy(
+            scoreJson = changed.scoreJson,
+            managedHistoryReplay = null,
+            managedCanvasFit = app.inku.mobile.data.db.ManagedCanvasFitInput(source.id, result.managedHistoryReplay),
+        ) to changed.derivationMetadata
+    }
+
     /** A touch change reads the parent's policy, not the editor or today's model choices. */
     suspend fun toolChangeSource(
         ddl: String,
@@ -821,6 +845,7 @@ class AndroidWorkPipeline(
                     bundledPluginsEnabled = bundledPluginsEnabled(),
                     importedPlugins = request.importedPlugins,
                     drawingModelId = request.drawingModel,
+                    canvasFit = request.canvasFit,
                 ),
             )
             else -> {
@@ -881,6 +906,7 @@ class AndroidWorkPipeline(
                     inherited != null -> inherited.lawsRecordsJson
                     else -> lawsRecordsOf(parentMetadata)?.takeIf { saved != null }
                 },
+                declareCanvas = request.parentHistoryId == null && inherited == null && parentVariationId == null,
             ),
             instructionLangRequested = requestedLang,
             instructionLangResolved = resolvedLang,
@@ -950,6 +976,7 @@ class AndroidWorkPipeline(
                 .put("catalog_mode", if (catalogId == "default") "default" else "explicit")
                 .put("background", "white")
                 .put("palette", palette)
+                .also { host -> request.canvasFit?.let { host.put("canvas_fit", it) } }
         }
         // Old saved configurations keep composition absent. A new fork that
         // changes the model retains composition but must respect the local limit.
@@ -1052,6 +1079,8 @@ class AndroidWorkPipeline(
             request.uiLang ?: stored.resultOptions.optionalString("ui_lang"),
         )
         return language != JSONObject(stored.config.configJson).requiredString("language") ||
+            request.canvasFit.orEmpty() != JSONObject(stored.config.configJson).requiredObject("compiler")
+                .requiredObject("host").optString("canvas_fit") ||
             request.drawingModel != stored.models.stage1ModelId ||
             request.drawingModel != stored.models.stage2ModelId ||
             (request.colorCatalogId == "auto") != (options.requiredString("catalog_mode") == "auto") ||

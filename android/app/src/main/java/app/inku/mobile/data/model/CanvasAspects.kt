@@ -124,6 +124,9 @@ object CanvasAspects {
     fun labelFor(id: String): String =
         registry().byId[id]?.label ?: if (id == LEGACY_PIXEL9_LANDSCAPE_SAFE_ID) legacyPixel9LandscapeSafe.label else id
 
+    fun find(id: String?): CanvasAspect? =
+        registry().byId[id] ?: legacyPixel9LandscapeSafe.takeIf { id == it.id }
+
     fun ratioFor(id: String?): Double {
         val exactId = normalize(id)
         val aspect = registry().byId[exactId] ?: legacyPixel9LandscapeSafe

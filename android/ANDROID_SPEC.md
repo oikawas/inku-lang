@@ -6,6 +6,16 @@ secrets must remain outside tracked files.
 
 Last updated: 2026-10-23.
 
+## 2026-10-23 Canvas declarations and fitting
+
+For DDL 26, DDL engine 70 and render engine 93, only a new direct-DDL start without a parent sends `declare_canvas: true`. Edits and redraws of saved works leave it false. The core adds Stage 1's declaration itself.
+
+Drawing DDL, editing a saved work's DDL and drawing new DDL use Web's question when the declared ratio differs from the current paper: “Fit it in”, “Draw to this paper” and “Cancel”. An untouched saved DDL without a declaration uses its recorded paper ratio. An unknown or equal ratio needs no question. Cancel keeps the text and editor open without starting a drawing or save. Ordinary DDL compilation sends `compiler.host.canvas_fit: "contain"` only for fitting. A choice that changes an existing execution's settings starts a new execution under the saved policy.
+
+Fitting an untouched saved work sends its saved Score, recorded paper and target paper to the shared `saved_variants` action `fit_render`. The returned Score is drawn without changing its version and saved as a `canvas_fit` (Fit) child, preserving the DDL, colors, seeds and Wild setting. No new DDL compilation or model request occurs, and the parent's description lock is inherited. Saving verifies the parent, Score, DDL and derivation record against the core result; the ordinary replay guard still rejects a changed Score.
+
+Saijiki displays the generated aspect group (aspect ratio) before relations, with 17 groups, 110 displayed words and 220 recognized surfaces across both languages. Its new color preserves the existing colors, including relations. Parsing and drawing semantics remain in the shared core.
+
 ## 2026-10-23 Saijiki brushmarks and the sweep explanation
 
 Brushmarks follows sweep in the surface group, with Web's Japanese and English explanations, example DDL and preview. The sweep explanation and drawing show each pass as one film at 0.6 of the tool opacity. The brushmarks drawing overlaps individual bands at 0.5 opacity without a filter. Explanations follow the UI language and examples the DDL language. The screen retains 16 groups and now shows 109 words, recognizing 218 across both languages. Group colors stay the same. Word meanings and targets follow the shared core's DDL 25 and render engine 91; Android adds no drawing semantics.

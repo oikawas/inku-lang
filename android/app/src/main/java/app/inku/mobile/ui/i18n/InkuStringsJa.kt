@@ -271,6 +271,7 @@ object InkuStringsJa : InkuStrings {
         when (kind) {
             "age_change" -> "経年"
             "canvas_aspect_change" -> "キャンバス変更"
+            "canvas_fit" -> "はめ込み"
             "catalog_change" -> "色"
             "color_arrangement_change" -> "配色"
             "ddl_edit" -> "DDL編集"
@@ -356,6 +357,9 @@ object InkuStringsJa : InkuStrings {
     override val baseUrlChange = "Base URLを変更"
     override val drawFromDdl = "DDLから描画"
     override val ddlOverwriteTitle = "DDLの編集結果が失われます"
+    override fun canvasFitMessage(declared: String, paper: String) = "このDDLは画面比${declared}で書かれています。今の紙（${paper}）にどう描きますか。はめ込むと、構図をそのままの比で紙の中央に置き、余白は地になります。"
+    override val canvasFitRun = "はめ込んで描く"
+    override val canvasFitStretch = "この紙に合わせて描く"
     override val ddlOverwriteRedraw = "記述から描き直す"
     override fun chatGptSignOutBody(label: String) = "「$label」のChatGPTプランへの接続を切ります。もう一度使うには再認証が必要です。"
     override val discard = "破棄"

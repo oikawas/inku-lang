@@ -48,6 +48,16 @@ class DescriptionLockTest {
     private fun nodeLocked(store: MemoryStore, nodeId: String) = runBlocking { DescriptionLock.nodeIsLocked(store, nodeId) }
 
     @Test
+    fun canvasFitInheritsItsParentsDescriptionLockWithoutReadingTheWordsAgain() {
+        val store = MemoryStore()
+        store.work("held", authority = "ddl_authoritative")
+        store.work("held-fit", "held", "canvas_fit")
+        store.work("free", authority = "description_authoritative")
+        store.work("free-fit", "free", "canvas_fit")
+        assertEquals(setOf("held-fit"), locked(store, listOf("held-fit", "free-fit")))
+    }
+
+    @Test
     fun test_a_ddl_edit_and_what_keeps_its_ddl_are_locked_and_a_new_reading_is_not() {
         val store = MemoryStore()
         store.work("root", authority = "description_authoritative")

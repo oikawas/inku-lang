@@ -76,6 +76,8 @@ data class PaintRequest(
     val importedPlugins: List<ImportedPluginDefinition> = emptyList(),
     /** False for a refinement candidate: no drawing of the run is saved until the author keeps it. */
     val saveHistory: Boolean = true,
+    /** The author's answer when a declared ratio differs from this paper. */
+    val canvasFit: String? = null,
 ) {
     /**
      * The one model that draws both stages (2026-09-30, the author): the Stage 1
@@ -138,6 +140,7 @@ data class PaintResult(
     val sketchState: String? = null,
     val managedHistoryLink: ManagedHistoryLinkInput? = null,
     val managedHistoryReplay: ManagedHistoryReplayInput? = null,
+    val managedCanvasFit: app.inku.mobile.data.db.ManagedCanvasFitInput? = null,
     val managedToolChange: app.inku.mobile.data.db.ManagedToolChangeInput? = null,
     val managedGroundVariant: app.inku.mobile.data.db.ManagedGroundVariantInput? = null,
     val pipelineView: PipelineView? = null,

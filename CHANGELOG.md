@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-23 — Thick sweep bands draw finer and steadier (render engine 92)
+
+Thick and extra-thick sweep lines and arcs were drawn as rough thick lines with striped marks that broke the scale of the whole work, so five things changed. A thick or extra-thick band adds to three default widths only what the thinness word adds to a round mark (an extra-thick thick-brush band 150→66 and an extra-thick oil band 180→84, per 1000 of the short side). A band's sideways sway and the kicks of its catches and corrections follow the round tool's width, and the sway's octaves finer than the samples are left out. A band's streaks become one fine streak for every four of its width (an oil line or arc one for every 15, none wider than 2.5), and the tools' texture filters, the sweep's film and the burr compute in sRGB like every other filter (removing the grey stripe a PNG showed inside a black band). A closed shape's sweep and brushmarks bands keep their width, and saved SVGs do not change. DDL, the Score and Stage 1 do not change.
+
 ### 2026-10-23 — Correct DDL reference constraints and the crossing example
 
 The Japanese and English reference now states connection and touching targets, one-mark placement, coordinate precision limits, and the exclusion of prior points for resting on and overlapping. Example 5.30 specifies the crossing line's length. SPEC's older descriptions of retention after a failed connection and touching with a current free line are aligned. Implementation and drawing semantics are unchanged.

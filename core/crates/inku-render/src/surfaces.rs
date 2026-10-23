@@ -162,14 +162,16 @@ fn sweep_bleed_filter_id(context: MarkContext<'_>) -> String {
     )
 }
 
-/// The filter of a pass of 刷き: the tool's displacement and a wider blur.
+/// The filter of a pass of 刷き: the tool's displacement and a wider blur,
+/// computed in sRGB as the tool's texture filter is (render engine 92).
 fn sweep_bleed_filter(instruction: &Instruction, context: MarkContext<'_>) -> Element {
     let mut filter = Element::new("filter")
         .attr("id", sweep_bleed_filter_id(context))
         .attr("x", "-20%")
         .attr("y", "-20%")
         .attr("width", "140%")
-        .attr("height", "140%");
+        .attr("height", "140%")
+        .attr("color-interpolation-filters", "sRGB");
     if let Some(base) = crate::materials::texture_filter(instruction.weight, context.canvas) {
         for child in base.children() {
             if let Node::Element(element) = child
@@ -479,6 +481,7 @@ fn sweep(
             support: context.support,
             scale: context.canvas.unit() / 1000.0,
             brush_size: sweep_band_width(instruction, context.canvas),
+            fine_streaks: false,
         }) {
             return Some(with_texture_filter(
                 flat_band_element(&band, color, &format!("{class_name} flat-brush-v1"))
@@ -578,6 +581,7 @@ fn sweep_parts(
             support: context.support,
             scale: context.canvas.unit() / 1000.0,
             brush_size: sweep_band_width(instruction, context.canvas),
+            fine_streaks: false,
         }) {
             let element = flat_band_element(&band, color, &format!("{class_name} flat-brush-v1"));
             let mut children = element.children().to_vec();

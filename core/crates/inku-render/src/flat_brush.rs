@@ -1,6 +1,7 @@
 //! The flat brush (平筆): the band a sweep (刷き) of the thin and thick brushes
 //! lays, with a square entry, a dry end that narrows without parting, and faint
-//! bristle streaks along it.
+//! bristle streaks along it: a few on a narrow band, many fine ones on a wide
+//! line's or arc's band (render engine 92).
 //!
 //! The band follows the same performed centerline the round stroke did; only
 //! its shape and the streaks inside it are the flat brush's own.
@@ -109,6 +110,9 @@ pub(crate) struct FlatBandRequest<'a> {
     /// The width of the band the brush sweeps as a line: its size. The dry end
     /// runs one to two sizes on every mark, however long the mark is.
     pub brush_size: f64,
+    /// Whether a wide band carries fine streaks (a line or an arc; a closed
+    /// shape's face keeps its few streaks).
+    pub fine_streaks: bool,
 }
 
 pub(crate) struct FlatBand {
@@ -118,7 +122,30 @@ pub(crate) struct FlatBand {
     pub light: String,
     pub dark_width: f64,
     pub light_width: f64,
+    /// The fine streaks of a wide line's or arc's band, each its own width and tone.
+    pub fine: Vec<FineStreak>,
 }
+
+/// One fine bristle streak (render engine 92).
+pub(crate) struct FineStreak {
+    pub path: String,
+    pub width: f64,
+    /// The streak's OKLCH lightness step.
+    pub step: f64,
+}
+
+/// A wide band's fine streaks (render engine 92): one for every four units of
+/// its width, at most 60. A band of a few streaks as wide as a fortieth of it
+/// read as a small stroke enlarged, its streaks as stripes (the author,
+/// 2026-10-23); a broad brush carries more bristles, not wider ones. A band
+/// whose share of fine streaks is no more than its few streaks keeps those.
+const FINE_SPACING: f64 = 4.0;
+const FINE_MOST: usize = 60;
+/// The fine streaks' widths in units, dark and light, and their slow sideways
+/// wander in units, so that no two run exactly parallel.
+const FINE_DARK_WIDTH: (f64, f64) = (0.5, 1.0);
+const FINE_LIGHT_WIDTH: (f64, f64) = (0.4, 0.8);
+const FINE_WANDER: f64 = 0.6;
 
 /// A point at `fraction` of the way from the left bank to the right one.
 fn across(left: Point, right: Point, fraction: f64) -> Point {
@@ -221,6 +248,7 @@ pub(crate) fn flat_band(request: FlatBandRequest<'_>) -> Option<FlatBand> {
         support,
         scale,
         brush_size,
+        fine_streaks,
     } = request;
     let count = centerline.len();
     if count < 2 || energies.len() != count || base_width <= 0.0 {
@@ -328,9 +356,15 @@ pub(crate) fn flat_band(request: FlatBandRequest<'_>) -> Option<FlatBand> {
         .clamp(3, 8)
         .saturating_sub(2)
         .clamp(2, 5);
+    let fine = if fine_streaks {
+        lay_fine_streaks(&banks, seed, unit_width, streaks, dry_from, scale)
+    } else {
+        Vec::new()
+    };
+    let few = if fine.is_empty() { streaks } else { 0 };
     let mut dark = String::new();
     let mut light = String::new();
-    for streak in 0..streaks {
+    for streak in 0..few {
         let index = streak as i64;
         let place = 0.10
             + 0.80 * (streak as f64 + 0.2 + 0.6 * hash01(index, seed, "flat-streak-place"))
@@ -363,7 +397,75 @@ pub(crate) fn flat_band(request: FlatBandRequest<'_>) -> Option<FlatBand> {
         light,
         dark_width: (base_width * DARK_WIDTH).max(floor),
         light_width: (base_width * LIGHT_WIDTH).max(floor),
+        fine,
     })
+}
+
+/// A wide band's fine streaks, or none when the band's width gives no more of
+/// them than its `few` streaks. They spread evenly over 4–96% of the width,
+/// each shifted in its slot by the seed, with its own width, tone (the few
+/// streaks' steps times 0.6–1.4, the same on average) and a slow wander of a
+/// cycle or two; dark ones carry the loaded entry, light ones start later, and
+/// both end before the band dries, as the few streaks do.
+fn lay_fine_streaks(
+    banks: &Banks<'_>,
+    seed: Seed,
+    unit_width: f64,
+    few: usize,
+    dry_from: f64,
+    scale: f64,
+) -> Vec<FineStreak> {
+    let count = ((unit_width / FINE_SPACING).round() as usize).min(FINE_MOST);
+    if count <= few {
+        return Vec::new();
+    }
+    let slot = 0.92 / count as f64;
+    let mut fine = Vec::new();
+    for streak in 0..count {
+        let index = streak as i64;
+        let place =
+            0.04 + slot * (streak as f64 + 0.15 + 0.70 * hash01(index, seed, "fine-streak-place"));
+        let is_dark = hash01(index, seed, "fine-streak-dark") < DARK_SHARE;
+        let start = if is_dark {
+            0.08 * hash01(index, seed, "fine-streak-start")
+        } else {
+            0.05 + 0.25 * hash01(index, seed, "fine-streak-start")
+        };
+        let floor = if is_dark { 0.55 } else { 0.5 };
+        let end = (floor + (1.0 - floor) * hash01(index, seed, "fine-streak-end")).min(dry_from);
+        if end <= start {
+            continue;
+        }
+        let (narrowest, widest) = if is_dark {
+            FINE_DARK_WIDTH
+        } else {
+            FINE_LIGHT_WIDTH
+        };
+        let width =
+            (narrowest + (widest - narrowest) * hash01(index, seed, "fine-streak-width")) * scale;
+        let step = (if is_dark { DARK_STEP } else { LIGHT_STEP })
+            * (0.6 + 0.8 * hash01(index, seed, "fine-streak-tone"));
+        let cycles = 1.0 + hash01(index, seed, "fine-streak-cycles");
+        let phase = hash01(index, seed, "fine-streak-phase") * std::f64::consts::TAU;
+        let points = banks
+            .span(start, end)
+            .into_iter()
+            .map(|t| {
+                let (l, r) = banks.at(t);
+                let across_px = (r.x - l.x).hypot(r.y - l.y).max(1.0e-9);
+                let wander =
+                    FINE_WANDER * scale * (t * std::f64::consts::TAU * cycles + phase).sin()
+                        / across_px;
+                hundredths(across(l, r, (place + wander).clamp(0.0, 1.0)))
+            })
+            .collect::<Vec<_>>();
+        let mut path = String::new();
+        push_polyline(&mut path, &points);
+        if !path.is_empty() {
+            fine.push(FineStreak { path, width, step });
+        }
+    }
+    fine
 }
 
 /// The band in its pigment and the streaks a step darker and lighter.
@@ -408,6 +510,17 @@ pub(crate) fn flat_band_element(band: &FlatBand, color: &str, class_name: &str) 
                 .attr("stroke-linecap", "butt"),
         );
     }
+    for streak in &band.fine {
+        group.push(
+            Element::new("path")
+                .attr("d", &streak.path)
+                .attr("class", "flat-brush-streak-fine-v1")
+                .attr("fill", "none")
+                .attr("stroke", bristle_tone(color, streak.step))
+                .attr("stroke-width", format_number(streak.width))
+                .attr("stroke-linecap", "butt"),
+        );
+    }
     group
 }
 
@@ -444,8 +557,69 @@ mod tests {
             support: STILL,
             scale: 1.0,
             brush_size,
+            fine_streaks: false,
         })
         .expect("a band with length")
+    }
+
+    /// A band laid as a line's (`fine_streaks`) or as a closed shape's face.
+    fn lay_streaked(
+        centerline: &[Point],
+        weight: Weight,
+        base_width: f64,
+        fine_streaks: bool,
+    ) -> FlatBand {
+        flat_band(FlatBandRequest {
+            centerline,
+            energies: &vec![0.0; centerline.len()],
+            hold: FlatHold::Fixed,
+            base_width,
+            weight,
+            seed: 17,
+            support: STILL,
+            scale: 1.0,
+            brush_size: base_width,
+            fine_streaks,
+        })
+        .expect("a band with length")
+    }
+
+    #[test]
+    fn a_wide_line_band_carries_a_fine_streak_for_every_four_units() {
+        let line = straight(2000.0, 101);
+        let wide = lay_streaked(&line, Weight::BrushThick, 150.0, true);
+        assert_eq!(wide.fine.len(), 38);
+        assert!(wide.dark.is_empty() && wide.light.is_empty());
+        for streak in &wide.fine {
+            assert!((0.4..=1.0).contains(&streak.width), "{}", streak.width);
+            let base = if streak.step < 0.0 {
+                DARK_STEP
+            } else {
+                LIGHT_STEP
+            };
+            assert!(
+                (0.6..=1.4).contains(&(streak.step / base)),
+                "{}",
+                streak.step
+            );
+        }
+        // The thick brush's default band of 24 units carries six, not four.
+        assert_eq!(
+            lay_streaked(&line, Weight::BrushThick, 24.0, true)
+                .fine
+                .len(),
+            6
+        );
+        // The fine brush's default band of 9 units keeps its two.
+        let narrow = lay_streaked(&line, Weight::BrushThin, 9.0, true);
+        assert!(narrow.fine.is_empty());
+        assert!(!narrow.dark.is_empty() || !narrow.light.is_empty());
+        // A closed shape's face keeps its few streaks however wide it is.
+        assert!(
+            lay_streaked(&line, Weight::BrushThick, 150.0, false)
+                .fine
+                .is_empty()
+        );
     }
 
     fn polygons(path: &str) -> Vec<Vec<Point>> {

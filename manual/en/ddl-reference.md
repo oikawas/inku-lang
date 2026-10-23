@@ -562,7 +562,7 @@ Surfaces are empty, flat, sweep, brushmarks, grain, stipple, hatch, crosshatch, 
 | Closed form with empty | Unfilled |
 | Closed form with flat or omitted surface | Filled |
 | Closed form with named texture | Texture belongs to that face |
-| Line, ordinary arc, or free line with sweep | A band three times the tool width, at 0.8 times its opacity |
+| Line, ordinary arc, or free line with sweep | A band three times the tool width (thick and extra-thick: three default widths plus what the thinness word adds), at 0.8 times its opacity |
 | Line, ordinary arc, or free line with grain | Increased ground tooth for that mark |
 | Line, ordinary arc, or free line with stipple, hatch, crosshatch, or aquatint | Accepted and retained in Score, but the current renderer paints no open-mark texture face; it does not transfer the texture to another shape |
 | Line, ordinary arc, or free line with brushmarks | `unsupported_surface_brushmarks`; only the word is omitted |
@@ -883,7 +883,7 @@ Surfaces are state nouns describing a closed face or a trace. Handling describes
 | A point mark | Accepts none of the nine surface words. The point remains a round filled mark. |
 | A crescent arc | Accepts only flat as an explicit surface. Empty and the seven textures are not accepted. |
 
-Sweep has no faintness of its own. Add faint handling for `薄い刷き` / `faint sweep`. An open mark's sweep is a band three times the tool width at 0.8 of the tool opacity. On a face, sweep makes two films at 0.6 opacity per pass; brushmarks layers each band at 0.5. The tool and handling also affect the result.
+Sweep has no faintness of its own. Add faint handling for `薄い刷き` / `faint sweep`. An open mark's sweep is a band three times the tool width at 0.8 of the tool opacity. A thick or extra-thick band adds to three default widths only what the thinness word adds to a round mark (for example, an extra-thick thick-brush sweep is 66 per 1000 of the short side, not 150). On a face, sweep makes two films at 0.6 opacity per pass; brushmarks layers each band at 0.5. The tool and handling also affect the result.
 
 `塗りの弧` / `a flat arc` can also express the fill inside a closed contour made by two touching arcs. Adding flat to an ordinary arc or line alone does not invent another closed form.
 

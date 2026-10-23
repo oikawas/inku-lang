@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 
 use inku_render::stroke::{
-    ContourStrokeRequest, StrokeRequest, StrokeTerminal, grammar, grid_point, synthesize_contour,
-    synthesize_stroke,
+    BandHand, ContourStrokeRequest, StrokeRequest, StrokeResult, StrokeTerminal, grammar,
+    grid_point, synthesize_contour, synthesize_stroke, synthesize_stroke_by,
 };
 use inku_render::support::{DEFAULT_SUPPORT, support_for_ground, support_with_mark_word};
 use inku_render::types::{GroundMaterial, Point, SurfaceTexture, Weight};
@@ -52,6 +52,57 @@ fn machine_samples_are_seed_independent_and_endpoints_are_pinned() {
     assert_eq!(first.samples.first().unwrap().residual, 0.0);
     assert_eq!(first.samples.last().unwrap().residual, 0.0);
     assert!(first.samples.iter().all(|sample| sample.event.is_none()));
+}
+
+#[test]
+fn a_band_hand_sways_by_its_share_and_draws_only_the_octaves_its_samples_can() {
+    let request = StrokeRequest {
+        start: Point::new(0.0, 0.0),
+        end: Point::new(800.0, 0.0),
+        base_width: 150.0,
+        weight: Weight::BrushThick,
+        seed: 41,
+        sample_count: 41,
+        wild: false,
+        grid_step: 0.0,
+        support: DEFAULT_SUPPORT,
+    };
+    let plain = synthesize_stroke(request);
+    assert_eq!(synthesize_stroke_by(request, BandHand::ROUND), plain);
+    // A band's sway and kicks follow a share of its width (render engine 92).
+    let third = synthesize_stroke_by(
+        request,
+        BandHand {
+            sway_share: 1.0 / 3.0,
+            smooth: false,
+        },
+    );
+    for (round, band) in plain.samples.iter().zip(&third.samples) {
+        assert!(
+            (band.lateral - round.lateral / 3.0).abs() < 1.0e-9,
+            "{} {}",
+            round.lateral,
+            band.lateral
+        );
+        assert_eq!(band.energy, round.energy);
+    }
+    // Without the octaves finer than its samples, the energy no longer turns
+    // at every sample.
+    let smooth = synthesize_stroke_by(
+        request,
+        BandHand {
+            sway_share: 1.0,
+            smooth: true,
+        },
+    );
+    let turning = |result: &StrokeResult| {
+        result
+            .samples
+            .windows(3)
+            .map(|window| (window[0].energy - 2.0 * window[1].energy + window[2].energy).abs())
+            .sum::<f64>()
+    };
+    assert!(turning(&smooth) < 0.5 * turning(&plain));
 }
 
 #[test]

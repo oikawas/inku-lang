@@ -188,6 +188,45 @@ pub struct ContourStrokeRequest<'a> {
     pub terminal: StrokeTerminal,
 }
 
+/// The hand a stroke is performed with (render engine 92).
+///
+/// A sweep's band is three of its tool's widths, and its sideways sway and
+/// kicks followed that width: a thick band was a small stroke enlarged, and its
+/// noise's finest octaves, finer than its samples, set every sample's corner
+/// into a zigzag that the band's bristle streaks repeated in parallel (the
+/// author, 2026-10-23). A band's hand sways by the round tool's width and keeps
+/// only the octaves its samples can draw.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BandHand {
+    /// The share of the stroke's width its sway and kicks follow.
+    pub sway_share: f64,
+    /// Keep only the noise octaves with at least four samples a cycle.
+    pub smooth: bool,
+}
+
+impl BandHand {
+    /// The round tool's own hand: the stroke's width, every octave.
+    pub const ROUND: Self = Self {
+        sway_share: 1.0,
+        smooth: false,
+    };
+
+    /// The octaves the hand's latent energy sums for a stroke of `samples`
+    /// samples: octave k has 2^k cycles a stroke.
+    fn octaves(self, samples: usize) -> usize {
+        if !self.smooth {
+            return ENERGY_OCTAVES;
+        }
+        (1..=ENERGY_OCTAVES)
+            .take_while(|octave| samples as f64 / 2_f64.powi(*octave as i32) >= 4.0)
+            .count()
+            .max(1)
+    }
+}
+
+/// The octaves of a stroke's latent energy.
+const ENERGY_OCTAVES: usize = 6;
+
 fn unit_from_digest(digest: [u8; 32]) -> f64 {
     let raw = u64::from_le_bytes(digest[..8].try_into().expect("eight digest bytes"));
     raw as f64 / u64::MAX as f64
@@ -306,12 +345,14 @@ impl StrokeNoise {
         }
     }
 
-    /// The value of `latent_energy(t, seed)`.
-    fn latent_energy(&mut self, t: f64) -> f64 {
+    /// The value of `latent_energy(t, seed)` from its first `octaves` octaves
+    /// (all six give it exactly).
+    fn latent_energy(&mut self, t: f64, octaves: usize) -> f64 {
         (self
             .energy
             .iter_mut()
             .zip(1..=6)
+            .take(octaves)
             .map(|(field, octave)| field.sample(t) / 2_f64.powi(octave).sqrt())
             .sum::<f64>()
             / 1.75)
@@ -522,6 +563,12 @@ fn correct_closed_seam(samples: &mut [StrokeSample], intended: &[Point], paramet
 
 #[must_use]
 pub fn synthesize_stroke(request: StrokeRequest) -> StrokeResult {
+    synthesize_stroke_by(request, BandHand::ROUND)
+}
+
+/// Synthesize a straight stroke performed with `hand`.
+#[must_use]
+pub fn synthesize_stroke_by(request: StrokeRequest, hand: BandHand) -> StrokeResult {
     let StrokeRequest {
         start,
         end,
@@ -541,6 +588,8 @@ pub fn synthesize_stroke(request: StrokeRequest) -> StrokeResult {
     let normal = Point::new(-direction.y, direction.x);
     let events = event_map(seed, grammar.event_rate, sample_count);
     let mut noise = StrokeNoise::new(seed);
+    let octaves = hand.octaves(sample_count);
+    let sway_width = base_width * hand.sway_share;
     let mut position = start;
     let mut velocity = Point::new(
         delta.x / (sample_count - 1) as f64,
@@ -563,20 +612,23 @@ pub fn synthesize_stroke(request: StrokeRequest) -> StrokeResult {
         let (energy, envelope) = if grammar.periodic {
             (machine_energy(t), machine_swell(t))
         } else {
-            (noise.latent_energy(t), edge_window(t) * noise.swell(t))
+            (
+                noise.latent_energy(t, octaves),
+                edge_window(t) * noise.swell(t),
+            )
         };
-        let mut lateral = energy * grammar.energy_lateral * base_width * (0.18 + 0.82 * envelope);
+        let mut lateral = energy * grammar.energy_lateral * sway_width * (0.18 + 0.82 * envelope);
         let event = events.get(&index).copied();
         let mut event_width = 1.0;
         match event {
             Some(StrokeEvent::Catch) => {
                 event_width = 1.45;
-                lateral += (unit(seed, "catch-side", index as i64) * 2.0 - 1.0) * base_width * 0.35;
+                lateral += (unit(seed, "catch-side", index as i64) * 2.0 - 1.0) * sway_width * 0.35;
             }
             Some(StrokeEvent::Fade) => event_width = 0.04,
             Some(StrokeEvent::Correction) => {
                 lateral +=
-                    (unit(seed, "correction-kick", index as i64) * 2.0 - 1.0) * base_width * 0.25;
+                    (unit(seed, "correction-kick", index as i64) * 2.0 - 1.0) * sway_width * 0.25;
             }
             None => {}
         }
@@ -708,6 +760,15 @@ const OIL_FILL_NOISE_SPAN: f64 = 8.0;
 /// Synthesize one performed stroke along an arbitrary intended centerline.
 #[must_use]
 pub fn synthesize_contour(request: ContourStrokeRequest<'_>) -> ContourStrokeResult {
+    synthesize_contour_by(request, BandHand::ROUND)
+}
+
+/// Synthesize one performed stroke along a centerline with `hand`.
+#[must_use]
+pub fn synthesize_contour_by(
+    request: ContourStrokeRequest<'_>,
+    hand: BandHand,
+) -> ContourStrokeResult {
     let ContourStrokeRequest {
         centerline,
         base_width,
@@ -759,6 +820,8 @@ pub fn synthesize_contour(request: ContourStrokeRequest<'_>) -> ContourStrokeRes
         event_map(seed, grammar.event_rate, count)
     };
     let mut noise = StrokeNoise::new(seed);
+    let octaves = hand.octaves(count);
+    let sway_width = base_width * hand.sway_share;
     // A short oil fill pass would pack every octave of the wave into a few
     // samples; widened threefold, its marks turned into a jagged line.
     let noise_scale = if terminal == StrokeTerminal::Loaded && weight == Weight::OilPaint {
@@ -819,25 +882,28 @@ pub fn synthesize_contour(request: ContourStrokeRequest<'_>) -> ContourStrokeRes
                 if closed { 1.0 } else { machine_swell(t) },
             )
         } else if closed {
-            (noise.latent_energy(t * noise_scale), noise.swell(t))
+            (
+                noise.latent_energy(t * noise_scale, octaves),
+                noise.swell(t),
+            )
         } else {
             (
-                noise.latent_energy(t * noise_scale),
+                noise.latent_energy(t * noise_scale, octaves),
                 edge_window(t) * noise.swell(t),
             )
         };
-        let mut lateral = energy * grammar.energy_lateral * base_width * (0.18 + 0.82 * envelope);
+        let mut lateral = energy * grammar.energy_lateral * sway_width * (0.18 + 0.82 * envelope);
         let mut event = events.get(&index).copied();
         let mut event_width = 1.0;
         match event {
             Some(StrokeEvent::Catch) => {
                 event_width = 1.45;
-                lateral += (unit(seed, "catch-side", index as i64) * 2.0 - 1.0) * base_width * 0.35;
+                lateral += (unit(seed, "catch-side", index as i64) * 2.0 - 1.0) * sway_width * 0.35;
             }
             Some(StrokeEvent::Fade) => event_width = 0.04,
             Some(StrokeEvent::Correction) => {
                 lateral +=
-                    (unit(seed, "correction-kick", index as i64) * 2.0 - 1.0) * base_width * 0.25;
+                    (unit(seed, "correction-kick", index as i64) * 2.0 - 1.0) * sway_width * 0.25;
             }
             None => {}
         }
@@ -968,4 +1034,23 @@ pub fn synthesize_default_stroke(
         grid_step: 0.0,
         support: DEFAULT_SUPPORT,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_band_hand_keeps_the_octaves_its_samples_can_draw() {
+        let smooth = BandHand {
+            sway_share: 1.0,
+            smooth: true,
+        };
+        assert_eq!(smooth.octaves(3), 1);
+        assert_eq!(smooth.octaves(17), 2);
+        assert_eq!(smooth.octaves(39), 3);
+        assert_eq!(smooth.octaves(129), 5);
+        assert_eq!(smooth.octaves(257), ENERGY_OCTAVES);
+        assert_eq!(BandHand::ROUND.octaves(17), ENERGY_OCTAVES);
+    }
 }

@@ -282,18 +282,44 @@ fn band_opacity(instruction: &Instruction) -> Option<f64> {
 const BAND_WIDTH_SCALE: f64 = 3.0;
 
 pub(crate) fn mark_width(instruction: &Instruction, canvas: CanvasSize) -> f64 {
-    let width = thinned_width(instruction.weight, instruction.thinness) * canvas.unit() / 1000.0;
-    width
-        * if band_opacity(instruction).is_some() {
-            BAND_WIDTH_SCALE
-        } else {
-            1.0
-        }
+    if band_opacity(instruction).is_some() {
+        return open_band_width(instruction, canvas);
+    }
+    thinned_width(instruction.weight, instruction.thinness) * canvas.unit() / 1000.0
 }
 
-/// The width of the band the mark's tool sweeps (刷き) as a line or an arc:
-/// the size of its flat brush, the same for the mark's lines and its closed
-/// shape's passes.
+/// Whether the mark is an open band: a line, an arc or a free line with sweep or wash.
+pub(crate) fn is_open_band(instruction: &Instruction) -> bool {
+    band_opacity(instruction).is_some()
+}
+
+/// The band an open sweep or wash mark lays, and the size of the flat brush
+/// that lays it: three of its tool's widths. A thick or extra-thick band adds
+/// to three default widths only what the word adds to a round mark (render
+/// engine 92): tripled as well, an extra-thick sweep was three of the tool's
+/// widest mark, a sixth of the short side, and read as a small stroke enlarged
+/// (the author, 2026-10-23).
+pub(crate) fn open_band_width(instruction: &Instruction, canvas: CanvasSize) -> f64 {
+    let thinned = thinned_width(instruction.weight, instruction.thinness);
+    if matches!(
+        instruction.thinness,
+        Some(Thinness::Thick | Thinness::ExtraThick)
+    ) {
+        let default = weight_width(instruction.weight);
+        return (BAND_WIDTH_SCALE * default + (thinned - default)) * canvas.unit() / 1000.0;
+    }
+    thinned * canvas.unit() / 1000.0 * BAND_WIDTH_SCALE
+}
+
+/// The round tool's width for the mark's thinness: the width a band's hand
+/// sways by (render engine 92).
+pub(crate) fn round_width(instruction: &Instruction, canvas: CanvasSize) -> f64 {
+    thinned_width(instruction.weight, instruction.thinness) * canvas.unit() / 1000.0
+}
+
+/// The width of the band the mark's tool sweeps (刷き) over a closed shape's
+/// face: the size of its flat brush for the face's passes, three of its tool's
+/// widths. A line or an arc lays `open_band_width`.
 pub(crate) fn sweep_band_width(instruction: &Instruction, canvas: CanvasSize) -> f64 {
     thinned_width(instruction.weight, instruction.thinness) * canvas.unit() / 1000.0
         * BAND_WIDTH_SCALE
@@ -1823,6 +1849,50 @@ mod tests {
         )
         .unwrap();
         assert_eq!(mark_style(&circle, context).width, plain.width);
+    }
+
+    #[test]
+    fn a_thick_band_adds_only_what_its_word_adds_to_a_round_mark() {
+        // Render engine 92: tripled with the rest, an extra-thick sweep was
+        // three of its tool's widest mark.
+        let canvas = CanvasSize::new(1000.0, 1000.0);
+        let mark = |primitive: &str, weight: &str, thinness: &str, texture: &str| {
+            let thinness = if thinness.is_empty() {
+                String::new()
+            } else {
+                format!(r#","thinness":"{thinness}""#)
+            };
+            serde_json::from_str::<Instruction>(&format!(
+                r#"{{"primitive":"{primitive}","weight":"{weight}"{thinness},"surface":{{"texture":"{texture}"}}}}"#
+            ))
+            .unwrap()
+        };
+        let width = |weight: &str, thinness: &str| {
+            mark_width(&mark("line", weight, thinness, "sweep"), canvas)
+        };
+        assert_eq!(width("brush_thick", ""), 24.0);
+        assert_eq!(width("brush_thick", "thick"), 36.0);
+        assert_eq!(width("brush_thick", "extra_thick"), 66.0);
+        assert_eq!(width("oil_paint", "extra_thick"), 84.0);
+        assert!((width("brush_thin", "fine") - 5.4).abs() < 1.0e-9);
+        // An arc and a saved wash band the same way, and the flat brush that
+        // lays a line's band is the band itself.
+        let extra = mark("line", "brush_thick", "extra_thick", "sweep");
+        assert_eq!(
+            mark_width(&mark("arc", "brush_thick", "extra_thick", "wash"), canvas),
+            66.0
+        );
+        assert_eq!(open_band_width(&extra, canvas), 66.0);
+        // A closed shape's face keeps its threefold flat brush.
+        assert_eq!(
+            sweep_band_width(
+                &mark("circle", "brush_thick", "extra_thick", "sweep"),
+                canvas
+            ),
+            150.0
+        );
+        // The round tool's width a band's hand sways by.
+        assert_eq!(round_width(&extra, canvas), 50.0);
     }
 
     #[test]

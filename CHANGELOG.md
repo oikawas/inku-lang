@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-23 — The saijiki shows the aspect ratio under じ
-
-By the author's judgment, the display-only category がめん / aspect is gone and `aspect ratio` / 画面比 is shown at the end of じ / grounds, since like a ground it speaks of the canvas itself. It stays no Saijiki word (no parser candidate, not in any prompt), and the DDL, DDL engine and render engine versions and the Saijiki asset are unchanged. The saijiki display has sixteen categories again. The web saijiki's example for it is now `Aspect ratio 16:9.` / `画面比16:9。` instead of the unreadable `Use "aspect ratio"`.
-
 ### 2026-10-23 — Correct DDL reference constraints and the crossing example
 
 The Japanese and English reference now states connection and touching targets, one-mark placement, coordinate precision limits, and the exclusion of prior points for resting on and overlapping. Example 5.30 specifies the crossing line's length. SPEC's older descriptions of retention after a failed connection and touching with a current free line are aligned. Implementation and drawing semantics are unchanged.
@@ -260,6 +256,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.240 (2026-10-23 / Build 1316)
+
+### 2026-10-23 — The saijiki shows the aspect ratio under じ
+
+By the author's judgment, the display-only category がめん / aspect is gone and `aspect ratio` / 画面比 is shown at the end of じ / grounds, since like a ground it speaks of the canvas itself. It stays no Saijiki word (no parser candidate, not in any prompt), and the DDL, DDL engine and render engine versions and the Saijiki asset are unchanged. The saijiki display has sixteen categories again. The web saijiki's example for it is now `Aspect ratio 16:9.` / `画面比16:9。` instead of the unreadable `Use "aspect ratio"`.
 
 ## v2.15.239 (2026-10-23 / Build 1315)
 

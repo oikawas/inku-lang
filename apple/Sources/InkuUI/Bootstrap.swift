@@ -122,12 +122,18 @@ struct Bootstrap {
                     preview: reference.saijikiPreviews[id + ":" + japanese])
             }, englishName: category["name_en"] as? String)
         }
-        displayCategories.append(SaijikiCategory(id: "gamen", name: "がめん", words: [
-            SaijikiWord(id: "gamen:画面比", japanese: "画面比", english: "aspect ratio",
-                detail: "画面比3:2。のように、横:縦の比をDDLの先頭に書く。数は1〜10000の整数。",
-                isDefault: false, englishDetail: "Write the width:height ratio first, as in Aspect ratio 3:2. Use integers from 1 to 10000.",
-                preview: nil, referenceOnly: true),
-        ], englishName: "aspect"))
+        guard let groundIndex = displayCategories.firstIndex(where: { $0.id == "ji" }) else {
+            throw HostError("bundled_vocabulary_invalid")
+        }
+        let grounds = displayCategories[groundIndex]
+        let ratioDetail = "画面比16:9。のように、横:縦の比をDDLの先頭に書く。数は1〜10000の整数。"
+        let ratioDetailEn = "Write the width:height ratio first, as in Aspect ratio 16:9. Use integers from 1 to 10000."
+        let ratio = SaijikiWord(id: "ji:画面比", japanese: "画面比", english: "aspect ratio",
+            detail: ratioDetail, isDefault: false, englishDetail: ratioDetailEn,
+            preview: SaijikiPreview(svg: "", effectJa: ratioDetail, effectEn: ratioDetailEn,
+                exampleJa: "画面比16:9。", exampleEn: "Aspect ratio 16:9."), referenceOnly: true)
+        displayCategories[groundIndex] = SaijikiCategory(id: grounds.id, name: grounds.name,
+            words: grounds.words + [ratio], englishName: grounds.englishName)
         guard let relations = vocabulary["relations"] as? [[String: Any]],
               let relationOrder = vocabulary["relation_display_order"] as? [String] else { throw HostError("bundled_vocabulary_invalid") }
         displayCategories.append(SaijikiCategory(id: "aida", name: "あいだ", words: try relationOrder.map { type in

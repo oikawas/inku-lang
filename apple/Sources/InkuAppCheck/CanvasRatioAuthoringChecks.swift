@@ -19,9 +19,11 @@ func runCanvasRatioAuthoringChecks() async throws {
     let host = PipelineHost(database: db, transport: transport)
     guard let square = app.canvases.first(where: { $0.widthRatio == $0.heightRatio }),
           let paper = app.canvases.first(where: { $0.widthRatio != $0.heightRatio }),
-          app.saijiki.count > 2,
-          app.saijiki.suffix(2).map(\.id) == ["gamen", "aida"],
-          app.saijiki.first(where: { $0.id == "gamen" })?.words.first?.referenceOnly == true,
+          app.saijiki.count == 16,
+          !app.saijiki.contains(where: { $0.id == "gamen" }), app.saijiki.last?.id == "aida",
+          let grounds = app.saijiki.first(where: { $0.id == "ji" }), grounds.words.count == 8,
+          let ratioWord = grounds.words.last, ratioWord.id == "ji:画面比", ratioWord.referenceOnly,
+          ratioWord.preview?.exampleJa == "画面比16:9。", ratioWord.preview?.exampleEn == "Aspect ratio 16:9.",
           !app.ddlCompletions.japanese.contains("画面比"), !app.ddlCompletions.english.contains("aspect ratio"),
           app.productReference?.versions["ddlSpec"]?.isEmpty == false,
           app.productReference?.versions["ddlEngine"]?.isEmpty == false else {
@@ -146,7 +148,7 @@ func runCanvasRatioAuthoringChecks() async throws {
           await transport.calls == 0 else {
         throw CheckFailure.message("Canvas fit: legacy/no-ratio edit gained a declaration, asked, or called a provider")
     }
-    print("Canvas fit PASS: new-root declaration and authored ratio; editable/new cancellation keeps drafts and history; contain versus draw-to-paper; saved fit_render child has core Score/metadata, same DDL/version/seeds/authority/laws and unchanged parent; saved child replays; same_ratio/no_recorded_ratio; legacy edits do not declare; gamen before aida, reference-only; provider=0. Isolated SQLite only.")
+    print("Canvas fit PASS: new-root declaration and authored ratio; editable/new cancellation keeps drafts and history; contain versus draw-to-paper; saved fit_render child has core Score/metadata, same DDL/version/seeds/authority/laws and unchanged parent; saved child replays; same_ratio/no_recorded_ratio; legacy edits do not declare; reference-only ratio last in grounds, 16 categories; provider=0. Isolated SQLite only.")
 }
 
 @MainActor private final class CanvasFitAnswers {

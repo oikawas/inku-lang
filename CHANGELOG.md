@@ -10,7 +10,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ### 2026-10-23 — macOS adds aspect ratio declarations and fitting
 
-New direct instructions ask the core to record their aspect ratio. When the declaration and paper differ, the author can fit the work in, draw to the paper, or cancel while keeping the dialog and input. An unedited saved work uses its saved Score to make a fitted child, preserving its instructions, version, seeds and description authority. Saijiki now shows aspect and relations; the aspect term is reference-only.
+New direct instructions ask the core to record their aspect ratio. When the declaration and paper differ, the author can fit the work in, draw to the paper, or cancel while keeping the dialog and input. An unedited saved work uses its saved Score to make a fitted child, preserving its instructions, version, seeds and description authority. Saijiki shows the reference-only aspect ratio at the end of grounds, along with relations.
 
 ### 2026-10-23 — Correct DDL reference constraints and the crossing example
 

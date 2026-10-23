@@ -1,8 +1,8 @@
 {
   "schema": "inku.apple-ui-reference.v1",
-  "version": "v2.15.239",
-  "build": "1315",
-  "buildDate": "2026-10-23T06:23:33.143Z",
+  "version": "v2.15.240",
+  "build": "1316",
+  "buildDate": "2026-10-23T06:56:53.471Z",
   "versions": {
     "ddlSpec": "26",
     "ddlEngine": "70",
@@ -3747,14 +3747,14 @@
     }
   },
   "source": {
-    "commit": "4b82b8f9b2f0299cf9d38c9aa6e95fe57718c146",
+    "commit": "2b7546bcac6a66498e071f5f4336829e24966a1b",
     "files": {
       "web/src/lib/plugins/system/canvas-aspect/index.ts": "51431fe06ed38cfb11f7e08a87b85b68dacdeda646525242fb561c234cf0c9ff",
-      "web/src/routes/+page.svelte": "0e27bee47feb25c6e2c4cc03a17cf008fabb497cee181711f235f9401c3a5855",
+      "web/src/routes/+page.svelte": "ebb58cc9a3a8f330ec30fa20136a9d3bb1e04a9f3cfc6fa64f967a401885db7d",
       "web/src/lib/saijiki-surface.ts": "d04c5d559cd1ed0889b7e93da0893c2600c158f81cc81ea1d04b0647982469fd",
       "web/src/lib/instructionLang.ts": "2af540a1b98d4aa688fcf96632de1309b30c3f137137a66596f1285e09f2dcbe",
-      "web/APP_VERSION": "c41e31f32ca8a43e25da489fe796843ffe9bc82968127e51a858ac7290098312",
-      "web/BUILD_NUMBER": "d611689af610b3e4879d77a3b4969ccbb4725907fc3f5874a07fca71d4ecb188",
+      "web/APP_VERSION": "65a8b0be8492fbfd7e0e04f8db5b3409b4b948fe633e58816cdc3fda4b48f491",
+      "web/BUILD_NUMBER": "a4c10ea2fa7fb1a1b8d03a52b8261353542a46d0138790e9ac9f6ba8fe03bc61",
       "server/src/inku_server/layer_versions.py": "88585112a85a5427987c9df3c163b9cfc5518bbdb53d4b24867163c955a682be",
       "core/crates/inku-render/src/lib.rs": "c4ea71cbaa469e25d2c7b63d92543975eaa6de02605491b379303c3aab23b504",
       "web/src/lib/i18n/ja.ts": "06e47caf30a2aaf2ae41e84b744475021db9d1e7de22c539ff15ee3be5b2ffc4",

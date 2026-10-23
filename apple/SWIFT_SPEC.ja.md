@@ -26,7 +26,7 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 
 新規・変更したDDLのはめ込みは`compiler.host.canvas_fit = "contain"`を渡し、宣言の読みと構図はcoreに任せる。紙へ合わせて描くときは前のはめ込み指定を持ち越さない。手を入れていない保存作品のはめ込みは、共有`saved_variants`の`fit_render`へ保存Score・描いた紙・今の紙を渡し、coreが返したScoreを描いて`canvas_fit`（はめ込み / Fit）の子として保存する。DDL・Score版・保存seed・配色・地・記述authority・法則の記録を保ち、親を変更しない。子のScore本体とhash、紙とfitのcontextを保存し、後の編集や再演奏もその記録を使う。記述を読み直さず、providerを呼ばない。
 
-歳時記は資産の類の後に表示用の「がめん」（画面比 / aspect ratio）、続いて資産のrelationsから「あいだ」を置く。画面比は数を添えて先頭に書く宣言なので、語だけの挿入・補完はしない。ui-referenceのDDL・DDL engineの版と問いの文は、既定のWeb参照exportで更新する。`InkuAppCheck --canvas-ratio-authoring-only`が、実core・一時SQLite・送信しないproviderでこの境目を確認する。
+歳時記は「じ」の末尾に表示用の「画面比 / aspect ratio」を置き、資産のrelationsから「あいだ」を表示する。画面比の例文は`画面比16:9。` / `Aspect ratio 16:9.`。数を添えて先頭に書く宣言なので、語だけの挿入・補完はしない。類は16で、資産には画面比を足さない。ui-referenceのDDL・DDL engineの版と問いの文は、既定のWeb参照exportで更新する。`InkuAppCheck --canvas-ratio-authoring-only`が、実core・一時SQLite・送信しないproviderでこの境目を確認する。
 
 ## 2026-10-21 主の層を持たない法則・配色と、選べる地への追随
 

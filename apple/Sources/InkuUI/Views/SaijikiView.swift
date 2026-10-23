@@ -271,7 +271,7 @@ public struct SaijikiView: View {
         offeredLanguage == "ja" ? word.japanese : word.english ?? word.japanese
     }
     private var referenceOnlyHint: String {
-        if case .builtin(let id) = selection, id.hasPrefix("gamen:") {
+        if case .builtin("ji:画面比") = selection {
             return model.display.localized("画面比の宣言は、比の数を添えてDDLの先頭に書きます。")
         }
         return model.display.localized("この語は参照のみです。DDLに挿入する定義が同梱されていません。")

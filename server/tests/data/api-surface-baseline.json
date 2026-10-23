@@ -1,7 +1,7 @@
 {
-  "endpoint_count": 133,
-  "operation_count": 133,
-  "schema_count": 195,
+  "endpoint_count": 134,
+  "operation_count": 134,
+  "schema_count": 197,
   "operations": [
     {
       "path": "/api/admin/unread-words",
@@ -1431,6 +1431,20 @@
       }
     },
     {
+      "path": "/api/render-canvas-fit",
+      "method": "POST",
+      "operationId": "api_render_canvas_fit_api_render_canvas_fit_post",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt"
+      ],
+      "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/CanvasFitRenderRequest\"}}},\"required\":true}",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/RenderScoreResponse\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
       "path": "/api/render-color-arrangement",
       "method": "POST",
       "operationId": "api_render_color_arrangement_api_render_color_arrangement_post",
@@ -1960,8 +1974,10 @@
     "BatchPromptHistoryBody": "{\"properties\":{\"items\":{\"items\":{\"type\":\"string\"},\"title\":\"Items\",\"type\":\"array\"}},\"title\":\"BatchPromptHistoryBody\",\"type\":\"object\"}",
     "BatchPromptHistoryResponse": "{\"properties\":{\"items\":{\"items\":{\"type\":\"string\"},\"title\":\"Items\",\"type\":\"array\"}},\"title\":\"BatchPromptHistoryResponse\",\"type\":\"object\"}",
     "BboxDimensions": "{\"additionalProperties\":false,\"properties\":{\"height\":{\"exclusiveMinimum\":0.0,\"title\":\"Height\",\"type\":\"number\"},\"kind\":{\"const\":\"bbox\",\"title\":\"Kind\",\"type\":\"string\"},\"width\":{\"exclusiveMinimum\":0.0,\"title\":\"Width\",\"type\":\"number\"}},\"required\":[\"kind\",\"width\",\"height\"],\"title\":\"BboxDimensions\",\"type\":\"object\"}",
+    "CanvasFitRenderRequest": "{\"properties\":{\"canvas_aspect\":{\"maxLength\":64,\"minLength\":1,\"title\":\"Canvas Aspect\",\"type\":\"string\"},\"work_id\":{\"maxLength\":200,\"minLength\":1,\"title\":\"Work Id\",\"type\":\"string\"}},\"required\":[\"work_id\",\"canvas_aspect\"],\"title\":\"CanvasFitRenderRequest\",\"type\":\"object\"}",
     "CanvasGroundSpec": "{\"additionalProperties\":false,\"properties\":{\"density\":{\"default\":0.2,\"description\":\"地の粒密度 0.0-1.0\",\"maximum\":1.0,\"minimum\":0.0,\"title\":\"Density\",\"type\":\"number\"},\"grain\":{\"default\":\"none\",\"description\":\"紙目・粒の粗さ\",\"enum\":[\"none\",\"fine\",\"medium\",\"coarse\"],\"title\":\"Grain\",\"type\":\"string\"},\"material\":{\"default\":\"plain\",\"description\":\"地の素材: plain=無地 / paper=紙 / washi=和紙 / ink_wash=薄墨地 / charcoal_ground=木炭地 / canvas=カンバス / drawing_paper=画用紙 / mezzotint=目立てした黒地\",\"enum\":[\"plain\",\"paper\",\"washi\",\"ink_wash\",\"charcoal_ground\",\"canvas\",\"drawing_paper\",\"mezzotint\"],\"title\":\"Material\",\"type\":\"string\"},\"opacity\":{\"default\":0.12,\"description\":\"地の質感不透明度 0.0-1.0\",\"maximum\":1.0,\"minimum\":0.0,\"title\":\"Opacity\",\"type\":\"number\"},\"seed\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"description\":\"任意の地 texture seed。省略時は Renderer が支持体の同一性から導出\",\"title\":\"Seed\"},\"tone\":{\"default\":\"white\",\"description\":\"地の色調\",\"enum\":[\"white\",\"off_white\",\"warm\",\"cool\",\"gray\",\"black\"],\"title\":\"Tone\",\"type\":\"string\"}},\"title\":\"CanvasGroundSpec\",\"type\":\"object\"}",
-    "CanvasSpec": "{\"additionalProperties\":false,\"properties\":{\"aspect\":{\"default\":\"square\",\"description\":\"キャンバス比率ID\",\"title\":\"Aspect\",\"type\":\"string\"},\"ground\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/CanvasGroundSpec\"},{\"type\":\"null\"}],\"description\":\"キャンバス地の質感\"}},\"title\":\"CanvasSpec\",\"type\":\"object\"}",
+    "CanvasRatio": "{\"additionalProperties\":false,\"description\":\"横:縦の正の整数比。最大公約数で割った形（DDL 26）。\",\"properties\":{\"height_units\":{\"description\":\"縦の項\",\"maximum\":10000.0,\"minimum\":1.0,\"title\":\"Height Units\",\"type\":\"integer\"},\"width_units\":{\"description\":\"横の項\",\"maximum\":10000.0,\"minimum\":1.0,\"title\":\"Width Units\",\"type\":\"integer\"}},\"required\":[\"width_units\",\"height_units\"],\"title\":\"CanvasRatio\",\"type\":\"object\"}",
+    "CanvasSpec": "{\"additionalProperties\":false,\"properties\":{\"aspect\":{\"default\":\"square\",\"description\":\"キャンバス比率ID\",\"title\":\"Aspect\",\"type\":\"string\"},\"declared_ratio\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/CanvasRatio\"},{\"type\":\"null\"}],\"description\":\"DDL が宣言した画面比（画面比W:H。DDL 26）。aspect は描いた紙\"},\"fit\":{\"anyOf\":[{\"const\":\"contain\",\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"宣言の比の枠を紙の中央にはめ込んで描く（描画エンジン 93）\",\"title\":\"Fit\"},\"ground\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/CanvasGroundSpec\"},{\"type\":\"null\"}],\"description\":\"キャンバス地の質感\"}},\"title\":\"CanvasSpec\",\"type\":\"object\"}",
     "CardExportBody": "{\"properties\":{\"height\":{\"anyOf\":[{\"maximum\":4096.0,\"minimum\":256.0,\"type\":\"integer\"},{\"type\":\"null\"}],\"title\":\"Height\"},\"id\":{\"title\":\"Id\",\"type\":\"string\"},\"layout\":{\"default\":\"square\",\"enum\":[\"square\",\"portrait\"],\"title\":\"Layout\",\"type\":\"string\"},\"seal\":{\"default\":true,\"title\":\"Seal\",\"type\":\"boolean\"}},\"required\":[\"id\"],\"title\":\"CardExportBody\",\"type\":\"object\"}",
     "CellsRecipe": "{\"additionalProperties\":false,\"properties\":{\"kind\":{\"const\":\"cells\",\"title\":\"Kind\",\"type\":\"string\"}},\"required\":[\"kind\"],\"title\":\"CellsRecipe\",\"type\":\"object\"}",
     "CenteredSizeDimensions": "{\"additionalProperties\":false,\"properties\":{\"height\":{\"exclusiveMinimum\":0.0,\"title\":\"Height\",\"type\":\"number\"},\"kind\":{\"const\":\"centered_size\",\"title\":\"Kind\",\"type\":\"string\"},\"width\":{\"exclusiveMinimum\":0.0,\"title\":\"Width\",\"type\":\"number\"}},\"required\":[\"kind\",\"width\",\"height\"],\"title\":\"CenteredSizeDimensions\",\"type\":\"object\"}",
@@ -2137,5 +2153,5 @@
     "Variation": "{\"additionalProperties\":false,\"properties\":{\"amplitude\":{\"default\":\"medium\",\"description\":\"揺れ幅: fine=細かく・震える / medium=中程度 / broad=大きく\",\"enum\":[\"fine\",\"medium\",\"broad\"],\"title\":\"Amplitude\",\"type\":\"string\"},\"dimensions\":{\"description\":\"揺れ軸: 横線→[position_y] / 縦線→[position_x] / 斜め→[position_x,position_y]\",\"items\":{\"enum\":[\"position_x\",\"position_y\",\"angle\",\"length\",\"rotation\",\"radius\"],\"type\":\"string\"},\"title\":\"Dimensions\",\"type\":\"array\"},\"frequency\":{\"default\":\"medium\",\"description\":\"揺れ頻度: slow=ゆっくり / medium=普通 / high=速く\",\"enum\":[\"slow\",\"medium\",\"high\"],\"title\":\"Frequency\",\"type\":\"string\"},\"quality\":{\"default\":\"none\",\"description\":\"揺れ種類: perlin=細かい揺れ・震える / wave=ゆっくり揺れる・波打つ / pink=滲む / white=白色雑音 / none=なし\",\"enum\":[\"none\",\"white\",\"perlin\",\"pink\",\"wave\"],\"title\":\"Quality\",\"type\":\"string\"}},\"title\":\"Variation\",\"type\":\"object\"}",
     "VerticalLineRecipe": "{\"additionalProperties\":false,\"properties\":{\"cell_height\":{\"exclusiveMinimum\":0.0,\"title\":\"Cell Height\",\"type\":\"number\"},\"kind\":{\"const\":\"vertical_line\",\"title\":\"Kind\",\"type\":\"string\"}},\"required\":[\"kind\",\"cell_height\"],\"title\":\"VerticalLineRecipe\",\"type\":\"object\"}"
   },
-  "digest": "e7c8a4e381c5befdead2a60229a731a5178fd0fd78a23b1472c562be68b81af8"
+  "digest": "048425f336d3c36b82ed5812d471a246b3abae839c1fbfce4a0e88e6fb9b6c4d"
 }

@@ -87,7 +87,9 @@ PUBLIC = {  # every entry needs a reason
 #   +4 for the AI refinement's runs: POST /api/refine/autonomous, GET /api/refine/autonomous,
 #   GET /api/refine/autonomous/{run_id} and POST /api/refine/autonomous/{run_id}/stop, and
 #   -1 for retiring POST /api/refine/vision-advice, which they replace (2026-10-21).
-EXPECTED_ROUTE_COUNT = 133
+#   +1 for POST /api/render-canvas-fit, fitting a saved Score to another paper
+#   without reinterpreting its description (2026-10-23).
+EXPECTED_ROUTE_COUNT = 134
 
 
 def _guard_names(dependant, seen=None) -> set[str]:

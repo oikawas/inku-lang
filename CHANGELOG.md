@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-23 — Add brushmarks and update the sweep preview in Android's Saijiki
+
+Brushmarks now follows sweep in the surface group, with Web's Japanese and English explanations, example instructions and preview. Sweep shows each pass as one film at 0.6 opacity; brushmarks overlaps individual bands at 0.5. Checks follow the 16 groups, 109 displayed words and 218 recognized words across both languages. Group colors and shared-core drawing semantics remain unchanged.
+
 ### 2026-10-22 — Edit a description while keeping the work visible on Android
 
 Editing a description now keeps the work and its text together. On narrow screens the work sits outside the editor's scroll and stays visible above the keyboard; wider screens place them side by side. The description remains available after drawing. Returning to Studio keeps the current work and text; New work starts an empty workspace. Back still restores the draft from before a work edit. Description locks and confirmation before replacing edited DDL remain in effect.

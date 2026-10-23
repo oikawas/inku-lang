@@ -99,12 +99,20 @@ private val surfaceAndHandling: Map<String, PreviewEntry> by lazy {
         "空" to PreviewEntry("面には何も置かず、輪郭を残す。", "空の四角を置く", "Leaves the face untouched, keeping the contour.", "Place an empty square", surfaceSvg("")),
         "塗り" to PreviewEntry("面を一様に塗りつぶす。", "塗りの四角を置く", "Fills the face evenly.", "Place a flat square", surfaceSvg("<rect $SURFACE_BOX fill=\"$INK\"/>")),
         "刷き" to PreviewEntry(
-            "少し角度を変えて面を二度掃く。各掃きは道具の不透明度の半分で、薄いを添えると淡くなる。線や弧では幅広い帯を作る。", "刷きの四角を置く",
-            "Sweeps the face twice at slightly different angles, each at half the tool opacity. Faint handling makes it paler. On a line or arc it makes a broad band.", "Place a sweep square",
+            "少し角度を変えて面を二度掃く。各掃きは、帯が溶け合った一枚の膜で、道具の不透明度の0.6倍。薄いを添えると淡くなる。線や弧では幅広い帯を作る。", "刷きの四角を置く",
+            "Sweeps the face twice at slightly different angles, each sweep one film of merged bands at 0.6 of the tool opacity. Faint handling makes it paler. On a line or arc it makes a broad band.", "Place a sweep square",
             surfaceSvg("<defs><filter id=\"surface-sweep\"><feGaussianBlur stdDeviation=\"2.4\"/></filter></defs>" +
                 "<g filter=\"url(#surface-sweep)\" stroke=\"$INK\" stroke-width=\"15\" stroke-linecap=\"round\">" +
-                "<g opacity=\"0.5\"><path d=\"M44 26 H136\"/><path d=\"M44 39 H136\"/><path d=\"M44 52 H136\"/><path d=\"M44 65 H136\"/></g>" +
-                "<g opacity=\"0.5\" transform=\"rotate(6 90 46)\"><path d=\"M44 22 H136\"/><path d=\"M44 35 H136\"/><path d=\"M44 48 H136\"/><path d=\"M44 61 H136\"/><path d=\"M44 74 H136\"/></g></g>"),
+                "<g opacity=\"0.6\"><path d=\"M44 26 H136\"/><path d=\"M44 39 H136\"/><path d=\"M44 52 H136\"/><path d=\"M44 65 H136\"/></g>" +
+                "<g opacity=\"0.6\" transform=\"rotate(6 90 46)\"><path d=\"M44 22 H136\"/><path d=\"M44 35 H136\"/><path d=\"M44 48 H136\"/><path d=\"M44 61 H136\"/><path d=\"M44 74 H136\"/></g></g>"),
+        ),
+        "刷毛目" to PreviewEntry(
+            "筆の帯を一本ずつ重ね、重なった所が濃い筋になる。少し角度を変えて二度掃き、輪郭の内に収める。閉じた形の面にだけ使える。", "刷毛目の四角を置く",
+            "Lays the brush's bands one by one, so they darken where they overlap; two passes at slightly different angles, kept inside the contour. Only on the face of a closed shape.", "Place a brushmarks square",
+            surfaceSvg("<g stroke=\"$INK\" stroke-linecap=\"round\">" +
+                "<g><path stroke-width=\"13\" stroke-opacity=\"0.5\" d=\"M44 24 H136\"/><path stroke-width=\"11\" stroke-opacity=\"0.5\" d=\"M44 33 H136\"/><path stroke-width=\"14\" stroke-opacity=\"0.5\" d=\"M44 42 H136\"/><path stroke-width=\"12\" stroke-opacity=\"0.5\" d=\"M44 51 H136\"/><path stroke-width=\"13\" stroke-opacity=\"0.5\" d=\"M44 60 H136\"/><path stroke-width=\"11\" stroke-opacity=\"0.5\" d=\"M44 69 H136\"/></g>" +
+                "<g transform=\"rotate(6 90 46)\"><path stroke-width=\"12\" stroke-opacity=\"0.5\" d=\"M44 20 H136\"/><path stroke-width=\"14\" stroke-opacity=\"0.5\" d=\"M44 29 H136\"/><path stroke-width=\"11\" stroke-opacity=\"0.5\" d=\"M44 38 H136\"/><path stroke-width=\"13\" stroke-opacity=\"0.5\" d=\"M44 47 H136\"/><path stroke-width=\"12\" stroke-opacity=\"0.5\" d=\"M44 56 H136\"/><path stroke-width=\"14\" stroke-opacity=\"0.5\" d=\"M44 65 H136\"/><path stroke-width=\"11\" stroke-opacity=\"0.5\" d=\"M44 74 H136\"/></g>" +
+                "</g>"),
         ),
         "粒" to PreviewEntry("細かい粒を面に撒き、擦れた粗さを出す。", "粒の四角を置く", "Scatters fine grain across the face for a scuffed roughness.", "Place a grain square", surfaceSvg(surfaceDabs(78, 1.3, 0.5, 1.7))),
         "点描" to PreviewEntry("点を面に撒いて濃淡を作る。", "点描の円を置く", "Scatters dots across the face to build tone.", "Place a stipple square", surfaceSvg(surfaceDabs(34, 2.6, 0.62, 5.3))),

@@ -4,6 +4,7 @@ import app.inku.mobile.data.CatalogModel
 import app.inku.mobile.ui.i18n.UiLanguage
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -11,8 +12,23 @@ import org.junit.Test
 class ParityPreviewsTest {
     @Test fun saijikiEffectFollowsUiAndExampleFollowsDdl() {
         val jaUiEnglishDdl = saijikiPreview("omote", "刷き", "sweep", UiLanguage.Ja, "en")
-        assertTrue(jaUiEnglishDdl.effect.contains("二度掃く"))
+        assertTrue(jaUiEnglishDdl.effect.contains("一枚の膜") && jaUiEnglishDdl.effect.contains("0.6倍"))
         assertEquals("Place a sweep square", jaUiEnglishDdl.example)
+        assertEquals(2, Regex("""<g opacity="0\.6"""").findAll(jaUiEnglishDdl.svg).count())
+        val sweepEn = saijikiPreview("omote", "刷き", "刷き", UiLanguage.En, "ja")
+        assertTrue(sweepEn.effect.contains("one film of merged bands at 0.6"))
+        assertEquals("刷きの四角を置く", sweepEn.example)
+        val brushmarksJa = saijikiPreview("omote", "刷毛目", "brushmarks", UiLanguage.Ja, "en")
+        val brushmarksEn = saijikiPreview("omote", "刷毛目", "刷毛目", UiLanguage.En, "ja")
+        assertTrue(brushmarksJa.effect.contains("一本ずつ重ね") && brushmarksJa.effect.contains("閉じた形"))
+        assertEquals("Place a brushmarks square", brushmarksJa.example)
+        assertTrue(brushmarksEn.effect.contains("darken where they overlap"))
+        assertEquals("刷毛目の四角を置く", brushmarksEn.example)
+        assertEquals(brushmarksJa.svg, brushmarksEn.svg)
+        assertTrue(brushmarksJa.svg.contains("surface-clip"))
+        assertFalse(brushmarksJa.svg.contains("filter"))
+        assertEquals(13, Regex("""stroke-opacity="0\.5"""").findAll(brushmarksJa.svg).count())
+        assertNotEquals(jaUiEnglishDdl.svg, brushmarksJa.svg)
         val enUiJapaneseDdl = saijikiPreview("sabaki", "薄い", "薄い", UiLanguage.En, "ja")
         assertTrue(enUiJapaneseDdl.effect.contains("faintly"))
         assertEquals("鉛筆の薄い点描の四角を置く", enUiJapaneseDdl.example)

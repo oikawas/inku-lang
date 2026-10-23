@@ -46,6 +46,9 @@ public struct DrawingAdjustmentPlan: Sendable {
 @Observable
 public final class AppModel {
     public let autonomousRefinement = AutonomousRefinementModel()
+    public private(set) var canvasFitQuestion: CanvasFitQuestion?
+    @ObservationIgnored public var canvasFitChoiceHandler: (@MainActor (CanvasFitQuestion) async -> CanvasFitChoice)?
+    @ObservationIgnored private var canvasFitContinuation: CheckedContinuation<CanvasFitChoice, Never>?
     public var inputMode = "description"
     public var descriptionText = ""
     public var ddlText = ""
@@ -335,6 +338,12 @@ public final class AppModel {
 
     private func generate(parentWorkID: String?, fork: Bool = false) async {
         guard fork ? canForkDescription : canGenerate, let host, let bootstrap else { return }
+        if inputMode == "ddl" {
+            if let work = selectedWork, work.id == parentWorkID {
+                _ = await drawEditedDDL(work: work, source: ddlText, paperID: canvasID)
+            } else { _ = await drawNewDDL(ddlText, presentation: .workspace) }
+            return
+        }
         let token = UUID()
         generationToken = token
         providerProgress = nil
@@ -916,24 +925,43 @@ public final class AppModel {
             catalogMode: catalogMode == "auto" ? "auto" : "fixed", sketch: sketchMode == "on" ? .on : .off)
     }
 
-    public func drawNewDDL(_ source: String, imported: DDLPackageImport? = nil) async -> Bool {
-        guard !isBusy, let bootstrap, !source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+    public func drawNewDDL(_ source: String, imported: DDLPackageImport? = nil,
+                           presentation: CanvasFitPresentation = .editor) async -> Bool {
+        guard !isBusy, canvasFitQuestion == nil, let bootstrap,
+              !source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
         do {
+            let paperID = canvasID
+            let fit = await chooseCanvasFit(source: source, paperID: paperID, presentation: presentation)
+            guard fit != .cancel, !isBusy, canvasID == paperID else { return false }
             var request = try bootstrap.request(inputMode: "ddl", source: source, description: "",
-                language: imported?.language ?? instructionLanguage(for: source), catalogID: catalogID, canvasID: canvasID,
+                language: imported?.language ?? instructionLanguage(for: source), catalogID: catalogID, canvasID: paperID,
                 seed: seedText, wild: wild, settings: settings, parentWorkID: nil, derivationKind: "new",
                 importedPlugins: imported?.plugins ?? [])
+            request.configuration = try configuration(request.configuration, canvasFit: fit, paperID: paperID)
             request = try await pinPersonalPlanRequests([request])[0]
             return await runAutomation(request: request) != nil
         } catch { report(error); return false }
     }
 
-    public func drawEditedDDL(work: SavedWork, source: String, wildOverride: Bool? = nil) async -> Bool {
-        guard !isBusy, !work.trashed, !source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+    public func drawEditedDDL(work: SavedWork, source: String, wildOverride: Bool? = nil,
+                              paperID: String? = nil, presentation: CanvasFitPresentation = .workspace) async -> Bool {
+        guard !isBusy, canvasFitQuestion == nil, !work.trashed,
+              !source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
         do {
             _ = try await checkedSavedAdjustmentParent(work)
             let saved = try await savedConfiguration(workID: work.id)
             var options = try ExactJSON(data: saved.renderOptions)
+            let target = paperID ?? options["canvas_aspect_id"].string ?? work.renderCanvasAspectID ?? canvasID
+            let unchanged = source == work.ddl && wildOverride == nil
+            let fit = await chooseCanvasFit(source: source, recordedWork: unchanged ? work : nil,
+                                             paperID: target, presentation: presentation)
+            guard fit != .cancel, !isBusy else { return false }
+            if fit == .contain, unchanged { return await drawFittedSavedWork(work, paperID: target) }
+            if let paperID, let bootstrap {
+                let paper = try bootstrap.replayOptions(catalogID: catalogID, canvasID: paperID)
+                options["canvas_aspect_id"] = .string(paper.canvasID)
+                options["canvas"] = .object(["width": .number(String(Int(paper.canvasWidth))), "height": .number(String(Int(paper.canvasHeight)))])
+            }
             if let wildOverride { options["wild"] = .bool(wildOverride) }
             guard let catalog = options["catalog_id"].string, options["resolved_color_map"].object != nil else {
                 throw HostError("saved_refinement_options_unavailable")
@@ -941,7 +969,8 @@ public final class AppModel {
             var models = settings.models
             models.stage1Model = work.stage1Model ?? ""
             if models.stage2Model.isEmpty { models.stage2Model = work.stage2Model ?? "" }
-            var request = GenerationRequest(authoring: .directDDL(source), configuration: saved.configuration,
+            var request = GenerationRequest(authoring: .directDDL(source),
+                configuration: try configuration(saved.configuration, canvasFit: fit, paperID: target),
                 renderOptions: options.data, clipPolicy: saved.clipPolicy, models: models, providers: settings.providers,
                 renderColorMaps: [catalog: options["resolved_color_map"].data], description: work.effectiveSourceText,
                 parentWorkID: work.id, derivationKind: "ddl_edit")
@@ -1697,10 +1726,10 @@ public final class AppModel {
         sketchDraft = nil
     }
 
-    public func commitDDL(wildOverride: Bool? = nil) async {
+    public func commitDDL(wildOverride: Bool? = nil, presentation: CanvasFitPresentation = .workspace) async {
         guard canCommitDDL else { return }
-        if let work = displayedWork, ddlText == visibleDDL || wildOverride != nil {
-            _ = await drawEditedDDL(work: work, source: ddlText, wildOverride: wildOverride)
+        if let work = displayedWork, !work.trashed {
+            _ = await drawEditedDDL(work: work, source: ddlText, wildOverride: wildOverride, presentation: presentation)
         } else if let id = currentExecutionID, wildOverride == nil {
             await performCommand(executionID: id, command: .commitUserDDL(expectedRevision: authoringRevision, source: ddlText), kind: "ddl_edit")
         } else if selectedContext != nil {
@@ -2259,5 +2288,64 @@ extension AppModel {
     /// Web `ddlCompletions`: the enabled saijiki words and macro names, in the language the instructions read in.
     public var ddlCompletions: DdlCompletions {
         DdlCompletions(saijiki: saijiki, plugins: pluginWords) { [weak self] text in self?.instructionLanguage(for: text) ?? "ja" }
+    }
+
+    private func chooseCanvasFit(source: String, recordedWork: SavedWork? = nil, paperID: String,
+                                 presentation: CanvasFitPresentation) async -> CanvasFitChoice {
+        guard let paper = canvases.first(where: { $0.id == paperID }),
+              let target = CanvasRatio(width: Int(paper.widthRatio), height: Int(paper.heightRatio)) else { return .paper }
+        let recorded = recordedWork.flatMap { work in
+            canvases.first { $0.id == (work.renderCanvasAspectID ?? work.renderCanvasAspect) }
+        }.flatMap { CanvasRatio(width: Int($0.widthRatio), height: Int($0.heightRatio)) }
+        guard let basis = CanvasRatio.declared(in: source) ?? recorded, basis != target else { return .paper }
+        guard canvasFitQuestion == nil else { return .cancel }
+        let question = CanvasFitQuestion(ratio: basis, paper: paper, presentation: presentation)
+        if let handler = canvasFitChoiceHandler {
+            canvasFitQuestion = question
+            let choice = await handler(question)
+            guard canvasFitQuestion?.id == question.id else { return .cancel }
+            canvasFitQuestion = nil
+            return choice
+        }
+        return await withCheckedContinuation { continuation in
+            canvasFitContinuation = continuation
+            canvasFitQuestion = question
+        }
+    }
+
+    public func resolveCanvasFit(_ choice: CanvasFitChoice, id: UUID) {
+        guard canvasFitQuestion?.id == id else { return }
+        let continuation = canvasFitContinuation
+        canvasFitContinuation = nil
+        canvasFitQuestion = nil
+        continuation?.resume(returning: choice)
+    }
+
+    private func configuration(_ data: Data, canvasFit: CanvasFitChoice, paperID: String) throws -> Data {
+        var config = try ExactJSON(data: data)
+        var host = try config["compiler"].requiredObject("host").object ?? [:]
+        host.removeValue(forKey: "canvas_fit")
+        if canvasFit == .contain { host["canvas_fit"] = .string("contain") }
+        host["canvas_format_id"] = .string(paperID)
+        config["compiler"]["host"] = .object(host)
+        return config.data
+    }
+
+    private func drawFittedSavedWork(_ work: SavedWork, paperID: String) async -> Bool {
+        guard !isBusy, let host, let bootstrap else { return false }
+        do {
+            let paper = try bootstrap.replayOptions(catalogID: catalogID, canvasID: paperID)
+            return await performSerialized(status: "はめ込み中") { [weak self] _ in
+                guard let self else { return }
+                let result = try await host.fitSavedWork(workID: work.id, paper: paper)
+                await self.notifySavedWork(result)
+                try Task.checkCancellation()
+                try await self.reloadWorks()
+                self.displayWork(result)
+                self.selectedContext = try await host.savedAuthoringContext(workID: result.id)
+                self.currentView = nil; self.currentExecutionID = nil
+                self.status = "はめ込みを保存しました"
+            }
+        } catch { report(error); return false }
     }
 }

@@ -2,7 +2,7 @@
 
 This directory contains the native SwiftUI client, developed for macOS first, and the shared Apple packages. [SWIFT_SPEC.ja.md](SWIFT_SPEC.ja.md) is the canonical specification for Swift host behavior; this document is its maintained English version. The [product specification](../SPEC.md) defines shared DDL, Score, prompts, authoring authority, pipeline transitions, seeds, and rendering semantics. Server remains the primary development host, and Swift follows the same Rust core without duplicating semantic processing.
 
-Last updated: 2026-10-21.
+Last updated: 2026-10-23.
 
 Binding and protocol identities come from the bundled Rust core's version report; rendering layer identities use render metadata and the [Server layer definitions](../server/src/inku_server/layer_versions.py). Do not duplicate shared engine version constants in this document. The macOS app has its own version, defined by `apple/VERSION` and `apple/BUILD_NUMBER` and allocated separately from the Server and Web versions (the first release is 1.0.0, Build 1). The corresponding Server version is shown in the app's About inku window and in the changelog. Matching shared layer versions does not establish that host features and the native UI port are complete.
 
@@ -17,6 +17,16 @@ Options and replacements for Change the touches, Change the ground and Change th
 - Record confirmed implementation changes and remaining scope in dated sections of this specification. Maintain product history in the shared [CHANGELOG.ja.md](../CHANGELOG.ja.md) and [CHANGELOG.md](../CHANGELOG.md). Do not create a separate Swift changelog.
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
+
+## 2026-10-23 Aspect ratio declarations and fitting
+
+A new parentless direct DDL sends `declare_canvas: true` in the core authoring input to record the chosen paper's ratio at the start. The core keeps a declaration the author wrote. Drawing or editing a saved work does not send this flag. The core writes declarations for Stage 1 itself.
+
+Paint from instructions in the main view uses the chosen paper; a saved work's instruction editor uses that work's paper; the new-instructions dialog uses the chosen paper. A small screen-side reader follows Web and asks Fit it in, Draw to this paper, or Cancel only when the declared ratio differs from the paper. An unedited saved work without a declaration uses its recorded paper. The same ratio, or no declaration and no recorded ratio, needs no question. Cancelling starts no drawing or saving and keeps the dialog's text and imported definitions.
+
+Fitting a new or edited DDL sends `compiler.host.canvas_fit = "contain"`; the core owns the declaration and composition. Drawing to the paper does not carry an earlier fit setting. Fitting an unedited saved work sends its Score, recorded paper and target paper to shared `saved_variants`, action `fit_render`. The host draws the returned Score and saves a `canvas_fit` child, shown as Fit. It keeps the DDL, Score version, saved seeds, colors, ground, description authority and laws records without changing the parent. The child saves the Score and its hash, paper and fit context for later editing and replay. It neither reads the description again nor calls a provider.
+
+Saijiki shows the display-only aspect ratio at the end of grounds, and relations from the asset. Its examples are `Aspect ratio 16:9.` / `画面比16:9。`. A declaration needs numbers at the start of the DDL, so the bare term is neither inserted nor offered as completion. There are sixteen categories, and the asset does not include the ratio term. The ordinary Web reference export refreshes the DDL and DDL-engine versions and question copy. `InkuAppCheck --canvas-ratio-authoring-only` checks these boundaries with the real core, temporary SQLite and a provider that cannot send requests.
 
 ## 2026-10-21 Laws and colors without a main layer, and a chosen ground
 

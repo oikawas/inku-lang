@@ -329,7 +329,7 @@ struct CreationWorkInfoView: View {
         if kind == "laws_change" { return model.display.preferences.language == "en" ? "Laws" : "法則" }
         let titles = ["tool_change": "てざわり", "touch_change": "タッチ", "layout_change": "構図", "catalog_change": "色", "reinterpretation": "解釈",
             "model_comparison": "モデル", "language_comparison": "言語", "ddl_edit": "DDL編集", "description_edit": "記述編集",
-            "replay": "再描画", "canvas_aspect_change": "キャンバス変更", "variation": "変奏（旧）", "sketch_grain_change": "写生の有無"]
+            "replay": "再描画", "canvas_aspect_change": "キャンバス変更", "canvas_fit": "はめ込み", "variation": "変奏（旧）", "sketch_grain_change": "写生の有無"]
         guard let kind, kind != "new" else { return model.display.localized("起点") }
         return model.display.localized(titles[kind] ?? kind)
     }

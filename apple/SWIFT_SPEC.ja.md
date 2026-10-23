@@ -2,7 +2,7 @@
 
 このディレクトリは、macOS先行のnative SwiftUIクライアントとApple向け共通packageのworkspaceである。本書をSwift host固有の仕様正本とし、[SWIFT_SPEC.md](SWIFT_SPEC.md)を対応英語版とする。共有DDL、Score、prompt、authoring authority、pipeline状態遷移、seed、描画の意味は[製品仕様](../SPEC.ja.md)を正本とし、Serverを開発上のprimaryとして同じRust coreへ追随する。Swift側に意味処理を複製しない。
 
-最終更新: 2026-10-21。
+最終更新: 2026-10-23。
 
 binding／protocolの版は同梱Rust coreのversion report、描画層の版はrender metadataと[Serverの層定義](../server/src/inku_server/layer_versions.py)を参照する。本書へ共通engineの版定数を複製しない。macOSアプリの版は`apple/VERSION`と`apple/BUILD_NUMBER`を正本とする独自の版で、Server／Webの版とは別に採番する（初回は1.0.0／Build 1）。対応するServerの版はアプリの「inkuについて」と変更履歴に併記する。共有層の版が一致しても、host機能とnative UIの移植が完了したことにはならない。
 
@@ -17,6 +17,16 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 確定した実装変更と残る範囲は本書の日付付き節へ記し、製品の変更履歴は共通の[CHANGELOG.ja.md](../CHANGELOG.ja.md)／[CHANGELOG.md](../CHANGELOG.md)へ同期して記す。Swift専用CHANGELOGを分けない。
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
+
+## 2026-10-23 画面比の宣言とはめ込み
+
+親のない新しいdirect DDLは、coreのauthoringへ`declare_canvas: true`を渡し、選んだ紙の画面比を先頭に記録する。作者が書いた宣言はcoreが保つ。保存作品から描く・編集する道にはこの印を渡さない。記述からのStage 1の宣言はcoreが書く。
+
+主画面の「指示書から描画」は選んだ紙、保存作品の指示書エディタはその作品の紙、新規の指示書dialogは選んだ紙を対象にする。画面はWebと同じ小さい比の読み取りを使い、宣言の比と紙が違うときだけ「はめ込んで描く」「この紙に合わせて描く」「キャンセル」を出す。手を入れていない保存作品は、宣言が無ければ描いた紙の記録を使う。比が同じ・記録も宣言も無いときは問わない。問いをキャンセルすると描画・保存を始めず、dialogの文と持ち込み定義を残す。
+
+新規・変更したDDLのはめ込みは`compiler.host.canvas_fit = "contain"`を渡し、宣言の読みと構図はcoreに任せる。紙へ合わせて描くときは前のはめ込み指定を持ち越さない。手を入れていない保存作品のはめ込みは、共有`saved_variants`の`fit_render`へ保存Score・描いた紙・今の紙を渡し、coreが返したScoreを描いて`canvas_fit`（はめ込み / Fit）の子として保存する。DDL・Score版・保存seed・配色・地・記述authority・法則の記録を保ち、親を変更しない。子のScore本体とhash、紙とfitのcontextを保存し、後の編集や再演奏もその記録を使う。記述を読み直さず、providerを呼ばない。
+
+歳時記は「じ」の末尾に表示用の「画面比 / aspect ratio」を置き、資産のrelationsから「あいだ」を表示する。画面比の例文は`画面比16:9。` / `Aspect ratio 16:9.`。数を添えて先頭に書く宣言なので、語だけの挿入・補完はしない。類は16で、資産には画面比を足さない。ui-referenceのDDL・DDL engineの版と問いの文は、既定のWeb参照exportで更新する。`InkuAppCheck --canvas-ratio-authoring-only`が、実core・一時SQLite・送信しないproviderでこの境目を確認する。
 
 ## 2026-10-21 主の層を持たない法則・配色と、選べる地への追随
 

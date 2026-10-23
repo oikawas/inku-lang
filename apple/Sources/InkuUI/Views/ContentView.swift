@@ -236,6 +236,7 @@ public struct ContentView: View {
         } message: { Text(model.errorText ?? "") }
         #endif
         .focusedSceneValue(\.inkuCommandContext, commandContext)
+        .canvasFitConfirmation(model: model, presentation: .workspace)
     }
 
     /// Web `.root`: the rail, then the main shell (input panel, canvas panel and history strip).
@@ -574,7 +575,7 @@ public struct ContentView: View {
             // Web DdlViewer: the box's draft is what is drawn, once.
             let source = model.ddlBoxText(for: work)
             guard DDLSource.hasBody(source) else { return }
-            Task { await model.drawEditedDDL(work: work, source: source) }
+            Task { await model.drawEditedDDL(work: work, source: source, paperID: model.canvasID) }
         // The editor opens on the box's draft; its discard returns to the work's saved instructions.
         case "ddl": dialog = .ddl(DdlEditingSession(work: work, draft: model.ddlBoxText(for: work)))
         case "color": dialog = .comparison(ComparisonSession(work: work, kind: .catalog))

@@ -1553,3 +1553,8 @@
 "モデルの答えを2回とも使えませんでした（%@）。" = "The model's choices could not be used, twice (%@).";
 "歳時記で語の作例と説明を確認します。語をクリックすると、編集中の指示書に挿入します。" = "Open Saijiki to see word examples and explanations. Click a word to insert it into the instruction draft.";
 "語にマウスを重ねると作例を表示します。クリックすると、挿入できる語を編集中の指示書に入れます。" = "Hover over a word to see its example. Click to insert the word into the instruction draft if its definition is available.";
+"画面比が異なります" = "Different aspect ratio";
+"画面比の宣言は、比の数を添えてDDLの先頭に書きます。" = "Write the ratio numbers in a declaration at the start of the DDL.";
+"はめ込み" = "Fit";
+"はめ込み中" = "Fitting…";
+"はめ込みを保存しました" = "Saved the fitted work";

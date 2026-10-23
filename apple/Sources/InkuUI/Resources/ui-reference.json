@@ -1,12 +1,12 @@
 {
   "schema": "inku.apple-ui-reference.v1",
-  "version": "v2.15.235",
-  "build": "1311",
-  "buildDate": "2026-10-22T23:30:01.389Z",
+  "version": "v2.15.240",
+  "build": "1316",
+  "buildDate": "2026-10-23T06:56:53.471Z",
   "versions": {
-    "ddlSpec": "25",
-    "ddlEngine": "69",
-    "renderEngine": "91"
+    "ddlSpec": "26",
+    "ddlEngine": "70",
+    "renderEngine": "93"
   },
   "canvasMetadata": {
     "square": {
@@ -639,6 +639,8 @@
         "composeFallbackBadge": "作曲フォールバック",
         "confirmRefineFromFallbackMessage": "この作品は記述との対応が切れています。ここから推敲を続けますか。",
         "confirmRefineFromFallbackContinue": "続ける",
+        "canvasFitRun": "はめ込んで描く",
+        "canvasFitStretch": "この紙に合わせて描く",
         "statsInterp": "DDL生成",
         "statsStruct": "JSON生成・SVGレンダリング",
         "statsTotal": "合計",
@@ -1334,6 +1336,7 @@
         "settingsTextSizeValue": "%@%（%@）",
         "pngYAxisDescription": "PNG / Y軸 %@px",
         "interpretFallbackHint": "Stage 1 が失敗したため、定型の代替DDLで描画しました。",
+        "canvasFitMessage": "このDDLは画面比%@で書かれています。今の紙（%@）にどう描きますか。はめ込むと、構図をそのままの比で紙の中央に置き、余白は地になります。",
         "composeFallbackHint": "Stage 2 が失敗したため、定型の楽譜で描画しました。",
         "composeFallbackRecord": "記録なし",
         "tokenSummary": "解釈 %@→%@ / 構造化 %@→%@ tok",
@@ -1439,6 +1442,7 @@
         "savedWorkExportLineagePathScope",
         "elapsedDetailed",
         "interpretFallbackHint",
+        "canvasFitMessage",
         "composeFallbackHint",
         "composeFallbackRecord",
         "tokenSummary",
@@ -2125,6 +2129,8 @@
         "composeFallbackBadge": "Score fallback",
         "confirmRefineFromFallbackMessage": "This work is not an answer to its description. Refine from it anyway?",
         "confirmRefineFromFallbackContinue": "Continue",
+        "canvasFitRun": "Fit it in",
+        "canvasFitStretch": "Draw to this paper",
         "statsInterp": "Interpretation",
         "statsStruct": "Score and performance",
         "statsTotal": "Total",
@@ -2820,6 +2826,7 @@
         "settingsTextSizeValue": "%@% (%@)",
         "pngYAxisDescription": "PNG / Y-axis %@px",
         "interpretFallbackHint": "The interpreter failed, so a stock set of instructions was performed.",
+        "canvasFitMessage": "This DDL was written for the aspect ratio %@. How should it be drawn on this paper (%@)? Fitted, the composition keeps its ratio in the middle of the paper, and the ground fills the margins.",
         "composeFallbackHint": "Stage 2 failed, so a stock score was performed.",
         "composeFallbackRecord": "Not recorded",
         "tokenSummary": "interp %@→%@ / struct %@→%@ tok",
@@ -2925,6 +2932,7 @@
         "savedWorkExportLineagePathScope",
         "elapsedDetailed",
         "interpretFallbackHint",
+        "canvasFitMessage",
         "composeFallbackHint",
         "composeFallbackRecord",
         "tokenSummary",
@@ -3739,18 +3747,18 @@
     }
   },
   "source": {
-    "commit": "97b50a52367554a94e9f364b90dc538d0f6b68bc",
+    "commit": "2b7546bcac6a66498e071f5f4336829e24966a1b",
     "files": {
       "web/src/lib/plugins/system/canvas-aspect/index.ts": "51431fe06ed38cfb11f7e08a87b85b68dacdeda646525242fb561c234cf0c9ff",
-      "web/src/routes/+page.svelte": "114fe51a4265a7f915e923517490c75e0a7dc2905d6e86e02e2bafa1758ab42b",
+      "web/src/routes/+page.svelte": "ebb58cc9a3a8f330ec30fa20136a9d3bb1e04a9f3cfc6fa64f967a401885db7d",
       "web/src/lib/saijiki-surface.ts": "d04c5d559cd1ed0889b7e93da0893c2600c158f81cc81ea1d04b0647982469fd",
       "web/src/lib/instructionLang.ts": "2af540a1b98d4aa688fcf96632de1309b30c3f137137a66596f1285e09f2dcbe",
-      "web/APP_VERSION": "39a5d648b28297d15063a22002a2a9172142af80f47dd12e2ab711799b2526c3",
-      "web/BUILD_NUMBER": "36043641189d4ed34f14a422c3f530aeda1d230b34cad7af8b70ea3062833afb",
-      "server/src/inku_server/layer_versions.py": "983df36d1109d22ddf4e2d8edd7b073d61cab652f631319dce157918240f92c9",
-      "core/crates/inku-render/src/lib.rs": "b9e08e6aa9348f1ca9becd1f870899a152e8c8c2d00af582664e98b777c795a7",
-      "web/src/lib/i18n/ja.ts": "261478a53ab30f20e72bb985e71ecb5b5c3e6568f581c7e6e10c3bb8302786aa",
-      "web/src/lib/i18n/en.ts": "42a86e03019d4a6bbe34f47215dc69a1f225ca3110d1c3d8d8aea6b2a8de0b53"
+      "web/APP_VERSION": "65a8b0be8492fbfd7e0e04f8db5b3409b4b948fe633e58816cdc3fda4b48f491",
+      "web/BUILD_NUMBER": "a4c10ea2fa7fb1a1b8d03a52b8261353542a46d0138790e9ac9f6ba8fe03bc61",
+      "server/src/inku_server/layer_versions.py": "88585112a85a5427987c9df3c163b9cfc5518bbdb53d4b24867163c955a682be",
+      "core/crates/inku-render/src/lib.rs": "c4ea71cbaa469e25d2c7b63d92543975eaa6de02605491b379303c3aab23b504",
+      "web/src/lib/i18n/ja.ts": "06e47caf30a2aaf2ae41e84b744475021db9d1e7de22c539ff15ee3be5b2ffc4",
+      "web/src/lib/i18n/en.ts": "b5241fb59edd550d212c4b7d715d9ae38fe2b845b73826b63f997f03f17638f1"
     },
     "tooltipKeys": [
       "tooltipAppRailLang",

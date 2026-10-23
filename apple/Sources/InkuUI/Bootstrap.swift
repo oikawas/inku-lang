@@ -46,6 +46,7 @@ public struct SaijikiWord: Identifiable, Sendable {
     public let isDefault: Bool
     public let englishDetail: String?
     public let preview: SaijikiPreview?
+    public var referenceOnly = false
 }
 
 public struct SaijikiCategory: Identifiable, Sendable {
@@ -109,7 +110,7 @@ struct Bootstrap {
               let plugins = try JSONSerialization.jsonObject(with: resource("plugin-words")) as? [[String: Any]] else {
             throw HostError("bundled_vocabulary_invalid")
         }
-        saijiki = try categories.map { category in
+        var displayCategories = try categories.map { category in
             guard let id = category["key"] as? String, let name = category["name_ja"] as? String,
                   let words = category["words"] as? [[String: Any]] else { throw HostError("bundled_vocabulary_invalid") }
             return SaijikiCategory(id: id, name: name, words: try words.filter { $0["display"] as? Bool == true }.map { word in
@@ -121,6 +122,29 @@ struct Bootstrap {
                     preview: reference.saijikiPreviews[id + ":" + japanese])
             }, englishName: category["name_en"] as? String)
         }
+        guard let groundIndex = displayCategories.firstIndex(where: { $0.id == "ji" }) else {
+            throw HostError("bundled_vocabulary_invalid")
+        }
+        let grounds = displayCategories[groundIndex]
+        let ratioDetail = "画面比16:9。のように、横:縦の比をDDLの先頭に書く。数は1〜10000の整数。"
+        let ratioDetailEn = "Write the width:height ratio first, as in Aspect ratio 16:9. Use integers from 1 to 10000."
+        let ratio = SaijikiWord(id: "ji:画面比", japanese: "画面比", english: "aspect ratio",
+            detail: ratioDetail, isDefault: false, englishDetail: ratioDetailEn,
+            preview: SaijikiPreview(svg: "", effectJa: ratioDetail, effectEn: ratioDetailEn,
+                exampleJa: "画面比16:9。", exampleEn: "Aspect ratio 16:9."), referenceOnly: true)
+        displayCategories[groundIndex] = SaijikiCategory(id: grounds.id, name: grounds.name,
+            words: grounds.words + [ratio], englishName: grounds.englishName)
+        guard let relations = vocabulary["relations"] as? [[String: Any]],
+              let relationOrder = vocabulary["relation_display_order"] as? [String] else { throw HostError("bundled_vocabulary_invalid") }
+        displayCategories.append(SaijikiCategory(id: "aida", name: "あいだ", words: try relationOrder.map { type in
+            guard let relation = relations.first(where: { $0["relation_type"] as? String == type }),
+                  let ja = relation["surface_ja"] as? String, let en = relation["surface_en"] as? String else {
+                throw HostError("bundled_vocabulary_invalid")
+            }
+            return SaijikiWord(id: "aida:" + ja, japanese: ja, english: en, detail: "", isDefault: false,
+                englishDetail: "", preview: reference.saijikiPreviews["aida:" + ja])
+        }, englishName: "relations"))
+        saijiki = displayCategories
         pluginWords = try plugins.map { item in
             guard let id = item["id"] as? String, let surfaces = item["surfaces"] as? [String: [String]],
                   let notes = item["notes"] as? [String: String] else { throw HostError("bundled_plugins_invalid") }
@@ -336,7 +360,8 @@ struct Bootstrap {
             provenance: GenerationProvenance(ddlVersion: productReference.versions["ddlSpec"],
                 ddlEngineVersion: productReference.versions["ddlEngine"],
                 build: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String,
-                referenceBuild: productReference.build))
+                referenceBuild: productReference.build),
+            declareCanvas: inputMode == "ddl" && parentWorkID == nil ? true : nil)
     }
 
     func macroCatalog(language: String, settings: HostSettings = .init(), importedPlugins: [ImportedMacroDefinition] = []) throws -> [String: Any] {

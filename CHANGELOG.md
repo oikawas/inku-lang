@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-23 — macOS adds aspect ratio declarations and fitting
+
+New direct instructions ask the core to record their aspect ratio. When the declaration and paper differ, the author can fit the work in, draw to the paper, or cancel while keeping the dialog and input. An unedited saved work uses its saved Score to make a fitted child, preserving its instructions, version, seeds and description authority. Saijiki shows the reference-only aspect ratio at the end of grounds, along with relations.
+
 ### 2026-10-23 — Add canvas declarations and fitting on Android
 
 New DDL declares its paper ratio. When the DDL ratio differs from the paper, choose fitting, drawing to the paper or canceling; cancel keeps the editor and text. An untouched saved work is fitted from its saved Score and saved as a Fit child with the same DDL, colors, seeds and description lock. Saijiki follows the 16 groups and 110 words, with aspect ratio last in grounds and the existing group colors preserved. Its example uses a valid declaration sentence.

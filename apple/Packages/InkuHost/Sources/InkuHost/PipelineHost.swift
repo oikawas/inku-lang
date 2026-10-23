@@ -343,6 +343,7 @@ public actor PipelineHost {
             work.ddl = ddl
             work.score = request["request"]["score"].text
         }
+        if plan.derivationKind == "canvas_fit" { work.score = request["request"]["score"].text }
         work.id = id; work.at = now; work.svg = svg; work.lineageNodeID = nodeID
         work.elapsedMS = max(0, Int64(Date().timeIntervalSince(began) * 1000))
         work.starred = false; work.trashed = false; work.historyVisibility = "normal"
@@ -372,6 +373,11 @@ public actor PipelineHost {
             guard nextContext["document"].object != nil else { throw HostError("saved_document_unavailable") }
             nextContext["document"]["source"] = .string(ddl)
             nextContext["score_sha256"] = .string(WorkIdentity.sha256(request["request"]["score"].data))
+        }
+        if plan.derivationKind == "canvas_fit" {
+            nextContext["score_sha256"] = .string(WorkIdentity.sha256(request["request"]["score"].data))
+            nextContext["configuration"]["compiler"]["host"]["canvas_format_id"] = options["canvas_aspect_id"]
+            nextContext["configuration"]["compiler"]["host"]["canvas_fit"] = .string("contain")
         }
         var stringOptions = options
         for key in ["render_seed", "composition_seed"] { if let number = options[key].number { stringOptions[key] = .string(number) } }
@@ -662,6 +668,9 @@ private actor ExecutionDriver {
     /// Server `start`: a direct DDL drawn from a saved work carries that work's completion range and laws records.
     private func authoring(_ request: GenerationRequest) throws -> ExactJSON {
         var authoring = request.authoring.json
+        if request.authoring.isDirect, request.parentWorkID == nil, request.declareCanvas == true {
+            authoring["declare_canvas"] = .bool(true)
+        }
         if let direction = request.savedLawsDirection {
             guard case .directDDL(let source) = request.authoring else { throw HostError("saved_laws_requires_saved_ddl") }
             authoring = .object(["tag": .string("saved_laws"), "source": .string(source),

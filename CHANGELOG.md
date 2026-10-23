@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-23 — Correct DDL reference constraints and the crossing example
+
+The Japanese and English reference now states connection and touching targets, one-mark placement, coordinate precision limits, and the exclusion of prior points for resting on and overlapping. Example 5.30 specifies the crossing line's length. SPEC's older descriptions of retention after a failed connection and touching with a current free line are aligned. Implementation and drawing semantics are unchanged.
+
 ### 2026-10-23 — Add a DDL syntax and vocabulary reference
 
 The Japanese and English manuals now collect grammar principles, introductory examples, a grammar and Saijiki reference, and 50 complex DDL examples from the current shared Rust implementation, so people and AI can write instructions. Japanese is canonical. Outdated descriptions of accepted syntax in SPEC are aligned with the implementation.

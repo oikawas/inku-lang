@@ -310,11 +310,11 @@ X runs left 0 to right 1; Y runs top 0 to bottom 1. Write both axes. Japanese us
 | bottom-edge / 下端 | 0–1 | 9/10–1 |
 | corner / 隅 | One corner, with each edge one fifth long | Composition seed selects the corner |
 
-For a placed shape, performance chooses inside the named range shrunk to two thirds about its center. Named center is not fixed at `(0.5,0.5)`. Omitted place/draw position likewise uses the shrunken center cell, `7/18–11/18` on both axes. Omitted position for line-up, scatter, and tile uses the whole canvas.
+For a placed shape, performance chooses inside the named range shrunk to two thirds about its center. Named center is not fixed at `(0.5,0.5)`. Omitted place/draw position likewise uses the shrunken center cell, `7/18–11/18` on both axes. Omitted position for line-up or scatter with at least two marks, and for tile, uses the whole canvas. A one-mark line-up or scatter is treated as place and uses the same shrunken center cell when position is omitted.
 
 An exact numeric anchor must be in 0–1, and the rotated declared geometry must fit the canvas. It is not silently shrunk or moved. Named and range placement preserve size and may allow contours to cross the canvas edge.
 
-For a numeric range, each start must be below its end, and all bounds must lie in 0–1. Decimals and fractions are accepted.
+For a numeric range, each start must be below its end, and all bounds must lie in 0–1. Decimals allow at most six digits after the decimal point; fraction denominators must be 1–1,000,000. Two-point coordinates have the same precision limits.
 
 ```ddl-en
 fill small red circles at the bottom (horizontal 0 to 1, vertical 2/3 to 1).
@@ -350,7 +350,7 @@ draw one gray pencil line from horizontal 0.118, vertical 0.118 to horizontal 0.
 画面の横0.118、縦0.118から横0.882、縦0.882まで、灰の鉛筆の線を1本引く。
 ```
 
-Points must differ and all four coordinates must lie in 0–1. This is not the construction for an arc, a one-mark row, scatter, tile, or fill. A two-point line already has length and direction: do not add length, full width, or angle. A two-point row already has its direction: do not add another row direction. Appending two points to a group or plugin call does not provide a general endpoint operation.
+Points must differ and all four coordinates must lie in 0–1. As in 3.8, decimals allow at most six fractional digits and fraction denominators must be 1–1,000,000. This is not the construction for an arc, a one-mark row, scatter, tile, or fill. A two-point line already has length and direction: do not add length, full width, or angle. A two-point row already has its direction: do not add another row direction. Appending two points to a group or plugin call does not provide a general endpoint operation.
 
 ### 3.10 Shape angle and row direction
 
@@ -527,7 +527,7 @@ Cutting makes a visual interruption; crossing places the mark across the target 
 
 ### 3.16 Connecting to a start, end, or interior
 
-Connected to the previous shape aligns the current canonical start with the previous end, or a nearby contour point when the target is closed. For a prior line or arc, target-side location may be explicit:
+Connected to the previous shape aligns the current canonical start with the previous end. Closed targets are limited to circle, ellipse, square, triangle, and polygon; these use a nearby contour point. Cloudform and crescent cannot be connection targets. For a prior line or arc, target-side location may be explicit:
 
 ```text
 connected to the start of the previous line
@@ -547,7 +547,7 @@ The current side stays its canonical start. Adding wording such as 終点を引�
 
 Partway excludes both ends and is not fixed at the center. Performance chooses the interior point on the actual swayed centerline and carries outer transforms with it. Do not write Score fields such as `target_path_position` into ordinary DDL. Partway does not align tangents or correct dimensions.
 
-A free line, current or target, supports only endpoint-connected and touching relationships. Connections to its interior, along, not touching, cutting, between, resting on, inside, overlapping, crossing, and mirrored are diagnosed and removed as relations. To refer to a prior free line in ordinary DDL, use connected to the previous shape for its end.
+A current free line supports endpoint-connected and touching relationships. A complete touching phrase names a prior line or ordinary arc; ordinary DDL has no touching phrase naming a prior free line. To refer to a prior free line in ordinary DDL, use connected to the previous shape for its end. Connections to a free line's interior, along, not touching, cutting, between, resting on, inside, overlapping, crossing, and mirrored are diagnosed and removed as relations.
 
 ### 3.17 Tools, continuity, surfaces, and handling
 
@@ -1048,13 +1048,13 @@ A short word names a relation without establishing a preceding target. Use a ful
 |---|---|---|---|---|
 | 沿う | `along` | `前の線に沿って` | `along the previous line` | Current and target must both be lines. Makes an unspecified direction parallel; retains dimensions and explicit direction. |
 | 触れない | `not touching` | `前の形に触れない` | `not touching the previous shape` | Leaves a gap from the preceding mark. Unavailable when a free line participates. |
-| 触れる | `touching` | `前の線に触れる` / `前の弧に両端で触れる` | `touching the previous line` / `touching the previous arc at both ends` | Matches both ends. Current and target use line, ordinary arc, or free line endpoint geometry. The phrase's line or arc target noun is also checked. |
+| 触れる | `touching` | `前の線に触れる` / `前の弧に両端で触れる` | `touching the previous line` / `touching the previous arc at both ends` | Matches both ends. Current may be a line, ordinary arc, or free line. The target must be the line or ordinary arc named by the complete phrase; no complete phrase names a prior free line. |
 | 切る | `cutting` | `前の線を切る` | `cutting the previous line` | Current and target must both be lines. Crosses them while retaining dimensions and explicit direction. |
 | 間に | `between` | `前の二つの間に` | `between the previous two` | Places between the bounding-box centers of the preceding two marks. Unavailable when a free line participates. |
 | つながる | `connected` | `前の形につながる` | `connected to the previous shape` | Joins the current start to the target end. Current: line, ordinary arc, free line, or point. Target: those forms, or the outline of a circle, ellipse, triangle, square, or polygon; excludes cloudform and crescent targets. |
-| 載る | `resting on` | `前の形に載る` | `resting on the previous shape` | Aligns the current bottom with the target top using bounding boxes. Excludes free line. |
+| 載る | `resting on` | `前の形に載る` | `resting on the previous shape` | Aligns the current bottom with the target top using bounding boxes. Excludes a prior point and a free line on either side. |
 | 中に | `inside` | `前の形の中に` | `inside the previous shape` | Fits the current mark inside a preceding circle, ellipse, triangle, square, polygon, or cloudform. An open mark, point, or crescent cannot be the container; a mark that does not fit fails the relation. Excludes free line. |
-| 重なる | `overlaps` | `前の形に重なる` | `overlapping the previous shape` | Partly overlaps bounding boxes. Excludes free line. Retains the distinct spellings of the English short word and full phrase. |
+| 重なる | `overlaps` | `前の形に重なる` | `overlapping the previous shape` | Partly overlaps bounding boxes. Excludes a prior point and a free line on either side. Retains the distinct spellings of the English short word and full phrase. |
 | 横切る | `crossing` | `前の形を横切る` | `crossing the previous shape` | Extends past opposite sides of the target. Fails if the current mark is too short. Excludes free line. |
 | 鏡写し | `mirrored` | `前の形と鏡写し` | `mirrored with the previous shape` | Reflects positions and orientations across an axis between two forms or groups. Does not copy color or tool. Incompatible bodies and free lines lose the relation. |
 
@@ -1774,7 +1774,7 @@ English DDL:
 Paper.
 Place one red thick-brush faint flat square at the center.
 Place one blue empty circle at the center overlapping the previous shape.
-Draw one black diagonal line at the center crossing the previous shape.
+Draw one black diagonal line length 0.5 at the center crossing the previous shape.
 ```
 
 Japanese DDL (reference):
@@ -1783,7 +1783,7 @@ Japanese DDL (reference):
 紙。
 中心に、赤の太筆の薄い塗りの四角を1個置く。
 前の形に重なる青の空の円を中心に1個置く。
-前の形を横切る黒の斜めの線を中心に1個引く。
+前の形を横切る長さ0.5の黒の斜めの線を中心に1個引く。
 ```
 
 ### 5.31. A mirror with a different color

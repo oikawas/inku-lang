@@ -8,6 +8,14 @@
 
 ## 未リリース
 
+### 2026-10-24 — inku-cliの `review unread` が未読語を記録するようにした
+
+`review unread` は語を `word` の鍵で送っていたが、`POST /api/feedback/unread-words` は `words`（配列）だけを読み、知らない鍵を捨てる。そのため何も記録されないのに「報告した」と表示していた（CLIのリファレンスの確かめで見つけた）。`words` の配列で送る。
+
+### 2026-10-24 — inku-cliのリファレンスを更新した
+
+inku-cliの引数でhelpの無かった41個とコマンド1つにhelpを書き、`cli/README.md` のhelp節を作り直した。manual（日英）の `cli-reference.md` に、載っていなかったコマンド3つ（`ddl-export`・`export-card`・`refine generate`）と引数40種類を足した。今あるhelp・README・manual・AI向けリファレンスをコードと照らし、誤りを直した。主なもの：`inspect` はモデルを順に回す（並列ではない）、`--stage1-provider` はサーバーに送らない、`--include-thinking` は常にnull、`plugin list` は署名した利用者なら使える、`export-card -o` は末尾が `/` か既存のディレクトリのときだけその中に書く、render limitsの現行の4つは作品に効き旧い5つは数を書き換えない、`review evaluate` の項目と要るAPIキー、`history state` の鍵は `newest_at`・`newest_id`。コードは変えていない。
+
 ### 2026-10-24 — リーダーが利用者をユーザーグループから外せた穴を塞いだ
 
 管理者でないリーダーが `PATCH /api/users/{user_id}` に `"group_id": null` を送ると、route の判定を通り抜け、自分のユーザーグループの利用者をグループの無い状態にできた（APIリファレンスの確かめで見つけた）。`group_id` が送られたときは、nullも含めて、自分のグループ以外を403で断る。管理者は今までどおりnullでグループを外せる。

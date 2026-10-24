@@ -2,7 +2,7 @@
 
 本ドキュメントは、AIエージェントが `inku-server` をコマンドラインから操作し、自律的に作品の生成、評価、および「系譜（Lineage）」を駆使した「推敲（Refine/Vary）」の品質向上プロセスをテスト・実行するためのガイドラインです。
 
-対象はinku v2.13.42（Web Build 929）です。旗の全一覧は`inku-cli リファレンス`が持ちます。
+対象はinku v2.15.241（Web Build 1317）です。旗の全一覧は`inku-cli リファレンス`が持ちます。
 
 今後の実providerテスト・比較では、次のモデルを使います（接続はChatGPTプランとGemini API（Cloud）の2系統）。NVIDIA NIMは候補・既定・fallback・Vision評価から外します。
 
@@ -57,7 +57,7 @@ uv run inku-cli refine perform PARENT_ID --kind layout -o ./test_output --png
 * **パラメータ `--kind` の選択基準**:
   * `layout`: 線の位置や大きさを再構築したいとき。新しい `composition_seed` を置き、Stage 2が再配置する
   * `color`: 他の色カタログを適用したいとき（LLM呼び出しなし）
-* **期待される出力**: 新しい派生作品の JSON メタデータ。
+* **期待される出力**: `-o`を省くと派生作品のメタデータを JSON で表示します。`-o DIR` を付けると DIR に `refine-<kind>-<render_hash_short>.json` と `.svg`（`--png` を付けると `.png` も）を書き、JSON の代わりに `Saved:` の行を表示します。
 
 `--kind` はサーバーへ `derivation_kind` として記録されます（順に `layout_change` / `catalog_change`）。系譜のedgeを検証するときはこの値を読みます。タッチ（`touch`）と読み取り（`reading`）の推敲は2026-10-14に削除しました。前に作った作品の辺は `touch_change`・`reinterpretation` のまま残ります。
 
@@ -89,12 +89,12 @@ uv run inku-cli lineage show PARENT_ID
 * **`plugin list`** — サーバーの宣言的プラグイン文書について、ロード済み／拒否、namespace、version、拒否理由をJSONで取得します。
 * **`plugin validate <FILE.inku-plugin.md>`** — ローカルのUTF-8文書本文を管理APIへ送り、コードや外部ファイルを実行せず構文検証します。
 * **`plugin reload`** — サーバーを再起動せず `server/plugins/` を明示再読込します。
-* これらは管理者セッションを必要とします。プラグイン試験で生成するファイルは `cli/out2/<build>-<version>-<benchmark>/` の一つのrunディレクトリにまとめ、Git追跡しません。
+* `plugin validate`と`plugin reload`は管理者セッションを必要とします（管理者でない場合は403）。`plugin list`はログイン済みセッションで実行できます。プラグイン試験で生成するファイルは `cli/out2/<build>-<version>-<benchmark>/` の一つのrunディレクトリにまとめ、Git追跡しません。
 
 ### 0.6 `reference`
 
 * **`reference [--md | --json] [-o FILE]`** — 実装内の語彙・定数テーブルの機械生成ダンプを取得します。既定は Markdown、`--json` で構造化 JSON。`-o` でファイルへ保存します。
-* 冒頭に APP_VERSION / BUILD_NUMBER / git short hash / 生成日時 / ロード中プラグインの namespace+version を付けます。
+* 冒頭に APP_VERSION / BUILD_NUMBER / git short hash / 生成日時 / インストール済みの各プラグインパッケージの namespace・name・version・status（拒否されたものを含む）を付けます。
 * 収録は8節（歳時記、正規化DDL定型句、展開層、Score schema、色解決、weight 特性、演奏、検証規約）で、すべて実装モジュールから取得します。値をどこにも手書きしない「鏡」であり、生成・受理・coerce のいかなる判定にも接続しません。
 * 設計・執筆セッションの冒頭資料として、生成した Markdown 一枚を添付する運用に使います。ログイン済みセッションで実行できます。
 
@@ -136,7 +136,7 @@ uv run inku-cli paint "TEXT" --stage1-model chatgpt:gpt-6-luna --sketch --catalo
 
 ### 3. `inspect`
 * **`inspect <TEXT> --models <MODEL_A,MODEL_B,...> -o DIR [--png]`**
-  * 同一の入力テキストに対して、複数の LLM モデルを並行して実行し、それぞれの DDL 解釈と描画ファイルをローカルに一括保存します。各モデルをStage 1とStage 2の両方に使います。
+  * 同一の入力テキストに対して、指定した複数の LLM モデルを順に（並行ではなく）実行し、それぞれの DDL 解釈と描画ファイルをローカルに一括保存します。各モデルをStage 1とStage 2の両方に使います。
   * どの LLM モデルが最も表現力に富む出力を生み出せるかを AI が検証・比較する際に使用します。
   * 今後の比較対象は`--models chatgpt:gpt-6-luna,gemini:gemma-4-31b-it`です。NIMは含めません。
 

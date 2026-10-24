@@ -136,7 +136,7 @@ test('the existing replay action reserves one drawing before awaiting its saved 
 	const harness = `export function setup(ensureVisibleLineageParentId, authorDdl) {
 		let replayStarting = false, ddl = 'edited numeric DDL', ddlGeneratedBaseline = 'saved DDL', reloading = false;
 		let reloadError, pendingCanvasAspectDerivation = null, lineageDetached = false;
-		let displayedHistoryItem = { lineage_node_id: 'parent' }, result = null, input = 'source';
+		let displayedHistoryItem = { lineage_node_id: 'parent' }, result = null, pipelineView = null, input = 'source';
 		let replayAbortController, replayStopRequested, elapsedStage1Ms, elapsedStage2Ms, elapsedTotalMs;
 		let tokensInStage1, tokensOutStage1, tokensInStage2, tokensOutStage2, stageLabel;
 		const hasDdlBody = () => true, submitWouldRefine = () => false, resetTargetScopedState = () => {};

@@ -78,12 +78,18 @@
 - On 2026-09-25 the fake provider was changed to answer in the v3 shape (`proposed` with replacement text per short ID `h1`) and to check that the prompt is v3. The test now also checks that, while approval is pending, the Score of the independent drawing (the red circle) remains as `complete_with_omissions` (the old test expected no Score during the wait).
 - Result: **resolved**.
 
-### F-13 Project Context version table and stale statements (open)
+### F-13 Project Context version table and stale statements (resolved)
 
-- `PROJECT_CONTEXT.ja.md` names its target version as v2.15.244 / Build 1320 at the top, but its "versions" table still reads Render Engine 68, DDL `ddl_version` 13 / `ddl_engine_version` 47, Android `2.1.4-android.80`, and Python package 2.7.2, and its terms section still says "Render Engine 66". Its Android section says the Android host owns the `rh3` computation. The English version (`PROJECT_CONTEXT.md`) says the same.
-- The implementation is Render Engine 93 (`core/crates/inku-render/src/lib.rs`), `ddl_version` 26 / `ddl_engine_version` 71 (`layer_versions.py`), Android `2.1.4-android.105` (`android/VERSION`), and `server/pyproject.toml` 2.15.240. Android, too, asks the shared core's `identity.rs` for `dh1` and `rh3` (JNI `descriptionHash` and `renderHash`).
-- The version list in `docs/spec/render-engine-history.md` also gives `server/pyproject.toml` as 2.15.33 (the Japanese version says the same).
-- Both are documents outside this set, so the 2026-10-24 reconciliation did not change them.
+- At the 2026-10-24 reconciliation, `PROJECT_CONTEXT.ja.md` named its target version as v2.15.244 / Build 1320 at the top, while its "versions" table still read Render Engine 68, DDL `ddl_version` 13 / `ddl_engine_version` 47, Android `2.1.4-android.80`, and Python package 2.7.2, and its terms section still said "Render Engine 66". Its Android section said the Android host owns the `rh3` computation. The English version (`PROJECT_CONTEXT.md`) said the same.
+- The implementation is Render Engine 93 (`core/crates/inku-render/src/lib.rs`), `ddl_version` 26 / `ddl_engine_version` 71 (`layer_versions.py`), Android `2.1.4-android.105` (`android/VERSION`), and `server/pyproject.toml` 2.15.240. Android, too, asks the shared core's `identity.rs` for `dh1` and `rh3` (JNI `descriptionHash` and `renderHash`). The version list in `docs/spec/render-engine-history.md` also gave `server/pyproject.toml` as 2.15.33 (the Japanese version said the same).
+- The same day, on the author's ruling (name the source of truth), the Render Engine, DDL, Android, and Python package rows of the version table were changed, like the application row, to name the constants in their sources without copying the values, with a note that the version list holds the current values. The number was taken out of "Render Engine 66" in the terms, and the Android section now says the host asks the shared core for the `dh1` and `rh3` computations. The version list keeps a "current" column by rule, so its value was corrected to 2.15.240. The English versions were corrected the same way.
+- Result: **resolved**.
+
+### F-14 Project Context Score version and saijiki statements (open)
+
+- `PROJECT_CONTEXT.ja.md`, in its pipeline figure and in the "Score and resources" item, says that against the compact baseline 0.10 only a work with mirroring needs 0.15. The implementation's `ScoreVersion` (`schema.py`) goes up to 0.22.0, and the lowerer chooses 0.11 through 0.22 according to the representation used.
+- The same document says the saijiki has ten categories, while the shared asset (`saijiki-v2.json`) holds fifteen categories and the relations (あいだ), and `SPEC.ja.md` §7.5 says sixteen categories.
+- The English version says the same. This was found while fixing F-13 and lies outside the author's ruling, so it has not been changed.
 - Result: **open**.
 
 ## Terms that need care across documents
@@ -128,6 +134,6 @@ All major nodes and edges have public-source implementation evidence. No node re
 
 ## Follow-up questions
 
-As of 2026-09-25, every difference through F-12 is resolved. F-13 was found in the 2026-10-24 reconciliation and is open. New differences are added here when found.
+As of 2026-09-25, every difference through F-12 is resolved. F-13 was found in the 2026-10-24 reconciliation and fixed the same day. F-14 is open. New differences are added here when found.
 
 These are not changes made by this review, so they were not copied into the ledger automatically.

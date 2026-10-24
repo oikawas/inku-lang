@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+### 2026-10-24 — architecture文書を今のcoreに合わせ、Project Contextの版の表を正本を名指す形にした
+
+`docs/architecture` の日英15対を、v2.15.244 / Build 1320 の実装（Render Engine 93、DDL 26 / DDL engine 71、135 route、DB registry v5、共有coreの10 crate）に合わせた。構図の読み・法則の段・配色の段、画像から書く作品、画面比の宣言とはめ込み、providerへの要求本文と答えの読み・作品の同一性・保存作品の推敲の規則の共有coreへの移管、Skiaの画面表示、macOSのhostを書き足した。`PROJECT_CONTEXT` の版の表は、Render Engine・DDL・Android・Pythonパッケージの値を写さずに正本の定数を名指す形にし、用語の「Render Engine 66」とAndroidの`rh3`の記述を直した。版の一覧の `server/pyproject.toml` の現在の値を2.15.240に直した。コードは変えていない。
+
 ### 2026-10-24 — inku-cliの `review unread` が未読語を記録するようにした
 
 `review unread` は語を `word` の鍵で送っていたが、`POST /api/feedback/unread-words` は `words`（配列）だけを読み、知らない鍵を捨てる。そのため何も記録されないのに「報告した」と表示していた（CLIのリファレンスの確かめで見つけた）。`words` の配列で送る。

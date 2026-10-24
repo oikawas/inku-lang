@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-24 — The architecture documents follow the current core, and the Project Context version table names its sources of truth
+
+The fifteen Japanese/English pairs in `docs/architecture` now match the v2.15.244 / Build 1320 implementation (Render Engine 93, DDL 26 / DDL engine 71, 135 routes, DB registry v5, ten shared-core crates). They add the composition reading, the laws stage and the color stage; works written from an image; the canvas ratio declaration and fitting; provider request bodies and answer reading, work identity and the rules of saved-work refinements moving into the shared core; the Skia screen display; and the macOS host. The `PROJECT_CONTEXT` version table now names the constants in their sources for Render Engine, DDL, Android, and the Python package instead of copying the values, and the terms' "Render Engine 66" and the Android `rh3` statement are corrected. The current `server/pyproject.toml` value in the version list is corrected to 2.15.240. No code changed.
+
 ### 2026-10-24 — inku-cli `review unread` now records the word
 
 `review unread` sent the word under a `word` key, while `POST /api/feedback/unread-words` reads only `words` (a list) and drops unknown keys, so nothing was recorded while the CLI said the word had been reported (found while checking the CLI reference). It now sends `words` as a list.

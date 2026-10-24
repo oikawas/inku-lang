@@ -78,12 +78,18 @@
 - 2026-09-25に、偽providerがv3の形（短いID `h1` ごとの`proposed`と置換文）で答え、promptがv3であることを確かめるよう直した。あわせて、承認待ちの時点で独立した描画（赤い円）のScoreが`complete_with_omissions`として残ることを確かめる検査へ改めた（旧testは承認待ちでScoreが無いことを期待していた）。
 - 判定: **解消済み**。
 
-### F-13 Project Contextの版の表と古い記述（未解消）
+### F-13 Project Contextの版の表と古い記述（解消）
 
-- `PROJECT_CONTEXT.ja.md`は冒頭で対象バージョンをv2.15.244 / Build 1320と名乗るが、「版」の表はRender Engine 68、DDL `ddl_version` 13 / `ddl_engine_version` 47、Android `2.1.4-android.80`、Pythonパッケージ2.7.2のままで、用語の節にも「Render Engine 66」が残る。Androidの節は`rh3`の計算をAndroid hostの所有と記す。英語版（`PROJECT_CONTEXT.md`）も同じである。
-- 実装はRender Engine 93（`core/crates/inku-render/src/lib.rs`）、`ddl_version` 26 / `ddl_engine_version` 71（`layer_versions.py`）、Android `2.1.4-android.105`（`android/VERSION`）、`server/pyproject.toml` 2.15.240である。`dh1`と`rh3`はAndroidも共有coreの`identity.rs`へ尋ねる（JNIの`descriptionHash`・`renderHash`）。
-- 版の一覧の`docs/spec/render-engine-history.ja.md`も、`server/pyproject.toml`を2.15.33と記す（英語版も同じ）。
-- いずれも本群の外の文書なので、2026-10-24の再照合では直していない。
+- 2026-10-24の再照合の時点で、`PROJECT_CONTEXT.ja.md`は冒頭で対象バージョンをv2.15.244 / Build 1320と名乗る一方、「版」の表はRender Engine 68、DDL `ddl_version` 13 / `ddl_engine_version` 47、Android `2.1.4-android.80`、Pythonパッケージ2.7.2のままで、用語の節にも「Render Engine 66」が残っていた。Androidの節は`rh3`の計算をAndroid hostの所有と記していた。英語版（`PROJECT_CONTEXT.md`）も同じだった。
+- 実装はRender Engine 93（`core/crates/inku-render/src/lib.rs`）、`ddl_version` 26 / `ddl_engine_version` 71（`layer_versions.py`）、Android `2.1.4-android.105`（`android/VERSION`）、`server/pyproject.toml` 2.15.240である。`dh1`と`rh3`はAndroidも共有coreの`identity.rs`へ尋ねる（JNIの`descriptionHash`・`renderHash`）。版の一覧の`docs/spec/render-engine-history.ja.md`も、`server/pyproject.toml`を2.15.33と記していた（英語版も同じ）。
+- 同日、作者の裁定（正本を名指す形に直す）で、版の表のRender Engine・DDL・Android・Pythonパッケージの行を、アプリの行と同じく値を写さずに正本の定数を名指す形へ改め、現在の値は版の一覧が持つと書き足した。用語の「Render Engine 66」から数を外し、Androidの節を「`dh1`・`rh3`の計算は共有coreへ尋ねる」へ直した。版の一覧は「現在」の列を持つ決まりなので、値を2.15.240へ直した。英語版も同じように直した。
+- 判定: **解消済み**。
+
+### F-14 Project ContextのScore版と歳時記の記述（未解消）
+
+- `PROJECT_CONTEXT.ja.md`は、pipelineの図と「Scoreと資源」の項で、compactの基準0.10に対して鏡写しを持つ作品だけが0.15を要ると記す。実装の`ScoreVersion`（`schema.py`）は0.22.0までを持ち、lowererは使う表現に応じて0.11〜0.22を選ぶ。
+- 同じ文書は歳時記を10カテゴリと記すが、共有asset（`saijiki-v2.json`）は15のカテゴリと関係（あいだ）を持ち、`SPEC.ja.md` §7.5は16カテゴリと記す。
+- 英語版も同じである。F-13を直すときに見つけたが、作者の裁定の範囲の外なので直していない。
 - 判定: **未解消**。
 
 ## 文書間で注意が必要な語
@@ -128,6 +134,6 @@ Session、current-workのsubmit/replay/stop、Batch/Demoの非同期lifecycle、
 
 ## 今後確認すべき質問
 
-F-12までの差異は、2026-09-25時点ですべて解消した。F-13は2026-10-24の再照合で見つけ、未解消である。新しい差異は見つけた時点で本書へ加える。
+F-12までの差異は、2026-09-25時点ですべて解消した。F-13は2026-10-24の再照合で見つけ、同日に直した。F-14は未解消である。新しい差異は見つけた時点で本書へ加える。
 
 これらは本調査で実装・仕様を変更する課題ではないため、台帳への自動転記はしていない。

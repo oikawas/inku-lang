@@ -7,7 +7,7 @@
 | 作成日 | 2026-08-10（JST）、全面更新 2026-08-17、Web・core refactoring再照合 2026-08-24、SQLite persistence refactoring完了を再照合 2026-08-27、Typed DDL Step 8完了を再照合 2026-09-02、共有Rust pipeline cutover後の全面再照合 2026-09-25、2026-10-24までのcoreの更新を再照合 2026-10-24 |
 | source branch / 実装commit | `main` / `086fbe3ea45dd0784b911a7599ef88f60b0c85dc`（本書更新前の実装baseline） |
 | source状態 | 実装baselineではclean。2026-10-24の更新は文書だけで、実装を変えない |
-| Project Context | `PROJECT_CONTEXT.ja.md`、対象 `v2.15.244 / Build 1320`（版の表は正本を名指す。残る古い記述は`known-differences.ja.md` F-14） |
+| Project Context | `PROJECT_CONTEXT.ja.md`、対象 `v2.15.244 / Build 1320`（版の表は正本を名指す。`known-differences.ja.md` F-13・F-14） |
 | 日本語仕様 | `SPEC.ja.md`、文書版 `v1.92.0` |
 | Web / app | `web/APP_VERSION` = `v2.15.244`、`web/BUILD_NUMBER` = `1320` |
 | Render Engine | `default` / `93`（`core/crates/inku-render/src/lib.rs`）、core API `0.1.0` |

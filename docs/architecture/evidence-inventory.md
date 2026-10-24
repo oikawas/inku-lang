@@ -7,7 +7,7 @@
 | Date | 2026-08-10 (JST); fully refreshed 2026-08-17; Web/core refactoring reconciled 2026-08-24; completed SQLite persistence refactoring reconciled 2026-08-27; completed typed DDL Step 8 reconciled 2026-09-02; fully reconciled after the shared Rust pipeline cutover 2026-09-25; the core updates through 2026-10-24 reconciled 2026-10-24 |
 | Source branch / implementation commit | `main` / `086fbe3ea45dd0784b911a7599ef88f60b0c85dc` (implementation baseline before this document update) |
 | Source state | Clean at the implementation baseline. The 2026-10-24 update changes documents only, not the implementation |
-| Project Context | `PROJECT_CONTEXT.ja.md`, target `v2.15.244 / Build 1320` (its version table names the sources of truth; the remaining stale statements are `known-differences.md` F-14) |
+| Project Context | `PROJECT_CONTEXT.ja.md`, target `v2.15.244 / Build 1320` (its version table names the sources of truth; `known-differences.md` F-13 and F-14) |
 | Japanese specification | `SPEC.ja.md`, document version `v1.92.0` |
 | Web / app | `web/APP_VERSION` = `v2.15.244`; `web/BUILD_NUMBER` = `1320` |
 | Render Engine | `default` / `93` (`core/crates/inku-render/src/lib.rs`); core API `0.1.0` |

@@ -4721,6 +4721,21 @@ the compose result through `POST /api/history` so the output appears in normal
 server history.  `/api/compose` returns the effective DDL after Stage 1.5
 expansion, and CLI output/history use that effective DDL for DDL-to-render
 benchmark parity.
+
+`inku-cli paint --image PATH` calls the same API, in the same order, as the web
+image tab. It sends the image bytes to `POST /api/pipeline/images`, starts
+`POST /api/pipeline/variations` with `kind=image` and the source note
+(`--provenance` / `--provenance-file`, empty by default) as `text`, waits for
+the run, and asks for `perform` once the Score arrives. The options are the
+image tab's too: the Vision model (`--vision-model`, defaulting to the CLI
+Vision setting) for both stages, no sketch, no wild, `instruction_lang=ja` and
+`canvas_fit=contain`. Without `--canvas-aspect` the paper is
+`canvas_format_id=image`, the paper nearest the image's ratio. The pipeline
+saves by default, so the CLI always sends `save_history`, as `false` unless
+`--save-history` is given. A saved work keeps the source note and `image_ddl`
+apart from its description. The description, `--input-mode`, the sketch,
+`--wild`, the drawing model and `--include-thinking` are refused with it. When
+the CLI is interrupted it sends `cancel` to the run.
 The CLI sends instruction language through `--instruction-lang auto|ja|en`.
 `auto` is the default and lets the server resolve Japanese or English from the
 input text.  `--ui-lang` may be supplied as display-context metadata, but it

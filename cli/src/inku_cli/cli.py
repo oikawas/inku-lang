@@ -256,6 +256,7 @@ class ApiClient:
         path: str,
         *,
         data: Any = None,
+        content: bytes | None = None,
         query: dict[str, Any] | None = None,
         auth: bool = True,
         headers: dict[str, str] | None = None,
@@ -264,6 +265,7 @@ class ApiClient:
             method,
             path,
             data=data,
+            content=content,
             query=query,
             auth=auth,
             headers=headers,
@@ -280,6 +282,7 @@ class ApiClient:
         path: str,
         *,
         data: Any = None,
+        content: bytes | None = None,
         query: dict[str, Any] | None = None,
         auth: bool = True,
         headers: dict[str, str] | None = None,
@@ -292,7 +295,11 @@ class ApiClient:
         body = None
         request_headers = {"Accept": "application/json"}
         request_headers.update(headers or {})
-        if data is not None:
+        if content is not None:
+            # A file sent as it is, such as the image POST /api/pipeline/images reads.
+            body = content
+            request_headers.setdefault("Content-Type", "application/octet-stream")
+        elif data is not None:
             body = json.dumps(data, ensure_ascii=False).encode("utf-8")
             request_headers.setdefault("Content-Type", "application/json")
         if auth:
@@ -2340,7 +2347,212 @@ def command_models(args: argparse.Namespace) -> int:
     _print_json(data)
     return 0
 
+PIPELINE_POLL_SECONDS = 0.5
+
+
+def _image_flag_conflicts(args: argparse.Namespace) -> list[str]:
+    """The paint flags an image run has no place for.
+
+    The web image tab draws without a description, a sketch or the wild
+    performance, and with the Vision model alone, so none of these can be
+    passed on; refusing them says so instead of dropping them unseen.
+    """
+    conflicts = []
+    if args.text or args.file:
+        conflicts.append("a description (TEXT or --file)")
+    if args.input_mode != "paint":
+        conflicts.append("--input-mode")
+    for flag, value in (
+        ("--sketch", args.sketch),
+        ("--sketch-grain", args.sketch_grain),
+        ("--sketch-text", args.sketch_text),
+        ("--wild", args.wild),
+        ("--stage1-provider", args.stage1_provider),
+        ("--stage1-model", args.stage1_model),
+        ("--include-thinking", args.include_thinking),
+    ):
+        if value:
+            conflicts.append(flag)
+    return conflicts
+
+
+def _image_pipeline_options(
+    args: argparse.Namespace,
+    *,
+    vision_model: str,
+    color_catalog: str,
+) -> dict[str, Any]:
+    # The options the web image tab sends (state.svelte.ts submitImage): the
+    # Vision model writes the DDL in Japanese, the paper is fitted to the image
+    # and there is no sketch or wild performance. The server saves a pipeline
+    # work unless told not to, so `save_history` is always named.
+    options: dict[str, Any] = {
+        "stage1_model": vision_model,
+        "stage2_model": vision_model,
+        "sketch": "off",
+        "wild": False,
+        "instruction_lang": "ja",
+        "ui_lang": args.ui_lang,
+        "catalog_id": color_catalog,
+        "catalog_mode": args.catalog_mode,
+        "canvas_fit": "contain",
+        "render_seed": args.render_seed,
+        "composition_seed": args.composition_seed,
+        "limits": _limits_argument(args.limits),
+        "save_history": bool(args.save_history),
+        "save_artifacts": args.save_artifacts,
+        "history_input": args.history_input,
+    }
+    return {k: v for k, v in options.items() if v is not None}
+
+
+def _await_pipeline(client: ApiClient, view: dict[str, Any]) -> dict[str, Any]:
+    while view.get("busy"):
+        time.sleep(PIPELINE_POLL_SECONDS)
+        view, _ = client.request("GET", f"/api/pipeline/variations/{urllib.parse.quote(str(view['variation_id']), safe='')}")
+    return view
+
+
+def _pipeline_command(client: ApiClient, view: dict[str, Any], command: dict[str, Any]) -> dict[str, Any]:
+    execution = urllib.parse.quote(str(view["execution_id"]), safe="")
+    updated, _ = client.request("POST", f"/api/pipeline/executions/{execution}/commands", data=command)
+    return updated
+
+
+def _run_image_pipeline(
+    client: ApiClient,
+    image: bytes,
+    *,
+    provenance: str,
+    canvas_format_id: str,
+    options: dict[str, Any],
+    started: list[dict[str, Any]],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Draw from an image the way the web image tab does; `started` receives the run.
+
+    The server keeps the image in memory only, until the run takes it.
+    """
+    prepared, _ = client.request("POST", "/api/pipeline/images", content=image)
+    canvas_aspect = prepared["nearest_format_id"] if canvas_format_id == "image" else canvas_format_id
+    view, _ = client.request("POST", "/api/pipeline/variations", data={
+        "kind": "image",
+        "text": provenance,
+        "image_id": prepared["image_id"],
+        "canvas_format_id": canvas_format_id,
+        "options": {**options, "canvas_aspect": canvas_aspect},
+    })
+    started.append(view)
+    view = _await_pipeline(client, view)
+    phase = (view.get("phase") or {}).get("tag")
+    if (
+        (view.get("delivery") or {}).get("score")
+        and not view.get("result")
+        and phase != "awaiting_patch_approval"
+        and not view.get("image_failure")
+    ):
+        view = _await_pipeline(client, _pipeline_command(client, view, {"tag": "perform"}))
+    return prepared, view
+
+
+def _image_run_result(view: dict[str, Any]) -> dict[str, Any]:
+    """The drawing of a finished image run, or the reason there is none."""
+    failure = view.get("image_failure") or view.get("current_render_refusal") or view.get("provider_failure")
+    if failure:
+        if isinstance(failure, dict):
+            raise CliError(f"image run failed: {failure.get('code')}: {failure.get('message') or ''}".rstrip(": "))
+        raise CliError(f"image run failed: {failure}")
+    phase = view.get("phase") or {}
+    if phase.get("tag") == "awaiting_patch_approval":
+        raise CliError(f"image run {view.get('variation_id')} waits for a patch approval; open it in the web UI")
+    result = view.get("result")
+    if not isinstance(result, dict) or not result.get("svg"):
+        reason = phase.get("reason") or phase.get("tag") or "unknown"
+        raise CliError(f"image run finished without a drawing ({reason})")
+    return result
+
+
+def _command_paint_image(args: argparse.Namespace) -> int:
+    conflicts = _image_flag_conflicts(args)
+    if conflicts:
+        raise CliError(f"--image cannot be combined with {', '.join(conflicts)}")
+    if args.provenance is not None and args.provenance_file:
+        raise CliError("give the provenance with --provenance or --provenance-file, not both")
+    config = load_config()
+    vision_model = args.vision_model or config.vision_model
+    if not vision_model:
+        raise CliError("--image needs a Vision model: pass --vision-model or save one with `inku-cli models --vision-model`")
+    image_path = Path(args.image)
+    try:
+        image = image_path.read_bytes()
+    except OSError as exc:
+        raise CliError(f"failed to read the image: {image_path}") from exc
+    if args.provenance_file:
+        provenance = _read_text_argument(None, args.provenance_file)
+    else:
+        provenance = (args.provenance or "").strip()
+    timeout_seconds = _resolved_timeout_seconds(args, config)
+    client = ApiClient(args.base_url or config.base_url, config.token, timeout_seconds=timeout_seconds)
+    started_at = int(time.time() * 1000)
+    catalog_data = _fetch_color_catalogs(client)
+    color_catalog = _resolved_color_catalog(args, config, catalog_data)
+    print(f"Vision model: {_display_model(vision_model)}", file=sys.stderr)
+    _print_color_catalog_summary(color_catalog, catalog_data)
+    started: list[dict[str, Any]] = []
+    try:
+        prepared, view = _run_with_progress(
+            "drawing from the image",
+            lambda: _run_image_pipeline(
+                client,
+                image,
+                provenance=provenance,
+                canvas_format_id=args.canvas_aspect or "image",
+                options=_image_pipeline_options(args, vision_model=vision_model, color_catalog=color_catalog),
+                started=started,
+            ),
+            enabled=not args.no_progress,
+        )
+    except KeyboardInterrupt:
+        # The run goes on at the server after the CLI stops; stop it there too.
+        if started:
+            try:
+                _pipeline_command(client, started[-1], {"tag": "cancel"})
+            except CliError:
+                pass
+        raise
+    result = _image_run_result(view)
+    prefix = args.prefix or f"inku-{started_at}"
+    output_result = _result_with_svg_profile(client, result, svg_profile=args.svg_profile, color_catalog=color_catalog)
+    paths = _write_paint_outputs(output_result, out_dir=Path(args.out_dir) if args.out_dir else None, prefix=prefix, png=args.png)
+    summary = {
+        "input_mode": "image",
+        "image": str(image_path),
+        "image_size": {
+            "original": [prepared.get("original_width"), prepared.get("original_height")],
+            "sent": [prepared.get("width"), prepared.get("height")],
+        },
+        "provenance": result.get("image_provenance", provenance),
+        "vision_model": vision_model,
+        "vision_model_display": _display_model(vision_model),
+        "variation_id": view.get("variation_id"),
+        "timeout_seconds": timeout_seconds,
+        "svg_profile": args.svg_profile,
+        **_color_catalog_summary(color_catalog, catalog_data),
+        **_render_response_summary(result),
+        "history_id": result.get("history_id"),
+        "elapsed_total_ms": result.get("elapsed_total_ms"),
+        "elapsed_image_ms": result.get("elapsed_image_ms"),
+        **_score_metrics(result.get("score")),
+        "paths": paths,
+    }
+    _print_json({**output_result, **summary} if args.full_json else summary)
+    return 0
+
+
 def command_paint(args: argparse.Namespace) -> int:
+    if args.image:
+        return _command_paint_image(args)
+    if args.provenance is not None or args.provenance_file or args.vision_model:
+        raise CliError("--provenance, --provenance-file and --vision-model are for --image")
     config = load_config()
     timeout_seconds = _resolved_timeout_seconds(args, config)
     client = ApiClient(args.base_url or config.base_url, config.token, timeout_seconds=timeout_seconds)
@@ -4108,6 +4320,18 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     else:
         parser.add_argument("text", nargs="?", help="the description to draw")
         parser.add_argument("--file", "-f", help="read the description from a UTF-8 file, or '-'")
+        parser.add_argument(
+            "--image",
+            metavar="PATH",
+            help="draw from this image instead of a description, as the web image tab does: the Vision model writes the DDL in Japanese and the paper follows the image unless --canvas-aspect names one; the server holds the image in memory only and never saves it",
+        )
+        parser.add_argument(
+            "--provenance",
+            metavar="TEXT",
+            help="with --image: the source note of the image (where it came from), kept with the work apart from the description and never sent to the models",
+        )
+        parser.add_argument("--provenance-file", metavar="PATH", help="with --image: read the source note from a UTF-8 file, or '-'")
+        parser.add_argument("--vision-model", help="with --image: the Vision model that writes the DDL (default: the CLI Vision setting)")
     parser.add_argument("--out-dir", "-o", help="directory for JSON/SVG/PNG outputs")
     parser.add_argument("--prefix", help="output filename prefix")
     parser.add_argument("--png", action="store_true", help="also render PNG output when --out-dir is set")
@@ -4166,7 +4390,7 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     parser.add_argument("--instruction-lang", default="auto", choices=["auto", "ja", "en"])
     parser.add_argument("--ui-lang")
     parser.add_argument("--include-thinking", action="store_true")
-    parser.add_argument("--save-history", action="store_true")
+    parser.add_argument("--save-history", action="store_true", help="add the drawing to the server's history database as a work; without it nothing is saved")
     parser.add_argument("--save-artifacts", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument("--no-progress", action="store_true", help="disable elapsed-time progress animation")
     if batch:

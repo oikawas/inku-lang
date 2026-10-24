@@ -84,6 +84,19 @@ class SharedAuthoringPipeline(
             ),
         )
 
+    /** Starts a work written from an image ([PreparedImageDdlInput.authoringJson]). */
+    suspend fun startImageView(request: SharedPipelineRunRequest, imageJson: String): PipelineView =
+        host.start(
+            PipelineStartRequest(
+                ownerId = request.ownerId,
+                configJson = request.config.configJson,
+                authoring = PipelineAuthoring.Image(imageJson, request.config.autoCatalog),
+                models = request.models,
+                context = request.context,
+                hostContextJson = durableHostContext(request),
+            ),
+        )
+
     suspend fun renderReady(
         ownerId: String,
         view: PipelineView,

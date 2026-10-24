@@ -69,7 +69,11 @@ class CameraInstantPrintCoordinatorTest {
     @Test
     fun cancellationAtEveryBlockingStagePreventsSave() = runBlocking {
         CameraInstantPrintPhase.entries
-            .filterNot { it == CameraInstantPrintPhase.Completed || it == CameraInstantPrintPhase.WritingDescription }
+            // Writing from the photo is the image route's stage (runFromImage, below).
+            .filterNot {
+                it == CameraInstantPrintPhase.Completed || it == CameraInstantPrintPhase.WritingDescription ||
+                    it == CameraInstantPrintPhase.WritingFromImage
+            }
             .forEach { blockedPhase ->
                 val entered = CompletableDeferred<Unit>()
                 val release = CompletableDeferred<Unit>()
@@ -104,6 +108,51 @@ class CameraInstantPrintCoordinatorTest {
                 job.cancelAndJoin()
                 assertEquals("$blockedPhase must save nothing", 0, saves)
             }
+    }
+
+    @Test
+    fun aPhotoWrittenByTheCoreSkipsAnalysisAndDescriptionAndCancelsBeforeSave() = runBlocking {
+        val phases = mutableListOf<CameraInstantPrintPhase>()
+        val outcome = CameraInstantPrintCoordinator(onPhase = phases::add).runFromImage(
+            prepare = { "photo" },
+            onLocalReady = { assertEquals("photo", it) },
+            interpret = { "$it ddl" },
+            compose = { _, interpreted, progress ->
+                assertEquals("photo ddl", interpreted)
+                progress(CameraInstantPrintPhase.Rendering)
+                progress(CameraInstantPrintPhase.Saving)
+                "saved"
+            },
+        )
+        assertEquals("saved", outcome.result)
+        assertEquals(
+            listOf(
+                CameraInstantPrintPhase.PreparingImage,
+                CameraInstantPrintPhase.WritingFromImage,
+                CameraInstantPrintPhase.Composing,
+                CameraInstantPrintPhase.Rendering,
+                CameraInstantPrintPhase.Saving,
+                CameraInstantPrintPhase.Completed,
+            ),
+            phases,
+        )
+
+        val entered = CompletableDeferred<Unit>()
+        var saves = 0
+        val coordinator = CameraInstantPrintCoordinator(
+            onPhase = { if (it == CameraInstantPrintPhase.WritingFromImage) entered.complete(Unit) },
+        )
+        val job = launch {
+            coordinator.runFromImage(
+                prepare = { "photo" },
+                onLocalReady = {},
+                interpret = { CompletableDeferred<Unit>().await(); "ddl" },
+                compose = { _, _, _ -> saves += 1; "saved" },
+            )
+        }
+        entered.await()
+        job.cancelAndJoin()
+        assertEquals(0, saves)
     }
 
     @Test

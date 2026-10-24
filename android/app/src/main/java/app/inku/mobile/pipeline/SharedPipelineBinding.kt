@@ -40,6 +40,22 @@ interface SharedPipelineBinding {
     fun providerWire(inputBytes: ByteArray): ByteArray =
         """{"error":"unavailable"}""".encodeToByteArray()
 
+    /**
+     * How the image a work is written from is prepared and the drawing shown
+     * beside it (`inku.image-input-policy.v1`). A binding without it refuses
+     * rather than letting Kotlin pick the sizes.
+     */
+    fun imageInputPolicy(): String =
+        throw PipelineHostException("binding_image_unavailable")
+
+    /** `{"original": [w, h]}` in, `inku.image-canvas.v1` or `{"error"}` out. */
+    fun imageCanvas(inputBytes: ByteArray): ByteArray =
+        """{"error":"unavailable"}""".encodeToByteArray()
+
+    /** The `draw_image_review` SVG for a snapshot waiting on it: `{"svg"}` or `{"error"}`. */
+    fun imageReviewSvg(snapshotBytes: ByteArray, requestBytes: ByteArray): ByteArray =
+        """{"error":"unavailable"}""".encodeToByteArray()
+
     /** The shared record's three states; an older binding reports no recorded ranges. */
     fun completionRangeStates(inputBytes: ByteArray): ByteArray =
         """{"schema":"inku.completion-range-states.v1","ranges":[]}""".encodeToByteArray()

@@ -24,6 +24,8 @@ fun interface PipelineProviderEffect {
 /** Executes one action once. Retry, fallback, and response judgment stay in Rust. */
 class SingleAttemptModelEffectProvider(
     private val provider: ModelProvider,
+    /** The images an image stage's prompt names; the host stops a run that lost them. */
+    private val images: PipelineImageStore? = null,
     /**
      * Told of every failed attempt, with the failure class the core receives
      * and the server's `failure_detail` when one applies
@@ -44,6 +46,9 @@ class SingleAttemptModelEffectProvider(
             "choose_laws" -> "laws_chosen"
             "choose_colors" -> "colors_chosen"
             "complete_visible_ddl_holes" -> "visible_ddl_hole_patch_generated"
+            "select_image_catalog" -> "image_catalog_selected"
+            "write_image_ddl" -> "image_ddl_written"
+            "review_image_ddl" -> "image_ddl_reviewed"
             else -> throw PipelineHostException("unsupported_provider_effect")
         }
         val identity = action.requiredObject("identity")
@@ -51,7 +56,21 @@ class SingleAttemptModelEffectProvider(
         val timeoutMs = action.requiredCanonicalLong("timeout_ms")
         val stage2 = tag == "complete_visible_ddl_holes"
         val modelId = if (stage2) models.stage2ModelId else models.stage1ModelId
-        val maxTokens = if (stage2) models.holeMaxTokens else models.stage1MaxTokens
+        // The catalog choice keeps Stage 1's limit, as on the server.
+        val maxTokens = when {
+            stage2 -> models.holeMaxTokens
+            tag == "write_image_ddl" || tag == "review_image_ddl" -> models.imageMaxTokens
+            else -> models.stage1MaxTokens
+        }
+        val pipelineImages = prompt.optJSONArray("images")?.takeIf { it.length() > 0 }?.let { references ->
+            app.inku.mobile.llm.PipelineImages(
+                referencesJson = references.toString(),
+                dataUrls = (0 until references.length()).map { index ->
+                    val sha256 = references.getJSONObject(index).requiredString("sha256")
+                    images?.dataUrl(sha256) ?: throw PipelineHostException("image_missing")
+                },
+            )
+        }
         require(maxTokens > 0) { "positive model token limit required" }
         val started = System.nanoTime()
         return try {
@@ -71,6 +90,7 @@ class SingleAttemptModelEffectProvider(
                         timeoutMs = timeoutMs,
                         pipelineAction = prompt.requiredString("action_name"),
                         chatGptSession = models.chatGptSession,
+                        pipelineImages = pipelineImages,
                     ),
                 ).text
             }

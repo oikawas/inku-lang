@@ -20,6 +20,8 @@ sealed interface CameraCaptureState {
     data object AnalyzingLocally : CameraCaptureState
     data object WritingDescription : CameraCaptureState
     data object InterpretingStage1 : CameraCaptureState
+    /** The shared core writes and reviews the DDL from the photo (SPEC §12.6.6). */
+    data object WritingFromImage : CameraCaptureState
     data object Composing : CameraCaptureState
     data object Rendering : CameraCaptureState
     data object Saving : CameraCaptureState
@@ -52,6 +54,7 @@ internal val CameraCaptureState.locksCameraInteraction: Boolean
         CameraCaptureState.AnalyzingLocally,
         CameraCaptureState.WritingDescription,
         CameraCaptureState.InterpretingStage1,
+        CameraCaptureState.WritingFromImage,
         CameraCaptureState.Composing,
         CameraCaptureState.Rendering,
         CameraCaptureState.Saving,

@@ -32,6 +32,10 @@ class SharedPipelineHost(
     /** Why a model attempt failed beyond its class (`credentials_unavailable`), by action id. */
     private val failureDetail: (actionId: String) -> String? = { null },
     private val readSvgLimitBytes: suspend () -> Long = { SvgOutputLimit.DEFAULT_BYTES },
+    /** The images the runs written from an image send; null for a host without them. */
+    private val images: PipelineImageStore? = null,
+    /** Draws a written DDL beside its image (`draw_image_review`); null answers undrawn. */
+    private val imageReview: ImageReviewPort? = null,
 ) {
     private val sessions = mutableMapOf<String, Session>()
     private val sessionsMutex = Mutex()
@@ -94,6 +98,10 @@ class SharedPipelineHost(
                         .put("direction", JSONObject(authoring.directionJson))
                         .also { value -> authoring.completionRangesJson?.let { value.put("completion_ranges", JSONObject(it)) } }
                         .also { value -> putLawsRecords(value, authoring.lawsRecordsJson) }
+                    is PipelineAuthoring.Image -> JSONObject()
+                        .put("tag", "image")
+                        .put("image", JSONObject(authoring.imageJson))
+                        .put("auto_catalog", authoring.autoCatalog)
                 },
             )
         val messageId = newId()
@@ -211,6 +219,7 @@ class SharedPipelineHost(
                 stage2ModelId = models.requiredString("stage2_model_id"),
                 stage1MaxTokens = models.getInt("stage1_max_tokens"),
                 holeMaxTokens = models.getInt("hole_max_tokens"),
+                imageMaxTokens = models.optInt("image_max_tokens", IMAGE_DDL_MAX_TOKENS),
                 chatGptSession = models.optJSONObject("chatgpt_session")?.let {
                     app.inku.mobile.llm.ChatGptSessionRef(it.requiredString("profile_id"), it.getLong("generation"))
                 },
@@ -313,6 +322,14 @@ class SharedPipelineHost(
                 "choose_laws",
                 "choose_colors",
                 -> if (!runProviderEffect(session, action)) return view(session)
+                "select_image_catalog",
+                "write_image_ddl",
+                "review_image_ddl",
+                -> {
+                    stopWithoutImages(session, action)
+                    if (!runProviderEffect(session, action)) return view(session)
+                }
+                "draw_image_review" -> runImageReviewEffect(session, action)
                 else -> throw PipelineHostException("unsupported_pipeline_effect")
             }
         }
@@ -340,6 +357,58 @@ class SharedPipelineHost(
                 session,
                 JSONObject().put("tag", "effect_result").put("result", result),
             )
+        }
+    }
+
+    /**
+     * A request naming an image this process no longer holds -- the app was
+     * stopped mid-run -- is not sent: the run is cancelled, as the server
+     * cancels one whose worker lost the image (`image_missing`).
+     */
+    private suspend fun stopWithoutImages(session: Session, action: JSONObject) {
+        val references = action.optJSONObject("payload")?.optJSONObject("prompt")?.optJSONArray("images") ?: return
+        val missing = (0 until references.length()).any { index ->
+            images?.has(references.getJSONObject(index).requiredString("sha256")) != true
+        }
+        if (!missing) return
+        session.mutex.withLock {
+            if (sameAction(session.snapshot().optJSONObject("action"), action)) {
+                advanceLocked(session, JSONObject().put("tag", "cancel"))
+            }
+        }
+        throw PipelineHostException("image_missing")
+    }
+
+    /**
+     * Draws the written DDL to show beside the image (server `_image_review`).
+     * A drawing that cannot be made answers undrawn, and the core commits the
+     * DDL as written.
+     */
+    private suspend fun runImageReviewEffect(session: Session, action: JSONObject) {
+        val (snapshotBytes, hostContext) = session.mutex.withLock {
+            if (!sameAction(session.snapshot().optJSONObject("action"), action)) return
+            session.snapshotBytes to session.hostContextJson
+        }
+        val identity = JSONObject(action.requiredObject("identity").toString())
+        val drawing = imageReview?.let { port ->
+            try {
+                port.draw(snapshotBytes, hostContext, readSvgLimitBytes())
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Throwable) {
+                // Neither the SVG nor an image enters this diagnostic.
+                android.util.Log.w("InkuPipeline", "pipeline_image_review_undrawn execution_id=${session.snapshot().optString("execution_id")}")
+                null
+            }
+        }
+        val result = if (drawing != null) {
+            JSONObject().put("tag", "image_review_drawn").put("identity", identity).put("drawing", drawing)
+        } else {
+            JSONObject().put("tag", "image_review_undrawn").put("identity", identity)
+        }
+        session.mutex.withLock {
+            if (!sameAction(session.snapshot().optJSONObject("action"), action)) return
+            advanceLocked(session, JSONObject().put("tag", "effect_result").put("result", result))
         }
     }
 
@@ -640,6 +709,7 @@ class SharedPipelineHost(
                 .put("stage2_model_id", session.models.stage2ModelId)
                 .put("stage1_max_tokens", session.models.stage1MaxTokens)
                 .put("hole_max_tokens", session.models.holeMaxTokens)
+                .put("image_max_tokens", session.models.imageMaxTokens)
                 .apply { session.models.chatGptSession?.let {
                     put("chatgpt_session", JSONObject().put("profile_id", it.profileId).put("generation", it.generation))
                 } },
@@ -834,6 +904,10 @@ class SharedPipelineHost(
             "choose_laws" to "laws",
             "choose_colors" to "colors",
             "complete_visible_ddl_holes" to "stage2",
+            // The image stages are timed apart from Stage 1 (server `provider_stage_record`).
+            "select_image_catalog" to "image",
+            "write_image_ddl" to "image",
+            "review_image_ddl" to "image",
         )
         /** The server's `_SYSTEM_PROMPT_STAGES` (`pipeline_product.py`), in the order a work calls them. */
         val SYSTEM_PROMPT_STAGES = listOf("sketch", "stage1", "composition", "laws", "colors", "stage2")

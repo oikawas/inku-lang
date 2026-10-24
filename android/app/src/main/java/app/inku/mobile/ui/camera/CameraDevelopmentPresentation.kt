@@ -42,6 +42,11 @@ internal fun cameraDevelopmentPresentation(
             "Planning the composition",
             CameraDevelopmentEffect.GrainAndForms,
         )
+        CameraCaptureState.WritingFromImage -> Triple(
+            "写真から指示書を書いています",
+            "Writing the instructions from your photo",
+            CameraDevelopmentEffect.GrainAndForms,
+        )
         CameraCaptureState.Composing -> Triple(
             "色と形を組み立てています",
             "Building the colors and forms",

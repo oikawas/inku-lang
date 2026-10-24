@@ -35,7 +35,15 @@ data class ModelRequest(
     val demoInstruction: Boolean = false,
     /** A square PNG for autonomous refinement Vision only. */
     val imagePng: ByteArray? = null,
+    /**
+     * A pipeline request's images (the image stages, SPEC §12.6.6): the
+     * prompt's `images` references as the core wrote them, and the `data:`
+     * URLs of those images in the same order. The core checks one against the other.
+     */
+    val pipelineImages: PipelineImages? = null,
 )
+
+class PipelineImages(val referencesJson: String, val dataUrls: List<String>)
 
 internal data class ModelImage(val bytes: ByteArray, val mimeType: String)
 

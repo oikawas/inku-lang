@@ -46,6 +46,7 @@ internal fun savedPipelineRevision(state: InkuUiState): Boolean = runCatching {
 private val STAGE_OF_REASON = mapOf(
     "stage1_failed" to "stage1",
     "hole_completion_failed" to "stage2",
+    "image_ddl_failed" to "image",
 )
 
 /**

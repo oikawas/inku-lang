@@ -70,6 +70,7 @@ import app.inku.mobile.pipeline.NativePipelineBridge
 import app.inku.mobile.pipeline.PipelineView
 import app.inku.mobile.pipeline.ComposeFromDdlProgress
 import app.inku.mobile.pipeline.PaintRequest
+import app.inku.mobile.pipeline.PreparedImageDdlInput
 import app.inku.mobile.pipeline.drawingModelOf
 import app.inku.mobile.pipeline.PaintResult
 import app.inku.mobile.pipeline.InterpretResult
@@ -1032,6 +1033,14 @@ class InkuRepository(
             ),
         )
     }
+
+    /**
+     * Writes a camera work's DDL from its photo with one Vision model
+     * (SPEC §12.6.6). [composeFromDdl] then draws the same execution with
+     * the same settings ([CameraImageDdl.request]).
+     */
+    suspend fun interpretImage(image: PreparedImageDdlInput, request: PaintRequest): InterpretResult =
+        pipeline.interpretImage(request, image)
 
     suspend fun composeFromDdl(description: String, ddl: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, uiLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput(), inputProvenance: CameraInputProvenance? = null, onProgress: suspend (ComposeFromDdlProgress) -> Unit = {}, beforeSave: suspend () -> Unit = {}, parentHistoryId: String? = null, executionId: String? = null, originalPhoto: File? = null, importedPlugins: List<ImportedPluginDefinition> = emptyList(), renderWild: Boolean? = null, canvasFit: String? = null): HistoryItemEntity {
         val started = System.currentTimeMillis()

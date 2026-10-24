@@ -129,6 +129,8 @@ object InkuStringsJa : InkuStrings {
         "host_commit_failed" -> "作品の保存を完了できませんでした"
         "compiler_boundary_failed" -> "DDLを楽譜へ変換できませんでした"
         "svg_output_too_large" -> "生成したSVGがサイズ上限を超えたため、作品は自動保存されません"
+        "image_ddl_failed" -> "写真から指示書を書けませんでした"
+        "image_ddl_undrawable" -> "写真から書いた指示書では何も描けませんでした"
         else -> reason
     }
     override fun pipelineFailureCause(failure: String, attempts: Int, detail: String?): String {
@@ -638,6 +640,7 @@ object InkuStringsJa : InkuStrings {
     override val generationInfoInputRouteLocalDdlToNimStage2 = "端末内DDL → NIM Stage 2"
     override val generationInfoInputRouteDescriptionToPipeline = "写真の記述 → 描画設定"
     override val generationInfoInputRouteDdlToPipelineStage2 = "写真のDDL → 描画設定のStage 2"
+    override val generationInfoInputRouteImageDdlToPipeline = "写真から書いたDDL → 見比べて直す"
     override val generationInfoVisionOutputModeDescription = "記述"
     override val generationInfoVisionOutputModeDdl = "DDL"
     override val generationInfoSketchGrain = "区切り"

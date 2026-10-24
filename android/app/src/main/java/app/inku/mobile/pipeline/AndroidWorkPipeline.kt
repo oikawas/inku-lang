@@ -47,14 +47,26 @@ class AndroidWorkPipeline(
      */
     private val saveSafePerformance: suspend (PaintResult) -> Unit = {},
     private val readSvgLimitBytes: suspend () -> Long = { SvgOutputLimit.DEFAULT_BYTES },
+    /** The review drawing's PNG at exactly that size, or null (`draw_image_review`). */
+    private val imageReviewPng: (svg: String, width: Int, height: Int) -> ByteArray? = ::reviewDrawingPng,
 ) {
     private val configBuilder = SharedPipelineConfigBuilder(binding)
     /** Why the last attempt of each action failed, until the host records it. */
     private val failureDetails = java.util.concurrent.ConcurrentHashMap<String, String>()
+    /** The photo and review drawing of a run written from an image, while it runs. */
+    private val images = PipelineImageStore()
     private val host = SharedPipelineHost(
         binding = binding,
-        providerEffect = SingleAttemptModelEffectProvider(modelProvider) { actionId, _, detail, _ ->
-            if (detail != null) failureDetails[actionId] = detail else failureDetails.remove(actionId)
+        providerEffect = SingleAttemptModelEffectProvider(
+            modelProvider,
+            onFailure = { actionId, _, detail, _ ->
+                if (detail != null) failureDetails[actionId] = detail else failureDetails.remove(actionId)
+            },
+            images = images,
+        ),
+        images = images,
+        imageReview = ImageReviewPort { snapshotBytes, hostContextJson, maxSvgBytes ->
+            imageReviewDrawing(snapshotBytes, hostContextJson, maxSvgBytes)
         },
         failureDetail = { actionId -> failureDetails.remove(actionId) },
         commitStore = commitStore,
@@ -143,6 +155,71 @@ class AndroidWorkPipeline(
             sketchState = sketch.state,
             executionId = view.executionId,
         )
+    }
+
+    /**
+     * Writes a work's DDL from a photo (SPEC §12.6.6) and commits it: the
+     * catalog chosen from the photo when asked, the DDL written, drawn beside
+     * the photo and reviewed. The run is DDL-authoritative and has no
+     * description; it is drawn and saved by [composeFromDdl] with its
+     * execution, on the paper nearest the photo's ratio, fitted. The photo
+     * and the review drawing are held only while the run writes.
+     */
+    suspend fun interpretImage(request: PaintRequest, image: PreparedImageDdlInput): InterpretResult {
+        require(request.canvasAspect == image.nearestFormatId && request.canvasFit == "contain") {
+            "An image run draws on the paper nearest its photo, fitted."
+        }
+        val run = prepare(request, descriptionFlow = false, text = "", imageReview = true)
+        images.put(image.jpeg, image.reference)
+        var executionId: String? = null
+        try {
+            val view = authoring.startImageView(run.request, image.authoringJson().toString())
+            executionId = view.executionId
+            if (view.phaseTag != "score_ready" && view.phaseTag != "completed") {
+                throw PipelineInteractionRequired(view)
+            }
+            return InterpretResult(
+                originalInput = request.originalText,
+                normalizedDdl = view.visibleDdl ?: throw PipelineHostException("visible_ddl_unavailable"),
+                instructionLangRequested = run.instructionLangRequested,
+                instructionLangResolved = run.instructionLangResolved,
+                sketchText = null,
+                sketchGrain = null,
+                sketchState = "off",
+                executionId = view.executionId,
+            )
+        } finally {
+            images.remove(image.reference.sha256)
+            executionId?.let { id ->
+                runCatching { images.release(JSONObject(host.snapshotJson(OWNER_ID, id)).optJSONObject("image_ddl")) }
+            }
+        }
+    }
+
+    /**
+     * The PNG of the written DDL beside the photo, drawn with the work's own
+     * colors and seed on the core's paper and size (server `review_drawing`).
+     * Null when the core cannot draw it or the raster comes out another size.
+     */
+    private fun imageReviewDrawing(snapshotBytes: ByteArray, hostContextJson: String, maxSvgBytes: Long): JSONObject? {
+        val snapshot = JSONObject(snapshotBytes.toString(Charsets.UTF_8))
+        val context = JSONObject(hostContextJson)
+        val request = configBuilder.imageReviewRequest(
+            context.requiredObject("color_maps").stringMaps(),
+            snapshot,
+            context.requiredObject("host_options").optionalUnsignedLong("render_seed"),
+            maxSvgBytes,
+        )
+        val answer = JSONObject(binding.imageReviewSvg(snapshotBytes, request.toString().encodeToByteArray()).toString(Charsets.UTF_8))
+        val svg = answer.optString("svg").takeIf { answer.has("svg") && it.isNotEmpty() } ?: return null
+        SvgOutputLimit.requireSvg(svg, maxSvgBytes)
+        val payload = snapshot.requiredObject("action").requiredObject("payload")
+        val width = payload.getInt("width")
+        val height = payload.getInt("height")
+        val png = imageReviewPng(svg, width, height) ?: return null
+        val reference = PipelineImageReference.of(png, "image/png", width, height)
+        images.put(png, reference)
+        return reference.toJson()
     }
 
     /**
@@ -659,6 +736,11 @@ class AndroidWorkPipeline(
         // The work keeps the layers its laws placed and their basis, as the
         // server keeps them in the work's fork context.
         putLawsRecords(metadata, lawsRecordsOf(snapshot))
+        // A work written from an image keeps the run's record with it, as the
+        // server keeps `image_ddl`: references and rounds, no image or SVG.
+        snapshot.optJSONObject("image_ddl")?.let { record ->
+            metadata.put("image_ddl", record).put("elapsed_image_ms", execution.metrics["image"] ?: 0L)
+        }
         val renderHash = renderHash(delivery.requiredObject("score"), metadata, catalogId)
         metadata.put("render_hash", renderHash).put("render_hash_short", renderHash.takeLast(4).uppercase())
         return PaintResult(
@@ -796,6 +878,7 @@ class AndroidWorkPipeline(
         parentVariationId: String? = null,
         inherited: InheritedRun? = null,
         preserveSavedConfig: Boolean = false,
+        imageReview: Boolean? = null,
     ): PreparedRun {
         // Legacy paper remains valid for display/replay; new works use the
         // canonical default even when started from a legacy history selection.
@@ -846,6 +929,7 @@ class AndroidWorkPipeline(
                     importedPlugins = request.importedPlugins,
                     drawingModelId = request.drawingModel,
                     canvasFit = request.canvasFit,
+                    imageReview = imageReview,
                 ),
             )
             else -> {

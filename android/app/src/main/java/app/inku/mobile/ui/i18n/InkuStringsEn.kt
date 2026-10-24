@@ -135,6 +135,8 @@ object InkuStringsEn : InkuStrings {
         "host_commit_failed" -> "the work could not be saved"
         "compiler_boundary_failed" -> "the DDL could not be converted into a score"
         "svg_output_too_large" -> "the SVG exceeds the size limit; the work is not saved automatically"
+        "image_ddl_failed" -> "instructions could not be written from the photo"
+        "image_ddl_undrawable" -> "the instructions written from the photo drew nothing"
         else -> reason
     }
     override fun pipelineFailureCause(failure: String, attempts: Int, detail: String?): String {
@@ -668,6 +670,7 @@ object InkuStringsEn : InkuStrings {
     override val generationInfoInputRouteLocalDdlToNimStage2 = "Local DDL → NIM Stage 2"
     override val generationInfoInputRouteDescriptionToPipeline = "Photo description → drawing settings"
     override val generationInfoInputRouteDdlToPipelineStage2 = "Photo DDL → drawing settings Stage 2"
+    override val generationInfoInputRouteImageDdlToPipeline = "DDL written from the photo → reviewed beside it"
     override val generationInfoVisionOutputModeDescription = "Description"
     override val generationInfoVisionOutputModeDdl = "DDL"
     override val generationInfoSketchGrain = "Grain"

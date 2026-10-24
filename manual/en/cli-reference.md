@@ -43,7 +43,7 @@ Run inku-cli COMMAND --help for the complete option list. This document states w
 
 ## Flags for paint and batch
 
-paint and batch take the same flags. **A flag you omit falls back to the server default, and the server default is not always the Web UI default.**
+paint and batch take the same flags, except that only paint draws from an image. **A flag you omit falls back to the server default, and the server default is not always the Web UI default.**
 
 ### Input and output
 
@@ -60,10 +60,25 @@ For limits they record the values used in `render_limits` and their origin in `r
 | `--input-mode {paint,ddl}` | `paint` sends the description through Stage 1; `ddl` starts from visible DDL and proceeds to compilation, any required hole completion, and performance. See SPEC for each stage's meaning |
 | `--ddl-text DDL` | **`render-score` only.** Sends the instructions as provenance / hash metadata; it does not automatically repair counts or relations from DDL |
 | `--ddl-file PATH` | **`render-score` only.** Reads the instructions from a file; `-` means stdin. Cannot be combined with `--ddl-text` |
-| `--save-history` | Save to the server's history |
+| `--save-history` | Add the drawing to the server's history database as a work. Without it nothing is saved, including with `--image` |
 | `--save-artifacts` / `--no-save-artifacts` | Whether the server stores artifacts |
 | `--full-json` | Print the full response |
 | `--no-progress` | Disable the elapsed-time animation |
+
+### Drawing from an image (paint only)
+
+| Flag | Contents |
+|---|---|
+| `--image PATH` | Draw from this image instead of a description, as the web image tab does. The Vision model writes the DDL in Japanese, and the paper follows the image unless `--canvas-aspect` names one. The server keeps the image in memory for the run and never saves it |
+| `--provenance TEXT` | The image's source note. It is kept with the work apart from the description and never sent to the models |
+| `--provenance-file PATH` | Read the source note from a UTF-8 file; `-` means stdin |
+| `--vision-model MODEL` | The Vision model that writes the DDL. Defaults to the one saved with `models --vision-model` |
+
+With `--image`, the description, `--input-mode`, the sketch flags, `--wild`, `--stage1-provider` / `--stage1-model` and `--include-thinking` are refused. The color catalog, seeds, `--limits`, `--out-dir`, `--png` and `--save-history` work as for a description.
+
+```sh
+uv run inku-cli paint --image photo.jpg --provenance "Taken by the Kamo River, Kyoto, October 2026" --vision-model chatgpt:gpt-6-luna --save-history -o ./out --png
+```
 
 ### Sketch from life (Stage 0.5)
 

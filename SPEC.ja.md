@@ -2548,6 +2548,8 @@ CLI の設定はローカルで編集可能である。ベース URL・プロバ
 
 `inku-cli paint` と `inku-cli batch` は `--input-mode paint|ddl` に対応する。既定の `paint` モードは自然言語の入力を `/api/paint` へ送り、Stage 1 → Stage 1.5 → Stage 2 → 描画のパイプライン全体を走らせる。`--input-mode ddl` は入力テキストを**既に正規化された DDL** として扱い、Stage 1 を飛ばして `/api/compose` へ送る。`--input-mode ddl --save-history` を使うと、CLI は compose の結果を `POST /api/history` で保存するので、出力は通常のサーバー履歴に現れる。`/api/compose` は Stage 1.5 の展開後の**実効 DDL** を返し、CLI の出力と履歴はその実効 DDL を使う — DDL から描画までのベンチマークの対応を保つためである。
 
+`inku-cli paint --image PATH` は Web の画像タブと同じ API を同じ順で呼ぶ。画像のバイト列を `POST /api/pipeline/images` へ送り、`POST /api/pipeline/variations` を `kind=image`・来歴（`--provenance` / `--provenance-file`、既定は空）を `text` として始め、run が終わるまで待ち、Score が届いたら `perform` を頼む。options も画像タブと同じで、Vision モデル（`--vision-model`、既定は CLI の Vision 設定）を両段に、写生なし・wild なし・`instruction_lang=ja`・`canvas_fit=contain` を送る。紙は `--canvas-aspect` が無ければ `canvas_format_id=image`（画像の比に近い紙）。pipeline は既定で保存するので、CLI は `save_history` を必ず送り、`--save-history` が無ければ `false` にする。保存した作品は来歴と `image_ddl` を記述とは別の欄に持つ。記述・`--input-mode`・写生・`--wild`・描画モデル・`--include-thinking` は併用を断る。CLI が中断されたときは run に `cancel` を送る。
+
 CLI は指示文の言語を `--instruction-lang auto|ja|en` で送る。既定の `auto` はサーバーに入力テキストから日本語か英語かを解決させる。`--ui-lang` は表示文脈のメタデータとして与えてよいが、**解釈は制御しない**。
 
 `inku-cli batch` はベンチマーク要約の JSON ファイルを書ける。出力ディレクトリを使うとき、既定の要約のパスはそのディレクトリの `analysis-summary.json` である。要約は成功したすべての標本と、フォールバック・遅い・通常の標本の講評用のまとまりを含む。**遅い標本は診断専用である** — 無料の推論エンドポイントが待ち行列に入っていたとしても、成功した描画は品質講評の一部であり続ける。

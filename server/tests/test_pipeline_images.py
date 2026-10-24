@@ -158,6 +158,8 @@ def _wait(service, execution_id):
         run = service.execution("owner", execution_id)
         view = run.view()
         if not view["busy"]:
+            # The worker clears transient images after the core's final state.
+            service._jobs[("owner", execution_id)].result(timeout=max(0.001, deadline - time.monotonic()))
             return run, view
         time.sleep(0.01)
     pytest.fail("image run did not finish")

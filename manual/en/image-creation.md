@@ -585,6 +585,8 @@ The performance of the corrected instructions appears in the work tab and is sav
 
 **Instructions before review.** When a work that keeps the instructions written before the comparison is shown on the Image tab, `Instructions before review` appears folded below the instructions. Open it to find the text and `Paint a child from these instructions`. Pressing it keeps the original work and paints an instruction-edit child from those instructions. If the instructions have edits of your own, you are asked before they are replaced. The compared instructions come closer to the original image, while the instructions before the comparison sometimes make the stronger picture, so both can be painted and compared.
 
+**From the CLI.** The CLI paints from an image the same way with `inku-cli paint --image PATH` (the source note with `--provenance`, the Vision model with `--vision-model`). See "Drawing from an image (paint only)" in the [inku-cli Reference](cli-reference.md) for the flags.
+
 ## 17. Batch
 
 1. Open the `Batch` tab.

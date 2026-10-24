@@ -69,8 +69,8 @@ These three items have no bearing on the compatibility path for older works and 
 
 ## Items whose shape the cutover settled
 
-- **Governing the Score schema version** — at the time of the old plan, `ScoreVersion` was `Literal["0.1.0"]` and no one had a procedure for raising it. The current `ScoreVersion` spans 0.1.0 through 0.15.0, and the SPEC holds the rule by which the shared lowerer selects the minimum version a work needs (compact baseline 0.10, 0.11 through 0.15 according to additional fields, flat compatibility 0.9). The compatibility reader in `inku-score` reads older saved versions.
-- **Sharing Android's deterministic pipeline** — Android also uses the shared Rust authoring pipeline, and Kotlin's own Stage 1, 1.5, and 2 and coerce are retired. What remains on Android is host responsibility (UI, provider transport, Room, the `rh3` computation, camera preparation).
+- **Governing the Score schema version** — at the time of the old plan, `ScoreVersion` was `Literal["0.1.0"]` and no one had a procedure for raising it. The current `ScoreVersion` spans 0.1.0 through 0.22.0, and the SPEC holds the rule by which the shared lowerer selects the minimum version a work needs (compact baseline 0.10, 0.11 through 0.22 according to additional fields, flat compatibility 0.9). The compatibility reader in `inku-score` reads older saved versions.
+- **Sharing Android's deterministic pipeline** — Android also uses the shared Rust authoring pipeline, and Kotlin's own Stage 1, 1.5, and 2 and coerce are retired. What remains on Android is host responsibility (UI, sending to providers, Room, camera preparation). Later the `dh1` and `rh3` computations, provider request bodies and answer reading, the rules of saved-work refinements, and the Skia screen display also moved into the shared core, and macOS uses the same core.
 
 ## Where measurement overturned a premise
 

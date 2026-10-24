@@ -1,6 +1,6 @@
 # Client boundaries
 
-## 三clientの責任差
+## 四clientの責任差
 
 ```mermaid
 flowchart TB
@@ -8,27 +8,34 @@ flowchart TB
     WEB["Web\nSvelteKit UI"]
     CLI["CLI\nHTTP client + bench補助"]
     ANDROID["Android\nKotlin UI + host"]
+    MACOS["macOS\nSwiftUI + host"]
     API["Server公開HTTP API"]
     SERVER_HOST["Server pipeline host\nPython"]
     ANDROID_HOST["Android pipeline host\nKotlin + JNI"]
-    CORE["共有Rust core\npipeline + compiler + renderer"]
+    MACOS_HOST["macOS pipeline host\nSwift + UniFFI"]
+    CORE["共有Rust core\npipeline + compiler + renderer\n+ provider wire + 推敲の規則 + 表示"]
     SERVER_DB[("Server DB")]
     ROOM[("Room DB")]
+    GRDB[("GRDB")]
 
     USER --> WEB
     USER --> CLI
     USER --> ANDROID
+    USER --> MACOS
     WEB -->|"HTTP"| API
     CLI -->|"HTTPのみ"| API
     API --> SERVER_HOST
     SERVER_HOST -->|"native wheel"| CORE
     ANDROID --> ANDROID_HOST
     ANDROID_HOST -->|"JNI"| CORE
+    MACOS --> MACOS_HOST
+    MACOS_HOST -->|"UniFFI"| CORE
     SERVER_HOST --> SERVER_DB
     ANDROID_HOST --> ROOM
+    MACOS_HOST --> GRDB
 ```
 
-Webはserver作品を操作する参照UI、CLIはserverの公開APIを測るclient、Androidは端末内で全段を動かすhostである。記述からSVGまでの意味の判断はServerとAndroidで同じ共有Rust coreが持ち、hostはprovider通信、保存、UIだけを持つ。Androidがserver APIを通常pipelineとして呼ぶ関係は無い。
+Webはserver作品を操作する参照UI、CLIはserverの公開APIを測るclient、AndroidとmacOSは端末内で全段を動かすhostである。記述からSVGまでの意味の判断、保存作品の推敲の規則、providerへの要求本文と答えの読みは、Server・Android・macOSで同じ共有Rust coreが持ち、hostはprovider通信、保存、UIだけを持つ。AndroidとmacOSがserver APIを通常pipelineとして呼ぶ関係は無い。画像から書く作品（画像タブ）はServer・Web（とCLI）だけにある。
 
 ## Web内部
 
@@ -111,7 +118,7 @@ flowchart TB
 |---|---|---|
 | route shell memory | output tab、modal表示、短い表示用projection、lifecycle配線 | reloadで消える。server正本ではない。domain workflowはrouteごとに1回生成し、routeへ複製しない |
 | route-instance Session owner | login/logout、current actor、profile編集、memberのUI/history preference、download folder preference | routeごとに1個の`createSessionState`。認証後処理はnamed boundaryを通り、password値はoperation内に留まる |
-| route-instance Work owner | single-work input、submit/replay/stop、current DDL/result/sketch projection、timer/token、Batch/Demoとの1作品Paint調停 | routeごとに1個の`createWorkState`。single-workのAbortControllerとstale-run判断を所有する。単一作品の送信とDDL編集は`PipelineController`へ、Batch・Demo・推敲の1作品Paintはstateless Paint operationへ渡す |
+| route-instance Work owner | single-work input、画像タブ（来歴、画像の受取、ブラウザのメモリにあるファイルの送り直し、見比べる前の指示書）、submit/replay/stop、current DDL/result/sketch projection、timer/token、Batch/Demoとの1作品Paint調停 | routeごとに1個の`createWorkState`。single-workのAbortControllerとstale-run判断を所有する。単一作品の送信とDDL編集は`PipelineController`へ、Batch・Demo・推敲の1作品Paintはstateless Paint operationへ渡す |
 | route-instance pipeline controller | 現在のvariation・execution・revision・phase、補完案の承認・辞退、記述からのfork、履歴とvariationの対応、診断の表示用projection | Workが1個の`PipelineController`を生成する。server snapshotとrevisionを正とし、保存済み状態を読み直し、作者の操作を転送し、完了したdeliveryの演奏を求めるだけで、provider effectを再試行しない |
 | route-instance Batch owner | prompt履歴、resume/retry plan、line進行、停止、failure、latest-result follow | routeごとに1個の`BatchState`。private run identityがlate resultを遮断し、Workから1作品Paintとfocused history callbackだけを借りる |
 | route-instance Demo owner | demo設定、prompt生成、反復、timeout/stop、token/elapsed、current result保存 | routeごとに1個の`DemoState`。private run identityが停止済みrunの遅延結果を遮断し、Workから1作品Paintとfocused projectionだけを借りる |
@@ -124,7 +131,6 @@ flowchart TB
 | route-instance refinement session owner | single/grid/save busy、elapsed/token、fan-out slot、AbortController、candidate selection | routeごとに1個の`RefinementSessionState`。active controllerだけがprogress/error/finishをcommitし、coordinatorとCanvas viewがtyped ownerを共有する |
 | route-instance refinement coordinator | target identity、precondition、candidate request transport、fan-out/session調停、redraw/save adoption、history reseat、Canvas fit | routeごとに1個の`createRefinementCoordinator`。明示的なtyped Work subsetとnamed history/render/catalog capabilityを受け、mutable stateやrequestを複製しない |
 | stateless refinement fan-out | 4 kindのcandidate plan、composition seed除外、alternate catalog順序、label、bounded indexed execution | `refinement-fanout.ts`がcoordinatorからtyped snapshot、1個のAbortSignal、named candidate factoryを受ける。route/session stateとHTTP transportは所有しない |
-| stateless single-redraw action | touch/layout/readingのseed選択、touch request/result構築、Paint invocation option、current-result field projection | `refinement-redraw.ts`が解決済みinputとnamed transport/seed/Paint capabilityを受ける。target check、session/loading/error、history reseat、reading diff、view選択、viewport適用はcoordinatorが保持する |
 | stateless refinement candidate actions | candidate→current Canvas projection、選択snapshotの逐次history保存、stale/identity調停 | `refinement-actions.ts`がtyped candidateとnamed save/context capabilityを受ける。coordinatorがprojectionとsaved identityをcanonical Work ownerへ適用する |
 | Canvas current-artwork focused view | current artwork、corner control、status mark、navigation、export、caption、empty motif、zoom表示 | `CanvasArtworkWorkspace.svelte`がtyped display propsと唯一の`CanvasViewportState`を受ける。`CanvasPanel`はtab/overlay compositionと共有work選択を保持する |
 | Canvas generation-information focused view | 詳細・prompt・score tab、作品由来情報の表示、drawer固有のscroll element | `CanvasGenerationInfo.svelte`がtyped display propsを受けて描画する。開閉、outside/Escape、tab別scroll memory、共有SVG計測は`CanvasPanel`が所有する |
@@ -140,7 +146,7 @@ flowchart TB
 
 `+page.svelte`はroute composition shellとなった。route-instance ownerを各1回生成し、top-level lifecycle、認証画面切替、modal/view表示、build表示、短いcross-owner projection、named capability配線を保持する。`features/work/state.svelte.ts`がcurrent single-work stateとsubmit/replay/stopを所有し、`features/batch/state.svelte.ts`と`features/demo/state.svelte.ts`が各runの非同期lifecycleを所有する。Workは両ownerへ1作品Paintとfocused callbackだけを貸す。`features/run/current-work.ts`はstatelessな1回のPaint operationに留まる。`features/session/state.svelte.ts`が認証とmember preferenceを所有する。`features/canvas/refinement-coordinator.svelte.ts`がtarget identityとrefinement orchestrationを所有し、既存session/action moduleを再利用する。
 
-2026-09-13に共有pipelineへ接続し、`features/pipeline/`を加えた。`PipelineController`は1つのbrowser tabから見たserver所有の実行を表し、`POST /api/pipeline/variations`で始め、executionが落ち着くまで保存済みviewを読み直す。DDLの編集は`DdlEditorDialog`から送り、選択中の作品に応じて、共有pipelineで保存した作品ならhistory linkからのfork、旧作品なら`legacy/{id}/fork`、実行中のvariationなら`author-ddl`、どれでもなければdirect DDLの新しいvariationになる。補完案は`PipelineStatus`が保存済みDDLと変更案を並べて示し、作者の承認・辞退だけを`/executions/{id}/commands`へ送る。同じ`PipelineStatus`が当該revisionの診断を示す。保存済み作品を選ぶと、共有pipelineで保存した作品はhistory linkからvariationへ、それ以外は旧作品として`/legacy/{id}`へ対応づける。判別中・失敗・選択の失効を新規作品として扱わない。診断は`diagnostics.ts`が上流・下流・資源・relation・renderer・catalogの6経路に分けて表示する。
+2026-09-13に共有pipelineへ接続し、`features/pipeline/`を加えた。`PipelineController`は1つのbrowser tabから見たserver所有の実行を表し、`POST /api/pipeline/variations`で始め、executionが落ち着くまで保存済みviewを読み直す。DDLの編集は`DdlEditorDialog`から送り、選択中の作品に応じて、共有pipelineで保存した作品ならhistory linkからのfork、旧作品なら`legacy/{id}/fork`、実行中のvariationなら`author-ddl`、どれでもなければdirect DDLの新しいvariationになる。補完案は`PipelineStatus`が保存済みDDLと変更案を並べて示し、作者の承認・辞退だけを`/executions/{id}/commands`へ送る。同じ`PipelineStatus`が当該revisionの診断を示す。保存済み作品を選ぶと、共有pipelineで保存した作品はhistory linkからvariationへ、それ以外は旧作品として`/legacy/{id}`へ対応づける。判別中・失敗・選択の失効を新規作品として扱わない。診断は`diagnostics.ts`が上流・下流・資源・relation・renderer・catalogの6経路に分けて表示する。画像タブ（2026-10-24）では、Workが`POST /api/pipeline/images`で画像を預け、`PipelineController.fromImage`で`kind: image`のvariationを始める。AI自動推敲は`features/autonomous/`、取り合わせは`features/juxtaposition/`、実験的な3D表示は`features/experimental-3d/`が持つ。
 
 以下のStage 5〜7の段落は、各cut直後の境界を記録した履歴である。現在の収束後の境界は、上の責務表とStage 10の段落を正とする。
 
@@ -164,6 +170,8 @@ Stage 6Dではstatelessな`refinement-fanout.ts`が4 kindのcandidate plan、com
 
 Stage 6Eではstatelessな`refinement-redraw.ts`がtouch/layout/readingのsingle redraw seed選択、touchの`render-svg` requestとderivation result identity、layout/readingのPaint option、共通current-result projectionを所有する。pageは解決済みwork/catalog/render inputとnamed transport/seed/Paint capabilityを渡す。precondition、fallback確認、visible lineage parent materialization、single sessionとloading/error state、history reseat、interpretation diff、最終Svelte assignment、output tab、timer、viewport coordinationはpageに残る。candidate grid request transportはこのStageで移動しない。
 
+2026-09-28に、ボタンが2026-07-11に外れていたCanvasのその場の演奏・配置・読みの描き直しを、`refinement-redraw.ts`、読みの差分の表示、どこからも開かれない手動推敲のdialogとともに削除した。上記Stage 6Eは当時の記録である。
+
 Stage 7Aでは`CanvasGenerationInfo.svelte`が生成情報drawerの詳細・prompt・score表示、作品由来の表示用projection、drawer固有styleを所有する。`CanvasPanel`は開閉、outside/Escape、active tab、tab別scroll memory、表示中作品からの共有SVG計測を保持し、typed propsとnamed callbackだけを渡す。抽出したviewはroute/session state、HTTP、current-work変更を所有しない。
 
 Stage 7Bでは`CanvasPresentationOverlay.svelte`がfullscreen作品画像、caption、control markup、presentation専用styleを所有する。`CanvasPanel`はopen/close、toolbar、Escape priority、current work、navigation/star/caption mutationを保持し、minimal mark projectionとnamed callbackだけを渡す。抽出したviewはmutable owner、route state、HTTPを持たない。
@@ -178,21 +186,30 @@ Stage 10では行数ではなく変更理由に沿って5つの高変更面を�
 
 - `ApiClient` は `urllib.request` で `/api/*` と `/health` だけを扱う。
 - runtime codeは `inku_server` をimportしない。`inku_analysis` はrasterize/analysis用の共有packageで、server pipelineを迂回するものではない。
-- `paint` / `batch` の自然文modeは `/api/paint`、DDL modeは `/api/compose`、保存時は `/api/history` を利用する。どちらもServer内で共有pipelineを通り、補完案の承認が要る場合は409と現在のviewを受ける。`/api/pipeline/*`を直接使うcommandは無い。
+- `paint` / `batch` の自然文modeは `/api/paint`、DDL modeは `/api/compose`、保存時は `/api/history` を利用する。どちらもServer内で共有pipelineを通り、補完案の承認が要る場合は409と現在のviewを受ける。画像から描く`paint --image`は`/api/pipeline/images`で画像を預け、`/api/pipeline/variations`（`kind: image`）で始め、`/api/pipeline/executions/{id}/commands`で演奏を求める。作品のDDL書き出しは`/api/pipeline/history/{id}/ddl-export`を使う。
 - 機能試験の送信者として `test_cli_sender_census.py` に検査される。CLI testがserver sourceを読む箇所はテスト上の契約照合であり、製品runtime依存ではない。
 
 ## Android境界
 
 - `InkuRepository` → `AndroidWorkPipeline` → `SharedAuthoringPipeline` / `SharedPipelineHost` → `NativePipelineBridge`（JNI）→ 共有`inku-pipeline` / `inku-ddl` / `inku-render` → Roomという端末内flow。
 - `SharedPipelineHost`は1 executionのcallを直列化し、coreが返したeffectを実行する。provider effectは`SingleAttemptModelEffectProvider`が1回だけ送り、再試行・fallback・応答の判定はRustに残す。可視DDLとauthorityのCAS保存、action ACK、実行snapshotは`RoomSharedPipelineStore`が持つ。
-- `RoutingModelProvider` はlocal LiteRT-LM、Gemini、OpenAI-compatible remote providerを選ぶ。OpenAI互換・Anthropic・Geminiの要求本文と応答の読み方（temperature、thinking量、schema変換、出力上限）はJNIの`providerWire`から共有coreの`provider_wire`（`inku.provider-wire.v1`）を呼ぶ。hostはcoreの本文bytesへ鍵を指定headerに足して送り、受けた本文をcoreへ返す。鍵・HTTP・流量・観測はhost、LiteRT-LMとChatGPTプランの要求/SSEはこの移行の対象外。推敲のVision助言はtoolなしのtext要求を使う。
+- `RoutingModelProvider` はlocal LiteRT-LM、Gemini、OpenAI-compatible remote providerを選ぶ。OpenAI互換・Anthropic・Geminiの要求本文と応答の読み方（temperature、thinking量、schema変換、出力上限）はJNIの`providerWire`から共有coreの`provider_wire`（`inku.provider-wire.v1`）を呼ぶ。hostはcoreの本文bytesへ鍵を指定headerに足して送り、受けた本文をcoreへ返す。鍵・HTTP・流量・観測はhost、LiteRT-LMはhostに残る。ChatGPTプランの本文、SSEの流れの読み、失敗の分類、本人のモデル一覧の読みも、2026-10-17から同じ`provider_wire`（`chatgpt_request`等）を使う。推敲のVision助言はtoolなしのtext要求を使う。
 - 端末内のVisionモデルでは構図を読まない（作者の決定 2026-10-17）。`composition.read`は`!isLocalVisionModel(modelId)`で、外部providerではtrueを保つ。Serverの常にtrueという設定との意図的な差であり、provider解決とVision助言の768×768 PNGはServerに揃えたままとする。
 - 保存済みScoreの再演は復元した資源policyの下で`renderSaved`を使う。端末専用の旧9:5形式だけ`AndroidRenderHost`（JNIの`render`）を使う。
 - engine identityとrenderer referenceは同梱Rust coreから取得し、Kotlinに版literalを持たない。
-- preview、thumbnail、refinement、PNG exportは保存済み／現行SVGを`inku-svg-raster`でpixel化する。AndroidSVGとKotlin renderer fallbackは無い。
+- 通常の画面表示は共有`inku-display`のSkia（`AndroidDisplayRenderer`、`NativeDisplayBridge`）で、WebのChromeと同じ見え方にする。thumbnail、refinement、PNG exportは保存済み／現行SVGを`inku-svg-raster`でpixel化する。AndroidSVGとKotlin renderer fallbackは無い。
+- 記述からの実行は、Serverと同じく構図の読みの後に法則の段（`choose_laws`）と配色の段（`choose_colors`）を通す（2026-10-21から）。AI自動推敲（法則の手と取り合わせの手）は共有coreの`autonomous_refine`・`juxtaposition`で端末が進め、Server APIは呼ばない。
 - 記述ハッシュ`dh1`、描画ハッシュ`rh3`、正準JSON、指示言語の正規化・判定は`NativePipelineBridge`（JNI）から共有coreを呼ぶ。Kotlinに同じ規則の写しは持たず、系譜の正準JSONも同じ入口を使う。
 - 保存作品のてざわり・支持体・配色の候補と差し替えは、JNIの`savedVariants`から共有coreの`inku.saved-variants.v1`へ委譲する。KotlinはJSONと大きな整数を保つ転送・保存を担い、規則の写しを持たない。配色の子はcoreの`{color_arrangement_index, catalog_id}`を保存する。
 - Kotlinが所有するのはUI、provider設定と通信、カメラ画像の前処理と端末内local LLM、host option、Room／history、coreへ渡すJSONの転送である。保存済みのハッシュを書き換える移行は行わない。旧KotlinのStage 1 / 1.5 / 2とScore coerceはretire済みで、runtime fallbackは無い。
+
+## macOS境界
+
+- `apple/Sources/InkuMac/`（SwiftUI）→ `PipelineHost.swift`（`InkuHost`）→ UniFFI（XCFramework）→ 共有`inku-pipeline` / `inku-ddl` / `inku-render` / `inku-display` → GRDB（`InkuPersistence`）という端末内flow。Server APIは呼ばない。
+- 作品の同一性（`dh1`・`rh3`・正準JSON）、指示言語、記述ラベル、保存作品のてざわり・支持体・配色（`inku.saved-variants.v1`）、取り合わせ（`inku.juxtaposition.v1`）、AI自動推敲（`inku.autonomous-refine.v1`）、providerの要求本文とChatGPTプランの要求・SSE・失敗の分類（`inku.provider-wire.v1`）は、UniFFIで共有coreを呼ぶ。Swiftには同じ規則を写さない。
+- 記述からの実行は、構図の読みの後に法則の段と配色の段を持つ（Serverの既定と同じ）。
+- 通常の画面表示は`inku-display`のSkia。拡大の窓はApple siliconで`inku-display-gpu`を別processとして起動し、標準入出力で窓の要求とpixelを受け渡す（GPU driverがそのprocessを終わらせてもアプリは落ちない。100%の画はCPUのまま）。
+- Swiftが所有するのはUI、provider設定と通信（URLSession・Keychain）、GRDBの保存、host option、OSのlifecycleである。macOSアプリの版（`apple/VERSION`・`apple/BUILD_NUMBER`）はServer／Webと別に採番する。iPad／iPhoneのアプリは未完了。
 
 ## i18nとUI token
 
@@ -205,4 +222,4 @@ Stage 10では行数ではなく変更理由に沿って5つの高変更面を�
 
 ## 根拠対応
 
-`SYS-WEB`, `SYS-CLI`, `SYS-ANDROID`, `PIPE-HOST`, `PIPE-MACHINE`, `WEB-FEATURES`, `WEB-REGISTRY`, `WEB-I18N`。主要pathは図中に記載した。
+`SYS-WEB`, `SYS-CLI`, `SYS-ANDROID`, `SYS-MACOS`, `PIPE-HOST`, `PIPE-MACHINE`, `PIPE-WIRE`, `PIPE-REFINE`, `PIPE-DISPLAY`, `PIPE-IMAGE`, `WEB-FEATURES`, `WEB-REGISTRY`, `WEB-I18N`。主要pathは図中に記載した。

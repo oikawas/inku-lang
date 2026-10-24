@@ -78,10 +78,24 @@
 - On 2026-09-25 the fake provider was changed to answer in the v3 shape (`proposed` with replacement text per short ID `h1`) and to check that the prompt is v3. The test now also checks that, while approval is pending, the Score of the independent drawing (the red circle) remains as `complete_with_omissions` (the old test expected no Score during the wait).
 - Result: **resolved**.
 
+### F-13 Project Context version table and stale statements (resolved)
+
+- At the 2026-10-24 reconciliation, `PROJECT_CONTEXT.ja.md` named its target version as v2.15.244 / Build 1320 at the top, while its "versions" table still read Render Engine 68, DDL `ddl_version` 13 / `ddl_engine_version` 47, Android `2.1.4-android.80`, and Python package 2.7.2, and its terms section still said "Render Engine 66". Its Android section said the Android host owns the `rh3` computation. The English version (`PROJECT_CONTEXT.md`) said the same.
+- The implementation is Render Engine 93 (`core/crates/inku-render/src/lib.rs`), `ddl_version` 26 / `ddl_engine_version` 71 (`layer_versions.py`), Android `2.1.4-android.105` (`android/VERSION`), and `server/pyproject.toml` 2.15.240. Android, too, asks the shared core's `identity.rs` for `dh1` and `rh3` (JNI `descriptionHash` and `renderHash`). The version list in `docs/spec/render-engine-history.md` also gave `server/pyproject.toml` as 2.15.33 (the Japanese version said the same).
+- The same day, on the author's ruling (name the source of truth), the Render Engine, DDL, Android, and Python package rows of the version table were changed, like the application row, to name the constants in their sources without copying the values, with a note that the version list holds the current values. The number was taken out of "Render Engine 66" in the terms, and the Android section now says the host asks the shared core for the `dh1` and `rh3` computations. The version list keeps a "current" column by rule, so its value was corrected to 2.15.240. The English versions were corrected the same way.
+- Result: **resolved**.
+
+### F-14 Project Context Score version and saijiki statements (resolved)
+
+- `PROJECT_CONTEXT.ja.md`, in its pipeline figure and in the "Score and resources" item, said that against the compact baseline 0.10 only a work with mirroring needs 0.15. The implementation's `ScoreVersion` (`schema.py`) goes up to 0.22.0, and the lowerer chooses 0.11 through 0.22 according to the representation used.
+- The same document said the saijiki has ten categories and `おもて` eleven words, while the shared asset (`saijiki-v2.json`) holds fifteen categories and the relations (あいだ), and `おもて` has nine words. `SPEC.ja.md` §7.5 says sixteen categories. The English version said the same.
+- Found while fixing F-13, it was fixed on 2026-10-24 on the author's ruling (name the source of truth). The two Score version statements now say later versions are chosen as the representation needs, naming `ScoreVersion` for the range and SPEC §18 for the rule. The saijiki sentence no longer copies the numbers of categories and words and says the shared asset holds them. The English version was fixed the same way.
+- Result: **resolved**.
+
 ## Terms that need care across documents
 
 - SPEC phrases such as "the Renderer is nondeterministic" and "different SVG from the same Score" describe performances with different render seeds. The Project Context and implementation contract is "the same Score + same seed + same drawing conditions produce the same work"; this documentation uses the latter for reproducibility.
-- `SPEC.ja.md` document version `v1.92.0` and app version `v2.15.28` are separate namespaces and are not treated as a mismatch.
+- `SPEC.ja.md` document version `v1.92.0` and app version `v2.15.244` are separate namespaces and are not treated as a mismatch.
 - "Stage 2" meant, in the old implementation, the LLM stage that wrote a Score from DDL; now it means the LLM stage that only produces visible patch proposals for known holes. The shared Rust lowerer structures the Score.
 - "Coerce" survives only in the context of older-Score compatibility (`coerce_saved_score`) and saved observation records (`coerce/observability.py`); it is not a generation stage for new works.
 - "Sketch" means different things for the old Stage 0.5 (a layer that passed a sketch downstream in place of the description) and the current optional effect (supplementing place and light beside the description). The `fine` / `coarse` records of older works belong to the former.
@@ -102,7 +116,7 @@ Remaining line count or compatibility re-exports alone do not show an ownership 
 
 ### C-03 Large modules in the shared core
 
-The old concentration in `api_core/routers/render.py` dissolved with the cutover; the router now holds only the compatibility projection and the entry for replaying older Scores. The crossing point for changes has moved into the shared core. `inku-ddl/src/score_lowering.rs` (about 7,800 lines), `semantic_association.rs` and `compiler_lock.rs` (about 4,600 lines each), and `inku-pipeline/src/machine.rs` (about 2,000 lines) are large, and on the Server side `pipeline_product.py:ProductPipelineEffects` holds four host responsibilities — preparation, provider, save, and replay — in one class.
+The old concentration in `api_core/routers/render.py` dissolved with the cutover; the router now holds only the compatibility projection and the entry for replaying older Scores. The crossing point for changes has moved into the shared core. `inku-ddl/src/score_lowering.rs` (about 8,700 lines), `semantic_association.rs` (about 5,200 lines) and `compiler_lock.rs` (about 4,800 lines), `inku-pipeline/src/laws.rs` (about 6,200 lines), `colors.rs` (about 5,200 lines), and `machine.rs` (about 4,200 lines; the image stages were split into the roughly 1,000 lines of `machine/image.rs`) are large, and on the Server side `pipeline_product.py:ProductPipelineEffects` holds five host responsibilities — preparation, provider, render options, save, and replay — in one class.
 
 Line count alone does not show an ownership violation. Consider a split only when independent reasons for change collide in the same module.
 
@@ -120,6 +134,6 @@ All major nodes and edges have public-source implementation evidence. No node re
 
 ## Follow-up questions
 
-As of 2026-09-25, every difference listed in this document is resolved. New differences are added here when found.
+As of 2026-09-25, every difference through F-12 is resolved. F-13 and F-14 were found in the 2026-10-24 reconciliation and fixed the same day. New differences are added here when found.
 
 These are not changes made by this review, so they were not copied into the ledger automatically.

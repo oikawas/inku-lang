@@ -8,27 +8,34 @@ flowchart TB
     WEB["Web\nSvelteKit UI"]
     CLI["CLI\nHTTP client + bench instrument"]
     ANDROID["Android\nKotlin UI + host"]
+    MACOS["macOS\nSwiftUI + host"]
     API["Public Server HTTP API"]
     SERVER_HOST["Server pipeline host\nPython"]
     ANDROID_HOST["Android pipeline host\nKotlin + JNI"]
-    CORE["Shared Rust core\npipeline + compiler + renderer"]
+    MACOS_HOST["macOS pipeline host\nSwift + UniFFI"]
+    CORE["Shared Rust core\npipeline + compiler + renderer\n+ provider wire + refinement rules + display"]
     SERVER_DB[("Server DB")]
     ROOM[("Room DB")]
+    GRDB[("GRDB")]
 
     USER --> WEB
     USER --> CLI
     USER --> ANDROID
+    USER --> MACOS
     WEB -->|"HTTP"| API
     CLI -->|"HTTP only"| API
     API --> SERVER_HOST
     SERVER_HOST -->|"native wheel"| CORE
     ANDROID --> ANDROID_HOST
     ANDROID_HOST -->|"JNI"| CORE
+    MACOS --> MACOS_HOST
+    MACOS_HOST -->|"UniFFI"| CORE
     SERVER_HOST --> SERVER_DB
     ANDROID_HOST --> ROOM
+    MACOS_HOST --> GRDB
 ```
 
-Web is the reference UI for Server works. The CLI measures the public API. Android is a host that runs every stage on the device. The same shared Rust core makes every decision about meaning from the description to the SVG on both the Server and Android; the hosts hold only provider transport, persistence, and UI. There is no ordinary Android path that calls the Server API as its pipeline.
+Web is the reference UI for Server works. The CLI measures the public API. Android and macOS are hosts that run every stage on the device. The same shared Rust core makes every decision about meaning from the description to the SVG, owns the rules of saved-work refinements, and builds provider request bodies and reads their answers on the Server, Android and macOS alike; the hosts hold only provider transport, persistence, and UI. There is no ordinary Android or macOS path that calls the Server API as its pipeline. Works written from an image (the image tab) exist only on Server/Web (and the CLI).
 
 ## Web internals
 
@@ -111,7 +118,7 @@ flowchart TB
 |---|---|---|
 | Route shell memory | Output tab, modal visibility, short presentation projections, and lifecycle wiring | Lost on reload; not Server-canonical. Domain workflows are constructed once and are not copied back into the route |
 | Route-instance Session owner | Login/logout, current actor, profile editing, member UI/history preferences, and download-folder preference | One `createSessionState` per route; authentication callbacks cross a named boundary and password values stay inside the operation |
-| Route-instance Work owner | Single-work input, submit/replay/stop, current DDL/result/sketch projection, timer/token totals, and one-work Paint coordination with Batch/Demo | One `createWorkState` per route; it owns single-work AbortControllers and stale-run decisions. Single-work submission and DDL edits go to `PipelineController`; one-work Paint for Batch, Demo, and refinement goes to the stateless Paint operation |
+| Route-instance Work owner | Single-work input, the image tab (source note, image intake, re-sending the file held in browser memory, the instructions before review), submit/replay/stop, current DDL/result/sketch projection, timer/token totals, and one-work Paint coordination with Batch/Demo | One `createWorkState` per route; it owns single-work AbortControllers and stale-run decisions. Single-work submission and DDL edits go to `PipelineController`; one-work Paint for Batch, Demo, and refinement goes to the stateless Paint operation |
 | Route-instance pipeline controller | Current variation, execution, revision, and phase; approving and declining completion proposals; forks from a description; mapping between history and variations; display projection of diagnostics | Work constructs one `PipelineController`. The Server snapshot and revision are authoritative; the controller only re-reads saved state, forwards author commands, and asks for a performance of a completed delivery. It never retries provider effects |
 | Route-instance Batch owner | Prompt history, resume/retry plans, line progress, stopping, failures, and latest-result following | One `BatchState` per route; a private run identity rejects late results, and the owner borrows only one-work Paint plus focused history callbacks from Work |
 | Route-instance Demo owner | Demo settings, prompt generation, repetition, timeout/stop, token/elapsed totals, and current-result saving | One `DemoState` per route; a private run identity rejects results from stopped runs, and the owner borrows only one-work Paint plus focused projections from Work |
@@ -124,7 +131,6 @@ flowchart TB
 | Route-instance refinement session owner | Single/grid/save busy state, elapsed/tokens, fan-out slots, AbortController, and candidate selection | One `RefinementSessionState` per route; only the active controller commits progress/errors/finish, and the coordinator and Canvas views share that typed owner |
 | Route-instance refinement coordinator | Target identity, preconditions, candidate request transport, fan-out/session coordination, redraw adoption, save adoption, history reseating, and Canvas fit | One `createRefinementCoordinator` per route; it receives an explicit typed Work subset and named history/render/catalog capabilities. No mutable state or request is duplicated |
 | Stateless refinement fan-out | Five-kind candidate plans, composition-seed exclusion, alternate-catalog order, variation-seed allocation call, labels, and bounded indexed execution | `refinement-fanout.ts` receives a typed snapshot, one AbortSignal, and named candidate factories from the coordinator. It owns no route/session state or HTTP transport |
-| Stateless single-redraw actions | Touch/layout/reading seed selection, touch request/result construction, Paint invocation options, and current-result field projection | `refinement-redraw.ts` receives resolved inputs and named transport, seed, and Paint capabilities. The coordinator retains target checks, session/loading/error, history reseating, reading diff, view selection, and viewport application |
 | Stateless refinement candidate actions | Candidate-to-current-Canvas projection, sequential history saves for a selected snapshot, and stale/identity coordination | `refinement-actions.ts` receives typed candidates plus named save/context capabilities. The coordinator applies the projection and saved identity to the canonical Work owner |
 | Canvas current-work focused view | Current work, corner controls, status marks, navigation, export, caption, empty motif, and zoom presentation | `CanvasArtworkWorkspace.svelte` receives typed display props and the one `CanvasViewportState`; `CanvasPanel` retains tab/overlay composition and shared work selection |
 | Canvas generation-information focused view | Details, prompts, and score tabs; recorded-work presentation; and drawer-local scroll elements | `CanvasGenerationInfo.svelte` renders typed display props. `CanvasPanel` owns open/close, outside/Escape handling, per-tab scroll memory, and the shared SVG measurement |
@@ -140,7 +146,7 @@ flowchart TB
 
 `+page.svelte` is now the route composition shell: it constructs route-instance owners once, keeps top-level lifecycle, authenticated switching, modal/view visibility, build presentation, and short cross-owner projections, and wires named capabilities. `features/work/state.svelte.ts` owns current single-work state plus submit/replay/stop; `features/batch/state.svelte.ts` and `features/demo/state.svelte.ts` own their asynchronous run lifecycles. Work lends each owner only one-work Paint and focused callbacks. `features/run/current-work.ts` remains the stateless one-Paint operation. `features/session/state.svelte.ts` owns authentication and member preferences. `features/canvas/refinement-coordinator.svelte.ts` owns target identity and refinement orchestration while reusing the existing session and stateless action modules.
 
-The connection to the shared pipeline on 2026-09-13 added `features/pipeline/`. `PipelineController` represents a Server-owned execution as one browser tab sees it: it starts with `POST /api/pipeline/variations` and re-reads the saved view until the execution settles. DDL edits are sent from `DdlEditorDialog`; depending on the selected work, they become a fork from the history link (a work saved through the shared pipeline), `legacy/{id}/fork` (an older work), `author-ddl` (an active variation), or otherwise a new direct-DDL variation. `PipelineStatus` shows a completion proposal next to the saved DDL and sends only the author's approval or decline to `/executions/{id}/commands`; the same `PipelineStatus` shows that revision's diagnostics. Selecting a saved work maps a work saved through the shared pipeline to its variation through the history link, and any other work to `/legacy/{id}` as an older work. A pending, failed, or stale selection is never treated as a new work. `diagnostics.ts` displays diagnostics in six channels: upstream, downstream, resource, relation, renderer, and catalog.
+The connection to the shared pipeline on 2026-09-13 added `features/pipeline/`. `PipelineController` represents a Server-owned execution as one browser tab sees it: it starts with `POST /api/pipeline/variations` and re-reads the saved view until the execution settles. DDL edits are sent from `DdlEditorDialog`; depending on the selected work, they become a fork from the history link (a work saved through the shared pipeline), `legacy/{id}/fork` (an older work), `author-ddl` (an active variation), or otherwise a new direct-DDL variation. `PipelineStatus` shows a completion proposal next to the saved DDL and sends only the author's approval or decline to `/executions/{id}/commands`; the same `PipelineStatus` shows that revision's diagnostics. Selecting a saved work maps a work saved through the shared pipeline to its variation through the history link, and any other work to `/legacy/{id}` as an older work. A pending, failed, or stale selection is never treated as a new work. `diagnostics.ts` displays diagnostics in six channels: upstream, downstream, resource, relation, renderer, and catalog. On the image tab (2026-10-24), Work deposits the image through `POST /api/pipeline/images` and starts a `kind: image` variation with `PipelineController.fromImage`. Autonomous refinement lives in `features/autonomous/`, juxtaposition in `features/juxtaposition/`, and the experimental 3D view in `features/experimental-3d/`.
 
 The following Stage 5-7 paragraphs record the boundary after each historical cut. The Stage 10 paragraph and ownership table above describe the current converged boundary.
 
@@ -164,6 +170,8 @@ Stage 6D makes stateless `refinement-fanout.ts` own the five candidate-kind plan
 
 Stage 6E makes stateless `refinement-redraw.ts` own touch/layout/reading single-redraw seed selection, the touch `render-svg` request and derived result identity, layout/reading Paint options, and the shared current-result projection. The page passes resolved work/catalog/render inputs and named transport, seed, and Paint capabilities. It retains preconditions, fallback confirmation, visible lineage-parent materialization, single-session and loading/error state, history reseating, interpretation diff, final Svelte assignments, output tab, timer, and viewport coordination. Candidate-grid request transport does not move in this Stage.
 
+On 2026-09-28 the Canvas's in-place performance, layout, and reading redraws, whose buttons had gone on 2026-07-11, were removed together with `refinement-redraw.ts`, the reading diff display, and the manual refinement dialog that nothing opened. The Stage 6E paragraph above records that time.
+
 Stage 7A makes `CanvasGenerationInfo.svelte` own the generation-information drawer's details, prompts, and score presentation, recorded-work display projections, and drawer-local styles. `CanvasPanel` retains open/close, outside/Escape handling, the active tab, per-tab scroll memory, and the shared SVG measurement for the displayed work, and passes only typed props and named callbacks. The extracted view owns no route or session state, HTTP, or current-work mutation.
 
 Stage 7B makes `CanvasPresentationOverlay.svelte` own the fullscreen work image, caption, control markup, and presentation-only styles. `CanvasPanel` retains open/close, the toolbar, Escape priority, the current work, and navigation, star, and caption mutations, and passes only a minimal mark projection plus named callbacks. The extracted view owns no mutable owner, route state, or HTTP.
@@ -178,21 +186,30 @@ The Settings aggregate in `features/settings/state.svelte.ts` constructs navigat
 
 - `ApiClient` uses `urllib.request` for `/api/*` and `/health`.
 - Runtime code does not import `inku_server`. Shared `inku_analysis` is used for rasterization/analysis, not to bypass the Server pipeline.
-- Natural-language `paint`/`batch` uses `/api/paint`; DDL mode uses `/api/compose`; history persistence uses `/api/history`. Both go through the shared pipeline inside the Server and receive 409 with the current view when a completion proposal needs approval. No command uses `/api/pipeline/*` directly.
+- Natural-language `paint`/`batch` uses `/api/paint`; DDL mode uses `/api/compose`; history persistence uses `/api/history`. Both go through the shared pipeline inside the Server and receive 409 with the current view when a completion proposal needs approval. Painting from an image (`paint --image`) deposits the image through `/api/pipeline/images`, starts with `/api/pipeline/variations` (`kind: image`), and asks for the performance through `/api/pipeline/executions/{id}/commands`. Exporting a work's DDL uses `/api/pipeline/history/{id}/ddl-export`.
 - `test_cli_sender_census.py` treats the CLI as the functional sender.
 
 ## Android boundary
 
 - Flow: `InkuRepository` → `AndroidWorkPipeline` → `SharedAuthoringPipeline` / `SharedPipelineHost` → `NativePipelineBridge` (JNI) → shared `inku-pipeline` / `inku-ddl` / `inku-render` → Room.
 - `SharedPipelineHost` serializes the calls for one execution and performs the effects the core returns. `SingleAttemptModelEffectProvider` sends each provider effect once; retry, fallback, and response judgment stay in Rust. `RoomSharedPipelineStore` holds the CAS save of visible DDL and authority, action acknowledgments, and execution snapshots.
-- `RoutingModelProvider` selects local LiteRT-LM, Gemini, Anthropic, or an OpenAI-compatible remote provider. Android calls the shared core's `provider_wire` (`inku.provider-wire.v1`) through JNI for pipeline and text request bodies and response parsing, including temperature, thinking, schema conversion, output limits and refusal redaction. Kotlin adds the key and owns HTTP, rate limits and observations. Refinement Vision advice uses a tool-free text request with a 768×768 PNG and extracts JSON from the returned text. LiteRT-LM stays on the host. ChatGPT plan request construction and SSE parsing remain in Kotlin for the next migration stage.
+- `RoutingModelProvider` selects local LiteRT-LM, Gemini, Anthropic, or an OpenAI-compatible remote provider. Android calls the shared core's `provider_wire` (`inku.provider-wire.v1`) through JNI for pipeline and text request bodies and response parsing, including temperature, thinking, schema conversion, output limits and refusal redaction. Kotlin adds the key and owns HTTP, rate limits and observations. Refinement Vision advice uses a tool-free text request with a 768×768 PNG and extracts JSON from the returned text. LiteRT-LM stays on the host. Since 2026-10-17, the ChatGPT plan's request bodies, SSE reading, failure classes and personal model-list reading use the same `provider_wire` (`chatgpt_request` and the like).
 - On-device Vision models do not read composition (the author's decision, 2026-10-17). `composition.read` is `!isLocalVisionModel(modelId)` and stays true for external providers. This intentionally differs from Server's always-true setting; provider resolution and 768×768 PNG Vision advice remain aligned with Server.
 - Replay of a saved Score uses `renderSaved` under the restored resource policy. Only the device-only legacy 9:5 format uses `AndroidRenderHost` (the JNI `render`).
 - Engine identity and renderer reference come from the packaged Rust core; Kotlin keeps no version literal.
-- Preview, thumbnails, refinement, and PNG export rasterize saved/current SVG through `inku-svg-raster`. There is no AndroidSVG or Kotlin renderer fallback.
+- Ordinary screen display uses Skia from the shared `inku-display` (`AndroidDisplayRenderer`, `NativeDisplayBridge`), so works look as they do in the Web's Chrome. Thumbnails, refinement, and PNG export rasterize saved/current SVG through `inku-svg-raster`. There is no AndroidSVG or Kotlin renderer fallback.
+- Description runs go through the laws stage (`choose_laws`) and the color stage (`choose_colors`) after the composition reading, as on the Server (since 2026-10-21). Autonomous refinement (laws moves and juxtaposition moves) runs on the device with the shared core's `autonomous_refine` and `juxtaposition`, without calling the Server API.
 - Description identity `dh1`, render identity `rh3`, canonical JSON, and instruction-language normalization/detection call the shared core through `NativePipelineBridge` (JNI). Kotlin holds no copy of these rules; lineage canonical JSON uses the same entry point.
 - Saved-work touch, ground and color-arrangement options and replacements delegate to shared-core `inku.saved-variants.v1` through JNI `savedVariants`. Kotlin transports and saves JSON with large integers intact and holds no rule copy. A color child saves the core's `{color_arrangement_index, catalog_id}`.
 - Kotlin owns the UI, provider settings and transport, camera image preparation and the on-device local LLM, host options, Room/history, and JSON transport to the core. No migration rewrites stored hashes. The old Kotlin Stage 1 / 1.5 / 2 and Score coerce are retired, with no runtime fallback.
+
+## macOS boundary
+
+- Flow: `apple/Sources/InkuMac/` (SwiftUI) → `PipelineHost.swift` (`InkuHost`) → UniFFI (an XCFramework) → shared `inku-pipeline` / `inku-ddl` / `inku-render` / `inku-display` → GRDB (`InkuPersistence`). It never calls the Server API.
+- Work identity (`dh1`, `rh3`, canonical JSON), instruction language, description labels, saved-work touches, ground and color arrangement (`inku.saved-variants.v1`), juxtaposition (`inku.juxtaposition.v1`), autonomous refinement (`inku.autonomous-refine.v1`), and provider request bodies with the ChatGPT plan's requests, SSE and failure classes (`inku.provider-wire.v1`) call the shared core through UniFFI. Swift copies none of these rules.
+- Description runs carry the laws stage and the color stage after the composition reading (as the Server's default).
+- Ordinary screen display uses Skia from `inku-display`. On Apple silicon, zoomed windows start `inku-display-gpu` as a separate process and pass window requests and pixels through its standard input and output (a GPU driver that ends that process does not end the app; the 100% picture stays on the CPU).
+- Swift owns the UI, provider settings and transport (URLSession, Keychain), GRDB persistence, host options, and the OS lifecycle. The macOS app's version (`apple/VERSION`, `apple/BUILD_NUMBER`) is numbered apart from Server/Web. The iPad and iPhone apps are not finished.
 
 ## Language and UI sources
 
@@ -205,4 +222,4 @@ The Settings aggregate in `features/settings/state.svelte.ts` constructs navigat
 
 ## Evidence map
 
-Evidence: `SYS-WEB`, `SYS-CLI`, `SYS-ANDROID`, `PIPE-HOST`, `PIPE-MACHINE`, `WEB-FEATURES`, `WEB-REGISTRY`, `WEB-I18N`.
+Evidence: `SYS-WEB`, `SYS-CLI`, `SYS-ANDROID`, `SYS-MACOS`, `PIPE-HOST`, `PIPE-MACHINE`, `PIPE-WIRE`, `PIPE-REFINE`, `PIPE-DISPLAY`, `PIPE-IMAGE`, `WEB-FEATURES`, `WEB-REGISTRY`, `WEB-I18N`.

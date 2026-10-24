@@ -57,7 +57,7 @@ description or direct DDL
   -> typed compiler (known holes automatically request a completion proposal)
   -> CAS-save a completion patch only after author approval
   -> typed Stage 1.5 + shared lowerer
-  -> minimum compatible Score (resource-aware compact baseline 0.10; 0.15 only with mirroring)
+  -> minimum compatible Score (resource-aware compact baseline 0.10; later versions as the representation needs)
   -> resource-aware Render Engine: SVG performance
   -> save raw Score, SVG, and the history-authority link
 ```
@@ -137,10 +137,12 @@ To learn why something took its current shape, search the changelog by term, ver
 | Subject | Value | Source of truth |
 |---|---|---|
 | Application | the "Target version" line at the top of this file | **the two files `web/APP_VERSION` and `web/BUILD_NUMBER`**. The UI, `/api/info` `version`, and the CLI all read them (the value is not copied here) |
-| Render Engine | 68 | `core/crates/inku-render/src/lib.rs` |
-| DDL | `ddl_version` 13 / `ddl_engine_version` 47 | `server/src/inku_server/layer_versions.py` |
-| Android | `2.1.4-android.80` | `android/VERSION` (a namespace separate from web and server) |
-| Python package | 2.7.2 | `server/pyproject.toml` (moves only on a product release) |
+| Render Engine | read the source of truth (the value is not copied here) | `RENDER_ENGINE_VERSION` in `core/crates/inku-render/src/lib.rs` |
+| DDL | read the source of truth (the value is not copied here) | `DDL_VERSION` and `DDL_ENGINE_VERSION` in `server/src/inku_server/layer_versions.py` |
+| Android | read the source of truth (the value is not copied here) | `android/VERSION` (a namespace separate from web and server) |
+| Python package | read the source of truth (the value is not copied here) | `version` in `server/pyproject.toml` (moves only on a product release) |
+
+The current values of Render Engine, DDL, Score, the application, and the distributed package, and when each goes up, are in the version table of `docs/spec/render-engine-history.md`.
 
 ### Vocabulary
 
@@ -158,7 +160,7 @@ The shared asset is a single source: the Stage 1 vocabulary projection, plugin c
 phrases, the web and Android Saijiki displays, and reference §1 are all derived from it.
 Vocabulary changes go through the shared asset and its checks (such as
 `core/crates/inku-ddl/tests/saijiki_asset.rs`).
-The saijiki holds ten categories, and `おもて` / surfaces (eleven words) says how the inside of a
+The shared asset holds the saijiki's categories and words, and among them `おもて` / surfaces says how the inside of a
 closed shape is (ddl-engine 15) — the counterpart to continuity, which says how a line is, with
 state nouns rather than actions. A surface attached to an instruction that encloses nothing is delivered
 by the shared compiler and lowerer to the corresponding closed shape, or omitted with a diagnostic where there is none. **The two words 粒 (grain)
@@ -172,9 +174,9 @@ inside.
 - **Host effects** — Python and Kotlin hosts perform one provider call for Stage 1 or known-hole completion, or one visible-DDL CAS save, as requested by core, and return an identity-preserving result. Core owns retries, authority transitions, and the next effect; hosts own no separate meaning branch.
 - **Visible DDL and authority** — only a description start uses Stage 1 to produce visible normalized DDL. Direct DDL and an author-approved completion patch enter the same CAS-save boundary, and only the exact acknowledged bytes are parsed again. Description authority locks monotonically to DDL authority after the first author commit that changes source bytes.
 - **Typed compiler, Stage 1.5, and lowerer** — the compiler lock verifies source, provenance, and Macro definitions. Bounded Macro expansion and the input-verifying typed Stage 1.5 feed one lowering to an actual Score or compact recipe. Only known holes can request a completion proposal; with no hole there is no Stage 2 LLM call. Recoverable failures omit the smallest affected field or execution unit with a diagnostic and preserve independent later drawing.
-- **Score and resources** — the lowerer selects the minimum Score version required by the representation. Resource-aware compact output starts at 0.10; only a work carrying a mirror relation requires 0.15. Replay recomputes demand from saved policy and omits one excessive source or coordinated placement before materializing instances.
+- **Score and resources** — the lowerer selects the minimum Score version required by the representation. Resource-aware compact output starts at 0.10, and later versions are chosen as the representation needs (the range of versions is `ScoreVersion` in `schema.py`; the rule is `SPEC.md` §18). Replay recomputes demand from saved policy and omits one excessive source or coordinated placement before materializing instances.
 - **Compatibility boundary** — old works display and replay from their saved Score, SVG, and context. Shared Rust determines the meaning of new work. Android camera DDL uses the shared vocabulary, and history display uses saved information without reconstructing an unrecorded prompt from the old implementation.
-- **Render Engine 66** — the SVG performance, owned by the shared Rust core and called through the same one-request boundary by the server's thin Python adapter and Android's thin JNI adapter.
+- **Render Engine** — the SVG performance, owned by the shared Rust core and called through the same one-request boundary by the server's thin Python adapter and Android's thin JNI adapter.
 Android main preview, thumbnails, and PNG export rasterize canonical saved/current SVG through the
 separate `inku-svg-raster` (`resvg`) crate. Pixels are derived presentation; SVG remains canonical storage.
 The macOS work area is drawn by the display-only `inku-display` (Skia) crate, so it looks as the Web does in Chrome. On Apple silicon, zoomed windows are drawn with Skia's Graphite (GPU) by a separate process (`inku-display-gpu`).
@@ -357,7 +359,7 @@ vocabulary.
 Android and the server now use the same shared Rust authoring pipeline and Render Engine.
 The Android-specific Kotlin drawing engine, the AndroidSVG display path, and Kotlin's old
 Stage 1 / 1.5 / 2 and Score coerce are retired, with no runtime fallback. The Android host owns the
-UI, provider transport, Room, history, and the `rh3` computation.
+UI, provider transport, Room, and history, and asks the shared core for the `dh1` and `rh3` computations.
 
 ### Verification surfaces
 

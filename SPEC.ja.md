@@ -1171,6 +1171,18 @@ Stage 1のfallback候補はStage 1の応答待ちにだけ属する。Stage 1が
 - 設定: `PipelineConfig.colors`（`ColorsConfig`。無くてよい欄`render_seed`は、hostが作品を描く描きの種。見積もりが散らした痕を画と同じ所に置くため）。無ければ配色の段を行わない。解いたパレットは、無くてよい欄`paints`（観測の順の9つの絵具の、色カタログの名）を持てる。読むのは配色の段だけ。Serverは既定の設定に`colors`を持ち、runの描きの種と作品の言語の絵具の名を足す。developer modeでは、要求の`developer_colors_stage`が、設定に`colors`の無い実行（既定にする前に保存した作品の子など）にも同じく`colors`を足す。Serverは配色の段をStage 1のmodelと上限で送り、時間と観測を`colors`として記録する（`elapsed_total_ms`に入り、`elapsed_stage1_ms`には入らない）。
 - 出来事`colors_chosen`は、選んだ法則（一覧の順）・主の法則・主の層（2026-10-21からは空の`null`）・選んだ地（2026-10-21から。地を替えなければ`null`）・当ての所見（code・層・色）を持つ。
 
+### 12.6.6 画像から書く作品（画像タブ、2026-10-24）
+
+実行は、記述の代わりに画像から始められる（`AuthoringInput::Image`。2026-10-24 作者の依頼「画像ファイルから、直接DDLを生成する機能」、記述タブの右隣の画像タブ）。Visionのモデルが画像を見て、compilerが読む文法で可視DDLを直接書く。写生・作品計画・構図・法則・配色の段は通らず、記述も無い。hostの設定が`image`（`ImageConfig`。欄`review`）を持つときだけ行える。書く回と見比べの回の予算は`image_retry`（無ければStage 1の予算）、画像からのカタログ選びはカタログの予算を使う。
+
+- 画像はcoreに入らない: hostが画像を縮め（coreの決まり`inku.image-input-policy.v1`: 長辺1568画素まで、JPEGの質90、4 MiBまで、JPEGかPNG）、その参照（形式・送る画素数・SHA-256・バイト数）と元の画素数を渡す（`ImageInput`）。依頼は送る画像を順に`images`で名指す。画像の無い依頼はこの欄を書かず、bytesとdigestは変わらない。promptのdigestは画像の参照を含む。
+- providerへの送り: `pipeline_request`と`chatgpt_request`は、promptの画像と同じ数の`data:` URLを`images`で受け取り、形式・バイト数・SHA-256のどれかがpromptの参照と違えば断る（`images do not match the prompt`）。画像は各方言のVisionの部品で置く。Anthropicは本文の前の`image`ブロック、OpenAI ResponsesとChatGPTプランは本文の後の`input_image`、OpenAI互換のchatは`image_url`、Geminiは`inlineData`（countTokensの数えにも入る）。
+- 紙: DDLの1文目は画像の比を宣言する（DDL 26）。元の画素数を約分した比で、どちらかの項が10,000を超えるときは送る画素数の比にする。モデルが書いた宣言は除いて書き直す。実行はDDLを紙にはめ込む（`canvas_fit: contain`。画像から選んだカタログの後にも付け直す）。「画像の縦横比を使う」hostは、比の一番近い登録の紙をcoreから受け取る（`inku.image-canvas.v1`: 比の対数の差が一番小さい紙。同点は登録の順）。
+- 流れ: (1) `auto_catalog`のとき、`select_image_catalog`（結果`image_catalog_selected`、prompt `inku.image-catalog-selection-prompt.v1`）が、候補ごとの9色の実際の色を見てカタログを選ぶ。使えなければ既定のカタログにする（`catalog_fallback`）。(2) `write_image_ddl`（結果`image_ddl_written`、prompt `inku.image-ddl-prompt.v1`）に、画像・DDLの手引き・紙の短辺の単位・作品の上限・カタログの色を渡す。答えは`{"ddl": …}`。coreは実行と同じcompileで組み、書いたとおりに描かれない行（読めない語句、紙からはみ出す形、上限を超える文など）を名指す。あれば予算の中で一度だけ、退けたDDLと行ごとの理由と手がかり（`compiler_feedback`）を添えて聞き直す（`provider_attempt`の`asked_again`）。その答えは聞き直さない。1文だけで作品全体を止める文は、1行ずつのcompileで名指し、聞き直しでも直らなければその文を除く（記録の`dropped`）。(3) `review`のとき、hostが書いたDDLを描く（effect `draw_image_review`。文書・紙・画の大きさ（長辺1024画素）を持つ。SVGはcoreの`image_review_svg`にhostが作品を描く描きのオプションを渡して得て、PNGにする）。結果は`image_review_drawn`（PNGの参照）か、描けなかったときの`image_review_undrawn`（書いたDDLをそのままcommitする）。(4) `review_image_ddl`（結果`image_ddl_reviewed`、prompt `inku.image-ddl-review-prompt.v1`）が、画像と描いた画とDDLを見せる。答えは書く回と同じく組み、一度だけ聞き直す。何も描けない答えや、予算を使い切った見比べは、見比べる前のDDLを使う（`image_review_fallback`）。
+- 確定: 残ったDDLをDDLの編集としてcommitする（reason `image_ddl`）。変奏は最初のcommitからDDLが正本で、描き直す記述は無い。読めなかった行は、確定の後に補完しない（画像を見ない補完は推測になる。作者は指示書のエディタから補完できる）。読める答えが一つも無い実行は失敗する（`image_ddl_failed`）。何も描けないDDLも、作者が直せるようにcommitする。
+- 記録: snapshotの`image_ddl`（画像の参照と元の画素数、宣言した比、近い紙、答えごとの段・promptのIDとdigest・聞き直しの答えか・直す行と描いた命令の数、見比べる前のDDL、描いた画の参照、除いた行）を、hostが作品と一緒に保存する。画像もSVGも持たない。
+- バージョン: protocol（1.0.0）、binding、core APIのバージョンは変えない。ServerのPythonの出口に`pipeline_image_input_policy`・`pipeline_image_canvas`・`pipeline_image_review_svg`を足す（UniFFI・JNIの呼び出しは変えない）。
+
 ### 12.7 第二段階（補完）と決定的な構造化
 
 Stage 2 LLMは、保存済み可視DDLにcompilerが明示したknown holeがある場合だけ、範囲を限定したpatch候補を返す。要求は共通pipelineが自動で作り、採用には作者承認と可視DDLのCAS保存を必要とする。LLMはScoreを出力しない。Lock検証済みtyped meaningからScoreへの構造化は共有lowererが一度だけ行い、色、素材、数量、運動、配置path、回転、canvas、明示relationを保つ。

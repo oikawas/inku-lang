@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+### 2026-10-24 — 共有coreが画像からDDLを書く（画像タブのcore）
+
+作者の依頼は、記述タブの右隣に画像タブを置き、Visionのモデルで画像ファイルから指示書を直接作ること。共有pipelineに、画像から始める実行を足した（`AuthoringInput::Image`。hostの設定が`image`を持つときに行える）。Visionのモデルが画像を見て、compilerが読む文法で可視DDLを書く。coreは1文目に画像の画面比を宣言し（DDL 26）、紙にはめ込む。compilerの所見（読めない語句、紙からはみ出す形、上限を超える文）は一度だけ返して直させ、それでも1文だけで作品全体を止める文は名指して除く。`review`のときはhostが書いたDDLを描き（`draw_image_review`）、モデルがそれを画像と見比べてもう一度直す。DDLはDDLの編集としてcommitし（reason `image_ddl`）、読めなかった行は画像を見ないまま補完しない。カタログは画像からも選べる。画像はcoreに入らない。依頼は各画像をSHA-256で名指し、providerへの送りは名指した画像と違う画像を断り、各方言のVisionの部品に置く。画像の無い依頼のbytesは変わらない。snapshotは記録`image_ddl`を持つ（画像もSVGも持たない）。ServerのPythonの出口に`pipeline_image_input_policy`・`pipeline_image_canvas`・`pipeline_image_review_svg`を足した。Claude Opus 5.5とSonnet 5.5で名画6枚を試し、どの答えからもDDLを取り出せ、compilerの所見を添えた依頼1回で、描かれない行はすべて無くなった。Serverの画像タブは別に入る。DDL・DDL engine・描画エンジン・歳時記・protocolとbindingのバージョン・記述からの実行は変えない。
+
 ### 2026-10-23 — macOSに画面比の宣言とはめ込みを追加
 
 新しい指示書から描くときはcoreへ画面比の書き入れを頼み、宣言と紙の比が違うときは、はめ込み・紙に合わせる・キャンセルを選べる。キャンセルではdialogと入力を保つ。手を入れていない保存作品は保存Scoreをはめ込んで子として保存し、指示書・版・種・記述の扱いを引き継ぐ。歳時記の「じ」の末尾に参照用の画面比を置き、あいだも表示する。

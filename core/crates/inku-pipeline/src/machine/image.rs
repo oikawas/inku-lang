@@ -241,8 +241,18 @@ impl PipelineSnapshot {
         match stage {
             LlmStage::WriteImageDdl => match usable.or_else(|| self.image_fallback.take()) {
                 Some(document) => self.after_image_write(document, events),
-                // Nothing draws: the DDL is committed for the author to edit.
-                None => self.commit_image(candidate, events),
+                // Nothing draws even after asking again: the run stops rather
+                // than save an empty work.
+                None => {
+                    self.phase = PipelinePhase::Failed {
+                        reason: "image_ddl_undrawable".into(),
+                    };
+                    self.event(
+                        events,
+                        "failed",
+                        json!({"stage": stage, "reason": ProviderFailure::SemanticViolation, "detail": "undrawable"}),
+                    )
+                }
             },
             _ => {
                 let document = match usable {
@@ -795,6 +805,20 @@ mod tests {
         let state = answer(&state, &ddl).snapshot;
         assert_eq!(committed_source(&state), declared(GOOD));
         assert_eq!(state.image_ddl.as_ref().unwrap().dropped, [STOPPING]);
+    }
+
+    #[test]
+    fn a_ddl_that_draws_nothing_after_asking_again_stops_the_run() {
+        let state = start(image_config(true), false).snapshot;
+        let state = answer(&state, STOPPING).snapshot;
+        assert_eq!(state.action.as_ref().unwrap().identity.attempt, 2);
+        let output = answer(&state, STOPPING);
+        assert!(matches!(
+            &output.snapshot.phase,
+            PipelinePhase::Failed { reason } if reason == "image_ddl_undrawable"
+        ));
+        assert_eq!(event(&output, "failed").unwrap()["detail"], "undrawable");
+        assert!(output.snapshot.action.is_none());
     }
 
     #[test]

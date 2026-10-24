@@ -43,7 +43,7 @@ inku-cliはWeb UIと同じ公開HTTP APIを操作するクライアントです�
 
 ## paint と batch の旗
 
-paintとbatchは同じ旗を受け取ります。**旗を書かなければサーバーの既定が使われ、サーバーの既定はWeb UIの既定と同じとは限りません。**
+paintとbatchは同じ旗を受け取ります（画像から描く旗はpaintだけ）。**旗を書かなければサーバーの既定が使われ、サーバーの既定はWeb UIの既定と同じとは限りません。**
 
 ### 入力と出力
 
@@ -60,10 +60,25 @@ JSON成果物は、その絵を描いたDDL層の版を `ddl_version` と `ddl_e
 | `--input-mode {paint,ddl}` | `paint` は記述をStage 1へ、`ddl` は可視DDLからcompile・必要な穴補完と演奏へ進む。各段の意味はSPECを参照 |
 | `--ddl-text DDL` | **`render-score` 専用。**指示書をprovenance・hash metadataとして送る。DDLに基づく本数・関係の自動補修は行わない |
 | `--ddl-file PATH` | **`render-score` 専用。**指示書をファイルから読む。`-` は標準入力。`--ddl-text` とは併用できない |
-| `--save-history` | サーバーの履歴へ保存する |
+| `--save-history` | 描いた絵を作品としてサーバーの履歴のDBへ追加する。付けなければ、`--image` でも何も保存しない |
 | `--save-artifacts` / `--no-save-artifacts` | サーバー側の成果物保存の有無 |
 | `--full-json` | 応答全体を印字する |
 | `--no-progress` | 経過時間のアニメーションを止める |
+
+### 画像から描く（paintのみ）
+
+| 旗 | 内容 |
+|---|---|
+| `--image PATH` | 記述の代わりにこの画像から描く。Web の画像タブと同じく、VisionモデルがDDLを日本語で書き、紙は `--canvas-aspect` を指定しなければ画像の比に近い紙になる。サーバーは画像を実行中のメモリにだけ置き、保存しない |
+| `--provenance TEXT` | 画像の来歴。記述とは別の欄に作品と一緒に保存され、モデルには送らない |
+| `--provenance-file PATH` | 来歴をUTF-8ファイルから読む。`-` は標準入力 |
+| `--vision-model MODEL` | DDLを書くVisionモデル。省略すると `models --vision-model` で保存したモデル |
+
+`--image` と、記述・`--input-mode`・写生の旗・`--wild`・`--stage1-provider` / `--stage1-model`・`--include-thinking` は併用できない。色カタログ・seed・`--limits`・`--out-dir`・`--png`・`--save-history` は記述からの描画と同じく使える。
+
+```sh
+uv run inku-cli paint --image photo.jpg --provenance "2026年10月 京都・鴨川で撮影" --vision-model chatgpt:gpt-6-luna --save-history -o ./out --png
+```
 
 ### 写生（Stage 0.5）
 

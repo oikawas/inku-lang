@@ -157,6 +157,10 @@ export const ja: LangPack = {
 	}[kind] ?? kind),
 	pipelineDiagnosticOwner: (kind, index) => `${kind} ${index} の箇所。`,
 	pipelineDiagnosticReason: (reason) => ({
+		missing_entity_head: 'この箇所には形（円・線など）や背景の色を表す語が無いため、描かずに外しました。面・道具・揺らぎの語だけでは描けません。',
+		missing_action_entity: 'この箇所の動作（置く・並べる・背景を埋めるなど）が結ぶ形や色が無いため、描かずに外しました。',
+		missing_position_entity: 'この箇所の位置が結ぶ形が無いため、描かずに外しました。',
+		missing_layout_direction_entity: 'この箇所の向き（並べる向きなど）が結ぶ形が無いため、描かずに外しました。',
 		legacy_semantics_require_authored_canonical_definition: '旧形式の定義は、新規作品で利用できる形式への移行が済んでいません。',
 		legacy_definition_replaced_by_canonical: '旧形式の定義に代わり、新形式の同名定義を使います。',
 		invalid_canonical_definition: '定義に問題があるため、読み込めませんでした。',

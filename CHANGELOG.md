@@ -14,26 +14,17 @@ With a remote Vision model, the Android camera hands the photo to the shared cor
 
 The photo and the review drawing are held in memory only while the run writes; the work keeps only their references and the rounds (`image_ddl`). A run whose image is gone is cancelled without sending. Writing and reviewing answer within 8192 tokens. JNI gains wrappers for the three image functions (`imageInputPolicy`, `imageCanvas`, `imageReviewSvg`). The core's behavior, the Room schema, Server, Web and macOS are unchanged.
 
-### 2026-10-24 — Read a whole number before an English period, and leave out a sentence without a shape (DDL engine 71)
+### 2026-10-24 — A leader can no longer take a member out of their user group
 
-Two readings found while writing DDL from images (§12.6.6) are corrected in the shared compiler. The author chose to fix both in drawing as a separate step (2026-10-24).
+A leader who is not an administrator could send `"group_id": null` to `PATCH /api/users/{user_id}`, pass the route's check, and leave a member of their own user group without one (found while checking the API reference). When `group_id` is sent, any value other than the leader's own group, null included, is now refused with 403. An administrator can still clear a group with null.
 
-- In English a period right after a whole number ends the sentence. The shared number reader took that period for a decimal point and gave the number up when no digit followed, so two points or a range ending in a whole number (`… to horizontal 0.9, vertical 1.`) were not read, and the mark fell to its default place with an unread clause. A point is now a decimal point only when a digit follows it, as the parser reads a decimal. The laws stage's English print keeps writing `1.0` for a host's older core.
-- A sentence without a shape, such as a surface, tool or sway word written as a shape (`… の黒の薄い粒を30個散らす。`) or a sway with no shape (`細かく揺れる。`), stopped the whole document when no hole held it, with `missing_canonical_semantic_identity`, which names no sentence. The compiler now names the sentence by a blocking diagnostic with its span (`missing_entity_head`, `missing_action_entity`, `missing_position_entity` or `missing_layout_direction_entity`), and the sentence is left out while the rest draws (`complete_with_omissions`). An incompleteness the compiler cannot name still stops the document. The image run's hints name these kinds, and the compile, rather than the line-by-line salvage, leaves such a sentence out.
+### 2026-10-24 — inku-cli draws from an image
 
-Recompiling the 5,157 DDLs of the 2026-10-17 5173 export changes 14 works, each from that stop to drawing its other sentences (one or two instructions); every other work keeps every field. No saved English DDL ends a number in a whole number before a period. DDL engine 71; DDL 26, the render engine, the Score and the protocol, binding and core API versions are unchanged.
+`inku-cli paint --image PATH` draws from an image through the same API calls, in the same order, as the web image tab. `--provenance` / `--provenance-file` give the source note beside it, and `--vision-model` chooses the Vision model that writes the DDL (defaulting to the CLI Vision setting). Only with `--save-history` is the work added to the history database; without it the CLI tells the pipeline not to save. The description, `--input-mode`, the sketch, `--wild`, the drawing model and `--include-thinking` are refused with it. An interrupted run is stopped. The server is unchanged.
 
-### 2026-10-24 — Paint a child from the instructions before review
+### 2026-10-24 — The manual and SPEC describe the Image tab
 
-When a work from the Image tab records its instructions before review, they appear in a collapsed section below the current instructions. Painting from them uses the existing DDL edit path and keeps the original work. An unfinished edit asks for confirmation before replacement. Works without this record show no section.
-
-### 2026-10-24 — Add the image tab to Server and Web
-
-The tab beside Description takes a source note, a JPEG/PNG/GIF/TIFF file, a Server-made thumbnail, a Vision model, a color catalog and the paper nearest the image's ratio. Server applies EXIF orientation, reads the first GIF frame and sends a JPEG at the core's size. Writing and reviewing default to an 8192-token output budget. The review PNG uses the work's paper, colors and seed, and the committed instructions use the existing DDL editor. Source pixels and review pictures stay in worker memory; durable records keep references and DDL history only. The source note is stored separately and never becomes a description. Schema registry v5 adds two nullable columns to v4 atomically after making a verified backup.
-
-### 2026-10-24 — The shared core writes DDL from an image (the image tab's core)
-
-The author asked for an image tab beside the description tab that generates the instructions directly from an image file with a Vision model. The shared pipeline adds a run that starts from an image (`AuthoringInput::Image`, offered when the host's configuration carries `image`). A Vision model sees the image and writes visible DDL in the grammar the compiler reads; the core declares the image's ratio as the first sentence (DDL 26) and fits the DDL into the paper. The compiler's findings (unread clauses, shapes off the paper, sentences over the limits) are given back once, a sentence that alone stops the whole work is named and left out when that does not mend it, and with `review` the host draws the written DDL (`draw_image_review`) so the model can compare it with the image and correct it once more. The DDL is committed as a DDL edit (reason `image_ddl`) and its unread lines are not completed without the image. The catalog can be chosen from the image. The image never enters the core: requests name each image by its SHA-256, and the provider wire refuses images that differ from the ones named and places them in each dialect's Vision parts; requests without images keep their bytes. The snapshot keeps the record `image_ddl` (no image or SVG). The Server's Python binding adds `pipeline_image_input_policy`, `pipeline_image_canvas` and `pipeline_image_review_svg`. In a trial with Claude Opus 5.5 and Sonnet 5.5 on six paintings, every answer gave DDL, and one request with the compiler's findings removed every line not drawn. The Server's image tab comes separately. DDL, the DDL engine, the render engine, the Saijiki, the protocol and binding versions, and the description runs are unchanged.
+"Creating Images" gains section 16, Paint from an Image (the source note, the image file, the Vision model, `Choose from image automatically`, `Use image aspect ratio`, the steps the indicator names, fitting into the paper, that the image is not saved, and `Instructions before review`), and Batch and the sections after it become 17 to 21. The opening, held descriptions, the input tabs and color catalog, provenance, lineage, history, model selection and troubleshooting also mention the Image tab. SPEC states the three input tabs, that the Image tab paints with the Vision model and that published ChatGPT plan Vision models appear there, that a work written from an image is description-locked, how its source note is shown in the provenance drawer, the history strip, the Library and the reading preview, and the Web's Japanese instructions, canvas default, step names, reasons and re-sending of the file it holds. The product does not change.
 
 ### 2026-10-23 — macOS adds aspect ratio declarations and fitting
 
@@ -291,6 +282,41 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.243 (2026-10-24 / Build1319)
+
+### 2026-10-24 — The API reference is written in full
+
+The server's `/docs` (OpenAPI) now gives all 135 routes a summary and a description and groups them under 14 tags, and every parameter and request or response field has an English description (existing Japanese descriptions are kept). The only fields left without one are the six of the validation error types FastAPI makes itself. No route, parameter, type, default or validation changed. The OpenAPI with its descriptions removed was checked to be the same as before, and the recorded API surface and the Score JSON schema (`core/crates/inku-score/schema/score.schema.json` and its digest) were regenerated for the new words. Existing descriptions that told the history of their development were rewritten for readers of the API.
+
+## v2.15.242 (2026-10-24 / Build1318)
+
+### 2026-10-24 — Explain missing shapes and background colors in Web diagnostics
+
+The Web explains omitted parts that lack a shape word or a shape for an action, position or direction in Japanese and English, instead of showing reason identifiers. Reasons also used for background clauses explain missing background colors. Source spans and the existing omission and continuation text are retained; DDL interpretation and drawing semantics are unchanged.
+
+## v2.15.241 (2026-10-24 / Build1317)
+
+### 2026-10-24 — Read a whole number before an English period, and leave out a sentence without a shape (DDL engine 71)
+
+Two readings found while writing DDL from images (§12.6.6) are corrected in the shared compiler. The author chose to fix both in drawing as a separate step (2026-10-24).
+
+- In English a period right after a whole number ends the sentence. The shared number reader took that period for a decimal point and gave the number up when no digit followed, so two points or a range ending in a whole number (`… to horizontal 0.9, vertical 1.`) were not read, and the mark fell to its default place with an unread clause. A point is now a decimal point only when a digit follows it, as the parser reads a decimal. The laws stage's English print keeps writing `1.0` for a host's older core.
+- A sentence without a shape, such as a surface, tool or sway word written as a shape (`… の黒の薄い粒を30個散らす。`) or a sway with no shape (`細かく揺れる。`), stopped the whole document when no hole held it, with `missing_canonical_semantic_identity`, which names no sentence. The compiler now names the sentence by a blocking diagnostic with its span (`missing_entity_head`, `missing_action_entity`, `missing_position_entity` or `missing_layout_direction_entity`), and the sentence is left out while the rest draws (`complete_with_omissions`). An incompleteness the compiler cannot name still stops the document. The image run's hints name these kinds, and the compile, rather than the line-by-line salvage, leaves such a sentence out.
+
+Recompiling the 5,157 DDLs of the 2026-10-17 5173 export changes 14 works, each from that stop to drawing its other sentences (one or two instructions); every other work keeps every field. No saved English DDL ends a number in a whole number before a period. DDL engine 71; DDL 26, the render engine, the Score and the protocol, binding and core API versions are unchanged.
+
+### 2026-10-24 — Paint a child from the instructions before review
+
+When a work from the Image tab records its instructions before review, they appear in a collapsed section below the current instructions. Painting from them uses the existing DDL edit path and keeps the original work. An unfinished edit asks for confirmation before replacement. Works without this record show no section.
+
+### 2026-10-24 — Add the image tab to Server and Web
+
+The tab beside Description takes a source note, a JPEG/PNG/GIF/TIFF file, a Server-made thumbnail, a Vision model, a color catalog and the paper nearest the image's ratio. Server applies EXIF orientation, reads the first GIF frame and sends a JPEG at the core's size. Writing and reviewing default to an 8192-token output budget. The review PNG uses the work's paper, colors and seed, and the committed instructions use the existing DDL editor. Source pixels and review pictures stay in worker memory; durable records keep references and DDL history only. The source note is stored separately and never becomes a description. Schema registry v5 adds two nullable columns to v4 atomically after making a verified backup.
+
+### 2026-10-24 — The shared core writes DDL from an image (the image tab's core)
+
+The author asked for an image tab beside the description tab that generates the instructions directly from an image file with a Vision model. The shared pipeline adds a run that starts from an image (`AuthoringInput::Image`, offered when the host's configuration carries `image`). A Vision model sees the image and writes visible DDL in the grammar the compiler reads; the core declares the image's ratio as the first sentence (DDL 26) and fits the DDL into the paper. The compiler's findings (unread clauses, shapes off the paper, sentences over the limits) are given back once, a sentence that alone stops the whole work is named and left out when that does not mend it, and with `review` the host draws the written DDL (`draw_image_review`) so the model can compare it with the image and correct it once more. The DDL is committed as a DDL edit (reason `image_ddl`) and its unread lines are not completed without the image. The catalog can be chosen from the image. The image never enters the core: requests name each image by its SHA-256, and the provider wire refuses images that differ from the ones named and places them in each dialect's Vision parts; requests without images keep their bytes. The snapshot keeps the record `image_ddl` (no image or SVG). The Server's Python binding adds `pipeline_image_input_policy`, `pipeline_image_canvas` and `pipeline_image_review_svg`. In a trial with Claude Opus 5.5 and Sonnet 5.5 on six paintings, every answer gave DDL, and one request with the compiler's findings removed every line not drawn. The Server's image tab comes separately. DDL, the DDL engine, the render engine, the Saijiki, the protocol and binding versions, and the description runs are unchanged.
 
 ## v2.15.240 (2026-10-23 / Build 1316)
 

@@ -9,6 +9,8 @@ description + sketch supplement (Stage 0.5, optional) -> interpretation (Stage 1
 
 The description is the work's score; the SVG is one performance. The same description may produce a different work when its models, sketch, composition seed, or render seed change.
 
+You can also paint from an image file instead of a description (v2.15.241). On the `Image` tab a Vision model reads the image, writes the instructions directly, and those instructions are painted. The sketch, interpretation, composition reading, laws stage and color stage are not used. See §16 for the steps.
+
 In the laws stage after the composition, the model chooses the laws for the work (their number is not fixed) from 19 laws of painting, design and music (the golden section, equal repetition, principal and subordinate, patterns, jo-ha-kyū and others). Only the layers a law changes are rewritten in the instructions, in numbers (`at horizontal 0.381966, vertical 0.381966`, `from horizontal 0.118, vertical 0.5 to horizontal 0.882, vertical 0.5` and the like). The laws' names do not appear in the instructions. When no law can be laid, the work is settled as the composition left it. After the laws stage comes a color stage, which chooses the work's colors by laws of color (contrast of hue, harmony of analogous colors, masses of light and dark and others, 18 in all), a default since 2026-10-20. It keeps the colors of the layers the description names and a ground color the description names; where the description names none, the color stage may choose the ground's color too. Estimating how the drawing looks, it chooses again a color that would not show from the ground or with which the law would not hold. When no colors can be laid, the work is settled as the laws stage left it. A refinement drawn from a saved work (Change the description, Juxtapose and the like) follows the settings the work was drawn with, so a work saved before the color stage became a default does not take it.
 
 Stage 2 completes holes remaining in the visible instructions; the shared Rust compiler produces JSON Score. Relations come only from the author's instructions or explicit definitions. The old Stage 1.5 and coerce are not layers that invent relations, and the old `Auto-repair` switch is retired. Layer and fallback names retained in older works' provenance describe their historical execution.
@@ -18,6 +20,7 @@ The vocabulary used in the UI is as follows.
 | Term | Meaning |
 |---|---|
 | description | The poetic input the author writes. The topmost layer of a work |
+| Source note | The image's source or a note, written on the Image tab. Saved with the work and not used for painting |
 | Sketch from life | The Stage 0.5 act of keeping the description and adding prose about place and light |
 | interpretation | The Stage 1 act of reading the description and, when enabled, its sketch supplement into instructions |
 | instructions (normalized DDL) | The executable specification interpretation produces |
@@ -233,12 +236,13 @@ A work whose instructions (DDL) were edited follows its DDL, not its description
 - The Describe tab heading shows `Held (DDL edited)` and the description cannot be changed. In place of `Paint`, `Start a new work from this description` appears: it draws the description as it stands as a new work (this work stays as it is, and the description can be changed in the new work).
 - In the work's edit menu, `Change the description`, `Redraw with or without sketch from life` and `Change the model` are shown but not offered, with the reason.
 - A child made by layout or color (or by touch, before it was removed) carries the DDL and is held as well. A child made by reading the description again is not.
+- A work painted from an image (§16) also follows its DDL, not a description, and is held in the same way.
 - The history strip shows a lock mark, and a lineage card shows `Held (DDL edited)`.
 - Autonomous refinement takes laws moves only (a juxtaposition move adds a sentence to the description, so it cannot be taken).
 
 ## 7. Choose Model, Color Catalog, Sketch, Wild, and Canvas
 
-`Conditions for the next work` on the Describe tab apply to the next painting. The input tabs are `Describe` and `Batch`. Batch shows the same kind of choices as its own `Drawing conditions for the next batch`.
+`Conditions for the next work` on the Describe tab apply to the next painting. The input tabs are `Describe`, `Image`, and `Batch`. Batch shows the same kind of choices as its own `Drawing conditions for the next batch`. See §16 for the Image tab's conditions.
 
 | Control | Contents |
 |---|---|
@@ -248,9 +252,9 @@ A work whose instructions (DDL) were edited follows its DDL, not its description
 | Wild | Removes the stroke limit |
 | Canvas | The aspect ratio |
 
-Drawing uses the same model for Stage 1 and Stage 2. Models measured per stage are ordered by the lower of the two stages. The model for Vision, which reads images, is chosen separately.
+Drawing uses the same model for Stage 1 and Stage 2. Models measured per stage are ordered by the lower of the two stages. The model for Vision, which reads images, is chosen separately. The Image tab (§16) paints with this Vision model.
 
-The color catalog list includes `From the description`. Choose it and the server reads each description and picks a catalog for every painting. The choice is saved per user.
+The color catalog list includes `From the description`. Choose it and the server reads each description and picks a catalog for every painting. The choice is saved per user. On the Image tab the same choice reads `Choose from image automatically`, and the model reads the image to choose the catalog.
 
 A work records the colors it was drawn in on its own row. **Redrawing an older work therefore draws it in those colors, not in today's definition of its catalog.** It still draws if the catalog has since been renamed, and it still draws if the catalog has been retired. The catalog name in the status area carries a note in those cases: `Retired` when the catalog is gone, and `No record of its colors` for an older work that has no recorded colors — that one is drawn from the current definition.
 
@@ -386,7 +390,7 @@ Choosing, saving, and discarding options work as in 8.2: choose the ones to keep
 
 Open the provenance drawer at the bottom of the work tab to see the record of the selected work. Its tabs are `Details`, `Prompts`, and `JSON`.
 
-`Details` has the following sections; sections such as Sketch and Origin depend on the work's records. The follow-selection setting in `Display and operation` is enabled by default: with the drawer open, selecting another work in the history strip switches its information to that work.
+`Details` has the following sections; sections such as Sketch and Origin depend on the work's records. The follow-selection setting in `Display and operation` is enabled by default: with the drawer open, selecting another work in the history strip switches its information to that work. For a work painted from an image (§16), `Details` begins with an `Image · Source note` section showing the source note written when it was painted.
 
 | Section | Main contents |
 |---|---|
@@ -417,6 +421,7 @@ The `Lineage` tab shows which explicit action a work was derived from. Performan
 - Intermediate works stay in the lineage as `lineage_only` and do not appear in ordinary history. Promoting one moves it into ordinary history.
 - From a lineage card you can promote to ordinary history, comment, star, mark for revision, and move to trash.
 - You may also select a work from the lineage and repaint it from its description or instructions.
+- A work painted from an image starts a lineage. A child drawn from its edited instructions, or from `Instructions before review` (§16), is an instruction-edit child and, like color and composition children, keeps the source note.
 
 ## 13. Read the Colophon
 
@@ -435,6 +440,8 @@ If the saved work selected in Work or Refine matches the Library search and filt
 From that starting point, use `← newer` to browse newer works or lineages. The query, filters, bulk selection and preview remain. The button becomes unavailable when you reach the latest position. Page numbers count from the newest, so a Library opened at the selected work shows which page it is. Type a number into the page field and press Enter to go to that page.
 
 The search field right of the filter buttons in the history strip filters its thumbnails. It matches a whole UUID, part of a description, or the beginning, end or whole of a render or description hash. Hashes work with or without a prefix such as `rh3:`, and matching is case-insensitive. Search after typing or press Enter, then choose a thumbnail to open the work. When nothing matches, an empty `No matches` tile appears. While the answer is awaited the tile reads `Searching…`, and the strip keeps its height. The × button clears the query and restores ordinary history. The Library keeps its own separate query.
+
+A work painted from an image has no description, so the history strip, the Library and the reading preview show its source note in the description's place (the history strip's tooltip labels it `Source note`).
 
 In the library, choose `Display` (`Thumbnails` or `List`) separately from `Group by` (`Timeline` or `By lineage`). A single click on an image opens its reading preview without changing the next-work conditions. Double-clicking opens and focuses that work in Work for `Timeline` or in Lineage for `By lineage`. You can also use `Open work`, `Open lineage`, or `Refine`.
 
@@ -541,7 +548,46 @@ For several works, choose the transition pattern and display hold for each work.
 
 From Library the order is oldest to newest; from the lineage it runs from the origin to the selected work.
 
-## 16. Batch
+## 16. Paint from an Image
+
+On the `Image` tab you paint from an image file instead of a description (v2.15.241). A Vision model reads the image and writes Japanese instructions directly, and those instructions are painted. The sketch, interpretation, composition reading, laws stage and color stage are not used.
+
+1. Open the `Image` tab (to the right of `Describe` among the input tabs).
+2. If you like, write the image's source or a note in `Source note`. It is saved with the work and is not used for painting.
+3. Choose an image with `Choose an image file (JPEG, PNG, GIF, TIFF)`. Once it is read, a thumbnail appears with the file name and the original size in pixels (width × height). A GIF uses its first frame, and a photograph's orientation (EXIF) is applied.
+4. Under `Conditions for the next work`, choose `Model`, `Color catalog`, and `Canvas`.
+5. Press `Paint`.
+
+| Condition | Contents |
+|---|---|
+| Model | The Vision model that reads the image. `Edit` opens the list of Vision models. With no Vision model available, `Paint` cannot be pressed and `Choose a Vision model that can read images.` appears |
+| Color catalog | `Choose from image automatically` lets the model read the image and choose the work's color catalog. Choose another catalog to paint with it |
+| Canvas | `Use image aspect ratio` (the default) chooses, from the eleven papers (§7), the one closest to the image's ratio. Another paper can be chosen as well |
+
+Sketch from life and Wild do not appear on the Image tab; both are off. The instructions are written in Japanese whatever the UI language.
+
+While you wait, the indicator names the step at work.
+
+| Indicator | What happens |
+|---|---|
+| `Choosing colors from the image…` | Only with `Choose from image automatically`. The candidate catalogs' colors are compared with the image |
+| `Writing instructions from the image…` | The model reads the image and writes the instructions. Their first sentence declares the image's ratio (`画面比W:H。`) |
+| `Revising the instructions…` | If some lines would not be drawn as written (an unread phrase, a shape off the paper and the like), the model is asked once to write them again, with each line's reason |
+| `Comparing the image with the drawing…` | The drawing of the written instructions is shown beside the original image, and the model corrects the instructions once |
+
+The performance of the corrected instructions appears in the work tab and is saved to history. A sentence without a shape (a surface word written as a shape, for example) is left out, and the rest is drawn. When only instructions that draw nothing could be written, `Instructions could not be written from the image. Choose another model and paint again.` appears and the run stops.
+
+**Paper and fitting.** The instructions are laid out in the image's ratio and fitted into the center of the chosen paper, keeping that ratio. On the Image tab nothing is asked before painting, even when the paper's ratio differs from the declaration (§7). With `Use image aspect ratio` the margins stay small.
+
+**The image is not saved.** The chosen image is kept in the server's memory only while it is painted, and is discarded afterwards. An image not painted within fifteen minutes is discarded as well. What stays with the work is the source note, the instructions (DDL), and the record of the writing and correcting rounds (including `Instructions before review`). Pressing `Paint` again with the same image sends the image the browser holds once more and paints a new work. When the server no longer holds the image, after a page reload for example, `The image is no longer available. …` appears; choose the file again. An unreadable format shows `The image could not be read. …`, and an image that is too large (a file over 32 MiB, for example) shows `The image is too large. …`.
+
+**After painting.** The Image tab shows the same instruction box as the Describe tab. Read the instructions there or in the Instruction editor, and edit them to paint again (the result is an instruction-edit child). Opening a work painted from an image from history or the lineage switches the input tab to `Image` and shows its source note (the image itself is not shown, so choose the file again to paint a new work). A work painted from an image has no description, and its description is held like that of a work whose DDL was edited (§6).
+
+**Instructions before review.** When a work that keeps the instructions written before the comparison is shown on the Image tab, `Instructions before review` appears folded below the instructions. Open it to find the text and `Paint a child from these instructions`. Pressing it keeps the original work and paints an instruction-edit child from those instructions. If the instructions have edits of your own, you are asked before they are replaced. The compared instructions come closer to the original image, while the instructions before the comparison sometimes make the stronger picture, so both can be painted and compared.
+
+**From the CLI.** The CLI paints from an image the same way with `inku-cli paint --image PATH` (the source note with `--provenance`, the Vision model with `--vision-model`). See "Drawing from an image (paint only)" in the [inku-cli Reference](cli-reference.md) for the flags.
+
+## 17. Batch
 
 1. Open the `Batch` tab.
 2. Enter one description per line.
@@ -557,7 +603,7 @@ When a stopped batch still has lines that failed to draw, `Retry failed works` a
 
 Set `Batch retry` in the settings to one or more and the failed lines alone are painted again after the first pass. Zero means no retry. A run that was stopped is not retried.
 
-## 17. Demo
+## 18. Demo
 
 Open `Settings` → `Making` → `Demo`. It writes short descriptions from a seed phrase, then paints them repeatedly. Choose saving to DB, saving files, the description model, display interval in seconds, and timeout in minutes.
 
@@ -567,7 +613,7 @@ Starting Demo closes Settings so you can watch the canvas. While it runs, the ma
 
 Even with automatic saving disabled, the current work can be saved to history explicitly. The demo stops on its own when the configured time is reached. History actions are locked while a demo runs.
 
-## 18. Settings
+## 19. Settings
 
 Open it from `Settings` in the app rail. Settings are grouped as `Display and operation`, `Making`, `Export`, `Connections and administration`, and `Extensions and details`, with a separate `ChatGPT plan` category where personal connections are enabled. The pages and controls visible depend on your role.
 
@@ -580,11 +626,11 @@ Open it from `Settings` in the app rail. Settings are grouped as `Display and op
 | Connections and administration | Administrators manage shared `Models`, `User management`, `DB settings`, and `Log retention`. Leaders can also manage users within their scope. Where personal ChatGPT is enabled, members can open their own `Models` settings. Administrators' `Detailed` mode also shows `Other (server)` and `Limits` |
 | Extensions and details | `Detailed` shows `Plugins` and `Unread-word ledger` |
 
-To choose one drawing model for both stages, open `Model selection` from the making screen's conditions and select it in `Stage 1/2`. Choose the image-reading model separately in `Vision` when needed. Ordinary model selection omits providers with no candidates. If a normal provider's selected model disappears, selection moves to the first available candidate, or keeps the original ID if none exists. Personal ChatGPT does not switch to another model automatically and explains why it is unavailable. The generic pickers in Demo and the Instruction editor instead show empty-list guidance and mark an absent selected ID `Not in the list`.
+To choose one drawing model for both stages, open `Model selection` from the making screen's conditions and select it in `Stage 1/2`. Choose the image-reading model separately in `Vision` when needed (the Image tab paints with it too). Ordinary model selection omits providers with no candidates. If a normal provider's selected model disappears, selection moves to the first available candidate, or keeps the original ID if none exists. Personal ChatGPT does not switch to another model automatically and explains why it is unavailable. The generic pickers in Demo and the Instruction editor instead show empty-list guidance and mark an absent selected ID `Not in the list`.
 
 The stars at the edge of each drawing-model button summarize its rating. Ordinary Stage 1/2 selection uses the lower available stage rating, or the LLM rating for an end-to-end measurement. Its detailed hover can show the strengths of each measured stage. Generic pickers show a single rating for the purpose in both button and hover; they do not select models per stage. Hover also shows `LLM` and `Vision` badges (greyed where unavailable), three recommendation tiers (★★★, ★★☆, ★☆☆), approximate cost (per drawing for LLM, per picture for Vision; $0 for a free model), and speed (measured mean seconds when present, otherwise the speed label).
 
-Administrators' `Models` settings manage shared connections and publication. Where personal ChatGPT is enabled, connect through the separate `ChatGPT plan` page and publish models in your personal `Models` settings, independently of API key connections. Published ChatGPT plan models become drawing candidates for LLM use, and Vision refinement and colophon candidates for Vision use. See the [ChatGPT plan connection guide](../../docs/guide/chatgpt-plan.md).
+Administrators' `Models` settings manage shared connections and publication. Where personal ChatGPT is enabled, connect through the separate `ChatGPT plan` page and publish models in your personal `Models` settings, independently of API key connections. Published ChatGPT plan models become drawing candidates for LLM use, and Vision refinement, colophon and Image tab candidates for Vision use. See the [ChatGPT plan connection guide](../../docs/guide/chatgpt-plan.md).
 
 The settings dialog has `Standard` and `Detailed` modes, switched through `Display mode` at upper right. `Standard` shows everyday settings; **`Plugins`, `Limits`, `Unread-word ledger`, and `Other (server)` appear only in `Detailed`.** The choice remains in this browser.
 
@@ -600,7 +646,7 @@ The nine values were introduced in v2.13.28 as three families: what the machine 
 
 The `Unread-word ledger` collects words whose direct counterpart could not be confirmed when the description was interpreted into DDL. Nothing is promoted from this ledger into the dictionary automatically. Administrators can also see the ledger for everyone.
 
-## 19. Paint from the CLI
+## 20. Paint from the CLI
 
 The CLI uses the same public HTTP API as the Web UI.
 
@@ -624,7 +670,7 @@ uv run inku-cli history --limit 20
 
 Flags you omit fall back to the server defaults. Sketch from life defaults to off in both the server and Web UI. See the `inku-cli Reference` for all flags and compatibility with older sketch values.
 
-## 20. When a Work Does Not Come Out
+## 21. When a Work Does Not Come Out
 
 | Symptom | What to do |
 |---|---|
@@ -640,6 +686,9 @@ Flags you omit fall back to the server defaults. Sketch from life defaults to of
 | Painting is refused | The concurrency ceiling has been reached. Wait a moment |
 | A comparison result is lost | Adopt or star the compared option to keep it in history |
 | The refinement dialog does not close | Options are unsaved. Choose `Save the chosen ones and close` or `Discard all and close` |
+| `Paint` cannot be pressed on the Image tab | The image is still being read, or no Vision model is chosen. Choose one through `Edit` beside `Model` |
+| `The image is no longer available. …` appears | The server no longer holds the image (fifteen minutes passed, the page was reloaded, and the like). Choose the file again and paint |
+| `Instructions could not be written from the image. …` appears | Choose another model and paint again |
 
 Write observable physical words, not only words of emotional judgment.
 

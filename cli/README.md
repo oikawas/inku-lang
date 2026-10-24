@@ -35,6 +35,24 @@ through Stage 2/rendering:
 inku-cli paint "白い背景に黒い線を一本引く。" --input-mode ddl --stage1-model chatgpt:gpt-6-luna --save-history
 ```
 
+## Draw from an image
+
+`paint --image PATH` draws from an image the way the web image tab does. The
+Vision model (`--vision-model`, or the one saved with `models --vision-model`)
+writes the DDL in Japanese, and the paper follows the image unless
+`--canvas-aspect` names one. The server keeps the image in memory for the run
+and never saves it. `--provenance TEXT` (or `--provenance-file PATH`) gives the
+image's source note: it is kept with the work apart from the description and
+is never sent to the models. Add `--save-history` to add the work to the
+server's history database; without it nothing is saved.
+
+```sh
+inku-cli paint --image photo.jpg --provenance "2026年10月 京都・鴨川で撮影" --vision-model chatgpt:gpt-6-luna --save-history -o ./out --png
+```
+
+An image run takes no description, `--input-mode`, sketch, `--wild`,
+`--stage1-model` or `--include-thinking`, and refuses them.
+
 ## List history, with or without the drawings
 
 `history` returns each work's whole SVG by default, which is what makes it
@@ -350,6 +368,8 @@ options:
 ```
 usage: inku-cli paint [-h] [--base-url BASE_URL]
                       [--timeout-seconds TIMEOUT_SECONDS] [--file FILE]
+                      [--image PATH] [--provenance TEXT]
+                      [--provenance-file PATH] [--vision-model VISION_MODEL]
                       [--out-dir OUT_DIR] [--prefix PREFIX] [--png]
                       [--svg-profile {display,editable,compat,live}]
                       [--input-mode {paint,ddl}]
@@ -380,6 +400,20 @@ options:
   --timeout-seconds TIMEOUT_SECONDS
                         HTTP timeout in seconds (default: 600)
   --file FILE, -f FILE  read the description from a UTF-8 file, or '-'
+  --image PATH          draw from this image instead of a description, as the
+                        web image tab does: the Vision model writes the DDL in
+                        Japanese and the paper follows the image unless
+                        --canvas-aspect names one; the server holds the image
+                        in memory only and never saves it
+  --provenance TEXT     with --image: the source note of the image (where it
+                        came from), kept with the work apart from the
+                        description and never sent to the models
+  --provenance-file PATH
+                        with --image: read the source note from a UTF-8 file,
+                        or '-'
+  --vision-model VISION_MODEL
+                        with --image: the Vision model that writes the DDL
+                        (default: the CLI Vision setting)
   --out-dir OUT_DIR, -o OUT_DIR
                         directory for JSON/SVG/PNG outputs
   --prefix PREFIX       output filename prefix
@@ -433,7 +467,8 @@ options:
   --instruction-lang {auto,ja,en}
   --ui-lang UI_LANG
   --include-thinking
-  --save-history
+  --save-history        add the drawing to the server's history database as a
+                        work; without it nothing is saved
   --save-artifacts, --no-save-artifacts
   --no-progress         disable elapsed-time progress animation
   --full-json           print the full paint response
@@ -526,7 +561,8 @@ options:
   --instruction-lang {auto,ja,en}
   --ui-lang UI_LANG
   --include-thinking
-  --save-history
+  --save-history        add the drawing to the server's history database as a
+                        work; without it nothing is saved
   --save-artifacts, --no-save-artifacts
   --no-progress         disable elapsed-time progress animation
   --continue-on-error

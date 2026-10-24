@@ -2,6 +2,14 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-10-24 — Painting from an image with the CLI
+
+`inku-cli paint --image` now paints from an image and the CLI reference gained "Drawing from an image (paint only)", so section 16 of "Creating Images" says how to paint from the CLI and points to that section.
+
+## 2026-10-24 — Painting from an image
+
+The Image tab (v2.15.241) paints from an image file instead of a description, so "Creating Images" gains section 16, "Paint from an Image", and Batch and the sections after it become 17 to 21. Section 16 covers choosing the source note, the image file, the Vision model, `Choose from image automatically` and `Use image aspect ratio`, the steps the indicator names, fitting into the paper, that the image is not saved, and painting a child from `Instructions before review`. The opening and its vocabulary table, section 6 (held descriptions), 7 (input tabs and color catalog), 11 (provenance), 12 (lineage), 14 (history), 19 (model selection) and 21 (when a work does not come out) also mention the Image tab.
+
 ## 2026-10-23 — The aspect ratio under じ
 
 The saijiki screens moved `aspect ratio` from the display-only category がめん / aspect to the end of じ / grounds, so the DDL reference's category list drops the がめん row, and the じ row and 4.9 say that the aspect ratio declaration is shown there.

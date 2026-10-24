@@ -71,9 +71,8 @@ EXPECTED_TABLE_NAMES = {
     "app_settings",
     *AUTHORING_TABLE_NAMES,
 }
-# I-706 replaces expanded_ddl with nullable ddl_source_origin. All remaining
-# declarations and indexes stay frozen alongside that accepted schema change.
-SINGLE_DDL_SCHEMA_SHA256 = "53ed8b97069d2e1ac2164f6230df531f66c79075f1e84c6fa8093d398f831fd7"
+# Registry v5 adds nullable image provenance and core metadata to the single-DDL schema.
+SINGLE_DDL_SCHEMA_SHA256 = "d3432962cad7d3117804668c355dfedf0bee3286bbecb0abb3a949c4c329ef61"
 
 
 def _compiled_schema_payload(base, *, excluded_tables: set[str] | None = None) -> bytes:

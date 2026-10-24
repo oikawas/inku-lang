@@ -33,7 +33,7 @@ def test_each_provider_effect_is_counted_by_its_outcome(monkeypatch) -> None:
     ])
     monkeypatch.setattr(
         pipeline_product, "SingleAttemptProvider",
-        lambda options, observation=None: (lambda action: next(results)),
+        lambda options, observation=None, images=None: (lambda action: next(results)),
     )
     monkeypatch.setattr(db, "get_model_settings", lambda: {})
     perform = effects.provider_for("author-1", {"host_options": {}, "execution_id": "execution-1"})

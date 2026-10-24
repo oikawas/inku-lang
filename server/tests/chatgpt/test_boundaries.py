@@ -71,7 +71,7 @@ def test_cached_model_admission_ignores_busy_wire_without_allowing_another_send(
             asyncio.run(provider.catalog("owner", value["id"], 1, time.monotonic() + 0.05, force=True))
         with pytest.raises(TimeoutError):
             asyncio.run(provider.request("owner", value["id"], 1, "gpt-6-luna",
-                                         {"tag": "generate_normalized_ddl"}, time.monotonic() + 0.05, 1024))
+                                         {"tag": "generate_normalized_ddl", "payload": {"prompt": {}}}, time.monotonic() + 0.05, 1024))
 
 
 @pytest.mark.parametrize("case, status, code", [
@@ -596,7 +596,7 @@ def test_catalog_quota_also_blocks_later_catalog_and_inference(isolated, monkeyp
     with pytest.raises(ChatGPTError, match="quota"):
         asyncio.run(catalog("owner", value["id"], 1, time.monotonic() + 5, force=True))
     with pytest.raises(ChatGPTError, match="quota"):
-        asyncio.run(request("owner", value["id"], 1, "model", {"tag": "generate_sketch"}, time.monotonic() + 5, 1024))
+        asyncio.run(request("owner", value["id"], 1, "model", {"tag": "generate_sketch", "payload": {"prompt": {}}}, time.monotonic() + 5, 1024))
     assert len(calls) == 1
 
 

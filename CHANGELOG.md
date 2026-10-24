@@ -297,6 +297,10 @@ Saved works also offer random or Vision autonomous refinement. The author sets t
 
 ## v2.15.244 (2026-10-24 / Build1320)
 
+### 2026-10-25 — Align the persistence contract and checks after image input
+
+The portable persistence contract now classifies the existing image provenance and DDL-history columns as Server host extensions. Test runs, provider doubles and schema expectations follow the current image-input interface, and the lightweight history-list check distinguishes the later ID lookup from the artwork projection. Runtime drawing, communication and storage formats are unchanged.
+
 ### 2026-10-24 — A leader can no longer take a member out of their user group
 
 A leader who is not an administrator could send `"group_id": null` to `PATCH /api/users/{user_id}`, pass the route's check, and leave a member of their own user group without one (found while checking the API reference). When `group_id` is sent, any value other than the leader's own group, null included, is now refused with 403. An administrator can still clear a group with null.

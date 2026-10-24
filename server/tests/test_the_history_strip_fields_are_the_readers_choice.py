@@ -190,9 +190,9 @@ def test_t162_the_listing_sends_each_works_weight_even_when_it_withholds_the_pic
         statement for statement in statements if re.search(r"FROM history\b(?!_)", statement)
     ]
     assert history_selects
-    selected = history_selects[-1].split("FROM history", 1)[0]
-    assert "CAST(history.svg AS BLOB)" in selected
-    assert "history.svg AS history_svg" not in selected
+    projections = [statement.split("FROM history", 1)[0] for statement in history_selects]
+    assert any("CAST(history.svg AS BLOB)" in selected for selected in projections)
+    assert all("history.svg AS history_svg" not in selected for selected in projections)
 
     carried = client.get(
         "/api/history",

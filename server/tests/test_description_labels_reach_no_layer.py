@@ -24,6 +24,7 @@ class _Recorder:
                  on_render_refusal=None):
         self.context = context
         self.config = config
+        self.image_data = {}
         self.authoring: dict | None = None
         self.commands: list[tuple[dict, dict | None]] = []
         _Recorder.runs.append(self)

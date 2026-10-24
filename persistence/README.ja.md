@@ -8,6 +8,8 @@
 
 ## 論理保存と物理保存
 
+Server registry v5の`image_provenance`と`image_ddl`はServerのhost拡張として列を分類する。共通historyの必須項目へは加えず、他hostへ同名の物理列を要求しない。来歴と画像参照・DDL経過を保存し、画像bytesは保存しないという既存の画像入力仕様に従う。
+
 論理recordは`history`、`lineage_nodes`、`lineage_edges`。Serverの`history`に対しAndroidは`history_items`、`at`に対し`created_at`、`input`に対し`original_input`、`ddl`に対し`normalized_ddl`、`score`に対し`score_json`、`svg`に対し`display_svg`を使う。物理名の一致でなく、意味・NULL区別・encoding・制約が一致することを要求する。
 
 Androidの現行物理正本は生成済み[Room schema 14](../android/app/schemas/app.inku.mobile.data.db.InkuDatabase/14.json)。`history_items.normalized_ddl`と`ddl_source_origin`はともにNULL可のTEXTであり、旧`expanded_ddl`列を持たない。共通checkerはServer、Android、Swiftの現行schemaを契約v2へ照合する。

@@ -102,6 +102,7 @@ def test_a_fork_and_change_the_layout_carry_the_records(saved_work, monkeypatch)
     class Run:
         def __init__(self, config, context):
             self.config, self.context = config, context
+            self.image_data = {}
 
         def start_new(self, authoring):
             starts.append(deepcopy(authoring))

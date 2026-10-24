@@ -16,6 +16,8 @@ The v1 reference SQL remains the historical definition for old input.
 
 ## Logical and physical storage
 
+Server registry v5 classifies `image_provenance` and `image_ddl` as Server host extensions. They do not become required common history fields or require identically named physical columns on other hosts. They follow the existing image-input policy: retain provenance, image references and DDL history, never image bytes.
+
 The logical record names are `history`, `lineage_nodes`, and `lineage_edges`. Physical storage may use different names. For example:
 
 | Logical field | Server physical storage | Android physical storage | Swift physical storage |

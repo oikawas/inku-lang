@@ -100,6 +100,7 @@ def test_only_saved_and_settings_changed_starts_receive_the_record(saved_work, m
     class Run:
         def __init__(self, config, context):
             self.config, self.context = config, context
+            self.image_data = {}
             self.record = None
 
         def start_new(self, authoring):
@@ -166,7 +167,7 @@ def test_authenticated_states_use_saved_or_run_inputs_and_pass_core_response_thr
     service = make_service(store, binding)
     monkeypatch.setattr(service, "execution", lambda *_: pytest.fail("state lookup must not resume"))
     store.create_execution("owner", "run", "variation-1", "0", json.dumps({"snapshot": snapshot, "context": {}, "rendered": None}).encode())
-    service._runs[("owner", "active")] = SimpleNamespace(snapshot=lambda: snapshot, view=lambda: {"busy": False})
+    service._runs[("owner", "active")] = SimpleNamespace(snapshot=lambda: snapshot, view=lambda: {"busy": False}, image_data={})
     app = FastAPI()
     app.include_router(pipeline_router(service, actor))
     edited = "  🌙\r\n月のそば（横2/3〜1、縦2/3〜1）に、円。  "

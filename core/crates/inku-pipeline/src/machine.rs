@@ -1,5 +1,7 @@
 //! Pure effect orchestration around the shared compiler and durable visible DDL.
 
+mod image;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use inku_ddl::work_plan::WorkPlan;
@@ -32,11 +34,12 @@ use crate::laws_record::{LawsBasis, LawsLayerRecord};
 use crate::prompts::{
     DescriptionCatalogEntry, HOLE_COMPLETION_PROMPT_ID, HoleCompletionResult,
     HolePatchEditResponse, HolePatchResponse, LEGACY_HOLE_COMPLETION_PROMPT_ID, LlmPrompt,
-    LlmStage, MacroPromptEntry, PREVIOUS_HOLE_COMPLETION_PROMPT_IDS, PromptLimits, Stage1Context,
-    build_catalog_selection_prompt, build_hole_completion_prompt, build_sketch_prompt,
-    build_stage1_prompt_for_run, parse_catalog_selection_response, parse_hole_completion_response,
-    parse_hole_patch_response, parse_sketch_response, parse_stage1_response_and_plan_with_plugins,
-    with_hole_completion_feedback, with_stage1_background_feedback, with_stage1_compiler_feedback,
+    LlmStage, MacroPromptEntry, PREVIOUS_HOLE_COMPLETION_PROMPT_IDS, PromptImage, PromptLimits,
+    Stage1Context, build_catalog_selection_prompt, build_hole_completion_prompt,
+    build_sketch_prompt, build_stage1_prompt_for_run, parse_catalog_selection_response,
+    parse_hole_completion_response, parse_hole_patch_response, parse_sketch_response,
+    parse_stage1_response_and_plan_with_plugins, with_hole_completion_feedback,
+    with_stage1_background_feedback, with_stage1_compiler_feedback,
 };
 use crate::protocol::{
     ActionEcho, DecimalU64, EffectAction, EffectResult, Envelope, PROTOCOL_NAME, PROTOCOL_VERSION,
@@ -215,6 +218,74 @@ pub struct PipelineConfig {
     /// Budget for the colors; the catalog budget when absent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub colors_retry: Option<RetryPolicy>,
+    /// The image stages (the image tab, 2026-10-24). Present, a host may
+    /// start a work from an image; absent, such a run is refused.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image: Option<ImageConfig>,
+    /// Budget for writing and reviewing a DDL from an image; Stage 1's budget
+    /// when absent. Choosing the catalog from the image takes the catalog
+    /// budget.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image_retry: Option<RetryPolicy>,
+}
+
+/// How a run writes a DDL from an image (2026-10-24).
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ImageConfig {
+    /// Show the written DDL's drawing beside the image and ask once more.
+    pub review: bool,
+}
+
+/// The image a work is written from: the image the host sends, by
+/// reference, and the size of the image it was made from, whose ratio the
+/// DDL declares. The core never holds the image itself.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ImageInput {
+    pub sent: PromptImage,
+    pub original_width: u32,
+    pub original_height: u32,
+}
+
+/// The record of a work written from an image, which a host keeps with the
+/// work: what was sent and how the run went. It holds no image and no SVG.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ImageDdlRecord {
+    pub image: ImageInput,
+    /// The ratio the DDL declares, and the registered paper nearest it.
+    pub declared_ratio: inku_score::CanvasRatio,
+    pub nearest_format_id: String,
+    /// Each answer the run read, in order.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rounds: Vec<ImageDdlRound>,
+    /// The DDL shown beside the image, kept so that it can be compared with
+    /// the one the review left.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub before_review: Option<String>,
+    /// The drawing of that DDL the host showed beside the image.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub drawing: Option<PromptImage>,
+    /// Lines left out because each alone stopped the whole work.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dropped: Vec<String>,
+}
+
+/// One answer of an image run: its stage, the request it answered, whether
+/// that request gave the compiler's findings back, and what its compile found.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ImageDdlRound {
+    pub stage: LlmStage,
+    pub prompt_id: String,
+    pub prompt_digest: String,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub asked_again: bool,
+    /// The lines the compile did not draw as written.
+    pub problems: usize,
+    /// The instructions the Score draws.
+    pub instructions: usize,
 }
 
 /// How a run chooses its colors: present, the run asks `choose_colors` once
@@ -417,6 +488,13 @@ pub enum AuthoringInput {
         #[serde(default, skip_serializing_if = "SketchRequest::is_off")]
         sketch: SketchRequest,
     },
+    /// A work written from an image (2026-10-24): a Vision model writes the
+    /// DDL, which is committed as a DDL edit. The catalog is chosen from the
+    /// image when `auto_catalog` is set.
+    Image {
+        image: ImageInput,
+        auto_catalog: bool,
+    },
 }
 
 /// Strict pipeline wire shape for render canvas dimensions.
@@ -525,6 +603,9 @@ pub enum PipelinePhase {
         proposal_digest: String,
         base_revision: DecimalU64,
     },
+    /// The host is drawing the written DDL to show beside the image
+    /// (`draw_image_review`).
+    AwaitingImageReviewDrawing,
     ScoreReady,
     Completed,
     NeedsUserEdit {
@@ -595,6 +676,15 @@ pub struct PipelineSnapshot {
     /// DDL edit and stops rather than commit its base unchanged.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub laws_move: Option<LawsMove>,
+    /// The record of a work written from an image (2026-10-24): made when the
+    /// run starts and kept after it commits, for the host to save with the
+    /// work.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image_ddl: Option<ImageDdlRecord>,
+    /// A drawable DDL of an image run kept while a later request is out: it
+    /// is used when that request fails.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image_fallback: Option<VisibleDocument>,
     pub snapshot_digest: String,
 }
 
@@ -666,6 +756,7 @@ impl PipelineSnapshot {
             self.composition.as_ref().map(|pending| &pending.document),
             self.laws.as_ref().map(|pending| &pending.document),
             self.colors.as_ref().map(|pending| &pending.document),
+            self.image_fallback.as_ref(),
             phase_document,
         ]
         .into_iter()
@@ -725,6 +816,32 @@ impl PipelineSnapshot {
                 return Err(ProtocolError::InvalidState);
             }
         }
+        if let Some(fallback) = &self.image_fallback {
+            fallback.document()?;
+            if !matches!(
+                self.phase,
+                PipelinePhase::AwaitingLlm {
+                    stage: LlmStage::WriteImageDdl | LlmStage::ReviewImageDdl,
+                    ..
+                } | PipelinePhase::AwaitingImageReviewDrawing
+            ) {
+                return Err(ProtocolError::InvalidState);
+            }
+        }
+        // Every image stage reads the run's image record.
+        if self.image_ddl.is_none()
+            && matches!(
+                self.phase,
+                PipelinePhase::AwaitingLlm {
+                    stage: LlmStage::SelectImageCatalog
+                        | LlmStage::WriteImageDdl
+                        | LlmStage::ReviewImageDdl,
+                    ..
+                } | PipelinePhase::AwaitingImageReviewDrawing
+            )
+        {
+            return Err(ProtocolError::InvalidState);
+        }
         if let Some(delivery) = &self.delivery {
             delivery
                 .validate()
@@ -782,8 +899,12 @@ impl PipelineSnapshot {
                     .get("ddl_digest")
                     .and_then(serde_json::Value::as_str)
                     == Some(document.source_digest().as_str()) => {}
+            (PipelinePhase::AwaitingImageReviewDrawing, Some(action))
+                if action.tag == image::DRAW_IMAGE_REVIEW && action.identity.attempt == 1 => {}
             (
-                PipelinePhase::AwaitingLlm { .. } | PipelinePhase::AwaitingVisibleDdlCommit { .. },
+                PipelinePhase::AwaitingLlm { .. }
+                | PipelinePhase::AwaitingVisibleDdlCommit { .. }
+                | PipelinePhase::AwaitingImageReviewDrawing,
                 _,
             ) => return Err(ProtocolError::InvalidState),
             (_, None) => {}
@@ -935,6 +1056,7 @@ impl PipelineSnapshot {
         self.composition = None;
         self.laws = None;
         self.colors = None;
+        self.image_fallback = None;
         let payload = json!({
             "variation_id": self.variation_id,
             "document": document,
@@ -974,8 +1096,9 @@ impl PipelineSnapshot {
                 .config
                 .colors_retry
                 .unwrap_or(self.config.catalog_retry),
-            LlmStage::SelectImageCatalog | LlmStage::WriteImageDdl | LlmStage::ReviewImageDdl => {
-                self.config.stage1_retry
+            LlmStage::SelectImageCatalog => self.config.catalog_retry,
+            LlmStage::WriteImageDdl | LlmStage::ReviewImageDdl => {
+                self.config.image_retry.unwrap_or(self.config.stage1_retry)
             }
         }
     }
@@ -1060,6 +1183,15 @@ fn off_canvas_instruction(compiled: &CompilerResourceExecutionResult) -> Option<
         })
 }
 
+/// Whether an effect's prompt message carries `field`: the feedback a request
+/// that asks once more adds.
+fn message_names(payload: &serde_json::Value, field: &str) -> bool {
+    payload["prompt"]["message"]
+        .as_str()
+        .and_then(|message| serde_json::from_str::<serde_json::Value>(message).ok())
+        .is_some_and(|message| message.get(field).is_some())
+}
+
 impl PipelineSnapshot {
     /// The provider attempt in flight, or `None` while no provider effect runs.
     ///
@@ -1077,13 +1209,15 @@ impl PipelineSnapshot {
                     max_attempts: self.retry_policy(*stage).max_attempts,
                     delay_ms: action.delay_ms,
                     timeout_ms: action.timeout_ms,
-                    asked_again: *stage == LlmStage::CompleteVisibleDdlHoles
-                        && action.payload["prompt"]["message"]
-                            .as_str()
-                            .and_then(|message| {
-                                serde_json::from_str::<serde_json::Value>(message).ok()
-                            })
-                            .is_some_and(|message| message.get("completion_feedback").is_some()),
+                    asked_again: match stage {
+                        LlmStage::CompleteVisibleDdlHoles => {
+                            message_names(&action.payload, "completion_feedback")
+                        }
+                        LlmStage::WriteImageDdl | LlmStage::ReviewImageDdl => {
+                            message_names(&action.payload, "compiler_feedback")
+                        }
+                        _ => false,
+                    },
                 })
             }
             _ => None,
@@ -1108,6 +1242,9 @@ impl PipelineConfig {
             policy.validate()?;
         }
         if let Some(policy) = self.colors_retry {
+            policy.validate()?;
+        }
+        if let Some(policy) = self.image_retry {
             policy.validate()?;
         }
         self.stage1_retry.validate()?;
@@ -1355,7 +1492,7 @@ impl PipelineSnapshot {
         self.reissue(
             LlmStage::GenerateNormalizedDdl,
             prompt,
-            description,
+            Some(description),
             elapsed_ms,
             attempt,
             events,
@@ -1363,11 +1500,12 @@ impl PipelineSnapshot {
     }
 
     /// Send a changed request of a stage as the next attempt of its budget.
+    /// An image stage has no description.
     fn reissue(
         &mut self,
         stage: LlmStage,
         prompt: LlmPrompt,
-        description: String,
+        description: Option<String>,
         elapsed_ms: u64,
         attempt: u32,
         events: &mut Vec<PipelineEvent>,
@@ -1378,7 +1516,7 @@ impl PipelineSnapshot {
             .ok_or(ProtocolError::InvalidPolicy)?;
         self.phase = PipelinePhase::AwaitingLlm {
             stage,
-            description: Some(description),
+            description,
             hole_ids: Vec::new(),
             elapsed_ms: DecimalU64::new(total),
         };
@@ -2081,7 +2219,7 @@ impl PipelineSnapshot {
         self.reissue(
             LlmStage::ChooseLaws,
             prompt,
-            description,
+            Some(description),
             total,
             next,
             events,
@@ -2368,7 +2506,7 @@ impl PipelineSnapshot {
         self.reissue(
             LlmStage::ChooseColors,
             prompt,
-            description,
+            Some(description),
             total,
             next,
             events,
@@ -2703,7 +2841,7 @@ impl PipelineSnapshot {
                 self.colors_fallback(payload, events)
             }
             LlmStage::SelectImageCatalog | LlmStage::WriteImageDdl | LlmStage::ReviewImageDdl => {
-                Err(ProtocolError::InvalidState)
+                self.image_stage_failed(stage, failure, detail, events)
             }
         }
     }
@@ -3414,8 +3552,11 @@ impl PipelineSnapshot {
             LlmStage::CompleteVisibleDdlHoles => {
                 self.hole_response(&response, &hole_ids, spent_ms, events)
             }
-            LlmStage::SelectImageCatalog | LlmStage::WriteImageDdl | LlmStage::ReviewImageDdl => {
-                Err(ProtocolError::InvalidState)
+            LlmStage::SelectImageCatalog => {
+                self.image_catalog_response(&response, spent_ms, events)
+            }
+            LlmStage::WriteImageDdl | LlmStage::ReviewImageDdl => {
+                self.image_ddl_response(stage, &response, spent_ms, total, events)
             }
         }
     }
@@ -3464,6 +3605,7 @@ fn advance_impl(
                 state.action = None;
                 state.delivery = None;
                 state.stage1_fallback = None;
+                state.image_fallback = None;
                 state.phase = PipelinePhase::Cancelled;
                 state.event(&mut events, "cancelled", json!({}))?;
             }
@@ -3667,7 +3809,7 @@ fn advance_impl(
             &json!({
                 "variation_id": variation_id, "nonce": authoring_nonce,
                 "config": config, "authority": authority,
-                "request_kind": match &authoring { AuthoringInput::DirectDdl { .. } => "direct_ddl", AuthoringInput::SavedLaws { .. } => "saved_laws", AuthoringInput::Description { .. } => "description" },
+                "request_kind": match &authoring { AuthoringInput::DirectDdl { .. } => "direct_ddl", AuthoringInput::SavedLaws { .. } => "saved_laws", AuthoringInput::Description { .. } => "description", AuthoringInput::Image { .. } => "image" },
             }),
         )?;
         let mut state = PipelineSnapshot {
@@ -3695,6 +3837,8 @@ fn advance_impl(
             laws_layers: None,
             laws_basis: None,
             laws_move: None,
+            image_ddl: None,
+            image_fallback: None,
             snapshot_digest: String::new(),
         };
         state.event(
@@ -3755,6 +3899,10 @@ fn advance_impl(
                 auto_catalog,
                 sketch,
             } => state.description(description, auto_catalog, sketch, &mut events)?,
+            AuthoringInput::Image {
+                image,
+                auto_catalog,
+            } => state.image(image, auto_catalog, &mut events)?,
         }
         state
     };
@@ -3832,6 +3980,30 @@ impl PipelineSnapshot {
                 elapsed_ms,
                 ..
             } => self.llm_response(LlmStage::ChooseColors, response, elapsed_ms.get(), events),
+            EffectResult::ImageCatalogSelected {
+                response,
+                elapsed_ms,
+                ..
+            } => self.llm_response(
+                LlmStage::SelectImageCatalog,
+                response,
+                elapsed_ms.get(),
+                events,
+            ),
+            EffectResult::ImageDdlWritten {
+                response,
+                elapsed_ms,
+                ..
+            } => self.llm_response(LlmStage::WriteImageDdl, response, elapsed_ms.get(), events),
+            EffectResult::ImageDdlReviewed {
+                response,
+                elapsed_ms,
+                ..
+            } => self.llm_response(LlmStage::ReviewImageDdl, response, elapsed_ms.get(), events),
+            EffectResult::ImageReviewDrawn { drawing, .. } => {
+                self.image_review_drawn(drawing, events)
+            }
+            EffectResult::ImageReviewUndrawn { .. } => self.image_review_undrawn(events),
             EffectResult::ProviderFailed {
                 failure,
                 elapsed_ms,
@@ -3916,8 +4088,11 @@ impl PipelineSnapshot {
                         .and_then(serde_json::Value::as_array)
                         .is_some_and(|identities| !identities.is_empty())
                 });
-                let completing =
-                    reason != "user_approved_patch" && reason != "stage1_residual_execution";
+                // A DDL written from an image keeps the lines its model could
+                // not mend: a completion without the image would guess them.
+                let completing = reason != "user_approved_patch"
+                    && reason != "stage1_residual_execution"
+                    && reason != "image_ddl";
                 // A range whose words alone the author changed is a hole the
                 // completion writes the numbers of again (A3).
                 let words_changed = if completing && self.completion_ranges.is_some() {

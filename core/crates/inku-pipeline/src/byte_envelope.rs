@@ -101,6 +101,42 @@ pub fn provider_attempt_owned(snapshot_bytes: &[u8]) -> Vec<u8> {
     }
 }
 
+/// The SVG a host makes the `draw_image_review` drawing from, for a stored
+/// snapshot waiting for it (the image stages, 2026-10-24). The request gives
+/// the host's render options and clip policy, and its SVG allowance when it
+/// has one. The answer is `{"svg": ...}`; a snapshot or request that cannot be
+/// read answers `{"error": "invalid_snapshot" | "invalid_request"}`, and a
+/// drawing the core refuses `{"error": <pipeline error code>}`.
+pub fn image_review_svg_owned(snapshot_bytes: &[u8], request_bytes: &[u8]) -> Vec<u8> {
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Request {
+        options: crate::machine::PipelineRenderOptions,
+        clip: crate::core_boundary::SerializableClipPolicy,
+        #[serde(default)]
+        max_svg_bytes: Option<usize>,
+    }
+    let snapshot = serde_json::from_slice::<LimitSnapshot>(snapshot_bytes)
+        .ok()
+        .filter(|limits| {
+            let limits = limits.config.envelope_limits;
+            limits.validate().is_ok() && snapshot_bytes.len() <= limits.max_snapshot_bytes
+        })
+        .and_then(|_| serde_json::from_slice::<PipelineSnapshot>(snapshot_bytes).ok());
+    let Some(snapshot) = snapshot else {
+        return br#"{"error":"invalid_snapshot"}"#.to_vec();
+    };
+    let Ok(request) = serde_json::from_slice::<Request>(request_bytes) else {
+        return br#"{"error":"invalid_request"}"#.to_vec();
+    };
+    let answer =
+        match snapshot.image_review_svg(request.options, request.clip, request.max_svg_bytes) {
+            Ok(svg) => json!({ "svg": svg }),
+            Err(error) => json!({ "error": error }),
+        };
+    serde_json::to_vec(&answer).expect("a JSON value serializes")
+}
+
 /// Empty snapshot bytes create an execution. A start reply assigns the execution
 /// identity; subsequent inputs must echo it and advance the returned sequence.
 /// The host must serialize calls per execution and store the returned snapshot.

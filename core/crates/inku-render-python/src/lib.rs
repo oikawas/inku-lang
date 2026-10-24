@@ -352,6 +352,36 @@ fn pipeline_provider_wire<'py>(
     PyBytes::new(py, &output)
 }
 
+/// How a host prepares the image a work is written from (`inku.image-input-policy.v1`).
+#[pyfunction]
+fn pipeline_image_input_policy() -> String {
+    inku_pipeline_uniffi::image_input_policy()
+}
+
+/// The size to send an image at, the ratio its DDL declares and the nearest paper.
+#[pyfunction]
+fn pipeline_image_canvas<'py>(
+    py: Python<'py>,
+    input_bytes: &Bound<'py, PyBytes>,
+) -> Bound<'py, PyBytes> {
+    let input = input_bytes.as_bytes().to_vec();
+    let output = py.detach(|| inku_pipeline_uniffi::image_canvas(input));
+    PyBytes::new(py, &output)
+}
+
+/// The SVG of the written DDL a host shows beside the image (`draw_image_review`).
+#[pyfunction]
+fn pipeline_image_review_svg<'py>(
+    py: Python<'py>,
+    snapshot_bytes: &Bound<'py, PyBytes>,
+    request_bytes: &Bound<'py, PyBytes>,
+) -> Bound<'py, PyBytes> {
+    let snapshot = snapshot_bytes.as_bytes().to_vec();
+    let request = request_bytes.as_bytes().to_vec();
+    let output = py.detach(|| inku_pipeline_uniffi::image_review_svg(snapshot, request));
+    PyBytes::new(py, &output)
+}
+
 /// A description's identity `dh1` (`identity.description_hash`), from the shared core.
 #[pyfunction]
 fn pipeline_description_hash(text: &str) -> String {
@@ -439,6 +469,9 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(pipeline_juxtaposition, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_autonomous_refine, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_provider_wire, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_image_input_policy, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_image_canvas, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_image_review_svg, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_description_hash, module)?)?;
     module.add_function(wrap_pyfunction!(
         pipeline_description_without_labels,

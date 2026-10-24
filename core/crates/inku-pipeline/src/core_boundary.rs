@@ -935,7 +935,10 @@ fn is_exact_decimal_field(field: &str) -> bool {
     field == "ordinal" || field.ends_with("_ordinal") || field == "seed" || field.ends_with("_seed")
 }
 
-fn render_canvas_matches_registry(options: &RenderOptions, canvas_format_id: &str) -> bool {
+pub(crate) fn render_canvas_matches_registry(
+    options: &RenderOptions,
+    canvas_format_id: &str,
+) -> bool {
     let width = options.canvas.width;
     let height = options.canvas.height;
     if !width.is_finite() || !height.is_finite() || width <= 0.0 || height <= 0.0 {

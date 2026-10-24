@@ -3,6 +3,8 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use crate::prompts::PromptImage;
+
 pub const PROTOCOL_NAME: &str = "inku.pipeline";
 pub const PROTOCOL_VERSION: &str = "1.0.0";
 
@@ -248,6 +250,31 @@ pub enum EffectResult {
         response: String,
         elapsed_ms: DecimalU64,
     },
+    /// The image stages (2026-10-24): the catalog chosen from the image, the
+    /// DDL written from it, and the DDL corrected beside its drawing.
+    ImageCatalogSelected {
+        identity: ActionEcho,
+        response: String,
+        elapsed_ms: DecimalU64,
+    },
+    ImageDdlWritten {
+        identity: ActionEcho,
+        response: String,
+        elapsed_ms: DecimalU64,
+    },
+    ImageDdlReviewed {
+        identity: ActionEcho,
+        response: String,
+        elapsed_ms: DecimalU64,
+    },
+    /// The host drew the DDL to show beside the image, as a PNG it keeps for
+    /// the review request, and names it here.
+    ImageReviewDrawn {
+        identity: ActionEcho,
+        drawing: PromptImage,
+    },
+    /// The host could not draw it; the run commits the DDL as written.
+    ImageReviewUndrawn { identity: ActionEcho },
     ProviderFailed {
         identity: ActionEcho,
         failure: ProviderFailure,
@@ -275,6 +302,11 @@ impl EffectResult {
             | Self::CompositionRead { identity, .. }
             | Self::LawsChosen { identity, .. }
             | Self::ColorsChosen { identity, .. }
+            | Self::ImageCatalogSelected { identity, .. }
+            | Self::ImageDdlWritten { identity, .. }
+            | Self::ImageDdlReviewed { identity, .. }
+            | Self::ImageReviewDrawn { identity, .. }
+            | Self::ImageReviewUndrawn { identity }
             | Self::ProviderFailed { identity, .. }
             | Self::VisibleNormalizedDdlCommitted { identity, .. }
             | Self::HostCommitFailed { identity, .. } => identity,

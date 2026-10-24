@@ -114,10 +114,12 @@ pub(crate) fn config() -> PipelineConfig {
         laws_retry: None,
         colors: None,
         colors_retry: None,
+        image: None,
+        image_retry: None,
     }
 }
 
-fn envelope(
+pub(crate) fn envelope(
     snapshot: Option<&PipelineSnapshot>,
     payload: PipelineInput,
 ) -> Envelope<PipelineInput> {
@@ -133,7 +135,10 @@ fn envelope(
     }
 }
 
-fn run(snapshot: Option<&PipelineSnapshot>, input: &Envelope<PipelineInput>) -> StepOutput {
+pub(crate) fn run(
+    snapshot: Option<&PipelineSnapshot>,
+    input: &Envelope<PipelineInput>,
+) -> StepOutput {
     let snapshot_bytes = snapshot
         .map(|state| serde_json::to_vec(state).unwrap())
         .unwrap_or_default();
@@ -149,7 +154,7 @@ fn run(snapshot: Option<&PipelineSnapshot>, input: &Envelope<PipelineInput>) -> 
     serde_json::from_value(output["payload"]["result"].clone()).unwrap()
 }
 
-fn run_error(
+pub(crate) fn run_error(
     snapshot: Option<&PipelineSnapshot>,
     input: &Envelope<PipelineInput>,
 ) -> serde_json::Value {
@@ -164,7 +169,7 @@ fn run_error(
     output
 }
 
-fn ack(state: &PipelineSnapshot) -> PipelineInput {
+pub(crate) fn ack(state: &PipelineSnapshot) -> PipelineInput {
     let action = state.action.as_ref().unwrap();
     PipelineInput::EffectResult {
         result: EffectResult::VisibleNormalizedDdlCommitted {
@@ -2439,7 +2444,7 @@ fn ddl_lines(source: &str) -> Vec<&str> {
     lines.collect()
 }
 
-fn tags(output: &StepOutput) -> Vec<&str> {
+pub(crate) fn tags(output: &StepOutput) -> Vec<&str> {
     output
         .events
         .iter()
@@ -2775,7 +2780,7 @@ fn golden(at: &str) -> serde_json::Value {
            "reason": "“A red circle” leads the picture."})
 }
 
-fn event<'a>(output: &'a StepOutput, tag: &str) -> Option<&'a serde_json::Value> {
+pub(crate) fn event<'a>(output: &'a StepOutput, tag: &str) -> Option<&'a serde_json::Value> {
     output
         .events
         .iter()

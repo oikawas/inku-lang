@@ -219,6 +219,36 @@ pub fn provider_wire(input_bytes: Vec<u8>) -> Vec<u8> {
     .unwrap_or_else(|_| br#"{"error":"internal_invariant"}"#.to_vec())
 }
 
+/// How a host prepares the image a work is written from and the drawing it
+/// shows beside it (`inku.image-input-policy.v1`, 2026-10-24). A Rust helper
+/// for the Server's CPython binding; the UniFFI and JNI calls are unchanged.
+pub fn image_input_policy() -> String {
+    inku_pipeline::image_ddl::image_input_policy_json()
+}
+
+/// The canvas of an image a host is about to send: `{"original": [width,
+/// height]}` in, `inku.image-canvas.v1` (the size to send it at, the ratio its
+/// DDL declares, the nearest paper) or `{"error": "invalid_request"}` out. A
+/// panic answers `{"error": "internal_invariant"}`. A Rust helper for the
+/// Server's CPython binding.
+pub fn image_canvas(input_bytes: Vec<u8>) -> Vec<u8> {
+    catch_unwind(AssertUnwindSafe(|| {
+        inku_pipeline::image_ddl::image_canvas_json(&input_bytes)
+    }))
+    .unwrap_or_else(|_| br#"{"error":"internal_invariant"}"#.to_vec())
+}
+
+/// The SVG a host makes the `draw_image_review` drawing from, for a stored
+/// snapshot waiting for it: `{"options", "clip", "max_svg_bytes"?}` in,
+/// `{"svg"}` or `{"error"}` out. A panic answers `{"error":
+/// "internal_invariant"}`. A Rust helper for the Server's CPython binding.
+pub fn image_review_svg(snapshot_bytes: Vec<u8>, request_bytes: Vec<u8>) -> Vec<u8> {
+    catch_unwind(AssertUnwindSafe(|| {
+        inku_pipeline::byte_envelope::image_review_svg_owned(&snapshot_bytes, &request_bytes)
+    }))
+    .unwrap_or_else(|_| br#"{"error":"internal_invariant"}"#.to_vec())
+}
+
 /// The experimental 3D viewer's input (`inku.ddl3d.v1`, Web `snapshot()`):
 /// `{"score": "<stored Score text>", "metadata": "<stored render metadata
 /// text>"}` in, `{"json": "<input>"}` or `{"error": "<reason>"}` out. A panic

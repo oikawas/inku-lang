@@ -861,12 +861,126 @@ fn bearer() -> (&'static str, &'static str, &'static str) {
     ("Authorization", "Bearer ", "none")
 }
 
-/// `SingleAttemptProvider._request`'s body for one pipeline effect.
+/// The images a pipeline request carries: the `data:` URLs the host sends,
+/// each the image the prompt names in its place by type, length and SHA-256
+/// (the image stages, 2026-10-24). A prompt without images takes none.
+fn prompt_images(request: &Value, prompt: &Value) -> Result<Vec<String>, Refusal> {
+    let sent = match get(request, "images") {
+        None => Vec::new(),
+        Some(Value::Array(items)) => items
+            .iter()
+            .map(|item| as_str(Some(item)).map(str::to_owned))
+            .collect::<Option<_>>()
+            .ok_or_else(|| Refusal::invalid("images must be strings"))?,
+        Some(_) => return Err(Refusal::invalid("images must be a list")),
+    };
+    let named: &[Value] = match get(prompt, "images") {
+        None => &[],
+        Some(Value::Array(items)) => items,
+        Some(_) => return Err(Refusal::invalid("prompt.images must be a list")),
+    };
+    if sent.len() != named.len() {
+        return Err(Refusal::invalid("images do not match the prompt"));
+    }
+    for (url, image) in sent.iter().zip(named) {
+        let (media, data) = image_parts(url)?;
+        let bytes = chatgpt::base64_decode(&data)
+            .ok_or_else(|| Refusal::invalid("images must be base64"))?;
+        let length = match get(image, "byte_len") {
+            Some(Value::Integer(digits)) => digits.parse::<usize>().ok(),
+            _ => None,
+        };
+        use sha2::{Digest, Sha256};
+        let digest: String = Sha256::digest(&bytes)
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+        if as_str(get(image, "media_type")) != Some(media.as_str())
+            || length != Some(bytes.len())
+            || as_str(get(image, "sha256")) != Some(digest.as_str())
+        {
+            return Err(Refusal::invalid("images do not match the prompt"));
+        }
+    }
+    Ok(sent)
+}
+
+/// OpenAI Responses parts: the text, then each image.
+fn responses_parts(text: &str, images: &[String]) -> Value {
+    let mut parts = vec![object(vec![
+        ("type", string("input_text")),
+        ("text", string(text)),
+    ])];
+    parts.extend(images.iter().map(|image| {
+        object(vec![
+            ("type", string("input_image")),
+            ("image_url", string(image)),
+        ])
+    }));
+    Value::Array(parts)
+}
+
+/// OpenAI-compatible chat parts: the text, then each image.
+fn chat_parts(text: &str, images: &[String]) -> Value {
+    let mut parts = vec![object(vec![
+        ("type", string("text")),
+        ("text", string(text)),
+    ])];
+    parts.extend(images.iter().map(|image| {
+        object(vec![
+            ("type", string("image_url")),
+            ("image_url", object(vec![("url", string(image))])),
+        ])
+    }));
+    Value::Array(parts)
+}
+
+/// Anthropic blocks: each image, then the text.
+fn anthropic_blocks(text: &str, images: &[String]) -> Result<Value, Refusal> {
+    let mut blocks = Vec::with_capacity(images.len() + 1);
+    for image in images {
+        let (media, data) = image_parts(image)?;
+        blocks.push(object(vec![
+            ("type", string("image")),
+            (
+                "source",
+                object(vec![
+                    ("type", string("base64")),
+                    ("media_type", string(&media)),
+                    ("data", string(&data)),
+                ]),
+            ),
+        ]));
+    }
+    blocks.push(object(vec![
+        ("type", string("text")),
+        ("text", string(text)),
+    ]));
+    Ok(Value::Array(blocks))
+}
+
+/// Gemini parts: the text, then each image inline.
+fn gemini_parts(text: &str, images: &[String]) -> Result<Value, Refusal> {
+    let mut parts = vec![object(vec![("text", string(text))])];
+    for image in images {
+        let (media, data) = image_parts(image)?;
+        parts.push(object(vec![(
+            "inlineData",
+            object(vec![("mimeType", string(&media)), ("data", string(&data))]),
+        )]));
+    }
+    Ok(Value::Array(parts))
+}
+
+/// `SingleAttemptProvider._request`'s body for one pipeline effect. The
+/// images the prompt names follow its message in each dialect's Vision parts;
+/// a request without images is written as it was.
 fn pipeline_request(
     connection: &Connection,
     model: &str,
     prompt: &Value,
     max_tokens: i64,
+    images: &[String],
 ) -> Result<Built, Refusal> {
     let field = |name: &str| {
         as_str(get(prompt, name))
@@ -883,7 +997,14 @@ fn pipeline_request(
         0.0
     });
     let base = connection.base();
-    let user = || object(vec![("role", string("user")), ("content", string(message))]);
+    let user = |parts: Value| {
+        let content = if images.is_empty() {
+            string(message)
+        } else {
+            parts
+        };
+        object(vec![("role", string("user")), ("content", content)])
+    };
     match connection.kind.as_str() {
         // OpenAI's own API draws through Responses, the only route that takes
         // function tools from every current model; the request is not stored.
@@ -899,7 +1020,10 @@ fn pipeline_request(
                 ("model".to_owned(), string(model)),
                 ("store".to_owned(), Value::Bool(false)),
                 ("instructions".to_owned(), string(system)),
-                ("input".to_owned(), Value::Array(vec![user()])),
+                (
+                    "input".to_owned(),
+                    Value::Array(vec![user(responses_parts(message, images))]),
+                ),
                 (
                     "tools".to_owned(),
                     Value::Array(vec![object(vec![
@@ -947,7 +1071,7 @@ fn pipeline_request(
                         ("role", string("system")),
                         ("content", string(system)),
                     ]),
-                    user(),
+                    user(chat_parts(message, images)),
                 ]),
             );
             // Ollama and MLX take the schema as grammar-constrained JSON output:
@@ -1017,7 +1141,10 @@ fn pipeline_request(
                     integer(anthropic_max_tokens(model, max_tokens)),
                 ),
                 ("system", string(system)),
-                ("messages", Value::Array(vec![user()])),
+                (
+                    "messages",
+                    Value::Array(vec![user(anthropic_blocks(message, images)?)]),
+                ),
                 (
                     "tools",
                     Value::Array(vec![object(vec![
@@ -1051,10 +1178,7 @@ fn pipeline_request(
                     "contents",
                     Value::Array(vec![object(vec![
                         ("role", string("user")),
-                        (
-                            "parts",
-                            Value::Array(vec![object(vec![("text", string(message))])]),
-                        ),
+                        ("parts", gemini_parts(message, images)?),
                     ])]),
                 ),
                 (
@@ -1125,17 +1249,7 @@ fn text_request(
             let content = if images.is_empty() {
                 string(text)
             } else {
-                let mut parts = vec![object(vec![
-                    ("type", string("text")),
-                    ("text", string(text)),
-                ])];
-                parts.extend(images.iter().map(|image| {
-                    object(vec![
-                        ("type", string("image_url")),
-                        ("image_url", object(vec![("url", string(image))])),
-                    ])
-                }));
-                Value::Array(parts)
+                chat_parts(text, images)
             };
             let mut body = vec![
                 ("model".to_owned(), string(model)),
@@ -1169,26 +1283,7 @@ fn text_request(
             let content = if images.is_empty() {
                 string(text)
             } else {
-                let mut blocks = Vec::with_capacity(images.len() + 1);
-                for image in images {
-                    let (media, data) = image_parts(image)?;
-                    blocks.push(object(vec![
-                        ("type", string("image")),
-                        (
-                            "source",
-                            object(vec![
-                                ("type", string("base64")),
-                                ("media_type", string(&media)),
-                                ("data", string(&data)),
-                            ]),
-                        ),
-                    ]));
-                }
-                blocks.push(object(vec![
-                    ("type", string("text")),
-                    ("text", string(text)),
-                ]));
-                Value::Array(blocks)
+                anthropic_blocks(text, images)?
             };
             Ok(Built {
                 url: format!("{base}/v1/messages"),
@@ -1218,14 +1313,7 @@ fn text_request(
         // The lowest thinking level and no temperature: Gemini 3 is tuned for
         // its default of 1.0 and below it can loop (Gemini 3 developer guide).
         "gemini" => {
-            let mut parts = vec![object(vec![("text", string(text))])];
-            for image in images {
-                let (media, data) = image_parts(image)?;
-                parts.push(object(vec![(
-                    "inlineData",
-                    object(vec![("mimeType", string(&media)), ("data", string(&data))]),
-                )]));
-            }
+            let parts = gemini_parts(text, images)?;
             Ok(Built {
                 url: format!(
                     "{base}/v1beta/models/{}:generateContent",
@@ -1246,7 +1334,7 @@ fn text_request(
                         "contents",
                         Value::Array(vec![object(vec![
                             ("role", string("user")),
-                            ("parts", Value::Array(parts)),
+                            ("parts", parts),
                         ])]),
                     ),
                     (
@@ -1839,6 +1927,7 @@ fn answer(request: &Value) -> Result<Value, Refusal> {
                 model,
                 prompt,
                 tokens_of(request, "max_tokens")?,
+                &prompt_images(request, prompt)?,
             )?;
             Ok(built.answer(true, model))
         }
@@ -1898,7 +1987,12 @@ fn answer(request: &Value) -> Result<Value, Refusal> {
             let prompt = get(request, "prompt")
                 .filter(|prompt| matches!(prompt, Value::Object(_)))
                 .ok_or_else(|| Refusal::invalid("prompt must be an object"))?;
-            chatgpt::pipeline_request(model, prompt, limit_of(request)?)
+            chatgpt::pipeline_request(
+                model,
+                prompt,
+                limit_of(request)?,
+                &prompt_images(request, prompt)?,
+            )
         }
         "chatgpt_vision_request" => {
             let model = model()?;
@@ -2117,6 +2211,115 @@ mod tests {
             r#"{"model":"mlx-community/gemma-4-e4b-it","stream":false,"max_tokens":320,"temperature":1.0,"enable_thinking":false,"top_p":0.95,"top_k":64,"messages":[{"role":"system","content":"s"},{"role":"user","content":"t\u001f"}]}"#
         );
         assert_eq!(answer["output_budget"], 320);
+    }
+
+    /// A prompt that names one image, and the `data:` URL of that image.
+    fn image_prompt() -> (serde_json::Value, &'static str) {
+        use sha2::{Digest, Sha256};
+        let digest: String = Sha256::digest(b"inku")
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+        let prompt = serde_json::json!({
+            "system": "s", "message": "m", "action_name": "write_image_ddl",
+            "response_schema": {"type": "object"},
+            "images": [{"media_type": "image/png", "width": 1, "height": 1, "sha256": digest, "byte_len": 4}],
+        });
+        (prompt, "data:image/png;base64,aW5rdQ==")
+    }
+
+    fn sent_body(answer: &serde_json::Value) -> serde_json::Value {
+        assert_eq!(answer["outcome"], "ok", "{answer}");
+        serde_json::from_str(answer["body"].as_str().unwrap()).unwrap()
+    }
+
+    #[test]
+    fn the_images_a_prompt_names_follow_its_message_in_each_dialect() {
+        let (prompt, url) = image_prompt();
+        let request = |kind: &str, base_url: &str| {
+            ask(&serde_json::json!({
+                "action": "pipeline_request",
+                "connection": {"id": "x", "kind": kind, "base_url": base_url},
+                "model": "m", "prompt": prompt, "max_tokens": 64, "images": [url],
+            }))
+        };
+        let anthropic = sent_body(&request("anthropic", "https://api.anthropic.com"));
+        assert_eq!(
+            anthropic["messages"][0]["content"],
+            serde_json::json!([
+                {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "aW5rdQ=="}},
+                {"type": "text", "text": "m"},
+            ])
+        );
+        let responses = sent_body(&request("openai_compatible", "https://api.openai.com/v1"));
+        assert_eq!(
+            responses["input"][0]["content"],
+            serde_json::json!([
+                {"type": "input_text", "text": "m"},
+                {"type": "input_image", "image_url": url},
+            ])
+        );
+        let chat = sent_body(&request("openai_compatible", "http://127.0.0.1:8080/v1"));
+        assert_eq!(
+            chat["messages"][1]["content"],
+            serde_json::json!([
+                {"type": "text", "text": "m"},
+                {"type": "image_url", "image_url": {"url": url}},
+            ])
+        );
+        let gemini = request("gemini", "https://generativelanguage.googleapis.com");
+        let parts = serde_json::json!([
+            {"text": "m"},
+            {"inlineData": {"mimeType": "image/png", "data": "aW5rdQ=="}},
+        ]);
+        assert_eq!(sent_body(&gemini)["contents"][0]["parts"], parts);
+        let counted: serde_json::Value =
+            serde_json::from_str(gemini["count_tokens"]["body"].as_str().unwrap()).unwrap();
+        assert_eq!(
+            counted["generateContentRequest"]["contents"][0]["parts"],
+            parts
+        );
+        let chatgpt = sent_body(&ask(&serde_json::json!({
+            "action": "chatgpt_request", "model": "m", "prompt": prompt,
+            "answer_limit": 65536, "images": [url],
+        })));
+        assert_eq!(
+            chatgpt["input"][0]["content"],
+            serde_json::json!([
+                {"type": "input_text", "text": "m"},
+                {"type": "input_image", "image_url": url},
+            ])
+        );
+    }
+
+    #[test]
+    fn images_that_are_not_the_ones_the_prompt_names_are_refused() {
+        let (prompt, url) = image_prompt();
+        let mut unnamed = prompt.clone();
+        unnamed.as_object_mut().unwrap().remove("images");
+        for (prompt, images) in [
+            (prompt.clone(), serde_json::json!([])),
+            (
+                prompt.clone(),
+                serde_json::json!(["data:image/png;base64,aW5rZQ=="]),
+            ),
+            (
+                prompt.clone(),
+                serde_json::json!(["data:image/jpeg;base64,aW5rdQ=="]),
+            ),
+            (unnamed, serde_json::json!([url])),
+        ] {
+            let answer = ask(&serde_json::json!({
+                "action": "pipeline_request",
+                "connection": {"id": "x", "kind": "anthropic", "base_url": "https://api.anthropic.com"},
+                "model": "m", "prompt": prompt, "max_tokens": 64, "images": images,
+            }));
+            assert_eq!(answer["outcome"], "refused", "{images}");
+            assert_eq!(
+                answer["detail"], "images do not match the prompt",
+                "{images}"
+            );
+        }
     }
 
     #[test]

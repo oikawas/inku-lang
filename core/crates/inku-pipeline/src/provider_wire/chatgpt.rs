@@ -12,7 +12,7 @@
 
 use super::{
     Refusal, Value, as_str, dumps, get, image_parts, object, ordered_schema, python_eq,
-    python_loads, set, string, truthy,
+    python_loads, responses_parts, set, string, truthy,
 };
 use crate::identity::canonical_json;
 
@@ -173,11 +173,14 @@ fn request_answer(body: &Value, limits: &Limits) -> Value {
 }
 
 /// `chatgpt_provider.request_body`: the one function, in the `inku` namespace,
-/// required; streamed and not stored.
+/// required; streamed and not stored. The images the prompt names follow its
+/// message as the Vision request sends them; without images the body is as
+/// it was.
 pub(super) fn pipeline_request(
     model: &str,
     prompt: &Value,
     answer_limit: usize,
+    images: &[String],
 ) -> Result<Value, Refusal> {
     let field = |name: &str| {
         as_str(get(prompt, name))
@@ -185,6 +188,12 @@ pub(super) fn pipeline_request(
     };
     let schema = get(prompt, "response_schema")
         .ok_or_else(|| Refusal::invalid("prompt.response_schema is required"))?;
+    let message = field("message")?;
+    let content = if images.is_empty() {
+        string(message)
+    } else {
+        responses_parts(message, images)
+    };
     let body = object(vec![
         ("model", string(model)),
         ("store", Value::Bool(false)),
@@ -194,7 +203,7 @@ pub(super) fn pipeline_request(
             "input",
             Value::Array(vec![object(vec![
                 ("role", string("user")),
-                ("content", string(field("message")?)),
+                ("content", content),
             ])]),
         ),
         (
@@ -236,16 +245,6 @@ pub(super) fn vision_request(
     for image in images {
         image_parts(image)?;
     }
-    let mut content = vec![object(vec![
-        ("type", string("input_text")),
-        ("text", string(text)),
-    ])];
-    content.extend(images.iter().map(|image| {
-        object(vec![
-            ("type", string("input_image")),
-            ("image_url", string(image)),
-        ])
-    }));
     let body = object(vec![
         ("model", string(model)),
         ("store", Value::Bool(false)),
@@ -255,7 +254,7 @@ pub(super) fn vision_request(
             "input",
             Value::Array(vec![object(vec![
                 ("role", string("user")),
-                ("content", Value::Array(content)),
+                ("content", responses_parts(text, images)),
             ])]),
         ),
     ]);

@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-24 — The Android camera can use a ChatGPT plan
+
+The Android camera's model choice also lists the published ChatGPT plan models (those serving both LLM and Vision). The photo is drawn by the shared core's image run, whose image stages send the photo and the review drawing through the same `chatgpt_request` as the server's Image tab. The rule that refused a ChatGPT plan model before the capture is retired. The core, Server and Web are unchanged.
+
 ### 2026-10-24 — The Android camera draws through the shared core's image run
 
 With a remote Vision model, the Android camera hands the photo to the shared core's image run (§12.6.6). The one chosen model writes the DDL from the photo, reviews it beside a drawing of it, and the work is drawn fitted into the paper nearest the photo's ratio. The observation, the poetic description and Stage 1 from a description are skipped, and the work has no description. With the color catalog on automatic, the catalog is chosen from the photo. An on-device model (LiteRT) keeps the observation and poetic description route (the author's choice, 2026-10-24).

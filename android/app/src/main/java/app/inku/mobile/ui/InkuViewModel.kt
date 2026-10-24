@@ -892,19 +892,8 @@ class InkuViewModel @JvmOverloads constructor(
                 val cameraProviders = providerSettings.first()
                 val cameraAssets = modelAssets.first()
                 val visionModelId = snapshot.selectedModelId
-                // The ChatGPT plan does not read the photo (SPEC 2026-10-17: not a
-                // camera Vision candidate). The shared model selection can still
-                // hold one, and the capture used to fail right after the shutter
-                // with no reason given.
-                if (visionModelId.startsWith("chatgpt:")) {
-                    if (serial == cameraRunSerial) {
-                        localState.value = localState.value.copy(
-                            cameraCaptureState = CameraCaptureState.Failed(CameraFailure.ModelNotReady),
-                            message = strings().cameraChatGptCannotReadPhoto,
-                        )
-                    }
-                    return@launch
-                }
+                // A ChatGPT plan model reads the photo through the shared core's
+                // image run (2026-10-24); it is ready while the plan can be used.
                 modelReadinessIssue(visionModelId, cameraProviders, cameraAssets)?.let { issue ->
                     if (serial == cameraRunSerial) {
                         localState.value = localState.value.copy(

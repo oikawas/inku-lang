@@ -4,6 +4,7 @@ import app.inku.mobile.llm.ModelProvider
 import app.inku.mobile.llm.ModelRequest
 import app.inku.mobile.llm.ModelResponse
 import app.inku.mobile.llm.ProviderWireTransport
+import app.inku.mobile.llm.chatGptRequest
 import app.inku.mobile.ui.camera.CameraImageDdl
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
@@ -20,6 +21,8 @@ class ImageDdlPipelineTest {
         val requests = mutableListOf<ModelRequest>()
         /** The Anthropic body each request would be sent as. */
         val bodies = mutableListOf<JSONObject>()
+        /** The ChatGPT plan body each request would be sent as. */
+        val chatGptBodies = mutableListOf<JSONObject>()
         val starts = mutableListOf<JSONObject>()
         val reviewSvgs = mutableListOf<String>()
         val binding = object : SharedPipelineBinding by NativePipelineBridge {
@@ -35,6 +38,7 @@ class ImageDdlPipelineTest {
             override suspend fun generate(request: ModelRequest): ModelResponse {
                 requests += request
                 bodies += JSONObject(ProviderWireTransport.build("anthropic", "anthropic", "https://api.anthropic.com", request).getString("body"))
+                chatGptBodies += JSONObject(chatGptRequest(request.copy(modelId = "chatgpt:gpt-6-luna")).body)
                 val answer = answers[request.pipelineAction] ?: error("unexpected ${request.pipelineAction}")
                 return ModelResponse(answer, request.modelId)
             }
@@ -80,6 +84,9 @@ class ImageDdlPipelineTest {
         assertEquals(listOf("image", "image", "text"), (0 until blocks.length()).map { blocks.getJSONObject(it).getString("type") })
         assertEquals("image/png", blocks.getJSONObject(1).getJSONObject("source").getString("media_type"))
         assertTrue(fixture.reviewSvgs.single().startsWith("<svg"))
+        // The ChatGPT plan body carries the same images, photo then drawing.
+        assertEquals(listOf(listOf("image/jpeg"), listOf("image/jpeg", "image/png")),
+            fixture.chatGptBodies.map { body -> inputImages(body).map { it.substringAfter("data:").substringBefore(';') } })
         assertTrue(written.normalizedDdl, written.normalizedDdl.contains("赤"))
 
         val drawn = fixture.pipeline.composeFromDdl(written.normalizedDdl, request.copy(executionId = written.executionId))
@@ -164,6 +171,14 @@ class ImageDdlPipelineTest {
     }
 
     companion object {
+        /** Every `input_image` URL in a Responses body, in order. */
+        private fun inputImages(value: Any?): List<String> = when (value) {
+            is JSONObject -> if (value.optString("type") == "input_image") listOf(value.getString("image_url"))
+                else value.keys().asSequence().toList().flatMap { inputImages(value.get(it)) }
+            is org.json.JSONArray -> (0 until value.length()).flatMap { inputImages(value.get(it)) }
+            else -> emptyList()
+        }
+
         private val JPEG = "not decoded by the core".encodeToByteArray()
         private val REVIEW_PNG = "a review drawing".encodeToByteArray()
 

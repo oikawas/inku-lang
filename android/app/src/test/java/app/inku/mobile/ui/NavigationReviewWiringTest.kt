@@ -71,11 +71,15 @@ class NavigationReviewWiringTest {
     }
 
     @Test
-    fun theCameraRefusesAChatGptModelBeforeTheShutter() {
+    fun theCameraTakesAChatGptPlanModelThroughTheImageRun() {
+        // Until 2026-10-24 the camera refused a ChatGPT plan model before the
+        // shutter; the shared core's image run now sends it the photo.
         val start = body("private fun startCameraCapture()", "mutableCameraCaptureRequests.emit(")
-        val refuse = start.indexOf("strings().cameraChatGptCannotReadPhoto")
-        assertTrue(refuse >= 0)
-        assertTrue(refuse < start.indexOf("CameraCaptureState.Capturing"))
+        assertFalse(start.contains("startsWith(\"chatgpt:\")"))
+        assertTrue(start.indexOf("modelReadinessIssue(visionModelId") < start.indexOf("CameraCaptureState.Capturing"))
+        val app = projectFile("app/src/main/java/app/inku/mobile/ui/InkuApp.kt").readText()
+        assertFalse(app.contains("state.modelSelectionForCamera && it.providerId == \"chatgpt\""))
+        assertFalse(app.contains("(state.modelSelectionForCamera || !includeChatGpt)"))
     }
 
     @Test

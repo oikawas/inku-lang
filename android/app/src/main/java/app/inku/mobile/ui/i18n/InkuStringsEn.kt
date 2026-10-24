@@ -404,7 +404,6 @@ object InkuStringsEn : InkuStrings {
     override fun discardCandidatesBody(count: Int) = "$count unsaved candidate${if (count == 1) "" else "s"} will not be kept. Save the ones to keep first."
     override val discardInstructionsTitle = "Discard the edited instructions?"
     override val discardInstructionsBody = "Closing returns this work's instructions to the saved ones. To draw from the edited instructions, press Draw from instructions."
-    override val cameraChatGptCannotReadPhoto = "ChatGPT plan models cannot read a photo. Choose one that can under Model on the studio."
     override val pipelineProposalNotAnswered = "Stopped: a proposed DDL change needed approval."
     override val ddlEdit = "DDL edit"
     override val mascotSubtitle = "Incu (cube) or Yuragi (crab)"

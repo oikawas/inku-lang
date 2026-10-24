@@ -378,7 +378,6 @@ object InkuStringsJa : InkuStrings {
     override fun discardCandidatesBody(count: Int) = "保存していない候補${count}件は残りません。残すものは先に「保存」してください。"
     override val discardInstructionsTitle = "指示書の編集を破棄しますか"
     override val discardInstructionsBody = "閉じると、この作品の指示書は保存したものに戻ります。直した指示書で描くには「DDLから描画」を押してください。"
-    override val cameraChatGptCannotReadPhoto = "ChatGPTプランのモデルは写真を読めません。制作の「モデル選択」で、写真を読めるモデルを選んでください。"
     override val pipelineProposalNotAnswered = "DDLの変更案の承認が必要なため、止めました。"
     override val ddlEdit = "DDL編集"
     override val mascotSubtitle = "Incu (立方体) または Yuragi (蟹)"

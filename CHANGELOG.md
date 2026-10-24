@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-24 — A leader can no longer take a member out of their user group
+
+A leader who is not an administrator could send `"group_id": null` to `PATCH /api/users/{user_id}`, pass the route's check, and leave a member of their own user group without one (found while checking the API reference). When `group_id` is sent, any value other than the leader's own group, null included, is now refused with 403. An administrator can still clear a group with null.
+
 ### 2026-10-24 — The API reference is written in full
 
 The server's `/docs` (OpenAPI) now gives all 135 routes a summary and a description and groups them under 14 tags, and every parameter and request or response field has an English description (existing Japanese descriptions are kept). The only fields left without one are the six of the validation error types FastAPI makes itself. No route, parameter, type, default or validation changed. The OpenAPI with its descriptions removed was checked to be the same as before, and the recorded API surface and the Score JSON schema (`core/crates/inku-score/schema/score.schema.json` and its digest) were regenerated for the new words. Existing descriptions that told the history of their development were rewritten for readers of the API.

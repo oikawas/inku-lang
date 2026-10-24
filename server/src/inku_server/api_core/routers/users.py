@@ -56,7 +56,8 @@ class UserAccountUpdateBody(BaseModel):
         default=None,
         description=(
             "Id of the user group to move the account into. Omitting the field leaves it unchanged; "
-            "sending null removes the account from its user group."
+            "sending null removes the account from its user group. Only an administrator may send "
+            "a value other than their own user group, null included."
         ),
     )
 
@@ -181,14 +182,16 @@ def api_users_update(
     """Update a user account. Only the fields sent are changed.
 
     A leader who is not an administrator cannot give an account any permission group other than
-    `users`, nor move it to another user group; those requests return 403. Returns 409 when the
+    `users`, nor move it to another user group or out of its group with `group_id: null`; those
+    requests return 403. Returns 409 when the
     change would leave the server without an administrator, 400 when a value is invalid, and 404
     when the account does not exist or a leader may not change it.
     """
     if not _db.has_permission_group(actor, "admins"):
         if body.permission_groups is not None and set(body.permission_groups) != {"users"}:
             raise HTTPException(status_code=403, detail="leaders cannot change permission groups")
-        if body.group_id is not None and body.group_id != actor.get("group_id"):
+        # A sent null clears the group, so it is a move like any other value.
+        if "group_id" in body.model_fields_set and body.group_id != actor.get("group_id"):
             raise HTTPException(status_code=403, detail="leaders cannot move members outside their group")
     try:
         user = _db.update_user(user_id, actor=actor, **body.model_dump(exclude_unset=True))

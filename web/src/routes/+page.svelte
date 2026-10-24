@@ -3013,6 +3013,19 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						</section>
 					{/if}
 
+					{#if work.imageBeforeReviewDdl !== null}
+						<section class="panel-section">
+							<details class="image-before-review">
+								<summary>{t().imageBeforeReviewTitle}</summary>
+								<p>{t().imageBeforeReviewHint}</p>
+								<pre>{work.imageBeforeReviewDdl}</pre>
+								<button class="ghost-btn" type="button"
+									disabled={!canEditCurrentDdl || rangeEditingLocked || work.singleRunning || work.loading || work.pipelineBusy}
+									onclick={() => { void work.replayImageBeforeReview(); }}>{t().imageBeforeReviewPaint}</button>
+							</details>
+						</section>
+					{/if}
+
 					<!-- What the expansion layer removed. This complements editor-time
 					     DDL warnings by reporting the side only known after expansion. -->
 					{#if work.pluginWarningsShown.length > 0 && work.inputMode === 'single'}
@@ -4005,6 +4018,12 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 
 	.panel-section { display: flex; flex-direction: column; gap: 6px; }
 	.ddl-new-action { display: flex; justify-content: flex-end; margin-top: -6px; }
+	.image-before-review summary { cursor: pointer; color: var(--fg2); font-size: var(--ui-font-size-12); }
+	.image-before-review p { color: var(--fg3); font-size: var(--ui-font-size-12); line-height: 1.6; }
+	.image-before-review pre {
+		max-height: 20rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere;
+		font-family: inherit; font-size: var(--ui-font-size-14); line-height: 1.78; color: var(--fg);
+	}
 	.displayed-work-heading {
 		margin: 4px 0 0;
 		padding-top: 16px;

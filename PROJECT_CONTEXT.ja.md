@@ -64,7 +64,7 @@ API、認証、DB、共有pipelineのhost adapter、描画、系譜と旧作品�
 
 通常WebとAPIは共有Rustのauthoring serviceを使う。系譜編集は選択したhistoryのownerと保存contextを引き継ぎ、元作品を保持する。Active DDLのsource変更はCASとauthority lockを保ち、設定変更は親関係を持つ新しいvariationへ進む。履歴は当該revisionの診断を復元し、古い形式や壊れたsidecarでも保存DDL／Score／SVGの表示を継続する。実装の時系列は[CHANGELOG.ja.md](CHANGELOG.ja.md)、現在の契約はSPECを参照する。
 
-Webの画像タブはVisionのモデルで画像から直接DDLを書く。`POST /api/pipeline/images`で前処理した画像は所有者別のworkerメモリに置き、15分または実行終了で破棄する。比較用PNGも保存しない。`image_provenance`はコメントとして表示し、描画の記述とは別にする。`image_ddl`は画像の参照とDDLの経過だけを持つ。保存schema v5は、v4の確認済みbackupを作ってからnullableな2列を追加する。
+Webの画像タブはVisionのモデルで画像から直接DDLを書く。`POST /api/pipeline/images`で前処理した画像は所有者別のworkerメモリに置き、15分または実行終了で破棄する。比較用PNGも保存しない。`image_provenance`はコメントとして表示し、描画の記述とは別にする。`image_ddl`は画像の参照とDDLの経過だけを持つ。記録に`before_review`があれば、描画後に見比べ前の指示書を開き、既存のDDL編集で子作品を描ける。保存schema v5は、v4の確認済みbackupを作ってからnullableな2列を追加する。
 
 ## 守るべき設計契約
 

@@ -84,7 +84,9 @@ Web's Image tab asks a Vision model to write DDL directly. Images prepared by
 `POST /api/pipeline/images` stay in owner-scoped worker memory and expire after
 15 minutes or when the run ends. Review PNGs are transient too. `image_provenance`
 is a source note, separate from the drawable description; `image_ddl` holds only
-image references and the DDL history. Schema v5 adds the two nullable columns to
+image references and the DDL history. When `before_review` is recorded, the tab
+can show those instructions after painting and use the existing DDL edit path
+to paint a child. Schema v5 adds the two nullable columns to
 v4 after making a verified backup.
 
 ## Contracts That Must Remain Intact

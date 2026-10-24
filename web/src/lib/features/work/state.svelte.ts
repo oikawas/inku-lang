@@ -1013,14 +1013,39 @@ export function createWorkState(deps: WorkStateDeps) {
 
 	// ── Replay (Stage 2 only) ───────────────────────────────
 	let replayStarting = false;
-	async function replay() {
+	function imageBeforeReviewDdl(): string | null {
+		if (inputMode !== 'image' || result === null) return null;
+		const record = displayedHistoryItem ? displayedHistoryItem.image_ddl
+			: result.image_ddl ?? (pipelineView?.result === result ? pipelineView.image_ddl : null);
+		const source = record?.before_review;
+		return typeof source === 'string' && source.trim() ? source : null;
+	}
+
+	async function replayImageBeforeReview(): Promise<void> {
+		const source = imageBeforeReviewDdl(), targetResult = result, targetHistory = displayedHistoryItem, targetDdl = ddl;
+		if (source === null) return;
+		const draw = async () => {
+			if (result !== targetResult || displayedHistoryItem !== targetHistory || ddl !== targetDdl || imageBeforeReviewDdl() !== source
+				|| loading || reloading || replayStarting || pipelineBusy || refinementSession.gridBusy || demo.running || batch.resuming) return;
+			ddl = source;
+			await replay({ ddlEdit: true });
+		};
+		if (ddl !== null && ddlGeneratedBaseline !== null && ddl !== ddlGeneratedBaseline) {
+			deps.requestConfirmation({ message: t().confirmDdlOverwriteMessage, runLabel: t().imageBeforeReviewPaint,
+				run: () => { void draw(); } });
+			return;
+		}
+		await draw();
+	}
+
+	async function replay(options: { ddlEdit?: boolean } = {}) {
 		// Reserve the action before the parent/fallback awaits can yield.
 		if (replayStarting) return;
 		replayStarting = true;
-		try { await replayOnce(); }
+		try { await replayOnce(options); }
 		finally { replayStarting = false; }
 	}
-	async function replayOnce() {
+	async function replayOnce(options: { ddlEdit?: boolean }) {
 		if (!ddl || !hasDdlBody(ddl) || reloading) return;
 		if (submitWouldRefine() && !(await confirmFallbackRefine(currentRefineParent()))) return;
 		resetTargetScopedState();
@@ -1031,12 +1056,14 @@ export function createWorkState(deps: WorkStateDeps) {
 			return;
 		}
 		const canvasAspectDerivation = pendingCanvasAspectDerivation;
-		const replayParentNodeId = canvasAspectDerivation?.parentNodeId ?? (lineageDetached ? null : (displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null));
+		const replayParentNodeId = options.ddlEdit
+			? (displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null)
+			: canvasAspectDerivation?.parentNodeId ?? (lineageDetached ? null : (displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null));
 		// A DDL written for another ratio than this paper: its own declaration,
 		// or, for an unedited saved work without one, the paper it was drawn on.
 		// A work that records neither is drawn to the paper as before (DDL 26).
 		const paperId = effectiveCanvasAspectId();
-		const unedited = replayParentNodeId !== null && ddlGeneratedBaseline !== null && ddl === ddlGeneratedBaseline;
+		const unedited = !options.ddlEdit && replayParentNodeId !== null && ddlGeneratedBaseline !== null && ddl === ddlGeneratedBaseline;
 		const parentWorkId = displayedHistoryItem?.id ?? result?.history_id ?? null;
 		const parentAspectId = canvasAspectDerivation?.fromAspectId
 			?? displayedHistoryItem?.render_canvas_aspect_id ?? result?.render_canvas_aspect_id ?? null;
@@ -1061,7 +1088,7 @@ export function createWorkState(deps: WorkStateDeps) {
 			}
 			return;
 		}
-		const replayKind: DerivationKind | null = canvasAspectDerivation
+		const replayKind: DerivationKind | null = options.ddlEdit && replayParentNodeId ? 'ddl_edit' : canvasAspectDerivation
 			? 'canvas_aspect_change'
 			: replayParentNodeId ? (ddlGeneratedBaseline !== null && ddl !== ddlGeneratedBaseline ? 'ddl_edit' : 'replay') : null;
 		const replayDerivationMetadata = canvasAspectDerivation
@@ -1233,6 +1260,8 @@ export function createWorkState(deps: WorkStateDeps) {
 		get imageRunning() { return imageRunActive || (reloading && !!(displayedHistoryItem?.image_ddl ?? result?.image_ddl)); },
 		get imageCanvasAspectId() { return imageCanvasAspectId; },
 		set imageCanvasAspectId(value) { imageCanvasAspectId = value; },
+		get imageBeforeReviewDdl() { return imageBeforeReviewDdl(); },
+		replayImageBeforeReview,
 		selectImage,
 		submitImage,
 		requestSubmitImage,

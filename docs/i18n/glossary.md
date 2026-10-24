@@ -106,6 +106,7 @@ composition / color catalog と食い違って見える（→ §8）。
 | 来歴（画像入力のコメント） | **Source note** | 出典や覚え書き。描画には使わない | ~~Provenance~~（生成情報のドロワーに予約） |
 | 画像から自動選択 | **Choose from image automatically** | 画像を見るVisionが色カタログを選ぶ | ~~Choose from description~~（記述は渡さない） |
 | 画像の縦横比を使う | **Use image aspect ratio** | 画像の比に最も近い登録の紙を選ぶ | ~~Exact image size~~（画素数のコピーではない） |
+| 見比べる前の指示書 | **Instructions before review** | 画像と見比べる回へ渡す前の本文。子作品を描くための記録 | ~~Original instructions~~（現在の作品の確定本文と紛れる） |
 | 作品ID（UUID） | **work ID (UUID)** | 保存済み作品を特定するID。生成情報に表示し、ライブラリで検索する | hash（絵の同一性とは別の保存ID） |
 | 記録なし | **not recorded** | 状態表示。値を推測しない契約の表示 | ~~unknown~~（調査の「未確認」は別概念 → §5） |
 | UIモード | **UI mode**（**Simple UI / Full UI / Custom UI**） | 表示構成のプリセットと個人設定 | ~~Beginner / Expert~~（習熟度の評価にしない） |

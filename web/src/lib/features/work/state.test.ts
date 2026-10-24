@@ -31,7 +31,7 @@ const { batchSettings } = await import('../batch/settings.svelte.ts');
 const { createWorkState } = await import('./state.svelte.ts');
 const { pipelineAttentionReason } = await import('../pipeline/attention.ts');
 
-function imageWork(apiFetch: WorkStateDeps['apiFetch']) {
+function imageWork(apiFetch: WorkStateDeps['apiFetch'], overrides: Partial<WorkStateDeps> = {}) {
 	return createWorkState({
 		apiFetch, batch: { resuming: false }, demo: { running: false, updateLiveTime: () => {} },
 		refinementSession: { gridBusy: false }, session: {},
@@ -43,11 +43,99 @@ function imageWork(apiFetch: WorkStateDeps['apiFetch']) {
 			stage2Provider: () => 'openai', stage2Model: () => 'text-only',
 			visionProvider: () => 'chatgpt', visionModel: () => 'vision',
 			includeThinking: () => false, available: () => [] },
+		...overrides,
 	} as unknown as WorkStateDeps);
 }
 
 const uploaded = (id: string) => ({ image_id: id, thumbnail: 'data:image/jpeg;base64,preview',
 	original_width: 200, original_height: 100, width: 200, height: 100, nearest_format_id: 'hd_monitor' });
+
+const beforeReview = '画面比2:1。\n背景を黄で埋める。';
+const afterReview = '画面比2:1。\n背景を赤で埋める。';
+function recordedImage(ddl = afterReview) {
+	return { id: 'image-work', input: '', source_text: '', ddl, at: 1, svg: '<svg/>', score: { instructions: [] },
+		lineage_node_id: 'image-node', image_provenance: 'source note', image_ddl: { before_review: beforeReview } };
+}
+function imageResult(ddl = afterReview) {
+	return { ...recordedImage(ddl), history_id: 'image-work', elapsed_stage1_ms: 0, elapsed_stage2_ms: 0,
+		elapsed_total_ms: 1, tokens_in_stage1: null, tokens_out_stage1: null, tokens_in_stage2: null, tokens_out_stage2: null };
+}
+
+test('before-review instructions belong only to the displayed completed image work', () => {
+	const work = imageWork(async () => { throw new Error('no request expected'); });
+	work.inputMode = 'image';
+	assert.equal(work.imageBeforeReviewDdl, null);
+	work.result = imageResult();
+	assert.equal(work.imageBeforeReviewDdl, beforeReview);
+	work.displayedHistoryItem = { ...recordedImage(), image_ddl: { rounds: [] } };
+	assert.equal(work.imageBeforeReviewDdl, null);
+	work.displayedHistoryItem = { ...recordedImage(), image_ddl: null };
+	assert.equal(work.imageBeforeReviewDdl, null);
+	work.displayedHistoryItem = recordedImage();
+	assert.equal(work.imageBeforeReviewDdl, beforeReview);
+	work.inputMode = 'single';
+	assert.equal(work.imageBeforeReviewDdl, null);
+});
+
+for (const unchanged of [false, true]) {
+	test(`before-review redraw forks the original through DDL editing (${unchanged ? 'same' : 'different'} final DDL)`, async () => {
+		const requests: Array<Record<string, unknown>> = [];
+		const original = recordedImage(unchanged ? beforeReview : afterReview);
+		const work = imageWork(async (path, init) => {
+			assert.equal(path, '/api/pipeline/history/image-work/fork');
+			requests.push(JSON.parse(String(init?.body)));
+			return Response.json({ detail: 'captured before provider' }, { status: 400 });
+		}, { ensureVisibleLineageParentId: async () => 'image-node' });
+		work.inputMode = 'image'; work.input = '';
+		work.lineageDetached = true;
+		work.result = imageResult(original.ddl);
+		work.displayedHistoryItem = original;
+		work.ddl = original.ddl; work.ddlGeneratedBaseline = original.ddl;
+		await work.selectHistoryAuthority('image-work', 'image-variation');
+		await work.replayImageBeforeReview();
+		assert.equal(requests.length, 1);
+		assert.equal(requests[0].kind, 'direct_ddl');
+		assert.equal(requests[0].text, beforeReview);
+		const options = requests[0].options as Record<string, unknown>;
+		assert.equal(options.lineage_parent_node_id, 'image-node');
+		assert.equal(options.derivation_kind, 'ddl_edit');
+		assert.equal(options.canvas_fit, 'contain');
+		assert.equal(original.ddl, unchanged ? beforeReview : afterReview);
+		assert.equal(work.ddlGeneratedBaseline, original.ddl);
+		assert.equal(work.input, '');
+	});
+}
+
+test('before-review redraw confirms draft replacement and ignores a confirmation for another work', async () => {
+	let confirmation: Parameters<WorkStateDeps['requestConfirmation']>[0] | null = null;
+	const work = imageWork(async () => { throw new Error('no request before confirmation'); }, {
+		requestConfirmation: (value) => { confirmation = value; },
+	});
+	work.inputMode = 'image'; work.result = imageResult(); work.displayedHistoryItem = recordedImage();
+	work.ddlGeneratedBaseline = afterReview; work.ddl = 'unfinished author edit';
+	await work.replayImageBeforeReview();
+	assert.ok(confirmation);
+	assert.equal(work.ddl, 'unfinished author edit');
+	work.displayedHistoryItem = { ...recordedImage(), id: 'another-work' };
+	confirmation.run();
+	assert.equal(work.ddl, 'unfinished author edit');
+	work.reloading = true;
+	work.ddl = afterReview;
+	await work.replayImageBeforeReview();
+	assert.equal(work.ddl, afterReview);
+});
+
+test('before-review action leaves ordinary unedited replay on its saved-Score path', async () => {
+	const requests: string[] = [];
+	const work = imageWork(async (path) => {
+		requests.push(path);
+		return Response.json({ detail: 'captured before rendering' }, { status: 400 });
+	}, { ensureVisibleLineageParentId: async () => 'image-node' });
+	work.inputMode = 'image'; work.result = imageResult(); work.displayedHistoryItem = recordedImage();
+	work.ddl = afterReview; work.ddlGeneratedBaseline = afterReview;
+	await work.replay();
+	assert.deepEqual(requests, ['/api/render-canvas-fit']);
+});
 
 test('image authoring keeps provenance out of description and reuploads consumed images for a second draw', async () => {
 	const file = new File(['browser memory only'], 'source.tiff', { type: 'image/tiff' });

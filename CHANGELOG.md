@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-24 — Paint a child from the instructions before review
+
+When a work from the Image tab records its instructions before review, they appear in a collapsed section below the current instructions. Painting from them uses the existing DDL edit path and keeps the original work. An unfinished edit asks for confirmation before replacement. Works without this record show no section.
+
 ### 2026-10-24 — Add the image tab to Server and Web
 
 The tab beside Description takes a source note, a JPEG/PNG/GIF/TIFF file, a Server-made thumbnail, a Vision model, a color catalog and the paper nearest the image's ratio. Server applies EXIF orientation, reads the first GIF frame and sends a JPEG at the core's size. Writing and reviewing default to an 8192-token output budget. The review PNG uses the work's paper, colors and seed, and the committed instructions use the existing DDL editor. Source pixels and review pictures stay in worker memory; durable records keep references and DDL history only. The source note is stored separately and never becomes a description. Schema registry v5 adds two nullable columns to v4 atomically after making a verified backup.

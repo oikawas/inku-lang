@@ -14,6 +14,9 @@ export interface LangPack {
 	imageCatalogAuto: string;
 	imageCatalogAutoHint: string;
 	imageWritingDdl: string;
+	imageBeforeReviewTitle: string;
+	imageBeforeReviewHint: string;
+	imageBeforeReviewPaint: string;
 	imageRevisingDdl: string;
 	imageReviewingDdl: string;
 	imageSelectingCatalog: string;

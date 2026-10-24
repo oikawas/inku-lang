@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-24 — The API reference is written in full
-
-The server's `/docs` (OpenAPI) now gives all 135 routes a summary and a description and groups them under 14 tags, and every parameter and request or response field has an English description (existing Japanese descriptions are kept). The only fields left without one are the six of the validation error types FastAPI makes itself. No route, parameter, type, default or validation changed. The OpenAPI with its descriptions removed was checked to be the same as before, and the recorded API surface and the Score JSON schema (`core/crates/inku-score/schema/score.schema.json` and its digest) were regenerated for the new words. Existing descriptions that told the history of their development were rewritten for readers of the API.
-
 ### 2026-10-24 — inku-cli draws from an image
 
 `inku-cli paint --image PATH` draws from an image through the same API calls, in the same order, as the web image tab. `--provenance` / `--provenance-file` give the source note beside it, and `--vision-model` chooses the Vision model that writes the DDL (defaulting to the CLI Vision setting). Only with `--save-history` is the work added to the history database; without it the CLI tells the pipeline not to save. The description, `--input-mode`, the sketch, `--wild`, the drawing model and `--include-thinking` are refused with it. An interrupted run is stopped. The server is unchanged.
@@ -276,6 +272,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.243 (2026-10-24 / Build1319)
+
+### 2026-10-24 — The API reference is written in full
+
+The server's `/docs` (OpenAPI) now gives all 135 routes a summary and a description and groups them under 14 tags, and every parameter and request or response field has an English description (existing Japanese descriptions are kept). The only fields left without one are the six of the validation error types FastAPI makes itself. No route, parameter, type, default or validation changed. The OpenAPI with its descriptions removed was checked to be the same as before, and the recorded API surface and the Score JSON schema (`core/crates/inku-score/schema/score.schema.json` and its digest) were regenerated for the new words. Existing descriptions that told the history of their development were rewritten for readers of the API.
 
 ## v2.15.242 (2026-10-24 / Build1318)
 

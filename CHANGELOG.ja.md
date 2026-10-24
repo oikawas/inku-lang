@@ -8,10 +8,6 @@
 
 ## 未リリース
 
-### 2026-10-24 — APIリファレンスを全面的に書いた
-
-Serverの `/docs`（OpenAPI）で、135のrouteすべてに要約と説明、14の群のtagを付け、引数と要求・応答の欄すべてに英語の説明を付けた（既存の日本語の説明は残した）。説明の無い欄は、FastAPIが自ら作る検証エラーの型の6つだけになった。route・引数・型・既定値・検証は変えていない。説明を除いたOpenAPIが変更前と同じことを確かめ、API表面の記録とScoreのJSON schema（`core/crates/inku-score/schema/score.schema.json` とそのdigest）を説明の変化に合わせて作り直した。開発の経緯が書かれていた既存の説明は、公開向けの文に書き直した。
-
 ### 2026-10-24 — inku-cliで画像から描く
 
 `inku-cli paint --image PATH` で、Webの画像タブと同じAPIを同じ順に呼んで画像から描けるようにした。`--provenance` / `--provenance-file` で来歴を併記し、`--vision-model` でDDLを書くVisionモデルを選ぶ（既定はCLIのVision設定）。`--save-history` を付けたときだけ作品として履歴のDBへ追加し、付けなければpipelineへ保存しないと伝える。記述・`--input-mode`・写生・`--wild`・描画モデル・`--include-thinking` との併用は断る。中断したときはrunを止める。Serverは変えていない。
@@ -276,6 +272,12 @@ macOSの`dh1`・`rh3`と正準JSON、指示言語の判定、記述ラベルの�
 Anthropicの対象Claudeモデルは通常描画とVisionでも思考用8,192 tokenを出力枠に加え、pipeline応答が `max_tokens` で切れたときは内容が読めても拒否して診断を残す。
 
 保存作品からランダムまたはVisionの自律推敲を開始できる。世代数、色・配置の対象、Wildを指定し、直前の作品を親として各世代を保存する。途中の世代は系譜専用、最終世代は通常の作品一覧にも表示する。Visionは作品画像への限定された助言を使い、観察と次の方向を表示する。画像の送信はこの専用助言requestに限り、既存の接続・ChatGPTプランのsession pinを保つ。
+
+## v2.15.243（2026-10-24 / Build1319）
+
+### 2026-10-24 — APIリファレンスを全面的に書いた
+
+Serverの `/docs`（OpenAPI）で、135のrouteすべてに要約と説明、14の群のtagを付け、引数と要求・応答の欄すべてに英語の説明を付けた（既存の日本語の説明は残した）。説明の無い欄は、FastAPIが自ら作る検証エラーの型の6つだけになった。route・引数・型・既定値・検証は変えていない。説明を除いたOpenAPIが変更前と同じことを確かめ、API表面の記録とScoreのJSON schema（`core/crates/inku-score/schema/score.schema.json` とそのdigest）を説明の変化に合わせて作り直した。開発の経緯が書かれていた既存の説明は、公開向けの文に書き直した。
 
 ## v2.15.242（2026-10-24 / Build1318）
 

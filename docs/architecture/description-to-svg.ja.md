@@ -1,6 +1,6 @@
 # 記述からSVGまで — 判定の道筋
 
-`ddl-processing-pipeline.ja.md` が層の並びを示すのに対し、本書は**判定**を追う — 入力された記述がどの条件でどう扱われ、どこで何が決まり、失敗がどう吸収され、何が記録されるかを、実装の関数単位で記す。一次根拠はServerでは`pipeline_compat.py`（`/api/paint`・`/api/paint/stream`・`/api/interpret`・`/api/compose`の互換投影）、`pipeline_api.py:PipelineService`、`pipeline_product.py:ProductPipelineEffects`、共有coreでは`core/crates/inku-pipeline/src/machine.rs`と`inku-ddl/src/compiler_execution.rs`である。Androidも同じ共有coreを通るため、host固有の部分を除いて同じ判定をたどる。snapshotと版は `README.ja.md` と `evidence-inventory.ja.md` が持つ。
+`ddl-processing-pipeline.ja.md` が層の並びを示すのに対し、本書は**判定**を追う — 入力された記述がどの条件でどう扱われ、どこで何が決まり、失敗がどう吸収され、何が記録されるかを、実装の関数単位で記す。一次根拠はServerでは`pipeline_compat.py`（`/api/paint`・`/api/paint/stream`・`/api/interpret`・`/api/compose`の互換投影）、`pipeline_api.py:PipelineService`、`pipeline_product.py:ProductPipelineEffects`、共有coreでは`core/crates/inku-pipeline/src/machine.rs`と`inku-ddl/src/compiler_execution.rs`である。AndroidとmacOSも同じ共有coreを通るため、host固有の部分を除いて同じ判定をたどる。snapshotと版は `README.ja.md` と `evidence-inventory.ja.md` が持つ。
 
 ## 全体の流れ
 
@@ -26,7 +26,10 @@ flowchart TD
     CORR{"Stage 1予算が残る?"}
     RESID{"描画可能な残部?"}
     S1F["停止: stage1_failed"]
-    CAS["可視DDLとauthorityのCAS保存"]
+    READ_COMP["構図の読み effect\n失敗は既定の読み"]
+    LAWS_ST["法則の段 effect\n当てられなければ構図のまま"]
+    COLORS_ST["配色の段 effect（Serverの既定）\n当てられなければ法則の段のまま"]
+    CAS["可視DDLとauthorityのCAS保存\n1文目に画面比の宣言"]
     COMP["typed compile\n+ Stage 1.5 + Plan + 資源選択 + materialize"]
     HOLE{"known hole?"}
     SAFE["Scoreが成立すれば\n先に安全な演奏を保存"]
@@ -35,7 +38,7 @@ flowchart TD
     E409["互換routeは409\n作者操作は /api/pipeline へ"]
     SCORE{"Scoreあり?"}
     EDIT["needs_user_edit"]
-    RENDER["render_delivery\nRender Engine 68"]
+    RENDER["render_delivery\nRender Engine 93"]
     SAVE{"save_history?"}
     ROW["履歴row + lineage\n+ history link sidecar"]
     QUEUE["作品ファイル・thumbnail queue\n（best-effort）"]
@@ -57,7 +60,7 @@ flowchart TD
     SKE -->|"補足あり / not_needed"| S1
     SK -->|"off / 作者の写生文"| S1
     S1 -->|"schema違反・transport失敗は予算内で再試行"| PRINT --> LOCK1
-    LOCK1 -->|"はい"| CAS
+    LOCK1 -->|"はい"| READ_COMP --> LAWS_ST --> COLORS_ST --> CAS
     LOCK1 -->|"いいえ"| CORR
     CORR -->|"はい: 理由とspanを添えて再要求"| S1
     CORR -->|"いいえ"| RESID
@@ -88,13 +91,14 @@ flowchart TD
 - **冪等な再送** — `Idempotency-Key`が同じ利用者の保存済み作品に一致すれば、新しいvariationを作らずその作品を返す。記述が異なれば409で断る。
 - **受理するoption** — `RunOptions`が`extra="forbid"`で検証する。旧requestの`stage1_input`、`include_thinking`、`auto_repair`、`sketch_grain`はrequest modelに残るが、互換投影はpipelineへ渡さない。
 - **指示文言語** — 記述そのものから`_resolve_instruction_lang`が自動判定し、信号が無ければUI言語へ落とす。
-- **model** — Stage 1（写生と色カタログ選択も同じmodel）とStage 2（hole補完）を`resolved_stage_model`がそれぞれ解決する。優先順はrequest指定 → 利用者のStage設定 → manifestの既定。
+- **model** — Stage 1（写生、色カタログ選択、構図の読み、法則の段、配色の段も同じmodel）とStage 2（hole補完）を`resolved_stage_model`がそれぞれ解決する。優先順はrequest指定 → 利用者のStage設定 → manifestの既定。構図の読み・法則の段・配色の段は時間と送信の記録だけをStage 1と分ける。
+- **段の構成** — Serverの既定manifestは構図の読み（`composition.read`）、法則の段（`laws`）、配色の段（`colors`、2026-10-20から）を持つ。保存作品からの推敲は保存した設定に従うので、配色の段を既定にする前の作品からは行わない。
 - **Macro catalog** — 新しい作品だけ、有効なplugin文書から新作用のMacro定義とlocalized summaryを`resolve_new_work_macro_catalog`が解決する。保存済みconfigからの派生はその定義をそのまま使う。
 - **資源上限** — manifestのhard policyとoperational budget（既存4上限 + 新6上限）に管理者の上限設定を重ね、保存済み作品からの派生はその作品のbudgetを保つ。
 - **色カタログ** — `fixed`は明示ID、`random`は現在以外から1つ、`auto`は色カタログ選択effectへ委ねる。全カタログの色をrender seedでpaletteへ解決しておき、選ばれたものだけを使う。
 - **seed** — 明示の`render_seed`、無ければ53 bit（JavaScriptの安全な整数）の新しいseedを採り、必ず記録する。`composition_seed`は明示されたときだけ設定する。
 - **変奏の廃止** — 新規要求は強度・seedを持たず、採番APIも無い。旧focus・強度・seedは履歴読取りだけに残し、新規保存へ書かない。保存済みの設定は保持し、次の実行用コピーからだけ`stage15_variation`を外す。
-- **再試行予算** — 色カタログ選択とhole補完は既定1回120秒・4回まで、Stage 1は1回300秒・合計540秒・4回まで（`INKU_LLM_*`で上書き）。写生は専用予算が無ければ色カタログ選択の予算を使う。developer modeでは`developer_disable_llm_retries`で全段を1回に限定できる。
+- **再試行予算** — 色カタログ選択とhole補完は既定1回120秒・4回まで、Stage 1は1回300秒・合計540秒・4回まで（`INKU_LLM_*`で上書き）。写生・構図の読み・法則の段・配色の段は専用予算が無ければ色カタログ選択の予算を使う。developer modeでは`developer_disable_llm_retries`で全段を1回に限定できる。
 
 ## 色カタログの自動選択
 
@@ -114,7 +118,7 @@ flowchart TD
 
 Stage 1のLLMは可視DDLの文字列を書かず、閉じた型の**下絵JSON**を返す（prompt `inku.typed-stage1-work-plan-prompt.v1`）。promptは歳時記から導出した有限語彙、解決済みcanvas・catalog identity、検証済みMacroのsignatureとlocalized summaryだけを持ち、Macro本文や展開後DDLを渡さない。
 
-- **正規化** — `normalize_work_plan`が各値を受理行列（`work-plan-capabilities-v1.json`、compilerへ一文ずつ問い合わせて生成したもの）と照合し、範囲外の値はfield単位で未指定に、形の無い層はその層だけを除く。層が1つも残らなければschema違反として予算内で再試行する。
+- **正規化** — `normalize_work_plan`が各値を受理行列（`work-plan-capabilities-v2.json`、compilerへ一文ずつ問い合わせて生成したもの）と照合し、範囲外の値はfield単位で未指定に、形の無い層はその層だけを除く。層が1つも残らなければschema違反として予算内で再試行する。
 - **印字** — `print_work_plan`が要求言語の可視DDLへ決定的に印字する。compilerへ渡るのはこの文字列だけで、下絵は一時物である。
 - **保存済み実行の再生** — `normalized_ddl`を持つ旧応答はそのまま読む。
 
@@ -128,12 +132,25 @@ Stage 1のLLMは可視DDLの文字列を書かず、閉じた型の**下絵JSON*
 
 provider拒否（`provider_rejected`）とsemantic違反は再試行しない。transport不能・timeout・rate limit・不正payload・schema違反だけが予算内で次のattemptを使う。
 
+## 構図の読み
+
+Stage 1の下絵が落ち着くと、記述が置き場所を言わない層の置き場所を記述から読むeffectが1回走る（`read_composition`、prompt `inku.composition-reading-prompt.v4`）。coreは答えを紙が見せられる値だけに絞り（`composition::check`）、層を数の範囲（範囲の名前と数）で印字する。端末内のVisionモデルの実行では読まずに既定の読みで置く（`composition_skipped`）。使えない答えや予算切れも、既定の読みで置いて続ける（`composition_fallback`）。残部採用で保存する候補は構図を通らない。
+
+## 法則の段
+
+構図の後に、絵画・意匠・音楽の法則（黄金分割、等間隔の反復、主従、文様、序破急など）から、読み手が作品に使う法則を選ぶ（`choose_laws`、prompt `inku.laws-prompt.v1`。数は決めない）。coreは答えを応答schemaと法則の決まりに照らし、拒んだ答えはその字と理由を添えて同じ予算の中で聞き直す（3回目からは、それより前に拒んだ理由も並べる）。法則が変えた層だけを数の形（数値の位置・端・範囲・角度・寸法）で印字し直し、描けない文書はcommitしない。当てられなければ構図のまま進む（`laws_fallback`）。作品は法則の記録（`laws_layers`・`laws_basis`）をhistory link sidecarに持ち、保存作品からの法則の手（入力`SavedLaws`、AI自動推敲）はこの記録を土台にする。
+
+## 配色の段
+
+法則の段の後に、色の法則（色相の対比、類似色の調和、明暗の塊など）から、読み手が作品の配色を選ぶ（`choose_colors`、prompt `inku.colors-prompt.v1`）。coreは楽譜の層ごとの見え方をrendererの編集用SVGから見積もり（`appearance.rs`）、地から見えない色や法則の成り立たない色を選び直させる。記述が言った色の層と地の色は替えず、地を言っていない作品では地の色も選べる。当てられなければ法則の段の後の文書のまま進む（`colors_fallback`）。
+
 ## 可視DDLの保存とauthority
 
 coreは可視DDLとauthorityの次状態を1つのCAS保存effectとしてhostへ渡す。hostは期待revisionが一致する場合だけ文書とauthorityを1 transactionで保存し、DDL digest・新revision・authority digestを返す。coreは一致を検査してから、保存されたbytesだけを再parseする。
 
 - 記述起点のvariationは`stage1_generated` / `description_authoritative`で始まる。作者がexact source bytesの変わるDDLを初めて確定するとDDL authorityへlockされ、元へ戻しても記述authorityへ戻らない。
 - direct DDLは最初から`user_authored_ddl` / `ddl_authoritative`である。
+- 新しいDDL（記述からのcommit、残部のcommit、親の無い新しいdirect DDL）は、1文目に紙の比を宣言する（`画面比W:H。`、DDL 26）。宣言は命令・文番号・種の材料にならず、Scoreの`canvas.declared_ratio`に入る。保存作品の編集・描き直しでは足さず、法則の手は親の宣言を保つ。
 - hostの保存失敗は`host_commit_failed`で停止し、直前に確認された文書とauthorityを保つ。
 - 同じaction identityの保存再送は2回目のrevision変更を起こさない（action ACKの冪等性）。
 
@@ -148,11 +165,11 @@ coreは可視DDLとauthorityの次状態を1つのCAS保存effectとしてhost�
 | `blocked_conflict` | 意味の衝突がある | sealed projectionで独立した残りだけを描画。補完対象にしない |
 | `blocked_diagnostic` | integrity等の診断で止まる | sealed projectionで描画できなければ停止 |
 
-曖昧な参照、候補の無い参照、複数候補はfirst / nearest / lastで推測せず、typed issueとしてfail closedする。`canonical_ready`でない場合も、`execution_projection`が確立済みの局所単位を省略して独立した命令を届け、省略を上流診断に残す。描画単位の全省略とintegrity不良は停止する。
+曖昧な参照、候補の無い参照、複数候補はfirst / nearest / lastで推測せず、typed issueとしてfail closedする。`canonical_ready`でない場合も、`execution_projection`が確立済みの局所単位を省略して独立した命令を届け、省略を上流診断に残す。描画単位の全省略とintegrity不良は停止する。形の無い文（面・道具・揺らぎの語を形のように書いた文など）は、抱える穴が無ければ範囲つきの止める診断（`missing_entity_head`など）で名指して省く（DDL engine 71。それまでは範囲の無い`missing_canonical_semantic_identity`で全体が止まった）。
 
 ## known-hole補完（Stage 2）
 
-保存済みDDLのlockがknown holeを持つとき、または作品の控えと比べて言葉だけを直した範囲があるとき（A3）、coreは別の作者操作を待たずにhole補完effectを要求する（prompt `inku.visible-ddl-hole-completion-prompt.v5`）。hostはこの要求の前に、Scoreが成立していれば安全な演奏を保存する（ServerもAndroidも同じ）。
+保存済みDDLのlockがknown holeを持つとき、または作品の控えと比べて言葉だけを直した範囲があるとき（A3）、coreは別の作者操作を待たずにhole補完effectを要求する（prompt `inku.visible-ddl-hole-completion-prompt.v5`）。hostはこの要求の前に、Scoreが成立していれば安全な演奏を保存する（Server・Android・macOSで同じ）。
 
 - 要求は対象の原文、確定済みtyped fact、有限語彙と受理構文だけを持ち、description、無関係なclause、Score、renderer指示を持たない。
 - 応答は短い対象IDごとの修正候補か未解決理由で、coreがIDの一致・重複・欠落を検査し、保存済み要求とlockから実hole ID、許可span、digestを復元する。
@@ -170,7 +187,7 @@ LLMを呼ばない。`canonical_ready`のmeaningだけを入力とし（それ�
 
 - **Plan** — `plan_verified_stage15_with_policy`がinstructionと宣言済みMacro Emitごとに1件のsymbolic Planを作る。exact count、解決済み寸法・外観・angle・位置・layout式とoriginを持ち、個体配列やScore命令の複製は作らない。成立しないfield・relation・coordinationは最小単位で省略し、診断に残す。
 - **資源選択** — `select_composition_plan_resources`が個体化の前に、hard policyとoperational budgetの両方で需要を検査する。単独primitiveの明示countが超える場合はsource順の先頭から安全に実行できる最大数を届け、要求数・実行数・理由を資源診断に残す。部分実行が構造を壊すcoordinated placementやMacroは単位全体を省略し、独立した後続を続ける。
-- **materialize** — `materialize_selected_composition`がPlanを再演可能なcompact recipeへ写す。Score 0.10を基準に、追加fieldを持つ作品だけが後続版（接続位置の数値0.11、端点指定や墨の広がり0.12、途中への接続0.13、member cycle 0.14、鏡写し0.15）を使う。Scoreは資源policyのsnapshotを持つが、需要の自己申告は持たない。
+- **materialize** — `materialize_selected_composition`がPlanを再演可能なcompact recipeへ写す。Score 0.10を基準に、追加fieldを持つ作品だけが後続版（接続位置の数値0.11、端点指定や墨の広がり0.12、途中への接続0.13、member cycle 0.14、鏡写し0.15、太い側0.16、塗り以外の濃さ0.17、数の範囲の塗りの出どころ0.18、写しの区画0.19、継ぎ目0.20、自由線0.21、刷毛目0.22）を使う。Scoreは資源policyのsnapshotを持つが、需要の自己申告は持たない。
 - **結果** — 省略が無ければ`complete`、あれば`complete_with_omissions`。省略の結果、描く内容（instructionまたは地）が残らなければ`stopped`とし、背景だけの空作品を成功にしない。
 
 ## 演奏 — Render Engine
@@ -179,7 +196,8 @@ hostは信頼済みのrender option（解決済みcolor map、render seed、wild
 
 - compact Scoreは`finalize_saved_score`で保存policyに照らして需要を再計算し、typed performanceがrecipeからsamplingして個体を作る。個体座標はScoreに無い。
 - 塗りの境界clipが不能または上限超過になった単位は、元sourceまたはcoordinated group全体を省略して演奏をやり直す。countの一部だけを残さない。
-- Render Engine 68はServerとAndroidで同じ。**同じScore・seed・描画条件は同じ作品を再現する。** runtime fallbackや過去engine selectorは無く、履歴のdisplay SVGは保存済みを返す。
+- 宣言と違う比の紙では、hostの`canvas_fit: contain`で、紙の中に宣言の比で入る最大の枠を中央に置き、構図をその枠の中で組んで描く。背景と地は紙全体を覆い、痕は枠で切らない（render engine 93）。
+- Render Engine 93はServer・Android・macOSで同じ。**同じScore・seed・描画条件は同じ作品を再現する。** runtime fallbackや過去engine selectorは無く、履歴のdisplay SVGは保存済みを返す。
 
 ## 同一性と保存
 
@@ -196,7 +214,7 @@ hostは信頼済みのrender option（解決済みcolor map、render seed、wild
 - 診断は履歴sidecarにも保存され、履歴を開き直すと当該revisionの診断が戻る。sidecarが壊れていても、その作品だけに警告を出し、保存DDL・Score・SVGの表示を続ける。
 - logには`pipeline_compiler_outcome`として、診断の件数と安全な投影（source本文を含まない）だけが出る。
 - providerとの送受信の原文は、developer modeで`developer_capture_provider_io`を指定した実行だけ、所有者限定の記録として残り、`/api/pipeline/executions/{id}/provider-observations`で読める。通常の履歴・応答・logには入らない。
-- Stage 1（作品計画）とhole completion（Stage 2）がproviderへ送ったsystem promptは、実行ごとに各Stageの最後の送信だけを実行のcontextに残す（再試行ではcompilerの指摘を含む最後の送信）。所有者だけが`/api/pipeline/variations/{id}/system-prompts`で読み、Webの生成情報のプロンプトタブが表示する。modelを呼ばなかったStageはnull、この記録より前の実行は`recorded: false`になる。
+- 写生・Stage 1（作品計画）・構図の読み・法則の段・配色の段・hole completion（Stage 2）がproviderへ送ったsystem promptは、実行ごとに各段の最後の送信だけを実行のcontextに残す（再試行ではcompilerの指摘を含む最後の送信）。写生・構図の読み・法則の段・配色の段は送ったメッセージも残す（2026-10-13から。法則の段と配色の段は2026-10-20から）。所有者だけが`/api/pipeline/variations/{id}/system-prompts`で読み、Webの生成情報のプロンプトタブが表示する。modelを呼ばなかった段はnull、この記録より前の実行は`recorded: false`になる。
 - streamは実行を読み直し、`sketch`（写生を通した場合）・`stage1`（保存したDDL）・`score`（instruction数）・`done`（通常応答）の順に知らせる。最初のeventより前の失敗はHTTPの状態そのもので届き、最初のeventが出た後の失敗（補完案の承認待ちを含む）は本文の`error` eventで届く。token数は共有pipelineが数えないためnullである。
 - modelの呼出しを待つ間、実行中のviewは`provider_attempt`（効果の種類、1始まりの試行番号、その段の再試行の上限、待ちと制限時間）を持つ。数え方と上限は共有coreが保存済みsnapshotから返し（`pipeline_provider_attempt`）、Serverは自分で始めた試行にだけ締切`deadline_at`（epoch ms）を足す。streamは試行が始まるたびと、最後の試行が終わったとき（null）に`attempt`を送る。何も落ち着かない間も10秒ごとに`wait`を送り（無通信の本文を中継が打ち切らないように）、読み手が去った（停止、ページを閉じた）実行は取り消す。流れを使わない3つの入口も、待つ間に1秒ごとに読み手を確かめ、去った実行を取り消す。Webの中継は、ブラウザの接続が閉じたらAPIへの要求を中断する（SvelteKitの要求のsignalは本文を受け取っている間しか働かない）。Webの描画中の表示は、1回目を「応答待ち」、2回目以降を「再試行中」として回数を出す。
 
@@ -216,11 +234,15 @@ hostは信頼済みのrender option（解決済みcolor map、render seed、wild
 | 10 | Stage 1 | provider拒否・予算切れ | 停止、作品を作らない | `stage1_failed`、provider失敗の分類 |
 | 11 | Stage 1 | compilerが完全採用しない・予算あり | 理由とspanを添えて再正規化 | `retry_scheduled`（`semantic_violation`） |
 | 12 | Stage 1 | 同上・予算切れ・残部あり | 候補全文を保存、残部だけ描画 | `complete_with_omissions`、上流診断 |
+| 12a | 構図の読み | 使えない答え・予算切れ、または端末内のVisionモデル | 既定の読みで置いて続ける | `composition_fallback`／`composition_skipped` |
+| 12b | 法則の段 | 当てられない・予算切れ | 構図のまま進む | `laws_fallback` |
+| 12c | 配色の段 | 当てられない・予算切れ | 法則の段の後の文書のまま進む | `colors_fallback` |
 | 13 | 保存 | CAS不一致・保存失敗 | 停止、直前の文書とauthorityを保つ | `host_commit_failed` |
 | 14 | compile | known holeあり | 安全な演奏を先に保存し、補完を要求 | `typed_ddl_parsed`、hole ID |
 | 15 | 補完 | 候補が有効 | 作者の承認待ち（互換routeは409） | `awaiting_patch_approval` |
 | 16 | 補完 | 失敗・辞退 | 保存済みDDLのまま作者の編集待ち | `needs_user_edit` |
 | 17 | lower | 一部が成立しない | 最小単位を省略して続行 | 下流診断、`complete_with_omissions` |
+| 17a | compile | 形の無い文で、抱える穴が無い | その文だけを範囲つきで名指して省く | `missing_entity_head`など、`complete_with_omissions` |
 | 18 | 資源 | 単独primitiveのcountが上限超過 | 先頭から実行可能な最大数を届ける | 資源診断（要求数・実行数・理由） |
 | 19 | 資源 | coordinated単位が上限超過 | 単位全体を省略 | 資源省略 |
 | 20 | lower | 描く内容が残らない | 停止 | `stopped`、`needs_user_edit` |
@@ -229,14 +251,25 @@ hostは信頼済みのrender option（解決済みcolor map、render seed、wild
 | 23 | 保存 | 冪等keyが一致 | 新しいrowを作らない | `_idempotent_replay` |
 | 24 | stream | 最初のevent後の失敗 | HTTPでなく`error` event | status・detail |
 
+## 画像から書く作品
+
+記述の代わりに画像から始める入口である（Server・Webの画像タブ、CLIの`paint --image`。SPEC §12.6.6）。`POST /api/pipeline/images`が画像（JPEG・PNG・GIF・TIFF、32 MiBまで）をPillowで読み（GIFは1枚目、EXIFの向きを当てる）、coreの決まり（`inku.image-input-policy.v1`：長辺1568画素、JPEGの質90、4 MiBまで）で縮めて、所有者別の一時ID・サムネイル・寸法・近い紙を返す。`POST /api/pipeline/variations`（`kind: image`）が実行を始め、coreは次の順に判定する。
+
+1. 色カタログが`画像から自動選択`なら、候補ごとの9色を画像と見比べてカタログを選ぶ（使えなければ既定のカタログ、`catalog_fallback`）。
+2. VisionのモデルがDDLを書く（`write_image_ddl`）。coreは1文目に画像の比を宣言し、書いたとおりに描かれない行を行ごとの理由と手がかりとともに名指して、一度だけ聞き直す。形の無い文はcompileが省き、それでも1文で全体を止める文は1行ずつのcompileで名指して除く。
+3. hostが書いたDDLを描き（`draw_image_review`、長辺1024画素のPNG）、画像・描いた画・DDLを見せて一度直させる（`review_image_ddl`）。描けなければ書いたDDLのままにする。
+4. 残ったDDLをDDLの編集としてcommitする（reason `image_ddl`）。読める答えが一つも無ければ`image_ddl_failed`、何も描けなければ`image_ddl_undrawable`で止まる。読めなかった行は確定の後に補完しない。
+
+作品は来歴（`image_provenance`）とcoreの記録（`image_ddl`。見比べる前のDDLを含む）を持ち、`input`・`source_text`は空で、画像は保存しない。紙は宣言と違う比でも問わずにはめ込む（`canvas_fit: contain`）。
+
 ## 旧Scoreの再演
 
 `/api/render-score`と`/api/render-svg`は、保存済みまたは外部のScoreを演奏し直す入口であり、記述もDDLも読まない。
 
-- **compact Score（0.10〜0.15）** — `ProductPipelineEffects.replay`が共有coreの`render_saved`を呼ぶ。資源policyは、Serverが所有するhistory linkを持つ作品だけ保存済みのものを使い、それ以外はinstallationの既定を使う。Score自身は予算を自己申告できない。
+- **compact Score（0.10〜0.22）** — `ProductPipelineEffects.replay`が共有coreの`render_saved`を呼ぶ。資源policyは、Serverが所有するhistory linkを持つ作品だけ保存済みのものを使い、それ以外はinstallationの既定を使う。Score自身は予算を自己申告できない。
 - **0.10未満の旧Score** — `saved_score_compat.py:coerce_saved_score`が構造互換（欠けたgeometryの既定、solid fillの2つの旧表記の橋渡し、解決不能relationの除去、記録された4上限）だけを当て、従来のchecked performanceで演奏する。旧coerceの配達・様式補修は行わない。
 - どちらも、作品を名指せば（`work_id`）その作品の色snapshot（`render_color_map`）と上限を使い、カタログの今日の定義を読まない。
 
 ## 図の根拠
 
-`PIPE-HOST`、`PIPE-MACHINE`、`PIPE-CATALOG`、`PIPE-SKETCH`、`PIPE-S1`、`PIPE-TYPED-DDL`、`PIPE-HOLE`、`PIPE-S15`、`PIPE-LOWER`、`PIPE-LIMITS`、`PIPE-RENDER`、`PIPE-COMPAT`、`PIPE-HISTORY`、`DATA-AUTHORITY`、`API-LIMIT`、`DATA-DH1`、`DATA-RH3`、`DATA-FALLBACK`。一次根拠は `pipeline_compat.py:{paint,paint_events}`、`description_labels.py`、`pipeline_api.py:PipelineService`、`pipeline_product.py:{prepare,provider_for,render_options,save_result,replay}`、`inku-pipeline/src/machine.rs:{description,stage1,llm_response,failure_with_detail,accept_result}`、`protocol.rs:RetryPolicy`、`inku-ddl/src/compiler_execution.rs:execute_compilation_with_resources`、`inku-render/src/render.rs:render_with_resources`、`saved_score_compat.py`、`db.py:render_hash_for_item`。
+`PIPE-HOST`、`PIPE-MACHINE`、`PIPE-CATALOG`、`PIPE-SKETCH`、`PIPE-S1`、`PIPE-COMPOSITION`、`PIPE-LAWS`、`PIPE-COLORS`、`PIPE-CANVAS`、`PIPE-TYPED-DDL`、`PIPE-HOLE`、`PIPE-IMAGE`、`PIPE-WIRE`、`PIPE-S15`、`PIPE-LOWER`、`PIPE-LIMITS`、`PIPE-RENDER`、`PIPE-COMPAT`、`PIPE-HISTORY`、`DATA-AUTHORITY`、`DATA-IMAGE`、`API-LIMIT`、`DATA-DH1`、`DATA-RH3`、`DATA-FALLBACK`。一次根拠は `pipeline_compat.py:{paint,paint_events}`、`description_labels.py`、`pipeline_api.py:PipelineService`、`pipeline_product.py:{prepare,provider_for,render_options,save_result,replay}`、`pipeline_images.py`、`inku-pipeline/src/machine.rs:{description,stage1,llm_response,failure_with_detail,accept_result,composition_response,laws_response,colors_response}`、`machine/image.rs`、`protocol.rs:RetryPolicy`、`inku-ddl/src/compiler_execution.rs:execute_compilation_with_resources`、`inku-render/src/render.rs:render_with_resources`、`saved_score_compat.py`、`db.py:render_hash_for_item`。

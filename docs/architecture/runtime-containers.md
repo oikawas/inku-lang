@@ -10,13 +10,16 @@ flowchart TB
     WEB_PROC["SvelteKit process"]
     API_PROC["FastAPI process"]
     PIPE_POOL["Pipeline worker pool\ninku-pipeline threads (default 4)"]
-    NATIVE["inku-render-python wheel\nshared Rust pipeline + typed compiler + Render Engine 68"]
+    AUTO_POOL["Autonomous refinement runner\none thread a run (default 4)"]
+    IMAGE_STORE["Temporary image store\nprocess memory (15-minute wait)"]
+    NATIVE["inku-render-python wheel\nshared Rust pipeline + typed compiler + Render Engine 93"]
     SAVE_POOL["Artifact executor / bounded queue"]
     THUMB_POOL["Thumbnail process pool\nrasterizes in spawned child processes"]
     BACKUP_TASK["lifespan backup scheduler"]
     MIGRATION["versioned startup\nregistry / snapshot / invariants"]
     PROVIDERS["LLM providers"]
     DB[("canonical SQLite")]
+    RUNS_DB[("autonomous-runs.db\nwhere runs stand")]
     THUMBS[("thumbs.db / derived")]
     OUTPUTS[("work files")]
     BACKUPS[("DB replicas")]
@@ -25,6 +28,12 @@ flowchart TB
     BROWSER -->|"HTTP"| WEB_PROC
     WEB_PROC -->|"/api proxy"| API_PROC
     API_PROC -->|"start / command"| PIPE_POOL
+    API_PROC -->|"image intake"| IMAGE_STORE
+    PIPE_POOL -->|"resolve image references"| IMAGE_STORE
+    API_PROC -->|"start / stop runs"| AUTO_POOL
+    AUTO_POOL -->|"an ordinary run per child"| PIPE_POOL
+    AUTO_POOL -->|"turns, visible difference, edge record"| NATIVE
+    AUTO_POOL -->|"where runs stand"| RUNS_DB
     PIPE_POOL -->|"step(snapshot, input)"| NATIVE
     PIPE_POOL -->|"one effect = one transport attempt"| PROVIDERS
     PIPE_POOL -->|"CAS save, execution snapshot, history"| DB
@@ -44,7 +53,11 @@ flowchart TB
 
 Ordinary drawing requests (`/api/paint`, `/api/paint/stream`, `/api/interpret`, `/api/compose`, `/api/pipeline/*`) run in the thread pool of `PipelineService`. Calls for one execution are serialized, and a worker performs the effects the core returns in order, up to `max_effect_steps` (default 32). The execution snapshot is saved to the DB by compare-and-set after each effect, so a replacement worker resumes from the saved snapshot. When the number of retained executions reaches `max_retained_runs` (default 8) and all of them are busy, a new start answers 429. The compatibility HTTP routes re-read the saved state at a short interval until the execution settles, then respond.
 
-Replay of an older Score (a Score below 0.10 on `/api/render-score` or `/api/render-svg`) does not go through the pipeline pool: the request thread calls the native wheel once under render capacity. Replay of a compact Score (0.10 through 0.15) calls the shared core's `render_saved` from the same request thread.
+Replay of an older Score (a Score below 0.10 on `/api/render-score` or `/api/render-svg`) does not go through the pipeline pool: the request thread calls the native wheel once under render capacity. Replay of a compact Score (0.10 through 0.22) calls the shared core's `render_saved` from the same request thread. Replacing a saved work's touches, ground or color arrangement, and fitting it (`/api/render-tool-variant` and the like, `/api/render-canvas-fit`), also call the shared core's same rules from the request thread.
+
+For a work written from an image, `POST /api/pipeline/images` shrinks the received image (up to 32 MiB) and keeps it in process memory under an owner-scoped temporary ID. An image not painted within fifteen minutes is discarded, a successful start consumes the ID, and the image and the review PNG are released when the run ends. Neither the DB nor a snapshot holds the image, so a run whose worker changed and whose image is gone stops with `image_missing`.
+
+The Server drives autonomous refinement runs (they go on with no screen open). The runner uses one thread a run (default 4, one running run per owner) and draws and saves the children through ordinary pipeline runs; the shared core decides the turns, the visible difference between parent and child, and the edge record. Where each run stands is kept in a SQLite store beside the canonical DB (`<name>-autonomous-runs.db`, or the one `INKU_AUTONOMOUS_RUNS_DB_URL` names); a work's record stays on each child's lineage edge. A run the Server was taking when it stopped reads as interrupted at the next start.
 
 ## Distribution Compose
 
@@ -78,7 +91,7 @@ Explicitly enabling ChatGPT plan with `INKU_CHATGPT_PLAN_ENABLED=1` and `INKU_CH
 | Persistence | Environment-specific DB and output locations | Under one persistent volume | Dockerfiles and `compose.yaml` |
 | Deployment | Environment-specific and outside this document | The maintainer builds and publishes images for each release tag; the release workflow is a manual build check that publishes nothing | `.github/workflows/release.yml` |
 
-The Server's physical owner is SQLAlchemy/SQLite and Android's is Room/SQLite; a future iOS adapter would own its own physical schema too. What they share is not file or table names but the language-neutral logical contract in [`persistence/README.md`](../../persistence/README.md) and [`persistence/contract.json`](../../persistence/contract.json). Server-only authentication/administration tables and device-only provider/model/cache tables are host extensions, not parity gaps.
+The Server's physical owner is SQLAlchemy/SQLite, Android's is Room/SQLite and macOS's is GRDB/SQLite; a future iOS adapter would own its own physical schema too. What they share is not file or table names but the language-neutral logical contract in [`persistence/README.md`](../../persistence/README.md) and [`persistence/contract.json`](../../persistence/contract.json). Server-only authentication/administration tables and device-only provider/model/cache tables are host extensions, not parity gaps.
 
 FastAPI does not accept ordinary requests until versioned startup completes. A current registry verifies only version and checksum and does not reintroduce a full legacy scan into normal startup. Only an accepted pre-registry DB or a DB at the previous registry version goes through the WAL-safe snapshot and single-writer migration; on failure the service does not serve and the snapshot remains. The pipeline service and its manifest are not assembled until the first pipeline request. The native wheel itself is a required Server runtime; the Server cannot start without it.
 
@@ -88,6 +101,8 @@ FastAPI does not accept ordinary requests until versioned startup completes. A c
 |---|---|---|
 | Web/API process | `SYS-WEB`, `SYS-API` | `hooks.server.ts`, `api.py` |
 | Pipeline worker pool | `PIPE-HOST`, `API-LIMIT` | `pipeline_api.py:PipelineService`, `pipeline_runtime.py`, `pipeline_defaults.py` |
+| Temporary image store | `PIPE-IMAGE`, `API-LIMIT`, `DATA-IMAGE` | `pipeline_images.py` |
+| Autonomous refinement runner | `PIPE-REFINE`, `DATA-LINEAGE` | `autonomous_refine.py:AutonomousRunner`, `routers/autonomous.py` |
 | Native boundary | `PIPE-MACHINE`, `PIPE-RENDER` | `pipeline_candidate.py:PipelineBinding`, `inku-render-python`, `inku-pipeline-uniffi` |
 | Save/thumbnail pools | `API-LIMIT`, `SYS-FILES` | `api_core/state.py`, `rendering.py`, `api_core/thumbnails.py` |
 | Migration/backup/log | `DATA-MIGRATION`, `SYS-BACKUP`, `SYS-LOG` | `persistence/{migrations,backup,invariants}.py`; `api.py:_db.init_db` (migration); `api.py:_lifespan` (backup scheduler); `logging_setup.py` |

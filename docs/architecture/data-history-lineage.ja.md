@@ -23,7 +23,7 @@ flowchart LR
     NODE -->|"明示parent + derivation kindのみ"| EDGE
 ```
 
-DB rowには入力、可視DDL、Score、server生成SVG、model/版/seed/色/時間、mark、表示状態が入る。共有pipelineで描いた作品では、`ddl`は保存・ACKされた可視DDL、`score`は共有lowererが作ったraw compact Scoreであり、`render_limits`は作品のoperational budgetから導いた既存4上限の写しである。写生は`sketch_text` / `sketch_state`（`supplemented` / `not_needed` / `fallback` / `off`）に残る。指示書本文は`ddl`に統合し、旧expanded本文を移した場合だけ`ddl_source_origin=legacy_expanded`を残す。旧Stage 1 / 2のfallback列（`interpret_fallback` / `compose_fallback`）と`score_pre_coerce`、`coerce_trace`は旧作品のために残り、新作は書かない（NULL）。Webの読みでは新作の`compose_fallback`は「記録なし」となり、fallbackの印は出ない。fallbackのbackfillはしない。自動作品ファイルを無効化またはqueue overflowしてもDB履歴は残る。
+DB rowには入力、可視DDL、Score、server生成SVG、model/版/seed/色/時間、mark、表示状態が入る。共有pipelineで描いた作品では、`ddl`は保存・ACKされた可視DDL、`score`は共有lowererが作ったraw compact Scoreであり、`render_limits`は作品のoperational budgetから導いた既存4上限の写しである。写生は`sketch_text` / `sketch_state`（`supplemented` / `not_needed` / `fallback` / `off`）に残る。画像から書いた作品は、来歴を`image_provenance`、coreの記録（画像の参照と元の画素数、宣言した比、近い紙、答えごとの段、見比べる前のDDL、描いた画の参照、除いた行）を`image_ddl`に持ち、`input`は空である。画像のbytesと見比べのPNGはどの列にも入らない（registry v5）。指示書本文は`ddl`に統合し、旧expanded本文を移した場合だけ`ddl_source_origin=legacy_expanded`を残す。旧Stage 1 / 2のfallback列（`interpret_fallback` / `compose_fallback`）と`score_pre_coerce`、`coerce_trace`は旧作品のために残り、新作は書かない（NULL）。Webの読みでは新作の`compose_fallback`は「記録なし」となり、fallbackの印は出ない。fallbackのbackfillはしない。自動作品ファイルを無効化またはqueue overflowしてもDB履歴は残る。
 
 ## 共有pipelineの状態
 
@@ -86,7 +86,7 @@ erDiagram
 - **variation authority** — variationごとの現在のsource、origin（`stage1_generated` / `user_authored_ddl`）、authority（`description_authoritative` / `ddl_authoritative` / `legacy_unknown`）、decimal-stringのrevision。変更はcoreが提案した次状態を期待revisionのcompare-and-setで保存したときだけ進み、authorityは単調にしか進まない。
 - **action ACK** — 1つのlogical commit actionの結果を記録する。同じactionの再送は2回目のrevision変更を起こさず、同じ結果を返す。
 - **実行snapshot** — coreのsnapshotとhost contextを不透明なbytesとしてsequenceのcompare-and-setで保存する。これはvariationの最新状態であり、過去のrevisionを復元する材料ではない。
-- **history link** — 保存した1演奏をvariation・revision・source digestへ結び、その時点のconfig、host context、Macro定義、4種の診断、renderer診断、`resource_execution`をfork用sidecar（v2）として不変に保存する。過去の作品を選ぶと、このsidecarを正として派生し、同じvariationの最新snapshotで置き換えない。v1 sidecarは診断を持たない。sidecarが壊れていてもその作品だけに警告を出し、保存DDL・Score・SVGの表示を続ける。
+- **history link** — 保存した1演奏をvariation・revision・source digestへ結び、その時点のconfig、host context、Macro定義、4種の診断、renderer診断、`resource_execution`、補完の控え（`completion_ranges`）、法則の記録（`laws_layers`・`laws_basis`）をfork用sidecar（v2）として不変に保存する。過去の作品を選ぶと、このsidecarを正として派生し、同じvariationの最新snapshotで置き換えない。v1 sidecarは診断を持たない。sidecarが壊れていてもその作品だけに警告を出し、保存DDL・Score・SVGの表示を続ける。
 - **provider観測** — developer modeで要求した実行だけ、provider送受信の原文を所有者・execution・action単位で保存する。通常の履歴・応答・logへは入らない。
 
 旧作品（linkを持たない履歴）は`legacy_unknown`として扱い、origin・authorityを本文から推測しない。旧作品からの派生は元行を変えず、`parent_legacy_history_id`を持つ新しいvariationになる。
@@ -102,7 +102,7 @@ flowchart LR
     CONFIG["config.py\n両SQLite URLを先に検証"]
     ENGINE["engine.py\nengine + connection PRAGMA"]
     FACADE["db.py\ncompatibility / composition façade"]
-    MIGRATION["migrations.py\nregistry v3 / fingerprint / writer lock"]
+    MIGRATION["migrations.py\nregistry v5 / fingerprint / writer lock"]
     SNAPSHOT["backup.py\nWAL-safe SQLite snapshot"]
     INVARIANTS["invariants.py\nPK + canonical history digest"]
     SCHEMA["schema.py / ddl_migration.py / legacy_v3_*\ncurrent schema / manual migration / frozen restore"]
@@ -118,9 +118,9 @@ flowchart LR
     DOMAIN --> DB
 ```
 
-`db.py`は既存のimportとcall shapeを保つfaçadeで、直接SQLやmigrationのownerではない。`persistence/`の19 owner module（これにpackage初期化を加える）が、設定・engine・schema・migration・backup・invariantと、access、account、group、session、identity、settings、history、search、lineage、奥書、feedback、variation authorityの変更理由ごとに分かれる。
+`db.py`は既存のimportとcall shapeを保つfaçadeで、直接SQLやmigrationのownerではない。`persistence/`の27 owner module（これにpackage初期化を加える）が、設定・engine・schema・migration・backup・invariantと、access、account、group、session、identity、settings、history、search、lineage、奥書、feedback、variation authority、記述固定（`description_lock`）、取り合わせの設定（`juxtaposition`）、単一のDDL本文への手動移行（`ddl_migration`・`ddl_source`）、凍結v3の復元（`legacy_restore`・`legacy_v3_*`）、歳時記の移行（`saijiki_migration`）の変更理由ごとに分かれる。AI自動推敲のrunの位置は、正本の外の別のSQLite（`<name>-autonomous-runs.db`、`autonomous_refine.py`）に置き、正本のschemaを変えない。
 
-起動時の経路は次のとおりである。fresh DBはschemaとregistry v4 `single_history_ddl`を1 transactionで作る。current DBは版・checksum、由来列と旧列の不存在、FTSを検査して通常起動し、全件照合を繰り返さない。旧二本文DBは手動移行必須として通常起動を拒否する。手動移行は既知のv3 fingerprintとregistryを確認し、検証済みsnapshotがwriter lock下の移行前像と一致した場合だけ一つのtransactionで本文を選択・旧列を削除する。全persistent tableの保護値、history rowid、主キー、本文byte、保存link digest、FTS、quick/foreign-key checkを照合し、registry v3の記録を保持してv4を加える。未知・部分状態・未来版・checksum不一致は拒否する。受入済みの古いbackupは原本を保持した新しいコピーで凍結v3 adapterを通してから統合する。詳しくは[共通保存契約](../../persistence/README.ja.md)を参照。
+起動時の経路は次のとおりである。fresh DBはschemaとregistry v5 `image_input_provenance`を1 transactionで作る。v4 `single_history_ddl`のDBは、通常起動で確認済みsnapshot（`migration-backups/<stem>-pre-v5-<ns>.db`）を作ってから、nullableな`image_provenance`・`image_ddl`とv5行を一つのtransactionで足す。既存行はNULLのままで、失敗すれば列とregistryをrollbackし、snapshotを残す。current DBは版・checksum、由来列と旧列の不存在、FTSを検査して通常起動し、全件照合を繰り返さない。旧二本文DBは手動移行必須として通常起動を拒否する。手動移行は既知のv3 fingerprintとregistryを確認し、検証済みsnapshotがwriter lock下の移行前像と一致した場合だけ一つのtransactionで本文を選択・旧列を削除する。全persistent tableの保護値、history rowid、主キー、本文byte、保存link digest、FTS、quick/foreign-key checkを照合し、registry v3の記録を保持してv4を加える。未知・部分状態・未来版・checksum不一致は拒否する。受入済みの古いbackupは原本を保持した新しいコピーで凍結v3 adapterを通してから統合する。詳しくは[共通保存契約](../../persistence/README.ja.md)を参照。
 
 Android Room v14は同じ論理契約v2を別の物理schemaで満たす。v10→v11で共有pipelineの状態、v11→v12で要求時の`catalog_mode`を加え、v12→v13でDDLをNULL可にし、v13→v14でDDL本文を一本化した。保存Score／SVGと既存作品の保護値を保持する。v1–9限定resetは旧DBと派生thumbnailを捨てるがmodel fileを残す。未来版や読めないDBは変更しない。このlifecycle差はportable contractのgapではなくhost adapterの明示的な所有範囲である。
 
@@ -151,7 +151,7 @@ flowchart TD
     SAME_VAR["同じvariation"] -.->|"自動edgeにしない"| EDGE
 ```
 
-`db.add_item` はparentがあるのにkindが無い場合、またはkindだけの場合を拒否する。parentがあれば同じuserの非tombstone nodeを確認し、history、node、edgeを1 transactionで書く。類似度、時刻、hash一致、同じvariationであることからedgeは作らない。共有pipelineの派生（記述fork、DDL fork、旧作品からのfork）は、元作品のlineage nodeを明示parentとして渡したときだけedgeになり、kindを明示しなければ`description_edit`または`ddl_edit`になる。
+`db.add_item` はparentがあるのにkindが無い場合、またはkindだけの場合を拒否する。parentがあれば同じuserの非tombstone nodeを確認し、history、node、edgeを1 transactionで書く。類似度、時刻、hash一致、同じvariationであることからedgeは作らない。共有pipelineの派生（記述fork、DDL fork、旧作品からのfork）は、元作品のlineage nodeを明示parentとして渡したときだけedgeになり、kindを明示しなければ`description_edit`または`ddl_edit`になる。保存作品の差し替え・はめ込み・法則の手・取り合わせ・見比べる前の指示書からの子も、明示したparentとkindでだけedgeになる。AI自動推敲の子は系譜にだけ保存され（`lineage_only`）、測った後に辺へ手の記録（`ai_move`）を書く。見える差の門を通った子が次の手番の親になり、最後に残った子をrunの終わりに通常履歴へ出す。
 
 ## 保存済みSVGと再描画
 
@@ -191,6 +191,8 @@ erDiagram
       string description_hash
       string render_hash
       string lineage_node_id
+      text image_provenance
+      text image_ddl
     }
     LINEAGE_NODE {
       string id PK
@@ -212,4 +214,4 @@ erDiagram
 
 ## 根拠対応
 
-`SYS-DB`, `SYS-FILES`, `DATA-AUTHORITY`, `DATA-MIGRATION`, `DATA-DH1`, `DATA-RH3`, `DATA-RH2`, `DATA-LINEAGE`, `DATA-FALLBACK`。実装根拠は `db.py`, `identity.py`, `persistence/schema.py`, `persistence/variation_authority.py`, `persistence/migrations.py`, `pipeline_product.py:save_result`, `routers/history.py`, `test_lineage_acceptance.py`, `test_render_hash.py`, `test_persistence_variation_authority.py`。
+`SYS-DB`, `SYS-FILES`, `DATA-AUTHORITY`, `DATA-MIGRATION`, `DATA-DH1`, `DATA-RH3`, `DATA-RH2`, `DATA-LINEAGE`, `DATA-FALLBACK`, `DATA-IMAGE`。実装根拠は `db.py`, `identity.py`, `persistence/schema.py`, `persistence/variation_authority.py`, `persistence/migrations.py`, `pipeline_product.py:save_result`, `routers/history.py`, `test_lineage_acceptance.py`, `test_render_hash.py`, `test_persistence_variation_authority.py`。

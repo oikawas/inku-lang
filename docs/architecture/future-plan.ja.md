@@ -69,8 +69,8 @@ flowchart TD
 
 ## cutoverで形が定まった項目
 
-- **Score schema版の統治** — 旧計画の時点では`ScoreVersion`が`Literal["0.1.0"]`で、上げる手順を持つ者がいなかった。現在の`ScoreVersion`は0.1.0から0.15.0までを持ち、共有lowererが表現に必要な最小版を選ぶ規則をSPECが持つ（compact基準0.10、追加fieldに応じて0.11〜0.15、flat互換0.9）。保存済みの旧版は`inku-score`の互換readerが読む。
-- **Android決定的pipelineの共有化** — Androidも共有Rustのauthoring pipelineを使い、Kotlinの独自Stage 1・1.5・2とcoerceはretireした。Androidに残るのはhost責任（UI、provider通信、Room、`rh3`の計算、カメラ前処理）である。
+- **Score schema版の統治** — 旧計画の時点では`ScoreVersion`が`Literal["0.1.0"]`で、上げる手順を持つ者がいなかった。現在の`ScoreVersion`は0.1.0から0.22.0までを持ち、共有lowererが表現に必要な最小版を選ぶ規則をSPECが持つ（compact基準0.10、追加fieldに応じて0.11〜0.22、flat互換0.9）。保存済みの旧版は`inku-score`の互換readerが読む。
+- **Android決定的pipelineの共有化** — Androidも共有Rustのauthoring pipelineを使い、Kotlinの独自Stage 1・1.5・2とcoerceはretireした。Androidに残るのはhost責任（UI、providerへの送信、Room、カメラ前処理）である。その後、`dh1`・`rh3`の計算、providerへの要求本文と答えの読み、保存作品の推敲の規則、Skiaの画面表示も共有coreへ移り、macOSも同じcoreを使う。
 
 ## 実測が前提を変えた記録
 

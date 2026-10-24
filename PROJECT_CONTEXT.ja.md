@@ -112,10 +112,12 @@ Replay は常に最新で行い、当時のエディションの再現は**保�
 | 対象 | 値 | 正本 |
 |---|---|---|
 | アプリ | 本書冒頭の「対象バージョン」 | **`web/APP_VERSION` と `web/BUILD_NUMBER` の 2 ファイル**。UI・`/api/info` の `version`・CLI はすべてここを読む（値をここに写さない） |
-| Render Engine | 68 | `core/crates/inku-render/src/lib.rs` |
-| DDL | `ddl_version` 13 / `ddl_engine_version` 47 | `server/src/inku_server/layer_versions.py` |
-| Android | `2.1.4-android.80` | `android/VERSION`（web / server とは別の名前空間） |
-| Python パッケージ | 2.7.2 | `server/pyproject.toml`（**製品リリースのときだけ動く**） |
+| Render Engine | 正本を読む（値をここに写さない） | `core/crates/inku-render/src/lib.rs` の `RENDER_ENGINE_VERSION` |
+| DDL | 正本を読む（値をここに写さない） | `server/src/inku_server/layer_versions.py` の `DDL_VERSION` と `DDL_ENGINE_VERSION` |
+| Android | 正本を読む（値をここに写さない） | `android/VERSION`（web / server とは別の名前空間） |
+| Python パッケージ | 正本を読む（値をここに写さない） | `server/pyproject.toml` の `version`（**製品リリースのときだけ動く**） |
+
+Render Engine・DDL・Score・アプリ・配布物の現在の値と上げる条件は、`docs/spec/render-engine-history.ja.md` の版の表が持つ。
 
 ### 語彙
 
@@ -144,7 +146,7 @@ Replay は常に最新で行い、当時のエディションの再現は**保�
 - **Typed compiler／Stage 1.5／lowerer** — compiler lockでsource、provenance、Macro definitionを検証し、bounded Macro expansionと入力を検証するtyped Stage 1.5を経てactual Scoreまたはcompact recipeへ一度だけ下ろす。Known holeだけが補完候補となり、holeなしではStage 2 LLMを呼ばない。Recoverableな不成立は最小のfieldまたは実行単位を診断付きで省略し、独立した後続を保つ。
 - **Scoreと資源** — lowererは表現に必要な最小Score版を選ぶ。Resource-awareなcompact基準は0.10で、鏡写しrelationを持つ作品だけが0.15を必要とする。保存済みpolicyから需要を再計算し、超過した一sourceまたはcoordinated placement全体を個体化前に省略する。
 - **互換境界** — 旧作品は保存済みScore／SVGと保存時contextで表示・再演する。新しい作品の意味は共有Rustが決定する。AndroidのカメラDDLも共有語彙を使い、履歴表示は保存情報に基づく。記録されていないpromptを旧実装から再構成しない。
-- **Render Engine 66** — 共有Rust coreが所有し、Serverの薄いPython adapterとAndroidの薄いJNI adapterが同じ1 requestで呼ぶSVGの演奏。
+- **Render Engine** — 共有Rust coreが所有し、Serverの薄いPython adapterとAndroidの薄いJNI adapterが同じ1 requestで呼ぶSVGの演奏。
 Androidのmain preview、thumbnail、PNG exportはcanonicalな保存済み／現行SVGを別crate
 `inku-svg-raster`（`resvg`）でpixel化する。pixelは派生presentationであり、保存の正本はSVGのままである。
 macOSの作品域は、WebのChromeと同じ見え方にするため、表示専用の`inku-display`（Skia）で描く。Apple Siliconの拡大した窓は、別のプロセス（`inku-display-gpu`）がSkiaのGraphite（GPU）で描く。
@@ -276,7 +278,7 @@ UI は日英で、切替は設定画面から行う（既定は `ja`）。
 画面の文言は Kotlin の言語パックが、歳時記の語彙は `server/scripts/gen_saijiki_kt.py` の生成物が持つ。
 現行AndroidとServerは同じ共有Rust authoring pipelineとRender Engineを使う。
 Android固有のKotlin描画engine、AndroidSVG artwork path、Kotlinの旧Stage 1 / 1.5 / 2とScore coerceはretire済みで、runtime fallbackは無い。
-UI、provider通信、Room、履歴、`rh3`の計算はAndroid hostが所有する。
+UI、provider通信、Room、履歴はAndroid hostが所有し、`dh1`・`rh3`の計算は共有coreへ尋ねる。
 
 ### 検査面
 

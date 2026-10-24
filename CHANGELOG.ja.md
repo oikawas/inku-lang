@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+### 2026-10-24 — architecture文書を今のcoreに合わせ、Project Contextの版の表を正本を名指す形にした
+
+`docs/architecture` の日英15対を、v2.15.244 / Build 1320 の実装（Render Engine 93、DDL 26 / DDL engine 71、135 route、DB registry v5、共有coreの10 crate）に合わせた。構図の読み・法則の段・配色の段、画像から書く作品、画面比の宣言とはめ込み、providerへの要求本文と答えの読み・作品の同一性・保存作品の推敲の規則の共有coreへの移管、Skiaの画面表示、macOSのhostを書き足した。`PROJECT_CONTEXT` の版の表は、Render Engine・DDL・Android・Pythonパッケージの値を写さずに正本の定数を名指す形にし、用語の「Render Engine 66」とAndroidの`rh3`の記述を直した。版の一覧の `server/pyproject.toml` の現在の値を2.15.240に直した。コードは変えていない。
+
 ### 2026-10-24 — Androidのカメラを共通coreの「画像から描く」で描く
 
 Androidのカメラは、外部のVisionモデルなら写真を共通coreの画像の実行（§12.6.6）へ渡す。選んだ1つのモデルが写真からDDLを書き、描いた画と写真を見比べて直し、写真の比に近い紙にはめ込んで描く。観察記述・詩的な記述・記述からのStage 1は通らず、作品は記述を持たない。色カタログが自動なら写真から選ぶ。端末内モデル（LiteRT）は従来の観察記述・詩的な記述の道で描く（作者の選択、2026-10-24）。

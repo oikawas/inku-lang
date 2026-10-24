@@ -10,13 +10,16 @@ flowchart TB
     WEB_PROC["SvelteKit process"]
     API_PROC["FastAPI process"]
     PIPE_POOL["Pipeline worker pool\ninku-pipeline threads（既定4）"]
-    NATIVE["inku-render-python wheel\n共有Rust pipeline + typed compiler + Render Engine 68"]
+    AUTO_POOL["AI自動推敲のrunner\nrunごとに1 thread（既定4）"]
+    IMAGE_STORE["画像の一時預かり\nprocessのメモリ（待機15分）"]
+    NATIVE["inku-render-python wheel\n共有Rust pipeline + typed compiler + Render Engine 93"]
     SAVE_POOL["Artifact executor / bounded queue"]
     THUMB_POOL["Thumbnail process pool\nspawnした子processでrasterize"]
     BACKUP_TASK["lifespan backup scheduler"]
     MIGRATION["versioned startup\nregistry / snapshot / invariants"]
     PROVIDERS["LLM providers"]
     DB[("canonical SQLite")]
+    RUNS_DB[("autonomous-runs.db\nrunの位置")]
     THUMBS[("thumbs.db / 派生")]
     OUTPUTS[("作品ファイル")]
     BACKUPS[("DB replica")]
@@ -25,6 +28,12 @@ flowchart TB
     BROWSER -->|"HTTP"| WEB_PROC
     WEB_PROC -->|"/api proxy"| API_PROC
     API_PROC -->|"start / command"| PIPE_POOL
+    API_PROC -->|"画像の受取"| IMAGE_STORE
+    PIPE_POOL -->|"画像の参照を解決"| IMAGE_STORE
+    API_PROC -->|"runの開始・停止"| AUTO_POOL
+    AUTO_POOL -->|"子ごとに通常のrun"| PIPE_POOL
+    AUTO_POOL -->|"手番・見える差・辺の記録"| NATIVE
+    AUTO_POOL -->|"runの位置"| RUNS_DB
     PIPE_POOL -->|"step(snapshot, input)"| NATIVE
     PIPE_POOL -->|"effect 1回 = transport 1回"| PROVIDERS
     PIPE_POOL -->|"CAS保存・実行snapshot・履歴"| DB
@@ -44,7 +53,11 @@ flowchart TB
 
 通常の描画要求（`/api/paint`、`/api/paint/stream`、`/api/interpret`、`/api/compose`、`/api/pipeline/*`）は`PipelineService`のthread poolで実行される。1つのexecutionへのcallは直列化され、workerはcoreが返したeffectを`max_effect_steps`（既定32）まで順に実行する。実行snapshotはeffectごとにDBへcompare-and-setで保存されるため、worker交代後も保存済みsnapshotから再開できる。保持するexecution数が`max_retained_runs`（既定8）に達し、すべてが実行中なら新しい開始は429になる。互換HTTP routeはexecutionが落ち着くまで短い間隔で保存済み状態を読み直してから応答する。
 
-旧Scoreの再演（`/api/render-score`、`/api/render-svg`で0.10未満のScore）は、pipeline poolを通らず、requestのthreadからrender capacityの下でnative wheelを1回呼ぶ。compact Score（0.10〜0.15）の再演は同じrequestのthreadから共有coreの`render_saved`を呼ぶ。
+旧Scoreの再演（`/api/render-score`、`/api/render-svg`で0.10未満のScore）は、pipeline poolを通らず、requestのthreadからrender capacityの下でnative wheelを1回呼ぶ。compact Score（0.10〜0.22）の再演は同じrequestのthreadから共有coreの`render_saved`を呼ぶ。保存作品のてざわり・支持体・配色の差し替えとはめ込み（`/api/render-tool-variant`等、`/api/render-canvas-fit`）も、requestのthreadから共有coreの同じ規則を呼ぶ。
+
+画像から書く作品では、`POST /api/pipeline/images`が受け取った画像（32 MiBまで）を縮めて、所有者別の一時IDでprocessのメモリに預ける。描き始めないまま15分たつと捨て、開始に成功するとIDを消費し、実行が終われば画像と見比べのPNGを解放する。DBにもsnapshotにも画像は入らないので、workerが替わって画像が無い実行は`image_missing`で止まる。
+
+AI自動推敲のrunはServerが進める（画面を閉じても続く）。runnerはrunごとに1 thread（既定4、所有者ごとに同時1 run）を使い、子を通常のpipeline runで描いて保存する。手番・親子の見える差・辺の記録は共有coreが決める。runの位置は正本のDBの横の別のSQLite（`<name>-autonomous-runs.db`、`INKU_AUTONOMOUS_RUNS_DB_URL`で変更）に置き、作品の記録は各子の系譜の辺に置く。Serverが止まったときに進んでいたrunは、次の起動で中断として読む。
 
 ## 配布時Compose
 
@@ -78,7 +91,7 @@ ChatGPTプランを`INKU_CHATGPT_PLAN_ENABLED=1`と`INKU_CHATGPT_SELF_HOSTED=1`�
 | 永続化 | 環境ごとのDB・出力先 | 1 persistent volume配下 | Dockerfileと`compose.yaml` |
 | 配備 | 環境固有のため本書の対象外 | release tagごとに保守者がimageをbuild/publishする。release workflowは公開しない手動のbuild確認 | `.github/workflows/release.yml` |
 
-Serverの物理ownerはSQLAlchemy/SQLite、Androidの物理ownerはRoom/SQLiteであり、将来iOS adapterを作る場合も自身の物理schemaを持つ。共通なのはfile名やtable名ではなく、[`persistence/README.md`](../../persistence/README.md)と[`persistence/contract.json`](../../persistence/contract.json)が定める言語非依存の論理契約である。Server専用の認証・管理tableと端末専用のprovider・model・cache tableはhost extensionであり、parity gapではない。
+Serverの物理ownerはSQLAlchemy/SQLite、Androidの物理ownerはRoom/SQLite、macOSの物理ownerはGRDB/SQLiteであり、将来iOS adapterを作る場合も自身の物理schemaを持つ。共通なのはfile名やtable名ではなく、[`persistence/README.md`](../../persistence/README.md)と[`persistence/contract.json`](../../persistence/contract.json)が定める言語非依存の論理契約である。Server専用の認証・管理tableと端末専用のprovider・model・cache tableはhost extensionであり、parity gapではない。
 
 FastAPIはversioned startupが完了するまで通常requestを受け付けない。current registryは版とchecksumだけを検証し、legacy全件scanを通常起動へ戻さない。受け入れたpre-registry DBと前版registryのDBだけがWAL-safe snapshotとsingle-writer migrationを通り、失敗時はserveせずsnapshotを残す。pipeline serviceとそのmanifestは最初のpipeline要求まで組み立てない。native wheel自体はServerの必須runtimeで、無ければ起動できない。
 
@@ -88,6 +101,8 @@ FastAPIはversioned startupが完了するまで通常requestを受け付けな�
 |---|---|---|
 | Web/API process | `SYS-WEB`, `SYS-API` | `hooks.server.ts`, `api.py` |
 | Pipeline worker pool | `PIPE-HOST`, `API-LIMIT` | `pipeline_api.py:PipelineService`, `pipeline_runtime.py`, `pipeline_defaults.py` |
+| 画像の一時預かり | `PIPE-IMAGE`, `API-LIMIT`, `DATA-IMAGE` | `pipeline_images.py` |
+| AI自動推敲のrunner | `PIPE-REFINE`, `DATA-LINEAGE` | `autonomous_refine.py:AutonomousRunner`, `routers/autonomous.py` |
 | native境界 | `PIPE-MACHINE`, `PIPE-RENDER` | `pipeline_candidate.py:PipelineBinding`, `inku-render-python`, `inku-pipeline-uniffi` |
 | save/thumbnail pool | `API-LIMIT`, `SYS-FILES` | `api_core/state.py`, `rendering.py`, `api_core/thumbnails.py` |
 | Migration/backup/log | `DATA-MIGRATION`, `SYS-BACKUP`, `SYS-LOG` | `persistence/{migrations,backup,invariants}.py`、`api.py:_db.init_db`（migration）、`api.py:_lifespan`（backup scheduler）、`logging_setup.py` |

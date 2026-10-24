@@ -103,7 +103,8 @@ class VisionModelPickerTest {
             return (candidates.firstOrNull(File::isFile) ?: candidates.first()).readText()
         }
         assertTrue(source("JuxtaposeDialog.kt").contains("VisionModelPicker(label = s.model"))
-        assertTrue(source("SavedWorkParityDialogs.kt").contains("VisionModelPicker(label = s.visionModel"))
+        // The autonomous refinement's own label since its moves moved to the shared core (7dc4755f4).
+        assertTrue(source("SavedWorkParityDialogs.kt").contains("VisionModelPicker(label = s[\"aiRefineModel\"]"))
         assertFalse(source("SavedWorkParityDialogs.kt").contains("DropdownMenu"))
         assertEquals(2, Regex("models = visionModelGroupsFor\\(state\\)").findAll(source("InkuApp.kt")).count())
     }

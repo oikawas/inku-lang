@@ -834,12 +834,19 @@ fn number(
     }
     let next = source[after_whole..].chars().next();
     let (end, value) = match next {
-        Some(point) if is_point(point) => {
+        // A point is a decimal point only when a digit follows it: a period
+        // right after a whole number ends the sentence (`vertical 1.`), as the
+        // parser reads a decimal (DDL engine 71).
+        Some(point)
+            if is_point(point)
+                && source[after_whole + point.len_utf8()..]
+                    .chars()
+                    .next()
+                    .and_then(&digit)
+                    .is_some() =>
+        {
             let after_point = after_whole + point.len_utf8();
             let (end, fraction, places) = digits(source, after_point, &digit);
-            if places == 0 {
-                return None;
-            }
             let value = (places <= MAX_DECIMAL_PLACES)
                 .then(|| 10_u64.checked_pow(places))
                 .flatten()
@@ -1028,6 +1035,19 @@ mod tests {
                 .annotation,
             None
         );
+    }
+
+    #[test]
+    fn a_period_right_after_a_whole_number_ends_the_sentence() {
+        let source = "In the range horizontal 0.2 to 0.5, vertical 0 to 1.";
+        let lexeme = read(source, "the range", ResolvedInstructionLanguage::En).unwrap();
+        assert_eq!(lexeme.bounds[3], fraction(1, 1));
+        assert_eq!(&source[lexeme.span.end_byte..], ".");
+        // A point a digit follows is still a decimal point.
+        let decimal = "In the range horizontal 0.2 to 0.5, vertical 0 to 0.75.";
+        let lexeme = read(decimal, "the range", ResolvedInstructionLanguage::En).unwrap();
+        assert_eq!(lexeme.bounds[3], fraction(3, 4));
+        assert_eq!(&decimal[lexeme.span.end_byte..], ".");
     }
 
     #[test]

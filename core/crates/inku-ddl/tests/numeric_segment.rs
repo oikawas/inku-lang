@@ -183,6 +183,28 @@ fn assert_row(centers: &[Point], from: [f64; 2], to: [f64; 2]) {
 }
 
 #[test]
+fn an_english_sentence_may_end_its_numbers_in_a_whole_number() {
+    // The period right after a whole number ends the sentence (DDL engine 71);
+    // it was taken for a decimal point and the numbers were not read.
+    for (whole, decimal) in [
+        (
+            "draw one black thick line from horizontal 0.1, vertical 0.9 to horizontal 0.9, vertical 1.",
+            "draw one black thick line from horizontal 0.1, vertical 0.9 to horizontal 0.9, vertical 1.0.",
+        ),
+        (
+            "tile 30 green flat circles diameter 0.03 in the range horizontal 0.0 to 1.0, vertical 0.66 to 1.",
+            "tile 30 green flat circles diameter 0.03 in the range horizontal 0.0 to 1.0, vertical 0.66 to 1.0.",
+        ),
+    ] {
+        assert_eq!(
+            compile(whole, "square", 240).score,
+            compile(decimal, "square", 240).score,
+            "{whole}"
+        );
+    }
+}
+
+#[test]
 fn a_row_puts_its_first_and_last_mark_on_the_two_points() {
     let row = score(
         "画面の横0.118、縦0.5から横0.882、縦0.5まで、半径0.03の青のロットリングの空の円を5個並べる。",

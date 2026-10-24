@@ -3958,8 +3958,10 @@ def command_review(args: argparse.Namespace) -> int:
             "evaluation": feedback
         })
     elif args.review_cmd == "unread":
+        # The server reads `words` (a list) and drops unknown keys; a lone
+        # `word` key was dropped, and nothing was recorded.
         params = {
-            "word": args.word,
+            "words": [args.word],
             "context": args.context,
         }
         data, _ = client.request("POST", "/api/feedback/unread-words", data=params)

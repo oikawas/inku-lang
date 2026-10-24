@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-24 — The Android camera can use a ChatGPT plan
+
+The Android camera's model choice also lists the published ChatGPT plan models (those serving both LLM and Vision). The photo is drawn by the shared core's image run, whose image stages send the photo and the review drawing through the same `chatgpt_request` as the server's Image tab. The rule that refused a ChatGPT plan model before the capture is retired. The core, Server and Web are unchanged.
+
 ### 2026-10-24 — The architecture documents follow the current core, and the Project Context version table names its sources of truth
 
 The fifteen Japanese/English pairs in `docs/architecture` now match the v2.15.244 / Build 1320 implementation (Render Engine 93, DDL 26 / DDL engine 71, 135 routes, DB registry v5, ten shared-core crates). They add the composition reading, the laws stage and the color stage; works written from an image; the canvas ratio declaration and fitting; provider request bodies and answer reading, work identity and the rules of saved-work refinements moving into the shared core; the Skia screen display; and the macOS host. The `PROJECT_CONTEXT` version table now names the constants in their sources for Render Engine, DDL, Android, and the Python package instead of copying the values, and the terms' "Render Engine 66" and the Android `rh3` statement are corrected. The Score version statement (0.15 only with mirroring) and the saijiki statement (ten categories, eleven words in `おもて`) now name their sources of truth instead of copying the numbers. The current `server/pyproject.toml` value in the version list is corrected to 2.15.240. No code changed.

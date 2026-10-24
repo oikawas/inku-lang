@@ -139,7 +139,9 @@ private fun ecdsaDer(raw: ByteArray): ByteArray {
 }
 
 internal val CHATGPT_EFFECTS = setOf("generate_sketch", "select_description_catalog", "generate_normalized_ddl", "read_composition",
-    "choose_laws", "choose_colors", "complete_visible_ddl_holes")
+    "choose_laws", "choose_colors", "complete_visible_ddl_holes",
+    // The image stages send the photo, and then the drawing, with the request (server `IMAGE_EFFECTS`).
+    "select_image_catalog", "write_image_ddl", "review_image_ddl")
 
 /** Server `request_vision`: the assistant text read up to 512 KiB. */
 private const val CHATGPT_VISION_ANSWER_LIMIT = 512 * 1024
@@ -184,12 +186,15 @@ internal fun chatGptRequest(request: ModelRequest): ChatGptRequest {
     }
     // The schema's original member order matters when it has no propertyOrdering.
     // Keep that object raw on the trip to the core.
+    val images = request.pipelineImages
     val raw = "{\"action\":\"chatgpt_request\",\"model\":${JSONObject.quote(model)}," +
         "\"answer_limit\":$MAX_PROVIDER_RESPONSE_BYTES," +
         "\"prompt\":{\"system\":${JSONObject.quote(request.systemInstruction.orEmpty())}," +
         "\"message\":${JSONObject.quote(request.prompt)}," +
         "\"action_name\":${JSONObject.quote(request.pipelineAction)}," +
-        "\"response_schema\":${tool.parametersJson}}}"
+        "\"response_schema\":${tool.parametersJson}" +
+        (images?.let { ",\"images\":${it.referencesJson}" } ?: "") + "}" +
+        (images?.let { ",\"images\":${JSONArray(it.dataUrls)}" } ?: "") + "}"
     return built(SharedProviderWire.call(raw), "pipeline", MAX_PROVIDER_RESPONSE_BYTES)
 }
 

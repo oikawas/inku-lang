@@ -5883,7 +5883,7 @@ private fun modelChoicesFor(state: InkuUiState, includeChatGpt: Boolean = true):
         choices += ModelChoice(asset.modelId, "${asset.displayName} ${asset.qualityTier}", "LiteRT-LM")
     }
     state.providerSettings
-        .filter { it.isEnabled && !it.isDefaultLocal && !((state.modelSelectionForCamera || !includeChatGpt) && it.providerId == "chatgpt") }
+        .filter { it.isEnabled && !it.isDefaultLocal && !(!includeChatGpt && it.providerId == "chatgpt") }
         .forEach { provider ->
             availablePublishedModels(provider, state).forEach { modelId ->
                 val qualified = qualifyModelId(provider.providerId, modelId)
@@ -5921,7 +5921,7 @@ internal fun autonomousVisionModelIds(state: InkuUiState): Set<String> =
 
 private fun modelProviderGroupsFor(state: InkuUiState): List<app.inku.mobile.data.db.ProviderSettingEntity> {
     val local = state.providerSettings.filter { it.isDefaultLocal }
-    val remote = state.providerSettings.filter { it.isEnabled && !it.isDefaultLocal && !(state.modelSelectionForCamera && it.providerId == "chatgpt") }
+    val remote = state.providerSettings.filter { it.isEnabled && !it.isDefaultLocal }
     return (local + remote).distinctBy { it.providerId }
 }
 

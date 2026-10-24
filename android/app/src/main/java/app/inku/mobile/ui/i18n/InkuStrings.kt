@@ -251,7 +251,6 @@ interface InkuStrings {
     val canvasFitRun: String
     val canvasFitStretch: String
     val ddlOverwriteRedraw: String
-    val cameraChatGptCannotReadPhoto: String
     val discard: String
     // Web's seven `ddl3d*` labels (experimental 3D view).
     val ddl3dMode: String

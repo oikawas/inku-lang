@@ -28,7 +28,7 @@ def _require_meter(language: str) -> None:
 class DescriptionMoraBody(BaseModel):
     # The meter asks as the author types; a description far past a chōka is
     # counted by characters on the page instead.
-    text: str = Field(default="", max_length=4000)
+    text: str = Field(default="", max_length=4000, description="The Japanese description to count, up to 4,000 characters. Omitted or empty counts as zero mora.")
 
 
 class DescriptionMoraResponse(BaseModel):
@@ -37,7 +37,7 @@ class DescriptionMoraResponse(BaseModel):
     unread: list[str] = Field(description="辞書が読めなかった字。空でなければ合計は推定を含む")
 
 
-@router.post("/api/description/mora", response_model=DescriptionMoraResponse)
+@router.post("/api/description/mora", response_model=DescriptionMoraResponse, summary="Count the mora of a description")
 def api_description_mora(body: DescriptionMoraBody) -> DescriptionMoraResponse:
     """記述の音数を数える。記述欄の詩型の目安（俳句 5-7-5 など）に使う。"""
     _require_meter("japanese")
@@ -46,7 +46,7 @@ def api_description_mora(body: DescriptionMoraBody) -> DescriptionMoraResponse:
 
 
 class DescriptionSyllablesBody(BaseModel):
-    text: str = Field(default="", max_length=4000)
+    text: str = Field(default="", max_length=4000, description="The English description to count, up to 4,000 characters. Omitted or empty counts as zero syllables.")
 
 
 class DescriptionSyllablesResponse(BaseModel):
@@ -55,7 +55,7 @@ class DescriptionSyllablesResponse(BaseModel):
     unknown: list[str] = Field(description="発音辞書に無かった語。空でなければ合計は推定を含む")
 
 
-@router.post("/api/description/syllables", response_model=DescriptionSyllablesResponse)
+@router.post("/api/description/syllables", response_model=DescriptionSyllablesResponse, summary="Count the syllables of a description")
 def api_description_syllables(body: DescriptionSyllablesBody) -> DescriptionSyllablesResponse:
     """英語の記述の音節を行ごとに数える（CMU Pronouncing Dictionary）。記述欄の形式の目安に使う。"""
     _require_meter("english")

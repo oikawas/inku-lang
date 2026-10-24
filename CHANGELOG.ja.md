@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+### 2026-10-24 — APIリファレンスを全面的に書いた
+
+Serverの `/docs`（OpenAPI）で、135のrouteすべてに要約と説明、14の群のtagを付け、引数と要求・応答の欄すべてに英語の説明を付けた（既存の日本語の説明は残した）。説明の無い欄は、FastAPIが自ら作る検証エラーの型の6つだけになった。route・引数・型・既定値・検証は変えていない。説明を除いたOpenAPIが変更前と同じことを確かめ、API表面の記録とScoreのJSON schema（`core/crates/inku-score/schema/score.schema.json` とそのdigest）を説明の変化に合わせて作り直した。開発の経緯が書かれていた既存の説明は、公開向けの文に書き直した。
+
 ### 2026-10-24 — inku-cliで画像から描く
 
 `inku-cli paint --image PATH` で、Webの画像タブと同じAPIを同じ順に呼んで画像から描けるようにした。`--provenance` / `--provenance-file` で来歴を併記し、`--vision-model` でDDLを書くVisionモデルを選ぶ（既定はCLIのVision設定）。`--save-history` を付けたときだけ作品として履歴のDBへ追加し、付けなければpipelineへ保存しないと伝える。記述・`--input-mode`・写生・`--wild`・描画モデル・`--include-thinking` との併用は断る。中断したときはrunを止める。Serverは変えていない。

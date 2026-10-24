@@ -6,7 +6,9 @@ import os
 import urllib.parse
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 from ...color_catalogs import RENAMED_COLOR_CATALOG_IDS, color_catalogs
@@ -30,56 +32,100 @@ authenticated_router = APIRouter(dependencies=[Depends(_current_user)])
 
 
 class AppInfoResponse(BaseModel):
-    name: str
+    name: str = Field(description="Product name. Always inku-server.")
     # The application version of the running tree, from web/APP_VERSION -- the
     # same value the UI shows. release_version is the tagged distribution and
     # lags on purpose while releases are on hold.
-    version: str
-    release_version: str
-    build_number: str | None = None
-    developer_mode: bool = False
+    version: str = Field(description="Application version of the running source tree, the same value the web UI shows.")
+    release_version: str = Field(
+        description="Version of the tagged distribution. It can lag behind version while releases are on hold."
+    )
+    build_number: str | None = Field(
+        default=None,
+        description="Build number read from the web build number file. Null when the file is missing or empty.",
+    )
+    developer_mode: bool = Field(
+        default=False,
+        description="True when the INKU_DEVELOPER_MODE environment variable is set to 1, true, yes or on.",
+    )
     # Whether this server belongs to one person.  The client reads it to drop
     # the doors that lead nowhere when there is nobody else to be.
-    single_user_mode: bool = False
-    chatgpt_plan_available: bool = False
-    chatgpt_plan_unavailable_reason: str | None = None
+    single_user_mode: bool = Field(
+        default=False,
+        description="True when this server belongs to one person. Clients use it to hide controls that lead nowhere.",
+    )
+    chatgpt_plan_available: bool = Field(
+        default=False, description="True when the ChatGPT plan can be used on this server.",
+    )
+    chatgpt_plan_unavailable_reason: str | None = Field(
+        default=None,
+        description="Why the ChatGPT plan is unavailable, such as chatgpt_disabled, chatgpt_mode_not_allowed or chatgpt_startup_unverified. Null when it is available.",
+    )
     # Whether this server keeps the second thumbnail size. The client asks for
     # it only where both this is on and the screen is dense enough to use it;
     # asking otherwise would be a 404 per thumbnail.
-    thumbnail_hidpi: bool = False
-    render_engine_id: str
-    render_engine_version: str
-    ddl_version: str
-    ddl_engine_version: str
+    thumbnail_hidpi: bool = Field(
+        default=False,
+        description="True when the server keeps the second, 2x thumbnail size. Clients request 2x thumbnails only when this is true.",
+    )
+    render_engine_id: str = Field(description="Identifier of the active render engine.")
+    render_engine_version: str = Field(description="Version of the active render engine.")
+    ddl_version: str = Field(description="Version of the DDL format that this server reads and writes.")
+    ddl_engine_version: str = Field(description="Version of the DDL engine that interprets DDL.")
 
 
 class ColorCatalogsResponse(BaseModel):
-    default_catalog_id: str
-    catalogs: list[dict]
+    default_catalog_id: str = Field(description="Identifier of the catalog used when a request names none.")
+    catalogs: list[dict] = Field(
+        description="The color catalogs in server order. Each entry is a catalog object whose keys are defined by the catalog data.",
+    )
     # Old id -> the id it answers to today. A client holding a work saved
     # before a rename has no other way to name the catalog it was drawn with;
     # an id in neither `catalogs` nor here is retired.
-    renamed_catalog_ids: dict[str, str]
+    renamed_catalog_ids: dict[str, str] = Field(
+        description="Maps each old catalog identifier to the current identifier that replaces it. An identifier in neither catalogs nor this map is retired.",
+    )
 
 
 class DemoInstructionBody(BaseModel):
-    seed_phrase: str = Field(..., min_length=1, max_length=1000)
-    model: str | None = Field(default=None)
-    instruction_lang: str = Field(default="auto")
-    ui_lang: str | None = None
+    seed_phrase: str = Field(
+        ..., min_length=1, max_length=1000,
+        description="The phrase the demo instruction is written from. Required, 1 to 1000 characters.",
+    )
+    model: str | None = Field(
+        default=None,
+        description="Model to ask for the instruction. When omitted, the Stage 1 default model is used. A model not offered to the caller is refused with 403.",
+    )
+    instruction_lang: str = Field(
+        default="auto",
+        description="Language of the instruction: ja, en, or auto. With auto, the language is read from seed_phrase, falling back to ui_lang. Any other value is refused with 422.",
+    )
+    ui_lang: str | None = Field(
+        default=None,
+        description="The viewer's interface language, such as ja or en. It is the fallback when auto cannot tell the language from seed_phrase. Unsupported values fall back to ja.",
+    )
 
 
 class DemoInstructionResponse(BaseModel):
-    instruction: str
+    instruction: str = Field(description="The generated demo instruction text, with surrounding quotation marks removed.")
 
 
-@router.get("/health")
+@router.get("/health", summary="Check that the server is running")
 def health() -> dict[str, bool]:
+    """Report that the server process is up. Public: no sign-in is needed.
+
+    Returns {"ok": true}. The check does not touch the database or the render engine.
+    """
     return {"ok": True}
 
 
-@router.get("/api/info", response_model=AppInfoResponse)
+@router.get("/api/info", response_model=AppInfoResponse, summary="Get server version and feature flags")
 def api_info() -> AppInfoResponse:
+    """Return the server name, versions and feature flags that clients read at startup. Public: no sign-in is needed.
+
+    Reports whether the ChatGPT plan is available and, when it is not, why. Also
+    reports the active render engine, the DDL versions and the single-user flag.
+    """
     from ...chatgpt_runtime import availability
     available, reason = availability()
     engine = current_render_engine()
@@ -100,8 +146,12 @@ def api_info() -> AppInfoResponse:
     )
 
 
-@authenticated_router.get("/api/color-catalogs", response_model=ColorCatalogsResponse)
+@authenticated_router.get("/api/color-catalogs", response_model=ColorCatalogsResponse, summary="List color catalogs")
 def api_color_catalogs() -> ColorCatalogsResponse:
+    """Return the color catalogs, the default catalog identifier and the map of renamed catalog identifiers.
+
+    Requires a signed-in user; responds 401 when there is no valid session.
+    """
     return ColorCatalogsResponse(
         default_catalog_id="default",
         catalogs=color_catalogs(),
@@ -109,21 +159,39 @@ def api_color_catalogs() -> ColorCatalogsResponse:
     )
 
 
-@router.get("/api/notices", response_model=NoticesResponse)
+@router.get("/api/notices", response_model=NoticesResponse, summary="List third-party notices")
 def api_notices() -> NoticesResponse:
+    """Return the third-party notice components bundled with this build. Public: no sign-in is needed.
+
+    Only components whose notice files are present in this build are listed,
+    so a native build and a container image can list different components.
+    """
     return notice_catalog(_RELEASE_VERSION)
 
 
-@router.get("/api/notices/{notice_id}", response_class=PlainTextResponse)
-def api_notice_text(notice_id: str) -> PlainTextResponse:
+@router.get("/api/notices/{notice_id}", response_class=PlainTextResponse, summary="Get a third-party notice text")
+def api_notice_text(
+    notice_id: Annotated[str, Path(description="Identifier of the notice, as the id field of GET /api/notices. Not a file name.")],
+) -> PlainTextResponse:
+    """Return the full text of one third-party notice as plain text. Public: no sign-in is needed.
+
+    Responds 404 when the notice identifier is unknown or its file is not present in this build.
+    """
     try:
         return PlainTextResponse(notice_bytes(notice_id))
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Notice not found") from None
 
 
-@router.get("/api/models", response_model=ModelSettingsResponse)
+@router.get("/api/models", response_model=ModelSettingsResponse, summary="Get model settings for the caller")
 def api_models(actor: dict = Depends(_current_user)) -> ModelSettingsResponse:
+    """Return the model catalogs offered to the signed-in caller and the caller's model settings.
+
+    The drawing (llm) and vision catalogs are returned. When the caller's ChatGPT
+    plan is available, a ChatGPT entry is added to both, listing the plan's
+    models for each purpose. Requires a signed-in user;
+    responds 401 when there is no valid session.
+    """
     settings = _db.get_model_settings()
     developer_mode = _env_flag("INKU_DEVELOPER_MODE")
     drawing = model_provider_catalog(settings, include_disabled=False, include_developer=developer_mode, purpose="llm")
@@ -193,30 +261,34 @@ def _enabled_plugin_entries() -> list[dict[str, object]]:
     return entries
 
 
-@authenticated_router.get("/api/saijiki")
+@authenticated_router.get("/api/saijiki", summary="List Saijiki vocabulary")
 def api_saijiki(
-    lang: str = Query(default="ja", pattern="^(ja|en)$"),
+    lang: str = Query(default="ja", pattern="^(ja|en)$", description="Language of the words in each category: ja or en. Category names are sent in both languages."),
 ) -> dict[str, object]:
-    """Saijiki vocabulary for display: core categories (from the saijiki table)
-    plus loaded declarative plugin words. Single delivery for web hydration."""
+    """Return the Saijiki vocabulary for display: the core categories and the
+    words of the loaded declarative plugins. Requires a signed-in user."""
     return {
         "categories": display_categories(lang),
         "plugins": _enabled_plugin_entries(),
     }
 
 
-@authenticated_router.get(PLUGIN_PREVIEW_ROUTE)
+@authenticated_router.get(PLUGIN_PREVIEW_ROUTE, summary="Get a plugin word's preview image")
 def api_plugin_preview(
-    name: str = Query(min_length=1, max_length=200),
-    scale: str = Query(default="1", pattern="^[12]$"),
+    name: str = Query(
+        min_length=1, max_length=200,
+        description="Qualified plugin word, written as Namespace.Word with the word in the document's own language.",
+    ),
+    scale: str = Query(
+        default="1", pattern="^[12]$",
+        description="Image scale: 1 for the standard size, 2 for the high-density size. Other values are refused with 422.",
+    ),
 ) -> Response:
-    """The artwork behind a plugin word in the saijiki preview.
+    """Return the preview image of one plugin word in the Saijiki.
 
-    Served from its own route rather than inside the saijiki payload: the bake
-    that prompted this came to 188 KB across seven words at 720px, which the
-    browser fetches once and caches instead of carrying on every hydration.
-    The lookup goes through the loaded documents, so a name that matches no
-    word is a 404 whatever it spells.
+    It is a separate request, so a client can cache the image instead of
+    receiving it with every Saijiki listing. Requires a signed-in user. Responds
+    404 when the name matches no word of a loaded plugin.
     """
     path = preview_path_for_qualified_name(name, hidpi=(scale == "2"))
     if path is None:
@@ -228,9 +300,12 @@ def api_plugin_preview(
     )
 
 
-@authenticated_router.get("/api/reference")
+@authenticated_router.get("/api/reference", summary="Get the implementation reference")
 def api_reference(
-    format: str = Query(default="json", pattern="^(json|md)$"),
+    format: str = Query(
+        default="json", pattern="^(json|md)$",
+        description="Response format: json for the structured object, or md for a Markdown document.",
+    ),
 ) -> Response:
     """Machine-generated mirror of implementation tables (read-only)."""
     reference = build_reference()
@@ -239,7 +314,7 @@ def api_reference(
     return JSONResponse(content=reference)
 
 
-@authenticated_router.get("/api/client-config")
+@authenticated_router.get("/api/client-config", summary="Get client configuration")
 def api_client_config() -> dict[str, object]:
     """Server-owned values every client needs. Editable by admins only."""
     return {
@@ -296,8 +371,14 @@ def _generate_demo_instruction(seed_phrase: str, *, model: str | None, lang: str
     return text
 
 
-@authenticated_router.post("/api/demo/instruction", response_model=DemoInstructionResponse)
+@authenticated_router.post("/api/demo/instruction", response_model=DemoInstructionResponse, summary="Get a demo instruction from a seed phrase")
 def api_demo_instruction(req: DemoInstructionBody, actor: dict = Depends(_current_user)) -> DemoInstructionResponse:
+    """Ask the chosen model for one short demo instruction, written from the seed phrase.
+
+    Requires a signed-in user. Responds 403 when the model is not offered to the
+    caller, 422 when instruction_lang is not supported, and 502 when the model
+    call fails or its answer is malformed.
+    """
     if not _model_offered_to(actor, req.model, stage="stage1", purpose="llm", settings=_db.get_model_settings()):
         raise HTTPException(status_code=403, detail=MODEL_NOT_OFFERED_DETAIL)
     instruction_lang = _resolve_instruction_lang(

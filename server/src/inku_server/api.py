@@ -84,7 +84,32 @@ async def _lifespan(_app: FastAPI):
         _shutdown_pipeline()
 
 
-app = FastAPI(title="inku-server", version=_APP_VERSION, lifespan=_lifespan)
+# The groups the API reference (/docs) shows, in this order. Each router below
+# is included under one of them.
+API_TAGS = [
+    {"name": "Server", "description": "Health, version, client configuration, color catalogs, models, notices, the Saijiki and the implementation reference. Some calls need no sign-in."},
+    {"name": "Sign-in", "description": "Sign in and out, and how this server authenticates."},
+    {"name": "My account", "description": "The signed-in user's profile, settings, templates and plugin storage."},
+    {"name": "ChatGPT plan", "description": "Connect the signed-in user's ChatGPT plan and choose its models."},
+    {"name": "Plugins", "description": "Declarative DDL plugins."},
+    {"name": "Administration", "description": "Server settings. Administrators only."},
+    {"name": "Users and groups", "description": "User accounts and user groups."},
+    {"name": "History", "description": "Saved works: listing, saving, stars and comments, sharing, trash and exports."},
+    {"name": "Lineage", "description": "How works descend from one another, and the colophon of a branch."},
+    {"name": "Drawing", "description": "Draw from a description or DDL, render a Score, and plan color arrangement, ground and tool variants of a saved work."},
+    {"name": "Autonomous refinement", "description": "Runs in which a model revises a work over several turns."},
+    {"name": "Pipeline", "description": "Variations drawn step by step from a description, DDL or an image, with their executions and forks."},
+    {"name": "Unread words", "description": "Words in descriptions that the drawing did not read."},
+    {"name": "Descriptions", "description": "Count the morae and syllables of a description."},
+]
+
+app = FastAPI(
+    title="inku-server",
+    version=_APP_VERSION,
+    description="The inku API: draw works from descriptions, DDL or images, and keep them with their lineage.",
+    openapi_tags=API_TAGS,
+    lifespan=_lifespan,
+)
 register_pipeline_errors(app)
 
 
@@ -283,23 +308,23 @@ _gzip.DEFAULT_EXCLUDED_CONTENT_TYPES = _gzip.DEFAULT_EXCLUDED_CONTENT_TYPES + (
 app.add_middleware(FlushingGZipMiddleware, minimum_size=500, compresslevel=6)
 
 
-app.include_router(public.router)
-app.include_router(public.authenticated_router)
-app.include_router(auth.router)
-app.include_router(auth.authenticated_router)
-app.include_router(auth.admin_router)
-app.include_router(me.router)
-app.include_router(chatgpt.router)
-app.include_router(plugins.router)
-app.include_router(settings.router)
-app.include_router(users.router)
-app.include_router(history.router)
-app.include_router(lineage.router)
-app.include_router(render.router)
-app.include_router(autonomous.router)
-app.include_router(pipeline_router(_pipeline_service, _current_user, binding_for=_pipeline_binding))
-app.include_router(feedback.router)
-app.include_router(description.router)
+app.include_router(public.router, tags=["Server"])
+app.include_router(public.authenticated_router, tags=["Server"])
+app.include_router(auth.router, tags=["Sign-in"])
+app.include_router(auth.authenticated_router, tags=["Sign-in"])
+app.include_router(auth.admin_router, tags=["Sign-in"])
+app.include_router(me.router, tags=["My account"])
+app.include_router(chatgpt.router, tags=["ChatGPT plan"])
+app.include_router(plugins.router, tags=["Plugins"])
+app.include_router(settings.router, tags=["Administration"])
+app.include_router(users.router, tags=["Users and groups"])
+app.include_router(history.router, tags=["History"])
+app.include_router(lineage.router, tags=["Lineage"])
+app.include_router(render.router, tags=["Drawing"])
+app.include_router(autonomous.router, tags=["Autonomous refinement"])
+app.include_router(pipeline_router(_pipeline_service, _current_user, binding_for=_pipeline_binding), tags=["Pipeline"])
+app.include_router(feedback.router, tags=["Unread words"])
+app.include_router(description.router, tags=["Descriptions"])
 
 
 def main() -> None:

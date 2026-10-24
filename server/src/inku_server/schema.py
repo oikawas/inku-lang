@@ -330,8 +330,16 @@ class AnchorPoint(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    position: Optional[Coord] = Field(default=None, exclude_if=lambda value: value is None)
-    at: Optional[AtRegion] = Field(default=None, exclude_if=lambda value: value is None)
+    position: Optional[Coord] = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="Point [x, y] in unit-canvas coordinates, each 0.0-1.0. Set exactly one of position or at.",
+    )
+    at: Optional[AtRegion] = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="Named placement region that is resolved to a point when the work is performed. Set exactly one of position or at.",
+    )
 
     @model_validator(mode="after")
     def _require_one_finite_placement(self) -> "AnchorPoint":
@@ -351,8 +359,8 @@ class AnchorPoint(BaseModel):
 class TouchingConstraints(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    dimensions_fixed: bool
-    direction_fixed: bool
+    dimensions_fixed: bool = Field(description="True when the dimensions of the touching object are fixed by the DDL.")
+    direction_fixed: bool = Field(description="True when the direction of the touching object is fixed by the DDL.")
 
 
 class Relation(BaseModel):
@@ -462,22 +470,25 @@ class Variation(BaseModel):
 
 class SourceInstructionOwner(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["source_instruction"]
-    instruction_index: int = Field(ge=0)
+    kind: Literal["source_instruction"] = Field(description='Always "source_instruction".')
+    instruction_index: int = Field(ge=0, description="Index of the source Score instruction. Zero or greater.")
 
 
 class MacroEmitOwner(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["macro_emit"]
-    source_instruction_index: int = Field(ge=0)
-    invocation_ordinal: int = Field(ge=0)
-    generated_ordinal: int = Field(ge=0)
+    kind: Literal["macro_emit"] = Field(description='Always "macro_emit".')
+    source_instruction_index: int = Field(ge=0, description="Index of the source instruction that invokes the Macro. Zero or greater.")
+    invocation_ordinal: int = Field(ge=0, description="Position of this invocation among the invocations of the same source. Zero or greater.")
+    generated_ordinal: int = Field(ge=0, description="Position of this instruction among those the invocation generates. Zero or greater.")
 
 
 class OrdinaryGroupOwner(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["ordinary_group"]
-    source_instruction_indices: list[Annotated[int, Field(ge=0)]] = Field(min_length=1)
+    kind: Literal["ordinary_group"] = Field(description='Always "ordinary_group".')
+    source_instruction_indices: list[Annotated[int, Field(ge=0)]] = Field(
+        min_length=1,
+        description="Indices of the source instructions in the group, unique and in source order. At least one.",
+    )
 
     @field_validator("source_instruction_indices")
     @classmethod
@@ -492,30 +503,30 @@ ScoreSourceOwner = SourceInstructionOwner | MacroEmitOwner | OrdinaryGroupOwner
 
 class ExplicitCountOrigin(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["explicit"]
+    kind: Literal["explicit"] = Field(description='Always "explicit": the count was written in the DDL.')
 
 
 class OmittedDefaultCountOrigin(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["omitted_default"]
+    kind: Literal["omitted_default"] = Field(description='Always "omitted_default": the count was not written and the default was used.')
 
 
 class TemplateSingleCountOrigin(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["template_single"]
+    kind: Literal["template_single"] = Field(description='Always "template_single": a single instance from a template.')
 
 
 class OmittedRegionExtentCountOrigin(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["omitted_region_extent"]
-    reference_extent: float = Field(gt=0.0)
+    kind: Literal["omitted_region_extent"] = Field(description='Always "omitted_region_extent": the count was derived from the region extent.')
+    reference_extent: float = Field(gt=0.0, description="Extent of the region that the count was derived from. Positive.")
 
 
 class OmittedBalancedGroupCountOrigin(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["omitted_balanced_group"]
-    reference_extents: list[Annotated[float, Field(gt=0.0)]]
-    explicit_counts: list[Optional[Annotated[int, Field(gt=0)]]]
+    kind: Literal["omitted_balanced_group"] = Field(description='Always "omitted_balanced_group": the counts were balanced across the group.')
+    reference_extents: list[Annotated[float, Field(gt=0.0)]] = Field(description="Reference extent of each group member used to balance the counts. Each positive.")
+    explicit_counts: list[Optional[Annotated[int, Field(gt=0)]]] = Field(description="Count written for each group member, or null where the count was omitted. Each positive when set.")
 
 
 CountOrigin = (
@@ -530,49 +541,49 @@ InstanceOrdinalScheme = Literal["source_member_then_instance_v1"]
 
 class PlaceRecipe(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["place"]
+    kind: Literal["place"] = Field(description='Always "place".')
 
 
 class HorizontalLineRecipe(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["horizontal_line"]
-    cell_width: float = Field(gt=0.0)
+    kind: Literal["horizontal_line"] = Field(description='Always "horizontal_line".')
+    cell_width: float = Field(gt=0.0, description="Horizontal spacing between successive copies, in canvas-short-edge units. Positive.")
 
 
 class VerticalLineRecipe(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["vertical_line"]
-    cell_height: float = Field(gt=0.0)
+    kind: Literal["vertical_line"] = Field(description='Always "vertical_line".')
+    cell_height: float = Field(gt=0.0, description="Vertical spacing between successive copies, in canvas-short-edge units. Positive.")
 
 
 class DiagonalLineRecipe(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["diagonal_line"]
-    step: Coord
+    kind: Literal["diagonal_line"] = Field(description='Always "diagonal_line".')
+    step: Coord = Field(description="Offset [x, y] from one copy to the next along the diagonal, in canvas-short-edge units.")
 
 
 class GridRecipe(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["grid"]
-    columns: int = Field(gt=0)
-    rows: int = Field(gt=0)
-    filled_count: int = Field(gt=0)
-    cell_width: float = Field(gt=0.0)
-    cell_height: float = Field(gt=0.0)
-    centroid: Coord
-    translate_to_numeric_anchor: bool
+    kind: Literal["grid"] = Field(description='Always "grid".')
+    columns: int = Field(gt=0, description="Number of columns in the grid. Positive.")
+    rows: int = Field(gt=0, description="Number of rows in the grid. Positive.")
+    filled_count: int = Field(gt=0, description="Number of grid cells that receive a copy. Positive.")
+    cell_width: float = Field(gt=0.0, description="Width of one grid cell, in canvas-short-edge units. Positive.")
+    cell_height: float = Field(gt=0.0, description="Height of one grid cell, in canvas-short-edge units. Positive.")
+    centroid: Coord = Field(description="Centroid [x, y] of the filled cells, in unit-canvas coordinates.")
+    translate_to_numeric_anchor: bool = Field(description="True when the grid is translated so that its centroid lands on the numeric anchor.")
 
 
 class ScatterUniformRecipe(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["scatter_uniform_with_centroid_translation"]
+    kind: Literal["scatter_uniform_with_centroid_translation"] = Field(description='Always "scatter_uniform_with_centroid_translation".')
 
 
 # Performance cuts cells the size of the largest performed copy and gives each
 # copy its own cell (Score 0.19.0). Only a cells placement group uses it.
 class CellsRecipe(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["cells"]
+    kind: Literal["cells"] = Field(description='Always "cells".')
 
 
 ResolvedPlacementRecipe = (
@@ -588,25 +599,25 @@ ResolvedPlacementRecipe = (
 
 class NumericPlacementAnchor(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["numeric"]
-    point: Coord
+    kind: Literal["numeric"] = Field(description='Always "numeric".')
+    point: Coord = Field(description="Anchor point [x, y] written in the DDL, in unit-canvas coordinates.")
 
 
 class GeneratedNumericPlacementAnchor(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["generated_numeric"]
-    point: Coord
+    kind: Literal["generated_numeric"] = Field(description='Always "generated_numeric".')
+    point: Coord = Field(description="Anchor point [x, y] generated by the compiler, in unit-canvas coordinates.")
 
 
 class NamedPlacementAnchor(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["named"]
-    region: tuple[float, float, float, float]
+    kind: Literal["named"] = Field(description='Always "named".')
+    region: tuple[float, float, float, float] = Field(description="Named region [x0, y0, x1, y1] in unit-canvas coordinates.")
 
 
 class EnclosingGroupPlacementAnchor(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["enclosing_group"]
+    kind: Literal["enclosing_group"] = Field(description='Always "enclosing_group".')
 
 
 ResolvedPlacementAnchor = (
@@ -619,13 +630,13 @@ ResolvedPlacementAnchor = (
 
 class ResolvedArrangement(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    owner: ScoreSourceOwner
-    first_instance_ordinal: int = Field(ge=0)
-    count_origin: CountOrigin
-    domain: Coord
-    anchor: ResolvedPlacementAnchor
-    recipe: ResolvedPlacementRecipe
-    ordinal_scheme: InstanceOrdinalScheme
+    owner: ScoreSourceOwner = Field(description="Source that owns this arrangement.")
+    first_instance_ordinal: int = Field(ge=0, description="Ordinal of the first instance. Zero or greater.")
+    count_origin: CountOrigin = Field(description="How the instance count was determined.")
+    domain: Coord = Field(description="Domain [x, y] over which the instances are laid out.")
+    anchor: ResolvedPlacementAnchor = Field(description="Anchor that the arrangement is placed around.")
+    recipe: ResolvedPlacementRecipe = Field(description="Recipe that positions each instance.")
+    ordinal_scheme: InstanceOrdinalScheme = Field(description="Scheme for numbering the instances. Currently always source_member_then_instance_v1.")
 
 
 class Arrangement(BaseModel):
@@ -781,7 +792,11 @@ class Arrangement(BaseModel):
     )
     # Absent while unset, like the Rust Score, so an arrangement without a
     # resolved recipe keeps its canonical bytes.
-    resolved: Optional[ResolvedArrangement] = Field(default=None, exclude_if=lambda value: value is None)
+    resolved: Optional[ResolvedArrangement] = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="Resolved arrangement, filled in when the Score is resolved. Absent when unset.",
+    )
 
 
 class Instruction(BaseModel):
@@ -1060,10 +1075,26 @@ class TransformGroup(BaseModel):
     start: int = Field(ge=0, description="変換する Score instruction 範囲の開始 index")
     end: int = Field(ge=0, description="変換する Score instruction 範囲の終端 exclusive index")
     rotation_degrees: float = Field(description="まとまり全体の回転角(度)。正=時計回り")
-    scale_x: float = Field(default=1.0, exclude_if=lambda value: value == 1.0)
-    scale_y: float = Field(default=1.0, exclude_if=lambda value: value == 1.0)
-    translate_x: float = Field(default=0.0, exclude_if=lambda value: value == 0.0)
-    translate_y: float = Field(default=0.0, exclude_if=lambda value: value == 0.0)
+    scale_x: float = Field(
+        default=1.0,
+        exclude_if=lambda value: value == 1.0,
+        description="Horizontal scale factor applied to the group. 1.0 means no scaling. Must be finite.",
+    )
+    scale_y: float = Field(
+        default=1.0,
+        exclude_if=lambda value: value == 1.0,
+        description="Vertical scale factor applied to the group. 1.0 means no scaling. Must be finite.",
+    )
+    translate_x: float = Field(
+        default=0.0,
+        exclude_if=lambda value: value == 0.0,
+        description="Horizontal translation applied to the group, in unit-canvas units. 0.0 means none. Must be finite.",
+    )
+    translate_y: float = Field(
+        default=0.0,
+        exclude_if=lambda value: value == 0.0,
+        description="Vertical translation applied to the group, in unit-canvas units. 0.0 means none. Must be finite.",
+    )
     fixed_position_indices: list[Annotated[int, Field(ge=0)]] = Field(
         default_factory=list,
         exclude_if=lambda value: not value,
@@ -1095,50 +1126,55 @@ class PlacementMember(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    start: int = Field(ge=0)
-    end: int = Field(ge=0)
+    start: int = Field(ge=0, description="Index of the first Score instruction of this member (inclusive).")
+    end: int = Field(ge=0, description="Index just past the last Score instruction of this member (exclusive).")
     anchor_indices: list[Annotated[int, Field(ge=0)]] = Field(
         default_factory=list,
         exclude_if=lambda value: not value,
+        description="Indices of the Score anchors that belong to this member.",
     )
     transform_group_indices: list[Annotated[int, Field(ge=0)]] = Field(
         default_factory=list,
         exclude_if=lambda value: not value,
+        description="Indices of the Score transform groups that belong to this member.",
     )
-    symbolic: Optional["SymbolicMember"] = None
+    symbolic: Optional["SymbolicMember"] = Field(
+        default=None,
+        description="Symbolic description of how many instances this member produces. Absent when not symbolic.",
+    )
 
 
 class SymbolicMember(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    owner: ScoreSourceOwner
-    kind: Literal["primitive", "macro", "ordinary_group"]
-    member_ordinal: int = Field(ge=0)
-    first_instance_ordinal: int = Field(ge=0)
-    instance_count: int = Field(gt=0)
-    count_origin: CountOrigin
+    owner: ScoreSourceOwner = Field(description="Source that owns this member.")
+    kind: Literal["primitive", "macro", "ordinary_group"] = Field(description="Kind of the member: primitive, macro or ordinary_group.")
+    member_ordinal: int = Field(ge=0, description="Position of this member within its group, starting at 0.")
+    first_instance_ordinal: int = Field(ge=0, description="Ordinal of the first instance this member produces. Zero or greater.")
+    instance_count: int = Field(gt=0, description="Number of instances this member produces. Positive.")
+    count_origin: CountOrigin = Field(description="How the instance count was determined.")
 
 
 class CoordinatedPlacementGroupOwner(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["coordinated_group"]
-    group_index: int = Field(ge=0)
+    kind: Literal["coordinated_group"] = Field(description='Always "coordinated_group".')
+    group_index: int = Field(ge=0, description="Index of the coordinated group that owns this placement. Zero or greater.")
 
 
 class ResolvedPlacementGroup(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    owner: CoordinatedPlacementGroupOwner
-    logical_count: int = Field(gt=0)
-    domain: Coord
-    anchor: ResolvedPlacementAnchor
-    recipe: ResolvedPlacementRecipe
-    ordinal_scheme: InstanceOrdinalScheme
+    owner: CoordinatedPlacementGroupOwner = Field(description="Coordinated group that owns this placement.")
+    logical_count: int = Field(gt=0, description="Number of logical instances the group places. Positive.")
+    domain: Coord = Field(description="Domain [x, y] over which the instances are laid out.")
+    anchor: ResolvedPlacementAnchor = Field(description="Anchor that the group is placed around.")
+    recipe: ResolvedPlacementRecipe = Field(description="Recipe that positions each instance.")
+    ordinal_scheme: InstanceOrdinalScheme = Field(description="Scheme for numbering the instances. Currently always source_member_then_instance_v1.")
 
 
 class CycleMembersV1(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    occurrence_count: int = Field(gt=0)
+    occurrence_count: int = Field(gt=0, description="Number of occurrences in the cycle. Must equal the resolved logical count of the group it belongs to.")
 
 
 class PlacementGroup(BaseModel):
@@ -1148,15 +1184,25 @@ class PlacementGroup(BaseModel):
 
     start: int = Field(ge=0, description="配置する Score instruction 範囲の開始 index")
     end: int = Field(ge=0, description="配置する Score instruction 範囲の終端 exclusive index")
-    layout: Literal["overlap", "horizontal_source_order", "scatter", "tile", "cells"]
+    layout: Literal["overlap", "horizontal_source_order", "scatter", "tile", "cells"] = Field(
+        description="How the group's members are laid out: overlap, horizontal_source_order, scatter, tile or cells."
+    )
     at: AtRegion = Field(description="群全体の中心を一度だけ解決する named 配置領域")
     members: list[PlacementMember] = Field(
         default_factory=list,
         exclude_if=lambda value: not value,
         description="Score 0.9 Macro body boundaries; absent retains the legacy drawable span",
     )
-    resolved: Optional[ResolvedPlacementGroup] = Field(default=None, exclude_if=lambda value: value is None)
-    cycle_members: Optional[CycleMembersV1] = Field(default=None, exclude_if=lambda value: value is None)
+    resolved: Optional[ResolvedPlacementGroup] = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="Resolved placement of the group, filled in when the Score is resolved. Absent when unset.",
+    )
+    cycle_members: Optional[CycleMembersV1] = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="Cycle record when the members repeat as a cycle. Absent otherwise.",
+    )
 
     @model_validator(mode="after")
     def _require_finite_ordered_region(self) -> "PlacementGroup":
@@ -1169,20 +1215,20 @@ class PlacementGroup(BaseModel):
 class RepetitionGroup(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    member: PlacementMember
-    ordinal_scheme: InstanceOrdinalScheme
+    member: PlacementMember = Field(description="The whole Macro member that is repeated.")
+    ordinal_scheme: InstanceOrdinalScheme = Field(description="Scheme for numbering the instances. Currently always source_member_then_instance_v1.")
 
 
 class CoordinatedFillGroupOwner(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["coordinated_group"]
-    group_index: int = Field(ge=0)
+    kind: Literal["coordinated_group"] = Field(description='Always "coordinated_group".')
+    group_index: int = Field(ge=0, description="Index of the coordinated group that owns this fill. Zero or greater.")
 
 
 class InstructionFillGroupOwner(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["instruction"]
-    source_instruction_index: int = Field(ge=0)
+    kind: Literal["instruction"] = Field(description='Always "instruction".')
+    source_instruction_index: int = Field(ge=0, description="Index of the Score instruction whose mark is filled. Zero or greater.")
 
 
 FillGroupOwner = CoordinatedFillGroupOwner | InstructionFillGroupOwner
@@ -1190,41 +1236,41 @@ FillGroupOwner = CoordinatedFillGroupOwner | InstructionFillGroupOwner
 
 class ScoreSourceSite(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    region_index: int = Field(ge=0)
-    clause_index: int = Field(ge=0)
+    region_index: int = Field(ge=0, description="Index of the DDL region that contains the source text. Zero or greater.")
+    clause_index: int = Field(ge=0, description="Index of the clause within that region. Zero or greater.")
 
 
 class OmittedCanvasTargetOwner(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["omitted_canvas"]
+    kind: Literal["omitted_canvas"] = Field(description='Always "omitted_canvas": the target was not written and defaults to the canvas.')
 
 
 class ExplicitCanvasTargetOwner(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["explicit_canvas"]
-    source: ScoreSourceSite
+    kind: Literal["explicit_canvas"] = Field(description='Always "explicit_canvas".')
+    source: ScoreSourceSite = Field(description="Location of the canvas target in the DDL source text.")
 
 
 class NamedTargetOwner(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["named"]
-    category: str
-    id: str
+    kind: Literal["named"] = Field(description='Always "named".')
+    category: str = Field(description="Category of the named target, as written in the DDL.")
+    id: str = Field(description="Identifier of the named target within its category.")
 
 
 class InlineShapeTargetOwner(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["inline_shape"]
-    source_instruction_index: int = Field(ge=0)
-    source: ScoreSourceSite
+    kind: Literal["inline_shape"] = Field(description='Always "inline_shape".')
+    source_instruction_index: int = Field(ge=0, description="Index of the Score instruction that defines the inline shape. Zero or greater.")
+    source: ScoreSourceSite = Field(description="Location of the inline shape in the DDL source text.")
 
 
 # A range the author wrote in numbers (Score 0.18.0); the range itself is the
 # rectangle's bounds.
 class NumericRangeTargetOwner(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["numeric_range"]
-    source: ScoreSourceSite
+    kind: Literal["numeric_range"] = Field(description='Always "numeric_range".')
+    source: ScoreSourceSite = Field(description="Location of the numeric range in the DDL source text.")
 
 
 FillTargetOwner = (
@@ -1238,60 +1284,60 @@ FillTargetOwner = (
 
 class BboxDimensions(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["bbox"]
-    width: float = Field(gt=0.0)
-    height: float = Field(gt=0.0)
+    kind: Literal["bbox"] = Field(description='Always "bbox".')
+    width: float = Field(gt=0.0, description="Width of the bounding box, in canvas-short-edge units. Positive.")
+    height: float = Field(gt=0.0, description="Height of the bounding box, in canvas-short-edge units. Positive.")
 
 
 class RegularTriangleDimensions(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["regular_triangle"]
-    side: float = Field(gt=0.0)
+    kind: Literal["regular_triangle"] = Field(description='Always "regular_triangle".')
+    side: float = Field(gt=0.0, description="Length of one side of the equilateral triangle, in canvas-short-edge units. Positive.")
 
 
 class PolygonDimensions(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["polygon"]
-    radius: float = Field(gt=0.0)
-    sides: int = Field(ge=5, le=8)
+    kind: Literal["polygon"] = Field(description='Always "polygon".')
+    radius: float = Field(gt=0.0, description="Radius of the polygon's circumscribed circle, in canvas-short-edge units. Positive.")
+    sides: int = Field(ge=5, le=8, description="Number of vertices of the regular polygon, from 5 to 8.")
 
 
 class LineDimensions(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["line"]
-    length: float = Field(gt=0.0)
+    kind: Literal["line"] = Field(description='Always "line".')
+    length: float = Field(gt=0.0, description="Length of the line, in canvas-short-edge units. Positive.")
 
 
 class CircleDimensions(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["circle"]
-    radius: float = Field(gt=0.0)
+    kind: Literal["circle"] = Field(description='Always "circle".')
+    radius: float = Field(gt=0.0, description="Radius of the circle, in canvas-short-edge units. Positive.")
 
 
 class ArcDimensions(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["arc"]
-    chord: float = Field(gt=0.0)
-    sagitta: float = Field(gt=0.0)
+    kind: Literal["arc"] = Field(description='Always "arc".')
+    chord: float = Field(gt=0.0, description="Length of the chord between the two ends of the arc, in canvas-short-edge units. Positive.")
+    sagitta: float = Field(gt=0.0, description="Distance from the chord to the top of the arc, measured perpendicular to the chord. Positive.")
 
 
 class PointDimensions(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["point"]
-    radius: float = Field(gt=0.0)
+    kind: Literal["point"] = Field(description='Always "point".')
+    radius: float = Field(gt=0.0, description="Radius of the point mark, in canvas-short-edge units. Positive.")
 
 
 class CenteredSizeDimensions(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["centered_size"]
-    width: float = Field(gt=0.0)
-    height: float = Field(gt=0.0)
+    kind: Literal["centered_size"] = Field(description='Always "centered_size".')
+    width: float = Field(gt=0.0, description="Width of the rectangle, in canvas-short-edge units. Positive.")
+    height: float = Field(gt=0.0, description="Height of the rectangle, in canvas-short-edge units. Positive.")
 
 
 class SquareDimensions(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["square"]
-    side: float = Field(gt=0.0)
+    kind: Literal["square"] = Field(description='Always "square".')
+    side: float = Field(gt=0.0, description="Length of one side of the square, in canvas-short-edge units. Positive.")
 
 
 ResolvedShapeDimensions = (
@@ -1309,20 +1355,20 @@ ResolvedShapeDimensions = (
 
 class NumericFillTargetAnchor(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["numeric"]
-    point: Coord
+    kind: Literal["numeric"] = Field(description='Always "numeric".')
+    point: Coord = Field(description="Anchor point [x, y] written in the DDL, in unit-canvas coordinates.")
 
 
 class GeneratedNumericFillTargetAnchor(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["generated_numeric"]
-    point: Coord
+    kind: Literal["generated_numeric"] = Field(description='Always "generated_numeric".')
+    point: Coord = Field(description="Anchor point [x, y] generated by the compiler, in unit-canvas coordinates.")
 
 
 class NamedFillTargetAnchor(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["named"]
-    region: tuple[float, float, float, float]
+    kind: Literal["named"] = Field(description='Always "named".')
+    region: tuple[float, float, float, float] = Field(description="Named region [x0, y0, x1, y1] of the fill target, in unit-canvas coordinates.")
 
 
 FillTargetAnchor = (
@@ -1332,19 +1378,19 @@ FillTargetAnchor = (
 
 class RectangleFillTargetGeometry(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["rectangle"]
-    bounds: tuple[float, float, float, float]
+    kind: Literal["rectangle"] = Field(description='Always "rectangle".')
+    bounds: tuple[float, float, float, float] = Field(description="Bounds [x0, y0, x1, y1] of the rectangle, in unit-canvas coordinates.")
 
 
 class ShapeFillTargetGeometry(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["shape"]
-    primitive: Primitive
-    dimensions: ResolvedShapeDimensions
-    arc_form: Optional[ArcForm] = None
-    anchor: FillTargetAnchor
-    rotation_degrees: Optional[float] = None
-    contour_variation: Optional[Variation] = None
+    kind: Literal["shape"] = Field(description='Always "shape".')
+    primitive: Primitive = Field(description="Primitive of the target shape.")
+    dimensions: ResolvedShapeDimensions = Field(description="Resolved dimensions of the target shape.")
+    arc_form: Optional[ArcForm] = Field(default=None, description="Arc form of the target when it is an arc. Null otherwise.")
+    anchor: FillTargetAnchor = Field(description="Anchor that the target shape is placed around.")
+    rotation_degrees: Optional[float] = Field(default=None, description="Rotation of the target shape in degrees. Null means no rotation.")
+    contour_variation: Optional[Variation] = Field(default=None, description="Variation applied to the outline of the target. Null means none.")
 
 
 FillTargetGeometry = RectangleFillTargetGeometry | ShapeFillTargetGeometry
@@ -1352,80 +1398,84 @@ FillTargetGeometry = RectangleFillTargetGeometry | ShapeFillTargetGeometry
 
 class FillTarget(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    owner: FillTargetOwner
-    geometry: FillTargetGeometry
-    reference_area: float = Field(gt=0.0)
+    owner: FillTargetOwner = Field(description="Source that defines the fill target.")
+    geometry: FillTargetGeometry = Field(description="Geometry of the fill target: a rectangle or a resolved shape.")
+    reference_area: float = Field(gt=0.0, description="Area of the target in canvas-short-edge units squared, used as the reference for the count. Positive.")
 
 
 class FillGroup(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    start: int = Field(ge=0)
-    end: int = Field(ge=0)
-    owner: FillGroupOwner
-    logical_count: int = Field(gt=0)
-    recipe: Literal["uniform_in_region"]
-    target: FillTarget
-    boundary: Literal["clip_to_target"]
-    ordinal_scheme: InstanceOrdinalScheme
-    members: list[PlacementMember]
-    cycle_members: Optional[CycleMembersV1] = Field(default=None, exclude_if=lambda value: value is None)
+    start: int = Field(ge=0, description="Index of the first Score instruction in the filled span (inclusive).")
+    end: int = Field(ge=0, description="Index just past the last Score instruction in the filled span (exclusive).")
+    owner: FillGroupOwner = Field(description="Source that owns this fill group.")
+    logical_count: int = Field(gt=0, description="Number of logical instances the fill places. Positive.")
+    recipe: Literal["uniform_in_region"] = Field(description='Always "uniform_in_region".')
+    target: FillTarget = Field(description="Region that the fill is spread over.")
+    boundary: Literal["clip_to_target"] = Field(description='Always "clip_to_target": marks are clipped to the target region.')
+    ordinal_scheme: InstanceOrdinalScheme = Field(description="Scheme for numbering the instances. Currently always source_member_then_instance_v1.")
+    members: list[PlacementMember] = Field(description="Atomic source members of the fill, in source order.")
+    cycle_members: Optional[CycleMembersV1] = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="Cycle record when the members repeat as a cycle. Absent otherwise.",
+    )
 
 
 class ResourceDemand(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    logical_objects: int = Field(ge=0)
-    primitive_marks: int = Field(ge=0)
-    object_templates: int = Field(ge=0)
-    maximum_per_template_primitive_marks: int = Field(ge=0)
-    maximum_resolved_count: int = Field(ge=0)
-    template_nodes: int = Field(ge=0)
-    anchor_instances: int = Field(ge=0)
-    transform_instances: int = Field(ge=0)
-    placement_instances: int = Field(ge=0)
-    fill_instances: int = Field(ge=0)
+    logical_objects: int = Field(ge=0, description="Number of logical objects in the Score. Zero or greater.")
+    primitive_marks: int = Field(ge=0, description="Number of primitive marks drawn. Zero or greater.")
+    object_templates: int = Field(ge=0, description="Number of object templates. Zero or greater.")
+    maximum_per_template_primitive_marks: int = Field(ge=0, description="Largest number of primitive marks that a single template produces, counting all outer repetitions. Zero or greater.")
+    maximum_resolved_count: int = Field(ge=0, description="Largest resolved count of any single arrangement or group. Zero or greater.")
+    template_nodes: int = Field(ge=0, description="Number of template nodes. Zero or greater.")
+    anchor_instances: int = Field(ge=0, description="Number of anchor nodes in the source, before repetition. Zero or greater.")
+    transform_instances: int = Field(ge=0, description="Number of transform nodes in the source, before repetition. Zero or greater.")
+    placement_instances: int = Field(ge=0, description="Number of placement nodes in the source, before repetition. Zero or greater.")
+    fill_instances: int = Field(ge=0, description="Number of fill nodes in the source, before repetition. Zero or greater.")
 
 
 class ResourceBudget(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    maximum: ResourceDemand
+    maximum: ResourceDemand = Field(description="Maximum resource demand allowed under this budget.")
 
 
 class HardResourcePolicy(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    identity: str
-    budget: ResourceBudget
+    identity: str = Field(description="Identifier of this hard policy. Must be a non-empty string.")
+    budget: ResourceBudget = Field(description="Hard budget: the maximum resource demand a Score may declare.")
 
 
 class ScoreResourcePolicy(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    accounting_id: Literal["inku.resource-accounting.v1"]
-    hard_policy: HardResourcePolicy
-    operational_budget: ResourceBudget
+    accounting_id: Literal["inku.resource-accounting.v1"] = Field(description='Accounting scheme identifier. Always "inku.resource-accounting.v1".')
+    hard_policy: HardResourcePolicy = Field(description="Hard policy captured with the Score.")
+    operational_budget: ResourceBudget = Field(description="Operational budget for the performance.")
 
 
 class MirrorInstructionRef(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["instruction"]
-    instruction_index: int = Field(ge=0)
+    kind: Literal["instruction"] = Field(description='Always "instruction".')
+    instruction_index: int = Field(ge=0, description="Index of the referenced Score instruction. Zero or greater.")
 
 
 class MirrorRepetitionGroupRef(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["repetition_group"]
-    repetition_group_index: int = Field(ge=0)
+    kind: Literal["repetition_group"] = Field(description='Always "repetition_group".')
+    repetition_group_index: int = Field(ge=0, description="Index into the Score's repetition_groups. Zero or greater.")
 
 
 class MirrorPlacementMemberRef(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["placement_member"]
-    placement_group_index: int = Field(ge=0)
-    member_index: int = Field(ge=0)
+    kind: Literal["placement_member"] = Field(description='Always "placement_member".')
+    placement_group_index: int = Field(ge=0, description="Index into the Score's placement_groups. Zero or greater.")
+    member_index: int = Field(ge=0, description="Index of the member within that placement group's members. Zero or greater.")
 
 
 class MirrorPlacementGroupRef(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["placement_group"]
-    placement_group_index: int = Field(ge=0)
+    kind: Literal["placement_group"] = Field(description='Always "placement_group".')
+    placement_group_index: int = Field(ge=0, description="Index into the Score's placement_groups. Zero or greater.")
 
 
 MirrorBodyRef = Annotated[
@@ -1436,8 +1486,12 @@ MirrorBodyRef = Annotated[
 
 class MirrorFollowerFactsV1(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    dimensions_fixed: bool
-    direction_degrees: Optional[float] = Field(default=None, exclude_if=lambda value: value is None)
+    dimensions_fixed: bool = Field(description="True when the follower's dimensions are fixed and must not be changed by the mirror.")
+    direction_degrees: Optional[float] = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="Direction of the follower in degrees, when the relation fixes one. Omitted otherwise. Must be finite.",
+    )
 
     @field_validator("direction_degrees")
     @classmethod
@@ -1449,15 +1503,18 @@ class MirrorFollowerFactsV1(BaseModel):
 
 class MirrorRelationV1(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    target: MirrorBodyRef
-    follower: MirrorBodyRef
-    follower_facts: MirrorFollowerFactsV1
+    target: MirrorBodyRef = Field(description="The body that is mirrored.")
+    follower: MirrorBodyRef = Field(description="The body that is drawn as the mirror image of the target.")
+    follower_facts: MirrorFollowerFactsV1 = Field(description="Facts about the follower that the renderer must keep.")
 
 
 class Score(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    version: ScoreVersion = "0.9.0"
+    version: ScoreVersion = Field(
+        default="0.9.0",
+        description="Score format version. Governs which fields and values are allowed.",
+    )
     canvas: Canvas = Field(
         default="square",
         description=(
@@ -1480,7 +1537,9 @@ class Score(BaseModel):
             "群れ、輪郭密度へ抽象化した描画パラメータ。目鼻口・四肢・耳・尻尾などの具象部品は禁止"
         ),
     )
-    instructions: list[Instruction]
+    instructions: list[Instruction] = Field(
+        description="Drawing instructions, in drawing order. Each one is a single mark or group of marks.",
+    )
     anchors: list["AnchorPoint"] = Field(
         default_factory=list,
         exclude_if=lambda value: not value,

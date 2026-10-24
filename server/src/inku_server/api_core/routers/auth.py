@@ -41,12 +41,12 @@ _login_rate_limiter = SlidingWindowRateLimiter(
 
 
 class LoginBody(BaseModel):
-    username: str = Field(..., min_length=1, max_length=320)
-    password: str = Field(..., min_length=1, max_length=1024)
+    username: str = Field(..., min_length=1, max_length=320, description="Username of the account to sign in to, 1 to 320 characters.")
+    password: str = Field(..., min_length=1, max_length=1024, description="Password of that account, 1 to 1,024 characters.")
 
 
 class LoginResponse(BaseModel):
-    user: UserAccountItem
+    user: UserAccountItem = Field(..., description="The account that signed in.")
 
 
 def _set_session_cookie(response: Response, token: str) -> None:
@@ -65,18 +65,33 @@ def _clear_session_cookie(response: Response) -> None:
     response.delete_cookie(_SESSION_COOKIE_NAME, path="/", samesite="lax")
 
 
-@authenticated_router.get("/api/auth/config")
+@authenticated_router.get("/api/auth/config", summary="Get sign-in method settings")
 def api_auth_config() -> dict:
+    """Return the stored sign-in method settings, `google_enabled` and `local_enabled`.
+
+    Requires a signed-in user.
+    """
     return _db.get_auth_settings()
 
 
 class AuthSettingsBody(BaseModel):
-    google_enabled: bool
-    local_enabled: bool
+    google_enabled: bool = Field(
+        ...,
+        description="Stored switch for Google sign-in. The server does not sign anyone in through it yet.",
+    )
+    local_enabled: bool = Field(
+        ...,
+        description="Whether username and password sign-in is enabled. Must be true; false is rejected with 409.",
+    )
 
 
-@admin_router.put("/api/auth/config")
+@admin_router.put("/api/auth/config", summary="Update sign-in method settings")
 def api_auth_config_update(body: AuthSettingsBody) -> dict:
+    """Store which sign-in methods are enabled. Requires an administrator.
+
+    Returns 409 when `local_enabled` is false, because local sign-in is the only method the server
+    can use to sign anyone in.
+    """
     # Local sign-in is the only way in this server implements: the Google
     # switch is stored, but nothing signs anyone in through it. Turning local
     # off therefore locked out every account, and `inku-admin reset-password`
@@ -89,8 +104,14 @@ def api_auth_config_update(body: AuthSettingsBody) -> dict:
     return _db.update_auth_settings(body.google_enabled, body.local_enabled)
 
 
-@router.post("/api/auth/login", response_model=LoginResponse)
+@router.post("/api/auth/login", response_model=LoginResponse, summary="Sign in with username and password")
 def api_auth_login(body: LoginBody, response: Response, request: Request) -> LoginResponse:
+    """Check a username and password, start a session and set its session cookie.
+
+    Returns the signed-in account. Returns 403 when local sign-in is disabled, 429 with a
+    `Retry-After` header after too many attempts from one client for one username, and 401 when
+    the username or password is wrong. This route needs no session.
+    """
     auth_config = _db.get_auth_settings()
     if not auth_config.get("local_enabled", True):
         raise HTTPException(status_code=403, detail="Local authentication is disabled")
@@ -112,8 +133,14 @@ def api_auth_login(body: LoginBody, response: Response, request: Request) -> Log
     return LoginResponse(user=UserAccountItem(**user))
 
 
-@router.post("/api/auth/logout")
+@router.post("/api/auth/logout", summary="Sign out of the current session")
 def api_auth_logout(response: Response, token: str = Depends(_session_token)) -> dict[str, bool]:
+    """End the current session and clear its session cookie.
+
+    Also stops the signed-in user's pending ChatGPT connection attempts and cancels their
+    ChatGPT work. An unknown or expired token is accepted. Returns 401 when no session token is sent,
+    and `{"ok": true}` otherwise.
+    """
     actor = _db.get_session_user(token)
     if actor is None and token == _SINGLE_USER_TOKEN:
         actor = _db.single_user_account()

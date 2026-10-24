@@ -16,10 +16,6 @@
 
 inku-cliの引数でhelpの無かった41個とコマンド1つにhelpを書き、`cli/README.md` のhelp節を作り直した。manual（日英）の `cli-reference.md` に、載っていなかったコマンド3つ（`ddl-export`・`export-card`・`refine generate`）と引数40種類を足した。今あるhelp・README・manual・AI向けリファレンスをコードと照らし、誤りを直した。主なもの：`inspect` はモデルを順に回す（並列ではない）、`--stage1-provider` はサーバーに送らない、`--include-thinking` は常にnull、`plugin list` は署名した利用者なら使える、`export-card -o` は末尾が `/` か既存のディレクトリのときだけその中に書く、render limitsの現行の4つは作品に効き旧い5つは数を書き換えない、`review evaluate` の項目と要るAPIキー、`history state` の鍵は `newest_at`・`newest_id`。コードは変えていない。
 
-### 2026-10-24 — リーダーが利用者をユーザーグループから外せた穴を塞いだ
-
-管理者でないリーダーが `PATCH /api/users/{user_id}` に `"group_id": null` を送ると、route の判定を通り抜け、自分のユーザーグループの利用者をグループの無い状態にできた（APIリファレンスの確かめで見つけた）。`group_id` が送られたときは、nullも含めて、自分のグループ以外を403で断る。管理者は今までどおりnullでグループを外せる。
-
 ### 2026-10-24 — inku-cliで画像から描く
 
 `inku-cli paint --image PATH` で、Webの画像タブと同じAPIを同じ順に呼んで画像から描けるようにした。`--provenance` / `--provenance-file` で来歴を併記し、`--vision-model` でDDLを書くVisionモデルを選ぶ（既定はCLIのVision設定）。`--save-history` を付けたときだけ作品として履歴のDBへ追加し、付けなければpipelineへ保存しないと伝える。記述・`--input-mode`・写生・`--wild`・描画モデル・`--include-thinking` との併用は断る。中断したときはrunを止める。Serverは変えていない。
@@ -284,6 +280,12 @@ macOSの`dh1`・`rh3`と正準JSON、指示言語の判定、記述ラベルの�
 Anthropicの対象Claudeモデルは通常描画とVisionでも思考用8,192 tokenを出力枠に加え、pipeline応答が `max_tokens` で切れたときは内容が読めても拒否して診断を残す。
 
 保存作品からランダムまたはVisionの自律推敲を開始できる。世代数、色・配置の対象、Wildを指定し、直前の作品を親として各世代を保存する。途中の世代は系譜専用、最終世代は通常の作品一覧にも表示する。Visionは作品画像への限定された助言を使い、観察と次の方向を表示する。画像の送信はこの専用助言requestに限り、既存の接続・ChatGPTプランのsession pinを保つ。
+
+## v2.15.244（2026-10-24 / Build1320）
+
+### 2026-10-24 — リーダーが利用者をユーザーグループから外せた穴を塞いだ
+
+管理者でないリーダーが `PATCH /api/users/{user_id}` に `"group_id": null` を送ると、route の判定を通り抜け、自分のユーザーグループの利用者をグループの無い状態にできた（APIリファレンスの確かめで見つけた）。`group_id` が送られたときは、nullも含めて、自分のグループ以外を403で断る。管理者は今までどおりnullでグループを外せる。
 
 ## v2.15.243（2026-10-24 / Build1319）
 

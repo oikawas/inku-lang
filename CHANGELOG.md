@@ -16,10 +16,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 The 41 inku-cli arguments and the one command that had no help now have it, and the help block of `cli/README.md` is regenerated. The manual's `cli-reference.md` (Japanese and English) now covers the three commands it did not name (`ddl-export`, `export-card`, `refine generate`) and 40 flags. The existing help, README, manual and AI reference were checked against the code and corrected. Among the corrections: `inspect` runs the models one after another, not in parallel; `--stage1-provider` is not sent to the server; `--include-thinking` always comes back null; `plugin list` needs only a signed-in user; `export-card -o` writes into a directory only for a path ending in `/` or an existing directory; the four current render limits are enforced on the work while the five legacy ones do not rewrite counts; what `review evaluate` scores and which API key it needs; and the `history state` keys are `newest_at` and `newest_id`. No code changed.
 
-### 2026-10-24 — A leader can no longer take a member out of their user group
-
-A leader who is not an administrator could send `"group_id": null` to `PATCH /api/users/{user_id}`, pass the route's check, and leave a member of their own user group without one (found while checking the API reference). When `group_id` is sent, any value other than the leader's own group, null included, is now refused with 403. An administrator can still clear a group with null.
-
 ### 2026-10-24 — inku-cli draws from an image
 
 `inku-cli paint --image PATH` draws from an image through the same API calls, in the same order, as the web image tab. `--provenance` / `--provenance-file` give the source note beside it, and `--vision-model` chooses the Vision model that writes the DDL (defaulting to the CLI Vision setting). Only with `--save-history` is the work added to the history database; without it the CLI tells the pipeline not to save. The description, `--input-mode`, the sketch, `--wild`, the drawing model and `--include-thinking` are refused with it. An interrupted run is stopped. The server is unchanged.
@@ -284,6 +280,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.244 (2026-10-24 / Build1320)
+
+### 2026-10-24 — A leader can no longer take a member out of their user group
+
+A leader who is not an administrator could send `"group_id": null` to `PATCH /api/users/{user_id}`, pass the route's check, and leave a member of their own user group without one (found while checking the API reference). When `group_id` is sent, any value other than the leader's own group, null included, is now refused with 403. An administrator can still clear a group with null.
 
 ## v2.15.243 (2026-10-24 / Build1319)
 

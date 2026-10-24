@@ -4354,9 +4354,16 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
         default="paint",
         help="paint: a natural-language description through Stage 1; ddl: normalized DDL directly through Stage 2/render",
     )
-    parser.add_argument("--stage1-provider", choices=PROVIDERS)
-    parser.add_argument("--stage1-model")
-    parser.add_argument("--history-input")
+    parser.add_argument(
+        "--stage1-provider",
+        choices=PROVIDERS,
+        help="provider shown in the run summary only; it is not sent. Name the provider inside --stage1-model as provider:model",
+    )
+    parser.add_argument("--stage1-model", help="model for both stages; default: the model saved by models")
+    parser.add_argument(
+        "--history-input",
+        help="input text recorded for this work in history when it is saved, in place of the description; the description still draws the work. In batch, the same text is used for every line",
+    )
     parser.add_argument("--catalog-id", help="color catalog id (legacy alias)")
     parser.add_argument("--color-catalog", help="server color catalog id for renderer and benchmark tracing")
     parser.add_argument("--canvas-aspect", choices=CANVAS_ASPECTS, help="canvas aspect id for paint, compose, and history")
@@ -4399,16 +4406,33 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
         choices=["fixed", "auto", "random"],
         help="how the color catalog is chosen: fixed (use --color-catalog), auto (the server reads the description and picks), random (draw one other than --color-catalog)",
     )
-    parser.add_argument("--instruction-lang", default="auto", choices=["auto", "ja", "en"])
-    parser.add_argument("--ui-lang")
-    parser.add_argument("--include-thinking", action="store_true")
-    parser.add_argument("--save-history", action="store_true", help="add the drawing to the server's history database as a work; without it nothing is saved")
-    parser.add_argument("--save-artifacts", action=argparse.BooleanOptionalAction, default=None)
+    parser.add_argument(
+        "--instruction-lang",
+        default="auto",
+        choices=["auto", "ja", "en"],
+        help="language of the instructions (normalized DDL); auto follows the language of the description",
+    )
+    parser.add_argument(
+        "--ui-lang",
+        help="your interface language, such as ja or en; used when --instruction-lang is auto and the description does not decide it, and saved with the work",
+    )
+    parser.add_argument("--include-thinking", action="store_true", help="accepted for compatibility; the server always returns thinking as null")
+    parser.add_argument("--save-history", action="store_true", help="add the drawing to the server's history database as a work; without it no work is saved (a paint still counts toward the generation counter)")
+    parser.add_argument(
+        "--save-artifacts",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="write the output files (SVG, JSON, PNG) to server storage when the work is saved; --no-save-artifacts writes none. Omitted, the server's default (to write them) applies",
+    )
     parser.add_argument("--no-progress", action="store_true", help="disable elapsed-time progress animation")
     if batch:
-        parser.add_argument("--continue-on-error", action="store_true")
+        parser.add_argument(
+            "--continue-on-error",
+            action="store_true",
+            help="keep going when a line fails and list the failures in the summary; without it, the batch stops at the first failure",
+        )
         parser.add_argument("--summary-json", help="write batch summary JSON to this path (default: OUT_DIR/analysis-summary.json)")
-        parser.add_argument("--composition-count", type=int, default=1, help="draw N works with different placements per description")
+        parser.add_argument("--composition-count", type=int, default=1, help="draw N works per description with placement seeds 0 to N-1; overrides --composition-seed when N > 1")
     else:
         parser.add_argument("--full-json", action="store_true", help="print the full paint response")
 
@@ -4418,8 +4442,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     login = subparsers.add_parser("login", help="log in and store an API session")
     _add_common_server_args(login)
-    login.add_argument("--username", "-u", required=True)
-    login.add_argument("--password", "-p")
+    login.add_argument("--username", "-u", required=True, help="account name to log in as")
+    login.add_argument("--password", "-p", help="account password; if omitted, it is asked for without echoing")
     login.set_defaults(func=command_login)
 
     logout = subparsers.add_parser("logout", help="log out and clear the stored session")
@@ -4450,9 +4474,14 @@ def build_parser() -> argparse.ArgumentParser:
     contact_sheet = subparsers.add_parser("contact-sheet", help="create a contact sheet from PNG files in a directory")
     contact_sheet.add_argument("input_dir", help="directory containing PNG outputs")
     contact_sheet.add_argument("--output", "-o", help="output PNG path (default: INPUT_DIR/contact-sheet.png)")
-    contact_sheet.add_argument("--columns", type=int, default=5)
-    contact_sheet.add_argument("--thumb-size", type=int, default=220)
-    contact_sheet.add_argument("--order", choices=["name", "similarity"], default="name")
+    contact_sheet.add_argument("--columns", type=int, default=5, help="thumbnails per row, at least 1 (default: 5)")
+    contact_sheet.add_argument("--thumb-size", type=int, default=220, help="width and height of each thumbnail box in pixels, at least 64 (default: 220)")
+    contact_sheet.add_argument(
+        "--order",
+        choices=["name", "similarity"],
+        default="name",
+        help="name sorts by file name; similarity puts next the picture whose composition is nearest to the last one (default: name)",
+    )
     contact_sheet.set_defaults(func=command_contact_sheet)
 
     rasterize = subparsers.add_parser("rasterize", help="rasterize a directory of SVG files to PNG")
@@ -4492,24 +4521,28 @@ def build_parser() -> argparse.ArgumentParser:
     analyze.add_argument("--diversity", action="store_true", help="compute diversity metrics and write diversity-summary.json")
     analyze.add_argument("--census", action="store_true", help="report frequent mechanical motif signatures with thumbnail examples")
     analyze.add_argument("--history", action="store_true", help="run --census over the current user history instead of a directory")
-    analyze.add_argument("--output", "-o", help="summary JSON path (default: INPUT_DIR/diversity-summary.json)")
-    analyze.add_argument("--replay", type=int, default=0, help="render each sampled score 2N times: N varying composition_seed (composition_distance) and N varying render_seed (performance_distance), each pinning the other seed")
+    analyze.add_argument(
+        "--output",
+        "-o",
+        help="summary JSON path (default: INPUT_DIR/diversity-summary.json with --diversity, INPUT_DIR/motif-census.json with --census; with --census --history it is written only when given)",
+    )
+    analyze.add_argument("--replay", type=int, default=0, help="render each sampled score 2N times (N must be at least 2; smaller values skip replay; needs a signed-in session): N varying composition_seed (composition_distance) and N varying render_seed (performance_distance), each pinning the other seed")
     analyze.add_argument("--replay-limit", type=int, default=5, help="maximum score artifacts to replay")
-    analyze.add_argument("--canvas-aspect", choices=CANVAS_ASPECTS, default="square")
+    analyze.add_argument("--canvas-aspect", choices=CANVAS_ASPECTS, default="square", help="canvas shape for the --replay renders (default: square)")
     analyze.add_argument("--catalog-id", help="color catalog id (legacy alias)")
     analyze.add_argument("--color-catalog", help="server color catalog id for replay rendering")
     analyze.set_defaults(func=command_analyze)
 
     ddl_compare = subparsers.add_parser("ddl-compare", help="compare normalized DDL artifacts side by side")
     ddl_compare.add_argument("input_dirs", nargs="+", help="two or more artifact directories")
-    ddl_compare.add_argument("--output", "-o")
+    ddl_compare.add_argument("--output", "-o", help="report JSON path (default: ddl-comparison.json in the current directory)")
     ddl_compare.set_defaults(func=command_ddl_compare)
 
     vision_review = subparsers.add_parser("vision-review", help="use the configured NIM vision model as a read-only visual mirror")
-    vision_review.add_argument("input_dir")
-    vision_review.add_argument("--vision-model", help="Vision model (defaults to the CLI Vision setting)")
+    vision_review.add_argument("input_dir", help="directory of PNG outputs to review; the score JSON beside each PNG supplies its original description")
+    vision_review.add_argument("--vision-model", help="Vision model (defaults to the CLI Vision setting, or meta/llama-3.2-90b-vision-instruct when that is unset; needs NVIDIA_API_KEY or NVIDIA_NIM_API_KEY)")
     vision_review.add_argument("--model", help="compatibility alias for --vision-model")
-    vision_review.add_argument("--output", "-o")
+    vision_review.add_argument("--output", "-o", help="summary JSON path (default: INPUT_DIR/vision-review-summary.json)")
     vision_review.set_defaults(func=command_vision_review)
 
     ddl_export = subparsers.add_parser(
@@ -4538,7 +4571,7 @@ def build_parser() -> argparse.ArgumentParser:
     render_score.add_argument("--prefix", help="output filename prefix")
     render_score.add_argument("--png", action="store_true", help="also render PNG output when --out-dir is set")
     render_score.add_argument("--svg-profile", choices=SVG_PROFILES, default="display", help="SVG output profile for saved files; editable targets SVG-native editors, compat is a filter-free flat vector fallback, live keeps editable's groups with the display appearance for performing the work in time")
-    render_score.add_argument("--canvas-aspect", default="square")
+    render_score.add_argument("--canvas-aspect", default="square", help="canvas shape id, such as square, a4 or wide (default: square)")
     render_score.add_argument("--render-seed", type=int, help="renderer performance seed for reproducible replay")
     render_score.add_argument("--composition-seed", type=int, help="seed for where the marks are placed; without it the placement follows --render-seed")
     render_score.add_argument("--catalog-id", help="color catalog id (legacy alias)")
@@ -4599,7 +4632,7 @@ def build_parser() -> argparse.ArgumentParser:
     render_local.add_argument("--render-seed", type=int, help="renderer performance seed; inherits the work's seed")
     render_local.add_argument("--composition-seed", type=int, help="placement seed; defaults to following the performance seed")
     render_local.add_argument("--canvas-aspect", help="core canvas registry id; inherits the work's performed aspect, otherwise square")
-    render_local.add_argument("--canvas-height", type=int, help="canvas height in pixels; inherits the saved SVG size, otherwise 1000")
+    render_local.add_argument("--canvas-height", type=int, help="canvas height in pixels; default: the selected checkout's base canvas height (1000 today); with --from-work-file and no --canvas-aspect, the saved SVG size is inherited unless this is given")
     render_local.add_argument("--svg-profile", choices=SVG_PROFILES, help="SVG output profile; inherits the work's profile, otherwise display")
     render_local.add_argument("--wild", action=argparse.BooleanOptionalAction, default=None, help="wild performance; inherits the work, otherwise disabled")
     render_local.add_argument("--limits", metavar="KEY=VALUE", nargs="+", help="replay caps: max_expanded_primitives, max_expanded_per_instruction, max_instructions, schema_count_max; bounded by the Score's resource policy")
@@ -4609,19 +4642,24 @@ def build_parser() -> argparse.ArgumentParser:
 
     demo = subparsers.add_parser("demo-instruction", help="generate one demo prompt from a seed phrase")
     _add_common_server_args(demo)
-    demo.add_argument("seed_phrase")
-    demo.add_argument("--model")
-    demo.add_argument("--instruction-lang", default="auto", choices=["auto", "ja", "en"])
-    demo.add_argument("--ui-lang")
+    demo.add_argument("seed_phrase", help="phrase the demo prompt is generated from")
+    demo.add_argument("--model", help="model that writes the demo prompt (default: the server's Stage 1 model)")
+    demo.add_argument(
+        "--instruction-lang",
+        default="auto",
+        choices=["auto", "ja", "en"],
+        help="language of the instruction: auto (from the seed phrase, else --ui-lang), ja or en (default: auto)",
+    )
+    demo.add_argument("--ui-lang", help="your interface language, such as ja or en; the fallback for auto when the seed phrase does not decide it")
     demo.set_defaults(func=command_demo_instruction)
 
     history = subparsers.add_parser("history", help="list history items")
     _add_common_server_args(history)
-    history.add_argument("--offset", type=int, default=0)
-    history.add_argument("--limit", type=int, default=20)
-    history.add_argument("--query", "-q")
-    history.add_argument("--starred", action="store_true")
-    history.add_argument("--for-revision", action="store_true")
+    history.add_argument("--offset", type=int, default=0, help="works to skip before the first one listed (default: 0)")
+    history.add_argument("--limit", type=int, default=20, help="works to list, from 1 to 100 (default: 20)")
+    history.add_argument("--query", "-q", help="text to search the works for, up to 200 characters")
+    history.add_argument("--starred", action="store_true", help="list only starred works")
+    history.add_argument("--for-revision", action="store_true", help="list only works marked for revision")
     history.add_argument(
         "--for-share",
         action="store_true",
@@ -4688,17 +4726,17 @@ def build_parser() -> argparse.ArgumentParser:
     unread_words = subparsers.add_parser("unread-words", help="report words the interpreter could not confidently read")
     _add_common_server_args(unread_words)
     unread_words.add_argument("--all", dest="all_users", action="store_true", help="admin-only aggregate across users")
-    unread_words.add_argument("--limit", type=int, default=100)
+    unread_words.add_argument("--limit", type=int, default=100, help="entries to list, from 1 to 500 (default: 100); with --all, up to 2000")
     unread_words.set_defaults(func=command_unread_words)
 
     history_export = subparsers.add_parser("history-export", help="export history items by hash for benchmark review")
     _add_common_server_args(history_export)
-    history_export.add_argument("hashes", nargs="*", help="individual 4+ character history hash suffixes")
+    history_export.add_argument("hashes", nargs="*", help="individual history hash suffixes (4 or more characters recommended; a shorter one is refused when it is ambiguous)")
     history_export.add_argument("--from", dest="from_hash", help="start hash suffix for an inclusive history-order range")
     history_export.add_argument("--to", dest="to_hash", help="end hash suffix for an inclusive history-order range")
     history_export.add_argument("--out-dir", "-o", required=True, help="output directory for contact sheet and JSON files")
-    history_export.add_argument("--columns", type=int, default=5)
-    history_export.add_argument("--thumb-size", type=int, default=220)
+    history_export.add_argument("--columns", type=int, default=5, help="thumbnails per row, at least 1 (default: 5)")
+    history_export.add_argument("--thumb-size", type=int, default=220, help="width and height of each thumbnail box in pixels, at least 64 (default: 220)")
     history_export.add_argument("--query", "-q", help="filter history before resolving hashes")
     history_export.add_argument("--starred", action="store_true", help="filter history to starred items before resolving hashes")
     history_export.add_argument(
@@ -4718,7 +4756,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="write one work as a shareable card: picture, headnote, seed and seal on one sheet",
     )
     _add_common_server_args(export_card)
-    export_card.add_argument("hash", help="4+ character history hash suffix of the work")
+    export_card.add_argument("hash", help="history hash suffix of the work (4 or more characters recommended; a shorter one is refused when it is ambiguous)")
     export_card.add_argument(
         "--out",
         "-o",
@@ -4743,12 +4781,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="call any public inku HTTP API endpoint with the stored session",
     )
     _add_common_server_args(api_command)
-    api_command.add_argument("method", type=str.upper, choices=["GET", "POST", "PUT", "PATCH", "DELETE"])
+    api_command.add_argument(
+        "method",
+        type=str.upper,
+        choices=["GET", "POST", "PUT", "PATCH", "DELETE"],
+        help="HTTP method: GET, POST, PUT, PATCH or DELETE (case does not matter)",
+    )
     api_command.add_argument("path", help="relative endpoint path, for example /api/lineage/NODE_ID")
     api_command.add_argument("--data", help="JSON request body")
     api_command.add_argument("--file", "-f", help="read JSON request body from a UTF-8 file, or '-'")
-    api_command.add_argument("--query", action="append", default=[], metavar="KEY=VALUE")
-    api_command.add_argument("--header", action="append", default=[], metavar="KEY=VALUE")
+    api_command.add_argument("--query", action="append", default=[], metavar="KEY=VALUE", help="query-string parameter as KEY=VALUE; repeat for more")
+    api_command.add_argument("--header", action="append", default=[], metavar="KEY=VALUE", help="request header as KEY=VALUE; repeat for more")
     api_command.add_argument("--no-auth", action="store_true", help="omit the stored session for public endpoints")
     api_command.add_argument("--output", "-o", help="write the raw response body to a file")
     api_command.set_defaults(func=command_api)
@@ -4784,7 +4827,7 @@ def build_parser() -> argparse.ArgumentParser:
     lineage_show = lineage_sub.add_parser("show", help="show lineage tree for a work")
     lineage_show.add_argument("item_id", help="history item ID or lineage node ID")
     lineage_show.add_argument("--depth", type=int, default=2, help="descendant search depth")
-    lineage_show.add_argument("--limit", type=int, default=200, help="max nodes to load")
+    lineage_show.add_argument("--limit", type=int, default=200, help="max lineage edges to load, counted outward from the work's node (default 200)")
     lineage_show.add_argument("--json", action="store_true", help="output raw JSON")
     
     lineage_promote = lineage_sub.add_parser("promote", help="promote a lineage-only node to regular history")
@@ -4798,7 +4841,7 @@ def build_parser() -> argparse.ArgumentParser:
     colophon.add_argument("target", help="history item ID or lineage node ID")
     colophon.add_argument("--vision-model", help="Vision reader model (defaults to CLI/server Vision setting)")
     colophon.add_argument("--model", help="compatibility alias for --vision-model")
-    colophon.add_argument("--language", choices=("ja", "en"), default="ja")
+    colophon.add_argument("--language", choices=("ja", "en"), default="ja", help="language of the colophon text: ja (default) or en")
     colophon.add_argument("--dry-run", action="store_true", help="generate and print without saving")
     colophon.add_argument("--json", action="store_true", help="print the complete response as JSON")
     colophon.add_argument("--output", "-o", help="also write the recitation body to a UTF-8 file")
@@ -4820,7 +4863,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     refine_perform = refine_sub.add_parser("perform", help="perform a refinement from an existing work")
     add_refine_perform_arguments(refine_perform)
-    refine_generate = refine_sub.add_parser("generate", help=argparse.SUPPRESS)
+    refine_generate = refine_sub.add_parser("generate", help="refine an existing work the same way as perform")
     add_refine_perform_arguments(refine_generate)
     # Keep the parser registered for compatibility but omit it from public help.
     refine_sub._choices_actions = [action for action in refine_sub._choices_actions if action.dest != "generate"]
@@ -4837,7 +4880,7 @@ def build_parser() -> argparse.ArgumentParser:
     refine_save.set_defaults(func=command_refine)
 
     # inspect
-    inspect_cmd = subparsers.add_parser("inspect", help="parallel model inspection comparison")
+    inspect_cmd = subparsers.add_parser("inspect", help="run several models one after another on the same description and compare their DDL and drawings")
     _add_common_server_args(inspect_cmd)
     inspect_cmd.add_argument("text", help="input text to translate and draw")
     inspect_cmd.add_argument("--models", required=True, help="comma-separated list of models to inspect")
@@ -4852,7 +4895,7 @@ def build_parser() -> argparse.ArgumentParser:
     
     review_eval = review_sub.add_parser("evaluate", help="evaluate drawing visual quality via Vision NIM")
     review_eval.add_argument("png_file", help="path to PNG image file of the drawing")
-    review_eval.add_argument("--vision-model", help="Vision model (defaults to the CLI Vision setting)")
+    review_eval.add_argument("--vision-model", help="Vision model (defaults to the CLI Vision setting, or nvidia/neva-22b when that is unset; needs NVIDIA_API_KEY or NVIDIA_NIM_API_KEY)")
     review_eval.add_argument("--model", help="compatibility alias for --vision-model")
     review_eval.add_argument("--prompt", help="override vision review prompt")
     
@@ -4953,8 +4996,8 @@ def build_parser() -> argparse.ArgumentParser:
     config_show = config_sub.add_parser("show", help="show current system configurations")
 
     config_update = config_sub.add_parser("update", help="update system configurations")
-    config_update.add_argument("--google-auth", choices=("true", "false"), help="enable/disable Google auth")
-    config_update.add_argument("--local-auth", choices=("true", "false"), help="enable/disable local auth")
+    config_update.add_argument("--google-auth", choices=("true", "false"), help="store the Google sign-in switch; the server does not sign anyone in through it yet")
+    config_update.add_argument("--local-auth", choices=("true", "false"), help="local sign-in cannot be turned off; only true is accepted (false is refused with 409)")
     config_update.add_argument("--backup-interval", type=int, help="DB backup interval in days")
     config_update.add_argument("--backup-generations", type=int, help="DB backup retention generations")
     config_update.add_argument("--log-retention-days", type=int, help="log retention days")
@@ -4965,14 +5008,14 @@ def build_parser() -> argparse.ArgumentParser:
     limits_group = config_update.add_argument_group(
         "render limits",
         "Resource ceilings for the shared compiler, recorded on each work. "
-        "The current pipeline uses primitive, per-template, template and resolved-count "
-        "ceilings; the remaining settings are retained for older works. "
-        "These values are not injected into both model prompts or used to rewrite counts.",
+        "The four current ceilings (max_expanded_primitives, max_expanded_per_instruction, "
+        "max_instructions, schema_count_max) are enforced on the work; the legacy five are "
+        "kept for saved works and do not rewrite counts.",
     )
     limits_group.add_argument(
         "--limit-max-expanded-primitives",
         type=int,
-        help="maximum primitive marks per work; a compiler resource ceiling, not a scale-down instruction",
+        help="maximum primitive marks per work; past it the largest groups are drawn represented",
     )
     limits_group.add_argument(
         "--limit-max-expanded-per-instruction",
@@ -5012,7 +5055,7 @@ def build_parser() -> argparse.ArgumentParser:
     limits_group.add_argument(
         "--limit-schema-count-max",
         type=int,
-        help="maximum resolved count in the compiler resource policy; does not clamp authored numbers",
+        help="ceiling on the count one arrangement may declare; a larger declared count is clamped down to it (default 2000)",
     )
     limits_group.add_argument(
         "--limits-reset",

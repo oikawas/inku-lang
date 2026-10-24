@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-24 — The inku-cli reference is updated
+
+The 41 inku-cli arguments and the one command that had no help now have it, and the help block of `cli/README.md` is regenerated. The manual's `cli-reference.md` (Japanese and English) now covers the three commands it did not name (`ddl-export`, `export-card`, `refine generate`) and 40 flags. The existing help, README, manual and AI reference were checked against the code and corrected. Among the corrections: `inspect` runs the models one after another, not in parallel; `--stage1-provider` is not sent to the server; `--include-thinking` always comes back null; `plugin list` needs only a signed-in user; `export-card -o` writes into a directory only for a path ending in `/` or an existing directory; the four current render limits are enforced on the work while the five legacy ones do not rewrite counts; what `review evaluate` scores and which API key it needs; and the `history state` keys are `newest_at` and `newest_id`. No code changed.
+
 ### 2026-10-24 — A leader can no longer take a member out of their user group
 
 A leader who is not an administrator could send `"group_id": null` to `PATCH /api/users/{user_id}`, pass the route's check, and leave a member of their own user group without one (found while checking the API reference). When `group_id` is sent, any value other than the leader's own group, null included, is now refused with 403. An administrator can still clear a group with null.

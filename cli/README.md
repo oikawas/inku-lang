@@ -69,8 +69,8 @@ The `svg` key is present either way. `--no-svg` empties it rather than removing
 it, so a reader that expects the field still finds it.
 
 When the question is only whether the listing changed at all, `history state`
-answers it in a few hundred bytes: how many works there are, and the `at` and
-`id` of the newest one. It reads no drawing, so it costs the same whether the
+answers it in a few hundred bytes: how many works there are, and the `newest_at` and
+`newest_id` of the newest one. It reads no drawing, so it costs the same whether the
 gallery holds twenty works or two thousand:
 
 ```sh
@@ -78,8 +78,8 @@ inku-cli history state
 inku-cli history state --bytes             # the answer, wrapped in its own wire size
 ```
 
-Both `at` and `id` are reported because two works saved inside the same
-millisecond share an `at`; without the id the second one would go unnoticed.
+Both `newest_at` and `newest_id` are reported because two works saved inside the same
+millisecond share a `newest_at`; without the id the second one would go unnoticed.
 
 ## Share one work with someone else
 
@@ -152,7 +152,7 @@ with `git archive` works too; the selected checkout's sources are never edited.
 The exported-work input inherits the recorded render conditions and compares the
 saved SVG automatically. Score input uses core default colors when `--color-map`
 is absent. `--compare-svg` adds a file comparison. Resource-aware Scores keep
-their recorded hard policy; the four `--limits` replay caps may lower its budget.
+their recorded hard policy. Each of the four `--limits` replay caps (given or inherited from the work) replaces the operational budget for its dimension, up to the recorded hard policy, so it can raise the budget as well as lower it.
 The command writes JSON to stdout with paths, SVG byte count and SHA256, separate
 build/render/raster times, core provenance, conditions and comparison results.
 Build progress goes to stderr. PNG uses the selected core's rasterizer.
@@ -198,22 +198,22 @@ represented band above the literal threshold lowers the band — and the respons
 is the set that actually took effect, so read it rather than assuming the
 request was honoured.
 
-Three families, in the order `config show` reports them:
+The table lists each limit flag and what it changes:
 
 | flag | what changes |
 |---|---|
-| `--limit-max-expanded-primitives` | marks per work; past it the whole work is scaled down |
+| `--limit-max-expanded-primitives` | marks per work; past it the largest groups are drawn represented |
 | `--limit-max-expanded-per-instruction` | marks one instruction may expand to |
-| `--limit-max-instructions` | instructions per work; the list is truncated past it |
-| `--limit-literal-count-threshold` | below it a stated number is drawn as stated; at or above it the group is shown as a band |
-| `--limit-represented-count-min` / `-max` | the two ends of that band |
-| `--limit-ddl-count-max` | ceiling on a numeral read out of the description, and the top of the density bands Stage 1 is told to use |
-| `--limit-ddl-count-max-grid` | the same ceiling for a literal grid |
-| `--limit-schema-count-max` | the only bound checked on Stage 2's own output |
+| `--limit-max-instructions` | instructions per work; the list is cut past it |
+| `--limit-literal-count-threshold` | legacy; caps the top of the represented band and does not decide literal versus band |
+| `--limit-represented-count-min` / `-max` | legacy; the two ends of the represented band, kept for saved works |
+| `--limit-ddl-count-max` | legacy; shown to Stage 2 as the typical range, not enforced |
+| `--limit-ddl-count-max-grid` | legacy; kept for saved works, does not rewrite counts |
+| `--limit-schema-count-max` | the ceiling on the count Stage 2 declares for one arrangement |
 
-The effective values are written into the Stage 1 and Stage 2 prompts, so the
-model is told the rule the pipeline will actually apply, and `stage2_prompt_digest`
-moves with them. They are also recorded on every work in `history.render_limits`,
+The effective values are written into the Stage 2 prompt and into the count field
+description the model receives, so the model is told the rule the pipeline will
+actually apply, and `stage2_prompt_digest` moves with them. They are also recorded on every work in `history.render_limits`,
 so a drawing made under one configuration can still be told apart from the same
 description drawn under another. A work saved before this column existed carries
 no value at all, which is not the same as carrying the defaults.
@@ -273,7 +273,8 @@ positional arguments:
     colophon            recite one root-to-target lineage branch as an append-
                         only reading
     refine              refine an existing work
-    inspect             parallel model inspection comparison
+    inspect             run several models one after another on the same
+                        description and compare their DDL and drawings
     review              evaluate drawings and submit feedback
     user                manage user accounts
     single-user         show or move the account this server opens as
@@ -298,7 +299,10 @@ options:
   --timeout-seconds TIMEOUT_SECONDS
                         HTTP timeout in seconds (default: 600)
   --username USERNAME, -u USERNAME
+                        account name to log in as
   --password PASSWORD, -p PASSWORD
+                        account password; if omitted, it is asked for without
+                        echoing
 
 ```
 
@@ -427,8 +431,17 @@ options:
                         paint: a natural-language description through Stage 1;
                         ddl: normalized DDL directly through Stage 2/render
   --stage1-provider {nvidia,anthropic,local}
+                        provider shown in the run summary only; it is not
+                        sent. Name the provider inside --stage1-model as
+                        provider:model
   --stage1-model STAGE1_MODEL
+                        model for both stages; default: the model saved by
+                        models
   --history-input HISTORY_INPUT
+                        input text recorded for this work in history when it
+                        is saved, in place of the description; the description
+                        still draws the work. In batch, the same text is used
+                        for every line
   --catalog-id CATALOG_ID
                         color catalog id (legacy alias)
   --color-catalog COLOR_CATALOG
@@ -465,11 +478,21 @@ options:
                         catalog), auto (the server reads the description and
                         picks), random (draw one other than --color-catalog)
   --instruction-lang {auto,ja,en}
-  --ui-lang UI_LANG
-  --include-thinking
+                        language of the instructions (normalized DDL); auto
+                        follows the language of the description
+  --ui-lang UI_LANG     your interface language, such as ja or en; used when
+                        --instruction-lang is auto and the description does
+                        not decide it, and saved with the work
+  --include-thinking    accepted for compatibility; the server always returns
+                        thinking as null
   --save-history        add the drawing to the server's history database as a
-                        work; without it nothing is saved
+                        work; without it no work is saved (a paint still
+                        counts toward the generation counter)
   --save-artifacts, --no-save-artifacts
+                        write the output files (SVG, JSON, PNG) to server
+                        storage when the work is saved; --no-save-artifacts
+                        writes none. Omitted, the server's default (to write
+                        them) applies
   --no-progress         disable elapsed-time progress animation
   --full-json           print the full paint response
 
@@ -521,8 +544,17 @@ options:
                         paint: a natural-language description through Stage 1;
                         ddl: normalized DDL directly through Stage 2/render
   --stage1-provider {nvidia,anthropic,local}
+                        provider shown in the run summary only; it is not
+                        sent. Name the provider inside --stage1-model as
+                        provider:model
   --stage1-model STAGE1_MODEL
+                        model for both stages; default: the model saved by
+                        models
   --history-input HISTORY_INPUT
+                        input text recorded for this work in history when it
+                        is saved, in place of the description; the description
+                        still draws the work. In batch, the same text is used
+                        for every line
   --catalog-id CATALOG_ID
                         color catalog id (legacy alias)
   --color-catalog COLOR_CATALOG
@@ -559,18 +591,31 @@ options:
                         catalog), auto (the server reads the description and
                         picks), random (draw one other than --color-catalog)
   --instruction-lang {auto,ja,en}
-  --ui-lang UI_LANG
-  --include-thinking
+                        language of the instructions (normalized DDL); auto
+                        follows the language of the description
+  --ui-lang UI_LANG     your interface language, such as ja or en; used when
+                        --instruction-lang is auto and the description does
+                        not decide it, and saved with the work
+  --include-thinking    accepted for compatibility; the server always returns
+                        thinking as null
   --save-history        add the drawing to the server's history database as a
-                        work; without it nothing is saved
+                        work; without it no work is saved (a paint still
+                        counts toward the generation counter)
   --save-artifacts, --no-save-artifacts
+                        write the output files (SVG, JSON, PNG) to server
+                        storage when the work is saved; --no-save-artifacts
+                        writes none. Omitted, the server's default (to write
+                        them) applies
   --no-progress         disable elapsed-time progress animation
-  --continue-on-error
+  --continue-on-error   keep going when a line fails and list the failures in
+                        the summary; without it, the batch stops at the first
+                        failure
   --summary-json SUMMARY_JSON
                         write batch summary JSON to this path (default:
                         OUT_DIR/analysis-summary.json)
   --composition-count COMPOSITION_COUNT
-                        draw N works with different placements per description
+                        draw N works per description with placement seeds 0 to
+                        N-1; overrides --composition-seed when N > 1
 
 ```
 
@@ -589,9 +634,14 @@ options:
   -h, --help            show this help message and exit
   --output OUTPUT, -o OUTPUT
                         output PNG path (default: INPUT_DIR/contact-sheet.png)
-  --columns COLUMNS
+  --columns COLUMNS     thumbnails per row, at least 1 (default: 5)
   --thumb-size THUMB_SIZE
+                        width and height of each thumbnail box in pixels, at
+                        least 64 (default: 220)
   --order {name,similarity}
+                        name sorts by file name; similarity puts next the
+                        picture whose composition is nearest to the last one
+                        (default: name)
 
 ```
 
@@ -659,14 +709,19 @@ options:
                         a directory
   --output OUTPUT, -o OUTPUT
                         summary JSON path (default: INPUT_DIR/diversity-
-                        summary.json)
-  --replay REPLAY       render each sampled score 2N times: N varying
-                        composition_seed (composition_distance) and N varying
-                        render_seed (performance_distance), each pinning the
-                        other seed
+                        summary.json with --diversity, INPUT_DIR/motif-
+                        census.json with --census; with --census --history it
+                        is written only when given)
+  --replay REPLAY       render each sampled score 2N times (N must be at least
+                        2; smaller values skip replay; needs a signed-in
+                        session): N varying composition_seed
+                        (composition_distance) and N varying render_seed
+                        (performance_distance), each pinning the other seed
   --replay-limit REPLAY_LIMIT
                         maximum score artifacts to replay
   --canvas-aspect {square,golden,a4,b4,pillar,oban,wide,byobu,vertical,sd_monitor,hd_monitor}
+                        canvas shape for the --replay renders (default:
+                        square)
   --catalog-id CATALOG_ID
                         color catalog id (legacy alias)
   --color-catalog COLOR_CATALOG
@@ -685,6 +740,8 @@ positional arguments:
 options:
   -h, --help            show this help message and exit
   --output OUTPUT, -o OUTPUT
+                        report JSON path (default: ddl-comparison.json in the
+                        current directory)
 
 ```
 
@@ -696,14 +753,19 @@ usage: inku-cli vision-review [-h] [--vision-model VISION_MODEL]
                               input_dir
 
 positional arguments:
-  input_dir
+  input_dir             directory of PNG outputs to review; the score JSON
+                        beside each PNG supplies its original description
 
 options:
   -h, --help            show this help message and exit
   --vision-model VISION_MODEL
-                        Vision model (defaults to the CLI Vision setting)
+                        Vision model (defaults to the CLI Vision setting, or
+                        meta/llama-3.2-90b-vision-instruct when that is unset;
+                        needs NVIDIA_API_KEY or NVIDIA_NIM_API_KEY)
   --model MODEL         compatibility alias for --vision-model
   --output OUTPUT, -o OUTPUT
+                        summary JSON path (default: INPUT_DIR/vision-review-
+                        summary.json)
 
 ```
 
@@ -770,6 +832,8 @@ options:
                         vector fallback, live keeps editable's groups with the
                         display appearance for performing the work in time
   --canvas-aspect CANVAS_ASPECT
+                        canvas shape id, such as square, a4 or wide (default:
+                        square)
   --render-seed RENDER_SEED
                         renderer performance seed for reproducible replay
   --composition-seed COMPOSITION_SEED
@@ -864,8 +928,10 @@ options:
                         core canvas registry id; inherits the work's performed
                         aspect, otherwise square
   --canvas-height CANVAS_HEIGHT
-                        canvas height in pixels; inherits the saved SVG size,
-                        otherwise 1000
+                        canvas height in pixels; default: the selected
+                        checkout's base canvas height (1000 today); with
+                        --from-work-file and no --canvas-aspect, the saved SVG
+                        size is inherited unless this is given
   --svg-profile {display,editable,compat,live}
                         SVG output profile; inherits the work's profile,
                         otherwise display
@@ -892,16 +958,21 @@ usage: inku-cli demo-instruction [-h] [--base-url BASE_URL]
                                  seed_phrase
 
 positional arguments:
-  seed_phrase
+  seed_phrase           phrase the demo prompt is generated from
 
 options:
   -h, --help            show this help message and exit
   --base-url BASE_URL   inku API base URL (default: http://127.0.0.1:8100)
   --timeout-seconds TIMEOUT_SECONDS
                         HTTP timeout in seconds (default: 600)
-  --model MODEL
+  --model MODEL         model that writes the demo prompt (default: the
+                        server's Stage 1 model)
   --instruction-lang {auto,ja,en}
-  --ui-lang UI_LANG
+                        language of the instruction: auto (from the seed
+                        phrase, else --ui-lang), ja or en (default: auto)
+  --ui-lang UI_LANG     your interface language, such as ja or en; the
+                        fallback for auto when the seed phrase does not decide
+                        it
 
 ```
 
@@ -929,11 +1000,12 @@ options:
   --base-url BASE_URL   inku API base URL (default: http://127.0.0.1:8100)
   --timeout-seconds TIMEOUT_SECONDS
                         HTTP timeout in seconds (default: 600)
-  --offset OFFSET
-  --limit LIMIT
+  --offset OFFSET       works to skip before the first one listed (default: 0)
+  --limit LIMIT         works to list, from 1 to 100 (default: 20)
   --query QUERY, -q QUERY
-  --starred
-  --for-revision
+                        text to search the works for, up to 200 characters
+  --starred             list only starred works
+  --for-revision        list only works marked for revision
   --for-share           list only the works whose owner opened them to an
                         organisation group
   --no-svg              leave each work's drawing out of the listing; the
@@ -1025,7 +1097,8 @@ options:
   --timeout-seconds TIMEOUT_SECONDS
                         HTTP timeout in seconds (default: 600)
   --all                 admin-only aggregate across users
-  --limit LIMIT
+  --limit LIMIT         entries to list, from 1 to 500 (default: 100); with
+                        --all, up to 2000
 
 ```
 
@@ -1041,7 +1114,9 @@ usage: inku-cli history-export [-h] [--base-url BASE_URL]
                                [hashes ...]
 
 positional arguments:
-  hashes                individual 4+ character history hash suffixes
+  hashes                individual history hash suffixes (4 or more characters
+                        recommended; a shorter one is refused when it is
+                        ambiguous)
 
 options:
   -h, --help            show this help message and exit
@@ -1052,8 +1127,10 @@ options:
   --to TO_HASH          end hash suffix for an inclusive history-order range
   --out-dir OUT_DIR, -o OUT_DIR
                         output directory for contact sheet and JSON files
-  --columns COLUMNS
+  --columns COLUMNS     thumbnails per row, at least 1 (default: 5)
   --thumb-size THUMB_SIZE
+                        width and height of each thumbnail box in pixels, at
+                        least 64 (default: 220)
   --query QUERY, -q QUERY
                         filter history before resolving hashes
   --starred             filter history to starred items before resolving
@@ -1074,7 +1151,9 @@ usage: inku-cli export-card [-h] [--base-url BASE_URL]
                             hash
 
 positional arguments:
-  hash                  4+ character history hash suffix of the work
+  hash                  history hash suffix of the work (4 or more characters
+                        recommended; a shorter one is refused when it is
+                        ambiguous)
 
 options:
   -h, --help            show this help message and exit
@@ -1102,6 +1181,8 @@ usage: inku-cli api [-h] [--base-url BASE_URL]
 
 positional arguments:
   {GET,POST,PUT,PATCH,DELETE}
+                        HTTP method: GET, POST, PUT, PATCH or DELETE (case
+                        does not matter)
   path                  relative endpoint path, for example
                         /api/lineage/NODE_ID
 
@@ -1112,8 +1193,8 @@ options:
                         HTTP timeout in seconds (default: 600)
   --data DATA           JSON request body
   --file FILE, -f FILE  read JSON request body from a UTF-8 file, or '-'
-  --query KEY=VALUE
-  --header KEY=VALUE
+  --query KEY=VALUE     query-string parameter as KEY=VALUE; repeat for more
+  --header KEY=VALUE    request header as KEY=VALUE; repeat for more
   --no-auth             omit the stored session for public endpoints
   --output OUTPUT, -o OUTPUT
                         write the raw response body to a file
@@ -1239,7 +1320,8 @@ positional arguments:
 options:
   -h, --help     show this help message and exit
   --depth DEPTH  descendant search depth
-  --limit LIMIT  max nodes to load
+  --limit LIMIT  max lineage edges to load, counted outward from the work's
+                 node (default 200)
   --json         output raw JSON
 
 ```
@@ -1279,7 +1361,7 @@ options:
                         Vision reader model (defaults to CLI/server Vision
                         setting)
   --model MODEL         compatibility alias for --vision-model
-  --language {ja,en}
+  --language {ja,en}    language of the colophon text: ja (default) or en
   --dry-run             generate and print without saving
   --json                print the complete response as JSON
   --output OUTPUT, -o OUTPUT
@@ -1434,7 +1516,9 @@ positional arguments:
 options:
   -h, --help            show this help message and exit
   --vision-model VISION_MODEL
-                        Vision model (defaults to the CLI Vision setting)
+                        Vision model (defaults to the CLI Vision setting, or
+                        nvidia/neva-22b when that is unset; needs
+                        NVIDIA_API_KEY or NVIDIA_NIM_API_KEY)
   --model MODEL         compatibility alias for --vision-model
   --prompt PROMPT       override vision review prompt
 
@@ -1716,9 +1800,11 @@ usage: inku-cli config update [-h] [--google-auth {true,false}]
 options:
   -h, --help            show this help message and exit
   --google-auth {true,false}
-                        enable/disable Google auth
+                        store the Google sign-in switch; the server does not
+                        sign anyone in through it yet
   --local-auth {true,false}
-                        enable/disable local auth
+                        local sign-in cannot be turned off; only true is
+                        accepted (false is refused with 409)
   --backup-interval BACKUP_INTERVAL
                         DB backup interval in days
   --backup-generations BACKUP_GENERATIONS
@@ -1731,14 +1817,14 @@ options:
                         compress log files
 
 render limits:
-  Resource ceilings for the shared compiler, recorded on each work. The
-  current pipeline uses primitive, per-template, template and resolved-count
-  ceilings; the remaining settings are retained for older works. These
-  values are not injected into both model prompts or used to rewrite counts.
+  Resource ceilings for the shared compiler, recorded on each work. The four
+  current ceilings (max_expanded_primitives, max_expanded_per_instruction,
+  max_instructions, schema_count_max) are enforced on the work; the legacy
+  five are kept for saved works and do not rewrite counts.
 
   --limit-max-expanded-primitives LIMIT_MAX_EXPANDED_PRIMITIVES
-                        maximum primitive marks per work; a compiler resource
-                        ceiling, not a scale-down instruction
+                        maximum primitive marks per work; past it the largest
+                        groups are drawn represented
   --limit-max-expanded-per-instruction LIMIT_MAX_EXPANDED_PER_INSTRUCTION
                         maximum primitive marks per template, bounded by the
                         per-work ceiling
@@ -1761,8 +1847,9 @@ render limits:
                         legacy grid-count bound, retained for saved-work
                         compatibility
   --limit-schema-count-max LIMIT_SCHEMA_COUNT_MAX
-                        maximum resolved count in the compiler resource
-                        policy; does not clamp authored numbers
+                        ceiling on the count one arrangement may declare; a
+                        larger declared count is clamped down to it (default
+                        2000)
   --limits-reset        put every render limit back to its default, ignoring
                         the other --limit-* flags
 

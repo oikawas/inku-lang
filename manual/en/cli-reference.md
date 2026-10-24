@@ -22,7 +22,7 @@ Run inku-cli COMMAND --help for the complete option list. This document states w
 | refine | Refine an existing work's composition or color |
 | lineage | Inspect lineage node trees and promote intermediate works |
 | colophon | Recite one origin-to-target lineage branch as an append-only reading |
-| inspect | Inspect and compare multiple inference models in parallel |
+| inspect | Inspect and compare multiple inference models, one after another |
 | review | Evaluate works with Vision and submit unread words |
 | render-score | Render Score JSON without Stage 1 or Stage 2 |
 | replay | Draw a saved work again with the current engine, compare it with the saved SVG, and optionally save it as a child (the web's `Replay`) |
@@ -30,7 +30,7 @@ Run inku-cli COMMAND --help for the complete option list. This document states w
 | demo-instruction | Write a demo description |
 | history / history-export | List or export history by hash |
 | unread-words | Show the user's ledger; administrators may use --all |
-| contact-sheet / analyze / ddl-compare | Compare and analyze local artifacts |
+| contact-sheet / analyze / ddl-compare | Compare and analyze local artifacts (`analyze --replay` and `analyze --census --history` call the server's API) |
 | rasterize | Burn a folder of SVGs to PNG, one child process per file; `--workers` sets how many run at once |
 | measure-raster | Count the raster measurements of a folder of PNGs (pixel count, ground color, the share of faint and strong marks, mean distance from the ground, saturated marks). **It counts the image it was handed, at the width it was handed, and declares no width or scale flag.** To read a record at another width, burn at that width with `rasterize --width` and count the result. It never contacts a server |
 | vision-review | Run the configured vision model as a read-only mirror |
@@ -39,11 +39,22 @@ Run inku-cli COMMAND --help for the complete option list. This document states w
 | user / group | Manage user accounts and groups |
 | config | Show and update the server's system settings |
 | api | Call any public API with an explicit HTTP method |
+| ddl-export / export-card | Export a saved work's DDL, or write a shareable card (PNG) |
 | version | Show CLI and server version and build information |
+
+Commands that call the server accept `--base-url` (default http://127.0.0.1:8100) and `--timeout-seconds` (HTTP timeout in seconds, default 600).
+
+### login and models flags
+
+| Flag | Contents |
+|---|---|
+| `login --username` / `-u` | The user name to log in with. Required |
+| `login --password` / `-p` | The password. If omitted, you are asked for it interactively |
+| `models --vision-provider` | Save the default Vision provider. The choices are the same list as the other provider flags |
 
 ## Flags for paint and batch
 
-paint and batch take the same flags, except that only paint draws from an image. **A flag you omit falls back to the server default, and the server default is not always the Web UI default.**
+paint and batch take the same flags, except that only paint draws from an image and takes `--full-json`. batch alone takes `--continue-on-error`, `--summary-json PATH` (default `OUT_DIR/analysis-summary.json`) and `--composition-count N`. **A flag you omit falls back to the server default, and the server default is not always the Web UI default.**
 
 ### Input and output
 
@@ -52,7 +63,7 @@ For limits they record the values used in `render_limits` and their origin in `r
 
 | Flag | Contents |
 |---|---|
-| `--file FILE` / `-f` | Read the description or DDL from a UTF-8 file; `-` means stdin for paint. For batch, each non-empty line is one work |
+| `--file FILE` / `-f` | Read the description or DDL from a UTF-8 file; `-` means stdin for both paint and batch. For batch, each non-empty line is one work |
 | `--out-dir DIR` / `-o` | Destination for JSON, SVG, and PNG output |
 | `--prefix P` | Output filename prefix |
 | `--png` | Also write PNG when `--out-dir` is set |
@@ -60,7 +71,8 @@ For limits they record the values used in `render_limits` and their origin in `r
 | `--input-mode {paint,ddl}` | `paint` sends the description through Stage 1; `ddl` starts from visible DDL and proceeds to compilation, any required hole completion, and performance. See SPEC for each stage's meaning |
 | `--ddl-text DDL` | **`render-score` only.** Sends the instructions as provenance / hash metadata; it does not automatically repair counts or relations from DDL |
 | `--ddl-file PATH` | **`render-score` only.** Reads the instructions from a file; `-` means stdin. Cannot be combined with `--ddl-text` |
-| `--save-history` | Add the drawing to the server's history database as a work. Without it nothing is saved, including with `--image` |
+| `--save-history` | Add the drawing to the server's history database as a work. Without it no work is saved, though the drawing still counts toward the generation count. This holds for `--image` too |
+| `--history-input TEXT` | The description shown as the work's input in history. It is not sent to the models; without it, the description itself is recorded |
 | `--save-artifacts` / `--no-save-artifacts` | Whether the server stores artifacts |
 | `--full-json` | Print the full response |
 | `--no-progress` | Disable the elapsed-time animation |
@@ -113,18 +125,25 @@ Variation is retired. The old amplitude and seed flags are rejected. Saved varia
 
 | Flag | Contents |
 |---|---|
-| `--stage1-provider` / `--stage1-model` | Provider and drawing model used for both stages |
+| `--stage1-provider` / `--stage1-model` | The drawing model, written as `provider:model` (for example `chatgpt:gpt-6-luna`), used for both stages. `--stage1-provider` is only shown in the run summary and is not sent |
 | `--instruction-lang {auto,ja,en}` | Description language |
 | `--ui-lang LANG` | The value recorded as the UI language |
-| `--include-thinking` | Include the thinking output in the response |
+| `--include-thinking` | Accepted for compatibility only; the server always returns `thinking` as null |
 
-batch additionally takes `--continue-on-error`.
+batch additionally takes `--continue-on-error`, `--summary-json PATH`, and `--composition-count N`.
 
 For example, set the performance mode and request ceiling for DDL input:
 
 ```sh
 uv run inku-cli paint --input-mode ddl --file work.ddl --stage1-model chatgpt:gpt-6-luna --wild --limits max_expanded_primitives=200
 ```
+
+### batch flags
+
+| Flag | Contents |
+|---|---|
+| `--composition-count N` | Draw each description N times with different placements. With N of 2 or more, the placement seeds are 0 to N-1, `--composition-seed` is not used, and `-vSEED` is added to the output file names. With N of 1 (the default), `--composition-seed` applies as usual |
+| `--summary-json PATH` | Write the batch summary (counts, each work's result, and failures) to this path as JSON; the same JSON is also printed to stdout. Without it, and with `--out-dir`, the file is OUT_DIR/analysis-summary.json |
 
 ## Rendering without a server (render-local)
 
@@ -138,6 +157,11 @@ uv run inku-cli render-local --core-root /path/to/inku-lang \
 uv run inku-cli render-local --core-root /path/to/inku-lang \
   --file score.json -o rendered.svg --color-map colors.json --render-seed 123
 ```
+
+| Flag | Contents |
+|---|---|
+| `--canvas-height PX` | Canvas height in pixels; the width follows from the chosen aspect. When omitted: with `--from-work-file` and no `--canvas-aspect`, the saved SVG's size; otherwise the selected checkout's base height (1000 in the current source). Giving `--canvas-aspect` also stops the saved SVG's size from being inherited |
+| `--wild` / `--no-wild` | Remove / keep the stroke-amplitude ceiling. When omitted: with `--from-work-file`, the work's record; with `--file`, off |
 
 Both inputs require a current compiled Score with `resource_policy.hard_policy` and `resource_policy.operational_budget`; this is not a general migration command for old Scores. (a) inherits the work's color map, seeds, canvas, profile, wild setting, and limits, and compares bytes with its saved SVG when present. (b) uses core defaults for unspecified conditions. `--limits` accepts only the four replay ceilings and rejects values above the Score's saved hard policy. `--compare-svg FILE` adds another SVG byte comparison. JSON on stdout records hashes, timings, selected conditions, and checkout HEAD / dirty state, among other provenance. No DB save occurs. Equality across different source or conditions is not guaranteed.
 
@@ -153,6 +177,17 @@ uv run inku-cli replay WORK_ID --save-child
 ```
 
 The JSON on standard output records the engine versions at saving and now (`recorded_render_engine_version`, `render_engine_version`, `version_changed`), the `render_hash`, the SHA-256 of the replay and of the saved SVG, and whether the two are byte-identical (`svg_equal`). With `--save-child` the server draws the work once more and saves the child only when that matches the replay shown, returning its `child_id`; otherwise it answers 409 and saves nothing.
+
+## Analyzing and comparing artifacts (analyze, contact-sheet)
+
+| Flag | Contents |
+|---|---|
+| `analyze --diversity` | Compute diversity metrics and write INPUT_DIR/diversity-summary.json; `-o` changes the destination |
+| `analyze --census` | Report frequent mechanical motif signatures with thumbnail examples; written to INPUT_DIR/motif-census.json (`-o` changes it) |
+| `analyze --census --history` | Use the logged-in user's history instead of INPUT_DIR; cannot be combined with INPUT_DIR. `--history` is used together with `--census` |
+| `analyze --replay N` | Used with `--diversity`. When N is 2 or more, each sampled score is drawn 2N times: N composition seeds with the render seed fixed, and N render seeds with the composition seed fixed. Calls the server's API. N of 1 or less draws nothing |
+| `analyze --replay-limit M` | The maximum number of scores to replay (default 5, minimum 1), taken from the head of the loaded works |
+| `contact-sheet --order {name,similarity}` | The order. `name` (default) sorts by file name. `similarity` places each image next to the one with the closest composition, reading the Score JSON in the folder |
 
 ## History and feedback
 
@@ -181,6 +216,21 @@ permission to hand it on.** A recipient is named by ID, and `history peers` is w
 `--permission` defaults to `read`; `write` also lets the recipient star, trash and delete that work.
 A work shared with you appears in your own history list, carrying a mark that says it is
 somebody else's.
+
+### Exporting a work (ddl-export, export-card)
+
+| Flag | Contents |
+|---|---|
+| `ddl-export WORK_ID --output` / `-o` | The file to write. Without it, the export goes to standard output. The output is JSON with the schema `inku.ddl-export.v1`, containing the work's DDL and the plugin definitions that DDL names |
+| `export-card HASH --out` / `-o` | The destination PNG path. A path ending in `/`, or an existing directory, receives the file as `inku-card-<the work's short hash>-<layout>.png`. Any other path is written as the PNG file itself. Required |
+| `export-card --layout {square,portrait}` | `square` is a 1080×1080 sheet; `portrait` is 1080×1350 |
+| `export-card --no-seal` | Leave off the small `inku` mark printed on the sheet. By default it is printed |
+
+`HASH` is the last four or more characters of the work's history hash.
+
+    uv run inku-cli ddl-export WORK_ID -o work.ddl.json
+    uv run inku-cli paint --input-mode ddl --file work.ddl.json
+    uv run inku-cli export-card HASH -o ./cards/ --layout portrait
 
 ## Plugins and reference
 
@@ -212,7 +262,42 @@ The colophon is neither an evaluation nor a selection command. It must not be co
 | `single-user show` | Show which account a single-user server opens as, and who else could |
 | `single-user set USER_ID` | Move it to another account, which must hold `admins` |
 
-`user` and `group` require a session in `admins` or `leaders`; `config` requires one in `admins`. `user create` takes the permission groups as `--permission-group {users,leaders,admins}`, which may be repeated. Existing limits, log retention policy, and DB backup settings are `config` subjects. Painting concurrency has no dedicated flags; use `api GET/PUT /api/settings/render-concurrency` as shown in [Server Configuration §2.3](server-configuration.md#23-artifacts-and-concurrency).
+`user` requires a session in `admins` or `leaders`. `group list` is open to both; `group create`, `group update` and `group delete` need `admins`. `config` requires one in `admins`. `user create` takes the permission groups as `--permission-group {users,leaders,admins}`, which may be repeated. Existing limits, log retention policy, and DB backup settings are `config` subjects. Painting concurrency has no dedicated flags; set it with `api PUT /api/settings/render-concurrency` and read the `render_concurrency` field of `api GET /api/settings/status` (see [Server Configuration §2.3](server-configuration.md#23-artifacts-and-concurrency)).
+
+### user flags
+
+| Flag | Contents |
+|---|---|
+| `user create --group-id ID` | Put the new account into a user group |
+| `user update --username` | Change the user name |
+| `user update --email` | Change the email address |
+| `user update --password` | Change the password |
+| `user update --group-id ID` | Change the user group the account belongs to |
+| `user delete --cascade` | Also delete the account's generation history. Without it, an account that has history is not deleted, and the server answers 409 |
+
+### config update flags
+
+Of the nine render limits, the four current ones (`max_expanded_primitives`, `max_expanded_per_instruction`, `max_instructions`, `schema_count_max`) are enforced as ceilings on the work. The other five (`literal_count_threshold`, `represented_count_min`, `represented_count_max`, `ddl_count_max`, `ddl_count_max_grid`) are legacy values kept for saved works, and they do not rewrite counts.
+
+| Flag | Contents |
+|---|---|
+| `--google-auth true\|false` | Stores the Google sign-in switch only; nothing signs in through it yet. Omitted, it is left unchanged |
+| `--local-auth true\|false` | Local sign-in cannot be turned off, so only `true` is accepted. `false` is refused with 409. Omitted, it is left unchanged |
+| `--backup-interval N` | The interval between automatic DB backups, in days. Omitted, it is left unchanged. [Server Configuration §8](server-configuration.md#8-backup-and-recovery) |
+| `--backup-generations N` | The number of automatic DB backup generations to keep. Each time a new automatic backup is made, older ones beyond this count are deleted |
+| `--log-retention-days N` | The number of days logs are kept. [Server Configuration §9](server-configuration.md#9-logs) |
+| `--log-retention-enabled true\|false` | Enable or disable log retention |
+| `--log-compress true\|false` | Compress log files |
+| `--limit-max-expanded-primitives N` | The maximum number of primitive marks per work. When a work would exceed it, the server draws its largest groups in represented (reduced-mark) form. It is a compiler resource ceiling, and the DDL text is not changed |
+| `--limit-max-expanded-per-instruction N` | The maximum number of primitive marks per template. It applies inside the per-work ceiling |
+| `--limit-max-instructions N` | The maximum number of object templates per work. A compiler resource ceiling |
+| `--limit-literal-count-threshold N` | A legacy value. The current pipeline does not replace counts with bands |
+| `--limit-represented-count-min N` | A legacy value, kept for saved works |
+| `--limit-represented-count-max N` | A legacy value. It is normalized against the literal count threshold |
+| `--limit-ddl-count-max N` | A legacy value. The current pipeline does not rewrite counts with it |
+| `--limit-ddl-count-max-grid N` | A legacy value, kept for saved works |
+| `--limit-schema-count-max N` | The maximum resolved count in the compiler resource policy. It does not clamp numbers the author wrote |
+| `--limits-reset` | Put every render limit back to its default. Other `--limit-*` flags are ignored |
 
 ## Calling any public API
 
@@ -296,16 +381,16 @@ Attach an existing work as the parent node and produce a local option, saved int
   ```sh
   uv run inku-cli refine perform WORK_ID --kind layout -o ./refinements --png
   ```
-  `--kind` takes `layout` (composition) or `color` (color catalog); the option is painted and stored on the server. With `-o` it is also written locally. As in the web refinements, both draw from the work's saved instructions (DDL) and do not read the description again: `layout` chooses the instructions' ranges again under a new composition seed, and `color` draws the saved Score in another color catalog. A work whose DDL was edited is refined the same way. The work's `Sketch from life` prose is carried over as it is, without running the layer again. `--no-save` leaves the option unsaved.
+  `--kind` takes `layout` (composition) or `color` (color catalog); the option is painted and stored on the server. With `-o` it is also written locally. As in the web refinements, both draw from the work's saved instructions (DDL) and do not read the description again: `layout` chooses the instructions' ranges again under a new composition seed, and `color` draws the saved Score in another color catalog. A work whose DDL was edited is refined the same way. The work's `Sketch from life` prose is carried over as it is, without running the layer again. `--no-save` leaves the option unsaved. `refine generate` is an alias of `refine perform` with the same arguments and behavior, kept for compatibility; `refine --help` does not list it.
 * **Save a manual option into the lineage**:
   ```sh
   uv run inku-cli refine save PARENT_NODE_ID --kind layout --file score.json --input-text "the description"
   ```
-  Imports a locally adjusted Score JSON straight into the server's history as a child attached to the given parent node.
+  Imports a locally adjusted Score JSON straight into the server's history as a child attached to the given parent node. `--svg-file` attaches an SVG (omitted, the SVG is saved empty). `--visibility lineage_only` keeps the work out of normal history and places it in the lineage only (the default is `normal`).
 
-### 3. Parallel model comparison (inspect)
+### 3. Model comparison (inspect)
 
-Runs several models on the same description in parallel and compares how each interprets it as DDL and performs it.
+Runs several models on the same description one after another and compares how each interprets it as DDL and performs it.
 
 Future real-provider tests and comparisons use ChatGPT plan / GPT-6-Luna as Primary and Gemini API (Cloud) / Gemma 4 31B IT as Secondary. Exclude NVIDIA NIM from targets, controls, fallbacks, and Vision evaluation. Follow the [AI testing procedure](cli-reference-for-ai.md) and stop on connection failure.
 
@@ -322,7 +407,7 @@ Autonomous assessment by a Vision model, and reporting of words the interpreter 
   ```sh
   uv run inku-cli review evaluate drawing.png --model VISION_MODEL
   ```
-  Sends the rendered file to a Vision LLM and returns a score and a one-sentence assessment on margin, contrast, and expression. The provider's API key must be configured.
+  Sends the rendered image to the Vision model and returns a 0–100 score for color harmony, composition balance, negative space pressure, and overall visual eventfulness, together with a one-sentence summary. It needs the `NVIDIA_API_KEY` (or `NVIDIA_NIM_API_KEY`) environment variable. Without a Vision setting it uses `nvidia/neva-22b`. `--prompt` replaces the default evaluation prompt with the given text.
 * **Report an unread word**:
   ```sh
   uv run inku-cli review unread "usuzumi" --context "draw a circle on a pale ink ground"

@@ -2,7 +2,7 @@
 
 This document serves as a guideline for AI agents to operate the `inku-server` via command line and paint works autonomously, evaluate them visually, and refine them while tracking lineage nodes.
 
-It covers inku v2.13.42 (Web Build 929). The full flag list lives in the `inku-cli Reference`.
+It covers inku v2.15.241 (Web Build 1317). The full flag list lives in the `inku-cli Reference`.
 
 Future tests and comparisons that call a real provider use these models (two routes: ChatGPT plan and Gemini API (Cloud)). Exclude NVIDIA NIM from candidates, defaults, fallbacks, and Vision evaluation.
 
@@ -57,7 +57,7 @@ uv run inku-cli refine perform PARENT_ID --kind layout -o ./test_output --png
 * **Choosing the `--kind` parameter**:
   * `layout`: Reconstruct coordinates and size balance. It sets a new `composition_seed` and Stage 2 recomposes.
   * `color`: Apply a different color catalog (very fast; no LLM call).
-* **Expected Output**: A JSON object containing the refined child work's metadata.
+* **Expected Output**: Without `-o`, a JSON object with the refined child work's metadata. With `-o DIR`, the command writes `refine-<kind>-<render_hash_short>.json` and `.svg` (and `.png` with `--png`) to DIR and prints a `Saved:` line instead of JSON.
 
 `--kind` is recorded on the server as `derivation_kind`, in the same order: `layout_change` and `catalog_change`. Read that value when verifying a lineage edge. The touch (`touch`) and reading (`reading`) refinements were removed on 2026-10-14; edges made before then stay `touch_change` and `reinterpretation`.
 
@@ -89,12 +89,12 @@ Compare the exported PNGs under the same viewing conditions. Check the descripti
 * **`plugin list`** — Returns loaded and rejected declarative plugin documents with namespace, version, and rejection reasons.
 * **`plugin validate <FILE.inku-plugin.md>`** — Sends a local UTF-8 document body to the management API for validation without executing code or external files.
 * **`plugin reload`** — Forces `server/plugins/` to reload without restarting the server.
-* These commands require an administrator session. Keep any plugin test artifacts together under one untracked `cli/out2/<build>-<version>-<benchmark>/` run directory.
+* `plugin validate` and `plugin reload` require an administrator session (403 otherwise); `plugin list` requires only a signed-in session. Keep any plugin test artifacts together under one untracked `cli/out2/<build>-<version>-<benchmark>/` run directory.
 
 ### 0.6 `reference`
 
 * **`reference [--md | --json] [-o FILE]`** — Fetches a machine-generated dump of the in-implementation vocabulary and constant tables. Markdown is the default; `--json` returns structured JSON; `-o` writes to a file.
-* The output begins with APP_VERSION / BUILD_NUMBER / git short hash / generation time / the namespace+version of each loaded plugin.
+* The output begins with APP_VERSION / BUILD_NUMBER / git short hash / generation time / the namespace, name, version, and status of each plugin package (rejected ones included).
 * It covers eight sections (saijiki, normalized-DDL phrases, expansion layer, Score schema, color resolution, weight properties, performance, verification), all pulled from the implementation modules. It is a mirror that hardcodes no values and connects to no generation, acceptance, or coercion decision.
 * Use it to attach one Markdown page at the start of a design or writing session. It runs on any logged-in session.
 
@@ -117,13 +117,13 @@ Variation is retired. Do not use the old amplitude or seed flags. Refinement has
 ### 1. `lineage`
 * **`lineage show <ITEM_ID> [--depth D] [--limit L] [--json]`**
   * Displays the parent-child derivation tree of the work.
-  * Use `--json` to retrieve raw connection details (`parent_node_id`, `child_node_id`).
+  * Use `--json` to print the raw response, including all nodes and edges (each edge carries `parent_node_id` and `child_node_id`).
 * **`lineage promote <NODE_ID>`**
   * Promotes a hidden intermediate work (`lineage_only` visibility) to standard history.
 
 ### 2. `refine`
 * **`refine perform <ITEM_ID> --kind {layout|color} [-o DIR] [--png] [--no-save]`**
-  * Draws an option from the target work's saved instructions (DDL) and connects it to the parent. The description is not read again (`layout` changes only the composition seed, `color` only the color catalog).
+  * Draws an option from the target work's saved instructions (DDL), connects it to the parent, and saves it to history unless `--no-save` is given. The description is not read again (`layout` changes only the composition seed, `color` only the color catalog).
 * **`refine save <PARENT_NODE_ID> --kind K --file SCORE_JSON --input-text T`**
   * Manually imports a Score JSON as a child node connected to a parent.
 
@@ -136,7 +136,7 @@ Variation is retired. Do not use the old amplitude or seed flags. Refinement has
 
 ### 3. `inspect`
 * **`inspect <TEXT> --models <MODEL_A,MODEL_B,...> -o DIR [--png]`**
-  * Runs multiple LLM backends in parallel to inspect and compare DDL interpretations and drawings for the same input text. Each model serves both Stage 1 and Stage 2.
+  * Runs the LLM backends one after another (not in parallel) to inspect and compare DDL interpretations and drawings for the same input text. Each model serves both Stage 1 and Stage 2.
   * Use it to compare which LLM model produces the most expressive output.
   * Future comparisons use `--models chatgpt:gpt-6-luna,gemini:gemma-4-31b-it`. Do not include NIM.
 

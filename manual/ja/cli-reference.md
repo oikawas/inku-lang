@@ -22,7 +22,7 @@ inku-cliはWeb UIと同じ公開HTTP APIを操作するクライアントです�
 | refine | 既存作品から要素（構図・色）を推敲し派生を生成・保存 |
 | lineage | 作品の系譜（親・子・兄弟）ツリーの探索表示、中間ノードの昇格 |
 | colophon | 起点から対象作品までの一本の枝を、追記専用の読みとして朗読 |
-| inspect | 同一記述に対する複数モデルの解釈・描画の並列比較 |
+| inspect | 同一記述に対する複数モデルの解釈・描画を順に実行して比較 |
 | review | Vision による視覚的評価、および未読語フィードバック |
 | render-score | Stage 1 / 2を通さずScore JSONを描画 |
 | replay | 保存済み作品を現行engineで描き直して保存済みSVGと比較し、必要なら子として保存（Webの`再演`） |
@@ -30,7 +30,7 @@ inku-cliはWeb UIと同じ公開HTTP APIを操作するクライアントです�
 | demo-instruction | デモ用記述の生成 |
 | history / history-export | 履歴一覧とhash指定の書き出し |
 | unread-words | 本人の未読語台帳。管理者は --all で全体集計 |
-| contact-sheet / analyze / ddl-compare | ローカル成果物の比較・解析 |
+| contact-sheet / analyze / ddl-compare | ローカル成果物の比較・解析（`analyze --replay` と `analyze --census --history` はサーバーのAPIを呼ぶ） |
 | rasterize | SVGのフォルダをPNGへ焼く。1ファイル1子プロセスで、`--workers` で同時に走らせる本数を決める |
 | measure-raster | PNGのフォルダの判定量（画素数・地の色・薄い痕と濃い痕の割合・地からの平均距離・彩度のある痕）を数える。**渡された画像をその幅のまま数え、幅や尺度の旗を持たない。**別の幅で読み直したいときは`rasterize --width`でその幅に焼いてから数える。サーバーには繋がない |
 | vision-review | 設定済みvision modelによる読み取り専用評価 |
@@ -39,11 +39,22 @@ inku-cliはWeb UIと同じ公開HTTP APIを操作するクライアントです�
 | user / group | ユーザーアカウントとグループの管理 |
 | config | サーバーのシステム設定の表示と更新 |
 | api | 任意の公開APIをHTTP method指定で操作 |
+| ddl-export / export-card | 保存済み作品のDDLの書き出し、共有用カード（PNG）の書き出し |
 | version | CLIと接続先serverのversion/build表示 |
+
+サーバーへ接続するコマンドは共通に `--base-url`（既定 http://127.0.0.1:8100）と `--timeout-seconds`（HTTP のタイムアウト秒。既定 600）を受け付けます。
+
+### login と models の旗
+
+| 旗 | 内容 |
+|---|---|
+| `login --username` / `-u` | ログインするユーザー名。必須 |
+| `login --password` / `-p` | パスワード。省略すると対話で入力を求めます |
+| `models --vision-provider` | 既定のVision providerを保存します。選べる値は他のprovider旗と同じ一覧です |
 
 ## paint と batch の旗
 
-paintとbatchは同じ旗を受け取ります（画像から描く旗はpaintだけ）。**旗を書かなければサーバーの既定が使われ、サーバーの既定はWeb UIの既定と同じとは限りません。**
+paintとbatchは同じ旗を受け取ります（画像から描く旗と `--full-json` はpaintだけ）。batchだけが `--continue-on-error`、`--summary-json PATH`（既定は OUT_DIR/analysis-summary.json）、`--composition-count N` を持ちます。**旗を書かなければサーバーの既定が使われ、サーバーの既定はWeb UIの既定と同じとは限りません。**
 
 ### 入力と出力
 
@@ -52,7 +63,7 @@ JSON成果物は、その絵を描いたDDL層の版を `ddl_version` と `ddl_e
 
 | 旗 | 内容 |
 |---|---|
-| `--file FILE` / `-f` | 記述またはDDLをUTF-8ファイルから読む。paintは `-` で標準入力。batchは空行以外の1行が1作品 |
+| `--file FILE` / `-f` | 記述またはDDLをUTF-8ファイルから読む。`-` で標準入力を読みます（paintとbatchの両方）。batchは空行以外の1行が1作品 |
 | `--out-dir DIR` / `-o` | JSON / SVG / PNGの出力先 |
 | `--prefix P` | 出力ファイル名の接頭辞 |
 | `--png` | `--out-dir` を指定したとき、PNGも書き出す |
@@ -60,7 +71,8 @@ JSON成果物は、その絵を描いたDDL層の版を `ddl_version` と `ddl_e
 | `--input-mode {paint,ddl}` | `paint` は記述をStage 1へ、`ddl` は可視DDLからcompile・必要な穴補完と演奏へ進む。各段の意味はSPECを参照 |
 | `--ddl-text DDL` | **`render-score` 専用。**指示書をprovenance・hash metadataとして送る。DDLに基づく本数・関係の自動補修は行わない |
 | `--ddl-file PATH` | **`render-score` 専用。**指示書をファイルから読む。`-` は標準入力。`--ddl-text` とは併用できない |
-| `--save-history` | 描いた絵を作品としてサーバーの履歴のDBへ追加する。付けなければ、`--image` でも何も保存しない |
+| `--save-history` | 描いた絵を作品としてサーバーの履歴のDBへ追加する。付けなければ作品は保存されず、ただし描画は生成回数に数えられます（`--image` も同じ）。 |
+| `--history-input TEXT` | 履歴に作品の入力として表示する記述。モデルには送らず、省略すると記述そのものが記録される |
 | `--save-artifacts` / `--no-save-artifacts` | サーバー側の成果物保存の有無 |
 | `--full-json` | 応答全体を印字する |
 | `--no-progress` | 経過時間のアニメーションを止める |
@@ -113,18 +125,25 @@ uv run inku-cli paint --image photo.jpg --provenance "2026年10月 京都・鴨�
 
 | 旗 | 内容 |
 |---|---|
-| `--stage1-provider` / `--stage1-model` | 両段に使う描画モデルの接続先とモデル |
+| `--stage1-provider` / `--stage1-model` | `provider:model` の形で指定する描画モデル（例 `chatgpt:gpt-6-luna`）。両段に使います。`--stage1-provider` は実行の要約に表示されるだけで、送信されません |
 | `--instruction-lang {auto,ja,en}` | 記述の言語 |
 | `--ui-lang LANG` | UI言語として記録する値 |
-| `--include-thinking` | 思考出力を応答に含める |
+| `--include-thinking` | 互換のために受け付けるだけです。サーバーは `thinking` を常に null で返します |
 
-batchはさらに `--continue-on-error` を持ちます。
+batchはさらに `--continue-on-error`、`--summary-json PATH`、`--composition-count N` を持ちます。
 
 DDL入力へ筆致と今回の上限を指定する例です。
 
 ```sh
 uv run inku-cli paint --input-mode ddl --file work.ddl --stage1-model chatgpt:gpt-6-luna --wild --limits max_expanded_primitives=200
 ```
+
+### batch の旗
+
+| 旗 | 内容 |
+|---|---|
+| `--composition-count N` | 記述1行をN通りの配置で描きます。Nが2以上のとき、配置のseedは0からN-1になり、`--composition-seed` は使われず、出力のファイル名に `-vSEED` が付きます。Nが1（既定）のときは `--composition-seed` が通常どおり効きます |
+| `--summary-json PATH` | batchの集計（件数、各作品の結果、失敗）をこのパスへJSONで書きます。標準出力にも同じJSONを出します。省略し `--out-dir` があれば、OUT_DIR/analysis-summary.json へ書きます |
 
 ## サーバーなしで描画する（render-local）
 
@@ -138,6 +157,11 @@ uv run inku-cli render-local --core-root /path/to/inku-lang \
 uv run inku-cli render-local --core-root /path/to/inku-lang \
   --file score.json -o rendered.svg --color-map colors.json --render-seed 123
 ```
+
+| 旗 | 内容 |
+|---|---|
+| `--canvas-height PX` | キャンバスの高さ（ピクセル）。幅は選んだ比率から決まります。省略時は、`--from-work-file` で `--canvas-aspect` を指定しなければ保存SVGの大きさ、それ以外は選んだcheckoutの基準高さ（現行は1000）を使います。`--canvas-aspect` を指定すると保存SVGの大きさは引き継ぎません |
+| `--wild` / `--no-wild` | 筆致の振幅の天井を外す／外さない。省略時は、`--from-work-file` なら作品の記録、`--file` なら外さない |
 
 どちらの入力も、`resource_policy.hard_policy`と`resource_policy.operational_budget`を持つ現行のcompile済みScoreが必要です。旧Score一般を自動移行するコマンドではありません。(a)は作品の色map・seed・canvas・profile・wild・制限値を継承し、保存SVGがあればbyte比較します。(b)は指定しなかった条件にcoreの既定を使います。`--limits`は四つのreplay上限だけを受け、Scoreの保存hard policyを越える指定は拒否します。`--compare-svg FILE`で別のSVGとも比較できます。標準出力のJSONにhash、時間、採用条件、checkoutのHEAD／dirty状態等を記録します。DBへは保存しません。異なるsource／条件での一致は保証しません。
 
@@ -153,6 +177,17 @@ uv run inku-cli replay WORK_ID --save-child
 ```
 
 標準出力のJSONに、保存時と現行のengineの版（`recorded_render_engine_version`・`render_engine_version`・`version_changed`）、`render_hash`、描き直しと保存済みSVGのSHA-256と、両者がbyte一致したか（`svg_equal`）を記録します。`--save-child`では、サーバーが元作品からもう一度描き、表示した描き直しと一致したときだけ子として保存し、子の`child_id`を返します。一致しなければ409で保存しません。
+
+## 成果物の解析と比較（analyze・contact-sheet）
+
+| 旗 | 内容 |
+|---|---|
+| `analyze --diversity` | 多様性の指標を計算し、INPUT_DIR/diversity-summary.json へ書きます。`-o` で出力先を変えられます |
+| `analyze --census` | 頻出する機械的な動機の署名を、サムネイルの例つきで報告します。INPUT_DIR/motif-census.json へ書きます（`-o` で変更） |
+| `analyze --census --history` | INPUT_DIR の代わりに、ログイン中の利用者の履歴を対象にします。INPUT_DIR とは併用できません。`--history` は `--census` と併用します |
+| `analyze --replay N` | `--diversity` と併用します。Nが2以上のとき、対象のScoreを1件あたり2N回描き直します。composition seed をN通り（render seed は固定）と、render seed をN通り（composition seed は固定）で描きます。サーバーのAPIを呼びます。Nが1以下なら描き直しません |
+| `analyze --replay-limit M` | 描き直すScoreの数の上限（既定5、最小1）。読み込んだ作品の先頭から選びます |
+| `contact-sheet --order {name,similarity}` | 並べる順序。`name`（既定）はファイル名順です。`similarity` は、直前の画に配置が近いものから順に並べます。フォルダ内のScore JSONを読みます |
 
 ## 履歴とフィードバック
 
@@ -180,6 +215,21 @@ uv run inku-cli replay WORK_ID --save-child
 宛先はIDで指定します。IDは `history peers` で調べられます。`--permission` の既定は `read` で、
 `write` を渡すとその作品の星付け・ゴミ箱への移動・削除もできるようになります。
 共有された作品は自分の履歴一覧に現れ、他人のものだと分かる印が付きます。
+
+### 作品の書き出し（ddl-export・export-card）
+
+| 旗 | 内容 |
+|---|---|
+| `ddl-export WORK_ID --output` / `-o` | 書き出し先のファイル。省略すると標準出力に書きます。出力は `inku.ddl-export.v1` のJSONで、作品のDDLと、そのDDLが名指すプラグインの定義を含みます |
+| `export-card HASH --out` / `-o` | 保存先のPNGパス。末尾が `/` のパス、または既存のディレクトリを指定すると、その中に `inku-card-<作品の短いhash>-<layout>.png` の名前で書きます。それ以外のパスは、そのままPNGファイルとして書きます。必須です |
+| `export-card --layout {square,portrait}` | `square` は1080×1080、`portrait` は1080×1350の紙です |
+| `export-card --no-seal` | 紙に小さく入る `inku` の印を入れません。省略時は入ります |
+
+`HASH` は履歴のhashの下位4文字以上です。
+
+    uv run inku-cli ddl-export WORK_ID -o work.ddl.json
+    uv run inku-cli paint --input-mode ddl --file work.ddl.json
+    uv run inku-cli export-card HASH -o ./cards/ --layout portrait
 
 ## プラグインと参照
 
@@ -211,7 +261,42 @@ uv run inku-cli replay WORK_ID --save-child
 | `single-user show` | 単独利用モードのサーバーがどのアカウントで開くか、ほかに誰を選べるかを表示する |
 | `single-user set USER_ID` | 開くアカウントを移す（移す先は `admins` に属している必要があります） |
 
-`user` と `group` は`admins`または`leaders`、`config` は`admins`のセッションを必要とします。`user create` の権限グループは `--permission-group {users,leaders,admins}` で指定し、複数回渡せます。既存の制限値、ログ保存ポリシー、DBバックアップ設定は `config` の対象です。描画の並列度には専用の旗がないので、[サーバー設定§2.3](server-configuration.md#23-artifactと同時実行)の`api GET/PUT /api/settings/render-concurrency`を使います。
+`user` は`admins`または`leaders`のセッションを必要とします。`group list` は両方から使えますが、`group create / update / delete` は`admins`が必要です。`config` は`admins`のセッションを必要とします。`user create` の権限グループは `--permission-group {users,leaders,admins}` で指定し、複数回渡せます。既存の制限値、ログ保存ポリシー、DBバックアップ設定は `config` の対象です。描画の並列度には専用の旗がないので、`api PUT /api/settings/render-concurrency` で設定し、`api GET /api/settings/status` の `render_concurrency` で読みます（[サーバー設定§2.3](server-configuration.md#23-artifactと同時実行)）。
+
+### user の旗
+
+| 旗 | 内容 |
+|---|---|
+| `user create --group-id ID` | 作成時にユーザーグループへ入れます |
+| `user update --username` | ユーザー名を変えます |
+| `user update --email` | メールアドレスを変えます |
+| `user update --password` | パスワードを変えます |
+| `user update --group-id ID` | 所属するユーザーグループを変えます |
+| `user delete --cascade` | 生成履歴も一緒に削除します。省略時は、履歴が残っている利用者を削除せず409を返します |
+
+### config update の旗
+
+制限値の9項目のうち、4項目（`max_expanded_primitives`・`max_expanded_per_instruction`・`max_instructions`・`schema_count_max`）は作品の上限として効きます。残りの5項目（`literal_count_threshold`・`represented_count_min`・`represented_count_max`・`ddl_count_max`・`ddl_count_max_grid`）は保存済みの作品のために残す旧互換の値で、数を書き換えません。
+
+| 旗 | 内容 |
+|---|---|
+| `--google-auth true\|false` | Google認証の切り替えを保存するだけです（この切り替えでサインインはまだできません）。省略すると変えません |
+| `--local-auth true\|false` | ローカル認証は無効にできないため、指定できるのは `true` だけです。`false` は409で拒否されます。省略すると変えません |
+| `--backup-interval N` | 自動DBバックアップの間隔（日）。省略すると変えません。[サーバー設定§8](server-configuration.md#8-backupと復旧) |
+| `--backup-generations N` | 自動DBバックアップを残す世代数。超えた古い自動バックアップは、新しいものを作るたびに消えます |
+| `--log-retention-days N` | ログを残す日数。[サーバー設定§9](server-configuration.md#9-log) |
+| `--log-retention-enabled true\|false` | ログの保存を有効／無効にします |
+| `--log-compress true\|false` | ログを圧縮します |
+| `--limit-max-expanded-primitives N` | 作品ごとの墨（図形）の数の上限。作品がこれを超えるとき、サーバーは大きなまとまりを控えめな墨の形（represented）で描きます。コンパイラの資源上限で、DDLの本文は変えません |
+| `--limit-max-expanded-per-instruction N` | 一つの型（テンプレート）あたりの墨の数の上限。作品全体の上限の内側で効きます |
+| `--limit-max-instructions N` | 作品ごとの物体テンプレートの数の上限。コンパイラの資源上限です |
+| `--limit-literal-count-threshold N` | 旧互換の値。現行の経路では、数を帯に置き換えません |
+| `--limit-represented-count-min N` | 旧互換の値。保存済みの作品のために残しています |
+| `--limit-represented-count-max N` | 旧互換の値。literal thresholdに対して正規化されます |
+| `--limit-ddl-count-max N` | 旧互換の値。現行の経路では、記述の数を書き換える規則ではありません |
+| `--limit-ddl-count-max-grid N` | 旧互換の値。保存済みの作品のために残しています |
+| `--limit-schema-count-max N` | コンパイラ資源方針で解決された数の上限。作者が書いた数は締めません |
+| `--limits-reset` | すべての制限値を既定に戻します。他の `--limit-*` は無視されます |
 
 ## 全公開APIの操作
 
@@ -293,15 +378,15 @@ AIエージェントによる自動生成、評価、および系譜ツリーを
   ```sh
   uv run inku-cli refine perform WORK_ID --kind layout -o ./refinements --png
   ```
-  `--kind` に `layout` (構図), `color` (配色カタログ) のいずれかを指定し、別案を生成してサーバーに保存します。`-o` が指定された場合はローカルファイルとしても書き出します。どちらも Web の推敲と同じく、元の作品の保存した指示書（DDL）から描き、記述を読み直しません。`layout` は指示書の範囲を新しい配置の seed で選び直し、`color` は保存した Score を別の色カタログで描きます。DDLを編集した作品も同じように推敲できます。写生は元の作品の写生文をそのまま引き継ぎ、写生を呼び直しません。`--no-save` を付けると保存しません。
+  `--kind` に `layout` (構図), `color` (配色カタログ) のいずれかを指定し、別案を生成してサーバーに保存します。`-o` が指定された場合はローカルファイルとしても書き出します。どちらも Web の推敲と同じく、元の作品の保存した指示書（DDL）から描き、記述を読み直しません。`layout` は指示書の範囲を新しい配置の seed で選び直し、`color` は保存した Score を別の色カタログで描きます。DDLを編集した作品も同じように推敲できます。写生は元の作品の写生文をそのまま引き継ぎ、写生を呼び直しません。`--no-save` を付けると保存しません。`refine generate` は `refine perform` と同じ引数・同じ処理の別名で、互換のために残しています。`refine --help` には表示されません。
 * **手動候補の系譜保存**:
   ```sh
   uv run inku-cli refine save PARENT_NODE_ID --kind layout --file score.json --input-text "入力記述"
   ```
-  ローカルで調整したScore JSONを、親ノードに接続した派生（子）としてサーバー履歴へ直接インポートします。
+  ローカルで調整したScore JSONを、親ノードに接続した派生（子）としてサーバー履歴へ直接インポートします。`--svg-file` でSVGを添えられます（省略するとSVGは空で保存されます）。`--visibility lineage_only` を付けると、通常の履歴には出さず系譜だけに置きます（既定は `normal`）。
 
-### 3. 多モデル並列比較 (inspect)
-同一の記述に対して、複数のモデルがどのように解釈（DDL）および描画するかを並列で実行し、比較します。
+### 3. 多モデル比較 (inspect)
+同一の記述に対して、複数のモデルがどのように解釈（DDL）および描画するかを順に実行し、比較します。
 
 今後の実providerテスト・比較はPrimaryをChatGPTプラン / GPT-6-Luna、SecondaryをGemini API（Cloud）/ Gemma 4 31B ITとし、NVIDIA NIMを対象・対照・fallback・Vision評価へ含めません。[AI向けテスト手順](cli-reference-for-ai.md)に従い、接続失敗時は止めます。
 
@@ -317,7 +402,7 @@ Visionモデルによる自律的な出来栄え評価、および解釈に自�
   ```sh
   uv run inku-cli review evaluate drawing.png --model VISION_MODEL
   ```
-  描画された画像を Vision LLM に送信し、余白、コントラスト、表現などの観点から点数評価および一文フィードバックを取得します（provider側のAPIキー設定が必要）。
+  描画された画像をVisionモデルに送り、色の調和・構図のバランス・余白の圧迫・全体の視覚的な出来事性のそれぞれについて0〜100の点数と、一文の要約を返します。`NVIDIA_API_KEY`（または `NVIDIA_NIM_API_KEY`）の環境変数が必要です。Vision設定がないときは `nvidia/neva-22b` を使います。`--prompt` を付けると、既定の評価文の代わりにその文を使います。
 * **未読語のフィードバック登録**:
   ```sh
   uv run inku-cli review unread "薄墨" --context "薄墨の地に円を描く"

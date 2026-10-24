@@ -558,8 +558,9 @@ mod tests {
     const GOOD: &str =
         "背景を黄で埋める。\n画面の横0.3、縦0.7の位置に、直径0.1の赤の塗りの円を1個置く。";
     const UNREAD: &str = "画面の横0.5、縦0.5の位置に、中くらいの赤い円を置く。";
-    /// From the 2026-10-24 probe: a surface word as the head stops a whole work.
-    const STOPPING: &str =
+    /// From the 2026-10-24 probe: a surface word written as a shape. The
+    /// compile leaves the sentence out; until DDL engine 71 it stopped the work.
+    const HEADLESS: &str =
         "画面の横0.0〜0.3、縦0.0〜1.0の範囲に、直径0.05の黒の薄い粒を30個散らす。";
     const REVIEWED: &str = "背景を黄で埋める。\n画面の横0.3、縦0.7の位置に、直径0.1の赤の塗りの円を1個置く。\n画面の横0.6、縦0.3の位置に、直径0.2の青の塗りの円を1個置く。";
 
@@ -796,23 +797,29 @@ mod tests {
     }
 
     #[test]
-    fn a_sentence_that_stops_the_work_is_left_out_when_asking_again_does_not_mend_it() {
-        let ddl = format!("{GOOD}\n{STOPPING}");
+    fn a_sentence_without_a_shape_is_asked_about_once_and_left_out_by_the_compile() {
+        let ddl = format!("{GOOD}\n{HEADLESS}");
         let state = start(image_config(false), false).snapshot;
         let state = answer(&state, &ddl).snapshot;
         assert_eq!(state.action.as_ref().unwrap().identity.attempt, 2);
-        assert!(state.image_fallback.is_none());
+        assert!(state.image_fallback.is_some());
         let state = answer(&state, &ddl).snapshot;
-        assert_eq!(committed_source(&state), declared(GOOD));
-        assert_eq!(state.image_ddl.as_ref().unwrap().dropped, [STOPPING]);
+        assert_eq!(committed_source(&state), declared(&ddl));
+        assert!(state.image_ddl.as_ref().unwrap().dropped.is_empty());
+        let done = run(Some(&state), &envelope(Some(&state), ack(&state))).snapshot;
+        assert!(
+            matches!(done.phase, PipelinePhase::ScoreReady),
+            "{:?}",
+            done.phase
+        );
     }
 
     #[test]
     fn a_ddl_that_draws_nothing_after_asking_again_stops_the_run() {
         let state = start(image_config(true), false).snapshot;
-        let state = answer(&state, STOPPING).snapshot;
+        let state = answer(&state, HEADLESS).snapshot;
         assert_eq!(state.action.as_ref().unwrap().identity.attempt, 2);
-        let output = answer(&state, STOPPING);
+        let output = answer(&state, HEADLESS);
         assert!(matches!(
             &output.snapshot.phase,
             PipelinePhase::Failed { reason } if reason == "image_ddl_undrawable"

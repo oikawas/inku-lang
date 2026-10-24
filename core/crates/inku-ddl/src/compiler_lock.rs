@@ -515,6 +515,10 @@ struct Projection {
     holes: Vec<TypedHole>,
     conflicts: Vec<CompilerConflict>,
     blocking: Vec<CompilerBlockingDiagnostic>,
+    /// The local issues of a sentence without a head, an action, a position
+    /// or a direction, left to the holes around them: when there are none,
+    /// each is named at its first occurrence (DDL engine 71).
+    deferred: Vec<(String, SourceSpan)>,
 }
 
 #[derive(Default)]
@@ -565,7 +569,17 @@ pub fn compile_typed_ddl(
         && projection.conflicts.is_empty()
         && projection.blocking.is_empty()
     {
-        add_blocking(&mut projection, MISSING_CANONICAL_SEMANTIC_IDENTITY, None);
+        // With no hole to hold a sentence's local issues, the sentence is named
+        // and left out rather than the whole document stopped (a surface word
+        // written as a shape, 2026-10-24). Incompleteness the compiler cannot
+        // name still stops it.
+        let deferred = std::mem::take(&mut projection.deferred);
+        if deferred.is_empty() {
+            add_blocking(&mut projection, MISSING_CANONICAL_SEMANTIC_IDENTITY, None);
+        }
+        for (kind, span) in deferred {
+            add_blocking(&mut projection, &kind, Some(span));
+        }
     }
     sort_projection(&mut projection);
     let structured_semantic_occurrence_digest = sha256_hex(&structured_semantic_occurrence_bytes(
@@ -1068,6 +1082,9 @@ fn project_deliveries(
             && !issue.occurrences.is_empty()
             && !spans_share_clause(&issue_spans, &background_clause_spans)
         {
+            projection
+                .deferred
+                .push((issue.kind.as_str().to_owned(), issue_spans[0]));
             continue;
         }
         let span = issue
@@ -1225,6 +1242,9 @@ fn project_deliveries(
             )
             && !issue.occurrences.is_empty()
         {
+            projection
+                .deferred
+                .push((issue.kind.as_str().to_owned(), issue_spans[0]));
             continue;
         }
         match issue.kind {

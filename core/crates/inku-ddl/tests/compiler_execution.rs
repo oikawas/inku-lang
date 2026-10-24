@@ -96,6 +96,86 @@ fn resource_geometry_omission_preserves_later_drawing_and_original_owner() {
 }
 
 #[test]
+fn a_sentence_without_a_shape_is_named_and_left_out_while_the_rest_draws() {
+    // A surface word written as a shape (a Vision model's DDL, 2026-10-24): the
+    // sentence has no head and its action no shape. With no hole to hold it,
+    // it stopped the whole document unnamed until DDL engine 71.
+    let headless = "画面の横0.0〜0.3、縦0.0〜1.0の範囲に、直径0.05の黒の薄い粒を30個散らす。";
+    let drawn = "画面の横0.3、縦0.7の位置に、直径0.1の黄の塗りの円を1個置く。";
+    let budget = inku_score::ResourceBudget {
+        maximum: inku_score::ResourceDemand {
+            logical_objects: 400,
+            primitive_marks: 400,
+            object_templates: 64,
+            maximum_per_template_primitive_marks: 240,
+            maximum_resolved_count: 2000,
+            template_nodes: 512,
+            anchor_instances: 400,
+            transform_instances: 400,
+            placement_instances: 400,
+            fill_instances: 400,
+        },
+    };
+    let compile = |source: &str| {
+        inku_ddl::compile_ddl_to_score_with_resources(
+            NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::Ja, Vec::new())
+                .unwrap(),
+            &[],
+            Some(23),
+            LIMITS,
+            ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+            ScoreErrorPolicy::OmitAndContinue,
+            inku_score::HardResourcePolicy {
+                identity: "headless-sentence-test.v1".to_owned(),
+                budget,
+            },
+            inku_score::OperationalResourceBudget(budget),
+        )
+    };
+    let source = format!("{drawn}{headless}");
+    let result = compile(&source);
+    let compilation = result.compilation();
+    let named = compilation
+        .blocking_diagnostics
+        .iter()
+        .map(|diagnostic| {
+            let span = diagnostic.span.expect("the sentence is named");
+            assert!(span.start_byte >= drawn.len(), "{diagnostic:?}");
+            diagnostic.kind.as_str()
+        })
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(
+        named,
+        ["missing_action_entity", "missing_entity_head"].into()
+    );
+    assert_eq!(
+        result.outcome(),
+        ScoreLoweringOutcome::CompleteWithOmissions,
+        "{:?}",
+        result.upstream_diagnostics()
+    );
+    let score = result.score().expect("the circle draws");
+    assert_eq!(score.instructions.len(), 1);
+    assert_eq!(score.instructions[0].primitive, Primitive::Circle);
+    assert_eq!(score.instructions[0].color, Color::Yellow);
+
+    // Alone, the sentence leaves nothing to draw, and is still named.
+    let alone = compile(headless);
+    assert!(
+        alone
+            .score()
+            .is_none_or(|score| score.instructions.is_empty())
+    );
+    assert!(
+        alone
+            .compilation()
+            .blocking_diagnostics
+            .iter()
+            .all(|diagnostic| diagnostic.span.is_some())
+    );
+}
+
+#[test]
 fn exact_decimal_macro_geometry_and_coordinates_share_direct_score_and_recovery() {
     use serde_json::json;
     for (shape, dimensions, direct) in [

@@ -923,6 +923,20 @@ fn hint(kind: &str, language: ResolvedInstructionLanguage) -> &'static str {
         "UnsupportedNumericSegment" => {
             "Two points (from … to) are only the ends of one line or free line, or of a line-up. Write several lines one by one, or scatter them in a range."
         }
+        "missing_entity_head" if ja => {
+            "この文には形の語（かたち）の head が無く、描かれなかった。形の語を head にし、面・道具・揺らぎの語を形として使わない。"
+        }
+        "missing_entity_head" => {
+            "This sentence has no forms word as its head and was not drawn. Make a forms word its head; do not use a surface, tool, or fluctuation word as a shape."
+        }
+        "missing_action_entity" | "missing_position_entity" | "missing_layout_direction_entity"
+            if ja =>
+        {
+            "この文の動作・位置・向きが結ぶ形が無く、描かれなかった。1 文に形を一つ書き、その形に動作を付ける。"
+        }
+        "missing_action_entity" | "missing_position_entity" | "missing_layout_direction_entity" => {
+            "The action, place, or direction of this sentence has no shape to belong to, so it was not drawn. Write one shape per sentence and give it the action."
+        }
         "missing_canonical_semantic_identity" | "MissingPlaceAction" if ja => {
             "この文のために作品が描けなかった。形の語（かたち）を head にし、面・道具・揺らぎの語を形として使わない。"
         }
@@ -1193,29 +1207,29 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn a_sentence_that_stops_the_work_is_named_and_can_be_left_out() {
-        // From the 2026-10-24 probe: a surface word as the head stopped a whole work.
+    fn a_sentence_without_a_shape_is_named_and_left_out_alone() {
+        // From the 2026-10-24 probe: a surface word as the head stopped a whole
+        // work until DDL engine 71; now only that sentence is left out.
         let ja = ResolvedInstructionLanguage::Ja;
-        let stopping = "画面の横0.0〜0.3、縦0.0〜1.0の範囲に、直径0.05の黒の薄い粒を30個散らす。";
+        let headless = "画面の横0.0〜0.3、縦0.0〜1.0の範囲に、直径0.05の黒の薄い粒を30個散らす。";
         let source = image_ddl_source(
-            &format!("画面の横0.3、縦0.7の位置に、直径0.1の黄の塗りの円を1個置く。\n{stopping}"),
+            &format!("画面の横0.3、縦0.7の位置に、直径0.1の黄の塗りの円を1個置く。\n{headless}"),
             w003(),
             ja,
         );
         let compiler = a4_compiler();
         let check = check_image_ddl(&source, ja, &compiler).unwrap();
-        assert!(!check.drawable);
+        assert!(check.drawable);
+        assert_eq!(check.instructions, 1);
         assert!(
             check
                 .problems
                 .iter()
-                .any(|problem| problem.line == stopping),
+                .any(|problem| problem.line == headless && problem.kind == "missing_entity_head"),
             "{:?}",
             check.problems
         );
-        let (salvaged, dropped) = salvage_image_ddl(&source, ja, &compiler).unwrap().unwrap();
-        assert_eq!(dropped, [stopping]);
-        assert!(check_image_ddl(&salvaged, ja, &compiler).unwrap().drawable);
+        assert_eq!(salvage_image_ddl(&source, ja, &compiler).unwrap(), None);
     }
 
     #[test]

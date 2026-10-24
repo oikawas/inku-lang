@@ -26,7 +26,7 @@ use inku_pipeline::core_boundary::{
 use inku_pipeline::image_ddl::{
     ImageCanvas, ImageDdlContext, ImageDdlLimits, ImageDdlProblem, build_image_ddl_prompt,
     build_image_ddl_review_prompt, check_image_ddl, image_ddl_source, parse_image_ddl_response,
-    render_image_ddl, review_canvas_size, with_image_ddl_feedback,
+    render_image_ddl, review_canvas_size, salvage_image_ddl, with_image_ddl_feedback,
 };
 use inku_pipeline::machine::{PipelineRenderCanvas, PipelineRenderOptions};
 use inku_pipeline::prompts::{LlmPrompt, PromptImage, PromptLimits};
@@ -154,13 +154,22 @@ fn finish(input: &str) -> Result<Value, String> {
         Err(error) => return Ok(json!({ "error": error.code() })),
     };
     let source = image_ddl_source(&ddl, canvas, input.language);
-    let check = check_image_ddl(&source, input.language, &compiler(canvas.nearest_format_id))
-        .map_err(|error| error.to_string())?;
+    let compiler = compiler(canvas.nearest_format_id);
+    let check =
+        check_image_ddl(&source, input.language, &compiler).map_err(|error| error.to_string())?;
+    let salvage = if check.drawable {
+        None
+    } else {
+        salvage_image_ddl(&source, input.language, &compiler)
+            .map_err(|error| error.to_string())?
+            .map(|(salvaged, dropped)| json!({ "source": salvaged, "dropped": dropped }))
+    };
     Ok(json!({
         "ddl": ddl,
         "source": source,
         "paper": canvas.nearest_format_id,
         "check": check,
+        "salvage": salvage,
     }))
 }
 

@@ -560,18 +560,29 @@ pub fn check_image_ddl(
         .map_err(|_| ImageDdlError::Document)?;
     let result =
         compile_with_resources(document, &[], compiler).map_err(ImageDdlError::Boundary)?;
-    let mut problems: Vec<ImageDdlProblem> = Vec::new();
-    let mut add = |span: Option<SourceSpan>, kind: String| {
-        let problem = ImageDdlProblem {
-            line: span.map_or_else(String::new, |span| line_at(source, span)),
-            kind,
-        };
-        if !problems.contains(&problem) {
-            problems.push(problem);
-        }
-    };
+    let mut found: Vec<(Option<SourceSpan>, String)> = Vec::new();
+    let compilation = result.compilation();
+    for hole in &compilation.holes {
+        found.push((Some(hole.span), hole.kind.clone()));
+    }
+    for conflict in &compilation.conflicts {
+        found.push((conflict.span, conflict.kind.clone()));
+    }
+    for blocking in &compilation.blocking_diagnostics {
+        found.push((blocking.span, blocking.kind.clone()));
+    }
+    let mut unspanned_stop = None;
     for diagnostic in result.upstream_diagnostics() {
-        add(diagnostic.span, diagnostic.reason.clone());
+        if diagnostic.span.is_none()
+            && matches!(
+                diagnostic.disposition,
+                inku_ddl::CompilerExecutionDisposition::Stopped
+            )
+        {
+            unspanned_stop = Some(diagnostic.reason.clone());
+        } else {
+            found.push((diagnostic.span, diagnostic.reason.clone()));
+        }
     }
     for diagnostic in result.downstream_diagnostics() {
         if matches!(
@@ -580,14 +591,13 @@ pub fn check_image_ddl(
         ) {
             continue;
         }
-        add(
+        found.push((
             owner_span(&diagnostic.owner),
             variant_name(&format!("{:?}", diagnostic.reason)),
-        );
+        ));
     }
     let instruction_span = |index: usize| {
-        result
-            .compilation()
+        compilation
             .semantic_document
             .as_ref()
             .and_then(|semantic| semantic.ast.instructions.get(index))
@@ -600,10 +610,37 @@ pub fn check_image_ddl(
             } => instruction_span(source_instruction_index),
             _ => None,
         };
-        add(span, "resource_limit".to_owned());
+        found.push((span, "resource_limit".to_owned()));
     }
     if result.failure().is_some() {
-        add(None, "resource_limit".to_owned());
+        found.push((None, "resource_limit".to_owned()));
+    }
+    let mut problems: Vec<ImageDdlProblem> = Vec::new();
+    let mut add = |problem: ImageDdlProblem| {
+        if !problems.contains(&problem) {
+            problems.push(problem);
+        }
+    };
+    if let Some(reason) = unspanned_stop {
+        // A stop names no sentence (2026-10-24 probe: one sentence with a
+        // surface word as its head stopped a whole work), so the lines that
+        // stop a compile alone are named instead.
+        let lines = stopping_lines(source, language, compiler)?;
+        if lines.is_empty() {
+            add(ImageDdlProblem {
+                line: String::new(),
+                kind: reason,
+            });
+        }
+        for (line, kind) in lines {
+            add(ImageDdlProblem { line, kind });
+        }
+    }
+    for (span, kind) in found {
+        add(ImageDdlProblem {
+            line: span.map_or_else(String::new, |span| line_at(source, span)),
+            kind,
+        });
     }
     let score = result.score();
     let instructions = score.map_or(0, |score| score.instructions.len());
@@ -615,6 +652,61 @@ pub fn check_image_ddl(
         instructions,
         drawable: instructions > 0 || ground,
     })
+}
+
+/// A candidate that draws nothing because a sentence stops the whole work,
+/// without the sentences that stop it alone, when what is left draws. Each
+/// line after the declaration is compiled alone with it; a line whose compile
+/// is stopped by the compiler itself (not a shape omitted for its geometry)
+/// is left out. The lines left out come back with the source.
+pub fn salvage_image_ddl(
+    source: &str,
+    language: ResolvedInstructionLanguage,
+    compiler: &CompilerOptions,
+) -> Result<Option<(String, Vec<String>)>, ImageDdlError> {
+    let dropped = stopping_lines(source, language, compiler)?
+        .into_iter()
+        .map(|(line, _)| line)
+        .collect::<Vec<_>>();
+    if dropped.is_empty() {
+        return Ok(None);
+    }
+    let salvaged = source
+        .lines()
+        .filter(|line| !dropped.contains(&line.trim().to_owned()))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let check = check_image_ddl(&salvaged, language, compiler)?;
+    Ok(check.drawable.then_some((salvaged, dropped)))
+}
+
+/// The lines after the declaration whose compile, each alone with the
+/// declaration, the compiler itself stops (not a shape omitted for its
+/// geometry), with the reason it gives.
+fn stopping_lines(
+    source: &str,
+    language: ResolvedInstructionLanguage,
+    compiler: &CompilerOptions,
+) -> Result<Vec<(String, String)>, ImageDdlError> {
+    let mut lines = source.lines();
+    let declaration = lines.next().unwrap_or_default();
+    let mut stopping = Vec::new();
+    for line in lines.filter(|line| !line.trim().is_empty()) {
+        let document =
+            NormalizedDdlDocument::new(format!("{declaration}\n{line}"), language, Vec::new())
+                .map_err(|_| ImageDdlError::Document)?;
+        let result =
+            compile_with_resources(document, &[], compiler).map_err(ImageDdlError::Boundary)?;
+        if let Some(stop) = result.upstream_diagnostics().iter().find(|diagnostic| {
+            matches!(
+                diagnostic.disposition,
+                inku_ddl::CompilerExecutionDisposition::Stopped
+            )
+        }) {
+            stopping.push((line.trim().to_owned(), stop.reason.clone()));
+        }
+    }
+    Ok(stopping)
 }
 
 fn owner_span(owner: &ScoreDiagnosticOwner) -> Option<SourceSpan> {
@@ -705,6 +797,30 @@ fn hint(kind: &str, language: ResolvedInstructionLanguage) -> &'static str {
         "resource_limit" => {
             "The marks or sentences exceed the limits. Reduce the counts or merge sentences."
         }
+        "GeometryDimensionMismatch" if ja => {
+            "この形に合わない寸法の語を使った。円・点は直径か半径、楕円・四角・三角・雲形は幅と高さ、線・自由線は長さか二点、弧は弦長と矢高で書く。"
+        }
+        "GeometryDimensionMismatch" => {
+            "A size word that this shape does not take. Circles and points take a diameter or radius; ellipses, squares, triangles, and cloudforms take a width and a height; lines and free lines take a length or two points; arcs take a chord and a sagitta."
+        }
+        "UnsupportedSurfaceIdentity" if ja => {
+            "この形はその面の語を持てない。点・線・弧・自由線に塗り・空などの面の語を付けない。"
+        }
+        "UnsupportedSurfaceIdentity" => {
+            "This shape cannot take that surface word. Do not give points, lines, arcs, or free lines a surface word such as flat or empty."
+        }
+        "UnsupportedNumericSegment" if ja => {
+            "二点（から…まで）は、1 本の線・自由線の両端か、並べる列の端にだけ使う。複数の線を引くなら、1 本ずつ書くか、範囲に散らす。"
+        }
+        "UnsupportedNumericSegment" => {
+            "Two points (from … to) are only the ends of one line or free line, or of a line-up. Write several lines one by one, or scatter them in a range."
+        }
+        "missing_canonical_semantic_identity" | "MissingPlaceAction" if ja => {
+            "この文のために作品が描けなかった。形の語（かたち）を head にし、面・道具・揺らぎの語を形として使わない。"
+        }
+        "missing_canonical_semantic_identity" | "MissingPlaceAction" => {
+            "This sentence kept the work from being drawn. Make a forms word its head; do not use a surface, tool, or fluctuation word as a shape."
+        }
         kind if kind.starts_with("ambiguous") && ja => {
             "語がどの形に掛かるかが一つに決まらない。1 文に形を一つ書き、代名詞を使わない。"
         }
@@ -738,10 +854,10 @@ const WRITING_JA: &str = r#"あなたは inku の写し手である。添えた�
 
 # 画面と数
 1. 画面は添えた画像と同じ比である。画面比の文は core が 1 文目に書くので、書かない。
-2. 位置は「画面の横X、縦Yの位置に」と書く。横は左端 0.0 から右端 1.0、縦は上端 0.0 から下端 1.0 で、横と縦を別々に測る。範囲は「画面の横a〜b、縦c〜dの範囲に」、二点は「画面の横X1、縦Y1から横X2、縦Y2まで、」と書く。
-3. 寸法（半径・直径・幅・高さ・長さ・弦長・矢高）は、画面の短辺を 1.0 とする単位で書く。本文の canvas の width と height が、画面の横と縦をこの単位で表した長さである。長い辺の向きの寸法は 1.0 を超えてよい。
+2. 位置は「画面の横X、縦Yの位置に」と書く。横は左端 0.0 から右端 1.0、縦は上端 0.0 から下端 1.0 で、横と縦を別々に測る。範囲は「画面の横a〜b、縦c〜dの範囲に」、二点は「画面の横X1、縦Y1から横X2、縦Y2まで、」と書く。二点は、1 本の線・自由線の両端か、並べる列の端にだけ使う。
+3. 寸法（半径・直径・幅・高さ・長さ・弦長・矢高）は、画面の短辺を 1.0 とする単位で書く。本文の canvas の width と height が、画面の横と縦をこの単位で表した長さである。長い辺の向きの寸法は 1.0 を超えてよい。寸法の語は形で決まる。円・点は直径か半径、楕円・四角・三角・雲形は幅と高さ、線・自由線は長さか二点、弧は弦長と矢高。
 4. 数は小数点の付いた小数で書く（0.0、0.5、1.0）。小数は 6 桁まで。
-5. 数の位置に置いた形は、回転した後の形全体が画面の内側に収まるようにする。はみ出した形は描かれない。
+5. 数の位置に置いた形は、回転した後の形全体が画面の内側に収まるようにする。回転していない形なら、横は X × canvas.width − 幅 ÷ 2 ≥ 0.0 と X × canvas.width + 幅 ÷ 2 ≤ canvas.width、縦は Y × canvas.height − 高さ ÷ 2 ≥ 0.0 と Y × canvas.height + 高さ ÷ 2 ≤ canvas.height を満たす（円は幅と高さを直径とする）。はみ出した形は描かれない。
 6. 回転は「回転N度の」と書く。画面上の時計回りで、0 以上 360 未満。
 
 # 描き方
@@ -757,10 +873,10 @@ const WRITING_EN: &str = r#"You are inku's tracer. Draw the attached image in in
 
 # Canvas and numbers
 1. The canvas has the attached image's ratio. The core writes the aspect ratio sentence first; do not write one.
-2. Write a position as "at horizontal X, vertical Y". Horizontal runs from 0.0 at the left edge to 1.0 at the right, vertical from 0.0 at the top to 1.0 at the bottom; each axis is measured on its own. A range is "in the range horizontal a to b, vertical c to d", and two points are "from horizontal X1, vertical Y1 to horizontal X2, vertical Y2".
-3. Write sizes (radius, diameter, width, height, length, chord, sagitta) in units of the canvas's short side, which is 1.0. The message's canvas width and height give the canvas's two sides in that unit. A size along the long side may exceed 1.0.
+2. Write a position as "at horizontal X, vertical Y". Horizontal runs from 0.0 at the left edge to 1.0 at the right, vertical from 0.0 at the top to 1.0 at the bottom; each axis is measured on its own. A range is "in the range horizontal a to b, vertical c to d", and two points are "from horizontal X1, vertical Y1 to horizontal X2, vertical Y2". Two points are only the ends of one line or free line, or of a line-up.
+3. Write sizes (radius, diameter, width, height, length, chord, sagitta) in units of the canvas's short side, which is 1.0. The message's canvas width and height give the canvas's two sides in that unit. A size along the long side may exceed 1.0. The size words depend on the shape: circles and points take a diameter or radius; ellipses, squares, triangles, and cloudforms take a width and a height; lines and free lines take a length or two points; arcs take a chord and a sagitta.
 4. Write numbers as decimals with a point (0.0, 0.5, 1.0), at most six decimal places.
-5. A shape placed at a numeric position must lie wholly inside the canvas after its rotation. A shape that extends outside is not drawn.
+5. A shape placed at a numeric position must lie wholly inside the canvas after its rotation. For an unrotated shape, horizontally X × canvas.width − width ÷ 2 ≥ 0.0 and X × canvas.width + width ÷ 2 ≤ canvas.width, and vertically Y × canvas.height − height ÷ 2 ≥ 0.0 and Y × canvas.height + height ÷ 2 ≤ canvas.height (a circle's width and height are its diameter). A shape that extends outside is not drawn.
 6. Write a rotation as "rotated N degrees" after the size: clockwise on the screen, at least 0 and below 360.
 
 # How to draw
@@ -966,6 +1082,32 @@ mod tests {
             ]
         );
         assert!(check.drawable);
+    }
+
+    #[test]
+    fn a_sentence_that_stops_the_work_is_named_and_can_be_left_out() {
+        // From the 2026-10-24 probe: a surface word as the head stopped a whole work.
+        let ja = ResolvedInstructionLanguage::Ja;
+        let stopping = "画面の横0.0〜0.3、縦0.0〜1.0の範囲に、直径0.05の黒の薄い粒を30個散らす。";
+        let source = image_ddl_source(
+            &format!("画面の横0.3、縦0.7の位置に、直径0.1の黄の塗りの円を1個置く。\n{stopping}"),
+            w003(),
+            ja,
+        );
+        let compiler = a4_compiler();
+        let check = check_image_ddl(&source, ja, &compiler).unwrap();
+        assert!(!check.drawable);
+        assert!(
+            check
+                .problems
+                .iter()
+                .any(|problem| problem.line == stopping),
+            "{:?}",
+            check.problems
+        );
+        let (salvaged, dropped) = salvage_image_ddl(&source, ja, &compiler).unwrap().unwrap();
+        assert_eq!(dropped, [stopping]);
+        assert!(check_image_ddl(&salvaged, ja, &compiler).unwrap().drawable);
     }
 
     #[test]

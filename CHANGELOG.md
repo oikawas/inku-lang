@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-24 — Explain missing shapes and background colors in Web diagnostics
+
+The Web explains omitted parts that lack a shape word or a shape for an action, position or direction in Japanese and English, instead of showing reason identifiers. Reasons also used for background clauses explain missing background colors. Source spans and the existing omission and continuation text are retained; DDL interpretation and drawing semantics are unchanged.
+
 ### 2026-10-24 — inku-cli draws from an image
 
 `inku-cli paint --image PATH` draws from an image through the same API calls, in the same order, as the web image tab. `--provenance` / `--provenance-file` give the source note beside it, and `--vision-model` chooses the Vision model that writes the DDL (defaulting to the CLI Vision setting). Only with `--save-history` is the work added to the history database; without it the CLI tells the pipeline not to save. The description, `--input-mode`, the sketch, `--wild`, the drawing model and `--include-thinking` are refused with it. An interrupted run is stopped. The server is unchanged.

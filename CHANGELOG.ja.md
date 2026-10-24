@@ -8,6 +8,15 @@
 
 ## 未リリース
 
+### 2026-10-24 — 英語の整数の後の「.」を読み、形の無い文を省いて描く（DDL engine 71）
+
+画像からDDLを書く試し（§12.6.6）で見つけた2つの読みを、共有compilerで直した。作者の答えは、どちらも「描画で直す（別の step）」（2026-10-24）。
+
+- 英語では、整数のすぐ後の「.」は文の終わりである。共有の数の読みはその点を小数点と読み、後に数字が無いと数ごと読めなかった。そのため、整数で終わる二点や範囲（`… to horizontal 0.9, vertical 1.`）は読めず、痕は読めない句を残して既定の位置に落ちていた。点の後に数字が続くときだけ小数点と読む（parserの小数の読みと同じ）。法則の段の英語の印字は、端末の古いcoreのために`1.0`と書き続ける。
+- 形の無い文（面・道具・揺らぎの語を形のように書いた文（`… の黒の薄い粒を30個散らす。`）や、形の無い揺らぎ（`細かく揺れる。`））は、それを抱える穴が無いと、文を名指さない`missing_canonical_semantic_identity`で文書全体を止めていた。compilerはその文を範囲つきの止める診断（`missing_entity_head`・`missing_action_entity`・`missing_position_entity`・`missing_layout_direction_entity`）で名指し、その文を省いて残りを描く（`complete_with_omissions`）。compilerが名指せない不完全さは今までどおり止める。画像の実行の手がかりもこれらの種類を名指し、こうした文は1行ずつの救い出しでなくcompileが省く。
+
+10/17の5173の書き出しのDDL 5,157本をcompileし直すと14本が変わり、どれもその止まりから、ほかの文を描く作品（命令1〜2）になる。ほかの作品は全項目が同じ。整数のすぐ後に「.」を書いた英語の保存DDLは無い。DDL engine 71。DDL 26・描画エンジン・Score・protocol・binding・core APIの版は変えない。
+
 ### 2026-10-24 — 共有coreが画像からDDLを書く（画像タブのcore）
 
 作者の依頼は、記述タブの右隣に画像タブを置き、Visionのモデルで画像ファイルから指示書を直接作ること。共有pipelineに、画像から始める実行を足した（`AuthoringInput::Image`。hostの設定が`image`を持つときに行える）。Visionのモデルが画像を見て、compilerが読む文法で可視DDLを書く。coreは1文目に画像の画面比を宣言し（DDL 26）、紙にはめ込む。compilerの所見（読めない語句、紙からはみ出す形、上限を超える文）は一度だけ返して直させ、それでも1文だけで作品全体を止める文は名指して除く。`review`のときはhostが書いたDDLを描き（`draw_image_review`）、モデルがそれを画像と見比べてもう一度直す。DDLはDDLの編集としてcommitし（reason `image_ddl`）、読めなかった行は画像を見ないまま補完しない。カタログは画像からも選べる。画像はcoreに入らない。依頼は各画像をSHA-256で名指し、providerへの送りは名指した画像と違う画像を断り、各方言のVisionの部品に置く。画像の無い依頼のbytesは変わらない。snapshotは記録`image_ddl`を持つ（画像もSVGも持たない）。ServerのPythonの出口に`pipeline_image_input_policy`・`pipeline_image_canvas`・`pipeline_image_review_svg`を足した。Claude Opus 5.5とSonnet 5.5で名画6枚を試し、どの答えからもDDLを取り出せ、compilerの所見を添えた依頼1回で、描かれない行はすべて無くなった。Serverの画像タブは別に入る。DDL・DDL engine・描画エンジン・歳時記・protocolとbindingのバージョン・記述からの実行は変えない。

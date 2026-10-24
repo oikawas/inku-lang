@@ -410,7 +410,17 @@
 # DDL declaring another ratio than the paper's out in its declared ratio, to be
 # fitted into the paper (`canvas.fit`). No undeclared DDL's Score changes (the
 # 5,157 DDLs of the 2026-10-17 5173 export).
-DDL_ENGINE_VERSION = "70"
+# 71: In English a period right after a whole number ends the sentence: a point
+# is a decimal point only when a digit follows it, so two points or a range
+# ending in a whole number (`… vertical 1.`) are read, where they fell to the
+# default place with an unread clause. A sentence without a shape (a surface,
+# tool or sway word written as a shape, or an action, place or direction that
+# belongs to no shape) is named by a blocking diagnostic with its span and left
+# out while the rest draws; with no hole to hold it, it stopped the whole
+# document with an unnamed `missing_canonical_semantic_identity`. 14 saved works
+# change, each from that stop to drawing its other sentences (the 5,157 DDLs of
+# the 2026-10-17 5173 export).
+DDL_ENGINE_VERSION = "71"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

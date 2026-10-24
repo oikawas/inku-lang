@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-24 — The manual and SPEC describe the Image tab
+
+"Creating Images" gains section 16, Paint from an Image (the source note, the image file, the Vision model, `Choose from image automatically`, `Use image aspect ratio`, the steps the indicator names, fitting into the paper, that the image is not saved, and `Instructions before review`), and Batch and the sections after it become 17 to 21. The opening, held descriptions, the input tabs and color catalog, provenance, lineage, history, model selection and troubleshooting also mention the Image tab. SPEC states the three input tabs, that the Image tab paints with the Vision model and that published ChatGPT plan Vision models appear there, that a work written from an image is description-locked, how its source note is shown in the provenance drawer, the history strip, the Library and the reading preview, and the Web's Japanese instructions, canvas default, step names, reasons and re-sending of the file it holds. The product does not change.
+
 ### 2026-10-23 — macOS adds aspect ratio declarations and fitting
 
 New direct instructions ask the core to record their aspect ratio. When the declaration and paper differ, the author can fit the work in, draw to the paper, or cancel while keeping the dialog and input. An unedited saved work uses its saved Score to make a fitted child, preserving its instructions, version, seeds and description authority. Saijiki shows the reference-only aspect ratio at the end of grounds, along with relations.

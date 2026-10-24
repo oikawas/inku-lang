@@ -85,12 +85,12 @@
 - The same day, on the author's ruling (name the source of truth), the Render Engine, DDL, Android, and Python package rows of the version table were changed, like the application row, to name the constants in their sources without copying the values, with a note that the version list holds the current values. The number was taken out of "Render Engine 66" in the terms, and the Android section now says the host asks the shared core for the `dh1` and `rh3` computations. The version list keeps a "current" column by rule, so its value was corrected to 2.15.240. The English versions were corrected the same way.
 - Result: **resolved**.
 
-### F-14 Project Context Score version and saijiki statements (open)
+### F-14 Project Context Score version and saijiki statements (resolved)
 
-- `PROJECT_CONTEXT.ja.md`, in its pipeline figure and in the "Score and resources" item, says that against the compact baseline 0.10 only a work with mirroring needs 0.15. The implementation's `ScoreVersion` (`schema.py`) goes up to 0.22.0, and the lowerer chooses 0.11 through 0.22 according to the representation used.
-- The same document says the saijiki has ten categories, while the shared asset (`saijiki-v2.json`) holds fifteen categories and the relations (あいだ), and `SPEC.ja.md` §7.5 says sixteen categories.
-- The English version says the same. This was found while fixing F-13 and lies outside the author's ruling, so it has not been changed.
-- Result: **open**.
+- `PROJECT_CONTEXT.ja.md`, in its pipeline figure and in the "Score and resources" item, said that against the compact baseline 0.10 only a work with mirroring needs 0.15. The implementation's `ScoreVersion` (`schema.py`) goes up to 0.22.0, and the lowerer chooses 0.11 through 0.22 according to the representation used.
+- The same document said the saijiki has ten categories and `おもて` eleven words, while the shared asset (`saijiki-v2.json`) holds fifteen categories and the relations (あいだ), and `おもて` has nine words. `SPEC.ja.md` §7.5 says sixteen categories. The English version said the same.
+- Found while fixing F-13, it was fixed on 2026-10-24 on the author's ruling (name the source of truth). The two Score version statements now say later versions are chosen as the representation needs, naming `ScoreVersion` for the range and SPEC §18 for the rule. The saijiki sentence no longer copies the numbers of categories and words and says the shared asset holds them. The English version was fixed the same way.
+- Result: **resolved**.
 
 ## Terms that need care across documents
 
@@ -134,6 +134,6 @@ All major nodes and edges have public-source implementation evidence. No node re
 
 ## Follow-up questions
 
-As of 2026-09-25, every difference through F-12 is resolved. F-13 was found in the 2026-10-24 reconciliation and fixed the same day. F-14 is open. New differences are added here when found.
+As of 2026-09-25, every difference through F-12 is resolved. F-13 and F-14 were found in the 2026-10-24 reconciliation and fixed the same day. New differences are added here when found.
 
 These are not changes made by this review, so they were not copied into the ledger automatically.

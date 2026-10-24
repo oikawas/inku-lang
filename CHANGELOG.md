@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-24 — A leader can no longer take a member out of their user group
+
+A leader who is not an administrator could send `"group_id": null` to `PATCH /api/users/{user_id}`, pass the route's check, and leave a member of their own user group without one (found while checking the API reference). When `group_id` is sent, any value other than the leader's own group, null included, is now refused with 403. An administrator can still clear a group with null.
+
 ### 2026-10-24 — inku-cli draws from an image
 
 `inku-cli paint --image PATH` draws from an image through the same API calls, in the same order, as the web image tab. `--provenance` / `--provenance-file` give the source note beside it, and `--vision-model` chooses the Vision model that writes the DDL (defaulting to the CLI Vision setting). Only with `--save-history` is the work added to the history database; without it the CLI tells the pipeline not to save. The description, `--input-mode`, the sketch, `--wild`, the drawing model and `--include-thinking` are refused with it. An interrupted run is stopped. The server is unchanged.

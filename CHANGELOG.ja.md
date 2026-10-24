@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+### 2026-10-24 — リーダーが利用者をユーザーグループから外せた穴を塞いだ
+
+管理者でないリーダーが `PATCH /api/users/{user_id}` に `"group_id": null` を送ると、route の判定を通り抜け、自分のユーザーグループの利用者をグループの無い状態にできた（APIリファレンスの確かめで見つけた）。`group_id` が送られたときは、nullも含めて、自分のグループ以外を403で断る。管理者は今までどおりnullでグループを外せる。
+
 ### 2026-10-24 — inku-cliで画像から描く
 
 `inku-cli paint --image PATH` で、Webの画像タブと同じAPIを同じ順に呼んで画像から描けるようにした。`--provenance` / `--provenance-file` で来歴を併記し、`--vision-model` でDDLを書くVisionモデルを選ぶ（既定はCLIのVision設定）。`--save-history` を付けたときだけ作品として履歴のDBへ追加し、付けなければpipelineへ保存しないと伝える。記述・`--input-mode`・写生・`--wild`・描画モデル・`--include-thinking` との併用は断る。中断したときはrunを止める。Serverは変えていない。

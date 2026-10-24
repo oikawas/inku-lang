@@ -84,7 +84,10 @@ const RESTRICTED = [
 	},
 	{
 		word: 'image', re: /\bimages?\b/i, instead: 'use "work" or "picture"',
-		keys: ['appInfoConceptBody', 'modelSelectionVisionHint'],
+		keys: ['appInfoConceptBody', 'modelSelectionVisionHint', 'imageTab', 'imageTabHint',
+			'imageChooseFile', 'imageUploading', 'imageThumbnailAlt', 'imageVisionRequired',
+			'imageCanvasAspect', 'imageCatalogAuto', 'imageCatalogAutoHint', 'imageWritingDdl',
+			'imageReviewingDdl', 'imageSelectingCatalog', 'imageMissing', 'imageInvalid', 'imageTooLarge', 'imageDdlFailed'],
 		texts: [],
 	},
 	{

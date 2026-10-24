@@ -80,6 +80,13 @@ The current lowerer shares finite background syntax and source-priority backgrou
 
 The normal Web and API paths use the shared-Rust authoring service. Lineage editing inherits the selected history owner and saved context while preserving the original work. Active DDL source edits retain CAS and the authority lock; changed settings create a parent-linked new variation. History restores the diagnostics for its revision and continues displaying saved DDL, Score, and SVG for old formats or a corrupt sidecar. See [CHANGELOG.md](CHANGELOG.md) for implementation history and SPEC for the current contracts.
 
+Web's Image tab asks a Vision model to write DDL directly. Images prepared by
+`POST /api/pipeline/images` stay in owner-scoped worker memory and expire after
+15 minutes or when the run ends. Review PNGs are transient too. `image_provenance`
+is a source note, separate from the drawable description; `image_ddl` holds only
+image references and the DDL history. Schema v5 adds the two nullable columns to
+v4 after making a verified backup.
+
 ## Contracts That Must Remain Intact
 
 - DDL text may be written in the author's language.
@@ -287,9 +294,9 @@ so adding one setting moves no line of `+page.svelte`.
 
 ### server (FastAPI)
 
-- The 107 endpoints live in the ten files under `server/src/inku_server/api_core/routers/` (`auth`,
-`feedback`, `history`, `lineage`, `me`, `plugins`, `public`, `render`, `settings`, `users`) and in
-the shared pipeline's `pipeline_api.py` (the thirteen `/api/pipeline/*` routes).
+- The 135 endpoints live in the thirteen files under `server/src/inku_server/api_core/routers/` (`auth`,
+`autonomous`, `chatgpt`, `description`, `feedback`, `history`, `lineage`, `me`, `plugins`, `public`, `render`, `settings`, `users`) and in
+the shared pipeline's `pipeline_api.py` (the fifteen `/api/pipeline/*` routes).
 The count is owned by `EXPECTED_ROUTE_COUNT` in `server/tests/test_route_authorization.py`.
 Shared definitions live in `api_core/{state,models,deps,common,rendering}.py`.
 - `api.py` holds only the `app` assembly, `_lifespan`, middleware, startup calls, and `include_router`

@@ -48,6 +48,9 @@ export type PipelineHoleCompletionCheck = {
 };
 
 export type PipelineView = {
+	image_ddl?: Record<string, unknown> | null;
+	image_provenance?: string | null;
+	image_failure?: PipelineErrorDetail | null;
 	execution_id: string;
 	variation_id: string;
 	sequence?: string;
@@ -129,6 +132,16 @@ export class PipelineApiError extends Error {
 
 type VariationKind = 'description' | 'direct_ddl';
 
+export type UploadedPipelineImage = {
+	image_id: string;
+	thumbnail: string;
+	original_width: number;
+	original_height: number;
+	width: number;
+	height: number;
+	nearest_format_id: string;
+};
+
 export class PipelineApi {
 	private readonly apiFetch: ApiFetch;
 	private readonly base: string;
@@ -161,6 +174,27 @@ export class PipelineApi {
 			text,
 			canvas_format_id: options.canvas_aspect,
 			options,
+		}, signal);
+	}
+
+	async uploadImage(file: File, signal?: AbortSignal): Promise<UploadedPipelineImage> {
+		const response = await this.apiFetch(this.base + '/images', {
+			method: 'POST', signal,
+			headers: { 'Content-Type': 'application/octet-stream' },
+			body: file,
+		});
+		if (!response.ok) {
+			const payload = await response.json().catch(() => ({})) as { detail?: string | PipelineErrorDetail };
+			throw new PipelineApiError(response.status, typeof payload.detail === 'string'
+				? { code: payload.detail } : payload.detail ?? { code: `http_${response.status}` });
+		}
+		return response.json() as Promise<UploadedPipelineImage>;
+	}
+
+	startImage(imageId: string, provenance: string, canvasFormatId: string, options: PipelineOptions, signal?: AbortSignal) {
+		return this.request<PipelineView>('/variations', {
+			kind: 'image', text: provenance, image_id: imageId,
+			canvas_format_id: canvasFormatId, options,
 		}, signal);
 	}
 

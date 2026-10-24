@@ -80,6 +80,8 @@ class RecompositionResult(BaseModel):
 
 class HistoryPostBody(BaseModel):
     input: str
+    image_provenance: str | None = None
+    image_ddl: dict | None = None
     ddl: str | None = None
     ddl_source_origin: Literal["legacy_expanded"] | None = None
 

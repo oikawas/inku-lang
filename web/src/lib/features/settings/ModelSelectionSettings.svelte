@@ -13,6 +13,7 @@
 		providerGroups: ProviderGroup[];
 		visionProviderGroups: ProviderGroup[];
 		allowVisionSelection: boolean;
+		visionOnlySelection?: boolean;
 		includeThinking: boolean;
 		onSetStage1Provider: (provider: Provider) => void;
 		onSetStage1Model: (model: string) => void;
@@ -27,7 +28,7 @@
 	let {
 		stage1Provider, stage1Model,
 		visionProvider, visionModel, providerGroups, visionProviderGroups,
-		allowVisionSelection, includeThinking = $bindable(),
+		allowVisionSelection, visionOnlySelection = false, includeThinking = $bindable(),
 		onSetStage1Provider, onSetStage1Model, onSetStage2Provider, onSetStage2Model,
 		onSetVisionProvider, onSetVisionModel, onCancel, onConfirm
 	}: Props = $props();
@@ -37,6 +38,7 @@
 	// chooses it for Stage 1 and Stage 2 together, and there is no per-stage tab.
 	type ModelSelectionTab = 'shared' | 'vision';
 	let modelSelectionTab = $state<ModelSelectionTab>('shared');
+	$effect(() => { if (visionOnlySelection) modelSelectionTab = 'vision'; });
 	const recommendationPurpose = $derived<ModelPurpose>(modelSelectionTab === 'vision' ? 'vision' : 'llm');
 	const recommendationStage = $derived<ModelStage | undefined>(modelSelectionTab === 'vision' ? undefined : 'both');
 	function modelSelected(provider: Provider, model: string): boolean {
@@ -60,16 +62,16 @@
 </script>
 
 		<div class="settings-tabs model-selection-tabs" role="tablist" aria-label={t().modelSelectButton}>
-			<button role="tab" aria-selected={modelSelectionTab === 'shared'} class:active={modelSelectionTab === 'shared'} onclick={() => (modelSelectionTab = 'shared')}>Stage 1/2</button>
+			{#if !visionOnlySelection}<button role="tab" aria-selected={modelSelectionTab === 'shared'} class:active={modelSelectionTab === 'shared'} onclick={() => (modelSelectionTab = 'shared')}>Stage 1/2</button>{/if}
 			{#if allowVisionSelection}<button role="tab" aria-selected={modelSelectionTab === 'vision'} class:active={modelSelectionTab === 'vision'} onclick={() => (modelSelectionTab = 'vision')}>Vision</button>{/if}
 		</div>
 	<div class="settings-body">
 			<div class="model-selection-summary">
-				<span><strong>Stage 1/2</strong>{providerGroups.find((group) => group.id === stage1Provider)?.models.find((model) => model.id === stage1Model)?.label ?? stage1Model}</span>
+				{#if !visionOnlySelection}<span><strong>Stage 1/2</strong>{providerGroups.find((group) => group.id === stage1Provider)?.models.find((model) => model.id === stage1Model)?.label ?? stage1Model}</span>{/if}
 				{#if allowVisionSelection}<span><strong>Vision</strong>{visionProviderGroups.find((group) => group.id === visionProvider)?.models.find((model) => model.id === visionModel)?.label ?? visionModel}</span>{/if}
 			</div>
 			<p class="model-selection-hint">{modelSelectionTab === 'vision' ? t().modelSelectionVisionHint : t().modelSelectionSharedHint}</p>
-			{#if stage1Provider === 'chatgpt'}
+			{#if !visionOnlySelection && stage1Provider === 'chatgpt'}
 				<p>{providerGroups.some((group) => group.id === 'chatgpt' && group.models.some((model) => model.id === stage1Model)) ? t().chatgptUsingPlan : t().chatgptModelUnavailable}</p>
 			{/if}
 			<div class="generation-model-groups">

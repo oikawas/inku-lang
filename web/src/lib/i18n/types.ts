@@ -2,6 +2,25 @@ import type { ComposeFallbackState } from '$lib/composeFallback';
 import type { EnglishForm, VerseForm } from '$lib/verseForm';
 
 export interface LangPack {
+	imageTab: string;
+	imageTabHint: string;
+	imageProvenanceLabel: string;
+	imageProvenanceHint: string;
+	imageChooseFile: string;
+	imageUploading: string;
+	imageThumbnailAlt: string;
+	imageVisionRequired: string;
+	imageCanvasAspect: string;
+	imageCatalogAuto: string;
+	imageCatalogAutoHint: string;
+	imageWritingDdl: string;
+	imageRevisingDdl: string;
+	imageReviewingDdl: string;
+	imageSelectingCatalog: string;
+	imageMissing: string;
+	imageInvalid: string;
+	imageTooLarge: string;
+	imageDdlFailed: string;
 	chatgptPlanLabel: string;
 	chatgptPlanNotice: string;
 	chatgptLocalHelperHint: string;

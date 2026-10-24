@@ -29,7 +29,7 @@ import { RefinementSessionState } from '$lib/features/canvas/refinement-session.
 import { HistoryBrowsingState } from '$lib/features/history/browsing-state.svelte';
 import { CanvasViewportState } from '$lib/features/canvas/viewport-state.svelte';
 import type { SaveHistoryOptions } from '$lib/features/history/save';
-import { PipelineApi, PipelineApiError, pipelineDiagnostics, pipelinePatch, pipelineViewFromErrorDetail, type PipelineOptions, type PipelineView } from '$lib/features/pipeline/api';
+import { PipelineApi, PipelineApiError, pipelineDiagnostics, pipelinePatch, pipelineViewFromErrorDetail, type PipelineOptions, type PipelineView, type UploadedPipelineImage } from '$lib/features/pipeline/api';
 import { PipelineController } from '$lib/features/pipeline/controller';
 import { runningStageLabel, type ProviderAttemptCount } from '$lib/paintStream';
 
@@ -50,6 +50,8 @@ export type WorkStateDeps = {
 		stage1Model: () => string;
 		stage2Provider: () => Provider;
 		stage2Model: () => string;
+		visionProvider: () => Provider;
+		visionModel: () => string;
 		includeThinking: () => boolean;
 		available: () => ProviderGroup[];
 	};
@@ -74,7 +76,30 @@ export function createWorkState(deps: WorkStateDeps) {
 	// ── Input ───────────────────────────────────────────────
 	const DEFAULT_INPUT = '山の向こうに月が昇る';
 
-	let inputMode = $state<'single' | 'batch'>('single');
+	let inputMode = $state<'single' | 'image' | 'batch'>('single');
+	let imageProvenance = $state('');
+	let uploadedImage = $state<UploadedPipelineImage | null>(null);
+	let imageFileName = $state('');
+	let imageUploading = $state(false);
+	let imageCanvasAspectId = $state<CanvasAspectId>('image');
+	let imageUploadOrdinal = 0;
+	let imageFile: File | null = null;
+	let imageUploadConsumed = false;
+	let imageRunActive = $state(false);
+	function clearImage(): void {
+		if (imageRunActive) {
+			submitStopRequested = true;
+			submitAbortController?.abort();
+			pipelineController.clear();
+		}
+		imageUploadOrdinal += 1;
+		imageFile = null;
+		uploadedImage = null;
+		imageFileName = '';
+		imageProvenance = '';
+		imageUploading = false;
+		imageUploadConsumed = false;
+	}
 
 	let input = $state(DEFAULT_INPUT);
 
@@ -245,8 +270,14 @@ export function createWorkState(deps: WorkStateDeps) {
 		pipelineView = view;
 		activeRunAttempt = view?.provider_attempt ?? null;
 		if (!view) return;
-		input = view.description;
-		stage1UserPrompt = view.description;
+		if (view.image_ddl || view.image_provenance != null) {
+			imageProvenance = view.image_provenance ?? '';
+			input = '';
+			stage1UserPrompt = '';
+		} else {
+			input = view.description;
+			stage1UserPrompt = view.description;
+		}
 		if (view.document) {
 			ddl = view.document.source;
 			ddlGeneratedBaseline = view.document.source;
@@ -272,6 +303,88 @@ export function createWorkState(deps: WorkStateDeps) {
 		() => pipelineOptions(),
 		adoptPipelineView,
 	);
+
+	async function selectImage(file: File): Promise<void> {
+		const ordinal = ++imageUploadOrdinal;
+		imageFile = file;
+		imageUploadConsumed = false;
+		uploadedImage = null;
+		imageFileName = file.name;
+		imageUploading = true;
+		error = null;
+		try {
+			const image = await new PipelineApi(apiFetch).uploadImage(file);
+			if (ordinal === imageUploadOrdinal) uploadedImage = image;
+		} catch (cause) {
+			if (ordinal === imageUploadOrdinal) error = cause instanceof PipelineApiError
+				? describeApiError(cause.detail, cause.status) : String(cause);
+		} finally {
+			if (ordinal === imageUploadOrdinal) imageUploading = false;
+		}
+	}
+
+	async function submitImage(): Promise<void> {
+		if (!uploadedImage || imageUploading || loading || reloading || pipelineBusy || refinementSession.gridBusy || demo.running || batch.resuming) return;
+		let image = uploadedImage;
+		const provenance = imageProvenance;
+		const model = qualifiedModelId(deps.models.visionProvider(), deps.models.visionModel());
+		const abortController = new AbortController();
+		submitAbortController = abortController;
+		submitStopRequested = false;
+		loading = true;
+		imageRunActive = true;
+		activeRunMode = 'single';
+		error = null;
+		ddl = null; ddlGeneratedBaseline = null; thinking = null; result = null;
+		displayedHistoryItem = null;
+		deps.history().clearSelection();
+		resetTargetScopedState();
+		pendingCanvasAspectDerivation = null;
+		pipelineController.clear();
+		adoptSketch(null, null, null, 'off');
+		stageLabel = t().imageWritingDdl;
+		startTimer();
+		try {
+			if (imageUploadConsumed && imageFile) {
+				image = await new PipelineApi(apiFetch).uploadImage(imageFile, abortController.signal);
+				abortController.signal.throwIfAborted();
+				uploadedImage = image;
+			}
+			imageUploadConsumed = true;
+			const view = await finishPipeline(() => pipelineController.fromImage(image.image_id, provenance, imageCanvasAspectId, {
+				...pipelineOptions(), stage1_model: model, stage2_model: model,
+				sketch: 'off', sketch_text: undefined, wild: false, instruction_lang: 'ja',
+				canvas_aspect: imageCanvasAspectId === 'image' ? image.nearest_format_id : imageCanvasAspectId,
+				canvas_fit: 'contain',
+			}, abortController.signal));
+			if (view.image_failure) error = describeApiError(view.image_failure, 422);
+			else if (view.phase.tag === 'failed') error = describeApiError({ code: view.phase.reason ?? 'image_ddl_failed' }, 422);
+		} catch (cause) {
+			if (!submitStopRequested && !abortController.signal.aborted) {
+				error = cause instanceof PipelineApiError ? describeApiError(cause.detail, cause.status)
+					: cause instanceof Error ? cause.message : String(cause);
+			}
+		} finally {
+			if (submitAbortController === abortController) submitAbortController = null;
+			submitStopRequested = false;
+			stopTimer(); loading = false; imageRunActive = false; activeRunMode = null; stageLabel = '';
+		}
+	}
+
+	function requestSubmitImage(): void {
+		if (ddl !== null && ddlGeneratedBaseline !== null && ddl !== ddlGeneratedBaseline && !loading && !reloading) {
+			deps.requestConfirmation({
+				message: t().confirmDdlOverwriteMessage,
+				runLabel: t().confirmOk,
+				hideCancel: false,
+				run: () => { void submitImage(); },
+				secondaryLabel: t().ddlPaintButton,
+				secondaryRun: () => { void replay(); },
+			});
+			return;
+		}
+		void submitImage();
+	}
 
 	async function pipelineCompatibilityError(response: Response): Promise<Error> {
 		const payload = await response.json().catch(() => ({})) as { detail?: unknown };
@@ -929,7 +1042,8 @@ export function createWorkState(deps: WorkStateDeps) {
 			?? displayedHistoryItem?.render_canvas_aspect_id ?? result?.render_canvas_aspect_id ?? null;
 		const declared = declaredCanvasRatio(ddl);
 		const fitBasis = declared ?? (unedited && parentAspectId ? canvasRatioOfAspect(parentAspectId) : null);
-		const fitChoice = await chooseCanvasFit(fitBasis, paperId);
+		const imageOrigin = !!(displayedHistoryItem?.image_ddl ?? result?.image_ddl ?? pipelineView?.image_ddl);
+		const fitChoice = imageOrigin ? 'fit' : await chooseCanvasFit(fitBasis, paperId);
 		if (fitChoice === null) return;
 		if (fitChoice === 'fit' && unedited && replayParentNodeId && parentWorkId) {
 			const abortController = new AbortController();
@@ -1092,6 +1206,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		},
 		get canSubmit() { return canSubmit; },
 		get currentInstructionText() {
+			if (displayedHistoryItem?.image_ddl || result?.image_ddl || pipelineView?.image_ddl) return '';
 			if (displayedHistoryItem?.input) return displayedHistoryItem.input;
 			if (showingDemo) return demo.generatedPrompt;
 			if (inputMode === 'batch' || activeRunMode === 'batch') return batch.latestPrompt;
@@ -1110,6 +1225,18 @@ export function createWorkState(deps: WorkStateDeps) {
 		},
 		get inputMode() { return inputMode; },
 		set inputMode(value) { inputMode = value; },
+		get imageProvenance() { return imageProvenance; },
+		set imageProvenance(value) { imageProvenance = value; },
+		get uploadedImage() { return uploadedImage; },
+		get imageFileName() { return imageFileName; },
+		get imageUploading() { return imageUploading; },
+		get imageRunning() { return imageRunActive || (reloading && !!(displayedHistoryItem?.image_ddl ?? result?.image_ddl)); },
+		get imageCanvasAspectId() { return imageCanvasAspectId; },
+		set imageCanvasAspectId(value) { imageCanvasAspectId = value; },
+		selectImage,
+		submitImage,
+		requestSubmitImage,
+		clearImage,
 		get input() { return input; },
 		set input(value) { input = value; },
 		get stage1UserPrompt() { return stage1UserPrompt; },

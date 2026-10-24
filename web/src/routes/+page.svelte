@@ -186,7 +186,7 @@
 	type CopyKind = 'sketch' | 'stage1' | 'composition' | 'laws' | 'colors' | 'stage2' | 'score';
 	let copiedPrompt = $state<CopyKind | null>(null);
 	let statusHashCopied = $state(false);
-	let previousInputMode = $state<'single' | 'batch'>('single');
+	let previousInputMode = $state<'single' | 'image' | 'batch'>('single');
 	type TextDiffPart = { kind: "same" | "removed" | "added"; text: string };
 	const refinementSession = new RefinementSessionState();
 	let lineageIntermediateNotice = $state<string | null>(null);
@@ -250,6 +250,7 @@
 	};
 	let modelSelectionSnapshot = $state<ModelSelectionSnapshot | null>(null);
 	let modelSelectionAllowVision = $state(true);
+	let modelSelectionVisionOnly = $state(false);
 	// The Server config supplies the candidate-grid cap so it tracks render slots;
 	// apiFetch handles 503 retries when other work temporarily occupies a slot.
 	let renderFanoutLimit = $state(4);
@@ -595,6 +596,8 @@
 			stage1Model: () => stage1Model,
 			stage2Provider: () => stage2Provider,
 			stage2Model: () => stage2Model,
+			visionProvider: () => visionProvider,
+			visionModel: () => visionModel,
 			includeThinking: () => includeThinking,
 			available: () => availableModelCatalog
 		},
@@ -948,8 +951,9 @@
 		return saveExportTemplates(exportTemplates.filter((template) => template.id !== id));
 	}
 
-	function openModelSelection(allowVision = true) {
+	function openModelSelection(allowVision = true, visionOnly = false) {
 		modelSelectionAllowVision = allowVision;
+		modelSelectionVisionOnly = visionOnly;
 		modelSelectionSnapshot = { stage1Provider, stage1Model, stage2Provider, stage2Model, visionProvider, visionModel };
 		settings.openModelSelection();
 	}
@@ -1159,7 +1163,9 @@
 			clearChatGPTModelCatalog();
 			availableModelCatalog = data.drawing_catalog ?? data.llm_catalog ?? data.catalog;
 			demoPromptModelCatalog = demoInstructionModelGroups(data.llm_catalog ?? data.catalog);
-			availableVisionModelCatalog = data.vision_catalog ?? data.catalog.filter((group) => group.models.some((model) => model.purposes?.includes('vision')));
+			availableVisionModelCatalog = (data.vision_catalog ?? data.catalog)
+				.map((group) => ({ ...group, models: group.models.filter((model) => model.purposes?.includes('vision') && !model.unsupported_purposes?.includes('vision')) }))
+				.filter((group) => group.models.length > 0);
 			availableModelsLoaded = true;
 			if (data.settings.model_settings) {
 				applyUserModelSettings(
@@ -1310,6 +1316,7 @@
 	}
 
 	function resetAfterSignedOut(): void {
+		work.clearImage();
 		compositionRanges = [];
 		ddlRangePreview = null;
 		userMenuOpen = false;
@@ -1763,7 +1770,7 @@ async function drawLineageDdlEdit(node: LineageNode, editedDdl: string, signal?:
 	const sourceText = node.history.source_text ?? node.history.input ?? '';
 	// An edited DDL that declares another ratio than the work's paper (DDL 26).
 	const paperId = lineageCanvasAspectId(node);
-	const fit = await work.chooseCanvasFit(declaredCanvasRatio(nextDdl), paperId);
+	const fit = node.history.image_ddl ? 'fit' : await work.chooseCanvasFit(declaredCanvasRatio(nextDdl), paperId);
 	if (fit === null) return false;
 	if (!(await work.selectHistoryAuthority(node.history.id, node.history.pipeline_variation_id, signal))) return true;
 	const view = await work.authorDdl(nextDdl, {
@@ -2019,7 +2026,11 @@ $effect(() => {
 		void history.syncToItem(it);
 		work.lineageDetached = false;
 		if (!options.preserveAuthoring) {
-			work.inputMode = 'single';
+			work.inputMode = it.image_ddl || it.image_provenance != null ? 'image' : 'single';
+			if (work.inputMode === 'image') {
+				work.clearImage();
+				work.imageProvenance = it.image_provenance ?? '';
+			}
 			work.input = projection.sourceText;
 			work.ddl = projection.ddl;
 			work.ddlGeneratedBaseline = projection.ddl;
@@ -2434,7 +2445,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		: (work.result?.stage2_model ? modelShortName(work.result.stage2_model) : '-'));
 	const nextStage1Model = $derived(statusModelName(qualifiedModelId(stage1Provider, stage1Model)));
 	const nextStage2Model = $derived(statusModelName(qualifiedModelId(stage2Provider, stage2Model)));
-	const nextCatalogName = $derived(colorCatalogSettings.isAuto ? t().colorCatalogAuto : currentCatalog.name);
+	const nextCatalogName = $derived(colorCatalogSettings.isAuto ? (work.inputMode === 'image' ? t().imageCatalogAuto : t().colorCatalogAuto) : currentCatalog.name);
 	// The catalog a work was drawn with, named as it stands today. Two things
 	// the bare name cannot say are said here instead of being papered over: an
 	// id nothing current answers to is marked retired rather than shown as the
@@ -2814,6 +2825,18 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						sketchMode={work.sketchMode}
 						onSelectSketchMode={(mode) => (work.sketchMode = mode)}
 						bind:inputMode={work.inputMode}
+						bind:imageProvenance={work.imageProvenance}
+						uploadedImage={work.uploadedImage}
+						imageFileName={work.imageFileName}
+						imageUploading={work.imageUploading}
+						imageRunning={work.imageRunning}
+						imageCanvasAspectId={work.imageCanvasAspectId}
+						visionModelName={statusModelName(qualifiedModelId(visionProvider, visionModel))}
+						visionModelAvailable={availableVisionModelCatalog.some((group) => group.id === visionProvider && group.models.some((model) => model.id === visionModel))}
+						onSelectImage={work.selectImage}
+						onSubmitImage={work.requestSubmitImage}
+						onSelectImageCanvasAspect={(id) => { work.imageCanvasAspectId = id; canvasAspectMenuOpen = false; }}
+						onOpenImageModelSelection={() => openModelSelection(true, true)}
 						bind:input={work.input}
 						bind:batchInput={batch.input}
 						lineNumbersText={batch.lineNumbersText}
@@ -2905,7 +2928,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						onDecline={work.declinePipelinePatch}
 					/>
 
-					{#if work.inputMode === 'single' && (work.result !== null || work.ddl !== null || work.sketchText !== null)}
+					{#if work.inputMode !== 'batch' && (work.result !== null || work.ddl !== null || work.sketchText !== null)}
 						<h3 class="displayed-work-heading">{t().displayedWorkProcess}</h3>
 					{/if}
 
@@ -2963,7 +2986,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					{/if}
 
 					<!-- The complete DDL draft uses the same editor as the dialog. -->
-					{#if work.ddl !== null && work.inputMode === 'single'}
+					{#if work.ddl !== null && work.inputMode !== 'batch'}
 						<section class="panel-section">
 							<DdlViewer
 								bind:this={ddlViewer}
@@ -3371,6 +3394,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			providerGroups={settings.mode === 'model' ? availableModelCatalog : settings.modelCatalog}
 			visionProviderGroups={availableVisionModelCatalog}
 			allowVisionSelection={modelSelectionAllowVision}
+			visionOnlySelection={modelSelectionVisionOnly}
 			bind:includeThinking
 			currentUser={session.currentUser}
 			uiMode={session.uiMode}
@@ -3513,6 +3537,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 {#if catalogOpen}
 	{#await import('$lib/components/ColorCatalogModal.svelte') then { default: ColorCatalogModal }}
 		<ColorCatalogModal
+			imageInput={work.inputMode === 'image'}
 			catalogs={colorCatalogs}
 			selectedCatalog={colorCatalogSettings.selected}
 			{currentCatalog}

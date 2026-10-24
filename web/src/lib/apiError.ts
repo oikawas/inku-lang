@@ -62,6 +62,12 @@ const RENDER_REFUSALS = new Set([
 
 /** Turn a Server failure detail into one human-readable line. */
 export function describeApiErrorDetail(detail: unknown, status: number, strings: LangPack): string {
+	const imageCode = typeof detail === 'string' ? detail : object(detail)?.code;
+	if (imageCode === 'image_missing' || imageCode === 'image_expired') return strings.imageMissing;
+	if (imageCode === 'image_invalid') return strings.imageInvalid;
+	if (imageCode === 'image_too_large') return strings.imageTooLarge;
+	if (imageCode === 'image_model_not_vision') return strings.imageVisionRequired;
+	if (imageCode === 'image_ddl_failed' || imageCode === 'image_ddl_undrawable') return strings.imageDdlFailed;
 	if (detail === 'render capacity is full') return strings.errorRenderBusy;
 	if (detail === 'description is only labels') return strings.errorDescriptionOnlyLabels;
 	// The account deletions the server refuses, said in the page's language.

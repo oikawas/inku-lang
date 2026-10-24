@@ -66,6 +66,8 @@ def _engine(path: Path):
 def _create_history_schema(connection) -> None:
     connection.exec_driver_sql(_HISTORY_DDL)
     connection.exec_driver_sql("ALTER TABLE history ADD COLUMN ddl_source_origin TEXT")
+    connection.exec_driver_sql("ALTER TABLE history ADD COLUMN image_provenance TEXT")
+    connection.exec_driver_sql("ALTER TABLE history ADD COLUMN image_ddl TEXT")
 
 
 def _no_op(_connection) -> None:

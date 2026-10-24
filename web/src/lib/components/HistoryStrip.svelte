@@ -10,6 +10,8 @@
 	type HistoryItem = {
 		id?: string;
 		input: string;
+		source_text?: string | null;
+		image_provenance?: string | null;
 		ddl: string | null;
 		thinking?: string | null;
 		score: { instructions: unknown[] };
@@ -279,10 +281,12 @@
 						onclick={() => !interactionLocked && onLoadItem(it)}
 						onkeydown={(event) => handleThumbKeydown(event, it)}
 						role="button"
+						aria-label={it.image_provenance ?? it.source_text ?? it.input}
 						tabindex={interactionLocked ? -1 : 0}
 					>
 						<div class="thumb-tooltip">
 							<div class="tooltip-title">#{historyIndexLabel(i)}</div>
+							<div class="tooltip-row tooltip-description"><span>{it.image_provenance != null ? t().imageProvenanceLabel : t().inputSectionLabel}</span><strong>{it.image_provenance ?? it.source_text ?? it.input}</strong></div>
 							<div class="tooltip-row"><span>Stage 1</span><strong>{historyModelStage1Full(it)}</strong></div>
 							<div class="tooltip-row"><span>Stage 2</span><strong>{historyModelStage2Full(it)}</strong></div>
 							<div class="tooltip-row"><span>{t().historyTooltipSavedAt}</span><strong>{formatHistoryDate(it.at)}</strong></div>
@@ -574,6 +578,8 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
+	.tooltip-description { align-items: start; white-space: normal; }
+	.tooltip-description strong { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow-wrap: anywhere; }
 	.thumb-meta {
 		padding: 3px 5px;
 		border-top: 1px solid var(--border);

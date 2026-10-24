@@ -14,7 +14,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.exc import OperationalError
 
-from .backup import SQLiteSnapshot
+from .backup import SQLiteSnapshot, create_sqlite_snapshot
 from .invariants import require_integrity
 
 
@@ -66,16 +66,24 @@ LEGACY_V3_CHECKSUM = hashlib.sha256(
     json.dumps(_V3_MIGRATION_MANIFEST, separators=(",", ":")).encode("utf-8")
 ).hexdigest()
 
-MIGRATION_VERSION = 4
-MIGRATION_NAME = "single_history_ddl"
-_MIGRATION_MANIFEST = (
+SINGLE_DDL_VERSION = 4
+SINGLE_DDL_NAME = "single_history_ddl"
+_SINGLE_DDL_MANIFEST = (
     *_V3_MIGRATION_MANIFEST, "ddl-priority-unicode-white-space-v1",
     "legacy-expanded-source-origin-v1", "drop-expanded-ddl-v1",
     "all-persistent-values-rowid-link-and-fts-invariants-v1",
 )
+SINGLE_DDL_CHECKSUM = hashlib.sha256(
+    json.dumps(_SINGLE_DDL_MANIFEST, separators=(",", ":")).encode("utf-8")
+).hexdigest()
+
+MIGRATION_VERSION = 5
+MIGRATION_NAME = "image_input_provenance"
+_MIGRATION_MANIFEST = (*_SINGLE_DDL_MANIFEST, "nullable-image-provenance-and-ddl-record-v1")
 MIGRATION_CHECKSUM = hashlib.sha256(
     json.dumps(_MIGRATION_MANIFEST, separators=(",", ":")).encode("utf-8")
 ).hexdigest()
+IMAGE_HISTORY_COLUMNS = ("image_provenance", "image_ddl")
 
 _REGISTRY_DDL = """
 CREATE TABLE schema_migrations (
@@ -348,11 +356,21 @@ def _require_single_ddl_schema(connection: Connection) -> None:
             raise MigrationStateError("single-DDL fields must be nullable TEXT")
 
 
+def _require_image_history_schema(connection: Connection) -> None:
+    columns = {row[1]: row for row in connection.exec_driver_sql("PRAGMA table_info(history)")}
+    if not set(IMAGE_HISTORY_COLUMNS) <= columns.keys():
+        raise MigrationStateError("registry and image history physical schema disagree")
+    for name in IMAGE_HISTORY_COLUMNS:
+        if columns[name][3] or columns[name][2].upper() != "TEXT" or columns[name][4] is not None:
+            raise MigrationStateError("image history fields must be nullable TEXT without a default")
+
+
 def _verify_registry(connection: Connection) -> str:
     rows = connection.exec_driver_sql(
         "SELECT version, name, checksum FROM schema_migrations ORDER BY version"
     ).fetchall()
     current = [(MIGRATION_VERSION, MIGRATION_NAME, MIGRATION_CHECKSUM)]
+    single_ddl = [(SINGLE_DDL_VERSION, SINGLE_DDL_NAME, SINGLE_DDL_CHECKSUM)]
     v3 = [(LEGACY_V3_VERSION, LEGACY_V3_NAME, LEGACY_V3_CHECKSUM)]
     previous = [
         (
@@ -362,8 +380,10 @@ def _verify_registry(connection: Connection) -> str:
         )
     ]
     v1 = [(_V1_MIGRATION_VERSION, _V1_MIGRATION_NAME, _V1_MIGRATION_CHECKSUM)]
-    if rows == current or rows == v3 + current:
+    if rows in (current, single_ddl + current, v3 + current, v3 + single_ddl + current):
         return "current"
+    if rows in (single_ddl, v3 + single_ddl):
+        return "single_ddl"
     if rows == v3:
         return "v3"
     if rows == previous:
@@ -437,6 +457,34 @@ def _begin_immediate(connection: Connection) -> None:
     connection.exec_driver_sql("BEGIN IMMEDIATE")
 
 
+def _upgrade_image_history(*, engine: Engine, database_path: Path | None,
+                           fts_enabled: bool) -> MigrationOutcome:
+    if database_path is None:
+        raise MigrationStateError("an existing in-memory database cannot be snapshotted")
+    snapshot = create_sqlite_snapshot(database_path, database_path.parent / "migration-backups" /
+                                      f"{database_path.stem}-pre-v{MIGRATION_VERSION}-{time.time_ns()}.db")
+    with engine.connect() as connection:
+        _begin_immediate(connection)
+        try:
+            if _verify_registry(connection) != "single_ddl":
+                raise MigrationStateError("registered schema changed before writer lock")
+            _require_single_ddl_schema(connection)
+            columns = {row[1] for row in connection.exec_driver_sql("PRAGMA table_info(history)")}
+            if set(IMAGE_HISTORY_COLUMNS) & columns:
+                raise MigrationStateError("v4 registry contains a partial image history schema")
+            for name in IMAGE_HISTORY_COLUMNS:
+                connection.exec_driver_sql(f"ALTER TABLE history ADD COLUMN {name} TEXT")
+            _require_image_history_schema(connection)
+            require_integrity(connection)
+            _record_baseline(connection)
+            connection.commit()
+        except Exception as exc:
+            connection.rollback()
+            raise MigrationExecutionError(snapshot) from exc
+    return MigrationOutcome(mode="registered_upgrade", fts_enabled=fts_enabled,
+                            fingerprint_name=SINGLE_DDL_NAME, snapshot=snapshot)
+
+
 def ensure_current_schema(
     *,
     engine: Engine,
@@ -445,7 +493,7 @@ def ensure_current_schema(
     seed_fresh: Callable[[Connection], None],
     apply_legacy: Callable[[Connection], None],
 ) -> MigrationOutcome:
-    """Create a current DB or verify it; existing old DBs require the CLI.
+    """Create or verify current storage; add nullable image fields to v4.
 
     The callback signature remains stable for the DB façade. Historical
     upgrades belong to ``legacy_v3_migrations`` and the isolated restore entry.
@@ -460,6 +508,7 @@ def ensure_current_schema(
                 seed_fresh(connection)
                 fts_enabled = install_history_fts(connection, rebuild=False)
                 _require_single_ddl_schema(connection)
+                _require_image_history_schema(connection)
                 require_integrity(connection)
                 _record_baseline(connection)
                 connection.commit()
@@ -475,9 +524,14 @@ def ensure_current_schema(
                 raise MigrationStateError("history FTS objects are internally inconsistent")
             if registry_state == "current":
                 _require_single_ddl_schema(connection)
+                _require_image_history_schema(connection)
                 return MigrationOutcome(
                     mode="current", fts_enabled=state == "complete"
                 )
+            if registry_state == "single_ddl":
+                _require_single_ddl_schema(connection)
+                return _upgrade_image_history(engine=engine, database_path=database_path,
+                                              fts_enabled=state == "complete")
             raise MigrationStateError(
                 "manual history DDL migration required; use migrate_history_ddl.py "
                 "on a verified copy before starting this release"

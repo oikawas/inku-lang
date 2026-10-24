@@ -38,6 +38,7 @@
 		providerGroups: ProviderGroup[];
 		visionProviderGroups: ProviderGroup[];
 		allowVisionSelection: boolean;
+		visionOnlySelection?: boolean;
 		includeThinking: boolean;
 		currentUser: SettingsUserItem | null;
 		uiMode: UiMode;
@@ -87,6 +88,7 @@
 		providerGroups,
 		visionProviderGroups,
 		allowVisionSelection,
+		visionOnlySelection = false,
 		includeThinking = $bindable(),
 		currentUser,
 		uiMode,
@@ -269,7 +271,7 @@
 	{#if settingsMode === 'model'}
 		<ModelSelectionSettings
 			bind:includeThinking {stage1Provider} {stage1Model}
-			{visionProvider} {visionModel} {providerGroups} {visionProviderGroups} {allowVisionSelection}
+			{visionProvider} {visionModel} {providerGroups} {visionProviderGroups} {allowVisionSelection} {visionOnlySelection}
 			{onSetStage1Provider} {onSetStage1Model} {onSetStage2Provider} {onSetStage2Model}
 			{onSetVisionProvider} {onSetVisionModel} onCancel={settings.close} onConfirm={onConfirmModelSelection}
 		/>

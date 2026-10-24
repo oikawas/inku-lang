@@ -703,6 +703,8 @@ def api_history_post(
         save_artifacts=body.save_artifacts,
         render_metadata=render_metadata,
         source_text=body.source_text,
+        image_provenance=body.image_provenance,
+        image_ddl=body.image_ddl,
         display_label=body.display_label,
         batch_line_number=body.batch_line_number,
         batch_run_id=body.batch_run_id,

@@ -21,7 +21,8 @@ from .invariants import capture_invariants, require_integrity, verify_invariants
 from .legacy_v3_schema import Base as LegacyBase
 from .migrations import (
     LEGACY_V3_CHECKSUM, LEGACY_V3_NAME, LEGACY_V3_VERSION,
-    MIGRATION_CHECKSUM, MIGRATION_NAME, MIGRATION_VERSION, MigrationStateError,
+    SINGLE_DDL_CHECKSUM as MIGRATION_CHECKSUM, SINGLE_DDL_NAME as MIGRATION_NAME,
+    SINGLE_DDL_VERSION as MIGRATION_VERSION, MigrationStateError,
     _require_single_ddl_schema, _verify_registry, history_fts_state, schema_fingerprint,
 )
 
@@ -184,7 +185,7 @@ def inspect_database(path: Path, *, expect_version: int = 3, expected_fingerprin
         with engine.connect() as connection:
             connection.exec_driver_sql("PRAGMA query_only=ON")
             state = _verify_registry(connection)
-            current = state == "current"
+            current = state in {"current", "single_ddl"}
             if current:
                 _require_single_ddl_schema(connection)
                 require_integrity(connection)

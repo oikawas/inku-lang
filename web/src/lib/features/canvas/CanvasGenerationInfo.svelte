@@ -14,6 +14,8 @@
 	import { loadSystemPrompts, type SystemPromptsState } from './system-prompts';
 
 	export type GenerationInfoWork = {
+		image_ddl?: Record<string, unknown> | null;
+		image_provenance?: string | null;
 		note?: string | null;
 		starred?: boolean;
 		shared?: boolean;
@@ -187,6 +189,8 @@
 	const detailDdlVersion = $derived(statusHistoryItem?.ddl_version ?? result?.ddl_version ?? '');
 	const detailDdlEngineVersion = $derived(statusHistoryItem?.ddl_engine_version ?? result?.ddl_engine_version ?? '');
 	const detailBuild = $derived(statusHistoryItem?.render_build_number ?? result?.render_build_number ?? '');
+	const detailImageRecord = $derived(statusHistoryItem?.image_ddl ?? result?.image_ddl ?? null);
+	const detailImageProvenance = $derived(statusHistoryItem?.image_provenance ?? result?.image_provenance ?? '');
 	const detailDerivationMetadata = $derived(statusHistoryItem?.derivation_metadata ?? result?.derivation_metadata ?? {});
 	const detailResolvedLang = $derived(statusHistoryItem?.instruction_lang_resolved ?? result?.instruction_lang_resolved ?? '');
 	const detailStage1Lang = $derived(typeof detailDerivationMetadata.stage1_language === 'string' ? detailDerivationMetadata.stage1_language : detailResolvedLang);
@@ -289,6 +293,12 @@
 				<dt><Tooltip placement="right" text={hint}><span>{label}</span></Tooltip></dt>
 			{/snippet}
 			<div class="generation-details" bind:this={detailsScrollEl}>
+				{#if detailImageRecord}
+					<section class="detail-group">
+						<h4>{t().imageTab} · {t().imageProvenanceLabel}</h4>
+						<p class="detail-note">{detailImageProvenance || '-'}</p>
+					</section>
+				{/if}
 				<section class="detail-group">
 					<h4 id="generation-info-comment-heading">{t().historyPreviewCommentLabel}</h4>
 					{#if canEditNote}

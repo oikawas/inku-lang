@@ -8,6 +8,8 @@ export type HistoryManagerTab = 'thumbs' | 'list';
 export type Score = { instructions: unknown[]; canvas?: string | null };
 
 export type HistoryItem = {
+	image_ddl?: Record<string, unknown> | null;
+	image_provenance?: string | null;
 	// Set only when the work is somebody else's, reached through a group scope
 	// or an explicit grant. Absent for one's own, so nothing changes for a
 	// listing of works the caller made.

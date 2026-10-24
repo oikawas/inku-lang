@@ -12,6 +12,7 @@
 	import DescriptionMeter from './DescriptionMeter.svelte';
 	import type { CanvasAspectId, CanvasAspectOption } from '$lib/plugins/system/canvas-aspect';
 	import type { ProviderAttemptCount } from '$lib/paintStream';
+	import type { UploadedPipelineImage } from '$lib/features/pipeline/api';
 
 	type BatchFailure = {
 		line: number;
@@ -26,7 +27,19 @@
 	type Props = {
 		chatgptPlanSelected?: boolean;
 		chatgptModelAvailable?: boolean;
-		inputMode: 'single' | 'batch';
+		inputMode: 'single' | 'image' | 'batch';
+		imageProvenance: string;
+		uploadedImage: UploadedPipelineImage | null;
+		imageFileName: string;
+		imageUploading: boolean;
+		imageRunning: boolean;
+		imageCanvasAspectId: CanvasAspectId;
+		visionModelName: string;
+		visionModelAvailable: boolean;
+		onSelectImage: (file: File) => void | Promise<void>;
+		onSubmitImage: () => void | Promise<void>;
+		onSelectImageCanvasAspect: (id: CanvasAspectId) => void;
+		onOpenImageModelSelection: () => void;
 		input: string;
 		batchInput: string;
 		lineNumbersText: string;
@@ -96,6 +109,9 @@
 		chatgptPlanSelected = false,
 		chatgptModelAvailable = false,
 		inputMode = $bindable('single'),
+		imageProvenance = $bindable(''), uploadedImage, imageFileName, imageUploading, imageRunning,
+		imageCanvasAspectId, visionModelName, visionModelAvailable,
+		onSelectImage, onSubmitImage, onSelectImageCanvasAspect, onOpenImageModelSelection,
 		input = $bindable(''),
 		batchInput = $bindable(''),
 		lineNumbersText,
@@ -179,7 +195,8 @@
 	);
 
 	const tabItems = $derived([
-		{ mode: 'single' as const, label: t().modeSingle, running: singleRunning, progress: '' },
+		{ mode: 'single' as const, label: t().modeSingle, running: singleRunning && !imageRunning, progress: '' },
+		{ mode: 'image' as const, label: t().imageTab, running: imageRunning, progress: '' },
 		{ mode: 'batch' as const, label: t().modeBatch, running: batchRunning, progress: batchProgress },
 	]);
 
@@ -189,7 +206,7 @@
 	{#each tabItems as item (item.mode)}
 		<Tooltip
 			placement={item.mode === 'single' ? 'bottom-right' : 'bottom-left'}
-			text={item.mode === 'single' ? t().tooltipInputTabSingle : t().tooltipInputTabBatch}
+			text={item.mode === 'single' ? t().tooltipInputTabSingle : item.mode === 'image' ? t().imageTabHint : t().tooltipInputTabBatch}
 		>
 			<button
 				class="panel-tab"
@@ -216,13 +233,15 @@
 					<!-- The button sits at the panel's right edge. A centred bubble reached
 					     past it even while hidden, so the panel scrolled sideways and a
 					     swipe or a focus cut off the left of every row. -->
-					<Tooltip text={t().tooltipInputModel} placement="top-left">
-						<button class="ghost-btn condition-change" aria-label={t().tooltipInputModel} onclick={onOpenModelSelection}>{t().editButton}</button>
+					<Tooltip text={inputMode === 'image' ? t().modelSelectionVisionHint : t().tooltipInputModel} placement="top-left">
+						<button class="ghost-btn condition-change" aria-label={inputMode === 'image' ? t().modelSelectionVisionHint : t().tooltipInputModel} onclick={inputMode === 'image' ? onOpenImageModelSelection : onOpenModelSelection}>{t().editButton}</button>
 					</Tooltip>
 				</div>
 				<div class="condition-value condition-model-value">
 					<div class="condition-model-names">
-						{#if nextStage1Model === nextStage2Model}
+						{#if inputMode === 'image'}
+							<span title={visionModelName}>{visionModelName}</span>
+						{:else if nextStage1Model === nextStage2Model}
 							<span title={nextStage1Model}>{nextStage1Model}</span>
 						{:else}
 							<span><small>{isJapanese ? '解釈' : 'Interpretation'}</small><span title={nextStage1Model}>{nextStage1Model}</span></span>
@@ -245,6 +264,7 @@
 				<span class="condition-value" title={nextCatalogName}>{nextCatalogName}</span>
 			</div>
 			<div class="condition-compact-rows">
+				{#if inputMode !== 'image'}
 				<div class="condition-compact-row">
 					<Tooltip text={t().tooltipInputSketch}><SketchSelect value={sketchMode} {isJapanese} showValue onSelect={onSelectSketchMode} /></Tooltip>
 				</div>
@@ -259,8 +279,17 @@
 						>{t().wildButton} {wildSettings.enabled ? t().wildEnabled : t().wildDisabled}</button>
 					</Tooltip>
 				</div>
+				{/if}
 				<div class="condition-compact-row">
 					<Tooltip text={t().tooltipInputCanvas}>
+						{#if inputMode === 'image'}
+						<CanvasAspectPlugin
+							selected={imageCanvasAspectId}
+							options={[{ id: 'image', label: t().imageCanvasAspect, category: 'Vision', ratio: '', ratioW: 1, ratioH: 1, intentJa: t().imageCanvasAspect, intentEn: t().imageCanvasAspect }, ...canvasAspectOptions]}
+							open={canvasAspectMenuOpen} showValue
+							onToggle={onToggleCanvasAspectMenu} onSelect={onSelectImageCanvasAspect}
+						/>
+						{:else}
 						<CanvasAspectPlugin
 							selected={canvasAspectId}
 							options={canvasAspectOptions}
@@ -269,6 +298,7 @@
 							onToggle={onToggleCanvasAspectMenu}
 							onSelect={onSelectCanvasAspect}
 					/>
+						{/if}
 					</Tooltip>
 				</div>
 				{#if inputMode === 'batch'}
@@ -356,6 +386,26 @@
 		{/if}
 
 		{#if error}<p class="error-text">{error}</p>{/if}
+	{:else if inputMode === 'image'}
+		<label class="input-heading" for="image-provenance">{t().imageProvenanceLabel}</label>
+		<textarea id="image-provenance" class="input-ta" rows="4" bind:value={imageProvenance} placeholder={t().imageProvenanceHint}></textarea>
+		<p class="input-description">{t().imageProvenanceHint}</p>
+		<label class="image-file-label">
+			<span>{t().imageChooseFile}</span>
+			<input type="file" accept=".jpeg,.jpg,.png,.gif,.tiff,.tif,image/jpeg,image/png,image/gif,image/tiff" disabled={imageUploading || singleRunning || generationDisabled} onchange={(event) => { const file = event.currentTarget.files?.[0]; if (file) void onSelectImage(file); event.currentTarget.value = ''; }} />
+		</label>
+		{#if imageUploading}<p role="status">{t().imageUploading}</p>{/if}
+		{#if uploadedImage}
+			<figure class="image-preview"><img src={uploadedImage.thumbnail} alt={t().imageThumbnailAlt} /><figcaption>{imageFileName} · {uploadedImage.original_width} × {uploadedImage.original_height}</figcaption></figure>
+		{/if}
+		{@render inputSettings()}
+		{#if singleRunning && !hideRunStatus}
+			<RunStatus label={stageLabel || t().imageWritingDdl} stage1Model={visionModelName} elapsedMs={liveMs} tokensIn={runTokensIn} tokensOut={runTokensOut} attempt={runAttempt} onStop={onStop} />
+		{:else}
+			<PaintButton onclick={onSubmitImage} disabled={!uploadedImage || imageUploading || !visionModelAvailable || generationDisabled || singleRunning}>{t().submitBtn}</PaintButton>
+			{#if !visionModelAvailable}<p role="status">{t().imageVisionRequired}</p>{/if}
+		{/if}
+		{#if error}<p class="error-text">{error}</p>{/if}
 	{:else if inputMode === 'batch'}
 		<BatchPanel
 			settings={inputConditionRows}
@@ -405,6 +455,11 @@
 </section>
 
 <style>
+	.image-file-label { display: grid; gap: 6px; color: var(--fg2); font-size: var(--ui-font-size-12); }
+	.image-file-label input { min-width: 0; width: 100%; font: inherit; }
+	.image-preview { margin: 4px 0; display: grid; gap: 4px; }
+	.image-preview img { max-width: 100%; max-height: 180px; object-fit: contain; align-self: start; }
+	.image-preview figcaption { color: var(--fg3); font-size: var(--ui-font-size-12); overflow-wrap: anywhere; }
 	.panel-tabs { display: flex; border-bottom: 1px solid var(--border); }
 	.panel-tabs :global(.tooltip-wrap) { flex: 1; }
 	.panel-section > :global(.tooltip-wrap) { width: 100%; }

@@ -282,6 +282,12 @@ class ProductPipelineEffects:
             options = RunOptions.model_validate(options).model_dump(exclude_unset=True)
         except ValidationError as error:
             raise CandidateHostError("invalid_authoring_options") from error
+        if kind == "image":
+            # Provenance never supplies a language hint or drawable text.
+            options.update(wild=False, sketch="off", instruction_lang="ja", canvas_fit="contain")
+            options.pop("sketch_text", None)
+            for key in ("history_input", "history_source_text"):
+                options[key] = ""
         requested_limits = options.pop("limits", None)
         previous = deepcopy((work or {}).get("host_options", {}))
         for retired in ("variation_amplitude", "variation_seed"):
@@ -304,6 +310,8 @@ class ProductPipelineEffects:
         if "lineage_parent_node_id" not in options and (work or {}).get("result", {}).get("lineage_node_id"):
             selected["lineage_parent_node_id"] = work["result"]["lineage_node_id"]
         config = self.settings.config_for(owner, work, requested_limits)
+        if kind == "image":
+            config.setdefault("image", {"review": True})
         _apply_developer_options(config, options, developer_mode=_env_flag("INKU_DEVELOPER_MODE"))
         language = _resolve_instruction_lang(text, selected.get("instruction_lang") or "auto", ui_lang=selected.get("ui_lang"))
         config["language"] = language
@@ -315,7 +323,7 @@ class ProductPipelineEffects:
             config["macro_summaries"] = catalog["macro_summaries"]
             catalog_context = {"definition_locks": catalog["definition_locks"],
                                "diagnostics": catalog["diagnostics"]}
-        if selected.get("canvas_aspect") is not None:
+        if selected.get("canvas_aspect") is not None and not (kind == "image" and selected["canvas_aspect"] == "image"):
             config = select_canvas(config, self.binding.canvas_registry, selected["canvas_aspect"])
         seed = selected.get("render_seed")
         seed = new_render_seed() if seed is None else int(seed)
@@ -366,7 +374,15 @@ class ProductPipelineEffects:
         # still names two keeps the Stage 1 one; one that names only Stage 2
         # (hand-written DDL, the old compose URL) is the one model; none takes
         # the account's model. The work still records both keys, now equal.
-        model = resolved_drawing_model(selected.get("stage1_model") or selected.get("stage2_model"), actor)
+        model_ref = selected.get("stage1_model") or selected.get("stage2_model")
+        if kind == "image" and not model_ref:
+            actor_models = (actor or {}).get("model_settings") or {}
+            vision_model = actor_models.get("vision_model")
+            vision_provider = actor_models.get("vision_provider")
+            model_ref = f"{vision_provider}:{vision_model}" if vision_provider and vision_model else vision_model
+            if not model_ref:
+                raise CandidateHostError("image_model_not_vision")
+        model = resolved_drawing_model(model_ref, actor)
         selected.update(
             stage1_model=model,
             stage2_model=model,
@@ -389,7 +405,16 @@ class ProductPipelineEffects:
                 selected["chatgpt_profile"], selected["chatgpt_generation"] = pin(owner)
                 model_settings = {**model_settings, "chatgpt_profile_id": selected["chatgpt_profile"],
                                   "chatgpt_generation": selected["chatgpt_generation"]}
-            for stage in ("stage1", "stage2") if kind in {"description", "saved_laws"} else ("stage2",):
+            if kind == "image":
+                from .model_settings import model_is_offered
+                provider_id, model_id = provider_for_model(model, stage="stage1", settings=model_settings)
+                offered = (_model_offered_to(actor, model, stage="stage1", purpose="vision", settings=model_settings,
+                                             operation="vision") if provider_id == "chatgpt"
+                           else model_is_offered(provider_id, model_id, model_settings, purpose="vision"))
+                if not offered:
+                    raise CandidateHostError("image_model_not_vision")
+            for stage in (() if kind == "image" else
+                          (("stage1", "stage2") if kind in {"description", "saved_laws"} else ("stage2",))):
                 if not _model_offered_to(
                     actor, selected[f"{stage}_model"], stage=stage, purpose="llm", settings=model_settings, operation="pipeline"
                 ):
@@ -405,10 +430,10 @@ class ProductPipelineEffects:
         return config, {"host_options": selected, "color_maps": color_maps, "macro_catalog": catalog_context,
                         "system_prompts": {}, "system_prompt_stages": list(_SYSTEM_PROMPT_STAGES.values()),
                         "render_limits_source": self.settings.limits_source(work, requested_limits),
-                        "auto_catalog": kind == "description" and mode == "auto",
+                        "auto_catalog": kind in {"description", "image"} and mode == "auto",
                         "sketch_request": sketch_request_for(kind, options), "metrics": {}}
 
-    def provider_for(self, owner: str, context: dict):
+    def provider_for(self, owner: str, context: dict, images: list[str] | None = None):
         from . import db
         from .api_core.state import _increment_stage_stat
         options = context.get("host_options", {})
@@ -421,12 +446,14 @@ class ProductPipelineEffects:
             transport = SingleAttemptProvider(ProviderOptions(
                 settings=db.get_model_settings(), stage1_model=options.get("stage1_model", configured["stage1_model"]),
                 stage2_model=options.get("stage2_model", configured["stage2_model"]),
-                max_tokens=configured.get("stage1_max_tokens", configured["max_tokens"]) if stage == "stage1" else configured["max_tokens"],
+                max_tokens=(configured.get("image_max_tokens", 8192) if action["tag"] in {"write_image_ddl", "review_image_ddl"}
+                            else configured.get("stage1_max_tokens", configured["max_tokens"]) if stage == "stage1"
+                            else configured["max_tokens"]),
                 max_response_bytes=self.manifest["pipeline"]["prompt_limits"]["max_response_bytes"],
                 chatgpt_owner=owner, chatgpt_profile=options.get("chatgpt_profile"),
                 chatgpt_generation=options.get("chatgpt_generation"),
                 chatgpt_cancel=execution_cancel(owner, context.get("execution_id", "")) if options.get("chatgpt_profile") else None,
-            ), observation=(
+            ), images=images, observation=(
                 ProviderObservationStore(
                     db.engine,
                     limit=max(16 * 1024 * 1024, self.manifest["pipeline"]["prompt_limits"]["max_response_bytes"]),
@@ -481,6 +508,15 @@ class ProductPipelineEffects:
         context["performance_options"] = deepcopy(render["options"])
         return render
 
+    def image_review_options(self, snapshot: dict, context: dict) -> dict:
+        render = self.settings.render_for({"delivery": {"compiler_options": snapshot["config"]["compiler"]}})
+        host = snapshot["config"]["compiler"]["host"]
+        render["options"].update(
+            resolved_color_map=context["color_maps"][host["resolved_catalog_id"]],
+            render_seed=context["host_options"]["render_seed"], wild=False,
+        )
+        return render
+
     def save_result(self, owner: str, snapshot: dict, context: dict, rendered: dict) -> dict:
         from . import db
         from .api_core.common import _build_number
@@ -525,6 +561,10 @@ class ProductPipelineEffects:
             "render_limits_source": context.get("render_limits_source"),
             "pipeline_variation_id": snapshot["variation_id"], "pipeline_revision": snapshot["authority"]["revision"],
         }
+        image_ddl = snapshot.get("image_ddl") or context.get("image_ddl")
+        if image_ddl is not None:
+            result.update(image_ddl=deepcopy(image_ddl), image_provenance=context.get("image_provenance", ""),
+                          elapsed_image_ms=metrics.get("image", 0))
         result["render_hash"] = db.render_hash_for_item({**result, "input": result["description"]})
         result["render_hash_short"] = db.render_hash_short(result["render_hash"])
         result["render_diagnostics"] = render_metadata.get("execution")

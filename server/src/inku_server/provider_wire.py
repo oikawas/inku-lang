@@ -16,6 +16,7 @@ the core names.
 from __future__ import annotations
 
 import base64
+import hashlib
 import importlib
 import json
 from functools import lru_cache
@@ -24,6 +25,13 @@ from typing import Any
 
 # A refusal body is read only this far.
 _REFUSAL_READ_BYTES = 16384
+IMAGE_EFFECTS = frozenset({"select_image_catalog", "write_image_ddl", "review_image_ddl"})
+
+
+def observation_digest(body: bytes) -> bytes:
+    """Image transport observations retain only the body's digest and size."""
+    return json.dumps({"capture": "digest_only", "sha256": hashlib.sha256(body).hexdigest(),
+                       "byte_len": len(body)}, separators=(",", ":")).encode("ascii")
 
 
 class ProviderWireRefused(ValueError):
@@ -56,11 +64,11 @@ def _connection(connection: dict) -> dict:
             "api_profile": str(connection.get("api_profile") or ""), "base_url": str(connection.get("base_url") or "")}
 
 
-def pipeline_request(connection: dict, model: str, prompt: dict, max_tokens: int) -> dict:
+def pipeline_request(connection: dict, model: str, prompt: dict, max_tokens: int, *, images: list[str] | None = None) -> dict:
     """The request for one pipeline effect: url, headers, auth, format, output_budget, body."""
     return _ask("pipeline_request", connection=_connection(connection), model=model,
-                prompt={key: prompt[key] for key in ("system", "message", "response_schema", "action_name") if key in prompt},
-                max_tokens=max_tokens)
+                prompt={key: prompt[key] for key in ("system", "message", "response_schema", "action_name", "images") if key in prompt},
+                max_tokens=max_tokens, **({"images": list(images)} if images is not None else {}))
 
 
 def text_request(connection: dict, model: str, *, system: str, text: str, images: list[str],
@@ -70,10 +78,11 @@ def text_request(connection: dict, model: str, *, system: str, text: str, images
                 images=list(images), temperature=temperature, max_tokens=max_tokens)
 
 
-def chatgpt_request(model: str, prompt: dict, answer_limit: int) -> dict:
+def chatgpt_request(model: str, prompt: dict, answer_limit: int, *, images: list[str] | None = None) -> dict:
     """The ChatGPT plan's body for one pipeline effect: body, canonical, wire_limit, event_limit."""
     return _ask("chatgpt_request", model=model, answer_limit=answer_limit,
-                prompt={key: prompt[key] for key in ("system", "message", "response_schema", "action_name") if key in prompt})
+                prompt={key: prompt[key] for key in ("system", "message", "response_schema", "action_name", "images") if key in prompt},
+                **({"images": list(images)} if images is not None else {}))
 
 
 def chatgpt_vision_request(model: str, *, system: str, text: str, images: list[str], answer_limit: int) -> dict:

@@ -17,6 +17,8 @@ flowchart TD
     LINEAGE["lineage router"]
     RENDER["render router"]
     FEEDBACK["feedback router"]
+    AUTONOMOUS["autonomous router\nautonomous refinement runs"]
+    AUTO_RUNNER["autonomous_refine.py\nAutonomousRunner"]
     PIPELINE["pipeline_api.py\n/api/pipeline router"]
     DEPS["api_core/deps.py\nsession and role guards"]
     SHARED["api_core state/models/common/rendering"]
@@ -34,7 +36,11 @@ flowchart TD
     API_PY -->|"include_router"| LINEAGE
     API_PY -->|"include_router"| RENDER
     API_PY -->|"include_router"| FEEDBACK
+    API_PY -->|"include_router"| AUTONOMOUS
     API_PY -->|"include_router(pipeline_router(...))"| PIPELINE
+    AUTONOMOUS --> DEPS
+    AUTONOMOUS --> AUTO_RUNNER
+    AUTO_RUNNER -->|"an ordinary run per child"| SERVICE
     AUTH --> DEPS
     ME --> DEPS
     PLUGINS --> DEPS
@@ -65,7 +71,9 @@ flowchart LR
     COMPAT["pipeline_compat.py\nrequest → options, result projection, idempotent resend"]
     SERVICE["PipelineService\nthread pool, retained runs, effect steps"]
     EXEC["CandidateExecution\nserializes one execution"]
-    BINDING["PipelineBinding\ninku_render wheel\nstep / render_saved / colors / canvas / Macro catalog"]
+    BINDING["PipelineBinding\ninku_render wheel\nstep / render_saved / colors / canvas / Macro catalog\nsaved_variants / juxtaposition / autonomous_refine / image"]
+    IMAGES["pipeline_images.py\nimage intake and review drawing"]
+    VARIANT_ROUTE["render router\nreplacements, fit, juxtaposition, composition ranges"]
     CORE["Shared Rust core\ninku-pipeline + inku-ddl + inku-render"]
     EFFECTS["ProductPipelineEffects\nprepare / provider_for / render_options / save_result / replay"]
     SETTINGS_ADAPTER["pipeline_settings.py\ncanvas, resource limits, administrator settings"]
@@ -93,13 +101,18 @@ flowchart LR
     EFFECTS -->|"history row"| DB
     EFFECTS -->|"history link + sidecar"| STORE
     EFFECTS --> FILES
-    SCORE_ROUTE -->|"0.10 to 0.15"| EFFECTS
+    PIPE_ROUTER -->|"POST /images"| IMAGES
+    EFFECTS -->|"image references, review drawing"| IMAGES
+    VARIANT_ROUTE --> BINDING
+    SCORE_ROUTE -->|"0.10 to 0.22"| EFFECTS
     SCORE_ROUTE -->|"below 0.10"| SAVED --> ADAPTER --> BINDING
 ```
 
 The canonical path is router → `pipeline_compat.py` (or HTTP `/api/pipeline`) → `PipelineService` → `CandidateExecution` → `step` in the native wheel. `CandidateExecution` serializes the calls for one execution, hands each effect the core returns to `ProductPipelineEffects` to perform once, and returns the result to the core. The next snapshot after each effect is saved to `VariationAuthorityStore` by compare-and-set, so a replacement worker resumes from the saved snapshot. A client cannot send snapshots, authority sidecars, effect results, or resource policies, and the `render` command is never accepted directly (only `perform`, to which the host attaches trusted options).
 
-`ProductPipelineEffects` has five host responsibilities, none of which decides meaning. `prepare` validates options and resolves the instruction language, the Macro catalog, the canvas, seeds, the color catalog and its resolved colors, and the stage models. `provider_for` sends each action the core requests once through `SingleAttemptProvider` and records elapsed time and provider failures in the execution context. `render_options` builds trusted render options from the saved snapshot. `save_result` saves a performance as a history row and a history link. `replay` performs a compact Score again under its saved policy.
+`ProductPipelineEffects` has five host responsibilities, none of which decides meaning. `prepare` validates options and resolves the instruction language, the Macro catalog, the canvas, seeds, the color catalog and its resolved colors, and the stage models (an image run adds the Vision model and the `image` configuration). `provider_for` sends each action the core requests once through `SingleAttemptProvider` and records elapsed time and provider failures in the execution context; the shared core's `provider_wire` builds the request body and reads the answer, and in an image run the image held in the run's memory is attached as its reference names it. `render_options` builds trusted render options from the saved snapshot. `save_result` saves a performance as a history row and a history link (and, for a work written from an image, its source note and `image_ddl`). `replay` performs a compact Score again under its saved policy. `pipeline_images.py` receives the image, keeps it in the run's memory, and answers the core's `draw_image_review` effect with the review drawing drawn under the actual drawing's settings (`pipeline_image_review_svg` → a resvg PNG).
+
+Replacing a saved work's touches, ground or color arrangement, and fitting it (`/api/render-tool-variant`, `/api/render-ground-variant`, `/api/render-color-arrangement` with their `plan` routes, `/api/render-canvas-fit`), call the shared core's rules in the native wheel (`saved_variants`) without a run. Juxtaposition (`/api/refine/juxtaposition`) gathers candidates and builds the request with the shared core's `juxtaposition` and returns the sentence the Vision model chose; the child is drawn by a `description_edit` run with that sentence added to the description. `autonomous_refine.py:AutonomousRunner` drives autonomous refinement runs: it draws the children through ordinary pipeline runs and asks the shared core's `autonomous_refine` for the turns, the visible difference and the edge record.
 
 Only replay of an older Score below 0.10 goes through the structural compatibility of `saved_score_compat.py` and then `api_core/rendering.py` → the `render_engines` registry → `default/adapter.py` → one `render` call in the native wheel. `renderer.py` is a compatibility façade for existing callers that need SVG only, and it delegates to the same registry. The old `interpreter.py`, `composer.py`, `ddl_expander.py`, `coerce/compose.py`, and `coerce/normalize.py` have been deleted; all that remains in `coerce/` is compatibility for saved observation records (`observability.py`).
 
@@ -139,9 +152,11 @@ The current `db.py` no longer owns direct SQL, transactions, migration sessions,
 flowchart LR
     PYBIND["inku-render-python\nCPython: render + pipeline_*"]
     JNI["inku-render-android\nJNI: render + raster + pipeline"]
-    UNIFFI["inku-pipeline-uniffi\nbyte facade\nstep / canvas / colors / Macro catalog\nStage 1 projection / render_saved"]
-    PIPE["inku-pipeline\nmachine / protocol / authority\nprompts / core_boundary / hole_completion / replay"]
-    DDL["inku-ddl\ntyped compiler / Stage 1.5 / Plan / materializer\nunderdrawing / visible patch / saijiki asset"]
+    UNIFFI["inku-pipeline-uniffi\nbyte facade\nstep / canvas / colors / Macro catalog\nStage 1 projection / render_saved\nsaved_variants / autonomous_refine / provider_wire / display"]
+    PIPE["inku-pipeline\nmachine / protocol / authority\nprompts / core_boundary / hole_completion / replay\ncomposition / laws / colors / image_ddl / provider_wire\nsaved_variants / juxtaposition / autonomous_refine / identity"]
+    DDL["inku-ddl\ntyped compiler / Stage 1.5 / Plan / materializer\nunderdrawing / visible patch / ratio declaration / saijiki asset"]
+    DISPLAY["inku-display\nSkia screen display (optional skia feature)"]
+    DISPLAY_GPU["inku-display-gpu\nmacOS zoomed windows (Graphite, separate process)"]
     SCORE["inku-score\nScore types / canonical digest / compatibility\ncanvas registry / resource authority"]
     RENDER["inku-render\nrender / checked + typed performance\ngeometry / marks / surfaces / SVG"]
     RASTER["inku-svg-raster\nSVG → premultiplied RGBA8"]
@@ -161,13 +176,16 @@ flowchart LR
     PIPE --> SCORE
     DDL --> SCORE
     RENDER --> SCORE
+    UNIFFI -.->|"display feature"| DISPLAY
+    DISPLAY --> RASTER
+    DISPLAY_GPU -->|"graphite feature"| DISPLAY
 ```
 
-Of the eight crates, the five host-neutral ones use `#![forbid(unsafe_code)]`, and the remaining three binding crates are thin adapters. Dependencies run one way. `inku-score` is the lowest layer and holds Score types and resource authority; `inku-ddl` and `inku-render` do not depend on each other. Only `inku-pipeline` joins them, and it performs a compiled delivery only with the same compiler options. `inku-pipeline-uniffi` is a façade that passes only owned UTF-8 JSON byte buffers; the Python and JNI adapters sit thinly on top of it and do not duplicate semantic branches. A panic is closed into a stable `internal_invariant` error envelope rather than a platform exception.
+Of the ten crates, the six host-neutral ones (`inku-score`, `inku-ddl`, `inku-pipeline`, `inku-render`, `inku-svg-raster`, `inku-display`) use `#![forbid(unsafe_code)]`, and the remaining four (`inku-pipeline-uniffi`, `inku-render-python`, `inku-render-android`, `inku-display-gpu`) are thin adapters or host programs. Skia in `inku-display` is an optional feature that Android and macOS take in through UniFFI's `display` feature (Android through `inku-render-android`). macOS starts `inku-display-gpu` as a separate process and passes window requests and pixels through its standard input and output. Dependencies run one way. `inku-score` is the lowest layer and holds Score types and resource authority; `inku-ddl` and `inku-render` do not depend on each other. Only `inku-pipeline` joins them, and it performs a compiled delivery only with the same compiler options. `inku-pipeline-uniffi` is a façade that passes only owned UTF-8 JSON byte buffers; the Python and JNI adapters sit thinly on top of it and do not duplicate semantic branches. A panic is closed into a stable `internal_invariant` error envelope rather than a platform exception.
 
 ```mermaid
 flowchart LR
-    SRC["document / parser / clause\nsource-preserving lexemes and clauses"]
+    SRC["document / parser / clause / numeric_range\nsource-preserving lexemes and clauses"]
     EVID["noun_phrase / phrase / attachment\nrelation_reference / opaque_head\nmeaning-neutral evidence"]
     MACRO["macro_resolution / macro_parameter_binding\nmacro_expansion / macro_seed / macro_definition"]
     SEM["semantic_association / semantic_instruction\nsemantic_document / composition\ngeometry / shape_constraint / fluctuation"]
@@ -177,7 +195,7 @@ flowchart LR
     PLAN["composition_plan / group_quantity\nplan_reference_extent"]
     RES["plan_resources\nhard policy + operational budget"]
     MAT["score_materialization / score_lowering\nscore_angle → compact Score"]
-    AUX["work_plan / visible_patch / prompt / saijiki\nauthoring aids and assets"]
+    AUX["work_plan / visible_patch / completion_record\ncanvas_ratio / saijiki\nauthoring aids and assets"]
 
     SRC --> EVID --> MACRO --> SEM --> LOCK
     LOCK -->|"canonical_ready"| S15
@@ -188,34 +206,37 @@ flowchart LR
 
 The entry point of `inku-ddl` is `compile_ddl_to_score_with_resources` (`compiler_execution.rs`). It compiles the original `NormalizedDdlDocument` once, then runs Stage 1.5, the Plan, resource selection, and materialization in order. Source, provenance, and Macro definitions are checked when the lock is built; only lock-verified meaning reaches Stage 1.5.
 
-In `inku-render`, `render.rs` is the only overall orchestrator. `render_with_resources` lets `checked_performance` tell Score versions apart, sending compact Scores to `typed_performance` (instances from the recipe and `arrangement_performance`) and older Scores to the established `anchor_execution` (dependency order from `anchor_schedule`). The geometry group (`geometry`, `affine`, `affine_geometry`, `arc`, `cloudform`, `contact`, `fill_geometry`, `surface_geometry`) computes side-effect-free point sequences; the material group (`marks`, `mark_paths`, `stroke`, `fills`, `accepted_fills`, `surfaces`, `support`, `materials`, `ink_spread`) owns mark/stroke/surface and support interaction; the canvas group (`ground`, `ground_patterns`, `layers`, `palette`) owns ground, presence, and color assignment; `compat_clip` and `render_fill_scopes` own fill-boundary clipping and paint order; and `svg.rs` owns the small document tree and final serialization. `determinism.rs` is used across the crate but never creates host entropy.
+In `inku-render`, `render.rs` is the only overall orchestrator. `render_with_resources` lets `checked_performance` tell Score versions apart, sending compact Scores to `typed_performance` (instances from the recipe and `arrangement_performance`) and older Scores to the established `anchor_execution` (dependency order from `anchor_schedule`). The geometry group (`geometry`, `affine`, `affine_geometry`, `arc`, `cloudform`, `contact`, `fill_geometry`, `surface_geometry`, `free_line`, `joint_relation`) computes side-effect-free point sequences; the material group (`marks`, `mark_paths`, `stroke`, `flat_brush`, `fills`, `accepted_fills`, `surfaces`, `support`, `materials`, `ink_spread`) owns mark/stroke/surface and support interaction; the canvas group (`ground`, `ground_patterns`, `layers`, `palette`) owns ground, presence, and color assignment; `compat_clip` and `render_fill_scopes` own fill-boundary clipping and paint order; and `svg.rs` owns the small document tree and final serialization. `geometry_export` is a read-only geometry boundary that the normal SVG path never calls. `determinism.rs` is used across the crate but never creates host entropy.
 
 ## Router classification
 
 | Router | Endpoints | Main responsibility | Default guard |
 |---|---:|---|---|
-| `public` | 12 | Health, info, catalog, models, saijiki, plugin preview, reference, client config, demo, composition ranges, third-party notices | None; routes other than health, info, and third-party notices have explicit guards |
+| `public` | 11 | Health, info, catalog, models, saijiki, plugin preview, reference, client config, demo, third-party notices | None; routes other than health, info, and third-party notices have explicit guards |
 | `auth` | 4 | Auth config and login/logout | None; routes other than login have explicit guards |
 | `me` | 13 | Profile, user settings, per-user storage | `_current_user` |
 | `plugins` | 5 | Plugin read/validation/CRUD/enable | `_current_user`; mutation requires admin |
-| `settings` | 18 | Server-wide settings and backup | `_admin_user` |
+| `settings` | 19 | Server-wide settings, backup, and juxtaposition settings | `_admin_user` |
 | `users` | 8 | User/group management | `_user_manager` |
 | `history` | 17 | History, SVG, thumbnails, marks, trash, sharing, artifact rebuild, animation and card export | `_current_user` |
 | `lineage` | 8 | Lineage graph/group, promote, colophon | `_current_user` |
-| `render` | 7 | Compose, interpret, render-score/svg, paint, paint stream, vision advice | `_current_user` |
+| `render` | 15 | Compose, interpret, render-score/svg, paint, paint stream, composition ranges, candidates and replacements of touches, ground and color arrangement, fit, juxtaposition | `_current_user` |
 | `feedback` | 3 | Unread words | `_current_user` |
 | `description` | 2 | Description mora and syllable counts | `_current_user` |
 | `chatgpt` | 11 | Personal connection state, authorization, profiles, and model publication settings | `_current_user`; actions also check the owner |
-| `pipeline` | 13 | Canvas formats; start, read, and fork variations; the system prompts a variation sent; execution commands; author DDL; history links and forks; DDL export of a work (with the plugin definitions it names); reading and forking older works; provider observations | `_current_user` on each route; provider observations also require developer mode |
+| `autonomous` | 4 | Start, list, read and stop autonomous refinement runs | `_current_user` |
+| `pipeline` | 15 | Canvas formats; image intake; start and read variations and fork them from a description; the system prompts a variation sent; execution commands; author DDL; completion range states; history links and forks; DDL export of a work (with the plugin definitions it names); reading and forking older works; provider observations | `_current_user` on each route; provider observations also require developer mode |
 
-Total: 121. Refinement variation seed allocation is retired. The public allowlist contains five paths: `/health`, `/api/info`, `/api/auth/login`, `/api/notices`, and `/api/notices/{notice_id}` (`test_route_authorization.py`). The two notice routes only read fixed distribution licenses and return neither arbitrary files nor personal data. The other public routes are limited to those needed for login.
+Total: 135. Refinement variation seed allocation and the Vision advice entry are retired. The public allowlist contains five paths: `/health`, `/api/info`, `/api/auth/login`, `/api/notices`, and `/api/notices/{notice_id}` (`test_route_authorization.py`). The two notice routes only read fixed distribution licenses and return neither arbitrary files nor personal data. The other public routes are limited to those needed for login.
 
-The per-router counts match the current API baseline operations to their route declarations (2026-10-05). The total's source of truth is `EXPECTED_ROUTE_COUNT` (121) in `test_route_authorization.py`, and `tests/data/api-surface-baseline.json`, generated from the live app's OpenAPI, also records 121 operations.
+The per-router counts count the live app's routes by endpoint module the way `test_route_authorization.py` counts them (`iter_route_contexts`, 2026-10-24). The total's source of truth is `EXPECTED_ROUTE_COUNT` (135) in `test_route_authorization.py`, and `tests/data/api-surface-baseline.json`, generated from the live app's OpenAPI, also records 135 operations (198 schemas). The OpenAPI (`/docs`) gives each router one tag (14) and carries a summary and a description for all 135 routes, and English descriptions for the parameters and the request and response fields (since v2.15.243).
 
 ## Main flows
 
 - `/api/paint`, `/api/paint/stream`, `/api/interpret`, and `/api/compose` go through `pipeline_compat.py` to the same `PipelineService`. The stream re-reads the execution, reports `sketch`, `stage1`, `score`, and `done` in order, and returns a failure after the first event as an in-band `error` event. When a completion proposal needs approval, the three other routes answer 409 with the current view, and the stream answers 409 before its first event or an `error` event after it. A description start hands only the label-cut description to the core and refuses a label-only description with 400.
-- `/api/pipeline/variations` starts a variation from a description or direct DDL; `/executions/{id}/commands` accepts author commands (approve, decline, request completion, regenerate, perform, cancel), and `/executions/{id}/author-ddl` accepts DDL edits. A DDL edit that changes settings leaves the original intact and creates a parent-linked variation.
+- `/api/pipeline/variations` starts a variation from a description, direct DDL or an image (`kind: image`, with the temporary ID `/api/pipeline/images` holds); `/executions/{id}/commands` accepts author commands (approve, decline, request completion, regenerate, perform, cancel), and `/executions/{id}/author-ddl` accepts DDL edits. A DDL edit that changes settings leaves the original intact and creates a parent-linked variation. `/variations/{id}/fork-description` makes a child with a changed description, and `/completion-range-states` returns the completion ranges' states the DDL editor shows.
+- `/api/refine/autonomous` starts, lists and stops autonomous refinement runs. The Server drives a run, and its children are drawn through ordinary pipeline runs.
+- Replacing a saved work's parts (`/api/render-tool-variant` and the like) and fitting it (`/api/render-canvas-fit`) draw a child with the shared core's `saved_variants`, without a run.
 - `/api/pipeline/history/{id}` returns the variation and revision of a work saved through the shared pipeline, and `/history/{id}/fork` derives from that moment's configuration, host context, and Macro definitions. `/history/{id}/ddl-export` exports the work's visible DDL together with the plugin definitions it names. `/legacy/{id}` and `/legacy/{id}/fork` read an older work without a link and derive from it without changing the original row.
 - `/api/render-score` and `/api/render-svg` branch on the Score version: compact Scores go through `ProductPipelineEffects.replay`, and those below 0.10 through `saved_score_compat.py`.
 - Provider/model selection resolves the request, the user's Stage settings, and the manifest default through `resolved_stage_model`.
@@ -225,8 +246,9 @@ The per-router counts match the current API baseline operations to their route d
 | Diagram element | Evidence ID | Evidence |
 |---|---|---|
 | App/router/deps | `SYS-API`, `API-ROUTERS`, `API-AUTH` | `api.py`, `api_core/routers`, `pipeline_api.py:pipeline_router`, `deps.py` |
-| Pipeline host | `PIPE-HOST`, `PIPE-LIMITS`, `API-LIMIT` | `pipeline_runtime.py`, `pipeline_api.py`, `pipeline_candidate.py`, `pipeline_product.py`, `pipeline_settings.py`, `pipeline_defaults.py` |
-| Shared Rust core | `SYS-CORE`, `PIPE-MACHINE`, `PIPE-TYPED-DDL`, `PIPE-LOWER`, `PIPE-RENDER` | `core/Cargo.toml`, each crate's `lib.rs` |
+| Pipeline host | `PIPE-HOST`, `PIPE-LIMITS`, `API-LIMIT`, `PIPE-IMAGE` | `pipeline_runtime.py`, `pipeline_api.py`, `pipeline_candidate.py`, `pipeline_product.py`, `pipeline_settings.py`, `pipeline_defaults.py`, `pipeline_images.py` |
+| Autonomous refinement and replacements | `PIPE-REFINE` | `autonomous_refine.py`, `routers/autonomous.py`, `routers/render.py` |
+| Shared Rust core | `SYS-CORE`, `PIPE-MACHINE`, `PIPE-TYPED-DDL`, `PIPE-LOWER`, `PIPE-RENDER`, `PIPE-WIRE`, `PIPE-DISPLAY` | `core/Cargo.toml`, each crate's `lib.rs` |
 | Older Score compatibility | `PIPE-COMPAT` | `saved_score_compat.py`, `render_engines/default/adapter.py` |
 | Persistence | `PIPE-HISTORY`, `SYS-DB`, `DATA-MIGRATION`, `DATA-AUTHORITY` | `pipeline_product.py:save_result`, `db.py`, `persistence/*`, `provider_observation.py` |
 | Shared rasterizer | `SYS-FILES` | `shared/src/inku_analysis/rasterizer.py`, `api_core/thumbnails.py` |

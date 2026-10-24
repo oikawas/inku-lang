@@ -1,6 +1,6 @@
 # inku architecture
 
-This documentation maps the DDL design stages to the current implementation and to the boundaries among Web, Server, CLI, Android, external providers, and persistence. The implementation baseline is public commit `f910a11e165ae3169818f3f1311ee869d33930ed`, app `v2.15.28 / Build 1104`, Render Engine 68, DDL engine 47, plus the fixes for `known-differences.md` F-05 through F-10. It describes the structure after the 2026-09-14 shared Rust pipeline cutover.
+This documentation maps the DDL design stages to the current implementation and to the boundaries among Web, Server, CLI, Android, macOS, external providers, and persistence. The implementation baseline is public commit `086fbe3ea45dd0784b911a7599ef88f60b0c85dc` (2026-10-24), app `v2.15.244 / Build 1320`, Render Engine 93, DDL 26 / DDL engine 71. It describes the structure after the 2026-09-14 shared Rust pipeline cutover, together with the core updates through 2026-10-24: the composition reading, the laws stage and the color stage; provider request bodies and answer reading, work identity and the rules of saved-work refinements moved into the shared core; the canvas ratio declaration and fitting; works written from an image; and screen display with Skia.
 
 ## Reading order
 
@@ -10,7 +10,7 @@ This documentation maps the DDL design stages to the current implementation and 
 4. `ddl-processing-pipeline.md` — DDL processing and the shared authoring state machine
 5. `description-to-svg.md` — From a description to an SVG, decision by decision (the shared pipeline deep dive)
 6. `server-components.md` — Server internals
-7. `client-boundaries.md` — Canonical Web owners and the Web, CLI, and Android boundaries
+7. `client-boundaries.md` — Canonical Web owners and the Web, CLI, Android, and macOS boundaries
 8. `data-history-lineage.md` — DB, identity, and lineage
 9. `operations-security.md` — Operations and security boundaries
 10. `change-impact-map.md` — Change propagation

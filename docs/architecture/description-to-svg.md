@@ -1,6 +1,6 @@
 # From a description to an SVG — the road of judgments
 
-Where `ddl-processing-pipeline.md` shows the order of the layers, this document follows the **judgments** — under which condition an entered description is treated which way, what is decided where, how failures are absorbed, and what gets recorded, at the level of the implementing functions. On the Server, the primary evidence is `pipeline_compat.py` (with `paint_events` for the stream, the compatibility projection behind `/api/paint`, `/api/paint/stream`, `/api/interpret`, and `/api/compose`), `pipeline_api.py:PipelineService`, and `pipeline_product.py:ProductPipelineEffects`; in the shared core it is `core/crates/inku-pipeline/src/machine.rs` and `inku-ddl/src/compiler_execution.rs`. Android goes through the same shared core, so apart from host-specific parts it follows the same judgments. The snapshot and versions live in `README.md` and `evidence-inventory.md`.
+Where `ddl-processing-pipeline.md` shows the order of the layers, this document follows the **judgments** — under which condition an entered description is treated which way, what is decided where, how failures are absorbed, and what gets recorded, at the level of the implementing functions. On the Server, the primary evidence is `pipeline_compat.py` (with `paint_events` for the stream, the compatibility projection behind `/api/paint`, `/api/paint/stream`, `/api/interpret`, and `/api/compose`), `pipeline_api.py:PipelineService`, and `pipeline_product.py:ProductPipelineEffects`; in the shared core it is `core/crates/inku-pipeline/src/machine.rs` and `inku-ddl/src/compiler_execution.rs`. Android and macOS go through the same shared core, so apart from host-specific parts they follow the same judgments. The snapshot and versions live in `README.md` and `evidence-inventory.md`.
 
 ## Overall flow
 
@@ -26,7 +26,10 @@ flowchart TD
     CORR{"Stage 1 budget left?"}
     RESID{"Drawable residual?"}
     S1F["Stop: stage1_failed"]
-    CAS["CAS save of visible DDL and authority"]
+    READ_COMP["Composition reading effect\nthe default reading on failure"]
+    LAWS_ST["Laws stage effect\nthe composition kept when no law fits"]
+    COLORS_ST["Color stage effect (a Server default)\nthe laws document kept when no colors fit"]
+    CAS["CAS save of visible DDL and authority\nratio declared first"]
     COMP["Typed compile\n+ Stage 1.5 + Plan + resource selection + materialization"]
     HOLE{"Known hole?"}
     SAFE["If a Score exists,\nsave the safe performance first"]
@@ -35,7 +38,7 @@ flowchart TD
     E409["Compatibility routes answer 409\nauthor commands move to /api/pipeline"]
     SCORE{"Score exists?"}
     EDIT["needs_user_edit"]
-    RENDER["render_delivery\nRender Engine 68"]
+    RENDER["render_delivery\nRender Engine 93"]
     SAVE{"save_history?"}
     ROW["History row + lineage\n+ history-link sidecar"]
     QUEUE["Work-file and thumbnail queues\n(best-effort)"]
@@ -57,7 +60,7 @@ flowchart TD
     SKE -->|"supplement / not_needed"| S1
     SK -->|"off / sketch from the author"| S1
     S1 -->|"schema and transport failures retry within the budget"| PRINT --> LOCK1
-    LOCK1 -->|"yes"| CAS
+    LOCK1 -->|"yes"| READ_COMP --> LAWS_ST --> COLORS_ST --> CAS
     LOCK1 -->|"no"| CORR
     CORR -->|"yes: ask again with reasons and spans"| S1
     CORR -->|"no"| RESID
@@ -88,13 +91,14 @@ Before the first LLM call, the request and the host settle the following.
 - **Idempotent resend** — when `Idempotency-Key` matches a work the same user already saved, that work is returned without creating a new variation. A different description is rejected with 409.
 - **Accepted options** — `RunOptions` validates with `extra="forbid"`. The old request fields `stage1_input`, `include_thinking`, `auto_repair`, and `sketch_grain` remain in the request model, but the compatibility projection does not pass them to the pipeline.
 - **Instruction language** — `_resolve_instruction_lang` detects it from the description itself and falls back to the UI language when there is no signal.
-- **Models** — `resolved_stage_model` resolves Stage 1 (the sketch and color catalog selection use the same model) and Stage 2 (hole completion) separately. The order is the request, then the user's Stage setting, then the manifest default.
+- **Models** — `resolved_stage_model` resolves Stage 1 (the sketch, color catalog selection, the composition reading, the laws stage and the color stage use the same model) and Stage 2 (hole completion) separately. The order is the request, then the user's Stage setting, then the manifest default. The composition reading, the laws stage and the color stage keep their time and send records apart from Stage 1.
+- **Stages run** — the Server's default manifest carries the composition reading (`composition.read`), the laws stage (`laws`) and the color stage (`colors`, since 2026-10-20). A refinement from a saved work follows its saved settings, so a work saved before the color stage became a default does not take it.
 - **Macro catalog** — for a new work only, `resolve_new_work_macro_catalog` resolves the Macro definitions and localized summaries from the enabled plugin documents. A derivation from a saved configuration uses that configuration's definitions unchanged.
 - **Resource limits** — the manifest's hard policy and operational budget (four existing limits plus six new ones) are combined with the administrator's limit settings; a derivation from a saved work keeps that work's budget.
 - **Color catalog** — `fixed` uses the explicit ID, `random` picks one other than the current one, and `auto` delegates to the color catalog selection effect. Every catalog's colors are resolved with the render seed in advance, and only the selected one is used.
 - **Seeds** — an explicit `render_seed` is used, or else a new 53-bit (JavaScript-safe) seed is drawn; either way it is recorded. `composition_seed` is set only when given.
 - **Retired variation** — new requests carry no amplitude or seed, and there is no seed allocation API. Old focus, amplitude and seed remain only in history reads and are never written by new saves. Saved configurations are preserved; only the copy for the next execution omits `stage15_variation`.
-- **Retry budgets** — color catalog selection and hole completion default to 120 seconds per attempt and up to 4 attempts; Stage 1 to 300 seconds per attempt, 540 seconds in total, and up to 4 attempts (overridable with `INKU_LLM_*`). The sketch uses the color catalog budget unless it has its own. In developer mode, `developer_disable_llm_retries` limits every stage to one attempt.
+- **Retry budgets** — color catalog selection and hole completion default to 120 seconds per attempt and up to 4 attempts; Stage 1 to 300 seconds per attempt, 540 seconds in total, and up to 4 attempts (overridable with `INKU_LLM_*`). The sketch, the composition reading, the laws stage and the color stage use the color catalog budget unless they have their own. In developer mode, `developer_disable_llm_retries` limits every stage to one attempt.
 
 ## Automatic color catalog selection
 
@@ -114,7 +118,7 @@ A sketch the author edited, or one already saved, is used as it stands without a
 
 The Stage 1 model writes no visible DDL string; it returns a closed-typed **underdrawing JSON** (prompt `inku.typed-stage1-work-plan-prompt.v1`). The prompt carries only the finite vocabulary derived from the saijiki, the resolved canvas and catalog identities, and the signatures and localized summaries of validated Macros. It never passes Macro bodies or expanded DDL.
 
-- **Normalization** — `normalize_work_plan` checks each value against the capability matrix (`work-plan-capabilities-v1.json`, generated by asking the compiler one sentence at a time). An out-of-range value becomes unspecified field by field, and a layer without a form is dropped alone. When no layer remains, it counts as a schema violation and retries within the budget.
+- **Normalization** — `normalize_work_plan` checks each value against the capability matrix (`work-plan-capabilities-v2.json`, generated by asking the compiler one sentence at a time). An out-of-range value becomes unspecified field by field, and a layer without a form is dropped alone. When no layer remains, it counts as a schema violation and retries within the budget.
 - **Printing** — `print_work_plan` prints the plan deterministically as visible DDL in the requested language. Only that string reaches the compiler; the underdrawing is transient.
 - **Replay of saved executions** — an older response that carries `normalized_ddl` is read unchanged.
 
@@ -128,12 +132,25 @@ The printed DDL is compiled once before it is saved. When the lock is not `canon
 
 A provider rejection (`provider_rejected`) or a semantic violation is never retried. Only unavailable transport, timeouts, rate limits, malformed payloads, and schema violations use the next attempt within the budget.
 
+## Composition reading
+
+Once the Stage 1 underdrawing settles, one effect reads from the description where the layers it gives no place go (`read_composition`, prompt `inku.composition-reading-prompt.v4`). Core narrows the answer to the values the canvas can show (`composition::check`) and prints the layers as numeric ranges (a range's name and numbers). A run with an on-device Vision model reads nothing and places the layers with the default reading (`composition_skipped`). An unusable answer or a spent budget also places them with the default reading and goes on (`composition_fallback`). A candidate saved by residual adoption does not go through the composition.
+
+## Laws stage
+
+After the composition, a reader chooses the laws the work uses from laws of painting, design and music (the golden section, equal repetition, principal and subordinate, patterns, jo-ha-kyū and others; `choose_laws`, prompt `inku.laws-prompt.v1`; their number is not fixed). Core checks the answer against the response schema and the laws' rules and asks again within the same budget with a refused answer's text and reason (from the third request on, with the reasons it refused earlier answers for). Only the layers the laws change are printed again in numbers (numeric points, ends, ranges, angles and sizes), and a document that cannot draw is not committed. When no law can be laid, the composition goes on as it is (`laws_fallback`). The work keeps the laws record (`laws_layers`, `laws_basis`) in its history-link sidecar, and the laws move from a saved work (input `SavedLaws`, autonomous refinement) builds on that record.
+
+## Color stage
+
+After the laws stage, a reader chooses the work's colors from laws of color (contrast of hue, harmony of analogous colors, masses of light and dark and others; `choose_colors`, prompt `inku.colors-prompt.v1`). Core estimates how each layer of the Score looks from the renderer's editable SVG (`appearance.rs`) and has the reader choose again a color that would not show from the ground or with which the law would not hold. The colors of the layers the description names and a ground color it names are kept; where the description names no ground, the ground's color may be chosen too. When no colors can be laid, the document after the laws stage goes on as it is (`colors_fallback`).
+
 ## Saving visible DDL and authority
 
 Core hands the host the visible DDL and the next authority state as one CAS save effect. The host saves the document and the authority in one transaction only when the expected revision matches, and returns the DDL digest, the new revision, and the authority digest. Core checks the match and then reparses only the saved bytes.
 
 - A description-origin variation starts as `stage1_generated` / `description_authoritative`. The first author confirmation that changes the exact source bytes locks it to DDL authority, and reverting the text does not unlock it.
 - Direct DDL is `user_authored_ddl` / `ddl_authoritative` from the start.
+- A new DDL (a commit from a description, a residual commit, a new direct DDL without a parent) declares the paper's ratio as its first sentence (`Aspect ratio W:H.` / `画面比W:H。`, DDL 26). The declaration makes no instruction, takes no sentence number and is not seed material; it goes into the Score's `canvas.declared_ratio`. Editing or redrawing a saved work adds none, and the laws move keeps the parent's declaration.
 - A host save failure stops as `host_commit_failed` and keeps the last acknowledged document and authority.
 - A resend of the same action identity causes no second revision change (idempotent action acknowledgment).
 
@@ -148,11 +165,11 @@ Core hands the host the visible DDL and the next authority state as one CAS save
 | `blocked_conflict` | There is a conflict of meaning | Only the independent remainder is drawn through the sealed projection. Not sent for completion |
 | `blocked_diagnostic` | Stopped by a diagnostic such as integrity | Stops unless the sealed projection can draw something |
 
-An ambiguous reference, a reference with no candidate, or several candidates are never guessed by first/nearest/last; they fail closed as typed issues. When the state is not `canonical_ready`, `execution_projection` still delivers independent instructions by omitting established local units, and records the omissions as upstream diagnostics. Omitting every drawing unit, or an integrity failure, stops.
+An ambiguous reference, a reference with no candidate, or several candidates are never guessed by first/nearest/last; they fail closed as typed issues. When the state is not `canonical_ready`, `execution_projection` still delivers independent instructions by omitting established local units, and records the omissions as upstream diagnostics. Omitting every drawing unit, or an integrity failure, stops. A sentence without a shape (a surface, tool or sway word written as a shape, for example) that no hole holds is named by a blocking diagnostic with its span (`missing_entity_head` and the like) and left out (DDL engine 71; until then the whole document stopped with `missing_canonical_semantic_identity`, which carries no span).
 
 ## Known-hole completion (Stage 2)
 
-When the lock of the saved DDL carries known holes, or the work's record shows a range whose words alone were edited (A3), core requests the hole completion effect without waiting for a separate author command (prompt `inku.visible-ddl-hole-completion-prompt.v5`). Before that request, the host saves the safe performance if a Score exists (Server and Android alike).
+When the lock of the saved DDL carries known holes, or the work's record shows a range whose words alone were edited (A3), core requests the hole completion effect without waiting for a separate author command (prompt `inku.visible-ddl-hole-completion-prompt.v5`). Before that request, the host saves the safe performance if a Score exists (Server, Android and macOS alike).
 
 - The request carries only the target source text, confirmed typed facts, the finite vocabulary, and the accepted syntax. It carries no description, unrelated clauses, Score, or renderer instructions.
 - The response is one correction or unresolved reason per short target ID. Core checks that the IDs match, with no duplicates or omissions, and restores the actual hole IDs, allowed spans, and digests from the saved request and the lock.
@@ -170,7 +187,7 @@ No model call. It takes only `canonical_ready` meaning (anything else goes throu
 
 - **Plan** — `plan_verified_stage15_with_policy` makes one symbolic Plan per instruction and per declared Macro Emit. It carries the exact count, resolved size, appearance, angle, position, layout formula, and origin, and makes no instance arrays or copies of Score instructions. A field, relation, or coordination that cannot hold is omitted at its smallest unit and recorded as a diagnostic.
 - **Resource selection** — `select_composition_plan_resources` checks demand against both the hard policy and the operational budget before any instance is made. When an explicit count on a single primitive exceeds it, the largest safely executable prefix in source order is delivered, and the requested count, the executed count, and the reason go into the resource diagnostic. A coordinated placement or Macro whose partial execution would break its structure is omitted as a whole unit, and independent successors continue.
-- **Materialization** — `materialize_selected_composition` writes the Plan as a replayable compact recipe. From the Score 0.10 baseline, only works with additional fields use later versions (a numeric attachment position 0.11, an endpoint target or ink spread 0.12, attachment partway 0.13, member cycles 0.14, mirroring 0.15). The Score carries a snapshot of the resource policy but no self-declared demand.
+- **Materialization** — `materialize_selected_composition` writes the Plan as a replayable compact recipe. From the Score 0.10 baseline, only works with additional fields use later versions (a numeric attachment position 0.11, an endpoint target or ink spread 0.12, attachment partway 0.13, member cycles 0.14, mirroring 0.15, the thick side 0.16, intensity off flat fills 0.17, a numeric fill range's origin 0.18, cells for copies 0.19, joints 0.20, the free line 0.21, brushmarks 0.22). The Score carries a snapshot of the resource policy but no self-declared demand.
 - **Outcome** — `complete` with no omissions, `complete_with_omissions` with some. If the omissions leave nothing to draw (no instruction and no ground), the outcome is `stopped`; a background-only empty work is never a success.
 
 ## Performance — Render Engine
@@ -179,7 +196,8 @@ The host supplies trusted render options (resolved color map, render seed, wild,
 
 - For a compact Score, `finalize_saved_score` recomputes demand against the saved policy, and typed performance samples instances from the recipe. The Score holds no instance coordinates.
 - A unit whose fill boundary cannot be clipped, or exceeds the clip limits, is omitted as its whole source or coordinated group, and the performance is repeated. No part of a count is left behind.
-- Render Engine 68 is the same on the Server and Android. **The same Score, seeds, and drawing conditions reproduce the same work.** There is no runtime fallback or past-engine selector, and history display SVG returns the saved copy.
+- On a paper of another ratio than the declaration, the host's `canvas_fit: contain` centres the largest frame of the declared ratio that fits the paper and lays the composition out in it. The background and ground cover the whole paper, and marks are not cut at the frame (render engine 93).
+- Render Engine 93 is the same on the Server, Android and macOS. **The same Score, seeds, and drawing conditions reproduce the same work.** There is no runtime fallback or past-engine selector, and history display SVG returns the saved copy.
 
 ## Identity and persistence
 
@@ -196,7 +214,7 @@ The host supplies trusted render options (resolved color map, render seed, wild,
 - The diagnostics are also saved in the history sidecar, so reopening the history restores that revision's diagnostics. If a sidecar is corrupt, only that work shows a warning, and the saved DDL, Score, and SVG stay visible.
 - The log receives only `pipeline_compiler_outcome`: diagnostic counts and a safe projection that excludes the source text.
 - Raw provider traffic is kept only for an execution run in developer mode with `developer_capture_provider_io`, as an owner-scoped record readable through `/api/pipeline/executions/{id}/provider-observations`. It never enters ordinary history, responses, or logs.
-- The system prompts that Stage 1 (the work plan) and hole completion (Stage 2) sent to the provider are kept in the execution's context, the last send of each stage per execution (on a retry, the last send with the compiler's feedback). Only the owner reads them through `/api/pipeline/variations/{id}/system-prompts`, and the Web provenance drawer's Prompts tab shows them. A stage that called no model is null, and an execution saved before this record reads `recorded: false`.
+- The system prompts that the sketch, Stage 1 (the work plan), the composition reading, the laws stage, the color stage and hole completion (Stage 2) sent to the provider are kept in the execution's context, the last send of each stage per execution (on a retry, the last send with the compiler's feedback). For the sketch, the composition reading, the laws stage and the color stage the message sent is kept too (since 2026-10-13; the laws stage and the color stage since 2026-10-20). Only the owner reads them through `/api/pipeline/variations/{id}/system-prompts`, and the Web provenance drawer's Prompts tab shows them. A stage that called no model is null, and an execution saved before this record reads `recorded: false`.
 - The stream re-reads the execution and reports, in order, `sketch` (when the sketch ran), `stage1` (the saved DDL), `score` (the instruction count), and `done` (the ordinary response). A failure before the first event arrives as its HTTP status, and a failure after it (including an approval wait for a completion proposal) as an in-band `error` event. Token counts are null because the shared pipeline does not count them.
 - While a model call is awaited, the running view carries `provider_attempt`: the effect, the one-based attempt, the stage's most attempts, and the wait and time limit. The shared core counts and bounds them from the saved snapshot (`pipeline_provider_attempt`), and the Server adds the deadline `deadline_at` (epoch ms) only to an attempt it began itself. The stream sends `attempt` whenever an attempt begins and once the last one has ended (null). While nothing settles it still sends `wait` every 10 seconds, so that a proxy does not drop a silent body, and it cancels the run of a reader that has left (a stop, a closed page). The three plain entry points ask every second while they wait whether their reader is still there and cancel the run of one that has gone. The Web's proxy aborts its API request once the browser's connection closes (SvelteKit's request signal works only while the request body is arriving). The Web running indicator shows the count, as awaiting a reply on the first attempt and as retrying on any later one.
 
@@ -216,11 +234,15 @@ The host supplies trusted render options (resolved color map, render seed, wild,
 | 10 | Stage 1 | Provider rejection or budget spent | Stops; no work is created | `stage1_failed`, provider failure class |
 | 11 | Stage 1 | Compiler does not fully accept; budget left | Renormalizes with reasons and spans | `retry_scheduled` (`semantic_violation`) |
 | 12 | Stage 1 | Same, budget spent, residual exists | Saves the full candidate; draws only the residual | `complete_with_omissions`, upstream diagnostics |
+| 12a | Composition reading | Unusable answer or budget spent, or an on-device Vision model | Places the layers with the default reading and goes on | `composition_fallback` / `composition_skipped` |
+| 12b | Laws stage | No law can be laid, or budget spent | Goes on with the composition | `laws_fallback` |
+| 12c | Color stage | No colors can be laid, or budget spent | Goes on with the document after the laws stage | `colors_fallback` |
 | 13 | Save | CAS mismatch or save failure | Stops; keeps the last document and authority | `host_commit_failed` |
 | 14 | Compile | Known holes present | Saves the safe performance first, then requests completion | `typed_ddl_parsed`, hole IDs |
 | 15 | Completion | Valid candidate | Waits for the author (409 on compatibility routes) | `awaiting_patch_approval` |
 | 16 | Completion | Failure or decline | Keeps the saved DDL and waits for the author's edit | `needs_user_edit` |
 | 17 | Lower | Part cannot hold | Omits the smallest unit and continues | Downstream diagnostics, `complete_with_omissions` |
+| 17a | Compile | A sentence without a shape that no hole holds | Names that sentence alone with its span and leaves it out | `missing_entity_head` and the like, `complete_with_omissions` |
 | 18 | Resources | A single primitive's count exceeds the limit | Delivers the largest executable prefix | Resource diagnostic (requested, executed, reason) |
 | 19 | Resources | A coordinated unit exceeds the limit | Omits the whole unit | Resource omission |
 | 20 | Lower | Nothing left to draw | Stops | `stopped`, `needs_user_edit` |
@@ -229,14 +251,25 @@ The host supplies trusted render options (resolved color map, render seed, wild,
 | 23 | Save | Idempotency key matches | Creates no new row | `_idempotent_replay` |
 | 24 | Stream | Failure after the first event | An `error` event rather than HTTP | Status and detail |
 
+## Works written from an image
+
+This entry starts from an image instead of a description (the Server/Web image tab and the CLI's `paint --image`; SPEC §12.6.6). `POST /api/pipeline/images` reads the image (JPEG, PNG, GIF or TIFF, up to 32 MiB) with Pillow (a GIF's first frame, with EXIF orientation applied), shrinks it under the core's policy (`inku.image-input-policy.v1`: a long side of 1568 pixels, JPEG quality 90, up to 4 MiB), and returns an owner-scoped temporary ID, a thumbnail, the dimensions and the nearest paper. `POST /api/pipeline/variations` (`kind: image`) starts the run, and core judges in this order.
+
+1. With the color catalog set to `Choose from image automatically`, it compares each candidate's nine colors with the image and chooses a catalog (the default catalog when that fails, `catalog_fallback`).
+2. The Vision model writes the DDL (`write_image_ddl`). Core declares the image's ratio as the first sentence, names each line not drawn as written with its reason and hint, and asks once again. The compile leaves out a sentence without a shape; a sentence that still stops the whole work is named by compiling each line alone and dropped.
+3. The host draws the written DDL (`draw_image_review`, a PNG with a long side of 1024 pixels), and the model, shown the image, the drawing and the DDL, corrects it once (`review_image_ddl`). When it cannot be drawn, the written DDL stands.
+4. The remaining DDL is committed as a DDL edit (reason `image_ddl`). With no readable answer the run stops as `image_ddl_failed`, and with nothing to draw as `image_ddl_undrawable`. Unread lines are not completed after the commit.
+
+The work keeps its source note (`image_provenance`) and the core's record (`image_ddl`, with the DDL before review), with `input` and `source_text` empty; the image is not saved. On a paper of another ratio it is fitted without a question (`canvas_fit: contain`).
+
 ## Replaying older Scores
 
 `/api/render-score` and `/api/render-svg` perform a saved or external Score again; they read neither a description nor DDL.
 
-- **Compact Score (0.10 through 0.15)** — `ProductPipelineEffects.replay` calls the shared core's `render_saved`. The saved resource policy is used only for a work with a Server-owned history link; otherwise the installation default applies. A Score cannot declare its own budget.
+- **Compact Score (0.10 through 0.22)** — `ProductPipelineEffects.replay` calls the shared core's `render_saved`. The saved resource policy is used only for a work with a Server-owned history link; otherwise the installation default applies. A Score cannot declare its own budget.
 - **Older Score below 0.10** — `saved_score_compat.py:coerce_saved_score` applies only structural compatibility (defaults for omitted geometry, a bridge between the two old spellings of a solid fill, removal of unresolvable relations, the four recorded limits), and the established checked performance plays it. The delivery and style repair of the old coerce do not run.
 - Either way, naming a work (`work_id`) uses that work's color snapshot (`render_color_map`) and limits, never today's catalog definition.
 
 ## Diagram evidence
 
-`PIPE-HOST`, `PIPE-MACHINE`, `PIPE-CATALOG`, `PIPE-SKETCH`, `PIPE-S1`, `PIPE-TYPED-DDL`, `PIPE-HOLE`, `PIPE-S15`, `PIPE-LOWER`, `PIPE-LIMITS`, `PIPE-RENDER`, `PIPE-COMPAT`, `PIPE-HISTORY`, `DATA-AUTHORITY`, `API-LIMIT`, `DATA-DH1`, `DATA-RH3`, `DATA-FALLBACK`. The primary evidence is `pipeline_compat.py:{paint,paint_events}`, `description_labels.py`, `pipeline_api.py:PipelineService`, `pipeline_product.py:{prepare,provider_for,render_options,save_result,replay}`, `inku-pipeline/src/machine.rs:{description,stage1,llm_response,failure_with_detail,accept_result}`, `protocol.rs:RetryPolicy`, `inku-ddl/src/compiler_execution.rs:execute_compilation_with_resources`, `inku-render/src/render.rs:render_with_resources`, `saved_score_compat.py`, and `db.py:render_hash_for_item`.
+`PIPE-HOST`, `PIPE-MACHINE`, `PIPE-CATALOG`, `PIPE-SKETCH`, `PIPE-S1`, `PIPE-COMPOSITION`, `PIPE-LAWS`, `PIPE-COLORS`, `PIPE-CANVAS`, `PIPE-TYPED-DDL`, `PIPE-HOLE`, `PIPE-IMAGE`, `PIPE-WIRE`, `PIPE-S15`, `PIPE-LOWER`, `PIPE-LIMITS`, `PIPE-RENDER`, `PIPE-COMPAT`, `PIPE-HISTORY`, `DATA-AUTHORITY`, `DATA-IMAGE`, `API-LIMIT`, `DATA-DH1`, `DATA-RH3`, `DATA-FALLBACK`. The primary evidence is `pipeline_compat.py:{paint,paint_events}`, `description_labels.py`, `pipeline_api.py:PipelineService`, `pipeline_product.py:{prepare,provider_for,render_options,save_result,replay}`, `pipeline_images.py`, `inku-pipeline/src/machine.rs:{description,stage1,llm_response,failure_with_detail,accept_result,composition_response,laws_response,colors_response}`, `machine/image.rs`, `protocol.rs:RetryPolicy`, `inku-ddl/src/compiler_execution.rs:execute_compilation_with_resources`, `inku-render/src/render.rs:render_with_resources`, `saved_score_compat.py`, and `db.py:render_hash_for_item`.

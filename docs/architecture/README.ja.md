@@ -1,6 +1,6 @@
 # inku アーキテクチャ
 
-この文書群は、DDLの設計段階、現行実装、Web/Server/CLI/Android/外部provider/永続化の境界を、相互に追跡できる形で記録する。実装baselineは公開commit `f910a11e165ae3169818f3f1311ee869d33930ed`、app `v2.15.28 / Build 1104`、Render Engine 68、DDL engine 47 に、`known-differences.ja.md` F-05〜F-10の修正を加えた状態である。2026-09-14の共有Rust pipeline cutover後の構造を記す。
+この文書群は、DDLの設計段階、現行実装、Web/Server/CLI/Android/macOS/外部provider/永続化の境界を、相互に追跡できる形で記録する。実装baselineは公開commit `086fbe3ea45dd0784b911a7599ef88f60b0c85dc`（2026-10-24）、app `v2.15.244 / Build 1320`、Render Engine 93、DDL 26 / DDL engine 71 である。2026-09-14の共有Rust pipeline cutover後の構造に、2026-10-24までのcoreの更新を加えて記す。構図の読み・法則の段・配色の段、providerへの要求本文と答えの読み・作品の同一性・保存作品の推敲の規則の共有coreへの移管、画面比の宣言とはめ込み、画像から書く作品、Skiaによる画面表示である。
 
 ## 推奨閲覧順
 
@@ -10,7 +10,7 @@
 4. `ddl-processing-pipeline.ja.md` — DDL処理と共有authoring state machine
 5. `description-to-svg.ja.md` — 記述からSVGまでの判定の道筋（共有pipelineの深掘り）
 6. `server-components.ja.md` — Server内部
-7. `client-boundaries.ja.md` — Web内部のcanonical owner図とWeb/CLI/Android境界
+7. `client-boundaries.ja.md` — Web内部のcanonical owner図とWeb/CLI/Android/macOS境界
 8. `data-history-lineage.ja.md` — DB、同一性、系譜
 9. `operations-security.ja.md` — 運用・安全境界
 10. `change-impact-map.ja.md` — 変更時の波及

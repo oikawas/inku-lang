@@ -78,10 +78,18 @@
 - 2026-09-25に、偽providerがv3の形（短いID `h1` ごとの`proposed`と置換文）で答え、promptがv3であることを確かめるよう直した。あわせて、承認待ちの時点で独立した描画（赤い円）のScoreが`complete_with_omissions`として残ることを確かめる検査へ改めた（旧testは承認待ちでScoreが無いことを期待していた）。
 - 判定: **解消済み**。
 
+### F-13 Project Contextの版の表と古い記述（未解消）
+
+- `PROJECT_CONTEXT.ja.md`は冒頭で対象バージョンをv2.15.244 / Build 1320と名乗るが、「版」の表はRender Engine 68、DDL `ddl_version` 13 / `ddl_engine_version` 47、Android `2.1.4-android.80`、Pythonパッケージ2.7.2のままで、用語の節にも「Render Engine 66」が残る。Androidの節は`rh3`の計算をAndroid hostの所有と記す。英語版（`PROJECT_CONTEXT.md`）も同じである。
+- 実装はRender Engine 93（`core/crates/inku-render/src/lib.rs`）、`ddl_version` 26 / `ddl_engine_version` 71（`layer_versions.py`）、Android `2.1.4-android.105`（`android/VERSION`）、`server/pyproject.toml` 2.15.240である。`dh1`と`rh3`はAndroidも共有coreの`identity.rs`へ尋ねる（JNIの`descriptionHash`・`renderHash`）。
+- 版の一覧の`docs/spec/render-engine-history.ja.md`も、`server/pyproject.toml`を2.15.33と記す（英語版も同じ）。
+- いずれも本群の外の文書なので、2026-10-24の再照合では直していない。
+- 判定: **未解消**。
+
 ## 文書間で注意が必要な語
 
 - SPECの「Rendererは非決定的」「同じScoreから違うSVG」は、render seedを変えた演奏の説明である。Project Contextと実装の契約は「同じScore + 同じseed + 同じ描画条件は同じ作品」。本群は後者を再現性の表現に使う。
-- `SPEC.ja.md` の文書Version `v1.92.0` とapp version `v2.15.28` は別namespaceとして記録した。これ自体を不一致とは判定しない。
+- `SPEC.ja.md` の文書Version `v1.92.0` とapp version `v2.15.244` は別namespaceとして記録した。これ自体を不一致とは判定しない。
 - 「Stage 2」は、旧実装ではDDLからScoreを作るLLM段を指し、現行ではknown holeへの可視patch候補だけを作るLLM段を指す。Scoreの構造化は共有Rustのlowererが行う。
 - 「coerce」は旧Score互換の文脈（`coerce_saved_score`）と保存済み観測記録（`coerce/observability.py`）にだけ残り、新作の生成段ではない。
 - 「写生」は、旧Stage 0.5（記述の代わりに写生文を後段へ渡す層）と、現行の任意effect（記述の横に場所と光を補う）で意味が異なる。旧作品の`fine` / `coarse`は前者の記録である。
@@ -102,7 +110,7 @@ Session、current-workのsubmit/replay/stop、Batch/Demoの非同期lifecycle、
 
 ### C-03 共有coreの大きいmodule
 
-旧`api_core/routers/render.py`の集中はcutoverで解け、routerは互換投影と旧Score再演の入口だけになった。変更の交差点は共有coreへ移っている。`inku-ddl/src/score_lowering.rs`（約7800行）、`semantic_association.rs`と`compiler_lock.rs`（各約4600行）、`inku-pipeline/src/machine.rs`（約2000行）が大きく、Server側では`pipeline_product.py:ProductPipelineEffects`が準備・provider・保存・再演の4つのhost責任を1 classに持つ。
+旧`api_core/routers/render.py`の集中はcutoverで解け、routerは互換投影と旧Score再演の入口だけになった。変更の交差点は共有coreへ移っている。`inku-ddl/src/score_lowering.rs`（約8700行）、`semantic_association.rs`（約5200行）と`compiler_lock.rs`（約4800行）、`inku-pipeline/src/laws.rs`（約6200行）、`colors.rs`（約5200行）、`machine.rs`（約4200行。画像の段は`machine/image.rs`の約1000行に分けた）が大きく、Server側では`pipeline_product.py:ProductPipelineEffects`が準備・provider・render option・保存・再演の5つのhost責任を1 classに持つ。
 
 行数だけではowner違反を示さない。分割は、独立した変更理由が同じmoduleで衝突する場合にだけ検討する。
 
@@ -120,6 +128,6 @@ Session、current-workのsubmit/replay/stop、Batch/Demoの非同期lifecycle、
 
 ## 今後確認すべき質問
 
-本書で挙げた差異は、2026-09-25時点ですべて解消した。新しい差異は見つけた時点で本書へ加える。
+F-12までの差異は、2026-09-25時点ですべて解消した。F-13は2026-10-24の再照合で見つけ、未解消である。新しい差異は見つけた時点で本書へ加える。
 
 これらは本調査で実装・仕様を変更する課題ではないため、台帳への自動転記はしていない。

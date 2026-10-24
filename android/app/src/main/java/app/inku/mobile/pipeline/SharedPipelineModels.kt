@@ -38,7 +38,24 @@ data class PipelineModelSelection(
     val stage1MaxTokens: Int = 2048,
     val holeMaxTokens: Int = 2048,
     val chatGptSession: app.inku.mobile.llm.ChatGptSessionRef? = null,
+    /**
+     * The answer limit of writing and reviewing a DDL from an image, the
+     * server's `image_max_tokens`: its answers run past Stage 1's 2048.
+     */
+    val imageMaxTokens: Int = IMAGE_DDL_MAX_TOKENS,
 )
+
+/** The server's default `image_max_tokens` (`pipeline_defaults.py`). */
+const val IMAGE_DDL_MAX_TOKENS = 8192
+
+/**
+ * Draws the DDL a run wrote from an image, for the model to see beside the
+ * image (`draw_image_review`): keeps the PNG for the review request and
+ * returns its reference, or null when it cannot be drawn.
+ */
+fun interface ImageReviewPort {
+    suspend fun draw(snapshotBytes: ByteArray, hostContextJson: String, maxSvgBytes: Long): JSONObject?
+}
 
 sealed interface PipelineAuthoring {
     data class Description(
@@ -58,6 +75,11 @@ sealed interface PipelineAuthoring {
         val directionJson: String,
         val completionRangesJson: String?,
         val lawsRecordsJson: String?,
+    ) : PipelineAuthoring
+    /** A work written from an image (SPEC §12.6.6): the core's `ImageInput` and the catalog choice. */
+    data class Image(
+        val imageJson: String,
+        val autoCatalog: Boolean,
     ) : PipelineAuthoring
 }
 

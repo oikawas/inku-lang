@@ -17,8 +17,12 @@ import app.inku.mobile.llm.VisionAnalysisRequest
 import app.inku.mobile.llm.VisionImagePreparer
 import app.inku.mobile.llm.VisionPrompts
 import app.inku.mobile.llm.isLocalVisionModel
+import app.inku.mobile.pipeline.ImageDdlInputs
+import app.inku.mobile.pipeline.InstructionLanguages
 import app.inku.mobile.pipeline.SketchInput
 import app.inku.mobile.security.DisplaySanitizer
+import app.inku.mobile.ui.camera.CameraDrawSettings
+import app.inku.mobile.ui.camera.CameraImageDdl
 import java.io.File
 import java.security.SecureRandom
 import kotlinx.coroutines.CoroutineScope
@@ -121,10 +125,14 @@ class HeadlessRenderActivity : Activity() {
                 compositionSeed = intent.longExtraOrNull("composition_seed"),
             )
 
-            val image = if (inputMode == "image") analyzeHeadlessImage(repository, outputDir, runId, stage1Model) else null
+            // A remote Vision model has the shared core write the DDL from the
+            // photo, as the camera does; an on-device model keeps the
+            // description route.
+            val imageDdl = inputMode == "image" && CameraImageDdl.usesImageDdl(stage1Model)
+            val image = if (inputMode == "image" && !imageDdl) analyzeHeadlessImage(repository, outputDir, runId, stage1Model) else null
             if (image != null && intent.getBooleanExtra("skip_draw", false)) return
             val item = when (inputMode) {
-                "image" -> {
+                "image" -> if (imageDdl) drawHeadlessImageDdl(repository, outputDir, stage1Model, catalogId, seeds) else {
                     val analysis = requireNotNull(image)
                     val started = System.currentTimeMillis()
                     val sketch = SketchInput(requested = intent.getStringExtra("sketch") == "on")
@@ -300,6 +308,74 @@ class HeadlessRenderActivity : Activity() {
             ),
             timings = timings,
         )
+    }
+
+    /**
+     * The camera path for a remote Vision model from a saved photo: prepare it
+     * by the core's rule, have the core write and review the DDL from it, and
+     * draw that execution on the paper nearest the photo. Writes the timings
+     * and the run's record (`image_ddl.json`: references and rounds, no image).
+     */
+    private suspend fun drawHeadlessImageDdl(
+        repository: InkuRepository,
+        outputDir: File,
+        modelId: String,
+        catalogId: String,
+        seeds: PaintSeeds,
+    ): app.inku.mobile.data.db.HistoryItemEntity {
+        val path = requireNotNull(intent.getStringExtra("text_file")?.takeIf { it.isNotBlank() }) {
+            "text_file must name the image for input_mode=image."
+        }
+        val file = resolveHeadlessInputFile(path)
+        val languageCode = intent.getStringExtra("ui_lang")?.takeIf { it == "en" } ?: "ja"
+        val prepareStarted = System.currentTimeMillis()
+        val prepared = ImageDdlInputs.prepare(file)
+        val prepareMs = System.currentTimeMillis() - prepareStarted
+        val provenance = CameraImageDdl.provenance(CameraInputOrigin.PhotoPicker, modelId, prepared)
+        val settings = CameraDrawSettings(modelId, modelId, catalogId, sketchRequested = false)
+        val request = CameraImageDdl.request(settings, prepared, languageCode, provenance)
+            .copy(renderSeed = seeds.renderSeed)
+        val writeStarted = System.currentTimeMillis()
+        val written = repository.interpretImage(prepared, request)
+        val writeMs = System.currentTimeMillis() - writeStarted
+        val drawStarted = System.currentTimeMillis()
+        val item = repository.composeFromDdl(
+            description = "",
+            ddl = written.normalizedDdl,
+            catalogId = catalogId,
+            canvasAspect = prepared.nearestFormatId,
+            stage1ModelId = modelId,
+            stage2ModelId = modelId,
+            instructionLang = InstructionLanguages.AUTO,
+            uiLang = languageCode,
+            sketch = SketchInput(),
+            inputProvenance = provenance,
+            executionId = written.executionId,
+            renderWild = false,
+            canvasFit = CameraImageDdl.CANVAS_FIT,
+        )
+        val drawMs = System.currentTimeMillis() - drawStarted
+        val record = JSONObject(item.renderMetadataJson).optJSONObject("image_ddl")
+        withContext(Dispatchers.IO) {
+            File(outputDir, "timings.json").writeText(
+                JSONObject()
+                    .put("route", provenance.route.wireValue)
+                    .put("vision_model", modelId)
+                    .put("original_width", prepared.originalWidth)
+                    .put("original_height", prepared.originalHeight)
+                    .put("image_width", prepared.reference.width)
+                    .put("image_height", prepared.reference.height)
+                    .put("jpeg_bytes", prepared.reference.byteLength)
+                    .put("nearest_format_id", prepared.nearestFormatId)
+                    .put("prepare_ms", prepareMs)
+                    .put("write_ms", writeMs)
+                    .put("image_stage_ms", JSONObject(item.renderMetadataJson).optLong("elapsed_image_ms"))
+                    .put("draw_ms", drawMs)
+                    .toString(2),
+            )
+            File(outputDir, "image_ddl.json").writeText(record?.toString(2) ?: "null")
+        }
+        return item
     }
 
     private suspend fun resolveInputText(): String = withContext(Dispatchers.IO) {

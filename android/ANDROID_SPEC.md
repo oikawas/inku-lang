@@ -4,7 +4,17 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-10-23.
+Last updated: 2026-10-24.
+
+## 2026-10-24 The camera draws through the shared core's image run
+
+A photo taken with a remote Vision model is drawn by the shared core's image run (SPEC §12.6.6). It skips the observation, the poetic description and Stage 1 from a description: the one chosen model writes the DDL from the photo, reviews it beside a drawing of it, and the result is committed as a DDL edit. With the color catalog on automatic, the catalog is chosen from the photo first. The work is DDL-authoritative and has no description (description-locked); 写生 and Wild are not used. An on-device model (LiteRT) has no way to be sent the photo with a DDL request, so it keeps the observation, poetic description and Stage 1 route (the author's choice, 2026-10-24).
+
+The photo is prepared by the core's rule (`image_input_policy`, `image_canvas`: long side 1568, JPEG quality 90, at most 4 MiB): oriented, any transparency set on white, scaled to the sent size and encoded as JPEG. The paper is the registered format nearest the photo's ratio (`nearest_format_id`); the DDL's first sentence declares the photo's ratio and the drawing is fitted (contain). Writing and reviewing answer within 8192 tokens (the server's `image_max_tokens`); choosing the catalog keeps Stage 1's limit. The review drawing is the core's SVG (`image_review_svg`) drawn with the work's own colors, seed and paper, rasterized to the requested size as a PNG and sent after the photo. When it cannot be drawn, the core receives `image_review_undrawn` and commits the DDL as written.
+
+The photo and the review PNG are held in memory only while the run writes; the snapshot, Room and logs receive only their references (type, size, SHA-256, length). A run whose image is gone, for example after the app was stopped, is cancelled without sending (`image_missing`). The committed run's `image_ddl` record (sent image reference, declared ratio, nearest paper, rounds, the DDL before review, the review drawing's reference, dropped lines) is saved in the work's render metadata, and `input_provenance` names the route `image_ddl_to_pipeline` (output mode `ddl`). The Room schema is unchanged. JNI gains `imageInputPolicy`, `imageCanvas` and `imageReviewSvg`, wrapping the uniffi functions without changing the core.
+
+Development shows “Preparing your photo”, “Writing the instructions from your photo”, “Finishing the work” and “Saving your work”. A draw-only retry writes again from the kept photo. Stop reasons gain “instructions could not be written from the photo” and “the instructions written from the photo drew nothing”. Headless `input_mode=image` takes the same route with a remote model and writes `timings.json` and `image_ddl.json` (references and rounds only).
 
 ## 2026-10-23 Canvas declarations and fitting
 

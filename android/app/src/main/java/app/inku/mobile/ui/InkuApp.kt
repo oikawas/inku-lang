@@ -3208,6 +3208,7 @@ private fun cameraStatusText(state: CameraCaptureState): String? = when (state) 
     CameraCaptureState.AnalyzingLocally -> S.cameraAnalyzingLocally
     CameraCaptureState.WritingDescription,
     CameraCaptureState.InterpretingStage1,
+    CameraCaptureState.WritingFromImage,
     CameraCaptureState.Composing,
     CameraCaptureState.Rendering,
     CameraCaptureState.Saving,
@@ -6757,6 +6758,7 @@ internal fun generationInfoDisplayValue(row: GenerationInfoRow, strings: InkuStr
     row.field == GenerationInfoField.InputRoute && row.value == "local_ddl_to_nim_stage2" -> strings.generationInfoInputRouteLocalDdlToNimStage2
     row.field == GenerationInfoField.InputRoute && row.value == "description_to_pipeline" -> strings.generationInfoInputRouteDescriptionToPipeline
     row.field == GenerationInfoField.InputRoute && row.value == "ddl_to_pipeline_stage2" -> strings.generationInfoInputRouteDdlToPipelineStage2
+    row.field == GenerationInfoField.InputRoute && row.value == "image_ddl_to_pipeline" -> strings.generationInfoInputRouteImageDdlToPipeline
     row.field == GenerationInfoField.VisionOutputMode && row.value == "description" -> strings.generationInfoVisionOutputModeDescription
     row.field == GenerationInfoField.VisionOutputMode && row.value == "ddl" -> strings.generationInfoVisionOutputModeDdl
     row.field == GenerationInfoField.RenderWild && row.value == "true" -> strings.generationInfoOn

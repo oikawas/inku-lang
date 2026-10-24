@@ -244,6 +244,48 @@ pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_provid
     unary_bytes(env, input, inku_pipeline_uniffi::provider_wire)
 }
 
+/// How a host prepares the image a work is written from (`inku.image-input-policy.v1`).
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
+pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_imageInputPolicy(
+    env: JNIEnv<'_>,
+    _receiver: JObject<'_>,
+) -> jstring {
+    jni_boundary(env, null_mut(), |env| {
+        new_java_string(env, &inku_pipeline_uniffi::image_input_policy())
+    })
+}
+
+/// The size to send an image at, the ratio its DDL declares and the nearest paper.
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
+pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_imageCanvas(
+    env: JNIEnv<'_>,
+    _receiver: JObject<'_>,
+    input: JByteArray<'_>,
+) -> jbyteArray {
+    unary_bytes(env, input, inku_pipeline_uniffi::image_canvas)
+}
+
+/// The SVG of the written DDL a host shows beside the image (`draw_image_review`).
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
+pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_imageReviewSvg(
+    env: JNIEnv<'_>,
+    _receiver: JObject<'_>,
+    snapshot: JByteArray<'_>,
+    request: JByteArray<'_>,
+) -> jbyteArray {
+    jni_boundary(env, null_mut(), |env| {
+        let snapshot = read_bytes(env, snapshot)?;
+        let request = read_bytes(env, request)?;
+        write_bytes(
+            env,
+            &inku_pipeline_uniffi::image_review_svg(snapshot, request),
+        )
+    })
+}
+
 #[unsafe(no_mangle)]
 #[allow(non_snake_case)]
 pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_completionRangeStates(

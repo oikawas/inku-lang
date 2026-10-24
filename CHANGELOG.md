@@ -8,6 +8,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-24 — The Android camera draws through the shared core's image run
+
+With a remote Vision model, the Android camera hands the photo to the shared core's image run (§12.6.6). The one chosen model writes the DDL from the photo, reviews it beside a drawing of it, and the work is drawn fitted into the paper nearest the photo's ratio. The observation, the poetic description and Stage 1 from a description are skipped, and the work has no description. With the color catalog on automatic, the catalog is chosen from the photo. An on-device model (LiteRT) keeps the observation and poetic description route (the author's choice, 2026-10-24).
+
+The photo and the review drawing are held in memory only while the run writes; the work keeps only their references and the rounds (`image_ddl`). A run whose image is gone is cancelled without sending. Writing and reviewing answer within 8192 tokens. JNI gains wrappers for the three image functions (`imageInputPolicy`, `imageCanvas`, `imageReviewSvg`). The core's behavior, the Room schema, Server, Web and macOS are unchanged.
+
 ### 2026-10-24 — Read a whole number before an English period, and leave out a sentence without a shape (DDL engine 71)
 
 Two readings found while writing DDL from images (§12.6.6) are corrected in the shared compiler. The author chose to fix both in drawing as a separate step (2026-10-24).

@@ -519,6 +519,7 @@ interface InkuStrings {
     val generationInfoInputRouteLocalDdlToNimStage2: String
     val generationInfoInputRouteDescriptionToPipeline: String
     val generationInfoInputRouteDdlToPipelineStage2: String
+    val generationInfoInputRouteImageDdlToPipeline: String
     val generationInfoVisionOutputModeDescription: String
     val generationInfoVisionOutputModeDdl: String
     val generationInfoSketchGrain: String

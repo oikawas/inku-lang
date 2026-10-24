@@ -10,6 +10,7 @@ internal enum class CameraInstantPrintPhase {
     AnalyzingLocally,
     WritingDescription,
     InterpretingStage1,
+    WritingFromImage,
     Composing,
     Rendering,
     Saving,
@@ -57,6 +58,28 @@ internal class CameraInstantPrintCoordinator(
         return runFromAnalysis(local, interpret, compose)
     }
 
+    /**
+     * A photo the shared core writes the DDL from: no local analysis and no
+     * description, so the run goes from the prepared photo straight to writing.
+     */
+    suspend fun <Local, Interpreted, Result> runFromImage(
+        prepare: suspend () -> Local,
+        onLocalReady: suspend (Local) -> Unit,
+        interpret: suspend (Local) -> Interpreted,
+        compose: suspend (
+            Local,
+            Interpreted,
+            suspend (CameraInstantPrintPhase) -> Unit,
+        ) -> Result,
+    ): CameraInstantPrintOutcome<Local, Result> {
+        emit(CameraInstantPrintPhase.PreparingImage)
+        val local = prepare()
+        ensureCurrent()
+        onLocalReady(local)
+        ensureCurrent()
+        return runFromAnalysis(local, interpret, compose, CameraInstantPrintPhase.WritingFromImage)
+    }
+
     suspend fun <Local, Interpreted, Result> runFromAnalysis(
         local: Local,
         interpret: suspend (Local) -> Interpreted,
@@ -65,8 +88,9 @@ internal class CameraInstantPrintCoordinator(
             Interpreted,
             suspend (CameraInstantPrintPhase) -> Unit,
         ) -> Result,
+        interpreting: CameraInstantPrintPhase = CameraInstantPrintPhase.InterpretingStage1,
     ): CameraInstantPrintOutcome<Local, Result> {
-        emit(CameraInstantPrintPhase.InterpretingStage1)
+        emit(interpreting)
         val interpreted = interpret(local)
         ensureCurrent()
         emit(CameraInstantPrintPhase.Composing)

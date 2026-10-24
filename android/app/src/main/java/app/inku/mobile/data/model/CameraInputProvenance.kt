@@ -20,6 +20,8 @@ enum class CameraInputRoute(val wireValue: String) {
     DescriptionToPipeline("description_to_pipeline"),
     // Saved by earlier builds that let the photo model write DDL directly.
     DdlToPipelineStage2("ddl_to_pipeline_stage2"),
+    // The shared core writes the DDL from the photo (SPEC §12.6.6, 2026-10-24).
+    ImageDdlToPipeline("image_ddl_to_pipeline"),
 }
 
 /** `Ddl` is read from works saved while the direct-DDL mode existed. */

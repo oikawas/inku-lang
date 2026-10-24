@@ -61,6 +61,8 @@ import app.inku.mobile.pipeline.AndroidWorkPipeline
 import app.inku.mobile.pipeline.PipelineInteractionRequired
 import app.inku.mobile.pipeline.PipelineView
 import app.inku.mobile.pipeline.SketchInput
+import app.inku.mobile.pipeline.ImageDdlInputs
+import app.inku.mobile.pipeline.PreparedImageDdlInput
 import app.inku.mobile.pipeline.SketchMode
 import app.inku.mobile.pipeline.Sketches
 import app.inku.mobile.pipeline.ProviderAttempt
@@ -72,6 +74,7 @@ import app.inku.mobile.ui.camera.CameraFailure
 import app.inku.mobile.ui.camera.CameraDrawRoute
 import app.inku.mobile.ui.camera.CameraDrawRouting
 import app.inku.mobile.ui.camera.CameraDrawSettings
+import app.inku.mobile.ui.camera.CameraImageDdl
 import app.inku.mobile.ui.camera.ModelReadinessIssue
 import app.inku.mobile.ui.camera.CameraInstantPrintCoordinator
 import app.inku.mobile.ui.camera.CameraInstantPrintPhase
@@ -393,6 +396,8 @@ private data class CameraDrawRunInput(
     val uiLanguageCode: String,
     val originalPhoto: java.io.File,
     val drawSettings: CameraDrawSettings,
+    /** The photo as sent, when the shared core writes the DDL from it; a retry sends it again. */
+    val imageDdl: PreparedImageDdlInput? = null,
 ) {
     val route: CameraDrawRoute
         get() = CameraDrawRoute(inputProvenance, drawSettings)
@@ -1007,7 +1012,49 @@ class InkuViewModel @JvmOverloads constructor(
         val coordinator = cameraCoordinator(serial)
         var stagedPhoto: java.io.File? = null
         try {
-            val outcome = coordinator.run(
+            val outcome = if (CameraImageDdl.usesImageDdl((cameraComposeSnapshot ?: localState.value).selectedModelId)) {
+                coordinator.runFromImage(
+                    prepare = {
+                        try {
+                            val prepared = withContext(Dispatchers.IO) {
+                                ImageDdlInputs.prepare(file).also {
+                                    stagedPhoto = originalPhotos.stage(file)
+                                }
+                            }
+                            if (serial != cameraRunSerial) throw CancellationException("Camera input was replaced.")
+                            stagedCameraPhoto = stagedPhoto
+                            localState.value = localState.value.copy(cameraSourcePhotoPath = stagedPhoto?.absolutePath)
+                            val snapshot = cameraComposeSnapshot ?: localState.value
+                            CameraDrawRunInput(
+                                description = "",
+                                inputProvenance = CameraImageDdl.provenance(origin, snapshot.selectedModelId, prepared),
+                                canvasAspect = prepared.nearestFormatId,
+                                uiLanguageCode = snapshot.uiLanguage.code,
+                                originalPhoto = requireNotNull(stagedPhoto),
+                                drawSettings = cameraDrawSettings(snapshot),
+                                imageDdl = prepared,
+                            )
+                        } catch (error: CancellationException) {
+                            throw error
+                        } catch (_: Throwable) {
+                            throw CameraStageFailure(CameraFailure.DecodeFailed)
+                        }
+                    },
+                    onLocalReady = { input ->
+                        cameraRetryInput = input
+                        localState.value = localState.value.copy(
+                            prompt = "",
+                            ddl = "",
+                            ddlEditedAfterGeneration = false,
+                            message = null,
+                        )
+                    },
+                    interpret = ::interpretCameraInput,
+                    compose = { input, interpreted, progress ->
+                        composeCameraInput(serial, input, interpreted, progress)
+                    },
+                )
+            } else coordinator.run(
                 prepare = {
                     try {
                         val prepared = withContext(Dispatchers.IO) {
@@ -1151,6 +1198,11 @@ class InkuViewModel @JvmOverloads constructor(
                     compose = { retained, interpreted, progress ->
                         composeCameraInput(serial, retained, interpreted, progress)
                     },
+                    interpreting = if (input.imageDdl != null) {
+                        CameraInstantPrintPhase.WritingFromImage
+                    } else {
+                        CameraInstantPrintPhase.InterpretingStage1
+                    },
                 )
                 finishCameraRun(serial, outcome.result)
             } catch (error: CancellationException) {
@@ -1214,6 +1266,7 @@ class InkuViewModel @JvmOverloads constructor(
             CameraInstantPrintPhase.AnalyzingLocally -> CameraCaptureState.AnalyzingLocally
             CameraInstantPrintPhase.WritingDescription -> CameraCaptureState.WritingDescription
             CameraInstantPrintPhase.InterpretingStage1 -> CameraCaptureState.InterpretingStage1
+            CameraInstantPrintPhase.WritingFromImage -> CameraCaptureState.WritingFromImage
             CameraInstantPrintPhase.Composing -> CameraCaptureState.Composing
             CameraInstantPrintPhase.Rendering -> CameraCaptureState.Rendering
             CameraInstantPrintPhase.Saving -> CameraCaptureState.Saving
@@ -1242,6 +1295,14 @@ class InkuViewModel @JvmOverloads constructor(
 
     private suspend fun interpretCameraInput(input: CameraDrawRunInput): InterpretResult {
         val route = input.route
+        input.imageDdl?.let { image ->
+            return withContext(Dispatchers.IO) {
+                repository.interpretImage(
+                    image,
+                    CameraImageDdl.request(input.drawSettings, image, input.uiLanguageCode, input.inputProvenance),
+                )
+            }
+        }
         return withContext(Dispatchers.IO) {
             repository.interpret(
                 input.description,
@@ -1279,10 +1340,14 @@ class InkuViewModel @JvmOverloads constructor(
             lineage = LineageDeclaration(),
             instructionLang = InstructionLanguages.AUTO,
             uiLang = input.uiLanguageCode,
-            sketch = route.sketch,
+            // A run written from the photo is drawn under its own settings:
+            // no 写生 or Wild, fitted into the paper nearest the photo.
+            sketch = if (input.imageDdl != null) SketchInput() else route.sketch,
             inputProvenance = input.inputProvenance,
             executionId = interpreted.executionId,
             originalPhoto = input.originalPhoto,
+            renderWild = if (input.imageDdl != null) false else null,
+            canvasFit = if (input.imageDdl != null) CameraImageDdl.CANVAS_FIT else null,
             onProgress = { pipelinePhase ->
                 progress(
                     when (pipelinePhase) {

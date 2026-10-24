@@ -49,6 +49,8 @@ data class SharedPipelineConfigRequest(
     val importedPlugins: List<ImportedPluginDefinition> = emptyList(),
     val drawingModelId: String = "",
     val canvasFit: String? = null,
+    /** Set for a run written from an image: whether its DDL is reviewed beside its drawing. */
+    val imageReview: Boolean? = null,
 )
 
 data class PreparedPipelineConfig(
@@ -223,6 +225,9 @@ class SharedPipelineConfigBuilder(
             .put("catalog_retry", JSONObject(retry.toString()))
             .put("stage1_retry", retryPolicy(policy.stage1AttemptTimeoutMs, policy.stage1TotalTimeoutMs))
             .put("hole_retry", JSONObject(retry.toString()))
+            // A run written from an image (SPEC §12.6.6) has the image stages;
+            // the server sets the review round on for every such run.
+            .also { config -> request.imageReview?.let { config.put("image", JSONObject().put("review", it)) } }
 
         return PreparedPipelineConfig(
             configJson = config.toString(),
@@ -253,7 +258,34 @@ class SharedPipelineConfigBuilder(
     ): PipelineCommand.Render {
         val delivery = view.deliveryJson?.let(::JSONObject)
             ?: throw PipelineHostException("score_not_ready")
-        val compiler = delivery.requiredObject("compiler_options")
+        return renderCommand(renderColorMaps, delivery.requiredObject("compiler_options"), renderSeed, wild)
+    }
+
+    /**
+     * The `draw_image_review` request for a snapshot waiting on it: the work's
+     * own drawing options under the run's compiler, as the server's
+     * `image_review_options` (Wild off). The core sets the paper and size.
+     */
+    fun imageReviewRequest(
+        renderColorMaps: Map<String, Map<String, String>>,
+        snapshot: JSONObject,
+        renderSeed: Long?,
+        maxSvgBytes: Long,
+    ): JSONObject {
+        val compiler = snapshot.requiredObject("config").requiredObject("compiler")
+        val render = renderCommand(renderColorMaps, compiler, renderSeed, wild = false)
+        return JSONObject()
+            .put("options", JSONObject(render.optionsJson))
+            .put("clip", JSONObject(render.clipJson))
+            .put("max_svg_bytes", maxSvgBytes)
+    }
+
+    private fun renderCommand(
+        renderColorMaps: Map<String, Map<String, String>>,
+        compiler: JSONObject,
+        renderSeed: Long?,
+        wild: Boolean,
+    ): PipelineCommand.Render {
         val host = compiler.requiredObject("host")
         val canvasFormatId = host.requiredString("canvas_format_id")
         val catalogId = host.requiredString("resolved_catalog_id")

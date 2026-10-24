@@ -81,12 +81,15 @@ internal object ProviderWireTransport {
             val tool = requireNotNull(request.tool) { "A pipeline request needs its answer function." }
             // The schema's original member order matters when it has no propertyOrdering.
             // Keep that object raw on the trip to the core.
+            val images = request.pipelineImages
             val raw = "{\"action\":\"pipeline_request\",\"connection\":${app.inku.mobile.pipeline.CoreIdentityJson.encode(connection)}," +
                 "\"model\":${JSONObject.quote(model)},\"max_tokens\":${request.maxTokens}," +
                 "\"prompt\":{\"system\":${JSONObject.quote(request.systemInstruction.orEmpty())}," +
                 "\"message\":${JSONObject.quote(request.prompt)}," +
                 "\"action_name\":${JSONObject.quote(request.pipelineAction)}," +
-                "\"response_schema\":${tool.parametersJson}}}"
+                "\"response_schema\":${tool.parametersJson}" +
+                (images?.let { ",\"images\":${it.referencesJson}" } ?: "") + "}" +
+                (images?.let { ",\"images\":${JSONArray(it.dataUrls)}" } ?: "") + "}"
             return requestAnswer(SharedProviderWire.call(raw))
         }
         return requestAnswer(SharedProviderWire.call(input))

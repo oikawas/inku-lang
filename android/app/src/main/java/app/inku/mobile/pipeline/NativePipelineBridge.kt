@@ -25,6 +25,9 @@ object NativePipelineBridge : SharedPipelineBinding {
     external override fun juxtaposition(inputBytes: ByteArray): ByteArray
     external override fun autonomousRefine(inputBytes: ByteArray): ByteArray
     external override fun providerWire(inputBytes: ByteArray): ByteArray
+    external override fun imageInputPolicy(): String
+    external override fun imageCanvas(inputBytes: ByteArray): ByteArray
+    external override fun imageReviewSvg(snapshotBytes: ByteArray, requestBytes: ByteArray): ByteArray
     external override fun completionRangeStates(inputBytes: ByteArray): ByteArray
     external override fun providerAttempt(snapshotBytes: ByteArray): ByteArray
     external override fun pipelineDescription(text: String): String

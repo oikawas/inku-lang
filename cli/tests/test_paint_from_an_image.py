@@ -28,14 +28,21 @@ CATALOGS = {
 class FakePipeline:
     """A server whose image run is busy once before the score and once before the drawing."""
 
-    def __init__(self, *, saved: bool = True, failure: dict | None = None):
+    def __init__(self, *, saved: bool = True, failure: dict | None = None, failed_phase: bool = False,
+                 retried: bool = False):
         self.calls: list[tuple[str, str, object]] = []
         self.saved = saved
         self.failure = failure
+        self.failed_phase = failed_phase
+        self.retried = retried
         self.polls = 0
 
     def view(self, **fields):
-        return {"variation_id": "v1", "execution_id": "e1", "phase": {"tag": "running"}, "busy": False, **fields}
+        view = {"variation_id": "v1", "execution_id": "e1", "phase": {"tag": "running"}, "busy": False, **fields}
+        if self.retried or self.failed_phase:
+            # The record of a provider request that failed; the run may have sent it again.
+            view["provider_failure"] = {"failure": "transport_timeout", "stage": "image", "attempt": 1}
+        return view
 
     def request(self, method, path, *, data=None, content=None, **kwargs):
         self.calls.append((method, path, content if content is not None else data))
@@ -52,6 +59,8 @@ class FakePipeline:
             self.polls += 1
             if self.failure is not None:
                 return self.view(phase={"tag": "failed", "reason": "image_ddl_failed"}, image_failure=self.failure), None
+            if self.failed_phase:
+                return self.view(phase={"tag": "failed", "reason": "provider_failed"}), None
             if self.polls == 1:
                 return self.view(phase={"tag": "delivered"}, delivery={"score": {"instructions": []}}), None
             result = {
@@ -156,6 +165,20 @@ def test_a_failed_image_run_is_an_error_and_writes_nothing(monkeypatch, capsys, 
     assert code == 2
     assert "image_missing" in capsys.readouterr().err
     assert not (tmp_path / "out").exists()
+    assert _sent(server, "POST", "/api/pipeline/executions/e1/commands") == []
+
+
+def test_a_provider_failure_the_run_got_past_is_not_a_failure(monkeypatch, capsys, image_file):
+    # Found on 5173 (2026-10-24): the first CLI reported such a run as "failed: None".
+    server = FakePipeline(retried=True)
+    assert _run(monkeypatch, server, ["paint", "--image", str(image_file)]) == 0
+    assert json.loads(capsys.readouterr().out)["history_id"] == "h1"
+
+
+def test_a_failed_phase_names_the_provider_failure(monkeypatch, capsys, image_file):
+    server = FakePipeline(failed_phase=True)
+    assert _run(monkeypatch, server, ["paint", "--image", str(image_file)]) == 2
+    assert "image run v1 failed: provider_failed (image: transport_timeout)" in capsys.readouterr().err
     assert _sent(server, "POST", "/api/pipeline/executions/e1/commands") == []
 
 

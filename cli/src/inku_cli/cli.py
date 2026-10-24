@@ -2455,19 +2455,31 @@ def _run_image_pipeline(
 
 
 def _image_run_result(view: dict[str, Any]) -> dict[str, Any]:
-    """The drawing of a finished image run, or the reason there is none."""
-    failure = view.get("image_failure") or view.get("current_render_refusal") or view.get("provider_failure")
-    if failure:
+    """The drawing of a finished image run, or the reason there is none.
+
+    As in the web image tab, the run failed when it says `image_failure` or its
+    phase is `failed`. `provider_failure` alone is not a failure: it stays on a
+    run whose request was sent again and then answered, and only says why the
+    run stopped when the phase has failed.
+    """
+    run = f"image run {view.get('variation_id')}"
+    for failure in (view.get("image_failure"), view.get("current_render_refusal")):
         if isinstance(failure, dict):
-            raise CliError(f"image run failed: {failure.get('code')}: {failure.get('message') or ''}".rstrip(": "))
-        raise CliError(f"image run failed: {failure}")
+            raise CliError(f"{run} failed: {failure.get('code')}: {failure.get('message') or ''}".rstrip(": "))
     phase = view.get("phase") or {}
+    if phase.get("tag") == "failed":
+        reason = phase.get("reason") or "failed"
+        provider = view.get("provider_failure")
+        if isinstance(provider, dict):
+            chatgpt = provider.get("chatgpt") if isinstance(provider.get("chatgpt"), dict) else {}
+            said = [str(value) for value in (provider.get("failure"), provider.get("detail"), chatgpt.get("code")) if value]
+            reason += f" ({provider.get('stage')}: {', '.join(said)})"
+        raise CliError(f"{run} failed: {reason}")
     if phase.get("tag") == "awaiting_patch_approval":
-        raise CliError(f"image run {view.get('variation_id')} waits for a patch approval; open it in the web UI")
+        raise CliError(f"{run} waits for a patch approval; open it in the web UI")
     result = view.get("result")
     if not isinstance(result, dict) or not result.get("svg"):
-        reason = phase.get("reason") or phase.get("tag") or "unknown"
-        raise CliError(f"image run finished without a drawing ({reason})")
+        raise CliError(f"{run} finished without a drawing ({phase.get('tag') or 'unknown'})")
     return result
 
 

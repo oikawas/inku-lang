@@ -53,7 +53,9 @@ const CATALOG_DIGEST_DOMAIN: &[u8] = b"inku.prompt-catalog-projection.v1";
 
 /// The LLM effects accepted by I-523, plus the optional sketch before Stage 1,
 /// the composition reading after it, the laws after the composition and the
-/// colors after the laws.
+/// colors after the laws. The three image stages write a work's DDL from an
+/// image (2026-10-24): the catalog chosen from the image, the DDL written from
+/// it, and the DDL corrected after its drawing is seen beside the image.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LlmStage {
@@ -64,6 +66,9 @@ pub enum LlmStage {
     ReadComposition,
     ChooseLaws,
     ChooseColors,
+    SelectImageCatalog,
+    WriteImageDdl,
+    ReviewImageDdl,
 }
 
 impl LlmStage {
@@ -77,6 +82,9 @@ impl LlmStage {
             Self::ReadComposition => "read_composition",
             Self::ChooseLaws => "choose_laws",
             Self::ChooseColors => "choose_colors",
+            Self::SelectImageCatalog => "select_image_catalog",
+            Self::WriteImageDdl => "write_image_ddl",
+            Self::ReviewImageDdl => "review_image_ddl",
         }
     }
 }
@@ -142,6 +150,20 @@ pub struct MacroPromptEntry<'a> {
     pub localized_summary: &'a str,
 }
 
+/// One image a request is sent with, named by the SHA-256 of the exact bytes
+/// the host sends. A request never carries the image itself: the host keeps
+/// the bytes and attaches them when it sends, and the provider wire refuses
+/// bytes that are not the ones named here.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct PromptImage {
+    pub media_type: String,
+    pub width: u32,
+    pub height: u32,
+    pub sha256: String,
+    pub byte_len: u64,
+}
+
 /// One fully constructed provider request. It carries no provider-specific fields.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -160,6 +182,11 @@ pub struct LlmPrompt {
     pub macro_catalog_digest: Option<String>,
     pub base_source_digest: Option<String>,
     pub base_compiler_lock_digest: Option<String>,
+    /// The images sent after the message, in order (the image stages,
+    /// 2026-10-24). A request without images does not write the field, so its
+    /// bytes and digest stay as they were.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub images: Vec<PromptImage>,
 }
 
 /// Exact catalog-selection response shape.
@@ -342,6 +369,10 @@ pub enum PromptError {
     HoleRangeDigestMismatch {
         hole_id: String,
     },
+    /// An image a request names is outside what a host may send.
+    InvalidImage {
+        field: &'static str,
+    },
 }
 
 impl PromptError {
@@ -366,6 +397,7 @@ impl PromptError {
             Self::DuplicateHole { .. } => "duplicate_hole",
             Self::InvalidHoleRange { .. } => "invalid_hole_range",
             Self::HoleRangeDigestMismatch { .. } => "hole_range_digest_mismatch",
+            Self::InvalidImage { .. } => "invalid_prompt_image",
         }
     }
 }
@@ -419,6 +451,7 @@ impl fmt::Display for PromptError {
             Self::HoleRangeDigestMismatch { hole_id } => {
                 write!(formatter, "hole range digest mismatch: {hole_id}")
             }
+            Self::InvalidImage { field } => write!(formatter, "invalid prompt image: {field}"),
         }
     }
 }
@@ -540,6 +573,7 @@ pub fn build_catalog_selection_prompt(
         macro_catalog_digest: Some(catalog_digest),
         base_source_digest: None,
         base_compiler_lock_digest: None,
+        images: Vec::new(),
     })
 }
 
@@ -579,6 +613,7 @@ pub fn build_sketch_prompt(
         macro_catalog_digest: None,
         base_source_digest: None,
         base_compiler_lock_digest: None,
+        images: Vec::new(),
     })
 }
 
@@ -691,6 +726,7 @@ pub fn build_stage1_prompt_for_run(
         macro_catalog_digest: Some(macro_catalog_digest),
         base_source_digest: None,
         base_compiler_lock_digest: None,
+        images: Vec::new(),
     })
 }
 
@@ -1164,6 +1200,27 @@ fn stage1_work_plan_system_for(
     ))
 }
 
+/// The shared grammar and accepted vocabulary for a request that writes
+/// visible DDL itself (the image stages, 2026-10-24): what it must not output,
+/// the grammar, how the vocabulary is used, and the vocabulary. It carries
+/// none of a description run's host context; the request gives its own.
+pub(crate) fn ddl_writing_guide(
+    language: ResolvedInstructionLanguage,
+) -> Result<String, PromptError> {
+    let saijiki =
+        saijiki_derived_projection(language).map_err(|_| PromptError::SaijikiProjection)?;
+    let output_scope = match language {
+        ResolvedInstructionLanguage::Ja => STAGE1_OUTPUT_SCOPE_JA,
+        ResolvedInstructionLanguage::En => STAGE1_OUTPUT_SCOPE_EN,
+    };
+    Ok(format!(
+        "{output_scope}\n\n{}\n\n{}\n\n# accepted_saijiki_vocabulary\n{}",
+        stage1_grammar(language),
+        stage1_vocabulary_roles(language),
+        saijiki.prompt_block
+    ))
+}
+
 /// Project the stable Stage 1 grammar and accepted vocabulary without a response envelope.
 ///
 /// This is intentionally not a provider prompt: it has no description, resolved host context,
@@ -1365,6 +1422,7 @@ pub fn build_hole_completion_prompt(
         macro_catalog_digest: None,
         base_source_digest: Some(base_source_digest),
         base_compiler_lock_digest: Some(base_compiler_lock.full_digest.clone()),
+        images: Vec::new(),
     })
 }
 
@@ -1762,7 +1820,7 @@ pub(crate) fn finish_prompt(mut prompt: LlmPrompt) -> Result<LlmPrompt, PromptEr
     Ok(hash_prompt(prompt, &schema_text))
 }
 
-fn hash_prompt(mut prompt: LlmPrompt, schema_text: &str) -> LlmPrompt {
+pub(crate) fn hash_prompt(mut prompt: LlmPrompt, schema_text: &str) -> LlmPrompt {
     let mut hasher = Sha256::new();
     hasher.update(PROMPT_DIGEST_DOMAIN);
     for field in [
@@ -1799,6 +1857,19 @@ fn hash_prompt(mut prompt: LlmPrompt, schema_text: &str) -> LlmPrompt {
         hasher.update((field.len() as u64).to_be_bytes());
         hasher.update(field);
     }
+    // Only a request with images hashes them, so every earlier digest stands.
+    for image in &prompt.images {
+        for field in [
+            image.media_type.as_bytes(),
+            &image.width.to_be_bytes(),
+            &image.height.to_be_bytes(),
+            image.sha256.as_bytes(),
+            &image.byte_len.to_be_bytes(),
+        ] {
+            hasher.update((field.len() as u64).to_be_bytes());
+            hasher.update(field);
+        }
+    }
     prompt.prompt_digest = hex_digest(hasher.finalize());
     prompt
 }
@@ -1811,7 +1882,7 @@ pub(crate) fn require_nonempty(field: &'static str, value: &str) -> Result<(), P
     }
 }
 
-fn require_nonblank(field: &'static str, value: &str) -> Result<(), PromptError> {
+pub(crate) fn require_nonblank(field: &'static str, value: &str) -> Result<(), PromptError> {
     if value.trim().is_empty() {
         Err(PromptError::EmptyField { field })
     } else {

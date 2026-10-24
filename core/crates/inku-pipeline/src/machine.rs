@@ -974,6 +974,9 @@ impl PipelineSnapshot {
                 .config
                 .colors_retry
                 .unwrap_or(self.config.catalog_retry),
+            LlmStage::SelectImageCatalog | LlmStage::WriteImageDdl | LlmStage::ReviewImageDdl => {
+                self.config.stage1_retry
+            }
         }
     }
 
@@ -2699,6 +2702,9 @@ impl PipelineSnapshot {
                 }
                 self.colors_fallback(payload, events)
             }
+            LlmStage::SelectImageCatalog | LlmStage::WriteImageDdl | LlmStage::ReviewImageDdl => {
+                Err(ProtocolError::InvalidState)
+            }
         }
     }
 
@@ -3407,6 +3413,9 @@ impl PipelineSnapshot {
             }
             LlmStage::CompleteVisibleDdlHoles => {
                 self.hole_response(&response, &hole_ids, spent_ms, events)
+            }
+            LlmStage::SelectImageCatalog | LlmStage::WriteImageDdl | LlmStage::ReviewImageDdl => {
+                Err(ProtocolError::InvalidState)
             }
         }
     }

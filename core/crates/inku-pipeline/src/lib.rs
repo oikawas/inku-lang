@@ -14,6 +14,7 @@ pub mod core_boundary;
 pub mod ddl3d;
 mod hole_completion;
 pub mod identity;
+pub mod image_ddl;
 pub mod juxtaposition;
 pub mod laws;
 pub mod laws_entry;

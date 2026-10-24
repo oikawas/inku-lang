@@ -2588,6 +2588,7 @@ pub fn build_colors_prompt(
         macro_catalog_digest: None,
         base_source_digest: None,
         base_compiler_lock_digest: None,
+        images: Vec::new(),
     })
 }
 

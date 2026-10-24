@@ -159,6 +159,10 @@ export const en: LangPack = {
 	}[kind] ?? kind),
 	pipelineDiagnosticOwner: (kind, index) => `At ${kind} ${index}.`,
 	pipelineDiagnosticReason: (reason) => ({
+		missing_entity_head: 'This part has no word naming a shape (such as a circle or line) or a background color, so it was left out. Surface, tool or sway words alone cannot be drawn.',
+		missing_action_entity: 'The action in this part (such as placing, lining up or filling the background) has no shape or color to belong to, so this part was left out.',
+		missing_position_entity: 'The position in this part has no shape to belong to, so this part was left out.',
+		missing_layout_direction_entity: 'The direction in this part (such as the direction of a row) has no shape to belong to, so this part was left out.',
 		legacy_semantics_require_authored_canonical_definition: 'This legacy definition has not yet been migrated to the format used for new works.',
 		legacy_definition_replaced_by_canonical: 'The new-format definition with this name is used in place of the legacy definition.',
 		invalid_canonical_definition: 'The definition could not be loaded because it is invalid.',

@@ -165,6 +165,50 @@ test('an angle written in numbers is said in words, in each language', () => {
 	assert.match(formatPipelineDiagnostic(conflict, en), /a numeric angle/);
 });
 
+test('missing shapes and their actions, positions and directions are said in words in each language', () => {
+	for (const [kind, japanese, english] of [
+		['missing_entity_head', /形（円・線など）や背景の色を表す語が無い/, /no word naming a shape \(such as a circle or line\) or a background color/],
+		['missing_action_entity', /動作（置く・並べる・背景を埋めるなど）が結ぶ形や色が無い/, /action in this part .* has no shape or color to belong to/],
+		['missing_position_entity', /位置が結ぶ形が無い/, /position in this part has no shape to belong to/],
+		['missing_layout_direction_entity', /向き（並べる向きなど）が結ぶ形が無い/, /direction in this part .* has no shape to belong to/],
+	] as const) {
+		const diagnostic = { channel: 'upstream' as const, value: { issue_kind: kind } };
+		const japaneseText = formatPipelineDiagnostic(diagnostic, ja);
+		const englishText = formatPipelineDiagnostic(diagnostic, en);
+		assert.match(japaneseText, japanese);
+		assert.match(englishText, english);
+		assert.match(japaneseText, /描かずに外しました。/);
+		assert.match(englishText, /was left out\./);
+		assert.ok(!japaneseText.includes(kind));
+		assert.ok(!englishText.includes(kind));
+		assert.doesNotMatch(japaneseText, /理由:/);
+		assert.doesNotMatch(englishText, /Reason:/);
+	}
+});
+
+test('invalid background clauses explain the missing color and action target with their source spans', () => {
+	// The shared background_draw fixture diagnoses these words in 背景を刷きで埋める。.
+	const source = '背景を刷きで埋める。';
+	for (const [reason, word] of [['missing_entity_head', '刷き'], ['missing_action_entity', '埋める']] as const) {
+		const start = Buffer.byteLength(source.slice(0, source.indexOf(word)));
+		const end = start + Buffer.byteLength(word);
+		const diagnostic = {
+			channel: 'upstream' as const,
+			value: { issue_kind: reason, span: { start_byte: start, end_byte: end } },
+		};
+		const japanese = formatPipelineDiagnostic(diagnostic, ja);
+		const english = formatPipelineDiagnostic(diagnostic, en);
+		assert.match(japanese, /背景/);
+		assert.match(japanese, /色/);
+		assert.match(english, /background/);
+		assert.match(english, /color/);
+		assert.ok(japanese.startsWith(`原文のバイト位置 ${start}〜${end}。`));
+		assert.ok(english.startsWith(`Source byte range ${start}–${end}.`));
+		assert.ok(!japanese.includes(reason));
+		assert.ok(!english.includes(reason));
+	}
+});
+
 test('fineness, underlayer and an amplitude alone are said in words, in each language', () => {
 	for (const [kind, japanese, english] of [
 		['conflicting_surface_finenesses', /きめの語（細かい・粗い・密な・疎な）が二つ/, /Two fineness words/],

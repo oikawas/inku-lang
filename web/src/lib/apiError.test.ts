@@ -5,6 +5,15 @@ import { describeApiErrorDetail } from './apiError.ts';
 import { ja } from './i18n/ja.ts';
 import { en } from './i18n/en.ts';
 
+test('expired uploads and failed image decoding tell the author how to select a usable source', () => {
+	for (const strings of [ja, en]) {
+		assert.equal(describeApiErrorDetail({ code: 'image_expired' }, 410, strings), strings.imageMissing);
+		assert.equal(describeApiErrorDetail({ code: 'image_invalid' }, 422, strings), strings.imageInvalid);
+		assert.equal(describeApiErrorDetail({ code: 'image_too_large' }, 413, strings), strings.imageTooLarge);
+		assert.equal(describeApiErrorDetail({ code: 'image_model_not_vision' }, 422, strings), strings.imageVisionRequired);
+	}
+});
+
 test('SVG save refusal names the actual configured ceiling in both languages', () => {
 	const detail = { code: 'generated_svg_too_large', limit_mib: 7, limit_bytes: 7 * 1024 * 1024 };
 	assert.equal(describeApiErrorDetail(detail, 422, ja), 'SVGが設定上限（7 MiB）を超えたため、この作品は保存されませんでした。');

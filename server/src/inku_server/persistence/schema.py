@@ -28,6 +28,9 @@ class HistoryRow(Base):
     user_id      = Column(String,     ForeignKey("user_accounts.id"), nullable=True, index=True)
     at           = Column(BigInteger, nullable=False, index=True)
     input        = Column(Text,       nullable=False, default="")
+    # Input provenance is displayed with the work, never read as a description.
+    image_provenance = Column(Text, nullable=True)
+    image_ddl = Column(Text, nullable=True)  # Core metadata JSON; never image bytes.
     ddl          = Column(Text,       nullable=True)  # The single saved instruction document.
     ddl_source_origin = Column(Text, nullable=True)  # NULL or the factual legacy_expanded migration origin.
     score        = Column(Text,       nullable=False, default="{}")

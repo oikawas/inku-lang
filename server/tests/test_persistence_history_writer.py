@@ -324,6 +324,8 @@ def test_root_save_maps_every_history_field_and_creates_root_and_catalog(
         "user_id": "user-1",
         "at": 1_777_777_777,
         "input": "input text",
+        "image_provenance": None,
+        "image_ddl": None,
         "ddl": "ddl",
         "ddl_source_origin": "legacy_expanded",
         "score": json.dumps({"objects": [1]}),

@@ -6,6 +6,16 @@ import { hasDdlBody } from '../../ddl-source.ts';
 import type { HistoryItem } from '../../historyManagerState.svelte.ts';
 import { projectHistoryCurrentWork } from './current-work.ts';
 
+test('image history keeps provenance separate from every description replay input', () => {
+	const item = { input: 'legacy display text', source_text: 'legacy source',
+		image_provenance: 'Museum source', image_ddl: { original_width: 300 },
+		ddl: '赤い円', svg: '<svg/>', score: { instructions: [] } } as unknown as HistoryItem;
+	const projected = projectHistoryCurrentWork(item);
+	assert.equal(projected.sourceText, '');
+	assert.equal(projected.result.image_provenance, 'Museum source');
+	assert.deepEqual(projected.result.image_ddl, item.image_ddl);
+});
+
 test('T-295: current-work projection preserves saved source, render identity, seeds, and sketch state', () => {
 	const item: HistoryItem = {
 		id: 'work-1',

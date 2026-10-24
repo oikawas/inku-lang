@@ -14,7 +14,7 @@ export type HistoryCurrentWorkProjection = {
 
 /** Map a persisted history item to the page's current drawing projection. */
 export function projectHistoryCurrentWork(item: HistoryItem): HistoryCurrentWorkProjection {
-	const sourceText = item.source_text ?? item.input;
+	const sourceText = item.image_ddl || item.image_provenance != null ? '' : item.source_text ?? item.input;
 	return {
 		sourceText,
 		ddl: item.ddl ?? '',
@@ -23,6 +23,8 @@ export function projectHistoryCurrentWork(item: HistoryItem): HistoryCurrentWork
 		sketchGrain: item.sketch_grain,
 		sketchState: item.sketch_state,
 		result: {
+			image_ddl: item.image_ddl,
+			image_provenance: item.image_provenance,
 			score: item.score,
 			svg: item.svg,
 			stage1_model: item.stage1_model,

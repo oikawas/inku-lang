@@ -11,7 +11,7 @@ from copy import deepcopy
 from dataclasses import asdict
 from typing import Callable, Literal
 
-from fastapi import APIRouter, Depends, FastAPI, HTTPException
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, model_validator
 
@@ -77,11 +77,18 @@ def _refuse_if_locked(history_id: str) -> None:
 
 class NewVariationBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["description", "direct_ddl"]
+    kind: Literal["description", "direct_ddl", "image"]
     text: str
+    image_id: str | None = None
     canvas_format_id: str | None = None
     canvas_aspect: str | None = None
     options: dict = {}
+
+    @model_validator(mode="after")
+    def image_only(self):
+        if (self.kind == "image") != bool(self.image_id):
+            raise ValueError("an image run requires its prepared image only")
+        return self
 
 
 class ForkDescriptionBody(BaseModel):
@@ -118,6 +125,16 @@ class AuthorDdlBody(BaseModel):
     options: dict = {}
 
 
+class PreparedImageView(BaseModel):
+    image_id: str
+    thumbnail: str
+    original_width: int
+    original_height: int
+    width: int
+    height: int
+    nearest_format_id: str
+
+
 class PipelineService:
     """One server worker; persisted snapshots survive worker replacement.
 
@@ -140,6 +157,8 @@ class PipelineService:
         replay_for: Callable[[str, dict, dict | None], dict] | None = None,
         provider_observations: Callable[[str, str], list[dict]] | None = None,
         reading_config_for: Callable[[str, str, dict | None], dict] | None = None,
+        image_provider_with_context: Callable[[str, dict, list[str]], Callable[[dict], dict]] | None = None,
+        image_review_options: Callable[[dict, dict], dict] | None = None,
     ):
         if max_workers <= 0 or max_effect_steps <= 0 or max_retained_runs < max_workers:
             raise ValueError("explicit positive pipeline host limits required")
@@ -154,6 +173,10 @@ class PipelineService:
         self.replay_for = replay_for
         self.provider_observations = provider_observations
         self.reading_config_for = reading_config_for
+        self.image_provider_with_context = image_provider_with_context
+        self.image_review_options = image_review_options
+        from .pipeline_images import PendingImages
+        self._images = PendingImages(max_retained_runs)
         self._runs: dict[tuple[str, str], CandidateExecution] = {}
         self._jobs: dict[tuple[str, str], Future] = {}
         self._lock = threading.RLock()
@@ -167,9 +190,23 @@ class PipelineService:
                 if run.view()["busy"]:
                     run.command({"tag": "cancel"})
         self._pool.shutdown(wait=True, cancel_futures=True)
+        self._images.clear()
+        for run in self._runs.values():
+            run.image_data.clear()
 
     def _host(self, owner: str, config: dict, context: dict) -> CandidateExecution:
         def provider(action):
+            if action["tag"] == "draw_image_review":
+                return self._image_review(run, action)
+            references = (action.get("payload", {}).get("prompt") or {}).get("images") or []
+            if references:
+                try:
+                    images = [run.image_data[reference["sha256"]] for reference in references]
+                except KeyError:
+                    self._stop_missing_image(run)
+                    return None
+                if self.image_provider_with_context is not None:
+                    return self.image_provider_with_context(owner, run.context, images)(action)
             transport = self.provider_with_context(owner, run.context) if self.provider_with_context else self.provider_for(owner)
             return transport(action)
 
@@ -207,17 +244,55 @@ class PipelineService:
         )
         return run
 
+    def prepare_image(self, owner: str, raw: bytes) -> dict:
+        from .pipeline_images import prepare_image
+        return self._images.add(owner, prepare_image(self.binding, raw))
+
+    @staticmethod
+    def _stop_missing_image(run: CandidateExecution) -> None:
+        run.command({"tag": "cancel"}, context_updates={"image_failure": {
+            "code": "image_missing", "message": "The worker no longer has the image. Select it again.",
+        }})
+        run.image_data.clear()
+
+    def _image_review(self, run: CandidateExecution, action: dict) -> dict:
+        from .pipeline_images import review_drawing
+        result = {"tag": "image_review_undrawn", "identity": action["identity"]}
+        if self.image_review_options is None:
+            return result
+        try:
+            snapshot = run.snapshot()
+            drawing = review_drawing(self.binding, snapshot, self.image_review_options(snapshot, run.context), owner=run.owner_id)
+            if drawing is not None:
+                reference, data_url = drawing
+                run.image_data[reference["sha256"]] = data_url
+                return {"tag": "image_review_drawn", "identity": action["identity"], "drawing": reference}
+        except Exception:
+            # Neither an SVG nor an input image can enter this diagnostic.
+            _logger.warning("pipeline_image_review_undrawn execution_id=%s", run.view()["execution_id"])
+        return result
+
     def start(self, owner: str, kind: str, text: str, *, parent: dict | None = None, source_work: dict | None = None,
               canvas_format_id: str | None = None, canvas_aspect: str | None = None,
               options: dict | None = None, prepared: tuple[dict, dict] | None = None,
-              direction: dict | None = None) -> dict:
-        """Start a run. `kind` is `description`, `direct_ddl`, or `saved_laws`: the
-        laws stage again on a saved work's DDL (`text`), with the records
+              direction: dict | None = None, image_id: str | None = None) -> dict:
+        """Start from a description, direct DDL, transient image, or `saved_laws`:
+        the laws stage again on a saved work's DDL (`text`), with the records
         `source_work` keeps and the refinement's `direction` (the AI
         refinement's laws move, 2026-10-21)."""
         description = text if kind == "description" else (source_work or {}).get("description", "")
-        drawn = _drawn_description(text) if kind == "description" else text
+        drawn = "" if kind == "image" else (_drawn_description(text) if kind == "description" else text)
         context = {"description": description, "committed_description": description, "parent": parent, "derivation_kind": "new"}
+        if kind == "image":
+            if parent is not None or source_work is not None or not image_id:
+                raise CandidateHostError("invalid_image_start")
+            context["image_provenance"] = text
+        elif source_work and kind != "description":
+            metadata = source_work.get("metadata", {})
+            for name in ("image_provenance", "image_ddl"):
+                value = source_work.get(name, metadata.get(name))
+                if value is not None:
+                    context[name] = deepcopy(value)
         if parent:
             if parent["kind"] == "legacy_history":
                 context.update(parent_legacy_history_id=parent["id"], derivation_kind="legacy_description_fork" if kind == "description" else "legacy_ddl_fork")
@@ -232,6 +307,7 @@ class PipelineService:
                 )
         with self._lock:
             self._reserve_run()
+            image = self._images.get(owner, image_id) if kind == "image" else None
             if prepared is not None:
                 config, resolved_context = prepared
                 context.update(resolved_context)
@@ -243,10 +319,17 @@ class PipelineService:
             if canvas_format_id is not None and canvas_aspect is not None and canvas_format_id != canvas_aspect:
                 raise CandidateHostError("canvas_alias_conflict")
             selected = canvas_format_id if canvas_format_id is not None else canvas_aspect
+            if selected == "image" and image is not None:
+                selected = image.nearest_format_id
             if selected is not None:
                 config = select_canvas(config, self.binding.canvas_registry, selected)
             run = self._host(owner, config, context)
-            if kind == "description":
+            if image is not None:
+                from .pipeline_images import image_data_url
+                run.image_data[image.reference["sha256"]] = image_data_url(image.jpeg, "image/jpeg")
+                authoring = {"tag": "image", "image": image.authoring_input(),
+                             "auto_catalog": context.get("auto_catalog", False)}
+            elif kind == "description":
                 authoring = {"tag": "description", "description": drawn, "auto_catalog": context.get("auto_catalog", self.auto_catalog)}
             elif kind == "saved_laws":
                 authoring = {"tag": "saved_laws", "source": text,
@@ -264,6 +347,8 @@ class PipelineService:
             if kind == "description" and sketch["mode"] != "off":
                 authoring["sketch"] = sketch
             run.start_new(authoring)
+            if image is not None:
+                self._images.consume(owner, image_id)
             run.context["execution_id"] = run.view()["execution_id"]
             key = (owner, run.view()["execution_id"])
             self._runs[key] = run
@@ -334,6 +419,7 @@ class PipelineService:
             if not run.view()["busy"] and (job is None or job.done()):
                 from .chatgpt_runtime import retire_execution
                 retire_execution(*key)
+                run.image_data.clear()
                 del self._runs[key]
                 self._jobs.pop(key, None)
                 return
@@ -377,10 +463,19 @@ class PipelineService:
         return None
 
     def _drain(self, run: CandidateExecution) -> None:
+        try:
+            self._drain_steps(run)
+        finally:
+            # An unsuccessful host job is not allowed to retain source pixels.
+            if not run.view()["busy"] or run.context.get("image_provenance") is not None:
+                run.image_data.clear()
+
+    def _drain_steps(self, run: CandidateExecution) -> None:
         # This is a host work cap, never a replacement retry policy.
         for _ in range(self.max_effect_steps):
             view = run.view()
             if not view["busy"]:
+                run.image_data.clear()
                 return
             snapshot = run.snapshot()
             action = snapshot.get("action") or {}
@@ -398,6 +493,7 @@ class PipelineService:
             run.run_effect()
         if run.view()["busy"]:
             raise CandidateHostError("pipeline_effect_limit")
+        run.image_data.clear()
 
     def execution(self, owner: str, execution_id: str) -> CandidateExecution:
         key = (owner, execution_id)
@@ -413,6 +509,11 @@ class PipelineService:
                 run.restore(saved["snapshot"], rendered=saved["rendered"])
                 run.context["execution_id"] = execution_id
                 self._runs[key] = run
+                if (run.snapshot().get("image_ddl") is not None
+                        and (run.snapshot().get("action") or {}).get("tag") in {
+                            "select_image_catalog", "write_image_ddl", "draw_image_review", "review_image_ddl",
+                        }):
+                    self._stop_missing_image(run)
                 self._schedule(key, run)
             return run
 
@@ -731,7 +832,22 @@ def pipeline_router(service: PipelineService | Callable[[], PipelineService], ac
 
     @router.post("/variations")
     def start(body: NewVariationBody, actor: dict = Depends(actor_dependency)):
-        return current_service().start(actor["id"], body.kind, body.text, canvas_format_id=body.canvas_format_id, canvas_aspect=body.canvas_aspect, options=body.options)
+        return current_service().start(actor["id"], body.kind, body.text, image_id=body.image_id, canvas_format_id=body.canvas_format_id, canvas_aspect=body.canvas_aspect, options=body.options)
+
+    @router.post("/images", response_model=PreparedImageView, openapi_extra={
+        "requestBody": {"required": True, "content": {
+            "application/octet-stream": {"schema": {"type": "string", "format": "binary"}},
+        }},
+    })
+    async def prepare_image(request: Request, actor: dict = Depends(actor_dependency)):
+        from .pipeline_images import IMAGE_UPLOAD_MAX_BYTES
+        raw = bytearray()
+        async for chunk in request.stream():
+            if len(raw) + len(chunk) > IMAGE_UPLOAD_MAX_BYTES:
+                raise HTTPException(413, {"code": "image_too_large", "message": "The image file is too large."})
+            raw.extend(chunk)
+        from starlette.concurrency import run_in_threadpool
+        return await run_in_threadpool(current_service().prepare_image, actor["id"], bytes(raw))
 
     @router.get("/variations/{variation_id}")
     def get(variation_id: str, actor: dict = Depends(actor_dependency)):
@@ -791,6 +907,10 @@ def pipeline_router(service: PipelineService | Callable[[], PipelineService], ac
 
 
 def _host_error_status(code: str) -> int:
+    if code == "image_too_large":
+        return 413
+    if code == "image_model_not_vision":
+        return 403
     if code.startswith("chatgpt_"):
         return 503 if code in {"chatgpt_transport_unavailable", "chatgpt_auth_unavailable", "chatgpt_refresh_not_ready"} else 403
     if code == "model_not_offered":

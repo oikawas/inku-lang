@@ -5,6 +5,7 @@ from the description would throw the edits away. Such a work is
 "description-locked". It is locked when
 
 - its authoring variation is DDL-authoritative, or
+- it carries the input record of a work written from an image, or
 - it was made by a DDL edit (`ddl_edit`, which also covers works saved before
   the pipeline kept an authority), or
 - it was derived from a locked work by an operation that keeps the parent's DDL
@@ -131,16 +132,23 @@ def _ddl_of_histories(session, history_ids: list[str | None]) -> dict[str, str]:
 def _ddl_authoritative_histories(session, history_ids: list[str]) -> set[str]:
     if not history_ids:
         return set()
+    # An exported image work can be imported without its pipeline sidecars.
+    # Its input record still says that its DDL, not prose, defines the work.
+    image_histories = {
+        history_id for history_id, in session.query(HistoryRow.id).filter(
+            HistoryRow.id.in_(history_ids), HistoryRow.image_ddl.is_not(None),
+        ).all()
+    }
     links = session.query(PipelineHistoryLinkRow).filter(PipelineHistoryLinkRow.history_id.in_(history_ids)).all()
     if not links:
-        return set()
+        return image_histories
     variations = {
         (row.owner_id, row.variation_id): row.authority
         for row in session.query(VariationAuthorityRow).filter(
             VariationAuthorityRow.variation_id.in_({link.variation_id for link in links})
         ).all()
     }
-    return {
+    return image_histories | {
         link.history_id for link in links
         if variations.get((link.owner_id, link.variation_id)) == "ddl_authoritative"
     }

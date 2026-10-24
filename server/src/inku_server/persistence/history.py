@@ -24,7 +24,7 @@ from .schema import (
     PipelineHistoryLinkRow,
     UserGroupRow,
 )
-from .description_lock import locked_history_ids
+from .description_lock import DESCRIPTION_READING_KINDS, locked_history_ids
 from .ddl_source import LEGACY_EXPANDED_ORIGIN
 from .variation_authority import (
     VariationAuthorityAdapterError,
@@ -1115,10 +1115,16 @@ class HistoryWriter:
             raise ValueError("lineage derivation metadata must be an object")
         if item.get("ddl_source_origin") not in (None, LEGACY_EXPANDED_ORIGIN):
             raise ValueError("invalid DDL source origin")
+        if item.get("image_provenance") is not None and not isinstance(item["image_provenance"], str):
+            raise ValueError("image provenance must be text or null")
+        if item.get("image_ddl") is not None and not isinstance(item["image_ddl"], dict):
+            raise ValueError("image DDL record must be an object or null")
 
         node_id = str(uuid.uuid4())
         row = HistoryRow(
             id=item["id"], user_id=item["user_id"], at=item["at"], input=item.get("input", ""),
+            image_provenance=item.get("image_provenance"),
+            image_ddl=json.dumps(item["image_ddl"], ensure_ascii=False) if item.get("image_ddl") is not None else None,
             ddl=item.get("ddl"), ddl_source_origin=item.get("ddl_source_origin"),
             score=json.dumps(item.get("score", {})), svg=item.get("svg", ""),
             output_path=item.get("output_path"), elapsed_ms=item.get("elapsed_ms", 0),
@@ -1198,6 +1204,17 @@ class HistoryWriter:
                 if parent is None:
                     raise ValueError("lineage parent not found")
                 node.root_node_id = parent.root_node_id or parent.id
+                # A derivation keeps its input's provenance even when its client
+                # predates the image fields. The node already proved readability.
+                parent_history_id = getattr(parent, "history_id", None)
+                if (parent_history_id and derivation_kind not in DESCRIPTION_READING_KINDS
+                        and (row.image_provenance is None or row.image_ddl is None)):
+                    parent_work = session.get(HistoryRow, parent_history_id)
+                    if parent_work is not None:
+                        if row.image_provenance is None:
+                            row.image_provenance = parent_work.image_provenance
+                        if row.image_ddl is None:
+                            row.image_ddl = parent_work.image_ddl
             row.idempotency_key = idempotency_key
             if item.get("coerce_catalog_digest") and item.get("coerce_catalog_snapshot") is not None:
                 digest = item["coerce_catalog_digest"]
@@ -1286,6 +1303,8 @@ def row_to_dict(
         "user_id":      row.user_id,
         "at":           row.at,
         "input":        row.input,
+        "image_provenance": getattr(row, "image_provenance", None),
+        "image_ddl": None,
         "ddl":          row.ddl,
         "ddl_source_origin": row.ddl_source_origin,
         "score":        score,
@@ -1318,6 +1337,15 @@ def row_to_dict(
     "history_visibility": row.history_visibility or "normal",
     "lineage_node_id": row.lineage_node_id,
 }
+    image_ddl = getattr(row, "image_ddl", None)
+    if image_ddl is not None:
+        try:
+            record = json.loads(image_ddl)
+            if isinstance(record, dict):
+                item["image_ddl"] = record
+        except (json.JSONDecodeError, TypeError):
+            data_warnings.append("image_ddl_json_invalid")
+            logger.error("history image DDL JSON is corrupt: history_id=%s", row.id)
     if not include_svg:
         # SQLite counts characters for TEXT. Casting to BLOB in the list query
         # counts UTF-8 bytes, which is the exported SVG's actual size.

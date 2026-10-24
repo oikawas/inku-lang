@@ -40,6 +40,8 @@ def provider_stage_record(tag: str) -> str:
         return "laws"
     if tag == "choose_colors":
         return "colors"
+    if tag in provider_wire.IMAGE_EFFECTS:
+        return "image"
     return "stage1"
 
 
@@ -74,13 +76,14 @@ def resolved_drawing_model(model: str | None, actor: dict | None) -> str:
 class SingleAttemptProvider:
     def __init__(self, options: ProviderOptions, *, transport: httpx.AsyncBaseTransport | None = None,
                  observation: tuple[ProviderObservationStore, str, str] | None = None,
-                 rate_budget: ProviderRateBudget | None = None):
+                 rate_budget: ProviderRateBudget | None = None, images: list[str] | None = None):
         if options.max_tokens <= 0 or options.max_response_bytes <= 0:
             raise ValueError("positive provider limits required")
         self.options = options
         self.transport = transport
         self.observation = observation
         self.rate_budget = rate_budget
+        self.images = list(images) if images is not None else None
         self.failure_detail: str | None = None
         self._observation_truncated = False
 
@@ -98,6 +101,9 @@ class SingleAttemptProvider:
             "choose_laws": "laws_chosen",
             "choose_colors": "colors_chosen",
             "complete_visible_ddl_holes": "visible_ddl_hole_patch_generated",
+            "select_image_catalog": "image_catalog_selected",
+            "write_image_ddl": "image_ddl_written",
+            "review_image_ddl": "image_ddl_reviewed",
         }
         if action["tag"] not in tags:
             raise ValueError("unsupported provider effect")
@@ -121,6 +127,8 @@ class SingleAttemptProvider:
                     self.options.chatgpt_owner, self.options.chatgpt_profile, self.options.chatgpt_generation,
                     model, action, started + timeout, self.options.max_response_bytes, self.options.chatgpt_cancel,
                     (self.observation[0], self.observation[2]) if self.observation else None,
+                    purpose="vision" if action["tag"] in provider_wire.IMAGE_EFFECTS else "llm",
+                    images=self.images, transport=self.transport,
                 ))
             else:
                 connection = connection_for(provider_id, self.options.settings)
@@ -187,18 +195,26 @@ class SingleAttemptProvider:
         # The shared core writes the body for the connection's dialect, byte for
         # byte as this transport wrote it (provider_wire), and names the header
         # the key goes under; a request it cannot build is a ValueError.
-        built = provider_wire.pipeline_request(connection, model, prompt, self.options.max_tokens)
+        built = provider_wire.pipeline_request(connection, model, prompt, self.options.max_tokens, images=self.images)
         url = built["url"]
         headers = provider_wire.headers(built, connection.get("api_key") or "")
         kind = connection["kind"]
         body_bytes = built["body"].encode("utf-8")
+        image_effect = action["tag"] in provider_wire.IMAGE_EFFECTS
+
+        def capture_body(body: bytes) -> bytes:
+            return provider_wire.observation_digest(body) if image_effect else body
+
+        def refusal(body: bytes) -> dict:
+            # A provider may echo any input in its rejection, including images.
+            return {} if image_effect else provider_wire.refusal(body)
         if self.observation is not None:
             store, owner_id, execution_id = self.observation
             # The durable request record is the send authorization: a failed
             # insert must leave this method before it reaches HTTPX.
             request_truncated = store.request(
                 owner_id, execution_id, action, provider_stage_record(action["tag"]),
-                str(connection["id"]), model, body_bytes,
+                str(connection["id"]), model, capture_body(body_bytes),
             )
             self._observation_truncated = request_truncated
             if request_truncated:
@@ -232,7 +248,7 @@ class SingleAttemptProvider:
                                     count_raw.extend(chunk)
                                 if counted.status_code >= 400:
                                     refused_raw = bytes(count_raw)
-                                    self._refusal = {**provider_wire.refusal(refused_raw), "operation": "count_tokens"}
+                                    self._refusal = {**refusal(refused_raw), "operation": "count_tokens"}
                                     counted.raise_for_status()
                             count_data = json.loads(count_raw)
                             if not isinstance(count_data, dict):
@@ -252,23 +268,23 @@ class SingleAttemptProvider:
                             if result.status_code >= 400:
                                 # Read a bounded refusal so the log can say why.
                                 refused_raw = bytes((await result.aread())[:16384])
-                                self._refusal = provider_wire.refusal(refused_raw)
+                                self._refusal = refusal(refused_raw)
                             result.raise_for_status()
                         async for chunk in result.aiter_bytes():
                             if len(raw) + len(chunk) > self.options.max_response_bytes:
                                 raw.extend(chunk[:max(0, self.options.max_response_bytes - len(raw))])
                                 if self.observation is not None:
                                     store, owner_id, execution_id = self.observation
-                                    store.response(owner_id, execution_id, action, status=result.status_code, raw=bytes(raw), truncated=True)
+                                    store.response(owner_id, execution_id, action, status=result.status_code, raw=capture_body(bytes(raw)), truncated=True)
                                 self._observation_truncated = True
                                 raise ValueError("provider response limit exceeded")
                             raw.extend(chunk)
                         if self.observation is not None:
                             store, owner_id, execution_id = self.observation
-                            store.response(owner_id, execution_id, action, status=result.status_code, raw=bytes(raw))
+                            store.response(owner_id, execution_id, action, status=result.status_code, raw=capture_body(bytes(raw)))
                             if result.status_code >= 400:
                                 refused_raw = bytes(raw[:16384])
-                                self._refusal = provider_wire.refusal(refused_raw)
+                                self._refusal = refusal(refused_raw)
                             result.raise_for_status()
             read = provider_wire.read_pipeline(built["format"], response_status, bytes(raw))
             if read.get("input_tokens") is not None:
@@ -282,7 +298,7 @@ class SingleAttemptProvider:
         except (TimeoutError, httpx.TimeoutException, httpx.TransportError):
             if self.observation is not None and response_status is not None:
                 store, owner_id, execution_id = self.observation
-                store.response(owner_id, execution_id, action, status=response_status, raw=bytes(raw), truncated=True)
+                store.response(owner_id, execution_id, action, status=response_status, raw=capture_body(bytes(raw)), truncated=True)
                 self._observation_truncated = True
             raise
         finally:
@@ -295,7 +311,7 @@ class SingleAttemptProvider:
             self.failure_detail = "output_limit_reached"
             _logger.warning("provider_output_limit %s", json.dumps({
                 "action": action["tag"], "provider": connection["id"], "model": model,
-                "max_tokens": built["output_budget"], **read["cut"],
+                "max_tokens": built["output_budget"], **({} if image_effect else read["cut"]),
             }, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
             raise TypeError("provider output reached its token limit")
         if read["outcome"] != "answer":

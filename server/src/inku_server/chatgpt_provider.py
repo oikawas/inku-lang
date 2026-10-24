@@ -161,9 +161,17 @@ async def catalog(owner: str, profile_id: str, generation: int, deadline: float,
 
 async def request(owner: str, profile_id: str, generation: int, model: str, action: dict, deadline: float,
                   limit: int, cancel=None, observation=None, *, purpose: str = "llm",
-                  transport: httpx.AsyncBaseTransport | None = None) -> str:
-    if (purpose == "llm" and action["tag"] not in EFFECTS) or (purpose == "vision" and action["tag"] != "vision") or purpose not in {"llm", "vision"}:
+                  transport: httpx.AsyncBaseTransport | None = None, images: list[str] | None = None) -> str:
+    image_effect = action["tag"] in provider_wire.IMAGE_EFFECTS
+    if (purpose == "llm" and action["tag"] not in EFFECTS) or (purpose == "vision" and action["tag"] != "vision" and not image_effect) or purpose not in {"llm", "vision"}:
         raise ChatGPTError("chatgpt_operation_not_supported")
+
+    def capture_body(body: bytes) -> bytes:
+        return provider_wire.observation_digest(body) if image_effect else body
+
+    prompt = action["payload"]["prompt"]
+    # Validate image references before catalog refresh or any other HTTP call.
+    built = (provider_wire.chatgpt_request(model, prompt, limit, images=images) if image_effect else None)
     def check():
         return check_session(owner, profile_id, generation, cancel)
     store = CredentialStore()
@@ -173,19 +181,19 @@ async def request(owner: str, profile_id: str, generation: int, model: str, acti
             if not any(entry["id"] == model and entry["enabled"] and purpose in entry["purposes"] for entry in models):
                 raise ChatGPTError("chatgpt_model_not_offered")
             token = await access_token(owner, profile_id, generation, deadline, cancel)
-            prompt = action["payload"]["prompt"]
             # The shared core writes the body (provider_wire); the observation
             # keeps its canonical form, as it did.
-            built = (provider_wire.chatgpt_vision_request(model, **prompt, answer_limit=limit) if purpose == "vision"
-                     else provider_wire.chatgpt_request(model, prompt, limit))
+            if built is None:
+                built = (provider_wire.chatgpt_vision_request(model, **prompt, answer_limit=limit) if action["tag"] == "vision"
+                         else provider_wire.chatgpt_request(model, prompt, limit, images=images))
             if observation:
                 from .pipeline_provider import provider_stage_record
                 capture, execution = observation
                 truncated = capture.request(owner, execution, action, provider_stage_record(action["tag"]), "chatgpt", model,
-                                            built["canonical"].encode())
+                                            capture_body(built["canonical"].encode()))
                 if truncated:
                     raise ChatGPTError("chatgpt_observation_incomplete")
-            decoder = TextSSEDecoder(limit) if purpose == "vision" else SSEDecoder(limit)
+            decoder = TextSSEDecoder(limit) if action["tag"] == "vision" else SSEDecoder(limit)
             raw = bytearray()
             status = 0
             try:
@@ -202,6 +210,8 @@ async def request(owner: str, profile_id: str, generation: int, model: str, acti
                     try:
                         if not response.is_success:
                             content = await read_limited(response, check, deadline, 64 * 1024)
+                            if observation and image_effect:
+                                raw.extend(content)
                             raise response_error(json.loads(content), status, response.headers.get("x-request-id"))
                         iterator = response.aiter_bytes()
                         while True:
@@ -218,9 +228,11 @@ async def request(owner: str, profile_id: str, generation: int, model: str, acti
                         await stream.__aexit__(None, None, None)
             finally:
                 if observation and status:
-                    capture.response(owner, execution, action, status=status, raw=bytes(raw), truncated=not decoder.completed,
-                                     decoded=decoder.terminal)
+                    capture.response(owner, execution, action, status=status, raw=capture_body(bytes(raw)), truncated=not decoder.completed,
+                                     decoded=None if image_effect else decoder.terminal)
         except ResponseFailure as error:
+            if image_effect:
+                error.request_id, error.param = safe_identifier(error.request_id), safe_identifier(error.param)
             if error.code == "subscription_sharing_usage_limit_exceeded":
                 pause_quota(owner, profile_id, generation, deadline)
             raise

@@ -32,6 +32,9 @@ _PIPELINE_FAILURES = {
 _PIPELINE_FAILURE_DETAILS = {"credentials_unavailable"}
 _HOLE_COMPLETION_STATUSES = {"validated", "rejected", "unresolved"}
 _ACTION_STAGES = {
+    "select_image_catalog": "image",
+    "write_image_ddl": "image",
+    "review_image_ddl": "image",
     "generate_sketch": "sketch",
     "select_description_catalog": "catalog",
     "generate_normalized_ddl": "stage1",
@@ -174,6 +177,9 @@ class PipelineBinding:
             self.completion_range_states = getattr(module, "pipeline_completion_range_states", None)
             # Older compatible wheels offer no touch change.
             self.retouch = getattr(module, "pipeline_retouch", None)
+            self.image_input_policy = getattr(module, "pipeline_image_input_policy", None)
+            self.image_canvas = getattr(module, "pipeline_image_canvas", None)
+            self.image_review_svg = getattr(module, "pipeline_image_review_svg", None)
         except (AttributeError, ImportError) as error:
             raise CandidateHostError("binding_unavailable") from error
         self.versions = json.loads(version_report())
@@ -211,17 +217,19 @@ class CandidateExecution:
         self._provider_in_flight = False
         # The provider action this host is running and when it began, in epoch ms.
         self._attempt_began: tuple[dict, int] | None = None
+        # Pixel bytes never enter context, snapshots, transcripts or history.
+        self.image_data: dict[str, str] = {}
         self.transcript: list[dict] = []
         self.last_output: dict | None = None
 
     def start_new(self, authoring: dict) -> dict:
         """A fresh host-minted identity; absence in history never implies newness."""
         with self._lock:
-            if self._snapshot is not None or authoring.get("tag") not in {"direct_ddl", "description", "saved_laws"}:
+            if self._snapshot is not None or authoring.get("tag") not in {"direct_ddl", "description", "saved_laws", "image"}:
                 raise CandidateHostError("invalid_start")
             # The laws stage from a saved work starts from the work's DDL and
             # commits a DDL its laws printed: the DDL holds the child.
-            direct = authoring["tag"] in {"direct_ddl", "saved_laws"}
+            direct = authoring["tag"] in {"direct_ddl", "saved_laws", "image"}
             self._fresh = True
             return self._advance({
                 "tag": "start", "variation_id": uuid.uuid4().hex,
@@ -331,6 +339,8 @@ class CandidateExecution:
                            "parent": self.context.get("parent"),
                            "busy": state["action"] is not None,
                            "sketch": state.get("sketch"),
+                           "image_ddl": state.get("image_ddl") or self.context.get("image_ddl"),
+                           "image_provenance": self.context.get("image_provenance"),
                            "catalog_diagnostics": self.context.get("macro_catalog", {}).get("diagnostics", []),
                            "rendered": self._rendered,
                            "result": json_seeds(self.context.get("result"))})
@@ -341,6 +351,8 @@ class CandidateExecution:
                               busy=False, rendered=None, result=None)
             if self.context.get("provider_failure") is not None:
                 result["provider_failure"] = self.context["provider_failure"]
+            if self.context.get("image_failure") is not None:
+                result["image_failure"] = self.context["image_failure"]
             attempt = self._provider_attempt(state)
             if attempt is not None:
                 result["provider_attempt"] = attempt

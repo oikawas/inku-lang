@@ -64,15 +64,15 @@ def test_manual_unification_preserves_text_other_values_search_and_second_start(
         assert connection.execute("SELECT fork_context_bytes FROM pipeline_history_links").fetchone() == (b"\x00\xff",)
     assert json.loads(Path(report["report"]).read_text())["status"] == "migrated"
     engine = create_engine(f"sqlite:///{path}")
-    for _ in range(2):
+    for expected in ("registered_upgrade", "current"):
         outcome = migrations.ensure_current_schema(
             engine=engine, database_path=path, create_schema=lambda _: pytest.fail("recreated schema"),
             seed_fresh=lambda _: pytest.fail("reseeded"), apply_legacy=lambda _: pytest.fail("inverse transform"),
         )
-        assert outcome.mode == "current"
+        assert outcome.mode == expected
     engine.dispose()
     assert migration.migrate_history_ddl(path, source_commit=SOURCE_SHA)["status"] == "already_current"
-    assert len(list((tmp_path / "migration-backups").glob("*.db"))) == 1
+    assert len(list((tmp_path / "migration-backups").glob("*.db"))) == 2
 
 
 def test_failure_after_column_drop_rolls_back_text_schema_registry_and_keeps_backup(tmp_path, monkeypatch):

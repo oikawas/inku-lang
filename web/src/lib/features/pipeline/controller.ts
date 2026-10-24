@@ -147,6 +147,14 @@ export class PipelineController {
 		});
 	}
 
+	async fromImage(imageId: string, provenance: string, canvasFormatId: string, override: PipelineOptions = {}, signal?: AbortSignal): Promise<PipelineView> {
+		signal?.throwIfAborted();
+		return this.run(() => {
+			this.observe(null);
+			return this.api.startImage(imageId, provenance, canvasFormatId, { ...this.options(), ...override }, signal);
+		});
+	}
+
 	async forkDescription(signal?: AbortSignal): Promise<PipelineView> {
 		const active = this.requiredView();
 		return this.run(() => this.api.forkDescription(active, active.description, this.options(), signal));

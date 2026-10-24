@@ -924,6 +924,8 @@ class VariationAuthorityStore:
             "render_limits",
             "lineage_node_id",
             "ddl_source_origin",
+            "image_provenance",
+            "image_ddl",
         )
         # A historical schema can lack a later optional column. The read remains
         # faithful by omitting that key rather than manufacturing a default.
@@ -932,6 +934,8 @@ class VariationAuthorityStore:
             for field in metadata_fields
             if field in row and row[field] is not None
         }
+        if "image_ddl" in metadata:
+            metadata["image_ddl"] = json.loads(metadata["image_ddl"])
         return LegacyHistoryRecord(
             history_id=str(row["id"]),
             description=str(row["input"] or ""),

@@ -1181,6 +1181,10 @@ Stage 1のfallback候補はStage 1の応答待ちにだけ属する。Stage 1が
 - 流れ: (1) `auto_catalog`のとき、`select_image_catalog`（結果`image_catalog_selected`、prompt `inku.image-catalog-selection-prompt.v1`）が、候補ごとの9色の実際の色を見てカタログを選ぶ。使えなければ既定のカタログにする（`catalog_fallback`）。(2) `write_image_ddl`（結果`image_ddl_written`、prompt `inku.image-ddl-prompt.v1`）に、画像・DDLの手引き・紙の短辺の単位・作品の上限・カタログの色を渡す。答えは`{"ddl": …}`。coreは実行と同じcompileで組み、書いたとおりに描かれない行（読めない語句、紙からはみ出す形、上限を超える文など）を名指す。あれば予算の中で一度だけ、退けたDDLと行ごとの理由と手がかり（`compiler_feedback`）を添えて聞き直す（`provider_attempt`の`asked_again`）。その答えは聞き直さない。形の無い文は、compileそのものが名指して省く（DDL engine 71、§12.7）。それでも1文だけで作品全体を止める文（compilerが名指せない不完全さ）は、1行ずつのcompileで名指し、聞き直しでも直らなければその文を除く（記録の`dropped`）。(3) `review`のとき、hostが書いたDDLを描く（effect `draw_image_review`。文書・紙・画の大きさ（長辺1024画素）を持つ。SVGはcoreの`image_review_svg`にhostが作品を描く描きのオプションを渡して得て、PNGにする）。結果は`image_review_drawn`（PNGの参照）か、描けなかったときの`image_review_undrawn`（書いたDDLをそのままcommitする）。(4) `review_image_ddl`（結果`image_ddl_reviewed`、prompt `inku.image-ddl-review-prompt.v1`）が、画像と描いた画とDDLを見せる。答えは書く回と同じく組み、一度だけ聞き直す。何も描けない答えや、予算を使い切った見比べは、見比べる前のDDLを使う（`image_review_fallback`）。
 - 確定: 残ったDDLをDDLの編集としてcommitする（reason `image_ddl`）。変奏は最初のcommitからDDLが正本で、描き直す記述は無い。読めなかった行は、確定の後に補完しない（画像を見ない補完は推測になる。作者は指示書のエディタから補完できる）。読める答えが一つも無い実行は失敗する（`image_ddl_failed`）。聞き直して止める文を除いても何も描けないDDLの実行は、空の作品を保存しないように止まる（`image_ddl_undrawable`）。
 - 記録: snapshotの`image_ddl`（画像の参照と元の画素数、宣言した比、近い紙、答えごとの段・promptのIDとdigest・聞き直しの答えか・直す行と描いた命令の数、見比べる前のDDL、描いた画の参照、除いた行）を、hostが作品と一緒に保存する。画像もSVGも持たない。
+- Server・Web: 記述の右隣の画像タブに、来歴、画像ファイル、サムネイル、Visionのモデル、色カタログ、キャンバス、描画するボタン、既存と同じ指示書エディタを置く。写生と暴れるはoffで出さない。JPEG・PNG・GIF・TIFFをPillowで読み、GIFは先頭のframe、EXIFの向きを適用してRGBへ変換する。受取上限は32 MiB、縮小後はcoreの`sent`の寸法とJPEGの質を使い、coreのバイト上限を超えると拒否する。TIFFを含むサムネイルもServerが返す。
+- 描画後の画像タブは、作品の`image_ddl.before_review`があるときだけ「見比べる前の指示書」を折りたたんで示す。「この指示書で子を描く」はその本文を既存のDDL編集の経路へ渡し、現在の作品を親にした子を作る。同じ本文でもDDL編集として扱い、元作品は変更しない。現在のDDLが編集中なら既存の上書き確認を使い、確認中に作品や草稿が変われば実行しない。見比べ前の記録の無い作品には欄を出さない。
+- 受取APIは認証済み`POST /api/pipeline/images`（binary body）で、所有者別の一時`image_id`とサムネイル・寸法・近い紙を返す。`POST /api/pipeline/variations`の`kind: image`、`image_id`、`text`（来歴）、`canvas_format_id: image`（または登録の紙）から実行する。待機画像は15分で破棄し、開始に成功するとIDを消費する。実行終了で画像と比較PNGを解放し、workerの交代で画像が無い実行は`image_missing`を付けて停止する。
+- 保存と送り: 来歴は`image_provenance`、coreの記録は`image_ddl`として保存し、`input`・`source_text`・描画する記述は空にする。DDL編集と見た目の子は来歴を引き継ぐ。モデルはVision用途で入場を確認し、画像の3段は時間・送信記録を`image`へ分ける。書く回と見比べる回の出力枠は既定8192 token（`INKU_IMAGE_DDL_MAX_TOKENS`またはhost manifestの`provider.image_max_tokens`で変更）。画像要求と応答の開発記録は本文を保存せずSHA-256とバイト数だけを持つ。
 - バージョン: protocol（1.0.0）、binding、core APIのバージョンは変えない。ServerのPythonの出口に`pipeline_image_input_policy`・`pipeline_image_canvas`・`pipeline_image_review_svg`を足す（UniFFI・JNIの呼び出しは変えない）。
 
 ### 12.7 第二段階（補完）と決定的な構造化
@@ -2435,7 +2439,7 @@ Webではバッチが停止中で前回の描画エラーが残っていると�
 
 `expanded_ddl`は旧エンジンの補完出力であり、現行エンジンとの100%互換を保証しない。移行はcompile・補完・再描画をせず、保存済みScore・SVG・版識別・権限・系譜・pipeline linkを保持する。通常の再描画は統合した`ddl`を共有pipelineへ渡し、現在の文書とauthorityを持つ新しい作品を保存する。旧作品の本文・保存描画をその操作で上書きしない。本文がない作品も保存Score/SVGで表示・再演できる。
 
-Serverの新規DBはschema registry v4 `single_history_ddl`で作る。旧二本文DBの通常起動は手動移行必須として拒否し、移行後は旧列の不存在と由来列・registry・FTSの整合を確認する。旧版への切り戻しには移行前DBと旧コードを組で復元する。旧backupの復元も原本を保持した明示的なコピーで行う。[移行入口と保護条件](persistence/README.ja.md#serverの手動移行)を参照。
+Serverの新規DBはschema registry v5 `image_input_provenance`で作る。既存v4 `single_history_ddl`は通常起動で確認済みbackupを作り、nullableな`image_provenance`・`image_ddl`を一つのtransactionで追加する。既存行はNULLを保つ。旧二本文DBの通常起動は引き続き手動移行必須として拒否し、移行後は旧列の不存在と由来列・画像記録列・registry・FTSの整合を確認する。旧版への切り戻しには移行前DBと旧コードを組で復元する。旧backupの復元も原本を保持した明示的なコピーで行う。[移行入口と保護条件](persistence/README.ja.md#serverの手動移行)を参照。
 
 **Web UI はクライアントが生成した SVG を、信頼できる履歴の中身としては送り返さない。** `/api/paint` がサーバー側で履歴を生成して直接保存する。互換のための履歴エンドポイントは、クライアントが送った SVG を信じるのではなく **JSON Score から描画し直す**。
 

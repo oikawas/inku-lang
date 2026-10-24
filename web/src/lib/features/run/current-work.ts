@@ -32,6 +32,8 @@ export type PaintScore = {
 export type Seed = number | string;
 
 export type PaintResult = {
+	image_ddl?: Record<string, unknown> | null;
+	image_provenance?: string | null;
 	svg: string;
 	score: PaintScore;
 	stage1_model?: string | null;

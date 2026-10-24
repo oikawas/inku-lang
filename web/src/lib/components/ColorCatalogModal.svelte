@@ -10,6 +10,7 @@
 		onSelectCatalog: (id: string) => void;
 		onCancel: () => void;
 		onConfirm: () => void;
+		imageInput?: boolean;
 	};
 
 	let {
@@ -19,6 +20,7 @@
 		onSelectCatalog,
 		onCancel,
 		onConfirm,
+		imageInput = false,
 	}: Props = $props();
 
 	function isLightColor(hex: string): boolean {
@@ -60,10 +62,10 @@
 			>
 				<div class="catalog-info">
 					<div class="catalog-name-row">
-						<div class="catalog-name">{t().colorCatalogAuto}</div>
+						<div class="catalog-name">{imageInput ? t().imageCatalogAuto : t().colorCatalogAuto}</div>
 						{#if autoActive}<span class="catalog-check" aria-hidden="true">✓</span>{/if}
 					</div>
-					<div class="catalog-sub">{t().colorCatalogAutoSub}</div>
+					<div class="catalog-sub">{imageInput ? t().imageCatalogAutoHint : t().colorCatalogAutoSub}</div>
 				</div>
 			</button>
 			{#each catalogs as cat (cat.id)}

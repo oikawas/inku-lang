@@ -51,7 +51,9 @@ SQLite backupは作品・系譜・execution／snapshot／ACK、annotation・奥�
 
 ## Serverの手動移行
 
-新規DBはregistry v4 `single_history_ddl`、既存v3からの移行はv3行を保持してv4行を追加する。`server/scripts/migrate_history_ddl.py`は通常APIを起動せず、明示したcanonicalな既存DBだけを扱う。SQLite 3.35以降の`DROP COLUMN`が必要。既知の元schema fingerprintとregistry/checksumを照合し、未知・部分状態を拒否する。
+新規DBはregistry v5 `image_input_provenance`。既存v4 `single_history_ddl`は通常起動で`migration-backups/<stem>-pre-v5-<ns>.db`へ確認済みsnapshotを作り、nullableなTEXT列`image_provenance`・`image_ddl`とv5行を一つのtransactionで追加する。既存行はNULLのまま、失敗時は列とregistryをrollbackし、snapshotは保持する。以後の起動は照合だけを行う。
+
+旧二本文のv3からの手動移行はv3行を保持してv4行を追加し、その後の通常起動でv5へ進む。`server/scripts/migrate_history_ddl.py`は通常APIを起動せず、明示したcanonicalな既存DBだけを扱う。SQLite 3.35以降の`DROP COLUMN`が必要。既知の元schema fingerprintとregistry/checksumを照合し、未知・部分状態を拒否する。
 
 Serverの`server/`から、まず読み取り専用で確認する。SHAには選択したproduct commitの40桁を指定する。
 

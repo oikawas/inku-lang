@@ -64,6 +64,8 @@ API、認証、DB、共有pipelineのhost adapter、描画、系譜と旧作品�
 
 通常WebとAPIは共有Rustのauthoring serviceを使う。系譜編集は選択したhistoryのownerと保存contextを引き継ぎ、元作品を保持する。Active DDLのsource変更はCASとauthority lockを保ち、設定変更は親関係を持つ新しいvariationへ進む。履歴は当該revisionの診断を復元し、古い形式や壊れたsidecarでも保存DDL／Score／SVGの表示を継続する。実装の時系列は[CHANGELOG.ja.md](CHANGELOG.ja.md)、現在の契約はSPECを参照する。
 
+Webの画像タブはVisionのモデルで画像から直接DDLを書く。`POST /api/pipeline/images`で前処理した画像は所有者別のworkerメモリに置き、15分または実行終了で破棄する。比較用PNGも保存しない。`image_provenance`はコメントとして表示し、描画の記述とは別にする。`image_ddl`は画像の参照とDDLの経過だけを持つ。記録に`before_review`があれば、描画後に見比べ前の指示書を開き、既存のDDL編集で子作品を描ける。保存schema v5は、v4の確認済みbackupを作ってからnullableな2列を追加する。
+
 ## 守るべき設計契約
 
 - DDLテキストは母語で書ける。
@@ -232,7 +234,7 @@ localStorage への保存・server への永続・描画要求への同梱は、
 
 ### server（FastAPI）
 
-- エンドポイント 107 本は `server/src/inku_server/api_core/routers/` の 10 ファイル（`auth` `feedback` `history` `lineage` `me` `plugins` `public` `render` `settings` `users`）と、共有pipelineの `pipeline_api.py`（`/api/pipeline/*` の 13 本）に在る。本数の正本は `server/tests/test_route_authorization.py` の `EXPECTED_ROUTE_COUNT` である。
+- エンドポイント 135 本は `server/src/inku_server/api_core/routers/` の 13 ファイル（`auth` `autonomous` `chatgpt` `description` `feedback` `history` `lineage` `me` `plugins` `public` `render` `settings` `users`）と、共有pipelineの `pipeline_api.py`（`/api/pipeline/*` の 15 本）に在る。本数の正本は `server/tests/test_route_authorization.py` の `EXPECTED_ROUTE_COUNT` である。
 共有される定義は `api_core/{state,models,deps,common,rendering}.py` に置く。
 - `api.py` が持つのは `app` の組み立て・`_lifespan`・ミドルウェア・起動時の呼び出し・`include_router` だけである。
 **依存の向きは `api.py` → routers → 共有の一方向**で、router から `api.py` を import しない。

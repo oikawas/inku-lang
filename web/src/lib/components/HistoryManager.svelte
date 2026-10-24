@@ -25,6 +25,8 @@
 		has_acl_shares?: boolean;
 		id?: string;
 		input: string;
+		image_ddl?: Record<string, unknown> | null;
+		image_provenance?: string | null;
 		source_text?: string | null;
 		display_label?: string | null;
 		lineage_generation?: number | null;
@@ -300,7 +302,7 @@
 			id: item.id,
 			at: item.at,
 			trashed: item.trashed,
-			description: item.source_text ?? item.input,
+			description: item.image_provenance ?? item.source_text ?? item.input,
 			preview: item.svg || null,
 		} : null;
 	}
@@ -1035,7 +1037,7 @@
 					<HistoryThumbnail item={previewItem} scope={'library-preview-' + previewItem.id} size="manager" />
 				</button>
 				<p class="history-preview-open-hint">{t().historyPreviewOpenHint}</p>
-				<p class="history-preview-description">{previewItem.source_text ?? previewItem.input}</p>
+				<p class="history-preview-description">{previewItem.image_provenance ?? previewItem.source_text ?? previewItem.input}</p>
 				{@render shareStatus(previewItem)}
 				<div class="history-preview-actions">
 					{#if previewReady}
@@ -1143,7 +1145,7 @@
 							<div class="lineage-group-summary">
 								<!-- A work drawn straight from DDL has no description; its label ('DDL') is what the
 								     thumbnail grid shows for it, so the group names it the same way. -->
-								<strong>{thumbnailPromptText(group.representative.source_text ?? group.representative.input) || group.representative.display_label || ''}</strong>
+								<strong>{thumbnailPromptText(group.representative.image_provenance ?? group.representative.source_text ?? group.representative.input) || group.representative.display_label || ''}</strong>
 								<span>{t().historyLineageWorkCount(group.item_count)} · {t().historyLineageStarCount(group.starred_count)} · {t().historyLineageForRevisionCount(group.for_revision_count)} · {formatHistoryDate(group.latest_at)}</span>
 								{#if currentLineageRootId === group.root_node_id}<span class="current-lineage-badge">{t().historyCurrentLineage}</span>{/if}
 							</div>
@@ -1166,7 +1168,7 @@
 											<div class="lineage-member-content">
 												<button use:focusWork={it.id} data-library-work-id={it.id} class="lineage-member-main" type="button" title={t().historyPreviewTitle} onclick={() => void openPreview(it)} ondblclick={() => openThumbnail(it)}>
 													<HistoryThumbnail item={it} scope={'lineage-member-' + it.id} size={historyManagerTab === 'list' ? 'mini' : 'manager'} />
-													<span>{thumbnailPromptText(it.source_text ?? it.input)}</span>
+													<span>{thumbnailPromptText(it.image_provenance ?? it.source_text ?? it.input)}</span>
 												</button>
 												{@render shareStatus(it)}
 											</div>
@@ -1227,7 +1229,7 @@
 						</div>
 						<div class="manager-thumb-actions">
 							{#if it.display_label}<span class="history-display-label">{it.display_label}</span>{/if}
-							<HistoryDescription text={historyListDescription(it.source_text ?? it.input)} className="thumb-description" />
+							<HistoryDescription text={it.image_provenance ?? historyListDescription(it.source_text ?? it.input)} className="thumb-description" />
 							{@render shareStatus(it)}
 							{#if it.note}<div class="thumb-note"><span>{t().historyPreviewCommentLabel}</span>{it.note}</div>{/if}
 							<div class="thumb-action-row">
@@ -1299,7 +1301,7 @@
 									aria-label={it.starred ? t().starOn : t().starOff}
 								>★</button>
 							</td>
-							<td class="table-description"><HistoryDescription text={historyListDescription(it.source_text ?? it.input)} />{@render shareStatus(it)}</td>
+							<td class="table-description"><HistoryDescription text={it.image_provenance ?? historyListDescription(it.source_text ?? it.input)} />{@render shareStatus(it)}</td>
 							<td>{formatHistoryMinute(it.at, isJapanese ? 'ja-JP' : 'en-US')}</td>
 							<td class="table-model">
 								{#each modelLines(it) as model}

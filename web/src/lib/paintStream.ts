@@ -189,6 +189,9 @@ export function runningStageLabel(
 	attempt: ProviderAttemptCount | null | undefined,
 	strings: LangPack
 ): string {
+	if (attempt?.action === 'select_image_catalog') return strings.imageSelectingCatalog;
+	if (attempt?.action === 'write_image_ddl') return attempt.asked_again ? strings.imageRevisingDdl : strings.imageWritingDdl;
+	if (attempt?.action === 'review_image_ddl') return attempt.asked_again ? strings.imageRevisingDdl : strings.imageReviewingDdl;
 	if (attempt?.action === 'read_composition') return strings.stageReadingComposition;
 	if (attempt?.action === 'choose_colors') return strings.stageChoosingColors;
 	return attempt?.action === 'choose_laws' ? strings.stageChoosingLaws : label;

@@ -24,8 +24,15 @@ _SINGLE_USER_TOKEN = "single-user:" + secrets.token_urlsafe(32)
 
 
 def _session_token(
-    authorization: str | None = Header(default=None),
-    session_cookie: str | None = Cookie(default=None, alias=_SESSION_COOKIE_NAME),
+    authorization: str | None = Header(
+        default=None,
+        description="`Bearer <token>`, where the token is the session that POST /api/auth/login sets as its cookie. Takes precedence over the cookie.",
+    ),
+    session_cookie: str | None = Cookie(
+        default=None,
+        alias=_SESSION_COOKIE_NAME,
+        description="The session cookie set by POST /api/auth/login, read when no Bearer token is sent. A server in single-user mode ignores it.",
+    ),
 ) -> str:
     if authorization and authorization.startswith("Bearer "):
         return authorization.removeprefix("Bearer ").strip()

@@ -11,9 +11,9 @@ from copy import deepcopy
 from dataclasses import asdict
 from typing import Callable, Literal
 
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Path, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .description_labels import pipeline_description
 from .pipeline_candidate import CandidateExecution, CandidateHostError, PipelineBinding
@@ -77,12 +77,28 @@ def _refuse_if_locked(history_id: str) -> None:
 
 class NewVariationBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["description", "direct_ddl", "image"]
-    text: str
-    image_id: str | None = None
-    canvas_format_id: str | None = None
-    canvas_aspect: str | None = None
-    options: dict = {}
+    kind: Literal["description", "direct_ddl", "image"] = Field(
+        description="What the work starts from: description (the author's description), direct_ddl (DDL source written by the author), or image (a prepared image, which needs image_id).",
+    )
+    text: str = Field(
+        description="For description, the description text. For direct_ddl, the DDL source. For image, the source note kept with the work; it is not drawn.",
+    )
+    image_id: str | None = Field(
+        default=None,
+        description="ID returned by POST /api/pipeline/images. Required when kind is image and refused when kind is anything else.",
+    )
+    canvas_format_id: str | None = Field(
+        default=None,
+        description="ID of the canvas format to draw on, from GET /api/pipeline/canvas-formats. Give it or canvas_aspect, not both with different values (refused with 422).",
+    )
+    canvas_aspect: str | None = Field(
+        default=None,
+        description="Canvas aspect to draw on, as an alternative to canvas_format_id. The value image picks the registered format nearest the prepared image's aspect ratio.",
+    )
+    options: dict = Field(
+        default={},
+        description="Run options for the work (for example stage1_model, catalog_id, render_seed, wild and sketch). Keys left out take the account's settings. Unknown or invalid keys are refused with 422.",
+    )
 
     @model_validator(mode="after")
     def image_only(self):
@@ -93,23 +109,43 @@ class NewVariationBody(BaseModel):
 
 class ForkDescriptionBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    expected_revision: str
-    description: str
-    options: dict = {}
+    expected_revision: str = Field(
+        description="Authority revision of the variation the caller last read. A different saved revision is refused with 409 (authority_conflict).",
+    )
+    description: str = Field(
+        description="The description the new work starts from. It may differ from the variation's description; words changed on a variation whose DDL holds the work are refused with 409 (description_locked).",
+    )
+    options: dict = Field(
+        default={},
+        description="Run options for the new work, with the same keys as the options of POST /api/pipeline/variations. Keys left out take the account's settings.",
+    )
 
 
 class LinkedHistoryForkBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["description", "direct_ddl"]
-    text: str
-    options: dict = {}
+    kind: Literal["description", "direct_ddl"] = Field(
+        description="What the fork starts from: description (a new description) or direct_ddl (a new DDL source).",
+    )
+    text: str = Field(
+        description="The new description when kind is description, or the new DDL source when kind is direct_ddl. Changed words of a description are refused with 409 (description_locked) when the saved work's DDL holds it.",
+    )
+    options: dict = Field(
+        default={},
+        description="Run options for the new work, with the same keys as the options of POST /api/pipeline/variations. Keys left out take the account's settings.",
+    )
 
 
 class CompletionRangeStatesBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    source: str
-    history_id: str | None = None
-    execution_id: str | None = None
+    source: str = Field(description="DDL source whose completion range states are read.")
+    history_id: str | None = Field(
+        default=None,
+        description="ID of a saved work whose completion ranges are read. Give exactly one of history_id and execution_id.",
+    )
+    execution_id: str | None = Field(
+        default=None,
+        description="ID of an execution whose completion ranges are read. Give exactly one of history_id and execution_id.",
+    )
 
     @model_validator(mode="after")
     def one_work(self):
@@ -120,19 +156,24 @@ class CompletionRangeStatesBody(BaseModel):
 
 class AuthorDdlBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    expected_revision: str
-    source: str
-    options: dict = {}
+    expected_revision: str = Field(
+        description="Authority revision of the execution the caller last read. A different saved revision is refused with 409 (authority_conflict).",
+    )
+    source: str = Field(description="The edited DDL source to commit.")
+    options: dict = Field(
+        default={},
+        description="Run options for the edited DDL, with the same keys as the options of POST /api/pipeline/variations. When they leave the run's settings unchanged, the source is committed to the same variation; otherwise a new direct-DDL variation is started.",
+    )
 
 
 class PreparedImageView(BaseModel):
-    image_id: str
-    thumbnail: str
-    original_width: int
-    original_height: int
-    width: int
-    height: int
-    nearest_format_id: str
+    image_id: str = Field(description="ID to pass as image_id when starting an image variation. It stays valid for 15 minutes.")
+    thumbnail: str = Field(description="JPEG thumbnail as a data URL, fitting within 256 by 256 pixels.")
+    original_width: int = Field(description="Width of the uploaded image in pixels, after its EXIF orientation is applied.")
+    original_height: int = Field(description="Height of the uploaded image in pixels, after its EXIF orientation is applied.")
+    width: int = Field(description="Width in pixels of the image as sent to the model, after the core's size limit for model input is applied.")
+    height: int = Field(description="Height in pixels of the image as sent to the model, after the core's size limit for model input is applied.")
+    nearest_format_id: str = Field(description="ID of the registered canvas format whose aspect ratio is nearest the image's.")
 
 
 class PipelineService:
@@ -803,43 +844,50 @@ def pipeline_router(service: PipelineService | Callable[[], PipelineService], ac
     def current_service() -> PipelineService:
         return service if isinstance(service, PipelineService) else service()
 
-    @router.get("/canvas-formats")
+    @router.get("/canvas-formats", summary="List canvas formats")
     def canvas_formats(actor: dict = Depends(actor_dependency)):
+        """List the canvas formats (paper sizes and aspect ratios) the pipeline offers, as the registry of the shared pipeline binding reports them. Requires a signed-in user."""
         return (binding_for() if binding_for else current_service().binding).canvas_registry
 
-    @router.post("/completion-range-states")
+    @router.post("/completion-range-states", summary="Read completion range states")
     def completion_range_states(body: CompletionRangeStatesBody, actor: dict = Depends(actor_dependency)):
+        """Read the states of the completion ranges of a DDL source, taken from a saved work or an execution. Nothing is started or resumed; the result has an empty ranges list when the work has no completion ranges. Requires a signed-in user; returns 404 (variation_not_found or history_not_found) when the work or execution is not found."""
         return current_service().completion_range_states(actor["id"], body)
 
-    @router.get("/history/{history_id}")
-    def history_link(history_id: str, actor: dict = Depends(actor_dependency)):
+    @router.get("/history/{history_id}", summary="Read a work's variation link")
+    def history_link(history_id: str = Path(description="ID of the saved work."), actor: dict = Depends(actor_dependency)):
+        """Return the variation link of a saved work: its owner, history ID, variation ID, revision and DDL digest. Requires a signed-in user; returns 404 (pipeline_history_not_found) when the work is not linked to a variation."""
         link = current_service().store.history_link(actor["id"], history_id)
         if link is None:
             raise HTTPException(404, "pipeline_history_not_found")
         return link
 
-    @router.get("/history/{history_id}/ddl-export")
-    def ddl_export(history_id: str, actor: dict = Depends(actor_dependency)):
+    @router.get("/history/{history_id}/ddl-export", summary="Export a work's DDL")
+    def ddl_export(history_id: str = Path(description="ID of the saved work to export."), actor: dict = Depends(actor_dependency)):
+        """Return the work's visible DDL together with the plugin definitions it names, for export. Requires a signed-in user; returns 404 (history_not_found) when the caller has no such work."""
         return current_service().ddl_export(actor["id"], history_id)
 
-    @router.post("/history/{history_id}/fork")
+    @router.post("/history/{history_id}/fork", summary="Fork a linked work")
     def fork_linked_history(
-        history_id: str,
         body: LinkedHistoryForkBody,
+        history_id: str = Path(description="ID of the saved work to fork from."),
         actor: dict = Depends(actor_dependency),
     ):
+        """Start a new variation from a saved work that is linked to a variation, as a description fork or a direct-DDL fork, and return its state. Requires a signed-in user; returns 404 (pipeline_history_not_found) when the work is not linked, and 409 (description_locked) when a changed description would reword a work whose DDL holds it."""
         return current_service().fork_linked_history(actor["id"], history_id, body)
 
-    @router.post("/variations")
+    @router.post("/variations", summary="Start a variation")
     def start(body: NewVariationBody, actor: dict = Depends(actor_dependency)):
+        """Start a new variation from a description, DDL source or prepared image and return its state. The run continues in the background; read its progress with GET /api/pipeline/variations/{variation_id}. Requires a signed-in user; returns 400 for a description made only of labels, 422 for invalid options, canvas or image choices, and 429 when all authoring workers are busy."""
         return current_service().start(actor["id"], body.kind, body.text, image_id=body.image_id, canvas_format_id=body.canvas_format_id, canvas_aspect=body.canvas_aspect, options=body.options)
 
-    @router.post("/images", response_model=PreparedImageView, openapi_extra={
+    @router.post("/images", response_model=PreparedImageView, summary="Upload an image for an image variation", openapi_extra={
         "requestBody": {"required": True, "content": {
             "application/octet-stream": {"schema": {"type": "string", "format": "binary"}},
         }},
     })
     async def prepare_image(request: Request, actor: dict = Depends(actor_dependency)):
+        """Prepare an image file sent as the raw request body (application/octet-stream), for use as image_id when starting an image variation. The accepted formats are JPEG, PNG, GIF and TIFF, up to 32 MiB; the result gives the image ID, which stays valid for 15 minutes. Returns 413 (image_too_large) for an upload that is too large and 422 (image_invalid) for a file that is not an accepted image."""
         from .pipeline_images import IMAGE_UPLOAD_MAX_BYTES
         raw = bytearray()
         async for chunk in request.stream():
@@ -849,20 +897,24 @@ def pipeline_router(service: PipelineService | Callable[[], PipelineService], ac
         from starlette.concurrency import run_in_threadpool
         return await run_in_threadpool(current_service().prepare_image, actor["id"], bytes(raw))
 
-    @router.get("/variations/{variation_id}")
-    def get(variation_id: str, actor: dict = Depends(actor_dependency)):
+    @router.get("/variations/{variation_id}", summary="Read a variation")
+    def get(variation_id: str = Path(description="ID of the variation."), actor: dict = Depends(actor_dependency)):
+        """Return the state of a variation's latest execution: its stage, authority revision, result and performance. Requires a signed-in user; returns 404 (variation_not_found) when no execution exists, 422 when the drawing was refused, and 503 (pipeline_effect_failed) when the last operation could not finish."""
         return current_service().get(actor["id"], variation_id)
 
-    @router.get("/variations/{variation_id}/system-prompts")
-    def system_prompts(variation_id: str, actor: dict = Depends(actor_dependency)):
+    @router.get("/variations/{variation_id}/system-prompts", summary="Read a variation's system prompts")
+    def system_prompts(variation_id: str = Path(description="ID of the variation."), actor: dict = Depends(actor_dependency)):
+        """Return the system prompts that the variation's latest saved execution sent to its models, read from saved state only, with the stages it kept. Requires a signed-in user; returns 404 (variation_not_found) when no execution exists."""
         return current_service().system_prompts(actor["id"], variation_id)
 
-    @router.post("/variations/{variation_id}/fork-description")
-    def fork(variation_id: str, body: ForkDescriptionBody, actor: dict = Depends(actor_dependency)):
+    @router.post("/variations/{variation_id}/fork-description", summary="Fork a variation's description")
+    def fork(body: ForkDescriptionBody, variation_id: str = Path(description="ID of the variation to fork from."), actor: dict = Depends(actor_dependency)):
+        """Start a new description variation from a variation, with the description given in the body, and return its state. Requires a signed-in user; returns 409 (authority_conflict) when expected_revision is stale and 409 (description_locked) when the words change on a variation whose DDL holds the work."""
         return current_service().fork_description(actor["id"], variation_id, body)
 
-    @router.post("/executions/{execution_id}/commands")
-    def command(execution_id: str, body: dict, actor: dict = Depends(actor_dependency)):
+    @router.post("/executions/{execution_id}/commands", summary="Send a command to an execution")
+    def command(body: dict, execution_id: str = Path(description="ID of the execution."), actor: dict = Depends(actor_dependency)):
+        """Send an author action to an execution and return its state. The accepted tags are perform (draw the saved score), commit_user_ddl, generate_from_description, complete_holes, approve_patch, decline_patch and cancel. Requires a signed-in user; returns 409 (authority_conflict, description_locked or stale_result) when the execution changed, 422 (unsupported_author_action or performance_unavailable) for an action it cannot take, and 403 or 503 for provider refusals."""
         try:
             return current_service().command(actor["id"], execution_id, body)
         except CandidateHostError as error:
@@ -873,8 +925,9 @@ def pipeline_router(service: PipelineService | Callable[[], PipelineService], ac
                 detail["current_revision"] = detail["current_view"]["authority"]["revision"]
             raise HTTPException(_host_error_status(code), detail) from None
 
-    @router.post("/executions/{execution_id}/author-ddl")
-    def author_ddl(execution_id: str, body: AuthorDdlBody, actor: dict = Depends(actor_dependency)):
+    @router.post("/executions/{execution_id}/author-ddl", summary="Commit an edited DDL")
+    def author_ddl(body: AuthorDdlBody, execution_id: str = Path(description="ID of the execution being edited."), actor: dict = Depends(actor_dependency)):
+        """Save an edited DDL source for an execution and return its state. When the run's settings are unchanged, the source is committed to the same variation; otherwise a new direct-DDL variation is started and returned. Requires a signed-in user; returns 409 (authority_conflict) when the revision is stale and 409 (stale_result) while the execution is still busy."""
         try:
             return current_service().author_ddl(actor["id"], execution_id, body)
         except CandidateHostError as error:
@@ -885,8 +938,9 @@ def pipeline_router(service: PipelineService | Callable[[], PipelineService], ac
                 detail["current_revision"] = detail["current_view"]["authority"]["revision"]
             raise HTTPException(_host_error_status(code), detail) from None
 
-    @router.get("/executions/{execution_id}/provider-observations")
-    def provider_observations(execution_id: str, actor: dict = Depends(actor_dependency)):
+    @router.get("/executions/{execution_id}/provider-observations", summary="Read an execution's provider observations")
+    def provider_observations(execution_id: str = Path(description="ID of the execution."), actor: dict = Depends(actor_dependency)):
+        """Return the captured provider exchanges of an execution. Available only when developer mode is enabled; returns 404 (developer_provider_observations_not_available) otherwise. When the execution was not run with provider I/O capture, returns capture_enabled false and an empty observations list. Requires a signed-in user."""
         from .api_core.common import _env_flag
         if not _env_flag("INKU_DEVELOPER_MODE") or current_service().provider_observations is None:
             raise HTTPException(404, "developer_provider_observations_not_available")
@@ -894,13 +948,15 @@ def pipeline_router(service: PipelineService | Callable[[], PipelineService], ac
         # actor; the client never supplies a filesystem or artifact path.
         return current_service().provider_capture_status(actor["id"], execution_id)
 
-    @router.get("/legacy/{history_id}")
-    def legacy(history_id: str, actor: dict = Depends(actor_dependency)):
+    @router.get("/legacy/{history_id}", summary="Read an older work")
+    def legacy(history_id: str = Path(description="ID of the older work, one that is not linked to a variation."), actor: dict = Depends(actor_dependency)):
+        """Return the description, source and SVG of an older work that is not linked to a variation. Requires a signed-in user; returns 409 (managed_history) for a work that opens through its variation instead, and 404 (history_not_found) when the caller has no such work."""
         work = current_service().legacy(actor["id"], history_id)
         return {key: work[key] for key in ("history_id", "description", "source", "svg")}
 
-    @router.post("/legacy/{history_id}/fork")
-    def fork_legacy(history_id: str, body: NewVariationBody, actor: dict = Depends(actor_dependency)):
+    @router.post("/legacy/{history_id}/fork", summary="Fork an older work")
+    def fork_legacy(body: NewVariationBody, history_id: str = Path(description="ID of the older work to fork from, one that is not linked to a variation."), actor: dict = Depends(actor_dependency)):
+        """Start a new variation from an older work that is not linked to a variation, as a description or DDL fork, and return its state. Requires a signed-in user; returns 404 (history_not_found) when the work does not exist and 409 (description_locked) when a changed description would reword a work whose DDL holds it."""
         return current_service().fork_legacy(actor["id"], history_id, body.kind, body.text, canvas_format_id=body.canvas_format_id, canvas_aspect=body.canvas_aspect, options=body.options)
 
     return router

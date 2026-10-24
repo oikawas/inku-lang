@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Literal
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
+from typing import Annotated, Literal
+from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query, Request, Response
 from pydantic import BaseModel, Field, ValidationError
 from ...animation_export import build_animation, build_layer_animation
 from ...card_export import build_card
@@ -27,18 +27,47 @@ router = APIRouter(dependencies=[Depends(_current_user)])
 
 
 class HistoryIdsBody(BaseModel):
-    ids: list[str] = Field(default_factory=list, max_length=1000)
+    ids: list[str] = Field(
+        default_factory=list,
+        max_length=1000,
+        description="Ids of the works to act on. Ids that are not found for the caller are skipped. Empty by default.",
+    )
 
 
 class AnimationExportBody(BaseModel):
-    ids: list[str] = Field(..., min_length=1, max_length=100)
-    format: Literal["apng", "gif"] = "apng"
-    pattern: Literal["cut", "crossfade", "fade_white", "slide"] = "cut"
-    hold_seconds: float = Field(default=1.0, ge=0.1, le=30.0)
-    resolution: Literal["1k", "4k", "8k"] = "1k"
-    height_px: int | None = Field(default=None, ge=64, le=12000)
-    layer_frame_count: int = Field(default=12, ge=2, le=120)
-    replay: Literal["restart", "reverse", "once"] = "restart"
+    ids: list[str] = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        description="Ids of the works to animate, in playing order. One id makes a layer animation of that work; several make a sequence. Duplicates are removed, keeping the first.",
+    )
+    format: Literal["apng", "gif"] = Field(default="apng", description="File format of the animation: apng or gif.")
+    pattern: Literal["cut", "crossfade", "fade_white", "slide"] = Field(
+        default="cut",
+        description="Transition between works in a sequence: cut, crossfade, fade_white or slide. Not used for a single work.",
+    )
+    hold_seconds: float = Field(
+        default=1.0, ge=0.1, le=30.0, description="Seconds each frame is held, from 0.1 to 30."
+    )
+    resolution: Literal["1k", "4k", "8k"] = Field(
+        default="1k", description="Frame height of the animation: 1k is 1080 px, 4k is 2160 px, 8k is 4320 px. Not used when height_px is set."
+    )
+    height_px: int | None = Field(
+        default=None,
+        ge=64,
+        le=12000,
+        description="Height of each frame in pixels, from 64 to 12000. Omit to use the height of the chosen resolution.",
+    )
+    layer_frame_count: int = Field(
+        default=12,
+        ge=2,
+        le=120,
+        description="Number of frames in a layer animation of a single work, from 2 to 120. Not used for a sequence.",
+    )
+    replay: Literal["restart", "reverse", "once"] = Field(
+        default="restart",
+        description="How a layer animation plays: restart (loop from the start), reverse (loop back and forth) or once (play one time). Not used for a sequence.",
+    )
 
 
 class HistoryStateResponse(BaseModel):
@@ -49,55 +78,82 @@ class HistoryStateResponse(BaseModel):
     separates two saves that landed in the same millisecond.
     """
 
-    total: int
-    newest_at: int | None = None
-    newest_id: str | None = None
+    total: int = Field(description="Number of works the caller may read, in the live listing.")
+    newest_at: int | None = Field(
+        default=None,
+        description="Save time of the newest work, in milliseconds since the Unix epoch. None when there are no works.",
+    )
+    newest_id: str | None = Field(
+        default=None,
+        description="Id of the newest work. None when there are no works.",
+    )
 
 
 class CardExportBody(BaseModel):
-    id: str
-    layout: Literal["square", "portrait"] = "square"
+    id: str = Field(description="Id of the work to put on the card.")
+    layout: Literal["square", "portrait"] = Field(
+        default="square", description="Card layout: square or portrait."
+    )
     # On by default. A card that carries no mark of where it came from is the
     # honest option to offer, not the one to make people opt into.
-    seal: bool = True
+    seal: bool = Field(
+        default=True,
+        description="When true, the card carries a seal that marks where the work came from. Set false to leave the seal off.",
+    )
     # The bitmap's height in pixels; absent keeps the layout's own size.
-    height: int | None = Field(default=None, ge=256, le=4096)
+    height: int | None = Field(
+        default=None,
+        ge=256,
+        le=4096,
+        description="Height of the card's bitmap in pixels, from 256 to 4096. Omit to keep the layout's own size.",
+    )
 
 
 class HistoryStarBody(BaseModel):
-    starred: bool = False
-    note: str | None = None
+    starred: bool = Field(default=False, description="True to star the work, false to remove the star.")
+    note: str | None = Field(
+        default=None, description="Note for the work, up to 240 characters. Leave it out to keep the current note; send an empty string to clear it."
+    )
 
 
 class HistoryForRevisionBody(BaseModel):
-    for_revision: bool = False
+    for_revision: bool = Field(
+        default=False,
+        description="True to mark the work for revision, false to clear the mark.",
+    )
 
 
 class HistoryForShareBody(BaseModel):
-    """The permission bit and, optionally, where it points.
+    """Whether a work is open to a user group, and optionally which group."""
 
-    Two keys rather than one because the destination has to be sayable without
-    being compulsory: leaving it out means "my own organisation", which is what
-    almost every caller wants, while naming it is how an administrator hands a
-    work to another group.
-    """
-
-    for_share: bool = False
-    share_group_id: str | None = None
+    for_share: bool = Field(
+        default=False,
+        description="True to open the work to a user group, false to close it again.",
+    )
+    share_group_id: str | None = Field(
+        default=None,
+        description="Id of the user group to open the work to. Omit to keep the group the work already has, or the owner's group if it has none. Naming a group other than your own needs administrator rights.",
+    )
 
 
 class HistoryAclEntry(BaseModel):
     """One guest on one work's list."""
 
-    subject_type: Literal["user", "org_group"]
-    subject_id: str = Field(..., min_length=1, max_length=100)
-    permission: Literal["read", "write"]
+    subject_type: Literal["user", "org_group"] = Field(
+        description="Kind of guest: user for one person, or org_group for a user group."
+    )
+    subject_id: str = Field(
+        ..., min_length=1, max_length=100, description="Id of the guest user or user group."
+    )
+    permission: Literal["read", "write"] = Field(
+        description="What the guest may do with the work: read or write."
+    )
 
 
 class HistoryAclEntryOut(HistoryAclEntry):
-    id: str
-    history_id: str
-    at: int
+    id: str = Field(description="Id of this access entry.")
+    history_id: str = Field(description="Id of the work the entry applies to.")
+    at: int = Field(description="Time the entry was recorded, in milliseconds since the Unix epoch.")
 
 
 class HistoryAclBody(BaseModel):
@@ -108,26 +164,48 @@ class HistoryAclBody(BaseModel):
     delete verb, and a client that never learned it would never revoke anything.
     """
 
-    entries: list[HistoryAclEntry] = Field(default_factory=list, max_length=200)
+    entries: list[HistoryAclEntry] = Field(
+        default_factory=list,
+        max_length=200,
+        description="The complete guest list for the work. An empty list removes every guest.",
+    )
 
 
-@router.get("/api/history", response_model=HistoryListResponse, response_model_exclude_none=True)
+@router.get(
+    "/api/history",
+    response_model=HistoryListResponse,
+    response_model_exclude_none=True,
+    summary="List history items",
+)
 def api_history_get(
-    offset: int = Query(default=0, ge=0),
-    limit: int = Query(default=10, ge=1, le=100),
-    trashed: bool = Query(default=False),
-    starred: bool = Query(default=False),
-    for_revision: bool = Query(default=False),
-    for_share: bool = Query(default=False),
-    q: str = Query(default="", max_length=200),
-    canvas_search: bool = Query(default=False),
-    anchor_id: str | None = Query(default=None, max_length=100),
+    offset: int = Query(default=0, ge=0, description="Number of works to skip before the first one returned."),
+    limit: int = Query(default=10, ge=1, le=100, description="Maximum number of works to return, from 1 to 100."),
+    trashed: bool = Query(default=False, description="When true, list works in the trash instead of the live works."),
+    starred: bool = Query(default=False, description="When true, list only starred works."),
+    for_revision: bool = Query(default=False, description="When true, list only works marked for revision."),
+    for_share: bool = Query(default=False, description="When true, list only works opened to a user group."),
+    q: str = Query(default="", max_length=200, description="Text to search the works for, up to 200 characters. Empty applies no text filter."),
+    canvas_search: bool = Query(default=False, description="When true, the q text is searched in canvas search mode."),
+    anchor_id: str | None = Query(
+        default=None,
+        max_length=100,
+        description="Id of a work to bring into view. When it is found, offset moves to the page that holds it. Ignored when canvas_search is true and q is not empty.",
+    ),
     include_svg: bool = Query(
         default=True,
         description="Send each work's whole SVG. Clients that draw from thumbnails send false.",
     ),
     actor: dict = Depends(_current_user),
 ) -> HistoryListResponse:
+    """Return one page of the works the caller may read: their own, those shared with them, and those opened to their user group.
+
+    The filters narrow that set.
+
+    The works come with their total count, the offset and the limit that were
+    used. When anchor_id names a work that is found, the offset is moved to the
+    page that holds it. Each work carries svg_bytes, its SVG size in bytes;
+    without include_svg, the svg key is sent as an empty string.
+    """
     if anchor_id and not (canvas_search and q.strip()):
         position = _db.item_position(
             actor["id"], anchor_id, trashed=trashed, starred=starred,
@@ -164,29 +242,30 @@ def api_history_get(
     return HistoryListResponse(items=items, total=total, offset=offset, limit=limit)
 
 
-@router.get("/api/history/state", response_model=HistoryStateResponse)
+@router.get("/api/history/state", response_model=HistoryStateResponse, summary="Get the history listing state")
 def api_history_state(actor: dict = Depends(_current_user)) -> HistoryStateResponse:
-    """What a poller needs to decide whether to ask for the listing at all.
+    """Return how many works the listing holds and which is newest, without the works themselves.
 
-    The client that draws the strip refetches every twelve seconds so a work
-    saved in another window appears. Nearly every one of those rounds finds
-    nothing changed and rebuilds no part of the page, so asking the question
-    here -- a few hundred bytes -- and fetching the listing only when the answer
-    moves is the whole point of this route.
-
-    `newest_id` is not redundant beside `newest_at`: two works saved inside one
-    millisecond share an `at`, and without the id the second one would never be
-    noticed.
+    A client can poll this and fetch the listing only when the answer changes.
+    `newest_id` tells apart two works saved in the same millisecond, which share
+    `newest_at`.
     """
     total, newest_at, newest_id = _db.list_state(actor["id"])
     return HistoryStateResponse(total=total, newest_at=newest_at, newest_id=newest_id)
 
 
-@router.post("/api/history/export-animation")
+@router.post("/api/history/export-animation", summary="Export works as an animation")
 def api_history_export_animation(
     body: AnimationExportBody,
     actor: dict = Depends(_current_user),
 ) -> Response:
+    """Build an APNG or GIF animation from the saved SVGs of the works sent.
+
+    One work makes a layer animation; several make a sequence joined by the
+    chosen transition. The file is returned as an attachment. Returns 404 when
+    any id is not found for the caller, 409 when a work has no saved SVG, and
+    400 when the animation cannot be built from the settings sent.
+    """
     ids = list(dict.fromkeys(body.ids))
     items = _db.get_items(actor["id"], ids)
     if len(items) != len(ids):
@@ -230,11 +309,18 @@ def api_history_export_animation(
     )
 
 
-@router.post("/api/history/export-card")
+@router.post("/api/history/export-card", summary="Export a work as a card")
 def api_history_export_card(
     body: CardExportBody,
     actor: dict = Depends(_current_user),
 ) -> Response:
+    """Build a PNG card for one work from its saved SVG.
+
+    The card uses the work's description as its headnote and its render seed to
+    identify the picture. The PNG is returned as an attachment. Returns 404 when
+    the work is not found for the caller, 409 when it has no saved SVG, and 400
+    when the card cannot be built from the settings sent.
+    """
     items = _db.get_items(actor["id"], [body.id])
     if not items:
         raise HTTPException(status_code=404, detail="history item not found")
@@ -286,11 +372,11 @@ def _thumb_etag(row: dict) -> str:
     return f'"{source}-{row.get("scale")}"'
 
 
-@router.get("/api/history/{item_id}/thumb")
+@router.get("/api/history/{item_id}/thumb", summary="Get a work's thumbnail")
 def api_history_thumb(
-    item_id: str,
+    item_id: Annotated[str, Path(description="Id of the work.")],
     request: Request,
-    scale: int = Query(default=1, ge=1, le=2),
+    scale: int = Query(default=1, ge=1, le=2, description="Thumbnail size: 1 for the standard size, 2 for the double size."),
     v: str = Query(default="", max_length=100, description="Cache key; the work's render hash. Not read."),
     actor: dict = Depends(_current_user),
 ) -> Response:
@@ -316,12 +402,18 @@ def api_history_thumb(
     return Response(content=row["png"], media_type="image/png", headers=headers)
 
 
-@router.get("/api/history/{item_id}/svg")
+@router.get("/api/history/{item_id}/svg", summary="Get a work's SVG")
 def api_history_svg(
-    item_id: str,
+    item_id: Annotated[str, Path(description="Id of the work.")],
     profile: str = Query(default="display", description="SVG output profile: display / editable / compat / live"),
     actor: dict = Depends(_current_user),
 ) -> Response:
+    """Return the SVG of one work in the requested profile.
+
+    The display profile returns the SVG saved with the work. Other profiles are
+    drawn again from the work's saved score. Returns 404 when the work is not
+    found for the caller and 422 when the redraw fails.
+    """
     svg_profile = _validated_svg_profile(profile)
     items = _db.get_items(actor["id"], [item_id])
     if not items:
@@ -419,12 +511,25 @@ def _parent_laws_records(owner_id: str, parent_node_id: str) -> dict:
     return laws_records_of(VariationAuthorityStore(_db.engine), owner_id, parent_id) if parent_id else {}
 
 
-@router.post("/api/history", response_model=HistoryItem, response_model_exclude_none=True)
+@router.post("/api/history", response_model=HistoryItem, response_model_exclude_none=True, summary="Save a work to history")
 def api_history_post(
     body: HistoryPostBody,
-    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key", max_length=200),
+    idempotency_key: str | None = Header(
+        default=None,
+        alias="Idempotency-Key",
+        max_length=200,
+        description="Key that makes a repeated save return the work saved earlier instead of saving it again. Omit to save on every call.",
+    ),
     actor: dict = Depends(_current_user),
 ) -> HistoryItem:
+    """Save a work into the caller's history and return it.
+
+    The body may carry a score that is checked, coerced and drawn on the server,
+    a replay of a saved work, or a child of a lineage node. Returns 404 when a
+    named lineage node or parent is not found, 409 when the parent's description
+    is locked or a replay preview has changed, and 422 when the score or the
+    replay request is invalid.
+    """
     replay_link = None
     # A sender never names a laws record: the Server writes them only on the edges
     # of the children it draws from their parent (color arrangement, support,
@@ -742,11 +847,20 @@ def api_history_post(
     return HistoryItem(**item_dict)
 
 
-@router.delete("/api/history")
+@router.delete("/api/history", summary="Permanently delete all trashed works")
 def api_history_delete(
-    x_inku_confirm: str | None = Header(default=None, alias="X-Inku-Confirm"),
+    x_inku_confirm: str | None = Header(
+        default=None,
+        alias="X-Inku-Confirm",
+        description="Must be permanent-delete-trash to confirm emptying the trash. Any other value, or none, is refused with 409.",
+    ),
     actor: dict = Depends(_current_user),
 ) -> dict[str, int | bool]:
+    """Permanently delete every work in the caller's trash.
+
+    Returns the number of works deleted. Returns 409 when the X-Inku-Confirm
+    header does not carry the confirmation value.
+    """
     if x_inku_confirm != "permanent-delete-trash":
         raise HTTPException(
             status_code=409,
@@ -756,46 +870,81 @@ def api_history_delete(
     return {"ok": True, "count": count}
 
 
-@router.post("/api/history/trash")
+@router.post("/api/history/trash", summary="Move works to the trash")
 def api_history_trash(body: HistoryIdsBody, actor: dict = Depends(_current_user)) -> dict[str, int | bool]:
+    """Move the works named in the body to the trash. Only works the caller may change are moved; others are skipped.
+
+    Returns {"ok": true, "count": n}, where n is the number of works moved.
+    """
     count = _db.trash_items(actor["id"], body.ids)
     return {"ok": True, "count": count}
 
 
-@router.post("/api/history/restore")
+@router.post("/api/history/restore", summary="Restore works from the trash")
 def api_history_restore(body: HistoryIdsBody, actor: dict = Depends(_current_user)) -> dict[str, int | bool]:
+    """Move the trashed works named in the body back to history. Only works the caller may change are moved; others are skipped.
+
+    Returns {"ok": true, "count": n}, where n is the number of works restored.
+    """
     count = _db.restore_items(actor["id"], body.ids)
     return {"ok": True, "count": count}
 
 
-@router.patch("/api/history/{item_id}/star", response_model=HistoryItem, response_model_exclude_none=True)
-def api_history_star(item_id: str, body: HistoryStarBody, actor: dict = Depends(_current_user)) -> HistoryItem:
+@router.patch(
+    "/api/history/{item_id}/star",
+    response_model=HistoryItem,
+    response_model_exclude_none=True,
+    summary="Set the star and note of a work",
+)
+def api_history_star(
+    item_id: Annotated[str, Path(description="Id of the work.")],
+    body: HistoryStarBody,
+    actor: dict = Depends(_current_user),
+) -> HistoryItem:
+    """Set or clear the star of one work and set its note.
+
+    Returns the updated work. Returns 404 when the work is not found or the
+    caller may not write it.
+    """
     item = _db.set_item_starred(actor["id"], item_id, body.starred, body.note)
     if not item:
         raise HTTPException(status_code=404, detail="history item not found")
     return HistoryItem(**item)
 
 
-@router.patch("/api/history/{item_id}/for-revision", response_model=HistoryItem, response_model_exclude_none=True)
+@router.patch(
+    "/api/history/{item_id}/for-revision",
+    response_model=HistoryItem,
+    response_model_exclude_none=True,
+    summary="Set the for-revision mark of a work",
+)
 def api_history_for_revision(
-    item_id: str, body: HistoryForRevisionBody, actor: dict = Depends(_current_user)
+    item_id: Annotated[str, Path(description="Id of the work.")], body: HistoryForRevisionBody, actor: dict = Depends(_current_user)
 ) -> HistoryItem:
+    """Mark or unmark one work for revision.
+
+    Returns the updated work. Returns 404 when the work is not found for the caller.
+    """
     item = _db.set_item_for_revision(actor["id"], item_id, body.for_revision)
     if not item:
         raise HTTPException(status_code=404, detail="history item not found")
     return HistoryItem(**item)
 
 
-@router.patch("/api/history/{item_id}/for-share", response_model=HistoryItem, response_model_exclude_none=True)
+@router.patch(
+    "/api/history/{item_id}/for-share",
+    response_model=HistoryItem,
+    response_model_exclude_none=True,
+    summary="Set the share state of a work",
+)
 def api_history_for_share(
-    item_id: str, body: HistoryForShareBody, actor: dict = Depends(_current_user)
+    item_id: Annotated[str, Path(description="Id of the work.")], body: HistoryForShareBody, actor: dict = Depends(_current_user)
 ) -> HistoryItem:
-    """Open one work to an organisation group, or close it again.
+    """Open one work to a user group, or close it again.
 
-    404, not 403, when the caller may not write the work: the same rule the ACL
-    routes follow, because saying "that exists but is not yours" discloses it.
-    403 is kept for the one case where the caller may write the work and is
-    still refused -- naming a group that is not their own.
+    Returns the updated work. Returns 404 when the work is not found or the
+    caller may not change it, and 403 when the caller names a user group other
+    than their own without administrator rights.
     """
     try:
         item = _db.set_item_for_share(actor["id"], item_id, body.for_share, body.share_group_id)
@@ -808,8 +957,13 @@ def api_history_for_share(
     return HistoryItem(**item)
 
 
-@router.get("/api/history/{item_id}/acl", response_model=list[HistoryAclEntryOut])
-def api_history_acl_get(item_id: str, actor: dict = Depends(_current_user)) -> list[HistoryAclEntryOut]:
+@router.get("/api/history/{item_id}/acl", response_model=list[HistoryAclEntryOut], summary="List the guests of a work")
+def api_history_acl_get(item_id: Annotated[str, Path(description="Id of the work.")], actor: dict = Depends(_current_user)) -> list[HistoryAclEntryOut]:
+    """List the guest entries on one work.
+
+    Returns 404 when the work is not found for the caller, which includes a
+    work the caller may not see.
+    """
     entries = _db.list_history_acl(actor["id"], item_id)
     if entries is None:
         # 404 rather than 403 throughout: telling a caller who may not see a work
@@ -818,10 +972,16 @@ def api_history_acl_get(item_id: str, actor: dict = Depends(_current_user)) -> l
     return [HistoryAclEntryOut(**entry) for entry in entries]
 
 
-@router.put("/api/history/{item_id}/acl", response_model=list[HistoryAclEntryOut])
+@router.put("/api/history/{item_id}/acl", response_model=list[HistoryAclEntryOut], summary="Replace the guest list of a work")
 def api_history_acl_put(
-    item_id: str, body: HistoryAclBody, actor: dict = Depends(_current_user)
+    item_id: Annotated[str, Path(description="Id of the work.")], body: HistoryAclBody, actor: dict = Depends(_current_user)
 ) -> list[HistoryAclEntryOut]:
+    """Replace the whole guest list of one work with the entries sent.
+
+    A subject left out of the list loses its access. Returns the new list.
+    Returns 404 when the work is not found for the caller and 400 when an entry
+    is invalid.
+    """
     try:
         entries = _db.replace_history_acl(actor["id"], item_id, [e.model_dump() for e in body.entries])
     except ValueError as error:
@@ -838,8 +998,14 @@ def api_history_acl_put(
 _REBUILD_OUTPUT_FILES_MAX = 50
 
 
-@router.post("/api/history/rebuild-output-files")
+@router.post("/api/history/rebuild-output-files", summary="Rebuild output files for works")
 def api_history_rebuild_output_files(body: HistoryIdsBody, actor: dict = Depends(_current_user)) -> dict[str, int | bool]:
+    """Write the output files again for the works named in the body.
+
+    Accepts at most 50 ids per request. Returns {"ok": true, "count": n}, where n
+    is the number of works found. Returns 409 when output file saving is switched
+    off and 422 when more than 50 ids are sent.
+    """
     # Saving files is the administrator's switch; this route used to write them
     # with the switch off.
     if not _output_save_settings()["enabled"]:
@@ -852,7 +1018,11 @@ def api_history_rebuild_output_files(body: HistoryIdsBody, actor: dict = Depends
     return {"ok": True, "count": len(items)}
 
 
-@router.post("/api/history/permanent-delete")
+@router.post("/api/history/permanent-delete", summary="Permanently delete trashed works")
 def api_history_permanent_delete(body: HistoryIdsBody, actor: dict = Depends(_current_user)) -> dict[str, int | bool]:
+    """Permanently delete the works named in the body, which must already be in the trash.
+
+    Returns {"ok": true, "count": n}, where n is the number of works deleted.
+    """
     count = _db.delete_items(actor["id"], body.ids, require_trashed=True)
     return {"ok": True, "count": count}

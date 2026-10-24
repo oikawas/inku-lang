@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 _PACKAGE_ROOT = Path(__file__).resolve().parent
@@ -15,16 +15,20 @@ _RUST_NOTICES = Path("/app/licenses/RUST_THIRD_PARTY_NOTICES.txt")
 
 
 class NoticeComponent(BaseModel):
-    id: str
-    group: Literal["server", "resources", "rust"]
-    name: str
-    version: str
-    license: str
-    source: str
+    id: str = Field(description="Stable identifier of the component. Pass it as notice_id to GET /api/notices/{notice_id} to read its notice text.")
+    group: Literal["server", "resources", "rust"] = Field(
+        description="Where the component comes from: server (the Server or its container image), resources (bundled dictionaries and fonts), or rust (the Rust core)."
+    )
+    name: str = Field(description="Display name of the component.")
+    version: str = Field(description="Version of the component. An empty string when no version is recorded.")
+    license: str = Field(description="License name as recorded here. An empty string when none is recorded; the notice text holds the full terms.")
+    source: str = Field(description="URL of the component's source or license page.")
 
 
 class NoticesResponse(BaseModel):
-    components: list[NoticeComponent]
+    components: list[NoticeComponent] = Field(
+        description="The notice components whose notice files are present in this build, in catalog order."
+    )
 
 
 @dataclass(frozen=True)

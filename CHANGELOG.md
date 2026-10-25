@@ -8,34 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-25 — The lineage no longer calls a work without a description deleted
-
-A lineage card showed Deleted work whenever a work's description and input text were both empty, so a picture-drawn work with an empty source note read as deleted though it was there (for example `de5882f9`). A present work now shows its source note or Work drawn from a picture when drawn from a picture, and Work without a description otherwise; Deleted work is kept for a node whose work is gone.
-
-### 2026-10-25 — The three per-work prompt digests are retired; the Prompts tab shows each stage's digest
-
-A work's `stage1_prompt_digest`, `stage1_prompt_base_digest` and `stage2_prompt_digest` had not been produced since the Python Stage 1/2 left on 2026-09-14; only color arrangement, ground and tool changes and replays copied a parent's values. New works no longer save them (the POST no longer takes them, nothing copies them from a parent or from an older work's read, and the writer leaves them empty), and the always-empty fields of `PaintResponse` and `ComposeResponse` are gone. Saved values stay in the database and are returned read-only with the work. Generation info no longer lists the three under Identity in Details, and the Prompts tab shows, for each stage, the prompt digest the shared core keeps in the execution record.
-
-### 2026-10-25 — Arrow keys move through the history strip
-
-With the keyboard focus on a history strip thumbnail, ← opens the next newer work and → the next older one. They use the canvas's per-work move (`history.move`), so at either end of the strip the neighbouring page is read and the move continues. The focus follows the opened work's thumbnail.
-
-### 2026-10-25 — The lineage Open large button is retired
-
-Open large in the lineage header only showed the work large on the canvas, as double-clicking a work card does, so it is retired from the Web. The same macOS button is unchanged.
-
-### 2026-10-25 — No × while a refinement has unsaved options
-
-While the refinement dialog held unsaved options, its × was shown as if usable although pressing it only showed a notice. It is now hidden then, leaving Save the chosen ones and close and Discard all and close as the ways out. The backdrop and Escape are unchanged.
-
-### 2026-10-25 — Database backups can be restored or deleted from DB settings
-
-Each row of Retained copies in DB settings has Restore and Delete. Delete asks once and Restore asks twice. A restore first saves the current database as a manual backup (and stops if it cannot), then replaces the whole running database through SQLite's Backup API; other writes are refused with 503 meanwhile, and the page reloads when it finishes. A backup whose tables or migration registry differ from the running database, or that fails `quick_check`, is refused. The Server adds `DELETE /api/settings/db-backup/{kind}/{name}` and `POST /api/settings/db-backup/{kind}/{name}/restore`, for administrators only.
-
-### 2026-10-25 — Settings categories read apart from their tabs
-
-In the settings list, a category name is now a small, letter-spaced heading ruled to the edge, and its tabs sit indented below it. Display and operation, Image and ChatGPT plan, each holding one tab of its own name, show only the rule. The Export category's Export tab is now File saving. Each of these had a category and a tab of the same name that were hard to tell apart. The narrow-screen row is unchanged. The manual's settings table gains the missing Image category.
-
 ### 2026-10-25 — inku-cli reads one work by its UUID
 
 inku-cli gains `history show`, which prints a work's description, DDL and JSON Score (`--part` for one of them), and `history png`, which rasterizes the saved display SVG into a PNG of the drawing alone (`--size` for the longer side, default 1024). Both take the UUID or its first few characters. There is no endpoint for one work, so the listing is asked with `anchor_id` and `limit=1` and the returned work's id is checked. A prefix is resolved against the listing without pictures, and one that fits more than one work stops with the candidates. The server is unchanged.
@@ -326,6 +298,36 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.250 (2026-10-25 / Build1326)
+
+### 2026-10-25 — The lineage no longer calls a work without a description deleted
+
+A lineage card showed Deleted work whenever a work's description and input text were both empty, so a picture-drawn work with an empty source note read as deleted though it was there (for example `de5882f9`). A present work now shows its source note or Work drawn from a picture when drawn from a picture, and Work without a description otherwise; Deleted work is kept for a node whose work is gone.
+
+### 2026-10-25 — The three per-work prompt digests are retired; the Prompts tab shows each stage's digest
+
+A work's `stage1_prompt_digest`, `stage1_prompt_base_digest` and `stage2_prompt_digest` had not been produced since the Python Stage 1/2 left on 2026-09-14; only color arrangement, ground and tool changes and replays copied a parent's values. New works no longer save them (the POST no longer takes them, nothing copies them from a parent or from an older work's read, and the writer leaves them empty), and the always-empty fields of `PaintResponse` and `ComposeResponse` are gone. Saved values stay in the database and are returned read-only with the work. Generation info no longer lists the three under Identity in Details, and the Prompts tab shows, for each stage, the prompt digest the shared core keeps in the execution record.
+
+### 2026-10-25 — Arrow keys move through the history strip
+
+With the keyboard focus on a history strip thumbnail, ← opens the next newer work and → the next older one. They use the canvas's per-work move (`history.move`), so at either end of the strip the neighbouring page is read and the move continues. The focus follows the opened work's thumbnail.
+
+### 2026-10-25 — The lineage Open large button is retired
+
+Open large in the lineage header only showed the work large on the canvas, as double-clicking a work card does, so it is retired from the Web. The same macOS button is unchanged.
+
+### 2026-10-25 — No × while a refinement has unsaved options
+
+While the refinement dialog held unsaved options, its × was shown as if usable although pressing it only showed a notice. It is now hidden then, leaving Save the chosen ones and close and Discard all and close as the ways out. The backdrop and Escape are unchanged.
+
+### 2026-10-25 — Database backups can be restored or deleted from DB settings
+
+Each row of Retained copies in DB settings has Restore and Delete. Delete asks once and Restore asks twice. A restore first saves the current database as a manual backup (and stops if it cannot), then replaces the whole running database through SQLite's Backup API; other writes are refused with 503 meanwhile, and the page reloads when it finishes. A backup whose tables or migration registry differ from the running database, or that fails `quick_check`, is refused. The Server adds `DELETE /api/settings/db-backup/{kind}/{name}` and `POST /api/settings/db-backup/{kind}/{name}/restore`, for administrators only.
+
+### 2026-10-25 — Settings categories read apart from their tabs
+
+In the settings list, a category name is now a small, letter-spaced heading ruled to the edge, and its tabs sit indented below it. Display and operation, Image and ChatGPT plan, each holding one tab of its own name, show only the rule. The Export category's Export tab is now File saving. Each of these had a category and a tab of the same name that were hard to tell apart. The narrow-screen row is unchanged. The manual's settings table gains the missing Image category.
 
 ## v2.15.249 (2026-10-25 / Build1325)
 

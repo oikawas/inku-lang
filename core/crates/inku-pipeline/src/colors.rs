@@ -2550,7 +2550,9 @@ impl ColorsContext {
                 "B11" | "B16" => seen_line("layer: ", self.seen_in(&self.multi, 2)),
                 "B13" => format!("layer: {}", optional(&choices.graded)),
                 "B14" => format!("layers: {}", optional(&choices.graded)),
-                "B19" => format!("layers: {}", listed(&choices.nameable)),
+                // B19 holds a layer's drawn lightness away from the ground, so a
+                // layer seen in no color cannot take it either.
+                "B19" => seen_line("layers: ", self.seen_in(&self.nameable(), 1)),
                 "B20" => {
                     let accent = self.seen_in(&self.colorable, 1);
                     if accent.is_empty() {

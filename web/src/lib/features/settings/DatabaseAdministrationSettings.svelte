@@ -2,6 +2,7 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import NumberStepper from '$lib/components/NumberStepper.svelte';
 	import type { SettingsStatus } from './state.svelte';
+	import type { DbBackupEntry } from './server-administration.svelte';
 
 	type DatabaseStatus = Pick<SettingsStatus, 'database' | 'db_backup'>;
 
@@ -14,6 +15,8 @@
 		onReload: () => void | Promise<void>;
 		onUpdateBackupSettings: (intervalDays: number, maxGenerations: number, backupHour: number, backupMinute: number) => void | Promise<void>;
 		onRunBackupNow: () => void | Promise<void>;
+		onDeleteBackup: (entry: DbBackupEntry) => void;
+		onRestoreBackup: (entry: DbBackupEntry) => void;
 	};
 
 	let {
@@ -24,7 +27,9 @@
 		isAdmin,
 		onReload,
 		onUpdateBackupSettings,
-		onRunBackupNow
+		onRunBackupNow,
+		onDeleteBackup,
+		onRestoreBackup
 	}: Props = $props();
 
 	function formatBytes(bytes: number | null | undefined): string {
@@ -159,6 +164,7 @@
 								<th>{t().settingsDbBackupListKind}</th>
 								<th>{t().settingsDbBackupListAt}</th>
 								<th>{t().settingsDbBackupListSize}</th>
+								<th>{t().settingsDbBackupListActions}</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -168,6 +174,10 @@
 									<td>{entry.kind === 'auto' ? t().settingsDbBackupKindAuto : t().settingsDbBackupKindManual}</td>
 									<td>{formatTimestamp(entry.at)}</td>
 									<td class="db-backup-size">{formatBytes(entry.size_bytes)}</td>
+									<td class="db-backup-actions">
+										<button class="ghost-btn" onclick={() => onRestoreBackup(entry)} disabled={loading || !isAdmin}>{t().settingsDbBackupRestore}</button>
+										<button class="ghost-btn danger" onclick={() => onDeleteBackup(entry)} disabled={loading || !isAdmin}>{t().settingsDbBackupDelete}</button>
+									</td>
 								</tr>
 							{/each}
 						</tbody>
@@ -317,6 +327,9 @@
 	.db-backup-list tr:last-child td { border-bottom: none; }
 	.db-backup-generation,
 	.db-backup-size { text-align: right; }
+	.db-backup-actions { display: flex; gap: 6px; }
+	.db-backup-actions .ghost-btn { min-height: 26px; padding: 2px 10px; }
+	.db-backup-actions .danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 48%, var(--border2)); }
 	.settings-inline-actions { display: flex; align-items: center; gap: 10px; }
 	.primary-inline {
 		border-color: var(--accent);

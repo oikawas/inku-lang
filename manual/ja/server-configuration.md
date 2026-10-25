@@ -348,6 +348,13 @@ APIのJSONの応答は、`render_seed`と`composition_seed`を10進の文字列�
 
 SQLite backup directoryは`INKU_DB_BACKUP_DIR`で変更できます。Web管理UIでは`DB設定`からDB状態を確認し、手動backup、定期backupの間隔・時刻・世代数を管理できます。外部backupも併用し、DBと暗号化鍵を同じ復旧点で保管します。
 
+`保持しているデータ`の各行には`リカバリ`と`削除`があります。
+
+- `削除`は確認のダイアログを1回出し、そのbackupのファイルを消します。消したbackupは戻せません。
+- `リカバリ`は確認のダイアログを2回出してから、動いているDBの中身を丸ごとそのbackupに置き換えます。その後に保存した作品・設定・ログインは、backupの時点に戻ります。置き換える前に今のDBを手動backupとして保存し、それが書けなければリカバリしません。間違えたときは、その手動backupからリカバリし直します。
+- 置き換えている間、ほかの書き込みは503で断ります。backupに無いログインは切れます。終わるとページを読み込み直します。
+- 今のServerとDBの構造（表と移行の記録）が違うbackup、検査（`quick_check`）に通らないbackupは、リカバリを断ります。古い構造のbackupを戻すには、Serverを止めてファイルを置き換え、起動時の移行を通します。
+
 復旧試験では、ログイン、provider key復号、履歴表示、lineage edge、SVG再現を確認します。
 
 誰も覚えていないpasswordは、backupからではなく`inku-admin reset-password`で再設定します（2.2）。

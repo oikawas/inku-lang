@@ -92,7 +92,10 @@ PUBLIC = {  # every entry needs a reason
 #   +1 for POST /api/pipeline/images, a transient authenticated image upload (2026-10-24).
 #   +1 for POST /api/me/chatgpt/profiles/{profile_id}/delete, deleting a ChatGPT plan
 #   registration (2026-10-25).
-EXPECTED_ROUTE_COUNT = 136
+#   +2 for DELETE /api/settings/db-backup/{kind}/{name} and
+#   POST /api/settings/db-backup/{kind}/{name}/restore, deleting and restoring a
+#   retained database backup (2026-10-25).
+EXPECTED_ROUTE_COUNT = 138
 
 
 def _guard_names(dependant, seen=None) -> set[str]:

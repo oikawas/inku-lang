@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-25 — Database backups can be restored or deleted from DB settings
+
+Each row of Retained copies in DB settings has Restore and Delete. Delete asks once and Restore asks twice. A restore first saves the current database as a manual backup (and stops if it cannot), then replaces the whole running database through SQLite's Backup API; other writes are refused with 503 meanwhile, and the page reloads when it finishes. A backup whose tables or migration registry differ from the running database, or that fails `quick_check`, is refused. The Server adds `DELETE /api/settings/db-backup/{kind}/{name}` and `POST /api/settings/db-backup/{kind}/{name}/restore`, for administrators only.
+
 ### 2026-10-25 — Settings categories read apart from their tabs
 
 In the settings list, a category name is now a small, letter-spaced heading ruled to the edge, and its tabs sit indented below it. Display and operation, Image and ChatGPT plan, each holding one tab of its own name, show only the rule. The Export category's Export tab is now File saving. Each of these had a category and a tab of the same name that were hard to tell apart. The narrow-screen row is unchanged. The manual's settings table gains the missing Image category.

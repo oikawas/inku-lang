@@ -9,7 +9,7 @@ import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
-from typing import Literal
+from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, HTTPException, Path
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from ...limits import (
@@ -21,7 +21,7 @@ from ...limits import (
     SVG_LIMIT_MAX_MIB,
     normalize_render_limit_settings,
 )
-from ...persistence.backup import SQLiteSnapshotError
+from ...persistence.backup import BackupNotFoundError, BackupSchemaMismatchError, SQLiteSnapshotError
 from ...plugins import plugin_status_items
 from ...model_catalog import catalog_models
 from ...model_settings import MODEL_METADATA_KEYS, connection_for, model_provider_catalog, normalize_model_settings, public_model_settings, update_model_settings
@@ -1223,6 +1223,59 @@ def api_settings_run_db_backup() -> DbBackupResult:
         _logger.warning("manual DB backup was not written: %s", e)
         raise HTTPException(status_code=409, detail=str(e)) from e
     return DbBackupResult(**result)
+
+
+class DbBackupRestoreResult(BaseModel):
+    restored: str = Field(description="File name of the copy written into the database")
+    kind: Literal["auto", "manual"] = Field(description="Folder of the restored copy, auto or manual")
+    safety_backup: str = Field(
+        description="File name of the manual backup of the contents the restore replaced, made just before it",
+    )
+
+
+_BackupKind = Annotated[Literal["auto", "manual"], Path(description="Folder of the copy, auto or manual")]
+_BackupName = Annotated[str, Path(max_length=64, description="File name of the copy, as the backup list gives it")]
+
+
+@router.delete("/api/settings/db-backup/{kind}/{name}", response_model=DbBackupStatus, summary="Delete a database backup")
+def api_settings_delete_db_backup(kind: _BackupKind, name: _BackupName) -> DbBackupStatus:
+    """Delete one retained backup and return the backup status.
+
+    Returns 404 when the name is not a retained copy in that folder. Only an administrator may call it.
+    """
+    try:
+        _db.delete_db_backup(kind, name)
+    except BackupNotFoundError as e:
+        raise HTTPException(status_code=404, detail="DB backup not found") from e
+    return DbBackupStatus(**_db.db_backup_status())
+
+
+@router.post("/api/settings/db-backup/{kind}/{name}/restore", response_model=DbBackupRestoreResult,
+             summary="Restore the database from a backup")
+def api_settings_restore_db_backup(kind: _BackupKind, name: _BackupName) -> DbBackupRestoreResult:
+    """Replace the whole database with one retained backup.
+
+    The current contents are first saved as a new manual backup, and the restore does not start
+    without it. Works, settings and sign-ins saved after the backup was made are replaced; a
+    sign-in the backup does not hold ends. Other writes are refused with 503 while it runs.
+    Returns 404 when the name is not a retained copy, 409 when the copy fails its integrity check,
+    its tables or migration registry differ from the running database, or the safety backup
+    cannot be written, and 400 when this database cannot be restored or another restore is
+    running. Only an administrator may call it.
+    """
+    try:
+        result = _db.restore_db_backup(kind, name)
+    except BackupNotFoundError as e:
+        raise HTTPException(status_code=404, detail="DB backup not found") from e
+    except BackupSchemaMismatchError as e:
+        raise HTTPException(status_code=409, detail="DB backup schema differs from the running database") from e
+    except SQLiteSnapshotError as e:
+        _logger.warning("DB restore did not run: %s", e)
+        raise HTTPException(status_code=409, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    _logger.warning("DB restored from %s/%s; previous contents saved as %s", kind, name, result["safety_backup"])
+    return DbBackupRestoreResult(**result)
 
 
 class SingleUserCandidate(BaseModel):

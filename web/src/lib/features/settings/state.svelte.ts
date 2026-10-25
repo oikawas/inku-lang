@@ -75,7 +75,8 @@ export function createSettingsController<TActor extends SettingsActor>(
 		apiFetch: deps.apiFetch,
 		currentUser: deps.currentUser,
 		setRenderFanoutLimit: deps.setRenderFanoutLimit,
-		describeApiError: deps.describeApiError
+		describeApiError: deps.describeApiError,
+		requestConfirmation: deps.requestConfirmation
 	});
 	const modelAdministration = createModelAdministration({
 		apiFetch: deps.apiFetch,
@@ -151,6 +152,8 @@ export function createSettingsController<TActor extends SettingsActor>(
 		setPluginEnabled: serverAdministration.setPluginEnabled,
 		updateDbBackupSettings: serverAdministration.updateDbBackupSettings,
 		runDbBackupNow: serverAdministration.runDbBackupNow,
+		deleteDbBackup: serverAdministration.deleteDbBackup,
+		restoreDbBackup: serverAdministration.restoreDbBackup,
 		updateOutputSaveSettings: serverAdministration.updateOutputSaveSettings,
 		updateRenderConcurrencySettings: serverAdministration.updateRenderConcurrencySettings,
 		updateDescriptionMeterSettings: serverAdministration.updateDescriptionMeterSettings,

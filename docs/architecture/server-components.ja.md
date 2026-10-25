@@ -216,7 +216,7 @@ flowchart LR
 | `auth` | 4 | auth config、login/logout | なし。login以外は個別guard |
 | `me` | 13 | profile、user settings、各user storage | `_current_user` |
 | `plugins` | 5 | plugin閲覧・検証・CRUD・enable | `_current_user`、変更はadmin |
-| `settings` | 19 | server-wide settings、backup、取り合わせの設定 | `_admin_user` |
+| `settings` | 21 | server-wide settings、backup、取り合わせの設定 | `_admin_user` |
 | `users` | 8 | user/group管理 | `_user_manager` |
 | `history` | 17 | 履歴、SVG、thumbnail、mark、trash、共有、artifact再作成、animation・card書き出し | `_current_user` |
 | `lineage` | 8 | lineage graph/group、promote、colophon | `_current_user` |
@@ -227,9 +227,9 @@ flowchart LR
 | `autonomous` | 4 | AI自動推敲のrunの開始・一覧・取得・停止 | `_current_user` |
 | `pipeline` | 15 | canvas形式、画像の受取、variationの開始・取得・記述からのfork、variationが送ったsystem prompt、execution command、author DDL、補完の範囲の状態、history link・fork、作品のDDL書き出し（名指すplugin定義つき）、旧作品の読取・fork、provider観測 | 各routeで`_current_user`。provider観測はさらにdeveloper modeだけ |
 
-合計136。推敲の変奏seed採番とVisionの助言の入口は廃止した。公開allowlistは `/health`、`/api/info`、`/api/auth/login`、`/api/notices`、`/api/notices/{notice_id}` の5 pathである（`test_route_authorization.py`）。通知の2つは固定した配布ライセンスの読取りだけを提供し、任意ファイルや本人情報を返さない。それ以外はログインに必要な入口だけを公開する。
+合計138。推敲の変奏seed採番とVisionの助言の入口は廃止した。公開allowlistは `/health`、`/api/info`、`/api/auth/login`、`/api/notices`、`/api/notices/{notice_id}` の5 pathである（`test_route_authorization.py`）。通知の2つは固定した配布ライセンスの読取りだけを提供し、任意ファイルや本人情報を返さない。それ以外はログインに必要な入口だけを公開する。
 
-router別の件数は、live appのrouteを`test_route_authorization.py`と同じ数え方（`iter_route_contexts`）でendpointのmoduleごとに数えたもの（2026-10-25）。合計の正本は`test_route_authorization.py`の`EXPECTED_ROUTE_COUNT`（136）で、live appのOpenAPIから作った`tests/data/api-surface-baseline.json`も136 operation（198 schema）を記録する。OpenAPI（`/docs`）はrouterごとに1つのtag（14）を付け、136 routeすべてに要約と説明を、引数と要求・応答の欄に英語の説明を持つ（v2.15.243から）。
+router別の件数は、live appのrouteを`test_route_authorization.py`と同じ数え方（`iter_route_contexts`）でendpointのmoduleごとに数えたもの（2026-10-25）。合計の正本は`test_route_authorization.py`の`EXPECTED_ROUTE_COUNT`（138）で、live appのOpenAPIから作った`tests/data/api-surface-baseline.json`も138 operation（199 schema）を記録する。OpenAPI（`/docs`）はrouterごとに1つのtag（14）を付け、138 routeすべてに要約と説明を、引数と要求・応答の欄に英語の説明を持つ（v2.15.243から）。
 
 ## 主要flow
 

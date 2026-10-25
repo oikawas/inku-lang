@@ -216,7 +216,7 @@ In `inku-render`, `render.rs` is the only overall orchestrator. `render_with_res
 | `auth` | 4 | Auth config and login/logout | None; routes other than login have explicit guards |
 | `me` | 13 | Profile, user settings, per-user storage | `_current_user` |
 | `plugins` | 5 | Plugin read/validation/CRUD/enable | `_current_user`; mutation requires admin |
-| `settings` | 19 | Server-wide settings, backup, and juxtaposition settings | `_admin_user` |
+| `settings` | 21 | Server-wide settings, backup, and juxtaposition settings | `_admin_user` |
 | `users` | 8 | User/group management | `_user_manager` |
 | `history` | 17 | History, SVG, thumbnails, marks, trash, sharing, artifact rebuild, animation and card export | `_current_user` |
 | `lineage` | 8 | Lineage graph/group, promote, colophon | `_current_user` |
@@ -227,9 +227,9 @@ In `inku-render`, `render.rs` is the only overall orchestrator. `render_with_res
 | `autonomous` | 4 | Start, list, read and stop autonomous refinement runs | `_current_user` |
 | `pipeline` | 15 | Canvas formats; image intake; start and read variations and fork them from a description; the system prompts a variation sent; execution commands; author DDL; completion range states; history links and forks; DDL export of a work (with the plugin definitions it names); reading and forking older works; provider observations | `_current_user` on each route; provider observations also require developer mode |
 
-Total: 136. Refinement variation seed allocation and the Vision advice entry are retired. The public allowlist contains five paths: `/health`, `/api/info`, `/api/auth/login`, `/api/notices`, and `/api/notices/{notice_id}` (`test_route_authorization.py`). The two notice routes only read fixed distribution licenses and return neither arbitrary files nor personal data. The other public routes are limited to those needed for login.
+Total: 138. Refinement variation seed allocation and the Vision advice entry are retired. The public allowlist contains five paths: `/health`, `/api/info`, `/api/auth/login`, `/api/notices`, and `/api/notices/{notice_id}` (`test_route_authorization.py`). The two notice routes only read fixed distribution licenses and return neither arbitrary files nor personal data. The other public routes are limited to those needed for login.
 
-The per-router counts count the live app's routes by endpoint module the way `test_route_authorization.py` counts them (`iter_route_contexts`, 2026-10-25). The total's source of truth is `EXPECTED_ROUTE_COUNT` (136) in `test_route_authorization.py`, and `tests/data/api-surface-baseline.json`, generated from the live app's OpenAPI, also records 136 operations (198 schemas). The OpenAPI (`/docs`) gives each router one tag (14) and carries a summary and a description for all 136 routes, and English descriptions for the parameters and the request and response fields (since v2.15.243).
+The per-router counts count the live app's routes by endpoint module the way `test_route_authorization.py` counts them (`iter_route_contexts`, 2026-10-25). The total's source of truth is `EXPECTED_ROUTE_COUNT` (138) in `test_route_authorization.py`, and `tests/data/api-surface-baseline.json`, generated from the live app's OpenAPI, also records 138 operations (199 schemas). The OpenAPI (`/docs`) gives each router one tag (14) and carries a summary and a description for all 138 routes, and English descriptions for the parameters and the request and response fields (since v2.15.243).
 
 ## Main flows
 

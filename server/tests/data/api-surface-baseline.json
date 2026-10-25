@@ -1,7 +1,7 @@
 {
-  "endpoint_count": 136,
-  "operation_count": 136,
-  "schema_count": 198,
+  "endpoint_count": 138,
+  "operation_count": 138,
+  "schema_count": 199,
   "operations": [
     {
       "path": "/api/admin/unread-words",
@@ -1603,6 +1603,38 @@
       }
     },
     {
+      "path": "/api/settings/db-backup/{kind}/{name}",
+      "method": "DELETE",
+      "operationId": "api_settings_delete_db_backup_api_settings_db_backup__kind___name__delete",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt",
+        "path:kind:req",
+        "path:name:req"
+      ],
+      "requestBody": "null",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DbBackupStatus\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "path": "/api/settings/db-backup/{kind}/{name}/restore",
+      "method": "POST",
+      "operationId": "api_settings_restore_db_backup_api_settings_db_backup__kind___name__restore_post",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt",
+        "path:kind:req",
+        "path:name:req"
+      ],
+      "requestBody": "null",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DbBackupRestoreResult\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
       "path": "/api/settings/db-write-lock",
       "method": "PUT",
       "operationId": "api_settings_update_db_write_lock_api_settings_db_write_lock_put",
@@ -2026,6 +2058,7 @@
     "CycleMembersV1": "{\"additionalProperties\":false,\"properties\":{\"occurrence_count\":{\"description\":\"Number of occurrences in the cycle. Must equal the resolved logical count of the group it belongs to.\",\"exclusiveMinimum\":0.0,\"title\":\"Occurrence Count\",\"type\":\"integer\"}},\"required\":[\"occurrence_count\"],\"title\":\"CycleMembersV1\",\"type\":\"object\"}",
     "DatabaseSettingsStatus": "{\"properties\":{\"backend\":{\"description\":\"Database backend name from the connection URL, such as sqlite or postgresql\",\"title\":\"Backend\",\"type\":\"string\"},\"database\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Database name from the connection URL; for SQLite, the file path given there\",\"title\":\"Database\"},\"driver\":{\"description\":\"SQLAlchemy driver name from the connection URL\",\"title\":\"Driver\",\"type\":\"string\"},\"file_path\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Path of the SQLite file; None when the database is not a file\",\"title\":\"File Path\"},\"file_size_bytes\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"description\":\"Size in bytes of the SQLite file plus its write-ahead log; None when the database is not a file\",\"title\":\"File Size Bytes\"},\"is_default\":{\"description\":\"Whether the store is the default one rather than a configured URL\",\"title\":\"Is Default\",\"type\":\"boolean\"},\"note\":{\"description\":\"Explanation of how the database connection is chosen\",\"title\":\"Note\",\"type\":\"string\"},\"runtime_editable\":{\"default\":false,\"description\":\"Whether the connection can be changed while the server runs; always false, because it is chosen at startup\",\"title\":\"Runtime Editable\",\"type\":\"boolean\"},\"url\":{\"description\":\"Connection URL with any password hidden\",\"title\":\"Url\",\"type\":\"string\"}},\"required\":[\"backend\",\"driver\",\"url\",\"is_default\",\"note\"],\"title\":\"DatabaseSettingsStatus\",\"type\":\"object\"}",
     "DbBackupEntry": "{\"properties\":{\"at\":{\"description\":\"When the copy was written, in milliseconds since the Unix epoch, from the file's modification time\",\"title\":\"At\",\"type\":\"integer\"},\"generation\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"description\":\"Position among automatic copies, where 1 is the newest; None for manual copies, which are not numbered\",\"title\":\"Generation\"},\"kind\":{\"description\":\"auto for a scheduled copy, which is pruned by generation; manual for a copy requested by an administrator, which is never pruned\",\"enum\":[\"auto\",\"manual\"],\"title\":\"Kind\",\"type\":\"string\"},\"name\":{\"description\":\"File name of the copy inside its auto or manual folder\",\"title\":\"Name\",\"type\":\"string\"},\"size_bytes\":{\"description\":\"Size of the copy in bytes\",\"title\":\"Size Bytes\",\"type\":\"integer\"}},\"required\":[\"kind\",\"name\",\"at\",\"size_bytes\"],\"title\":\"DbBackupEntry\",\"type\":\"object\"}",
+    "DbBackupRestoreResult": "{\"properties\":{\"kind\":{\"description\":\"Folder of the restored copy, auto or manual\",\"enum\":[\"auto\",\"manual\"],\"title\":\"Kind\",\"type\":\"string\"},\"restored\":{\"description\":\"File name of the copy written into the database\",\"title\":\"Restored\",\"type\":\"string\"},\"safety_backup\":{\"description\":\"File name of the manual backup of the contents the restore replaced, made just before it\",\"title\":\"Safety Backup\",\"type\":\"string\"}},\"required\":[\"restored\",\"kind\",\"safety_backup\"],\"title\":\"DbBackupRestoreResult\",\"type\":\"object\"}",
     "DbBackupResult": "{\"properties\":{\"at\":{\"description\":\"When the copy was made, in milliseconds since the Unix epoch\",\"title\":\"At\",\"type\":\"integer\"},\"manual\":{\"description\":\"Whether the copy was requested by an administrator; true for this endpoint\",\"title\":\"Manual\",\"type\":\"boolean\"},\"path\":{\"description\":\"Path of the new copy\",\"title\":\"Path\",\"type\":\"string\"},\"size_bytes\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"description\":\"Size of the copy in bytes; None when the file is not present after it was written\",\"title\":\"Size Bytes\"}},\"required\":[\"path\",\"at\",\"manual\"],\"title\":\"DbBackupResult\",\"type\":\"object\"}",
     "DbBackupSettingsBody": "{\"properties\":{\"backup_hour\":{\"default\":3,\"description\":\"Hour of the day, from 0 to 23 in the server's local time, at which an automatic backup is due\",\"maximum\":23.0,\"minimum\":0.0,\"title\":\"Backup Hour\",\"type\":\"integer\"},\"backup_minute\":{\"default\":0,\"description\":\"Minute of the hour, from 0 to 59, at which an automatic backup is due\",\"maximum\":59.0,\"minimum\":0.0,\"title\":\"Backup Minute\",\"type\":\"integer\"},\"interval_days\":{\"default\":7,\"description\":\"Days between automatic backups, from 1 to 365\",\"maximum\":365.0,\"minimum\":1.0,\"title\":\"Interval Days\",\"type\":\"integer\"},\"max_generations\":{\"default\":4,\"description\":\"Number of automatic copies to keep, from 1 to 100\",\"maximum\":100.0,\"minimum\":1.0,\"title\":\"Max Generations\",\"type\":\"integer\"}},\"title\":\"DbBackupSettingsBody\",\"type\":\"object\"}",
     "DbBackupStatus": "{\"properties\":{\"auto_count\":{\"default\":0,\"description\":\"Number of automatic copies on disk\",\"title\":\"Auto Count\",\"type\":\"integer\"},\"backup_dir\":{\"description\":\"Folder that holds the automatic and manual backup subfolders\",\"title\":\"Backup Dir\",\"type\":\"string\"},\"backup_hour\":{\"default\":3,\"description\":\"Hour of the day, from 0 to 23 in the server's local time, at which an automatic backup is due\",\"title\":\"Backup Hour\",\"type\":\"integer\"},\"backup_minute\":{\"default\":0,\"description\":\"Minute of the hour, from 0 to 59, at which an automatic backup is due\",\"title\":\"Backup Minute\",\"type\":\"integer\"},\"backups\":{\"description\":\"Retained copies, newest first, limited to 50 entries\",\"items\":{\"$ref\":\"#/components/schemas/DbBackupEntry\"},\"title\":\"Backups\",\"type\":\"array\"},\"backups_total_count\":{\"default\":0,\"description\":\"Number of copies on disk, including any beyond the list limit\",\"title\":\"Backups Total Count\",\"type\":\"integer\"},\"backups_total_size_bytes\":{\"default\":0,\"description\":\"Total size in bytes of every copy on disk, including any beyond the list limit\",\"title\":\"Backups Total Size Bytes\",\"type\":\"integer\"},\"interval_days\":{\"description\":\"Days between automatic backups\",\"title\":\"Interval Days\",\"type\":\"integer\"},\"last_auto_backup_at\":{\"default\":0,\"description\":\"When the last automatic backup was made, in milliseconds since the Unix epoch; 0 when none has run\",\"title\":\"Last Auto Backup At\",\"type\":\"integer\"},\"manual_count\":{\"default\":0,\"description\":\"Number of manual copies on disk\",\"title\":\"Manual Count\",\"type\":\"integer\"},\"max_generations\":{\"description\":\"Number of automatic copies kept; older automatic copies are deleted after each new one\",\"title\":\"Max Generations\",\"type\":\"integer\"},\"next_auto_backup_at\":{\"default\":0,\"description\":\"When the next automatic backup is due, in milliseconds since the Unix epoch; 0 when none has run yet, which means it is due at once\",\"title\":\"Next Auto Backup At\",\"type\":\"integer\"},\"supported\":{\"description\":\"Whether backups can be made; true only for a SQLite file database\",\"title\":\"Supported\",\"type\":\"boolean\"}},\"required\":[\"supported\",\"interval_days\",\"max_generations\",\"backup_dir\"],\"title\":\"DbBackupStatus\",\"type\":\"object\"}",
@@ -2183,5 +2216,5 @@
     "Variation": "{\"additionalProperties\":false,\"properties\":{\"amplitude\":{\"default\":\"medium\",\"description\":\"揺れ幅: fine=細かく・震える / medium=中程度 / broad=大きく\",\"enum\":[\"fine\",\"medium\",\"broad\"],\"title\":\"Amplitude\",\"type\":\"string\"},\"dimensions\":{\"description\":\"揺れ軸: 横線→[position_y] / 縦線→[position_x] / 斜め→[position_x,position_y]\",\"items\":{\"enum\":[\"position_x\",\"position_y\",\"angle\",\"length\",\"rotation\",\"radius\"],\"type\":\"string\"},\"title\":\"Dimensions\",\"type\":\"array\"},\"frequency\":{\"default\":\"medium\",\"description\":\"揺れ頻度: slow=ゆっくり / medium=普通 / high=速く\",\"enum\":[\"slow\",\"medium\",\"high\"],\"title\":\"Frequency\",\"type\":\"string\"},\"quality\":{\"default\":\"none\",\"description\":\"揺れ種類: perlin=細かい揺れ・震える / wave=ゆっくり揺れる・波打つ / pink=滲む / white=白色雑音 / none=なし\",\"enum\":[\"none\",\"white\",\"perlin\",\"pink\",\"wave\"],\"title\":\"Quality\",\"type\":\"string\"}},\"title\":\"Variation\",\"type\":\"object\"}",
     "VerticalLineRecipe": "{\"additionalProperties\":false,\"properties\":{\"cell_height\":{\"description\":\"Vertical spacing between successive copies, in canvas-short-edge units. Positive.\",\"exclusiveMinimum\":0.0,\"title\":\"Cell Height\",\"type\":\"number\"},\"kind\":{\"const\":\"vertical_line\",\"description\":\"Always \\\"vertical_line\\\".\",\"title\":\"Kind\",\"type\":\"string\"}},\"required\":[\"kind\",\"cell_height\"],\"title\":\"VerticalLineRecipe\",\"type\":\"object\"}"
   },
-  "digest": "32a7d0d408663bda2b21c29002d6a5a606b67d4c001796116eb4be1a69cfb5ac"
+  "digest": "babbad9a9999180e3055d7ef3fa5fef0b72cfdee4a794e6616569641833e3230"
 }

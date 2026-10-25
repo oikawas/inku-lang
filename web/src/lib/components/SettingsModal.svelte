@@ -357,6 +357,8 @@
 				onReload={onLoadSettingsStatus}
 				onUpdateBackupSettings={onUpdateDbBackupSettings}
 				onRunBackupNow={onRunDbBackupNow}
+				onDeleteBackup={settings.deleteDbBackup}
+				onRestoreBackup={settings.restoreDbBackup}
 			/>
 		{:else if settingsTab === 'server_misc'}
 			<ServerRuntimeSettings

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -26,6 +27,32 @@ DB_BACKUP_LIST_LIMIT = 50
 
 class SQLiteSnapshotError(RuntimeError):
     """A consistent, readable SQLite snapshot could not be produced."""
+
+
+class BackupNotFoundError(LookupError):
+    """The named backup is not one of the retained copies."""
+
+
+class BackupSchemaMismatchError(ValueError):
+    """The backup's tables or migration registry differ from the running database."""
+
+
+_BACKUP_NAME = {kind: re.compile(rf"inku-{kind}-[0-9]{{8}}-[0-9]{{6}}\.db") for kind in ("auto", "manual")}
+
+
+def _schema_signature(connection: sqlite3.Connection) -> tuple:
+    """The physical schema and the migration registry, which a restore must not change."""
+    objects = sorted(
+        (str(kind), str(name), str(table), re.sub(r"\s+", " ", str(sql or "")).strip())
+        for kind, name, table, sql in connection.execute(
+            "SELECT type, name, tbl_name, sql FROM sqlite_master "
+            "WHERE type IN ('table', 'index', 'trigger', 'view') AND name NOT LIKE 'sqlite_%'"
+        )
+    )
+    registry: list = []
+    if any(kind == "table" and name == "schema_migrations" for kind, name, _table, _sql in objects):
+        registry = [tuple(row) for row in connection.execute("SELECT * FROM schema_migrations ORDER BY 1")]
+    return tuple(objects), tuple(registry)
 
 
 @dataclass(frozen=True)
@@ -298,3 +325,45 @@ class BackupService:
             "backups_total_count": listing["total_count"],
             "backups_total_size_bytes": listing["total_size_bytes"],
         }
+
+    def backup_path(self, kind: str, name: str) -> Path:
+        """A retained copy named by the listing; anything else is not found."""
+        pattern = _BACKUP_NAME.get(kind)
+        if pattern is None or not pattern.fullmatch(name):
+            raise BackupNotFoundError(name)
+        path = self.backup_dir / kind / name
+        if path.is_symlink() or not path.is_file():
+            raise BackupNotFoundError(name)
+        return path
+
+    def delete_backup(self, kind: str, name: str) -> None:
+        self.backup_path(kind, name).unlink()
+
+    def restore_backup(self, kind: str, name: str) -> dict:
+        """Replace the running database's contents with a retained copy.
+
+        The copy must pass quick_check and carry the same tables and migration
+        registry as the running database; an older shape would need the startup
+        migration, which a running Server does not repeat. The current contents
+        are saved first as a manual backup, and the restore does not start
+        without it. SQLite's Backup API writes the copy into the live file, so
+        connections opened afterwards see it whole.
+        """
+        if self.dialect_name != "sqlite":
+            raise ValueError("DB restore is supported only for SQLite file databases")
+        source = self.backup_path(kind, name)
+        target = self.database_path()
+        if not target or not target.exists():
+            raise ValueError("SQLite DB file is not available")
+        verify_sqlite_snapshot(source)
+        with sqlite3.connect(_read_only_uri(source), uri=True) as backup_connection:
+            backup_signature = _schema_signature(backup_connection)
+        with sqlite3.connect(_read_only_uri(target), uri=True) as live_connection:
+            live_signature = _schema_signature(live_connection)
+        if backup_signature != live_signature:
+            raise BackupSchemaMismatchError(name)
+        safety = self.create_backup(manual=True)
+        with sqlite3.connect(_read_only_uri(source), uri=True) as backup_connection:
+            with sqlite3.connect(target, timeout=30) as live_connection:
+                backup_connection.backup(live_connection)
+        return {"restored": name, "kind": kind, "safety_backup": Path(safety["path"]).name}

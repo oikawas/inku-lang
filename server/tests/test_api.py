@@ -1552,6 +1552,61 @@ def test_db_backup_settings_and_manual_run_are_admin_only(tmp_path, monkeypatch)
         db.delete_user_group(group["id"])
 
 
+
+def test_db_backup_delete_and_restore_are_admin_only_and_restore_saves_the_current_contents_first(tmp_path, monkeypatch):
+    monkeypatch.setattr(db, "_DB_BACKUP_DIR", tmp_path / "db-backups")
+    suffix = uuid.uuid4().hex[:8]
+    group = db.add_user_group(f"db-restore-{suffix}")
+    user = db.add_user(
+        username=f"db-restore-user-{suffix}",
+        email=f"db-restore-user-{suffix}@example.test",
+        password="password-123",
+        permission_groups=["users"],
+        group_id=group["id"],
+    )
+    admin = db.add_user(
+        username=f"db-restore-admin-{suffix}",
+        email=f"db-restore-admin-{suffix}@example.test",
+        password="password-123",
+        permission_groups=["admins"],
+        group_id=group["id"],
+    )
+    user_headers, user_token = _auth_headers(user)
+    admin_headers, admin_token = _auth_headers(admin)
+    marker = None
+    try:
+        backup = client.post("/api/settings/db-backup/run", headers=admin_headers).json()
+        name = Path(backup["path"]).name
+        assert client.post(f"/api/settings/db-backup/manual/{name}/restore", headers=user_headers).status_code == 403
+        assert client.delete(f"/api/settings/db-backup/manual/{name}", headers=user_headers).status_code == 403
+        assert client.post("/api/settings/db-backup/manual/../../x.db/restore", headers=admin_headers).status_code == 404
+        assert client.post("/api/settings/db-backup/auto/" + name + "/restore", headers=admin_headers).status_code == 404
+
+        # Something saved after the copy disappears with the restore; the
+        # contents it replaced are kept as a new manual copy.
+        marker = db.add_user_group(f"db-restore-after-{suffix}")
+        monkeypatch.setattr(db, "_now_ms", lambda: backup["at"] + 2000)
+        restore_r = client.post(f"/api/settings/db-backup/manual/{name}/restore", headers=admin_headers)
+        assert restore_r.status_code == 200, restore_r.text
+        result = restore_r.json()
+        assert result["restored"] == name and result["safety_backup"] != name
+        assert all(g["id"] != marker["id"] for g in db.list_user_groups())
+        assert (tmp_path / "db-backups" / "manual" / result["safety_backup"]).is_file()
+        assert db.db_restoring() is False
+
+        delete_r = client.delete(f"/api/settings/db-backup/manual/{name}", headers=admin_headers)
+        assert delete_r.status_code == 200, delete_r.text
+        assert [e["name"] for e in delete_r.json()["backups"]] == [result["safety_backup"]]
+        assert client.delete(f"/api/settings/db-backup/manual/{name}", headers=admin_headers).status_code == 404
+    finally:
+        if marker and any(g["id"] == marker["id"] for g in db.list_user_groups()):
+            db.delete_user_group(marker["id"])
+        db.delete_session(admin_token)
+        db.delete_session(user_token)
+        db.delete_user(admin["id"])
+        db.delete_user(user["id"])
+        db.delete_user_group(group["id"])
+
 def test_reading_the_settings_panel_does_not_write_a_backup(tmp_path, monkeypatch):
     """The reload button reads; the scheduler writes.
 

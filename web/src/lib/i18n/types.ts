@@ -930,6 +930,17 @@ export interface LangPack {
 	settingsDbBackupListTruncated: (shown: number) => string;
 	settingsDbBackupRunNow: string;
 	settingsDbBackupRunDone: string;
+	settingsDbBackupListActions: string;
+	settingsDbBackupRestore: string;
+	settingsDbBackupDelete: string;
+	settingsDbBackupRestoreNext: string;
+	settingsDbBackupReload: string;
+	settingsDbBackupDeleted: string;
+	settingsDbBackupRestoring: string;
+	settingsDbBackupDeleteConfirm: (label: string) => string;
+	settingsDbBackupRestoreConfirm: (label: string) => string;
+	settingsDbBackupRestoreFinalConfirm: (label: string) => string;
+	settingsDbBackupRestoreDone: (safety: string) => string;
 	settingsDbBackupSaveFailed: string;
 	settingsOutputSaveTitle: string;
 	settingsOutputSaveEnabled: string;

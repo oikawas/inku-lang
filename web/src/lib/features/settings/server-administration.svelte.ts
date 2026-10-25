@@ -1,6 +1,7 @@
 import { getLang, t } from '$lib/i18n/index.svelte';
 import type { ApiFetch } from '$lib/transport/api-fetch';
 import type { SettingsActor } from './navigation-state.svelte';
+import type { SettingsConfirmation } from './model-administration.svelte';
 import { applyMeterSwitches } from '$lib/descriptionMeter.svelte';
 import type { MeterSwitches } from '$lib/verseForm';
 
@@ -115,6 +116,8 @@ type ServerAdministrationDeps<TActor extends SettingsActor> = {
 	currentUser: () => TActor | null;
 	setRenderFanoutLimit: (limit: number) => void;
 	describeApiError: (detail: unknown, status: number) => string;
+	requestConfirmation: (confirmation: SettingsConfirmation) => void;
+	reloadPage?: () => void;
 };
 
 export type ServerAdministration = {
@@ -136,6 +139,8 @@ export type ServerAdministration = {
 	setPluginEnabled: (id: string, enabled: boolean) => Promise<boolean>;
 	updateDbBackupSettings: (intervalDays: number, maxGenerations: number, backupHour: number, backupMinute: number) => Promise<void>;
 	runDbBackupNow: () => Promise<void>;
+	deleteDbBackup: (entry: DbBackupEntry) => void;
+	restoreDbBackup: (entry: DbBackupEntry) => void;
 	updateOutputSaveSettings: (enabled: boolean, outputDir: string, pngSize: number) => Promise<void>;
 	updateRenderConcurrencySettings: (serverLimit: number, clientLimit: number) => Promise<void>;
 	updateDescriptionMeterSettings: (switches: MeterSwitches) => Promise<void>;
@@ -279,6 +284,61 @@ export function createServerAdministration<TActor extends SettingsActor>(
 		} catch (error) {
 			dbBackupStatus = error instanceof Error ? error.message : String(error);
 		}
+	}
+
+	const backupPath = (entry: DbBackupEntry) => '/api/settings/db-backup/' + entry.kind + '/' + encodeURIComponent(entry.name);
+	const backupLabel = (entry: DbBackupEntry) => new Date(entry.at).toLocaleString()
+		+ ' (' + (entry.kind === 'auto' ? t().settingsDbBackupKindAuto : t().settingsDbBackupKindManual) + ')';
+
+	function deleteDbBackup(entry: DbBackupEntry): void {
+		deps.requestConfirmation({
+			message: t().settingsDbBackupDeleteConfirm(backupLabel(entry)), runLabel: t().settingsDbBackupDelete, destructive: true,
+			run: () => void (async () => {
+				dbBackupStatus = null;
+				try {
+					const response = await deps.apiFetch(backupPath(entry), { method: 'DELETE' });
+					if (!response.ok) {
+						const body = await response.json().catch(() => ({})) as { detail?: unknown };
+						throw new Error(deps.describeApiError(body.detail, response.status));
+					}
+					const next = await response.json() as SettingsStatus['db_backup'];
+					if (settingsStatus) settingsStatus = { ...settingsStatus, db_backup: next };
+					dbBackupStatus = t().settingsDbBackupDeleted;
+				} catch (error) {
+					dbBackupStatus = error instanceof Error ? error.message : String(error);
+				}
+			})()
+		});
+	}
+
+	// A restore replaces every saved record, so it asks twice: what it does, then
+	// whether to do it. Every screen then reads the restored contents afresh.
+	function restoreDbBackup(entry: DbBackupEntry): void {
+		const restore = async () => {
+			dbBackupStatus = t().settingsDbBackupRestoring;
+			try {
+				const response = await deps.apiFetch(backupPath(entry) + '/restore', { method: 'POST' });
+				if (!response.ok) {
+					const body = await response.json().catch(() => ({})) as { detail?: unknown };
+					throw new Error(deps.describeApiError(body.detail, response.status));
+				}
+				const result = await response.json() as { safety_backup: string };
+				dbBackupStatus = null;
+				deps.requestConfirmation({
+					message: t().settingsDbBackupRestoreDone(result.safety_backup), runLabel: t().settingsDbBackupReload,
+					run: () => (deps.reloadPage ?? (() => window.location.reload()))()
+				});
+			} catch (error) {
+				dbBackupStatus = error instanceof Error ? error.message : String(error);
+			}
+		};
+		deps.requestConfirmation({
+			message: t().settingsDbBackupRestoreConfirm(backupLabel(entry)), runLabel: t().settingsDbBackupRestoreNext, destructive: true,
+			run: () => deps.requestConfirmation({
+				message: t().settingsDbBackupRestoreFinalConfirm(backupLabel(entry)), runLabel: t().settingsDbBackupRestore, destructive: true,
+				run: () => void restore()
+			})
+		});
 	}
 
 	async function updateOutputSaveSettings(enabled: boolean, outputDir: string, pngSize: number): Promise<void> {
@@ -457,6 +517,8 @@ export function createServerAdministration<TActor extends SettingsActor>(
 		setPluginEnabled,
 		updateDbBackupSettings,
 		runDbBackupNow,
+		deleteDbBackup,
+		restoreDbBackup,
 		updateOutputSaveSettings,
 		updateRenderConcurrencySettings,
 		updateDescriptionMeterSettings,

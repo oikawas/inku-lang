@@ -360,6 +360,13 @@ Back up at least:
 
 Change the SQLite backup directory with `INKU_DB_BACKUP_DIR`. In `DB settings`, the Web admin UI shows DB status and manages manual backups plus the interval, time, and generation count for scheduled backups. Use external backups as well, keeping the DB and encryption key at the same recovery point.
 
+Each row of `Retained copies` has `Restore` and `Delete`.
+
+- `Delete` asks once, then removes that backup file. A deleted backup cannot be brought back.
+- `Restore` asks twice, then replaces the whole running database with that backup. Works, settings and sign-ins saved since then go back to the backup's point. The current database is first saved as a manual backup, and the restore does not run if that cannot be written. To undo a restore, restore from that manual backup.
+- Other writes are refused with 503 while it runs, and a sign-in the backup does not hold ends. The page reloads when it finishes.
+- A backup whose structure (tables and migration registry) differs from the running Server's database, or that fails its integrity check (`quick_check`), is refused. To bring back a backup of an older structure, stop the Server, replace the file and let the startup migration run.
+
 Recovery tests should verify sign-in, provider-key decryption, history display, lineage edges, and SVG replay.
 
 A password nobody remembers is not recovered from a backup: reset it with `inku-admin reset-password` (2.2).

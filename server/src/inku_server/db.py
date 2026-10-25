@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import secrets
+import threading
 import uuid
 from contextlib import nullcontext
 from pathlib import Path
@@ -968,6 +969,34 @@ def _prune_auto_backups(max_generations: int) -> None:
 
 def create_db_backup(*, manual: bool = False) -> dict:
     return _backup_service().create_backup(manual=manual)
+
+
+def delete_db_backup(kind: str, name: str) -> None:
+    _backup_service().delete_backup(kind, name)
+
+
+_db_restore_lock = threading.Lock()
+_db_restoring = threading.Event()
+
+
+def db_restoring() -> bool:
+    """True while a backup is being written into the live database."""
+    return _db_restoring.is_set()
+
+
+def restore_db_backup(kind: str, name: str) -> dict:
+    # Writes are refused while the copy goes in (the write-lock middleware reads
+    # db_restoring), and pooled connections are dropped afterwards so none keeps
+    # a page cache or prepared schema from the replaced contents.
+    if not _db_restore_lock.acquire(blocking=False):
+        raise ValueError("Another DB restore is in progress")
+    _db_restoring.set()
+    try:
+        return _backup_service().restore_backup(kind, name)
+    finally:
+        engine.dispose()
+        _db_restoring.clear()
+        _db_restore_lock.release()
 
 
 def next_scheduled_db_backup_at(settings: dict | None = None) -> int:

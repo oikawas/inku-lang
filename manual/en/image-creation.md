@@ -420,6 +420,7 @@ The `Lineage` tab shows which explicit action a work was derived from. Performan
 - Parentage is never inferred from visual similarity, an identical description, or timing alone.
 - Intermediate works stay in the lineage as `lineage_only` and do not appear in ordinary history. Promoting one moves it into ordinary history.
 - From a lineage card you can promote to ordinary history, comment, star, mark for revision, and move to trash.
+- Double-click a lineage card to show that work large in the Work tab.
 - You may also select a work from the lineage and repaint it from its description or instructions.
 - A work painted from an image starts a lineage. A child drawn from its edited instructions, or from `Instructions before review` (§16), is an instruction-edit child and, like color and composition children, keeps the source note.
 

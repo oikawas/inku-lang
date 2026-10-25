@@ -713,7 +713,6 @@ $effect(() => {
 					onOpenChange={(open) => (headerWorkMenuOpen = open)}
 					onAction={runWorkAction}
 				/>
-				<button type="button" disabled={!focusNode?.history} onclick={() => focusNode && void onOpenNodeInCanvas(focusNode)}>{t().lineageOpenLarge}</button>
 				<SavedWorkExportMenu
 					scope={focusExportScope}
 					animationSettings={animationExportSettings}

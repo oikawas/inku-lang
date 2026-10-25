@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-25 — The lineage Open large button is retired
+
+Open large in the lineage header only showed the work large on the canvas, as double-clicking a work card does, so it is retired from the Web. The same macOS button is unchanged.
+
 ### 2026-10-25 — No × while a refinement has unsaved options
 
 While the refinement dialog held unsaved options, its × was shown as if usable although pressing it only showed a notice. It is now hidden then, leaving Save the chosen ones and close and Discard all and close as the ways out. The backdrop and Escape are unchanged.

@@ -95,6 +95,9 @@ class SingleAttemptProvider:
         self._observation_truncated = False
         self._refusal: dict[str, Any] = {}
         self._target: tuple[str, str] = ("", "")
+        # What this send used, as the response reported it; None when it reported nothing.
+        self.usage: dict | None = None
+        chatgpt_usage: list = []
         tags = {
             "generate_sketch": "sketch_generated",
             "select_description_catalog": "description_catalog_selected",
@@ -133,7 +136,7 @@ class SingleAttemptProvider:
                     model, action, started + timeout, self.options.max_response_bytes, self.options.chatgpt_cancel,
                     (self.observation[0], self.observation[2]) if self.observation else None,
                     purpose="vision" if action["tag"] in provider_wire.IMAGE_EFFECTS else "llm",
-                    images=self.images, transport=self.transport,
+                    images=self.images, transport=self.transport, usage=chatgpt_usage,
                 ))
             else:
                 connection = connection_for(provider_id, self.options.settings)
@@ -182,6 +185,8 @@ class SingleAttemptProvider:
             failure = "provider_rejected"
         except ValueError:
             failure = "provider_rejected"
+        if chatgpt_usage:
+            self.usage = chatgpt_usage[-1]
         elapsed_int = max(0, int((time.monotonic() - started) * 1000))
         if self.observation is not None:
             store, owner_id, execution_id = self.observation
@@ -292,6 +297,8 @@ class SingleAttemptProvider:
                                 self._refusal = refusal(refused_raw)
                             result.raise_for_status()
             read = provider_wire.read_pipeline(built["format"], response_status, bytes(raw))
+            # A cut or malformed answer still used what it reports.
+            self.usage = provider_wire.usage(built["format"], bytes(raw))
             if read.get("input_tokens") is not None:
                 input_used = read["input_tokens"]
         except httpx.HTTPStatusError as error:

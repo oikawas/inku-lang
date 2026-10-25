@@ -387,6 +387,9 @@ def default_user_model_settings() -> dict[str, Any]:
         # Whether the generation-information drawer stays open, and shows the
         # new work, when another work is chosen from the history strip.
         "generation_info_follows_selection": True,
+        # Whether the generation information shows the tokens of each stage
+        # beside the work's total (2026-10-26); the total alone by default.
+        "generation_info_token_detail": False,
     }
 
 
@@ -617,6 +620,7 @@ def normalize_user_model_settings(settings: dict[str, Any] | None) -> dict[str, 
     # An absent sketch fold means "never folded".
     clean["sketch_open"] = settings.get("sketch_open") is not False
     clean["generation_info_follows_selection"] = settings.get("generation_info_follows_selection") is not False
+    clean["generation_info_token_detail"] = settings.get("generation_info_token_detail") is True
     return clean
 
 
@@ -644,7 +648,7 @@ def update_user_model_settings(current: dict[str, Any] | None, patch: dict[str, 
         clean["color_catalog_id"] = _normalize_catalog_choice(patch.get("color_catalog_id"))
     if "ui_text_size" in patch:
         clean["ui_text_size"] = _normalize_ui_text_size(patch.get("ui_text_size"))
-    for key in ("sketch_open", "generation_info_follows_selection"):
+    for key in ("sketch_open", "generation_info_follows_selection", "generation_info_token_detail"):
         if key in patch:
             clean[key] = bool(patch[key])
     return normalize_user_model_settings(clean)

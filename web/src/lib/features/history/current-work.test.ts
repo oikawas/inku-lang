@@ -27,6 +27,13 @@ test('a read-and-draw work opened from the history keeps its record for the read
 	assert.equal(projected.sketchText, record.reading_text);
 });
 
+test('a work opened from the history keeps its tokens by stage for Generation Info', () => {
+	const usage = { read_and_draw: { sends: 2, unreported_sends: 0, input_tokens: 40, output_tokens: 9, cached_input_tokens: null } };
+	const item = { input: '赤', source_text: '赤', provider_usage: usage, tokens_in: 40, tokens_out: 9,
+		ddl: '赤い円', svg: '<svg/>', score: { instructions: [] } } as unknown as HistoryItem;
+	assert.deepEqual(projectHistoryCurrentWork(item).result.provider_usage, usage);
+});
+
 test('T-295: current-work projection preserves saved source, render identity, seeds, and sketch state', () => {
 	const item: HistoryItem = {
 		id: 'work-1',

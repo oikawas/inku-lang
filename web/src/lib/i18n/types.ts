@@ -903,6 +903,10 @@ export interface LangPack {
 	generationInfoFollowLabel: string;
 	generationInfoFollowToggle: string;
 	generationInfoFollowDescription: string;
+	generationInfoTokensLabel: string;
+	generationInfoTokensDescription: string;
+	generationInfoTokensTotal: string;
+	generationInfoTokensDetail: string;
 	settingsTabServerMisc: string;
 	settingsTabLogs: string;
 	settingsTabLimits: string;
@@ -1448,6 +1452,14 @@ export interface LangPack {
 	provenanceHintElapsed: string;
 	provenanceElapsedNotRecorded: string;
 	provenanceHintTokens: string;
+	provenanceTokenStageReadAndDraw: string;
+	provenanceTokenStagePicture: string;
+	provenanceTokenStageStage1: string;
+	provenanceTokenStageComposition: string;
+	provenanceTokenStageLaws: string;
+	provenanceTokenStageColors: string;
+	provenanceTokenStageStage2: string;
+	provenanceTokenSends: (sends: number, unreported: number) => string;
 	historyCreatedAtHeader: string;
 	historyDescriptionHeader: string;
 	historyCanvasHeader: string;

@@ -16,6 +16,7 @@ import type { ApiFetch } from '../../transport/api-fetch.ts';
 import { ConnectionFailure, GATEWAY_STATUSES, isAbort } from '../../transport/connection-failure.ts';
 import type { RenderOverrides } from '../render-payload.ts';
 import type { Recomposition } from '../canvas/recomposition.ts';
+import type { ProviderUsage } from '../canvas/generation-info-tokens.ts';
 import { pipelineViewFromErrorDetail, type PipelineView } from '../pipeline/api.ts';
 
 export type InstructionLang = 'auto' | 'ja' | 'en';
@@ -36,6 +37,8 @@ export type PaintResult = {
 	image_ddl?: Record<string, unknown> | null;
 	/** Read and draw's record (SPEC 12.6.7); null on any other work. */
 	description_ddl?: DescriptionDdlRecord | null;
+	/** The tokens by stage (2026-10-26); null when the drawing sent nothing. */
+	provider_usage?: ProviderUsage | null;
 	image_provenance?: string | null;
 	svg: string;
 	score: PaintScore;

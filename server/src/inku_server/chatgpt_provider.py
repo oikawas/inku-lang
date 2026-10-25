@@ -161,7 +161,8 @@ async def catalog(owner: str, profile_id: str, generation: int, deadline: float,
 
 async def request(owner: str, profile_id: str, generation: int, model: str, action: dict, deadline: float,
                   limit: int, cancel=None, observation=None, *, purpose: str = "llm",
-                  transport: httpx.AsyncBaseTransport | None = None, images: list[str] | None = None) -> str:
+                  transport: httpx.AsyncBaseTransport | None = None, images: list[str] | None = None,
+                  usage: list | None = None) -> str:
     image_effect = action["tag"] in provider_wire.IMAGE_EFFECTS
     if (purpose == "llm" and action["tag"] not in EFFECTS) or (purpose == "vision" and action["tag"] != "vision" and not image_effect) or purpose not in {"llm", "vision"}:
         raise ChatGPTError("chatgpt_operation_not_supported")
@@ -227,6 +228,9 @@ async def request(owner: str, profile_id: str, generation: int, model: str, acti
                     finally:
                         await stream.__aexit__(None, None, None)
             finally:
+                # The terminal response carries usage whether or not its answer was read.
+                if usage is not None and isinstance(decoder.terminal, dict):
+                    usage.append(provider_wire.usage("openai_responses", json.dumps(decoder.terminal).encode("utf-8")))
                 if observation and status:
                     capture.response(owner, execution, action, status=status, raw=capture_body(bytes(raw)), truncated=not decoder.completed,
                                      decoded=None if image_effect else decoder.terminal)

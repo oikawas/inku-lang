@@ -204,10 +204,10 @@ class HistoryPostBody(BaseModel):
         description="The identifier of the model used for Stage 2 (score composition). Null if not recorded.",
     )
     tokens_in: int | None = Field(
-        default=None, description="The number of input tokens the model reported for the work. Null when not recorded, including for works saved through the pipeline, which do not record token counts.",
+        default=None, description="The input tokens the work's sends used, cache reads and writes included, every stage and retry together. 0 when the work sent nothing. Null when not recorded (works saved through the pipeline before 2026-10-26), or when no send reported it.",
     )
     tokens_out: int | None = Field(
-        default=None, description="The number of output tokens the model reported for the work. Null when not recorded, including for works saved through the pipeline, which do not record token counts.",
+        default=None, description="The output tokens the work's sends used, thinking included, every stage and retry together. 0 when the work sent nothing. Null when not recorded (works saved through the pipeline before 2026-10-26), or when no send reported it.",
     )
     catalog_id: str | None = Field(
         default=None,
@@ -397,6 +397,16 @@ class HistoryPostBody(BaseModel):
     )
 
 
+class ProviderStageUsage(BaseModel):
+    """The tokens one stage's sends used, counted alike for every provider."""
+
+    sends: int = Field(description="The requests the stage sent, retries and answers cut at the output limit included.")
+    unreported_sends: int = Field(description="The requests whose response reported no usage (a timeout, a lost connection, a provider that does not report it); their tokens are not in the counts.")
+    input_tokens: int | None = Field(default=None, description="The input tokens, cache reads and writes included. Null when no send reported it.")
+    output_tokens: int | None = Field(default=None, description="The output tokens, thinking and reasoning included. Null when no send reported it.")
+    cached_input_tokens: int | None = Field(default=None, description="The part of input_tokens read from the provider's cache. Null when no send reported it.")
+
+
 class HistoryItem(HistoryPostBody):
     """A saved work as the history listing and the work endpoints return it."""
 
@@ -475,6 +485,14 @@ class HistoryItem(HistoryPostBody):
             "the items dropped because the description and its labels do not hold them, each round's answer "
             "and the drawing it was corrected beside. It holds metadata only, never image bytes. Null when "
             "the work was drawn through the stages."
+        ),
+    )
+    provider_usage: dict[str, ProviderStageUsage] | None = Field(
+        default=None,
+        description=(
+            "The tokens the work's sends used, by the stage they are timed under (sketch and Stage 1 are "
+            "stage1; composition, laws, colors, stage2 for hole completion, image, read_and_draw). Only stages "
+            "that sent appear. Null when the work sent nothing or predates this record (2026-10-26)."
         ),
     )
     # The work's own weight in UTF-8 bytes, sent whether or not the picture is.

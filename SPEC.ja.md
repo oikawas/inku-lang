@@ -1051,6 +1051,20 @@ MLXのGemma 4は、[モデルの推奨生成設定](https://ai.google.dev/gemma/
 - Claude 5系とMythos Previewには、出力枠に思考の分として8,192を足す（描画は2,048→10,240、助言は320→8,512）。思考は切らない。Claude 4.xは変えない。デモの指示文もtemperatureを送らず、同じ枠を足す。
 - 出力の上限で切れた応答（OpenAIの`status: "incomplete"`、OpenAI互換の`finish_reason: "length"`、Geminiの`finishReason: "MAX_TOKENS"`、Claudeの`stop_reason: "max_tokens"`）は、描画では答えとして使わず「応答を読めない」として扱い（§12.8）、`provider_output_limit`の行に上限・出力トークン数・思考の有無・本文と関数呼び出しの有無を残す。Visionは応答を返し、同じ行を残す。
 
+**作品のトークン数（2026-10-26 作者）。** Serverで描いた作品は、描いた送信の全部で使ったトークン数を持つ。1回の送信の数は共通coreの`provider_wire`の`usage`が応答から読み、`input_tokens`・`output_tokens`・`cached_input_tokens`を返す（報告が無ければnull）。入力はキャッシュから読んだ分と書いた分を含め、出力は思考・推論を含める。
+
+| 方言 | 入力 | 出力 | キャッシュの入力 |
+|---|---|---|---|
+| Claude | `input_tokens` + `cache_read_input_tokens` + `cache_creation_input_tokens` | `output_tokens` | `cache_read_input_tokens` |
+| OpenAI Responses・ChatGPTプラン（流れの終わりの応答） | `input_tokens` | `output_tokens` | `input_tokens_details.cached_tokens` |
+| OpenAI互換のChat Completions | `prompt_tokens` | `completion_tokens` | `prompt_tokens_details.cached_tokens` |
+| Gemini | `promptTokenCount` | `candidatesTokenCount` + `thoughtsTokenCount` | `cachedContentTokenCount` |
+
+- 数える送信: その作品を描いたrunの送信のすべて。再試行、出力の上限で切れた応答、形の崩れた応答も、数の報告があれば数える。Geminiの送信前の`countTokens`、奥書、AI自動推敲の見比べ、Visionの助言、デモの指示文は数えない。
+- 足し方: 時間と同じ記録の名（`provider_stage_record`。写生とカタログ選択は`stage1`、ほかに`composition`・`laws`・`colors`・`stage2`・`image`・`read_and_draw`）で、stageごとに送信の数・数の報告の無かった送信の数・入力・出力・キャッシュの入力を足す。
+- 保存: 合計を作品の`tokens_in`・`tokens_out`に、stageごとの記録を作品の保存済みの文脈の`provider_usage`に置き、作品の読み出しと描画の応答に出す。描画の応答の`tokens_in_stage2`・`tokens_out_stage2`は`stage2`、`tokens_in_stage1`・`tokens_out_stage1`はそれ以外の全部。送信の無かった作品は0、どの送信も数を報告しなかった値はnull、2026-10-26より前の作品はnull（記録なし）。
+- 表示: Webの生成情報の「tokens in / out」は合計を出す。アカウントの設定`generation_info_token_detail`（設定の表示の「生成情報のトークン数」、既定は「合計だけ」）が「詳細」なら、送信のあったstageごとに入力・出力と送信の数の行も出す。
+
 **描画のStage 1とStage 2は同じモデルを使う（作者の決定、2026-09-30）。** 要求の`stage1_model`、無ければ`stage2_model`、どちらも無ければアカウントの描画モデルを両段に使う。アカウントの設定を正規化すると、`stage2_provider`と`stage2_model`をStage 1の値へ揃える。Visionは描画とは別のモデル設定を持つ（§8.4、`/api/models`のLLM/Visionカタログ）。APIの`stage1_model` / `stage2_model`の鍵と過去の作品のモデル記録は保持し、新しい描画では両方の鍵に同じ実使用モデルを記録する。
 
 **サーバーの資格情報で呼ぶモデルは、管理者が公開したものに限る（2026-09-26）。** `admins` 以外の利用者の生成、デモ指示、奥書、Vision 推敲の助言は、有効な provider がその用途の一覧に持ち、管理者が無効にしていないモデルだけを呼ぶ。それ以外を名指した要求は 403（生成は `model_not_offered`）で断る。提供終了と有料プラン限定の印が付いたモデルは公開に入れられない（2026-09-28）。以前は無効化が一覧から隠すだけで、名指した要求はサーバーの鍵で provider へ届いた。developer mode は判定に使わない —— 表示だけを変える設定であり、組み込みの Stage 既定は developer mode でしか表示されない provider にある。`admins` は公開前に試すため、構成済みの任意のモデルを呼べる。

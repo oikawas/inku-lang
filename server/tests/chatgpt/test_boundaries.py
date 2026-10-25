@@ -526,6 +526,8 @@ def test_composition_effect_preserves_wire_and_separate_observation(isolated, tm
         assert saved["outcome"] == "completed" and saved["failure"] is None and saved["capture_complete"]
         assert saved["elapsed_ms"] == int(result["elapsed_ms"])
         assert json.loads(saved["usage_json"]) == {"input_tokens": 3, "output_tokens": 2, "total_tokens": 5}
+        # The work's count reads the terminal response, with or without the capture.
+        assert transport.usage == {"input_tokens": 3, "output_tokens": 2, "cached_input_tokens": None}
         assert json.loads(saved["request_body"]) == sent[0] and saved["response_body"] == wire.decode()
         assert not saved["request_truncated"] and not saved["response_truncated"]
         assert "fixture-access" not in json.dumps(saved)

@@ -171,6 +171,32 @@
 				</label>
 			</div>
 			<div class="popover-group">
+				<div class="popover-group-label">{t().generationInfoTokensLabel}</div>
+				<div class="db-test-result">{t().generationInfoTokensDescription}</div>
+				<div class="settings-radio-set">
+					<label class="setting-toggle">
+						<input
+							type="radio"
+							name="generation-info-tokens"
+							value="total"
+							checked={!generationInfoSettings.tokenDetail}
+							onchange={() => generationInfoSettings.setTokenDetail(false)}
+						/>
+						<span>{t().generationInfoTokensTotal}</span>
+					</label>
+					<label class="setting-toggle">
+						<input
+							type="radio"
+							name="generation-info-tokens"
+							value="detail"
+							checked={generationInfoSettings.tokenDetail}
+							onchange={() => generationInfoSettings.setTokenDetail(true)}
+						/>
+						<span>{t().generationInfoTokensDetail}</span>
+					</label>
+				</div>
+			</div>
+			<div class="popover-group">
 				<div class="popover-group-label">{t().settingsMascotLabel}</div>
 				<div class="settings-radio-set">
 					<label class="setting-toggle">

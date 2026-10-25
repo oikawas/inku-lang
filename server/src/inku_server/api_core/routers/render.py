@@ -30,7 +30,7 @@ from ..common import DESCRIPTION_LOCKED_DETAIL, _resolve_instruction_lang, _reso
 from ..vision import chatgpt_vision_error, prepare_vision_settings
 from ...chatgpt_store import ChatGPTError
 from ..deps import _current_user
-from ..models import CompositionRanges, JsonSeed, RecompositionResult
+from ..models import CompositionRanges, JsonSeed, ProviderStageUsage, RecompositionResult
 from ..rendering import (
     COLOR_CATALOG_ID_HEADER,
     COLOR_SOURCE_HEADER,
@@ -310,10 +310,10 @@ class PaintResponse(BaseModel):
     elapsed_stage1_ms: int = Field(default=0, description="Time spent on Stage 1 (interpretation), in milliseconds.")
     elapsed_stage2_ms: int = Field(default=0, description="Time spent on Stage 2 (score composition), in milliseconds.")
     elapsed_total_ms: int = Field(default=0, description="Total time the request took, in milliseconds.")
-    tokens_in_stage1: int | None = Field(default=None, description="Input tokens the Stage 1 model used. None when not recorded.")
-    tokens_out_stage1: int | None = Field(default=None, description="Output tokens the Stage 1 model produced. None when not recorded.")
-    tokens_in_stage2: int | None = Field(default=None, description="Input tokens the Stage 2 model used. None when not recorded.")
-    tokens_out_stage2: int | None = Field(default=None, description="Output tokens the Stage 2 model produced. None when not recorded.")
+    tokens_in_stage1: int | None = Field(default=None, description="Input tokens of every send but hole completion (sketch, Stage 1, composition, laws, colors, image, read and draw), cache included. 0 when none was sent. None when no send reported it.")
+    tokens_out_stage1: int | None = Field(default=None, description="Output tokens of every send but hole completion, thinking included. 0 when none was sent. None when no send reported it.")
+    tokens_in_stage2: int | None = Field(default=None, description="Input tokens of hole completion (Stage 2), cache included. 0 when none was sent. None when no send reported it.")
+    tokens_out_stage2: int | None = Field(default=None, description="Output tokens of hole completion (Stage 2), thinking included. 0 when none was sent. None when no send reported it.")
     interpret_fallback_used: bool = Field(default=False, description="Whether the Stage 1 fallback interpretation was used instead of the model's answer.")
     interpret_fallback_reasons: list[str] = Field(default_factory=list, description="Reasons the Stage 1 fallback was used, in order. Empty when it was not used.")
     compose_retry_count: int = Field(default=0, description="Number of times the Stage 2 composition was retried.")
@@ -340,6 +340,7 @@ class PaintResponse(BaseModel):
     compiler_outcome: str | None = Field(default=None, description="Outcome of the score compiler for this drawing.")
     pipeline_diagnostics: dict[str, object] | None = Field(default=None, description="Diagnostics recorded by the pipeline for this drawing. None when none were recorded.")
     description_ddl: dict | None = Field(default=None, description="The record of a drawing made by reading its description (route read_and_draw): the reading, its state, the items dropped and each round. Metadata only, never image bytes. None for the stages.")
+    provider_usage: dict[str, ProviderStageUsage] | None = Field(default=None, description="The tokens the drawing's sends used, by the stage they are timed under. Only stages that sent appear. None when nothing was sent.")
 
 
 class RenderSvgRequest(BaseModel):

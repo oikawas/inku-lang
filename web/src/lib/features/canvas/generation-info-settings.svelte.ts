@@ -5,15 +5,25 @@
 //
 // It rides in the user's `model_settings` on the server, like the describe
 // panel's folds: see features/user-settings.ts.
+//
+// Whether the drawer shows each stage's tokens beside the work's total rides
+// the same way; its key and parsing live in ./generation-info-tokens.ts.
 import { FOLLOW_DEFAULT, FOLLOW_FIELD, followFromSettings } from '$lib/features/canvas/generation-info-follow';
+import { TOKEN_DETAIL_DEFAULT, TOKEN_DETAIL_FIELD, tokenDetailFromSettings } from '$lib/features/canvas/generation-info-tokens';
 import { registerUserSettingsContributor } from '$lib/features/user-settings';
 
 class GenerationInfoSettings {
 	followsSelection = $state(FOLLOW_DEFAULT);
+	tokenDetail = $state(TOKEN_DETAIL_DEFAULT);
 
 	setFollowsSelection = (follows: boolean) => {
 		this.followsSelection = follows;
 		persist({ [FOLLOW_FIELD]: follows });
+	};
+
+	setTokenDetail = (detail: boolean) => {
+		this.tokenDetail = detail;
+		persist({ [TOKEN_DETAIL_FIELD]: detail });
 	};
 }
 
@@ -28,8 +38,12 @@ export function bindGenerationInfoSettingsPersist(write: (fields: Record<string,
 
 registerUserSettingsContributor({
 	id: 'generation-info',
-	collect: () => ({ [FOLLOW_FIELD]: generationInfoSettings.followsSelection }),
+	collect: () => ({
+		[FOLLOW_FIELD]: generationInfoSettings.followsSelection,
+		[TOKEN_DETAIL_FIELD]: generationInfoSettings.tokenDetail
+	}),
 	apply: (settings) => {
 		generationInfoSettings.followsSelection = followFromSettings(settings);
+		generationInfoSettings.tokenDetail = tokenDetailFromSettings(settings);
 	}
 });

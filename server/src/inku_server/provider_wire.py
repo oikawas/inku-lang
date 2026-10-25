@@ -148,6 +148,16 @@ def read_pipeline(format_name: str, status: int, raw: bytes) -> dict:
     return _ask("pipeline_response", format=format_name, status=status, body=_body_text(raw))
 
 
+def usage(format_name: str, raw: bytes) -> dict | None:
+    """The tokens one send used: ``input_tokens`` (cache included), ``output_tokens``
+    (thinking included) and ``cached_input_tokens``, or None when it reports none."""
+    try:
+        body = _body_text(raw)
+    except UnicodeDecodeError:
+        return None
+    return _ask("usage", format=format_name, body=body)["usage"]
+
+
 def read_text(format_name: str, status: int, raw: bytes) -> dict:
     """The answer to a text response: ``answer`` with ``text`` (and ``cut`` when it was cut off), or ``malformed``."""
     return _ask("text_response", format=format_name, status=status, body=_body_text(raw))

@@ -59,6 +59,9 @@ LAWS_RECORD_KEYS = ("laws_layers", "laws_basis")
 # The snapshot's records a saved work keeps beside its config, each only when
 # the run made it. Read and draw's record (SPEC §12.6.7) joined them 2026-10-26.
 _OPTIONAL_FORK_CONTEXT_KEYS = ("completion_ranges", *LAWS_RECORD_KEYS, "description_ddl")
+# The host's records a saved work keeps, each only when the run made it: the
+# tokens its sends used by stage (2026-10-26).
+_OPTIONAL_HOST_CONTEXT_KEYS = ("provider_usage",)
 _PIPELINE_DIAGNOSTIC_KEYS = frozenset(
     {
         "upstream_diagnostics",
@@ -682,6 +685,9 @@ def _history_fork_context_bytes(
     for key in _OPTIONAL_FORK_CONTEXT_KEYS:
         if snapshot.get(key) is not None:
             payload[key] = snapshot[key]
+    for key in _OPTIONAL_HOST_CONTEXT_KEYS:
+        if context.get(key):
+            payload[key] = context[key]
     encoded = _canonical_json(payload, sort_keys=True).encode("utf-8")
     return encoded, hashlib.sha256(encoded).hexdigest()
 
@@ -752,7 +758,7 @@ def _decode_history_fork_context_payload(
     elif protocol in {_DIAGNOSTICS_HISTORY_FORK_CONTEXT_PROTOCOL, HISTORY_FORK_CONTEXT_PROTOCOL}:
         expected_keys = legacy_keys | {"pipeline_diagnostics"}
         if protocol == HISTORY_FORK_CONTEXT_PROTOCOL:
-            expected_keys |= set(_OPTIONAL_FORK_CONTEXT_KEYS) & set(payload)
+            expected_keys |= set(_OPTIONAL_FORK_CONTEXT_KEYS + _OPTIONAL_HOST_CONTEXT_KEYS) & set(payload)
         pipeline_diagnostics = _validate_pipeline_diagnostics(
             payload.get("pipeline_diagnostics")
         )
@@ -788,10 +794,11 @@ def history_pipeline_diagnostics(
 
 def history_link_records(
     row: Mapping[str, Any],
-) -> tuple[dict[str, object] | None, object | None]:
-    """The diagnostics and read and draw's record frozen on one history link."""
+) -> tuple[dict[str, object] | None, dict[str, object]]:
+    """The diagnostics and the optional records (read and draw's, the tokens by
+    stage) frozen on one history link, each record only when it was kept."""
     payload, pipeline_diagnostics = _decode_history_fork_context_payload(row)
-    return pipeline_diagnostics, payload.get("description_ddl")
+    return pipeline_diagnostics, {key: payload[key] for key in ("description_ddl", "provider_usage") if payload.get(key) is not None}
 
 
 def _decode_history_fork_context(

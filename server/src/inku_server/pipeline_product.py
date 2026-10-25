@@ -198,6 +198,47 @@ def reading_result(record: dict) -> dict:
     return {"sketch_text": None, "sketch_grain": None, "sketch_state": "fallback" if state == "fallback" else "off"}
 
 
+_USAGE_COUNTS = ("input_tokens", "output_tokens", "cached_input_tokens")
+
+
+def _add_provider_usage(context: dict, stage: str, used: dict | None) -> None:
+    """Add one send to its stage's tokens, under the stage it is timed under.
+
+    Every send counts, retries and cut answers included; one whose response
+    reported no usage is counted apart, so a total is known to be partial.
+    """
+    entry = context.setdefault("provider_usage", {}).setdefault(
+        stage, {"sends": 0, "unreported_sends": 0, **dict.fromkeys(_USAGE_COUNTS)})
+    entry["sends"] += 1
+    if used is None:
+        entry["unreported_sends"] += 1
+        return
+    for key in _USAGE_COUNTS:
+        if used.get(key) is not None:
+            entry[key] = (entry[key] or 0) + int(used[key])
+
+
+def usage_result(record: dict) -> dict:
+    """The token columns of a performance from its sends by stage (SPEC §12.5).
+
+    Stage 2 is hole completion and Stage 1 every other send, so the two add up to
+    the work's total. A work that sent nothing used 0; a count no send reported
+    is None.
+    """
+    def total(key: str, stages: list[dict]) -> int | None:
+        known = [entry[key] for entry in stages if entry[key] is not None]
+        if known:
+            return sum(known)
+        return None if any(entry["sends"] for entry in stages) else 0
+    everything = list(record.values())
+    stage2 = [entry for name, entry in record.items() if name == "stage2"]
+    stage1 = [entry for name, entry in record.items() if name != "stage2"]
+    return {"tokens_in": total("input_tokens", everything), "tokens_out": total("output_tokens", everything),
+            "tokens_in_stage1": total("input_tokens", stage1), "tokens_out_stage1": total("output_tokens", stage1),
+            "tokens_in_stage2": total("input_tokens", stage2), "tokens_out_stage2": total("output_tokens", stage2),
+            "provider_usage": deepcopy(record) if record else None}
+
+
 # The provider actions whose system prompt the prompt tab shows, by the name
 # the tab gives each stage, in the order a work calls them.
 _SYSTEM_PROMPT_STAGES = {
@@ -497,6 +538,7 @@ class ProductPipelineEffects:
                 _increment_stage_stat("failed")
             metrics = context.setdefault("metrics", {})
             metrics[recorded] = metrics.get(recorded, 0) + int(result["elapsed_ms"])
+            _add_provider_usage(context, recorded, getattr(transport, "usage", None))
             if result["tag"] == "provider_failed":
                 context["provider_failure"] = {
                     "failure": result["failure"],
@@ -568,8 +610,7 @@ class ProductPipelineEffects:
             "description": context["committed_description"], "ddl": document["source"],
             "score": score, "svg": rendered["svg"], "stage1_model": settings["stage1_model"], "stage2_model": settings["stage2_model"],
             "elapsed_stage1_ms": metrics.get("stage1", 0), "elapsed_stage2_ms": metrics.get("stage2", 0),
-            "elapsed_total_ms": sum(metrics.values()), "tokens_in_stage1": None, "tokens_out_stage1": None,
-            "tokens_in_stage2": None, "tokens_out_stage2": None, "thinking": None,
+            "elapsed_total_ms": sum(metrics.values()), **usage_result(context.get("provider_usage") or {}), "thinking": None,
             **sketch_result(snapshot.get("sketch")),
             "ddl_version": DDL_VERSION, "ddl_engine_version": DDL_ENGINE_VERSION,
             "render_build_number": _build_number(), "render_engine_id": render_metadata["render_engine_id"],

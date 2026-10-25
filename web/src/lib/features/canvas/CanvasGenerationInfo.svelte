@@ -13,6 +13,8 @@
 	import { drawRouteLabel, droppedReadingLines, figureWhoLabel, readingStateNote, type DescriptionDdlRecord } from '$lib/draw-route';
 	import type { SvgWeight } from '$lib/svgWeight';
 	import { loadSystemPrompts, type SystemPromptsState } from './system-prompts';
+	import { generationInfoSettings } from './generation-info-settings.svelte';
+	import { tokenStageLabel, tokenStageRows, type ProviderUsage } from './generation-info-tokens';
 
 	export type GenerationInfoWork = {
 		image_ddl?: Record<string, unknown> | null;
@@ -57,6 +59,8 @@
 		tokens_out_stage1?: number | null;
 		tokens_in_stage2?: number | null;
 		tokens_out_stage2?: number | null;
+		/** The tokens by stage; absent on a work drawn before the record (2026-10-26). */
+		provider_usage?: ProviderUsage | null;
 	};
 
 	type Props = {
@@ -209,6 +213,11 @@
 	const detailElapsedMs = $derived(statusHistoryItem?.elapsed_ms ?? result?.elapsed_total_ms ?? null);
 	const detailTokensIn = $derived(statusHistoryItem?.tokens_in ?? ((result?.tokens_in_stage1 ?? 0) + (result?.tokens_in_stage2 ?? 0) || null));
 	const detailTokensOut = $derived(statusHistoryItem?.tokens_out ?? ((result?.tokens_out_stage1 ?? 0) + (result?.tokens_out_stage2 ?? 0) || null));
+	// The stages' rows follow the total only when the account chose the detail.
+	const detailTokenStages = $derived(
+		generationInfoSettings.tokenDetail ? tokenStageRows(statusHistoryItem?.provider_usage ?? result?.provider_usage) : []
+	);
+	const tokenCount = (value: number | null) => (value == null ? '-' : groupDigits(value));
 	const detailRequestedLang = $derived(statusHistoryItem?.instruction_lang_requested ?? result?.instruction_lang_requested ?? '');
 	const detailUiLang = $derived(statusHistoryItem?.ui_lang ?? result?.ui_lang ?? '');
 	const detailFocus = $derived(statusHistoryItem?.focus ?? result?.focus ?? '');
@@ -470,6 +479,9 @@
 						{@render term(isJapanese ? '作成日' : 'Created', t().provenanceHintCreated)}<dd>{currentRenderedAt ?? '-'}</dd>
 						{@render term(isJapanese ? '処理時間' : 'Elapsed', t().provenanceHintElapsed)}<dd>{detailElapsedMs == null ? '-' : detailElapsedMs <= 0 ? t().provenanceElapsedNotRecorded : (detailElapsedMs / 1000).toFixed(1) + 's'}</dd>
 						{@render term('tokens in / out', t().provenanceHintTokens)}<dd>{detailTokensIn == null ? '-' : groupDigits(detailTokensIn)} / {detailTokensOut == null ? '-' : groupDigits(detailTokensOut)}</dd>
+						{#each detailTokenStages as row (row.stage)}
+							<dt class="token-stage">{tokenStageLabel(row.stage, t())}</dt><dd>{tokenCount(row.usage.input_tokens)} / {tokenCount(row.usage.output_tokens)}<span class="token-sends">（{t().provenanceTokenSends(row.usage.sends, row.usage.unreported_sends)}）</span></dd>
+						{/each}
 						{@render term(t().provenanceLabelUiLang, t().provenanceHintUiLang)}<dd>{detailUiLang ? displayLanguageName(detailUiLang) : '-'}</dd>
 					</dl>
 				</section>
@@ -532,6 +544,9 @@
 	.generation-details dl { display: grid; grid-template-columns: minmax(120px, auto) minmax(0, 1fr); gap: 10px 16px; margin: 0; font-size: var(--ui-font-size-12); }
 	.generation-details dt { min-width: 0; color: var(--fg3); }
 	.generation-details dt :global(.tooltip-wrap) { max-width: 100%; }
+	/* A stage's row sits under the work's total. */
+	.generation-details dt.token-stage { padding-left: 1em; }
+	.generation-details .token-sends { color: var(--fg3); }
 	.detail-note { margin: 0; white-space: pre-wrap; font-size: var(--ui-font-size-12); }
 	.detail-read-text, .detail-read-before pre { margin: 6px 0 0; white-space: pre-wrap; font-size: var(--ui-font-size-12); }
 	.detail-read-list { margin: 4px 0 0; padding-left: 1.4em; font-size: var(--ui-font-size-12); }

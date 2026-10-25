@@ -1,5 +1,6 @@
 import type { PipelineHistoryDiagnostics } from '$lib/features/pipeline/diagnostics';
 import type { DescriptionDdlRecord } from '$lib/draw-route';
+import type { ProviderUsage } from '$lib/features/canvas/generation-info-tokens';
 
 export const HISTORY_MANAGER_DEFAULT_PAGE_SIZE = 24;
 
@@ -65,6 +66,8 @@ export type HistoryItem = {
 	stage2_model?: string | null;
 	tokens_in?: number | null;
 	tokens_out?: number | null;
+	/** The tokens by stage; absent on a work drawn before the record (2026-10-26). */
+	provider_usage?: ProviderUsage | null;
 	catalog_id?: string | null;
 	// How the catalog was asked for (fixed / auto / random). Absent on works
 	// saved before the column, which means "older than the field".

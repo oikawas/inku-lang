@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+### 2026-10-26 — 作品は描いた送信のトークン数を持つ
+
+Serverで描いた作品は、描いた送信の全部で使ったトークン数を保存する。共通coreの`provider_wire`に`usage`を足し、社ごとに違う応答の数を同じ意味に揃える。入力はキャッシュから読んだ分と書いた分を含め（Claudeの`input_tokens`はどちらも含まない）、出力は思考・推論を含める（Geminiの`candidatesTokenCount`は思考を含まない）。ChatGPTプランは流れの終わりの応答を同じように読む。Serverは送信ごとの数を時間と同じ記録の名（`stage1`・`composition`・`laws`・`colors`・`stage2`・`image`・`read_and_draw`）で足す。再試行と出力の上限で切れた応答も数える。作品の`tokens_in`・`tokens_out`に合計を、作品の保存済みの文脈に`provider_usage`（stageごとの送信の数・数の報告の無かった送信の数・入力・出力・キャッシュの入力）を置く。DBの形は変えない。描画の応答の`tokens_in_stage2`・`tokens_out_stage2`は穴埋め、`tokens_in_stage1`・`tokens_out_stage1`はそれ以外の全部。送信の無かった作品は0、これより前の作品は記録なし（null）のまま。Webの生成情報の「tokens in / out」は合計を出し、設定の表示の「生成情報のトークン数」で「詳細」を選ぶと、送信のあったstageごとの行も出す。既定は「合計だけ」で、選択はアカウントの`generation_info_token_detail`に保存する。奥書・AI自動推敲の見比べ・デモの指示文の送信は数えない。Android・macOSは変えない。
+
 ### 2026-10-25 — inku-cliはUUIDで1作品を読み出す
 
 inku-cliに、UUID（全体か先頭の数文字）で1作品を読む `history show`（記述・DDL・JSON Scoreを出す。`--part`で1つだけ）と `history png`（保存された表示用SVGを画だけのPNGに焼く。`--size`で長い辺、既定1024）を足した。1作品を返すAPIは無いので、一覧のAPIに `anchor_id` と `limit=1` を渡して引き、返った作品のIDを確かめる。先頭の数文字は絵を除いた一覧で引き当て、2つ以上に当たれば候補を示して止まる。Serverは変えない。

@@ -1774,6 +1774,20 @@ Gemma 4 on MLX explicitly receives the [model's recommended sampling settings](h
 - Claude 5 models and Mythos Preview get 8,192 more output tokens for thinking (drawing 2,048 → 10,240, advice 320 → 8,512). Thinking stays on. Claude 4.x is unchanged. Demo instructions also send no temperature and get the same room.
 - A response cut at the output limit (OpenAI `status: "incomplete"`, OpenAI-compatible `finish_reason: "length"`, Gemini `finishReason: "MAX_TOKENS"`, Claude `stop_reason: "max_tokens"`) is not used as a drawing answer: it is treated as an unreadable response (§12.8), and a `provider_output_limit` line records the limit, the output tokens, whether there was thinking, and whether text and a function call were present. Vision returns the response and records the same line.
 
+**A work's tokens (the author, 2026-10-26).** A work drawn by the Server keeps the tokens every send that drew it used. The shared core's `provider_wire` `usage` reads one send's counts from its response and returns `input_tokens`, `output_tokens` and `cached_input_tokens` (null when not reported). Input includes cache reads and writes; output includes thinking and reasoning.
+
+| Dialect | Input | Output | Cached input |
+|---|---|---|---|
+| Claude | `input_tokens` + `cache_read_input_tokens` + `cache_creation_input_tokens` | `output_tokens` | `cache_read_input_tokens` |
+| OpenAI Responses and the ChatGPT plan (the stream's terminal response) | `input_tokens` | `output_tokens` | `input_tokens_details.cached_tokens` |
+| OpenAI-compatible Chat Completions | `prompt_tokens` | `completion_tokens` | `prompt_tokens_details.cached_tokens` |
+| Gemini | `promptTokenCount` | `candidatesTokenCount` + `thoughtsTokenCount` | `cachedContentTokenCount` |
+
+- What counts: every send of the run that drew the work. Retries, answers cut at the output limit and malformed answers count when they report usage. Gemini's `countTokens` before a send, the colophon, the AI refinement's juxtaposition, Vision advice and the demo instruction do not.
+- How they add up: under the name the send is timed under (`provider_stage_record`: the sketch and the catalog choice are `stage1`, then `composition`, `laws`, `colors`, `stage2`, `image`, `read_and_draw`), each stage adds its sends, the sends whose response reported no count, and the input, output and cached input tokens.
+- Saved: the total in the work's `tokens_in` and `tokens_out`, and the stages in `provider_usage` in the work's saved context, returned when the work is read and in the drawing response. In the drawing response, `tokens_in_stage2` and `tokens_out_stage2` are `stage2` and `tokens_in_stage1` and `tokens_out_stage1` everything else. A work that sent nothing records 0, a count no send reported is null, and works drawn before 2026-10-26 are null (not recorded).
+- Shown: the Web's provenance drawer shows the total in "tokens in / out". When the account setting `generation_info_token_detail` ("Provenance tokens" in the display settings, "Total only" by default) is "Detail", a row for each stage that sent follows with its input, output and sends.
+
 **Stage 1 and Stage 2 use the same drawing model (the author's decision, 2026-09-30).** Both stages use the request's `stage1_model`, otherwise its `stage2_model`, otherwise the account's drawing model. Normalizing account settings aligns `stage2_provider` and `stage2_model` with the Stage 1 values. Vision has a separate model setting (§8.4 and the LLM/Vision catalogs of `/api/models`). The API's `stage1_model` / `stage2_model` keys and old works' model records remain. New drawings record the same actual model under both keys.
 
 **The models the server calls with its own credentials are the ones the

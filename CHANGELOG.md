@@ -8,6 +8,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-25 — Naming a work by its UUID: the `#` buttons copy the UUID, and inku-cli reads one work by it
+
+The `#` at the bottom right of the canvas and the `#` buttons in the library's thumbnails, list and preview copy the work's UUID instead of the full render hash (`rh3`). The same Score drawn again with the same seed gives another work the same `rh3`, and a stored hash is rewritten when the hash scheme changes, so it does not name a work. The preview row changed from `Hash` with `#XXXX` to `ID` with the UUID's first eight characters (the author's choice), and the list's column heading is now `ID`. The render hash copy under `Identity` in Provenance and the hash copies in the lineage panel are unchanged.
+
+inku-cli gains `history show`, which prints a work's description, DDL and JSON Score (`--part` for one of them), and `history png`, which rasterizes the saved display SVG into a PNG of the drawing alone (`--size` for the longer side, default 1024). Both take the UUID or its first few characters. There is no endpoint for one work, so the listing is asked with `anchor_id` and `limit=1` and the returned work's id is checked. A prefix is resolved against the listing without pictures, and one that fits more than one work stops with the candidates. The server is unchanged.
+
 ### 2026-10-24 — The Android camera can use a ChatGPT plan
 
 The Android camera's model choice also lists the published ChatGPT plan models (those serving both LLM and Vision). The photo is drawn by the shared core's image run, whose image stages send the photo and the review drawing through the same `chatgpt_request` as the server's Image tab. The rule that refused a ChatGPT plan model before the capture is retired. The core, Server and Web are unchanged.

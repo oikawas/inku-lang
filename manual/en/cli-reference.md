@@ -28,7 +28,7 @@ Run inku-cli COMMAND --help for the complete option list. This document states w
 | replay | Draw a saved work again with the current engine, compare it with the saved SVG, and optionally save it as a child (the web's `Replay`) |
 | render-local | Render and compare Score offline with a chosen checkout's core; no server connection or DB save |
 | demo-instruction | Write a demo description |
-| history / history-export | List or export history by hash |
+| history / history-export | List or export history by hash. `history show` / `history png` read one work by its UUID |
 | unread-words | Show the user's ledger; administrators may use --all |
 | contact-sheet / analyze / ddl-compare | Compare and analyze local artifacts (`analyze --replay` and `analyze --census --history` call the server's API) |
 | rasterize | Burn a folder of SVGs to PNG, one child process per file; `--workers` sets how many run at once |
@@ -201,6 +201,10 @@ The JSON on standard output records the engine versions at saving and now (`reco
 | `history acl` | (the work ID only) shows who else may see or change that work |
 | `history peers` | (no flags) lists the members of your own organisation group with their IDs |
 | `history state` | `--bytes` (adds the byte count the response actually arrived in). Returns only the number of works and the newest work's timestamp and ID. **It reads no picture bytes at all**, so you can ask whether anything changed before re-fetching the listing |
+| `history show WORK_ID` | `--part {all,description,ddl,score}`. Prints the work's description (the author's own words), DDL and JSON Score. The default `all` prints `id`, `at`, `description`, `ddl` and `score` as one JSON object; `description` and `ddl` print that text alone, and `score` prints the JSON Score alone |
+| `history png WORK_ID` | `--out` / `-o` (required; a path ending in `/`, or an existing directory, gets `<UUID>.png` inside it) / `--size` (pixels on the longer side, at least 64, default 1024). Rasterizes the saved display SVG into a PNG of the drawing alone, for showing a work to an AI |
+
+`WORK_ID` is the work's UUID. The `#` copy buttons on the web canvas and in the library copy it, and the history preview shows its first eight characters. Its first few characters are enough; when they fit more than one work, the command stops and lists the candidates. Unlike the hash, no two works share a UUID and it never changes after the work is saved.
 
 `--for-revision` narrows to works carrying the revision mark. That mark is independent of the star.
 `--for-share` narrows to the works their owner has opened to an organisation group. That mark is independent too, and the three can be combined.

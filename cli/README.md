@@ -983,10 +983,10 @@ usage: inku-cli history [-h] [--base-url BASE_URL]
                         [--timeout-seconds TIMEOUT_SECONDS] [--offset OFFSET]
                         [--limit LIMIT] [--query QUERY] [--starred]
                         [--for-revision] [--for-share] [--no-svg]
-                        {share,unshare,acl,peers,state} ...
+                        {share,unshare,acl,peers,state,show,png} ...
 
 positional arguments:
-  {share,unshare,acl,peers,state}
+  {share,unshare,acl,peers,state,show,png}
     share               let another member see or change one work
     unshare             take one member's access to a work away again
     acl                 show who else may see or change one work
@@ -994,6 +994,10 @@ positional arguments:
                         work with
     state               how many works there are and which is newest, without
                         sending any of them
+    show                print one work's description, DDL and JSON Score,
+                        named by its UUID
+    png                 write one work's drawing alone as a PNG to look at,
+                        named by its UUID
 
 options:
   -h, --help            show this help message and exit
@@ -1081,6 +1085,42 @@ options:
   -h, --help  show this help message and exit
   --bytes     wrap the answer in the size of the response it arrived in, to
               check it stays small
+
+```
+
+### `inku-cli history show`
+
+```
+usage: inku-cli history show [-h] [--part {all,description,ddl,score}] item_id
+
+positional arguments:
+  item_id               the work's UUID, or its first characters (the first 8
+                        are shown in the web history); an ambiguous prefix is
+                        refused
+
+options:
+  -h, --help            show this help message and exit
+  --part {all,description,ddl,score}
+                        all prints one JSON object with id, at, description,
+                        ddl and score (default); description and ddl print
+                        that text alone; score prints the JSON Score alone
+
+```
+
+### `inku-cli history png`
+
+```
+usage: inku-cli history png [-h] --out OUT [--size SIZE] item_id
+
+positional arguments:
+  item_id            the work's UUID, or its first characters (the first 8 are
+                     shown in the web history); an ambiguous prefix is refused
+
+options:
+  -h, --help         show this help message and exit
+  --out OUT, -o OUT  destination PNG path, or a directory to write <UUID>.png
+                     inside
+  --size SIZE        pixels on the longer side, at least 64 (default: 1024)
 
 ```
 

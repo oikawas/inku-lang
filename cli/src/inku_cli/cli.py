@@ -1202,6 +1202,51 @@ def _resolve_history_hash(items: list[dict[str, Any]], ref: str) -> dict[str, An
         raise CliError(f"history hash is ambiguous: {ref}. candidates: {candidates}. Use more digits.")
     return matches[0]
 
+_WORK_ID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+
+def _fetch_history_item_by_id(client: ApiClient, ref: str, *, include_svg: bool = True) -> dict[str, Any]:
+    """One work, named by its UUID or by the UUID's first characters.
+
+    The UUID is the work's own name: unlike the render hash, two saved works
+    never share it and it is never rewritten. There is no endpoint for one
+    work, so the listing is asked for a page of one with `anchor_id`, which
+    moves that page onto the work. A prefix is first resolved against the
+    whole listing, sent without the pictures.
+    """
+    needle = ref.strip().lower()
+    if not needle:
+        raise CliError("work id is empty")
+    if _WORK_ID_RE.fullmatch(needle):
+        work_id = needle
+    else:
+        matches = [
+            item for item in _fetch_all_history(client, include_svg=False)
+            if str(item.get("id") or "").lower().startswith(needle)
+        ]
+        if not matches:
+            raise CliError(f"work id not found: {ref}")
+        if len(matches) > 1:
+            candidates = ", ".join(
+                f"{item.get('id')} {item.get('at')} {str(item.get('source_text') or item.get('input') or '')[:28]}"
+                for item in matches[:8]
+            )
+            raise CliError(f"work id is ambiguous: {ref}. candidates: {candidates}. Use more characters.")
+        work_id = str(matches[0]["id"]).lower()
+    data, _ = client.request(
+        "GET",
+        "/api/history",
+        query={"anchor_id": work_id, "limit": 1, "include_svg": None if include_svg else False},
+    )
+    page = data.get("items")
+    if not isinstance(page, list):
+        raise CliError("server returned invalid history list")
+    # An anchor that is not found leaves the page at the newest work, so the
+    # id is checked rather than the first item trusted.
+    for item in page:
+        if isinstance(item, dict) and str(item.get("id") or "").lower() == work_id:
+            return item
+    raise CliError(f"work id not found: {ref}")
+
 def _select_history_items(
     items: list[dict[str, Any]],
     *,
@@ -1241,6 +1286,7 @@ def _fetch_all_history(
     for_revision: bool = False,
     for_share: bool = False,
     query: str | None = None,
+    include_svg: bool = True,
 ) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
     offset = 0
@@ -1257,6 +1303,8 @@ def _fetch_all_history(
                 "starred": starred,
                 "for_revision": for_revision,
                 "for_share": for_share,
+                # Sent only to withhold the pictures; None drops the key.
+                "include_svg": None if include_svg else False,
             },
         )
         page = data.get("items")
@@ -3563,6 +3611,90 @@ def command_export_card(args: argparse.Namespace) -> int:
     return 0
 
 
+_SVG_VIEWBOX_RE = re.compile(r"<svg\b[^>]*?\bviewBox\s*=\s*[\"']\s*[-\d.eE+]+[\s,]+[-\d.eE+]+[\s,]+([\d.eE+]+)[\s,]+([\d.eE+]+)")
+
+def _svg_long_edge_size(svg: str, long_edge: int) -> dict[str, int]:
+    """The width or height to rasterize at so the longer side is `long_edge`.
+
+    Only one is returned; the rasterizer scales the other to keep the aspect.
+    An SVG without a readable viewBox is sized by its width.
+    """
+    match = _SVG_VIEWBOX_RE.search(svg)
+    if match:
+        width, height = float(match.group(1)), float(match.group(2))
+        if height > width:
+            return {"height": long_edge}
+    return {"width": long_edge}
+
+def command_history_show(args: argparse.Namespace) -> int:
+    """Print one work's description, DDL and JSON Score, named by its UUID."""
+    config = load_config()
+    client = ApiClient(
+        args.base_url or config.base_url,
+        config.token,
+        timeout_seconds=_resolved_timeout_seconds(args, config),
+    )
+    item = _fetch_history_item_by_id(client, args.item_id, include_svg=False)
+    # The author's own words; works saved before source_text was stored fall
+    # back to input, as the history listing does.
+    description = item.get("source_text") or item.get("input") or ""
+    if args.part == "description":
+        print(description)
+    elif args.part == "ddl":
+        print(item.get("ddl") or "")
+    elif args.part == "score":
+        _print_json(item.get("score"))
+    else:
+        _print_json(
+            {
+                "id": item.get("id"),
+                "at": item.get("at"),
+                "description": description,
+                "ddl": item.get("ddl"),
+                "score": item.get("score"),
+            }
+        )
+    return 0
+
+def command_history_png(args: argparse.Namespace) -> int:
+    """Write one work's drawing alone as a PNG to look at, named by its UUID.
+
+    The SVG is the one saved with the work, the same picture the canvas shows.
+    """
+    if args.size < 64:
+        raise CliError("--size must be at least 64")
+    config = load_config()
+    client = ApiClient(
+        args.base_url or config.base_url,
+        config.token,
+        timeout_seconds=_resolved_timeout_seconds(args, config),
+    )
+    item = _fetch_history_item_by_id(client, args.item_id)
+    svg = str(item.get("svg") or "")
+    if not svg.strip():
+        raise CliError(f"work {item.get('id')} has no saved SVG")
+    png = _rasterize_png(svg, **_svg_long_edge_size(svg, args.size))
+    out = Path(args.out)
+    # A trailing separator means a directory even when it does not exist yet,
+    # as for export-card.
+    if args.out.endswith(("/", os.sep)) or out.is_dir():
+        out.mkdir(parents=True, exist_ok=True)
+        out = out / f"{item['id']}.png"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_bytes(png)
+    _print_json(
+        {
+            "id": item.get("id"),
+            "path": str(out),
+            "long_edge": args.size,
+            "bytes": len(png),
+            # Different backends and versions produce different pixels from one SVG.
+            "png_rasterizer": rasterizer_info(),
+        }
+    )
+    return 0
+
+
 def command_lineage(args: argparse.Namespace) -> int:
     config = load_config()
     client = ApiClient(
@@ -4718,6 +4850,45 @@ def build_parser() -> argparse.ArgumentParser:
         help="wrap the answer in the size of the response it arrived in, to check it stays small",
     )
     history_state.set_defaults(func=command_history_state)
+
+    history_show = history_sub.add_parser(
+        "show",
+        help="print one work's description, DDL and JSON Score, named by its UUID",
+    )
+    history_show.add_argument(
+        "item_id",
+        help="the work's UUID, or its first characters (the first 8 are shown in the web history); an ambiguous prefix is refused",
+    )
+    history_show.add_argument(
+        "--part",
+        choices=("all", "description", "ddl", "score"),
+        default="all",
+        help="all prints one JSON object with id, at, description, ddl and score (default); "
+        "description and ddl print that text alone; score prints the JSON Score alone",
+    )
+    history_show.set_defaults(func=command_history_show)
+
+    history_png = history_sub.add_parser(
+        "png",
+        help="write one work's drawing alone as a PNG to look at, named by its UUID",
+    )
+    history_png.add_argument(
+        "item_id",
+        help="the work's UUID, or its first characters (the first 8 are shown in the web history); an ambiguous prefix is refused",
+    )
+    history_png.add_argument(
+        "--out",
+        "-o",
+        required=True,
+        help="destination PNG path, or a directory to write <UUID>.png inside",
+    )
+    history_png.add_argument(
+        "--size",
+        type=int,
+        default=1024,
+        help="pixels on the longer side, at least 64 (default: 1024)",
+    )
+    history_png.set_defaults(func=command_history_png)
 
     # No _add_common_server_args here: `history` itself already carries them,
     # so the server flags go before the subcommand, as they do for `user`,

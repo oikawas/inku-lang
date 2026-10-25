@@ -28,7 +28,7 @@ inku-cliはWeb UIと同じ公開HTTP APIを操作するクライアントです�
 | replay | 保存済み作品を現行engineで描き直して保存済みSVGと比較し、必要なら子として保存（Webの`再演`） |
 | render-local | 指定checkoutのcoreでScoreをoffline描画・比較。サーバー接続・DB保存なし |
 | demo-instruction | デモ用記述の生成 |
-| history / history-export | 履歴一覧とhash指定の書き出し |
+| history / history-export | 履歴一覧とhash指定の書き出し。`history show` / `history png` はUUIDで1作品を読み出す |
 | unread-words | 本人の未読語台帳。管理者は --all で全体集計 |
 | contact-sheet / analyze / ddl-compare | ローカル成果物の比較・解析（`analyze --replay` と `analyze --census --history` はサーバーのAPIを呼ぶ） |
 | rasterize | SVGのフォルダをPNGへ焼く。1ファイル1子プロセスで、`--workers` で同時に走らせる本数を決める |
@@ -201,6 +201,10 @@ uv run inku-cli replay WORK_ID --save-child
 | `history acl` | （引数は作品IDのみ）いま誰がその作品を見られる／変えられるかを表示します |
 | `history peers` | （旗なし）自分と同じ組織グループの利用者をIDつきで一覧します |
 | `history state` | `--bytes`（応答が届いた実バイト数を添えます）。作品の総数と、最新の作品の時刻とIDだけを返します。**作品の絵は1バイトも読みません**ので、一覧を取り直す前に「変わったかどうか」だけを安く確かめられます |
+| `history show WORK_ID` | `--part {all,description,ddl,score}`。作品の記述（作者が書いた文）・DDL・JSON Scoreを表示します。既定の `all` は `id`・`at`・`description`・`ddl`・`score` を1つのJSONで、`description`・`ddl` はその文だけを、`score` はJSON Scoreだけを出します |
+| `history png WORK_ID` | `--out` / `-o`（必須。末尾が `/` のパスか既存のディレクトリなら、その中に `<UUID>.png`）/ `--size`（長い辺の画素数、64以上、既定1024）。保存された表示用のSVGを、画だけのPNGに焼きます。AIに作品を見せる時に使います |
+
+`WORK_ID` は作品のUUIDです。WebのキャンバスやライブラリーのUUIDのコピーボタン（`#`）でコピーでき、履歴のプレビューには先頭8文字が出ます。先頭の数文字だけでも指定できますが、2つ以上の作品に当てはまる時は候補を示して止まります。hashと違い、別の作品が同じUUIDになることはなく、保存の後に変わることもありません。
 
 `--for-revision` は推敲マークの付いた作品だけに絞ります。スターとは別の印です。
 `--for-share` は、所有者が組織グループへ開いた作品だけに絞ります。これも別の印で、3つは併用できます。

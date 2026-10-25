@@ -386,7 +386,8 @@ usage: inku-cli paint [-h] [--base-url BASE_URL]
                       [--render-seed RENDER_SEED]
                       [--composition-seed COMPOSITION_SEED] [--sketch]
                       [--sketch-grain {fine,coarse}]
-                      [--sketch-text SKETCH_TEXT] [--wild]
+                      [--sketch-text SKETCH_TEXT]
+                      [--route {stages,read_and_draw}] [--wild]
                       [--limits KEY=VALUE [KEY=VALUE ...]]
                       [--catalog-mode {fixed,auto,random}]
                       [--instruction-lang {auto,ja,en}] [--ui-lang UI_LANG]
@@ -464,6 +465,13 @@ options:
   --sketch-text SKETCH_TEXT
                         use this sketch text as it stands instead of asking
                         for one (replay of a saved or hand-edited sketch)
+  --route {stages,read_and_draw}
+                        how a description is drawn: stages (the server
+                        default) or read_and_draw (read from the speaker's
+                        eye, written as DDL and corrected once beside its
+                        drawing); with read_and_draw, --sketch reads the
+                        description first and --sketch-text is an edited
+                        reading
   --wild                remove the amplitude ceiling on the stroke performance
                         for prose or DDL input, letting the renderer swing
                         further
@@ -515,7 +523,8 @@ usage: inku-cli batch [-h] [--base-url BASE_URL]
                       [--render-seed RENDER_SEED]
                       [--composition-seed COMPOSITION_SEED] [--sketch]
                       [--sketch-grain {fine,coarse}]
-                      [--sketch-text SKETCH_TEXT] [--wild]
+                      [--sketch-text SKETCH_TEXT]
+                      [--route {stages,read_and_draw}] [--wild]
                       [--limits KEY=VALUE [KEY=VALUE ...]]
                       [--catalog-mode {fixed,auto,random}]
                       [--instruction-lang {auto,ja,en}] [--ui-lang UI_LANG]
@@ -577,6 +586,13 @@ options:
   --sketch-text SKETCH_TEXT
                         use this sketch text as it stands instead of asking
                         for one (replay of a saved or hand-edited sketch)
+  --route {stages,read_and_draw}
+                        how a description is drawn: stages (the server
+                        default) or read_and_draw (read from the speaker's
+                        eye, written as DDL and corrected once beside its
+                        drawing); with read_and_draw, --sketch reads the
+                        description first and --sketch-text is an edited
+                        reading
   --wild                remove the amplitude ceiling on the stroke performance
                         for prose or DDL input, letting the renderer swing
                         further

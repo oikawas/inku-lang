@@ -5,6 +5,8 @@
 // works were drawn under -- is arithmetic over a list and a listing, and is
 // testable on its own. Same reason retry.ts is a module and not a closure.
 
+import { drawRouteOf, type DrawRoute } from '../../draw-route.ts';
+
 /** One line of a batch prompt, numbered the way the run numbers it. */
 export type NumberedLine = {
 	/** 1-based index into the whole prompt, blank lines included. */
@@ -31,6 +33,7 @@ export type BatchWork = {
 	render_wild?: boolean | null;
 	render_canvas_aspect_id?: string | null;
 	render_canvas_aspect?: string | null;
+	description_ddl?: unknown;
 };
 
 /** The `#12 ` a batch run puts at the head of the description it stores. */
@@ -136,6 +139,10 @@ export type BatchRunConditions = {
 	sketchGrain: string | null;
 	wild: boolean | null;
 	canvasAspectId: string | null;
+	/** How the descriptions were drawn. A work without the read-and-draw
+	 *  record was drawn by the stages, so a work always says; a run that
+	 *  records no conditions leaves it null. */
+	route?: DrawRoute | null;
 };
 
 /**
@@ -155,5 +162,6 @@ export function conditionsOfWork(work: BatchWork): BatchRunConditions {
 		sketchGrain: work.sketch_grain ?? null,
 		wild: typeof work.render_wild === 'boolean' ? work.render_wild : null,
 		canvasAspectId: work.render_canvas_aspect_id ?? work.render_canvas_aspect ?? null,
+		route: drawRouteOf(work),
 	};
 }

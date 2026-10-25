@@ -32,6 +32,7 @@
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import { holeCompletionIssues } from '$lib/features/pipeline/hole-completion';
 	import { DEFAULT_SKETCH_MODE, normalizeSketchGrain, normalizeSketchState, sketchGrainLabel, sketchModeLabel, sketchModeOf, sketchStateNote, type SketchMode, type SketchState } from '$lib/sketch';
+	import { drawRouteOf, readingStateNote } from '$lib/draw-route';
 	import { composeFallbackReason, composeFallbackState, composeFallbackValue } from '$lib/composeFallback';
 	import { needsFallbackRefineConfirm, rememberFallbackRefineConfirm, type FallbackRefineParent } from '$lib/fallbackRefineGate';
 	import { submitDerivationKind as submitDerivationKindOf, type DerivationKind } from '$lib/derivation';
@@ -185,7 +186,7 @@
 		preview_url?: string;
 		preview_url_2x?: string;
 	};
-	type CopyKind = 'sketch' | 'stage1' | 'composition' | 'laws' | 'colors' | 'stage2' | 'score';
+	type CopyKind = 'sketch' | 'stage1' | 'composition' | 'laws' | 'colors' | 'reading' | 'stage2' | 'score';
 	let copiedPrompt = $state<CopyKind | null>(null);
 	let statusHashCopied = $state(false);
 	let previousInputMode = $state<'single' | 'image' | 'batch'>('single');
@@ -784,6 +785,9 @@
 		// then the resolved id is the best that was ever stored.
 		if (conditions.catalogMode === 'auto') colorCatalogSettings.selected = AUTO_CATALOG_ID;
 		else if (conditions.catalogId) colorCatalogSettings.selected = conditions.catalogId;
+		// The route first: choosing read and draw turns the sketch on, and the
+		// line after puts back the sketch the run was drawn with.
+		if (conditions.route) work.selectDrawRoute(conditions.route);
 		// Not conditional: a work with no prose was drawn with the layer off, and
 		// leaving the switch where it is would resume under other conditions.
 		work.sketchMode = sketchModeOf(conditions.sketchGrain);
@@ -2045,7 +2049,7 @@ $effect(() => {
 			work.ddlGeneratedBaseline = projection.ddl;
 			work.thinking = projection.thinking;
 			work.stage1UserPrompt = projection.sourceText;
-			work.adoptSketch(projection.sketchText, projection.sketchGrain, projection.sourceText, projection.sketchState);
+			work.adoptSketch(projection.sketchText, projection.sketchGrain, projection.sourceText, projection.sketchState, drawRouteOf(it));
 		}
 		work.result = projection.result;
 		work.error = null;
@@ -2834,6 +2838,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						chatgptModelAvailable={modelCatalogOwner === session.currentUser?.id && chatgptPlanAvailable && availableModelCatalog.some((group) => group.id === 'chatgpt' && group.models.some((model) => model.id === stage1Model))}
 						sketchMode={work.sketchMode}
 						onSelectSketchMode={(mode) => (work.sketchMode = mode)}
+						drawRoute={work.drawRoute}
+						onSelectDrawRoute={work.selectDrawRoute}
 						bind:inputMode={work.inputMode}
 						bind:imageProvenance={work.imageProvenance}
 						uploadedImage={work.uploadedImage}
@@ -2967,7 +2973,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 								<Tooltip placement="right" text={t().tooltipSketchToggle}>
 									<button class="sketch-toggle" type="button" aria-expanded={describePanelSettings.sketchOpen} onclick={describePanelSettings.toggleSketch}>
 										<span class="sketch-arrow" class:open={describePanelSettings.sketchOpen}>▶</span>
-										<span class="sketch-title">{t().sketchLabel}</span>
+										<!-- A read-and-draw work keeps its reading here, where it is read and edited the same way. -->
+										<span class="sketch-title">{work.result?.description_ddl ? t().readDrawReadingLabel : t().sketchLabel}</span>
 									</button>
 								</Tooltip>
 								{#if work.sketchText !== null}
@@ -2987,7 +2994,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 									     record, not from the absence: a work drawn with the
 									     layer off and a work drawn before the layer was
 									     recorded read the same here otherwise. -->
-									<p class="sketch-note">{sketchStateNote(work.sketchState, getLang() === 'ja')}</p>
+									<p class="sketch-note">{work.result?.description_ddl ? readingStateNote(work.result.description_ddl.reading_state, getLang() === 'ja') : sketchStateNote(work.sketchState, getLang() === 'ja')}</p>
 								{:else if work.sketchEditing}
 									<textarea class="sketch-editor" rows="7" bind:value={work.sketchDraft} spellcheck="true"></textarea>
 									<p class="sketch-note">{t().sketchEditHint}</p>

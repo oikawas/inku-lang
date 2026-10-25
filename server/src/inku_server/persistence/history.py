@@ -28,7 +28,7 @@ from .description_lock import DESCRIPTION_READING_KINDS, locked_history_ids
 from .ddl_source import LEGACY_EXPANDED_ORIGIN
 from .variation_authority import (
     VariationAuthorityAdapterError,
-    history_pipeline_diagnostics,
+    history_link_records,
 )
 
 
@@ -985,7 +985,7 @@ class HistoryListProjector:
                     item["pipeline_variation_id"] = link.variation_id
                     item["pipeline_revision"] = link.revision
                     try:
-                        stored_diagnostics = history_pipeline_diagnostics(
+                        stored_diagnostics, description_ddl = history_link_records(
                             {
                                 "variation_id": link.variation_id,
                                 "revision": link.revision,
@@ -1001,9 +1001,11 @@ class HistoryListProjector:
                         item.setdefault("data_warnings", []).append(
                             "pipeline_diagnostics_invalid"
                         )
-                        stored_diagnostics = None
+                        stored_diagnostics, description_ddl = None, None
                     if stored_diagnostics is not None:
                         item["pipeline_diagnostics"] = stored_diagnostics
+                    if description_ddl is not None:
+                        item["description_ddl"] = description_ddl
         if actor is not None:
             owned_ids = {row.id for row in rows if row.user_id == actor["id"]}
             acl_shared_ids = (

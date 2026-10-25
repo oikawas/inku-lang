@@ -25,7 +25,11 @@ from typing import Any
 
 # A refusal body is read only this far.
 _REFUSAL_READ_BYTES = 16384
-IMAGE_EFFECTS = frozenset({"select_image_catalog", "write_image_ddl", "review_image_ddl"})
+# The effects that send an image. Read and draw's review sends its drawing.
+IMAGE_EFFECTS = frozenset({"select_image_catalog", "write_image_ddl", "review_image_ddl", "review_description_ddl"})
+# Read and draw's three requests (SPEC §12.6.7), recorded apart from Stage 1
+# and the image tab.
+READ_AND_DRAW_EFFECTS = frozenset({"read_description", "write_description_ddl", "review_description_ddl"})
 
 
 def observation_digest(body: bytes) -> bytes:

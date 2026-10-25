@@ -99,6 +99,7 @@ uv run inku-cli paint --image photo.jpg --provenance "Taken by the Kamo River, K
 | `--sketch` | Enable a sketch that adds place and light alongside the original description for interpretation. Both server and Web UI default to off. Current choices are off/on |
 | `--sketch-grain {fine,coarse}` | Compatibility flag for old works; unused by the current sketch |
 | `--sketch-text TEXT` | Use this sketch text instead of calling Stage 0.5, replaying a saved or hand-edited sketch |
+| `--route {stages,read_and_draw}` | How the description is drawn: `stages` (the current stages, the default) or `read_and_draw` (read from the speaker's eye, written as DDL and corrected once beside its drawing). With read and draw, `--sketch` passes through the reading and `--sketch-text` is an edited reading |
 
 Variation is retired. The old amplitude and seed flags are rejected. Saved variation metadata stays in the database and is never sent in a new drawing request.
 

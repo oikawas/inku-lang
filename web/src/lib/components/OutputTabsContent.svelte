@@ -2,7 +2,7 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import type { PromptStage, SentSystemPrompt, SystemPromptsState } from '$lib/features/canvas/system-prompts';
 
-	type CopyKind = 'sketch' | 'stage1' | 'composition' | 'laws' | 'colors' | 'stage2' | 'score';
+	type CopyKind = 'sketch' | 'stage1' | 'composition' | 'laws' | 'colors' | 'reading' | 'stage2' | 'score';
 	type Props = {
 		outputTab: 'prompts' | 'score';
 		/** The pane that scrolls in whichever tab is showing. The drawer that
@@ -48,6 +48,14 @@
 	const lawsSystem = $derived(systemPrompts.state === 'recorded' ? systemPrompts.laws : null);
 	const colorsSystem = $derived(systemPrompts.state === 'recorded' ? systemPrompts.colors : null);
 	const stage2System = $derived(systemPrompts.state === 'recorded' ? systemPrompts.stage2 : null);
+	// Read and draw's three requests (SPEC 12.6.7), shown only for a work that sent any.
+	let readingSystemExpanded = $state(false);
+	let descriptionDdlSystemExpanded = $state(false);
+	let descriptionReviewSystemExpanded = $state(false);
+	const readingSystem = $derived(systemPrompts.state === 'recorded' ? systemPrompts.reading : null);
+	const descriptionDdlSystem = $derived(systemPrompts.state === 'recorded' ? systemPrompts.description_ddl : null);
+	const descriptionReviewSystem = $derived(systemPrompts.state === 'recorded' ? systemPrompts.description_review : null);
+	const readAndDrawSent = $derived(!!(readingSystem || descriptionDdlSystem || descriptionReviewSystem));
 	// Said in place of a stage's system prompt when there is none to show: a
 	// stage the execution kept called no model; one it did not keep was drawn
 	// before its record began.
@@ -73,7 +81,7 @@
 
 <!-- The sketch, the composition reading, the laws stage and the color stage: what each was given, then its system prompt. -->
 {#snippet sentStage(
-	kind: 'sketch' | 'composition' | 'laws' | 'colors',
+	kind: 'sketch' | 'composition' | 'laws' | 'colors' | 'reading' | 'description_ddl' | 'description_review',
 	inputLabel: string,
 	systemLabel: string,
 	sent: SentSystemPrompt | null,
@@ -89,7 +97,7 @@
 				type="button"
 				title={copiedPrompt === kind ? t().promptCopied : t().promptCopy}
 				aria-label={copiedPrompt === kind ? t().promptCopied : t().promptCopy}
-				onclick={() => onCopyPromptText(kind, sent.message)}
+				onclick={() => onCopyPromptText(kind as CopyKind, sent.message)}
 			>
 				<svg viewBox="0 0 24 24" aria-hidden="true">
 					<rect x="9" y="9" width="10" height="10" rx="2"></rect>
@@ -119,6 +127,11 @@
 {#if outputTab === 'prompts'}
 	<div class="prompt-section" bind:this={scrollEl}>
 		{@render sentStage('sketch', t().promptSketchInput, t().promptSketchSystem, sketchSystem, sketchSystemExpanded, () => (sketchSystemExpanded = !sketchSystemExpanded))}
+		{#if readAndDrawSent}
+			{@render sentStage('reading', t().promptReadingInput, t().promptReadingSystem, readingSystem, readingSystemExpanded, () => (readingSystemExpanded = !readingSystemExpanded))}
+			{@render sentStage('description_ddl', t().promptDescriptionDdlInput, t().promptDescriptionDdlSystem, descriptionDdlSystem, descriptionDdlSystemExpanded, () => (descriptionDdlSystemExpanded = !descriptionDdlSystemExpanded))}
+			{@render sentStage('description_review', t().promptDescriptionReviewInput, t().promptDescriptionReviewSystem, descriptionReviewSystem, descriptionReviewSystemExpanded, () => (descriptionReviewSystemExpanded = !descriptionReviewSystemExpanded))}
+		{/if}
 		<div class="prompt-head">
 			<p class="prompt-label">{t().promptStage1Input}</p>
 			<button

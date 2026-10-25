@@ -32,6 +32,9 @@ _PIPELINE_FAILURES = {
 _PIPELINE_FAILURE_DETAILS = {"credentials_unavailable"}
 _HOLE_COMPLETION_STATUSES = {"validated", "rejected", "unresolved"}
 _ACTION_STAGES = {
+    "read_description": "read_and_draw",
+    "write_description_ddl": "read_and_draw",
+    "review_description_ddl": "read_and_draw",
     "select_image_catalog": "image",
     "write_image_ddl": "image",
     "review_image_ddl": "image",
@@ -341,6 +344,8 @@ class CandidateExecution:
                            "sketch": state.get("sketch"),
                            "image_ddl": state.get("image_ddl") or self.context.get("image_ddl"),
                            "image_provenance": self.context.get("image_provenance"),
+                           "route": self.context.get("host_options", {}).get("route") or "stages",
+                           "description_ddl": state.get("description_ddl"),
                            "catalog_diagnostics": self.context.get("macro_catalog", {}).get("diagnostics", []),
                            "rendered": self._rendered,
                            "result": json_seeds(self.context.get("result"))})

@@ -7,7 +7,9 @@
 	import type { ImageFolderBatch } from '$lib/features/batch/image-folder.svelte';
 	import CanvasAspectPlugin from './CanvasAspectPlugin.svelte';
 	import SketchSelect from './SketchSelect.svelte';
+	import RouteSelect from './RouteSelect.svelte';
 	import { type SketchMode } from '$lib/sketch';
+	import { type DrawRoute } from '$lib/draw-route';
 	import { wildSettings } from '$lib/features/wild/settings.svelte';
 	import PaintButton from './PaintButton.svelte';
 	import RunStatus from './RunStatus.svelte';
@@ -98,6 +100,9 @@
 		/** Sketch from life (Stage 0.5). Chosen per draw, not stored as a user setting. */
 		sketchMode: SketchMode;
 		onSelectSketchMode: (mode: SketchMode) => void;
+		/** How a description is drawn. Chosen per draw, like the sketch. */
+		drawRoute: DrawRoute;
+		onSelectDrawRoute: (route: DrawRoute) => void;
 		nextStage1Model: string;
 		nextStage2Model: string;
 		nextCatalogName: string;
@@ -169,6 +174,8 @@
 		stage2ModelLabel,
 		sketchMode,
 		onSelectSketchMode,
+		drawRoute,
+		onSelectDrawRoute,
 		nextStage1Model,
 		nextStage2Model,
 		nextCatalogName,
@@ -281,6 +288,9 @@
 			</div>
 			<div class="condition-compact-rows">
 				{#if !pictureConditions}
+				<div class="condition-compact-row">
+					<Tooltip text={t().tooltipInputRoute}><RouteSelect value={drawRoute} {isJapanese} onSelect={onSelectDrawRoute} /></Tooltip>
+				</div>
 				<div class="condition-compact-row">
 					<Tooltip text={t().tooltipInputSketch}><SketchSelect value={sketchMode} {isJapanese} showValue onSelect={onSelectSketchMode} /></Tooltip>
 				</div>

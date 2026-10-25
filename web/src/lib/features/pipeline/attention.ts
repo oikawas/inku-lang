@@ -10,6 +10,9 @@ import type { LangPack } from '../../i18n/types';
 const STAGE_OF_REASON: Record<string, string> = {
 	stage1_failed: 'stage1',
 	hole_completion_failed: 'stage2',
+	// Read and draw: its three model calls are recorded under one name.
+	description_ddl_failed: 'read_and_draw',
+	description_ddl_undrawable: 'read_and_draw',
 };
 
 /**

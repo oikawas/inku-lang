@@ -165,8 +165,15 @@ export type PaintStageMoment = 'requested' | 'sketch' | 'stage1' | 'score';
 export function paintStageLabel(
 	moment: PaintStageMoment,
 	strings: LangPack,
-	options: { sketchOn: boolean }
+	options: { sketchOn: boolean; readAndDraw?: boolean }
 ): string {
+	// Read and draw has no Stage 1 of its own: the reading (with the sketch on)
+	// or the writing comes first, and once its DDL is committed the work is saved.
+	if (options.readAndDraw) {
+		if (moment === 'requested') return options.sketchOn ? strings.readDrawReading : strings.readDrawWriting;
+		if (moment === 'sketch') return strings.readDrawWriting;
+		return strings.readDrawSaving;
+	}
 	if (moment === 'requested') {
 		return options.sketchOn ? strings.stageSketching : strings.stageInterpreting;
 	}
@@ -192,6 +199,11 @@ export function runningStageLabel(
 	if (attempt?.action === 'select_image_catalog') return strings.imageSelectingCatalog;
 	if (attempt?.action === 'write_image_ddl') return attempt.asked_again ? strings.imageRevisingDdl : strings.imageWritingDdl;
 	if (attempt?.action === 'review_image_ddl') return attempt.asked_again ? strings.imageRevisingDdl : strings.imageReviewingDdl;
+	// Read and draw (SPEC 12.6.7): the reading, the writing, and the correction
+	// beside the drawing; a request asked again after the check revises.
+	if (attempt?.action === 'read_description') return strings.readDrawReading;
+	if (attempt?.action === 'write_description_ddl') return attempt.asked_again ? strings.readDrawRevising : strings.readDrawWriting;
+	if (attempt?.action === 'review_description_ddl') return attempt.asked_again ? strings.readDrawRevising : strings.readDrawReviewing;
 	if (attempt?.action === 'read_composition') return strings.stageReadingComposition;
 	if (attempt?.action === 'choose_colors') return strings.stageChoosingColors;
 	return attempt?.action === 'choose_laws' ? strings.stageChoosingLaws : label;
@@ -221,7 +233,7 @@ export function providerAttemptText(
 export function paintStageHandlers(
 	strings: LangPack,
 	setLabel: (label: string) => void,
-	options: { sketchOn: boolean; onStage1?: (event: PaintStage1Event) => void }
+	options: { sketchOn: boolean; readAndDraw?: boolean; onStage1?: (event: PaintStage1Event) => void }
 ): Pick<PaintStreamHandlers, 'onSketch' | 'onStage1' | 'onScore'> {
 	return {
 		onSketch: () => setLabel(paintStageLabel('sketch', strings, options)),

@@ -149,6 +149,29 @@ If the layer does not answer, the description goes to interpretation unchanged a
 
 `Sketch from life (Stage 0.5)` folds from the triangle in its heading. This state is saved on the account and starts open. The instructions box stays visible. Folding numeric ranges within its editor is separate from collapsing the whole box.
 
+### Read and Draw a Description
+
+`Drawing` under `Conditions for the next work` in the Describe and Batch tabs chooses `Current stages` (the default) or `Read and draw`. With `Read and draw`, the model reads the description from the speaker's eye, writes what that eye sees as instructions, and corrects them once beside their drawing before the work is made. The composition reading, the laws stage and the color stage are not passed through. The work stays a description's work and can be drawn again from its description or an edited reading. Editing it in the DDL tab holds its description, as it does for any work.
+
+| Sketch | Meaning with `Read and draw` |
+|---|---|
+| On | The description is read before the instructions are written. Choosing `Read and draw` turns the sketch on |
+| Off | The instructions are written from the description alone, without a reading |
+
+Only the reading reads what the description's bracketed labels hold (such as `[Ki no Tomonori / Kokinshū]`). The choice is not kept as a setting. Opening a work from the history sets it to the way that work was drawn. A child drawn again by a pairing or by AI refinement takes its parent's way.
+
+While it waits, the display names the step at work.
+
+| Display | What happens |
+|---|---|
+| `Reading the description…` | With the sketch on. The speaker, the viewpoint, the core images and the images of words quoted from the description are read |
+| `Writing the instructions…` | The instructions are written from the reading, or from the description when the sketch is off |
+| `Revising the instructions…` | When lines would not draw as written, the model is asked once to write again, with the reasons |
+| `Correcting the instructions beside the drawing…` | The model is shown the drawing of its instructions and corrects them once. A model that cannot read images is not shown it |
+| `Saving the work…` | The committed instructions are drawn and saved |
+
+The reading appears under `Sketch from life (reading)` in the description panel. Editing it with `Edit` and drawing again writes from the edited reading without asking for a new one. `Read and draw` in Generation Info shows the reading, the items dropped because neither the description nor a label holds them, each round (writing and review, with the people drawn), and the instructions before the review. When only instructions that draw nothing could be written, the run stops with the reason.
+
 ## 5. Consult the Saijiki
 
 The `Saijiki` is inku's vocabulary dictionary. Open `New instructions` or `Instruction editor` to find the shared instruction editor, with a broad Saijiki list beneath it. Close the vocabulary to make more room for the text.

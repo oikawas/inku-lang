@@ -95,7 +95,8 @@ def test_a_drawing_shows_the_stage_1_system_prompt_it_sent(author, sent):
     assert body["stage2"] is None
     assert body["sketch"] is None and body["composition"] is None and body["laws"] is None
     assert body["colors"] is None
-    assert body["stages"] == ["sketch", "stage1", "composition", "laws", "colors", "stage2"]
+    assert body["stages"] == ["sketch", "stage1", "composition", "laws", "colors", "stage2",
+                              "reading", "description_ddl", "description_review"]
 
 
 def _action(tag: str, attempt: int, system: str) -> dict:
@@ -167,6 +168,9 @@ def test_an_execution_from_before_the_sketch_and_the_reading_kept_stage_1_and_st
         "laws": None,
         "colors": None,
         "stage2": None,
+        "reading": None,
+        "description_ddl": None,
+        "description_review": None,
     }
     # Saved before the record began at all.
     assert system_prompts_view({})["recorded"] is False

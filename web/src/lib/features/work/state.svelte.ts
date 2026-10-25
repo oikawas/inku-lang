@@ -4,6 +4,7 @@ import { pluginWarningsToShow } from '$lib/plugin-names';
 import { limitNotesToShow } from '$lib/limitNotes';
 import { t, getLang } from '$lib/i18n/index.svelte';
 import { DEFAULT_SKETCH_MODE, normalizeSketchState, type SketchMode, type SketchState } from '$lib/sketch';
+import { DEFAULT_DRAW_ROUTE, drawRouteOf, sketchModeForRoute, type DrawRoute } from '$lib/draw-route';
 import { composeFallbackReason, composeFallbackState, composeFallbackValue } from '$lib/composeFallback';
 import { needsFallbackRefineConfirm, rememberFallbackRefineConfirm, type FallbackRefineParent } from '$lib/fallbackRefineGate';
 import { submitDerivationKind as submitDerivationKindOf, type DerivationKind } from '$lib/derivation';
@@ -183,6 +184,17 @@ export function createWorkState(deps: WorkStateDeps) {
 	// way a user setting like the color catalog is (contract section 0.3.1).
 	let sketchMode = $state<SketchMode>(DEFAULT_SKETCH_MODE);
 
+	// How a description is drawn (SPEC 12.6.7). Chosen per draw like the sketch,
+	// never saved as a setting; a work opened from the history sets it.
+	let drawRoute = $state<DrawRoute>(DEFAULT_DRAW_ROUTE);
+
+	/** The author's choice of route. Read and draw starts with the sketch on
+	 *  (the author's answer, 2026-10-25); the current stages leave it alone. */
+	function selectDrawRoute(route: DrawRoute): void {
+		if (route !== drawRoute) sketchMode = sketchModeForRoute(route, sketchMode);
+		drawRoute = route;
+	}
+
 	// The prose the layer wrote for the run on screen, and the author's edit of
 	// it. Editing and painting again sends the edited prose instead of calling
 	// the layer, so what the author reads is what Stage 1 reads.
@@ -231,7 +243,8 @@ export function createWorkState(deps: WorkStateDeps) {
 		text: string | null,
 		grain: unknown,
 		source: string | null = null,
-		state: unknown = null
+		state: unknown = null,
+		route: DrawRoute = DEFAULT_DRAW_ROUTE
 	): void {
 		sketchText = text;
 		sketchSource = source;
@@ -240,6 +253,9 @@ export function createWorkState(deps: WorkStateDeps) {
 		void grain;
 		sketchState = normalizeSketchState(state);
 		sketchMode = text ? 'on' : DEFAULT_SKETCH_MODE;
+		// The route the work was drawn by. A read-and-draw work's reading is its
+		// sketch text; one drawn without a reading keeps the sketch off.
+		drawRoute = route;
 	}
 
 	let pendingCanvasAspectDerivation = $state<{ parentNodeId: string; fromAspectId: CanvasAspectId; toAspectId: CanvasAspectId; } | null>(null);
@@ -280,6 +296,7 @@ export function createWorkState(deps: WorkStateDeps) {
 	function pipelineOptions(options: PaintOptions = {}): PipelineOptions {
 		const render = renderSettingsPayload('paint', options.renderOverrides);
 		return {
+			route: options.route ?? drawRoute,
 			sketch: options.sketchMode ?? sketchMode,
 			...(options.sketchText ? { sketch_text: options.sketchText } : {}),
 			stage1_model: options.stage1Model ?? qualifiedModelId(deps.models.stage1Provider(), deps.models.stage1Model()),
@@ -309,6 +326,8 @@ export function createWorkState(deps: WorkStateDeps) {
 		pipelineView = view;
 		activeRunAttempt = view?.provider_attempt ?? null;
 		if (!view) return;
+		// A read-and-draw run whose DDL is committed is drawn and saved next.
+		if (loading && view.route === 'read_and_draw' && view.delivery?.score && !view.result) stageLabel = t().readDrawSaving;
 		if (view.image_ddl || view.image_provenance != null) {
 			imageProvenance = view.image_provenance ?? '';
 			input = '';
@@ -324,7 +343,8 @@ export function createWorkState(deps: WorkStateDeps) {
 		if (!view.result) return;
 		const painted = view.result;
 		result = painted;
-		adoptSketch(painted.sketch_text ?? null, painted.sketch_grain, view.description, painted.sketch_state);
+		adoptSketch(painted.sketch_text ?? null, painted.sketch_grain, view.description, painted.sketch_state,
+			drawRouteOf({ route: view.route, description_ddl: view.description_ddl ?? painted.description_ddl }));
 		thinking = painted.thinking ?? null;
 		elapsedStage1Ms = painted.elapsed_stage1_ms;
 		elapsedStage2Ms = painted.elapsed_stage2_ms;
@@ -761,6 +781,7 @@ export function createWorkState(deps: WorkStateDeps) {
 				instructionLang,
 				canvasAspectId: effectiveCanvasAspectId(),
 				sketchMode,
+				route: drawRoute,
 				renderPayload: renderSettingsPayload('paint', options.renderOverrides)
 			},
 			{
@@ -1031,7 +1052,9 @@ export function createWorkState(deps: WorkStateDeps) {
 		startTimer();
 
 		try {
-			stageLabel = t().stageDdlGenerating;
+			stageLabel = drawRoute === 'read_and_draw'
+				? (sketchMode === 'off' ? t().readDrawWriting : t().readDrawReading)
+				: t().stageDdlGenerating;
 			const view = await authorDescription(input, {
 				sourceText: input,
 				canvasAspectId: effectiveCanvasAspectId(),
@@ -1062,6 +1085,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		const batchStage1Model = qualifiedModelId(deps.models.stage1Provider(), deps.models.stage1Model());
 		const batchStage2Model = qualifiedModelId(deps.models.stage2Provider(), deps.models.stage2Model());
 		const batchSketchMode = sketchMode;
+		const batchRoute = drawRoute;
 		const batchWild = wildSettings.enabled;
 		// The batch owns its line failures; the previous single-work run is no longer current.
 		pipelineController.clear();
@@ -1087,13 +1111,14 @@ export function createWorkState(deps: WorkStateDeps) {
 					sketchGrain: batchSketchMode === 'off' ? null : batchSketchMode,
 					wild: batchWild,
 					canvasAspectId: batchCanvasAspectId,
+					route: batchRoute,
 				},
 				canvasAspectId: batchCanvasAspectId,
 				renderOverrides: { ...colorCatalogOverride(batchCatalogId), ...wildOverride(batchWild) },
 				maxRetries: batchSettings.maxRetries,
 				paintLine: (text, paintOptions) => paintOne(text, {
 					...paintOptions, stage1Model: batchStage1Model, stage2Model: batchStage2Model,
-					sketchMode: batchSketchMode,
+					sketchMode: batchSketchMode, route: batchRoute,
 				}),
 				onLatestResult: (painted) => {
 					thinking = painted.thinking;
@@ -1443,6 +1468,8 @@ export function createWorkState(deps: WorkStateDeps) {
 		set result(value) { result = value; },
 		get sketchMode() { return sketchMode; },
 		set sketchMode(value) { sketchMode = value; },
+		get drawRoute() { return drawRoute; },
+		selectDrawRoute,
 		get sketchText() { return sketchText; },
 		set sketchText(value) { sketchText = value; },
 		get sketchSource() { return sketchSource; },

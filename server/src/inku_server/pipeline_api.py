@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, FastAPI, HTTPException, Path, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from .description_labels import pipeline_description
+from .description_labels import pipeline_description, source_labels
 from .pipeline_candidate import CandidateExecution, CandidateHostError, PipelineBinding
 from .pipeline_settings import select_canvas
 from .persistence.variation_authority import (
@@ -66,6 +66,15 @@ def _rewords(text: str, description: str) -> bool:
     def read(value: str) -> str:
         return " ".join(pipeline_description(str(value)).split())
     return read(text) != read(description)
+
+
+def _route_fields(context: dict, text: str) -> dict:
+    """What a description run adds for read and draw (SPEC §12.6.7): the route
+    and the labels' words, which only the reading reads. The stages add nothing,
+    so their request is the one they always sent."""
+    if context.get("host_options", {}).get("route") != "read_and_draw":
+        return {}
+    return {"route": "read_and_draw", "source_labels": source_labels(text)}
 
 
 def _refuse_if_locked(history_id: str) -> None:
@@ -371,7 +380,8 @@ class PipelineService:
                 authoring = {"tag": "image", "image": image.authoring_input(),
                              "auto_catalog": context.get("auto_catalog", False)}
             elif kind == "description":
-                authoring = {"tag": "description", "description": drawn, "auto_catalog": context.get("auto_catalog", self.auto_catalog)}
+                authoring = {"tag": "description", "description": drawn, "auto_catalog": context.get("auto_catalog", self.auto_catalog),
+                             **_route_fields(context, text)}
             elif kind == "saved_laws":
                 authoring = {"tag": "saved_laws", "source": text,
                              "description": pipeline_description(description), "direction": deepcopy(direction or {})}
@@ -674,6 +684,8 @@ class PipelineService:
         context_updates = None
         if payload.get("tag") == "generate_from_description":
             payload = {**payload, "auto_catalog": run.context.get("auto_catalog", self.auto_catalog)}
+            written = payload["description"] if isinstance(payload.get("description"), str) else run.context.get("description", "")
+            payload.update(_route_fields(run.context, written))
             if isinstance(payload.get("description"), str):
                 context_updates = {"description": payload["description"]}
                 payload["description"] = _drawn_description(payload["description"])

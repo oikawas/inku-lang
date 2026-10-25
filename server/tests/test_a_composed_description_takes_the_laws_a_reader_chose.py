@@ -129,6 +129,7 @@ def test_a_composed_description_is_printed_with_the_laws_its_reader_chose(author
     prompts = client.get(f"/api/pipeline/variations/{body['pipeline_variation_id']}/system-prompts", headers=author)
     assert prompts.status_code == 200, prompts.text
     kept = prompts.json()
-    assert kept["stages"] == ["sketch", "stage1", "composition", "laws", "colors", "stage2"]
+    assert kept["stages"] == ["sketch", "stage1", "composition", "laws", "colors", "stage2",
+                              "reading", "description_ddl", "description_review"]
     assert kept["laws"]["system"] == laws["system"]
     assert kept["laws"]["message"] == laws["message"]

@@ -56,6 +56,9 @@ LAWS_RECORD_DERIVATIONS = frozenset(
 # document and answer they were applied by, from which the AI refinement's laws
 # move applies other laws (2026-10-20).
 LAWS_RECORD_KEYS = ("laws_layers", "laws_basis")
+# The snapshot's records a saved work keeps beside its config, each only when
+# the run made it. Read and draw's record (SPEC §12.6.7) joined them 2026-10-26.
+_OPTIONAL_FORK_CONTEXT_KEYS = ("completion_ranges", *LAWS_RECORD_KEYS, "description_ddl")
 _PIPELINE_DIAGNOSTIC_KEYS = frozenset(
     {
         "upstream_diagnostics",
@@ -190,6 +193,8 @@ class LinkedHistoryForkRecord:
     laws_layers: object | None = None
     # The composed document and answer the laws were applied by (2026-10-20).
     laws_basis: object | None = None
+    # Read and draw's record: the reading, its rounds and the drawing seen (2026-10-26).
+    description_ddl: object | None = None
 
 
 @dataclass(frozen=True)
@@ -674,7 +679,7 @@ def _history_fork_context_bytes(
             pipeline_diagnostics
         ),
     }
-    for key in ("completion_ranges", *LAWS_RECORD_KEYS):
+    for key in _OPTIONAL_FORK_CONTEXT_KEYS:
         if snapshot.get(key) is not None:
             payload[key] = snapshot[key]
     encoded = _canonical_json(payload, sort_keys=True).encode("utf-8")
@@ -747,7 +752,7 @@ def _decode_history_fork_context_payload(
     elif protocol in {_DIAGNOSTICS_HISTORY_FORK_CONTEXT_PROTOCOL, HISTORY_FORK_CONTEXT_PROTOCOL}:
         expected_keys = legacy_keys | {"pipeline_diagnostics"}
         if protocol == HISTORY_FORK_CONTEXT_PROTOCOL:
-            expected_keys |= {"completion_ranges", *LAWS_RECORD_KEYS} & set(payload)
+            expected_keys |= set(_OPTIONAL_FORK_CONTEXT_KEYS) & set(payload)
         pipeline_diagnostics = _validate_pipeline_diagnostics(
             payload.get("pipeline_diagnostics")
         )
@@ -781,6 +786,14 @@ def history_pipeline_diagnostics(
     return pipeline_diagnostics
 
 
+def history_link_records(
+    row: Mapping[str, Any],
+) -> tuple[dict[str, object] | None, object | None]:
+    """The diagnostics and read and draw's record frozen on one history link."""
+    payload, pipeline_diagnostics = _decode_history_fork_context_payload(row)
+    return pipeline_diagnostics, payload.get("description_ddl")
+
+
 def _decode_history_fork_context(
     row: Mapping[str, Any], history: LegacyHistoryRecord
 ) -> LinkedHistoryForkRecord:
@@ -805,6 +818,7 @@ def _decode_history_fork_context(
         completion_ranges=payload.get("completion_ranges"),
         laws_layers=payload.get("laws_layers"),
         laws_basis=payload.get("laws_basis"),
+        description_ddl=payload.get("description_ddl"),
     )
 
 

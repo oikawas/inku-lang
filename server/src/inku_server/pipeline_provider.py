@@ -40,6 +40,8 @@ def provider_stage_record(tag: str) -> str:
         return "laws"
     if tag == "choose_colors":
         return "colors"
+    if tag in provider_wire.READ_AND_DRAW_EFFECTS:
+        return "read_and_draw"
     if tag in provider_wire.IMAGE_EFFECTS:
         return "image"
     return "stage1"
@@ -104,6 +106,9 @@ class SingleAttemptProvider:
             "select_image_catalog": "image_catalog_selected",
             "write_image_ddl": "image_ddl_written",
             "review_image_ddl": "image_ddl_reviewed",
+            "read_description": "description_read",
+            "write_description_ddl": "description_ddl_written",
+            "review_description_ddl": "description_ddl_reviewed",
         }
         if action["tag"] not in tags:
             raise ValueError("unsupported provider effect")

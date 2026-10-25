@@ -55,6 +55,12 @@ export interface LangPack {
 	imageRevisingDdl: string;
 	imageReviewingDdl: string;
 	imageSelectingCatalog: string;
+	/** Read and draw (SPEC 12.6.7): what the run is doing. */
+	readDrawReading: string;
+	readDrawWriting: string;
+	readDrawRevising: string;
+	readDrawReviewing: string;
+	readDrawSaving: string;
 	imageMissing: string;
 	imageInvalid: string;
 	imageTooLarge: string;
@@ -353,6 +359,7 @@ export interface LangPack {
 	tooltipDdlLang: string;
 	displayedWorkProcess: string;
 	sketchLabel: string;
+	readDrawReadingLabel: string;
 	sketchGrainLabel: string;
 	sketchOffNote: string;
 	sketchFallbackNote: string;
@@ -511,6 +518,7 @@ export interface LangPack {
 	tooltipInputModel: string;
 	tooltipInputClear: string;
 	tooltipInputSketch: string;
+	tooltipInputRoute: string;
 	wildButton: string;
 	wildEnabled: string;
 	wildDisabled: string;
@@ -643,6 +651,12 @@ export interface LangPack {
 	promptLawsSystem: string;
 	promptColorsInput: string;
 	promptColorsSystem: string;
+	promptReadingInput: string;
+	promptReadingSystem: string;
+	promptDescriptionDdlInput: string;
+	promptDescriptionDdlSystem: string;
+	promptDescriptionReviewInput: string;
+	promptDescriptionReviewSystem: string;
 	promptStage2Input: string;
 	promptStage1System: string;
 	promptStage2System: string;
@@ -1405,6 +1419,10 @@ export interface LangPack {
 	provenanceHintWild: string;
 	provenanceHintSketchGrain: string;
 	provenanceHintSketchRecord: string;
+	provenanceHintDrawRoute: string;
+	provenanceHintReading: string;
+	provenanceHintReadReview: string;
+	provenanceHintReadLabels: string;
 	provenanceHintCatalog: string;
 	provenanceHintColorMap: string;
 	provenanceHintCanvas: string;

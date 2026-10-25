@@ -3,6 +3,7 @@ import type { PaintResult, Seed } from '$lib/features/run/current-work';
 import type { ApiFetch } from '$lib/transport/api-fetch';
 import type { PipelineDiagnostic, PipelineHistoryDiagnostics, PluginDiagnostic } from './diagnostics';
 import type { ImportedPlugin } from '../ddl-editor/ddl-import';
+import type { DescriptionDdlRecord, DrawRoute } from '$lib/draw-route';
 
 export type PipelineAuthority = {
 	revision: string;
@@ -49,6 +50,10 @@ export type PipelineHoleCompletionCheck = {
 
 export type PipelineView = {
 	image_ddl?: Record<string, unknown> | null;
+	/** How the description is drawn; absent on a view from before the route. */
+	route?: DrawRoute;
+	/** Read and draw's record, as the core keeps it (SPEC 12.6.7). */
+	description_ddl?: DescriptionDdlRecord | null;
 	image_provenance?: string | null;
 	image_failure?: PipelineErrorDetail | null;
 	execution_id: string;
@@ -78,6 +83,8 @@ export type PipelineView = {
 
 export type PipelineOptions = {
 	imported_plugins?: ImportedPlugin[];
+	/** How a description is drawn; left out, a fork takes its parent's. */
+	route?: DrawRoute;
 	sketch?: 'off' | 'on';
 	sketch_text?: string;
 	stage1_model?: string;

@@ -247,6 +247,15 @@ class PaintRequest(BaseModel):
     sketch: bool = Field(default=False, description="写生を通すか（場所の広がりと季節・時刻の光を記述の横に補う）。既定は通さない")
     sketch_text: str | None = Field(default=None, max_length=100_000, description="既にある写生文 (作者が直した / 保存済み作品の再演)。与えられたら写生を呼び直さない")
     sketch_grain: str | None = Field(default=None, pattern="^(fine|coarse)$", description="旧写生層の区切り（保存互換のみ。新しい写生では使わない）")
+    route: Literal["stages", "read_and_draw"] = Field(
+        default="stages",
+        description=(
+            "How the description is drawn: stages (the default; the description passes through Stage 1, the "
+            "composition reading, the laws and the colors) or read_and_draw (it is read from the speaker's eye, "
+            "written as DDL and corrected once beside its drawing). With read_and_draw, sketch reads the "
+            "description first and sketch_text is the author's edited reading."
+        ),
+    )
     limits: dict[str, int] | None = Field(default=None, description=_LIMITS_FIELD_DESCRIPTION)
 
 
@@ -330,6 +339,7 @@ class PaintResponse(BaseModel):
     pipeline_revision: str | None = Field(default=None, description="Revision of the shared pipeline that produced the drawing.")
     compiler_outcome: str | None = Field(default=None, description="Outcome of the score compiler for this drawing.")
     pipeline_diagnostics: dict[str, object] | None = Field(default=None, description="Diagnostics recorded by the pipeline for this drawing. None when none were recorded.")
+    description_ddl: dict | None = Field(default=None, description="The record of a drawing made by reading its description (route read_and_draw): the reading, its state, the items dropped and each round. Metadata only, never image bytes. None for the stages.")
 
 
 class RenderSvgRequest(BaseModel):

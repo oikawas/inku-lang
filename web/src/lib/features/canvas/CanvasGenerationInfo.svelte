@@ -10,11 +10,14 @@
 	import { hashDigest, hashRowLabel } from '$lib/hashIdentity';
 	import { t } from '$lib/i18n/index.svelte';
 	import { normalizeSketchGrain, normalizeSketchState, sketchGrainLabel, sketchStateNote } from '$lib/sketch';
+	import { drawRouteLabel, droppedReadingLines, figureWhoLabel, readingStateNote, type DescriptionDdlRecord } from '$lib/draw-route';
 	import type { SvgWeight } from '$lib/svgWeight';
 	import { loadSystemPrompts, type SystemPromptsState } from './system-prompts';
 
 	export type GenerationInfoWork = {
 		image_ddl?: Record<string, unknown> | null;
+		/** The read-and-draw record; present only on a work drawn that way. */
+		description_ddl?: DescriptionDdlRecord | null;
 		image_provenance?: string | null;
 		note?: string | null;
 		starred?: boolean;
@@ -84,7 +87,7 @@
 		statusHashCopied: boolean;
 		stage1PromptText: string;
 		ddl: string | null;
-		copiedPrompt: 'sketch' | 'stage1' | 'composition' | 'laws' | 'colors' | 'stage2' | 'score' | null;
+		copiedPrompt: 'sketch' | 'stage1' | 'composition' | 'laws' | 'colors' | 'reading' | 'stage2' | 'score' | null;
 		scoreJsonText: string;
 		scoreJsonLines: string[];
 		scoreJsonHighlighted: string;
@@ -93,7 +96,7 @@
 		onSaveNote: HistoryMutations['saveNote'];
 		onCopyWorkId: (workId: string) => void | Promise<void>;
 		onCopyStatusHash: () => void | Promise<void>;
-		onCopyPromptText: (kind: 'sketch' | 'stage1' | 'composition' | 'laws' | 'colors' | 'stage2' | 'score', text: string | null | undefined) => void | Promise<void>;
+		onCopyPromptText: (kind: 'sketch' | 'stage1' | 'composition' | 'laws' | 'colors' | 'reading' | 'stage2' | 'score', text: string | null | undefined) => void | Promise<void>;
 	};
 
 	let {
@@ -188,6 +191,14 @@
 	const detailBuild = $derived(statusHistoryItem?.render_build_number ?? result?.render_build_number ?? '');
 	const detailImageRecord = $derived(statusHistoryItem?.image_ddl ?? result?.image_ddl ?? null);
 	const detailImageProvenance = $derived(statusHistoryItem?.image_provenance ?? result?.image_provenance ?? '');
+	// Read and draw (SPEC 12.6.7): the reading, what its anchor check dropped,
+	// each answer the run read, and whether the drawing was seen.
+	const detailReadRecord = $derived(statusHistoryItem?.description_ddl ?? result?.description_ddl ?? null);
+	const detailReadDropped = $derived(droppedReadingLines(detailReadRecord));
+	const detailReadReviewed = $derived(!!detailReadRecord?.rounds?.some((round) => round.stage === 'review_description_ddl'));
+	const readRoundLabel = (stage: unknown) => stage === 'review_description_ddl'
+		? (isJapanese ? '見比べ' : 'Review')
+		: (isJapanese ? '書く' : 'Writing');
 	const detailDerivationMetadata = $derived(statusHistoryItem?.derivation_metadata ?? result?.derivation_metadata ?? {});
 	const detailResolvedLang = $derived(statusHistoryItem?.instruction_lang_resolved ?? result?.instruction_lang_resolved ?? '');
 	const detailStage1Lang = $derived(typeof detailDerivationMetadata.stage1_language === 'string' ? detailDerivationMetadata.stage1_language : detailResolvedLang);
@@ -326,6 +337,48 @@
 								{@render term(t().provenanceLabelSketchRecord, t().provenanceHintSketchRecord)}<dd>{detailSketchNote}</dd>
 							{/if}
 						</dl>
+					</section>
+				{/if}
+				{#if detailReadRecord}
+					<section class="detail-group">
+						<h4>{drawRouteLabel('read_and_draw', isJapanese)}</h4>
+						<dl>
+							{@render term(isJapanese ? '描き方' : 'Drawing', t().provenanceHintDrawRoute)}<dd>{drawRouteLabel('read_and_draw', isJapanese)}</dd>
+							{@render term(isJapanese ? '読み' : 'Reading', t().provenanceHintReading)}<dd>{readingStateNote(detailReadRecord.reading_state, isJapanese)}</dd>
+							{@render term(isJapanese ? '見比べ' : 'Review', t().provenanceHintReadReview)}<dd>{detailReadReviewed ? (isJapanese ? '描いた画を見て一度直した' : 'Corrected once beside its drawing') : (isJapanese ? '見比べなし' : 'Not reviewed')}</dd>
+							{#if detailReadRecord.source_labels?.length}
+								{@render term(isJapanese ? '札' : 'Labels', t().provenanceHintReadLabels)}<dd>{detailReadRecord.source_labels.join(' / ')}</dd>
+							{/if}
+						</dl>
+						{#if detailReadRecord.reading_text}
+							<pre class="detail-read-text">{detailReadRecord.reading_text}</pre>
+						{/if}
+						{#if detailReadDropped.length}
+							<p class="detail-note">{isJapanese ? '記述と札に無いため落とした項目' : 'Dropped: not in the description or its labels'}</p>
+							<ul class="detail-read-list">
+								{#each detailReadDropped as line, index (index)}<li>{line}</li>{/each}
+							</ul>
+						{/if}
+						{#if detailReadRecord.rounds?.length}
+							<p class="detail-note">{isJapanese ? '回の記録' : 'Rounds'}</p>
+							<ol class="detail-read-list">
+								{#each detailReadRecord.rounds as round, index (index)}
+									<li>
+										{readRoundLabel(round.stage)}{round.asked_again ? (isJapanese ? '（聞き直し）' : ' (asked again)') : ''}
+										· {isJapanese ? `指示 ${round.instructions ?? 0}・直す行 ${round.problems ?? 0}` : `${round.instructions ?? 0} instructions, ${round.problems ?? 0} lines to fix`}
+										{#if round.figures?.length}
+											· {round.figures.map((figure) => `${figureWhoLabel(figure.who, isJapanese)}: ${figure.what ?? ''}`).join(isJapanese ? '、' : ', ')}
+										{/if}
+									</li>
+								{/each}
+							</ol>
+						{/if}
+						{#if detailReadRecord.before_review}
+							<details class="detail-read-before">
+								<summary>{isJapanese ? '見比べる前の指示書' : 'Instructions before the review'}</summary>
+								<pre>{detailReadRecord.before_review}</pre>
+							</details>
+						{/if}
 					</section>
 				{/if}
 				<section class="detail-group">
@@ -479,6 +532,9 @@
 	.generation-details dt { min-width: 0; color: var(--fg3); }
 	.generation-details dt :global(.tooltip-wrap) { max-width: 100%; }
 	.detail-note { margin: 0; white-space: pre-wrap; font-size: var(--ui-font-size-12); }
+	.detail-read-text, .detail-read-before pre { margin: 6px 0 0; white-space: pre-wrap; font-size: var(--ui-font-size-12); }
+	.detail-read-list { margin: 4px 0 0; padding-left: 1.4em; font-size: var(--ui-font-size-12); }
+	.detail-read-before { margin-top: 6px; font-size: var(--ui-font-size-12); }
 	.detail-group textarea { display: block; box-sizing: border-box; width: 100%; min-height: 72px; resize: vertical; padding: 8px; border: 1px solid var(--border2); border-radius: var(--r); background: var(--panel); color: var(--fg); font: inherit; font-size: var(--ui-font-size-12); }
 	.detail-note-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 6px; }
 	.detail-note-actions button { flex: 0 0 auto; padding: var(--btn-sm-padding); border: 1px solid var(--border2); border-radius: var(--btn-sm-radius); background: var(--panel); color: var(--fg); font: inherit; font-size: var(--btn-sm-font-size); cursor: pointer; }

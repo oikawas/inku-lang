@@ -18,6 +18,7 @@ from ``server/tests/data/description-label-cases.json``.
 from __future__ import annotations
 
 import importlib
+import json
 
 
 def pipeline_description(text: str | None) -> str:
@@ -31,3 +32,16 @@ def pipeline_description(text: str | None) -> str:
     if not text:
         return text or ""
     return importlib.import_module("inku_render").pipeline_description_without_labels(text)
+
+
+def source_labels(text: str | None) -> list[str]:
+    """The bracketed comments' contents, brackets and outer spaces cut, in order.
+
+    Read and draw (SPEC §12.6.7) hands them to the reading only, as words the
+    description's source gives; a leading number is not one. The ranges are
+    the shared core's, as the cut is.
+    """
+    if not text:
+        return []
+    spans = json.loads(importlib.import_module("inku_render").pipeline_description_label_spans(text))
+    return [label for start, end, kind in spans if kind == "comment" and (label := text[start + 1:end - 1].strip())]

@@ -468,6 +468,15 @@ class HistoryItem(HistoryPostBody):
             "predates this record. Empty arrays mean there were no diagnostics."
         ),
     )
+    description_ddl: dict | None = Field(
+        default=None,
+        description=(
+            "The record of a work drawn by reading its description (read and draw): the reading and its state, "
+            "the items dropped because the description and its labels do not hold them, each round's answer "
+            "and the drawing it was corrected beside. It holds metadata only, never image bytes. Null when "
+            "the work was drawn through the stages."
+        ),
+    )
     # The work's own weight in UTF-8 bytes, sent whether or not the picture is.
     # The listing that draws the strip asks for `include_svg=false`, so a client
     # cannot count this for itself: what arrives in `svg` is then an empty

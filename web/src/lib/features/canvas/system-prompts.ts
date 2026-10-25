@@ -9,8 +9,10 @@ export type SentSystemPrompt = {
 	message?: string;
 };
 
-/** The stages whose prompts the tab shows, in the order a work calls them. */
-export const PROMPT_STAGES = ['sketch', 'stage1', 'composition', 'laws', 'colors', 'stage2'] as const;
+/** The stages whose prompts the tab shows, in the order a work calls them.
+ *  Read and draw (SPEC 12.6.7) calls the reading, the writing and the review
+ *  in place of Stage 1 and the stages after it. */
+export const PROMPT_STAGES = ['sketch', 'reading', 'description_ddl', 'description_review', 'stage1', 'composition', 'laws', 'colors', 'stage2'] as const;
 export type PromptStage = (typeof PROMPT_STAGES)[number];
 
 /** The stages an execution saved before 2026-10-13 kept. */
@@ -58,6 +60,9 @@ export async function loadSystemPrompts(
 			state: 'recorded',
 			stages: PROMPT_STAGES.filter((stage) => kept.includes(stage)),
 			sketch: sentPrompt(body.sketch),
+			reading: sentPrompt(body.reading),
+			description_ddl: sentPrompt(body.description_ddl),
+			description_review: sentPrompt(body.description_review),
 			stage1: sentPrompt(body.stage1),
 			composition: sentPrompt(body.composition),
 			laws: sentPrompt(body.laws),

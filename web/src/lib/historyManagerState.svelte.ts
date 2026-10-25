@@ -1,4 +1,5 @@
 import type { PipelineHistoryDiagnostics } from '$lib/features/pipeline/diagnostics';
+import type { DescriptionDdlRecord } from '$lib/draw-route';
 
 export const HISTORY_MANAGER_DEFAULT_PAGE_SIZE = 24;
 
@@ -9,6 +10,8 @@ export type Score = { instructions: unknown[]; canvas?: string | null };
 
 export type HistoryItem = {
 	image_ddl?: Record<string, unknown> | null;
+	/** Read and draw's record (SPEC 12.6.7); a work drawn that way keeps it. */
+	description_ddl?: DescriptionDdlRecord | null;
 	image_provenance?: string | null;
 	// Set only when the work is somebody else's, reached through a group scope
 	// or an explicit grant. Absent for one's own, so nothing changes for a

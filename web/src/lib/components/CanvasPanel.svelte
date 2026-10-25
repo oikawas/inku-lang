@@ -75,7 +75,7 @@
 		stage1PromptText: string;
 		instructionText: string;
 		ddl: string | null;
-		copiedPrompt: 'sketch' | 'stage1' | 'composition' | 'laws' | 'colors' | 'stage2' | 'score' | null;
+		copiedPrompt: 'sketch' | 'stage1' | 'composition' | 'laws' | 'colors' | 'reading' | 'stage2' | 'score' | null;
 		scoreJsonText: string;
 		scoreJsonLines: string[];
 		scoreJsonHighlighted: string;
@@ -114,7 +114,7 @@
 		onGotoPrev: () => void | Promise<void>;
 		onGotoLatest: () => void | Promise<void>;
 		onGotoOldest: () => void | Promise<void>;
-		onCopyPromptText: (kind: 'sketch' | 'stage1' | 'composition' | 'laws' | 'colors' | 'stage2' | 'score', text: string | null | undefined) => void | Promise<void>;
+		onCopyPromptText: (kind: 'sketch' | 'stage1' | 'composition' | 'laws' | 'colors' | 'reading' | 'stage2' | 'score', text: string | null | undefined) => void | Promise<void>;
 		onCopyStatusHash: () => void | Promise<void>;
 		onCopyWorkId: (workId: string) => void | Promise<void>;
 		onSaveNote: HistoryMutations['saveNote'];

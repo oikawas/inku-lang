@@ -2038,6 +2038,7 @@ def _paint_payload(
         "sketch": bool(getattr(args, "sketch", False)) or None,
         "sketch_grain": getattr(args, "sketch_grain", None),
         "sketch_text": getattr(args, "sketch_text", None),
+        "route": getattr(args, "route", None),
         "wild": bool(getattr(args, "wild", False)) or None,
         # None when the flag is absent, so the filter below drops the key: the
         # server must see no `limits` at all to run at its own settings.
@@ -2414,6 +2415,7 @@ def _image_flag_conflicts(args: argparse.Namespace) -> list[str]:
         ("--sketch", args.sketch),
         ("--sketch-grain", args.sketch_grain),
         ("--sketch-text", args.sketch_text),
+        ("--route", args.route),
         ("--wild", args.wild),
         ("--stage1-provider", args.stage1_provider),
         ("--stage1-model", args.stage1_model),
@@ -4519,6 +4521,11 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     parser.add_argument(
         "--sketch-text",
         help="use this sketch text as it stands instead of asking for one (replay of a saved or hand-edited sketch)",
+    )
+    parser.add_argument(
+        "--route",
+        choices=["stages", "read_and_draw"],
+        help="how a description is drawn: stages (the server default) or read_and_draw (read from the speaker's eye, written as DDL and corrected once beside its drawing); with read_and_draw, --sketch reads the description first and --sketch-text is an edited reading",
     )
     parser.add_argument(
         "--wild",

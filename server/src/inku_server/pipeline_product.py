@@ -136,6 +136,9 @@ class RunOptions(BaseModel):
     # stands, without a request.
     sketch: Literal["off", "on"] | None = None
     sketch_text: str | None = Field(default=None, max_length=100_000)
+    # How a description is drawn (SPEC §12.6.7): the stages (the default) or
+    # read and draw. Left out, a child takes its parent's.
+    route: Literal["stages", "read_and_draw"] | None = None
     history_display_label: str | None = None
     batch_line_number: int | None = None
     batch_run_id: str | None = None
@@ -183,6 +186,18 @@ def sketch_result(record: dict | None) -> dict:
     return {"sketch_text": None, "sketch_grain": None, "sketch_state": "fallback"}
 
 
+def reading_result(record: dict) -> dict:
+    """Saved sketch columns from read and draw's reading (SPEC §12.6.7).
+
+    A reading read or supplied is the work's sketch text, which the author edits
+    and draws again from; a run without one saves none.
+    """
+    state = record.get("reading_state")
+    if state in {"read", "supplied"} and record.get("reading_text"):
+        return {"sketch_text": record["reading_text"], "sketch_grain": None, "sketch_state": "supplemented"}
+    return {"sketch_text": None, "sketch_grain": None, "sketch_state": "fallback" if state == "fallback" else "off"}
+
+
 # The provider actions whose system prompt the prompt tab shows, by the name
 # the tab gives each stage, in the order a work calls them.
 _SYSTEM_PROMPT_STAGES = {
@@ -192,11 +207,18 @@ _SYSTEM_PROMPT_STAGES = {
     "choose_laws": "laws",
     "choose_colors": "colors",
     "complete_visible_ddl_holes": "stage2",
+    "read_description": "reading",
+    "write_description_ddl": "description_ddl",
+    "review_description_ddl": "description_review",
 }
 # The stages whose message the tab shows as sent too (2026-10-13): no other
-# view shows what the sketch, the composition reading, the laws stage and the
-# color stage were given.
-_MESSAGE_STAGES = {"sketch", "composition", "laws", "colors"}
+# view shows what the sketch, the composition reading, the laws stage, the
+# color stage and read and draw's reading were given.
+_MESSAGE_STAGES = {"sketch", "composition", "laws", "colors", "reading"}
+# The requests given the image tab's answer limit: the image tab's DDL and
+# read and draw's three, as they were measured (8192 tokens, 2026-10-25).
+_WRITTEN_DDL_EFFECTS = frozenset({"write_image_ddl", "review_image_ddl", "read_description", "write_description_ddl",
+                                  "review_description_ddl"})
 # The stages an execution saved before 2026-10-13 kept.
 _EARLIER_STAGES = ["stage1", "stage2"]
 
@@ -237,8 +259,7 @@ def system_prompts_view(context: dict) -> dict:
     """
     prompts = context.get("system_prompts")
     if not isinstance(prompts, dict):
-        return {"recorded": False, "stages": [], "sketch": None, "stage1": None, "composition": None, "laws": None,
-                "colors": None, "stage2": None}
+        return {"recorded": False, "stages": [], **{stage: None for stage in _SYSTEM_PROMPT_STAGES.values()}}
     return {
         "recorded": True,
         "stages": list(context.get("system_prompt_stages", _EARLIER_STAGES)),
@@ -405,14 +426,18 @@ class ProductPipelineEffects:
                 selected["chatgpt_profile"], selected["chatgpt_generation"] = pin(owner)
                 model_settings = {**model_settings, "chatgpt_profile_id": selected["chatgpt_profile"],
                                   "chatgpt_generation": selected["chatgpt_generation"]}
-            if kind == "image":
+            def reads_images() -> bool:
                 from .model_settings import model_is_offered
                 provider_id, model_id = provider_for_model(model, stage="stage1", settings=model_settings)
-                offered = (_model_offered_to(actor, model, stage="stage1", purpose="vision", settings=model_settings,
-                                             operation="vision") if provider_id == "chatgpt"
-                           else model_is_offered(provider_id, model_id, model_settings, purpose="vision"))
-                if not offered:
-                    raise CandidateHostError("image_model_not_vision")
+                return (_model_offered_to(actor, model, stage="stage1", purpose="vision", settings=model_settings,
+                                          operation="vision") if provider_id == "chatgpt"
+                        else model_is_offered(provider_id, model_id, model_settings, purpose="vision"))
+            if kind == "image" and not reads_images():
+                raise CandidateHostError("image_model_not_vision")
+            if kind == "description" and selected.get("route") == "read_and_draw":
+                # The drawing is seen once only by a model that reads images;
+                # another's DDL is committed as written (PLAN-PRODUCT §12).
+                config["description_ddl"] = {"review": reads_images()}
             for stage in (() if kind == "image" else
                           (("stage1", "stage2") if kind in {"description", "saved_laws"} else ("stage2",))):
                 if not _model_offered_to(
@@ -446,7 +471,7 @@ class ProductPipelineEffects:
             transport = SingleAttemptProvider(ProviderOptions(
                 settings=db.get_model_settings(), stage1_model=options.get("stage1_model", configured["stage1_model"]),
                 stage2_model=options.get("stage2_model", configured["stage2_model"]),
-                max_tokens=(configured.get("image_max_tokens", 8192) if action["tag"] in {"write_image_ddl", "review_image_ddl"}
+                max_tokens=(configured.get("image_max_tokens", 8192) if action["tag"] in _WRITTEN_DDL_EFFECTS
                             else configured.get("stage1_max_tokens", configured["max_tokens"]) if stage == "stage1"
                             else configured["max_tokens"]),
                 max_response_bytes=self.manifest["pipeline"]["prompt_limits"]["max_response_bytes"],
@@ -561,6 +586,12 @@ class ProductPipelineEffects:
             "render_limits_source": context.get("render_limits_source"),
             "pipeline_variation_id": snapshot["variation_id"], "pipeline_revision": snapshot["authority"]["revision"],
         }
+        description_ddl = snapshot.get("description_ddl")
+        if description_ddl is not None:
+            # The work keeps its record with its config (the history link); the
+            # reading stands where a sketch does, so the author reads and edits it there.
+            result.update(description_ddl=deepcopy(description_ddl), **reading_result(description_ddl),
+                          elapsed_read_and_draw_ms=metrics.get("read_and_draw", 0))
         image_ddl = snapshot.get("image_ddl") or context.get("image_ddl")
         if image_ddl is not None:
             result.update(image_ddl=deepcopy(image_ddl), image_provenance=context.get("image_provenance", ""),

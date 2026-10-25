@@ -99,6 +99,7 @@ uv run inku-cli paint --image photo.jpg --provenance "2026年10月 京都・鴨�
 | `--sketch` | 写生を有効にし、元の記述を残して場所と光を補って解釈へ渡す。サーバー・Web UIとも既定はなし（off）。現行選択はなし／あり（off/on） |
 | `--sketch-grain {fine,coarse}` | 旧作品との互換用の旗。現行写生には使わない |
 | `--sketch-text TEXT` | Stage 0.5を呼ばず、この写生文を使う（保存済みまたは手で直した写生の再演） |
+| `--route {stages,read_and_draw}` | 描き方。`stages`（今の流れ。既定）か `read_and_draw`（読んで描く。記述を語り手の目から読み、DDL に書き、描いた画を見て一度直す）。読んで描くでは `--sketch` が読みを通し、`--sketch-text` は直した読みになる |
 
 変奏は廃止しました。旧強度・seedの旗は受け付けません。保存済みの変奏情報はDBに保持し、新しい描画要求へ渡しません。
 

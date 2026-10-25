@@ -116,8 +116,11 @@ test('T-63  the conditions are read off the work that was drawn last', () => {
 			sketchGrain: 'coarse',
 			wild: true,
 			canvasAspectId: 'tate',
+			route: 'stages',
 		},
 	);
+	// A read-and-draw work keeps its record, and the batch resumes on that route.
+	assert.equal(conditionsOfWork({ description_ddl: { reading_state: 'read' } }).route, 'read_and_draw');
 });
 
 test('T-63  a condition the work never recorded is not invented', () => {
@@ -132,6 +135,9 @@ test('T-63  a condition the work never recorded is not invented', () => {
 		sketchGrain: null,
 		wild: null,
 		canvasAspectId: null,
+		// Not invented: every work without the read-and-draw record was drawn
+		// by the stages, the only route there was before it.
+		route: 'stages',
 	});
 	assert.equal(conditionsOfWork({ render_wild: false }).wild, false);
 });

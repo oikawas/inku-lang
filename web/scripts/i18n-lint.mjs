@@ -71,6 +71,7 @@ const RESTRICTED = [
 		keys: [
 			'tabPrompts', 'tooltipCanvasTabPrompts', 'promptStage1System', 'promptStage2System',
 			'promptSketchSystem', 'promptCompositionSystem', 'promptLawsSystem', 'promptColorsSystem',
+			'promptReadingSystem', 'promptDescriptionDdlSystem', 'promptDescriptionReviewSystem',
 			'provenanceLabelStage1PromptDigest', 'provenanceLabelStage1PromptBaseDigest',
 			'provenanceLabelStage2PromptDigest', 'provenanceHintStage1PromptDigest',
 			'provenanceHintStage1PromptBaseDigest', 'provenanceHintStage2PromptDigest',

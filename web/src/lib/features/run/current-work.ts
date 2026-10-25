@@ -11,6 +11,7 @@ import {
 } from '../../paintStream.ts';
 import type { CanvasAspectId } from '../../plugins/system/canvas-aspect/index.ts';
 import { type SketchMode } from '../../sketch.ts';
+import type { DescriptionDdlRecord, DrawRoute } from '../../draw-route.ts';
 import type { ApiFetch } from '../../transport/api-fetch.ts';
 import { ConnectionFailure, GATEWAY_STATUSES, isAbort } from '../../transport/connection-failure.ts';
 import type { RenderOverrides } from '../render-payload.ts';
@@ -33,6 +34,8 @@ export type Seed = number | string;
 
 export type PaintResult = {
 	image_ddl?: Record<string, unknown> | null;
+	/** Read and draw's record (SPEC 12.6.7); null on any other work. */
+	description_ddl?: DescriptionDdlRecord | null;
 	image_provenance?: string | null;
 	svg: string;
 	score: PaintScore;
@@ -126,6 +129,8 @@ export type PaintOptions = {
 	// replay can reuse it instead of asking a non-deterministic layer again.
 	sketchMode?: SketchMode;
 	sketchText?: string | null;
+	/** How the description is drawn; absent, the page's choice. */
+	route?: DrawRoute;
 	// Qualified model ids apply to this run only. Absence uses the page's
 	// current model setting, which is what ordinary callers expect.
 	stage1Model?: string;
@@ -143,6 +148,7 @@ export type CurrentWorkDefaults = {
 	instructionLang: InstructionLang;
 	canvasAspectId: CanvasAspectId;
 	sketchMode: SketchMode;
+	route: DrawRoute;
 	renderPayload: Record<string, unknown>;
 };
 
@@ -182,11 +188,13 @@ export async function runCurrentWork(
 	const resolvedStage2Model = options.stage2Model ?? defaults.stage2Model;
 	const resolvedSketchMode = options.sketchMode ?? defaults.sketchMode;
 	const sketchOn = resolvedSketchMode !== 'off';
+	const route = options.route ?? defaults.route;
+	const readAndDraw = route === 'read_and_draw';
 
 	capabilities.setStage1UserPrompt(text);
 	// Before the first event, name the layer requested rather than guessing the
 	// layer that will follow it.
-	capabilities.setStageLabel(paintStageLabel('requested', defaults.strings, { sketchOn }));
+	capabilities.setStageLabel(paintStageLabel('requested', defaults.strings, { sketchOn, readAndDraw }));
 
 	let response: Response;
 	try {
@@ -196,6 +204,7 @@ export async function runCurrentWork(
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				description: text,
+				route,
 				sketch: sketchOn,
 				...(options.sketchText ? { sketch_text: options.sketchText } : {}),
 				stage1_model: resolvedStage1Model,
@@ -245,6 +254,7 @@ export async function runCurrentWork(
 			onAttempt: (event) => capabilities.setProviderAttempt?.(event.provider_attempt),
 			...paintStageHandlers(defaults.strings, capabilities.setStageLabel, {
 				sketchOn,
+				readAndDraw,
 				onStage1: (event) => {
 					capabilities.setActiveRunTokens(event.tokens_in, event.tokens_out);
 					options.onStage1?.(event);

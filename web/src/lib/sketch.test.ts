@@ -162,9 +162,10 @@ test('T-6: both places that put a work on screen carry its state, and the panel 
 	// A fresh run and a saved work reopened. Wiring one and not the other leaves
 	// half the works reading as though they predate the column. Saved-work field
 	// mapping now belongs to the canonical current-work projection.
-	assert.match(work, /adoptSketch\(painted\.sketch_text \?\? null, painted\.sketch_grain, view\.description, painted\.sketch_state\)/);
+	// Both carry the route the work was drawn by after the state (2026-10-25).
+	assert.match(work, /adoptSketch\(painted\.sketch_text \?\? null, painted\.sketch_grain, view\.description, painted\.sketch_state,\s*drawRouteOf\(/);
 	assert.match(currentWork, /sketchState: item\.sketch_state/);
-	assert.match(page, /work\.adoptSketch\(projection\.sketchText, projection\.sketchGrain, projection\.sourceText, projection\.sketchState\)/);
+	assert.match(page, /work\.adoptSketch\(projection\.sketchText, projection\.sketchGrain, projection\.sourceText, projection\.sketchState, drawRouteOf\(it\)\)/);
 	assert.match(page, /sketchStateNote\(work\.sketchState, getLang\(\) === 'ja'\)/);
 	assert.match(generationInfo, /normalizeSketchState\(statusHistoryItem\?\.sketch_state \?\? result\?\.sketch_state\)/);
 });

@@ -33,9 +33,6 @@
 		interpretation_seed?: string | null;
 		variation_amplitude?: string | null;
 		variation_seed?: number | string | null;
-		stage1_prompt_digest?: string | null;
-		stage1_prompt_base_digest?: string | null;
-		stage2_prompt_digest?: string | null;
 		pipeline_variation_id?: string | null;
 		pipeline_revision?: string | null;
 		render_color_map?: ColorMap | null;
@@ -229,9 +226,6 @@
 	// list means no map was recorded, not that nine defaults were used.
 	const detailColorMap = $derived(colorMapEntries(statusHistoryItem?.render_color_map ?? result?.render_color_map));
 	const detailCanvasRatio = $derived(statusHistoryItem?.render_canvas_aspect_ratio ?? result?.render_canvas_aspect_ratio ?? null);
-	const detailStage1PromptDigest = $derived(statusHistoryItem?.stage1_prompt_digest ?? result?.stage1_prompt_digest ?? '');
-	const detailStage1PromptBaseDigest = $derived(statusHistoryItem?.stage1_prompt_base_digest ?? result?.stage1_prompt_base_digest ?? '');
-	const detailStage2PromptDigest = $derived(statusHistoryItem?.stage2_prompt_digest ?? result?.stage2_prompt_digest ?? '');
 	const detailDerivationKind = $derived(statusHistoryItem?.derivation_kind ?? result?.derivation_kind ?? null);
 	const detailBatchRunId = $derived(statusHistoryItem?.batch_run_id ?? '');
 	const detailBatchLine = $derived(statusHistoryItem?.batch_line_number ?? null);
@@ -396,9 +390,6 @@
 						{@render term('Render engine version', t().provenanceHintRenderEngine)}<dd>{detailEngineVersion || '-'}</dd>
 						{@render term(t().provenanceLabelDdlSpec, t().provenanceHintDdlSpec)}<dd>{detailDdlVersion || t().historyVersionNotRecorded}</dd>
 						{@render term(t().provenanceLabelTransformLayer, t().provenanceHintTransformLayer)}<dd>{detailDdlEngineVersion || t().historyVersionNotRecorded}</dd>
-						{@render term(t().provenanceLabelStage1PromptDigest, t().provenanceHintStage1PromptDigest)}<dd><code>{detailStage1PromptDigest || t().historyVersionNotRecorded}</code></dd>
-						{@render term(t().provenanceLabelStage1PromptBaseDigest, t().provenanceHintStage1PromptBaseDigest)}<dd><code>{detailStage1PromptBaseDigest || t().historyVersionNotRecorded}</code></dd>
-						{@render term(t().provenanceLabelStage2PromptDigest, t().provenanceHintStage2PromptDigest)}<dd><code>{detailStage2PromptDigest || t().historyVersionNotRecorded}</code></dd>
 						{@render term('Build', t().provenanceHintBuild)}<dd>{detailBuild || '-'}</dd>
 					</dl>
 				</section>

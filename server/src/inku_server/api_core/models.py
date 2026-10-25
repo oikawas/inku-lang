@@ -203,18 +203,6 @@ class HistoryPostBody(BaseModel):
         default=None,
         description="The identifier of the model used for Stage 2 (score composition). Null if not recorded.",
     )
-    stage1_prompt_digest: str | None = Field(
-        default=None,
-        description="A digest of the Stage 1 prompt text used for the work. Null when not recorded.",
-    )
-    stage1_prompt_base_digest: str | None = Field(
-        default=None,
-        description="A digest of the base Stage 1 prompt, before the work-specific additions. Null when not recorded.",
-    )
-    stage2_prompt_digest: str | None = Field(
-        default=None,
-        description="A digest of the Stage 2 prompt text used for the work. Null when not recorded.",
-    )
     tokens_in: int | None = Field(
         default=None, description="The number of input tokens the model reported for the work. Null when not recorded, including for works saved through the pipeline, which do not record token counts.",
     )
@@ -413,6 +401,20 @@ class HistoryItem(HistoryPostBody):
     """A saved work as the history listing and the work endpoints return it."""
 
     id: str = Field(description="The identifier of the work, a UUID.")
+    # Read-only: the Python Stage 1/2 recorded these until the shared core took
+    # over (2026-09-14). The core's prompt digest lives in the execution record.
+    stage1_prompt_digest: str | None = Field(
+        default=None,
+        description="Read-only. A digest of the Stage 1 prompt recorded for an older work. Not written for new works. Null when absent.",
+    )
+    stage1_prompt_base_digest: str | None = Field(
+        default=None,
+        description="Read-only. A digest of the base Stage 1 prompt recorded for an older work. Not written for new works. Null when absent.",
+    )
+    stage2_prompt_digest: str | None = Field(
+        default=None,
+        description="Read-only. A digest of the Stage 2 prompt recorded for an older work. Not written for new works. Null when absent.",
+    )
     # Read-only historical metadata: new authoring no longer records variation.
     focus: str | None = Field(
         default=None,

@@ -748,6 +748,8 @@ export const en: LangPack = {
 	promptLoading: 'loading…',
 	promptExpand: 'Expand',
 	promptCollapse: 'Collapse',
+	promptDigestLabel: 'Prompt digest',
+	promptDigestHint: 'A fingerprint of what was sent to this stage: its system prompt, input, answer shape and saijiki. Equal values mean it was sent under the same conditions. It is the record of the last run of this draft, so after a redraw it can differ from the moment the work was saved.',
 	promptSystemNotSent: 'This stage called no model for this work.',
 	promptSystemNotRecorded: 'Not recorded: this work was drawn before what it sent was kept.',
 	promptSystemUnavailable: 'Could not be loaded.',

@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from inku_server import db
+from inku_server.persistence.schema import HistoryRow
 from inku_server.api import app
 from inku_server.color_catalogs import render_color_map_for_catalog
 from inku_server.limits import DEFAULT_LIMITS, limits_as_dict
@@ -63,6 +64,10 @@ def test_replay_child_matches_preview_and_rejects_unbound_source(monkeypatch):
                 "sketch_text": "recorded sketch", "sketch_state": "fine",
             }
             parent = db.add_item(initial)
+            # Only a work saved before 2026-09-14 holds a prompt digest; seed one.
+            with db.SessionLocal() as session:
+                session.query(HistoryRow).filter_by(id=parent["id"]).update({"stage1_prompt_digest": "recorded-prompt"})
+                session.commit()
             parent = db.get_items(user["id"], [parent["id"]])[0]
             preview_response = client.post("/api/render-score", json={
                 "work_id": parent["id"], "score": parent["score"], "input": parent["input"], "ddl": parent["ddl"],
@@ -92,8 +97,11 @@ def test_replay_child_matches_preview_and_rejects_unbound_source(monkeypatch):
                 assert child[key] == preview[key], key
             assert child["render_seed"] == str(seed if seed is not None else 0)
             assert child["composition_seed"] == str(wide_seed)
-            for key in ("input", "ddl", "source_text", "stage1_model", "stage1_prompt_digest", "sketch_text"):
+            for key in ("input", "ddl", "source_text", "stage1_model", "sketch_text"):
                 assert child[key] == parent[key], key
+            # The retired prompt digests stay on the parent and are not copied on.
+            assert parent["stage1_prompt_digest"] == "recorded-prompt"
+            assert child.get("stage1_prompt_digest") is None
             assert child["interpretation_seed"] == "reading"
             assert child["history_visibility"] == "normal"
             assert child["lineage_parent_node_id"] == parent["lineage_node_id"]

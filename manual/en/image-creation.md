@@ -397,7 +397,7 @@ Open the provenance drawer at the bottom of the work tab to see the record of th
 | Sketch | The sketch record and the paper grain (**the record of the work on screen**, not the setting for the next painting) |
 | Interpretation | Stage 1 model, Stage 1 language, requested language, interpretation seed, interpretation fallback and Score fallback records |
 | Performance | Stage 2 model, Stage 2 language, focus, Variation (retired) and its seed (old works only), composition seed, render seed, seed text, Wild, the colour words this work was drawn in, the colour catalogue, the canvas and its ratio, and **three rows for how heavy the drawing is** (`SVG size` / `SVG objects` / `SVG points`) |
-| Identity | work ID (UUID), render hash, description hash, render engine, DDL specification, transform layer, prompt digests, Build |
+| Identity | work ID (UUID), render hash, description hash, render engine, DDL specification, transform layer, Build |
 | Origin | generation, derivation, batch run ID and line number, comment, UI language |
 | Run | elapsed time, token counts |
 
@@ -406,6 +406,8 @@ Every row carries an explanation. The render seed is "the seed that fixes the sw
 **The weight of a drawing is printed as three quantities.** `SVG size` is the amount of data, `SVG objects` is how many shapes the SVG holds (containers and notes — svg, defs, title, desc, metadata — are not shapes), and `SVG points` is how many points those shapes are drawn from. **None of the three stands in for the others**: at the same size, few objects with many points is a drawing of fine lines, and many objects with few points is a drawing of many forms.
 
 `Prompts` shows the system prompts and input of the sketch (Stage 0.5), Stage 1, the composition reading, the laws stage, the color stage, and Stage 2, in the order a work calls them. For the sketch, the composition reading, the laws stage and the color stage it also shows the input actually sent. `JSON` shows the JSON Score. The system prompts are the ones actually sent when the work was drawn, and they differ from work to work with the plugins, the sketch, and retries. A stage that called no model (the sketch of a work drawn without one, Stage 1 of DDL you wrote yourself, the composition reading of a work that had none, the laws stage of a work whose laws request could not be built, the color stage of a work drawn without it, Stage 2 when no hole needed filling) and a work drawn before the record began say so instead. The sketch and the composition reading have been kept since 2026-10-13 and the laws stage and the color stage since 2026-10-20, so an earlier work says they were not recorded. Do not confuse the JSON Score itself with the provenance.
+
+Under each stage's system prompt appears its `Prompt digest`, a fingerprint of what was sent to that stage (its instructions, input, answer shape, saijiki and so on); equal values mean it was sent under the same conditions. After a redraw it can differ from the moment the work was saved, because it is the record of that draft's last run. The three prompt digests that works from before 2026-09-14 carried under Identity in `Details` are no longer recorded for new works, so they are no longer shown; the values remain on the saved works.
 
 Ordinary Stage 1 generation stops as a failure if its finite retries cannot succeed. Uncompleted holes in the instructions wait for the author's edits; neither case saves a stock replacement as a successful work. Limited fallbacks, such as using the original description after a sketch failure, are separate.
 

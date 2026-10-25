@@ -598,8 +598,7 @@ def api_history_post(
             raise HTTPException(status_code=409, detail="replay preview changed; redraw before saving")
         inherited = {key: parent.get(key) for key in (
             "input", "ddl", "ddl_source_origin", "source_text", "interpret_fallback", "compose_fallback",
-            "catalog_mode", "stage1_model", "stage2_model", "stage1_prompt_digest",
-            "stage1_prompt_base_digest", "stage2_prompt_digest", "instruction_lang_requested",
+            "catalog_mode", "stage1_model", "stage2_model", "instruction_lang_requested",
             "instruction_lang_resolved", "ui_lang", "sketch_text", "sketch_grain", "sketch_state",
             "elapsed_ms", "tokens_in", "tokens_out", "display_label", "batch_line_number", "batch_run_id",
         )}
@@ -610,7 +609,6 @@ def api_history_post(
         render_metadata = {
             **{key: value for key, value in replayed.items() if key not in {"score", "svg", "catalog_id"}},
             **{key: parent.get(key) for key in (
-                "stage1_prompt_digest", "stage1_prompt_base_digest", "stage2_prompt_digest",
                 "instruction_lang_requested", "instruction_lang_resolved", "ui_lang", "interpretation_seed",
             )},
         }
@@ -687,8 +685,7 @@ def api_history_post(
         # Score, map, seeds and limits cannot rewrite the work being recolored.
         inherited = {key: parent.get(key) for key in (
             "input", "ddl", "ddl_source_origin", "source_text", "interpret_fallback", "compose_fallback",
-            "catalog_mode", "stage1_model", "stage2_model", "stage1_prompt_digest",
-            "stage1_prompt_base_digest", "stage2_prompt_digest", "instruction_lang_requested",
+            "catalog_mode", "stage1_model", "stage2_model", "instruction_lang_requested",
             "instruction_lang_resolved", "sketch_text", "sketch_grain", "sketch_state",
         )}
         inherited["input"] = inherited["input"] or ""
@@ -705,7 +702,6 @@ def api_history_post(
         render_metadata = {
             **{key: value for key, value in replayed.items() if key not in {"score", "svg", "catalog_id", "derivation_metadata", "ddl"}},
             **{key: body.model_dump()[key] for key in (
-                "stage1_prompt_digest", "stage1_prompt_base_digest", "stage2_prompt_digest",
                 "instruction_lang_requested", "instruction_lang_resolved", "ui_lang",
             )},
         }
@@ -732,9 +728,6 @@ def api_history_post(
         coerce_observability = None
         render_metadata = {
             **{key: value for key, value in replayed.items() if key not in {"score", "svg", "catalog_id"}},
-            "stage1_prompt_digest": body.stage1_prompt_digest,
-            "stage1_prompt_base_digest": body.stage1_prompt_base_digest,
-            "stage2_prompt_digest": body.stage2_prompt_digest,
             "instruction_lang_requested": body.instruction_lang_requested,
             "instruction_lang_resolved": body.instruction_lang_resolved,
             "ui_lang": body.ui_lang,
@@ -767,9 +760,6 @@ def api_history_post(
                 score = _score_with_canvas(score, canvas_aspect)
             render_metadata = {
                 **_render_metadata(catalog_id, canvas_aspect=_score_canvas_aspect_value(score)),
-                "stage1_prompt_digest": body.stage1_prompt_digest,
-                "stage1_prompt_base_digest": body.stage1_prompt_base_digest,
-                "stage2_prompt_digest": body.stage2_prompt_digest,
                 "instruction_lang_requested": body.instruction_lang_requested,
                 "instruction_lang_resolved": body.instruction_lang_resolved,
                 "ui_lang": body.ui_lang,

@@ -74,6 +74,7 @@ const RESTRICTED = [
 			'provenanceLabelStage1PromptDigest', 'provenanceLabelStage1PromptBaseDigest',
 			'provenanceLabelStage2PromptDigest', 'provenanceHintStage1PromptDigest',
 			'provenanceHintStage1PromptBaseDigest', 'provenanceHintStage2PromptDigest',
+			'promptDigestLabel', 'promptDigestHint',
 		],
 		texts: ['Show the provenance, prompts, and JSON of the chosen work'],
 	},

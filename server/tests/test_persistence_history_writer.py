@@ -334,9 +334,11 @@ def test_root_save_maps_every_history_field_and_creates_root_and_catalog(
         "elapsed_ms": 12,
         "stage1_model": "stage-1",
         "stage2_model": "stage-2",
-        "stage1_prompt_digest": "prompt-1",
-        "stage1_prompt_base_digest": "prompt-base",
-        "stage2_prompt_digest": "prompt-2",
+        # Retired with the Python Stage 1/2 (2026-09-14): an item that still
+        # carries them does not write them; older rows keep what they hold.
+        "stage1_prompt_digest": None,
+        "stage1_prompt_base_digest": None,
+        "stage2_prompt_digest": None,
         "tokens_in": 3,
         "tokens_out": 5,
         "catalog_id": "catalog-id",

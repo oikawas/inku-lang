@@ -63,6 +63,14 @@
 					: t().promptSystemUnavailable;
 </script>
 
+<!-- The shared core's prompt digest, as the execution kept it: the provenance the
+     retired per-work Stage 1/2 digests used to carry. -->
+{#snippet promptDigest(sent: SentSystemPrompt)}
+	{#if sent.prompt_digest}
+		<p class="prompt-digest" title={t().promptDigestHint}>{t().promptDigestLabel}: <code>{sent.prompt_digest}</code></p>
+	{/if}
+{/snippet}
+
 <!-- The sketch, the composition reading, the laws stage and the color stage: what each was given, then its system prompt. -->
 {#snippet sentStage(
 	kind: 'sketch' | 'composition' | 'laws' | 'colors',
@@ -102,6 +110,7 @@
 			<textarea class="prompt-textarea prompt-system" readonly value={sent.system}></textarea>
 			{#if !expanded}<div class="prompt-fade"></div>{/if}
 		</div>
+		{@render promptDigest(sent)}
 	{:else}
 		<p class="prompt-note">{systemPromptNote(kind)}</p>
 	{/if}
@@ -138,6 +147,7 @@
 				<textarea class="prompt-textarea prompt-system" readonly value={stage1System.system}></textarea>
 				{#if !stage1SystemExpanded}<div class="prompt-fade"></div>{/if}
 			</div>
+			{@render promptDigest(stage1System)}
 		{:else}
 			<p class="prompt-note">{systemPromptNote('stage1')}</p>
 		{/if}
@@ -174,6 +184,7 @@
 				<textarea class="prompt-textarea prompt-system stage2-system" readonly value={stage2System.system}></textarea>
 				{#if !stage2SystemExpanded}<div class="prompt-fade"></div>{/if}
 			</div>
+			{@render promptDigest(stage2System)}
 		{:else}
 			<p class="prompt-note">{systemPromptNote('stage2')}</p>
 		{/if}
@@ -320,6 +331,8 @@
 		pointer-events: none;
 	}
 	.prompt-note { margin: 2px 0 0; font-size: var(--ui-font-size-11); color: var(--fg3); }
+	.prompt-digest { margin: 4px 0 0; font-size: var(--ui-font-size-11); color: var(--fg3); overflow-wrap: anywhere; }
+	.prompt-digest code { color: var(--fg2); }
 	.score-shell {
 		position: relative;
 		width: 100%;

@@ -746,6 +746,8 @@ export const ja: LangPack = {
 	promptLoading: '読み込み中…',
 	promptExpand: '展開',
 	promptCollapse: '折りたたむ',
+	promptDigestLabel: 'プロンプト digest',
+	promptDigestHint: 'この段へ送ったプロンプト（指示・入力・応答の形・歳時記などを含む）の指紋です。値が同じなら、同じ条件で送ったことを示します。この下書きの最後の実行の記録なので、描き直した後は保存した作品の時点と違うことがあります。',
 	promptSystemNotSent: 'この作品では、このStageはモデルを呼んでいません。',
 	promptSystemNotRecorded: 'この作品は、送った内容を記録する前に描かれたため、記録がありません。',
 	promptSystemUnavailable: '読み込めませんでした。',

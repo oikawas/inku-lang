@@ -624,6 +624,8 @@ export interface LangPack {
 	promptLoading: string;
 	promptExpand: string;
 	promptCollapse: string;
+	promptDigestLabel: string;
+	promptDigestHint: string;
 	promptSystemNotSent: string;
 	promptSystemNotRecorded: string;
 	promptSystemUnavailable: string;

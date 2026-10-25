@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-25 — Settings categories read apart from their tabs
+
+In the settings list, a category name is now a small, letter-spaced heading ruled to the edge, and its tabs sit indented below it. The Display and operation, Image, ChatGPT plan and Export entries each had a category and a tab of the same name that were hard to tell apart. The narrow-screen row is unchanged.
+
 ### 2026-10-25 — inku-cli reads one work by its UUID
 
 inku-cli gains `history show`, which prints a work's description, DDL and JSON Score (`--part` for one of them), and `history png`, which rasterizes the saved display SVG into a PNG of the drawing alone (`--size` for the longer side, default 1024). Both take the UUID or its first few characters. There is no endpoint for one work, so the listing is asked with `anchor_id` and `limit=1` and the returned work's id is checked. A prefix is resolved against the listing without pictures, and one that fits more than one work stops with the candidates. The server is unchanged.

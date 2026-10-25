@@ -51,11 +51,15 @@
 	}
 	.settings-feature-root .settings-category { display: grid; gap: 3px; }
 	.settings-feature-root .settings-category + .settings-category { margin-top: 20px; }
+	/* A category is a heading, not a choice: small, spaced, ruled to the edge. Its tabs sit
+	   indented beside a guide line, so a category and a tab of the same name read apart. */
 	.settings-feature-root .settings-category-label {
-		padding: 0 10px 6px; color: var(--fg3); font-size: var(--ui-font-size-12); font-weight: 500;
+		display: flex; align-items: center; gap: 8px; padding: 0 2px 6px;
+		color: var(--fg3); font-size: var(--ui-font-size-11); font-weight: 600; letter-spacing: .08em;
 	}
+	.settings-feature-root .settings-category-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 	.settings-feature-root .settings-category button {
-		width: 100%; min-height: 38px; padding: 8px 10px; border: 1px solid transparent; border-radius: var(--r); background: transparent;
+		width: calc(100% - 10px); margin-left: 10px; min-height: 38px; padding: 8px 10px; border: 1px solid transparent; border-radius: var(--r); background: transparent;
 		color: var(--fg2); cursor: pointer; font-family: inherit; font-size: var(--ui-font-size-14); line-height: 1.4; text-align: left;
 	}
 	.settings-feature-root .settings-category button:hover { background: var(--panel); color: var(--fg); }
@@ -104,7 +108,7 @@
 		.settings-feature-root .settings-category + .settings-category { margin-top: 0; }
 		.settings-feature-root .settings-category-label { display: none; }
 		.settings-feature-root .settings-category { display: flex; }
-		.settings-feature-root .settings-category button { white-space: nowrap; }
+		.settings-feature-root .settings-category button { width: auto; margin-left: 0; white-space: nowrap; }
 		.settings-feature-root .settings-page-heading { padding: 16px; }
 		.settings-feature-root .settings-page-heading h2 { font-size: var(--ui-font-size-18); }
 		.settings-feature-root .settings-body { padding: 16px; gap: 14px; }

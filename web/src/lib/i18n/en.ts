@@ -1330,6 +1330,8 @@ export const en: LangPack = {
 	lineageViewTools: 'View',
 	lineageFocusedWork: 'Displayed work',
 	lineageOpenLarge: 'Open large',
+	lineageImageWork: 'Work drawn from a picture',
+	lineageNoDescription: 'Work without a description',
 	lineagePathScope: (count) => `Origin to displayed: ${groupDigits(count)} works`,
 	lineageSelectionScope: (count) => `Selected: ${groupDigits(count)} works`,
 	lineageWorkActions: 'Work actions',

@@ -1328,6 +1328,8 @@ export const ja: LangPack = {
 	lineageViewTools: '表示',
 	lineageFocusedWork: '表示中の作品',
 	lineageOpenLarge: '作品を大きく見る',
+	lineageImageWork: '画像から描いた作品',
+	lineageNoDescription: '記述の無い作品',
 	lineagePathScope: (count) => `起点から表示中まで ${groupDigits(count)} 件`,
 	lineageSelectionScope: (count) => `選択 ${groupDigits(count)} 件`,
 	lineageWorkActions: '作品の操作',

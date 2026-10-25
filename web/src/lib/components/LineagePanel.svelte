@@ -86,6 +86,15 @@
 		return isJapanese ? '削除された作品' : 'Deleted work';
 	}
 
+	// A work that is there is never called deleted: a picture-drawn work has no
+	// description, and its source note may be empty too.
+	function workText(node: LineageNode): string {
+		const history = node.history;
+		if (!history) return withheldWorkLabel(node);
+		if (history.image_ddl) return history.image_provenance || history.source_text || history.input || t().lineageImageWork;
+		return history.source_text || history.input || t().lineageNoDescription;
+	}
+
 	type ArrowPath = { id: string; path: string; tombstone: boolean };
 	let { graph, loading, focusRequest = 0, error, isJapanese, onOpenNode, onOpenNodeInCanvas, onToggleStar, onToggleForRevision, onOpenRefinement, onDrawDescription, onOpenDdlEditor, onDrawSketchGrain, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, runAttempt = null, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, autonomousRuns, onOpenAutonomousChild, onJuxtapose, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, pngTemplates = [], onDownloadSavedWorkSVG, onDownloadSavedWorkPNG, onDownloadSavedWorkCard, onDownloadSavedWorkDdl, onDownloadSavedWorkAnimation, onDownloadSavedWorkContactSheet, onValidateSavedWorkExport, browsingState }: Props = $props();
 
@@ -859,7 +868,7 @@ $effect(() => {
 {/if}
 </div>
 
-								<button type="button" class="card-main" disabled={!node.history} aria-current={node.id === graph.focus_node_id ? 'true' : undefined} aria-label={node.history ? `${operationLabel(edge?.derivation_kind)}: ${node.history.source_text ?? node.history.input}` : withheldWorkLabel(node)} onclick={() => openNode(node)} ondblclick={() => { if (node.history) void onOpenNodeInCanvas(node); }}>
+								<button type="button" class="card-main" disabled={!node.history} aria-current={node.id === graph.focus_node_id ? 'true' : undefined} aria-label={node.history ? `${operationLabel(edge?.derivation_kind)}: ${workText(node)}` : withheldWorkLabel(node)} onclick={() => openNode(node)} ondblclick={() => { if (node.history) void onOpenNodeInCanvas(node); }}>
 									<div class="operation">
 										<span>{operationLabel(edge?.derivation_kind)}</span>
 										<!-- Both stages only when they differ: naming the same model twice
@@ -876,7 +885,7 @@ $effect(() => {
 									</div>
 									{#if node.history?.display_label}<div class="display-label">{node.history.display_label}</div>{/if}
 									{#if node.history?.trashed}<div class="trash-state">{isJapanese ? 'ゴミ箱（復元可能）' : 'In trash (restorable)'}</div>{/if}
-									<div class="meta" title={node.history?.source_text ?? node.history?.input ?? node.description_hash ?? ''}>{node.history?.source_text || node.history?.input || withheldWorkLabel(node)}</div>
+									<div class="meta" title={node.history ? workText(node) : (node.description_hash ?? '')}>{workText(node)}</div>
 								</button>
 								{#if childCount > 0 && !browsingState.overviewOpen}
 									<button class="branch-toggle" type="button" aria-expanded={browsingState.expandedNodeIds.includes(node.id)} onclick={() => toggleBranch(node)}>{browsingState.expandedNodeIds.includes(node.id) ? '▾' : '▸'} {isJapanese ? `子作品 ${groupDigits(childCount)}件` : `${groupDigits(childCount)} children`}</button>
@@ -894,7 +903,7 @@ $effect(() => {
 		<ol class="sr-only" aria-label={isJapanese ? '作品系譜の階層一覧' : 'Lineage hierarchy of works'}>
 			{#each graph.nodes as node (node.id)}
 				{@const edge = edgeByChild.get(node.id)}
-				<li>{node.id === graph.focus_node_id ? (isJapanese ? '表示中 — ' : 'Displayed — ') : ''}{operationLabel(edge?.derivation_kind)} — {node.history?.source_text ?? node.history?.input ?? withheldWorkLabel(node)}</li>
+				<li>{node.id === graph.focus_node_id ? (isJapanese ? '表示中 — ' : 'Displayed — ') : ''}{operationLabel(edge?.derivation_kind)} — {workText(node)}</li>
 			{/each}
 		</ol>
 	{/if}

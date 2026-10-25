@@ -1139,6 +1139,8 @@ export interface LangPack {
 	lineageViewTools: string;
 	lineageFocusedWork: string;
 	lineageOpenLarge: string;
+	lineageImageWork: string;
+	lineageNoDescription: string;
 	lineagePathScope: (count: number) => string;
 	lineageSelectionScope: (count: number) => string;
 	lineageWorkActions: string;

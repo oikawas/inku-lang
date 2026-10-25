@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-25 — The lineage no longer calls a work without a description deleted
+
+A lineage card showed Deleted work whenever a work's description and input text were both empty, so a picture-drawn work with an empty source note read as deleted though it was there (for example `de5882f9`). A present work now shows its source note or Work drawn from a picture when drawn from a picture, and Work without a description otherwise; Deleted work is kept for a node whose work is gone.
+
 ### 2026-10-25 — The three per-work prompt digests are retired; the Prompts tab shows each stage's digest
 
 A work's `stage1_prompt_digest`, `stage1_prompt_base_digest` and `stage2_prompt_digest` had not been produced since the Python Stage 1/2 left on 2026-09-14; only color arrangement, ground and tool changes and replays copied a parent's values. New works no longer save them (the POST no longer takes them, nothing copies them from a parent or from an older work's read, and the writer leaves them empty), and the always-empty fields of `PaintResponse` and `ComposeResponse` are gone. Saved values stay in the database and are returned read-only with the work. Generation info no longer lists the three under Identity in Details, and the Prompts tab shows, for each stage, the prompt digest the shared core keeps in the execution record.

@@ -3,7 +3,7 @@
 	import type { SettingsStatus } from './state.svelte';
 	import type { MeterSwitches } from '$lib/verseForm';
 
-	type ServerRuntimeStatus = Pick<SettingsStatus, 'output_save' | 'render_concurrency' | 'description_meter' | 'db_write_lock' | 'juxtaposition'>;
+	type ServerRuntimeStatus = Pick<SettingsStatus, 'output_save' | 'render_concurrency' | 'description_meter' | 'image_upload_notice' | 'db_write_lock' | 'juxtaposition'>;
 
 	type Props = {
 		status: ServerRuntimeStatus | null;
@@ -17,6 +17,8 @@
 		onUpdateRenderConcurrency: (serverLimit: number, clientLimit: number) => void | Promise<void>;
 		descriptionMeterStatus: string | null;
 		onUpdateDescriptionMeter: (switches: MeterSwitches) => void | Promise<void>;
+		imageUploadNoticeStatus: string | null;
+		onUpdateImageUploadNotice: (enabled: boolean) => void | Promise<void>;
 		dbWriteLockStatus: string | null;
 		onUpdateDbWriteLock: (locked: boolean) => void | Promise<void>;
 		juxtapositionStatus: string | null;
@@ -35,6 +37,8 @@
 		onUpdateRenderConcurrency,
 		descriptionMeterStatus,
 		onUpdateDescriptionMeter,
+		imageUploadNoticeStatus,
+		onUpdateImageUploadNotice,
 		dbWriteLockStatus,
 		onUpdateDbWriteLock,
 		juxtapositionStatus,
@@ -198,6 +202,30 @@
 		</label>
 		{#if descriptionMeterStatus}
 			<div class="inline-message">{descriptionMeterStatus}</div>
+		{/if}
+	{:else}
+		<div class="inline-message">{statusError ?? t().settingsLoadFailed}</div>
+	{/if}
+</div>
+<div class="popover-group">
+	<div class="popover-group-label">{t().settingsImageUploadNoticeLabel}</div>
+	{#if loading}
+		<div class="inline-message">{t().settingsLoading}</div>
+	{:else if status}
+		<label class="setting-toggle">
+			<input
+				type="checkbox"
+				checked={status.image_upload_notice.enabled}
+				onchange={(e) => onUpdateImageUploadNotice((e.currentTarget as HTMLInputElement).checked)}
+			/>
+			<span>{t().settingsImageUploadNoticeLabel}</span>
+			<span class="info-dot" aria-label={t().settingsImageUploadNoticeHint}>
+				i
+				<span class="info-tooltip">{t().settingsImageUploadNoticeHint}</span>
+			</span>
+		</label>
+		{#if imageUploadNoticeStatus}
+			<div class="inline-message">{imageUploadNoticeStatus}</div>
 		{/if}
 	{:else}
 		<div class="inline-message">{statusError ?? t().settingsLoadFailed}</div>

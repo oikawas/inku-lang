@@ -18,6 +18,11 @@ export interface LangPack {
 	settingsImageProvenanceExifNote: string;
 	imageChooseFile: string;
 	imageUploading: string;
+	imageUploadNoticeMessage: string;
+	imageUploadNoticeContinue: string;
+	settingsImageUploadNoticeLabel: string;
+	settingsImageUploadNoticeHint: string;
+	settingsImageUploadNoticeSaved: string;
 	batchSourceLabel: string;
 	batchSourceText: string;
 	batchSourceImage: string;

@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-10-25 — The picture upload warning
+
+Painting from a picture now first warns, once after each sign-in, that the picture data is uploaded to the AI, so section 16 of "Creating Images" describes the warning and when it stops appearing, and `Other (server)` in "Server Configuration" describes the `Picture upload warning` switch.
+
 ## 2026-10-25 — A folder of pictures in the Batch tab
 
 The Batch tab gained a switch between `Descriptions` and `Pictures` and can paint the pictures of a folder one by one, so section 17 of "Creating Images" gained 17.1 "A folder of pictures": choosing the folder, which files and in what order, the Image tab's conditions, why there is no path field, stopping and continuing, pictures that failed, and the folder history (ten folders, this browser only).

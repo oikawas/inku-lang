@@ -95,7 +95,9 @@ PUBLIC = {  # every entry needs a reason
 #   +2 for DELETE /api/settings/db-backup/{kind}/{name} and
 #   POST /api/settings/db-backup/{kind}/{name}/restore, deleting and restoring a
 #   retained database backup (2026-10-25).
-EXPECTED_ROUTE_COUNT = 138
+#   +1 for PUT /api/settings/image-upload-notice, the switch for the warning
+#   before painting from a picture (2026-10-25).
+EXPECTED_ROUTE_COUNT = 139
 
 
 def _guard_names(dependant, seen=None) -> set[str]:

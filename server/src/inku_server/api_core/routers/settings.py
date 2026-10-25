@@ -475,6 +475,10 @@ class DescriptionMeterStatus(BaseModel):
     english: bool = Field(description="英語の記述の形式を行数と音節で判定する")
 
 
+class ImageUploadNoticeStatus(BaseModel):
+    enabled: bool = Field(description="画像から描く前に、画像が AI のプロバイダへ送られることを、ログインごとに一度だけ警告する")
+
+
 class DbWriteLockStatus(BaseModel):
     locked: bool = Field(description="DB への書き込みを伴う要求をすべて断る（管理者の切り替えだけは通す）")
 
@@ -495,6 +499,7 @@ class SettingsStatusResponse(BaseModel):
     render_concurrency: RenderConcurrencyStatus = Field(description="How many renders may run at once")
     render_limits: RenderLimitsStatus = Field(description="Limits on how many marks and how much SVG a work may draw")
     description_meter: DescriptionMeterStatus = Field(description="Which description languages the meter judges")
+    image_upload_notice: ImageUploadNoticeStatus = Field(description="Whether the Web warns before painting from a picture")
     db_write_lock: DbWriteLockStatus = Field(description="Whether writes to the database are locked")
     juxtaposition: JuxtapositionSettingsStatus = Field(description="How many sentences Juxtaposition offers the model")
 
@@ -537,6 +542,7 @@ def api_settings_status() -> SettingsStatusResponse:
         render_limits=_render_limits_status(),
         stage_execution=_stage_execution_status(),
         description_meter=DescriptionMeterStatus(**_db.get_description_meter_settings()),
+        image_upload_notice=ImageUploadNoticeStatus(**_db.get_image_upload_notice_settings()),
         db_write_lock=DbWriteLockStatus(**_db.get_db_write_lock()),
         juxtaposition=_juxtaposition_status(),
     )
@@ -1135,6 +1141,19 @@ def api_settings_update_description_meter(body: DescriptionMeterBody) -> Descrip
     Only an administrator may call it.
     """
     return DescriptionMeterStatus(**_db.update_description_meter_settings(body.japanese, body.english))
+
+
+class ImageUploadNoticeBody(BaseModel):
+    enabled: bool = Field(description="Whether the Web warns before painting from a picture, once after each sign-in")
+
+
+@router.put("/api/settings/image-upload-notice", response_model=ImageUploadNoticeStatus, summary="Update the picture upload warning switch")
+def api_settings_update_image_upload_notice(body: ImageUploadNoticeBody) -> ImageUploadNoticeStatus:
+    """Save whether the Web warns that a picture is sent to the model's provider, and return it.
+
+    Only an administrator may call it.
+    """
+    return ImageUploadNoticeStatus(**_db.update_image_upload_notice_settings(body.enabled))
 
 
 def _juxtaposition_status() -> JuxtapositionSettingsStatus:

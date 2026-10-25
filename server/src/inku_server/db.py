@@ -843,6 +843,14 @@ def update_description_meter_settings(japanese: bool, english: bool) -> dict:
     return _settings.DescriptionMeterSettingsStore(_app_settings_store()).update(japanese, english)
 
 
+def get_image_upload_notice_settings() -> dict:
+    return _settings.ImageUploadNoticeSettingsStore(_app_settings_store()).get()
+
+
+def update_image_upload_notice_settings(enabled: bool) -> dict:
+    return _settings.ImageUploadNoticeSettingsStore(_app_settings_store()).update(enabled)
+
+
 def get_juxtaposition_settings() -> dict:
     return _settings.JuxtapositionSettingsStore(_app_settings_store()).get()
 

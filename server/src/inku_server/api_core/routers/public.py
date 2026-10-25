@@ -320,6 +320,7 @@ def api_client_config() -> dict[str, object]:
     return {
         "render_fanout_limit": int(_db.get_render_concurrency_settings()["client_limit"]),
         "description_meter": _db.get_description_meter_settings(),
+        "image_upload_notice": _db.get_image_upload_notice_settings(),
     }
 
 

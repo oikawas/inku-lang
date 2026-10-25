@@ -64,7 +64,9 @@ type ConfirmAction = {
 		padding: 22px 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.18);
 		min-width: 280px; text-align: center;
 	}
-	.confirm-box p { margin-bottom: 16px; font-size: var(--ui-font-size-13); color: var(--fg); }
+	/* A message may hold paragraphs (the picture upload warning); a long one wraps
+	   instead of widening the box past the window. */
+	.confirm-box p { margin-bottom: 16px; max-width: 520px; font-size: var(--ui-font-size-13); color: var(--fg); white-space: pre-line; }
 	.confirm-actions { display: flex; gap: 8px; justify-content: center; }
 	.danger-btn, .confirm-btn {
 		padding: var(--btn-sm-padding); border: none; border-radius: var(--btn-sm-radius);

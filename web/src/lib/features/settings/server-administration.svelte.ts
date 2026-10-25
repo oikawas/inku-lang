@@ -3,6 +3,7 @@ import type { ApiFetch } from '$lib/transport/api-fetch';
 import type { SettingsActor } from './navigation-state.svelte';
 import type { SettingsConfirmation } from './model-administration.svelte';
 import { applyMeterSwitches } from '$lib/descriptionMeter.svelte';
+import { applyImageUploadNotice } from '$lib/features/image-provenance/upload-notice';
 import type { MeterSwitches } from '$lib/verseForm';
 
 export type PluginItem = {
@@ -89,6 +90,7 @@ export type SettingsStatus = {
 		note: string;
 	};
 	description_meter: MeterSwitches;
+	image_upload_notice: { enabled: boolean };
 	db_write_lock: { locked: boolean };
 	juxtaposition: { candidate_limit: number; min_limit: number; max_limit: number };
 	render_limits: {
@@ -131,6 +133,7 @@ export type ServerAdministration = {
 	readonly pluginActionStatus: string | null;
 	readonly renderConcurrencyStatus: string | null;
 	readonly descriptionMeterStatus: string | null;
+	readonly imageUploadNoticeStatus: string | null;
 	readonly dbWriteLockStatus: string | null;
 	readonly juxtapositionStatus: string | null;
 	loadStatus: () => Promise<void>;
@@ -144,6 +147,7 @@ export type ServerAdministration = {
 	updateOutputSaveSettings: (enabled: boolean, outputDir: string, pngSize: number) => Promise<void>;
 	updateRenderConcurrencySettings: (serverLimit: number, clientLimit: number) => Promise<void>;
 	updateDescriptionMeterSettings: (switches: MeterSwitches) => Promise<void>;
+	updateImageUploadNotice: (enabled: boolean) => Promise<void>;
 	updateDbWriteLock: (locked: boolean) => Promise<void>;
 	updateJuxtapositionSettings: (candidateLimit: number) => Promise<void>;
 	updateLogRetentionSettings: (enabled: boolean, retentionDays: number, rotate: string, compress: boolean) => Promise<void>;
@@ -163,6 +167,7 @@ export function createServerAdministration<TActor extends SettingsActor>(
 	let pluginActionStatus = $state<string | null>(null);
 	let renderConcurrencyStatus = $state<string | null>(null);
 	let descriptionMeterStatus = $state<string | null>(null);
+	let imageUploadNoticeStatus = $state<string | null>(null);
 	let dbWriteLockStatus = $state<string | null>(null);
 	let juxtapositionStatus = $state<string | null>(null);
 
@@ -408,6 +413,29 @@ export function createServerAdministration<TActor extends SettingsActor>(
 		}
 	}
 
+	async function updateImageUploadNotice(enabled: boolean): Promise<void> {
+		imageUploadNoticeStatus = null;
+		try {
+			const response = await deps.apiFetch('/api/settings/image-upload-notice', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ enabled })
+			});
+			if (!response.ok) {
+				const body = await response.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(deps.describeApiError(body.detail, response.status));
+			}
+			const next = await response.json() as { enabled: boolean };
+			if (settingsStatus) settingsStatus = { ...settingsStatus, image_upload_notice: next };
+			// This tab follows at once; other tabs read it when they load.
+			applyImageUploadNotice(next);
+			imageUploadNoticeStatus = t().settingsImageUploadNoticeSaved;
+		} catch (error) {
+			imageUploadNoticeStatus = error instanceof Error ? error.message : String(error);
+			console.warn('failed to update the picture upload warning switch', error);
+		}
+	}
+
 	// The switch itself is never refused by the lock, so a locked server can always be unlocked here.
 	async function updateDbWriteLock(locked: boolean): Promise<void> {
 		dbWriteLockStatus = null;
@@ -509,6 +537,7 @@ export function createServerAdministration<TActor extends SettingsActor>(
 		get pluginActionStatus() { return pluginActionStatus; },
 		get renderConcurrencyStatus() { return renderConcurrencyStatus; },
 		get descriptionMeterStatus() { return descriptionMeterStatus; },
+		get imageUploadNoticeStatus() { return imageUploadNoticeStatus; },
 		get dbWriteLockStatus() { return dbWriteLockStatus; },
 		get juxtapositionStatus() { return juxtapositionStatus; },
 		loadStatus: loadSettingsStatus,
@@ -522,6 +551,7 @@ export function createServerAdministration<TActor extends SettingsActor>(
 		updateOutputSaveSettings,
 		updateRenderConcurrencySettings,
 		updateDescriptionMeterSettings,
+		updateImageUploadNotice,
 		updateDbWriteLock,
 		updateJuxtapositionSettings,
 		updateLogRetentionSettings,

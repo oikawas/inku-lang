@@ -9,11 +9,13 @@ import { ja } from '../../i18n/ja';
 const stub = (code: string) => 'data:text/javascript;base64,' + Buffer.from(code).toString('base64');
 const i18n = stub(`import { ja } from ${JSON.stringify(new URL('../../i18n/ja.ts', import.meta.url).href)}; export const t = () => ja; export const getLang = () => 'ja';`);
 const meter = stub('export function applyMeterSwitches() {}');
+const uploadNotice = stub('export function applyImageUploadNotice() {}');
 const source = ts.transpileModule(readFileSync(new URL('./server-administration.svelte.ts', import.meta.url), 'utf8'), {
 	compilerOptions: { target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext }
 }).outputText
 	.replace(/(['"])\$lib\/i18n\/index\.svelte\1/g, JSON.stringify(i18n))
-	.replace(/(['"])\$lib\/descriptionMeter\.svelte\1/g, JSON.stringify(meter));
+	.replace(/(['"])\$lib\/descriptionMeter\.svelte\1/g, JSON.stringify(meter))
+	.replace(/(['"])\$lib\/features\/image-provenance\/upload-notice\1/g, JSON.stringify(uploadNotice));
 const generated = compileModule(source, { filename: 'server-administration.svelte.js', generate: 'client' }).js.code
 	.replace(/(['"])svelte\/internal\/client\1/g, JSON.stringify(import.meta.resolve('svelte/internal/client')));
 const { createServerAdministration } = await import(stub(generated));

@@ -111,6 +111,11 @@ RENDER_LIMIT_SETTINGS_KEY = "render_limit_settings"
 # sounds) and English forms (the Server counts syllables). Both on by default.
 DESCRIPTION_METER_SETTINGS_KEY = "description_meter_settings"
 DESCRIPTION_METER_DEFAULT_SETTINGS = {"japanese": True, "english": True}
+# Whether the Web warns, once after each sign-in, that painting from a picture
+# sends the picture to the chosen model's provider (author, 2026-10-25). On by
+# default; an administrator turns it off for everyone.
+IMAGE_UPLOAD_NOTICE_SETTINGS_KEY = "image_upload_notice_settings"
+IMAGE_UPLOAD_NOTICE_DEFAULT_SETTINGS = {"enabled": True}
 # While locked, the Server refuses every request that would write (an
 # administrator's switch, 2026-09-30: the saved records hold still while a copy
 # of the database is counted and until the service stops for a migration).
@@ -463,6 +468,13 @@ def normalize_description_meter_settings(settings: dict | None) -> dict:
     return clean
 
 
+def normalize_image_upload_notice_settings(settings: dict | None) -> dict:
+    clean = dict(IMAGE_UPLOAD_NOTICE_DEFAULT_SETTINGS)
+    if isinstance(settings, dict) and isinstance(settings.get("enabled"), bool):
+        clean["enabled"] = settings["enabled"]
+    return clean
+
+
 def checked_juxtaposition_limit(value: object) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         raise ValueError("candidate_limit must be an integer")
@@ -744,6 +756,22 @@ class DescriptionMeterSettingsStore:
     def update(self, japanese: bool, english: bool) -> dict:
         clean = normalize_description_meter_settings({"japanese": japanese, "english": english})
         return self.app_settings.write(DESCRIPTION_METER_SETTINGS_KEY, clean)
+
+
+@dataclass(frozen=True)
+class ImageUploadNoticeSettingsStore:
+    """Read and write whether the Web warns before painting from a picture."""
+
+    app_settings: AppSettingsStore
+
+    def get(self) -> dict:
+        return normalize_image_upload_notice_settings(
+            self.app_settings.read(IMAGE_UPLOAD_NOTICE_SETTINGS_KEY)
+        )
+
+    def update(self, enabled: bool) -> dict:
+        clean = normalize_image_upload_notice_settings({"enabled": enabled})
+        return self.app_settings.write(IMAGE_UPLOAD_NOTICE_SETTINGS_KEY, clean)
 
 
 @dataclass(frozen=True)

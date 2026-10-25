@@ -67,6 +67,8 @@ export type WorkStateDeps = {
 	requestConfirmation: (confirmation: { message: string; run: () => void; destructive?: boolean; runLabel?: string; secondaryLabel?: string; secondaryRun?: () => void; hideCancel?: boolean; cancelRun?: () => void; }) => void;
 	displayLatestBatchRender: () => void;
 	pushHistory: (item: Iteration, options?: SaveHistoryOptions) => Promise<Iteration | null>;
+	/** The warning that a picture goes to the provider, due before the first picture after a sign-in. */
+	imageUploadNotice?: { due: () => boolean; acknowledge: () => void };
 };
 
 export function createWorkState(deps: WorkStateDeps) {
@@ -409,7 +411,25 @@ export function createWorkState(deps: WorkStateDeps) {
 		}
 	}
 
+	/** Paints from a picture once the author has gone on past the upload warning, if it is due. */
+	function afterImageUploadNotice(run: () => void): void {
+		const notice = deps.imageUploadNotice;
+		if (!notice?.due()) {
+			run();
+			return;
+		}
+		deps.requestConfirmation({
+			message: t().imageUploadNoticeMessage,
+			runLabel: t().imageUploadNoticeContinue,
+			run: () => { notice.acknowledge(); run(); },
+		});
+	}
+
 	function requestSubmitImage(): void {
+		afterImageUploadNotice(confirmSubmitImage);
+	}
+
+	function confirmSubmitImage(): void {
 		if (ddl !== null && ddlGeneratedBaseline !== null && ddl !== ddlGeneratedBaseline && !loading && !reloading) {
 			deps.requestConfirmation({
 				message: t().confirmDdlOverwriteMessage,
@@ -454,7 +474,11 @@ export function createWorkState(deps: WorkStateDeps) {
 			|| (cause instanceof PipelineApiError && [502, 503, 504].includes(cause.status));
 	}
 
-	async function runImageFolder(fromStart: boolean): Promise<void> {
+	function runImageFolder(fromStart: boolean): void {
+		afterImageUploadNotice(() => { void paintImageFolder(fromStart); });
+	}
+
+	async function paintImageFolder(fromStart: boolean): Promise<void> {
 		if (imageFolder.running || loading || reloading || pipelineBusy || refinementSession.gridBusy || demo.running || batch.running || batch.resuming) return;
 		loading = true;
 		activeRunMode = 'image-batch';

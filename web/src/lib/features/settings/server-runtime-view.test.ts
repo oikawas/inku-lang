@@ -25,15 +25,15 @@ test('Stage 3D gives server-runtime presentation one feature-local view', () => 
 });
 
 test('the focused view receives three status slices and named capabilities', () => {
-	assert.match(VIEW, /type ServerRuntimeStatus = Pick<SettingsStatus, 'output_save' \| 'render_concurrency' \| 'description_meter' \| 'db_write_lock' \| 'juxtaposition'>;/);
+	assert.match(VIEW, /type ServerRuntimeStatus = Pick<SettingsStatus, 'output_save' \| 'render_concurrency' \| 'description_meter' \| 'image_upload_notice' \| 'db_write_lock' \| 'juxtaposition'>;/);
 	assert.match(VIEW, /status: ServerRuntimeStatus \| null;/);
 	assert.doesNotMatch(VIEW, /SettingsController|apiFetch|\/api\//);
-	assert.match(SERVER_BRANCH, /status=\{settingsStatus \? \{ output_save: settingsStatus\.output_save, render_concurrency: settingsStatus\.render_concurrency, description_meter: settingsStatus\.description_meter, db_write_lock: settingsStatus\.db_write_lock, juxtaposition: settingsStatus\.juxtaposition \} : null\}/);
-	for (const capability of ['onReload', 'onUpdateOutputSave', 'onUpdateRenderConcurrency', 'onUpdateDescriptionMeter', 'onUpdateJuxtaposition']) {
+	assert.match(SERVER_BRANCH, /status=\{settingsStatus \? \{ output_save: settingsStatus\.output_save, render_concurrency: settingsStatus\.render_concurrency, description_meter: settingsStatus\.description_meter, image_upload_notice: settingsStatus\.image_upload_notice, db_write_lock: settingsStatus\.db_write_lock, juxtaposition: settingsStatus\.juxtaposition \} : null\}/);
+	for (const capability of ['onReload', 'onUpdateOutputSave', 'onUpdateRenderConcurrency', 'onUpdateDescriptionMeter', 'onUpdateImageUploadNotice', 'onUpdateJuxtaposition']) {
 		assert.match(VIEW, new RegExp(capability + ':'), capability);
 		assert.match(SERVER_BRANCH, new RegExp(capability + '='), capability);
 	}
-	for (const owner of ['loadSettingsStatus', 'updateOutputSaveSettings', 'updateRenderConcurrencySettings', 'updateDescriptionMeterSettings', 'updateJuxtapositionSettings']) {
+	for (const owner of ['loadSettingsStatus', 'updateOutputSaveSettings', 'updateRenderConcurrencySettings', 'updateDescriptionMeterSettings', 'updateImageUploadNotice', 'updateJuxtapositionSettings']) {
 		assert.match(OWNER, new RegExp('async function ' + owner + '\\('), owner);
 		assert.doesNotMatch(VIEW, new RegExp('(?:async\\s+)?function ' + owner + '\\('), owner);
 	}

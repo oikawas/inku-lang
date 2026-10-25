@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-25 — Painting from a picture warns once after each sign-in
+
+Before the first picture is painted after a sign-in, from the Image tab or the picture side of the Batch tab, the Web shows the author's warning that the picture data is uploaded to the AI and handled under the terms of the chosen model and its provider, and asks not to upload sensitive data. Going on paints and keeps the warning quiet in this browser for that account until the next sign-in; Cancel does not paint. Administrators switch it for everyone in Settings > Other (server) (`PUT /api/settings/image-upload-notice`, on by default, read by every page from `/api/client-config` as `image_upload_notice`; routes 138 → 139). The confirmation dialog now keeps line breaks and wraps a long message at 520 px.
+
 ### 2026-10-25 — inku-cli reads one work by its UUID
 
 inku-cli gains `history show`, which prints a work's description, DDL and JSON Score (`--part` for one of them), and `history png`, which rasterizes the saved display SVG into a PNG of the drawing alone (`--size` for the longer side, default 1024). Both take the UUID or its first few characters. There is no endpoint for one work, so the listing is asked with `anchor_id` and `limit=1` and the returned work's id is checked. A prefix is resolved against the listing without pictures, and one that fits more than one work stops with the candidates. The server is unchanged.

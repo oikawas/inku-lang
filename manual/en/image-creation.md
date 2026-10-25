@@ -564,6 +564,8 @@ On the `Image` tab you paint from an image file instead of a description (v2.15.
 4. Under `Conditions for the next work`, choose `Model`, `Color catalog`, and `Canvas`.
 5. Press `Paint`.
 
+The first time you paint from a picture after signing in, a warning says that painting from a picture uploads the picture data to the AI and asks you not to upload sensitive data. `Understood, paint` starts painting; `Cancel` does not paint. Once you go on, it does not appear again until the next sign-in (in this browser, per account). The picture side of the Batch tab (§17.1) does the same. Administrators can turn it off for everyone with `Picture upload warning` in `Other (server)`.
+
 | Condition | Contents |
 |---|---|
 | Model | The Vision model that reads the image. `Edit` opens the list of Vision models. With no Vision model available, `Paint` cannot be pressed and `Choose a Vision model that can read images.` appears |

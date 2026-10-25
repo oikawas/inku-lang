@@ -139,6 +139,7 @@
 	const renderLimitsStatus = $derived(settings.renderLimitsStatus);
 	const renderConcurrencyStatus = $derived(settings.renderConcurrencyStatus);
 	const descriptionMeterStatus = $derived(settings.descriptionMeterStatus);
+	const imageUploadNoticeStatus = $derived(settings.imageUploadNoticeStatus);
 	const dbWriteLockStatus = $derived(settings.dbWriteLockStatus);
 	const juxtapositionStatus = $derived(settings.juxtapositionStatus);
 	const onClose = () => settings.close();
@@ -150,6 +151,7 @@
 	const onUpdateOutputSaveSettings = (enabled: boolean, outputDir: string, pngSize: number) => settings.updateOutputSaveSettings(enabled, outputDir, pngSize);
 	const onUpdateRenderConcurrencySettings = (serverLimit: number, clientLimit: number) => settings.updateRenderConcurrencySettings(serverLimit, clientLimit);
 	const onUpdateDescriptionMeterSettings = (switches: MeterSwitches) => settings.updateDescriptionMeterSettings(switches);
+	const onUpdateImageUploadNotice = (enabled: boolean) => settings.updateImageUploadNotice(enabled);
 	const onUpdateDbWriteLock = (locked: boolean) => settings.updateDbWriteLock(locked);
 	const onUpdateJuxtapositionSettings = (candidateLimit: number) => settings.updateJuxtapositionSettings(candidateLimit);
 	const onUpdateLogRetentionSettings = (enabled: boolean, retentionDays: number, rotate: string, compress: boolean) => settings.updateLogRetentionSettings(enabled, retentionDays, rotate, compress);
@@ -362,7 +364,7 @@
 			/>
 		{:else if settingsTab === 'server_misc'}
 			<ServerRuntimeSettings
-				status={settingsStatus ? { output_save: settingsStatus.output_save, render_concurrency: settingsStatus.render_concurrency, description_meter: settingsStatus.description_meter, db_write_lock: settingsStatus.db_write_lock, juxtaposition: settingsStatus.juxtaposition } : null}
+				status={settingsStatus ? { output_save: settingsStatus.output_save, render_concurrency: settingsStatus.render_concurrency, description_meter: settingsStatus.description_meter, image_upload_notice: settingsStatus.image_upload_notice, db_write_lock: settingsStatus.db_write_lock, juxtaposition: settingsStatus.juxtaposition } : null}
 				statusError={settingsStatusError}
 				loading={settingsStatusLoading}
 				{outputSaveStatus}
@@ -373,6 +375,8 @@
 				onUpdateRenderConcurrency={onUpdateRenderConcurrencySettings}
 				{descriptionMeterStatus}
 				onUpdateDescriptionMeter={onUpdateDescriptionMeterSettings}
+				{imageUploadNoticeStatus}
+				onUpdateImageUploadNotice={onUpdateImageUploadNotice}
 				{dbWriteLockStatus}
 				{onUpdateDbWriteLock}
 				{juxtapositionStatus}

@@ -76,8 +76,8 @@ final class ProviderWireMigrationChecks: XCTestCase {
                 }
             }
         }
-        XCTAssertEqual(counts, ["requests": 246, "text_requests": 81, "responses": 97])
-        print("Shared provider wire rows checked: requests=246, text=81, responses=97, body/auth/budget/countTokens; synthetic KEY only, HTTP=0")
+        XCTAssertEqual(counts, ["requests": 248, "text_requests": 81, "responses": 97])
+        print("Shared provider wire rows checked: requests=248, text=81, responses=97, body/auth/budget/countTokens; synthetic KEY only, HTTP=0")
     }
 
     func testCaptureSwiftWireInventory() throws {

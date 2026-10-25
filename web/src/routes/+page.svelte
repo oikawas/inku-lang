@@ -2839,6 +2839,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						onImageProvenanceInput={work.noteImageProvenanceTyped}
 						onSubmitImage={work.requestSubmitImage}
 						onSelectImageCanvasAspect={(id) => { work.imageCanvasAspectId = id; canvasAspectMenuOpen = false; }}
+						imageFolder={work.imageFolder}
+						onRunImageFolder={work.runImageFolder}
 						onOpenImageModelSelection={() => openModelSelection(true, true)}
 						bind:input={work.input}
 						bind:batchInput={batch.input}
@@ -2876,7 +2878,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						onResumeBatch={() => void resumeInterruptedBatch()}
 						onRetryBatchFailures={() => void retryFailedBatch()}
 						canSubmit={work.canSubmit}
-						generationDisabled={refinementSession.gridBusy || work.reloading || demoRunning || batch.resuming}
+						generationDisabled={refinementSession.gridBusy || work.reloading || demoRunning || batch.resuming || work.imageFolder.running}
 						error={work.error}
 						stageLabel={work.stageLabel}
 						{canvasAspectId}

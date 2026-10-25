@@ -3,6 +3,8 @@
 	import LabelHighlight from './LabelHighlight.svelte';
 	import Tooltip from './Tooltip.svelte';
 	import BatchPanel from './BatchPanel.svelte';
+	import ImageFolderBatchPanel from './ImageFolderBatchPanel.svelte';
+	import type { ImageFolderBatch } from '$lib/features/batch/image-folder.svelte';
 	import CanvasAspectPlugin from './CanvasAspectPlugin.svelte';
 	import SketchSelect from './SketchSelect.svelte';
 	import { type SketchMode } from '$lib/sketch';
@@ -42,6 +44,9 @@
 		onSubmitImage: () => void | Promise<void>;
 		onSelectImageCanvasAspect: (id: CanvasAspectId) => void;
 		onOpenImageModelSelection: () => void;
+		/** The batch tab's picture side: a picked folder painted picture by picture. */
+		imageFolder: ImageFolderBatch;
+		onRunImageFolder: (fromStart: boolean) => void | Promise<void>;
 		input: string;
 		batchInput: string;
 		lineNumbersText: string;
@@ -114,6 +119,7 @@
 		imageProvenance = $bindable(''), uploadedImage, imageFileName, imageUploading, imageRunning,
 		imageCanvasAspectId, visionModelName, visionModelAvailable,
 		onSelectImage, onImageProvenanceInput, onSubmitImage, onSelectImageCanvasAspect, onOpenImageModelSelection,
+		imageFolder, onRunImageFolder,
 		input = $bindable(''),
 		batchInput = $bindable(''),
 		lineNumbersText,
@@ -184,22 +190,30 @@
 	// During a retry round the counter runs over that round's own lines, marked
 	// with ↻n so the numbers restarting does not read as the batch restarting.
 	const batchRetryMark = $derived(batchRetryRound > 0 ? ` ↻${batchRetryRound}` : '');
+	// The picture batch counts its pictures the same way.
+	const folderRunning = $derived(imageFolder.running);
+	const progressTotal = $derived(folderRunning ? imageFolder.total : batchTotal);
 	const batchProgress = $derived(
-		batchRunning && batchTotal > 0 && batchCurrent > 0
-			? `(${batchCurrent}/${batchTotal}${batchRetryMark})`
-			: '',
+		folderRunning && imageFolder.total > 0 && imageFolder.current > 0
+			? `(${imageFolder.current}/${imageFolder.total})`
+			: batchRunning && batchTotal > 0 && batchCurrent > 0
+				? `(${batchCurrent}/${batchTotal}${batchRetryMark})`
+				: '',
 	);
 	// The counter is reserved at its widest form -- "(NN/NN)" for a two-digit total --
 	// so the label beside it does not shuffle as the count crosses a digit boundary.
 	// The tabs themselves are flex: 1 with a zero basis, so no tab can push another.
 	const batchProgressWidth = $derived(
-		2 * String(batchTotal).length + 3 + (batchRetryRound > 0 ? 2 + String(batchRetryRound).length : 0),
+		2 * String(progressTotal).length + 3 + (!folderRunning && batchRetryRound > 0 ? 2 + String(batchRetryRound).length : 0),
 	);
+
+	// The batch tab paints pictures with the picture tab's settings.
+	const pictureConditions = $derived(inputMode === 'image' || (inputMode === 'batch' && imageFolder.source === 'image'));
 
 	const tabItems = $derived([
 		{ mode: 'single' as const, label: t().modeSingle, running: singleRunning && !imageRunning, progress: '' },
 		{ mode: 'image' as const, label: t().imageTab, running: imageRunning, progress: '' },
-		{ mode: 'batch' as const, label: t().modeBatch, running: batchRunning, progress: batchProgress },
+		{ mode: 'batch' as const, label: t().modeBatch, running: batchRunning || folderRunning, progress: batchProgress },
 	]);
 
 </script>
@@ -235,13 +249,13 @@
 					<!-- The button sits at the panel's right edge. A centred bubble reached
 					     past it even while hidden, so the panel scrolled sideways and a
 					     swipe or a focus cut off the left of every row. -->
-					<Tooltip text={inputMode === 'image' ? t().modelSelectionVisionHint : t().tooltipInputModel} placement="top-left">
-						<button class="ghost-btn condition-change" aria-label={inputMode === 'image' ? t().modelSelectionVisionHint : t().tooltipInputModel} onclick={inputMode === 'image' ? onOpenImageModelSelection : onOpenModelSelection}>{t().editButton}</button>
+					<Tooltip text={pictureConditions ? t().modelSelectionVisionHint : t().tooltipInputModel} placement="top-left">
+						<button class="ghost-btn condition-change" aria-label={pictureConditions ? t().modelSelectionVisionHint : t().tooltipInputModel} onclick={pictureConditions ? onOpenImageModelSelection : onOpenModelSelection}>{t().editButton}</button>
 					</Tooltip>
 				</div>
 				<div class="condition-value condition-model-value">
 					<div class="condition-model-names">
-						{#if inputMode === 'image'}
+						{#if pictureConditions}
 							<span title={visionModelName}>{visionModelName}</span>
 						{:else if nextStage1Model === nextStage2Model}
 							<span title={nextStage1Model}>{nextStage1Model}</span>
@@ -266,7 +280,7 @@
 				<span class="condition-value" title={nextCatalogName}>{nextCatalogName}</span>
 			</div>
 			<div class="condition-compact-rows">
-				{#if inputMode !== 'image'}
+				{#if !pictureConditions}
 				<div class="condition-compact-row">
 					<Tooltip text={t().tooltipInputSketch}><SketchSelect value={sketchMode} {isJapanese} showValue onSelect={onSelectSketchMode} /></Tooltip>
 				</div>
@@ -284,7 +298,7 @@
 				{/if}
 				<div class="condition-compact-row">
 					<Tooltip text={t().tooltipInputCanvas}>
-						{#if inputMode === 'image'}
+						{#if pictureConditions}
 						<CanvasAspectPlugin
 							selected={imageCanvasAspectId}
 							options={[{ id: 'image', label: t().imageCanvasAspect, category: 'Vision', ratio: '', ratioW: 1, ratioH: 1, intentJa: t().imageCanvasAspect, intentEn: t().imageCanvasAspect }, ...canvasAspectOptions]}
@@ -303,7 +317,7 @@
 						{/if}
 					</Tooltip>
 				</div>
-				{#if inputMode === 'batch'}
+				{#if inputMode === 'batch' && !pictureConditions}
 					<div class="condition-compact-row">
 						<Tooltip text={t().tooltipInputClear}>
 							<button class="ghost-btn" onclick={onClearInput}>{t().clearInputBtn}</button>
@@ -409,6 +423,37 @@
 		{/if}
 		{#if error}<p class="error-text">{error}</p>{/if}
 	{:else if inputMode === 'batch'}
+		<!-- Descriptions or pictures; locked while either side runs. -->
+		<div class="batch-source">
+			<span class="batch-source-name" class:on={imageFolder.source === 'text'}>{t().batchSourceText}</span>
+			<button
+				type="button"
+				class="batch-source-switch"
+				role="switch"
+				aria-label={t().batchSourceLabel}
+				aria-checked={imageFolder.source === 'image'}
+				disabled={batchRunning || batchResuming || folderRunning}
+				onclick={() => imageFolder.setSource(imageFolder.source === 'image' ? 'text' : 'image')}
+			><span class="batch-source-knob" aria-hidden="true"></span></button>
+			<span class="batch-source-name" class:on={imageFolder.source === 'image'}>{t().batchSourceImage}</span>
+		</div>
+		{#if imageFolder.source === 'image'}
+			<ImageFolderBatchPanel
+				folder={imageFolder}
+				busy={singleRunning || generationDisabled || batchRunning}
+				{visionModelName}
+				{visionModelAvailable}
+				{stageLabel}
+				{liveMs}
+				{runTokensIn}
+				{runTokensOut}
+				{runAttempt}
+				{error}
+				onRun={onRunImageFolder}
+				{onStop}
+				settings={inputConditionRows}
+			/>
+		{:else}
 		<BatchPanel
 			settings={inputConditionRows}
 			{runTokensIn}
@@ -453,10 +498,24 @@
 			onSubmit={onSubmit}
 			onStop={onStop}
 		/>
+		{/if}
 	{/if}
 </section>
 
 <style>
+	.batch-source { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: var(--ui-font-size-12); }
+	.batch-source-name { color: var(--fg3); }
+	.batch-source-name.on { color: var(--fg); font-weight: 600; }
+	.batch-source-switch {
+		position: relative; flex: 0 0 auto; width: 34px; height: 18px; padding: 0;
+		border: 1px solid var(--border2); border-radius: 9px; background: var(--bg2); cursor: pointer;
+	}
+	.batch-source-switch:disabled { cursor: default; opacity: 0.55; }
+	.batch-source-knob {
+		position: absolute; top: 2px; left: 2px; width: 12px; height: 12px;
+		border-radius: 50%; background: var(--fg2); transition: transform 0.15s;
+	}
+	.batch-source-switch[aria-checked='true'] .batch-source-knob { transform: translateX(16px); background: var(--fg); }
 	.image-file-label { display: grid; gap: 6px; color: var(--fg2); font-size: var(--ui-font-size-12); }
 	.image-file-label input { min-width: 0; width: 100%; font: inherit; }
 	.image-preview { margin: 4px 0; display: grid; gap: 4px; }

@@ -24,6 +24,8 @@ import type { JuxtapositionResult } from '$lib/features/juxtaposition/juxtaposit
 import type { AutonomousRun, AutonomousRunsApi } from '$lib/features/autonomous/runs';
 import type { SessionState } from '$lib/features/session/state.svelte';
 import { BatchState } from '$lib/features/batch/state.svelte';
+import { ImageFolderBatch } from '$lib/features/batch/image-folder.svelte';
+import { isConnectionFailure } from '$lib/transport/connection-failure';
 import { DemoState } from '$lib/features/demo/state.svelte';
 import { RefinementSessionState } from '$lib/features/canvas/refinement-session.svelte';
 import { HistoryBrowsingState } from '$lib/features/history/browsing-state.svelte';
@@ -108,7 +110,8 @@ export function createWorkState(deps: WorkStateDeps) {
 		imageUploadConsumed = false;
 	}
 
-	async function fillImageProvenance(file: File, ordinal: number): Promise<void> {
+	/** The source note the picture tab writes for a chosen file, from its name and Exif. */
+	async function provenanceOfFile(file: File): Promise<string> {
 		const options = imageProvenanceSettings.options;
 		let facts = null;
 		if (options.includeExif) {
@@ -118,16 +121,21 @@ export function createWorkState(deps: WorkStateDeps) {
 				facts = null;
 			}
 		}
-		// A note the author typed and then emptied is filled again.
-		if (ordinal !== imageUploadOrdinal || (imageProvenanceTyped && imageProvenance.trim())) return;
 		const strings = t();
-		imageProvenance = imageProvenanceText(file.name, facts, options, {
+		return imageProvenanceText(file.name, facts, options, {
 			fileName: strings.imageProvenanceFileName,
 			takenAt: strings.imageProvenanceTakenAt,
 			camera: strings.imageProvenanceCamera,
 			lens: strings.imageProvenanceLens,
 			exposure: strings.imageProvenanceExposure,
 		});
+	}
+
+	async function fillImageProvenance(file: File, ordinal: number): Promise<void> {
+		const text = await provenanceOfFile(file);
+		// A note the author typed and then emptied is filled again.
+		if (ordinal !== imageUploadOrdinal || (imageProvenanceTyped && imageProvenance.trim())) return;
+		imageProvenance = text;
 	}
 
 	let input = $state(DEFAULT_INPUT);
@@ -139,7 +147,7 @@ export function createWorkState(deps: WorkStateDeps) {
 	// ── Loading ─────────────────────────────────────────────
 	let loading = $state(false);
 
-	let activeRunMode = $state<'single' | 'batch' | 'demo' | null>(null);
+	let activeRunMode = $state<'single' | 'batch' | 'image-batch' | 'demo' | null>(null);
 
 	let submitAbortController: AbortController | null = null;
 
@@ -414,6 +422,62 @@ export function createWorkState(deps: WorkStateDeps) {
 			return;
 		}
 		void submitImage();
+	}
+
+	// ── Picture batch ───────────────────────────────────────
+	// Each picture of a picked folder goes the picture tab's way: upload, write
+	// the instructions from it with the vision model, paint, save. The source note
+	// is the one the picture tab would write for that file.
+	const imageFolder = new ImageFolderBatch();
+
+	async function paintPictureFile(file: File, signal: AbortSignal): Promise<void> {
+		const api = new PipelineApi(apiFetch);
+		const provenance = await provenanceOfFile(file);
+		const image = await api.uploadImage(file, signal);
+		signal.throwIfAborted();
+		const model = qualifiedModelId(deps.models.visionProvider(), deps.models.visionModel());
+		ddl = null; ddlGeneratedBaseline = null; thinking = null;
+		stageLabel = t().imageWritingDdl;
+		const view = await finishPipeline(() => pipelineController.fromImage(image.image_id, provenance, imageCanvasAspectId, {
+			...pipelineOptions(), stage1_model: model, stage2_model: model,
+			sketch: 'off', sketch_text: undefined, wild: false, instruction_lang: 'ja',
+			canvas_aspect: imageCanvasAspectId === 'image' ? image.nearest_format_id : imageCanvasAspectId,
+			canvas_fit: 'contain',
+		}, signal));
+		if (view.image_failure) throw new Error(describeApiError(view.image_failure, 422));
+		if (view.phase.tag === 'failed') throw new Error(describeApiError({ code: view.phase.reason ?? 'image_ddl_failed' }, 422));
+	}
+
+	/** A cut or a Server that is away stops the run; it resumes from the same picture. */
+	function pictureRunLost(cause: unknown): boolean {
+		return isConnectionFailure(cause) || cause instanceof TypeError
+			|| (cause instanceof PipelineApiError && [502, 503, 504].includes(cause.status));
+	}
+
+	async function runImageFolder(fromStart: boolean): Promise<void> {
+		if (imageFolder.running || loading || reloading || pipelineBusy || refinementSession.gridBusy || demo.running || batch.running || batch.resuming) return;
+		loading = true;
+		activeRunMode = 'image-batch';
+		error = null;
+		result = null;
+		displayedHistoryItem = null;
+		deps.history().clearSelection();
+		resetTargetScopedState();
+		pendingCanvasAspectDerivation = null;
+		pipelineController.clear();
+		adoptSketch(null, null, null, 'off');
+		startTimer();
+		try {
+			await imageFolder.run({
+				fromStart,
+				paintPicture: paintPictureFile,
+				stopsTheRun: pictureRunLost,
+				describe: (cause) => cause instanceof PipelineApiError ? describeApiError(cause.detail, cause.status)
+					: cause instanceof Error ? cause.message : String(cause),
+			});
+		} finally {
+			stopTimer(); loading = false; activeRunMode = null; stageLabel = '';
+		}
 	}
 
 	async function pipelineCompatibilityError(response: Response): Promise<Error> {
@@ -1004,6 +1068,11 @@ export function createWorkState(deps: WorkStateDeps) {
 	}
 
 	function stopBatch() {
+		if (activeRunMode === 'image-batch') {
+			imageFolder.stop();
+			void pipelineController.cancel();
+			return;
+		}
 		if (activeRunMode === 'batch') {
 			batch.stop();
 			return;
@@ -1295,6 +1364,8 @@ export function createWorkState(deps: WorkStateDeps) {
 		selectImage,
 		submitImage,
 		requestSubmitImage,
+		imageFolder,
+		runImageFolder,
 		clearImage,
 		noteImageProvenanceTyped: () => { imageProvenanceTyped = true; },
 		get input() { return input; },

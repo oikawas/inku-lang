@@ -609,6 +609,24 @@ When a stopped batch still has lines that failed to draw, `Retry failed works` a
 
 Set `Batch retry` in the settings to one or more and the failed lines alone are painted again after the first pass. Zero means no retry. A run that was stopped is not retried.
 
+### 17.1 A folder of pictures
+
+Turn the switch at the top of the Batch tab from `Descriptions` to `Pictures` to paint the pictures of a folder one by one. This browser remembers the switch. The `Descriptions` side works as described above.
+
+1. Press `Choose a folder` and pick a folder in the browser's dialog. The browser may ask whether to upload the files.
+2. The folder name and the number of pictures appear. JPEG, PNG, GIF and TIFF are taken, including those in subfolders; files and folders whose names start with `.` are left out. They are painted in the order of their paths inside the folder, with numbers compared as numbers (`2.jpg` before `10.jpg`).
+3. Press `Paint (N)`.
+
+Each picture goes the same way as the Image tab in §16 and is saved. The conditions are the Image tab's too: its vision model, the color catalog, and the canvas (the picture's own aspect or a fixed ratio). The source note is the one the Image tab writes when that picture is chosen (its file name, and Exif when the setting asks for it). While it runs, the tab and the card show `n/total: path`.
+
+A browser cannot read a folder from a typed path, and cannot open a picked folder again later, so there is no path field.
+
+**Stopping and continuing**: the run stops with `Stop`, or by itself when the Server cannot be reached. While the same folder is chosen, `Continue (N left)` paints the pictures not yet painted. After a reload, choose the same folder again and the same button appears. A painted picture is recognised by its path inside the folder, its size and its modification time, so a file replaced under the same name is painted again. `Paint from the start` forgets that folder's progress and paints every picture.
+
+**Pictures that failed**: one failure does not stop the run. Open `N pictures could not be painted` to see each path and its reason. `Continue` paints them again.
+
+**Folder history**: the ten most recent folders are kept in this browser with their name, progress (painted/total) and the time of the last run. Pressing one opens the folder dialog; choose the same folder to continue. The history is not sent to the Server, so another browser or computer does not show it.
+
 ## 18. Demo
 
 Open `Settings` → `Making` → `Demo`. It writes short descriptions from a seed phrase, then paints them repeatedly. Choose saving to DB, saving files, the description model, display interval in seconds, and timeout in minutes.

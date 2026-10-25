@@ -46,5 +46,7 @@ test('T-161  the counter is still reserved at its widest, which is why the room 
 	// the wrap would go away for the wrong reason -- and the word would start
 	// shuffling sideways on every digit boundary instead.
 	assert.match(PANEL, /min-width:\s*\{batchProgressWidth\}ch/);
-	assert.match(PANEL, /2 \* String\(batchTotal\)\.length \+ 3/);
+	// The picture batch counts on the same tab, so the reserve follows whichever runs.
+	assert.match(PANEL, /2 \* String\(progressTotal\)\.length \+ 3/);
+	assert.match(PANEL, /progressTotal = \$derived\(folderRunning \? imageFolder\.total : batchTotal\)/);
 });

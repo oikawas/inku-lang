@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-25 — The Batch tab paints a folder of pictures
+
+The Batch tab gains a switch between descriptions (unchanged) and pictures. On the picture side the author picks a folder in the browser's dialog (`<input webkitdirectory>`; a browser cannot open a typed path, and `showDirectoryPicker` is unavailable on the http 5173), and its JPEG, PNG, GIF and TIFF files are painted one by one in natural path order through the Image tab's own run (upload, `fromImage`, the Image tab's vision model, catalog and canvas, and the source note it would write). A failed picture is recorded and the run goes on; a cut connection or a 502–504 stops it. Progress is kept per folder in the browser's localStorage (path, size and modification time per picture, ten folders), so after a stop or a reload, choosing the same folder again offers `Continue` from the unpainted pictures. The Server is unchanged.
+
 ### 2026-10-25 — inku-cli reads one work by its UUID
 
 inku-cli gains `history show`, which prints a work's description, DDL and JSON Score (`--part` for one of them), and `history png`, which rasterizes the saved display SVG into a PNG of the drawing alone (`--size` for the longer side, default 1024). Both take the UUID or its first few characters. There is no endpoint for one work, so the listing is asked with `anchor_id` and `limit=1` and the returned work's id is checked. A prefix is resolved against the listing without pictures, and one that fits more than one work stops with the candidates. The server is unchanged.

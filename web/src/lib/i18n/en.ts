@@ -958,6 +958,7 @@ export const en: LangPack = {
 	settingsTabPlugins: 'Plugins',
 	settingsTabUsers: 'User management',
 	settingsTabExport: 'Export',
+	settingsTabFileSaving: 'File saving',
 	settingsTabClipboard: 'Clipboard',
 	settingsClipboardHint: 'The format and size of the picture that "Copy to clipboard" on the canvas puts on the clipboard.',
 	clipboardFormatLabel: 'Format',

@@ -37,5 +37,6 @@ test('ChatGPT has its own category and never includes the appearance settings bo
 	assert.match(appearance, /data-view="AppearanceSettings"/);
 	assert.doesNotMatch(appearance, /data-view="ChatGPTSettings"/);
 	const category = source.slice(source.indexOf("{#if reaches('chatgpt')}"), source.indexOf("{/if}", source.indexOf("{#if reaches('chatgpt')}")));
-	assert.match(category, /<section class="settings-category">/);
+	// Its one tab carries the category name, so the category shows only its rule.
+	assert.match(category, /<section class="settings-category untitled">/);
 });

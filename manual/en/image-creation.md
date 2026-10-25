@@ -491,7 +491,7 @@ Only a saved work is exported. A picture that is not saved (one drawn by the dem
 
 `Editable`, `Compat`, and `Live` are drawn again from the Score, and **a redraw uses the performance that was saved** (both the render seed and the composition seed the saved work carries). **The only difference from the stored SVG is how far the drawing engine has moved on** -- inku keeps no past version, so a redraw after the engine advances is never byte-identical.
 
-Set the download folder under `Settings` → `Export` → `Save location`. Without one, files land in the browser's default folder. The folder itself lives only inside that browser, so another browser or another device needs its own choice. If writing is not permitted, the file lands in the browser's default folder and says so.
+Set the download folder under `Settings` → `Export`, page `File saving` → `Save location`. Without one, files land in the browser's default folder. The folder itself lives only inside that browser, so another browser or another device needs its own choice. If writing is not permitted, the file lands in the browser's default folder and says so.
 
 ### 15.1 Contact Sheets
 
@@ -616,14 +616,15 @@ Even with automatic saving disabled, the current work can be saved to history ex
 
 ## 19. Settings
 
-Open it from `Settings` in the app rail. Settings are grouped as `Display and operation`, `Making`, `Export`, `Connections and administration`, and `Extensions and details`, with a separate `ChatGPT plan` category where personal connections are enabled. The pages and controls visible depend on your role.
+Open it from `Settings` in the app rail. Settings are grouped as `Display and operation`, `Making`, `Image`, `Export`, `Connections and administration`, and `Extensions and details`, with a separate `ChatGPT plan` category where personal connections are enabled. In the list on the left, each category name is a small heading with its pages indented below it. `Display and operation`, `Image` and `ChatGPT plan` each hold one page of the same name, so they show only a dividing rule instead of the heading. The pages and controls visible depend on your role.
 
 | Category | Pages and contents |
 |---|---|
 | Display and operation | `Display and operation`. Text size, caption position, UI mode, facts under history thumbnails, mascot, and related controls |
 | Making | `Batch retry` and `Demo` |
+| Image | `Image`. Whether the Image tab's source note gets the file name and the Exif shooting details |
 | ChatGPT plan | When signed in and the feature is enabled, its dedicated page connects, reconnects, or disconnects your account. Publish models in your personal `Models` settings |
-| Export | `Export`. Save location, PNG export templates, animation, and the share card's page shape and seal |
+| Export | `File saving` (save location, PNG export templates, animation, and the share card's page shape and seal) and `Clipboard` |
 | Connections and administration | Administrators manage shared `Models`, `User management`, `DB settings`, and `Log retention`. Leaders can also manage users within their scope. Where personal ChatGPT is enabled, members can open their own `Models` settings. Administrators' `Detailed` mode also shows `Other (server)` and `Limits` |
 | Extensions and details | `Detailed` shows `Plugins` and `Unread-word ledger` |
 

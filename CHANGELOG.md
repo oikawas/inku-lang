@@ -10,7 +10,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ### 2026-10-25 — Settings categories read apart from their tabs
 
-In the settings list, a category name is now a small, letter-spaced heading ruled to the edge, and its tabs sit indented below it. The Display and operation, Image, ChatGPT plan and Export entries each had a category and a tab of the same name that were hard to tell apart. The narrow-screen row is unchanged.
+In the settings list, a category name is now a small, letter-spaced heading ruled to the edge, and its tabs sit indented below it. Display and operation, Image and ChatGPT plan, each holding one tab of its own name, show only the rule. The Export category's Export tab is now File saving. Each of these had a category and a tab of the same name that were hard to tell apart. The narrow-screen row is unchanged. The manual's settings table gains the missing Image category.
 
 ### 2026-10-25 — inku-cli reads one work by its UUID
 

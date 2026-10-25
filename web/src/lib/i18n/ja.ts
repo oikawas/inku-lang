@@ -956,6 +956,7 @@ export const ja: LangPack = {
 	settingsTabPlugins: 'プラグイン',
 	settingsTabUsers: 'ユーザー管理',
 	settingsTabExport: 'エクスポート',
+	settingsTabFileSaving: 'ファイル保存',
 	settingsTabClipboard: 'クリップボード',
 	settingsClipboardHint: 'キャンバスの「クリップボードにコピー」で出す画像の形式と大きさを設定します。',
 	clipboardFormatLabel: '形式',

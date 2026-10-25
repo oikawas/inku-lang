@@ -181,7 +181,7 @@
 			case 'unread': return { title: strings.settingsTabUnreadWords, hint: strings.settingsUnreadHint };
 			case 'export': return exportSection === 'clipboard'
 				? { title: strings.settingsTabClipboard, hint: strings.settingsClipboardHint }
-				: { title: strings.settingsTabExport, hint: strings.settingsExportHint };
+				: { title: strings.settingsTabFileSaving, hint: strings.settingsExportHint };
 			case 'image': return { title: strings.imageTab, hint: strings.settingsImageHint };
 			case 'demo': return { title: strings.modeDemo, hint: strings.tooltipInputTabDemo };
 			default: return appearanceSection === 'making'
@@ -280,8 +280,7 @@
 	{:else}
 		<div class="settings-workspace">
 			<nav class="settings-category-nav" aria-label={t().settingsTitle}>
-				<section class="settings-category">
-					<div class="settings-category-label">{t().settingsCategoryDisplayOperation}</div>
+				<section class="settings-category untitled">
 					<button aria-current={settingsTab === 'misc' && appearanceSection === 'display' ? 'page' : undefined} class:active={settingsTab === 'misc' && appearanceSection === 'display'} onclick={() => selectAppearanceSection('display')}>{t().settingsCategoryDisplayOperation}</button>
 				</section>
 				<section class="settings-category">
@@ -289,19 +288,17 @@
 					<button aria-current={settingsTab === 'misc' && appearanceSection === 'making' ? 'page' : undefined} class:active={settingsTab === 'misc' && appearanceSection === 'making'} onclick={() => selectAppearanceSection('making')}>{t().settingsBatchRetryLabel}</button>
 					<button aria-current={settingsTab === 'demo' ? 'page' : undefined} class:active={settingsTab === 'demo'} onclick={() => onSelectSettingsTab('demo')}>{t().modeDemo}</button>
 				</section>
-				<section class="settings-category">
-					<div class="settings-category-label">{t().imageTab}</div>
+				<section class="settings-category untitled">
 					<button aria-current={settingsTab === 'image' ? 'page' : undefined} class:active={settingsTab === 'image'} onclick={() => onSelectSettingsTab('image')}>{t().imageTab}</button>
 				</section>
 				{#if reaches('chatgpt')}
-					<section class="settings-category">
-						<div class="settings-category-label">{t().chatgptPlanLabel}</div>
+					<section class="settings-category untitled">
 						<button aria-current={settingsTab === 'chatgpt' ? 'page' : undefined} class:active={settingsTab === 'chatgpt'} onclick={() => onSelectSettingsTab('chatgpt')}>{t().chatgptPlanLabel}</button>
 					</section>
 				{/if}
 				<section class="settings-category">
 					<div class="settings-category-label">{t().settingsTabExport}</div>
-					<button aria-current={settingsTab === 'export' && exportSection === 'files' ? 'page' : undefined} class:active={settingsTab === 'export' && exportSection === 'files'} onclick={() => selectExportSection('files')}>{t().settingsTabExport}</button>
+					<button aria-current={settingsTab === 'export' && exportSection === 'files' ? 'page' : undefined} class:active={settingsTab === 'export' && exportSection === 'files'} onclick={() => selectExportSection('files')}>{t().settingsTabFileSaving}</button>
 					<button aria-current={settingsTab === 'export' && exportSection === 'clipboard' ? 'page' : undefined} class:active={settingsTab === 'export' && exportSection === 'clipboard'} onclick={() => selectExportSection('clipboard')}>{t().settingsTabClipboard}</button>
 				</section>
 				{#if reaches('models') || reaches('users')}

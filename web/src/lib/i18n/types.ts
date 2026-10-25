@@ -812,6 +812,7 @@ export interface LangPack {
 	settingsTabPlugins: string;
 	settingsTabUsers: string;
 	settingsTabExport: string;
+	settingsTabFileSaving: string;
 	settingsTabClipboard: string;
 	settingsClipboardHint: string;
 	clipboardFormatLabel: string;

@@ -39,6 +39,7 @@ export const ja: LangPack = {
 	imageFolderInterrupted: '中断しました。「続きから描く」で残りの画像から描きます。',
 	imageFolderServerLost: (reason) => `Server に届かないため止めました（${reason}）。`,
 	imageFolderFailures: (n) => `描けなかった画像 ${n} 枚（続きから描くと描き直します）`,
+	imageFolderNotSaved: (phase) => `保存まで届きませんでした（${phase}）`,
 	imageFolderHistoryLabel: 'フォルダの履歴',
 	imageFolderHistoryHint: 'ブラウザはフォルダを覚えておけません。続きを描くには、同じフォルダを選び直してください。',
 	imageFolderHistoryEntry: (done, total, date) => `${done}/${total} 枚・${date}`,

@@ -450,22 +450,44 @@ export function createWorkState(deps: WorkStateDeps) {
 	// is the one the picture tab would write for that file.
 	const imageFolder = new ImageFolderBatch();
 
+	// The batch's pictures run on a controller of their own. On the shared one,
+	// opening a saved work while a picture ran moved its request ordinal, and the
+	// run returned half-way without an error: the picture was counted painted
+	// and never performed or saved (2026-10-25, 3 of 5 saved).
+	const followsImageBatch = () => inputMode === 'batch' && imageFolder.source === 'image';
+	const imageBatchController = new PipelineController(
+		new PipelineApi(apiFetch),
+		() => pipelineOptions(),
+		// The canvas follows the batch only while the author is on its tab.
+		(view) => { if (followsImageBatch()) adoptPipelineView(view); },
+	);
+
 	async function paintPictureFile(file: File, signal: AbortSignal): Promise<void> {
 		const api = new PipelineApi(apiFetch);
 		const provenance = await provenanceOfFile(file);
 		const image = await api.uploadImage(file, signal);
 		signal.throwIfAborted();
 		const model = qualifiedModelId(deps.models.visionProvider(), deps.models.visionModel());
-		ddl = null; ddlGeneratedBaseline = null; thinking = null;
 		stageLabel = t().imageWritingDdl;
-		const view = await finishPipeline(() => pipelineController.fromImage(image.image_id, provenance, imageCanvasAspectId, {
+		const view = await imageBatchController.fromImage(image.image_id, provenance, imageCanvasAspectId, {
 			...pipelineOptions(), stage1_model: model, stage2_model: model,
 			sketch: 'off', sketch_text: undefined, wild: false, instruction_lang: 'ja',
 			canvas_aspect: imageCanvasAspectId === 'image' ? image.nearest_format_id : imageCanvasAspectId,
 			canvas_fit: 'contain',
-		}, signal));
+		}, signal);
+		activeRunAttempt = null;
 		if (view.image_failure) throw new Error(describeApiError(view.image_failure, 422));
 		if (view.phase.tag === 'failed') throw new Error(describeApiError({ code: view.phase.reason ?? 'image_ddl_failed' }, 422));
+		// Only a saved work counts as painted; anything short of that is a failure
+		// the next Continue paints again, never a silent success.
+		const historyId = view.result?.history_id;
+		if (!historyId) throw new Error(t().imageFolderNotSaved(view.phase.tag));
+		if (followsImageBatch()) {
+			await deps.history().fetchOffset(0, { anchorId: historyId });
+			displayedHistoryItem = deps.history().items.find((item) => item.id === historyId) ?? null;
+		} else {
+			await deps.history().refreshAfterServerSave();
+		}
 	}
 
 	/** A cut or a Server that is away stops the run; it resumes from the same picture. */
@@ -1094,7 +1116,7 @@ export function createWorkState(deps: WorkStateDeps) {
 	function stopBatch() {
 		if (activeRunMode === 'image-batch') {
 			imageFolder.stop();
-			void pipelineController.cancel();
+			void imageBatchController.cancel();
 			return;
 		}
 		if (activeRunMode === 'batch') {

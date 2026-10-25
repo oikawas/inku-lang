@@ -39,6 +39,7 @@ export interface LangPack {
 	imageFolderInterrupted: string;
 	imageFolderServerLost: (reason: string) => string;
 	imageFolderFailures: (n: number) => string;
+	imageFolderNotSaved: (phase: string) => string;
 	imageFolderHistoryLabel: string;
 	imageFolderHistoryHint: string;
 	imageFolderHistoryEntry: (done: number, total: number, date: string) => string;

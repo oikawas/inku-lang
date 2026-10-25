@@ -39,6 +39,7 @@ export const en: LangPack = {
 	imageFolderInterrupted: 'Stopped. Continue paints the remaining pictures.',
 	imageFolderServerLost: (reason) => `Stopped because the Server could not be reached (${reason}).`,
 	imageFolderFailures: (n) => `${n} pictures could not be painted (Continue paints them again)`,
+	imageFolderNotSaved: (phase) => `The work was not saved (${phase})`,
 	imageFolderHistoryLabel: 'Folder history',
 	imageFolderHistoryHint: 'A browser cannot keep a folder open. To continue, choose the same folder again.',
 	imageFolderHistoryEntry: (done, total, date) => `${done}/${total} · ${date}`,

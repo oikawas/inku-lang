@@ -33,7 +33,7 @@ test('each picture goes the picture tab way, with its settings', () => {
 	assert.match(paint, /provenanceOfFile\(file\)/);
 	assert.match(paint, /uploadImage\(file, signal\)/);
 	assert.match(paint, /visionProvider\(\), deps\.models\.visionModel\(\)/);
-	assert.match(paint, /pipelineController\.fromImage\(image\.image_id, provenance, imageCanvasAspectId/);
+	assert.match(paint, /imageBatchController\.fromImage\(image\.image_id, provenance, imageCanvasAspectId/);
 	assert.match(paint, /canvas_aspect: imageCanvasAspectId === 'image' \? image\.nearest_format_id : imageCanvasAspectId/);
 });
 

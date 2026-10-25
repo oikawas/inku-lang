@@ -431,6 +431,14 @@ fn pipeline_description_without_labels(text: &str) -> String {
     inku_pipeline_uniffi::description_without_labels(text.to_owned())
 }
 
+/// The labels' ranges as `[[start, end, kind], ...]` JSON, in Unicode scalar
+/// offsets (Python's string indices): a host takes a read-and-draw run's
+/// source labels from the `comment` ranges.
+#[pyfunction]
+fn pipeline_description_label_spans(text: &str) -> String {
+    inku_pipeline_uniffi::description_label_spans(text.to_owned())
+}
+
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(core_api_version, module)?)?;
@@ -477,6 +485,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
         pipeline_description_without_labels,
         module
     )?)?;
+    module.add_function(wrap_pyfunction!(pipeline_description_label_spans, module)?)?;
     module.add_function(wrap_pyfunction!(
         pipeline_normalize_instruction_language,
         module

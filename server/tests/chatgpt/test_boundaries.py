@@ -445,8 +445,10 @@ def test_four_effect_tags_and_quota_blocks_fallback_http(isolated, monkeypatch):
         calls.append(request)
         assert str(request.url) == auth.RESOURCE + "/responses"
         body = json.loads(request.content)
-        assert set(body) == {"model", "store", "stream", "instructions", "input", "tools", "tool_choice", "parallel_tool_calls"}
+        assert set(body) == {"model", "store", "stream", "instructions", "input", "tools", "tool_choice", "parallel_tool_calls",
+                             "prompt_cache_key"}
         assert body["store"] is False and body["stream"] is True and body["instructions"] == "Rust system"
+        assert body["prompt_cache_key"].startswith("inku-")
         assert body["tools"][0]["tools"][0]["parameters"] == {"type": "object"}
         wire, _ = stream_bytes(failed=quota["value"])
         return httpx.Response(200, content=wire, headers={"content-type": "text/event-stream"})

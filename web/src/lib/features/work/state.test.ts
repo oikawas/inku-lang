@@ -154,7 +154,9 @@ test('image authoring keeps provenance out of description and reuploads consumed
 			phase: { tag: 'ready' }, image_provenance: body.text, image_ddl: { original_width: 200 } });
 	});
 	work.inputMode = 'image';
+	// Typed by the author before choosing the image: the image leaves it alone.
 	work.imageProvenance = '# Source and private notes';
+	work.noteImageProvenanceTyped();
 	work.sketchMode = 'on';
 	await work.selectImage(file);
 	await work.submitImage();
@@ -180,6 +182,37 @@ test('image authoring keeps provenance out of description and reuploads consumed
 	work.clearImage();
 	assert.equal(work.uploadedImage, null);
 	assert.equal(work.imageProvenance, '');
+});
+
+test('a chosen image fills an empty or untouched source note, and keeps one the author typed', async () => {
+	let uploads = 0;
+	const work = imageWork(async () => Response.json(uploaded(`image-${++uploads}`)));
+	const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+	work.inputMode = 'image';
+	await work.selectImage(new File(['no exif'], 'first.tiff', { type: 'image/tiff' }));
+	await settle();
+	assert.equal(work.imageProvenance, 'ファイル名: first.tiff');
+	// The note was filled, not typed, so the next image replaces it.
+	await work.selectImage(new File(['no exif'], 'second.png', { type: 'image/png' }));
+	await settle();
+	assert.equal(work.imageProvenance, 'ファイル名: second.png');
+	work.imageProvenance = '美術館の図録から';
+	work.noteImageProvenanceTyped();
+	await work.selectImage(new File(['no exif'], 'third.png', { type: 'image/png' }));
+	await settle();
+	assert.equal(work.imageProvenance, '美術館の図録から');
+	// Typed and then emptied: filled again.
+	work.imageProvenance = '';
+	await work.selectImage(new File(['no exif'], 'fourth.png', { type: 'image/png' }));
+	await settle();
+	assert.equal(work.imageProvenance, 'ファイル名: fourth.png');
+	// Clearing the image forgets that the note was typed.
+	work.imageProvenance = 'typed';
+	work.noteImageProvenanceTyped();
+	work.clearImage();
+	await work.selectImage(new File(['no exif'], 'fifth.png', { type: 'image/png' }));
+	await settle();
+	assert.equal(work.imageProvenance, 'ファイル名: fifth.png');
 });
 
 test('a delayed image upload cannot replace a later choice or return after sign-out', async () => {

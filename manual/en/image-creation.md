@@ -554,7 +554,7 @@ From Library the order is oldest to newest; from the lineage it runs from the or
 On the `Image` tab you paint from an image file instead of a description (v2.15.241). A Vision model reads the image and writes Japanese instructions directly, and those instructions are painted. The sketch, interpretation, composition reading, laws stage and color stage are not used.
 
 1. Open the `Image` tab (to the right of `Describe` among the input tabs).
-2. If you like, write the image's source or a note in `Source note`. It is saved with the work and is not used for painting.
+2. If you like, write the image's source or a note in `Source note`. It is saved with the work and is not used for painting. Choosing an image fills the source note with the file name and the shooting facts from the photo's Exif (time taken, camera, lens, exposure). The location (GPS) is never included. You can edit the note before painting, and a note you have typed yourself is kept. What goes in is chosen in `Settings` under `Image`, with the `Put the file name in the source note` and `Put the Exif in the source note` checkboxes (both on by default, kept in this browser).
 3. Choose an image with `Choose an image file (JPEG, PNG, GIF, TIFF)`. Once it is read, a thumbnail appears with the file name and the original size in pixels (width × height). A GIF uses its first frame, and a photograph's orientation (EXIF) is applied.
 4. Under `Conditions for the next work`, choose `Model`, `Color catalog`, and `Canvas`.
 5. Press `Paint`.

@@ -103,6 +103,7 @@
 	import { wildSettings } from '$lib/features/wild/settings.svelte';
 	import { wildOverride } from '$lib/features/wild/render';
 	import { exportSettings } from '$lib/features/export/settings.svelte';
+	import { imageProvenanceSettings } from '$lib/features/image-provenance/settings.svelte';
 	import { downloadCard, fetchCardPng } from '$lib/cardExport';
 	import { browserClipboardEnvironment, ClipboardCopyRefused, clipboardUnavailableReason, writePngToClipboard } from '$lib/clipboardExport';
 	import { rasterizeSvgToPng } from '$lib/features/export/download';
@@ -2729,6 +2730,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	// persist() reads every field it writes, so this effect tracks them all
 	// without the page having to name them one by one.
 	$effect(() => exportSettings.persist());
+	$effect(() => imageProvenanceSettings.persist());
 	$effect(() => {
 		if (typeof document === 'undefined') return;
 		document.documentElement.dataset.theme = session.darkMode ? 'dark' : 'light';
@@ -2834,6 +2836,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						visionModelName={statusModelName(qualifiedModelId(visionProvider, visionModel))}
 						visionModelAvailable={availableVisionModelCatalog.some((group) => group.id === visionProvider && group.models.some((model) => model.id === visionModel))}
 						onSelectImage={work.selectImage}
+						onImageProvenanceInput={work.noteImageProvenanceTyped}
 						onSubmitImage={work.requestSubmitImage}
 						onSelectImageCanvasAspect={(id) => { work.imageCanvasAspectId = id; canvasAspectMenuOpen = false; }}
 						onOpenImageModelSelection={() => openModelSelection(true, true)}

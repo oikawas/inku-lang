@@ -14,6 +14,7 @@
 	import PluginAdministrationSettings from '$lib/features/settings/PluginAdministrationSettings.svelte';
 	import ExportSettings from '$lib/features/settings/ExportSettings.svelte';
 	import ClipboardExportSettings from '$lib/features/settings/ClipboardExportSettings.svelte';
+	import ImageSettings from '$lib/features/settings/ImageSettings.svelte';
 	import AppearanceSettings from '$lib/features/settings/AppearanceSettings.svelte';
 	import '$lib/features/settings/settings-modal.css';
 	import type { ExportTemplate } from '$lib/exportTemplates';
@@ -181,6 +182,7 @@
 			case 'export': return exportSection === 'clipboard'
 				? { title: strings.settingsTabClipboard, hint: strings.settingsClipboardHint }
 				: { title: strings.settingsTabExport, hint: strings.settingsExportHint };
+			case 'image': return { title: strings.imageTab, hint: strings.settingsImageHint };
 			case 'demo': return { title: strings.modeDemo, hint: strings.tooltipInputTabDemo };
 			default: return appearanceSection === 'making'
 				? { title: strings.settingsCategoryMaking, hint: strings.settingsMakingHint }
@@ -286,6 +288,10 @@
 					<div class="settings-category-label">{t().settingsCategoryMaking}</div>
 					<button aria-current={settingsTab === 'misc' && appearanceSection === 'making' ? 'page' : undefined} class:active={settingsTab === 'misc' && appearanceSection === 'making'} onclick={() => selectAppearanceSection('making')}>{t().settingsBatchRetryLabel}</button>
 					<button aria-current={settingsTab === 'demo' ? 'page' : undefined} class:active={settingsTab === 'demo'} onclick={() => onSelectSettingsTab('demo')}>{t().modeDemo}</button>
+				</section>
+				<section class="settings-category">
+					<div class="settings-category-label">{t().imageTab}</div>
+					<button aria-current={settingsTab === 'image' ? 'page' : undefined} class:active={settingsTab === 'image'} onclick={() => onSelectSettingsTab('image')}>{t().imageTab}</button>
 				</section>
 				{#if reaches('chatgpt')}
 					<section class="settings-category">
@@ -477,6 +483,8 @@
 					{exportTemplates} {exportTemplateStatus} {onChooseDownloadFolder} {onClearDownloadFolder}
 					{onAddExportTemplate} {onUpdateExportTemplate} {onRemoveExportTemplate}
 				/>
+			{:else if settingsTab === 'image'}
+				<ImageSettings />
 			{:else if settingsTab === 'demo'}
 				{@render demoContent?.()}
 			{:else}

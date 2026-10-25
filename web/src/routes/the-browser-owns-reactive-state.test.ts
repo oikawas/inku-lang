@@ -54,6 +54,7 @@ test('the browser owns every module-scoped reactive setting', () => {
 		'features/describe-panel/settings.svelte.ts',
 		'features/export/download-folder.svelte.ts',
 		'features/export/settings.svelte.ts',
+		'features/image-provenance/settings.svelte.ts',
 		'features/model-inspection/state.svelte.ts',
 		'features/result-log/settings.svelte.ts',
 		'features/wild/settings.svelte.ts',

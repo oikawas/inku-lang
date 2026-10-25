@@ -6,6 +6,16 @@ export interface LangPack {
 	imageTabHint: string;
 	imageProvenanceLabel: string;
 	imageProvenanceHint: string;
+	imageProvenanceFileName: string;
+	imageProvenanceTakenAt: string;
+	imageProvenanceCamera: string;
+	imageProvenanceLens: string;
+	imageProvenanceExposure: string;
+	settingsImageHint: string;
+	settingsImageProvenanceDescription: string;
+	settingsImageProvenanceFileName: string;
+	settingsImageProvenanceExif: string;
+	settingsImageProvenanceExifNote: string;
 	imageChooseFile: string;
 	imageUploading: string;
 	imageThumbnailAlt: string;

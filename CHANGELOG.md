@@ -8,6 +8,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-25 — The Image tab's source note holds the file name and Exif by default
+
+Choosing an image on the Image tab fills the source note with the file name and the shooting facts from Exif (time taken, camera, lens, f-number, shutter speed, ISO and focal length). The Exif is read in the browser from JPEG (APP1), PNG (`eXIf`) and TIFF. The GPS directory is never opened, so the location stays out of the note (the author's choice: the note is saved with the work and visible to anyone it is shared with). A note the author has typed is kept (the author's choice); a filled note is replaced when the next image is chosen.
+
+Settings gains an `Image` tab with the `Put the file name in the source note` and `Put the Exif in the source note` checkboxes, both on by default and kept in this browser's localStorage. The tab is not written back as the account's remembered settings tab, a name the server does not know. The server and CLI are unchanged.
+
 ### 2026-10-25 — inku-cli reads one work by its UUID
 
 inku-cli gains `history show`, which prints a work's description, DDL and JSON Score (`--part` for one of them), and `history png`, which rasterizes the saved display SVG into a PNG of the drawing alone (`--size` for the longer side, default 1024). Both take the UUID or its first few characters. There is no endpoint for one work, so the listing is asked with `anchor_id` and `limit=1` and the returned work's id is checked. A prefix is resolved against the listing without pictures, and one that fits more than one work stops with the candidates. The server is unchanged.

@@ -119,7 +119,7 @@ const PROPER = new Set([
 	'Saijiki', 'DDL', 'JSON', 'Score', 'SVG', 'PNG', 'API', 'DB', 'LLM', 'AI', 'Vision', 'URL', 'ID', 'IDs',
 	'Stage', 'Gen', 'OK', 'NG', 'GitHub', 'Illustrator', 'Affinity', 'Qwen3', 'Base', 'Y-axis', 'Editable',
 	'Display', 'Compatibility', 'Standard', 'Square', 'Web', 'Vary', 'Another', 'Requires', 'Copy',
-	'Japanese', 'English',
+	'Japanese', 'English', 'Exif',
 ]);
 
 // ── read the five channels ───────────────────────────────────────────────

@@ -37,6 +37,8 @@
 		visionModelName: string;
 		visionModelAvailable: boolean;
 		onSelectImage: (file: File) => void | Promise<void>;
+		/** The author typed in the source note; a chosen image then leaves it alone. */
+		onImageProvenanceInput?: () => void;
 		onSubmitImage: () => void | Promise<void>;
 		onSelectImageCanvasAspect: (id: CanvasAspectId) => void;
 		onOpenImageModelSelection: () => void;
@@ -111,7 +113,7 @@
 		inputMode = $bindable('single'),
 		imageProvenance = $bindable(''), uploadedImage, imageFileName, imageUploading, imageRunning,
 		imageCanvasAspectId, visionModelName, visionModelAvailable,
-		onSelectImage, onSubmitImage, onSelectImageCanvasAspect, onOpenImageModelSelection,
+		onSelectImage, onImageProvenanceInput, onSubmitImage, onSelectImageCanvasAspect, onOpenImageModelSelection,
 		input = $bindable(''),
 		batchInput = $bindable(''),
 		lineNumbersText,
@@ -388,7 +390,7 @@
 		{#if error}<p class="error-text">{error}</p>{/if}
 	{:else if inputMode === 'image'}
 		<label class="input-heading" for="image-provenance">{t().imageProvenanceLabel}</label>
-		<textarea id="image-provenance" class="input-ta" rows="4" bind:value={imageProvenance} placeholder={t().imageProvenanceHint}></textarea>
+		<textarea id="image-provenance" class="input-ta" rows="4" bind:value={imageProvenance} oninput={() => onImageProvenanceInput?.()} placeholder={t().imageProvenanceHint}></textarea>
 		<p class="input-description">{t().imageProvenanceHint}</p>
 		<label class="image-file-label">
 			<span>{t().imageChooseFile}</span>

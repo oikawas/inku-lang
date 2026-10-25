@@ -23,11 +23,17 @@ export type SettingsTab =
 	| 'users'
 	| 'unread'
 	| 'export'
+	| 'image'
 	| 'demo'
 	| 'misc'
 	| 'server_misc'
 	| 'logs'
 	| 'limits';
+
+// Tabs the Server keeps no name for: they are browser-only pages, so opening
+// one is not written back as the account's remembered tab (the Server would
+// refuse the name with 400).
+const BROWSER_ONLY_SETTINGS_TABS: readonly SettingsTab[] = ['image'];
 
 export type SettingsActor = {
 	id?: string;
@@ -62,7 +68,7 @@ export type SettingsNavigation = {
 };
 
 function isSettingsContentTab(tab: string | null | undefined): tab is Exclude<SettingsTab, 'connection'> {
-	return tab === 'chatgpt' || tab === 'models' || tab === 'db' || tab === 'plugins' || tab === 'users' || tab === 'unread' || tab === 'export' || tab === 'demo' || tab === 'misc' || tab === 'server_misc' || tab === 'logs' || tab === 'limits';
+	return tab === 'chatgpt' || tab === 'models' || tab === 'db' || tab === 'plugins' || tab === 'users' || tab === 'unread' || tab === 'export' || tab === 'image' || tab === 'demo' || tab === 'misc' || tab === 'server_misc' || tab === 'logs' || tab === 'limits';
 }
 
 export function createSettingsNavigation<TActor extends SettingsActor>(
@@ -88,7 +94,7 @@ export function createSettingsNavigation<TActor extends SettingsActor>(
 
 	async function updateUserSettingsTab(tab: SettingsTab): Promise<void> {
 		const currentUser = deps.currentUser();
-		if (!currentUser || !isSettingsContentTab(tab)) return;
+		if (!currentUser || !isSettingsContentTab(tab) || BROWSER_ONLY_SETTINGS_TABS.includes(tab)) return;
 		try {
 			const response = await deps.apiFetch('/api/auth/me/settings', {
 				method: 'PATCH',

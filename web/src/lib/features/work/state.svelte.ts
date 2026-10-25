@@ -31,6 +31,9 @@ import { CanvasViewportState } from '$lib/features/canvas/viewport-state.svelte'
 import type { SaveHistoryOptions } from '$lib/features/history/save';
 import { PipelineApi, PipelineApiError, pipelineDiagnostics, pipelinePatch, pipelineViewFromErrorDetail, type PipelineOptions, type PipelineView, type UploadedPipelineImage } from '$lib/features/pipeline/api';
 import { PipelineController } from '$lib/features/pipeline/controller';
+import { readExifFacts } from '$lib/features/image-provenance/exif';
+import { imageProvenanceText } from '$lib/features/image-provenance/provenance';
+import { imageProvenanceSettings } from '$lib/features/image-provenance/settings.svelte';
 import { runningStageLabel, type ProviderAttemptCount } from '$lib/paintStream';
 
 type Iteration = HistoryItem;
@@ -86,6 +89,9 @@ export function createWorkState(deps: WorkStateDeps) {
 	let imageFile: File | null = null;
 	let imageUploadConsumed = false;
 	let imageRunActive = $state(false);
+	// Set when the author types in the source note. A chosen image then leaves
+	// the note alone; otherwise it fills it with the file name and Exif.
+	let imageProvenanceTyped = false;
 	function clearImage(): void {
 		if (imageRunActive) {
 			submitStopRequested = true;
@@ -97,8 +103,31 @@ export function createWorkState(deps: WorkStateDeps) {
 		uploadedImage = null;
 		imageFileName = '';
 		imageProvenance = '';
+		imageProvenanceTyped = false;
 		imageUploading = false;
 		imageUploadConsumed = false;
+	}
+
+	async function fillImageProvenance(file: File, ordinal: number): Promise<void> {
+		const options = imageProvenanceSettings.options;
+		let facts = null;
+		if (options.includeExif) {
+			try {
+				facts = readExifFacts(await file.arrayBuffer());
+			} catch {
+				facts = null;
+			}
+		}
+		// A note the author typed and then emptied is filled again.
+		if (ordinal !== imageUploadOrdinal || (imageProvenanceTyped && imageProvenance.trim())) return;
+		const strings = t();
+		imageProvenance = imageProvenanceText(file.name, facts, options, {
+			fileName: strings.imageProvenanceFileName,
+			takenAt: strings.imageProvenanceTakenAt,
+			camera: strings.imageProvenanceCamera,
+			lens: strings.imageProvenanceLens,
+			exposure: strings.imageProvenanceExposure,
+		});
 	}
 
 	let input = $state(DEFAULT_INPUT);
@@ -312,6 +341,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		imageFileName = file.name;
 		imageUploading = true;
 		error = null;
+		void fillImageProvenance(file, ordinal);
 		try {
 			const image = await new PipelineApi(apiFetch).uploadImage(file);
 			if (ordinal === imageUploadOrdinal) uploadedImage = image;
@@ -1266,6 +1296,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		submitImage,
 		requestSubmitImage,
 		clearImage,
+		noteImageProvenanceTyped: () => { imageProvenanceTyped = true; },
 		get input() { return input; },
 		set input(value) { input = value; },
 		get stage1UserPrompt() { return stage1UserPrompt; },

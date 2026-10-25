@@ -450,6 +450,65 @@ fn ordered_schema(value: &Value, named: bool) -> Value {
     }
 }
 
+/// The schema a provider other than Gemini reads: its properties in the
+/// order `propertyOrdering` names, without the names themselves, which only
+/// Gemini reads (2026-10-25: every provider was sent them, some 17% of the
+/// laws stage's schema).
+pub(crate) fn transport_schema(value: &Value) -> Value {
+    without_ordering(&ordered_schema(value, false), false)
+}
+
+fn without_ordering(value: &Value, named: bool) -> Value {
+    match value {
+        Value::Array(items) => Value::Array(
+            items
+                .iter()
+                .map(|item| without_ordering(item, false))
+                .collect(),
+        ),
+        Value::Object(members) if named => Value::Object(
+            members
+                .iter()
+                .map(|(name, item)| (name.clone(), without_ordering(item, false)))
+                .collect(),
+        ),
+        Value::Object(members) => Value::Object(
+            members
+                .iter()
+                .filter(|(key, _)| key != "propertyOrdering")
+                .map(|(key, item)| {
+                    (
+                        key.clone(),
+                        without_ordering(item, NAMED_SCHEMA_MAPS.contains(&key.as_str())),
+                    )
+                })
+                .collect(),
+        ),
+        other => other.clone(),
+    }
+}
+
+/// The stages whose system text and schema are the same for every work
+/// (2026-10-25). Anthropic is asked to keep them (`cache_control`): the next
+/// work's request and a request asked again read them at the cache's price.
+/// Another stage's system text or schema changes with the work, and a mark
+/// would only write a new entry each time.
+const CACHED_ACTIONS: [&str; 2] = ["choose_laws", "choose_colors"];
+
+/// Anthropic's system: the text, as one block the cache keeps for the stages
+/// that send the same system text and schema to every work.
+fn anthropic_system(system: &str, action_name: &str) -> Value {
+    if CACHED_ACTIONS.contains(&action_name) {
+        Value::Array(vec![object(vec![
+            ("type", string("text")),
+            ("text", string(system)),
+            ("cache_control", object(vec![("type", string("ephemeral"))])),
+        ])])
+    } else {
+        string(system)
+    }
+}
+
 /// The JSON Schema keywords Gemini's function declarations take.
 const GEMINI_SCHEMA_KEYS: [&str; 21] = [
     "$anchor",
@@ -1030,7 +1089,7 @@ fn pipeline_request(
                         ("type", string("function")),
                         ("name", string(RESPONSE_NAME)),
                         ("description", string(TOOL_DESCRIPTION)),
-                        ("parameters", ordered_schema(schema, false)),
+                        ("parameters", transport_schema(schema)),
                         ("strict", Value::Bool(false)),
                     ])]),
                 ),
@@ -1087,7 +1146,7 @@ fn pipeline_request(
                             "json_schema",
                             object(vec![
                                 ("name", string(RESPONSE_NAME)),
-                                ("schema", ordered_schema(schema, false)),
+                                ("schema", transport_schema(schema)),
                                 ("strict", Value::Bool(true)),
                             ]),
                         ),
@@ -1104,7 +1163,7 @@ fn pipeline_request(
                             object(vec![
                                 ("name", string(RESPONSE_NAME)),
                                 ("description", string(TOOL_DESCRIPTION)),
-                                ("parameters", ordered_schema(schema, false)),
+                                ("parameters", transport_schema(schema)),
                             ]),
                         ),
                     ])]),
@@ -1140,7 +1199,7 @@ fn pipeline_request(
                     "max_tokens",
                     integer(anthropic_max_tokens(model, max_tokens)),
                 ),
-                ("system", string(system)),
+                ("system", anthropic_system(system, action_name)),
                 (
                     "messages",
                     Value::Array(vec![user(anthropic_blocks(message, images)?)]),
@@ -1150,7 +1209,7 @@ fn pipeline_request(
                     Value::Array(vec![object(vec![
                         ("name", string(RESPONSE_NAME)),
                         ("description", string(TOOL_DESCRIPTION)),
-                        ("input_schema", ordered_schema(schema, false)),
+                        ("input_schema", transport_schema(schema)),
                     ])]),
                 ),
                 // Left to the model: claude-opus-5-5 refuses a forced tool
@@ -2154,7 +2213,10 @@ mod tests {
 
     #[test]
     fn every_shared_pipeline_request_is_written_as_server_wrote_it() {
-        assert_eq!(check_requests("requests"), 246);
+        // 246 rows as Server wrote them, and the laws and colors stages' six
+        // rows the core wrote when their system text and schema became the
+        // same for every work (2026-10-25).
+        assert_eq!(check_requests("requests"), 252);
     }
 
     #[test]

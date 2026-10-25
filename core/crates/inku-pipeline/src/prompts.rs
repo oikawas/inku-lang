@@ -1807,11 +1807,15 @@ pub(crate) fn finish_prompt(mut prompt: LlmPrompt) -> Result<LlmPrompt, PromptEr
     // v3 transports supply response_schema through their structured-output contract.
     // Preserve old stage prompt bytes and persisted request editions. The prompts
     // written for that contract (hole completion, the composition reading, the laws,
-    // the colors) carry the schema only there.
-    if prompt.prompt_id != HOLE_COMPLETION_PROMPT_ID
-        && prompt.prompt_id != crate::composition_reading::COMPOSITION_READING_PROMPT_ID
-        && prompt.prompt_id != crate::laws::LAWS_PROMPT_ID
-        && prompt.prompt_id != crate::colors::COLORS_PROMPT_ID
+    // the colors, and the laws' and colors' editions a saved run asks again with)
+    // carry the schema only there.
+    let id = prompt.prompt_id.as_str();
+    if id != HOLE_COMPLETION_PROMPT_ID
+        && id != crate::composition_reading::COMPOSITION_READING_PROMPT_ID
+        && id != crate::laws::LAWS_PROMPT_ID
+        && !crate::laws::PREVIOUS_LAWS_PROMPT_IDS.contains(&id)
+        && id != crate::colors::COLORS_PROMPT_ID
+        && !crate::colors::PREVIOUS_COLORS_PROMPT_IDS.contains(&id)
     {
         prompt.system.push_str(&format!(
             "\n\n{response_instruction}\n# response_schema\n{schema_text}"
@@ -2810,6 +2814,43 @@ mod tests {
             assert!(!projection.contains("JSON"));
             assert!(!projection.contains("足音"));
             assert!(!projection.contains("footsteps"));
+        }
+    }
+
+    /// A run saved while it asked the laws or the colors holds a v1 request and
+    /// asks again with it: its schema stays out of the system text, as it was
+    /// sent (2026-10-25, when the requests became v2).
+    #[test]
+    fn a_saved_laws_or_colors_request_asks_again_with_its_schema_out_of_the_system() {
+        for (id, stage) in [
+            (
+                crate::laws::PREVIOUS_LAWS_PROMPT_IDS[0],
+                LlmStage::ChooseLaws,
+            ),
+            (
+                crate::colors::PREVIOUS_COLORS_PROMPT_IDS[0],
+                LlmStage::ChooseColors,
+            ),
+        ] {
+            let prompt = finish_prompt(LlmPrompt {
+                schema_id: LLM_PROMPT_SCHEMA_ID.to_owned(),
+                prompt_id: id.to_owned(),
+                stage,
+                action_name: stage.action_name().to_owned(),
+                instruction_language: ResolvedInstructionLanguage::Ja,
+                system: "決まり".to_owned(),
+                message: "## 記述\n赤い円".to_owned(),
+                response_schema: json!({"type": "object", "properties": {"reason": {"type": "string"}}}),
+                prompt_digest: String::new(),
+                saijiki_asset_id: None,
+                saijiki_asset_digest: None,
+                macro_catalog_digest: None,
+                base_source_digest: None,
+                base_compiler_lock_digest: None,
+                images: Vec::new(),
+            })
+            .unwrap();
+            assert_eq!(prompt.system, "決まり", "{id}");
         }
     }
 }

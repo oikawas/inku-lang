@@ -11,8 +11,8 @@
 //! on a usage limit stay with the host.
 
 use super::{
-    Refusal, Value, as_str, dumps, get, image_parts, object, ordered_schema, python_eq,
-    python_loads, responses_parts, set, string, truthy,
+    Refusal, Value, as_str, dumps, get, image_parts, object, python_eq, python_loads,
+    responses_parts, set, string, transport_schema, truthy,
 };
 use crate::identity::canonical_json;
 
@@ -221,7 +221,7 @@ pub(super) fn pipeline_request(
                         ("type", string("function")),
                         ("name", string(FUNCTION)),
                         ("description", string("Return the requested drawing data.")),
-                        ("parameters", ordered_schema(schema, false)),
+                        ("parameters", transport_schema(schema)),
                         ("strict", Value::Bool(false)),
                     ])]),
                 ),

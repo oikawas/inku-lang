@@ -40,8 +40,13 @@ use crate::laws::{
 };
 use crate::prompts::{LlmPrompt, LlmStage, PromptError, PromptLimits};
 
-/// The color request edition.
-pub const COLORS_PROMPT_ID: &str = "inku.colors-prompt.v1";
+/// The color request edition: v2 (2026-10-25) sends what is the same for every
+/// work in the system text and one schema for every work.
+pub const COLORS_PROMPT_ID: &str = "inku.colors-prompt.v2";
+
+/// The editions before it, which a run saved while it asked the colors may
+/// still hold and asks again with (`with_colors_feedback`).
+pub const PREVIOUS_COLORS_PROMPT_IDS: [&str; 1] = ["inku.colors-prompt.v1"];
 
 /// The color laws, in the order the request lists them.
 pub const COLOR_LAWS: [&str; 18] = [
@@ -1868,7 +1873,7 @@ const SYSTEM_JA: &str = "あなたは、作品の配色を決める係です。
 配色の法則の一覧（18）から、この作品に使う法則を選び、法則ごとの値を選択肢から選んでください。明るさ・面積・濃さの計算と、決まりの検査は、道具がします。
 
 決まり:
-1. 主の配色の法則（main_law）を一つ決めます。画を見た人が最初に感じ取る、色の骨組みになる法則です。支える法則の数は決めません。この画ですでに成り立っている法則（一覧に印がある）は、主には選べません。支えには使えます。主には、画の色を変える法則を選びます。画を何も変えない答えは退けられます。
+1. 主の配色の法則（main_law）を一つ決めます。画を見た人が最初に感じ取る、色の骨組みになる法則です。支える法則の数は決めません。この画ですでに成り立っている法則（本文の「この作品で当てられる法則と選べる値」に印がある）は、主には選べません。支えには使えます。主には、画の色を変える法則を選びます。画を何も変えない答えは退けられます。
 2. C9・D1・D2・D5・B19・B20 は、当てる層を法則の値（layer・layers）で選びます。
 3. 記述が色の言葉で言った層と地は、道具が決めました（「記述の色」に書いたもの）。その色は、どの法則でも替えません（替える答えは退けられます）。
 4. 層の要約に fixed がある層は、前の段が色を決めた層です。色を替えてかまいませんが、空気遠近 B15 の遠い層は、地との描いた明るさの差を 0.2 以上で、遠くない層のうち地との差がいちばん大きい層より小さく保ちます（遠い物ほど地に溶けます）。文様 C2 の層は、地から見えるように保ちます。差し込みの形の層（arranged が plugin）は、色を替えられません。
@@ -1885,7 +1890,7 @@ The work is a Score made from the description (the author's words). The previous
 From the list of color laws (18), choose the laws this work uses and, for each law, its values from the choices. The tool computes lightness, area and handling and checks the rules.
 
 Rules:
-1. Choose one main color law (main_law): the color framework a viewer feels first. The number of laws that support it is not fixed. A law that already holds in this picture (marked in the list) cannot be the main law; it can support. As the main law, choose a law that changes the picture's colors. An answer that changes nothing in the picture is refused.
+1. Choose one main color law (main_law): the color framework a viewer feels first. The number of laws that support it is not fixed. A law that already holds in this picture (marked in “The laws this work can take and their values” in the message) cannot be the main law; it can support. As the main law, choose a law that changes the picture's colors. An answer that changes nothing in the picture is refused.
 2. C9, D1, D2, D5, B19 and B20 choose the layers they work on by their values (layer, layers).
 3. The tool has decided the layers and the ground whose colors the description states in color words (listed under “Stated colors”). No law changes those colors; an answer that does is refused.
 4. A layer with fixed in its summary got its color from the previous stage. It may be recolored, but a distant layer of aerial perspective B15 keeps a drawn lightness difference from the ground of 0.2 or more and less than that of the layer, among the ones not distant, farthest from the ground (distant things melt into the ground), and a pattern layer of C2 stays seen against the ground. A plugged-in layer (arranged plugin) cannot change its color.
@@ -1897,19 +1902,34 @@ Rules:
 10. In reason, quote the description's words in “ ” and say in one or two lines why you chose the main color law.
 Return the answer as JSON of the given shape. In laws, key each law you use by its number and write its values.";
 
+/// The legend of the Score's layers, a table since 2026-10-25 (one line a
+/// layer instead of a JSON object repeating every key).
 const LAYER_NOTE: [&str; 2] = [
-    "box は層の痕が占める矩形 [x0, y0, x1, y1]（画面を 0〜1 とする）、mark_size は痕1つの幅と高さ。arranged は並べ方: place は1か所に置く（数が2以上なら同じ所に重ねた束）、row_horizontal・row_vertical・row_diagonal は列、grid は格子、scatter は散らす、fill はほかの形の中に塗り込める形、plugin は差し込みの形（色を替えられない）。",
-    "box is the rectangle [x0, y0, x1, y1] the layer's marks cover (the canvas is 0 to 1); mark_size is the width and height of one mark. arranged is how the layer is arranged: place puts it at one spot (with a count of 2 or more, a bundle at that spot), row_horizontal, row_vertical and row_diagonal are rows, grid is a grid, scatter scatters, fill is a shape filled inside another shape, and plugin is a plugged-in shape (its color cannot change).",
+    "## 楽譜の層の表\n本文の楽譜の層は表で示す。1 行目が欄の名で、2 行目から 1 層 1 行。欄は | で、一つの欄の中の値はコンマで区切る（- は無し）。box は層の痕が占める矩形 x0,y0,x1,y1（画面を 0〜1 とする）、mark_size は痕1つの幅,高さ。arranged は並べ方: place は1か所に置く（数が2以上なら同じ所に重ねた束）、row_horizontal・row_vertical・row_diagonal は列、grid は格子、scatter は散らす、fill はほかの形の中に塗り込める形、plugin は差し込みの形（色を替えられない）。",
+    "## The table of the Score's layers\nThe message shows the Score's layers as a table: the first line names the columns, and each line after it is one layer. Columns are separated by |, and the values inside one column by commas (- is none). box is the rectangle x0,y0,x1,y1 the layer's marks cover (the canvas is 0 to 1); mark_size is the width,height of one mark. arranged is how the layer is arranged: place puts it at one spot (with a count of 2 or more, a bundle at that spot), row_horizontal, row_vertical and row_diagonal are rows, grid is a grid, scatter scatters, fill is a shape filled inside another shape, and plugin is a plugged-in shape (its color cannot change).",
 ];
+
+const LAYER_COLUMNS: &str = "layer | shape | tool | count | color | filled | arranged | box | mark_size | handling | area | contrast | chroma | unseen | neighbors | fixed | stated";
 
 const FACTS_NOTE: [&str; 2] = [
     "handling は濃さ（さばき: dense 濃い・temperate 程よい・faint 薄い）。area は層の痕が画面に占める割合（%）。contrast は今の色で描いた層の痕と地の明るさの差（0〜1）、chroma はその鮮やかさ。unseen は、その層をその色で描くと地から見えない色。neighbors は痕が接する層。fixed は前の段が色を決めた層（B15 空気遠近・C2 文様。決まり4）。stated は記述が色を言った層。",
     "handling is how densely the marks are laid (dense, temperate, faint). area is the share of the canvas the layer's marks cover (%). contrast is the lightness difference of the layer's marks from the ground, drawn in its current color (0 to 1), and chroma their vividness. unseen lists the colors in which the layer, drawn, would not be seen against the ground. neighbors are the layers its marks touch. fixed is a layer whose color the previous stage decided (B15 aerial perspective, C2 pattern; rule 4). stated is a layer whose color the description states.",
 ];
 
+/// The legend of the work's color table; the table is the message's.
 const TABLE_NOTE: [&str; 2] = [
-    "## この作品の色の表（9つの名が描く絵具。paint は絵具の名、looks は見え方、wheel は色相環の12色の名、place は色相環の位置（度）、lightness は明るさ 0〜1、chroma は鮮やかさ、ground_diff は今の地との明るさの差（表の値）、same_paint_as は同じ絵具を描く名）",
-    "## This work's color table (the paints the nine names draw: paint is the paint's name, looks how it looks, wheel its hue among the wheel's twelve, place its place on the wheel in degrees, lightness its lightness from 0 to 1, chroma its vividness, ground_diff its lightness difference from the ground in the table, same_paint_as the names that draw the same paint)",
+    "## 色の表\n本文の「この作品の色の表」は、9つの名が描く絵具の表（欄は楽譜の層の表と同じく | で区切る）。paint は絵具の名、looks は見え方、wheel は色相環の12色の名、place は色相環の位置（度）、lightness は明るさ 0〜1、chroma は鮮やかさ、ground_diff は今の地との明るさの差（表の値）、same_paint_as は同じ絵具を描く名。",
+    "## The color table\n“This work's color table” in the message is a table of the paints the nine names draw (columns separated by |, as in the table of the Score's layers): paint is the paint's name, looks how it looks, wheel its hue among the wheel's twelve, place its place on the wheel in degrees, lightness its lightness from 0 to 1, chroma its vividness, ground_diff its lightness difference from the ground in the table, same_paint_as the names that draw the same paint.",
+];
+
+const TABLE_HEAD: [&str; 2] = ["## この作品の色の表", "## This work's color table"];
+
+const TABLE_COLUMNS: &str =
+    "name | paint | looks | wheel | place | lightness | chroma | ground_diff | same_paint_as";
+
+const CHOICES_HEAD: [&str; 2] = [
+    "## この作品で当てられる法則と選べる値",
+    "## The laws this work can take and their values",
 ];
 
 const WHEEL_NOTE: [&str; 2] = [
@@ -1924,11 +1944,13 @@ const EXAMPLE_DESCRIPTION: [&str; 2] = [
     "On a winter morning a single tree stood in a snowy field, and only the berries on its branches shone.",
 ];
 
-/// The example's layers (the prototype's, with what the product shows).
-const EXAMPLE_LAYERS: [&str; 3] = [
-    r#"{"layer":0,"shape":"line","tool":"brush_thick","count":1,"color":"black","filled":false,"arranged":"place","box":[0.3,0.2,0.7,0.9],"mark_size":[0.7,0.0],"handling":"dense","area":2.1,"contrast":0.31,"chroma":1,"unseen":["gray"],"neighbors":[1]}"#,
-    r#"{"layer":1,"shape":"circle","tool":"brush_thin","count":7,"color":"orange","filled":true,"arranged":"place","box":[0.4,0.2,0.6,0.4],"mark_size":[0.03,0.03],"handling":"temperate","area":0.6,"contrast":0.12,"chroma":38,"unseen":["white","yellow","orange"],"neighbors":[0]}"#,
-    r#"{"layer":2,"shape":"point","tool":"chalk","count":40,"color":"white","filled":true,"arranged":"scatter","box":[0.0,0.0,1.0,1.0],"mark_size":[0.004,0.004],"handling":"faint","area":0.3,"contrast":0.35,"chroma":2,"unseen":["yellow"],"neighbors":[]}"#,
+/// The example's layers (the prototype's, with what the product shows), in the
+/// table the request prints.
+const EXAMPLE_LAYERS: [&str; 4] = [
+    LAYER_COLUMNS,
+    "0 | line | brush_thick | 1 | black | false | place | 0.3,0.2,0.7,0.9 | 0.7,0.0 | dense | 2.1 | 0.31 | 1 | gray | 1 | - | -",
+    "1 | circle | brush_thin | 7 | orange | true | place | 0.4,0.2,0.6,0.4 | 0.03,0.03 | temperate | 0.6 | 0.12 | 38 | white,yellow,orange | 0 | - | -",
+    "2 | point | chalk | 40 | white | true | scatter | 0.0,0.0,1.0,1.0 | 0.004,0.004 | faint | 0.3 | 0.35 | 2 | yellow | - | - | -",
 ];
 
 const EXAMPLE_ANSWER: [&str; 2] = [
@@ -1937,8 +1959,8 @@ const EXAMPLE_ANSWER: [&str; 2] = [
 ];
 
 const RULE: [&str; 2] = [
-    "## この答えの決まり\n主の配色の法則を1つと、それを支える法則を選ぶ（数は決めない）。主には、「この画ですでに成り立っている」の印の無い法則を選ぶ。",
-    "## The rule of this answer\nChoose one main color law and the laws that support it (their number is not fixed). As the main law, choose a law without the mark “already holds in this picture”.",
+    "## この答えの決まり\n主の配色の法則を1つと、それを支える法則を選ぶ（数は決めない）。主には、「この画ですでに成り立っている」の印の無い法則を選ぶ。法則と、その値（層・色・色相・明るさ・組）は、本文の「この作品で当てられる法則と選べる値」から選ぶ。",
+    "## The rule of this answer\nChoose one main color law and the laws that support it (their number is not fixed). As the main law, choose a law without the mark “already holds in this picture”. Take the laws and their values (layers, colors, hues, levels, pairs) from “The laws this work can take and their values” in the message.",
 ];
 
 fn color_enum() -> Value {
@@ -1953,219 +1975,301 @@ fn targets(item: Value) -> Value {
     json!({"type": "array", "minItems": 1, "items": item})
 }
 
-impl ColorsContext {
-    /// The schema of one law's values in this work, or `None` when the work
-    /// cannot take it.
-    #[allow(clippy::too_many_lines)]
-    fn law_schema(&self, law: &str) -> Option<Value> {
-        if self.colorable.is_empty() {
-            return None;
+fn open_layer() -> Value {
+    json!({"type": "integer", "minimum": 0})
+}
+
+fn wheel_enum() -> Value {
+    json!({"type": "string", "enum": WHEEL.iter().map(|color| color.as_str()).collect::<Vec<_>>()})
+}
+
+/// What a color law's values may name. The check reads the answer against
+/// the work's own (`ColorsContext::choices`); the request sends them open,
+/// one schema for every work that a provider can keep with the system text,
+/// and the message tells the work's (2026-10-25). `None` leaves a law out.
+struct ColorChoices {
+    /// B11 and B16: the layers of more than one mark.
+    multi: Option<Value>,
+    /// B13 and B14: the layers a gradation runs through.
+    graded: Option<Value>,
+    /// B19's layers and B20's layer: every layer but a plugged-in shape.
+    nameable: Value,
+    /// B20's accent, C8's and D4's layers: the layers the stage may recolor.
+    colorable: Value,
+    /// D4 takes two of them or more.
+    colorable_two: bool,
+    /// C7's layers.
+    kasane: Option<Value>,
+    /// C9's colors and layers.
+    c9: Option<(Value, Value)>,
+    /// D1's and D5's hues and layers.
+    hued: [Option<(Value, Value)>; 2],
+    /// D7's levels.
+    levels: Option<Value>,
+    /// D2's vivid colors and layers.
+    d2: Option<(Value, Value)>,
+    /// D3's pairs.
+    pairs: Option<Value>,
+    /// D6's layers.
+    scattered: Option<Value>,
+}
+
+impl ColorChoices {
+    fn open() -> Self {
+        Self {
+            multi: Some(open_layer()),
+            graded: Some(open_layer()),
+            nameable: open_layer(),
+            colorable: open_layer(),
+            colorable_two: true,
+            kasane: Some(open_layer()),
+            c9: Some((color_enum(), open_layer())),
+            hued: [
+                Some((wheel_enum(), open_layer())),
+                Some((wheel_enum(), open_layer())),
+            ],
+            levels: Some(json!({"type": "string", "enum": ["light", "middle", "dark"]})),
+            d2: Some((wheel_enum(), open_layer())),
+            pairs: Some(json!({"type": "string"})),
+            scattered: Some(open_layer()),
         }
-        let color = color_enum();
-        let colors = |least: usize, most: usize| json!({"type": "array", "minItems": least, "maxItems": most, "items": color_enum()});
-        let multi = (!self.multi.is_empty()).then(|| layer_enum(&self.multi));
-        let graded = (!self.graded.is_empty()).then(|| layer_enum(&self.graded));
-        Some(match law {
-            "B11" | "B16" => {
-                let (least, most) = if law == "B11" { (2, 2) } else { (2, 4) };
-                json!({
-                    "type": "object",
-                    "properties": {"targets": targets(json!({
-                        "type": "object",
-                        "properties": {"layer": multi?, "colors": colors(least, most)},
-                        "required": ["layer", "colors"]
-                    }))},
-                    "required": ["targets"]
-                })
-            }
-            "B13" => json!({
+    }
+}
+
+/// The schema of one law's values over the given choices, or `None` when
+/// they leave it out.
+#[allow(clippy::too_many_lines)]
+fn law_shape(law: &str, choices: &ColorChoices) -> Option<Value> {
+    let color = color_enum();
+    let colors = |least: usize, most: usize| json!({"type": "array", "minItems": least, "maxItems": most, "items": color_enum()});
+    Some(match law {
+        "B11" | "B16" => {
+            let (least, most) = if law == "B11" { (2, 2) } else { (2, 4) };
+            json!({
                 "type": "object",
                 "properties": {"targets": targets(json!({
                     "type": "object",
-                    "properties": {
-                        "layer": graded?,
-                        "direction": {"type": "string", "enum": ["left_to_right", "right_to_left", "top_to_bottom", "bottom_to_top"]}
-                    },
-                    "required": ["layer", "direction"]
+                    "properties": {"layer": choices.multi.clone()?, "colors": colors(least, most)},
+                    "required": ["layer", "colors"]
                 }))},
                 "required": ["targets"]
-            }),
-            "B14" => json!({
-                "type": "object",
-                "properties": {"layers": {"type": "array", "minItems": 1, "items": graded?}},
-                "required": ["layers"]
-            }),
-            "B17" => {
-                json!({"type": "object", "properties": {"accent": color}, "required": ["accent"]})
-            }
-            "B18" => json!({
-                "type": "object",
-                "properties": {"use": {"type": "boolean"}},
-                "required": ["use"]
-            }),
-            "B19" => json!({
-                "type": "object",
-                "properties": {"layers": {"type": "array", "minItems": 1, "items": layer_enum(&self.nameable())}},
-                "required": ["layers"]
-            }),
-            "B20" => json!({
+            })
+        }
+        "B13" => json!({
+            "type": "object",
+            "properties": {"targets": targets(json!({
                 "type": "object",
                 "properties": {
-                    "accent_layer": layer_enum(&self.colorable),
-                    "layer": layer_enum(&self.nameable())
+                    "layer": choices.graded.clone()?,
+                    "direction": {"type": "string", "enum": ["left_to_right", "right_to_left", "top_to_bottom", "bottom_to_top"]}
                 },
-                "required": ["accent_layer", "layer"]
-            }),
-            "C7" => {
-                let layers = self.kasane_layers();
-                if layers.is_empty() {
-                    return None;
-                }
-                let mut under: Vec<&str> = COLORS.iter().map(|color| color.as_str()).collect();
-                under.push("none");
-                json!({
-                    "type": "object",
-                    "properties": {
-                        "targets": {"type": "array", "minItems": 1, "maxItems": 2, "items": layer_enum(&layers)},
-                        "omote": color,
-                        "ura": color_enum(),
-                        "naka": {"type": "string", "enum": under},
-                        "kasane_name": {"type": "string"},
-                        "offset": {"type": "string", "enum": ["small", "medium"]}
-                    },
-                    "required": ["targets", "omote", "ura", "naka", "kasane_name", "offset"]
-                })
-            }
-            "C8" => json!({
+                "required": ["layer", "direction"]
+            }))},
+            "required": ["targets"]
+        }),
+        "B14" => json!({
+            "type": "object",
+            "properties": {"layers": {"type": "array", "minItems": 1, "items": choices.graded.clone()?}},
+            "required": ["layers"]
+        }),
+        "B17" => {
+            json!({"type": "object", "properties": {"accent": color}, "required": ["accent"]})
+        }
+        "B18" => json!({
+            "type": "object",
+            "properties": {"use": {"type": "boolean"}},
+            "required": ["use"]
+        }),
+        "B19" => json!({
+            "type": "object",
+            "properties": {"layers": {"type": "array", "minItems": 1, "items": choices.nameable}},
+            "required": ["layers"]
+        }),
+        "B20" => json!({
+            "type": "object",
+            "properties": {
+                "accent_layer": choices.colorable,
+                "layer": choices.nameable
+            },
+            "required": ["accent_layer", "layer"]
+        }),
+        "C7" => {
+            let layers = choices.kasane.clone()?;
+            let mut under: Vec<&str> = COLORS.iter().map(|color| color.as_str()).collect();
+            under.push("none");
+            json!({
                 "type": "object",
                 "properties": {
-                    "chord": {"type": "string", "enum": ["complement", "triad", "tetrad"]},
-                    "assignments": targets(json!({
-                        "type": "object",
-                        "properties": {"layer": layer_enum(&self.colorable), "color": color},
-                        "required": ["layer", "color"]
-                    }))
+                    "targets": {"type": "array", "minItems": 1, "maxItems": 2, "items": layers},
+                    "omote": color,
+                    "ura": color_enum(),
+                    "naka": {"type": "string", "enum": under},
+                    "kasane_name": {"type": "string"},
+                    "offset": {"type": "string", "enum": ["small", "medium"]}
                 },
-                "required": ["chord", "assignments"]
-            }),
-            "C9" => {
-                // The ground stays (V1), so the strong color takes a layer: a
-                // closed shape the stage may recolor and move.
-                let layers = self.c9_layers();
-                if layers.is_empty() {
-                    return None;
-                }
-                json!({
+                "required": ["targets", "omote", "ura", "naka", "kasane_name", "offset"]
+            })
+        }
+        "C8" => json!({
+            "type": "object",
+            "properties": {
+                "chord": {"type": "string", "enum": ["complement", "triad", "tetrad"]},
+                "assignments": targets(json!({
                     "type": "object",
-                    "properties": {
-                        "color": {"type": "string", "enum": self.vivid.iter().map(|color| color.as_str()).collect::<Vec<_>>()},
-                        "layer": layer_enum(&layers),
-                        "area": {"type": "string", "enum": ["15-30", "30-50"]},
-                        "others": {"type": "string", "enum": ["neutral", "keep"]}
-                    },
-                    "required": ["color", "layer", "area", "others"]
-                })
+                    "properties": {"layer": choices.colorable, "color": color},
+                    "required": ["layer", "color"]
+                }))
+            },
+            "required": ["chord", "assignments"]
+        }),
+        "C9" => {
+            let (colors, layers) = choices.c9.clone()?;
+            json!({
+                "type": "object",
+                "properties": {
+                    "color": colors,
+                    "layer": layers,
+                    "area": {"type": "string", "enum": ["15-30", "30-50"]},
+                    "others": {"type": "string", "enum": ["neutral", "keep"]}
+                },
+                "required": ["color", "layer", "area", "others"]
+            })
+        }
+        "D1" | "D5" => {
+            let (hues, layers) = choices.hued[usize::from(law == "D5")].clone()?;
+            json!({
+                "type": "object",
+                "properties": {
+                    "hue": hues,
+                    "layer": layers
+                },
+                "required": ["hue", "layer"]
+            })
+        }
+        "D7" => json!({
+            "type": "object",
+            "properties": {"level": choices.levels.clone()?},
+            "required": ["level"]
+        }),
+        "D2" => {
+            let (vivid, layers) = choices.d2.clone()?;
+            json!({
+                "type": "object",
+                "properties": {
+                    "vivid": vivid,
+                    "layer": layers
+                },
+                "required": ["vivid", "layer"]
+            })
+        }
+        "D3" => {
+            let pairs = choices.pairs.clone()?;
+            let mut partners: Vec<&str> = WHEEL.iter().map(|color| color.as_str()).collect();
+            partners.push("gray");
+            json!({
+                "type": "object",
+                "properties": {
+                    "pair": pairs,
+                    "partner_color": {"type": "string", "enum": partners}
+                },
+                "required": ["pair", "partner_color"]
+            })
+        }
+        "D4" => {
+            if !choices.colorable_two {
+                return None;
             }
-            "D1" | "D5" => {
-                let hues = self.feasible.get(law).filter(|values| !values.is_empty())?;
-                let mut layers: BTreeSet<usize> = BTreeSet::new();
-                for hue in hues {
-                    layers.extend(
-                        self.hue_layers
-                            .get(&(law_key(law)?, *hue))
-                            .into_iter()
-                            .flatten(),
-                    );
-                }
-                json!({
-                    "type": "object",
-                    "properties": {
-                        "hue": {"type": "string", "enum": hues},
-                        "layer": layer_enum(&layers.into_iter().collect::<Vec<_>>())
-                    },
-                    "required": ["hue", "layer"]
-                })
-            }
-            "D7" => {
-                let values = self.feasible.get(law).filter(|values| !values.is_empty())?;
-                json!({
-                    "type": "object",
-                    "properties": {"level": {"type": "string", "enum": values}},
-                    "required": ["level"]
-                })
-            }
-            "D2" => {
-                let choices = self.d2_choices();
-                if choices.is_empty() {
-                    return None;
-                }
-                let mut vivid: Vec<&str> = Vec::new();
-                for color in WHEEL.iter().map(|color| color.as_str()) {
-                    if choices.values().any(|colors| colors.contains(&color)) {
-                        vivid.push(color);
-                    }
-                }
-                json!({
-                    "type": "object",
-                    "properties": {
-                        "vivid": {"type": "string", "enum": vivid},
-                        "layer": layer_enum(&choices.keys().copied().collect::<Vec<_>>())
-                    },
-                    "required": ["vivid", "layer"]
-                })
-            }
-            "D3" => {
-                if self.pairs.is_empty() {
-                    return None;
-                }
-                let pairs: Vec<String> =
-                    self.pairs.iter().map(|(a, b)| format!("{a}-{b}")).collect();
-                let mut partners: Vec<&str> = WHEEL.iter().map(|color| color.as_str()).collect();
-                partners.push("gray");
-                json!({
-                    "type": "object",
-                    "properties": {
-                        "pair": {"type": "string", "enum": pairs},
-                        "partner_color": {"type": "string", "enum": partners}
-                    },
-                    "required": ["pair", "partner_color"]
-                })
-            }
-            "D4" => {
-                if self.colorable.len() < 2 {
-                    return None;
-                }
-                json!({
-                    "type": "object",
-                    "properties": {
-                        "color": color,
-                        "layers": {"type": "array", "minItems": 2, "items": {
-                            "type": "object",
-                            "properties": {
-                                "layer": layer_enum(&self.colorable),
-                                "handling": {"type": "string", "enum": ["dense", "temperate", "faint"]}
-                            },
-                            "required": ["layer", "handling"]
-                        }}
-                    },
-                    "required": ["color", "layers"]
-                })
-            }
-            "D6" => {
-                if self.scatter_small.is_empty() {
-                    return None;
-                }
-                json!({
-                    "type": "object",
-                    "properties": {"targets": targets(json!({
+            json!({
+                "type": "object",
+                "properties": {
+                    "color": color,
+                    "layers": {"type": "array", "minItems": 2, "items": {
                         "type": "object",
-                        "properties": {"layer": layer_enum(&self.scatter_small), "colors": colors(2, 3)},
-                        "required": ["layer", "colors"]
-                    }))},
-                    "required": ["targets"]
-                })
+                        "properties": {
+                            "layer": choices.colorable,
+                            "handling": {"type": "string", "enum": ["dense", "temperate", "faint"]}
+                        },
+                        "required": ["layer", "handling"]
+                    }}
+                },
+                "required": ["color", "layers"]
+            })
+        }
+        "D6" => json!({
+            "type": "object",
+            "properties": {"targets": targets(json!({
+                "type": "object",
+                "properties": {"layer": choices.scattered.clone()?, "colors": colors(2, 3)},
+                "required": ["layer", "colors"]
+            }))},
+            "required": ["targets"]
+        }),
+        _ => return None,
+    })
+}
+
+impl ColorsContext {
+    /// The work's own choices, or `None` when no layer may be recolored (no
+    /// color law can take the work).
+    fn choices(&self) -> Option<ColorChoices> {
+        if self.colorable.is_empty() {
+            return None;
+        }
+        let some_layers = |layers: &[usize]| (!layers.is_empty()).then(|| layer_enum(layers));
+        let hued = |law: &'static str| -> Option<(Value, Value)> {
+            let hues = self.feasible.get(law).filter(|values| !values.is_empty())?;
+            let mut layers: BTreeSet<usize> = BTreeSet::new();
+            for hue in hues {
+                layers.extend(
+                    self.hue_layers
+                        .get(&(law_key(law)?, *hue))
+                        .into_iter()
+                        .flatten(),
+                );
             }
-            _ => return None,
+            Some((
+                json!({"type": "string", "enum": hues}),
+                layer_enum(&layers.into_iter().collect::<Vec<_>>()),
+            ))
+        };
+        let d2 = self.d2_choices();
+        let d2 = (!d2.is_empty()).then(|| {
+            let vivid: Vec<&str> = WHEEL
+                .iter()
+                .map(|color| color.as_str())
+                .filter(|color| d2.values().any(|colors| colors.contains(color)))
+                .collect();
+            (
+                json!({"type": "string", "enum": vivid}),
+                layer_enum(&d2.keys().copied().collect::<Vec<_>>()),
+            )
+        });
+        // The ground stays (V1), so C9's strong color takes a layer: a closed
+        // shape the stage may recolor and move.
+        let c9 = some_layers(&self.c9_layers()).map(|layers| {
+            (
+                json!({"type": "string", "enum": self.vivid.iter().map(|color| color.as_str()).collect::<Vec<_>>()}),
+                layers,
+            )
+        });
+        let pairs: Vec<String> = self.pairs.iter().map(|(a, b)| format!("{a}-{b}")).collect();
+        Some(ColorChoices {
+            multi: some_layers(&self.multi),
+            graded: some_layers(&self.graded),
+            nameable: layer_enum(&self.nameable()),
+            colorable: layer_enum(&self.colorable),
+            colorable_two: self.colorable.len() >= 2,
+            kasane: some_layers(&self.kasane_layers()),
+            c9,
+            hued: [hued("D1"), hued("D5")],
+            levels: self
+                .feasible
+                .get("D7")
+                .filter(|values| !values.is_empty())
+                .map(|values| json!({"type": "string", "enum": values})),
+            d2,
+            pairs: (!pairs.is_empty()).then(|| json!({"type": "string", "enum": pairs})),
+            scattered: some_layers(&self.scatter_small),
         })
     }
 
@@ -2240,10 +2344,13 @@ impl ColorsContext {
 
     /// The laws this work can take, in the request's order.
     fn offered(&self) -> Vec<&'static str> {
+        let Some(choices) = self.choices() else {
+            return Vec::new();
+        };
         COLOR_LAWS
             .iter()
             .copied()
-            .filter(|law| self.law_schema(law).is_some())
+            .filter(|law| law_shape(law, &choices).is_some())
             .collect()
     }
 
@@ -2259,40 +2366,242 @@ impl ColorsContext {
         }
     }
 
+    /// The Score's layers as the request's table: the columns, then a row a
+    /// layer (2026-10-25: a table instead of a JSON object a row).
     fn layer_lines(&self) -> Vec<String> {
-        self.summaries
-            .iter()
-            .map(|summary| {
-                let layer = summary.layer;
-                let look = self.now.looks.get(&layer);
-                let unseen = if self.colorable.contains(&layer) {
-                    COLORS
+        let mut rows = vec![LAYER_COLUMNS.to_owned()];
+        rows.extend(self.summaries.iter().map(|summary| {
+            let layer = summary.layer;
+            let look = self.now.looks.get(&layer);
+            let unseen = if self.colorable.contains(&layer) {
+                COLORS
+                    .iter()
+                    .filter(|color| self.seen(layer, **color) < VISIBLE)
+                    .map(|color| color.as_str())
+                    .collect()
+            } else {
+                Vec::new()
+            };
+            let line = ColorLayer {
+                summary: summary.clone(),
+                handling: self.handling_of(layer),
+                area: round1(100.0 * look.map_or(0.0, |look| look.ink)),
+                contrast: laws::round3(look.map_or(0.0, |look| look.contrast)),
+                chroma: laws::round_int(look.map_or(0.0, |look| look.chroma)),
+                unseen,
+                neighbors: self
+                    .now
+                    .neighbors
+                    .get(&layer)
+                    .map(|near| near.iter().copied().collect())
+                    .unwrap_or_default(),
+                fixed: self.fixed.get(&layer).cloned(),
+                stated: self.stated.get(&layer).cloned(),
+            };
+            let summary = &line.summary;
+            laws::table_row(&[
+                json!(summary.layer),
+                json!(summary.shape),
+                json!(summary.tool),
+                json!(summary.count),
+                json!(summary.color),
+                json!(summary.filled),
+                json!(summary.arranged),
+                json!(summary.covered),
+                json!(summary.mark_size),
+                json!(line.handling),
+                json!(line.area),
+                json!(line.contrast),
+                json!(line.chroma),
+                json!(line.unseen),
+                json!(line.neighbors),
+                json!(line.fixed),
+                json!(line.stated),
+            ])
+        }));
+        rows
+    }
+
+    fn table_lines(&self, at: usize) -> Vec<String> {
+        let mut rows = vec![TABLE_COLUMNS.to_owned()];
+        rows.extend(self.table(at).iter().map(|row| {
+            laws::table_row(&[
+                json!(row.name),
+                json!(row.paint),
+                json!(row.looks),
+                json!(row.wheel),
+                json!(row.place),
+                json!(row.lightness),
+                json!(row.chroma),
+                json!(row.ground_diff),
+                json!(row.same_paint_as),
+            ])
+        }));
+        rows
+    }
+
+    /// The laws this work can take and the values each may choose. The schema
+    /// the request sends is the same for every work, so the work's choices
+    /// are told here (2026-10-25).
+    fn choice_lines(&self, at: usize) -> Vec<String> {
+        let ja = at == 0;
+        let between = if ja { "／" } else { "; " };
+        let listed = |value: &Value| {
+            value["enum"]
+                .as_array()
+                .map(|items| {
+                    items
                         .iter()
-                        .filter(|color| self.seen(layer, **color) < VISIBLE)
-                        .map(|color| color.as_str())
-                        .collect()
+                        .map(|item| match item {
+                            Value::String(text) => text.clone(),
+                            other => other.to_string(),
+                        })
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                })
+                .unwrap_or_default()
+        };
+        let optional = |value: &Option<Value>| value.as_ref().map(listed).unwrap_or_default();
+        let joined = |layers: &[usize]| {
+            layers
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        let choices = self.choices();
+        let mut lines = vec![CHOICES_HEAD[at].to_owned()];
+        for law in COLOR_LAWS {
+            let Some(choices) = choices
+                .as_ref()
+                .filter(|choices| law_shape(law, choices).is_some())
+            else {
+                lines.push(format!(
+                    "- {law}: {}",
+                    if ja {
+                        "なし（この作品では当てられない）"
+                    } else {
+                        "none (this work cannot take it)"
+                    }
+                ));
+                continue;
+            };
+            let values = match law {
+                "B11" | "B16" => format!("layer: {}", optional(&choices.multi)),
+                "B13" => format!("layer: {}", optional(&choices.graded)),
+                "B14" => format!("layers: {}", optional(&choices.graded)),
+                "B19" => format!("layers: {}", listed(&choices.nameable)),
+                "B20" => format!(
+                    "accent_layer: {}{between}layer: {}",
+                    listed(&choices.colorable),
+                    listed(&choices.nameable)
+                ),
+                "C7" => format!("targets: {}", optional(&choices.kasane)),
+                "C8" => format!(
+                    "{}{}",
+                    if ja {
+                        "assignments の layer: "
+                    } else {
+                        "assignments' layer: "
+                    },
+                    listed(&choices.colorable)
+                ),
+                "C9" => choices
+                    .c9
+                    .as_ref()
+                    .map_or_else(String::new, |(colors, layers)| {
+                        format!(
+                            "color: {}{between}layer: {}",
+                            listed(colors),
+                            listed(layers)
+                        )
+                    }),
+                "D1" | "D5" => {
+                    let hues: Vec<String> = self
+                        .feasible
+                        .get(law)
+                        .into_iter()
+                        .flatten()
+                        .filter_map(|hue| {
+                            let layers = self.hue_layers.get(&(law_key(law)?, *hue))?;
+                            Some(format!("{hue} → {}", joined(layers)))
+                        })
+                        .collect();
+                    format!(
+                        "{}{}",
+                        if ja {
+                            "hue と layer: "
+                        } else {
+                            "hue and layer: "
+                        },
+                        hues.join(between)
+                    )
+                }
+                "D2" => {
+                    let vivid: Vec<String> = self
+                        .d2_choices()
+                        .iter()
+                        .map(|(layer, colors)| format!("{layer} → {}", colors.join(", ")))
+                        .collect();
+                    format!(
+                        "{}{}",
+                        if ja {
+                            "layer と vivid: "
+                        } else {
+                            "layer and vivid: "
+                        },
+                        vivid.join(between)
+                    )
+                }
+                "D3" => format!("pair: {}", optional(&choices.pairs)),
+                "D4" => format!(
+                    "{}{}",
+                    if ja {
+                        "layers の layer（2 つ以上）: "
+                    } else {
+                        "layers' layer (two or more): "
+                    },
+                    listed(&choices.colorable)
+                ),
+                "D6" => format!("layer: {}", optional(&choices.scattered)),
+                "D7" => format!("level: {}", optional(&choices.levels)),
+                // B17 and B18 choose no layer.
+                _ => (if ja {
+                    "当てられる（層は選ばない）"
                 } else {
-                    Vec::new()
-                };
-                let line = ColorLayer {
-                    summary: summary.clone(),
-                    handling: self.handling_of(layer),
-                    area: round1(100.0 * look.map_or(0.0, |look| look.ink)),
-                    contrast: laws::round3(look.map_or(0.0, |look| look.contrast)),
-                    chroma: laws::round_int(look.map_or(0.0, |look| look.chroma)),
-                    unseen,
-                    neighbors: self
-                        .now
-                        .neighbors
-                        .get(&layer)
-                        .map(|near| near.iter().copied().collect())
-                        .unwrap_or_default(),
-                    fixed: self.fixed.get(&layer).cloned(),
-                    stated: self.stated.get(&layer).cloned(),
-                };
-                serde_json::to_string(&line).unwrap_or_default()
-            })
-            .collect()
+                    "can be taken (no layer to choose)"
+                })
+                .to_owned(),
+            };
+            let held = if !self.already.contains(&law) {
+                ""
+            } else if ja {
+                "（この画ですでに成り立っている。主には選べない）"
+            } else {
+                " (already holds in this picture; it cannot be the main law)"
+            };
+            lines.push(format!("- {law}: {values}{held}"));
+        }
+        lines.push(match (ja, self.ground_free()) {
+            (true, true) => "地: 選べる（ground に書く。記述は地の色を言っていない）。".to_owned(),
+            (true, false) => "地: 記述が言った色なので替えない（ground は書かない）。".to_owned(),
+            (false, true) => "Ground: it may be chosen (write it in ground; the description does not state it).".to_owned(),
+            (false, false) => "Ground: in a color the description states, so it does not change (leave ground out).".to_owned(),
+        });
+        let sourced = self.offered().iter().any(|law| SOURCE_LAWS.contains(law));
+        lines.push(match (ja, sourced) {
+            (true, true) => format!(
+                "colors の layer（B17〜B20 を使う時）: {}",
+                joined(&self.colorable)
+            ),
+            (true, false) => "colors: 書かない（この作品は B17〜B20 を取れない）。".to_owned(),
+            (false, true) => format!(
+                "colors' layer (with B17 to B20): {}",
+                joined(&self.colorable)
+            ),
+            (false, false) => "colors: leave it out (this work cannot take B17 to B20).".to_owned(),
+        });
+        lines
     }
 
     fn table(&self, at: usize) -> Vec<ColorRow> {
@@ -2395,11 +2704,6 @@ impl ColorsContext {
             }
             .to_owned(),
         );
-        lines.push(if ja {
-            format!("{}{}", LAYER_NOTE[at], FACTS_NOTE[at])
-        } else {
-            format!("{} {}", LAYER_NOTE[at], FACTS_NOTE[at])
-        });
         lines.extend(self.layer_lines());
         lines.push(String::new());
         let table = self.table(at);
@@ -2413,104 +2717,134 @@ impl ColorsContext {
             (false, None) => format!("## Ground: {ground} ({looks})"),
         });
         lines.push(String::new());
-        lines.push(TABLE_NOTE[at].to_owned());
-        lines.extend(
-            table
-                .iter()
-                .map(|row| serde_json::to_string(row).unwrap_or_default()),
-        );
+        lines.push(TABLE_HEAD[at].to_owned());
+        lines.extend(self.table_lines(at));
         lines.push(String::new());
-        lines.push(WHEEL_NOTE[at].to_owned());
-        lines.push(String::new());
-        lines.push(
-            if ja {
-                "## 配色の法則の一覧（18）"
-            } else {
-                "## The color laws (18)"
-            }
-            .to_owned(),
-        );
-        let offered = self.offered();
-        let labels = if ja {
-            ["典拠: ", "法則: ", "選ぶもの: ", "例: "]
-        } else {
-            ["Source: ", "Law: ", "Choose: ", "Example: "]
-        };
-        for (law, text) in &LAW_TEXTS {
-            if !offered.contains(law) {
-                lines.push(if ja {
-                    format!(
-                        "### {law} {}（{}）（この作品では当てられない）",
-                        text.name[0], text.family[0]
-                    )
-                } else {
-                    format!(
-                        "### {law} {} ({}) (this work cannot take it)",
-                        text.name[1], text.family[1]
-                    )
-                });
-                continue;
-            }
-            let held = self.already.contains(law);
-            lines.push(match (ja, held) {
-                (true, true) => format!(
-                    "### {law} {}（{}）（この画ですでに成り立っている。主には選べない）",
-                    text.name[0], text.family[0]
-                ),
-                (true, false) => format!("### {law} {}（{}）", text.name[0], text.family[0]),
-                (false, true) => format!(
-                    "### {law} {} ({}) (already holds in this picture; it cannot be the main law)",
-                    text.name[1], text.family[1]
-                ),
-                (false, false) => format!("### {law} {} ({})", text.name[1], text.family[1]),
-            });
-            lines.push(format!("{}{}", labels[0], text.source[at]));
-            lines.push(format!("{}{}", labels[1], text.law[at]));
-            lines.push(format!("{}{}", labels[2], text.choose[at]));
-            lines.push(format!("{}{}", labels[3], text.example[at]));
-        }
-        lines.push(String::new());
-        lines.push(
-            if ja {
-                "## 答え全体の例（この作品と別の記述）"
-            } else {
-                "## A whole answer (for another description)"
-            }
-            .to_owned(),
-        );
-        let labels = if ja {
-            ["記述: ", "層:", "答え: "]
-        } else {
-            ["Description: ", "Layers:", "Answer: "]
-        };
-        lines.push(format!("{}{}", labels[0], EXAMPLE_DESCRIPTION[at]));
-        lines.push(labels[1].to_owned());
-        lines.extend(EXAMPLE_LAYERS.iter().map(|layer| (*layer).to_owned()));
-        lines.push(format!("{}{}", labels[2], EXAMPLE_ANSWER[at]));
-        lines.push(String::new());
-        lines.push(RULE[at].to_owned());
+        lines.extend(self.choice_lines(at));
         lines.join("\n")
     }
 }
 
+/// The system text: the stage's rules and everything the request shows that
+/// is the same for every work (the tables' legends, the color wheel, the
+/// laws, the whole answer's example and the answer's rule). It comes first
+/// and does not change, so that a provider can keep it from one request to
+/// the next (2026-10-25).
+fn system(language: ResolvedInstructionLanguage) -> String {
+    let at = laws::language_index(language);
+    let ja = at == 0;
+    let mut lines: Vec<String> = vec![[SYSTEM_JA, SYSTEM_EN][at].to_owned(), String::new()];
+    lines.push(if ja {
+        format!("{}{}", LAYER_NOTE[at], FACTS_NOTE[at])
+    } else {
+        format!("{} {}", LAYER_NOTE[at], FACTS_NOTE[at])
+    });
+    lines.push(String::new());
+    lines.push(TABLE_NOTE[at].to_owned());
+    lines.push(String::new());
+    lines.push(WHEEL_NOTE[at].to_owned());
+    lines.push(String::new());
+    lines.push(
+        if ja {
+            "## 配色の法則の一覧（18）"
+        } else {
+            "## The color laws (18)"
+        }
+        .to_owned(),
+    );
+    let labels = if ja {
+        ["典拠: ", "法則: ", "選ぶもの: ", "例: "]
+    } else {
+        ["Source: ", "Law: ", "Choose: ", "Example: "]
+    };
+    for (law, text) in &LAW_TEXTS {
+        lines.push(if ja {
+            format!("### {law} {}（{}）", text.name[0], text.family[0])
+        } else {
+            format!("### {law} {} ({})", text.name[1], text.family[1])
+        });
+        lines.push(format!("{}{}", labels[0], text.source[at]));
+        lines.push(format!("{}{}", labels[1], text.law[at]));
+        lines.push(format!("{}{}", labels[2], text.choose[at]));
+        lines.push(format!("{}{}", labels[3], text.example[at]));
+    }
+    lines.push(String::new());
+    lines.push(
+        if ja {
+            "## 答え全体の例（この作品と別の記述）"
+        } else {
+            "## A whole answer (for another description)"
+        }
+        .to_owned(),
+    );
+    let labels = if ja {
+        ["記述: ", "層:", "答え: "]
+    } else {
+        ["Description: ", "Layers:", "Answer: "]
+    };
+    lines.push(format!("{}{}", labels[0], EXAMPLE_DESCRIPTION[at]));
+    lines.push(labels[1].to_owned());
+    lines.extend(EXAMPLE_LAYERS.iter().map(|layer| (*layer).to_owned()));
+    lines.push(format!("{}{}", labels[2], EXAMPLE_ANSWER[at]));
+    lines.push(String::new());
+    lines.push(RULE[at].to_owned());
+    lines.join("\n")
+}
+
 /// The answer's schema for this work: the main law among the laws that do not
 /// already hold, the laws, the ground when the description does not state it,
-/// the layers' colors for B17 to B20 and the reason.
+/// the layers' colors for B17 to B20 and the reason. The check reads the
+/// answer against it.
 #[must_use]
 pub fn colors_response_schema(context: &ColorsContext) -> Value {
-    let mut laws = Map::new();
-    let mut order = Vec::new();
-    for law in COLOR_LAWS {
-        if let Some(schema) = context.law_schema(law) {
-            laws.insert(law.to_owned(), schema);
-            order.push(law);
-        }
-    }
-    let main: Vec<&str> = order
+    let given: Vec<(&'static str, Value)> = context
+        .choices()
+        .map(|choices| {
+            COLOR_LAWS
+                .iter()
+                .filter_map(|law| law_shape(law, &choices).map(|schema| (*law, schema)))
+                .collect()
+        })
+        .unwrap_or_default();
+    let main: Vec<&'static str> = given
         .iter()
-        .copied()
+        .map(|(law, _)| *law)
         .filter(|law| !context.already.contains(law))
         .collect();
+    let colors = given
+        .iter()
+        .any(|(law, _)| SOURCE_LAWS.contains(law))
+        .then(|| layer_enum(&context.colorable));
+    // The ground a description does not state may be chosen (2026-10-21).
+    answer_schema(given, &main, context.ground_free(), colors)
+}
+
+/// The answer's schema as the request sends it: every color law, the ground
+/// and the layers' colors, their values open. It is the same for every work,
+/// so that a provider can keep it with the system text; the message tells the
+/// work's choices, and the check narrows the answer to them
+/// (`colors_response_schema`, 2026-10-25).
+#[must_use]
+pub fn colors_request_schema() -> Value {
+    let given: Vec<(&'static str, Value)> = COLOR_LAWS
+        .iter()
+        .filter_map(|law| law_shape(law, &ColorChoices::open()).map(|schema| (*law, schema)))
+        .collect();
+    answer_schema(given, &COLOR_LAWS, true, Some(open_layer()))
+}
+
+fn answer_schema(
+    given: Vec<(&'static str, Value)>,
+    main: &[&'static str],
+    ground: bool,
+    colors: Option<Value>,
+) -> Value {
+    let mut laws = Map::new();
+    let mut order = Vec::new();
+    for (law, schema) in given {
+        laws.insert(law.to_owned(), schema);
+        order.push(law);
+    }
     let mut properties = Map::new();
     properties.insert(
         "main_law".to_owned(),
@@ -2521,19 +2855,18 @@ pub fn colors_response_schema(context: &ColorsContext) -> Value {
         json!({"type": "object", "propertyOrdering": order, "properties": laws}),
     );
     let mut ordering = vec!["main_law", "laws"];
-    // The ground a description does not state may be chosen (2026-10-21).
-    if context.ground_free() {
+    if ground {
         properties.insert("ground".to_owned(), color_enum());
         ordering.push("ground");
     }
-    if order.iter().any(|law| SOURCE_LAWS.contains(law)) {
+    if let Some(layer) = colors {
         properties.insert(
             "colors".to_owned(),
             json!({
                 "type": "object",
                 "properties": {"layers": {"type": "array", "items": {
                     "type": "object",
-                    "properties": {"layer": layer_enum(&context.colorable), "color": color_enum()},
+                    "properties": {"layer": layer, "color": color_enum()},
                     "required": ["layer", "color"]
                 }}},
                 "required": ["layers"]
@@ -2561,27 +2894,23 @@ pub fn build_colors_prompt(
 ) -> Result<LlmPrompt, PromptError> {
     crate::prompts::require_nonempty("description", description)?;
     crate::prompts::require_within("description", description.len(), limits.max_source_bytes)?;
-    let schema = colors_response_schema(context);
-    if schema["properties"]["main_law"]["enum"]
+    // The work's own schema tells whether there is a main law to choose; the
+    // request sends the schema that is the same for every work (2026-10-25).
+    if colors_response_schema(context)["properties"]["main_law"]["enum"]
         .as_array()
         .is_none_or(Vec::is_empty)
     {
         return Err(PromptError::EmptyField { field: "colors" });
     }
-    let system = match language {
-        ResolvedInstructionLanguage::Ja => SYSTEM_JA,
-        ResolvedInstructionLanguage::En => SYSTEM_EN,
-    }
-    .to_owned();
     crate::prompts::finish_prompt(LlmPrompt {
         schema_id: crate::prompts::LLM_PROMPT_SCHEMA_ID.to_owned(),
         prompt_id: COLORS_PROMPT_ID.to_owned(),
         stage: LlmStage::ChooseColors,
         action_name: LlmStage::ChooseColors.action_name().to_owned(),
         instruction_language: language,
-        system,
+        system: system(language),
         message: context.message(description, language),
-        response_schema: schema,
+        response_schema: colors_request_schema(),
         prompt_digest: String::new(),
         saijiki_asset_id: None,
         saijiki_asset_digest: None,

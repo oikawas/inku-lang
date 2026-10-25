@@ -138,8 +138,9 @@ def test_a_run_asked_for_its_colors_prints_the_colors_its_reader_chose(author, s
     ]
     colors = sent[3]["payload"]["prompt"]
     assert DESCRIPTION in colors["message"]
-    # The color table names the paint each of the nine colors draws.
-    assert '"name":"black","paint":"黒"' in colors["message"], colors["message"]
+    # The color table names the paint each of the nine colors draws (a table
+    # since 2026-10-25: name | paint | looks | ...).
+    assert "\nblack | 黒 | " in colors["message"], colors["message"]
     assert "## 主の層（前の段が決めた）" not in colors["message"]
     assert "主の層: layer 1" not in colors["message"]
     # The circle the laws placed is printed in the blue.

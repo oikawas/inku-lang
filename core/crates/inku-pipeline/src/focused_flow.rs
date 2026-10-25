@@ -3327,7 +3327,10 @@ fn the_colors_come_after_the_laws_with_what_the_laws_decided() {
     // laws decided.
     assert!(!message.contains("Main layer"), "{message}");
     assert!(message.contains("- layer 1: “red” (red)"), "{message}");
-    assert!(message.contains(r#""fixed":"B15""#), "{message}");
+    assert!(
+        message.lines().any(|line| line.contains(" | B15 | ")),
+        "{message}"
+    );
 }
 
 /// B20 with the stated red circle (layer 1) recolored blue.
@@ -3541,6 +3544,19 @@ fn refusal_reason(output: &StepOutput) -> &str {
         .map_or("", |(_, reason)| reason)
 }
 
+/// The colors request's line for one law: what the work lets it choose. The
+/// schema the request sends is the same for every work, so the message tells
+/// the work's choices (2026-10-25); the check still narrows the answer.
+fn choice_line<'a>(state: &'a PipelineSnapshot, law: &str) -> &'a str {
+    let message = state.action.as_ref().unwrap().payload["prompt"]["message"]
+        .as_str()
+        .unwrap();
+    message
+        .lines()
+        .find(|line| line.starts_with(&format!("- {law}: ")))
+        .unwrap_or_else(|| panic!("{law}: {message}"))
+}
+
 /// C9 fills the layer it enlarges, so a texture's fineness word (DDL 24),
 /// which only a named texture takes, goes with the texture.
 #[test]
@@ -3553,12 +3569,8 @@ fn c9_fills_a_textured_layer_without_its_texture_words() {
         textured,
     ]});
     let asked = plan_answer_with(&colors_start(UNCOLORED_DESCRIPTION, None), &plan).snapshot;
-    let schema = &asked.action.as_ref().unwrap().payload["prompt"]["response_schema"];
-    assert_eq!(
-        schema["properties"]["laws"]["properties"]["C9"]["properties"]["layer"]["enum"],
-        json!([1]),
-        "{schema}"
-    );
+    let c9 = choice_line(&asked, "C9");
+    assert!(c9.ends_with("; layer: 1"), "{c9}");
     let chosen = colors_answer(
         &asked,
         &json!({"main_law": "C9", "laws": {"C9": {"color": "red", "layer": 1, "area": "15-30",
@@ -3640,11 +3652,12 @@ fn d2_counts_the_vivid_layers_the_colors_keep() {
     ]});
     let start = colors_start("A red circle above red marks at the bottom", None);
     let asked = plan_answer_with(&start, &plan).snapshot;
-    let schema = &asked.action.as_ref().unwrap().payload["prompt"]["response_schema"];
-    assert_eq!(
-        schema["properties"]["laws"]["properties"]["D2"]["properties"]["vivid"]["enum"],
-        json!(["red"])
-    );
+    // D2 is offered only in red.
+    let d2 = choice_line(&asked, "D2");
+    assert!(d2.starts_with("- D2: layer and vivid: 0 → red"), "{d2}");
+    for other in ["yellow", "orange", "purple", "blue", "green"] {
+        assert!(!d2.contains(other), "{d2}");
+    }
     let refused = colors_answer(
         &asked,
         &json!({"main_law": "D2", "laws": {"D2": {"vivid": "red", "layer": 0}}, "reason": "“A red circle”."}),
@@ -3660,21 +3673,19 @@ fn d2_counts_the_vivid_layers_the_colors_keep() {
 /// support but not lead; beside a green field it may lead.
 #[test]
 fn d2_already_holds_by_any_layer() {
-    let main_laws = |state: &PipelineSnapshot| {
-        let schema = &state.action.as_ref().unwrap().payload["prompt"]["response_schema"];
-        assert!(schema["properties"]["laws"]["properties"]["D2"].is_object());
-        schema["properties"]["main_law"]["enum"].clone()
-    };
+    let held = " (already holds in this picture; it cannot be the main law)";
     let gray = plan_answer(&colors_start(UNCOLORED_DESCRIPTION, None)).snapshot;
-    let main = main_laws(&gray);
-    assert!(!main.as_array().unwrap().contains(&json!("D2")), "{main}");
+    let d2 = choice_line(&gray, "D2");
+    assert!(!d2.starts_with("- D2: none"), "{d2}");
+    assert!(d2.ends_with(held), "{d2}");
     let green = plan_answer_with(
         &colors_start(UNCOLORED_DESCRIPTION, None),
         &green_field_plan_response(),
     )
     .snapshot;
-    let main = main_laws(&green);
-    assert!(main.as_array().unwrap().contains(&json!("D2")), "{main}");
+    let d2 = choice_line(&green, "D2");
+    assert!(!d2.starts_with("- D2: none"), "{d2}");
+    assert!(!d2.ends_with(held), "{d2}");
 }
 
 /// The color laws name the layers they work on (2026-10-21): D2 makes the
@@ -3776,8 +3787,13 @@ fn the_colors_keep_a_stated_ground_and_the_layers_it_shows() {
         None,
     ))
     .snapshot;
-    let schema = &stated.action.as_ref().unwrap().payload["prompt"]["response_schema"];
-    assert!(schema["properties"]["ground"].is_null(), "{schema}");
+    let message = stated.action.as_ref().unwrap().payload["prompt"]["message"]
+        .as_str()
+        .unwrap();
+    assert!(
+        message.contains("\nGround: in a color the description states, so it does not change (leave ground out).\n"),
+        "{message}"
+    );
     let refused = colors_answer(
         &stated,
         &json!({"main_law": "D5", "laws": {"D5": {"hue": "blue", "layer": 0}}, "ground": "black",
@@ -3815,16 +3831,8 @@ fn a_gradation_runs_through_three_marks_or_more() {
         lines,
     ]});
     let asked = plan_answer_with(&colors_start(UNCOLORED_DESCRIPTION, None), &plan).snapshot;
-    let laws = &asked.action.as_ref().unwrap().payload["prompt"]["response_schema"]["properties"]["laws"]
-        ["properties"];
-    assert_eq!(
-        laws["B14"]["properties"]["layers"]["items"]["enum"],
-        json!([2])
-    );
-    assert_eq!(
-        laws["B13"]["properties"]["targets"]["items"]["properties"]["layer"]["enum"],
-        json!([2])
-    );
+    assert_eq!(choice_line(&asked, "B14"), "- B14: layers: 2");
+    assert_eq!(choice_line(&asked, "B13"), "- B13: layer: 2");
     // The two circles cannot fade from the center: both lie as far from it.
     let refused = colors_answer(
         &asked,
@@ -3867,12 +3875,14 @@ fn the_colors_may_recolor_a_distant_layer_in_its_order() {
     let after_laws = laws_answer(&asked, &two_laws()).snapshot;
     let action = after_laws.action.as_ref().unwrap();
     let message = action.payload["prompt"]["message"].as_str().unwrap();
-    assert!(message.contains(r#""fixed":"B15""#), "{message}");
-    assert_eq!(
-        action.payload["prompt"]["response_schema"]["properties"]["laws"]["properties"]["B11"]["properties"]
-            ["targets"]["items"]["properties"]["layer"]["enum"],
-        json!([2])
+    // The row of squares is fixed by B15 (the table's fixed column).
+    assert!(
+        message
+            .lines()
+            .any(|line| line.starts_with("2 | ") && line.ends_with(" | B15 | -")),
+        "{message}"
     );
+    assert_eq!(choice_line(&after_laws, "B11"), "- B11: layer: 2");
     let alternate = |colors: [&str; 2]| {
         json!({"main_law": "B11", "laws": {"B11": {"targets": [{"layer": 2, "colors": colors}]}},
                "reason": "A distant row in turn."})
@@ -4011,28 +4021,23 @@ fn the_laws_a_refinement_leaves_out_are_not_offered() {
     };
     let from_work = saved_laws_start(&composed, direction, None, None).snapshot;
     let prompt = &from_work.action.as_ref().unwrap().payload["prompt"];
-    let schema = &prompt["response_schema"]["properties"];
-    for law in ["B15", "C1", "C2"] {
-        assert!(schema["laws"]["properties"].get(law).is_none(), "{law}");
-        assert!(
-            !schema["main_law"]["enum"]
-                .as_array()
-                .unwrap()
-                .contains(&json!(law)),
-            "{law}"
-        );
-    }
+    // The schema the request sends is the same for every work (2026-10-25):
+    // the message tells the laws left out, and the check refuses them.
+    assert_eq!(
+        prompt["response_schema"],
+        crate::laws::laws_request_schema()
+    );
     let message = prompt["message"].as_str().unwrap();
     assert!(
         message.contains("## The author's direction\nLet the circle lead.\n"),
         "{message}"
     );
-    for law in ["B15", "C2"] {
-        let head = message
-            .lines()
-            .find(|line| line.starts_with(&format!("### {law} ")))
-            .unwrap();
-        assert!(head.ends_with(" (not used in this refinement)"), "{head}");
+    for law in ["B15", "C1", "C2"] {
+        let left_out = format!("- {law}: none (not used in this refinement)");
+        assert!(
+            message.lines().any(|line| line == left_out),
+            "{law}: {message}"
+        );
     }
     // An answer that names a law left out is asked again with the reason.
     let refused = laws_answer(&from_work, &two_laws());

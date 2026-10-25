@@ -50,8 +50,13 @@ use crate::composition::hypot;
 use crate::core_boundary::ResolvedPaletteDto;
 use crate::prompts::{LlmPrompt, LlmStage, PromptError, PromptLimits};
 
-/// The laws request edition.
-pub const LAWS_PROMPT_ID: &str = "inku.laws-prompt.v1";
+/// The laws request edition: v2 (2026-10-25) sends what is the same for every
+/// work in the system text and one schema for every work.
+pub const LAWS_PROMPT_ID: &str = "inku.laws-prompt.v2";
+
+/// The editions before it, which a run saved while it asked the laws may
+/// still hold and asks again with (`with_laws_feedback`).
+pub const PREVIOUS_LAWS_PROMPT_IDS: [&str; 1] = ["inku.laws-prompt.v1"];
 
 /// The laws this core applies, in the order the request lists them.
 pub const LAWS: [&str; 19] = [
@@ -2105,10 +2110,15 @@ Rules:
 7. In reason, quote the description's words in “ ” and say in one or two lines why you chose the main law.
 Return the answer as JSON of the given shape. In laws, key each law you use by its number and write its values.";
 
+/// The legend of the Score's layers, a table since 2026-10-25 (one line a
+/// layer instead of a JSON object repeating every key).
 const LAYER_NOTE: [&str; 2] = [
-    "box は層の痕が占める矩形 [x0, y0, x1, y1]（画面を 0〜1 とする）、mark_size は痕1つの幅と高さ。arranged は並べ方: place は1か所に置く（数が2以上なら同じ所に重ねた束）、row_horizontal・row_vertical・row_diagonal は列、grid は格子、scatter は散らす、fill はほかの形の中に塗り込める形（置き場と並びを変えられない）、plugin は差し込みの形（法則を当てられない）。",
-    "box is the rectangle [x0, y0, x1, y1] the layer's marks cover (the canvas is 0 to 1); mark_size is the width and height of one mark. arranged is how the layer is arranged: place puts it at one spot (with a count of 2 or more, a bundle at that spot), row_horizontal, row_vertical and row_diagonal are rows, grid is a grid, scatter scatters, fill is a shape filled inside another shape (its place and arrangement cannot change), and plugin is a plugged-in shape (no law takes it).",
+    "## 楽譜の層の表\n本文の楽譜の層は表で示す。1 行目が欄の名で、2 行目から 1 層 1 行。欄は | で、一つの欄の中の値はコンマで区切る（- は無し）。box は層の痕が占める矩形 x0,y0,x1,y1（画面を 0〜1 とする）、mark_size は痕1つの幅,高さ。arranged は並べ方: place は1か所に置く（数が2以上なら同じ所に重ねた束）、row_horizontal・row_vertical・row_diagonal は列、grid は格子、scatter は散らす、fill はほかの形の中に塗り込める形（置き場と並びを変えられない）、plugin は差し込みの形（法則を当てられない）。",
+    "## The table of the Score's layers\nThe message shows the Score's layers as a table: the first line names the columns, and each line after it is one layer. Columns are separated by |, and the values inside one column by commas (- is none). box is the rectangle x0,y0,x1,y1 the layer's marks cover (the canvas is 0 to 1); mark_size is the width,height of one mark. arranged is how the layer is arranged: place puts it at one spot (with a count of 2 or more, a bundle at that spot), row_horizontal, row_vertical and row_diagonal are rows, grid is a grid, scatter scatters, fill is a shape filled inside another shape (its place and arrangement cannot change), and plugin is a plugged-in shape (no law takes it).",
 ];
+
+const LAYER_COLUMNS: &str =
+    "layer | shape | tool | count | color | filled | arranged | box | mark_size";
 
 const AT_NOTE: [&str; 2] = [
     "比例（B1〜B4）の at: point_ul・point_ur・point_ll・point_lr は4つの交点（左上・右上・左下・右下）、line_left・line_right は左と右の縦の線、line_top・line_bottom は上と下の横の線。span（線に置く時だけ）: full は全幅（端から 0.118 の余白）、current は今の長さ。線の層は線に沿わせ、複数の物は線の上に並ぶ。交点に置くと、閉じた形は中心がそこに来て、複数の物は今の並びのまま寄る。",
@@ -2120,11 +2130,12 @@ const EXAMPLE_DESCRIPTION: [&str; 2] = [
     "On a winter morning, a single tree hung with red berries stood in a snowy field.",
 ];
 
-/// The example's layers, as the prototype printed them.
-const EXAMPLE_LAYERS: [&str; 3] = [
-    r#"{"layer":0,"shape":"line","tool":"brush_thick","count":1,"color":"black","filled":false,"arranged":"place","box":[0.3,0.2,0.7,0.9],"mark_size":[0.7,0.0]}"#,
-    r#"{"layer":1,"shape":"circle","tool":"brush_thin","count":7,"color":"red","filled":true,"arranged":"place","box":[0.4,0.2,0.6,0.4],"mark_size":[0.03,0.03]}"#,
-    r#"{"layer":2,"shape":"point","tool":"chalk","count":40,"color":"white","filled":true,"arranged":"scatter","box":[0.0,0.0,1.0,1.0],"mark_size":[0.004,0.004]}"#,
+/// The example's layers, the prototype's in the table the request prints.
+const EXAMPLE_LAYERS: [&str; 4] = [
+    LAYER_COLUMNS,
+    "0 | line | brush_thick | 1 | black | false | place | 0.3,0.2,0.7,0.9 | 0.7,0.0",
+    "1 | circle | brush_thin | 7 | red | true | place | 0.4,0.2,0.6,0.4 | 0.03,0.03",
+    "2 | point | chalk | 40 | white | true | scatter | 0.0,0.0,1.0,1.0 | 0.004,0.004",
 ];
 
 /// The prototype's example answer with the laws of this stage only, its
@@ -2135,24 +2146,39 @@ const EXAMPLE_ANSWER: [&str; 2] = [
 ];
 
 /// The head of the table of the work's nine colors, shown when the run's
-/// palette has observations.
+/// palette has observations; its legend is in the system text.
 const COLOR_HEAD: [&str; 2] = [
-    "## この作品のカタログの色（9つの色名と、それが描く色。lightness は明るさ 0〜1、chroma は鮮やかさ、hue は色相の角度）",
-    "## The colors of this work's catalog (the nine color names and the colors they draw; lightness is the lightness from 0 to 1, chroma the vividness and hue the hue angle)",
+    "## この作品のカタログの色",
+    "## The colors of this work's catalog",
 ];
 
-/// The rule at the end of the message; the number of laws is not fixed
-/// (2026-10-21).
+const COLOR_NOTE: [&str; 2] = [
+    "## カタログの色の表\n本文の「この作品のカタログの色」は、9つの色名と、それが描く色の表（欄は楽譜の層の表と同じく | で区切る）。lightness は明るさ 0〜1、chroma は鮮やかさ、hue は色相の角度。",
+    "## The table of the catalog's colors\n“The colors of this work's catalog” in the message is a table of the nine color names and the colors they draw (columns separated by |, as in the table of the Score's layers). lightness is the lightness from 0 to 1, chroma the vividness and hue the hue angle.",
+];
+
+const COLOR_COLUMNS: &str = "name | lightness | chroma | hue";
+
+/// The rule of the answer; the number of laws is not fixed (2026-10-21). The
+/// layers each law can take are the message's (2026-10-25).
 const ANSWER_RULE: [&str; 2] = [
-    "## この答えの決まり\n主の法則を一つと、それを支える法則を選ぶ（数は決めない）。",
-    "## The rule of this answer\nChoose one main law and the laws that support it (their number is not fixed).",
+    "## この答えの決まり\n主の法則を一つと、それを支える法則を選ぶ（数は決めない）。法則と、その値で名指す層は、本文の「この作品で法則を当てられる層」から選ぶ（B7 の against と description_counts の layer は、どの層でもよい）。当てる層の無い法則は使わない。",
+    "## The rule of this answer\nChoose one main law and the laws that support it (their number is not fixed). Take the laws, and the layers their values name, from “The layers each law can take in this work” in the message (B7's against and description_counts' layer may be any layer). Use no law that no layer can take.",
+];
+
+const CANDIDATES_HEAD: [&str; 2] = [
+    "## この作品で法則を当てられる層",
+    "## The layers each law can take in this work",
 ];
 
 const ABSENT_MARK: [&str; 2] = [
-    "（この作品では当てる層が無い）",
-    " (no layer of this work can take it)",
+    "なし（この作品では当てる層が無い）",
+    "none (no layer of this work can take it)",
 ];
-const EXCLUDED_MARK: [&str; 2] = ["（この推敲では使わない）", " (not used in this refinement)"];
+const EXCLUDED_MARK: [&str; 2] = [
+    "なし（この推敲では使わない）",
+    "none (not used in this refinement)",
+];
 const DIRECTION_HEAD: [&str; 2] = ["## 推敲の向き", "## The direction of this refinement"];
 const CARDS_INVITED: [&str; 2] = [
     "カード（C1〜C6）を主の法則に選ぶことを考える。カードは層を作り直し、画を大きく変える。",
@@ -2167,6 +2193,110 @@ pub(crate) fn language_index(language: ResolvedInstructionLanguage) -> usize {
     }
 }
 
+/// One cell of a request's table: the value as its JSON prints it, a list's
+/// items joined by commas, nothing (or an empty list) as a dash.
+fn cell(value: &Value) -> String {
+    match value {
+        Value::Null => "-".to_owned(),
+        Value::String(text) => text.clone(),
+        Value::Array(items) if items.is_empty() => "-".to_owned(),
+        Value::Array(items) => items.iter().map(cell).collect::<Vec<_>>().join(","),
+        other => other.to_string(),
+    }
+}
+
+/// One row of a request's table (2026-10-25: the tables replaced one JSON
+/// object a row, which repeated every key on every line).
+pub(crate) fn table_row(cells: &[Value]) -> String {
+    cells.iter().map(cell).collect::<Vec<_>>().join(" | ")
+}
+
+fn layer_rows(summaries: &[LayerSummary]) -> Vec<String> {
+    let mut rows = vec![LAYER_COLUMNS.to_owned()];
+    rows.extend(summaries.iter().map(|summary| {
+        table_row(&[
+            json!(summary.layer),
+            json!(summary.shape),
+            json!(summary.tool),
+            json!(summary.count),
+            json!(summary.color),
+            json!(summary.filled),
+            json!(summary.arranged),
+            json!(summary.covered),
+            json!(summary.mark_size),
+        ])
+    }));
+    rows
+}
+
+fn color_rows(colors: &[ColorRow]) -> Vec<String> {
+    let mut rows = vec![COLOR_COLUMNS.to_owned()];
+    rows.extend(colors.iter().map(|color| {
+        table_row(&[
+            json!(color.name),
+            json!(color.lightness),
+            json!(color.chroma),
+            json!(color.hue),
+        ])
+    }));
+    rows
+}
+
+/// The system text: the stage's rules and everything the request shows that
+/// is the same for every work (the tables' legends, the laws, the whole
+/// answer's example and the answer's rule). It comes first and does not
+/// change, so that a provider can keep it from one request to the next
+/// (2026-10-25).
+fn system(language: ResolvedInstructionLanguage) -> String {
+    let at = language_index(language);
+    let mut lines: Vec<String> = vec![[SYSTEM_JA, SYSTEM_EN][at].to_owned(), String::new()];
+    lines.push(LAYER_NOTE[at].to_owned());
+    lines.push(String::new());
+    lines.push(COLOR_NOTE[at].to_owned());
+    lines.push(String::new());
+    lines.push(["## 法則の一覧（19）", "## The laws (19)"][at].to_owned());
+    lines.push(AT_NOTE[at].to_owned());
+    let labels = match language {
+        ResolvedInstructionLanguage::Ja => ["典拠: ", "法則: ", "選ぶもの: ", "例: "],
+        ResolvedInstructionLanguage::En => ["Source: ", "Law: ", "Choose: ", "Example: "],
+    };
+    for (law, text) in &LAW_TEXTS {
+        lines.push(match language {
+            ResolvedInstructionLanguage::Ja => {
+                format!("### {law} {}（{}）", text.name[0], text.family[0])
+            }
+            ResolvedInstructionLanguage::En => {
+                format!("### {law} {} ({})", text.name[1], text.family[1])
+            }
+        });
+        lines.push(format!("{}{}", labels[0], text.source[at]));
+        lines.push(format!("{}{}", labels[1], text.law[at]));
+        lines.push(format!("{}{}", labels[2], text.choose[at]));
+        lines.push(format!("{}{}", labels[3], text.example));
+    }
+    lines.push(String::new());
+    lines.push(
+        [
+            "## 答え全体の例（この作品と別の記述）",
+            "## A whole answer (for another description)",
+        ][at]
+            .to_owned(),
+    );
+    let labels = match language {
+        ResolvedInstructionLanguage::Ja => ["記述: ", "層:", "答え: "],
+        ResolvedInstructionLanguage::En => ["Description: ", "Layers:", "Answer: "],
+    };
+    lines.push(format!("{}{}", labels[0], EXAMPLE_DESCRIPTION[at]));
+    lines.push(labels[1].to_owned());
+    lines.extend(EXAMPLE_LAYERS.iter().map(|layer| (*layer).to_owned()));
+    lines.push(format!("{}{}", labels[2], EXAMPLE_ANSWER[at]));
+    lines.push(String::new());
+    lines.push(ANSWER_RULE[at].to_owned());
+    lines.join("\n")
+}
+
+/// The message: what this work is (2026-10-25: only what changes with the
+/// work; the rest is the system text).
 fn message(
     description: &str,
     context: &LawsContext,
@@ -2176,19 +2306,11 @@ fn message(
     let ground = context.score.background.as_str();
     let mut lines: Vec<String> = Vec::new();
     let heads = match language {
-        ResolvedInstructionLanguage::Ja => [
-            "## 記述",
-            "## 楽譜の層（法則を当てる前）",
-            "## 地: ",
-            "## 法則の一覧（19）",
-            "## 答え全体の例（この作品と別の記述）",
-        ],
+        ResolvedInstructionLanguage::Ja => ["## 記述", "## 楽譜の層（法則を当てる前）", "## 地: "],
         ResolvedInstructionLanguage::En => [
             "## Description",
             "## The Score's layers (before the laws)",
             "## Ground: ",
-            "## The laws (19)",
-            "## A whole answer (for another description)",
         ],
     };
     lines.push(heads[0].to_owned());
@@ -2209,60 +2331,41 @@ fn message(
         lines.push(String::new());
     }
     lines.push(heads[1].to_owned());
-    lines.push(LAYER_NOTE[at].to_owned());
-    for summary in &context.summaries {
-        lines.push(serde_json::to_string(summary).unwrap_or_default());
-    }
+    lines.extend(layer_rows(&context.summaries));
     lines.push(String::new());
     lines.push(format!("{}{ground}", heads[2]));
     lines.push(String::new());
     // The colors' lightness, so that a reader sees which of them the ground hides.
     if let Some(colors) = &context.colors {
         lines.push(COLOR_HEAD[at].to_owned());
-        for color in colors {
-            lines.push(serde_json::to_string(color).unwrap_or_default());
-        }
+        lines.extend(color_rows(colors));
         lines.push(String::new());
     }
-    lines.push(heads[3].to_owned());
-    lines.push(AT_NOTE[at].to_owned());
-    for (law, text) in &LAW_TEXTS {
-        let mark = if context.excluded(law) {
-            EXCLUDED_MARK[at]
-        } else if !offered.contains(law) {
-            ABSENT_MARK[at]
+    // The layers each law can take: the schema the request sends is the same
+    // for every work, so the work's choices are told here (2026-10-25).
+    lines.push(CANDIDATES_HEAD[at].to_owned());
+    for law in LAWS {
+        let layers = context.candidates(law);
+        let taken = if context.excluded(law) {
+            EXCLUDED_MARK[at].to_owned()
+        } else if layers.is_empty() {
+            ABSENT_MARK[at].to_owned()
         } else {
-            ""
+            layers
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join(", ")
         };
-        lines.push(match language {
-            ResolvedInstructionLanguage::Ja => {
-                format!("### {law} {}（{}）{mark}", text.name[0], text.family[0])
-            }
-            ResolvedInstructionLanguage::En => {
-                format!("### {law} {} ({}){mark}", text.name[1], text.family[1])
-            }
-        });
-        let labels = match language {
-            ResolvedInstructionLanguage::Ja => ["典拠: ", "法則: ", "選ぶもの: ", "例: "],
-            ResolvedInstructionLanguage::En => ["Source: ", "Law: ", "Choose: ", "Example: "],
-        };
-        lines.push(format!("{}{}", labels[0], text.source[at]));
-        lines.push(format!("{}{}", labels[1], text.law[at]));
-        lines.push(format!("{}{}", labels[2], text.choose[at]));
-        lines.push(format!("{}{}", labels[3], text.example));
+        lines.push(format!("- {law}: {taken}"));
     }
-    lines.push(String::new());
-    lines.push(heads[4].to_owned());
-    let labels = match language {
-        ResolvedInstructionLanguage::Ja => ["記述: ", "層:", "答え: "],
-        ResolvedInstructionLanguage::En => ["Description: ", "Layers:", "Answer: "],
-    };
-    lines.push(format!("{}{}", labels[0], EXAMPLE_DESCRIPTION[at]));
-    lines.push(labels[1].to_owned());
-    lines.extend(EXAMPLE_LAYERS.iter().map(|layer| (*layer).to_owned()));
-    lines.push(format!("{}{}", labels[2], EXAMPLE_ANSWER[at]));
-    lines.push(String::new());
-    lines.push(ANSWER_RULE[at].to_owned());
+    if offered.contains(&"C4") {
+        let most = context.max_count().max(9);
+        lines.push(match language {
+            ResolvedInstructionLanguage::Ja => format!("C4 の repeats は 3〜{most}。"),
+            ResolvedInstructionLanguage::En => format!("C4's repeats run from 3 to {most}."),
+        });
+    }
     lines.join("\n")
 }
 
@@ -2274,6 +2377,30 @@ fn targets(item: Value) -> Value {
     json!({"type": "array", "minItems": 1, "items": item})
 }
 
+/// What a law's values may name: its layers, B7's partner and C4's repeats.
+/// The check narrows them to the work; the request leaves them open, one
+/// schema for every work that a provider can keep with the system text
+/// (2026-10-25).
+struct Choices {
+    layer: Value,
+    against: Value,
+    repeats: Value,
+}
+
+impl Choices {
+    fn open() -> Self {
+        Self {
+            layer: open_layer(),
+            against: open_layer(),
+            repeats: json!({"type": "integer", "minimum": 3}),
+        }
+    }
+}
+
+fn open_layer() -> Value {
+    json!({"type": "integer", "minimum": 0})
+}
+
 /// The schema of one law's values in this work, or `None` when no layer can
 /// take it. Each object names its property order, the prototype's.
 fn law_schema(law: &str, context: &LawsContext) -> Option<Value> {
@@ -2281,7 +2408,27 @@ fn law_schema(law: &str, context: &LawsContext) -> Option<Value> {
     if layers.is_empty() {
         return None;
     }
-    let layer = layer_enum(&layers);
+    let all: Vec<usize> = context
+        .summaries
+        .iter()
+        .map(|summary| summary.layer)
+        .collect();
+    law_shape(
+        law,
+        &Choices {
+            layer: layer_enum(&layers),
+            // The partner is any layer of the work, as the main layer was
+            // before the laws chose it (2026-10-21).
+            against: layer_enum(&all),
+            repeats: json!({"type": "integer", "minimum": 3, "maximum": context.max_count().max(9)}),
+        },
+    )
+}
+
+/// The schema of one law's values over the given choices.
+#[allow(clippy::too_many_lines)]
+fn law_shape(law: &str, choices: &Choices) -> Option<Value> {
+    let layer = &choices.layer;
     let proportion = json!({
         "type": "object",
         "propertyOrdering": ["layer", "at", "span"],
@@ -2332,14 +2479,12 @@ fn law_schema(law: &str, context: &LawsContext) -> Option<Value> {
             },
             "required": ["main"]
         }),
-        // The partner is any layer of the work, as the main layer was before
-        // the laws chose it (2026-10-21).
         "B7" => json!({
             "type": "object",
             "propertyOrdering": ["layer", "against"],
             "properties": {
                 "layer": layer,
-                "against": layer_enum(&context.summaries.iter().map(|summary| summary.layer).collect::<Vec<_>>())
+                "against": choices.against
             },
             "required": ["layer", "against"]
         }),
@@ -2469,7 +2614,7 @@ fn law_schema(law: &str, context: &LawsContext) -> Option<Value> {
             "propertyOrdering": ["layer", "repeats", "sequence", "path"],
             "properties": {
                 "layer": layer,
-                "repeats": {"type": "integer", "minimum": 3, "maximum": context.max_count().max(9)},
+                "repeats": choices.repeats,
                 "sequence": {"type": "array", "minItems": 1, "maxItems": 4,
                              "items": {"type": "string", "enum": ["grow", "shrink", "rotate", "mirror", "echo"]}},
                 "path": {"type": "string", "enum": ["row", "diagonal", "golden_spiral"]}
@@ -2522,7 +2667,8 @@ const SPOTS: [(&str, [f64; 2]); 9] = [
     ("center", [0.5, 0.5]),
 ];
 
-/// The answer's schema for this work, its choices narrowed to the work's layers.
+/// The answer's schema for this work, its choices narrowed to the work's
+/// layers: the check reads the answer against it.
 #[must_use]
 pub fn laws_response_schema(context: &LawsContext) -> Value {
     let all: Vec<usize> = context
@@ -2530,14 +2676,32 @@ pub fn laws_response_schema(context: &LawsContext) -> Value {
         .iter()
         .map(|summary| summary.layer)
         .collect();
-    let layer = layer_enum(&all);
+    let laws = LAWS
+        .into_iter()
+        .filter_map(|law| law_schema(law, context).map(|schema| (law, schema)))
+        .collect();
+    answer_schema(laws, &layer_enum(&all))
+}
+
+/// The answer's schema as the request sends it: every law, its layers open.
+/// It is the same for every work, so that a provider can keep it with the
+/// system text; the message tells the work's choices, and the check narrows
+/// the answer to them (`laws_response_schema`, 2026-10-25).
+#[must_use]
+pub fn laws_request_schema() -> Value {
+    let laws = LAWS
+        .into_iter()
+        .filter_map(|law| law_shape(law, &Choices::open()).map(|schema| (law, schema)))
+        .collect();
+    answer_schema(laws, &open_layer())
+}
+
+fn answer_schema(given: Vec<(&'static str, Value)>, layer: &Value) -> Value {
     let mut laws = Map::new();
     let mut order = Vec::new();
-    for law in LAWS {
-        if let Some(schema) = law_schema(law, context) {
-            laws.insert(law.to_owned(), schema);
-            order.push(law);
-        }
+    for (law, schema) in given {
+        laws.insert(law.to_owned(), schema);
+        order.push(law);
     }
     let main: Vec<&str> = order.iter().copied().filter(|law| *law != "B21").collect();
     // A layer the description counts, with the words that count it: a list of
@@ -2574,20 +2738,15 @@ pub fn build_laws_prompt(
     if !context.offered().iter().any(|law| *law != "B21") {
         return Err(PromptError::EmptyField { field: "laws" });
     }
-    let system = match language {
-        ResolvedInstructionLanguage::Ja => SYSTEM_JA,
-        ResolvedInstructionLanguage::En => SYSTEM_EN,
-    }
-    .to_owned();
     crate::prompts::finish_prompt(LlmPrompt {
         schema_id: crate::prompts::LLM_PROMPT_SCHEMA_ID.to_owned(),
         prompt_id: LAWS_PROMPT_ID.to_owned(),
         stage: LlmStage::ChooseLaws,
         action_name: LlmStage::ChooseLaws.action_name().to_owned(),
         instruction_language: language,
-        system,
+        system: system(language),
         message: message(description, context, language),
-        response_schema: laws_response_schema(context),
+        response_schema: laws_request_schema(),
         prompt_digest: String::new(),
         saijiki_asset_id: None,
         saijiki_asset_digest: None,

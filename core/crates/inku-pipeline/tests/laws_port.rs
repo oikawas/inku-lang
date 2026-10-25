@@ -9,8 +9,11 @@
 //! a progression of sizes, a grid the core tiles otherwise than the prototype
 //! counted, and each card: the five patterns, dense places, voices, motifs,
 //! jo-ha-kyu and shin-gyo-so); and wide cases on the wide canvas. The requests
-//! are the reference's, in both languages, but for the items of
-//! description_counts (2026-10-21). It holds no description text and no reason.
+//! were the reference's, in both languages, but for the items of
+//! description_counts (2026-10-21); since 2026-10-25 the system text holds
+//! what is the same for every work, the message only the work, and the schema
+//! the request sends is one for every work, each work's narrowed one being the
+//! check's. It holds no description text and no reason.
 
 mod common;
 
@@ -24,7 +27,7 @@ use inku_ddl::{
 use inku_pipeline::core_boundary::{CompilerOptions, compile_committed};
 use inku_pipeline::laws::{
     Chosen, ComposedPlan, LAWS_PROMPT_ID, LawsContext, Refusal, apply_laws_without_count_rule,
-    build_laws_prompt, choose_laws, off_canvas,
+    build_laws_prompt, choose_laws, laws_response_schema, off_canvas,
 };
 use inku_pipeline::prompts::{LlmStage, PromptLimits, work_plan_plugins};
 use serde::Deserialize;
@@ -65,6 +68,7 @@ struct Fixture {
     schema: String,
     placeholder: BTreeMap<String, String>,
     system: BTreeMap<String, String>,
+    request_schema: Value,
     cases: Vec<Case>,
 }
 
@@ -400,11 +404,14 @@ fn a_print_the_canvas_cannot_hold_names_the_requested_layer() {
     }
 }
 
-/// The request is the prototype's: its system text and message in both
-/// languages (the description a placeholder) and its schema, but for the items
-/// of description_counts, a layer and the description's words (2026-10-21).
+/// The request is the fixture's: its system text and message in both
+/// languages (the description a placeholder) and the schema it sends, one for
+/// every work; the check reads the answer against the work's narrowed schema,
+/// the prototype's but for the items of description_counts, a layer and the
+/// description's words (2026-10-21). The system text and the sent schema are
+/// the same for every work, so that a provider can keep them (2026-10-25).
 #[test]
-fn the_laws_request_is_built_as_the_prototype_builds_it() {
+fn the_laws_request_is_built_as_the_fixture_records_it() {
     let fixture = fixture();
     let definitions = definitions();
     let works: Vec<&Case> = fixture
@@ -437,9 +444,12 @@ fn the_laws_request_is_built_as_the_prototype_builds_it() {
                     first_difference(&prompt.message, message)
                 ));
             }
-            if Some(&prompt.response_schema) != case.schema.as_ref() {
-                failures.push(format!("{} {lang}: schema", case.id));
+            if prompt.response_schema != fixture.request_schema {
+                failures.push(format!("{} {lang}: the request's schema", case.id));
             }
+        }
+        if Some(&laws_response_schema(&context)) != case.schema.as_ref() {
+            failures.push(format!("{}: the check's schema", case.id));
         }
         failures
     })

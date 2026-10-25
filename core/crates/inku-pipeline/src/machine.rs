@@ -1,6 +1,8 @@
 //! Pure effect orchestration around the shared compiler and durable visible DDL.
 
+mod description;
 mod image;
+mod written;
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -29,6 +31,7 @@ use crate::composition_reading::{
 };
 use crate::core_boundary::CatalogMode;
 use crate::core_boundary::{CompiledDelivery, CompilerOptions, ResolvedHostOptions};
+use crate::description_ddl::{DescriptionReading, DrawnFigure, ReadingItem};
 use crate::laws::{self, ComposedPlan, LawsContext, LawsDirection};
 use crate::laws_record::{LawsBasis, LawsLayerRecord};
 use crate::prompts::{
@@ -222,11 +225,16 @@ pub struct PipelineConfig {
     /// start a work from an image; absent, such a run is refused.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub image: Option<ImageConfig>,
-    /// Budget for writing and reviewing a DDL from an image; Stage 1's budget
-    /// when absent. Choosing the catalog from the image takes the catalog
-    /// budget.
+    /// Budget for writing and reviewing a DDL from an image, or from a
+    /// description that is read and drawn; Stage 1's budget when absent.
+    /// Choosing the catalog from the image takes the catalog budget.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub image_retry: Option<RetryPolicy>,
+    /// The read-and-draw route (2026-10-25). Present, a host may draw a
+    /// description by reading it and writing its DDL; absent, such a run is
+    /// refused. The reading takes the sketch's budget.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description_ddl: Option<DescriptionDdlConfig>,
 }
 
 /// How a run writes a DDL from an image (2026-10-24).
@@ -234,6 +242,15 @@ pub struct PipelineConfig {
 #[serde(deny_unknown_fields)]
 pub struct ImageConfig {
     /// Show the written DDL's drawing beside the image and ask once more.
+    pub review: bool,
+}
+
+/// How a run reads a description and writes its DDL (2026-10-25).
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DescriptionDdlConfig {
+    /// Show the written DDL's drawing to the model and ask once more. A host
+    /// sets it when the model that writes reads images.
     pub review: bool,
 }
 
@@ -259,7 +276,7 @@ pub struct ImageDdlRecord {
     pub nearest_format_id: String,
     /// Each answer the run read, in order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub rounds: Vec<ImageDdlRound>,
+    pub rounds: Vec<WrittenDdlRound>,
     /// The DDL shown beside the image, kept so that it can be compared with
     /// the one the review left.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -272,11 +289,13 @@ pub struct ImageDdlRecord {
     pub dropped: Vec<String>,
 }
 
-/// One answer of an image run: its stage, the request it answered, whether
-/// that request gave the compiler's findings back, and what its compile found.
+/// One answer of a run that writes its DDL directly, from an image or from a
+/// description: its stage, the request it answered, whether that request gave
+/// the compiler's findings back, what its compile found, and the figures the
+/// answer says it drew (a description's answers name them).
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct ImageDdlRound {
+pub struct WrittenDdlRound {
     pub stage: LlmStage,
     pub prompt_id: String,
     pub prompt_digest: String,
@@ -286,6 +305,85 @@ pub struct ImageDdlRound {
     pub problems: usize,
     /// The instructions the Score draws.
     pub instructions: usize,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub figures: Vec<DrawnFigure>,
+}
+
+/// How a description run draws (2026-10-25).
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DescriptionRoute {
+    /// Through Stage 1 and the stages after it.
+    #[default]
+    Stages,
+    /// Read the description and write its DDL from that reading (read and
+    /// draw): no work plan, composition, laws or colors.
+    ReadAndDraw,
+}
+
+impl DescriptionRoute {
+    fn is_stages(&self) -> bool {
+        matches!(self, Self::Stages)
+    }
+}
+
+/// What the reading did for a read-and-draw run. The run's sketch request
+/// chooses it: on asks for a reading, off writes from the description alone,
+/// and a supplied text is the author's reading.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReadingState {
+    /// No reading: the writing request reads the description alone.
+    Off,
+    /// The reading is waiting to be asked for.
+    Pending,
+    /// The reader read the description.
+    Read,
+    /// The author's reading was used without a request.
+    Supplied,
+    /// The reading failed; the writing request read the description alone.
+    Fallback,
+}
+
+/// The record of a read-and-draw run, which a host keeps with the work: the
+/// description and its labels, the reading and what its check dropped, and
+/// how the writing went. It holds no image and no SVG.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DescriptionDdlRecord {
+    /// The description as every request reads it, its labels cut.
+    pub description: String,
+    /// The source labels cut from it, which only the reader reads.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub source_labels: Vec<String>,
+    pub reading_state: ReadingState,
+    /// The reading the writing request read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reading: Option<DescriptionReading>,
+    /// The reading as the author sees and edits it; given back as a supplied
+    /// sketch, it is the next run's reading.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reading_text: Option<String>,
+    /// The reader's items whose quote neither the description nor a label
+    /// holds.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dropped_items: Vec<ReadingItem>,
+    /// The viewpoint's quotes emptied for the same reason, by name.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub dropped_quotes: BTreeMap<String, String>,
+    /// Each writing or review answer the run read, in order.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rounds: Vec<WrittenDdlRound>,
+    /// The DDL whose drawing the model saw, kept so that it can be compared
+    /// with the one the review left.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub before_review: Option<String>,
+    /// The drawing of that DDL the host showed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub drawing: Option<PromptImage>,
+    /// Lines left out because each alone stopped the whole work.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dropped: Vec<String>,
 }
 
 /// How a run chooses its colors: present, the run asks `choose_colors` once
@@ -487,6 +585,13 @@ pub enum AuthoringInput {
         auto_catalog: bool,
         #[serde(default, skip_serializing_if = "SketchRequest::is_off")]
         sketch: SketchRequest,
+        /// Through the stages, or read and drawn (2026-10-25).
+        #[serde(default, skip_serializing_if = "DescriptionRoute::is_stages")]
+        route: DescriptionRoute,
+        /// The source labels cut from the description, which only the reading
+        /// of a read-and-draw run reads.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        source_labels: Vec<String>,
     },
     /// A work written from an image (2026-10-24): a Vision model writes the
     /// DDL, which is committed as a DDL edit. The catalog is chosen from the
@@ -559,6 +664,10 @@ pub enum PipelineInput {
         auto_catalog: bool,
         #[serde(default, skip_serializing_if = "SketchRequest::is_off")]
         sketch: SketchRequest,
+        #[serde(default, skip_serializing_if = "DescriptionRoute::is_stages")]
+        route: DescriptionRoute,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        source_labels: Vec<String>,
     },
     CompleteHoles {
         expected_revision: DecimalU64,
@@ -681,10 +790,14 @@ pub struct PipelineSnapshot {
     /// work.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub image_ddl: Option<ImageDdlRecord>,
-    /// A drawable DDL of an image run kept while a later request is out: it
-    /// is used when that request fails.
+    /// A drawable DDL of an image or read-and-draw run kept while a later
+    /// request is out: it is used when that request fails.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub image_fallback: Option<VisibleDocument>,
+    /// The record of a read-and-draw run (2026-10-25): made when the run
+    /// starts and kept after it commits, for the host to save with the work.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description_ddl: Option<DescriptionDdlRecord>,
     pub snapshot_digest: String,
 }
 
@@ -821,14 +934,21 @@ impl PipelineSnapshot {
             if !matches!(
                 self.phase,
                 PipelinePhase::AwaitingLlm {
-                    stage: LlmStage::WriteImageDdl | LlmStage::ReviewImageDdl,
+                    stage: LlmStage::WriteImageDdl
+                        | LlmStage::ReviewImageDdl
+                        | LlmStage::WriteDescriptionDdl
+                        | LlmStage::ReviewDescriptionDdl,
                     ..
                 } | PipelinePhase::AwaitingImageReviewDrawing
             ) {
                 return Err(ProtocolError::InvalidState);
             }
         }
-        // Every image stage reads the run's image record.
+        // Every image stage reads the run's image record, and every
+        // description stage the run's description record; a run has one.
+        if self.image_ddl.is_some() && self.description_ddl.is_some() {
+            return Err(ProtocolError::InvalidState);
+        }
         if self.image_ddl.is_none()
             && matches!(
                 self.phase,
@@ -837,8 +957,27 @@ impl PipelineSnapshot {
                         | LlmStage::WriteImageDdl
                         | LlmStage::ReviewImageDdl,
                     ..
-                } | PipelinePhase::AwaitingImageReviewDrawing
+                }
             )
+        {
+            return Err(ProtocolError::InvalidState);
+        }
+        if self.description_ddl.is_none()
+            && matches!(
+                self.phase,
+                PipelinePhase::AwaitingLlm {
+                    stage: LlmStage::ReadDescription
+                        | LlmStage::WriteDescriptionDdl
+                        | LlmStage::ReviewDescriptionDdl,
+                    ..
+                }
+            )
+        {
+            return Err(ProtocolError::InvalidState);
+        }
+        if matches!(self.phase, PipelinePhase::AwaitingImageReviewDrawing)
+            && self.image_ddl.is_none()
+            && self.description_ddl.is_none()
         {
             return Err(ProtocolError::InvalidState);
         }
@@ -900,7 +1039,7 @@ impl PipelineSnapshot {
                     .and_then(serde_json::Value::as_str)
                     == Some(document.source_digest().as_str()) => {}
             (PipelinePhase::AwaitingImageReviewDrawing, Some(action))
-                if action.tag == image::DRAW_IMAGE_REVIEW && action.identity.attempt == 1 => {}
+                if action.tag == written::DRAW_IMAGE_REVIEW && action.identity.attempt == 1 => {}
             (
                 PipelinePhase::AwaitingLlm { .. }
                 | PipelinePhase::AwaitingVisibleDdlCommit { .. }
@@ -1097,9 +1236,17 @@ impl PipelineSnapshot {
                 .colors_retry
                 .unwrap_or(self.config.catalog_retry),
             LlmStage::SelectImageCatalog => self.config.catalog_retry,
-            LlmStage::WriteImageDdl | LlmStage::ReviewImageDdl => {
+            LlmStage::WriteImageDdl
+            | LlmStage::ReviewImageDdl
+            | LlmStage::WriteDescriptionDdl
+            | LlmStage::ReviewDescriptionDdl => {
                 self.config.image_retry.unwrap_or(self.config.stage1_retry)
             }
+            // The reading widens the sketch, and takes its budget.
+            LlmStage::ReadDescription => self
+                .config
+                .sketch_retry
+                .unwrap_or(self.config.catalog_retry),
         }
     }
 
@@ -1213,7 +1360,10 @@ impl PipelineSnapshot {
                         LlmStage::CompleteVisibleDdlHoles => {
                             message_names(&action.payload, "completion_feedback")
                         }
-                        LlmStage::WriteImageDdl | LlmStage::ReviewImageDdl => {
+                        LlmStage::WriteImageDdl
+                        | LlmStage::ReviewImageDdl
+                        | LlmStage::WriteDescriptionDdl
+                        | LlmStage::ReviewDescriptionDdl => {
                             message_names(&action.payload, "compiler_feedback")
                         }
                         _ => false,
@@ -1607,11 +1757,15 @@ impl PipelineSnapshot {
         document: VisibleDocument,
         writing: CanvasRatioWriting,
     ) -> Result<VisibleDocument, ProtocolError> {
+        self.with_ratio(document, self.paper_ratio()?, writing)
+    }
+
+    /// The ratio of the run's paper.
+    fn paper_ratio(&self) -> Result<inku_score::CanvasRatio, ProtocolError> {
         let format = inku_score::lookup_canvas_format(self.config.compiler.host.canvas_format_id())
             .map_err(|_| ProtocolError::InvalidPolicy)?;
-        let ratio = inku_score::CanvasRatio::reduced(format.width_units, format.height_units)
-            .ok_or(ProtocolError::InternalInvariant)?;
-        self.with_ratio(document, ratio, writing)
+        inku_score::CanvasRatio::reduced(format.width_units, format.height_units)
+            .ok_or(ProtocolError::InternalInvariant)
     }
 
     /// The document with `ratio` declared as its first sentence.
@@ -2551,6 +2705,8 @@ impl PipelineSnapshot {
         description: String,
         auto_catalog: bool,
         sketch: SketchRequest,
+        route: DescriptionRoute,
+        source_labels: Vec<String>,
         events: &mut Vec<PipelineEvent>,
     ) -> Result<(), ProtocolError> {
         let _ = proposal(
@@ -2562,7 +2718,15 @@ impl PipelineSnapshot {
         {
             return Err(ProtocolError::SchemaViolation);
         }
-        self.sketch = SketchRecord::from_request(sketch);
+        // A run keeps no record of the run before it in the same execution.
+        self.description_ddl = None;
+        match route {
+            DescriptionRoute::Stages => self.sketch = SketchRecord::from_request(sketch),
+            DescriptionRoute::ReadAndDraw => {
+                self.sketch = None;
+                self.begin_read_and_draw(description.clone(), sketch, source_labels)?;
+            }
+        }
         if auto_catalog {
             if !self
                 .config
@@ -2586,6 +2750,20 @@ impl PipelineSnapshot {
             )
             .map_err(|_| ProtocolError::SchemaViolation)?;
             self.begin_llm(prompt, Some(description), Vec::new(), events)
+        } else {
+            self.after_description_catalog(description, events)
+        }
+    }
+
+    /// Once the catalog is chosen: a read-and-draw run reads or writes, any
+    /// other description run goes to Stage 1.
+    fn after_description_catalog(
+        &mut self,
+        description: String,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<(), ProtocolError> {
+        if self.description_ddl.is_some() {
+            self.read_or_write_description(events)
         } else {
             self.stage1(description, events)
         }
@@ -2784,7 +2962,10 @@ impl PipelineSnapshot {
             LlmStage::SelectDescriptionCatalog => {
                 self.select_catalog("default", CatalogMode::AutoFallbackDefault)?;
                 self.event(events, "catalog_fallback", json!({"catalog_id": "default", "catalog_mode": "auto_fallback_default", "failure": failure}))?;
-                self.stage1(description.ok_or(ProtocolError::InternalInvariant)?, events)
+                self.after_description_catalog(
+                    description.ok_or(ProtocolError::InternalInvariant)?,
+                    events,
+                )
             }
             LlmStage::GenerateNormalizedDdl => {
                 self.phase = PipelinePhase::Failed {
@@ -2842,6 +3023,10 @@ impl PipelineSnapshot {
             }
             LlmStage::SelectImageCatalog | LlmStage::WriteImageDdl | LlmStage::ReviewImageDdl => {
                 self.image_stage_failed(stage, failure, detail, events)
+            }
+            LlmStage::ReadDescription => self.description_reading_failed(failure, detail, events),
+            LlmStage::WriteDescriptionDdl | LlmStage::ReviewDescriptionDdl => {
+                self.written_stage_failed(stage, failure, detail, events)
             }
         }
     }
@@ -3445,7 +3630,10 @@ impl PipelineSnapshot {
                 {
                     return self.failure(ProviderFailure::SchemaViolation, spent_ms, events);
                 }
-                self.stage1(description.ok_or(ProtocolError::InternalInvariant)?, events)
+                self.after_description_catalog(
+                    description.ok_or(ProtocolError::InternalInvariant)?,
+                    events,
+                )
             }
             LlmStage::GenerateNormalizedDdl => {
                 let plugins = crate::prompts::work_plan_plugins(&self.config.definitions);
@@ -3555,8 +3743,14 @@ impl PipelineSnapshot {
             LlmStage::SelectImageCatalog => {
                 self.image_catalog_response(&response, spent_ms, events)
             }
-            LlmStage::WriteImageDdl | LlmStage::ReviewImageDdl => {
-                self.image_ddl_response(stage, &response, spent_ms, total, events)
+            LlmStage::WriteImageDdl
+            | LlmStage::ReviewImageDdl
+            | LlmStage::WriteDescriptionDdl
+            | LlmStage::ReviewDescriptionDdl => {
+                self.written_ddl_response(stage, &response, spent_ms, total, events)
+            }
+            LlmStage::ReadDescription => {
+                self.description_reading_response(&response, spent_ms, events)
             }
         }
     }
@@ -3644,10 +3838,19 @@ fn advance_impl(
                 description,
                 auto_catalog,
                 sketch,
+                route,
+                source_labels,
             } => {
                 state.editable()?;
                 state.revision(expected_revision)?;
-                state.description(description, auto_catalog, sketch, &mut events)?;
+                state.description(
+                    description,
+                    auto_catalog,
+                    sketch,
+                    route,
+                    source_labels,
+                    &mut events,
+                )?;
             }
             PipelineInput::CompleteHoles {
                 expected_revision,
@@ -3839,6 +4042,7 @@ fn advance_impl(
             laws_move: None,
             image_ddl: None,
             image_fallback: None,
+            description_ddl: None,
             snapshot_digest: String::new(),
         };
         state.event(
@@ -3898,7 +4102,16 @@ fn advance_impl(
                 description,
                 auto_catalog,
                 sketch,
-            } => state.description(description, auto_catalog, sketch, &mut events)?,
+                route,
+                source_labels,
+            } => state.description(
+                description,
+                auto_catalog,
+                sketch,
+                route,
+                source_labels,
+                &mut events,
+            )?,
             AuthoringInput::Image {
                 image,
                 auto_catalog,
@@ -4000,10 +4213,38 @@ impl PipelineSnapshot {
                 elapsed_ms,
                 ..
             } => self.llm_response(LlmStage::ReviewImageDdl, response, elapsed_ms.get(), events),
-            EffectResult::ImageReviewDrawn { drawing, .. } => {
-                self.image_review_drawn(drawing, events)
-            }
-            EffectResult::ImageReviewUndrawn { .. } => self.image_review_undrawn(events),
+            EffectResult::ImageReviewDrawn { drawing, .. } => self.review_drawn(drawing, events),
+            EffectResult::ImageReviewUndrawn { .. } => self.review_undrawn(events),
+            EffectResult::DescriptionRead {
+                response,
+                elapsed_ms,
+                ..
+            } => self.llm_response(
+                LlmStage::ReadDescription,
+                response,
+                elapsed_ms.get(),
+                events,
+            ),
+            EffectResult::DescriptionDdlWritten {
+                response,
+                elapsed_ms,
+                ..
+            } => self.llm_response(
+                LlmStage::WriteDescriptionDdl,
+                response,
+                elapsed_ms.get(),
+                events,
+            ),
+            EffectResult::DescriptionDdlReviewed {
+                response,
+                elapsed_ms,
+                ..
+            } => self.llm_response(
+                LlmStage::ReviewDescriptionDdl,
+                response,
+                elapsed_ms.get(),
+                events,
+            ),
             EffectResult::ProviderFailed {
                 failure,
                 elapsed_ms,
@@ -4089,10 +4330,13 @@ impl PipelineSnapshot {
                         .is_some_and(|identities| !identities.is_empty())
                 });
                 // A DDL written from an image keeps the lines its model could
-                // not mend: a completion without the image would guess them.
+                // not mend: a completion without the image would guess them. A
+                // DDL read and drawn from a description keeps them too, as its
+                // prototype did.
                 let completing = reason != "user_approved_patch"
                     && reason != "stage1_residual_execution"
-                    && reason != "image_ddl";
+                    && reason != "image_ddl"
+                    && reason != "description_ddl";
                 // A range whose words alone the author changed is a hole the
                 // completion writes the numbers of again (A3).
                 let words_changed = if completing && self.completion_ranges.is_some() {

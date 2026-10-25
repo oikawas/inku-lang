@@ -12,6 +12,7 @@ pub mod composition;
 pub mod composition_reading;
 pub mod core_boundary;
 pub mod ddl3d;
+pub mod description_ddl;
 mod hole_completion;
 pub mod identity;
 pub mod image_ddl;

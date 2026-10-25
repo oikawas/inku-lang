@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-25 — ChatGPT plan connect buttons are named for what they do
-
-The connect buttons are named for what they do. On a self-hosted server the button is Connect with inku ChatGPT and the link that opens it again is Open inku ChatGPT again; on the same PC they are Sign in to ChatGPT and Open the sign-in page again. All four were Continue with ChatGPT. The message after pressing asks you to press Open inku ChatGPT in the confirmation at the top of the browser.
-
 ### 2026-10-25 — inku-cli reads one work by its UUID
 
 inku-cli gains `history show`, which prints a work's description, DDL and JSON Score (`--part` for one of them), and `history png`, which rasterizes the saved display SVG into a PNG of the drawing alone (`--size` for the longer side, default 1024). Both take the UUID or its first few characters. There is no endpoint for one work, so the listing is asked with `anchor_id` and `limit=1` and the returned work's id is checked. A prefix is resolved against the listing without pictures, and one that fits more than one work stops with the candidates. The server is unchanged.
@@ -302,6 +298,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.249 (2026-10-25 / Build1325)
+
+### 2026-10-25 — ChatGPT plan connect buttons are named for what they do
+
+The connect buttons are named for what they do. On a self-hosted server the button is Connect with inku ChatGPT and the link that opens it again is Open inku ChatGPT again; on the same PC they are Sign in to ChatGPT and Open the sign-in page again. All four were Continue with ChatGPT. The message after pressing asks you to press Open inku ChatGPT in the confirmation at the top of the browser.
 
 ## v2.15.248 (2026-10-25 / Build1324)
 

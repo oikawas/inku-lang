@@ -8,14 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-25 — Requests to the ChatGPT plan carry a cache routing hint
-
-A drawing request body to the ChatGPT plan (the shared core's `provider_wire`) now ends with the digest of its system prompt and response schema as `prompt_cache_key` (`inku-` and 16 hex digits), so that requests sharing a system prompt and schema are routed to the same cache. In the laws and colors stages, the works of one language share the key. In a send of the laws and colors stages of 32 works to GPT-6.1-Sol and GPT-6-Luna (2026-10-25, with the same key added through testbox), the share of a later request's input read from the cache went from 10-15% (sol) and 38-45% (luna) without it to 20-39% (sol) and 58-68% (luna) with it. The Server and Android send the shared core's body as it is.
-
-### 2026-10-25 — The colors stage offers only the layers and colors that are seen
-
-In the colors stage's message, the laws this work can take and their values now leave a layer seen in no color against the present ground (a drawn lightness difference under 0.15) out of every law that names a layer's color (C8, B20's accent layer, D4, C7, the layers' colors). B19 keeps every layer seen against the ground, so it says it cannot be taken in a work with a layer seen in no color, and otherwise offers only the layers that can stand 0.35 from the ground. B11, B16 and D6, which name two colors or more, offer only the layers seen in two colors or more. C9 offers pairs of a layer and the strong colors it is seen in. Two lines follow: each layer's seen colors, and the layers seen in no color. In a send of 32 works to the ChatGPT plan's GPT-6.1-Sol and GPT-6-Luna (2026-10-25), every color the colors stage refused as unseen was among the layer table's unseen colors. The check and its refusals, the rules of the laws and colors, and the Server, Web, Android and macOS are unchanged.
-
 ### 2026-10-25 — inku-cli reads one work by its UUID
 
 inku-cli gains `history show`, which prints a work's description, DDL and JSON Score (`--part` for one of them), and `history png`, which rasterizes the saved display SVG into a PNG of the drawing alone (`--size` for the longer side, default 1024). Both take the UUID or its first few characters. There is no endpoint for one work, so the listing is asked with `anchor_id` and `limit=1` and the returned work's id is checked. A prefix is resolved against the listing without pictures, and one that fits more than one work stops with the candidates. The server is unchanged.
@@ -306,6 +298,16 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.251 (2026-10-25 / Build1327)
+
+### 2026-10-25 — Requests to the ChatGPT plan carry a cache routing hint
+
+A drawing request body to the ChatGPT plan (the shared core's `provider_wire`) now ends with the digest of its system prompt and response schema as `prompt_cache_key` (`inku-` and 16 hex digits), so that requests sharing a system prompt and schema are routed to the same cache. In the laws and colors stages, the works of one language share the key. In a send of the laws and colors stages of 32 works to GPT-6.1-Sol and GPT-6-Luna (2026-10-25, with the same key added through testbox), the share of a later request's input read from the cache went from 10-15% (sol) and 38-45% (luna) without it to 20-39% (sol) and 58-68% (luna) with it. The Server and Android send the shared core's body as it is.
+
+### 2026-10-25 — The colors stage offers only the layers and colors that are seen
+
+In the colors stage's message, the laws this work can take and their values now leave a layer seen in no color against the present ground (a drawn lightness difference under 0.15) out of every law that names a layer's color (C8, B20's accent layer, D4, C7, the layers' colors). B19 keeps every layer seen against the ground, so it says it cannot be taken in a work with a layer seen in no color, and otherwise offers only the layers that can stand 0.35 from the ground. B11, B16 and D6, which name two colors or more, offer only the layers seen in two colors or more. C9 offers pairs of a layer and the strong colors it is seen in. Two lines follow: each layer's seen colors, and the layers seen in no color. In a send of 32 works to the ChatGPT plan's GPT-6.1-Sol and GPT-6-Luna (2026-10-25), every color the colors stage refused as unseen was among the layer table's unseen colors. The check and its refusals, the rules of the laws and colors, and the Server, Web, Android and macOS are unchanged.
 
 ## v2.15.250 (2026-10-25 / Build1326)
 

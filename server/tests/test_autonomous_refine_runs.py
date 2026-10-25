@@ -256,9 +256,11 @@ def test_a_run_cut_off_by_a_restart_reads_as_interrupted(runner, monkeypatch):
     assert promoted == [("owner", "node-child")]
 
 
-def test_an_owner_takes_one_run_at_a_time(author, monkeypatch):
+def test_an_owner_takes_one_run_at_a_time(author, runner, monkeypatch):
     """Failure: a second run of the same owner starts beside the first."""
-    runner = autonomous_refine.get_runner()
+    # The API's runner is shared by the process; a test that closed the app's lifespan
+    # before this one has closed it. This test takes a runner of its own.
+    monkeypatch.setattr(autonomous_refine, "_runner", runner)
     started = threading.Event()
 
     def work(_owner, history_id):

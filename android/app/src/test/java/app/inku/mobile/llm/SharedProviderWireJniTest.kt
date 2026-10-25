@@ -104,7 +104,7 @@ class SharedProviderWireJniTest {
     }
 
     @Test
-    fun allPipelineRequestsMatchServerWireBytes() = requests("requests", 246)
+    fun allPipelineRequestsMatchServerWireBytes() = requests("requests", 248)
 
     @Test
     fun allTextRequestsMatchServerWireBytes() = requests("text_requests", 81)

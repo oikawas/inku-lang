@@ -35,7 +35,9 @@ def _built(row: dict) -> dict:
                                       temperature=request["temperature"], max_tokens=request["max_tokens"])
 
 
-@pytest.mark.parametrize(("section", "rows"), [("requests", 246), ("text_requests", 81)])
+# 246 requests as Server wrote them, and the laws and color stages' two Anthropic
+# rows the core wrote when it marked their system text for the cache (2026-10-25).
+@pytest.mark.parametrize(("section", "rows"), [("requests", 248), ("text_requests", 81)])
 def test_every_shared_request_is_written_as_server_wrote_it(section, rows):
     compared = 0
     for row in CASES[section]:
@@ -81,7 +83,7 @@ def test_the_pipeline_transport_sends_the_bytes_server_sent(monkeypatch):
         headers = {name: value for name, value in sent[0].headers.items() if name not in _CLIENT_HEADERS}
         assert headers == row["expect"]["headers"], row["why"]
         compared += 1
-    assert compared == 221
+    assert compared == 223
 
 
 def test_every_shared_response_is_read_as_server_read_it():

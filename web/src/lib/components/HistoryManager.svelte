@@ -243,7 +243,7 @@
 	let lineageRequestId = 0;
 	let lineageGroupController: AbortController | null = null;
 	const lineageMemberControllers = new Map<string, AbortController>();
-	let copiedHistoryHash = $state<string | null>(null);
+	let copiedHistoryId = $state<string | null>(null);
 	let previewItem = $state<HistoryItem | null>(null);
 	// The comment being typed in the preview, per work, until it is saved.
 	let noteDraft = $state<{ id: string; text: string } | null>(null);
@@ -344,7 +344,7 @@
 		}
 		if (!sameExportItems(selectedExportItems, next)) selectedExportItems = next;
 	});
-	let copiedHistoryHashTimer: number | null = null;
+	let copiedHistoryIdTimer: number | null = null;
 	const lineageGroupPageSize = 8;
 	const lineageGroupTotalPages = $derived(Math.max(1, Math.ceil((lineageGroupTotal - lineageStartOffset) / lineageGroupPageSize)));
 	// The pagers print pages counted from the newest; `page` and the start offset still count from the start.
@@ -376,7 +376,7 @@
 			previewController?.abort();
 			lineageGroupController?.abort();
 			for (const controller of lineageMemberControllers.values()) controller.abort();
-			if (copiedHistoryHashTimer !== null) window.clearTimeout(copiedHistoryHashTimer);
+			if (copiedHistoryIdTimer !== null) window.clearTimeout(copiedHistoryIdTimer);
 		};
 	});
 
@@ -679,22 +679,24 @@
 		void openPreview(item);
 	}
 
-	async function copyHash(item: HistoryItem, event: MouseEvent): Promise<void> {
+	// The `#` buttons copy the work's UUID, not its render hash: two saved works
+	// can share one rh3, and a stored rh3 is rewritten when its scheme changes.
+	async function copyWorkId(item: HistoryItem, event: MouseEvent): Promise<void> {
 		event.stopPropagation();
 		event.preventDefault();
-		const hash = item.render_hash;
-		if (!hash) return;
+		const id = item.id;
+		if (!id) return;
 		try {
-			if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(hash);
-			else fallbackCopy(hash);
-			copiedHistoryHash = hash;
-			if (copiedHistoryHashTimer !== null) window.clearTimeout(copiedHistoryHashTimer);
-			copiedHistoryHashTimer = window.setTimeout(() => {
-				if (copiedHistoryHash === hash) copiedHistoryHash = null;
-				copiedHistoryHashTimer = null;
+			if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(id);
+			else fallbackCopy(id);
+			copiedHistoryId = id;
+			if (copiedHistoryIdTimer !== null) window.clearTimeout(copiedHistoryIdTimer);
+			copiedHistoryIdTimer = window.setTimeout(() => {
+				if (copiedHistoryId === id) copiedHistoryId = null;
+				copiedHistoryIdTimer = null;
 			}, 1200);
 		} catch {
-			copiedHistoryHash = null;
+			copiedHistoryId = null;
 		}
 	}
 
@@ -1078,16 +1080,16 @@
 						{#if previewItem.lineage_generation}
 							<div><dt>{t().historyStripFieldGeneration}</dt><dd>{groupDigits(previewItem.lineage_generation)}</dd></div>
 						{/if}
-						{#if previewItem.render_hash}
+						{#if previewItem.id}
 							<div>
-								<dt>{t().historyHashHeader}</dt>
+								<dt>{t().historyIdHeader}</dt>
 								<dd class="history-preview-hash">
-									<span>#{(previewItem.render_hash_short ?? previewItem.render_hash.slice(-4)).toUpperCase()}</span>
+									<span title={previewItem.id}>{previewItem.id.slice(0, 8)}</span>
 									<button
 										type="button"
-										title={copiedHistoryHash === previewItem.render_hash ? t().historyHashCopied : t().historyHashCopyTitle}
-										aria-label={t().historyHashCopyTitle}
-										onclick={(event) => previewItem && copyHash(previewItem, event)}
+										title={copiedHistoryId === previewItem.id ? t().historyHashCopied : t().historyIdCopyTitle}
+										aria-label={t().historyIdCopyTitle}
+										onclick={(event) => previewItem && copyWorkId(previewItem, event)}
 									>
 										<svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M13 7V4.5A1.5 1.5 0 0 0 11.5 3h-7A1.5 1.5 0 0 0 3 4.5v7A1.5 1.5 0 0 0 4.5 13H7"/></svg>
 									</button>
@@ -1247,9 +1249,9 @@
 									title={it.for_revision ? t().forRevisionOn : t().forRevisionOff}
 									aria-label={it.for_revision ? t().forRevisionOn : t().forRevisionOff}
 								>⚑</button>
-								{#if it.render_hash}
-									<Tooltip placement="top" text={copiedHistoryHash === it.render_hash ? t().historyHashCopied : t().historyHashCopyTitle}>
-										<button type="button" class="hash-chip hash-icon" class:marked={copiedHistoryHash === it.render_hash} onclick={(event) => copyHash(it, event)} aria-label={t().historyHashCopyTitle}>#</button>
+								{#if it.id}
+									<Tooltip placement="top" text={copiedHistoryId === it.id ? t().historyHashCopied : t().historyIdCopyTitle}>
+										<button type="button" class="hash-chip hash-icon" class:marked={copiedHistoryId === it.id} onclick={(event) => copyWorkId(it, event)} aria-label={t().historyIdCopyTitle}>#</button>
 									</Tooltip>
 								{/if}
 								<div class="thumb-model">
@@ -1274,7 +1276,7 @@
 					<col class="history-table-select" /><col class="history-table-image" /><col class="history-table-description" /><col class="history-table-created" /><col class="history-table-model" /><col class="history-table-catalog" /><col class="history-table-size" /><col class="history-table-hash" /><col class="history-table-actions" />
 				</colgroup>
 				<thead>
-					<tr><th></th><th>{t().historyImageHeader}</th><th>{t().historyDescriptionHeader}</th><th>{t().historyCreatedAtHeader}</th><th>{t().historyModelHeader}</th><th>{t().historyCatalogHeader}</th><th>{t().historySvgSizeHeader}</th><th>{t().historyHashHeader}</th><th>{t().historyActionHeader}</th></tr>
+					<tr><th></th><th>{t().historyImageHeader}</th><th>{t().historyDescriptionHeader}</th><th>{t().historyCreatedAtHeader}</th><th>{t().historyModelHeader}</th><th>{t().historyCatalogHeader}</th><th>{t().historySvgSizeHeader}</th><th>{t().historyIdHeader}</th><th>{t().historyActionHeader}</th></tr>
 				</thead>
 				<tbody>
 					{#each managedHistoryItems as it (it.id ?? it.at)}
@@ -1314,9 +1316,9 @@
 							<td>{catalogName(it.catalog_id)}</td>
 							<td class="table-svg-size">{formatByteSize(it.svg_bytes)}</td>
 							<td>
-								{#if it.render_hash}
-									<Tooltip placement="top" text={copiedHistoryHash === it.render_hash ? t().historyHashCopied : t().historyHashCopyTitle}>
-										<button type="button" class="hash-chip hash-icon table-hash" class:marked={copiedHistoryHash === it.render_hash} onclick={(event) => copyHash(it, event)} aria-label={t().historyHashCopyTitle}>#</button>
+								{#if it.id}
+									<Tooltip placement="top" text={copiedHistoryId === it.id ? t().historyHashCopied : t().historyIdCopyTitle}>
+										<button type="button" class="hash-chip hash-icon table-hash" class:marked={copiedHistoryId === it.id} onclick={(event) => copyWorkId(it, event)} aria-label={t().historyIdCopyTitle}>#</button>
 									</Tooltip>
 								{/if}
 							</td>

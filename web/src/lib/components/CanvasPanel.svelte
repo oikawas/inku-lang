@@ -846,8 +846,6 @@
 				{canUseVerticalInstructionCaption}
 				{instructionCaptionVertical}
 				{statusHistoryItem}
-				{statusHashLabel}
-				{statusHashCopied}
 				{replayDisabled}
 				{allowEmptyOutputTabs}
 				{generationInfoOpen}
@@ -862,7 +860,7 @@
 				{onToggleForRevision}
 				{onToggleForShare}
 				{singleUserMode}
-				{onCopyStatusHash}
+				{onCopyWorkId}
 				{onReplayCurrent}
 				onToggleGenerationInfo={() => (generationInfoOpen ? closeGenerationInfo() : openGenerationInfo())}
 				{onToggleSaijiki}

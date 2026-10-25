@@ -1255,6 +1255,7 @@ export interface LangPack {
 	historyRestore: string;
 	historyImageHeader: string;
 	historyHashHeader: string;
+	historyIdHeader: string;
 	tooltipHistoryThumbsTab: string;
 	tooltipHistoryListTab: string;
 	tooltipHistoryChronological: string;
@@ -1277,6 +1278,7 @@ export interface LangPack {
 	historyLineageExpandTitle: string;
 	historySelectLineageTitle: string;
 	historyHashCopyTitle: string;
+	historyIdCopyTitle: string;
 	historyHashCopied: string;
 	historyGenerationTitle: string;
 	historyReplay: string;

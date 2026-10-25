@@ -37,8 +37,6 @@
 		canUseVerticalInstructionCaption: boolean;
 		instructionCaptionVertical: boolean;
 		statusHistoryItem: CanvasStatusHistoryItem | null;
-		statusHashLabel: string;
-		statusHashCopied: boolean;
 		replayDisabled: boolean;
 		allowEmptyOutputTabs: boolean;
 		generationInfoOpen: boolean;
@@ -57,7 +55,8 @@
 		onToggleForRevision: (item: CanvasStatusHistoryItem | null | undefined, event?: Event) => void | Promise<void>;
 		onToggleForShare?: ((item: CanvasStatusHistoryItem | null | undefined, event?: Event) => void | Promise<void>) | null;
 		singleUserMode?: boolean;
-		onCopyStatusHash: () => void | Promise<void>;
+		/** Copies the saved work's id (its UUID), the value a work is named by. */
+		onCopyWorkId: (workId: string) => void | Promise<void>;
 		onReplayCurrent: () => void | Promise<void>;
 		onToggleGenerationInfo: () => void;
 		onToggleSaijiki: () => void;
@@ -91,8 +90,6 @@
 		canUseVerticalInstructionCaption,
 		instructionCaptionVertical,
 		statusHistoryItem,
-		statusHashLabel,
-		statusHashCopied,
 		replayDisabled,
 		allowEmptyOutputTabs,
 		generationInfoOpen,
@@ -110,7 +107,7 @@
 		onToggleForRevision,
 		onToggleForShare = null,
 		singleUserMode = false,
-		onCopyStatusHash,
+		onCopyWorkId,
 		onReplayCurrent,
 		onToggleGenerationInfo,
 		onToggleSaijiki,
@@ -127,6 +124,25 @@
 	const placeholderTransform = $derived(placeholderMotifTransform(placeholderWidth, placeholderHeight));
 	const shareTarget = $derived(shareTargetOf(statusHistoryItem));
 	const activeZoom = $derived(zoomControls ?? viewport);
+
+	// The `#` button copies the work's UUID, not its render hash: two saved works
+	// can share one rh3, and a stored rh3 is rewritten when its scheme changes.
+	// An unsaved refinement preview has no id to copy.
+	const copyableWorkId = $derived(unsavedRefinementPreview ? null : currentHistoryId);
+	let copiedWorkId = $state<string | null>(null);
+	async function copyWorkId(): Promise<void> {
+		const value = copyableWorkId;
+		if (!value) return;
+		try {
+			await onCopyWorkId(value);
+			copiedWorkId = value;
+			window.setTimeout(() => {
+				if (copiedWorkId === value) copiedWorkId = null;
+			}, 1200);
+		} catch {
+			copiedWorkId = null;
+		}
+	}
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -297,14 +313,14 @@
 				     corner, so it keeps the position it has always had. -->
 				<div class="canvas-corner-controls canvas-corner-right" onpointerdown={(event) => event.stopPropagation()}>
 					{@render leadingCornerControls?.()}
-					{#if statusHashLabel}
-						<Tooltip placement="top-left" text={statusHashCopied ? (isJapanese ? 'コピーしました' : 'Copied') : (isJapanese ? 'クリックでfull hashをコピーします' : 'Click to copy the full hash')}>
+					{#if copyableWorkId}
+						<Tooltip placement="top-left" text={copiedWorkId === copyableWorkId ? t().historyHashCopied : t().historyIdCopyTitle}>
 							<button
 								type="button"
 								class="canvas-icon-btn canvas-hash-btn"
-								class:marked={statusHashCopied}
-								aria-label={isJapanese ? 'full hash をコピー' : 'Copy the full hash'}
-								onclick={onCopyStatusHash}
+								class:marked={copiedWorkId === copyableWorkId}
+								aria-label={t().historyIdCopyTitle}
+								onclick={copyWorkId}
 							>#</button>
 						</Tooltip>
 					{/if}

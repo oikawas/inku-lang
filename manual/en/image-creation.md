@@ -450,9 +450,10 @@ Combine `Thumbnails` with `By lineage` to show lineages with at least two works 
 **What is printed under each thumbnail is chosen under `Display and operation` in `Settings`** (`Facts under the history thumbnails`). Choose **up to three** of generation, model, engine version and file size; **choose none and the strip shows only the pictures**. A fourth choice is refused rather than allowed to evict an existing one, and the limit is shown. **File size is the size the server reports for the stored work.**
 
 - Search descriptions, DDL, Stage 1/2 models, color catalogs, whole hashes, hash beginnings or last four characters, and whole work IDs (UUIDs) or their beginnings. Find the UUID under `Identity` in Provenance. Searches are case-insensitive
+- The `#` buttons copy the work's UUID (so does the `#` at the bottom right of the canvas). The `ID` row of the preview shows the UUID's first eight characters. To name a work to an AI or to inku-cli, pass this UUID rather than a hash: a hash can coincide with another work of the same drawing, and it is rewritten when the hash scheme changes
 - The `Starred`, `Revision`, and `Shared` filters. Used together, only works matching every one of them remain
 - Switching between ordinary history and trash
-- Thumbnail view and list view. The list compares hash, timestamp, model, elapsed time, and color catalog
+- Thumbnail view and list view. The list compares ID (a UUID copy button), timestamp, model, elapsed time, and color catalog
 - Move to trash, restore, and permanent delete, singly or by multiple selection
 - Expanding and selecting a whole lineage at once
 - Syncing to the displayed work and jumping to the oldest or latest page

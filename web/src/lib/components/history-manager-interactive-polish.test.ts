@@ -51,15 +51,34 @@ test('the timeline revision control belongs to the actions column, not the thumb
 	assert.match(actionCell, /onToggleForRevision\(it, event\)/);
 });
 
-test('list and thumbnail hash buttons match the canvas full-hash copy feedback', () => {
+test('list, thumbnail and preview `#` buttons copy the work UUID with the canvas copy feedback', () => {
 	assert.doesNotMatch(MANAGER, /function hashLabel/);
-	assert.match(MANAGER, /const hash = item\.render_hash;/);
+	assert.match(MANAGER, /const id = item\.id;/);
+	assert.doesNotMatch(MANAGER, /function copyHash/);
 	assert.doesNotMatch(MANAGER, /render_hash \|\|/);
-	assert.equal(MANAGER.match(/aria-label=\{t\(\)\.historyHashCopyTitle\}>#<\/button>/g)?.length, 2);
-	assert.match(MANAGER, /copiedHistoryHash === it\.render_hash \? t\(\)\.historyHashCopied : t\(\)\.historyHashCopyTitle/g);
+	assert.equal(MANAGER.match(/aria-label=\{t\(\)\.historyIdCopyTitle\}>#<\/button>/g)?.length, 2);
+	assert.match(MANAGER, /copiedHistoryId === it\.id \? t\(\)\.historyHashCopied : t\(\)\.historyIdCopyTitle/g);
+	// The preview names the work by the UUID's first eight characters, the
+	// value the copy button puts on the clipboard, not by the rh3 suffix.
+	assert.match(MANAGER, /<dt>\{t\(\)\.historyIdHeader\}<\/dt>/);
+	assert.match(MANAGER, /\{previewItem\.id\.slice\(0, 8\)\}/);
+	assert.doesNotMatch(MANAGER, /previewItem\.render_hash\.slice\(-4\)/);
 	assert.match(MANAGER, /\}, 1200\);/);
-	for (const pack of [JA, EN]) assert.match(pack, /historyHashCopied:/);
+	for (const pack of [JA, EN]) {
+		assert.match(pack, /historyHashCopied:/);
+		assert.match(pack, /historyIdCopyTitle: .*UUID/);
+		assert.match(pack, /historyIdHeader: 'ID'/);
+	}
 	assert.match(TYPES, /historyHashCopied: string;/);
+	assert.match(TYPES, /historyIdCopyTitle: string;/);
+});
+
+test('the canvas `#` button copies the saved work UUID, and hides for an unsaved preview', () => {
+	const WORKSPACE = read('../features/canvas/CanvasArtworkWorkspace.svelte');
+	assert.match(WORKSPACE, /const copyableWorkId = \$derived\(unsavedRefinementPreview \? null : currentHistoryId\);/);
+	assert.match(WORKSPACE, /\{#if copyableWorkId\}/);
+	assert.match(WORKSPACE, /await onCopyWorkId\(value\);/);
+	assert.doesNotMatch(WORKSPACE, /onCopyStatusHash|full hash/);
 });
 
 test('lineage thumbnails form a parent-first horizontal generation lane', () => {

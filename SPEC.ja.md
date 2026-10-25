@@ -1199,7 +1199,7 @@ Stage 1のfallback候補はStage 1の応答待ちにだけ属する。Stage 1が
 - 頼む文: 試作B2の文（読み、書く回の頭と答えの節、見比べ、聞き直し）に、2026-10-25のstep 0bの数の決まり（位置・範囲・二点・寸法・回転は小数、個数は整数）を当てたもの。読みなしの書く回・見比べ・聞き直しは、読みに触れる文を記述から読む形に替えた文。書く回の後半（数の文の例・DDLの手引き）は§12.6.6と共有する。3つのstageはStage 1と同じ温度で送る（試作が`generate_normalized_ddl`の名で送ったため。構図・法則・配色と同じ扱い）。
 - 確定: 残ったDDLをreason `description_ddl`でcommitする。権限はStage 1の結果と同じく記述のまま（`propose_stage1_result_commit`）で、同じ作品を記述や直した読みから描き直せる。DDLを直すと、今の作品と同じく記述が錠になる。読めなかった行は確定の後に補完しない（§12.6.6と同じ）。読める答えが一つも無い実行は失敗し（`description_ddl_failed`）、何も描けないDDLの実行は止まる（`description_ddl_undrawable`）。事象は`description_reading_ready`・`description_ddl_fallback`・`description_review_fallback`・`description_review_skipped`。
 - 記録: snapshotの`description_ddl`（札を除いた記述、札、`reading_state`（`off`・`pending`・`read`・`supplied`・`fallback`）、読み（`core`・`items`・`note`・`viewpoint`）、作者に見せて直せる読みの文`reading_text`、錨で落としたもの、答えごとの記録（§12.6.6と同じ形に`figures`）、見比べる前のDDL、描いた画の参照、除いた行）を、hostが作品と一緒に保存する。画像もSVGも持たない。同じ実行で描き直すと、前の実行の記録は消える。
-- バージョン: protocol（1.0.0）、binding、core APIのバージョンは変えない。新しい出口は無い。Server・Web・Android・macOSの選択・表示・保存は、後のstepで足す（2026-10-25の時点ではcoreだけにある）。
+- バージョン: protocol（1.0.0）、binding、core APIのバージョンは変えない。ServerのPythonの出口に`pipeline_description_label_spans`（札の範囲の`[[start, end, kind], …]`。Pythonの文字の位置で数える。UniFFIの`description_label_spans`と同じ）を足す（UniFFI・JNIの呼び出しは変えない）。Server・Web・Android・macOSの選択・表示・保存は、後のstepで足す（2026-10-25の時点ではcoreだけにある）。
 
 ### 12.7 第二段階（補完）と決定的な構造化
 

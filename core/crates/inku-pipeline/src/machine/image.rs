@@ -3,34 +3,23 @@
 //! The run chooses the catalog from the image when asked, has a Vision model
 //! write the DDL and gives the compiler's findings back once, shows the
 //! model the drawing of that DDL beside the image and asks once more, and
-//! commits the DDL it is left with as a DDL edit. The DDL declares the
-//! image's ratio and is fitted into the run's paper. The core holds no image:
-//! each request names its images by reference, and the host draws the
+//! commits the DDL it is left with as a DDL edit (`written`). The DDL declares
+//! the image's ratio and is fitted into the run's paper. The core holds no
+//! image: each request names its images by reference, and the host draws the
 //! drawing and keeps both images for the requests it sends.
 
 use inku_score::CanvasFit;
 use serde_json::json;
 
-use super::{
-    ImageDdlRecord, ImageDdlRound, ImageInput, PipelinePhase, PipelineRenderCanvas,
-    PipelineRenderOptions, PipelineSnapshot, VisibleDocument, message_names, proposal,
-};
-use crate::core_boundary::{
-    CatalogMode, SerializableClipPolicy, compile_committed, render_delivery,
-    render_delivery_with_svg_limit,
-};
+use super::{ImageDdlRecord, ImageInput, PipelineSnapshot, proposal};
+use crate::core_boundary::CatalogMode;
 use crate::image_ddl::{
-    ImageCanvas, ImageCatalogCandidate, ImageDdlCheck, ImageDdlContext, ImageDdlLimits,
-    REVIEW_DRAWING_MEDIA_TYPE, build_image_catalog_selection_prompt, build_image_ddl_prompt,
-    build_image_ddl_review_prompt, check_image_document, image_ddl_source,
-    parse_image_ddl_response, review_drawing_size, salvage_image_document, validate_image,
-    with_image_ddl_feedback,
+    ImageCanvas, ImageCatalogCandidate, ImageDdlContext, ImageDdlLimits,
+    build_image_catalog_selection_prompt, build_image_ddl_prompt, build_image_ddl_review_prompt,
+    validate_image,
 };
 use crate::prompts::{LlmPrompt, LlmStage, PromptImage, parse_catalog_selection_response};
 use crate::protocol::{PipelineEvent, ProtocolError, ProviderFailure};
-
-/// The effect that asks the host to draw the written DDL beside the image.
-pub(super) const DRAW_IMAGE_REVIEW: &str = "draw_image_review";
 
 impl PipelineSnapshot {
     /// Start a work from an image.
@@ -128,13 +117,7 @@ impl PipelineSnapshot {
             .ok_or(ProtocolError::InternalInvariant)
     }
 
-    fn image_record_mut(&mut self) -> Result<&mut ImageDdlRecord, ProtocolError> {
-        self.image_ddl
-            .as_mut()
-            .ok_or(ProtocolError::InternalInvariant)
-    }
-
-    fn image_canvas(&self) -> Result<ImageCanvas, ProtocolError> {
+    pub(super) fn image_canvas(&self) -> Result<ImageCanvas, ProtocolError> {
         let image = &self.image_record()?.image;
         ImageCanvas::of(
             (image.original_width, image.original_height),
@@ -145,7 +128,7 @@ impl PipelineSnapshot {
 
     /// The request that writes the DDL, or with a drawing and the DDL it was
     /// drawn from, the request that reviews it.
-    fn image_prompt(
+    pub(super) fn image_prompt(
         &self,
         review: Option<(&PromptImage, &str)>,
     ) -> Result<LlmPrompt, ProtocolError> {
@@ -197,244 +180,8 @@ impl PipelineSnapshot {
         self.write_image_ddl(events)
     }
 
-    /// Read a DDL written or reviewed from the image. Lines the compiler did
-    /// not draw are given back once; then the DDL is kept, or, when it draws
-    /// nothing, the drawable DDL kept before it.
-    pub(super) fn image_ddl_response(
-        &mut self,
-        stage: LlmStage,
-        response: &str,
-        spent_ms: u64,
-        total: u64,
-        events: &mut Vec<PipelineEvent>,
-    ) -> Result<(), ProtocolError> {
-        let Ok(ddl) = parse_image_ddl_response(response, self.config.prompt_limits) else {
-            return self.failure(ProviderFailure::SchemaViolation, spent_ms, events);
-        };
-        let source = image_ddl_source(&ddl, self.image_canvas()?, self.config.language);
-        let Ok(candidate) = self.new_document(source) else {
-            return self.failure(ProviderFailure::SchemaViolation, spent_ms, events);
-        };
-        let Ok(check) = self.check_image(&candidate) else {
-            return self.failure(ProviderFailure::SemanticViolation, spent_ms, events);
-        };
-        let action = self.action.as_ref().ok_or(ProtocolError::InvalidState)?;
-        let asked_again = message_names(&action.payload, "compiler_feedback");
-        let prompt: LlmPrompt = serde_json::from_value(action.payload["prompt"].clone())
-            .map_err(|_| ProtocolError::InternalInvariant)?;
-        self.image_record_mut()?.rounds.push(ImageDdlRound {
-            stage,
-            prompt_id: prompt.prompt_id.clone(),
-            prompt_digest: prompt.prompt_digest.clone(),
-            asked_again,
-            problems: check.problems.len(),
-            instructions: check.instructions,
-        });
-        if !check.problems.is_empty()
-            && !asked_again
-            && self.ask_image_again(stage, prompt, &candidate, &check, total, events)?
-        {
-            return Ok(());
-        }
-        self.action = None;
-        let usable = self.usable_image_document(&candidate, &check)?;
-        match stage {
-            LlmStage::WriteImageDdl => match usable.or_else(|| self.image_fallback.take()) {
-                Some(document) => self.after_image_write(document, events),
-                // Nothing draws even after asking again: the run stops rather
-                // than save an empty work.
-                None => {
-                    self.phase = PipelinePhase::Failed {
-                        reason: "image_ddl_undrawable".into(),
-                    };
-                    self.event(
-                        events,
-                        "failed",
-                        json!({"stage": stage, "reason": ProviderFailure::SemanticViolation, "detail": "undrawable"}),
-                    )
-                }
-            },
-            _ => {
-                let document = match usable {
-                    Some(document) => document,
-                    None => {
-                        self.event(
-                            events,
-                            "image_review_fallback",
-                            json!({"stage": stage, "reason": "undrawable"}),
-                        )?;
-                        self.image_fallback
-                            .take()
-                            .ok_or(ProtocolError::InternalInvariant)?
-                    }
-                };
-                self.commit_image(document, events)
-            }
-        }
-    }
-
-    fn check_image(&self, candidate: &VisibleDocument) -> Result<ImageDdlCheck, ProtocolError> {
-        check_image_document(
-            &candidate.document()?,
-            &self.config.definitions,
-            &self.config.compiler,
-        )
-        .map_err(|_| ProtocolError::SemanticViolation)
-    }
-
-    /// Ask once more with the lines the compiler did not draw, within the
-    /// stage's budget. A drawable candidate is kept for a failed answer.
-    fn ask_image_again(
-        &mut self,
-        stage: LlmStage,
-        prompt: LlmPrompt,
-        candidate: &VisibleDocument,
-        check: &ImageDdlCheck,
-        total: u64,
-        events: &mut Vec<PipelineEvent>,
-    ) -> Result<bool, ProtocolError> {
-        let attempt = self
-            .action
-            .as_ref()
-            .ok_or(ProtocolError::InvalidState)?
-            .identity
-            .attempt;
-        let Some(next) = self
-            .retry_policy(stage)
-            .next_budgeted_attempt(attempt, total)
-        else {
-            return Ok(false);
-        };
-        let Ok(again) = with_image_ddl_feedback(
-            prompt,
-            &candidate.source,
-            &check.problems,
-            self.config.prompt_limits,
-        ) else {
-            return Ok(false);
-        };
-        if check.drawable {
-            self.image_fallback = Some(candidate.clone());
-        }
-        self.reissue(stage, again, None, total, next, events)?;
-        self.event(
-            events,
-            "retry_scheduled",
-            json!({
-                "identity": self.action.as_ref().unwrap().identity,
-                "failure": ProviderFailure::SemanticViolation,
-                "detail": "image_ddl_problems",
-                "problems": check.problems.len(),
-            }),
-        )?;
-        Ok(true)
-    }
-
-    /// The candidate when it draws; else the candidate without the lines
-    /// that each alone stop the whole work, when what is left draws.
-    fn usable_image_document(
-        &mut self,
-        candidate: &VisibleDocument,
-        check: &ImageDdlCheck,
-    ) -> Result<Option<VisibleDocument>, ProtocolError> {
-        if check.drawable {
-            return Ok(Some(candidate.clone()));
-        }
-        let Ok(Some((salvaged, dropped))) = salvage_image_document(
-            &candidate.document()?,
-            &self.config.definitions,
-            &self.config.compiler,
-        ) else {
-            return Ok(None);
-        };
-        self.image_record_mut()?.dropped.extend(dropped);
-        Ok(Some(VisibleDocument::from_document(&salvaged)))
-    }
-
-    /// Show the written DDL beside the image when the run reviews, else
-    /// commit it.
-    fn after_image_write(
-        &mut self,
-        document: VisibleDocument,
-        events: &mut Vec<PipelineEvent>,
-    ) -> Result<(), ProtocolError> {
-        let review = self.config.image.is_some_and(|config| config.review);
-        let size = review_drawing_size(self.config.compiler.host.canvas_format_id());
-        let Some((width, height)) = size.filter(|_| review) else {
-            return self.commit_image(document, events);
-        };
-        self.image_record_mut()?.before_review = Some(document.source.clone());
-        self.image_fallback = Some(document.clone());
-        self.phase = PipelinePhase::AwaitingImageReviewDrawing;
-        self.delivery = None;
-        let payload = json!({
-            "document": document,
-            "canvas_format_id": self.config.compiler.host.canvas_format_id(),
-            "width": width,
-            "height": height,
-        });
-        self.issue(DRAW_IMAGE_REVIEW, payload, 0, events)
-    }
-
-    /// The host's drawing of the written DDL: ask for the review with it.
-    pub(super) fn image_review_drawn(
-        &mut self,
-        drawing: PromptImage,
-        events: &mut Vec<PipelineEvent>,
-    ) -> Result<(), ProtocolError> {
-        if !matches!(self.phase, PipelinePhase::AwaitingImageReviewDrawing) {
-            return Err(ProtocolError::StaleResult);
-        }
-        let action = self.action.as_ref().ok_or(ProtocolError::StaleResult)?;
-        let size = (
-            action.payload["width"].as_u64(),
-            action.payload["height"].as_u64(),
-        );
-        if validate_image(&drawing).is_err()
-            || drawing.media_type != REVIEW_DRAWING_MEDIA_TYPE
-            || size
-                != (
-                    Some(u64::from(drawing.width)),
-                    Some(u64::from(drawing.height)),
-                )
-        {
-            return Err(ProtocolError::SchemaViolation);
-        }
-        let document = self
-            .image_fallback
-            .clone()
-            .ok_or(ProtocolError::InternalInvariant)?;
-        self.action = None;
-        self.image_record_mut()?.drawing = Some(drawing.clone());
-        match self.image_prompt(Some((&drawing, &document.source))) {
-            Ok(prompt) => self.begin_llm(prompt, None, Vec::new(), events),
-            Err(_) => {
-                self.event(events, "image_review_skipped", json!({"reason": "prompt"}))?;
-                self.image_fallback = None;
-                self.commit_image(document, events)
-            }
-        }
-    }
-
-    /// The host could not draw the written DDL: commit it without a review.
-    pub(super) fn image_review_undrawn(
-        &mut self,
-        events: &mut Vec<PipelineEvent>,
-    ) -> Result<(), ProtocolError> {
-        if !matches!(self.phase, PipelinePhase::AwaitingImageReviewDrawing) {
-            return Err(ProtocolError::StaleResult);
-        }
-        self.action = None;
-        let document = self
-            .image_fallback
-            .take()
-            .ok_or(ProtocolError::InternalInvariant)?;
-        self.event(events, "image_review_skipped", json!({"reason": "undrawn"}))?;
-        self.commit_image(document, events)
-    }
-
-    /// An image stage whose attempts are spent: the default catalog, the kept
-    /// DDL, or, when nothing was written, a failed run.
+    /// An image stage whose attempts are spent: the default catalog, or what
+    /// a writing or review stage leaves (`written`).
     pub(super) fn image_stage_failed(
         &mut self,
         stage: LlmStage,
@@ -442,99 +189,17 @@ impl PipelineSnapshot {
         detail: Option<&str>,
         events: &mut Vec<PipelineEvent>,
     ) -> Result<(), ProtocolError> {
-        let mut payload = json!({"stage": stage, "reason": failure});
-        if let Some(detail) = detail {
-            payload["detail"] = json!(detail);
+        if stage != LlmStage::SelectImageCatalog {
+            return self.written_stage_failed(stage, failure, detail, events);
         }
-        match stage {
-            LlmStage::SelectImageCatalog => {
-                self.select_catalog("default", CatalogMode::AutoFallbackDefault)?;
-                self.fit_image_canvas();
-                self.event(
-                    events,
-                    "catalog_fallback",
-                    json!({"catalog_id": "default", "catalog_mode": "auto_fallback_default", "failure": failure}),
-                )?;
-                self.write_image_ddl(events)
-            }
-            LlmStage::WriteImageDdl => match self.image_fallback.take() {
-                Some(document) => {
-                    self.event(events, "image_ddl_fallback", payload)?;
-                    self.after_image_write(document, events)
-                }
-                None => {
-                    self.phase = PipelinePhase::Failed {
-                        reason: "image_ddl_failed".into(),
-                    };
-                    self.event(events, "failed", payload)
-                }
-            },
-            _ => {
-                let document = self
-                    .image_fallback
-                    .take()
-                    .ok_or(ProtocolError::InternalInvariant)?;
-                self.event(events, "image_review_fallback", payload)?;
-                self.commit_image(document, events)
-            }
-        }
-    }
-
-    fn commit_image(
-        &mut self,
-        document: VisibleDocument,
-        events: &mut Vec<PipelineEvent>,
-    ) -> Result<(), ProtocolError> {
-        self.image_fallback = None;
-        let next = proposal(
-            self.authority
-                .propose_committed_user_ddl_mutation(self.authority.revision(), true),
-        )?
-        .ok_or(ProtocolError::InternalInvariant)?;
-        self.commit_document(document, next, "image_ddl", events)
-    }
-
-    /// The SVG a host makes the `draw_image_review` PNG from: the action's DDL
-    /// compiled as the run compiles it, and drawn with the host's render
-    /// options on the run's paper at the drawing's size. The host gives the
-    /// options it draws the work with (its colour map for the run's catalog,
-    /// its render seed); the canvas is set here.
-    pub fn image_review_svg(
-        &self,
-        mut options: PipelineRenderOptions,
-        clip: SerializableClipPolicy,
-        max_svg_bytes: Option<usize>,
-    ) -> Result<String, ProtocolError> {
-        self.validate()?;
-        let (PipelinePhase::AwaitingImageReviewDrawing, Some(action)) = (&self.phase, &self.action)
-        else {
-            return Err(ProtocolError::InvalidState);
-        };
-        let document: VisibleDocument = serde_json::from_value(action.payload["document"].clone())
-            .map_err(|_| ProtocolError::InternalInvariant)?;
-        let (Some(width), Some(height)) = (
-            action.payload["width"].as_f64(),
-            action.payload["height"].as_f64(),
-        ) else {
-            return Err(ProtocolError::InternalInvariant);
-        };
-        let delivery = compile_committed(
-            document.document()?,
-            &self.config.definitions,
-            &self.config.compiler,
-        )
-        .map_err(|_| ProtocolError::SemanticViolation)?;
-        options.canvas = PipelineRenderCanvas { width, height };
-        options.canvas_aspect_id = self.config.compiler.host.canvas_format_id().to_owned();
-        let compiler = &self.config.compiler;
-        match max_svg_bytes {
-            Some(maximum) => {
-                render_delivery_with_svg_limit(&delivery, options.into(), compiler, clip, maximum)
-            }
-            None => render_delivery(&delivery, options.into(), compiler, clip),
-        }
-        .map(|output| output.svg)
-        .map_err(|_| ProtocolError::SemanticViolation)
+        self.select_catalog("default", CatalogMode::AutoFallbackDefault)?;
+        self.fit_image_canvas();
+        self.event(
+            events,
+            "catalog_fallback",
+            json!({"catalog_id": "default", "catalog_mode": "auto_fallback_default", "failure": failure}),
+        )?;
+        self.write_image_ddl(events)
     }
 }
 
@@ -549,8 +214,10 @@ mod tests {
     use crate::core_boundary::{ClipPolicy, ResolvedHostOptions};
     use crate::focused_flow::{ack, config, envelope, event, run, run_error, tags};
     use crate::image_ddl::tests::{a4_compiler, palette};
+    use crate::machine::written::DRAW_IMAGE_REVIEW;
     use crate::machine::{
-        AuthoringInput, CatalogCandidate, ImageConfig, PipelineConfig, PipelineInput, StepOutput,
+        AuthoringInput, CatalogCandidate, ImageConfig, PipelineConfig, PipelineInput,
+        PipelinePhase, PipelineRenderCanvas, PipelineRenderOptions, StepOutput,
     };
     use crate::prompts::DescriptionCatalogEntry;
     use crate::protocol::{DecimalU64, EffectResult};

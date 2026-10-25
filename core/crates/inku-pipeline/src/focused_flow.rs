@@ -13,8 +13,8 @@ use crate::core_boundary::{
     ResolvedPaletteColorDto, ResolvedPaletteDto,
 };
 use crate::machine::{
-    AuthoringInput, ColorsConfig, CompositionConfig, LawsConfig, PipelineConfig, PipelineInput,
-    PipelinePhase, PipelineSnapshot, SketchRequest, SketchState, StepOutput,
+    AuthoringInput, ColorsConfig, CompositionConfig, DescriptionRoute, LawsConfig, PipelineConfig,
+    PipelineInput, PipelinePhase, PipelineSnapshot, SketchRequest, SketchState, StepOutput,
 };
 use crate::prompts::PromptLimits;
 use crate::protocol::{
@@ -116,6 +116,7 @@ pub(crate) fn config() -> PipelineConfig {
         colors_retry: None,
         image: None,
         image_retry: None,
+        description_ddl: None,
     }
 }
 
@@ -399,6 +400,8 @@ fn stage1_compiler_feedback_retries_before_the_corrected_ddl_commits() {
                 description: description.into(),
                 auto_catalog: false,
                 sketch: SketchRequest::Off,
+                route: DescriptionRoute::Stages,
+                source_labels: Vec::new(),
             },
         },
     );
@@ -520,6 +523,8 @@ fn stage1_compiler_feedback_uses_the_shared_attempt_budget() {
                 description: "One quiet black circle".into(),
                 auto_catalog: false,
                 sketch: SketchRequest::Off,
+                route: DescriptionRoute::Stages,
+                source_labels: Vec::new(),
             },
         },
     );
@@ -588,6 +593,8 @@ fn a_retrying_stage1_reports_its_attempt_and_budget() {
                 description: "One quiet black circle".into(),
                 auto_catalog: false,
                 sketch: SketchRequest::Off,
+                route: DescriptionRoute::Stages,
+                source_labels: Vec::new(),
             },
         },
     );
@@ -635,6 +642,8 @@ fn exhausted_stage1_proposes_sealed_residual_only_after_visible_ack() {
                 description: "One red square with an unresolved clause".into(),
                 auto_catalog: false,
                 sketch: SketchRequest::Off,
+                route: DescriptionRoute::Stages,
+                source_labels: Vec::new(),
             },
         },
     );
@@ -743,6 +752,8 @@ fn stage1_does_not_correct_canonical_ddl_when_macro_expansion_exceeds_its_budget
                 description: "Two black circles at the center".into(),
                 auto_catalog: false,
                 sketch: SketchRequest::Off,
+                route: DescriptionRoute::Stages,
+                source_labels: Vec::new(),
             },
         },
     );
@@ -854,6 +865,8 @@ fn committed_ddl_and_approved_hole_patch_share_one_replayable_path() {
                 description: "One quiet black circle".into(),
                 auto_catalog: false,
                 sketch: SketchRequest::Off,
+                route: DescriptionRoute::Stages,
+                source_labels: Vec::new(),
             },
         },
     )];
@@ -1899,6 +1912,8 @@ fn sketch_start(sketch: SketchRequest) -> PipelineSnapshot {
                 description: "A crane stands alone".into(),
                 auto_catalog: false,
                 sketch,
+                route: DescriptionRoute::Stages,
+                source_labels: Vec::new(),
             },
         },
     );
@@ -2005,6 +2020,8 @@ fn ground_start(pipeline_config: PipelineConfig) -> PipelineSnapshot {
                 description: "A white circle beside a black square".into(),
                 auto_catalog: false,
                 sketch: SketchRequest::Off,
+                route: DescriptionRoute::Stages,
+                source_labels: Vec::new(),
             },
         },
     );
@@ -2385,6 +2402,8 @@ fn started_description(pipeline_config: PipelineConfig) -> PipelineSnapshot {
                 description: COMPOSED_DESCRIPTION.into(),
                 auto_catalog: false,
                 sketch: SketchRequest::Off,
+                route: DescriptionRoute::Stages,
+                source_labels: Vec::new(),
             },
         },
     );
@@ -3232,6 +3251,8 @@ fn started_with(pipeline_config: PipelineConfig, description: &str) -> PipelineS
                 description: description.into(),
                 auto_catalog: false,
                 sketch: SketchRequest::Off,
+                route: DescriptionRoute::Stages,
+                source_labels: Vec::new(),
             },
         },
     );

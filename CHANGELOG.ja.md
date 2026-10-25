@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+### 2026-10-25 — 共通coreに「読んで描く」を足した（記述を読み、DDLを直接書く）
+
+記述の実行に、今の流れ（Stage 1から配色まで）の代わりの道`route: read_and_draw`を足した（SPEC §12.6.7）。読み手が記述を語り手の目から読み（`read_description`）、描き手がその目に映る景を可視DDLとして直接書き（`write_description_ddl`）、描いた画を見て一度直す（`review_description_ddl`。画は画像タブと同じ`draw_image_review`で作る）。写生の欄で、読む（on）・読まずに書く（off）・作者の直した読みで書く（supplied）を選ぶ。出典の札の中身は`source_labels`で渡し、読みだけが読む。読みの項目と視点の引用は、記述と札の中に一続きで無ければ落として記録する。頼む文は試作B2の文に、個数を整数で書く数の決まりを当てたもので、日英とも試作の文とbytesで同じ。3つのstageはStage 1と同じ温度で送る。作品は記述の作品のまま確定し（reason `description_ddl`）、記録`description_ddl`をhostが作品と保存する。画像タブの答えの扱い（確かめ・聞き直し・救い出し・見比べの画・確定）は2つの道で共有にし、画像タブの依頼のbytesは変えていない。hostの設定`description_ddl`の無いhostでは始められない。Server・Web・Android・macOSは変えていない（後のstepで足す）。
+
 ### 2026-10-25 — inku-cliはUUIDで1作品を読み出す
 
 inku-cliに、UUID（全体か先頭の数文字）で1作品を読む `history show`（記述・DDL・JSON Scoreを出す。`--part`で1つだけ）と `history png`（保存された表示用SVGを画だけのPNGに焼く。`--size`で長い辺、既定1024）を足した。1作品を返すAPIは無いので、一覧のAPIに `anchor_id` と `limit=1` を渡して引き、返った作品のIDを確かめる。先頭の数文字は絵を除いた一覧で引き当て、2つ以上に当たれば候補を示して止まる。Serverは変えない。

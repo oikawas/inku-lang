@@ -55,7 +55,10 @@ const CATALOG_DIGEST_DOMAIN: &[u8] = b"inku.prompt-catalog-projection.v1";
 /// the composition reading after it, the laws after the composition and the
 /// colors after the laws. The three image stages write a work's DDL from an
 /// image (2026-10-24): the catalog chosen from the image, the DDL written from
-/// it, and the DDL corrected after its drawing is seen beside the image.
+/// it, and the DDL corrected after its drawing is seen beside the image. The
+/// three description stages draw a description by reading it (read and draw,
+/// 2026-10-25): the reading, the DDL written from the description and the
+/// reading, and the DDL corrected after its drawing is seen.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LlmStage {
@@ -69,6 +72,9 @@ pub enum LlmStage {
     SelectImageCatalog,
     WriteImageDdl,
     ReviewImageDdl,
+    ReadDescription,
+    WriteDescriptionDdl,
+    ReviewDescriptionDdl,
 }
 
 impl LlmStage {
@@ -85,6 +91,9 @@ impl LlmStage {
             Self::SelectImageCatalog => "select_image_catalog",
             Self::WriteImageDdl => "write_image_ddl",
             Self::ReviewImageDdl => "review_image_ddl",
+            Self::ReadDescription => "read_description",
+            Self::WriteDescriptionDdl => "write_description_ddl",
+            Self::ReviewDescriptionDdl => "review_description_ddl",
         }
     }
 }
@@ -1808,10 +1817,12 @@ pub(crate) fn finish_prompt(mut prompt: LlmPrompt) -> Result<LlmPrompt, PromptEr
     // Preserve old stage prompt bytes and persisted request editions. The prompts
     // written for that contract (hole completion, the composition reading, the laws,
     // the colors, and the laws' and colors' editions a saved run asks again with)
-    // carry the schema only there.
+    // carry the schema only there, and so does the reading of a description,
+    // as its prototype sent it.
     let id = prompt.prompt_id.as_str();
     if id != HOLE_COMPLETION_PROMPT_ID
         && id != crate::composition_reading::COMPOSITION_READING_PROMPT_ID
+        && id != crate::description_ddl::DESCRIPTION_READING_PROMPT_ID
         && id != crate::laws::LAWS_PROMPT_ID
         && !crate::laws::PREVIOUS_LAWS_PROMPT_IDS.contains(&id)
         && id != crate::colors::COLORS_PROMPT_ID

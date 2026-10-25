@@ -275,6 +275,25 @@ pub enum EffectResult {
     },
     /// The host could not draw it; the run commits the DDL as written.
     ImageReviewUndrawn { identity: ActionEcho },
+    /// The description stages (read and draw, 2026-10-25): the reading, the
+    /// DDL written from the description, and the DDL corrected beside its
+    /// drawing. The drawing is answered by `ImageReviewDrawn` and
+    /// `ImageReviewUndrawn`, as an image's is.
+    DescriptionRead {
+        identity: ActionEcho,
+        response: String,
+        elapsed_ms: DecimalU64,
+    },
+    DescriptionDdlWritten {
+        identity: ActionEcho,
+        response: String,
+        elapsed_ms: DecimalU64,
+    },
+    DescriptionDdlReviewed {
+        identity: ActionEcho,
+        response: String,
+        elapsed_ms: DecimalU64,
+    },
     ProviderFailed {
         identity: ActionEcho,
         failure: ProviderFailure,
@@ -307,6 +326,9 @@ impl EffectResult {
             | Self::ImageDdlReviewed { identity, .. }
             | Self::ImageReviewDrawn { identity, .. }
             | Self::ImageReviewUndrawn { identity }
+            | Self::DescriptionRead { identity, .. }
+            | Self::DescriptionDdlWritten { identity, .. }
+            | Self::DescriptionDdlReviewed { identity, .. }
             | Self::ProviderFailed { identity, .. }
             | Self::VisibleNormalizedDdlCommitted { identity, .. }
             | Self::HostCommitFailed { identity, .. } => identity,

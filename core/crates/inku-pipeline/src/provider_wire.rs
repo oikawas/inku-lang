@@ -32,13 +32,17 @@ const OPENAI_REASONING_ROOM_TOKENS: i64 = 25000;
 const OLLAMA_THINKING_ROOM_TOKENS: i64 = 8192;
 const OPENAI_API_HOST: &str = "api.openai.com";
 /// The composition reading is sent as the prototype measured it, with Stage 1's
-/// sampling (COMPOSITION-PRODUCT-DESIGN section 12), and so are the laws and
-/// the colors (their prototypes' requests went as Stage 1's).
-const STAGE1_SAMPLED_ACTIONS: [&str; 4] = [
+/// sampling (COMPOSITION-PRODUCT-DESIGN section 12), and so are the laws, the
+/// colors and the three stages that read and draw a description (their
+/// prototypes' requests went as Stage 1's).
+const STAGE1_SAMPLED_ACTIONS: [&str; 7] = [
     "generate_normalized_ddl",
     "read_composition",
     "choose_laws",
     "choose_colors",
+    "read_description",
+    "write_description_ddl",
+    "review_description_ddl",
 ];
 /// A refusal body is read only this far, as Server read it.
 const REFUSAL_READ_BYTES: usize = 16384;
@@ -2314,6 +2318,33 @@ mod tests {
                 {"type": "input_image", "image_url": url},
             ])
         );
+    }
+
+    /// The stages that read and draw a description are sampled as Stage 1 is,
+    /// as their prototype sent them; the image stages are not (2026-10-25).
+    #[test]
+    fn the_description_stages_are_sampled_as_stage1() {
+        let temperature = |action_name: &str| {
+            let answer = ask(&serde_json::json!({
+                "action": "pipeline_request",
+                "connection": {"id": "openai", "kind": "openai_compatible", "api_profile": "openai_compatible", "base_url": "https://api.openai.com/v1"},
+                "model": "gpt-4o",
+                "prompt": {"system": "s", "message": "m", "action_name": action_name,
+                           "response_schema": {"type": "object"}},
+                "max_tokens": 1024,
+            }));
+            sent_body(&answer)["temperature"].clone()
+        };
+        let stage1 = temperature("generate_normalized_ddl");
+        assert_eq!(stage1, serde_json::json!(0.3));
+        for action_name in [
+            "read_description",
+            "write_description_ddl",
+            "review_description_ddl",
+        ] {
+            assert_eq!(temperature(action_name), stage1, "{action_name}");
+        }
+        assert_eq!(temperature("write_image_ddl"), serde_json::json!(0.0));
     }
 
     /// The ChatGPT body ends with a cache routing hint, the same for the

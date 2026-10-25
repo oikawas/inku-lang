@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-26 — A work keeps the tokens its sends used
-
-A work drawn by the Server saves the tokens every send that drew it used. The shared core's `provider_wire` gains `usage`, which reads each provider's counts with one meaning: input includes cache reads and writes (Claude's `input_tokens` holds neither), and output includes thinking and reasoning (Gemini's `candidatesTokenCount` leaves thoughts out). The ChatGPT plan's terminal response is read the same way. The Server adds each send under the stage it is timed under (`stage1`, `composition`, `laws`, `colors`, `stage2`, `image`, `read_and_draw`), retries and answers cut at the output limit included. The work's `tokens_in` and `tokens_out` hold the total, and its saved context holds `provider_usage`: for each stage, the sends, the sends whose response reported no count, and the input, output and cached input tokens. The database shape is unchanged. In the drawing response, `tokens_in_stage2` and `tokens_out_stage2` are hole completion and `tokens_in_stage1` and `tokens_out_stage1` everything else. A work that sent nothing records 0; earlier works stay unrecorded (null). The Web's provenance drawer shows the total in "tokens in / out"; choosing "Detail" under "Provenance tokens" in the display settings adds a row for each stage that sent. The default is "Total only", and the choice is saved to the account as `generation_info_token_detail`. Sends for the colophon, the AI refinement's juxtaposition and the demo instruction are not counted. Android and macOS are unchanged.
-
 ### 2026-10-25 — inku-cli reads one work by its UUID
 
 inku-cli gains `history show`, which prints a work's description, DDL and JSON Score (`--part` for one of them), and `history png`, which rasterizes the saved display SVG into a PNG of the drawing alone (`--size` for the longer side, default 1024). Both take the UUID or its first few characters. There is no endpoint for one work, so the listing is asked with `anchor_id` and `limit=1` and the returned work's id is checked. A prefix is resolved against the listing without pictures, and one that fits more than one work stops with the candidates. The server is unchanged.
@@ -302,6 +298,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.257 (2026-10-26 / Build1333)
+
+### 2026-10-26 — A work keeps the tokens its sends used
+
+A work drawn by the Server saves the tokens every send that drew it used. The shared core's `provider_wire` gains `usage`, which reads each provider's counts with one meaning: input includes cache reads and writes (Claude's `input_tokens` holds neither), and output includes thinking and reasoning (Gemini's `candidatesTokenCount` leaves thoughts out). The ChatGPT plan's terminal response is read the same way. The Server adds each send under the stage it is timed under (`stage1`, `composition`, `laws`, `colors`, `stage2`, `image`, `read_and_draw`), retries and answers cut at the output limit included. The work's `tokens_in` and `tokens_out` hold the total, and its saved context holds `provider_usage`: for each stage, the sends, the sends whose response reported no count, and the input, output and cached input tokens. The database shape is unchanged. In the drawing response, `tokens_in_stage2` and `tokens_out_stage2` are hole completion and `tokens_in_stage1` and `tokens_out_stage1` everything else. A work that sent nothing records 0; earlier works stay unrecorded (null). The Web's provenance drawer shows the total in "tokens in / out"; choosing "Detail" under "Provenance tokens" in the display settings adds a row for each stage that sent. The default is "Total only", and the choice is saved to the account as `generation_info_token_detail`. Sends for the colophon, the AI refinement's juxtaposition and the demo instruction are not counted. Android and macOS are unchanged.
 
 ## v2.15.256 (2026-10-26 / Build1332)
 

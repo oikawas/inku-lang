@@ -8,9 +8,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-25 — Naming a work by its UUID: the `#` buttons copy the UUID, and inku-cli reads one work by it
-
-The `#` at the bottom right of the canvas and the `#` buttons in the library's thumbnails, list and preview copy the work's UUID instead of the full render hash (`rh3`). The same Score drawn again with the same seed gives another work the same `rh3`, and a stored hash is rewritten when the hash scheme changes, so it does not name a work. The preview row changed from `Hash` with `#XXXX` to `ID` with the UUID's first eight characters (the author's choice), and the list's column heading is now `ID`. The render hash copy under `Identity` in Provenance and the hash copies in the lineage panel are unchanged.
+### 2026-10-25 — inku-cli reads one work by its UUID
 
 inku-cli gains `history show`, which prints a work's description, DDL and JSON Score (`--part` for one of them), and `history png`, which rasterizes the saved display SVG into a PNG of the drawing alone (`--size` for the longer side, default 1024). Both take the UUID or its first few characters. There is no endpoint for one work, so the listing is asked with `anchor_id` and `limit=1` and the returned work's id is checked. A prefix is resolved against the listing without pictures, and one that fits more than one work stops with the candidates. The server is unchanged.
 
@@ -300,6 +298,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.245 (2026-10-25 / Build1321)
+
+### 2026-10-25 — Naming a work by its UUID: the `#` buttons copy the UUID
+
+The `#` at the bottom right of the canvas and the `#` buttons in the library's thumbnails, list and preview copy the work's UUID instead of the full render hash (`rh3`). The same Score drawn again with the same seed gives another work the same `rh3`, and a stored hash is rewritten when the hash scheme changes, so it does not name a work. The preview row changed from `Hash` with `#XXXX` to `ID` with the UUID's first eight characters (the author's choice), and the list's column heading is now `ID`. The render hash copy under `Identity` in Provenance and the hash copies in the lineage panel are unchanged.
 
 ## v2.15.244 (2026-10-24 / Build1320)
 

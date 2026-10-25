@@ -1633,6 +1633,75 @@ fn input_tokens(format: &str, data: &Value) -> Option<Value> {
     count(get(object_or_empty(get(data, usage)), name))
 }
 
+/// The tokens one send used, counted alike for every dialect so a work's total
+/// means one thing: input is everything read, cache reads and writes included
+/// (Claude's `input_tokens` leaves both out), and output is everything written,
+/// thinking included (Gemini's `candidatesTokenCount` leaves thoughts out).
+/// `None` when the response reports no usage; a count it leaves out is null.
+fn usage(format: &str, data: &Value) -> Option<Value> {
+    let number = |value: Option<&Value>| match count(value) {
+        Some(Value::Integer(digits)) => digits.parse::<i64>().ok(),
+        _ => None,
+    };
+    let sum = |base: Option<i64>, more: &[Option<i64>]| {
+        base.map(|first| first + more.iter().flatten().sum::<i64>())
+    };
+    let source = object_or_empty(get(
+        data,
+        if format == "gemini" {
+            "usageMetadata"
+        } else {
+            "usage"
+        },
+    ));
+    let field = |name: &str| number(get(source, name));
+    let detail =
+        |details: &str, name: &str| number(get(object_or_empty(get(source, details)), name));
+    let (input, output, cached) = match format {
+        "anthropic" => {
+            let cache_read = field("cache_read_input_tokens");
+            (
+                sum(
+                    field("input_tokens"),
+                    &[cache_read, field("cache_creation_input_tokens")],
+                ),
+                field("output_tokens"),
+                cache_read,
+            )
+        }
+        "openai_responses" => (
+            field("input_tokens"),
+            field("output_tokens"),
+            detail("input_tokens_details", "cached_tokens"),
+        ),
+        "gemini" => {
+            let written = match (field("candidatesTokenCount"), field("thoughtsTokenCount")) {
+                (None, None) => None,
+                (candidates, thoughts) => Some(candidates.unwrap_or(0) + thoughts.unwrap_or(0)),
+            };
+            (
+                field("promptTokenCount"),
+                written,
+                field("cachedContentTokenCount"),
+            )
+        }
+        _ => (
+            field("prompt_tokens"),
+            field("completion_tokens"),
+            detail("prompt_tokens_details", "cached_tokens"),
+        ),
+    };
+    if input.is_none() && output.is_none() {
+        return None;
+    }
+    let or_null = |value: Option<i64>| value.map_or(Value::Null, integer);
+    Some(object(vec![
+        ("input_tokens", or_null(input)),
+        ("output_tokens", or_null(output)),
+        ("cached_input_tokens", or_null(cached)),
+    ]))
+}
+
 /// The object an answer given as text carries, fenced or not.
 fn json_object_in(text: &str) -> Option<Value> {
     let start = text.find('{')?;
@@ -2007,6 +2076,21 @@ fn answer(request: &Value) -> Result<Value, Refusal> {
                 action == "text_response",
             ))
         }
+        "usage" => {
+            // The ChatGPT plan's terminal response is read as `openai_responses`.
+            let format = as_str(get(request, "format"))
+                .filter(|format| {
+                    ["openai_responses", "openai_chat", "anthropic", "gemini"].contains(format)
+                })
+                .ok_or_else(|| Refusal::invalid("format is unknown"))?;
+            let body = as_str(get(request, "body"))
+                .ok_or_else(|| Refusal::invalid("body must be a string"))?;
+            let read = match python_loads(body) {
+                Ok(data @ Value::Object(_)) => usage(format, &data),
+                _ => None,
+            };
+            Ok(object(vec![("usage", read.unwrap_or(Value::Null))]))
+        }
         "chatgpt_request" => {
             let model = model()?;
             let prompt = get(request, "prompt")
@@ -2091,8 +2175,9 @@ fn answer(request: &Value) -> Result<Value, Refusal> {
 /// JSON in, JSON out, for the hosts' bindings. A request answers
 /// `{"schema", "outcome": "ok", "url", "headers", "auth", "format",
 /// "output_budget", "body"}`; a response answers `{"schema", "outcome":
-/// "answer" | "cut" | "malformed" | "http_error", ...}`; a request that cannot
-/// be built answers `{"schema", "outcome": "refused", "reason", "detail"}`.
+/// "answer" | "cut" | "malformed" | "http_error", ...}`; a response's `usage`
+/// answers `{"schema", "outcome": "ok", "usage"}`; a request that cannot be
+/// built answers `{"schema", "outcome": "refused", "reason", "detail"}`.
 #[must_use]
 pub fn provider_wire_json(input: &[u8]) -> Vec<u8> {
     let parsed = std::str::from_utf8(input)
@@ -2426,5 +2511,59 @@ mod tests {
             assert_eq!(answer["reason"], "invalid_request");
             assert_eq!(answer["detail"], detail);
         }
+    }
+
+    #[test]
+    fn usage_counts_cache_and_thinking_alike_in_every_dialect() {
+        let read = |format: &str, body: serde_json::Value| {
+            let answer = ask(
+                &serde_json::json!({"action": "usage", "format": format, "body": body.to_string()}),
+            );
+            assert_eq!(answer["outcome"], "ok", "{format}");
+            answer["usage"].clone()
+        };
+        // Claude leaves cache reads and writes out of input_tokens.
+        assert_eq!(
+            read(
+                "anthropic",
+                serde_json::json!({"usage": {"input_tokens": 10, "cache_read_input_tokens": 300,
+                                                             "cache_creation_input_tokens": 40, "output_tokens": 7}})
+            ),
+            serde_json::json!({"input_tokens": 350, "output_tokens": 7, "cached_input_tokens": 300})
+        );
+        assert_eq!(
+            read(
+                "openai_responses",
+                serde_json::json!({"usage": {"input_tokens": 120, "output_tokens": 30,
+                "input_tokens_details": {"cached_tokens": 100}, "output_tokens_details": {"reasoning_tokens": 20}}})
+            ),
+            serde_json::json!({"input_tokens": 120, "output_tokens": 30, "cached_input_tokens": 100})
+        );
+        assert_eq!(
+            read(
+                "openai_chat",
+                serde_json::json!({"usage": {"prompt_tokens": 50, "completion_tokens": 9}})
+            ),
+            serde_json::json!({"input_tokens": 50, "output_tokens": 9, "cached_input_tokens": null})
+        );
+        // Gemini leaves thoughts out of candidatesTokenCount.
+        assert_eq!(
+            read(
+                "gemini",
+                serde_json::json!({"usageMetadata": {"promptTokenCount": 80, "candidatesTokenCount": 12,
+                                                                 "thoughtsTokenCount": 200, "cachedContentTokenCount": 64}})
+            ),
+            serde_json::json!({"input_tokens": 80, "output_tokens": 212, "cached_input_tokens": 64})
+        );
+        assert_eq!(
+            read("gemini", serde_json::json!({"candidates": []})),
+            serde_json::Value::Null
+        );
+        assert_eq!(
+            ask(
+                &serde_json::json!({"action": "usage", "format": "openai_chat", "body": "not json"})
+            )["usage"],
+            serde_json::Value::Null
+        );
     }
 }

@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-25 — Arrow keys move through the history strip
+
+With the keyboard focus on a history strip thumbnail, ← opens the next newer work and → the next older one. They use the canvas's per-work move (`history.move`), so at either end of the strip the neighbouring page is read and the move continues. The focus follows the opened work's thumbnail.
+
 ### 2026-10-25 — The lineage Open large button is retired
 
 Open large in the lineage header only showed the work large on the canvas, as double-clicking a work card does, so it is retired from the Web. The same macOS button is unchanged.

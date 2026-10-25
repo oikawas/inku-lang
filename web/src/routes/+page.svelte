@@ -3261,6 +3261,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			onOldestPage={gotoHistoryOldestPage}
 			onJumpPage={jumpToHistoryPage}
 			onLoadItem={loadIterationItem}
+			onNewerWork={gotoNext}
+			onOlderWork={gotoPrev}
 			onToggleStar={toggleHistoryStar}
 			interactionLocked={demoRunning}
 			navLatestDisabled={historyPageNavDisabled.latest}

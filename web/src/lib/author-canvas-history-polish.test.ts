@@ -51,7 +51,7 @@ test('the work search sits right of the history filters, and while it waits or f
 	assert.match(HISTORY, /\{#if noCandidates \|\| searching\}[\s\S]*?class="thumb thumb-empty"[\s\S]*?\{searching \? \(filtered \? t\(\)\.historySearching : t\(\)\.historyLoading\) : t\(\)\.historyNoCandidates\}/);
 	assert.match(HISTORY, /const searching = \$derived\(\(filtered \|\| heldWorks\) && historyItems\.length === 0 && searchBusy\);/);
 	assert.match(HISTORY, /\{#if historyTotal > 0 \|\| filtered \|\| searching\}/);
-	assert.match(HISTORY, /<div class="thumb-strip" bind:clientHeight=\{stripHeight\} style:min-height=\{keptHeight \? `\$\{keptHeight\}px` : null\}>/);
+	assert.match(HISTORY, /<div class="thumb-strip" bind:this=\{thumbStrip\} bind:clientHeight=\{stripHeight\} style:min-height=\{keptHeight \? `\$\{keptHeight\}px` : null\}>/);
 	assert.equal(ja.historyNoCandidates, '候補無し');
 	assert.equal(en.historyNoCandidates, 'No matches');
 	assert.equal(ja.historySearching, '検索中…');

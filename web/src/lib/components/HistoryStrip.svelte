@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import HistoryThumbnail from '$lib/components/HistoryThumbnail.svelte';
 	import LibraryPageInput from '$lib/components/LibraryPageInput.svelte';
@@ -51,6 +51,9 @@
 		onOldestPage: () => void | Promise<void>;
 		onJumpPage: (page: number) => void | Promise<void>;
 		onLoadItem: (item: HistoryItem) => void;
+		/** ← and → on a picture: the next work newer or older, across pages, opened. */
+		onNewerWork?: () => void | Promise<void>;
+		onOlderWork?: () => void | Promise<void>;
 		onToggleStar: (item: HistoryItem, event?: Event) => void | Promise<void>;
 		interactionLocked: boolean;
 		// Counted in works, so this button and the canvas's "Latest" are never in
@@ -101,6 +104,8 @@
 		onOldestPage,
 		onJumpPage,
 		onLoadItem,
+		onNewerWork,
+		onOlderWork,
 		onToggleStar,
 		interactionLocked,
 		navLatestDisabled,
@@ -201,10 +206,30 @@
 	// pressed for as long as the listing stands still, and it does not: a save in
 	// another window is taken in at the front every twelve seconds.
 	function handleThumbKeydown(event: KeyboardEvent, item: HistoryItem) {
+		if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+			event.preventDefault();
+			if (interactionLocked) return;
+			// The strip runs newest on the left, as the buttons above it do.
+			void moveByKey(event.key === 'ArrowLeft' ? onNewerWork : onOlderWork);
+			return;
+		}
 		if (event.key !== 'Enter' && event.key !== ' ') return;
 		event.preventDefault();
 		if (interactionLocked) return;
 		onLoadItem(item);
+	}
+
+	let thumbStrip = $state<HTMLDivElement | null>(null);
+
+	// The move may fetch another page, which replaces the picture that had the
+	// focus, so the focus follows the work that opened rather than the old tile.
+	async function moveByKey(move: (() => void | Promise<void>) | undefined): Promise<void> {
+		if (!move) return;
+		await move();
+		await tick();
+		const current = thumbStrip?.querySelector<HTMLElement>('.thumb.current');
+		current?.focus();
+		current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 	}
 </script>
 
@@ -272,7 +297,7 @@
 			<div class="history-filter-notice" role="status" aria-live="polite">{starredFilterClearedNotice}</div>
 		{/if}
 		{#if !historyCollapsed}
-			<div class="thumb-strip" bind:clientHeight={stripHeight} style:min-height={keptHeight ? `${keptHeight}px` : null}>
+			<div class="thumb-strip" bind:this={thumbStrip} bind:clientHeight={stripHeight} style:min-height={keptHeight ? `${keptHeight}px` : null}>
 				{#each historyItems as it, i (it.id ?? it.at)}
 					<div
 						class="thumb"

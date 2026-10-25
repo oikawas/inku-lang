@@ -903,6 +903,12 @@ pub struct ColorsContext {
     feasible: BTreeMap<&'static str, Vec<&'static str>>,
     /// The layers each hue of D1 and D5 can be put on, by the law and the hue.
     hue_layers: BTreeMap<(&'static str, &'static str), Vec<usize>>,
+    /// D2's layers and the vivid colors the tool can realize on each with D2
+    /// alone, on the work's own ground: what the request offers (2026-10-25:
+    /// half the color answers refused in the prototype took D2 where no other
+    /// layer could turn neutral and be seen, or keep the aerial order). The
+    /// check still takes any of `d2_choices` and refuses with the reason.
+    d2_alone: BTreeMap<usize, Vec<&'static str>>,
     /// The ground the work had, when this is the work on the ground an answer
     /// chose (2026-10-21).
     ground_from: Option<Color>,
@@ -1088,10 +1094,12 @@ impl ColorsContext {
             already: BTreeSet::new(),
             feasible: BTreeMap::new(),
             hue_layers: BTreeMap::new(),
+            d2_alone: BTreeMap::new(),
             ground_from: None,
         };
         context.already = context.find_already();
         (context.feasible, context.hue_layers) = context.find_feasible();
+        context.d2_alone = context.find_d2_alone();
         Some(context)
     }
 
@@ -1454,6 +1462,23 @@ impl ColorsContext {
             .collect();
         found.insert("D7", levels);
         (found, on)
+    }
+
+    /// D2's layers and vivid colors the tool realizes with D2 alone.
+    fn find_d2_alone(&self) -> BTreeMap<usize, Vec<&'static str>> {
+        if self.colorable.is_empty() {
+            return BTreeMap::new();
+        }
+        self.d2_choices()
+            .into_iter()
+            .filter_map(|(layer, colors)| {
+                let realized: Vec<&'static str> = colors
+                    .into_iter()
+                    .filter(|vivid| self.trial("D2", json!({"vivid": vivid, "layer": layer})))
+                    .collect();
+                (!realized.is_empty()).then_some((layer, realized))
+            })
+            .collect()
     }
 
     /// The layers B19, B20, D1, D2 and D5 may name as the layer they work on:
@@ -2537,9 +2562,16 @@ impl ColorsContext {
                         hues.join(between)
                     )
                 }
+                // The pairs the tool realizes with D2 alone (2026-10-25).
+                "D2" if self.d2_alone.is_empty() => (if ja {
+                    "なし（この作品では、D2 だけでは道具が成り立たせられない）"
+                } else {
+                    "none (the tool cannot realize D2 alone in this work)"
+                })
+                .to_owned(),
                 "D2" => {
                     let vivid: Vec<String> = self
-                        .d2_choices()
+                        .d2_alone
                         .iter()
                         .map(|(layer, colors)| format!("{layer} → {}", colors.join(", ")))
                         .collect();

@@ -3652,12 +3652,12 @@ fn d2_counts_the_vivid_layers_the_colors_keep() {
     ]});
     let start = colors_start("A red circle above red marks at the bottom", None);
     let asked = plan_answer_with(&start, &plan).snapshot;
-    // D2 is offered only in red.
-    let d2 = choice_line(&asked, "D2");
-    assert!(d2.starts_with("- D2: layer and vivid: 0 → red"), "{d2}");
-    for other in ["yellow", "orange", "purple", "blue", "green"] {
-        assert!(!d2.contains(other), "{d2}");
-    }
+    // The tool tries D2 alone before it asks (2026-10-25): the red row stays
+    // as vivid, so the request offers no D2, and the check refuses it.
+    assert_eq!(
+        choice_line(&asked, "D2"),
+        "- D2: none (the tool cannot realize D2 alone in this work)"
+    );
     let refused = colors_answer(
         &asked,
         &json!({"main_law": "D2", "laws": {"D2": {"vivid": "red", "layer": 0}}, "reason": "“A red circle”."}),

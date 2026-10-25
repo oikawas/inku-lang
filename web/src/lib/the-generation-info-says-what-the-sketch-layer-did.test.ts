@@ -103,7 +103,8 @@ test('T-39  the prose is not repeated here; the describe panel holds it', () => 
 });
 
 test('T-39  and the section is withheld when there is no work at all', () => {
-	assert.match(INFO, /\{#if hasSketchDetails\}/);
+	// A read-and-draw work shows its reading in its own section instead (2026-10-26).
+	assert.match(INFO, /\{#if hasSketchDetails && !detailReadRecord\}/);
 	assert.match(INFO, /hasSketchDetails = \$derived\(!!\(statusHistoryItem \?\? result\)\)/);
 });
 

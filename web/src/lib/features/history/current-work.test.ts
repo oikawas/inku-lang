@@ -16,6 +16,17 @@ test('image history keeps provenance separate from every description replay inpu
 	assert.deepEqual(projected.result.image_ddl, item.image_ddl);
 });
 
+test('a read-and-draw work opened from the history keeps its record for the reading and Generation Info', () => {
+	const record = { reading_state: 'read', reading_text: '読み: 野に立つ女。' };
+	const item = { input: '紫のにほへる妹', source_text: '紫のにほへる妹', description_ddl: record,
+		sketch_text: record.reading_text, sketch_state: 'supplemented',
+		ddl: '赤い円', svg: '<svg/>', score: { instructions: [] } } as unknown as HistoryItem;
+	const projected = projectHistoryCurrentWork(item);
+	assert.equal(projected.sourceText, '紫のにほへる妹');
+	assert.deepEqual(projected.result.description_ddl, record);
+	assert.equal(projected.sketchText, record.reading_text);
+});
+
 test('T-295: current-work projection preserves saved source, render identity, seeds, and sketch state', () => {
 	const item: HistoryItem = {
 		id: 'work-1',

@@ -326,7 +326,8 @@
 						<p class="detail-note">{detailNote || (hasSketchDetails && !workId ? t().provenanceWorkNotSaved : '-')}</p>
 					{/if}
 				</section>
-				{#if hasSketchDetails}
+				<!-- A read-and-draw work's sketch text is its reading, which its own section shows. -->
+				{#if hasSketchDetails && !detailReadRecord}
 					<section class="detail-group">
 						<h4>{t().sketchLabel}</h4>
 						<dl>

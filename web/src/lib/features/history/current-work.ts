@@ -24,6 +24,7 @@ export function projectHistoryCurrentWork(item: HistoryItem): HistoryCurrentWork
 		sketchState: item.sketch_state,
 		result: {
 			image_ddl: item.image_ddl,
+			description_ddl: item.description_ddl,
 			image_provenance: item.image_provenance,
 			score: item.score,
 			svg: item.svg,

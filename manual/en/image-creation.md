@@ -312,7 +312,7 @@ Variation was retired on 2026-10-04. Once the focus reinterpretation was removed
 
 ### 8.2 Save Options
 
-Options are unsaved. Select the ones to adopt and choose `Save the chosen ones and close` to save them to history; the others are discarded. To keep none, choose `Discard all and close`. While unsaved options remain, the ×, the backdrop and Escape do not close the dialog and it asks for one of the two. Reloading or closing the tab brings up the browser's confirmation.
+Options are unsaved. Select the ones to adopt and choose `Save the chosen ones and close` to save them to history; the others are discarded. To keep none, choose `Discard all and close`. While unsaved options remain, the × is not shown, and the backdrop and Escape do not close the dialog; it asks for one of the two. Reloading or closing the tab brings up the browser's confirmation.
 
 Pressing an option enlarges it inside the dialog; `Back to all options` or a second press returns to all of them. Saving and starring are separate actions. You may record why you chose a saved option.
 

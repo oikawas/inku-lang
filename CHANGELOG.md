@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-25 — No × while a refinement has unsaved options
+
+While the refinement dialog held unsaved options, its × was shown as if usable although pressing it only showed a notice. It is now hidden then, leaving Save the chosen ones and close and Discard all and close as the ways out. The backdrop and Escape are unchanged.
+
 ### 2026-10-25 — Database backups can be restored or deleted from DB settings
 
 Each row of Retained copies in DB settings has Restore and Delete. Delete asks once and Restore asks twice. A restore first saves the current database as a manual backup (and stops if it cannot), then replaces the whole running database through SQLite's Backup API; other writes are refused with 503 meanwhile, and the page reloads when it finishes. A backup whose tables or migration registry differ from the running database, or that fails `quick_check`, is refused. The Server adds `DELETE /api/settings/db-backup/{kind}/{name}` and `POST /api/settings/db-backup/{kind}/{name}/restore`, for administrators only.

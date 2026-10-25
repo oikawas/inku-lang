@@ -102,7 +102,10 @@
 	{#if modalOpen}
 		<div class="refine-modal-header">
 			<h2 id="lineage-refine-dialog-title">{dialogTitle}</h2>
-			<button type="button" aria-label={isJapanese ? '閉じる' : 'Close'} onclick={onClose}>×</button>
+			<!-- Unsaved options can leave only by saving or discarding them, so × is not offered then. -->
+			{#if !refinementSession.hasUnsaved}
+				<button type="button" aria-label={isJapanese ? '閉じる' : 'Close'} onclick={onClose}>×</button>
+			{/if}
 		</div>
 	{/if}
 	{#if view === 'layout'}

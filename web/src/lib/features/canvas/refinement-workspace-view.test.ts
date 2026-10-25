@@ -101,3 +101,12 @@ test('I-528: language comparison has no Canvas or Lineage entry point', () => {
 	assert.doesNotMatch(panel, /'language'/);
 	assert.doesNotMatch(lineage, /'language'/);
 });
+
+test('unsaved options hide × while discard-and-close and save-and-close are the only ways out', () => {
+	const shell = read('./CanvasRefinementWorkspace.svelte');
+	const header = shell.slice(shell.indexOf('<div class="refine-modal-header">'), shell.indexOf('</div>', shell.indexOf('<div class="refine-modal-header">')));
+	assert.match(header, /\{#if !refinementSession\.hasUnsaved\}\s*<button[^>]*onclick=\{onClose\}>×<\/button>\s*\{\/if\}/);
+	const grid = read('./RefinementCandidateGrid.svelte');
+	assert.match(grid, /onclick=\{onDiscardAndClose\}/);
+	assert.match(grid, /onclick=\{onSaveAndClose\}/);
+});

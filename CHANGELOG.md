@@ -8,14 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-25 — A picture folder batch no longer skips pictures when a work is opened
-
-A folder of five pictures saved three without an error. The batch shared the pipeline controller that shows works on screen; opening a saved work while a picture ran moved that controller's request ordinal, so the picture's run returned at `score_ready` without performing, and the batch counted it painted. The batch now runs on a controller of its own, follows the canvas only while the author is on its tab, and counts a picture painted only when it comes back with a saved work; anything else is listed as a failure that Continue paints again.
-
-### 2026-10-25 — Painting from a picture warns once after each sign-in
-
-Before the first picture is painted after a sign-in, from the Image tab or the picture side of the Batch tab, the Web shows the author's warning that the picture data is uploaded to the AI and handled under the terms of the chosen model and its provider, and asks not to upload sensitive data. Going on paints and keeps the warning quiet in this browser for that account until the next sign-in; Cancel does not paint. Administrators switch it for everyone in Settings > Other (server) (`PUT /api/settings/image-upload-notice`, on by default, read by every page from `/api/client-config` as `image_upload_notice`; routes 138 → 139). The confirmation dialog now keeps line breaks and wraps a long message at 520 px.
-
 ### 2026-10-25 — inku-cli reads one work by its UUID
 
 inku-cli gains `history show`, which prints a work's description, DDL and JSON Score (`--part` for one of them), and `history png`, which rasterizes the saved display SVG into a PNG of the drawing alone (`--size` for the longer side, default 1024). Both take the UUID or its first few characters. There is no endpoint for one work, so the listing is asked with `anchor_id` and `limit=1` and the returned work's id is checked. A prefix is resolved against the listing without pictures, and one that fits more than one work stops with the candidates. The server is unchanged.
@@ -306,6 +298,16 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.253 (2026-10-25 / Build1329)
+
+### 2026-10-25 — A picture folder batch no longer skips pictures when a work is opened
+
+A folder of five pictures saved three without an error. The batch shared the pipeline controller that shows works on screen; opening a saved work while a picture ran moved that controller's request ordinal, so the picture's run returned at `score_ready` without performing, and the batch counted it painted. The batch now runs on a controller of its own, follows the canvas only while the author is on its tab, and counts a picture painted only when it comes back with a saved work; anything else is listed as a failure that Continue paints again.
+
+### 2026-10-25 — Painting from a picture warns once after each sign-in
+
+Before the first picture is painted after a sign-in, from the Image tab or the picture side of the Batch tab, the Web shows the author's warning that the picture data is uploaded to the AI and handled under the terms of the chosen model and its provider, and asks not to upload sensitive data. Going on paints and keeps the warning quiet in this browser for that account until the next sign-in; Cancel does not paint. Administrators switch it for everyone in Settings > Other (server) (`PUT /api/settings/image-upload-notice`, on by default, read by every page from `/api/client-config` as `image_upload_notice`; routes 138 → 139). The confirmation dialog now keeps line breaks and wraps a long message at 520 px.
 
 ## v2.15.252 (2026-10-25 / Build1328)
 

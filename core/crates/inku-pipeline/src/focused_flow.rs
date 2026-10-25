@@ -3619,11 +3619,16 @@ fn the_colors_offer_no_color_to_a_layer_seen_in_none() {
         .unwrap_or_else(|| panic!("{message}"));
     assert!(seen.contains("1 → "), "{seen}");
     assert!(!seen.contains("2 → "), "{seen}");
-    for law in ["C8", "B19"] {
-        let line = choice_line(&asked, law);
-        let (_, layers) = line.split_once("layer").unwrap_or_else(|| panic!("{line}"));
-        assert!(!layers.contains('2'), "{line}");
-    }
+    let assignments = choice_line(&asked, "C8");
+    assert!(
+        assignments.starts_with("- C8: assignments' layer: ") && !assignments.contains('2'),
+        "{assignments}"
+    );
+    // B19 keeps every layer seen, so the unseen outline leaves it out.
+    assert_eq!(
+        choice_line(&asked, "B19"),
+        "- B19: none (B19 needs every layer seen against the ground, and on the present ground some layer is seen in no color)"
+    );
 }
 
 /// C9 fills a brushmarks layer (DDL 25) as it fills any textured layer: the

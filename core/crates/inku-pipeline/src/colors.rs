@@ -2377,6 +2377,33 @@ impl ColorsContext {
             .collect()
     }
 
+    /// B19's far layers on the present ground, or `None` when B19 cannot hold
+    /// there: it keeps every layer at least seen and its far layers farther
+    /// (`B19_MAIN`), so a layer that no color it may take shows leaves it out
+    /// (2026-10-25: in the step 3b send most of B19's refusals were such
+    /// layers, named or not).
+    fn b19_far_layers(&self) -> Option<Vec<usize>> {
+        let reach = |layer: usize, need: f64| {
+            if self.colorable.contains(&layer) {
+                COLORS.iter().any(|color| self.seen(layer, *color) >= need)
+            } else {
+                self.now
+                    .looks
+                    .get(&layer)
+                    .is_none_or(|look| !look.read || look.contrast >= need)
+            }
+        };
+        if !self.layers().all(|layer| reach(layer, VISIBLE)) {
+            return None;
+        }
+        Some(
+            self.nameable()
+                .into_iter()
+                .filter(|layer| reach(*layer, B19_MAIN))
+                .collect(),
+        )
+    }
+
     /// The layers seen in `least` colors or more.
     fn seen_in(&self, layers: &[usize], least: usize) -> Vec<usize> {
         layers
@@ -2550,9 +2577,15 @@ impl ColorsContext {
                 "B11" | "B16" => seen_line("layer: ", self.seen_in(&self.multi, 2)),
                 "B13" => format!("layer: {}", optional(&choices.graded)),
                 "B14" => format!("layers: {}", optional(&choices.graded)),
-                // B19 holds a layer's drawn lightness away from the ground, so a
-                // layer seen in no color cannot take it either.
-                "B19" => seen_line("layers: ", self.seen_in(&self.nameable(), 1)),
+                "B19" => match self.b19_far_layers() {
+                    Some(layers) => seen_line("layers: ", layers),
+                    None => (if ja {
+                        "なし（B19 は全ての層が地から見えることを求めるが、今の地では、どの色でも見えない層がある）"
+                    } else {
+                        "none (B19 needs every layer seen against the ground, and on the present ground some layer is seen in no color)"
+                    })
+                    .to_owned(),
+                },
                 "B20" => {
                     let accent = self.seen_in(&self.colorable, 1);
                     if accent.is_empty() {

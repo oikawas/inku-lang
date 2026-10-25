@@ -17,6 +17,16 @@ test('the batch tab has a switch, and the description side is the panel it alway
 	assert.match(INPUT_PANEL, /disabled=\{batchRunning \|\| batchResuming \|\| folderRunning\}/);
 });
 
+test('the switch sits at the right end of each side heading line', () => {
+	const BATCH_PANEL = readFileSync(new URL('./BatchPanel.svelte', import.meta.url), 'utf8');
+	assert.match(INPUT_PANEL, /<ImageFolderBatchPanel\s+sourceSwitch=\{batchSourceSwitch\}/);
+	assert.match(INPUT_PANEL, /<BatchPanel\s+sourceSwitch=\{batchSourceSwitch\}/);
+	for (const panel of [BATCH_PANEL, FOLDER_PANEL]) {
+		assert.match(panel, /<div class="batch-label">[\s\S]*?<span class="batch-label-end">[\s\S]*?\{@render sourceSwitch\?\.\(\)\}\s*<\/span>\s*<\/div>/);
+		assert.match(panel, /\.batch-label-end \{[^}]*margin-left: auto;/);
+	}
+});
+
 test('the picture side shows the picture tab settings', () => {
 	assert.match(INPUT_PANEL, /pictureConditions = \$derived\(inputMode === 'image' \|\| \(inputMode === 'batch' && imageFolder\.source === 'image'\)\)/);
 	assert.match(FOLDER_PANEL, /\{@render settings\?\.\(\)\}/);

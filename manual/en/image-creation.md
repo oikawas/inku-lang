@@ -613,7 +613,7 @@ Set `Batch retry` in the settings to one or more and the failed lines alone are 
 
 ### 17.1 A folder of pictures
 
-Turn the switch at the top of the Batch tab from `Descriptions` to `Pictures` to paint the pictures of a folder one by one. This browser remembers the switch. The `Descriptions` side works as described above.
+Turn the switch at the right end of the Batch tab's heading line (`Batch` or `Picture folder`) from `Descriptions` to `Pictures` to paint the pictures of a folder one by one. This browser remembers the switch. The `Descriptions` side works as described above.
 
 1. Press `Choose a folder` and pick a folder in the browser's dialog. The browser may ask whether to upload the files.
 2. The folder name and the number of pictures appear. JPEG, PNG, GIF and TIFF are taken, including those in subfolders; files and folders whose names start with `.` are left out. They are painted in the order of their paths inside the folder, with numbers compared as numbers (`2.jpg` before `10.jpg`).

@@ -22,11 +22,13 @@
 		onStop: () => void;
 		// The picture tab's settings rows, rendered by the parent.
 		settings?: Snippet;
+		/** The descriptions / pictures switch, at the right end of the heading line. */
+		sourceSwitch?: Snippet;
 	};
 
 	let {
 		folder, busy, visionModelName, visionModelAvailable, stageLabel, liveMs,
-		runTokensIn, runTokensOut, runAttempt = null, error, onRun, onStop, settings,
+		runTokensIn, runTokensOut, runAttempt = null, error, onRun, onStop, settings, sourceSwitch,
 	}: Props = $props();
 
 	let folderInputEl = $state<HTMLInputElement | null>(null);
@@ -49,9 +51,12 @@
 
 <div class="batch-label">
 	<span class="batch-label-text"><strong>{t().imageFolderLabel}</strong><span class="batch-label-hint">{t().imageFolderHint}</span></span>
-	{#if folder.interrupted && !folder.running}
-		<span class="batch-interrupted-mark">{t().batchInterruptedLabel}</span>
-	{/if}
+	<span class="batch-label-end">
+		{#if folder.interrupted && !folder.running}
+			<span class="batch-interrupted-mark">{t().batchInterruptedLabel}</span>
+		{/if}
+		{@render sourceSwitch?.()}
+	</span>
 </div>
 
 <!-- The browser reads a folder only when it is picked in its own dialog; a typed
@@ -153,6 +158,7 @@
 	.batch-label-text { display: grid; min-width: 0; gap: 2px; }
 	.batch-label strong { font-weight: 600; color: var(--fg); }
 	.batch-label-hint { color: var(--fg2); font-size: var(--ui-font-size-12); }
+	.batch-label-end { display: flex; flex: 0 0 auto; align-items: center; gap: 10px; margin-left: auto; }
 	.batch-interrupted-mark { flex: 0 0 auto; color: var(--danger); font-size: var(--ui-font-size-12); font-weight: 500; }
 	.error-text { color: var(--danger); font-size: var(--ui-font-size-12); white-space: pre-line; }
 	.folder-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0 4px; }

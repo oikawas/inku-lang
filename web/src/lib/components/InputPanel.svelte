@@ -423,22 +423,26 @@
 		{/if}
 		{#if error}<p class="error-text">{error}</p>{/if}
 	{:else if inputMode === 'batch'}
-		<!-- Descriptions or pictures; locked while either side runs. -->
-		<div class="batch-source">
-			<span class="batch-source-name" class:on={imageFolder.source === 'text'}>{t().batchSourceText}</span>
-			<button
-				type="button"
-				class="batch-source-switch"
-				role="switch"
-				aria-label={t().batchSourceLabel}
-				aria-checked={imageFolder.source === 'image'}
-				disabled={batchRunning || batchResuming || folderRunning}
-				onclick={() => imageFolder.setSource(imageFolder.source === 'image' ? 'text' : 'image')}
-			><span class="batch-source-knob" aria-hidden="true"></span></button>
-			<span class="batch-source-name" class:on={imageFolder.source === 'image'}>{t().batchSourceImage}</span>
-		</div>
+		<!-- Descriptions or pictures; locked while either side runs. Each panel puts
+		     it at the right end of its own heading line. -->
+		{#snippet batchSourceSwitch()}
+			<span class="batch-source">
+				<span class="batch-source-name" class:on={imageFolder.source === 'text'}>{t().batchSourceText}</span>
+				<button
+					type="button"
+					class="batch-source-switch"
+					role="switch"
+					aria-label={t().batchSourceLabel}
+					aria-checked={imageFolder.source === 'image'}
+					disabled={batchRunning || batchResuming || folderRunning}
+					onclick={() => imageFolder.setSource(imageFolder.source === 'image' ? 'text' : 'image')}
+				><span class="batch-source-knob" aria-hidden="true"></span></button>
+				<span class="batch-source-name" class:on={imageFolder.source === 'image'}>{t().batchSourceImage}</span>
+			</span>
+		{/snippet}
 		{#if imageFolder.source === 'image'}
 			<ImageFolderBatchPanel
+				sourceSwitch={batchSourceSwitch}
 				folder={imageFolder}
 				busy={singleRunning || generationDisabled || batchRunning}
 				{visionModelName}
@@ -455,6 +459,7 @@
 			/>
 		{:else}
 		<BatchPanel
+			sourceSwitch={batchSourceSwitch}
 			settings={inputConditionRows}
 			{runTokensIn}
 			{runTokensOut}
@@ -503,7 +508,7 @@
 </section>
 
 <style>
-	.batch-source { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: var(--ui-font-size-12); }
+	.batch-source { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 6px; font-size: var(--ui-font-size-12); font-weight: 400; white-space: nowrap; }
 	.batch-source-name { color: var(--fg3); }
 	.batch-source-name.on { color: var(--fg); font-weight: 600; }
 	.batch-source-switch {

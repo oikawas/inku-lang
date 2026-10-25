@@ -69,6 +69,8 @@
 		// The shared button row and settings readout, rendered by the parent but
 		// placed here so it sits between the input box and the batch options.
 		settings?: Snippet;
+		/** The descriptions / pictures switch, at the right end of the heading line. */
+		sourceSwitch?: Snippet;
 	};
 
 	let {
@@ -114,6 +116,7 @@
 		onSubmit,
 		onStop,
 		settings,
+		sourceSwitch,
 	}: Props = $props();
 
 	let batchTextareaEl = $state<HTMLTextAreaElement | null>(null);
@@ -168,9 +171,12 @@
 
 <div class="batch-label">
 	<span class="batch-label-text"><strong>{t().batchSectionLabel}</strong><span class="batch-label-hint">{t().batchSectionHint}</span></span>
-	{#if batchInterrupted && !batchRunning}
-		<span class="batch-interrupted-mark">{t().batchInterruptedLabel}</span>
-	{/if}
+	<span class="batch-label-end">
+		{#if batchInterrupted && !batchRunning}
+			<span class="batch-interrupted-mark">{t().batchInterruptedLabel}</span>
+		{/if}
+		{@render sourceSwitch?.()}
+	</span>
 </div>
 {#if batchRunning}
 	<!-- The box is read-only for the length of the run, so the whole list is not
@@ -372,6 +378,7 @@
 	.batch-label-text { display: flex; min-width: 0; gap: 2px; }
 	.batch-label strong { font-weight: 600; color: var(--fg); }
 	.batch-label-hint { color: var(--fg2); }
+	.batch-label-end { display: flex; flex: 0 0 auto; align-items: center; gap: 10px; margin-left: auto; }
 	.batch-interrupted-mark {
 		flex: 0 0 auto;
 		color: var(--danger);

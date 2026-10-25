@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-25 — ChatGPT plan registrations can be deleted
+
+Each registration in the ChatGPT plan settings has a Delete button. It shows Delete and Keep in place and deletes only after that confirmation. A connected registration is signed out first, asking OpenAI to revoke its tokens as Sign out does, and then the registration and its published model settings are removed. Deleting the active registration leaves none active. The Server adds `POST /api/me/chatgpt/profiles/{profile_id}/delete`. After connecting with the Mac helper, returning to the page now reads the connection state again; before, it stayed stale until Check connection was pressed.
+
 ### 2026-10-25 — inku-cli reads one work by its UUID
 
 inku-cli gains `history show`, which prints a work's description, DDL and JSON Score (`--part` for one of them), and `history png`, which rasterizes the saved display SVG into a PNG of the drawing alone (`--size` for the longer side, default 1024). Both take the UUID or its first few characters. There is no endpoint for one work, so the listing is asked with `anchor_id` and `limit=1` and the returned work's id is checked. A prefix is resolved against the listing without pictures, and one that fits more than one work stops with the candidates. The server is unchanged.

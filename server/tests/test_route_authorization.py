@@ -90,7 +90,9 @@ PUBLIC = {  # every entry needs a reason
 #   +1 for POST /api/render-canvas-fit, fitting a saved Score to another paper
 #   without reinterpreting its description (2026-10-23).
 #   +1 for POST /api/pipeline/images, a transient authenticated image upload (2026-10-24).
-EXPECTED_ROUTE_COUNT = 135
+#   +1 for POST /api/me/chatgpt/profiles/{profile_id}/delete, deleting a ChatGPT plan
+#   registration (2026-10-25).
+EXPECTED_ROUTE_COUNT = 136
 
 
 def _guard_names(dependant, seen=None) -> set[str]:

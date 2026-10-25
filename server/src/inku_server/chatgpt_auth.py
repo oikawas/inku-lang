@@ -216,6 +216,26 @@ async def sign_out(owner: str, profile_id: str) -> dict:
     return {"status": "signed_out", "revocation_confirmed": confirmed}
 
 
+async def delete_profile(owner: str, profile_id: str) -> dict:
+    # Sign out first so a connected registration's tokens are revoked, then drop the entry.
+    result = await sign_out(owner, profile_id)
+    store = CredentialStore()
+    with store.lock("edit:" + owner, time.monotonic() + 5):
+        value = store.read(owner)
+        profile = value["profiles"].get(profile_id)
+        if not profile:
+            raise ChatGPTError("chatgpt_not_connected")
+        # A reconnection that landed during revocation is newer than this request.
+        if profile["state"] != "signed_out":
+            raise ChatGPTError("chatgpt_session_changed")
+        del value["profiles"][profile_id]
+        value.get("registrations_pending", {}).pop(profile_id, None)
+        if value["active"] == profile_id:
+            value["active"] = None
+        store.write(owner, value)
+    return {"status": "deleted", "revocation_confirmed": result["revocation_confirmed"]}
+
+
 class AuthorizationAttempts:
     def __init__(self):
         self.attempts: dict[str, dict] = {}

@@ -6,7 +6,7 @@
 - passwordはsalt付きPBKDF2-SHA256。存在しないuserにもdummy hashを計算し、単純なtiming差を減らす。
 - session tokenはDBへhash保存され、clientはBearerまたは`HttpOnly` cookieで提示する。cookieは`SameSite=Lax`、secure属性は環境設定。
 - 権限グループは`admins`、`leaders`、`users`の3つで、1 userが複数に属せる。`_current_user`、`_user_manager`、`_admin_user`でrouteを保護し、guardは所属を1本の述語へ尋ねる。`role`列は所属から導出した写しとして残るが、どの判定も読まない。管理者でないleaderは自分のユーザーグループの利用者だけを見て管理する。作れるのは`users`だけの利用者で、`group_id`はnullも含めて自分のグループ以外へ動かせない（403）。最後の管理者を外す変更は409で断る。
-- 135 routeのうちguardなしは理由付きallowlist 5 path（`/health`、`/api/info`、`/api/auth/login`、`/api/notices`、`/api/notices/{notice_id}`）だけで、live routeをtestが列挙する。共有pipelineの`/api/pipeline/*`は各routeで`_current_user`を要求し、認証済みの利用者をexecution・variation・historyの所有者として全操作へ渡す。他人のexecutionやhistory linkは所有者の不一致で見えない。
+- 136 routeのうちguardなしは理由付きallowlist 5 path（`/health`、`/api/info`、`/api/auth/login`、`/api/notices`、`/api/notices/{notice_id}`）だけで、live routeをtestが列挙する。共有pipelineの`/api/pipeline/*`は各routeで`_current_user`を要求し、認証済みの利用者をexecution・variation・historyの所有者として全操作へ渡す。他人のexecutionやhistory linkは所有者の不一致で見えない。
 - ChatGPTの接続APIは同じsession guardに明示有効化・モード・起動・owner検証を重ねる。HTTPには本人の非秘密stateだけを返し、自己ホスト認証はMac loopbackと封印した一登録の保護移送を使う。host専用鍵・単一refresh所有者・profile/generation固定と通信cancelを[接続仕様](../guide/chatgpt-plan.ja.md)に記す。
 - clientはsnapshot、authority sidecar、effect結果、資源policy、`render` commandを送れない。資源上限はinstallationのmanifestと管理者設定から解決し、作品の保存済みbudgetは上げられない。保存済みScoreも自分の予算を自己申告できず、Serverが所有するhistory linkを持つ作品だけが保存policyで再演される。
 - 画像の入力は`/api/pipeline/images`が受け（32 MiBまで、超えれば413 `image_too_large`）、画素はそのworkerのメモリにだけ置く。開始を待つ画像は15分で期限が切れ、期限の後の開始は`image_missing`で止まる。durableな境界とhistory rowへ渡るのは参照（形式・画素数・SHA-256・バイト数）と来歴だけで、画像のbytesはDBにも作品ファイルにも保存しない。画像を送るeffectのprovider観測は要求本文のSHA-256とバイト数だけを残し、providerの拒否の本文も読まない（画像を写し返しうるため）。

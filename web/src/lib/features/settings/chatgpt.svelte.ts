@@ -85,7 +85,7 @@ export function createChatGPTSettings(deps: {
 		try {
 			const result = await call(path, {});
 			if (!current(owner, stamp)) return;
-			await refresh(owner, stamp, result.status === 'signed_out' && !result.revocation_confirmed ? 'chatgpt_revocation_unconfirmed' : null);
+			await refresh(owner, stamp, (result.status === 'signed_out' || result.status === 'deleted') && result.revocation_confirmed === false ? 'chatgpt_revocation_unconfirmed' : null);
 			if (current(owner, stamp)) await deps.changed();
 		} catch (error) {
 			if (current(owner, stamp)) code = error instanceof Error ? error.message : 'chatgpt_operation_failed';
@@ -141,6 +141,18 @@ export function createChatGPTSettings(deps: {
 		} catch (error) { if (current(owner, stamp)) { code = error instanceof Error ? error.message : 'chatgpt_operation_failed'; busy = false; } }
 	}
 
+	// The Mac helper finishes outside this page, so re-read the state when the author comes back,
+	// keeping the helper link and its message.
+	async function recheck() {
+		const owner = deps.owner();
+		if (!helperUrl || busy || !owner || owner !== boundOwner || !deps.available()) return;
+		const stamp = epoch, before = JSON.stringify(state);
+		try {
+			await refresh(owner, stamp, code);
+			if (current(owner, stamp) && JSON.stringify(state) !== before) await deps.changed();
+		} catch { /* The explicit check button reports errors. */ }
+	}
+
 	async function cancel() {
 		const pending = attemptId;
 		const owner = boundOwner;
@@ -154,9 +166,10 @@ export function createChatGPTSettings(deps: {
 		get state() { return visible() ? state : null; }, get code() { return visible() ? code : null; }, get busy() { return visible() && busy; },
 		get authorizationUrl() { return visible() ? authorizationUrl : null; },
 		get helperUrl() { return visible() ? helperUrl : null; },
-		load, reset, stop, cancel, authorize,
+		load, reset, stop, cancel, authorize, recheck,
 		select: (id: string) => mutate('/profiles/' + encodeURIComponent(id) + '/select'),
 		signOut: (id: string) => mutate('/profiles/' + encodeURIComponent(id) + '/sign-out'),
+		remove: (id: string) => mutate('/profiles/' + encodeURIComponent(id) + '/delete'),
 		retry: (id: string) => mutate('/profiles/' + encodeURIComponent(id) + '/retry')
 	};
 }

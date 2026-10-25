@@ -223,13 +223,13 @@ flowchart LR
 | `render` | 15 | compose、interpret、render-score/svg、paint、paint stream、構図の範囲、てざわり・支持体・配色の候補と差し替え、はめ込み、取り合わせ | `_current_user` |
 | `feedback` | 3 | unread words | `_current_user` |
 | `description` | 2 | 記述の音数・音節 | `_current_user` |
-| `chatgpt` | 11 | 本人の接続状態・認可・profile・モデル公開設定 | `_current_user`、操作は本人owner判定 |
+| `chatgpt` | 12 | 本人の接続状態・認可・profile・モデル公開設定 | `_current_user`、操作は本人owner判定 |
 | `autonomous` | 4 | AI自動推敲のrunの開始・一覧・取得・停止 | `_current_user` |
 | `pipeline` | 15 | canvas形式、画像の受取、variationの開始・取得・記述からのfork、variationが送ったsystem prompt、execution command、author DDL、補完の範囲の状態、history link・fork、作品のDDL書き出し（名指すplugin定義つき）、旧作品の読取・fork、provider観測 | 各routeで`_current_user`。provider観測はさらにdeveloper modeだけ |
 
-合計135。推敲の変奏seed採番とVisionの助言の入口は廃止した。公開allowlistは `/health`、`/api/info`、`/api/auth/login`、`/api/notices`、`/api/notices/{notice_id}` の5 pathである（`test_route_authorization.py`）。通知の2つは固定した配布ライセンスの読取りだけを提供し、任意ファイルや本人情報を返さない。それ以外はログインに必要な入口だけを公開する。
+合計136。推敲の変奏seed採番とVisionの助言の入口は廃止した。公開allowlistは `/health`、`/api/info`、`/api/auth/login`、`/api/notices`、`/api/notices/{notice_id}` の5 pathである（`test_route_authorization.py`）。通知の2つは固定した配布ライセンスの読取りだけを提供し、任意ファイルや本人情報を返さない。それ以外はログインに必要な入口だけを公開する。
 
-router別の件数は、live appのrouteを`test_route_authorization.py`と同じ数え方（`iter_route_contexts`）でendpointのmoduleごとに数えたもの（2026-10-24）。合計の正本は`test_route_authorization.py`の`EXPECTED_ROUTE_COUNT`（135）で、live appのOpenAPIから作った`tests/data/api-surface-baseline.json`も135 operation（198 schema）を記録する。OpenAPI（`/docs`）はrouterごとに1つのtag（14）を付け、135 routeすべてに要約と説明を、引数と要求・応答の欄に英語の説明を持つ（v2.15.243から）。
+router別の件数は、live appのrouteを`test_route_authorization.py`と同じ数え方（`iter_route_contexts`）でendpointのmoduleごとに数えたもの（2026-10-25）。合計の正本は`test_route_authorization.py`の`EXPECTED_ROUTE_COUNT`（136）で、live appのOpenAPIから作った`tests/data/api-surface-baseline.json`も136 operation（198 schema）を記録する。OpenAPI（`/docs`）はrouterごとに1つのtag（14）を付け、136 routeすべてに要約と説明を、引数と要求・応答の欄に英語の説明を持つ（v2.15.243から）。
 
 ## 主要flow
 

@@ -5,7 +5,14 @@
 	let { connection, onOpenModelSettings }: { connection: ChatGPTSettingsController; onOpenModelSettings: () => void } = $props();
 	const connected = $derived(connection.state?.profiles.some((profile) => profile.id === connection.state?.active_profile_id
 		&& profile.state === 'connected' && profile.scopes.includes('chatgpt.tokens.use.direct')) === true);
-	onMount(() => { void connection.load(); });
+	let confirmingDelete = $state<string | null>(null);
+	const recheck = () => { if (document.visibilityState === 'visible') void connection.recheck(); };
+	onMount(() => {
+		void connection.load();
+		window.addEventListener('focus', recheck);
+		document.addEventListener('visibilitychange', recheck);
+		return () => { window.removeEventListener('focus', recheck); document.removeEventListener('visibilitychange', recheck); };
+	});
 	onDestroy(() => { void connection.cancel(); });
 </script>
 
@@ -40,7 +47,17 @@
 				{/if}
 				{#if profile.state === 'quota'}<button class="ghost-btn" disabled={connection.busy} onclick={() => void connection.retry(profile.id)}>{t().chatgptRetry}</button>{/if}
 				<button class="ghost-btn" disabled={connection.busy} onclick={() => void connection.signOut(profile.id)}>{t().chatgptSignOut}</button>
+				{#if confirmingDelete !== profile.id}
+					<button class="ghost-btn" disabled={connection.busy} onclick={() => { confirmingDelete = profile.id; }}>{t().chatgptDelete}</button>
+				{/if}
 			</div>
+			{#if confirmingDelete === profile.id}
+				<div class="actions" role="group" aria-label={t().chatgptDelete}>
+					<span>{t().chatgptDeleteConfirmText}</span>
+					<button class="ghost-btn danger" disabled={connection.busy} onclick={() => { confirmingDelete = null; void connection.remove(profile.id); }}>{t().chatgptDeleteConfirm}</button>
+					<button class="ghost-btn" onclick={() => { confirmingDelete = null; }}>{t().chatgptDeleteCancel}</button>
+				</div>
+			{/if}
 		</section>
 	{/each}
 	{#if connected}
@@ -53,4 +70,5 @@
 	.chatgpt-connection { display: grid; gap: 1rem; }
 	.actions { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
 	.profile { border-top: 1px solid var(--border); padding-top: .75rem; }
+	.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 48%, var(--border2)); }
 </style>

@@ -263,3 +263,41 @@ test('personal publication picker exposes Vision use; the shared assessments are
 	assert.ok(!administrator.includes(ja.settingsModelRecommendationFields.recommendation_stage1));
 	assert.match(administrator, /平均秒数 Vision/);
 });
+
+test('delete posts to the registration, and a return from the Mac helper re-reads the state', async () => {
+	const owner = '00000000-0000-4000-8000-000000000001';
+	const id = '00000000-0000-4000-8000-000000000002';
+	const calls: string[] = [];
+	let current: unknown = { ...state('Account'), profiles: [{ id, label: 'Account', state: 'signed_out', generation: 2, scopes: [] }] };
+	let changes = 0;
+	const previous = globalThis.window;
+	(globalThis as any).window = { location: { assign() {} } };
+	try {
+		const connection = createChatGPTSettings({
+			owner: () => owner, available: () => true, invalidate() {}, changed() { changes++; },
+			apiFetch: async (url: string) => {
+				calls.push(url);
+				if (url.endsWith('/authorize')) return response({ action: 'local_helper' });
+				if (url.endsWith('/delete')) { current = { ...state('Account'), active_profile_id: null, profiles: [] }; return response({ status: 'deleted', revocation_confirmed: true }); }
+				return response(current);
+			}
+		});
+		await connection.load();
+		await connection.recheck();
+		assert.equal(calls.length, 1, 'no helper was opened, so a return does not re-read');
+		await connection.authorize(id);
+		assert.equal(connection.code, 'chatgpt_helper_requested');
+		current = { ...state('Account'), profiles: [{ id, label: 'Account', state: 'connected', generation: 3, scopes: ['chatgpt.tokens.use.direct'] }] };
+		await connection.recheck();
+		assert.equal(connection.state.profiles[0].state, 'connected');
+		assert.equal(connection.code, 'chatgpt_helper_requested');
+		assert.ok(connection.helperUrl);
+		assert.equal(changes, 1);
+		await connection.recheck();
+		assert.equal(changes, 1, 'an unchanged state does not reload the model lists');
+		await connection.remove(id);
+		assert.ok(calls.some((url) => url === '/api/me/chatgpt/profiles/' + id + '/delete'));
+		assert.deepEqual(connection.state.profiles, []);
+		assert.equal(connection.code, null);
+	} finally { (globalThis as any).window = previous; }
+});

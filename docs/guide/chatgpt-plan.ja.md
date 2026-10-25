@@ -31,7 +31,7 @@ INKU_CHATGPT_PLAN_ENABLED=1 INKU_DEVELOPER_MODE=1 \
 
 設定の独立した「ChatGPTプラン」タブで「ChatGPTで続ける」を押すと、このMacにセットアップした専用アプリ「inku ChatGPT」を開きます。ChromeまたはBraveがアプリを開く確認を表示したら許可します。開かない場合は画面の同じリンクから再度開けます。アプリ未導入の場合は、運用者がこのMacへセットアップしてから進めます。
 
-Macの確認画面には保護された接続で取得したinku本人の名前・IDと移送先host IDが表示されます。接続先を確認して「続ける」を押すと、設定を始めたChromeまたはBraveでOpenAI認証・利用同意へ進み、同じブラウザのcallbackへ戻ります。ブラウザを開けない場合に別のブラウザへ自動で切り替えません。認証後の封印と移送は専用アプリが一回ずつ行います。完了したらWebの「接続状態を確認」を押します。Macの確認・完了・失敗の理由は設定の表示言語に合わせます。OpenAI自身の認証画面の文言はOpenAIが提供します。失敗時は理由を表示して止まり、自動再試行しません。既に別のinku本人へ固定したMacではその接続を拒否します。
+Macの確認画面には保護された接続で取得したinku本人の名前・IDと移送先host IDが表示されます。接続先を確認して「続ける」を押すと、設定を始めたChromeまたはBraveでOpenAI認証・利用同意へ進み、同じブラウザのcallbackへ戻ります。ブラウザを開けない場合に別のブラウザへ自動で切り替えません。認証後の封印と移送は専用アプリが一回ずつ行います。完了してWebのページへ戻ると、ページが接続状態を読み直します。「接続状態を確認」でも読み直せます。Macの確認・完了・失敗の理由は設定の表示言語に合わせます。OpenAI自身の認証画面の文言はOpenAIが提供します。失敗時は理由を表示して止まり、自動再試行しません。既に別のinku本人へ固定したMacではその接続を拒否します。
 
 起動リンクの`inku-chatgpt://connect`には本人ID・選択登録ID・同意指定に加え、固定のブラウザ指定（`chrome`／`brave`）と表示言語（`ja`／`en`）を載せます。任意のアプリやcommandは指定できません。Braveは公開の`navigator.brave.isBrave()`で識別します。[Braveの公式案内](https://github.com/brave/brave-browser/wiki/Detecting-Brave-(for-Websites))。OAuth URL/code/tokenや転送する登録の本文をリンクへ含めません。「表示・操作」「描画」「その他（サーバー）」などの既存設定は元のページに残ります。以下は運用者向けの同じ接続手順です。
 
@@ -122,7 +122,7 @@ quota時は同じ登録の後続送信を止めます。「利用枠を確認」
 
 写生文、色カタログ選択、記述からのDDL、構図の読み、法則の段、配色の段、可視holeの補完へ同じ描画モデルを使います。構図の読みは`read_composition`を、法則の段は`choose_laws`を、配色の段は`choose_colors`を受け、観測の時間とusageはStage 1から分けてそれぞれ`composition`・`laws`・`colors`へ記録します。読み・法則・配色が使えないときの既定fallbackは共有Rustが決めます。Rustのprompt/schema・検証・再試行・Score/SVGは継承します。Responsesは`store:false`・SSEで、温度や出力tokenの旧パラメータを流用せず、必要なJSONを一つのnamespaced function callで受け取ります。正しい`response.completed`だけを採用し、途中切断、refusal、未知tool、サイズ超過、後続quotaでは部分JSONがあっても失敗です。
 
-実行は開始時profile/generationへ固定し、別profile選択は次の実行に適用します。cancel、sign-out、inku logout、モード変更、Server終了は新規通信と遅い結果の採用を止めます。profileごとに一通信slot、owner単位でrefresh排他を持ちます。sign-outはローカルtokenを直ちに消し、登録identity・host IDを残します。remote revocation失敗は未確認と表示します。[セッション](https://developers.openai.com/siwc/token-sharing-open-source/profiles-and-sessions)
+実行は開始時profile/generationへ固定し、別profile選択は次の実行に適用します。cancel、sign-out、inku logout、モード変更、Server終了は新規通信と遅い結果の採用を止めます。profileごとに一通信slot、owner単位でrefresh排他を持ちます。sign-outはローカルtokenを直ちに消し、登録identity・host IDを残します。各登録の「削除」は、その場の確かめの後に、接続中ならsign-outと同じ解除をしてから登録とその公開設定を消します（`POST /api/me/chatgpt/profiles/{profile_id}/delete`）。選択中の登録を消すと、選択中の登録は無くなります。remote revocation失敗は未確認と表示します。[セッション](https://developers.openai.com/siwc/token-sharing-open-source/profiles-and-sessions)
 
 ## 確認結果の読み方
 

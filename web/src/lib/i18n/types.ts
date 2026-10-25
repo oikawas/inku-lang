@@ -46,6 +46,10 @@ export interface LangPack {
 	chatgptGrantPlan: string;
 	chatgptRetry: string;
 	chatgptSignOut: string;
+	chatgptDelete: string;
+	chatgptDeleteConfirmText: string;
+	chatgptDeleteConfirm: string;
+	chatgptDeleteCancel: string;
 	chatgptRefreshModels: string;
 	chatgptModelsLoaded: (count: number) => string;
 	chatgptModelsEmpty: string;

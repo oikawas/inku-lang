@@ -1,6 +1,6 @@
 {
-  "endpoint_count": 135,
-  "operation_count": 135,
+  "endpoint_count": 136,
+  "operation_count": 136,
   "schema_count": 198,
   "operations": [
     {
@@ -948,6 +948,21 @@
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PublishedModelsBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Publish Models Api Me Chatgpt Models Settings Put\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "path": "/api/me/chatgpt/profiles/{profile_id}/delete",
+      "method": "POST",
+      "operationId": "delete_api_me_chatgpt_profiles__profile_id__delete_post",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt",
+        "path:profile_id:req"
+      ],
+      "requestBody": "null",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Delete Api Me Chatgpt Profiles  Profile Id  Delete Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
         "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
       }
     },
@@ -2168,5 +2183,5 @@
     "Variation": "{\"additionalProperties\":false,\"properties\":{\"amplitude\":{\"default\":\"medium\",\"description\":\"揺れ幅: fine=細かく・震える / medium=中程度 / broad=大きく\",\"enum\":[\"fine\",\"medium\",\"broad\"],\"title\":\"Amplitude\",\"type\":\"string\"},\"dimensions\":{\"description\":\"揺れ軸: 横線→[position_y] / 縦線→[position_x] / 斜め→[position_x,position_y]\",\"items\":{\"enum\":[\"position_x\",\"position_y\",\"angle\",\"length\",\"rotation\",\"radius\"],\"type\":\"string\"},\"title\":\"Dimensions\",\"type\":\"array\"},\"frequency\":{\"default\":\"medium\",\"description\":\"揺れ頻度: slow=ゆっくり / medium=普通 / high=速く\",\"enum\":[\"slow\",\"medium\",\"high\"],\"title\":\"Frequency\",\"type\":\"string\"},\"quality\":{\"default\":\"none\",\"description\":\"揺れ種類: perlin=細かい揺れ・震える / wave=ゆっくり揺れる・波打つ / pink=滲む / white=白色雑音 / none=なし\",\"enum\":[\"none\",\"white\",\"perlin\",\"pink\",\"wave\"],\"title\":\"Quality\",\"type\":\"string\"}},\"title\":\"Variation\",\"type\":\"object\"}",
     "VerticalLineRecipe": "{\"additionalProperties\":false,\"properties\":{\"cell_height\":{\"description\":\"Vertical spacing between successive copies, in canvas-short-edge units. Positive.\",\"exclusiveMinimum\":0.0,\"title\":\"Cell Height\",\"type\":\"number\"},\"kind\":{\"const\":\"vertical_line\",\"description\":\"Always \\\"vertical_line\\\".\",\"title\":\"Kind\",\"type\":\"string\"}},\"required\":[\"kind\",\"cell_height\"],\"title\":\"VerticalLineRecipe\",\"type\":\"object\"}"
   },
-  "digest": "2dd78e1031a7b3859a66338d3464b1fd3fa34e7ef9bd0bc4f690f1d6e5f41ed0"
+  "digest": "32a7d0d408663bda2b21c29002d6a5a606b67d4c001796116eb4be1a69cfb5ac"
 }

@@ -323,6 +323,36 @@ def test_refresh_serializes_across_threads_and_signout_invalidates_late_result(i
     assert "access_token" not in isolated.profile("owner")
 
 
+
+def test_delete_signs_out_then_removes_the_registration(isolated, monkeypatch):
+    connected, other = profile(), profile(client_id="oaiapp_other", sub="other")
+    seed(isolated, other)
+    seed(isolated, connected)
+    revoked = []
+    real_client = httpx.AsyncClient
+    def handle(request):
+        if request.url.path.endswith("openid-configuration"):
+            return httpx.Response(200, json={"issuer": auth.ISSUER, "jwks_uri": auth.ISSUER + "/jwks", "revocation_endpoint": auth.ISSUER + "/revoke"})
+        revoked.append(parse_qs(request.content.decode())["token"])
+        return httpx.Response(200)
+    monkeypatch.setattr(auth.httpx, "AsyncClient", lambda **kwargs: real_client(transport=httpx.MockTransport(handle), **kwargs))
+    with isolated.lock("edit:owner"):
+        value = isolated.read("owner")
+        value.setdefault("registrations_pending", {})[connected["id"]] = {"client_id": "oaiapp_fixture"}
+        isolated.write("owner", value)
+    result = asyncio.run(auth.delete_profile("owner", connected["id"]))
+    assert result == {"status": "deleted", "revocation_confirmed": True}
+    assert revoked == [["fixture-refresh"]]
+    state = isolated.public_state("owner")
+    assert state["active_profile_id"] is None
+    assert [entry["id"] for entry in state["profiles"]] == [other["id"]]
+    assert state["pending_registrations"] == []
+    with pytest.raises(ChatGPTError, match="chatgpt_not_connected"):
+        asyncio.run(auth.delete_profile("owner", connected["id"]))
+    asyncio.run(auth.delete_profile("owner", other["id"]))
+    assert isolated.public_state("owner")["profiles"] == []
+
+
 def stream_bytes(*, failed=False):
     arguments = json.dumps({"ddl": "赤い円を置く。"}, ensure_ascii=False)
     item = {"type": "function_call", "id": "fc_fixture", "call_id": "call_fixture", "name": "submit_pipeline_response", "namespace": "inku"}

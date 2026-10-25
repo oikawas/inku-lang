@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path
 from pydantic import BaseModel, ConfigDict, Field
 
 from ... import chatgpt_runtime as runtime
-from ...chatgpt_auth import USAGE_URL, attempts, sign_out
+from ...chatgpt_auth import USAGE_URL, attempts, delete_profile, sign_out
 from ...chatgpt_models import save_publication, saved_publication
 from ...chatgpt_provider import catalog, pin
 from ...chatgpt_store import ChatGPTError, CredentialStore
@@ -160,7 +160,25 @@ def disconnect(
         raise _error(error) from None
 
 
-@router.post("/profiles/{profile_id}/retry", summary="Retry a ChatGPT plan paused by its usage limit")
+@router.post("/profiles/{profile_id}/delete", summary="Delete a ChatGPT plan registration")
+def delete(
+    profile_id: str = Path(..., description="Id of the ChatGPT plan profile to delete."),
+    actor: str = Depends(owner),
+) -> dict:
+    """Sign out one ChatGPT plan, then remove its registration and its saved model settings.
+
+    A connected plan is signed out first, as by sign-out. When the deleted plan was the active one,
+    no plan is active afterwards. Returns the result, including whether revocation was confirmed.
+    Returns 403 when the profile is not registered for the user, or with `chatgpt_session_changed`
+    when it was reconnected while being deleted.
+    """
+    try:
+        return asyncio.run(delete_profile(actor, profile_id))
+    except ChatGPTError as error:
+        raise _error(error) from None
+
+
+@router.post("/profiles/{profile_id}/retry",summary="Retry a ChatGPT plan paused by its usage limit")
 def retry(
     profile_id: str = Path(..., description="Id of the ChatGPT plan profile to resume."),
     actor: str = Depends(owner),

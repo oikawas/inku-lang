@@ -268,7 +268,7 @@ When a member hovers over a model in `Model selection`, the card shows `LLM` and
 
 **ChatGPT plan.** Where a member's own ChatGPT plan can be connected, the member fetches their model list under `ChatGPT plan` in `Models`, chooses the models to publish and their `LLM` / `Vision` purposes, and saves. Published LLM models appear as "ChatGPT plan" candidates for drawing, and published Vision models for Vision refinement and colophons. Model assessments (recommendation, purposes measured without a response, labels, cost, mean seconds, speed label and comments) live in the model catalog in the same format as every other provider's; administrators save their edits through `providers.chatgpt.models` in `PUT /api/settings/models`, each entry replacing that model's assessment. The assessment fields are shown to administrators only. Saving a member's publications and purposes (`PUT /api/me/chatgpt/models/settings`) takes no assessment, and sending `model_metadata` is refused with 422. A purpose measured without a response leaves the purposes, and a model with no purpose left, or not supported, cannot be published. For connection, transfer and recovery see `docs/guide/chatgpt-plan.md`.
 
-**ChatGPT plan connection.** Connections and registrations are managed under `ChatGPT plan` in `Settings`. `Continue with ChatGPT` connects a new registration, and `Check connection` reads the state again. Each registration shows its name and state (`Connected`, `Not connected` and so on), and the selected one is marked `Selected`. The buttons of each registration are:
+**ChatGPT plan connection.** Connections and registrations are managed under `ChatGPT plan` in `Settings`. A new registration is connected with `Connect with inku ChatGPT` on a self-hosted server, or `Sign in to ChatGPT` on the same PC, and `Check connection` reads the state again. Each registration shows its name and state (`Connected`, `Not connected` and so on), and the selected one is marked `Selected`. The buttons of each registration are:
 
 | Button | Action |
 |---|---|
@@ -279,7 +279,7 @@ When a member hovers over a model in `Model selection`, the card shows `LLM` and
 | `Sign out` | Remove the tokens and ask OpenAI to revoke them. The registration stays, as `Not connected` |
 | `Delete` | `Delete`, shown in place, removes the registration and its published model settings; `Keep` cancels. A connected registration is signed out first, as by `Sign out`. Deleting the selected registration leaves none selected |
 
-On a self-hosted server on another host, `Continue with ChatGPT` and `Sign in again` open the Mac helper app "inku ChatGPT". When you return to the Web page after connecting with the helper, the page reads the connection state again. If pressing the button does not bring up the helper's confirmation, quit "inku ChatGPT" in Activity Monitor (it has no Dock icon) and press it again.
+On a self-hosted server on another host, `Connect with inku ChatGPT` and `Sign in again` open the Mac helper app "inku ChatGPT". Chrome or Brave then asks at the top of its window whether to open "inku ChatGPT"; press `Open inku ChatGPT` (it is easy to miss while the settings dim the page). If it does not open, `Open inku ChatGPT again` on screen opens it again. When you return to the Web page after connecting with the helper, the page reads the connection state again. If pressing the button does not bring up the helper's confirmation, quit "inku ChatGPT" in Activity Monitor (it has no Dock icon) and press it again.
 
 | Stage | Role |
 |---|---|

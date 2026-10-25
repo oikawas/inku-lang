@@ -21,16 +21,16 @@
 	{#if connection.state?.self_hosted}<p>{t().chatgptLocalHelperHint}</p>{/if}
 	{#if connection.code}<p role="status">{t().chatgptStatus(connection.code)}</p>{/if}
 	<div class="actions">
-		<button class="ghost-btn" disabled={connection.busy} onclick={() => void connection.authorize()}>{t().chatgptContinue}</button>
+		<button class="ghost-btn" disabled={connection.busy} onclick={() => void connection.authorize()}>{connection.state?.self_hosted ? t().chatgptConnectHelper : t().chatgptSignIn}</button>
 		<button class="ghost-btn" disabled={connection.busy} onclick={() => void connection.load()}>{t().chatgptCheckConnection}</button>
 		<a href="https://chatgpt.com/settings/usage" target="_blank" rel="noopener noreferrer">{t().chatgptManageUsage}</a>
 	</div>
 	{#if connection.authorizationUrl}
-		<a href={connection.authorizationUrl} target="_blank" rel="noopener noreferrer">{t().chatgptContinue}</a>
+		<a href={connection.authorizationUrl} target="_blank" rel="noopener noreferrer">{t().chatgptReopenSignIn}</a>
 		<button class="ghost-btn" onclick={() => void connection.cancel()}>{t().pipelineCancel}</button>
 	{/if}
 	{#if connection.helperUrl}
-		<a href={connection.helperUrl}>{t().chatgptContinue}</a>
+		<a href={connection.helperUrl}>{t().chatgptReopenHelper}</a>
 	{/if}
 	{#each connection.state?.pending_registrations ?? [] as pending (pending.id)}
 		<button class="ghost-btn" disabled={connection.busy} onclick={() => void connection.authorize(pending.id)}>{t().chatgptReconnect} ({pending.client_id})</button>

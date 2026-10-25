@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-25 — ChatGPT plan connect buttons are named for what they do
+
+The connect buttons are named for what they do. On a self-hosted server the button is Connect with inku ChatGPT and the link that opens it again is Open inku ChatGPT again; on the same PC they are Sign in to ChatGPT and Open the sign-in page again. All four were Continue with ChatGPT. The message after pressing asks you to press Open inku ChatGPT in the confirmation at the top of the browser.
+
 ### 2026-10-25 — ChatGPT plan registrations can be deleted
 
 Each registration in the ChatGPT plan settings has a Delete button. It shows Delete and Keep in place and deletes only after that confirmation. A connected registration is signed out first, asking OpenAI to revoke its tokens as Sign out does, and then the registration and its published model settings are removed. Deleting the active registration leaves none active. The Server adds `POST /api/me/chatgpt/profiles/{profile_id}/delete`. After connecting with the Mac helper, returning to the page now reads the connection state again; before, it stayed stale until Check connection was pressed.

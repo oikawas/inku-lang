@@ -25,11 +25,11 @@ INKU_CHATGPT_PLAN_ENABLED=1 INKU_DEVELOPER_MODE=1 \
   uv run --frozen --no-sync inku-chatgpt serve --host 127.0.0.1 --port 8100
 ```
 
-設定「ChatGPTプラン」の「ChatGPTで続ける」から本人がサインイン・同意します。callbackは同じPCの`http://127.0.0.1:<port>/auth/callback`です。戻り画面は設定の表示言語に合わせ、認証の完了と失敗を区別します。拒否・中止・5分の期限切れは失敗として表示します。popupを遮断した場合は画面の同じ認可リンクを開けます。1 worker・reloadなしで、通常の直uvicorn起動やlocal LAN bindでは有効にしません。認証後は下の「登録・モデル・利用枠」で公開モデルを設定し、Stage 1/2共通のモデルを選びます。[認証手順](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)
+設定「ChatGPTプラン」の「ChatGPTにサインイン」から本人がサインイン・同意します。callbackは同じPCの`http://127.0.0.1:<port>/auth/callback`です。戻り画面は設定の表示言語に合わせ、認証の完了と失敗を区別します。拒否・中止・5分の期限切れは失敗として表示します。popupを遮断した場合は画面の「認証画面をもう一度開く」で開けます。1 worker・reloadなしで、通常の直uvicorn起動やlocal LAN bindでは有効にしません。認証後は下の「登録・モデル・利用枠」で公開モデルを設定し、Stage 1/2共通のモデルを選びます。[認証手順](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)
 
 ## 別hostの自己ホストで接続する
 
-設定の独立した「ChatGPTプラン」タブで「ChatGPTで続ける」を押すと、このMacにセットアップした専用アプリ「inku ChatGPT」を開きます。ChromeまたはBraveがアプリを開く確認を表示したら許可します。開かない場合は画面の同じリンクから再度開けます。アプリ未導入の場合は、運用者がこのMacへセットアップしてから進めます。
+設定の独立した「ChatGPTプラン」タブで「inku ChatGPTで接続」を押すと、このMacにセットアップした専用アプリ「inku ChatGPT」を開きます。ChromeまたはBraveはウィンドウの上にアプリを開くかの確認を出すので、「inku ChatGPT を開く」を押します。開かない場合は画面の「inku ChatGPTをもう一度開く」で再度開けます。アプリ未導入の場合は、運用者がこのMacへセットアップしてから進めます。
 
 Macの確認画面には保護された接続で取得したinku本人の名前・IDと移送先host IDが表示されます。接続先を確認して「続ける」を押すと、設定を始めたChromeまたはBraveでOpenAI認証・利用同意へ進み、同じブラウザのcallbackへ戻ります。ブラウザを開けない場合に別のブラウザへ自動で切り替えません。認証後の封印と移送は専用アプリが一回ずつ行います。完了してWebのページへ戻ると、ページが接続状態を読み直します。「接続状態を確認」でも読み直せます。Macの確認・完了・失敗の理由は設定の表示言語に合わせます。OpenAI自身の認証画面の文言はOpenAIが提供します。失敗時は理由を表示して止まり、自動再試行しません。既に別のinku本人へ固定したMacではその接続を拒否します。
 

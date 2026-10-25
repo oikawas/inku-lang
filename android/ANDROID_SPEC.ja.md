@@ -508,7 +508,7 @@ Androidは端末で本人が使うsingle-user hostとして、Serverを介さず
 
 OAuthは端末の`127.0.0.1`の一時listenerを先に開き、dynamic registration、PKCE S256、state、nonce、OpenAIのJWKSによるID token署名とissuer/audience/期限の照合を行う。host UUIDはアプリの保存領域で固定し、発行されたclient IDを再認証・refreshに使う。refreshは直列化し、更新されたrefresh tokenと`earliest_refresh_at`を保持する。token・本人情報・本人の公開モデルはAndroid Keystoreで暗号化した`noBackupFilesDir`内のAtomicFileへ保存する。URLやtokenをLogcat、作品JSON、Roomへ書かない。Room14と既存の作品データは変更しない。
 
-描画は七つの共有pipeline effect（2026-10-21に法則の段・配色の段を足した）を専用のResponses/SSEへ送り、`store:false`・`stream:true`と、一つの`inku.submit_pipeline_response`関数を要求する。promptと応答の型、構図の読み、retryとfallbackは共有coreに委ねる。APIキーや端末モデルへ自動で切り替えない。完了イベントのoutputが空・NULL・省略なら完了itemの関数を採用するが、途中のdeltaやassistant本文だけでは採用しない。実行に保存するのは登録ID/generationだけで、アカウント切替・再認証・切断後に古い実行の応答を採用しない。DDLに穴がなくmodel呼出しが不要な描画は、プランの切断中も行える。
+描画は七つの共有pipeline effect（2026-10-21に法則の段・配色の段を足した）を専用のResponses/SSEへ送り、`store:false`・`stream:true`と、一つの`inku.submit_pipeline_response`関数を要求する。本文の最後には、共有coreがsystem promptと応答schemaのdigestを`prompt_cache_key`として付ける（2026-10-25）。promptと応答の型、構図の読み、retryとfallbackは共有coreに委ねる。APIキーや端末モデルへ自動で切り替えない。完了イベントのoutputが空・NULL・省略なら完了itemの関数を採用するが、途中のdeltaやassistant本文だけでは採用しない。実行に保存するのは登録ID/generationだけで、アカウント切替・再認証・切断後に古い実行の応答を採用しない。DDLに穴がなくmodel呼出しが不要な描画は、プランの切断中も行える。
 
 公式の[認証](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)、[モデル一覧と推論](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference)、[登録とsession](https://developers.openai.com/siwc/token-sharing-open-source/profiles-and-sessions)の契約に沿う。実際のOpenAIへの接続には本人のChromeでの認可が必要で、局所の試験成功とは区別する。
 

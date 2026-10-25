@@ -2367,6 +2367,52 @@ impl ColorsContext {
             .collect()
     }
 
+    /// The colors a layer is seen in against the ground: the table's unseen,
+    /// turned over (2026-10-25).
+    fn seen_colors(&self, layer: usize) -> Vec<&'static str> {
+        COLORS
+            .iter()
+            .filter(|color| self.seen(layer, **color) >= VISIBLE)
+            .map(|color| color.as_str())
+            .collect()
+    }
+
+    /// B19's far layers on the present ground, or `None` when B19 cannot hold
+    /// there: it keeps every layer at least seen and its far layers farther
+    /// (`B19_MAIN`), so a layer that no color it may take shows leaves it out
+    /// (2026-10-25: in the step 3b send most of B19's refusals were such
+    /// layers, named or not).
+    fn b19_far_layers(&self) -> Option<Vec<usize>> {
+        let reach = |layer: usize, need: f64| {
+            if self.colorable.contains(&layer) {
+                COLORS.iter().any(|color| self.seen(layer, *color) >= need)
+            } else {
+                self.now
+                    .looks
+                    .get(&layer)
+                    .is_none_or(|look| !look.read || look.contrast >= need)
+            }
+        };
+        if !self.layers().all(|layer| reach(layer, VISIBLE)) {
+            return None;
+        }
+        Some(
+            self.nameable()
+                .into_iter()
+                .filter(|layer| reach(*layer, B19_MAIN))
+                .collect(),
+        )
+    }
+
+    /// The layers seen in `least` colors or more.
+    fn seen_in(&self, layers: &[usize], least: usize) -> Vec<usize> {
+        layers
+            .iter()
+            .copied()
+            .filter(|layer| self.seen_colors(*layer).len() >= least)
+            .collect()
+    }
+
     /// The laws this work can take, in the request's order.
     fn offered(&self) -> Vec<&'static str> {
         let Some(choices) = self.choices() else {
@@ -2494,6 +2540,22 @@ impl ColorsContext {
                 .collect::<Vec<_>>()
                 .join(", ")
         };
+        // A law that names a layer's color offers only the layers seen in
+        // enough colors, and C9 only the strong colors each is seen in: every
+        // refused color of the efficiency send was one the table listed as
+        // unseen (2026-10-25). The check reads the answer as before.
+        let unseeable = if ja {
+            "なし（この作品では、見える色で塗れる層が無い）"
+        } else {
+            "none (no layer here can be painted in a seen color)"
+        };
+        let seen_line = |label: &str, layers: Vec<usize>| {
+            if layers.is_empty() {
+                unseeable.to_owned()
+            } else {
+                format!("{label}{}", joined(&layers))
+            }
+        };
         let choices = self.choices();
         let mut lines = vec![CHOICES_HEAD[at].to_owned()];
         for law in COLOR_LAWS {
@@ -2512,35 +2574,68 @@ impl ColorsContext {
                 continue;
             };
             let values = match law {
-                "B11" | "B16" => format!("layer: {}", optional(&choices.multi)),
+                "B11" | "B16" => seen_line("layer: ", self.seen_in(&self.multi, 2)),
                 "B13" => format!("layer: {}", optional(&choices.graded)),
                 "B14" => format!("layers: {}", optional(&choices.graded)),
-                "B19" => format!("layers: {}", listed(&choices.nameable)),
-                "B20" => format!(
-                    "accent_layer: {}{between}layer: {}",
-                    listed(&choices.colorable),
-                    listed(&choices.nameable)
-                ),
-                "C7" => format!("targets: {}", optional(&choices.kasane)),
-                "C8" => format!(
-                    "{}{}",
+                "B19" => match self.b19_far_layers() {
+                    Some(layers) => seen_line("layers: ", layers),
+                    None => (if ja {
+                        "なし（B19 は全ての層が地から見えることを求めるが、今の地では、どの色でも見えない層がある）"
+                    } else {
+                        "none (B19 needs every layer seen against the ground, and on the present ground some layer is seen in no color)"
+                    })
+                    .to_owned(),
+                },
+                "B20" => {
+                    let accent = self.seen_in(&self.colorable, 1);
+                    if accent.is_empty() {
+                        unseeable.to_owned()
+                    } else {
+                        format!(
+                            "accent_layer: {}{between}layer: {}",
+                            joined(&accent),
+                            listed(&choices.nameable)
+                        )
+                    }
+                }
+                "C7" => seen_line("targets: ", self.seen_in(&self.kasane_layers(), 1)),
+                "C8" => seen_line(
                     if ja {
                         "assignments の layer: "
                     } else {
                         "assignments' layer: "
                     },
-                    listed(&choices.colorable)
+                    self.seen_in(&self.colorable, 1),
                 ),
-                "C9" => choices
-                    .c9
-                    .as_ref()
-                    .map_or_else(String::new, |(colors, layers)| {
+                "C9" => {
+                    let pairs: Vec<String> = self
+                        .c9_layers()
+                        .into_iter()
+                        .filter_map(|layer| {
+                            let seen = self.seen_colors(layer);
+                            let colors: Vec<&str> = self
+                                .vivid
+                                .iter()
+                                .map(|color| color.as_str())
+                                .filter(|color| seen.contains(color))
+                                .collect();
+                            (!colors.is_empty()).then(|| format!("{layer} → {}", colors.join(", ")))
+                        })
+                        .collect();
+                    if pairs.is_empty() {
+                        unseeable.to_owned()
+                    } else {
                         format!(
-                            "color: {}{between}layer: {}",
-                            listed(colors),
-                            listed(layers)
+                            "{}{}",
+                            if ja {
+                                "layer と color: "
+                            } else {
+                                "layer and color: "
+                            },
+                            pairs.join(between)
                         )
-                    }),
+                    }
+                }
                 "D1" | "D5" => {
                     let hues: Vec<String> = self
                         .feasible
@@ -2586,16 +2681,23 @@ impl ColorsContext {
                     )
                 }
                 "D3" => format!("pair: {}", optional(&choices.pairs)),
-                "D4" => format!(
-                    "{}{}",
-                    if ja {
-                        "layers の layer（2 つ以上）: "
+                "D4" => {
+                    let layers = self.seen_in(&self.colorable, 1);
+                    if layers.len() < 2 {
+                        unseeable.to_owned()
                     } else {
-                        "layers' layer (two or more): "
-                    },
-                    listed(&choices.colorable)
-                ),
-                "D6" => format!("layer: {}", optional(&choices.scattered)),
+                        format!(
+                            "{}{}",
+                            if ja {
+                                "layers の layer（2 つ以上）: "
+                            } else {
+                                "layers' layer (two or more): "
+                            },
+                            joined(&layers)
+                        )
+                    }
+                }
+                "D6" => seen_line("layer: ", self.seen_in(&self.scatter_small, 2)),
                 "D7" => format!("level: {}", optional(&choices.levels)),
                 // B17 and B18 choose no layer.
                 _ => (if ja {
@@ -2621,18 +2723,51 @@ impl ColorsContext {
             (false, false) => "Ground: in a color the description states, so it does not change (leave ground out).".to_owned(),
         });
         let sourced = self.offered().iter().any(|law| SOURCE_LAWS.contains(law));
+        let paintable = seen_line("", self.seen_in(&self.colorable, 1));
         lines.push(match (ja, sourced) {
-            (true, true) => format!(
-                "colors の layer（B17〜B20 を使う時）: {}",
-                joined(&self.colorable)
-            ),
+            (true, true) => format!("colors の layer（B17〜B20 を使う時）: {paintable}"),
             (true, false) => "colors: 書かない（この作品は B17〜B20 を取れない）。".to_owned(),
-            (false, true) => format!(
-                "colors' layer (with B17 to B20): {}",
-                joined(&self.colorable)
-            ),
+            (false, true) => format!("colors' layer (with B17 to B20): {paintable}"),
             (false, false) => "colors: leave it out (this work cannot take B17 to B20).".to_owned(),
         });
+        let seen: Vec<String> = self
+            .colorable
+            .iter()
+            .filter_map(|layer| {
+                let colors = self.seen_colors(*layer);
+                (!colors.is_empty()).then(|| format!("{layer} → {}", colors.join(", ")))
+            })
+            .collect();
+        if !seen.is_empty() {
+            lines.push(format!(
+                "{}{}",
+                if ja {
+                    "見える色（今の地に対して。答えが層の色を名指す時は、その層の色から選ぶ）: "
+                } else {
+                    "Seen colors (against the present ground; when the answer names a layer's color, take one of that layer's): "
+                },
+                seen.join(between)
+            ));
+        }
+        let hidden: Vec<usize> = self
+            .colorable
+            .iter()
+            .copied()
+            .filter(|layer| self.seen_colors(*layer).is_empty())
+            .collect();
+        if !hidden.is_empty() {
+            lines.push(if ja {
+                format!(
+                    "どの色でも見えない層: {}（色を名指さない）",
+                    joined(&hidden)
+                )
+            } else {
+                format!(
+                    "Layers seen in no color: {} (name no color for them)",
+                    joined(&hidden)
+                )
+            });
+        }
         lines
     }
 

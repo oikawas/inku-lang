@@ -10,6 +10,8 @@
 //! arrived. The token, the registration, its locks, cancellation and the pause
 //! on a usage limit stay with the host.
 
+use sha2::{Digest, Sha256};
+
 use super::{
     Refusal, Value, as_str, dumps, get, image_parts, object, ordered_schema, python_eq,
     python_loads, responses_parts, set, string, truthy,
@@ -172,10 +174,27 @@ fn request_answer(body: &Value, limits: &Limits) -> Value {
     ])
 }
 
+/// The Responses API's cache routing hint: the digest of the system text and
+/// the schema, which every request of one stage and language shares (the laws
+/// and colors requests since v2). In the efficiency send of 2026-10-25 the
+/// plan then read most of those requests' shared part from its cache.
+fn cache_key(system: &str, schema: &Value) -> String {
+    let digest = Sha256::new()
+        .chain_update(system.as_bytes())
+        .chain_update(b"\n")
+        .chain_update(dumps(schema).as_bytes())
+        .finalize();
+    let hex: String = digest[..8]
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    format!("inku-{hex}")
+}
+
 /// `chatgpt_provider.request_body`: the one function, in the `inku` namespace,
-/// required; streamed and not stored. The images the prompt names follow its
-/// message as the Vision request sends them; without images the body is as
-/// it was.
+/// required; streamed and not stored, with the cache routing hint last. The
+/// images the prompt names follow its message as the Vision request sends
+/// them; without images the body is as it was.
 pub(super) fn pipeline_request(
     model: &str,
     prompt: &Value,
@@ -189,6 +208,7 @@ pub(super) fn pipeline_request(
     let schema = get(prompt, "response_schema")
         .ok_or_else(|| Refusal::invalid("prompt.response_schema is required"))?;
     let message = field("message")?;
+    let system = field("system")?;
     let content = if images.is_empty() {
         string(message)
     } else {
@@ -198,7 +218,7 @@ pub(super) fn pipeline_request(
         ("model", string(model)),
         ("store", Value::Bool(false)),
         ("stream", Value::Bool(true)),
-        ("instructions", string(field("system")?)),
+        ("instructions", string(system)),
         (
             "input",
             Value::Array(vec![object(vec![
@@ -229,6 +249,7 @@ pub(super) fn pipeline_request(
         ),
         ("tool_choice", string("required")),
         ("parallel_tool_calls", Value::Bool(false)),
+        ("prompt_cache_key", string(&cache_key(system, schema))),
     ]);
     Ok(request_answer(&body, &Limits::for_answer(answer_limit)))
 }

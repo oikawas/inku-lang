@@ -2316,6 +2316,35 @@ mod tests {
         );
     }
 
+    /// The ChatGPT body ends with a cache routing hint, the same for the
+    /// requests that share a system text and a schema (2026-10-25).
+    #[test]
+    fn chatgpt_requests_that_share_a_system_and_schema_share_a_cache_key() {
+        let key = |system: &str, message: &str| {
+            let answer = ask(&serde_json::json!({
+                "action": "chatgpt_request", "model": "m", "answer_limit": 65536,
+                "prompt": {"system": system, "message": message, "response_schema":
+                    {"type": "object", "properties": {"reason": {"type": "string"}}}},
+            }));
+            let text = answer["body"].as_str().unwrap().to_owned();
+            assert!(
+                text.find("\"prompt_cache_key\"") > text.find("\"parallel_tool_calls\""),
+                "{text}"
+            );
+            sent_body(&answer)["prompt_cache_key"]
+                .as_str()
+                .unwrap()
+                .to_owned()
+        };
+        let shared = key("rules", "one work");
+        assert_eq!(shared, key("rules", "another work"));
+        assert_ne!(shared, key("other rules", "one work"));
+        assert!(
+            shared.starts_with("inku-") && shared.len() == 21,
+            "{shared}"
+        );
+    }
+
     #[test]
     fn images_that_are_not_the_ones_the_prompt_names_are_refused() {
         let (prompt, url) = image_prompt();

@@ -3570,7 +3570,8 @@ fn c9_fills_a_textured_layer_without_its_texture_words() {
     ]});
     let asked = plan_answer_with(&colors_start(UNCOLORED_DESCRIPTION, None), &plan).snapshot;
     let c9 = choice_line(&asked, "C9");
-    assert!(c9.ends_with("; layer: 1"), "{c9}");
+    assert!(c9.starts_with("- C9: layer and color: 1 → "), "{c9}");
+    assert!(c9.contains("red"), "{c9}");
     let chosen = colors_answer(
         &asked,
         &json!({"main_law": "C9", "laws": {"C9": {"color": "red", "layer": 1, "area": "15-30",
@@ -3584,6 +3585,50 @@ fn c9_fills_a_textured_layer_without_its_texture_words() {
     assert!(square.contains(" flat "), "{source}");
     assert!(!square.contains("packed"), "{source}");
     assert!(!square.contains("stipple"), "{source}");
+}
+
+/// A layer seen in no color against the ground is offered to no law that
+/// names its color, and the lines say so; the seen colors of the others are
+/// told a layer at a time (2026-10-25: every color the efficiency send had
+/// refused as unseen was one the table already listed).
+#[test]
+fn the_colors_offer_no_color_to_a_layer_seen_in_none() {
+    // A faint silverpoint outline: no paint stands far enough from the white.
+    let mut faint = plan_layer("place", "square", 1, "bottom", "medium", "green");
+    faint["tool"] = json!("silverpoint");
+    faint["surface"] = json!("empty");
+    faint["handling"] = json!("faint");
+    let plan = json!({"ground": "paper", "background": "white", "plugins": [], "layers": [
+        plan_layer("fill", "square", 1, "unspecified", "large", "gray"),
+        plan_layer("place", "circle", 1, "center", "small", "red"),
+        faint,
+    ]});
+    let asked = plan_answer_with(&colors_start(UNCOLORED_DESCRIPTION, None), &plan).snapshot;
+    let message = asked.action.as_ref().unwrap().payload["prompt"]["message"]
+        .as_str()
+        .unwrap();
+    assert!(
+        message
+            .lines()
+            .any(|line| line == "Layers seen in no color: 2 (name no color for them)"),
+        "{message}"
+    );
+    let seen = message
+        .lines()
+        .find(|line| line.starts_with("Seen colors (against the present ground; "))
+        .unwrap_or_else(|| panic!("{message}"));
+    assert!(seen.contains("1 → "), "{seen}");
+    assert!(!seen.contains("2 → "), "{seen}");
+    let assignments = choice_line(&asked, "C8");
+    assert!(
+        assignments.starts_with("- C8: assignments' layer: ") && !assignments.contains('2'),
+        "{assignments}"
+    );
+    // B19 keeps every layer seen, so the unseen outline leaves it out.
+    assert_eq!(
+        choice_line(&asked, "B19"),
+        "- B19: none (B19 needs every layer seen against the ground, and on the present ground some layer is seen in no color)"
+    );
 }
 
 /// C9 fills a brushmarks layer (DDL 25) as it fills any textured layer: the

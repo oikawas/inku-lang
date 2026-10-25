@@ -38,6 +38,10 @@ export interface LangPack {
 	chatgptPlanNotice: string;
 	chatgptLocalHelperHint: string;
 	chatgptContinue: string;
+	chatgptConnectHelper: string;
+	chatgptReopenHelper: string;
+	chatgptSignIn: string;
+	chatgptReopenSignIn: string;
 	chatgptCheckConnection: string;
 	chatgptManageUsage: string;
 	chatgptActive: string;

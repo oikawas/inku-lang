@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-25 — ChatGPT plan connect buttons are named for what they do
+
+The connect buttons are named for what they do. On a self-hosted server the button is Connect with inku ChatGPT and the link that opens it again is Open inku ChatGPT again; on the same PC they are Sign in to ChatGPT and Open the sign-in page again. All four were Continue with ChatGPT. The message after pressing asks you to press Open inku ChatGPT in the confirmation at the top of the browser.
+
 ### 2026-10-25 — inku-cli reads one work by its UUID
 
 inku-cli gains `history show`, which prints a work's description, DDL and JSON Score (`--part` for one of them), and `history png`, which rasterizes the saved display SVG into a PNG of the drawing alone (`--size` for the longer side, default 1024). Both take the UUID or its first few characters. There is no endpoint for one work, so the listing is asked with `anchor_id` and `limit=1` and the returned work's id is checked. A prefix is resolved against the listing without pictures, and one that fits more than one work stops with the candidates. The server is unchanged.

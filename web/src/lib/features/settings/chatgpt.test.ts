@@ -36,7 +36,8 @@ test('self-hosted authorization keeps Brave and Japanese in the public Mac helpe
 		assert.equal(url.protocol, 'inku-chatgpt:');
 		assert.equal(url.hostname, 'connect');
 		assert.deepEqual([...url.searchParams], [['owner_id', owner], ['consent', '1'], ['profile_id', profile], ['browser', 'brave'], ['language', 'ja']]);
-		assert.equal(ja.chatgptContinue, 'ChatGPTで続ける');
+		assert.equal(ja.chatgptConnectHelper, 'inku ChatGPTで接続');
+		assert.match(ja.chatgptLocalHelperHint, new RegExp(ja.chatgptConnectHelper));
 		assert.doesNotMatch(ja.chatgptLocalHelperHint, /Chrome|helper|Continue with/);
 		assert.equal(connection.helperUrl, url.href);
 		assert.equal(connection.busy, false);
@@ -126,6 +127,12 @@ test('connected guide leads to personal model settings with explicit publication
 	assert.match(body(), new RegExp(ja.chatgptModelSettingsGuide));
 	assert.match(body(), new RegExp(ja.chatgptOpenModelSettings));
 	assert.doesNotMatch(body(), new RegExp(ja.chatgptRefreshModels));
+	// The self-hosted button names the Mac helper it opens; the same-PC one signs in.
+	assert.match(body(), new RegExp('>' + ja.chatgptConnectHelper + '<'));
+	assert.doesNotMatch(body(), new RegExp(ja.chatgptSignIn));
+	const samePc = render(view, { props: { connection: { state: { ...connection.state, self_hosted: false }, code: null, busy: false, load() {}, cancel() {} }, onOpenModelSettings() {} } }).body;
+	assert.match(samePc, new RegExp('>' + ja.chatgptSignIn + '<'));
+	assert.doesNotMatch(samePc, new RegExp(ja.chatgptConnectHelper));
 
 	const adminSource = ts.transpileModule(readFileSync(new URL('./model-administration.svelte.ts', import.meta.url), 'utf8')
 		.replace("import { t } from '$lib/i18n/index.svelte';", `import { ja } from ${JSON.stringify(new URL('../../i18n/ja.ts', import.meta.url).href)}; const t = () => ja;`)

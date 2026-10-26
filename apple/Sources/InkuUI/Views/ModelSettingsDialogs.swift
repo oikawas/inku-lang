@@ -375,7 +375,7 @@ struct ProviderModelsSheet: View {
         let toggle = Toggle(model.display.webCopy("settingsModelPublishedModels", "ユーザーに公開するモデル") + ": " + item.label, isOn: Binding(
             get: { draft.isEnabled(modelID: item.id) },
             set: { draft.setEnabled(modelID: item.id, enabled: $0) }))
-            .labelsHidden().disabled(!item.isSelectable)
+            .labelsHidden().disabled(!item.isPublishable)
         #if os(macOS)
         toggle.toggleStyle(.checkbox)
         #else
@@ -383,18 +383,27 @@ struct ProviderModelsSheet: View {
         #endif
     }
 
+    /// A purpose measured without a response can be pressed, framed in red as not recommended (the author, 2026-10-26).
     private func purposeButton(_ label: String, purpose: String, item: ProviderModelSettings) -> some View {
         let selected = item.purposes.contains(purpose)
+        let unrecommended = item.isNotRecommended(for: purpose)
+        let tint = unrecommended ? Color.red : Color.accentColor
+        let note = model.display.preferences.language == "en"
+            ? "No response when measured for this purpose. It can be chosen, but the system does not recommend it"
+            : "計測で応答が無かった用途です。選べますが、システムとしては推奨しません"
         return Button(label) { draft.togglePurpose(modelID: item.id, purpose: purpose) }
             .buttonStyle(.plain)
             .inkuFont(12, weight: .medium)
             .padding(.horizontal, 10).padding(.vertical, 5)
-            .foregroundStyle(selected ? Color.accentColor : Color.secondary)
-            .background(selected ? Color.accentColor.opacity(0.14) : Color.secondary.opacity(0.08), in: Capsule())
-            .overlay(Capsule().stroke(selected ? Color.accentColor.opacity(0.4) : Color.secondary.opacity(0.2)))
+            .foregroundStyle(selected || unrecommended ? tint : Color.secondary)
+            .background(selected ? tint.opacity(0.14) : Color.secondary.opacity(0.08), in: Capsule())
+            .overlay(Capsule().stroke(unrecommended ? Color.red : selected ? Color.accentColor.opacity(0.4) : Color.secondary.opacity(0.2),
+                                      lineWidth: unrecommended ? 2 : 1))
+            .inkuTooltip(unrecommended ? note : "")
             .accessibilityLabel(item.label + " " + label)
             .accessibilityValue(model.display.localized(selected ? "選択中" : "未選択"))
-            .disabled(!ProviderModelsDraft.canEditPurposes(item) || (item.unsupportedPurposes ?? []).contains(purpose))
+            .accessibilityHint(unrecommended ? note : "")
+            .disabled(!ProviderModelsDraft.canEditPurposes(item))
     }
 
     @ViewBuilder

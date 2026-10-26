@@ -26,7 +26,7 @@ Prepare Java 21, Python 3.11 or newer, Android SDK 36, NDK 29.0.14206865, the pi
 
 ```sh
 cd android
-rustup component add rust-docs --toolchain 1.95.0
+rustup component add rust-docs --toolchain 1.99.1
 ./gradlew :app:assembleRelease -PinkuAndroidReproducibleRelease=true
 ```
 

@@ -39,9 +39,7 @@ export MACOSX_DEPLOYMENT_TARGET=14.0
 export IPHONEOS_DEPLOYMENT_TARGET=17.0
 PROFILE_ARGS=()
 if [[ "$PROFILE" == release ]]; then
-    # Rust 1.95's debuginfo stripping can misalign macOS proc-macro LINKEDIT.
-    # Keep host build dependencies loadable while target libraries stay optimized.
-    PROFILE_ARGS+=(--release --config 'profile.release.build-override.strip="none"')
+    PROFILE_ARGS+=(--release)
 fi
 # Skia screen display (inku-display): skia-bindings reads the prebuilt binaries from
 # copies checked against core/crates/inku-display/skia-binaries.sha256 on every build.

@@ -301,7 +301,7 @@ UI、provider通信、Room、履歴はAndroid hostが所有し、`dh1`・`rh3`�
 `reference-corpus` は凍結コーパスの再生成を照合するが、手動dispatchでだけ走る。通常のpush・PRでは `checks` が
 **server（ruff と pytest）・cli（ruff と pytest）・web（`npm run check`・`test:unit`・`lint:i18n`）・
 公開文書（`check_docs.py`）**を回す。`android-native` は共有Rust core / raster / JNI / Android hostの
-変更だけで起動し、Rust 1.95、NDK 29、`arm64-v8a` native library、境界のhost JVM testを検査する。
+変更だけで起動し、Rust 1.99、NDK 29、`arm64-v8a` native library、境界のhost JVM testを検査する。
 
 **⚠ CI が見ていないものは残っている。**
 **① 実providerの受入**（通常のpytest成功は、本人の接続・利用枠を使った描画やVisionの成功を証明しない）、

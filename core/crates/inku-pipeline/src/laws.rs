@@ -84,7 +84,8 @@ const MAX_INSTRUCTIONS: usize = 60;
 const MAX_MARKS: u64 = 380;
 
 /// The prototype's values of `PHI = (1 + 5 ** 0.5) / 2`, as Python computed them.
-const PHI: f64 = 1.618_033_988_749_895;
+/// Python's PHI is the same `f64` as the standard library's golden ratio.
+const PHI: f64 = std::f64::consts::GOLDEN_RATIO;
 const SQRT_PHI: f64 = 1.272_019_649_514_069;
 const PHI_SQUARED: f64 = 2.618_033_988_749_895;
 const INVERSE_PHI: f64 = 0.618_033_988_749_894_8;

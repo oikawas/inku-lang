@@ -213,7 +213,7 @@ fn bundled_nature_leaves_are_valid_bounded_definitions_that_reach_normal_score_l
         }
         if *qualified_name == "Nature.枯葉" {
             // Curled withered leaves: a deep and a shallow chalk arc, gray and yellow in turn.
-            for (leaf_index, pair) in score.instructions.chunks_exact(2).enumerate() {
+            for (leaf_index, pair) in score.instructions.as_chunks::<2>().0.iter().enumerate() {
                 let expected_color = if leaf_index % 2 == 0 {
                     Color::Gray
                 } else {
@@ -228,7 +228,7 @@ fn bundled_nature_leaves_are_valid_bounded_definitions_that_reach_normal_score_l
         }
         if *qualified_name == "Nature.落葉" {
             // Each leaf is red or gray in its drift cell; both arcs share it.
-            for pair in score.instructions.chunks_exact(2) {
+            for pair in score.instructions.as_chunks::<2>().0 {
                 assert!(matches!(pair[0].color, Color::Red | Color::Gray));
                 assert!(
                     pair.iter()

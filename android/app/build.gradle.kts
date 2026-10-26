@@ -206,9 +206,9 @@ val rustLibrary = rustTargetDirectory.map {
 
 fun Exec.configureRustAndroidCompiler() {
     val pinnedRustc = providers.exec {
-        commandLine("rustup", "which", "--toolchain", "1.95.0", "rustc")
+        commandLine("rustup", "which", "--toolchain", "1.99.1", "rustc")
     }.standardOutput.asText.get().trim()
-    require(file(pinnedRustc).isFile) { "Pinned Rust 1.95.0 rustc was not found" }
+    require(file(pinnedRustc).isFile) { "Pinned Rust 1.99.1 rustc was not found" }
     val toolchainBin = rustNdkDirectory.get()
         .dir("toolchains/llvm/prebuilt/$rustNdkHostTag/bin").asFile
     val clang = toolchainBin.resolve("aarch64-linux-android${rustAndroidApi}-clang")
@@ -268,7 +268,7 @@ val buildRustAndroidArm64 = tasks.register<Exec>("buildRustAndroidArm64") {
     commandLine(
         "rustup",
         "run",
-        "1.95.0",
+        "1.99.1",
         "cargo",
         "build",
         "--locked",
@@ -295,7 +295,7 @@ val buildRustHostJni = tasks.register<Exec>("buildRustHostJni") {
         exclude("target/**")
     })
     outputs.file(rustHostJniLibrary)
-    commandLine("rustup", "run", "1.95.0", "cargo", "build", "--locked", "--package",
+    commandLine("rustup", "run", "1.99.1", "cargo", "build", "--locked", "--package",
         "inku-render-android", "--lib", "--target-dir", rustHostTargetDirectory.get().asFile.absolutePath)
 }
 
@@ -330,7 +330,7 @@ val buildDisplayCheckAndroid = tasks.register<Exec>("buildDisplayCheckAndroid") 
     })
     outputs.file(displayCheckLibrary)
     doFirst { configureRustAndroidCompiler() }
-    commandLine("rustup", "run", "1.95.0", "cargo", "build", "--locked", "--package", "inku-display",
+    commandLine("rustup", "run", "1.99.1", "cargo", "build", "--locked", "--package", "inku-display",
         "--example", "display_check_android", "--target", rustAndroidTarget, "--release",
         "--target-dir", rustTargetDirectory.get().asFile.absolutePath)
 }
@@ -414,15 +414,15 @@ val generateRustParityExpected = tasks.register<Exec>("generateRustParityExpecte
             "Generate Rust comparison fixtures on Linux, then import them with -PinkuRustParityExpectedDir=<directory>."
         }
         val pinnedRustc = providers.exec {
-            commandLine("rustup", "which", "--toolchain", "1.95.0", "rustc")
+            commandLine("rustup", "which", "--toolchain", "1.99.1", "rustc")
         }.standardOutput.asText.get().trim()
-        require(file(pinnedRustc).isFile) { "Pinned Rust 1.95.0 rustc was not found" }
+        require(file(pinnedRustc).isFile) { "Pinned Rust 1.99.1 rustc was not found" }
         environment("RUSTC", pinnedRustc)
         rustParityExpectedDirectory.get().asFile.deleteRecursively()
     }
     commandLine(
         listOf(
-            "rustup", "run", "1.95.0", "cargo", "run", "--locked", "--release",
+            "rustup", "run", "1.99.1", "cargo", "run", "--locked", "--release",
             "--package", "inku-render-android", "--example", "render-parity-expected",
             "--target-dir", rustHostTargetDirectory.get().asFile.absolutePath,
             "--",

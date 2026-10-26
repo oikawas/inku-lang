@@ -61,7 +61,7 @@
 
 ### Rust / native
 
-- Rust `1.95.0`、edition 2024。workspaceは10 crateで、`inku-score`、`inku-ddl`、`inku-pipeline`、`inku-render`、`inku-svg-raster`、`inku-display`のhost非依存6 crateと、`inku-pipeline-uniffi`、`inku-render-python`、`inku-render-android`、`inku-display-gpu`のbinding／host用4 crateから成る。
+- Rust `1.99.1`、edition 2024。workspaceは10 crateで、`inku-score`、`inku-ddl`、`inku-pipeline`、`inku-render`、`inku-svg-raster`、`inku-display`のhost非依存6 crateと、`inku-pipeline-uniffi`、`inku-render-python`、`inku-render-android`、`inku-display-gpu`のbinding／host用4 crateから成る。
 - UniFFI `0.32.0`はpipelineのbyte facade、PyO3 `0.29.2`はCPython 3.12 abi3 wheel、`jni` `0.21.1`はAndroid direct JNI、`resvg` `0.48.1`はhost-neutral raster presentation、`kurbo` `0.13.1`と`svgtypes` `0.16.1`は塗りの境界clipとpath処理、`sha2` `0.11.0`はdigest、`roxmltree` `0.21.1`はSVGの読み、`unicode-normalization` `0.1.25`は文字列の正規化を担う。
 - Skiaは`skia-safe` `=0.153.3`で、表示するhostだけがfeatureで入れる。AndroidとmacOSのCPU表示は公開の事前ビルド（AndroidのものはGanesh・Vulkanを含むが、表示はCPUのraster surfaceで描き、GPU contextを作らない）、macOSのGraphite／Metalは`scripts/skia-graphite-binaries.sh`で一度組んだ写しを使い、どちらもSHA-256を照合する（`skia-binaries.sha256`）。Serverのbuildと、CIのRust workspace検査（`cargo test --workspace`）はSkiaを入れない。CIのAndroid native gate（`checkRustNative`）は、照合したAndroidの事前ビルドで`display`入りのJNI libraryを組む。
 - host非依存のcrateはhost SDK、DB、network、provider clientを持たない。`provider_wire`は要求本文を作り答えを読むだけで、送信はhostが行う。

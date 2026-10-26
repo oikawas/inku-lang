@@ -14,7 +14,7 @@ trap 'rm -rf "$TEST_DIR"' EXIT
 
 FAKE_HOME="$TEST_DIR/cargo home"
 RUSTUP_HOME="$TEST_DIR/rustup home"
-TOOLCHAIN_BIN="$RUSTUP_HOME/toolchains/1.95.0-fake/bin"
+TOOLCHAIN_BIN="$RUSTUP_HOME/toolchains/1.99.1-fake/bin"
 BREW_BIN="$TEST_DIR/homebrew/bin"
 LOG="$TEST_DIR/cargo.log"
 VALIDATION_LOG="$TEST_DIR/validation.log"
@@ -26,10 +26,10 @@ cat > "$FAKE_HOME/.cargo/bin/rustup" <<'FAKE_RUSTUP'
 set -eu
 [ "$1" = which ]
 [ "$2" = --toolchain ]
-[ "$3" = 1.95.0 ]
+[ "$3" = 1.99.1 ]
 tool="$4"
 printf 'which %s\n' "$tool" >> "$INKU_RUST_VALIDATION_LOG"
-printf '%s/toolchains/1.95.0-fake/bin/%s\n' "$RUSTUP_HOME" "$tool"
+printf '%s/toolchains/1.99.1-fake/bin/%s\n' "$RUSTUP_HOME" "$tool"
 FAKE_RUSTUP
 
 cat > "$TOOLCHAIN_BIN/cargo" <<'FAKE_CARGO'
@@ -37,7 +37,7 @@ cat > "$TOOLCHAIN_BIN/cargo" <<'FAKE_CARGO'
 set -eu
 if [ "${1:-}" = --version ]; then
     printf 'cargo version\n' >> "$INKU_RUST_VALIDATION_LOG"
-    printf 'cargo 1.95.0 (pinned-test)\n'
+    printf 'cargo 1.99.1 (pinned-test)\n'
     exit 0
 fi
 {
@@ -56,7 +56,7 @@ cat > "$TOOLCHAIN_BIN/rustc" <<'FAKE_RUSTC'
 set -eu
 if [ "${1:-}" = --version ]; then
     printf 'rustc version\n' >> "$INKU_RUST_VALIDATION_LOG"
-    printf 'rustc 1.95.0 (pinned-test)\n'
+    printf 'rustc 1.99.1 (pinned-test)\n'
     exit 0
 fi
 exit 0

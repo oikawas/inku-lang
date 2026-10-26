@@ -409,7 +409,7 @@ and fresh host entropy.
 manual dispatch. On ordinary pushes and pull requests, `checks` runs
 **server (ruff and pytest), cli (ruff and pytest), web (`npm run check`, `test:unit`, `lint:i18n`),
 and the published documents (`check_docs.py`).** `android-native` is path-scoped to shared Rust,
-raster, JNI, and Android-host changes; it checks Rust 1.95, NDK 29, the `arm64-v8a` native library,
+raster, JNI, and Android-host changes; it checks Rust 1.99, NDK 29, the `arm64-v8a` native library,
 and focused host-JVM boundary tests.
 
 **⚠ Some surfaces are still outside it.**

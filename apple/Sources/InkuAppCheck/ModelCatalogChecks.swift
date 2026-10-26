@@ -99,18 +99,47 @@ import InkuUI
           try JSONDecoder().decode(ProviderModelSettings.self, from: JSONEncoder().encode(reoffered)) == reoffered else {
         throw CheckFailure.message("Old settings compatibility or persistent access corrections failed")
     }
-    // Clearing the last local purpose must not trap its editor, or reopen a canonically blocked purpose.
+    // Clearing the last local purpose must not trap its editor. A purpose measured without a response can be
+    // chosen, as not recommended, and is kept as chosen (the author, 2026-10-26).
     let cleared = ProviderModelSettings(id: "local", purposes: [])
-    let blocked = ProviderModelSettings(id: "blocked", purposes: [], labels: ["no_response"])
+    let blocked = ProviderModelSettings(id: "blocked", purposes: [], unsupportedPurposes: ["llm", "vision"])
     let unsupported = ProviderModelSettings(id: "unsupported", purposes: ["llm"], unsupportedPurposes: ["vision"])
     var draft = ProviderModelsDraft(models: [cleared, blocked, unsupported], enabled: [:])
+    draft.setVisible(models: draft.models, enabled: true)
+    guard !draft.isEnabled(modelID: cleared.id), !draft.isEnabled(modelID: blocked.id), draft.isEnabled(modelID: unsupported.id),
+          blocked.isSelectable, !blocked.isPublishable, blocked.resolvedLabels.map(\.id).contains("no_response") else {
+        throw CheckFailure.message("Selecting everything published a model offered for no purpose")
+    }
     draft.togglePurpose(modelID: cleared.id, purpose: "llm")
     draft.togglePurpose(modelID: blocked.id, purpose: "llm")
     draft.togglePurpose(modelID: unsupported.id, purpose: "vision")
-    guard draft.model(modelID: cleared.id)?.isSelectable == true,
-          draft.model(modelID: blocked.id)?.isSelectable == false,
-          draft.model(modelID: unsupported.id)?.purposes == ["llm"] else {
-        throw CheckFailure.message("Purpose editing trapped a local empty model or reopened a canonical blocked purpose")
+    guard let chosenBlocked = draft.model(modelID: blocked.id), let chosenVision = draft.model(modelID: unsupported.id),
+          draft.model(modelID: cleared.id)?.isSelectable == true,
+          chosenBlocked.purposes == ["llm"], chosenBlocked.allowedUnsupportedPurposes == ["llm"], chosenBlocked.offers("llm"),
+          chosenBlocked.resolvedLabels.map(\.id).contains("no_response"), draft.isEnabled(modelID: blocked.id),
+          chosenVision.purposes == ["llm", "vision"], chosenVision.allowedUnsupportedPurposes == ["vision"],
+          chosenVision.offers("vision"), chosenVision.isNotRecommended(for: "vision"), !chosenVision.isNotRecommended(for: "llm") else {
+        throw CheckFailure.message("Purpose editing trapped a local empty model or refused a purpose measured without a response")
+    }
+    draft.togglePurpose(modelID: unsupported.id, purpose: "vision")
+    guard draft.model(modelID: unsupported.id)?.allowedUnsupportedPurposes == nil else {
+        throw CheckFailure.message("Clearing a chosen unrecommended purpose left it allowed")
+    }
+    // The catalog keeps such a purpose out of its defaults, and keeps it only where it was chosen.
+    let openAI = ProviderSettings(id: "openai", kind: .openAICompatible, baseURL: endpoint)
+    var chosen = ProviderModelSettings(id: "gpt-4", purposes: ["llm", "vision"])
+    let catalogDefault = catalog.applyingCatalog(to: chosen, providerID: "openai", kind: .openAICompatible)
+    chosen.allowedUnsupportedPurposes = ["vision"]
+    let kept = catalog.applyingCatalog(to: chosen, providerID: "openai", kind: .openAICompatible)
+    let keptProvider = ProviderSettings(id: "openai", kind: .openAICompatible, baseURL: endpoint, models: [kept])
+    guard catalogDefault.purposes == ["llm"], catalogDefault.allowedUnsupportedPurposes == nil,
+          kept.purposes == ["llm", "vision"], kept.allowedUnsupportedPurposes == ["vision"], kept.isNotRecommended(for: "vision"),
+          catalog.applyingCatalog(to: kept, providerID: "openai", kind: .openAICompatible) == kept,
+          SettingsModel.registeredModels(for: keptProvider, purpose: "vision").map(\.id) == ["gpt-4"],
+          SettingsModel.isRegisteredModelAvailable("openai:gpt-4", purpose: "vision", settings: HostSettings(providers: [keptProvider])),
+          SettingsModel.registeredModels(for: openAI, purpose: "vision").allSatisfy({ !$0.isNotRecommended(for: "vision") }),
+          try JSONDecoder().decode(ProviderModelSettings.self, from: JSONEncoder().encode(kept)) == kept else {
+        throw CheckFailure.message("A purpose chosen against the measurement was lost, or the catalog's defaults chose one")
     }
     // The Web displays three tiers while retaining the measured five-step ordering.
     guard [1, 2, 3, 4, 5].map({ ModelGuidance.recommendationTier($0) }) == [1, 1, 2, 3, 3],
@@ -144,5 +173,5 @@ import InkuUI
           ModelNaming(providers: [plan]).modelShortName("chatgpt:\(saved.id)") == saved.label else {
         throw CheckFailure.message("Historical naming lost canonical/local labels or registered a removed model")
     }
-    print("Model catalog passed: shared 15 cases; exact v2 export and Host label table; measurement key presence; ChatGPT evaluations and author purposes; stale labels refreshed; account/re-offer corrections; custom/wrong-kind boundaries; old settings compatibility; three-tier presentation; measured units and absent values; unsupported purposes; historical naming without registration. Zero provider calls.")
+    print("Model catalog passed: shared 15 cases; exact v2 export and Host label table; measurement key presence; ChatGPT evaluations and author purposes; stale labels refreshed; account/re-offer corrections; custom/wrong-kind boundaries; old settings compatibility; three-tier presentation; measured units and absent values; unsupported purposes chosen as not recommended and kept only where chosen; historical naming without registration. Zero provider calls.")
 }

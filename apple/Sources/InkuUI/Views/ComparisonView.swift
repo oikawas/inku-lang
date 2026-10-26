@@ -143,11 +143,17 @@ public struct ComparisonView: View {
                 Spacer(minLength: 0)
             }
             Text(model.display.providerName(provider)).inkuFont(10).foregroundStyle(.secondary)
+            if entry.isNotRecommended(for: "llm") {
+                Text(BatchModelPickerView.notRecommended(language: model.display.preferences.language))
+                    .inkuFont(10, weight: .semibold).foregroundStyle(.red)
+            }
             if target { Text(model.display.localized("元の作品のモデル")).inkuFont(10).foregroundStyle(.secondary) }
             if comparison.failedModelReferences.contains(reference) { Text(model.display.localized("このモデルの候補を用意できませんでした。")).inkuFont(10).foregroundStyle(.red) }
         }.padding(8).frame(maxWidth: .infinity, minHeight: 50, alignment: .topLeading)
             .background(selected ? Color.accentColor.opacity(0.12) : InkuColor.bg2)
-            .overlay(Rectangle().stroke(selected || target ? Color.accentColor : InkuColor.border))
+            // Published for drawing though it did not answer when measured: framed in red (2026-10-26).
+            .overlay(Rectangle().stroke(entry.isNotRecommended(for: "llm") ? Color.red : selected || target ? Color.accentColor : InkuColor.border,
+                                        lineWidth: entry.isNotRecommended(for: "llm") ? 2 : 1))
             .inkuTooltip(model.display.preferences.showTooltips ? modelMetadata(entry, provider: provider) : "")
             .accessibilityHint(modelMetadata(entry, provider: provider))
     }

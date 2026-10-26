@@ -36,7 +36,8 @@ public enum ModelCatalogLabels {
         if let eol = model.eol {
             if eol { labels.insert("eol") } else { labels.remove("eol") }
         }
-        if model.purposes.isEmpty { labels.insert("no_response") }
+        // A purpose chosen against the measurement (2026-10-26) does not make the model answer it.
+        if model.purposes.allSatisfy(model.isNotRecommended(for:)) { labels.insert("no_response") }
         if !model.hasCatalogMeasurement && definitions.filter({ labels.contains($0.id) }).allSatisfy(\.publishable) {
             labels.insert("unmeasured")
         }

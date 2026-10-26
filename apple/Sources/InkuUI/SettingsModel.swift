@@ -62,8 +62,8 @@ public final class SettingsModel {
 
     public func publishedModels(for provider: ProviderSettings, purpose: String? = nil) -> [ProviderModelSettings] {
         catalogModels(for: provider).filter { entry in
-            entry.isSelectable && provider.enabledModels?[entry.id] != false
-                && (purpose.map { entry.purposes.contains($0) && !(entry.unsupportedPurposes ?? []).contains($0) } ?? true)
+            entry.isPublishable && provider.enabledModels?[entry.id] != false
+                && (purpose.map(entry.offers) ?? true)
         }
     }
 
@@ -77,7 +77,7 @@ public final class SettingsModel {
         guard provider.enabledModels?[modelID] != false else { return false }
         let models = ModelGuidanceCatalog.bundled?.registeredModelSettings(for: provider) ?? provider.models ?? []
         guard let model = models.first(where: { $0.id == modelID }) else { return false }
-        return model.isSelectable && model.purposes.contains("llm") && !(model.unsupportedPurposes ?? []).contains("llm")
+        return model.isSelectable && model.offers("llm")
     }
 
     /// Server `/api/models` lists the active ChatGPT profile's published models as the `chatgpt` drawing group.
@@ -107,8 +107,7 @@ public final class SettingsModel {
 
     public nonisolated static func registeredModels(for provider: ProviderSettings, purpose: String) -> [ProviderModelSettings] {
         let models = ModelGuidanceCatalog.bundled?.registeredModelSettings(for: provider) ?? provider.models ?? []
-        return models.filter { $0.purposes.contains(purpose) && !($0.unsupportedPurposes ?? []).contains(purpose)
-            && provider.enabledModels?[$0.id] != false }
+        return models.filter { $0.offers(purpose) && provider.enabledModels?[$0.id] != false }
     }
 
     public nonisolated static func isRegisteredModelAvailable(_ reference: String, purpose: String, settings: HostSettings) -> Bool {

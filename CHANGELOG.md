@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-26 — macOS also lets a purpose that gave no response be chosen, as not recommended
+
+In macOS model publication the LLM or Vision button of a purpose measured without a response can now be pressed, framed in red as not recommended (following the Server and Web in Build 1337). The chosen purpose is saved with the model; the catalog's defaults and "select all shown" never choose it. The drawing model picker and the comparison cards frame a model in red for a purpose it did not answer, with "Not recommended (no response when measured)", and the picker lists such models after those that answered. The label table and catalog copies were regenerated from the canonical source. ChatGPT plan purposes are unchanged.
+
 ### 2026-10-26 — PLUGIN now teaches how to make a plugin the current specification loads
 
 `PLUGIN.md` and `PLUGIN.ja.md` are rewritten in this order: steps, an example, the definition format, calling from DDL, ways to load, writing the summary, checking, limits, and what a definition cannot do. The example `Sky.Stars` (alias `Sky.星`) was passed to `/api/compose` as an export file and drew through the shared core. The guide states the three ways the current specification loads a new definition, a DDL export file (`inku.ddl-export.v1`), the `definitions` / `macro_summaries` of the Server's pipeline manifest, and bundling with the shared core, and that a new `.inku-plugin.md` placed in `server/plugins/` does not become a definition. It also states that a `vary` inside `repeat` chooses again for every repetition, gives a command that prints the meaning words from the Saijiki and the use of `compile-score` to check a definition alone, and lists the expansion limits. The previous text stays as Appendix A, with the bundled `Nature.leaves` version (2.1.0) and the sway fields reaching the drawing brought up to date. No code changed.

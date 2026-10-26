@@ -35,12 +35,13 @@ const OPENAI_API_HOST: &str = "api.openai.com";
 /// sampling (COMPOSITION-PRODUCT-DESIGN section 12), and so are the laws, the
 /// colors and the three stages that read and draw a description (their
 /// prototypes' requests went as Stage 1's).
-const STAGE1_SAMPLED_ACTIONS: [&str; 7] = [
+const STAGE1_SAMPLED_ACTIONS: [&str; 8] = [
     "generate_normalized_ddl",
     "read_composition",
     "choose_laws",
     "choose_colors",
     "read_description",
+    "compose_description",
     "write_description_ddl",
     "review_description_ddl",
 ];
@@ -455,11 +456,12 @@ fn ordered_schema(value: &Value, named: bool) -> Value {
 }
 
 /// The stages whose system text and schema are the same for every work
-/// (2026-10-25). Anthropic is asked to keep them (`cache_control`): the next
-/// work's request and a request asked again read them at the cache's price.
-/// Another stage's system text or schema changes with the work, and a mark
-/// would only write a new entry each time.
-const CACHED_ACTIONS: [&str; 2] = ["choose_laws", "choose_colors"];
+/// (2026-10-25; the composition of a read-and-draw run, 2026-10-26).
+/// Anthropic is asked to keep them (`cache_control`): the next work's request
+/// and a request asked again read them at the cache's price. Another stage's
+/// system text or schema changes with the work, and a mark would only write a
+/// new entry each time.
+const CACHED_ACTIONS: [&str; 3] = ["choose_laws", "choose_colors", "compose_description"];
 
 /// Anthropic's system: the text, as one block the cache keeps for the stages
 /// that send the same system text and schema to every work.
@@ -2424,12 +2426,36 @@ mod tests {
         assert_eq!(stage1, serde_json::json!(0.3));
         for action_name in [
             "read_description",
+            "compose_description",
             "write_description_ddl",
             "review_description_ddl",
         ] {
             assert_eq!(temperature(action_name), stage1, "{action_name}");
         }
         assert_eq!(temperature("write_image_ddl"), serde_json::json!(0.0));
+    }
+
+    /// A read-and-draw composition's system text and schema are the same for
+    /// every work, so Anthropic is asked to keep them, as the laws' and the
+    /// colors' are; the writing request's are not marked (2026-10-26).
+    #[test]
+    fn the_composition_of_a_description_is_kept_in_anthropics_cache() {
+        let system = |action_name: &str| {
+            let answer = ask(&serde_json::json!({
+                "action": "pipeline_request",
+                "connection": {"id": "x", "kind": "anthropic", "base_url": "https://api.anthropic.com"},
+                "model": "m",
+                "prompt": {"system": "s", "message": "m", "action_name": action_name,
+                           "response_schema": {"type": "object"}},
+                "max_tokens": 64,
+            }));
+            sent_body(&answer)["system"].clone()
+        };
+        assert_eq!(
+            system("compose_description"),
+            serde_json::json!([{"type": "text", "text": "s", "cache_control": {"type": "ephemeral"}}])
+        );
+        assert_eq!(system("write_description_ddl"), serde_json::json!("s"));
     }
 
     /// The ChatGPT body ends with a cache routing hint, the same for the

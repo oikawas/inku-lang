@@ -20,6 +20,8 @@ use serde_json::{Value, json};
 use unicode_normalization::UnicodeNormalization;
 
 use crate::core_boundary::ResolvedPaletteDto;
+use crate::description_composition::{self as composition, CompositionAnswer};
+use crate::description_laws::{ThingProblem, ThingSentence};
 use crate::image_ddl::{
     ImageDdlLimits, ImageDdlProblem, answer_ddl, canvas_message, finish_image_prompt, known_hint,
     palette_words, validate_image, with_feedback, writing_tail,
@@ -282,6 +284,269 @@ pub fn with_description_ddl_feedback(
     with_feedback(prompt, rejected_ddl, problems, limits, section, hint)
 }
 
+/// What the writing and review requests of a composed run add (2026-10-26):
+/// the composer's answer, the sentence of each law it chose, and the targets
+/// the tool computed.
+#[derive(Clone, Copy, Debug)]
+pub struct ComposedContext<'a> {
+    pub answer: &'a CompositionAnswer,
+    pub laws_text: &'a BTreeMap<String, String>,
+    pub targets: &'a [String],
+}
+
+/// Build the `write_description_ddl` request of a composed run: the writing
+/// request's rules, then the composition's (25 to 29), and an answer of
+/// sentences each with its thing.
+pub fn build_composed_description_ddl_prompt(
+    context: &DescriptionDdlContext<'_>,
+    composed: &ComposedContext<'_>,
+    language: ResolvedInstructionLanguage,
+    limits: PromptLimits,
+) -> Result<LlmPrompt, PromptError> {
+    let message = composed_message(context, composed, language, None);
+    require_within(
+        "description_message",
+        message.len(),
+        limits.max_source_bytes,
+    )?;
+    finish_image_prompt(
+        DESCRIPTION_DDL_PROMPT_ID,
+        LlmStage::WriteDescriptionDdl,
+        language,
+        composed_writing_system(context, language)?,
+        message,
+        sentences_response_schema(),
+        Vec::new(),
+    )
+}
+
+/// Build the `review_description_ddl` request of a composed run: the drawing,
+/// and the sentences it was drawn from with their things (`current`, a card's
+/// thing as the drawer wrote it), after the ratio sentence `head`.
+pub fn build_composed_description_ddl_review_prompt(
+    context: &DescriptionDdlContext<'_>,
+    composed: &ComposedContext<'_>,
+    drawing: &PromptImage,
+    head: &str,
+    current: &[ThingSentence],
+    language: ResolvedInstructionLanguage,
+    limits: PromptLimits,
+) -> Result<LlmPrompt, PromptError> {
+    validate_image(drawing)?;
+    let message = composed_message(context, composed, language, Some((head, current)));
+    require_within(
+        "description_message",
+        message.len(),
+        limits.max_source_bytes,
+    )?;
+    let mut prompt = finish_image_prompt(
+        DESCRIPTION_DDL_REVIEW_PROMPT_ID,
+        LlmStage::ReviewDescriptionDdl,
+        language,
+        composed_writing_system(context, language)?,
+        message,
+        sentences_response_schema(),
+        vec![drawing.clone()],
+    )?;
+    prompt.system.push_str("\n\n");
+    prompt
+        .system
+        .push_str(match (language, context.reading.is_some()) {
+            (ResolvedInstructionLanguage::Ja, true) => REVIEW_JA,
+            (ResolvedInstructionLanguage::Ja, false) => REVIEW_UNREAD_JA,
+            (ResolvedInstructionLanguage::En, true) => REVIEW_EN,
+            (ResolvedInstructionLanguage::En, false) => REVIEW_UNREAD_EN,
+        });
+    prompt
+        .system
+        .push_str(composition::REVIEW_MORE[composition_index(language)]);
+    let schema_text =
+        serde_json::to_string(&prompt.response_schema).map_err(|_| PromptError::Serialization)?;
+    Ok(hash_prompt(prompt, &schema_text))
+}
+
+/// Ask a composed run's writing or review once more: the compiler's findings
+/// (`problems`, which may be none) and the things the tool measured far off,
+/// left undrawn or written in more sentences than a card takes (`things`).
+pub fn with_composed_description_ddl_feedback(
+    mut prompt: LlmPrompt,
+    rejected_ddl: &str,
+    problems: &[ImageDdlProblem],
+    things: &[ThingProblem],
+    read: bool,
+    limits: PromptLimits,
+) -> Result<LlmPrompt, PromptError> {
+    if problems.is_empty() && things.is_empty() {
+        return Err(PromptError::EmptyField { field: "problems" });
+    }
+    let language = prompt.instruction_language;
+    let compiler = json!({
+        "rejected_ddl": rejected_ddl,
+        "problems": problems.iter().map(|problem| json!({
+            "line": problem.line,
+            "kind": problem.kind,
+            "hint": hint(&problem.kind, language),
+        })).collect::<Vec<_>>(),
+    });
+    let mut message: Value =
+        serde_json::from_str(&prompt.message).map_err(|_| PromptError::Serialization)?;
+    message["compiler_feedback"] = compiler;
+    if !things.is_empty() {
+        message["composition_feedback"] = json!({ "problems": things });
+    }
+    let message = message.to_string();
+    require_within("composed_feedback", message.len(), limits.max_source_bytes)?;
+    prompt.message = message;
+    prompt.system.push_str("\n\n");
+    prompt.system.push_str(match (language, read) {
+        (ResolvedInstructionLanguage::Ja, true) => FEEDBACK_JA,
+        (ResolvedInstructionLanguage::Ja, false) => FEEDBACK_UNREAD_JA,
+        (ResolvedInstructionLanguage::En, true) => FEEDBACK_EN,
+        (ResolvedInstructionLanguage::En, false) => FEEDBACK_UNREAD_EN,
+    });
+    prompt
+        .system
+        .push_str(composition::FEEDBACK_MORE[composition_index(language)]);
+    let schema_text =
+        serde_json::to_string(&prompt.response_schema).map_err(|_| PromptError::Serialization)?;
+    Ok(hash_prompt(prompt, &schema_text))
+}
+
+/// Read a composed run's writing or review answer: its sentences, each cut at
+/// its ends and given its thing (one text may hold several sentences), and
+/// the figures it says it drew. An item without text is left out.
+pub fn parse_composed_description_ddl_response(
+    response_text: &str,
+    language: ResolvedInstructionLanguage,
+    limits: PromptLimits,
+) -> Result<(Vec<ThingSentence>, Vec<DrawnFigure>), PromptError> {
+    #[derive(Deserialize)]
+    struct Answer {
+        sentences: Vec<Value>,
+        #[serde(default)]
+        figures: Value,
+    }
+    let answer: Answer = parse_bounded(response_text, limits)?;
+    let mut sentences = Vec::new();
+    for item in &answer.sentences {
+        let Some(text) = item.get("text").and_then(Value::as_str) else {
+            continue;
+        };
+        let thing = item.get("thing").and_then(Value::as_u64).unwrap_or(0);
+        for sentence in cut_sentences(&answer_ddl(text, limits)?, language) {
+            sentences.push(ThingSentence {
+                thing,
+                text: sentence,
+            });
+        }
+    }
+    Ok((sentences, figures_of(&answer.figures)))
+}
+
+/// One answer text cut into its sentences, as the prototype cut them: a
+/// Japanese text at each 。 (each part ends with one), an English one where a
+/// sentence's period is followed by white space and a lower-case letter.
+fn cut_sentences(text: &str, language: ResolvedInstructionLanguage) -> Vec<String> {
+    match language {
+        ResolvedInstructionLanguage::Ja => text
+            .split('。')
+            .map(str::trim)
+            .filter(|part| !part.is_empty())
+            .map(|part| format!("{part}。"))
+            .collect(),
+        ResolvedInstructionLanguage::En => {
+            let mut out = Vec::new();
+            let mut start = 0;
+            for (at, character) in text.char_indices() {
+                if character != '.' || at < start {
+                    continue;
+                }
+                let after = &text[at + 1..];
+                let rest = after.trim_start();
+                if rest.len() < after.len() && rest.starts_with(|c: char| c.is_ascii_lowercase()) {
+                    out.push(text[start..=at].trim().to_owned());
+                    start = text.len() - rest.len();
+                }
+            }
+            out.push(text[start..].trim().to_owned());
+            out.retain(|part| !part.is_empty());
+            out
+        }
+    }
+}
+
+fn composed_message(
+    context: &DescriptionDdlContext<'_>,
+    composed: &ComposedContext<'_>,
+    language: ResolvedInstructionLanguage,
+    current: Option<(&str, &[ThingSentence])>,
+) -> String {
+    let mut message: Value =
+        serde_json::from_str(&description_message(context, language, None)).unwrap_or_default();
+    message["composition"] = json!(composed.answer);
+    message["laws_text"] = json!(composed.laws_text);
+    message["targets"] = json!(composed.targets);
+    if let Some((head, current)) = current {
+        let ddl = std::iter::once(head)
+            .chain(current.iter().map(|item| item.text.as_str()))
+            .collect::<Vec<_>>()
+            .join("\n");
+        message["current_ddl"] = json!(ddl);
+        message["current_sentences"] = json!(current);
+    }
+    message.to_string()
+}
+
+fn composed_writing_system(
+    context: &DescriptionDdlContext<'_>,
+    language: ResolvedInstructionLanguage,
+) -> Result<String, PromptError> {
+    let header = match (language, context.reading.is_some()) {
+        (ResolvedInstructionLanguage::Ja, true) => WRITING_JA,
+        (ResolvedInstructionLanguage::Ja, false) => WRITING_UNREAD_JA,
+        (ResolvedInstructionLanguage::En, true) => WRITING_EN,
+        (ResolvedInstructionLanguage::En, false) => WRITING_UNREAD_EN,
+    };
+    let at = composition_index(language);
+    Ok(format!(
+        "{header}\n\n{}{}\n\n{}",
+        writing_tail(language)?,
+        composition::WRITE_RULES[at],
+        composition::ANSWER[at]
+    ))
+}
+
+const fn composition_index(language: ResolvedInstructionLanguage) -> usize {
+    match language {
+        ResolvedInstructionLanguage::Ja => 0,
+        ResolvedInstructionLanguage::En => 1,
+    }
+}
+
+fn sentences_response_schema() -> Value {
+    let figures = ddl_response_schema()["properties"]["figures"].clone();
+    json!({
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sentences", "figures"],
+        "properties": {
+            "sentences": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["thing", "text"],
+                    "properties": {
+                        "thing": { "type": "integer", "minimum": 0 },
+                        "text": { "type": "string" },
+                    }
+                }
+            },
+            "figures": figures,
+        }
+    })
+}
+
 /// The image tab's hints, with counts named: a decimal no shape owns is
 /// usually a count written as a decimal ("1.0個"), and an unclear owner may be.
 fn hint(kind: &str, language: ResolvedInstructionLanguage) -> &'static str {
@@ -313,7 +578,7 @@ fn writing_system(
     ))
 }
 
-fn description_message(
+pub(crate) fn description_message(
     context: &DescriptionDdlContext<'_>,
     language: ResolvedInstructionLanguage,
     current_ddl: Option<&str>,
@@ -531,7 +796,7 @@ const QUOTE_MARKS: [char; 14] = [
 /// Text as a quote is looked for: NFKC, without whitespace or the slashes
 /// that mark a poem's line breaks, without quote marks at either end, in
 /// lower case.
-fn folded(text: &str) -> String {
+pub(crate) fn folded(text: &str) -> String {
     let text: String = text
         .nfkc()
         .filter(|character| !character.is_whitespace() && *character != '/')
@@ -677,8 +942,12 @@ pub fn parse_description_ddl_response(
     }
     let answer: Answer = parse_bounded(response_text, limits)?;
     let ddl = answer_ddl(&answer.ddl, limits)?;
-    let figures = answer
-        .figures
+    Ok((ddl, figures_of(&answer.figures)))
+}
+
+/// The figures an answer names: one without a `who` is left out.
+fn figures_of(figures: &Value) -> Vec<DrawnFigure> {
+    figures
         .as_array()
         .into_iter()
         .flatten()
@@ -690,8 +959,7 @@ pub fn parse_description_ddl_response(
                 what: what.to_owned(),
             })
         })
-        .collect();
-    Ok((ddl, figures))
+        .collect()
 }
 
 // The texts, as prototype B2 sent them (evocation-20261025, proto-b2), rule 15

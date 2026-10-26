@@ -21,12 +21,54 @@ export type PluginItem = {
 		note_ja: string;
 		note_en: string;
 		has_preview?: boolean;
+		/** Package words only: the DDL call the Saijiki shows as the example. */
+		example_ja?: string;
+		example_en?: string;
+		/** Package words only: an administrator's picture replaces the drawn one. */
+		custom_preview?: boolean;
+		preview_version?: string;
 	}>;
 	id?: string;
 	enabled?: boolean;
-	/** Whether the drawing uses definitions this document switches (a package
-	    bundled with the core). A legacy document without them is not drawn from. */
+	/** Whether the drawing uses definitions this item gives (a package bundled
+	    with the core, or one installed from the Web). A legacy document without
+	    them is not drawn from. */
 	has_definitions?: boolean;
+	/** "document" for a file in the server's plugin directory, "package" for
+	    one an administrator installed from the Web. */
+	kind?: 'document' | 'package';
+	deletable?: boolean;
+	description_ja?: string;
+	description_en?: string;
+};
+
+/** One reason a package cannot be installed: where in the file, and what. */
+export type PluginPackageProblem = { path: string; code: string; detail: string };
+
+/** What checking a package file found, word by word (POST /api/plugins/packages/validate). */
+export type PluginPackageReport = {
+	ok: boolean;
+	id?: string;
+	namespace?: string;
+	name?: string;
+	version?: string;
+	description_ja?: string;
+	description_en?: string;
+	exists?: boolean;
+	problems: PluginPackageProblem[];
+	words: Array<{
+		heading: string;
+		qualified_name: string;
+		aliases: string[];
+		summary_ja: string;
+		summary_en: string;
+		note_ja: string;
+		note_en: string;
+		example_ja: string;
+		example_en: string;
+		preview_png: string;
+		problems: PluginPackageProblem[];
+	}>;
 };
 
 export type DbBackupEntry = {
@@ -140,6 +182,9 @@ export type ServerAdministration = {
 	resetForLoggedOut: () => void;
 	deletePlugin: (id: string) => Promise<boolean>;
 	setPluginEnabled: (id: string, enabled: boolean) => Promise<boolean>;
+	checkPluginPackage: (document: string) => Promise<PluginPackageReport | null>;
+	installPluginPackage: (document: string, replace: boolean) => Promise<PluginPackageReport | true | null>;
+	setPluginWordPicture: (id: string, heading: string, pngBase64: string | null) => Promise<boolean>;
 	updateDbBackupSettings: (intervalDays: number, maxGenerations: number, backupHour: number, backupMinute: number) => Promise<void>;
 	runDbBackupNow: () => Promise<void>;
 	deleteDbBackup: (entry: DbBackupEntry) => void;
@@ -246,6 +291,78 @@ export function createServerAdministration<TActor extends SettingsActor>(
 			if (!response.ok) {
 				const body = await response.json().catch(() => ({})) as { detail?: unknown };
 				pluginActionStatus = pluginErrorMessage(response.status, body.detail);
+				return false;
+			}
+			await loadSettingsStatus();
+			return true;
+		} catch (error) {
+			pluginActionStatus = error instanceof Error ? error.message : String(error);
+			return false;
+		}
+	}
+
+	// A package check answers 200 with its report whatever it found; only a
+	// refused request (no admin, no server support) lands in the status line.
+	async function checkPluginPackage(document: string): Promise<PluginPackageReport | null> {
+		pluginActionStatus = null;
+		try {
+			const response = await deps.apiFetch('/api/plugins/packages/validate', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ document })
+			});
+			if (!response.ok) {
+				const body = await response.json().catch(() => ({})) as { detail?: unknown };
+				pluginActionStatus = pluginErrorMessage(response.status, body.detail);
+				return null;
+			}
+			return await response.json() as PluginPackageReport;
+		} catch (error) {
+			pluginActionStatus = error instanceof Error ? error.message : String(error);
+			return null;
+		}
+	}
+
+	/** true when installed; the report when a check failed on the way (422); null otherwise. */
+	async function installPluginPackage(document: string, replace: boolean): Promise<PluginPackageReport | true | null> {
+		pluginActionStatus = null;
+		try {
+			const response = await deps.apiFetch('/api/plugins/packages', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ document, replace })
+			});
+			if (!response.ok) {
+				const body = await response.json().catch(() => ({})) as { detail?: unknown };
+				if (response.status === 422 && body.detail && typeof body.detail === 'object' && 'words' in body.detail) {
+					return body.detail as PluginPackageReport;
+				}
+				pluginActionStatus = response.status === 409
+					? t().settingsPluginPackageExists
+					: pluginErrorMessage(response.status, body.detail);
+				return null;
+			}
+			await loadSettingsStatus();
+			return true;
+		} catch (error) {
+			pluginActionStatus = error instanceof Error ? error.message : String(error);
+			return null;
+		}
+	}
+
+	/** Replace a package word's Saijiki picture, or with null go back to the drawn one. */
+	async function setPluginWordPicture(id: string, heading: string, pngBase64: string | null): Promise<boolean> {
+		pluginActionStatus = null;
+		try {
+			const response = await deps.apiFetch(
+				`/api/plugins/${encodeURIComponent(id)}/words/${encodeURIComponent(heading)}/preview`,
+				pngBase64 === null
+					? { method: 'DELETE' }
+					: { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ png_base64: pngBase64 }) }
+			);
+			if (!response.ok) {
+				const body = await response.json().catch(() => ({})) as { detail?: unknown };
+				pluginActionStatus = response.status === 422 ? t().settingsPluginPictureRefused : pluginErrorMessage(response.status, body.detail);
 				return false;
 			}
 			await loadSettingsStatus();
@@ -544,6 +661,9 @@ export function createServerAdministration<TActor extends SettingsActor>(
 		resetForLoggedOut,
 		deletePlugin,
 		setPluginEnabled,
+		checkPluginPackage,
+		installPluginPackage,
+		setPluginWordPicture,
 		updateDbBackupSettings,
 		runDbBackupNow,
 		deleteDbBackup,

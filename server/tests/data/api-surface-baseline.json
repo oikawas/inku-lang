@@ -1,7 +1,7 @@
 {
-  "endpoint_count": 139,
-  "operation_count": 139,
-  "schema_count": 202,
+  "endpoint_count": 143,
+  "operation_count": 143,
+  "schema_count": 205,
   "operations": [
     {
       "path": "/api/admin/unread-words",
@@ -1314,6 +1314,34 @@
       }
     },
     {
+      "path": "/api/plugins/packages",
+      "method": "POST",
+      "operationId": "api_plugin_package_install_api_plugins_packages_post",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt"
+      ],
+      "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PluginPackageInstallBody\"}}},\"required\":true}",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Plugin Package Install Api Plugins Packages Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "path": "/api/plugins/packages/validate",
+      "method": "POST",
+      "operationId": "api_plugin_package_validate_api_plugins_packages_validate_post",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt"
+      ],
+      "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PluginPackageCheckBody\"}}},\"required\":true}",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Plugin Package Validate Api Plugins Packages Validate Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
       "path": "/api/plugins/reload",
       "method": "POST",
       "operationId": "api_plugins_reload_api_plugins_reload_post",
@@ -1368,6 +1396,38 @@
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PluginEnabledBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Plugin Set Enabled Api Plugins  Plugin Id  Enabled Put\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "path": "/api/plugins/{plugin_id}/words/{heading}/preview",
+      "method": "DELETE",
+      "operationId": "api_plugin_preview_reset_api_plugins__plugin_id__words__heading__preview_delete",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt",
+        "path:heading:req",
+        "path:plugin_id:req"
+      ],
+      "requestBody": "null",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Plugin Preview Reset Api Plugins  Plugin Id  Words  Heading  Preview Delete\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "path": "/api/plugins/{plugin_id}/words/{heading}/preview",
+      "method": "PUT",
+      "operationId": "api_plugin_preview_replace_api_plugins__plugin_id__words__heading__preview_put",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt",
+        "path:heading:req",
+        "path:plugin_id:req"
+      ],
+      "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PluginPreviewBody\"}}},\"required\":true}",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Plugin Preview Replace Api Plugins  Plugin Id  Words  Heading  Preview Put\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
         "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
       }
     },
@@ -2170,6 +2230,9 @@
     "PlacementGroup": "{\"additionalProperties\":false,\"description\":\"One direct coordinated-group placement over a contiguous Score span.\",\"properties\":{\"at\":{\"$ref\":\"#/components/schemas/AtRegion\",\"description\":\"群全体の中心を一度だけ解決する named 配置領域\"},\"cycle_members\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/CycleMembersV1\"},{\"type\":\"null\"}],\"description\":\"Cycle record when the members repeat as a cycle. Absent otherwise.\"},\"end\":{\"description\":\"配置する Score instruction 範囲の終端 exclusive index\",\"minimum\":0.0,\"title\":\"End\",\"type\":\"integer\"},\"layout\":{\"description\":\"How the group's members are laid out: overlap, horizontal_source_order, scatter, tile or cells.\",\"enum\":[\"overlap\",\"horizontal_source_order\",\"scatter\",\"tile\",\"cells\"],\"title\":\"Layout\",\"type\":\"string\"},\"members\":{\"description\":\"Score 0.9 Macro body boundaries; absent retains the legacy drawable span\",\"items\":{\"$ref\":\"#/components/schemas/PlacementMember\"},\"title\":\"Members\",\"type\":\"array\"},\"resolved\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/ResolvedPlacementGroup\"},{\"type\":\"null\"}],\"description\":\"Resolved placement of the group, filled in when the Score is resolved. Absent when unset.\"},\"start\":{\"description\":\"配置する Score instruction 範囲の開始 index\",\"minimum\":0.0,\"title\":\"Start\",\"type\":\"integer\"}},\"required\":[\"start\",\"end\",\"layout\",\"at\"],\"title\":\"PlacementGroup\",\"type\":\"object\"}",
     "PlacementMember": "{\"additionalProperties\":false,\"description\":\"One atomic source member of a Score 0.9 coordinated placement.\",\"properties\":{\"anchor_indices\":{\"description\":\"Indices of the Score anchors that belong to this member.\",\"items\":{\"minimum\":0.0,\"type\":\"integer\"},\"title\":\"Anchor Indices\",\"type\":\"array\"},\"end\":{\"description\":\"Index just past the last Score instruction of this member (exclusive).\",\"minimum\":0.0,\"title\":\"End\",\"type\":\"integer\"},\"start\":{\"description\":\"Index of the first Score instruction of this member (inclusive).\",\"minimum\":0.0,\"title\":\"Start\",\"type\":\"integer\"},\"symbolic\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/SymbolicMember\"},{\"type\":\"null\"}],\"description\":\"Symbolic description of how many instances this member produces. Absent when not symbolic.\"},\"transform_group_indices\":{\"description\":\"Indices of the Score transform groups that belong to this member.\",\"items\":{\"minimum\":0.0,\"type\":\"integer\"},\"title\":\"Transform Group Indices\",\"type\":\"array\"}},\"required\":[\"start\",\"end\"],\"title\":\"PlacementMember\",\"type\":\"object\"}",
     "PluginEnabledBody": "{\"properties\":{\"enabled\":{\"description\":\"True to switch the plugin package on, False to switch it off.\",\"title\":\"Enabled\",\"type\":\"boolean\"}},\"required\":[\"enabled\"],\"title\":\"PluginEnabledBody\",\"type\":\"object\"}",
+    "PluginPackageCheckBody": "{\"properties\":{\"document\":{\"description\":\"The full text of an inku.plugin-package.v1 JSON file, 1 to 1,000,000 characters.\",\"maxLength\":1000000,\"minLength\":1,\"title\":\"Document\",\"type\":\"string\"}},\"required\":[\"document\"],\"title\":\"PluginPackageCheckBody\",\"type\":\"object\"}",
+    "PluginPackageInstallBody": "{\"properties\":{\"document\":{\"description\":\"The full text of an inku.plugin-package.v1 JSON file, 1 to 1,000,000 characters.\",\"maxLength\":1000000,\"minLength\":1,\"title\":\"Document\",\"type\":\"string\"},\"replace\":{\"default\":false,\"description\":\"True to replace an installed package with the same id. Without it a package whose id is already installed is refused with 409.\",\"title\":\"Replace\",\"type\":\"boolean\"}},\"required\":[\"document\"],\"title\":\"PluginPackageInstallBody\",\"type\":\"object\"}",
+    "PluginPreviewBody": "{\"properties\":{\"png_base64\":{\"description\":\"The replacement picture as base64-encoded PNG bytes, up to 2 MB before encoding. It is fitted to the Saijiki frame at both scales.\",\"maxLength\":3000000,\"minLength\":1,\"title\":\"Png Base64\",\"type\":\"string\"}},\"required\":[\"png_base64\"],\"title\":\"PluginPreviewBody\",\"type\":\"object\"}",
     "PluginSettingsStatus": "{\"properties\":{\"enabled\":{\"default\":false,\"description\":\"Whether declarative DDL plugin documents are in use\",\"title\":\"Enabled\",\"type\":\"boolean\"},\"loaded\":{\"description\":\"Status of each plugin document, as the plugin loader reports it, including the reason a document was rejected\",\"items\":{\"additionalProperties\":true,\"type\":\"object\"},\"title\":\"Loaded\",\"type\":\"array\"},\"note\":{\"description\":\"Explanation of how plugin documents are reloaded\",\"title\":\"Note\",\"type\":\"string\"},\"runtime_editable\":{\"default\":false,\"description\":\"Whether plugin documents can be changed while the server runs, without a restart\",\"title\":\"Runtime Editable\",\"type\":\"boolean\"}},\"required\":[\"note\"],\"title\":\"PluginSettingsStatus\",\"type\":\"object\"}",
     "PluginStorageBody": "{\"properties\":{\"storage\":{\"additionalProperties\":true,\"description\":\"Saved plugin data, keyed by plugin id. A plugin id is 1 to 80 characters of letters, digits, hyphens, underscores or dots, and each value must be an object. The whole map is limited to 20,000 bytes of JSON.\",\"title\":\"Storage\",\"type\":\"object\"}},\"title\":\"PluginStorageBody\",\"type\":\"object\"}",
     "PluginValidateBody": "{\"properties\":{\"document\":{\"description\":\"The full text of the plugin document to check, 1 to 500,000 characters.\",\"maxLength\":500000,\"minLength\":1,\"title\":\"Document\",\"type\":\"string\"}},\"required\":[\"document\"],\"title\":\"PluginValidateBody\",\"type\":\"object\"}",
@@ -2233,5 +2296,5 @@
     "Variation": "{\"additionalProperties\":false,\"properties\":{\"amplitude\":{\"default\":\"medium\",\"description\":\"揺れ幅: fine=細かく・震える / medium=中程度 / broad=大きく\",\"enum\":[\"fine\",\"medium\",\"broad\"],\"title\":\"Amplitude\",\"type\":\"string\"},\"dimensions\":{\"description\":\"揺れ軸: 横線→[position_y] / 縦線→[position_x] / 斜め→[position_x,position_y]\",\"items\":{\"enum\":[\"position_x\",\"position_y\",\"angle\",\"length\",\"rotation\",\"radius\"],\"type\":\"string\"},\"title\":\"Dimensions\",\"type\":\"array\"},\"frequency\":{\"default\":\"medium\",\"description\":\"揺れ頻度: slow=ゆっくり / medium=普通 / high=速く\",\"enum\":[\"slow\",\"medium\",\"high\"],\"title\":\"Frequency\",\"type\":\"string\"},\"quality\":{\"default\":\"none\",\"description\":\"揺れ種類: perlin=細かい揺れ・震える / wave=ゆっくり揺れる・波打つ / pink=滲む / white=白色雑音 / none=なし\",\"enum\":[\"none\",\"white\",\"perlin\",\"pink\",\"wave\"],\"title\":\"Quality\",\"type\":\"string\"}},\"title\":\"Variation\",\"type\":\"object\"}",
     "VerticalLineRecipe": "{\"additionalProperties\":false,\"properties\":{\"cell_height\":{\"description\":\"Vertical spacing between successive copies, in canvas-short-edge units. Positive.\",\"exclusiveMinimum\":0.0,\"title\":\"Cell Height\",\"type\":\"number\"},\"kind\":{\"const\":\"vertical_line\",\"description\":\"Always \\\"vertical_line\\\".\",\"title\":\"Kind\",\"type\":\"string\"}},\"required\":[\"kind\",\"cell_height\"],\"title\":\"VerticalLineRecipe\",\"type\":\"object\"}"
   },
-  "digest": "ab9a8d9764eb731449872ddf4c460149c5aa59543401afff87a3269065d3e8d9"
+  "digest": "62be76e6b942a615cb08c4cc721ced97e0139d8a50beadae96ccf001946b7794"
 }

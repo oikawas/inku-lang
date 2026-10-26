@@ -105,6 +105,7 @@ ENV PATH="/app/server/.venv/bin:${PATH}" \
     INKU_SECRET_KEY_FILE=/data/secret.key \
     INKU_OUTPUT_DIR=/data/outputs \
     INKU_DB_BACKUP_DIR=/data/db-backups \
+    INKU_PLUGIN_PACKAGE_DIR=/data/plugin-packages \
     INKU_LOG_DIR=/data/logs \
     INKU_CHATGPT_AUTH_DIR=/data/chatgpt \
     UV_CACHE_DIR=/data/cache

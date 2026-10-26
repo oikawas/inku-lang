@@ -17,7 +17,7 @@
 | Android | `android/VERSION` = `2.1.4-android.105`、`android/BUILD_NUMBER` = `148446`、Room schema 14、共有Rust pipelineと同梱coreのRender Engine |
 | macOS | `apple/VERSION` = `1.1.5`、`apple/BUILD_NUMBER` = `13`（Server／Webと別の採番）、GRDBの物理schema、UniFFIで共有Rust core |
 | Server DB | migration registry version 5（`image_input_provenance`） |
-| Server API | 139 route（`test_route_authorization.py`の`EXPECTED_ROUTE_COUNT`）、公開allowlist 5 path |
+| Server API | 143 route（`test_route_authorization.py`の`EXPECTED_ROUTE_COUNT`）、公開allowlist 5 path |
 
 「公開可否」は、この表の記述をそのまま公開できるかを示す。環境変数は名前だけを扱い、値、資格情報、実DB、配備先固有の識別子は調査対象外とした。
 
@@ -38,7 +38,7 @@
 | SYS-LOG | ログ領域 | stdoutとアプリ内ローテーションファイル。compiler結果は診断の件数と安全な投影だけを記録する | `logging_setup.py` (`configure_logging`); `pipeline_product.py` (`pipeline_compiler_outcome`) | §21 | 確認済み | 抽象化すれば可 |
 | SYS-BACKUP | DBバックアップ領域 | migration・手動・定時で共有するWAL-safe SQLite snapshotと世代管理 | `persistence/backup.py`; `db.py`の薄いdelegate | §22 | 確認済み | 抽象化すれば可 |
 | DATA-MIGRATION | Server schema lifecycle | SQLite-only事前検証、versioned registry（v1 legacy baseline → v2 共有pipeline sidecar → v3 provider観測 → v4 単一のDDL本文 → v5 画像入力の記録）、allowlisted legacy fingerprint、単一writer移行、PK/canonical history byte invariant、fail-closed | `persistence/{config,engine,migrations,legacy_schema,invariants,backup}.py`; portable persistence tests | §22 | 確認済み | 公開可 |
-| API-ROUTERS | Router群 | 用途別の13 router moduleと`/api/pipeline`の共有pipeline router。139 endpoint（件数の正本は`test_route_authorization.py`の`EXPECTED_ROUTE_COUNT`。router別は`server-components.ja.md`） | `api_core/routers/{public,auth,me,plugins,settings,users,history,lineage,render,feedback,description,chatgpt,autonomous}.py`; `pipeline_api.py:pipeline_router` | Project Context「server」 | 確認済み | 公開可 |
+| API-ROUTERS | Router群 | 用途別の13 router moduleと`/api/pipeline`の共有pipeline router。143 endpoint（件数の正本は`test_route_authorization.py`の`EXPECTED_ROUTE_COUNT`。router別は`server-components.ja.md`） | `api_core/routers/{public,auth,me,plugins,settings,users,history,lineage,render,feedback,description,chatgpt,autonomous}.py`; `pipeline_api.py:pipeline_router` | Project Context「server」 | 確認済み | 公開可 |
 | API-AUTH | 認証・認可 | Bearer/cookie session、role guard、理由付きの公開allowlist 5 path。管理者でないleaderは自分のユーザーグループの利用者だけを管理する。共有pipeline routerは`_current_user`を所有者として全操作へ渡す | `api_core/deps.py`; `routers/auth.py`; `routers/users.py`; `api.py`（`pipeline_router(_pipeline_service, _current_user, ...)`）; `test_route_authorization.py`; `test_a_leader_keeps_members_in_their_group.py` | §22 | 確認済み | 公開可 |
 | API-LIMIT | 容量境界 | body、request、render、pipeline worker・保持run・effect段数、envelope byte、保存queue、画像の受取（32 MiB、所有者ごとの一時ID、待機15分）の上限 | `security.py`; `api_core/state.py`; `pipeline_api.py:PipelineService`; `pipeline_defaults.py` (`host_limits`, `envelope_limits`); `pipeline_images.py` | §12.6.6, §22 | 確認済み | 公開可 |
 | PIPE-HOST | Server pipeline host | 信頼済みconfig・provider・保存effectを共有coreへ供給し、実行snapshotを直列化して保存する。画像の実行では受け取った画像をrunのメモリに置き、見比べの画を描く。意味分岐を持たない | `pipeline_runtime.py`; `pipeline_api.py:PipelineService`; `pipeline_candidate.py` (`PipelineBinding`, `CandidateExecution`); `pipeline_product.py:ProductPipelineEffects`; `pipeline_settings.py`; `pipeline_defaults.py`; `pipeline_compat.py`; `pipeline_images.py` | §12.6.6, §12.7.1 | 確認済み | 公開可 |

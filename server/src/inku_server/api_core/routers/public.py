@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 from ...color_catalogs import RENAMED_COLOR_CATALOG_IDS, color_catalogs
 from ...layer_versions import DDL_ENGINE_VERSION, DDL_VERSION
-from ...plugins import DOCUMENT_PLUGIN_MANAGER, entries_with_fires_on
+from ...plugins import DOCUMENT_PLUGIN_MANAGER, PLUGIN_PACKAGE_MANAGER, entries_with_fires_on
 from ...plugins.document_format import preview_path_for_qualified_name
 from ...reference import build_reference, render_markdown
 from ...saijiki import display_categories
@@ -229,14 +229,19 @@ def api_models(actor: dict = Depends(_current_user)) -> ModelSettingsResponse:
 PLUGIN_PREVIEW_ROUTE = "/api/saijiki/plugin-preview"
 
 
-def _preview_url(qualified_name: str, *, hidpi: bool) -> str:
+def _preview_url(qualified_name: str, *, hidpi: bool, version: str = "") -> str:
     """Where the browser fetches this word's artwork.
 
     The name rides as a query parameter rather than in the path: a qualified
     name is `Namespace.Word` with the word in the document's own language, and
     a query value needs no decisions about what a path segment may hold.
+    `version` changes when an administrator replaces a package word's picture,
+    so the day-long cache does not keep showing the old one.
     """
-    query = urllib.parse.urlencode({"name": qualified_name, "scale": "2" if hidpi else "1"})
+    fields = {"name": qualified_name, "scale": "2" if hidpi else "1"}
+    if version:
+        fields["v"] = version
+    query = urllib.parse.urlencode(fields)
     return f"{PLUGIN_PREVIEW_ROUTE}?{query}"
 
 
@@ -249,14 +254,18 @@ def _enabled_plugin_entries() -> list[dict[str, object]]:
         # without it the editor can only say a qualified name is unknown, not
         # which plain word it would have fired.
         entries.extend(entries_with_fires_on(item.entries))
+    # Packages installed from the Web carry their own example (a DDL call)
+    # where a document's word has firing phrases.
+    entries.extend(PLUGIN_PACKAGE_MANAGER.saijiki_entries())
     # v2.14: the loader says whether a picture exists at each scale; the URL is
     # this layer's to write, since this layer owns the route. A word with no
     # picture carries "" and the panel falls back to the shared mark.
     for entry in entries:
         name = str(entry.get("qualified_name", ""))
-        entry["preview_url"] = _preview_url(name, hidpi=False) if entry.get("has_preview") else ""
+        version = str(entry.pop("preview_version", "") or "")
+        entry["preview_url"] = _preview_url(name, hidpi=False, version=version) if entry.get("has_preview") else ""
         entry["preview_url_2x"] = (
-            _preview_url(name, hidpi=True) if entry.get("has_preview_hidpi") else ""
+            _preview_url(name, hidpi=True, version=version) if entry.get("has_preview_hidpi") else ""
         )
     return entries
 
@@ -290,7 +299,9 @@ def api_plugin_preview(
     receiving it with every Saijiki listing. Requires a signed-in user. Responds
     404 when the name matches no word of a loaded plugin.
     """
-    path = preview_path_for_qualified_name(name, hidpi=(scale == "2"))
+    path = preview_path_for_qualified_name(name, hidpi=(scale == "2")) or (
+        PLUGIN_PACKAGE_MANAGER.preview_path_for_qualified_name(name, hidpi=(scale == "2"))
+    )
     if path is None:
         raise HTTPException(status_code=404, detail="no preview for that word")
     # Immutable for a day: a picture changes only when its plugin document is

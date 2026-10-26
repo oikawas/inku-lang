@@ -44,7 +44,11 @@ public struct ModelGuidanceCatalog: Decodable, Sendable {
         guard let source = knownProvider(providerID, kind: kind)?.models.first(where: { $0.id == model.id })?.settings else { return model }
         var result = source
         result.label = model.label
-        result.purposes = model.purposes.filter { !(source.unsupportedPurposes ?? []).contains($0) }
+        // A purpose measured without a response stays only when it was chosen for the model (2026-10-26).
+        let allowed = (model.allowedUnsupportedPurposes ?? []).filter(source.isNotRecommended(for:))
+        result.purposes = model.purposes.filter { !source.isNotRecommended(for: $0) || allowed.contains($0) }
+        let kept = allowed.filter(result.purposes.contains)
+        result.allowedUnsupportedPurposes = kept.isEmpty ? nil : kept
         result.eol = model.eol
         result.requiresSubscription = model.requiresSubscription
         result.eolDate = model.eol == false ? nil : model.eolDate ?? source.eolDate

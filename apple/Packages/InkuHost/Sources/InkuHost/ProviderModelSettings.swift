@@ -19,6 +19,8 @@ public struct ProviderModelSettings: Codable, Sendable, Equatable, Identifiable 
     public var requiresSubscription: Bool?
     public var labels: [String]
     public var unsupportedPurposes: [String]?
+    /// Purposes chosen knowing the measurement found no response (the author, 2026-10-26).
+    public var allowedUnsupportedPurposes: [String]?
     public var speedLLMSeconds: Double?
     public var speedVisionSeconds: Double?
     public var costUSDLLM: Double?
@@ -32,6 +34,7 @@ public struct ProviderModelSettings: Codable, Sendable, Equatable, Identifiable 
                 speedLabel: String? = nil, commentJA: String? = nil, commentEN: String? = nil,
                 eol: Bool? = nil, eolDate: String? = nil, requiresSubscription: Bool? = nil,
                 labels: [String] = [], unsupportedPurposes: [String]? = nil,
+                allowedUnsupportedPurposes: [String]? = nil,
                 speedLLMSeconds: Double? = nil, speedVisionSeconds: Double? = nil,
                 costUSDLLM: Double? = nil, costUSDVision: Double? = nil,
                 catalogMeasurementPresent: Bool? = nil) {
@@ -42,6 +45,7 @@ public struct ProviderModelSettings: Codable, Sendable, Equatable, Identifiable 
         self.speedLabel = speedLabel; self.commentJA = commentJA; self.commentEN = commentEN
         self.eol = eol; self.eolDate = eolDate; self.requiresSubscription = requiresSubscription
         self.labels = labels; self.unsupportedPurposes = unsupportedPurposes
+        self.allowedUnsupportedPurposes = allowedUnsupportedPurposes
         self.speedLLMSeconds = speedLLMSeconds; self.speedVisionSeconds = speedVisionSeconds
         self.costUSDLLM = costUSDLLM; self.costUSDVision = costUSDVision
         self.catalogMeasurementPresent = catalogMeasurementPresent
@@ -50,6 +54,16 @@ public struct ProviderModelSettings: Codable, Sendable, Equatable, Identifiable 
     public var resolvedLabels: [ModelCatalogLabelDefinition] { ModelCatalogLabels.resolve(for: self) }
     public var modelFold: String? { resolvedLabels.last?.id }
     public var isSelectable: Bool { resolvedLabels.allSatisfy(\.publishable) }
+    /// A model offered for no purpose is never published, nor turned on by "select all".
+    public var isPublishable: Bool { isSelectable && !purposes.isEmpty }
+
+    /// Measured without a response for this purpose: it can be chosen, but is not recommended.
+    public func isNotRecommended(for purpose: String) -> Bool { (unsupportedPurposes ?? []).contains(purpose) }
+
+    /// Offered for the purpose: a purpose measured without a response only when it was chosen for it.
+    public func offers(_ purpose: String) -> Bool {
+        purposes.contains(purpose) && (!isNotRecommended(for: purpose) || (allowedUnsupportedPurposes ?? []).contains(purpose))
+    }
     public var hasCatalogMeasurement: Bool {
         catalogMeasurementPresent == true
             || [recommendationLevel, recommendationLLM, recommendationVision, recommendationStage1, recommendationStage2].contains { $0 != nil }
@@ -71,7 +85,7 @@ public struct ProviderModelSettings: Codable, Sendable, Equatable, Identifiable 
         case id, label, purposes, recommendationLevel, recommendationLLM, recommendationVision
         case recommendationStage1, recommendationStage2, speedClass, speedLabel, commentJA, commentEN
         case eol, eolDate, requiresSubscription
-        case labels, unsupportedPurposes, speedLLMSeconds, speedVisionSeconds, costUSDLLM, costUSDVision
+        case labels, unsupportedPurposes, allowedUnsupportedPurposes, speedLLMSeconds, speedVisionSeconds, costUSDLLM, costUSDVision
         case catalogMeasurementPresent
     }
 
@@ -94,6 +108,7 @@ public struct ProviderModelSettings: Codable, Sendable, Equatable, Identifiable 
         requiresSubscription = try values.decodeIfPresent(Bool.self, forKey: .requiresSubscription)
         labels = try values.decodeIfPresent([String].self, forKey: .labels) ?? []
         unsupportedPurposes = try values.decodeIfPresent([String].self, forKey: .unsupportedPurposes)
+        allowedUnsupportedPurposes = try values.decodeIfPresent([String].self, forKey: .allowedUnsupportedPurposes)
         speedLLMSeconds = try values.decodeIfPresent(Double.self, forKey: .speedLLMSeconds)
         speedVisionSeconds = try values.decodeIfPresent(Double.self, forKey: .speedVisionSeconds)
         costUSDLLM = try values.decodeIfPresent(Double.self, forKey: .costUSDLLM)

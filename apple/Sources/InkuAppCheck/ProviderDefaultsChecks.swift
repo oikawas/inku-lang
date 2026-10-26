@@ -81,7 +81,11 @@ func runProviderDefaultsChecks() async throws {
     let openAI = defaults[0]
     let candidates = state.availableModels(for: openAI)
     let wrongKind = ProviderSettings(id: "openai", kind: .anthropic, baseURL: openAI.baseURL)
-    guard candidates.contains(where: { $0.id == "openai:gpt-5.1" && $0.name == "GPT-5.1" }),
+    // The catalog's defaults decide the offline candidates (gpt-5.1 left them on 2026-10-13, 403f2e179).
+    let catalogDefaults = (ModelGuidanceCatalog.bundled?.registeredModelSettings(for: openAI) ?? []).filter { $0.offers("llm") }
+    guard !catalogDefaults.isEmpty,
+          catalogDefaults.allSatisfy({ model in candidates.contains { $0.id == "openai:" + model.id && $0.name == model.label } }),
+          !candidates.contains(where: { $0.id == "openai:gpt-5.1" }),
           state.availableModels(for: custom).isEmpty,
           state.availableModels(for: wrongKind).isEmpty else {
         throw CheckFailure.message("Bundled model candidates were missing or applied to a custom/different-kind provider")

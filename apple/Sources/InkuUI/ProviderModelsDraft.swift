@@ -28,7 +28,7 @@ public struct ProviderModelsDraft: Sendable, Equatable {
     }
 
     public func isEnabled(modelID: String) -> Bool {
-        guard let model = model(modelID: modelID), model.isSelectable else { return false }
+        guard let model = model(modelID: modelID), model.isPublishable else { return false }
         return enabled[modelID] ?? true
     }
 
@@ -56,20 +56,23 @@ public struct ProviderModelsDraft: Sendable, Equatable {
     }
 
     public mutating func setEnabled(modelID: String, enabled value: Bool) {
-        guard let model = model(modelID: modelID), !value || model.isSelectable else { return }
+        guard let model = model(modelID: modelID), !value || model.isPublishable else { return }
         enabled[modelID] = value
     }
 
+    /// A purpose measured without a response can be chosen too, as not recommended (the author, 2026-10-26);
+    /// the model keeps it in `allowedUnsupportedPurposes`, as the Server does.
     public mutating func togglePurpose(modelID: String, purpose: String) {
         guard ["llm", "vision"].contains(purpose),
               let index = models.firstIndex(where: { $0.id == modelID }),
-              Self.canEditPurposes(models[index]),
-              !(models[index].unsupportedPurposes ?? []).contains(purpose) else { return }
+              Self.canEditPurposes(models[index]) else { return }
         if models[index].purposes.contains(purpose) {
             models[index].purposes.removeAll { $0 == purpose }
         } else {
             models[index].purposes.append(purpose)
         }
+        let allowed = models[index].purposes.filter(models[index].isNotRecommended(for:))
+        models[index].allowedUnsupportedPurposes = allowed.isEmpty ? nil : allowed
         enabled[modelID] = !models[index].purposes.isEmpty
     }
 

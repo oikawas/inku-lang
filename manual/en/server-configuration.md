@@ -133,13 +133,21 @@ Explicitly set the additional structural limits in both `pipeline.compiler.hard_
 |---|---|---|
 | `INKU_LLM_BACKEND` | Which LLM backend family to use | `anthropic` |
 | `INKU_DOCUMENT_PLUGIN_DIR` | Where declarative plugin documents live | `server/plugins/` |
+| `INKU_PLUGIN_PACKAGE_DIR` | Where plugins (packages) an administrator added from the Web live | `~/.local/share/inku/plugin-packages` (`/data/plugin-packages` in Docker) |
 | `INKU_OKUGAKI_MODEL` | Default reader model for the colophon | a vision-capable model |
 | `INKU_OKUGAKI_CACHE_TTL_SECONDS` | Colophon cache lifetime | `1800` |
 | `INKU_OKUGAKI_CACHE_MAX_ENTRIES` | Colophon cache size | `256` |
 | `INKU_LEARNED_FILE` | Where learned words are stored | `/tmp/inku-learned.json` |
 | `INKU_DEVELOPER_MODE` | Extra developer-facing output | unset |
 
-The `Plugins` settings show vocabulary plugins: whether each is on, and its words (name, aliases, surfaces, notes, preview). Plugin documents cannot be created or edited there. Only a bundled package whose definitions the developers wrote in JSON (today `Nature.leaves`) is drawn from, and its document is marked `Used for drawing`. Any other `.inku-plugin.md` is a legacy document without definitions and is marked `Not used for drawing`: writing its words leaves them out with a diagnostic. A legacy document can be deleted; a bundled package's document cannot (switch it off instead).
+The `Plugins` settings add and delete vocabulary plugins and show whether each is on and its words (name, aliases, surfaces, notes, example, preview).
+
+- `Add a plugin` takes a plugin file (`inku.plugin-package.v1` JSON, or a zip holding it with the PNGs of its Saijiki pictures; `PLUGIN.md` §5.1 says how to write one) and the Server checks it at once: the file's shape, the shared core's checks of each definition, and drawing each word's Japanese and English example. Whatever is wrong is listed word by word with its place in the file and the reason. A word that passed shows the note, example, and picture the Saijiki will show (the zip's picture, or one drawn from its example). `Add` is offered only when everything passed; when a plugin with the same name (`namespace.name`) is installed it becomes `Replace`.
+- An added plugin's words can be drawn in every new work on that Server, appear in the Saijiki and in DDL editor completion, and reach Stage 1 through their summaries when drawing from a description. Saved works keep drawing with the definitions they saved, whatever is replaced or deleted later.
+- `Replace picture` on a word uploads a PNG the Saijiki shows instead; `Back to the original picture` returns to the zip's picture or the one drawn from the example. Replacing the plugin keeps replaced pictures.
+- `Export` saves an installed plugin as a zip with its definitions, summaries, notes, examples, and current pictures; another Server can add it as it is.
+- An added plugin can be switched off or deleted.
+- A bundled package's document (today `Nature.leaves`) is marked `Used for drawing`; it cannot be deleted, so switch it off when it is not wanted. Any other `.inku-plugin.md` is a legacy document without definitions and is marked `Not used for drawing`: writing its words leaves them out with a diagnostic. A legacy document can be deleted.
 
 A document counts as a bundled package only where it sits in `server/plugins/`. With `INKU_DOCUMENT_PLUGIN_DIR` pointed elsewhere, a `nature-leaves.inku-plugin.md` placed there is treated as legacy and the `Nature.leaves` words are not drawn. If the settings mark it `Not used for drawing`, check that directory.
 

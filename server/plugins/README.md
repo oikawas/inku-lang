@@ -1,7 +1,12 @@
-# Declarative vocabulary plugins
+# Plugin documents
 
-Place UTF-8 `*.inku-plugin.md` vocabulary documents in this directory. The server parses them as data and never executes plugin code. Added, changed, and removed files are detected without a service restart; administrators can force a reload with `inku-cli plugin reload`.
+This directory holds `*.inku-plugin.md` documents. Today the only one that is drawn from is
+`nature-leaves.inku-plugin.md`: it switches the `Nature.leaves` package bundled with the shared core on and off
+and gives its words, notes and Saijiki pictures. Any other document here is legacy Markdown; its words are
+listed as "not used for drawing" and left out of drawings with a diagnostic.
 
-A rejected document is not partially loaded. Inspect validation reasons with `inku-cli plugin list` or validate before installation with `inku-cli plugin validate FILE`.
+To add vocabulary, an administrator adds a plugin file (`inku.plugin-package.v1`) from the Web settings
+"Plugins" instead; see `PLUGIN.md` §5.1. Those files are kept in `INKU_PLUGIN_PACKAGE_DIR`, not here.
 
-Official vocabulary documents may be tracked here in future releases. Local or third-party documents should be reviewed before deciding whether they belong in repository history.
+The server parses documents as data and never executes plugin code. Added, changed, and removed documents are
+detected without a service restart; administrators can force a reload with `inku-cli plugin reload`.

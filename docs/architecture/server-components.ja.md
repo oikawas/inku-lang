@@ -215,7 +215,7 @@ flowchart LR
 | `public` | 11 | health、info、catalog、models、saijiki、plugin preview、reference、client config、demo、第三者通知 | なし。health・info・第三者通知以外は個別guard |
 | `auth` | 4 | auth config、login/logout | なし。login以外は個別guard |
 | `me` | 13 | profile、user settings、各user storage | `_current_user` |
-| `plugins` | 5 | plugin閲覧・検証・CRUD・enable | `_current_user`、変更はadmin |
+| `plugins` | 10 | plugin閲覧・検証・CRUD・enable、Webから入れるpackage（JSONかzip）の検査・追加・書き出し・歳時記の絵の差し替え | `_current_user`、変更はadmin |
 | `settings` | 22 | server-wide settings、backup、取り合わせの設定、画像のアップロードの警告 | `_admin_user` |
 | `users` | 8 | user/group管理 | `_user_manager` |
 | `history` | 17 | 履歴、SVG、thumbnail、mark、trash、共有、artifact再作成、animation・card書き出し | `_current_user` |

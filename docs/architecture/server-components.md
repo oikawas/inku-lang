@@ -215,7 +215,7 @@ In `inku-render`, `render.rs` is the only overall orchestrator. `render_with_res
 | `public` | 11 | Health, info, catalog, models, saijiki, plugin preview, reference, client config, demo, third-party notices | None; routes other than health, info, and third-party notices have explicit guards |
 | `auth` | 4 | Auth config and login/logout | None; routes other than login have explicit guards |
 | `me` | 13 | Profile, user settings, per-user storage | `_current_user` |
-| `plugins` | 5 | Plugin read/validation/CRUD/enable | `_current_user`; mutation requires admin |
+| `plugins` | 10 | Plugin read/validation/CRUD/enable; checking, installing, and exporting packages (JSON or zip) from the Web and replacing their Saijiki pictures | `_current_user`; mutation requires admin |
 | `settings` | 22 | Server-wide settings, backup, juxtaposition settings, and the picture upload warning | `_admin_user` |
 | `users` | 8 | User/group management | `_user_manager` |
 | `history` | 17 | History, SVG, thumbnails, marks, trash, sharing, artifact rebuild, animation and card export | `_current_user` |

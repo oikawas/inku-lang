@@ -226,6 +226,7 @@ struct BatchModelPickerView: View {
     private func modelCard(_ entry: ProviderModelSettings, provider: ProviderSettings) -> some View {
         let reference = provider.id + ":" + entry.id
         let selected = reference == selectedReference
+        let unrecommended = entry.isNotRecommended(for: selectedPurpose)
         return Button {
             guard !cannotSelect, let settings,
                   SettingsModel.isRegisteredModelAvailable(reference, purpose: selectedPurpose, settings: settings) else { return }
@@ -241,6 +242,11 @@ struct BatchModelPickerView: View {
                     Spacer(minLength: 0)
                     if selected { Image(systemName: "checkmark").foregroundStyle(Color.accentColor) }
                 }
+                if unrecommended {
+                    Text(Self.notRecommended(language: model.display.preferences.language))
+                        .inkuFont(11, weight: .semibold).foregroundStyle(Color.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 ModelLabelsView(labels: entry.resolvedLabels, display: model.display, endOfLifeDate: entry.eolDate)
                 HStack {
                     ModelPurposeBadgesView(entry: entry, language: model.display.preferences.language)
@@ -254,8 +260,10 @@ struct BatchModelPickerView: View {
             .background(selected ? Color.accentColor.opacity(0.12) : Color.primary.opacity(0.035),
                         in: RoundedRectangle(cornerRadius: 8))
             .overlay {
+                // Published for a purpose it did not answer when measured: choosable, framed in red (2026-10-26).
                 RoundedRectangle(cornerRadius: 8)
-                    .stroke(selected ? Color.accentColor : Color.primary.opacity(0.18), lineWidth: selected ? 2 : 1)
+                    .stroke(unrecommended ? Color.red : selected ? Color.accentColor : Color.primary.opacity(0.18),
+                            lineWidth: selected || unrecommended ? 2 : 1)
             }
             .contentShape(RoundedRectangle(cornerRadius: 8))
         }
@@ -278,6 +286,9 @@ struct BatchModelPickerView: View {
         if provider.kind == .chatGPTPlan { return models }
         return models.sorted { first, second in
             if first.isSelectable != second.isSelectable { return first.isSelectable }
+            // A model chosen for a purpose it did not answer comes after those that did (2026-10-26).
+            let firstUnrecommended = first.isNotRecommended(for: selectedPurpose)
+            if firstUnrecommended != second.isNotRecommended(for: selectedPurpose) { return !firstUnrecommended }
             let firstLevel = sharedRecommendationLevel(first), secondLevel = sharedRecommendationLevel(second)
             if firstLevel != secondLevel { return firstLevel > secondLevel }
             let firstLabel = first.label.isEmpty ? first.id : first.label
@@ -339,11 +350,17 @@ struct BatchModelPickerView: View {
         return candidates.compactMap { $0 }.first { !$0.isEmpty } ?? "—"
     }
 
+    /// web/src/lib/i18n modelNotRecommended (2026-10-26).
+    static func notRecommended(language: String) -> String {
+        language == "en" ? "Not recommended (no response when measured)" : "推奨しません（計測で応答なし）"
+    }
+
     private func metadataText(_ entry: ProviderModelSettings, provider: ProviderSettings) -> String {
         let rows = [("用途", purposes(entry))] + recommendationRows(entry)
             + [("概算コスト", ModelMetadataPresentation.cost(entry, language: model.display.preferences.language)),
                ("速度", speed(entry, provider: provider)), ("評価コメント", comment(entry))]
-        return (entry.resolvedLabels.map { $0.name(language: model.display.preferences.language) }
+        let warning = entry.isNotRecommended(for: selectedPurpose) ? [Self.notRecommended(language: model.display.preferences.language)] : []
+        return (warning + entry.resolvedLabels.map { $0.name(language: model.display.preferences.language) }
                 + rows.map { model.display.localized($0.0) + ": " + $0.1 }).joined(separator: ". ")
     }
 }

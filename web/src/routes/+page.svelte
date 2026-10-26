@@ -180,6 +180,9 @@
 		// qualified name from a name that does not exist at all.
 		fires_on_ja?: string[];
 		fires_on_en?: string[];
+		// A package installed from the Web gives the DDL call its check drew.
+		example_ja?: string;
+		example_en?: string;
 		// Where the drawing baked from this word's own expansion is served,
 		// shared by both languages the way the built-in previews share theirs.
 		// "" when the document ships none at that scale.
@@ -486,8 +489,9 @@
 	 * The document supplies three of them already: the qualified name is the
 	 * title, the note is the effect, and the first firing phrase is the example
 	 * -- it is what a description would actually say to reach the word, which is
-	 * what the built-in examples are too. The fourth is the drawing baked from
-	 * the word's own expansion.
+	 * what the built-in examples are too. A package installed from the Web has
+	 * no firing phrases; its example is the DDL call the check drew. The fourth
+	 * is the drawing baked from the word's own expansion.
 	 */
 	function pluginPreview(entry: {
 		qualified_name: string;
@@ -496,6 +500,8 @@
 		note_en: string;
 		fires_on_ja?: string[];
 		fires_on_en?: string[];
+		example_ja?: string;
+		example_en?: string;
 		preview_url?: string;
 		preview_url_2x?: string;
 	}, wordLang: ResolvedInstructionLang): SaijikiPreview {
@@ -503,12 +509,13 @@
 		// The note explains the word, so it is the reader's language; the firing
 		// phrase is what a description would say to reach it, so it is the DDL's.
 		const firesOn = (wordLang === 'ja' ? entry.fires_on_ja : entry.fires_on_en) ?? [];
+		const example = wordLang === 'ja' ? entry.example_ja : entry.example_en;
 		return {
 			categoryKey: 'plugin',
 			word: pluginDisplayName(entry, wordLang),
 			canonicalWord: entry.qualified_name,
 			effect: (uiLang === 'ja' ? entry.note_ja : entry.note_en) || '',
-			example: firesOn[0] ?? '',
+			example: example || (firesOn[0] ?? ''),
 			// The fallback is the drawing, not an empty frame; it is only read
 			// when the word ships no artwork, since `image` wins where it is set.
 			svg: PLUGIN_FALLBACK_SVG,
@@ -633,7 +640,10 @@
 		cancelModelSelection: restoreModelSelection,
 		requestConfirmation: (confirmation) => { confirmAction = confirmation; },
 		setRenderFanoutLimit: (limit) => { renderFanoutLimit = limit; },
-		describeApiError
+		describeApiError,
+		// Read only once after sign-in otherwise, so a plugin added in the
+		// settings would not reach the Saijiki until the page was reloaded.
+		pluginsChanged: () => { void loadPluginVocabulary(); }
 	});
 	let chatgptActor: string | undefined;
 	$effect(() => {

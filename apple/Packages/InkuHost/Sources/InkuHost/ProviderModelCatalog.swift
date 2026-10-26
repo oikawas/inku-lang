@@ -123,7 +123,7 @@ public enum ProviderModelCatalog {
         }.sorted { $0.id < $1.id }
         models += retired
         let enabled = Dictionary(models.map { model in
-            (model.id, model.isSelectable && byID[model.id] != nil && previousEnabled?[model.id] != false)
+            (model.id, model.isPublishable && byID[model.id] != nil && previousEnabled?[model.id] != false)
         }, uniquingKeysWith: { first, _ in first })
         return (models, enabled)
     }

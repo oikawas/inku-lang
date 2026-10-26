@@ -55,7 +55,8 @@ struct ModelLabelsView: View {
             ForEach(labels) { label in
                 Text(label.name(language: display.preferences.language) + (label.id == "eol" ? endOfLifeDate.map { " (\($0))" } ?? "" : ""))
                     .inkuFont(12)
-                    .foregroundStyle(label.publishable ? Color.secondary : Color.orange)
+                    // No response when measured is publishable since 2026-10-26, as not recommended, and keeps the warning colour.
+                    .foregroundStyle(label.publishable && label.id != "no_response" ? Color.secondary : Color.orange)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }

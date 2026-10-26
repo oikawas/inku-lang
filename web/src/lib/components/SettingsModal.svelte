@@ -463,6 +463,10 @@
 					{isAdmin} onLoadSettingsStatus={settings.loadStatus}
 					onDeletePlugin={settings.deletePlugin}
 					onSetPluginEnabled={settings.setPluginEnabled}
+					onCheckPluginPackage={settings.checkPluginPackage}
+					onInstallPluginPackage={settings.installPluginPackage}
+					onSetPluginWordPicture={settings.setPluginWordPicture}
+					onExportPluginPackage={settings.exportPluginPackage}
 				/>
 		{:else if settingsTab === 'users'}
 			<UserAdministrationSettings

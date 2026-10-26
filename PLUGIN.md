@@ -12,10 +12,15 @@ Engine Packs are separate mechanisms, not plugins.
 ## 1. Steps
 
 1. Write the definition as JSON (the example in §2, the format in §3).
-2. Check it (§7). A mistake reports which field failed and why.
-3. Load it (§5). For your own use, the fastest way is a DDL export file (`inku.ddl-export.v1`).
-4. Write its name in DDL (§4). For the underdrawing (Stage 1) to choose it when drawing from a description,
-   write a summary (§6) and add it to the Server's settings (§5.2).
+2. Put the definition, with a summary (§6), a note, and an example, in a plugin file (`inku.plugin-package.v1`, §5.1).
+   For your own Saijiki picture, zip that file with the PNG (without one, the picture is drawn from the example).
+3. A Server administrator chooses the file under "Add a plugin" in the Web settings "Plugins" (§5.1). The Server
+   checks it at once and lists, word by word, where in the file something is wrong and why (§7). A word that
+   passed shows the picture and example the Saijiki will show; check them and press "Add".
+4. Write its name in DDL (§4). An added word can be drawn in every new work on that Server, appears in the
+   Saijiki, and is chosen by the underdrawing (Stage 1) from its summary when drawing from a description.
+
+To try a definition in your own works without installing it on a Server, load it in a DDL export file (§5.2).
 
 ## 2. Example: `Sky.Stars` (alias `Sky.星`)
 
@@ -92,7 +97,7 @@ How to read it:
 - `vary` chooses one of its choices from a fixed seed. Being inside `repeat`, it chooses again for each star.
 - `emit` becomes one shape instruction: here a pencil-yellow filled circle at a numeric position.
 
-The same definition in an export file (§5.1) looks like this. `ddl` is the text placed in the DDL editor
+The same definition in an export file (§5.2) looks like this. `ddl` is the text placed in the DDL editor
 when the file is loaded.
 
 ```json
@@ -139,7 +144,8 @@ A definition has only these fields. An unknown field rejects the whole definitio
 
 DDL writes the name as `namespace.heading` (`Sky.Stars`) or `namespace.alias` (`Sky.星`). One name belongs to
 one definition: a definition claiming a canonical name or alias that a definition already loaded holds is not
-accepted (except that definitions from an export file in §5.1 take precedence for that work). The namespace
+accepted (except that definitions from an export file in §5.2 take precedence for that work). Adding from the
+Web, the check refuses a word whose name another plugin already holds (§5.1). The namespace
 convention is in [SPEC §4.10](SPEC.md#410-namespace-convention); canonical names and aliases are in
 [SPEC §4.13](SPEC.md#413-canonical-names-and-aliases).
 
@@ -334,9 +340,167 @@ Three categories outside the Saijiki are closed words defined by the core:
 
 ## 5. Ways to Load a Definition
 
-The current specification loads new definitions in three ways. The settings "Plugins" screen cannot add a document (§5.4).
+The current specification loads new definitions in four ways. §5.1 is the usual one.
 
-### 5.1 A DDL export file (immediately usable by an author)
+### 5.1 Adding a plugin file from the Web (a Server administrator)
+
+Put the definitions and what the Saijiki shows in one JSON file (`inku.plugin-package.v1`) and choose it under
+"Add a plugin" in the Web settings "Plugins". The `Sky.Stars` of §2 as a file looks like this. Saved as it is to a
+UTF-8 file, for example `sky-night.json`, it passes the checks and can be added (checked on 5173, Build 1338, 2026-10-26).
+
+```json
+{
+  "schema": "inku.plugin-package.v1",
+  "namespace": "Sky",
+  "name": "night",
+  "version": "1.0.0",
+  "description_ja": "夜空の語。",
+  "description_en": "Night-sky words.",
+  "words": [
+    {
+      "definition": {
+        "schema": "inku.macro-definition.v1",
+        "namespace": "Sky",
+        "heading": "Stars",
+        "aliases": ["星"],
+        "version": "1.0.0",
+        "parameters": {
+          "star_count": {"type": "integer", "receives": "count", "minimum": 1, "maximum": 9, "omitted": [3, 4, 5], "counter": "general"}
+        },
+        "components": {},
+        "body": [
+          {
+            "op": "repeat",
+            "count": {"expr": "parameter", "name": "star_count"},
+            "maximum": 9,
+            "index": "star_index",
+            "body": [
+              {
+                "op": "vary",
+                "binding": "star_size",
+                "domain": "sky_stars_size",
+                "choices": [
+                  {"expr": "semantic_ref", "category": "relative_scale", "id": "very_small"},
+                  {"expr": "semantic_ref", "category": "relative_scale", "id": "small"}
+                ],
+                "body": [
+                  {
+                    "op": "emit",
+                    "binding": null,
+                    "fields": {
+                      "shape": {"expr": "semantic_ref", "category": "shape", "id": "circle"},
+                      "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
+                      "position_x": {"expr": "cycle", "index": {"expr": "local", "name": "star_index"}, "items": [
+                        {"expr": "exact_decimal", "value": "0.170"}, {"expr": "exact_decimal", "value": "0.830"},
+                        {"expr": "exact_decimal", "value": "0.500"}, {"expr": "exact_decimal", "value": "0.330"},
+                        {"expr": "exact_decimal", "value": "0.670"}, {"expr": "exact_decimal", "value": "0.170"},
+                        {"expr": "exact_decimal", "value": "0.830"}, {"expr": "exact_decimal", "value": "0.500"},
+                        {"expr": "exact_decimal", "value": "0.330"}
+                      ]},
+                      "position_y": {"expr": "cycle", "index": {"expr": "local", "name": "star_index"}, "items": [
+                        {"expr": "exact_decimal", "value": "0.100"}, {"expr": "exact_decimal", "value": "0.140"},
+                        {"expr": "exact_decimal", "value": "0.280"}, {"expr": "exact_decimal", "value": "0.180"},
+                        {"expr": "exact_decimal", "value": "0.080"}, {"expr": "exact_decimal", "value": "0.380"},
+                        {"expr": "exact_decimal", "value": "0.340"}, {"expr": "exact_decimal", "value": "0.120"},
+                        {"expr": "exact_decimal", "value": "0.420"}
+                      ]},
+                      "relative_scale": {"expr": "local", "name": "star_size"},
+                      "color": {"expr": "semantic_ref", "category": "color", "id": "yellow"},
+                      "touch": {"expr": "semantic_ref", "category": "touch", "id": "pencil"},
+                      "surface": {"expr": "semantic_ref", "category": "surface", "id": "solid"}
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "summary_ja": "空の上半分に、黄色の星を散らす。星の数を書けばその数（1〜9個）、書かなければ3〜5個。",
+      "summary_en": "Scatters yellow stars over the upper half of the sky: the written count (1–9), or 3–5 when none is written.",
+      "note_ja": "夜の空に小さな星。",
+      "note_en": "Small stars in a night sky.",
+      "example_ja": "5個のSky.星。",
+      "example_en": "5 Sky.Stars."
+    }
+  ]
+}
+```
+
+| Field | Required | Content |
+|---|---|---|
+| `schema` | required | exactly `inku.plugin-package.v1` |
+| `namespace` | required | the namespace; every definition's `namespace` must equal it (§3.1) |
+| `name` | required | the plugin's name: a letter, then letters, digits, `_`, `-`. `namespace.name` (e.g. `Sky.night`) is its id |
+| `version` | required | in the form `1.0.0` |
+| `description_ja`, `description_en` | optional | the description shown in the settings |
+| `authors`, `license` | optional | authors (a list of strings) and terms of use |
+| `words` | required | the words (1 to 64), each with the fields below |
+
+Fields of each word:
+
+| Field | Required | Content, and where it is shown |
+|---|---|---|
+| `definition` | required | an `inku.macro-definition.v1` definition (§3) |
+| `summary_ja`, `summary_en` | one of the two | the summary given to the underdrawing (Stage 1) (§6); one alone serves both languages |
+| `note_ja`, `note_en` | optional | the description line of the Saijiki preview (the "effect" line of a built-in word): say briefly what the word draws |
+| `example_ja`, `example_en` | optional | the DDL sentence shown as the Saijiki's "example"; without one, `Sky.星。` (Japanese uses the first alias) and `Sky.Stars.` |
+| `preview` | optional | the Saijiki preview's picture: the place of a PNG inside the zip (e.g. `previews/stars.png`); only in a zip |
+
+A Saijiki preview has four parts: the title (canonical name or alias), the description (`note_*`), the example
+(`example_*`), and the picture. Write examples whose count and wording show what the word looks like (for
+`Sky.Stars`, `5 Sky.Stars.`).
+
+The picture comes one of two ways:
+
+- Your own picture: name the JSON above `package.json` and zip it with the PNGs its words name in `preview`. A PNG
+  of any shape is fitted to the Saijiki frame (216×92 and twice that), the margin filled with its corner colour.
+- Drawn: for a word without `preview`, the Server draws its Japanese example on adding, cuts out what it drew,
+  and fits it into the frame.
+
+The zip (`package.json` at its top; the PNGs may sit anywhere under any name):
+
+```text
+sky-night.zip
+├── package.json          (the form of §5.1; the word has "preview": "previews/stars.png")
+└── previews/
+    └── stars.png
+```
+
+With or without `preview`, the examples are drawn as a check (step 3 below). `preview` in a JSON file alone is a
+problem.
+
+Three checks run in order, and a file can be added only when all of them pass:
+
+1. The file's shape (unknown fields, required fields, a namespace that differs, a missing summary, and so on).
+2. The shared core's checks of each definition (the mistakes of §7.2), and names another plugin already holds.
+3. Each word's Japanese and English example is drawn as DDL through the shared pipeline. Drawing nothing, or a
+   diagnostic, fails the check.
+
+Whatever is wrong is listed per word with its place in the file
+(e.g. `words[0].definition.body[0].body[0].body[0].fields.color`) and the reason.
+Only a file that is not JSON, has no readable `namespace` or `name`, or has no words stops at step 1. Otherwise a
+shape problem such as a missing summary does not stop steps 2 and 3, so one check lists everything to fix. A word
+whose definition has a problem is not drawn.
+
+- An added word can be drawn in every new work on that Server, appears in the Saijiki and DDL editor completion,
+  and its summary reaches the underdrawing when drawing from a description.
+- When a plugin with the same id (`namespace.name`) is installed, "Add" becomes "Replace"; new works then draw
+  with the new definitions.
+- "Replace picture" on a word uploads a PNG that the Saijiki shows instead (fitted to the frame); "Back to the original
+  picture" returns to the file's picture (`preview`) or the one drawn from the example. Replacing the plugin keeps
+  replaced pictures.
+- "Export" saves an installed plugin as a zip: `package.json` with the picture each word shows in the Saijiki now (a
+  replaced one where there is one), each word's `preview` naming it. Another Server can add it as it is.
+- Switching a plugin off removes it from new works, the Saijiki, and completion. It can also be deleted.
+- Saved works carry copies of the definitions they used, so they redraw the same after a replacement, a switch-off,
+  or a deletion.
+- The files are kept in the Server's `INKU_PLUGIN_PACKAGE_DIR` ([Server configuration §2.5](manual/en/server-configuration.md)).
+- The API is `POST /api/plugins/packages/validate` (check only), `POST /api/plugins/packages` (add; a JSON file as
+  `document`, a zip in base64 as `archive`), and `GET /api/plugins/{plugin_id}/export` (export), for administrators only.
+- Android and macOS never call the Server, so words added here are not available there yet.
+
+### 5.2 A DDL export file (immediately usable by an author)
 
 Make the JSON of §2 (`inku.ddl-export.v1`) and load it; the definitions in `plugins` serve that new work only.
 
@@ -357,7 +521,7 @@ Make the JSON of §2 (`inku.ddl-export.v1`) and load it; the definitions in `plu
 - Exporting a drawn work writes the definitions its DDL names, with their summaries, in the same format, so it
   can be carried to another environment.
 
-### 5.2 The Server's pipeline manifest (an administrator adds it to every new work)
+### 5.3 The Server's pipeline manifest (an administrator adds it to every new work)
 
 Add the definition to `pipeline.definitions` and its summary, in the same order, to `pipeline.macro_summaries`
 in the manifest that the Server's `INKU_PIPELINE_CONFIG` names. How to make the manifest is in
@@ -371,22 +535,22 @@ in the manifest that the Server's `INKU_PIPELINE_CONFIG` names. How to make the 
 - Every new work on that Server can use it. When drawing from a description, the name and summary reach the
   underdrawing (Stage 1), which chooses it when the description writes the word.
 - If the two lists differ in length, a new work's run fails with `macro_catalog_summary_mismatch`.
-- It does not appear on the settings "Plugins" screen and cannot be enabled or disabled there.
+- It does not appear on the settings "Plugins" screen or in the Saijiki and cannot be enabled or disabled there. §5.1 is easier to manage.
 
-### 5.3 Bundling with the shared core (a development change)
+### 5.4 Bundling with the shared core (a development change)
 
 Bundling like `Nature.leaves` for every host means placing an `inku.bundled-macro-package.v1` package under
 `core/crates/inku-ddl/assets/`, adding it to the bundled names in `inku-pipeline-uniffi/src/macro_catalog.rs`,
 and having the Server's `_BUNDLED_DOCUMENTS` in `server/src/inku_server/plugins/__init__.py` and Android's
 `SharedPipelineConfigBuilder.kt` name that package. This is a product change that needs a build and a deployment.
 
-### 5.4 What does not load today
+### 5.5 What does not load today
 
 - A new `.inku-plugin.md` in `server/plugins/` (`INKU_DOCUMENT_PLUGIN_DIR`) does not become a definition.
   Documents other than the bundled package show "not used for drawing", and their words are left out.
 - "Read and draw" and the image tab do not give the model a list of plugins. A name the model writes in DDL
   draws, but without the list the model will rarely choose one.
-- There is no general loader for user-installed definitions and no installable package catalog yet.
+- Android and macOS have no way yet for users to install definitions, and there is no public catalog of installable packages.
 
 ## 6. Writing the Summary
 
@@ -397,11 +561,15 @@ thing, never by association with a season, place, or similar thing.
 
 - Say what is drawn, where on the canvas, and with which medium, color, and form.
 - For a count, give the range and the number when none is written ("the written count (1–9), or 3–5 when none is written").
-- Prepare both Japanese and English (a bundled package carries `summaries.ja` and `summaries.en`; an export
-  file and the manifest take one string).
+- Prepare both Japanese and English (a plugin file carries `summary_ja` and `summary_en`, a bundled package
+  `summaries.ja` and `summaries.en`; an export file and the manifest take one string).
 - The Server's default limit is 8192 bytes. The summary in §2 and those of the bundled `Nature.leaves` are models.
 
 ## 7. Checking, and When Something Goes Wrong
+
+A Server administrator only has to choose the file under "Add a plugin" in the Web: the three checks of §5.1
+run together, and their reasons read as in the table of §7.2. To check without adding, read the result and
+press "Cancel". §7.1 below checks a definition alone in a product checkout, without a Server.
 
 ### 7.1 Checking a definition alone
 
@@ -443,10 +611,52 @@ aliases to a lock, so call the canonical name here; the product also accepts ali
   the count is in range, and that the expansion stays within the limits (§8). If the DDL holds only that word,
   leaving it out leaves nothing to draw and no work is made.
 
+### 7.3 Problems a plugin file check reports
+
+"Add a plugin" in the Web reports these codes besides the definition mistakes of §7.2. The screen shows an
+explanation with the same meaning.
+
+| Step | Diagnostic code | Meaning and fix |
+|---|---|---|
+| shape | `invalid_json` | not valid JSON; the detail gives the line and column |
+| shape | `unknown_field` | a key not in the tables of §5.1; fix its spelling or remove it |
+| shape | `wrong_schema` | `schema` is not `inku.plugin-package.v1` |
+| shape | `invalid_identifier` | `namespace` or `name` is not a letter followed by letters, digits, `_`, `-` |
+| shape | `invalid_semantic_version` | `version` is not in the form `1.0.0` |
+| shape | `not_an_object` | a word, or its `definition`, is not an object (`{ }`) |
+| shape | `no_words`, `too_many_words` | `words` is empty or has more than 64 |
+| shape | `namespace_differs_from_package` | a definition's `namespace` differs from the file's |
+| shape | `no_summary` | neither `summary_ja` nor `summary_en` is written |
+| shape | `not_a_string`, `text_too_long` | not a string, or too long (§8) |
+| definition | `unknown_json_field` | the definition has an unknown field (the place points at the definition's start) |
+| definition | `duplicate_qualified_name` | two words in the file share a canonical name or alias |
+| definition | `name_taken` | another installed plugin (the bundled `Nature.leaves` included) holds the name; the detail gives the name and its holder |
+| example | `macro_binding_count_out_of_range` | the example's count is outside the range the definition takes |
+| example | `macro_resolution_missing_lock` | the example's word is not found (a misspelt name) |
+| example | `example_draws_nothing`, `example_not_drawn` | the example draws nothing, or cannot be drawn |
+| picture | `not_a_png`, `image_too_large` | a `preview` or replacement picture is not a PNG, or is too large (§8) |
+| picture | `preview_needs_zip` | `preview` in a JSON file alone; zip it, or remove `preview` |
+| picture | `preview_not_found` | the zip has no PNG by the `preview` name (case and folders must match) |
+| picture | `invalid_preview_path` | `preview` starts with `/` or holds `..` |
+| zip | `invalid_zip`, `not_base64` | not a readable zip |
+| zip | `archive_without_package_json` | no `package.json` at the top of the zip (check it is not inside a folder) |
+| zip | `archive_too_large`, `too_many_archive_members` | the zip is too large, or holds too many files (§8) |
+| zip | `not_utf8` | `package.json` is not UTF-8 |
+
+A shape problem does not stop the definition and example checks (§5.1). A word whose definition has a problem
+is not drawn.
+
 ## 8. Limits
 
 | Limit | Default | Set by |
 |---|---|---|
+| plugin file size | 1,000,000 bytes (UTF-8) | the Server (fixed) |
+| words in a plugin file | 64 | the Server (fixed) |
+| length of `description_*` and `note_*` | 2000 characters | the Server (fixed) |
+| length of `example_*` | 500 characters | the Server (fixed) |
+| length of `license` | 200 characters | the Server (fixed) |
+| `preview` and replacement pictures | PNG, up to 2 MiB each and 4096×4096 pixels | the Server (fixed); fitted to the frame (216×92 and twice that) |
+| zip | up to 16 MiB, 256 files inside, 64 MiB of PNGs in all | the Server (fixed); read without unpacking |
 | definitions in an export file | 64 | the Web, Android, and macOS readers |
 | definitions given to the underdrawing | 64 | Server manifest `prompt_limits.max_catalog_entries` |
 | summary length | 8192 bytes | Server manifest `prompt_limits.max_summary_bytes` |

@@ -288,6 +288,43 @@ def _recompose(
         return source, unchanged("invalid_response"), prepared
 
 
+def draw_plugin_example(owner: str, ddl: str, language: str, imported: list[dict[str, Any]]):
+    """Draw one plugin word's example the way /api/compose draws DDL, and say why when it does not.
+
+    The plugin package check reads the stopped run itself: /api/compose answers
+    a stopped run with "score not ready", which does not say which rule the
+    example broke. Fixed seeds, so the same package always draws the same picture.
+    """
+    from .pipeline_candidate import CandidateHostError
+    from .plugins.packages import PREVIEW_SEED, ExampleDrawing
+
+    options = _options(
+        {"instruction_lang": language, "render_seed": PREVIEW_SEED, "composition_seed": PREVIEW_SEED},
+        save_history=False,
+    )
+    options["count_generation"] = False
+    options["imported_plugins"] = imported
+    service = _service()
+    try:
+        view = _wait(owner, service.start(owner, "direct_ddl", ddl, parent=None, source_work={"description": ""},
+                                          canvas_aspect=None, options=options, prepared=None), None)
+        delivery = view.get("delivery") or {}
+        reasons = tuple(
+            str(item.get("reason", ""))
+            for key in ("upstream_diagnostics", "downstream_diagnostics")
+            for item in delivery.get(key) or ()
+        )
+        if view.get("result") is None and delivery and delivery.get("outcome") != "stopped" and not reasons:
+            view = _wait(owner, service.command(owner, view["execution_id"], {"tag": "perform"}), None)
+    except CandidateHostError as error:
+        return ExampleDrawing(reasons=(str(error) or "example_not_drawn",))
+    result = view.get("result") or {}
+    if not reasons and not result:
+        reasons = (str((view.get("phase") or {}).get("reason") or "example_not_drawn"),)
+    marks = len((result.get("score") or {}).get("instructions") or ())
+    return ExampleDrawing(svg=str(result.get("svg") or ""), marks=marks, reasons=reasons)
+
+
 def compose(owner: str, data: dict[str, Any], reader_left: Callable[[], bool] | None = None) -> dict:
     options = _options(data, save_history=False)
     # The old compose endpoint produced a candidate and never counted it as a

@@ -85,6 +85,9 @@ class ModelCatalogDeviceTest {
                 assertTrue(label.id in selected)
             } else checkbox.assertIsNotEnabled()
             if (label.id == "legacy") {
+                // The figures are folded away, as on Web (2026-10-26), until the model's details are opened.
+                rule.onNodeWithText("推奨度 LLM: ★★★★").assertDoesNotExist()
+                rule.onNodeWithTag("CatalogMore:${label.id}").performClick()
                 rule.onNodeWithText("推奨度 LLM: ★★★★").assertExists()
                 rule.onNodeWithText("平均秒数 LLM: 2.8 s").assertExists()
                 rule.onNodeWithText("概算コスト LLM: USD 0.000070").assertExists()

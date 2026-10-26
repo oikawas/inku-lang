@@ -19,6 +19,8 @@ export type PluginEntry = {
 	note_en: string;
 	fires_on_ja?: string[];
 	fires_on_en?: string[];
+	example_ja?: string;
+	example_en?: string;
 	preview_url?: string;
 	preview_url_2x?: string;
 };

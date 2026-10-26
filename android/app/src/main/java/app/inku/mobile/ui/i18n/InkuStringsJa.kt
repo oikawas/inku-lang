@@ -465,6 +465,11 @@ object InkuStringsJa : InkuStrings {
     override val modelPurposeNoResponse = "薄い用途は、計測で応答が無かったため選べません"
     override val modelPurposeNotRecommended = "赤枠の用途は計測で応答が無かった用途です。選べますが、システムとしては推奨しません"
     override val modelNotRecommended = "推奨しません（計測で応答なし）"
+    override val modelDetails = "モデル詳細"
+    override val connectionSettings = "接続設定"
+    override val modelPublishedCount: (Int) -> String = { count -> "$count モデルを公開中" }
+    override val modelPickerCount: (Int, Int) -> String = { visible, total -> "$visible / $total モデルを表示" }
+    override val modelDraftChanges = "未保存の変更"
     override val publishedModels = "ユーザーに公開するモデル"
     override val licenseAndDownload = "ライセンス/ダウンロード"
     override val licenseAndDownloaded = "ライセンス/取得済み"

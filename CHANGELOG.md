@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-26 — Opening another work while drawing no longer stops the drawing; it is drawn and saved to the end
-
-The author reported that opening another work (from the history, the thumbnail strip, the previous and next arrows, or the lineage) or starting a new one while the description tab was drawing stopped the drawing. Moving the shared pipeline display's request ordinal made the run's polling return half-way: it never sent the command to draw and save, and showed no error (the same shape as the picture batch on 2026-10-25). Now the run is drawn and saved to the end even when the display moves to another work. The input panel keeps its progress and Stop, and Stop stops that run. When it ends, the new work joins the history and the screen stays on the work the author opened; when none was opened, the drawing is shown as before. Clearing the picture still stops the run in flight. Web only.
-
 ### 2026-10-26 — PLUGIN alone is enough to write a plugin file
 
 After the author's review, three gaps in `PLUGIN.ja.md` and `PLUGIN.md` were filled. The example in §5.1 is now a complete file with its definition written out, and the guide says it can be saved and added as it is (a Server test passes the example through the check). §7.3 adds a table of the codes a plugin file check reports for its shape, taken names, examples, and pictures, with their fixes. §8 adds the limits on the file size (1,000,000 bytes), the number of words (64), the lengths of descriptions, examples, and the license, and the replacement picture. No code changed.
@@ -322,6 +318,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.267 (2026-10-26 / Build1343)
+
+### 2026-10-26 — Opening another work while drawing no longer stops the drawing; it is drawn and saved to the end
+
+The author reported that opening another work (from the history, the thumbnail strip, the previous and next arrows, or the lineage) or starting a new one while the description tab was drawing stopped the drawing. Moving the shared pipeline display's request ordinal made the run's polling return half-way: it never sent the command to draw and save, and showed no error (the same shape as the picture batch on 2026-10-25). Now the run is drawn and saved to the end even when the display moves to another work. The input panel keeps its progress and Stop, and Stop stops that run. When it ends, the new work joins the history and the screen stays on the work the author opened; when none was opened, the drawing is shown as before. Clearing the picture still stops the run in flight. Web only.
 
 ## v2.15.266 (2026-10-26 / Build1342)
 

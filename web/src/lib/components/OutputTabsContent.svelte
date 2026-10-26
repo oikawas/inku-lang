@@ -11,6 +11,10 @@
 		stage1PromptText: string;
 		/** The system prompts this work sent, as its execution kept them. */
 		systemPrompts?: SystemPromptsState;
+		/** A work written from a picture: its three requests are shown even when unrecorded. */
+		imageWork?: boolean;
+		/** A work whose description chose its color catalog: the choice is shown even when unrecorded. */
+		catalogChosen?: boolean;
 		ddl: string | null;
 		copiedPrompt: CopyKind | null;
 		scoreJsonText: string;
@@ -25,6 +29,8 @@
 		scrollEl = $bindable(null),
 		stage1PromptText,
 		systemPrompts = { state: 'not_recorded' },
+		imageWork = false,
+		catalogChosen = false,
 		ddl,
 		copiedPrompt,
 		scoreJsonText,
@@ -56,6 +62,17 @@
 	const descriptionDdlSystem = $derived(systemPrompts.state === 'recorded' ? systemPrompts.description_ddl : null);
 	const descriptionReviewSystem = $derived(systemPrompts.state === 'recorded' ? systemPrompts.description_review : null);
 	const readAndDrawSent = $derived(!!(readingSystem || descriptionDdlSystem || descriptionReviewSystem));
+	// The color catalog chosen from the description, and a work from a picture's
+	// three requests (SPEC 12.6.6), recorded since 2026-10-26.
+	let catalogSystemExpanded = $state(false);
+	let imageCatalogSystemExpanded = $state(false);
+	let imageDdlSystemExpanded = $state(false);
+	let imageReviewSystemExpanded = $state(false);
+	const catalogSystem = $derived(systemPrompts.state === 'recorded' ? systemPrompts.catalog : null);
+	const imageCatalogSystem = $derived(systemPrompts.state === 'recorded' ? systemPrompts.image_catalog : null);
+	const imageDdlSystem = $derived(systemPrompts.state === 'recorded' ? systemPrompts.image_ddl : null);
+	const imageReviewSystem = $derived(systemPrompts.state === 'recorded' ? systemPrompts.image_review : null);
+	const imageSent = $derived(imageWork || !!(imageCatalogSystem || imageDdlSystem || imageReviewSystem));
 	// Said in place of a stage's system prompt when there is none to show: a
 	// stage the execution kept called no model; one it did not keep was drawn
 	// before its record began.
@@ -81,7 +98,7 @@
 
 <!-- The sketch, the composition reading, the laws stage and the color stage: what each was given, then its system prompt. -->
 {#snippet sentStage(
-	kind: 'sketch' | 'composition' | 'laws' | 'colors' | 'reading' | 'description_ddl' | 'description_review',
+	kind: 'catalog' | 'image_catalog' | 'image_ddl' | 'image_review' | 'sketch' | 'composition' | 'laws' | 'colors' | 'reading' | 'description_ddl' | 'description_review',
 	inputLabel: string,
 	systemLabel: string,
 	sent: SentSystemPrompt | null,
@@ -126,6 +143,14 @@
 
 {#if outputTab === 'prompts'}
 	<div class="prompt-section" bind:this={scrollEl}>
+		{#if catalogChosen || catalogSystem}
+			{@render sentStage('catalog', t().promptCatalogInput, t().promptCatalogSystem, catalogSystem, catalogSystemExpanded, () => (catalogSystemExpanded = !catalogSystemExpanded))}
+		{/if}
+		{#if imageSent}
+			{@render sentStage('image_catalog', t().promptImageCatalogInput, t().promptImageCatalogSystem, imageCatalogSystem, imageCatalogSystemExpanded, () => (imageCatalogSystemExpanded = !imageCatalogSystemExpanded))}
+			{@render sentStage('image_ddl', t().promptImageDdlInput, t().promptImageDdlSystem, imageDdlSystem, imageDdlSystemExpanded, () => (imageDdlSystemExpanded = !imageDdlSystemExpanded))}
+			{@render sentStage('image_review', t().promptImageReviewInput, t().promptImageReviewSystem, imageReviewSystem, imageReviewSystemExpanded, () => (imageReviewSystemExpanded = !imageReviewSystemExpanded))}
+		{/if}
 		{@render sentStage('sketch', t().promptSketchInput, t().promptSketchSystem, sketchSystem, sketchSystemExpanded, () => (sketchSystemExpanded = !sketchSystemExpanded))}
 		{#if readAndDrawSent}
 			{@render sentStage('reading', t().promptReadingInput, t().promptReadingSystem, readingSystem, readingSystemExpanded, () => (readingSystemExpanded = !readingSystemExpanded))}

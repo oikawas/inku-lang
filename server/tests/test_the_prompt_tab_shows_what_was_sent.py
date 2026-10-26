@@ -95,7 +95,8 @@ def test_a_drawing_shows_the_stage_1_system_prompt_it_sent(author, sent):
     assert body["stage2"] is None
     assert body["sketch"] is None and body["composition"] is None and body["laws"] is None
     assert body["colors"] is None
-    assert body["stages"] == ["sketch", "stage1", "composition", "laws", "colors", "stage2",
+    assert body["stages"] == ["catalog", "image_catalog", "image_ddl", "image_review",
+                              "sketch", "stage1", "composition", "laws", "colors", "stage2",
                               "reading", "description_ddl", "description_review"]
 
 
@@ -134,8 +135,16 @@ def test_the_last_attempt_of_each_stage_is_kept_and_other_actions_are_not():
     assert prompts["composition"]["system"] == "reading"
     assert prompts["laws"]["system"] == "laws"
     assert prompts["colors"]["system"] == "colors"
-    # The catalog choice is not shown.
-    assert set(prompts) == {"sketch", "stage1", "composition", "laws", "colors", "stage2"}
+    # The catalog choice is shown with what it was given (2026-10-26; it sent
+    # unrecorded before), and so are the image tab's three.
+    assert prompts["catalog"]["system"] == "catalog"
+    assert prompts["catalog"]["message"] == "select_description_catalog message"
+    for tag, stage in (("select_image_catalog", "image_catalog"), ("write_image_ddl", "image_ddl"),
+                       ("review_image_ddl", "image_review")):
+        record_system_prompt(context, _action(tag, 1, stage))
+        assert prompts[stage]["system"] == stage and prompts[stage]["message"] == f"{tag} message"
+    assert set(prompts) == {"catalog", "sketch", "stage1", "composition", "laws", "colors", "stage2",
+                            "image_catalog", "image_ddl", "image_review"}
     # The sketch, the reading, the laws stage and the color stage keep what
     # they were given; Stage 1 and Stage 2 as before.
     assert prompts["sketch"]["message"] == "generate_sketch message"
@@ -162,6 +171,10 @@ def test_an_execution_from_before_the_sketch_and_the_reading_kept_stage_1_and_st
     assert system_prompts_view({"system_prompts": kept}) == {
         "recorded": True,
         "stages": ["stage1", "stage2"],
+        "catalog": None,
+        "image_catalog": None,
+        "image_ddl": None,
+        "image_review": None,
         "sketch": None,
         "stage1": {"system": "planner"},
         "composition": None,

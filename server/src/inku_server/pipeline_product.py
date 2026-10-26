@@ -242,6 +242,12 @@ def usage_result(record: dict) -> dict:
 # The provider actions whose system prompt the prompt tab shows, by the name
 # the tab gives each stage, in the order a work calls them.
 _SYSTEM_PROMPT_STAGES = {
+    # The catalog chosen from the description and the image tab's three joined
+    # 2026-10-26; they sent without a record before.
+    "select_description_catalog": "catalog",
+    "select_image_catalog": "image_catalog",
+    "write_image_ddl": "image_ddl",
+    "review_image_ddl": "image_review",
     "generate_sketch": "sketch",
     "generate_normalized_ddl": "stage1",
     "read_composition": "composition",
@@ -255,7 +261,8 @@ _SYSTEM_PROMPT_STAGES = {
 # The stages whose message the tab shows as sent too (2026-10-13): no other
 # view shows what the sketch, the composition reading, the laws stage, the
 # color stage and read and draw's reading were given.
-_MESSAGE_STAGES = {"sketch", "composition", "laws", "colors", "reading"}
+_MESSAGE_STAGES = {"sketch", "composition", "laws", "colors", "reading",
+                   "catalog", "image_catalog", "image_ddl", "image_review"}
 # The requests given the image tab's answer limit: the image tab's DDL and
 # read and draw's three, as they were measured (8192 tokens, 2026-10-25).
 _WRITTEN_DDL_EFFECTS = frozenset({"write_image_ddl", "review_image_ddl", "read_description", "write_description_ddl",

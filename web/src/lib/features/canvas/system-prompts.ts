@@ -5,14 +5,30 @@ export type SentSystemPrompt = {
 	prompt_digest: string;
 	instruction_language: string;
 	attempt: number;
-	/** What the stage was given, kept for the sketch, the composition reading, the laws stage and the color stage. */
+	/** What the stage was given; Stage 1, Stage 2 and read and draw's writing and review keep none. */
 	message?: string;
 };
 
 /** The stages whose prompts the tab shows, in the order a work calls them.
- *  Read and draw (SPEC 12.6.7) calls the reading, the writing and the review
- *  in place of Stage 1 and the stages after it. */
-export const PROMPT_STAGES = ['sketch', 'reading', 'description_ddl', 'description_review', 'stage1', 'composition', 'laws', 'colors', 'stage2'] as const;
+ *  The catalog is chosen first when the description chooses it. A work from a
+ *  picture calls its own three (SPEC 12.6.6), and read and draw (SPEC 12.6.7)
+ *  calls the reading, the writing and the review in place of Stage 1 and the
+ *  stages after it. */
+export const PROMPT_STAGES = [
+	'catalog',
+	'image_catalog',
+	'image_ddl',
+	'image_review',
+	'sketch',
+	'reading',
+	'description_ddl',
+	'description_review',
+	'stage1',
+	'composition',
+	'laws',
+	'colors',
+	'stage2'
+] as const;
 export type PromptStage = (typeof PROMPT_STAGES)[number];
 
 /** The stages an execution saved before 2026-10-13 kept. */
@@ -59,6 +75,10 @@ export async function loadSystemPrompts(
 		return {
 			state: 'recorded',
 			stages: PROMPT_STAGES.filter((stage) => kept.includes(stage)),
+			catalog: sentPrompt(body.catalog),
+			image_catalog: sentPrompt(body.image_catalog),
+			image_ddl: sentPrompt(body.image_ddl),
+			image_review: sentPrompt(body.image_review),
 			sketch: sentPrompt(body.sketch),
 			reading: sentPrompt(body.reading),
 			description_ddl: sentPrompt(body.description_ddl),

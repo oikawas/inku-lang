@@ -642,6 +642,14 @@ export interface LangPack {
 	historyModelDetails: string;
 
 	// Prompts tab
+	promptCatalogInput: string;
+	promptCatalogSystem: string;
+	promptImageCatalogInput: string;
+	promptImageCatalogSystem: string;
+	promptImageDdlInput: string;
+	promptImageDdlSystem: string;
+	promptImageReviewInput: string;
+	promptImageReviewSystem: string;
 	promptSketchInput: string;
 	promptSketchSystem: string;
 	promptStage1Input: string;

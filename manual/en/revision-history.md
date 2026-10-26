@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-10-26 — The catalog choice and a picture's three in the prompt tab
+
+The provenance drawer's prompt tab now also shows the color catalog chosen `From the description` and a work from a picture's three requests (the catalog choice for the picture, the writing from it and the review beside it), so section 11 of "Creating Images" says so in Japanese and English.
+
 ## 2026-10-25 — The picture upload warning
 
 Painting from a picture now first warns, once after each sign-in, that the picture data is uploaded to the AI, so section 16 of "Creating Images" describes the warning and when it stops appearing, and `Other (server)` in "Server Configuration" describes the `Picture upload warning` switch.

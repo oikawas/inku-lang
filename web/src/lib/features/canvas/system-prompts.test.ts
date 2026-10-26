@@ -21,7 +21,7 @@ test('the prompt tab tells a recorded prompt from an unrecorded or unreadable on
 	// A server from before 2026-10-13 names no stages: it kept Stage 1 and Stage 2.
 	assert.deepEqual(
 		await loadSystemPrompts('variation/1', answering(200, { recorded: true, stage1: sent, stage2: null }, paths)),
-		{ state: 'recorded', stages: ['stage1', 'stage2'], sketch: null, reading: null, description_ddl: null, description_review: null, stage1: sent, composition: null, laws: null, colors: null, stage2: null }
+		{ state: 'recorded', stages: ['stage1', 'stage2'], catalog: null, image_catalog: null, image_ddl: null, image_review: null, sketch: null, reading: null, description_ddl: null, description_review: null, stage1: sent, composition: null, laws: null, colors: null, stage2: null }
 	);
 	assert.deepEqual(paths, ['/api/pipeline/variations/variation%2F1/system-prompts']);
 	assert.deepEqual(await loadSystemPrompts('v', answering(200, { recorded: false })), { state: 'not_recorded' });
@@ -55,6 +55,10 @@ test('the sketch, the composition reading, the laws stage and the color stage co
 	assert.deepEqual(loaded, {
 		state: 'recorded',
 		stages: ['sketch', 'stage1', 'composition', 'laws', 'colors', 'stage2'],
+		catalog: null,
+		image_catalog: null,
+		image_ddl: null,
+		image_review: null,
 		sketch,
 		reading: null,
 		description_ddl: null,
@@ -76,8 +80,17 @@ test('the sketch, the composition reading, the laws stage and the color stage co
 	assert.equal(earlier.state === 'recorded' && earlier.stages.includes('colors'), false);
 	assert.equal(earlier.state === 'recorded' && earlier.colors, null);
 	// A stage the record does not know stays out of the kept stages.
-	const unknown = await loadSystemPrompts('v', answering(200, { recorded: true, stages: ['stage1', 'catalog'] }));
+	const unknown = await loadSystemPrompts('v', answering(200, { recorded: true, stages: ['stage1', 'later'] }));
 	assert.equal(unknown.state === 'recorded' && unknown.stages.join(), 'stage1');
+	// The catalog choice and a picture's three are read and kept in call order (2026-10-26).
+	const catalog = { ...sent, system: 'catalog chooser…', message: '記述: 一滴の墨' };
+	const picture = { ...sent, system: 'picture writer…', message: '画像を読む' };
+	const drawnFrom = await loadSystemPrompts(
+		'v',
+		answering(200, { recorded: true, stages: ['image_review', 'image_ddl', 'image_catalog', 'catalog'], catalog, image_ddl: picture })
+	);
+	assert.equal(drawnFrom.state === 'recorded' && drawnFrom.stages.join(), 'catalog,image_catalog,image_ddl,image_review');
+	assert.deepEqual(drawnFrom.state === 'recorded' && [drawnFrom.catalog, drawnFrom.image_ddl, drawnFrom.image_review], [catalog, picture, null]);
 });
 
 test('a read-and-draw work shows its reading, its writing and its review, in the order it called them', async () => {

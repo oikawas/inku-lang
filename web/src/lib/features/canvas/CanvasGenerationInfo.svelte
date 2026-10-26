@@ -59,6 +59,8 @@
 		tokens_out_stage1?: number | null;
 		tokens_in_stage2?: number | null;
 		tokens_out_stage2?: number | null;
+		/** How the color catalog was asked for; `auto` read it from the description. */
+		catalog_mode?: string | null;
 		/** The tokens by stage; absent on a work drawn before the record (2026-10-26). */
 		provider_usage?: ProviderUsage | null;
 	};
@@ -492,6 +494,8 @@
 				outputTab={tab}
 				{stage1PromptText}
 				{systemPrompts}
+				imageWork={!!detailImageRecord}
+				catalogChosen={(statusHistoryItem?.catalog_mode ?? result?.catalog_mode) === 'auto'}
 				{ddl}
 				{copiedPrompt}
 				{scoreJsonText}

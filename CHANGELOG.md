@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-26 — The prompt tab shows the catalog choice and a picture's three
+
+Fixed at the author's report that the provenance drawer's prompt tab did not cover the prompts in use. Of the sends that draw a work, the color catalog chosen from the description (`select_description_catalog`) and a work from a picture's three (`select_image_catalog`, `write_image_ddl`, `review_image_ddl`) sent without recording their system prompts: a read-and-draw work with an automatic catalog showed three of its four sends, and a work from the Image tab none. The Server now records these four as the stages `catalog`, `image_catalog`, `image_ddl` and `image_review`, each with the message it sent (its text only, never the picture). The Web's prompt tab shows the catalog choice for a work whose catalog was chosen `From the description`, and the picture's three for a work written from a picture; an earlier such work says it was not recorded. The core is unchanged. The Android and macOS prompt tabs are unchanged.
+
 ### 2026-10-25 — inku-cli reads one work by its UUID
 
 inku-cli gains `history show`, which prints a work's description, DDL and JSON Score (`--part` for one of them), and `history png`, which rasterizes the saved display SVG into a PNG of the drawing alone (`--size` for the longer side, default 1024). Both take the UUID or its first few characters. There is no endpoint for one work, so the listing is asked with `anchor_id` and `limit=1` and the returned work's id is checked. A prefix is resolved against the listing without pictures, and one that fits more than one work stops with the candidates. The server is unchanged.

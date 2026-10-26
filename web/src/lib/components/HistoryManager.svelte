@@ -884,15 +884,15 @@
 					{groupDigits(historyManagerOffset + 1)}-{groupDigits(historyManagerShownTo)} / {groupDigits(managedHistoryTotal)}
 				{/if}
 			</span>
-			<!-- A search left in the box from an earlier visit narrowed the library
-			     with nothing near the count to say so (2026-10-27). -->
-			{#if historySearch.trim()}
-				<button class="history-search-active" type="button" title={t().historySearchClear}
-					onclick={() => { historySearch = ''; }}>{t().historySearchActive(historySearch.trim())} ×</button>
-			{/if}
 		</div>
 		<div class="history-head-actions">
 			<div class="history-manager-pager">
+				<!-- A search left in the box from an earlier visit narrowed the library
+				     with nothing to say so; the author placed this left of 最新 (2026-10-27). -->
+				{#if historySearch.trim()}
+					<button class="history-search-active" type="button" title={t().historySearchClear}
+						onclick={() => { historySearch = ''; }}>{t().historySearchActive(historySearch.trim())} ×</button>
+				{/if}
 				{#if historyDisplayMode === 'lineage'}
 					<Tooltip placement="bottom-left" text={t().tooltipHistoryLatestPage}>
 						<button class="ghost-btn history-latest-btn" onclick={latestLineagePage} disabled={(lineageGroupPage <= 0 && lineageStartOffset === 0) || lineageGroupLoading}>{t().historyLatest}</button>

@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-10-26 — A purpose that gave no response can be chosen, framed in red
+
+The `LLM` or `Vision` button of a purpose measured without a response can now be pressed, framed in red, and a model labelled `No response when measured` can be published as not recommended, so the model publication and assessment paragraphs of "Server Configuration" say so in Japanese and English.
+
 ## 2026-10-26 — The catalog choice and a picture's three in the prompt tab
 
 The provenance drawer's prompt tab now also shows the color catalog chosen `From the description` and a work from a picture's three requests (the catalog choice for the picture, the writing from it and the review beside it), so section 11 of "Creating Images" says so in Japanese and English.

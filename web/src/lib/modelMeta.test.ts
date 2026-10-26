@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
-import { isModelUnselectable, modelCost, modelFold, modelFoldTitle, modelFolds, modelPurposeBadges, modelSpeed, modelStatusLabel, modelStatusParts, setModelLabelTable } from './modelMeta';
+import { isModelUnselectable, modelCost, modelFold, modelFoldTitle, modelFolds, modelPurposeBadges, modelSpeed, modelStatusLabel, modelStatusParts, purposeUnsupported, setModelLabelTable, sortModels } from './modelMeta';
 import type { ModelLabel, ModelOption } from './models';
 
 // The Server's model catalog and the cases every client checks itself against (2026-10-13).
@@ -25,13 +25,22 @@ test('both purposes are listed, and the one a model cannot be chosen for is mark
 	assert.deepEqual(modelPurposeBadges({ id: 'x', label: 'x' }).map((badge) => badge.selectable), [true, false]);
 });
 
-test('a purpose measured without a response is greyed, and a model with neither cannot be chosen', () => {
+test('a purpose measured without a response is not recommended, and a model with neither can still be chosen', () => {
 	const drawsNothing = { id: 'x', label: 'x', purposes: ['vision'] as ('llm' | 'vision')[], unsupported_purposes: ['llm'] as ('llm' | 'vision')[], labels: [], fold: null };
 	assert.deepEqual(modelPurposeBadges(drawsNothing).map((badge) => badge.selectable), [false, true]);
 	assert.equal(isModelUnselectable(drawsNothing), false);
-	const answersNothing = { id: 'x', label: 'x', purposes: [], unsupported_purposes: ['llm', 'vision'] as ('llm' | 'vision')[], labels: ['no_response'], fold: 'no_response' };
-	assert.equal(isModelUnselectable(answersNothing), true);
-	assert.equal(modelStatusLabel(answersNothing, true), '計測で応答なし');
+	assert.deepEqual([purposeUnsupported(drawsNothing, 'llm'), purposeUnsupported(drawsNothing, 'vision')], [true, false]);
+	// Chosen against the measurement (2026-10-26): publishable, its label still in the warning colour.
+	const answersNothing = { id: 'x', label: 'x', purposes: ['llm'] as ('llm' | 'vision')[], unsupported_purposes: ['llm', 'vision'] as ('llm' | 'vision')[], labels: ['no_response'], fold: 'no_response' };
+	assert.equal(isModelUnselectable(answersNothing), false);
+	assert.deepEqual(modelStatusParts(answersNothing, true), [{ text: '計測で応答なし', blocking: true }]);
+	assert.equal(isModelUnselectable({ id: 'x', label: 'x', unsupported_purposes: ['llm', 'vision'] }), false);
+});
+
+test('a model chosen for a purpose it did not answer is listed after those that answered it', () => {
+	const answered = { id: 'b', label: 'b', recommendation_llm: 1 };
+	const unanswered = { id: 'a', label: 'a', purposes: ['llm'] as ('llm' | 'vision')[], unsupported_purposes: ['llm'] as ('llm' | 'vision')[], recommendation_llm: 5 };
+	assert.deepEqual(sortModels([unanswered, answered], 'llm').map((model) => model.id), ['b', 'a']);
 });
 
 test('the labels the Server worked out decide the fold and the publication, as the shared cases say', () => {

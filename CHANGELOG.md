@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-26 — A purpose that gave no response can be chosen as not recommended
+
+At the author's instruction (make the models the benchmark does not recommend, for LLM or Vision, selectable, but frame their buttons in red and make plain that the system does not recommend them), the rule of 2026-10-13 (such a purpose cannot be chosen, and a model that answered neither cannot be published) changes. In the settings' model publication, the `LLM` or `Vision` button of a purpose that gave no response is framed in red and can be pressed, its hover saying it is not recommended. The Server keeps such a purpose an administrator chose in a new field, `allowed_unsupported_purposes`, and offers the model for it; purposes coming from the catalog or a refetch still leave it out, so "Select visible" never chooses one. The label "No response when measured" becomes publishable (`model_catalog.json` and the shared rows `model-catalog-cases.json`) and keeps the warning colour. A model so published is framed in red where users pick a drawing model too (the settings' model selection, and the pickers of refinement, juxtaposition, the demo and the like), says "Not recommended (no response when measured)", and is listed after the models that answered. ChatGPT plan purposes are each person's own and are unchanged. macOS and Android are unchanged (they hold a copy of the label table).
+
 ### 2026-10-25 — inku-cli reads one work by its UUID
 
 inku-cli gains `history show`, which prints a work's description, DDL and JSON Score (`--part` for one of them), and `history png`, which rasterizes the saved display SVG into a PNG of the drawing alone (`--size` for the longer side, default 1024). Both take the UUID or its first few characters. There is no endpoint for one work, so the listing is asked with `anchor_id` and `limit=1` and the returned work's id is checked. A prefix is resolved against the listing without pictures, and one that fits more than one work stops with the candidates. The server is unchanged.

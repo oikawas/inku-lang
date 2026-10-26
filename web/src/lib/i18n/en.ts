@@ -362,6 +362,8 @@ export const en: LangPack = {
 	modelSelectButton: 'Model selection',
 	modelPickerEmpty: 'No models to choose from. An administrator can make models visible in Settings → Models.',
 	modelPickerNotInList: 'Not in the list',
+	modelNotRecommended: 'Not recommended (no response when measured)',
+	modelNotRecommendedHint: 'This model gave no response for this purpose when measured. It can be chosen, but the system does not recommend it, and a drawing may fail.',
 	modelButton: 'Model',
 	colorCatalogButton: 'Color catalog',
 	instructionLangLabel: 'Description language',

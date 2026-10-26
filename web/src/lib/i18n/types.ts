@@ -417,6 +417,8 @@ export interface LangPack {
 	modelSelectButton: string;
 	modelPickerEmpty: string;
 	modelPickerNotInList: string;
+	modelNotRecommended: string;
+	modelNotRecommendedHint: string;
 	modelButton: string;
 	colorCatalogButton: string;
 	instructionLangLabel: string;

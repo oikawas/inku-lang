@@ -1,9 +1,14 @@
-"""A purpose a model was measured not to answer cannot be chosen for it.
+"""A purpose a model was measured not to answer is left out unless chosen against it.
 
 The author's instruction (2026-10-13): a model the benchmark found without an LLM
 or Vision response cannot be selected for that purpose, and a model with neither
 cannot be selected at all. The measurement is stored as `unsupported_purposes`,
 apart from the purposes an operator ticks, so ticking cannot bring a purpose back.
+
+Changed at the author's instruction (2026-10-26): an administrator can choose such
+a purpose, and publish a model answering neither, as not recommended. The choice is
+stored as `allowed_unsupported_purposes`; the catalog and a plain tick still leave
+the purpose out, so publishing everything never chooses one.
 """
 
 from __future__ import annotations
@@ -45,6 +50,30 @@ def test_a_model_answering_neither_purpose_is_offered_for_nothing_and_cannot_be_
     published = update_model_settings(settings, {"providers": {"gemini": {"enabled_models": {"measured-model": True}}}})
     assert published["providers"]["gemini"]["enabled_models"]["measured-model"] is False
     assert (_offered(settings, "llm"), _offered(settings, "vision")) == (False, False)
+
+
+def test_a_purpose_chosen_against_the_measurement_is_offered_as_not_recommended():
+    settings = _settings({"purposes": ["llm", "vision"], "unsupported_purposes": ["vision"],
+                          "allowed_unsupported_purposes": ["vision"], "recommendation_llm": 3})
+    model = normalize_model_settings(settings)["providers"]["gemini"]["models"][0]
+    assert (model["purposes"], model["allowed_unsupported_purposes"]) == (["llm", "vision"], ["vision"])
+    assert (_offered(settings, "llm"), _offered(settings, "vision")) == (True, True)
+    # An allowance for a purpose it answers, or one not ticked, keeps nothing.
+    plain = normalize_model_settings(_settings({"purposes": ["llm"], "unsupported_purposes": ["vision"],
+                                                "allowed_unsupported_purposes": ["llm", "vision"]}))
+    assert "allowed_unsupported_purposes" not in plain["providers"]["gemini"]["models"][0]
+
+
+def test_a_model_answering_neither_purpose_is_published_once_a_purpose_is_chosen_for_it():
+    settings = _settings({"purposes": ["llm"], "unsupported_purposes": ["llm", "vision"],
+                          "allowed_unsupported_purposes": ["llm"]})
+    published = update_model_settings(settings, {"providers": {"gemini": {"enabled_models": {"measured-model": True}}}})
+    gemini = published["providers"]["gemini"]
+    assert (gemini["models"][0]["purposes"], gemini["enabled_models"]["measured-model"]) == (["llm"], True)
+    assert (_offered(published, "llm"), _offered(published, "vision")) == (True, False)
+    shown = model_provider_catalog(published, include_disabled=False, purpose="llm")
+    labels = next(group for group in shown if group["id"] == "gemini")["models"][0]["labels"]
+    assert labels == ["no_response"]
 
 
 def test_a_model_left_out_of_the_benchmark_is_not_supported_and_cannot_be_published():

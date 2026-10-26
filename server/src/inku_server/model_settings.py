@@ -227,18 +227,27 @@ def _normalize_models(models: Any) -> list[dict[str, Any]]:
             else:
                 marker = f"{model_id} {item.get('notes', '')}".lower()
                 clean_purposes = ["vision"] if "vision" in marker else ["llm"]
-            # A purpose the model was measured not to answer cannot be chosen for it
-            # (the author, 2026-10-13), whatever the operator ticked. A model left
+            # A purpose the model was measured not to answer is left out of what the
+            # catalog or a tick offers (the author, 2026-10-13), unless an
+            # administrator chose it for the model knowing it is not recommended
+            # (`allowed_unsupported_purposes`, the author, 2026-10-26). A model left
             # with no purpose is offered for nothing, rather than defaulted to LLM.
             unsupported = model.get("unsupported_purposes")
             clean_unsupported = ([purpose for purpose in ("llm", "vision") if purpose in unsupported]
                                  if isinstance(unsupported, list) else [])
-            clean_purposes = [purpose for purpose in clean_purposes if purpose not in clean_unsupported]
+            allowed = model.get("allowed_unsupported_purposes")
+            clean_allowed = ([purpose for purpose in clean_unsupported if purpose in allowed]
+                             if isinstance(allowed, list) else [])
+            clean_purposes = [purpose for purpose in clean_purposes
+                              if purpose not in clean_unsupported or purpose in clean_allowed]
             if not clean_purposes and not clean_unsupported:
                 clean_purposes = ["llm"]
             item["purposes"] = clean_purposes
             if clean_unsupported:
                 item["unsupported_purposes"] = clean_unsupported
+            allowed_kept = [purpose for purpose in clean_allowed if purpose in clean_purposes]
+            if allowed_kept:
+                item["allowed_unsupported_purposes"] = allowed_kept
             # v1.98: 推奨度は用途ごとに持つ。LLM は「3 回成功したか・スキーマを壊さないか・
             # 補正発火が少ないか」、Vision は画像特徴の再現率で決まり、尺度が異なるため。
             # 旧 recommendation_level は用途別の値が無いときだけ読む (書き出しはしない)。

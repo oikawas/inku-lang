@@ -811,6 +811,8 @@ def api_settings_fetch_provider_models(
     }
     carried = (
         *MODEL_METADATA_KEYS,
+        # An administrator's choice of a purpose against the measurement (2026-10-26).
+        "allowed_unsupported_purposes",
         "eol", "eol_date",
         # 有料プラン限定の印は提供元の一覧に現れない (一覧には載るが叩くと 402 か
         # 403 が返る)。取得のたびに消えては困るので、EOL と違って再提供で外さない。

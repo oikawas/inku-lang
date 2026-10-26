@@ -2,7 +2,7 @@
 	import { tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import { pickerSelection, type ModelOption, type Provider, type ProviderGroup } from '$lib/models';
-	import { modelRecommendation, modelRecommendationStars, modelSpeed, modelCost, modelComment, modelStatusLabel, modelStatusParts, isModelUnselectable, sortModels, type ModelPurpose } from '$lib/modelMeta';
+	import { modelRecommendation, modelRecommendationStars, modelSpeed, modelCost, modelComment, modelStatusLabel, modelStatusParts, isModelUnselectable, purposeUnsupported, sortModels, type ModelPurpose } from '$lib/modelMeta';
 	import { openFloatingCard } from '$lib/floatingCard';
 	import ModelPurposeBadges from './ModelPurposeBadges.svelte';
 
@@ -98,11 +98,12 @@
 			{#each configuredGroups as group (group.id)}
 				<section><h3>{group.id === 'chatgpt' ? t().chatgptPlanLabel : group.label}</h3><div class="model-grid">
 					{#each sortModels(group.models, purpose) as model (model.id)}
-						<button type="button" class:selected={selected?.group.id === group.id && selected?.model.id === model.id} class:eol={model.eol} class:unselectable={isModelUnselectable(model)} disabled={isModelUnselectable(model)} onpointerenter={positionMeta} onfocus={positionMeta} onclick={() => choose(group.id, model.id)}>
+						<button type="button" class:selected={selected?.group.id === group.id && selected?.model.id === model.id} class:eol={model.eol} class:unselectable={isModelUnselectable(model)} class:not-recommended={purposeUnsupported(model, purpose)} disabled={isModelUnselectable(model)} onpointerenter={positionMeta} onfocus={positionMeta} onclick={() => choose(group.id, model.id)}>
 							<div class="model-button-heading">
 								<strong>{model.label}</strong>
 								<span class="model-recommendation" aria-label={`${t().settingsModelRecommendationFields[purpose === 'vision' ? 'recommendation_vision' : 'recommendation_llm']} ${modelRecommendation(model, purpose)}`}>{modelRecommendationStars(model, purpose)}</span>
 							</div>
+							{#if purposeUnsupported(model, purpose)}<small class="not-recommended-note">{t().modelNotRecommended}</small>{/if}
 							{#if modelStatusLabel(model, isJapanese)}<small class="model-label-mark">{#each modelStatusParts(model, isJapanese) as part, partIndex (partIndex)}{#if partIndex > 0}{' · '}{/if}<span class:eol-mark={part.blocking}>{part.text}</span>{/each}</small>{/if}{#if model.notes}<small>{model.notes}</small>{/if}
 							<span class="metadata" role="tooltip">
 								{#if modelStatusLabel(model, isJapanese)}<span><b>状態 / Status</b><span class="status-muted">{#each modelStatusParts(model, isJapanese) as part, partIndex (partIndex)}{#if partIndex > 0}{' · '}{/if}<span class:status-warning={part.blocking}>{part.text}</span>{/each}</span></span>{/if}
@@ -158,6 +159,12 @@
 	.model-grid > button { position: relative; display: grid; gap: 3px; min-width: 0; padding: 9px 10px; border: 1px solid var(--border2); border-radius: var(--r); background: var(--panel); color: var(--fg2); text-align: left; cursor: pointer; font: inherit; }
 	.model-grid > button:hover { border-color: var(--accent); background: var(--bg2); }
 	.model-grid > button.selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--accent-light); color: var(--fg); }
+	/* Published for a purpose it did not answer when measured: choosable, framed in
+	   red as not recommended (the author, 2026-10-26). */
+	.model-grid > button.not-recommended,
+	.model-grid > button.not-recommended:hover { border: 2px solid var(--danger); }
+	.model-grid > button.not-recommended.selected { box-shadow: inset 0 0 0 1px var(--danger); }
+	.model-grid > button > small.not-recommended-note { color: var(--danger); font-weight: 600; }
 	.model-button-heading { display: flex; align-items: baseline; gap: 8px; width: 100%; min-width: 0; }
 	.model-button-heading strong { flex: 1 1 auto; min-width: 0; font-size: var(--ui-font-size-12); font-weight: 500; overflow-wrap: anywhere; }
 	.model-recommendation { flex: 0 0 auto; font-size: var(--ui-font-size-11); white-space: nowrap; }

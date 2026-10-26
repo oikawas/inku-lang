@@ -360,6 +360,8 @@ export const ja: LangPack = {
 	modelSelectButton: 'モデル選択',
 	modelPickerEmpty: '選べるモデルがありません。管理者が 設定 → モデル設定 で公開すると選べます。',
 	modelPickerNotInList: '一覧にない',
+	modelNotRecommended: '推奨しません（計測で応答なし）',
+	modelNotRecommendedHint: 'この用途は計測で応答が無かったモデルです。選べますが、システムとしては推奨しません。描けずに失敗することがあります。',
 	modelButton: 'モデル',
 	colorCatalogButton: '色カタログ',
 	instructionLangLabel: '記述の言語',

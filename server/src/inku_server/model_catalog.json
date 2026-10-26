@@ -25,7 +25,7 @@
    "id": "no_response",
    "ja": "計測で応答なし",
    "en": "No response when measured",
-   "publishable": false
+   "publishable": true
   },
   {
    "id": "not_supported",

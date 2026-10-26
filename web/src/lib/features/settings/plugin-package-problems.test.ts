@@ -8,8 +8,15 @@ const read = (path: string) => readFileSync(new URL(path, here), 'utf8');
 
 test('every problem the Server writes for a package file is explained in both languages', () => {
 	const server = read('../../../../../server/src/inku_server/plugins/packages.py');
-	const codes = new Set([...server.matchAll(/Problem\([^)]*?,\s*"([a-z_]+)"/g)].map((match) => match[1]));
-	assert.ok(codes.size >= 15, `found only ${codes.size} codes; the pattern no longer reads packages.py`);
+	const router = read('../../../../../server/src/inku_server/api_core/routers/plugins.py');
+	// Problem(path, "code", ...) and, in the zip reader, problem("code", ...).
+	const codes = new Set(
+		[...`${server}\n${router}`.matchAll(/(?:Problem\([^)]*?,\s*|\bproblem\()"([a-z0-9_]+)"/g)].map((match) => match[1])
+	);
+	assert.ok(codes.size >= 25, `found only ${codes.size} codes; the pattern no longer reads packages.py`);
+	for (const zipCode of ['invalid_zip', 'archive_without_package_json', 'not_base64', 'preview_needs_zip']) {
+		assert.ok(codes.has(zipCode), `the pattern missed ${zipCode}`);
+	}
 	for (const code of codes) {
 		assert.notEqual(pluginProblemMessage(code, true), code, `no Japanese explanation for ${code}`);
 		assert.notEqual(pluginProblemMessage(code, false), code, `no English explanation for ${code}`);

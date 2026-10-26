@@ -12,6 +12,7 @@ Canvasの選択（`inku.canvas-format-registry.v1`）とRender Engine Packは、
 
 1. 定義をJSONで書く（§2の手本、§3の形式）。
 2. 定義と、要約（§6）・説明・例文をプラグインのファイル（`inku.plugin-package.v1`、§5.1）にまとめる。
+   歳時記に自分の絵を出すなら、そのファイルとPNGをzipにまとめる（無ければ例文から自動で描く）。
 3. Serverの管理者は、Webの設定「プラグイン」の「プラグインを追加」でファイルを選ぶ（§5.1）。
    Serverがすぐに検査し、駄目なところはファイルの中の場所と理由が語ごとに出る（§7）。
    通った語には歳時記に出る絵と例が出るので、確かめて「追加する」を押す。
@@ -421,10 +422,27 @@ UTF-8のファイルに保存すれば、検査に通って追加できる（202
 | `summary_ja`・`summary_en` | どちらか一方 | 下絵（Stage 1）に渡す要約（§6）。片方だけなら、もう一方の言語にも使う |
 | `note_ja`・`note_en` | 任意 | 歳時記の見本の説明の行（組み込みの語の「効果」の行に当たる）。何を描く語かを短く書く |
 | `example_ja`・`example_en` | 任意 | 歳時記の見本の「例」に出すDDLの文。書かなければ`Sky.星。`（日本語は最初の別名）・`Sky.Stars.`を使う |
+| `preview` | 任意 | 歳時記の見本の絵。zipの中のPNGの場所（例: `previews/stars.png`）。zipで渡すときだけ書ける |
 
-歳時記の見本は、題（正式名か別名）・説明（`note_*`）・例（`example_*`）・絵の四つでできている。絵は書かない。
-追加するとき、Serverが日本語の例文を描き、描いたところを切り出して歳時記の枠（216×92と、その2倍）に収める。
+歳時記の見本は、題（正式名か別名）・説明（`note_*`）・例（`example_*`）・絵の四つでできている。
 例文は、語の見た目が分かる個数や書き方で書く（例: `Sky.星`なら`5個のSky.星。`）。
+
+絵は二通りで用意できる。
+
+- 自分の絵を使う：上のJSONを`package.json`という名前にし、語が`preview`で名指すPNGと一緒にzipにまとめて選ぶ。
+  PNGは形を問わず、歳時記の枠（216×92と、その2倍）に収めて縮める（余白は絵の隅の色で埋める）。
+- 自動で描く：`preview`を書かない語は、追加するとき、Serverが日本語の例文を描き、描いたところを切り出して枠に収める。
+
+zipの形（`package.json`はzipの一番上に置く。PNGの置き場所と名前は自由）:
+
+```text
+sky-night.zip
+├── package.json          （§5.1の形。語の"preview": "previews/stars.png"）
+└── previews/
+    └── stars.png
+```
+
+`preview`を書いても書かなくても、例文を描く検査（下の3）は行う。JSONだけのファイルで`preview`を書くと誤りになる。
 
 検査は三つを順に行い、全部通ったときだけ追加できる。
 
@@ -438,12 +456,15 @@ JSONとして読めない、`namespace`・`name`が読めない、語が無い�
 
 - 追加した語は、そのServerの全ての新しい作品で描け、歳時記とDDLエディタの補完に出て、記述から描くときは下絵に要約が渡る。
 - 同じid（`namespace.name`）のプラグインが入っていると、「置き換える」になる。置き換えると、新しい作品は新しい定義で描く。
-- 語ごとの「絵を差し替える」でPNGを上げると、歳時記の絵がその画像になる（枠に収めて縮める）。「自動の絵に戻す」で
-  例文から描いた絵に戻る。置き換えても、差し替えた絵は残る。
+- 語ごとの「絵を差し替える」でPNGを上げると、歳時記の絵がその画像になる（枠に収めて縮める）。「元の絵に戻す」で
+  ファイルの絵（`preview`）か、例文から描いた絵に戻る。置き換えても、差し替えた絵は残る。
+- 「書き出す」で、入っているプラグインをzipで保存できる。`package.json`と、各語が今歳時記に出している絵
+  （差し替えた絵があればそれ）が入り、各語の`preview`がその絵を名指す。そのまま別のServerで追加できる。
 - 無効にすると、新しい作品・歳時記・補完から外れる。削除もできる。
 - 保存済みの作品は、使った定義の写しを持つので、後から置き換え・無効・削除をしても同じに描き直せる。
 - ファイルはServerの`INKU_PLUGIN_PACKAGE_DIR`に置かれる（[Serverの設定 §2.5](manual/ja/server-configuration.md)）。
-- APIは`POST /api/plugins/packages/validate`（検査だけ）と`POST /api/plugins/packages`（追加）。どちらも管理者だけが使える。
+- APIは`POST /api/plugins/packages/validate`（検査だけ）・`POST /api/plugins/packages`（追加。JSONは`document`、zipはbase64で`archive`）・
+  `GET /api/plugins/{plugin_id}/export`（書き出し）。どれも管理者だけが使える。
 - Android・macOSはServerを呼ばないので、ここで追加した語はまだ使えない。
 
 ### 5.2 DDLの書き出しファイル（作者がすぐ使える）
@@ -570,7 +591,14 @@ Webの「プラグインを追加」は、§7.2の定義の誤りに加えて、
 | 例文 | `macro_binding_count_out_of_range` | 例文の個数が、定義の受ける範囲の外 |
 | 例文 | `macro_resolution_missing_lock` | 例文の語が見つからない（名前の綴り違い） |
 | 例文 | `example_draws_nothing`・`example_not_drawn` | 例文を描いても何も描かれない、または描けない |
-| 絵 | `not_a_png`・`image_too_large` | 差し替えの絵がPNGでない、または大きすぎる（§8） |
+| 絵 | `not_a_png`・`image_too_large` | `preview`の絵か差し替えの絵がPNGでない、または大きすぎる（§8） |
+| 絵 | `preview_needs_zip` | JSONだけのファイルで`preview`を書いた。zipにまとめるか、`preview`を消す |
+| 絵 | `preview_not_found` | zipの中に、`preview`の名前のPNGが無い（大文字小文字・フォルダも同じに書く） |
+| 絵 | `invalid_preview_path` | `preview`が`/`で始まるか`..`を含む |
+| zip | `invalid_zip`・`not_base64` | zipとして読めない |
+| zip | `archive_without_package_json` | zipの一番上に`package.json`が無い（フォルダの中に入れていないかを見る） |
+| zip | `archive_too_large`・`too_many_archive_members` | zipが大きすぎる、または中のファイルが多すぎる（§8） |
+| zip | `not_utf8` | `package.json`がUTF-8でない |
 
 形の誤りがあっても、定義と例文の検査は続く（§5.1）。定義に誤りのある語は、例文を描かない。
 
@@ -583,7 +611,8 @@ Webの「プラグインを追加」は、§7.2の定義の誤りに加えて、
 | `description_*`・`note_*`の長さ | 2000字 | Server（固定） |
 | `example_*`の長さ | 500字 | Server（固定） |
 | `license`の長さ | 200字 | Server（固定） |
-| 差し替えの絵 | PNG、2 MiBまで、4096×4096画素まで | Server（固定）。枠（216×92と2倍）に収めて縮める |
+| `preview`の絵・差し替えの絵 | PNG、1枚2 MiBまで、4096×4096画素まで | Server（固定）。枠（216×92と2倍）に収めて縮める |
+| zip | 16 MiBまで、中のファイル256個まで、PNGの合計64 MiBまで | Server（固定）。展開せずに読む |
 | 書き出しファイルの定義の数 | 64 | Web・Android・macOSの読み込み |
 | 下絵に渡す定義の数 | 64 | Server manifestの`prompt_limits.max_catalog_entries` |
 | 要約の長さ | 8192 bytes | Server manifestの`prompt_limits.max_summary_bytes` |

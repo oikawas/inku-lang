@@ -13,6 +13,7 @@ Engine Packs are separate mechanisms, not plugins.
 
 1. Write the definition as JSON (the example in §2, the format in §3).
 2. Put the definition, with a summary (§6), a note, and an example, in a plugin file (`inku.plugin-package.v1`, §5.1).
+   For your own Saijiki picture, zip that file with the PNG (without one, the picture is drawn from the example).
 3. A Server administrator chooses the file under "Add a plugin" in the Web settings "Plugins" (§5.1). The Server
    checks it at once and lists, word by word, where in the file something is wrong and why (§7). A word that
    passed shows the picture and example the Saijiki will show; check them and press "Add".
@@ -439,11 +440,30 @@ Fields of each word:
 | `summary_ja`, `summary_en` | one of the two | the summary given to the underdrawing (Stage 1) (§6); one alone serves both languages |
 | `note_ja`, `note_en` | optional | the description line of the Saijiki preview (the "effect" line of a built-in word): say briefly what the word draws |
 | `example_ja`, `example_en` | optional | the DDL sentence shown as the Saijiki's "example"; without one, `Sky.星。` (Japanese uses the first alias) and `Sky.Stars.` |
+| `preview` | optional | the Saijiki preview's picture: the place of a PNG inside the zip (e.g. `previews/stars.png`); only in a zip |
 
 A Saijiki preview has four parts: the title (canonical name or alias), the description (`note_*`), the example
-(`example_*`), and the picture. The picture is not written: on adding, the Server draws the Japanese example,
-cuts out what it drew, and fits it into the Saijiki frame (216×92 and twice that). Write examples whose count and
-wording show what the word looks like (for `Sky.Stars`, `5 Sky.Stars.`).
+(`example_*`), and the picture. Write examples whose count and wording show what the word looks like (for
+`Sky.Stars`, `5 Sky.Stars.`).
+
+The picture comes one of two ways:
+
+- Your own picture: name the JSON above `package.json` and zip it with the PNGs its words name in `preview`. A PNG
+  of any shape is fitted to the Saijiki frame (216×92 and twice that), the margin filled with its corner colour.
+- Drawn: for a word without `preview`, the Server draws its Japanese example on adding, cuts out what it drew,
+  and fits it into the frame.
+
+The zip (`package.json` at its top; the PNGs may sit anywhere under any name):
+
+```text
+sky-night.zip
+├── package.json          (the form of §5.1; the word has "preview": "previews/stars.png")
+└── previews/
+    └── stars.png
+```
+
+With or without `preview`, the examples are drawn as a check (step 3 below). `preview` in a JSON file alone is a
+problem.
 
 Three checks run in order, and a file can be added only when all of them pass:
 
@@ -462,13 +482,17 @@ whose definition has a problem is not drawn.
   and its summary reaches the underdrawing when drawing from a description.
 - When a plugin with the same id (`namespace.name`) is installed, "Add" becomes "Replace"; new works then draw
   with the new definitions.
-- "Replace picture" on a word uploads a PNG that the Saijiki shows instead (fitted to the frame); "Back to the drawn
-  picture" returns to the one drawn from the example. Replacing the plugin keeps replaced pictures.
+- "Replace picture" on a word uploads a PNG that the Saijiki shows instead (fitted to the frame); "Back to the original
+  picture" returns to the file's picture (`preview`) or the one drawn from the example. Replacing the plugin keeps
+  replaced pictures.
+- "Export" saves an installed plugin as a zip: `package.json` with the picture each word shows in the Saijiki now (a
+  replaced one where there is one), each word's `preview` naming it. Another Server can add it as it is.
 - Switching a plugin off removes it from new works, the Saijiki, and completion. It can also be deleted.
 - Saved works carry copies of the definitions they used, so they redraw the same after a replacement, a switch-off,
   or a deletion.
 - The files are kept in the Server's `INKU_PLUGIN_PACKAGE_DIR` ([Server configuration §2.5](manual/en/server-configuration.md)).
-- The API is `POST /api/plugins/packages/validate` (check only) and `POST /api/plugins/packages` (add), for administrators only.
+- The API is `POST /api/plugins/packages/validate` (check only), `POST /api/plugins/packages` (add; a JSON file as
+  `document`, a zip in base64 as `archive`), and `GET /api/plugins/{plugin_id}/export` (export), for administrators only.
 - Android and macOS never call the Server, so words added here are not available there yet.
 
 ### 5.2 A DDL export file (immediately usable by an author)
@@ -605,7 +629,14 @@ explanation with the same meaning.
 | example | `macro_binding_count_out_of_range` | the example's count is outside the range the definition takes |
 | example | `macro_resolution_missing_lock` | the example's word is not found (a misspelt name) |
 | example | `example_draws_nothing`, `example_not_drawn` | the example draws nothing, or cannot be drawn |
-| picture | `not_a_png`, `image_too_large` | a replacement picture is not a PNG, or is too large (§8) |
+| picture | `not_a_png`, `image_too_large` | a `preview` or replacement picture is not a PNG, or is too large (§8) |
+| picture | `preview_needs_zip` | `preview` in a JSON file alone; zip it, or remove `preview` |
+| picture | `preview_not_found` | the zip has no PNG by the `preview` name (case and folders must match) |
+| picture | `invalid_preview_path` | `preview` starts with `/` or holds `..` |
+| zip | `invalid_zip`, `not_base64` | not a readable zip |
+| zip | `archive_without_package_json` | no `package.json` at the top of the zip (check it is not inside a folder) |
+| zip | `archive_too_large`, `too_many_archive_members` | the zip is too large, or holds too many files (§8) |
+| zip | `not_utf8` | `package.json` is not UTF-8 |
 
 A shape problem does not stop the definition and example checks (§5.1). A word whose definition has a problem
 is not drawn.
@@ -619,7 +650,8 @@ is not drawn.
 | length of `description_*` and `note_*` | 2000 characters | the Server (fixed) |
 | length of `example_*` | 500 characters | the Server (fixed) |
 | length of `license` | 200 characters | the Server (fixed) |
-| replacement picture | PNG, up to 2 MiB and 4096×4096 pixels | the Server (fixed); fitted to the frame (216×92 and twice that) |
+| `preview` and replacement pictures | PNG, up to 2 MiB each and 4096×4096 pixels | the Server (fixed); fitted to the frame (216×92 and twice that) |
+| zip | up to 16 MiB, 256 files inside, 64 MiB of PNGs in all | the Server (fixed); read without unpacking |
 | definitions in an export file | 64 | the Web, Android, and macOS readers |
 | definitions given to the underdrawing | 64 | Server manifest `prompt_limits.max_catalog_entries` |
 | summary length | 8192 bytes | Server manifest `prompt_limits.max_summary_bytes` |

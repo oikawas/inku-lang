@@ -37,18 +37,40 @@ function owner(status: number) {
 
 test('every plugin change the Server took tells the page to read the words again', async () => {
 	const { admin, changed } = owner(200);
-	assert.equal(await admin.installPluginPackage('{}', false), true);
+	assert.equal(await admin.installPluginPackage({ archive: 'UEs=' }, false), true);
 	assert.equal(await admin.setPluginEnabled('Sky.night', false), true);
 	assert.equal(await admin.setPluginWordPicture('Sky.night', 'Stars', null), true);
 	assert.equal(await admin.deletePlugin('Sky.night'), true);
 	assert.equal(changed(), 4);
 });
 
+test('a zip goes as an archive and an export keeps the name the Server gave', async () => {
+	const sent: unknown[] = [];
+	const admin = createServerAdministration({
+		currentUser: () => ({ id: 'admin', permission_groups: ['admins'] }), setRenderFanoutLimit() {},
+		describeApiError: (detail: unknown) => String(detail),
+		requestConfirmation() {},
+		apiFetch: async (path: string, init?: RequestInit) => {
+			if (init?.body) sent.push(JSON.parse(String(init.body)));
+			if (path.endsWith('/export')) {
+				return new Response('PK', { status: 200, headers: { 'Content-Disposition': 'attachment; filename="Sky.night-1.0.0.zip"' } });
+			}
+			return path === '/api/settings/status' ? json({ plugins: { loaded: [] } }) : json({ ok: true, problems: [], words: [] });
+		}
+	});
+	await admin.checkPluginPackage({ archive: 'UEs=' });
+	await admin.installPluginPackage({ archive: 'UEs=' }, true);
+	assert.deepEqual(sent, [{ archive: 'UEs=' }, { archive: 'UEs=', replace: true }]);
+	const exported = await admin.exportPluginPackage('Sky.night');
+	assert.equal(exported?.name, 'Sky.night-1.0.0.zip');
+	assert.equal(await exported?.blob.text(), 'PK');
+});
+
 test('a refused change and a check alone leave the words as they are', async () => {
 	const { admin, changed } = owner(403);
-	await admin.installPluginPackage('{}', false);
+	await admin.installPluginPackage({ document: '{}' }, false);
 	await admin.setPluginEnabled('Sky.night', false);
 	await admin.deletePlugin('Sky.night');
-	await owner(200).admin.checkPluginPackage('{}');
+	await owner(200).admin.checkPluginPackage({ document: '{}' });
 	assert.equal(changed(), 0);
 });

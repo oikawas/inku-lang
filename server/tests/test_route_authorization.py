@@ -100,7 +100,9 @@ PUBLIC = {  # every entry needs a reason
 #   +4 for plugin packages an administrator installs from the Web:
 #   POST /api/plugins/packages/validate, POST /api/plugins/packages, and
 #   PUT and DELETE /api/plugins/{plugin_id}/words/{heading}/preview (2026-10-26).
-EXPECTED_ROUTE_COUNT = 143
+#   +1 for GET /api/plugins/{plugin_id}/export, a package as a zip with its
+#   pictures (2026-10-26).
+EXPECTED_ROUTE_COUNT = 144
 
 
 def _guard_names(dependant, seen=None) -> set[str]:
@@ -202,6 +204,7 @@ def test_only_stronger_admin_guards_remain_as_unused_route_arguments():
 
     assert unused == {
         ("plugins.py", "api_plugin_delete", "_admin_user"),
+        ("plugins.py", "api_plugin_package_export", "_admin_user"),
         ("plugins.py", "api_plugin_preview_replace", "_admin_user"),
         ("plugins.py", "api_plugin_preview_reset", "_admin_user"),
         ("plugins.py", "api_plugin_set_enabled", "_admin_user"),

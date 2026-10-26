@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
-	import type { PluginItem, PluginPackageReport, SettingsStatus } from './server-administration.svelte';
+	import type { PluginItem, PluginPackageReport, PluginPackageUpload, SettingsStatus } from './server-administration.svelte';
 	import PluginPackageInstaller from './PluginPackageInstaller.svelte';
+	import { fileToBase64, saveBlob } from './plugin-files';
 	import './plugin-administration-settings.css';
 
 	// The drawing uses only definitions written in JSON. An administrator adds
-	// them here as one package file, which is checked before it is installed
+	// them here as one package file (or a zip with its pictures), which is
+	// checked before it is installed, and exports an installed one as a zip
 	// (2026-10-26, replacing I-703's developer-only packages); the bundled
 	// package's document switches it on and off. A legacy document without
 	// definitions is shown as not drawn from and may only be deleted.
@@ -18,15 +20,16 @@
 		onLoadSettingsStatus: () => void;
 		onDeletePlugin: (id: string) => Promise<boolean>;
 		onSetPluginEnabled: (id: string, enabled: boolean) => Promise<boolean>;
-		onCheckPluginPackage: (document: string) => Promise<PluginPackageReport | null>;
-		onInstallPluginPackage: (document: string, replace: boolean) => Promise<PluginPackageReport | true | null>;
+		onCheckPluginPackage: (upload: PluginPackageUpload) => Promise<PluginPackageReport | null>;
+		onInstallPluginPackage: (upload: PluginPackageUpload, replace: boolean) => Promise<PluginPackageReport | true | null>;
 		onSetPluginWordPicture: (id: string, heading: string, pngBase64: string | null) => Promise<boolean>;
+		onExportPluginPackage: (id: string) => Promise<{ name: string; blob: Blob } | null>;
 	};
 
 	let {
 		pluginsStatus, settingsStatusError, settingsStatusLoading, pluginActionStatus,
 		isAdmin, onLoadSettingsStatus, onDeletePlugin, onSetPluginEnabled,
-		onCheckPluginPackage, onInstallPluginPackage, onSetPluginWordPicture,
+		onCheckPluginPackage, onInstallPluginPackage, onSetPluginWordPicture, onExportPluginPackage,
 	}: Props = $props();
 
 	let pluginBusy = $state(false);
@@ -64,11 +67,16 @@
 		input.value = '';
 		if (!file || !pictureTarget || pluginBusy) return;
 		pluginBusy = true;
-		const bytes = new Uint8Array(await file.arrayBuffer());
-		let binary = '';
-		for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-		await onSetPluginWordPicture(pictureTarget.id, pictureTarget.heading, btoa(binary));
+		await onSetPluginWordPicture(pictureTarget.id, pictureTarget.heading, await fileToBase64(file));
 		pictureTarget = null;
+		pluginBusy = false;
+	}
+
+	async function exportPlugin(plugin: PluginItem): Promise<void> {
+		if (!isAdmin || pluginBusy) return;
+		pluginBusy = true;
+		const exported = await onExportPluginPackage(pluginId(plugin));
+		if (exported) saveBlob(exported.name, exported.blob);
 		pluginBusy = false;
 	}
 
@@ -145,6 +153,9 @@
 								{/if}
 							</div>
 							<div class="user-plugin-controls">
+								{#if plugin.kind === 'package' && plugin.status !== 'rejected'}
+									<button class="ghost-btn user-plugin-btn" type="button" onclick={() => void exportPlugin(plugin)} disabled={!isAdmin || pluginBusy}>{t().settingsPluginPackageExport}</button>
+								{/if}
 								{#if pluginIsDeletable(plugin)}
 									{#if pluginDeleteConfirmId === pluginId(plugin)}
 										{#if plugin.kind === 'package'}<span class="plugin-use-hint">{t().settingsPluginPackageDeleteHint}</span>{/if}

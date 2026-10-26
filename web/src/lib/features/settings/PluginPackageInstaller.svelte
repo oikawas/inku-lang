@@ -1,22 +1,24 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
-	import type { PluginPackageProblem, PluginPackageReport } from './server-administration.svelte';
+	import type { PluginPackageProblem, PluginPackageReport, PluginPackageUpload } from './server-administration.svelte';
 	import { pluginProblemMessage } from './plugin-package-problems';
+	import { readPluginPackageFile } from './plugin-files';
 
-	// Adding a plugin is one file: choosing it checks it at once, and the
-	// result says word by word what the Saijiki will show or what is wrong
-	// and where. Only a package that passed every check can be added.
+	// Adding a plugin is one file -- the JSON, or a zip holding it beside its
+	// pictures: choosing it checks it at once, and the result says word by
+	// word what the Saijiki will show or what is wrong and where. Only a
+	// package that passed every check can be added.
 	type Props = {
 		isAdmin: boolean;
-		onCheck: (document: string) => Promise<PluginPackageReport | null>;
-		onInstall: (document: string, replace: boolean) => Promise<PluginPackageReport | true | null>;
+		onCheck: (upload: PluginPackageUpload) => Promise<PluginPackageReport | null>;
+		onInstall: (upload: PluginPackageUpload, replace: boolean) => Promise<PluginPackageReport | true | null>;
 	};
 
 	let { isAdmin, onCheck, onInstall }: Props = $props();
 
 	let fileInput = $state<HTMLInputElement | null>(null);
 	let fileName = $state('');
-	let documentText = $state('');
+	let upload = $state<PluginPackageUpload | null>(null);
 	let report = $state<PluginPackageReport | null>(null);
 	let busy = $state(false);
 	let installed = $state('');
@@ -31,21 +33,19 @@
 		installed = '';
 		report = null;
 		busy = true;
-		documentText = await file.text();
-		report = await onCheck(documentText);
+		upload = await readPluginPackageFile(file);
+		report = await onCheck(upload);
 		busy = false;
 	}
 
 	async function install(): Promise<void> {
-		if (!report?.ok || busy) return;
+		if (!report?.ok || !upload || busy) return;
 		busy = true;
-		const result = await onInstall(documentText, report.exists === true);
+		const result = await onInstall(upload, report.exists === true);
 		busy = false;
 		if (result === true) {
 			installed = report.id ?? '';
-			report = null;
-			documentText = '';
-			fileName = '';
+			cancel();
 		} else if (result) {
 			report = result;
 		}
@@ -53,7 +53,7 @@
 
 	function cancel(): void {
 		report = null;
-		documentText = '';
+		upload = null;
 		fileName = '';
 	}
 
@@ -66,7 +66,7 @@
 <div class="plugin-installer">
 	<div class="plugin-installer-head">
 		<button class="ghost-btn" type="button" onclick={() => fileInput?.click()} disabled={!isAdmin || busy}>{t().settingsUserPluginsAddTitle}</button>
-		<input bind:this={fileInput} class="plugin-installer-file" type="file" accept=".json,application/json" onchange={chooseFile} />
+		<input bind:this={fileInput} class="plugin-installer-file" type="file" accept=".json,.zip,application/json,application/zip" onchange={chooseFile} />
 		<span class="plugin-use-hint">{t().settingsUserPluginsAddDescription}</span>
 	</div>
 	{#if busy && !report}
@@ -98,8 +98,10 @@
 							<div class="plugin-word-text">
 								<strong>{word.qualified_name}</strong>
 								{#if word.aliases.length}<small>{word.aliases.join(', ')}</small>{/if}
+								{#if (isJapanese ? word.note_ja : word.note_en)}<span>{isJapanese ? word.note_ja : word.note_en}</span>{/if}
 								<span>{t().saijikiPreviewExampleLabel}{isJapanese ? word.example_ja : word.example_en}</span>
-								<span>{isJapanese ? word.summary_ja : word.summary_en}</span>
+								{#if word.preview_png}<small>{word.preview_source === 'file' ? t().settingsPluginPictureFromFile : t().settingsPluginPictureDrawn}</small>{/if}
+								<span class="plugin-word-summary">{t().settingsPluginSummaryLabel}{isJapanese ? word.summary_ja : word.summary_en}</span>
 								{#if word.problems.length}
 									<ul class="plugin-problems">
 										{#each word.problems as problem (problem.path + problem.code)}

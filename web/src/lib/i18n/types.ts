@@ -1141,6 +1141,10 @@ export interface LangPack {
 	settingsPluginPackageDeleteHint: string;
 	settingsPluginPictureReplace: string;
 	settingsPluginPictureReset: string;
+	settingsPluginPictureFromFile: string;
+	settingsPluginPictureDrawn: string;
+	settingsPluginSummaryLabel: string;
+	settingsPluginPackageExport: string;
 	settingsPluginPictureRefused: string;
 	settingsUserPluginPathPlaceholder: string;
 	settingsYes: string;

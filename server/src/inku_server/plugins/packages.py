@@ -1,14 +1,17 @@
 """Plugin packages an administrator installs from the Web (`inku.plugin-package.v1`).
 
 A package is one JSON file: the MacroDefinition v1 of each word, with the
-summary Stage 1 reads and the note and example the Saijiki shows. Nothing in a
-package is executed. Checking one is three steps -- the file's own shape, the
-shared core's definition checks, and drawing each word's example through the
-shared pipeline -- and only a package that passes all three is installed.
+summary Stage 1 reads and the note and example the Saijiki shows. It may also
+come as a zip holding that file as `package.json` beside the PNG pictures its
+words name in `preview`. Nothing in a package is executed. Checking one is
+three steps -- the file's own shape, the shared core's definition checks, and
+drawing each word's example through the shared pipeline -- and only a package
+that passes all three is installed.
 
-The Saijiki picture of a word is drawn from its example when the package is
-installed. An administrator may replace it with a PNG of their own and go back
-to the drawn one later.
+A word's Saijiki picture is the PNG it names, or else is drawn from its example
+when the package is installed. An administrator may replace it with a PNG of
+their own and go back to the original later. An installed package is exported
+as such a zip, with the pictures it shows now, so it can be added elsewhere.
 
 Packages live outside the repository (`INKU_PLUGIN_PACKAGE_DIR`), so a deploy
 neither removes them nor leaves the checkout dirty.
@@ -23,6 +26,7 @@ import json
 import os
 import re
 import shutil
+import zipfile
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -44,7 +48,14 @@ LANGUAGES = ("ja", "en")
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
 _SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$")
 _PACKAGE_KEYS = {"schema", "namespace", "name", "version", "description_ja", "description_en", "authors", "license", "words"}
-_WORD_KEYS = {"definition", "summary_ja", "summary_en", "note_ja", "note_en", "example_ja", "example_en"}
+_WORD_KEYS = {"definition", "summary_ja", "summary_en", "note_ja", "note_en", "example_ja", "example_en", "preview"}
+# A zip is read in memory, never unpacked to disk, and only up to these sizes:
+# the archive itself, how many members it may list, and each PNG member.
+ARCHIVE_PACKAGE_NAME = "package.json"
+MAX_ARCHIVE_BYTES = 16 * 1024 * 1024
+MAX_ARCHIVE_MEMBERS = 256
+MAX_ARCHIVE_PICTURE_BYTES = MAX_PREVIEW_BYTES * 4
+MAX_ARCHIVE_PICTURES_BYTES = 64 * 1024 * 1024
 _PACKAGE_ID_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*\.[A-Za-z][A-Za-z0-9_-]*$")
 _PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 _DEFAULT_DIR = Path.home() / ".local" / "share" / "inku" / "plugin-packages"
@@ -78,6 +89,8 @@ class PackageWord:
     index: int = 0
     # Problems with this word's own fields that still leave its definition checkable.
     problems: tuple[Problem, ...] = ()
+    # The picture the word names in its zip, already fitted to the Saijiki frame (1x, 2x).
+    picture: tuple[bytes, bytes] | None = None
 
     @property
     def namespace(self) -> str:
@@ -157,13 +170,20 @@ def _text(value: object, path: str, problems: list[Problem], *, limit: int = MAX
     return value.strip()
 
 
-def parse_plugin_package(text: str) -> PluginPackage:
+def parse_plugin_package(
+    text: str, *, archive: Mapping[str, bytes | None] | None = None, stored: bool = False
+) -> PluginPackage:
     """Read a package file's own shape. The definitions are checked by the core later.
 
     Only what leaves nothing to check stops here (not JSON, no readable
     namespace or name, no words): every other problem is kept on the package
     or its word, so the core and the examples still check the rest and one
     upload shows the whole list. A package with any problem is not installed.
+
+    `archive` holds the PNG members of the zip the file came in (see
+    `read_package_archive`); a word's `preview` names one of them. `stored`
+    reads a file this server already installed, whose pictures were taken
+    out of its zip on installing, so `preview` names nothing to read again.
     """
     if len(text.encode("utf-8")) > MAX_PACKAGE_BYTES:
         raise PluginPackageError([Problem("", "package_too_large", str(MAX_PACKAGE_BYTES))])
@@ -205,7 +225,7 @@ def parse_plugin_package(text: str) -> PluginPackage:
         blocking.append(Problem("words", "too_many_words", str(MAX_PACKAGE_WORDS)))
     else:
         for index, item in enumerate(words_raw):
-            word = _parse_word(item, index, namespace, problems)
+            word = _parse_word(item, index, namespace, problems, archive=archive, stored=stored)
             if word is not None:
                 words.append(word)
     if blocking:
@@ -222,7 +242,15 @@ def parse_plugin_package(text: str) -> PluginPackage:
     )
 
 
-def _parse_word(item: object, index: int, namespace: str, file_problems: list[Problem]) -> PackageWord | None:
+def _parse_word(
+    item: object,
+    index: int,
+    namespace: str,
+    file_problems: list[Problem],
+    *,
+    archive: Mapping[str, bytes | None] | None,
+    stored: bool,
+) -> PackageWord | None:
     """One word; a word with no definition to check is a problem of the file instead."""
     path = f"words[{index}]"
     if not isinstance(item, dict):
@@ -245,8 +273,91 @@ def _parse_word(item: object, index: int, namespace: str, file_problems: list[Pr
         problems.append(Problem(f"{path}.summary_ja", "no_summary"))
     note = {lang: _text(item.get(f"note_{lang}"), f"{path}.note_{lang}", problems) for lang in LANGUAGES}
     example = {lang: _text(item.get(f"example_{lang}"), f"{path}.example_{lang}", problems, limit=500) for lang in LANGUAGES}
+    picture = None if stored else _word_picture(item.get("preview"), f"{path}.preview", archive, problems)
     return PackageWord(definition=definition, summary=summary, note=note, example=example,
-                       index=index, problems=tuple(problems))
+                       index=index, problems=tuple(problems), picture=picture)
+
+
+def _word_picture(
+    named: object, path: str, archive: Mapping[str, bytes | None] | None, problems: list[Problem]
+) -> tuple[bytes, bytes] | None:
+    """The picture a word names in its zip, fitted to the Saijiki frame, or None."""
+    if named is None:
+        return None
+    if not isinstance(named, str) or not named.strip():
+        problems.append(Problem(path, "not_a_string"))
+        return None
+    if archive is None:
+        problems.append(Problem(path, "preview_needs_zip"))
+        return None
+    # Members are only looked up by name, never written out, but a name that
+    # climbs or starts at the root is refused so the file reads as it means.
+    parts = named.replace("\\", "/").split("/")
+    if named.startswith("/") or ".." in parts:
+        problems.append(Problem(path, "invalid_preview_path", named))
+        return None
+    if named not in archive:
+        problems.append(Problem(path, "preview_not_found", named))
+        return None
+    data = archive[named]
+    if data is None:
+        problems.append(Problem(path, "image_too_large", str(MAX_ARCHIVE_PICTURE_BYTES)))
+        return None
+    try:
+        return uploaded_preview_pngs(data)
+    except PluginPackageError as error:
+        problems.extend(Problem(path, problem.code, problem.detail) for problem in error.problems)
+        return None
+
+
+def read_package_archive(data: bytes) -> tuple[str, dict[str, bytes | None]]:
+    """The `package.json` text of a zip and its PNG members, read in memory.
+
+    Nothing is unpacked to disk. Sizes are checked against what is actually
+    read rather than what the zip's directory claims, so a member that
+    inflates past its limit is cut off there. A PNG member over the limit is
+    kept as None, so the word naming it is told its picture is too large.
+    """
+    problem = lambda code, detail="": PluginPackageError([Problem("", code, detail)])  # noqa: E731
+    if len(data) > MAX_ARCHIVE_BYTES:
+        raise problem("archive_too_large", str(MAX_ARCHIVE_BYTES))
+    try:
+        archive = zipfile.ZipFile(io.BytesIO(data))
+        members = archive.infolist()
+    except (zipfile.BadZipFile, OSError, ValueError):
+        raise problem("invalid_zip") from None
+    if len(members) > MAX_ARCHIVE_MEMBERS:
+        raise problem("too_many_archive_members", str(MAX_ARCHIVE_MEMBERS))
+
+    def read(info: zipfile.ZipInfo, limit: int) -> bytes | None:
+        try:
+            with archive.open(info) as handle:
+                content = handle.read(limit + 1)
+        except (zipfile.BadZipFile, OSError, ValueError, RuntimeError, NotImplementedError):
+            raise problem("invalid_zip", info.filename) from None
+        return None if len(content) > limit else content
+
+    package = next((info for info in members if info.filename == ARCHIVE_PACKAGE_NAME), None)
+    if package is None:
+        raise problem("archive_without_package_json", ARCHIVE_PACKAGE_NAME)
+    raw = read(package, MAX_PACKAGE_BYTES)
+    if raw is None:
+        raise problem("package_too_large", str(MAX_PACKAGE_BYTES))
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        raise problem("not_utf8", ARCHIVE_PACKAGE_NAME) from None
+    pictures: dict[str, bytes | None] = {}
+    total = 0
+    for info in members:
+        if info.is_dir() or not info.filename.lower().endswith(PREVIEW_SUFFIX):
+            continue
+        content = read(info, MAX_ARCHIVE_PICTURE_BYTES)
+        total += len(content or b"")
+        if total > MAX_ARCHIVE_PICTURES_BYTES:
+            raise problem("archive_too_large", str(MAX_ARCHIVE_PICTURES_BYTES))
+        pictures[info.filename] = content
+    return text, pictures
 
 
 # --------------------------------------------------------------------------- #
@@ -450,7 +561,8 @@ class PluginPackageManager:
     """Installed packages: one directory each, and one state file for which are off.
 
     <dir>/<id>/package.json         the file as uploaded
-    <dir>/<id>/previews/<key>.png   the picture drawn from the example (and @2x)
+    <dir>/<id>/previews/<key>.png   the picture the word named in its zip, or else
+                                    the one drawn from its example (and @2x)
     <dir>/<id>/custom/<key>.png     an administrator's replacement (and @2x)
     <dir>/.package-state.json       {"disabled": [ids]}
     """
@@ -485,7 +597,7 @@ class PluginPackageManager:
             packages, rejected = [], []
             for path in self._package_files():
                 try:
-                    package = parse_plugin_package(path.read_text(encoding="utf-8"))
+                    package = parse_plugin_package(path.read_text(encoding="utf-8"), stored=True)
                     if not package.is_sound:
                         raise PluginPackageError([*package.problems, *(p for w in package.words for p in w.problems)])
                     if package.id != path.parent.name:
@@ -613,6 +725,32 @@ class PluginPackageManager:
 
     def has_custom_preview(self, package: PluginPackage, word: PackageWord) -> bool:
         return (self._package_dir(package.id) / "custom" / f"{word.preview_key()}{PREVIEW_SUFFIX}").is_file()
+
+    def export(self, package_id: str) -> tuple[str, bytes]:
+        """The installed package as a zip another server can add as it is: a file name and its bytes.
+
+        `package.json` is the file as installed, each word's `preview` naming
+        the picture it shows now (an administrator's replacement where there
+        is one), written at the larger of the two sizes.
+        """
+        with self._lock:
+            package = self.get(package_id)
+            if package is None:
+                raise FileNotFoundError(package_id)
+            raw = json.loads((self._package_dir(package_id) / "package.json").read_text(encoding="utf-8"))
+            out = io.BytesIO()
+            with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+                for word in package.words:
+                    entry = raw["words"][word.index]
+                    entry.pop("preview", None)
+                    picture = self.preview_path(package, word, hidpi=True) or self.preview_path(package, word)
+                    if picture is None:
+                        continue
+                    member = f"previews/{word.preview_key()}{PREVIEW_SUFFIX}"
+                    archive.writestr(member, picture.read_bytes())
+                    entry["preview"] = member
+                archive.writestr(ARCHIVE_PACKAGE_NAME, json.dumps(raw, ensure_ascii=False, indent=2) + "\n")
+            return f"{package.id}-{package.version}.zip", out.getvalue()
 
     def preview_path_for_qualified_name(self, qualified_name: str, *, hidpi: bool = False) -> Path | None:
         # A switched-off package's pictures are still served: the settings list

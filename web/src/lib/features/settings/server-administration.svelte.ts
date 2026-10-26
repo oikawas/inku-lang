@@ -42,6 +42,9 @@ export type PluginItem = {
 	description_en?: string;
 };
 
+/** A package as sent: the JSON file's text, or a zip as base64 (package.json beside its PNG pictures). */
+export type PluginPackageUpload = { document: string } | { archive: string };
+
 /** One reason a package cannot be installed: where in the file, and what. */
 export type PluginPackageProblem = { path: string; code: string; detail: string };
 
@@ -67,6 +70,8 @@ export type PluginPackageReport = {
 		example_ja: string;
 		example_en: string;
 		preview_png: string;
+		/** "file" when the picture is the one the word names in its zip, "drawn" when its example drew it. */
+		preview_source?: 'file' | 'drawn';
 		problems: PluginPackageProblem[];
 	}>;
 };
@@ -183,8 +188,9 @@ export type ServerAdministration = {
 	resetForLoggedOut: () => void;
 	deletePlugin: (id: string) => Promise<boolean>;
 	setPluginEnabled: (id: string, enabled: boolean) => Promise<boolean>;
-	checkPluginPackage: (document: string) => Promise<PluginPackageReport | null>;
-	installPluginPackage: (document: string, replace: boolean) => Promise<PluginPackageReport | true | null>;
+	checkPluginPackage: (upload: PluginPackageUpload) => Promise<PluginPackageReport | null>;
+	installPluginPackage: (upload: PluginPackageUpload, replace: boolean) => Promise<PluginPackageReport | true | null>;
+	exportPluginPackage: (id: string) => Promise<{ name: string; blob: Blob } | null>;
 	setPluginWordPicture: (id: string, heading: string, pngBase64: string | null) => Promise<boolean>;
 	updateDbBackupSettings: (intervalDays: number, maxGenerations: number, backupHour: number, backupMinute: number) => Promise<void>;
 	runDbBackupNow: () => Promise<void>;
@@ -306,13 +312,13 @@ export function createServerAdministration<TActor extends SettingsActor>(
 
 	// A package check answers 200 with its report whatever it found; only a
 	// refused request (no admin, no server support) lands in the status line.
-	async function checkPluginPackage(document: string): Promise<PluginPackageReport | null> {
+	async function checkPluginPackage(upload: PluginPackageUpload): Promise<PluginPackageReport | null> {
 		pluginActionStatus = null;
 		try {
 			const response = await deps.apiFetch('/api/plugins/packages/validate', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ document })
+				body: JSON.stringify(upload)
 			});
 			if (!response.ok) {
 				const body = await response.json().catch(() => ({})) as { detail?: unknown };
@@ -327,13 +333,13 @@ export function createServerAdministration<TActor extends SettingsActor>(
 	}
 
 	/** true when installed; the report when a check failed on the way (422); null otherwise. */
-	async function installPluginPackage(document: string, replace: boolean): Promise<PluginPackageReport | true | null> {
+	async function installPluginPackage(upload: PluginPackageUpload, replace: boolean): Promise<PluginPackageReport | true | null> {
 		pluginActionStatus = null;
 		try {
 			const response = await deps.apiFetch('/api/plugins/packages', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ document, replace })
+				body: JSON.stringify({ ...upload, replace })
 			});
 			if (!response.ok) {
 				const body = await response.json().catch(() => ({})) as { detail?: unknown };
@@ -354,7 +360,26 @@ export function createServerAdministration<TActor extends SettingsActor>(
 		}
 	}
 
-	/** Replace a package word's Saijiki picture, or with null go back to the drawn one. */
+	/** The installed package as a zip with its pictures; the page saves it under `name`. */
+	async function exportPluginPackage(id: string): Promise<{ name: string; blob: Blob } | null> {
+		pluginActionStatus = null;
+		try {
+			const response = await deps.apiFetch(`/api/plugins/${encodeURIComponent(id)}/export`);
+			if (!response.ok) {
+				const body = await response.json().catch(() => ({})) as { detail?: unknown };
+				pluginActionStatus = pluginErrorMessage(response.status, body.detail);
+				return null;
+			}
+			const disposition = response.headers.get('Content-Disposition') ?? '';
+			const name = /filename="([^"]+)"/.exec(disposition)?.[1] ?? `${id}.zip`;
+			return { name, blob: await response.blob() };
+		} catch (error) {
+			pluginActionStatus = error instanceof Error ? error.message : String(error);
+			return null;
+		}
+	}
+
+	/** Replace a package word's Saijiki picture, or with null go back to its original one. */
 	async function setPluginWordPicture(id: string, heading: string, pngBase64: string | null): Promise<boolean> {
 		pluginActionStatus = null;
 		try {
@@ -668,6 +693,7 @@ export function createServerAdministration<TActor extends SettingsActor>(
 		setPluginEnabled,
 		checkPluginPackage,
 		installPluginPackage,
+		exportPluginPackage,
 		setPluginWordPicture,
 		updateDbBackupSettings,
 		runDbBackupNow,

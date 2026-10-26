@@ -49,9 +49,19 @@ const MESSAGES: Record<string, Message> = {
 	compiler_diagnostics: { ja: '例文が DDL として描けません。', en: 'The example does not draw as DDL.' },
 	example_draws_nothing: { ja: '例文を描いても、何も描かれません。', en: 'The example draws nothing.' },
 	example_not_drawn: { ja: '例文を描けませんでした。', en: 'The example could not be drawn.' },
-	// Replacing a picture
-	not_a_png: { ja: 'PNG の画像ではありません。', en: 'Not a PNG image.' },
-	image_too_large: { ja: '画像が大きすぎます。', en: 'The image is too large.' },
+	// Pictures: a word's own in its zip, or a replacement
+	not_a_png: { ja: 'PNG の画像ではありません。', en: 'Not a PNG picture.' },
+	image_too_large: { ja: '画像が大きすぎます。', en: 'The picture is too large.' },
+	preview_needs_zip: { ja: '絵（preview）は zip の中の PNG を名指します。JSON だけのファイルでは使えません。', en: 'preview names a PNG inside a zip; a JSON file alone cannot have one.' },
+	preview_not_found: { ja: 'zip の中に、この名前の PNG がありません。', en: 'The zip has no PNG by this name.' },
+	invalid_preview_path: { ja: '絵の場所は、zip の中の場所で書きます（「..」や「/」で始まる場所は使えません）。', en: 'Write the place inside the zip (not starting with "/" and without "..").' },
+	// The zip itself
+	invalid_zip: { ja: 'zip として読めません。', en: 'Not a readable zip.' },
+	not_base64: { ja: 'ファイルを送れませんでした（base64 でない）。', en: 'The file could not be sent (not base64).' },
+	archive_too_large: { ja: 'zip が大きすぎます。', en: 'The zip is too large.' },
+	too_many_archive_members: { ja: 'zip の中のファイルが多すぎます。', en: 'The zip holds too many files.' },
+	archive_without_package_json: { ja: 'zip の一番上に package.json がありません。', en: 'The zip has no package.json at its top.' },
+	not_utf8: { ja: 'package.json が UTF-8 ではありません。', en: 'package.json is not UTF-8.' },
 };
 
 export function pluginProblemMessage(code: string, isJapanese: boolean): string {

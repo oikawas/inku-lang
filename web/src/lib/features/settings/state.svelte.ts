@@ -158,6 +158,7 @@ export function createSettingsController<TActor extends SettingsActor>(
 		checkPluginPackage: serverAdministration.checkPluginPackage,
 		installPluginPackage: serverAdministration.installPluginPackage,
 		setPluginWordPicture: serverAdministration.setPluginWordPicture,
+		exportPluginPackage: serverAdministration.exportPluginPackage,
 		updateDbBackupSettings: serverAdministration.updateDbBackupSettings,
 		runDbBackupNow: serverAdministration.runDbBackupNow,
 		deleteDbBackup: serverAdministration.deleteDbBackup,

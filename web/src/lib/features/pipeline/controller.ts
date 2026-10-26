@@ -7,6 +7,17 @@ import {
 
 type ViewObserver = (view: PipelineView | null) => void;
 type Pause = (milliseconds: number) => Promise<void>;
+type RunningView = { view: PipelineView | null; stopped: boolean };
+
+// A persisted refusal must not become another automatic perform request.
+function throwRefusal(view: PipelineView): void {
+	if (view.current_render_refusal) {
+		throw new PipelineApiError(
+			view.current_render_refusal.code === 'svg_limit_binding_unavailable' ? 503 : 422,
+			view.current_render_refusal,
+		);
+	}
+}
 
 /**
  * Own one browser tab's view of a server-owned pipeline execution.
@@ -21,25 +32,36 @@ export class PipelineController {
 	private linkedHistoryId: string | null = null;
 	private historySelection: Promise<boolean> | null = null;
 	private requestOrdinal = 0;
+	private running: RunningView | null = null;
+	private lastRunFollowed = true;
 	private readonly api: PipelineApi;
 	private readonly options: () => PipelineOptions;
 	private readonly observe: ViewObserver;
 	private readonly pause: Pause;
+	private readonly progress: ((view: PipelineView) => void) | undefined;
 
+	/** `progress` sees every view of the run in flight, shown or not. */
 	constructor(
 		api: PipelineApi,
 		options: () => PipelineOptions,
 		observe: ViewObserver,
 		pause: Pause = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
+		progress?: (view: PipelineView) => void,
 	) {
 		this.api = api;
 		this.options = options;
 		this.observe = observe;
 		this.pause = pause;
+		this.progress = progress;
 	}
 
 	get current(): PipelineView | null {
 		return this.view;
+	}
+
+	/** Whether the last run to end was still the one shown when it ended. */
+	get lastRunWasShown(): boolean {
+		return this.lastRunFollowed;
 	}
 
 	adopt(view: PipelineView): void {
@@ -195,9 +217,17 @@ export class PipelineController {
 		return this.run(() => this.api.load(variationId, signal), false);
 	}
 
+	/** Stop the run in flight, shown or not; with none, the shown execution. */
 	async cancel(): Promise<void> {
-		const active = this.view;
+		const running = this.running;
+		const active = running?.view ?? this.view;
 		if (!active) return;
+		const shown = !running || this.view?.variation_id === active.variation_id;
+		if (running) running.stopped = true;
+		if (!shown) {
+			await this.api.command(active, { tag: 'cancel' });
+			return;
+		}
 		this.requestOrdinal += 1;
 		const next = await this.api.command(active, { tag: 'cancel' });
 		this.legacyHistoryId = null;
@@ -234,47 +264,65 @@ export class PipelineController {
 
 	private setRunView(view: PipelineView): void {
 		this.setView(view);
-		// A persisted refusal must not become another automatic perform request.
-		if (view.current_render_refusal) {
-			throw new PipelineApiError(
-				view.current_render_refusal.code === 'svg_limit_binding_unavailable' ? 503 : 422,
-				view.current_render_refusal,
-			);
-		}
+		throwRefusal(view);
 	}
 
+	/**
+	 * Follow one run to its end. Opening another work or starting afresh moves
+	 * the request ordinal: the run then stops showing itself but is still drawn
+	 * and saved (2026-10-26; it used to return half-way, never performed, and
+	 * the drawing read as cancelled). Only `cancel` stops it.
+	 */
 	private async run(start: () => Promise<PipelineView>, autoPerform = true): Promise<PipelineView> {
 		const ordinal = ++this.requestOrdinal;
-		let next = await start();
-		if (ordinal !== this.requestOrdinal) return next;
-		this.historySelection = null;
-		this.legacyHistoryId = null;
-		this.linkedHistoryId = null;
-		this.setRunView(next);
-		while (next.busy) {
-			await this.pause(250);
-			if (ordinal !== this.requestOrdinal) return next;
-			next = await this.api.load(next.variation_id);
-			if (ordinal !== this.requestOrdinal) return next;
-			this.setRunView(next);
-		}
-		if (
-			autoPerform
-			&& next.delivery?.score
-			&& !next.result
-			&& next.phase.tag !== 'awaiting_patch_approval'
-		) {
-			next = await this.api.command(next, { tag: 'perform' });
-			if (ordinal !== this.requestOrdinal) return next;
-			this.setRunView(next);
+		const running: RunningView = { view: null, stopped: false };
+		this.running = running;
+		const following = () => ordinal === this.requestOrdinal;
+		const show = (view: PipelineView) => {
+			running.view = view;
+			this.progress?.(view);
+			if (following()) {
+				this.setRunView(view);
+				return;
+			}
+			throwRefusal(view);
+		};
+		try {
+			let next = await start();
+			if (following()) {
+				this.historySelection = null;
+				this.legacyHistoryId = null;
+				this.linkedHistoryId = null;
+			}
+			show(next);
 			while (next.busy) {
 				await this.pause(250);
-				if (ordinal !== this.requestOrdinal) return next;
+				if (running.stopped) return next;
 				next = await this.api.load(next.variation_id);
-				if (ordinal !== this.requestOrdinal) return next;
-				this.setRunView(next);
+				if (running.stopped) return next;
+				show(next);
 			}
+			if (
+				autoPerform
+				&& next.delivery?.score
+				&& !next.result
+				&& next.phase.tag !== 'awaiting_patch_approval'
+			) {
+				next = await this.api.command(next, { tag: 'perform' });
+				if (running.stopped) return next;
+				show(next);
+				while (next.busy) {
+					await this.pause(250);
+					if (running.stopped) return next;
+					next = await this.api.load(next.variation_id);
+					if (running.stopped) return next;
+					show(next);
+				}
+			}
+			return next;
+		} finally {
+			this.lastRunFollowed = following();
+			if (this.running === running) this.running = null;
 		}
-		return next;
 	}
 }

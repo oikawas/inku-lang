@@ -104,7 +104,9 @@ export function createWorkState(deps: WorkStateDeps) {
 		if (imageRunActive) {
 			submitStopRequested = true;
 			submitAbortController?.abort();
+			// Clearing shows nothing; only the cancel stops the run behind it.
 			pipelineController.clear();
+			cancelPipelineRun();
 		}
 		imageUploadOrdinal += 1;
 		imageFile = null;
@@ -339,12 +341,18 @@ export function createWorkState(deps: WorkStateDeps) {
 		};
 	}
 
+	// The run's progress, also while the author looks at another work.
+	function followRunProgress(view: PipelineView): void {
+		activeRunAttempt = view.provider_attempt ?? null;
+		// A read-and-draw run whose DDL is committed is drawn and saved next.
+		if (loading && view.route === 'read_and_draw' && view.delivery?.score && !view.result) stageLabel = t().readDrawSaving;
+	}
+
 	function adoptPipelineView(view: PipelineView | null): void {
 		pipelineView = view;
 		activeRunAttempt = view?.provider_attempt ?? null;
 		if (!view) return;
-		// A read-and-draw run whose DDL is committed is drawn and saved next.
-		if (loading && view.route === 'read_and_draw' && view.delivery?.score && !view.result) stageLabel = t().readDrawSaving;
+		followRunProgress(view);
 		if (view.image_ddl || view.image_provenance != null) {
 			imageProvenance = view.image_provenance ?? '';
 			input = '';
@@ -379,6 +387,8 @@ export function createWorkState(deps: WorkStateDeps) {
 		new PipelineApi(apiFetch),
 		() => pipelineOptions(),
 		adoptPipelineView,
+		undefined,
+		followRunProgress,
 	);
 
 	async function selectImage(file: File): Promise<void> {
@@ -577,7 +587,11 @@ export function createWorkState(deps: WorkStateDeps) {
 		reloadError = null;
 		try {
 			const view = await run();
-			if (view.result?.history_id) {
+			if (view.result?.history_id && !pipelineController.lastRunWasShown) {
+				// The author opened another work meanwhile: the new work joins the
+				// history, and the work they look at stays, as for a picture batch.
+				await deps.history().refreshAfterServerSave();
+			} else if (view.result?.history_id) {
 				await deps.history().fetchOffset(0, { anchorId: view.result.history_id });
 				displayedHistoryItem = deps.history().items.find((item) => item.id === view.result?.history_id) ?? null;
 			}
@@ -1082,14 +1096,16 @@ export function createWorkState(deps: WorkStateDeps) {
 				derivationMetadata: submitDerivationMetadata,
 			}, abortController.signal);
 			if (submitStopRequested) return;
-			if (view.result?.history_id && submitAbortController === abortController && !submitStopRequested) {
+			if (view.result?.history_id && submitAbortController === abortController && !submitStopRequested
+				&& pipelineController.lastRunWasShown) {
 				if (canvasAspectDerivation) pendingCanvasAspectDerivation = null;
 				lineageDetached = false;
 			}
 		} catch (cause) {
 			if (!(submitStopRequested || abortController.signal.aborted)) {
 				error = cause instanceof Error ? cause.message : String(cause);
-				result = null;
+				// The work the author opened meanwhile keeps its picture.
+				if (pipelineController.lastRunWasShown) result = null;
 			}
 		} finally {
 			if (submitAbortController === abortController) submitAbortController = null;

@@ -1419,7 +1419,6 @@ export interface LangPack {
 	provenanceHintStage1Lang: string;
 	provenanceHintStage2Lang: string;
 	provenanceHintLangRequested: string;
-	provenanceHintInterpretationSeed: string;
 	provenanceHintInterpretFallback: string;
 	provenanceHintComposeFallback: string;
 	provenanceHintFocus: string;

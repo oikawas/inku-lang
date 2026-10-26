@@ -1610,7 +1610,6 @@ export const ja: LangPack = {
 	provenanceHintStage1Lang: 'Stage 1 が実際に使った言語。',
 	provenanceHintStage2Lang: 'Stage 2 が実際に使った言語。',
 	provenanceHintLangRequested: '作者が要求した言語。実際に使われた言語と食い違うことがある。',
-	provenanceHintInterpretationSeed: '解釈を固定する種。同じ種なら同じ読み替えになる。',
 	provenanceHintInterpretFallback: 'Stage 1 が答えず、代わりの指示書で演奏された理由。',
 	provenanceHintComposeFallback: 'Stage 2 が答えたか。記録なし＝この欄より前に保存された作品。',
 	provenanceHintFocus: 'Stage 2 が置いた絵の焦点。',

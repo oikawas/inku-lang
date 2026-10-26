@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-26 — Provenance no longer shows the interpretation seed
+
+At the author's instruction, the Web's provenance drawer drops the "Interpretation seed" row. The value named a reinterpretation of "Change the reading", removed 2026-10-14; it never reached Stage 1 or the drawing, and a new work always showed "-". Its hint, that the same seed reads the words the same way, was not true either. Saved works keep their values, and the API's `interpretation_seed` is unchanged.
+
 ### 2026-10-25 — inku-cli reads one work by its UUID
 
 inku-cli gains `history show`, which prints a work's description, DDL and JSON Score (`--part` for one of them), and `history png`, which rasterizes the saved display SVG into a PNG of the drawing alone (`--size` for the longer side, default 1024). Both take the UUID or its first few characters. There is no endpoint for one work, so the listing is asked with `anchor_id` and `limit=1` and the returned work's id is checked. A prefix is resolved against the listing without pictures, and one that fits more than one work stops with the candidates. The server is unchanged.

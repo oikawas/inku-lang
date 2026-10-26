@@ -64,6 +64,13 @@ test('the prompt tab shows the catalog choice for a description and a picture it
 	assert.match(tabs, /imageSent = \$derived\(imageWork \|\| /);
 });
 
+test('generation info no longer shows the interpretation seed', () => {
+	// It named a reinterpretation removed 2026-10-14 and never reached Stage 1;
+	// the author stopped showing it (2026-10-26). The API still returns older works' values.
+	const view = read('./CanvasGenerationInfo.svelte');
+	assert.doesNotMatch(view, /interpretation_seed|Interpretation seed|解釈 seed/);
+});
+
 test('T-338: the focused view is typed and owns no route or session state', () => {
 	const view = read('./CanvasGenerationInfo.svelte');
 

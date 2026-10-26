@@ -1612,7 +1612,6 @@ export const en: LangPack = {
 	provenanceHintStage1Lang: 'The language Stage 1 actually worked in.',
 	provenanceHintStage2Lang: 'The language Stage 2 actually worked in.',
 	provenanceHintLangRequested: 'The language you asked for. It can differ from the one that was used.',
-	provenanceHintInterpretationSeed: 'The seed that fixes the interpretation. The same seed reads your words the same way.',
 	provenanceHintInterpretFallback: 'Why a stock set of instructions was performed instead of an answer from Stage 1.',
 	provenanceHintComposeFallback: 'Whether Stage 2 answered. Not recorded means the work was saved before this field existed.',
 	provenanceHintFocus: 'The focus Stage 2 placed in the picture.',

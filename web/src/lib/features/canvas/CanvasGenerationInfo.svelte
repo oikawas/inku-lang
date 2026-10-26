@@ -35,7 +35,6 @@
 		seed_text?: string | null;
 		focus?: string | null;
 		composition_seed?: number | string | null;
-		interpretation_seed?: string | null;
 		variation_amplitude?: string | null;
 		variation_seed?: number | string | null;
 		pipeline_variation_id?: string | null;
@@ -181,7 +180,6 @@
 
 	const detailRenderSeed = $derived(statusHistoryItem?.render_seed ?? result?.render_seed ?? null);
 	const detailVarySeed = $derived(statusHistoryItem?.composition_seed ?? result?.composition_seed ?? null);
-	const detailInterpretationSeed = $derived(statusHistoryItem?.interpretation_seed ?? result?.interpretation_seed ?? null);
 	// The stored form is `<scheme>:<digest>`. The scheme is named in the row's
 	// label and the digest stands alone in the cell, so the value shown is the
 	// value copied. See $lib/hashIdentity.
@@ -399,7 +397,6 @@
 						{@render term(`Stage 1 (${isJapanese ? '解釈' : 'Interpretation'})`, t().provenanceHintStage1Model)}<dd>{statusStage1Model}</dd>
 						{@render term(`Stage 1 ${isJapanese ? '言語' : 'Language'}`, t().provenanceHintStage1Lang)}<dd>{displayLanguageName(detailStage1Lang)}</dd>
 						{@render term(t().provenanceLabelLangRequested, t().provenanceHintLangRequested)}<dd>{detailRequestedLang ? displayLanguageName(detailRequestedLang) : '-'}</dd>
-						{@render term(isJapanese ? '解釈 seed' : 'Interpretation seed', t().provenanceHintInterpretationSeed)}<dd>{detailInterpretationSeed ?? '-'}</dd>
 						{#if interpretFallbackReason}
 							{@render term(t().provenanceLabelInterpretFallback, t().provenanceHintInterpretFallback)}<dd>{interpretFallbackReason}</dd>
 						{/if}

@@ -220,6 +220,7 @@ OFF_GRID_EXEMPT = {
     "cameraSignalLine",
     "cameraPlotterStroke",
     "rangeFrameStroke",
+    "notRecommendedFrame",
 }
 GRID_STEP = 4.0
 

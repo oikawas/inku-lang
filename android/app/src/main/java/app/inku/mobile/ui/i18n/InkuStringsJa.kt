@@ -463,6 +463,8 @@ object InkuStringsJa : InkuStrings {
     override val modelPickerNotInList = "一覧にない"
     override val modelPurposeNotSelectable = "（選べません）"
     override val modelPurposeNoResponse = "薄い用途は、計測で応答が無かったため選べません"
+    override val modelPurposeNotRecommended = "赤枠の用途は計測で応答が無かった用途です。選べますが、システムとしては推奨しません"
+    override val modelNotRecommended = "推奨しません（計測で応答なし）"
     override val publishedModels = "ユーザーに公開するモデル"
     override val licenseAndDownload = "ライセンス/ダウンロード"
     override val licenseAndDownloaded = "ライセンス/取得済み"

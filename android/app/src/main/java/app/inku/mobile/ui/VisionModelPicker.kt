@@ -53,7 +53,9 @@ internal data class VisionModelGroup(val id: String, val label: String, val mode
  * and its connection, and a list grouped by connection. Each card shows the
  * Vision recommendation, the model's labels, the LLM and Vision badges (a
  * purpose it cannot be chosen for greyed out) and the catalog's figures. A
- * model a label keeps from publication is shown greyed and cannot be chosen.
+ * model a label keeps from publication is shown greyed and cannot be chosen;
+ * one published for Vision though it gave no Vision answer when measured is
+ * framed in red as not recommended, after the others (2026-10-26).
  */
 @Composable
 internal fun VisionModelPicker(
@@ -121,11 +123,14 @@ internal fun VisionModelPicker(
 private fun VisionModelCard(model: VisionModelOption, selected: Boolean, onClick: () -> Unit) {
     val strings = LocalStrings.current
     val unselectable = isModelUnselectable(model.catalog)
+    // Web `not-recommended`: published for Vision though it gave no Vision answer when measured.
+    val notRecommended = purposeUnsupported(model.catalog, "vision")
     Surface(
         onClick = onClick, enabled = !unselectable,
         shape = RoundedCornerShape(Dimens.radiusCard),
-        border = BorderStroke(Dimens.hairline,
-            if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
+        border = if (notRecommended) BorderStroke(Dimens.notRecommendedFrame, MaterialTheme.colorScheme.error)
+            else BorderStroke(Dimens.hairline,
+                if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
         color = if (selected) ActiveRowTint else MaterialTheme.colorScheme.surface,
         modifier = Modifier.fillMaxWidth().alpha(if (unselectable) 0.55f else 1f).testTag(visionModelCardTag(model.id)),
     ) {
@@ -137,6 +142,9 @@ private fun VisionModelCard(model: VisionModelOption, selected: Boolean, onClick
                     textDecoration = if (model.catalog.labels.any { it.id == "eol" }) TextDecoration.LineThrough else null)
                 ModelRecommendationStars(model.catalog, "vision")
             }
+            if (notRecommended) Text(strings.modelNotRecommended, style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.testTag("VisionModelNotRecommended:${model.id}"))
             Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
                 modelPurposeBadges(model.catalog, model.purposes).forEach { (badge, selectable) ->
                     Surface(shape = RoundedCornerShape(Dimens.radiusPill),

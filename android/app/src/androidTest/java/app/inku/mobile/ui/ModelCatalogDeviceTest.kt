@@ -30,9 +30,12 @@ class ModelCatalogDeviceTest {
         val models = listOf(
             catalog.classify(JSONObject().put("id", "mixed").put("labels", JSONArray(listOf("legacy", "eol")))),
             catalog.classify(JSONObject().put("id", "muted").put("labels", JSONArray(listOf("legacy")))),
+            // Publishable since 2026-10-26, but still in the warning colour (Web `modelStatusParts`).
+            catalog.classify(JSONObject().put("id", "silent").put("purposes", JSONArray()).put("recommendation_llm", 0)),
         )
         val scheme = lightColorScheme()
-        val expectedByLabel = mapOf("legacy" to scheme.onSurfaceVariant, "eol" to scheme.error, "unmeasured" to scheme.onSurfaceVariant)
+        val expectedByLabel = mapOf("legacy" to scheme.onSurfaceVariant, "eol" to scheme.error, "unmeasured" to scheme.onSurfaceVariant,
+            "no_response" to scheme.error)
         rule.setContent { MaterialTheme(colorScheme = scheme) { Column {
             models.forEach { ModelCatalogDetails(it, InkuStringsJa) }
         } } }
@@ -90,6 +93,7 @@ class ModelCatalogDeviceTest {
             rule.onNodeWithTag("CatalogList").performScrollToNode(hasTestTag("CatalogFold:${label.id}"))
             rule.onNodeWithTag("CatalogFold:${label.id}").performClick()
         }
-        assertEquals(setOf("unmeasured", "legacy"), selected)
+        // No response when measured can be published since 2026-10-26.
+        assertEquals(setOf("unmeasured", "legacy", "no_response"), selected)
     }
 }

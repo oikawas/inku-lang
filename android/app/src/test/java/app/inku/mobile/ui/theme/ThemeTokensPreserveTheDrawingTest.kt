@@ -48,6 +48,7 @@ class ThemeTokensPreserveTheDrawingTest {
         "CameraPlotterStroke",
         "LineageArrowWidth",
         "RangeFrameStroke",
+        "NotRecommendedFrame",
     )
 
     // --- T-3 ---------------------------------------------------------------

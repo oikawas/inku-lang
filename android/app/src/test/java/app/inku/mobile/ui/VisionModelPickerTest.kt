@@ -31,38 +31,47 @@ class VisionModelPickerTest {
     }
 
     @Test
-    fun aLabelThatKeepsItFromPublicationOrNoPurposeMakesItUnselectable() {
+    fun onlyALabelThatKeepsItFromPublicationMakesItUnselectable() {
         assertTrue(isModelUnselectable(model("a", """{"purposes":["vision"]}""", eol)))
-        assertTrue(isModelUnselectable(model("b", """{"purposes":[],"unsupported_purposes":["llm","vision"]}""")))
+        // Answering neither purpose no longer does: it is not recommended (2026-10-26).
+        assertFalse(isModelUnselectable(model("b", """{"purposes":[],"unsupported_purposes":["llm","vision"]}""")))
         assertFalse(isModelUnselectable(model("c", """{"purposes":["vision"]}""", old)))
         assertFalse(isModelUnselectable(model("d", """{"purposes":["vision"],"unsupported_purposes":["llm"]}""")))
     }
 
     @Test
-    fun cardsAreOrderedSelectableFirstThenByTheVisionLevelThenByName() {
+    fun cardsAreOrderedSelectableFirstThenAnsweredThenByTheVisionLevelThenByName() {
         val models = listOf(
             model("retired", """{"purposes":["vision"],"recommendation_vision":5}""", eol),
             model("modest", """{"purposes":["vision"],"recommendation_vision":2}"""),
             model("legacy", """{"purposes":["vision"],"recommendation_level":4}"""),
             model("best", """{"purposes":["vision"],"recommendation_vision":5,"recommendation_llm":1}"""),
             model("alpha", """{"purposes":["vision"],"recommendation_vision":2}"""),
+            // Chosen for Vision though it gave no Vision answer: after those that did.
+            model("silent", """{"purposes":["llm"],"unsupported_purposes":["vision"],"recommendation_vision":5}"""),
         )
-        assertEquals(listOf("best", "legacy", "alpha", "modest", "retired"),
+        assertEquals(listOf("best", "legacy", "alpha", "modest", "silent", "retired"),
             sortModels(models, "vision", { it }, { it.id }).map { it.id })
         assertEquals("★★★", modelRecommendationStars(models[3], "vision"))
         assertEquals("★☆☆", modelRecommendationStars(models[3], "llm"))
     }
 
     @Test
-    fun theAuthorsTicksDecideThePurposesButNotOneTheModelDoesNotAnswer() {
+    fun theAuthorsTicksDecideThePurposesAndTheCatalogsLeaveOutOneTheModelDoesNotAnswer() {
         val both = model("a", """{"purposes":["llm","vision"]}""")
         assertEquals(listOf("llm", "vision"), modelPurposes(both))
         assertEquals(listOf("vision"), modelPurposes(both, listOf("vision")))
         assertEquals(emptyList<String>(), modelPurposes(both, emptyList()))
-        // Ticked or not, a purpose measured not to answer is not served (Server, 2026-10-13).
+        // The catalog's never bring in a purpose measured not to answer; a tick does,
+        // as Server's allowed_unsupported_purposes (2026-10-26).
         val mute = model("b", """{"purposes":["llm"],"unsupported_purposes":["vision"]}""")
-        assertEquals(listOf("llm"), modelPurposes(mute, listOf("llm", "vision")))
-        assertEquals(listOf("LLM" to true, "Vision" to false), modelPurposeBadges(mute, listOf("llm", "vision")))
+        assertEquals(listOf("llm"), modelPurposes(mute))
+        assertEquals(listOf("llm", "vision"), modelPurposes(mute, listOf("llm", "vision")))
+        assertEquals(listOf("LLM" to true, "Vision" to true), modelPurposeBadges(mute, listOf("llm", "vision")))
+        assertTrue(purposeUnsupported(mute, "vision"))
+        val silent = model("s", """{"purposes":[],"unsupported_purposes":["llm","vision"]}""")
+        assertEquals(emptyList<String>(), modelPurposes(silent))
+        assertEquals(listOf("llm"), modelPurposes(silent, listOf("llm")))
         // A catalog row that names no purpose serves LLM, as Server normalises it.
         assertEquals(listOf("llm"), modelPurposes(model("c", """{"purposes":[]}""")))
         assertEquals(listOf("LLM" to false, "Vision" to true), modelPurposeBadges(both, listOf("vision")))
@@ -88,6 +97,11 @@ class VisionModelPickerTest {
         assertTrue(picker.contains("purposes = purposes,"))
         assertTrue(picker.contains("selected = if (next.isNotEmpty()) selected + id else selected - id"))
         assertTrue(picker.contains("onSave(published, published.associateWith { purposes[it].orEmpty() })"))
+        // A red-framed purpose can be pressed except on a ChatGPT plan, and select-all never takes a model with none (2026-10-26).
+        assertTrue(picker.contains("lockUnsupportedPurposes = provider.providerId == \"chatgpt\""))
+        assertTrue(picker.contains("it.id in candidateIds && hasPurpose(it)"))
+        // The drawing models that did not answer come after those that did.
+        assertTrue(app.contains("}.sortedBy { it.notRecommended }"))
         assertEquals(2, Regex("saveModelPurposes\\(").findAll(app).count())
         assertTrue(app.contains("provider != \"local-litert-lm\" && \"vision\" in servedPurposes(state, provider, choice.id)"))
         // The camera reads the photo and draws with one model, so it offers those used for both (2026-10-21).

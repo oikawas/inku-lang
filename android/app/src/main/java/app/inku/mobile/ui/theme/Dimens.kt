@@ -80,6 +80,9 @@ object Dimens {
     /** 2dp. The foreground stroke of the numeric-range frame. */
     val rangeFrameStroke: Dp = 2.dp
 
+    /** 2dp. The red frame of a model or purpose not recommended (Web's 2px `--danger`). */
+    val notRecommendedFrame: Dp = 2.dp
+
     // --- Control sizes ------------------------------------------------------
 
     /** 24dp. A history badge. */

@@ -352,8 +352,12 @@ interface InkuStrings {
     val modelPickerNotInList: String
     /** Read after a purpose badge the model cannot be chosen for (Web `ModelPurposeBadges`). */
     val modelPurposeNotSelectable: String
-    /** Web `noResponseTitle`: why a greyed LLM or Vision toggle cannot be pressed. */
+    /** Web `noResponseTitle(locked)`: why a greyed LLM or Vision toggle (ChatGPT plan) cannot be pressed. */
     val modelPurposeNoResponse: String
+    /** Web `noResponseTitle`: a red-framed LLM or Vision toggle can be pressed but is not recommended. */
+    val modelPurposeNotRecommended: String
+    /** Web `modelNotRecommended`: the note on a drawing model card framed in red. */
+    val modelNotRecommended: String
     val publishedModels: String
     val licenseAndDownload: String
     val licenseAndDownloaded: String

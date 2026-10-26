@@ -57,7 +57,10 @@ class ModelCatalog(source: JSONObject) {
 
     fun classify(record: JSONObject): CatalogModel {
         val keys = record.optJSONArray("labels").strings().toMutableSet()
-        if (record.has("purposes") && record.optJSONArray("purposes").strings().isEmpty()) keys += "no_response"
+        // Server `model_labels`: no purpose it is offered for is one it answered when measured.
+        val unsupported = record.optJSONArray("unsupported_purposes").strings()
+        val purposes = if (record.has("purposes")) record.optJSONArray("purposes").strings() else listOf("llm")
+        if (purposes.none { it !in unsupported }) keys += "no_response"
         if (MEASUREMENT_KEYS.none(record::has) && labels.filter { it.id in keys }.all { it.publishable }) keys += "unmeasured"
         return CatalogModel(record.optString("id"), JSONObject(record.toString()), labels.filter { it.id in keys })
     }

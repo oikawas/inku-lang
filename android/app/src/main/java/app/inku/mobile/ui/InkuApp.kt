@@ -318,7 +318,14 @@ private val DeviceRotation.clockwiseDegrees: Int
 internal data class SaijikiGroup(val key: String, val label: String, val en: String, val words: List<String>)
 internal data class DdlVocabularyToken(val word: String, val group: SaijikiGroup, val color: Color)
 private data class ModelChoice(val id: String, val label: String, val providerName: String)
-private data class ModelOptionChoice(val rawId: String, val qualifiedId: String, val label: String, val notes: String? = null)
+private data class ModelOptionChoice(
+    val rawId: String,
+    val qualifiedId: String,
+    val label: String,
+    val notes: String? = null,
+    /** Published for a purpose it did not answer when measured: framed in red, after the others. */
+    val notRecommended: Boolean = false,
+)
 
 private object HistoryThumbnailCache {
     private const val THUMBNAIL_PX = 384
@@ -1567,9 +1574,11 @@ private fun WebStyleModelStageEditor(
             Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                 models.forEach { option ->
                     Surface(
-                        modifier = Modifier.fillMaxWidth().clickable { onSelectModel(option.qualifiedId) },
+                        modifier = Modifier.fillMaxWidth().clickable { onSelectModel(option.qualifiedId) }
+                            .testTag("DrawingModelOption:${option.qualifiedId}:${if (option.notRecommended) "not-recommended" else "recommended"}"),
                         shape = RoundedCornerShape(Dimens.radiusCard),
                         color = if (option.qualifiedId == selectedModelId) ActiveRowTint else MaterialTheme.colorScheme.surface,
+                        border = if (option.notRecommended) BorderStroke(Dimens.notRecommendedFrame, MaterialTheme.colorScheme.error) else null,
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceM),
@@ -1590,6 +1599,10 @@ private fun WebStyleModelStageEditor(
                                         ModelRecommendationStars(catalogModelFor(state, selectedProviderId, option.rawId),
                                             if (state.modelSelectionForCamera) "vision" else "llm")
                                     }
+                                }
+                                if (option.notRecommended) {
+                                    Text(S.modelNotRecommended, style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.error)
                                 }
                                 if (option.notes != null) {
                                     Text(option.notes, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -5412,6 +5425,9 @@ private fun ProviderModelPickerDialog(
     val savedPurposes = state.modelPurposes[provider.providerId].orEmpty()
     val initialPurposes = candidateModels.associate { it.id to modelPurposes(it, savedPurposes[it.id]) }
     var purposes by remember(provider.providerId, provider.publishedModelsJson, savedPurposes) { mutableStateOf(initialPurposes) }
+    // Web: publishing everything never chooses a purpose the model did not answer,
+    // so a model with none from the catalog is left out unless one was ticked.
+    fun hasPurpose(model: app.inku.mobile.data.CatalogModel) = purposes[model.id].orEmpty().isNotEmpty() || modelPurposes(model).isNotEmpty()
     val selectionChanged = selected != normalizedSelection || purposes != initialPurposes
     val fetching = fetchState?.loading == true
     val filtered = candidateModels.filter { model ->
@@ -5436,7 +5452,7 @@ private fun ProviderModelPickerDialog(
                         enabled = !fetching && !selectionChanged,
                         modifier = Modifier.weight(1.5f),
                     )
-                    ModelPickerActionButton(text = S.selectAll, onClick = { selected = filtered.filter { it.id in candidateIds }.map { it.id }.toSet() }, modifier = Modifier.weight(1f), enabled = !fetching)
+                    ModelPickerActionButton(text = S.selectAll, onClick = { selected = filtered.filter { it.id in candidateIds && hasPurpose(it) }.map { it.id }.toSet() }, modifier = Modifier.weight(1f), enabled = !fetching)
                     ModelPickerActionButton(text = S.selectNone, onClick = { selected = emptySet() }, modifier = Modifier.weight(1f), enabled = !fetching)
                 }
                 ImeAwareOutlinedTextField(
@@ -5464,7 +5480,9 @@ private fun ProviderModelPickerDialog(
                         val next = if (purpose in current) current - purpose else listOf("llm", "vision").filter { it in current || it == purpose }
                         purposes = purposes + (id to next)
                         selected = if (next.isNotEmpty()) selected + id else selected - id
-                    })
+                    },
+                    // A ChatGPT plan model's purposes are each person's own (Web `purposeLocked`).
+                    lockUnsupportedPurposes = provider.providerId == "chatgpt")
                 fetchState?.let {
                     Text(
                         it.message,
@@ -5955,8 +5973,10 @@ private fun modelOptionsForProvider(state: InkuUiState, providerId: String, stri
             qualifiedId = qualifyModelId(provider.providerId, id),
             label = if (providerId == "chatgpt") state.chatGptPlan.models?.firstOrNull { it.id == id }?.label ?: catalogModelFor(state, providerId, id).name else catalogModelFor(state, providerId, id).name,
             notes = id,
+            notRecommended = (if (state.modelSelectionForCamera) listOf("llm", "vision") else listOf("llm"))
+                .any { purposeUnsupported(catalogModelFor(state, providerId, id), it) },
         )
-    }
+    }.sortedBy { it.notRecommended }
 }
 
 private fun providerOfModelId(modelId: String, state: InkuUiState): String {

@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -66,19 +67,25 @@ internal fun modelRecommendationLevel(model: CatalogModel, purpose: String? = nu
 private fun CatalogModel.listed(key: String): List<String> =
     record.optJSONArray(key)?.let { array -> (0 until array.length()).map(array::optString) }.orEmpty()
 
-/** Web `purposeUnsupported`: the benchmark found the model does not answer this purpose. */
+/**
+ * Web `purposeUnsupported`: the benchmark found the model does not answer this
+ * purpose. It can be chosen, but the system does not recommend it: every
+ * control that chooses it is framed in red (the author, 2026-10-26).
+ */
 internal fun purposeUnsupported(model: CatalogModel, purpose: String): Boolean =
     purpose in model.listed("unsupported_purposes")
 
 /**
  * The purposes a published model serves, as Server normalises them: the ones
- * the author [ticked] in the model picker, or the catalog's when none were,
- * less any it was measured not to answer. A catalog row with neither purpose
- * and nothing measured serves LLM.
+ * the author [ticked] in the model picker, or the catalog's when none were.
+ * The catalog's leave out any purpose the model was measured not to answer;
+ * a tick keeps it, as Server's `allowed_unsupported_purposes` (2026-10-26).
+ * A catalog row with neither purpose and nothing measured serves LLM.
  */
 internal fun modelPurposes(model: CatalogModel, ticked: List<String>? = null): List<String> {
+    if (ticked != null) return listOf("llm", "vision").filter { it in ticked }
     val unsupported = model.listed("unsupported_purposes")
-    val chosen = ticked ?: model.record.optJSONArray("purposes")?.let { model.listed("purposes") }
+    val chosen = model.record.optJSONArray("purposes")?.let { model.listed("purposes") }
         ?.takeIf { it.isNotEmpty() || unsupported.isNotEmpty() } ?: listOf("llm")
     return listOf("llm", "vision").filter { it in chosen && it !in unsupported }
 }
@@ -92,13 +99,19 @@ internal fun modelPurposeBadges(model: CatalogModel, ticked: List<String>? = nul
     return listOf("llm" to "LLM", "vision" to "Vision").map { (purpose, label) -> label to (purpose in purposes) }
 }
 
-/** Web `isModelUnselectable`: a label that keeps it from publication, or no purpose it answers. */
-internal fun isModelUnselectable(model: CatalogModel): Boolean =
-    !model.publishable || (purposeUnsupported(model, "llm") && purposeUnsupported(model, "vision"))
+/**
+ * Web `isModelUnselectable`: a label that keeps it from publication. No
+ * response when measured no longer does (2026-10-26).
+ */
+internal fun isModelUnselectable(model: CatalogModel): Boolean = !model.publishable
 
-/** Web `sortModels`: selectable first, then by the purpose's level, then by name. */
+/**
+ * Web `sortModels`: selectable first, then those that answered the purpose when
+ * measured, then by the purpose's level, then by name.
+ */
 internal fun <T> sortModels(models: List<T>, purpose: String, catalog: (T) -> CatalogModel, name: (T) -> String): List<T> =
     models.sortedWith(compareBy<T> { isModelUnselectable(catalog(it)) }
+        .thenBy { purposeUnsupported(catalog(it), purpose) }
         .thenByDescending { modelRecommendationLevel(catalog(it), purpose) }
         .thenBy { name(it) })
 
@@ -113,9 +126,12 @@ internal fun ModelRecommendationStars(model: CatalogModel, purpose: String, modi
 @Composable
 internal fun ModelCatalogDetails(model: CatalogModel, strings: InkuStrings) {
     Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs), modifier = Modifier.testTag("CatalogDetails:${model.id}")) {
+        // Web `modelStatusParts`: no response when measured is publishable since
+        // 2026-10-26, as not recommended, and keeps the warning colour.
         model.labels.forEach { label ->
             Text(label.name(strings.code == "en"), style = MaterialTheme.typography.labelSmall,
-                color = if (label.publishable) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error)
+                color = if (label.publishable && label.id != "no_response") MaterialTheme.colorScheme.onSurfaceVariant
+                    else MaterialTheme.colorScheme.error)
         }
         val record = model.record
         listOf("llm" to "LLM", "stage1" to "Stage 1", "stage2" to "Stage 2", "vision" to "Vision").forEach { (key, name) ->
@@ -135,21 +151,32 @@ internal fun ModelCatalogDetails(model: CatalogModel, strings: InkuStrings) {
 
 /**
  * Web's `model-purpose-controls`: LLM and Vision pressed or not for one model.
- * A purpose it was measured not to answer cannot be pressed, and says why.
+ * A purpose it was measured not to answer is framed in red as not recommended,
+ * and says why. Where [lockUnsupported] (a ChatGPT plan model, whose purposes
+ * are each person's own) it still cannot be pressed.
  */
 @Composable
 internal fun ModelPurposeToggles(model: CatalogModel, ticked: List<String>, enabled: Boolean, strings: InkuStrings,
-                                 onToggle: (String) -> Unit) {
+                                 lockUnsupported: Boolean = false, onToggle: (String) -> Unit) {
     Column(Modifier.padding(start = Dimens.spaceXl), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
         Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
             listOf("llm" to "LLM", "vision" to "Vision").forEach { (purpose, label) ->
+                val unsupported = purposeUnsupported(model, purpose)
+                val chipEnabled = enabled && !(lockUnsupported && unsupported)
                 FilterChip(selected = purpose in ticked, onClick = { onToggle(purpose) },
-                    enabled = enabled && !purposeUnsupported(model, purpose), label = { Text(label) },
+                    enabled = chipEnabled, label = { Text(label) },
+                    border = if (unsupported && !lockUnsupported) FilterChipDefaults.filterChipBorder(
+                        enabled = chipEnabled, selected = purpose in ticked,
+                        borderColor = MaterialTheme.colorScheme.error, selectedBorderColor = MaterialTheme.colorScheme.error,
+                        borderWidth = Dimens.notRecommendedFrame, selectedBorderWidth = Dimens.notRecommendedFrame,
+                    ) else FilterChipDefaults.filterChipBorder(enabled = chipEnabled, selected = purpose in ticked),
                     modifier = Modifier.testTag("CatalogPurpose:${model.id}:$purpose"))
             }
         }
-        if (listOf("llm", "vision").any { purposeUnsupported(model, it) }) Text(strings.modelPurposeNoResponse,
-            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (listOf("llm", "vision").any { purposeUnsupported(model, it) }) Text(
+            if (lockUnsupported) strings.modelPurposeNoResponse else strings.modelPurposeNotRecommended,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (lockUnsupported) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error)
     }
 }
 
@@ -169,6 +196,8 @@ internal fun ModelCatalogRows(
     /** The purposes ticked per model (Server's model picker); null leaves the toggles out. */
     purposes: Map<String, List<String>>? = null,
     onTogglePurpose: ((String, String) -> Unit)? = null,
+    /** A ChatGPT plan connection: a purpose measured without a response cannot be pressed. */
+    lockUnsupportedPurposes: Boolean = false,
 ) {
     var expanded by remember(catalog) { mutableStateOf(emptySet<String>()) }
     val grouped = models.groupBy { it.fold }
@@ -177,7 +206,9 @@ internal fun ModelCatalogRows(
             items(rows, key = { "model:${it.id}" }) { model ->
                 Column {
                     val checked = model.id in selected
-                    val selectable = enabled && model.publishable && (offeredForSelection == null || model.id in offeredForSelection)
+                    // Web: a model with no purpose to serve is not published.
+                    val hasPurpose = purposes == null || purposes[model.id].orEmpty().isNotEmpty() || modelPurposes(model).isNotEmpty()
+                    val selectable = enabled && model.publishable && hasPurpose && (offeredForSelection == null || model.id in offeredForSelection)
                     Row(modifier = Modifier.fillMaxWidth().testTag("CatalogRow:${model.id}")
                         .clickable(enabled = selectable) { onSelect(model.id, !checked) }.padding(vertical = Dimens.spaceXs),
                         verticalAlignment = Alignment.Top) {
@@ -191,7 +222,7 @@ internal fun ModelCatalogRows(
                     }
                     if (purposes != null && onTogglePurpose != null) ModelPurposeToggles(model, purposes[model.id].orEmpty(),
                         enabled = enabled && model.publishable && (offeredForSelection == null || model.id in offeredForSelection),
-                        strings = strings) { purpose -> onTogglePurpose(model.id, purpose) }
+                        strings = strings, lockUnsupported = lockUnsupportedPurposes) { purpose -> onTogglePurpose(model.id, purpose) }
                     if (onCheckAccess != null && model.fold != "eol") TextButton(onClick = { onCheckAccess(model.id) }, enabled = enabled) { Text(strings.modelAccessCheck) }
                 }
             }

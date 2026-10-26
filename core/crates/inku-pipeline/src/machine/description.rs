@@ -19,9 +19,10 @@ use super::{
     DescriptionCompositionRecord, DescriptionDdlRecord, PendingColors, PipelineSnapshot,
     ReadingState, SketchRequest, VisibleDocument, message_names,
 };
-use crate::colors::{self, LawsHandoff};
+use crate::colors::{self, ColorsContext, LawsHandoff};
 use crate::description_colors::{
-    ColorsChangeHow, DescribedPlan, LayerThing, apply_colors, plan_of, with_layer_things,
+    ColorsChangeHow, DescribedPlan, LayerThing, apply_colors, drawn_layers, plan_of,
+    with_layer_things,
 };
 use crate::description_composition::{
     build_description_composition_prompt, check_composition, composition_targets, laws_text,
@@ -488,6 +489,31 @@ impl PipelineSnapshot {
             .collect()
     }
 
+    /// A composed document's sentences the run's compile drew, as the color
+    /// stage's layers.
+    fn described_plan(&self, document: &VisibleDocument) -> Option<DescribedPlan> {
+        let compiled = self.compile_for_run(document)?;
+        let (_, drawn) = drawn_layers(compiled.score()?);
+        plan_of(&document.source, self.config.language)?.drawn(&drawn)
+    }
+
+    /// What the colors read of a composed document: the sentences the run's
+    /// compile drew as the stage's layers (a sentence it left out keeps its
+    /// words and takes no colors), their context, and how much the compile
+    /// diagnosed or left out.
+    fn described_colors(
+        &self,
+        document: &VisibleDocument,
+        description: &str,
+    ) -> Option<(DescribedPlan, ColorsContext, usize)> {
+        let compiled = self.compile_for_run(document)?;
+        let (score, drawn) = drawn_layers(compiled.score()?);
+        let plan = plan_of(&document.source, self.config.language)?.drawn(&drawn)?;
+        let context =
+            self.colors_context_of(&score, &plan.printed, &LawsHandoff::default(), description)?;
+        Some((plan, context, super::shortfalls(&compiled)))
+    }
+
     /// The color request with the thing each layer of the document waiting
     /// for its colors draws, in a description run; any other run's as it is.
     pub(super) fn with_described_things(
@@ -497,12 +523,12 @@ impl PipelineSnapshot {
         let (Some(_), Some(pending)) = (&self.description_ddl, &self.colors) else {
             return Ok(prompt);
         };
-        let source = &pending.document.source;
-        let plan = plan_of(source, self.config.language)
+        let plan = self
+            .described_plan(&pending.document)
             .ok_or(PromptError::EmptyField { field: "colors" })?;
         with_layer_things(
             prompt,
-            &self.layer_things(source, &plan),
+            &self.layer_things(&pending.document.source, &plan),
             self.config.prompt_limits,
         )
     }
@@ -516,18 +542,18 @@ impl PipelineSnapshot {
     ) -> Result<(), ProtocolError> {
         let description = self.description_record()?.description.clone();
         let (language, limits) = (self.config.language, self.config.prompt_limits);
-        let asked = plan_of(&document.source, language).and_then(|plan| {
-            let handoff = LawsHandoff::default();
-            let (context, _) =
-                self.colors_context(&document, &plan.printed, &handoff, &description)?;
-            let prompt = colors::build_colors_prompt(&description, &context, language, limits)
-                .and_then(|prompt| {
-                    with_layer_things(prompt, &self.layer_things(&document.source, &plan), limits)
-                })
-                .ok()?;
-            Some((plan, prompt))
-        });
-        let Some((plan, prompt)) = asked else {
+        let Some((plan, context, _)) = self.described_colors(&document, &description) else {
+            return self.description_colors_fallback(
+                document,
+                json!({"failure": "context"}),
+                events,
+            );
+        };
+        let prompt = colors::build_colors_prompt(&description, &context, language, limits)
+            .and_then(|prompt| {
+                with_layer_things(prompt, &self.layer_things(&document.source, &plan), limits)
+            });
+        let Ok(prompt) = prompt else {
             return self.description_colors_fallback(
                 document,
                 json!({"failure": "prompt"}),
@@ -560,13 +586,10 @@ impl PipelineSnapshot {
             .as_ref()
             .ok_or(ProtocolError::InternalInvariant)?;
         let language = self.config.language;
-        let read = description
-            .zip(plan_of(&pending.document.source, language))
-            .and_then(|(text, plan)| {
-                let (context, before) =
-                    self.colors_context(&pending.document, &plan.printed, &pending.handoff, &text)?;
-                Some((text, plan, context, before))
-            });
+        let read = description.and_then(|text| {
+            let (plan, context, before) = self.described_colors(&pending.document, &text)?;
+            Some((text, plan, context, before))
+        });
         let Some((text, plan, context, before)) = read else {
             return self.colors_fallback(json!({"failure": "context"}), events);
         };
@@ -580,9 +603,11 @@ impl PipelineSnapshot {
         let Some((document, compiled)) = self.laws_document(source) else {
             return self.colors_fallback(json!({"failure": "compile"}), events);
         };
+        // The written DDL keeps the sentences left out: its drawn layers are
+        // numbered as the colors numbered them.
         if compiled
             .score()
-            .is_none_or(|score| !chosen.compiled_as_chosen(score))
+            .is_none_or(|score| !chosen.compiled_as_chosen(&drawn_layers(score).0))
             || super::shortfalls(&compiled) > before
         {
             return self.colors_fallback(json!({"failure": "compile"}), events);
@@ -1687,6 +1712,52 @@ mod tests {
         assert_eq!(record.state, CompositionState::Fallback);
         assert_eq!(record.fallback.as_deref(), Some("transport_timeout"));
         assert_eq!(composition_record(&state).things, [0, 1, 2]);
+    }
+
+    /// A sentence the compile leaves out (a semicircle's chord and sagitta in
+    /// a tiling): the live work e5b0d996's of 2026-10-26, which fell back.
+    const LEFT_OUT: &str = "画面の横0.0〜1.0、縦0.618〜1.0の範囲に、弦長0.083333、矢高0.041667の灰の細かくゆるやかに揺れる細い半円の弧を60個敷き詰める。";
+
+    #[test]
+    fn a_sentence_the_compile_leaves_out_keeps_its_words_and_takes_no_colors() {
+        let mut state = composed_with(colored_config());
+        state = answer_text(&state, &composition(golden()).to_string()).snapshot;
+        let written = [
+            (0, "背景を白で埋める。"),
+            (1, WOMAN),
+            (0, LEFT_OUT),
+            (2, SHADE),
+        ];
+        let reviewed = [
+            (0, "背景を白で埋める。"),
+            (1, FITTED),
+            (0, LEFT_OUT),
+            (2, SHADE),
+        ];
+        // The left-out line is given back once in each stage, and kept.
+        loop {
+            state = match tag(&state) {
+                "write_description_ddl" => sentences(&state, &written).snapshot,
+                DRAW_IMAGE_REVIEW => reply(&state, drawn(&state)).snapshot,
+                "review_description_ddl" => sentences(&state, &reviewed).snapshot,
+                _ => break,
+            };
+        }
+        assert_eq!(tag(&state), "choose_colors");
+        // The layers are the sentences drawn: the shade is layer 1.
+        let message = prompt(&state)["message"].as_str().unwrap();
+        assert!(
+            message.ends_with("- layer 0: 物 1（女の姿）\n- layer 1: 物 2（紫の影）\n"),
+            "{message}"
+        );
+        let answer = json!({"main_law": "D5", "laws": {"D5": {"hue": "blue", "layer": 1}},
+                            "reason": "影を青に寄せる。"});
+        let state = colors_answer(&state, &answer).snapshot;
+        let source = committed_source(&state);
+        assert!(source.contains(LEFT_OUT), "{source}");
+        assert!(source.contains("の青の薄い塗りの三角"), "{source}");
+        assert_eq!(colors_record(&state).state, CompositionState::Used);
+        assert_eq!(composition_record(&state).things, [0, 1, 0, 2]);
     }
 
     #[test]

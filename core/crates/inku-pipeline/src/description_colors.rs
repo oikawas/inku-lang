@@ -11,7 +11,8 @@
 //! rewritten where the parser read it, so the drawer's words stay; a sentence
 //! otherwise changed (a cycle, a shift, a fade, a kasane, a size) is printed
 //! again with its numbers; a chosen ground prints the background sentence. A
-//! sentence the colors keep is not touched.
+//! sentence the colors keep is not touched, nor is a sentence the compile left
+//! out (it draws nothing and takes no colors; the layers are those drawn).
 
 use inku_ddl::work_plan::{
     NumericPlace, NumericSize, NumericWriting, WorkPlan, WorkPlanLayer, WorkPlanSlot,
@@ -21,7 +22,9 @@ use inku_ddl::{
     NormalizedDdlDocument, ResolvedInstructionLanguage, SemanticExplicitGeometry,
     SemanticGeometryValue, SemanticInstruction, compile_typed_ddl,
 };
-use inku_score::Color;
+use std::collections::{BTreeMap, BTreeSet};
+
+use inku_score::{Color, Score, ScoreSourceOwner};
 use serde::{Deserialize, Serialize};
 
 use crate::colors::{ColorsChosen, PrintedPlan};
@@ -39,6 +42,88 @@ pub struct DescribedPlan {
     /// Whether a layer's color word may be rewritten in place: its sentence
     /// reads as a layer and draws no color cycle.
     rewritable: Vec<bool>,
+}
+
+impl DescribedPlan {
+    /// The plan of the sentences the compile drew (`drawn`, the source
+    /// instructions its Score draws), in their order. A sentence the compile
+    /// left out keeps its words and takes no colors. `None` when the compile
+    /// drew none, or drew an instruction the plan does not read.
+    #[must_use]
+    pub fn drawn(self, drawn: &BTreeSet<usize>) -> Option<Self> {
+        if drawn.is_empty() || drawn.iter().any(|index| *index >= self.lines.len()) {
+            return None;
+        }
+        let printed = self.printed;
+        Some(Self {
+            printed: PrintedPlan {
+                plan: WorkPlan {
+                    layers: kept(printed.plan.layers, drawn),
+                    ..printed.plan
+                },
+                ranges: kept(printed.ranges, drawn),
+                joints: kept(printed.joints, drawn),
+                numeric: kept(printed.numeric, drawn),
+            },
+            lines: kept(self.lines, drawn),
+            rewritable: kept(self.rewritable, drawn),
+        })
+    }
+}
+
+fn kept<T>(items: Vec<T>, drawn: &BTreeSet<usize>) -> Vec<T> {
+    items
+        .into_iter()
+        .enumerate()
+        .filter(|(at, _)| drawn.contains(at))
+        .map(|(_, item)| item)
+        .collect()
+}
+
+/// The source instructions a Score draws, and the Score with their layers
+/// numbered in order (0, 1, …) as the color stage numbers a printed plan's
+/// layers. The renumbered Score serves the colors' estimate and checks only;
+/// the work is drawn from its own compile, so a sentence left out moves
+/// nothing.
+#[must_use]
+pub fn drawn_layers(score: &Score) -> (Score, BTreeSet<usize>) {
+    let index_of = |owner: &ScoreSourceOwner| match owner {
+        ScoreSourceOwner::SourceInstruction { instruction_index } => Some(*instruction_index),
+        ScoreSourceOwner::MacroEmit {
+            source_instruction_index,
+            ..
+        } => Some(*source_instruction_index),
+        ScoreSourceOwner::OrdinaryGroup { .. } => None,
+    };
+    let drawn: BTreeSet<usize> = score
+        .instructions
+        .iter()
+        .filter_map(|instruction| instruction.arrangement.as_ref()?.resolved.as_ref())
+        .filter_map(|resolved| index_of(&resolved.owner))
+        .collect();
+    let rank: BTreeMap<usize, usize> = drawn
+        .iter()
+        .enumerate()
+        .map(|(rank, index)| (*index, rank))
+        .collect();
+    let mut renumbered = score.clone();
+    for resolved in renumbered
+        .instructions
+        .iter_mut()
+        .filter_map(|instruction| instruction.arrangement.as_mut()?.resolved.as_mut())
+    {
+        match &mut resolved.owner {
+            ScoreSourceOwner::SourceInstruction { instruction_index } => {
+                *instruction_index = rank[&*instruction_index];
+            }
+            ScoreSourceOwner::MacroEmit {
+                source_instruction_index,
+                ..
+            } => *source_instruction_index = rank[&*source_instruction_index],
+            ScoreSourceOwner::OrdinaryGroup { .. } => {}
+        }
+    }
+    (renumbered, drawn)
 }
 
 /// What one layer of a composed work draws: the thing its sentence draws (0

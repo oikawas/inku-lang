@@ -2652,6 +2652,19 @@ impl PipelineSnapshot {
         description: &str,
     ) -> Option<(ColorsContext, usize)> {
         let compiled = self.compile_for_run(document)?;
+        let context = self.colors_context_of(compiled.score()?, printed, handoff, description)?;
+        Some((context, shortfalls(&compiled)))
+    }
+
+    /// The colors' context of a Score, drawn with the seeds the host draws
+    /// the work with.
+    fn colors_context_of(
+        &self,
+        score: &inku_score::Score,
+        printed: &PrintedPlan,
+        handoff: &LawsHandoff,
+        description: &str,
+    ) -> Option<ColorsContext> {
         let seeds = crate::appearance::Seeds {
             render: self
                 .config
@@ -2666,8 +2679,8 @@ impl PipelineSnapshot {
                 .flatten()
                 .map(i128::from),
         };
-        let context = ColorsContext::new(colors::ColorsInput {
-            score: compiled.score()?,
+        ColorsContext::new(colors::ColorsInput {
+            score,
             printed,
             handoff,
             palette: self.config.compiler.host.palette(),
@@ -2675,8 +2688,7 @@ impl PipelineSnapshot {
             seeds,
             error_policy: self.config.compiler.error_policy,
             description,
-        })?;
-        Some((context, shortfalls(&compiled)))
+        })
     }
 
     /// Read the colors reply, apply it and commit the document the colors

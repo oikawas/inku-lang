@@ -8,14 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-26 — Read and draw with "Composition and laws: On" chooses its colors before the commit (Server and Web)
-
-The form the author chose (arm B of the colors prototype: colors applied to the reviewed picture, which the author judged better than before the colors for 8 of 10 works with both sol and Sonnet 5.5) now always runs inside "Composition and laws: On". The Server always writes `colors: true` in read and draw's configuration `description_ddl`, and the core (the previous entry) passes the color request before the commit of a run by the composition and laws. No switch was added. Off, the stages, the picture tab and the DDL tab are unchanged. The colors are sent with the Stage 1 model as the stages' colors are, and recorded, and shown in the prompt tab, under `colors`. The progress reads "Choosing the colors…". The Web adds "then choose its colors" to the composition's hints, and a "Colors" part to the generation info's "Composition and laws" section (the state, the main law and laws, the ground, the lines changed counted by how, and each changed line before and after).
-
-### 2026-10-26 — Read and draw by the composition and laws chooses its colors before the commit (core)
-
-At the author's choice, arm B of the colors in the prototype read-draw-laws-20261026 (the colors chosen on the drawing the review left; in the author's view better than the drawing without them in 8 of 10 works with each model) is in the shared core. A read-and-draw run by the composition and laws passes the color request before its commit (the color stage's `choose_colors`, with its request, checks and budget) when its host sets the field `colors` of `description_ddl` to true and the run has the color stage. Each sentence of the DDL is read as one layer, and the request is followed by a table of the thing each layer draws. A sentence whose color alone changes has its color word rewritten in place; only a sentence whose shape changes is printed again with its numbers; a ground prints the background sentence again. A sentence the colors keep is not touched. When the written DDL does not compile to the chosen colors, the DDL before them is committed. The record is `description_ddl.composition.colors`. The Server and Web do not pass the field yet, so today's works keep their bytes.
-
 ### 2026-10-26 — PLUGIN alone is enough to write a plugin file
 
 After the author's review, three gaps in `PLUGIN.ja.md` and `PLUGIN.md` were filled. The example in §5.1 is now a complete file with its definition written out, and the guide says it can be saved and added as it is (a Server test passes the example through the check). §7.3 adds a table of the codes a plugin file check reports for its shape, taken names, examples, and pictures, with their fixes. §8 adds the limits on the file size (1,000,000 bytes), the number of words (64), the lengths of descriptions, examples, and the license, and the replacement picture. No code changed.
@@ -326,6 +318,16 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.268 (2026-10-26 / Build1344)
+
+### 2026-10-26 — Read and draw with "Composition and laws: On" chooses its colors before the commit (Server and Web)
+
+The form the author chose (arm B of the colors prototype: colors applied to the reviewed picture, which the author judged better than before the colors for 8 of 10 works with both sol and Sonnet 5.5) now always runs inside "Composition and laws: On". The Server always writes `colors: true` in read and draw's configuration `description_ddl`, and the core (the previous entry) passes the color request before the commit of a run by the composition and laws. No switch was added. Off, the stages, the picture tab and the DDL tab are unchanged. The colors are sent with the Stage 1 model as the stages' colors are, and recorded, and shown in the prompt tab, under `colors`. The progress reads "Choosing the colors…". The Web adds "then choose its colors" to the composition's hints, and a "Colors" part to the generation info's "Composition and laws" section (the state, the main law and laws, the ground, the lines changed counted by how, and each changed line before and after).
+
+### 2026-10-26 — Read and draw by the composition and laws chooses its colors before the commit (core)
+
+At the author's choice, arm B of the colors in the prototype read-draw-laws-20261026 (the colors chosen on the drawing the review left; in the author's view better than the drawing without them in 8 of 10 works with each model) is in the shared core. A read-and-draw run by the composition and laws passes the color request before its commit (the color stage's `choose_colors`, with its request, checks and budget) when its host sets the field `colors` of `description_ddl` to true and the run has the color stage. Each sentence of the DDL is read as one layer, and the request is followed by a table of the thing each layer draws. A sentence whose color alone changes has its color word rewritten in place; only a sentence whose shape changes is printed again with its numbers; a ground prints the background sentence again. A sentence the colors keep is not touched. When the written DDL does not compile to the chosen colors, the DDL before them is committed. The record is `description_ddl.composition.colors`. The Server and Web do not pass the field yet, so today's works keep their bytes.
 
 ## v2.15.267 (2026-10-26 / Build1343)
 

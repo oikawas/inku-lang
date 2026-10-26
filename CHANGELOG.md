@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-26 — The example `Water.Ripples` now draws wavering ellipses, and `Water.Rings` adds a ripple seen at a low angle
+
+The example `Water.Ripples` (alias `Water.波紋`) in `docs/plugins/` is now 2.0.0. Its rings are ellipses instead of true circles, each ring picking its width and height separately from a few factors so its proportions differ a little, and the rings from the third outward fluctuate `broadly`, so the rings themselves undulate and bend. With `loosely` as the frequency the bending was barely visible, so no frequency is written (medium). The new example `Water.Rings` (alias `Water.水輪`) is a ripple seen at a low angle: wide ellipses stacked with each outer ring's center lower, moved by a `transform` to one of five positions and tilted by −3 to 3 degrees. Both definitions passed `compile-score`, and passing the Japanese and English export files to `/api/compose` drew them under both the alias and the name. Not bundled; no code changed.
+
 ### 2026-10-26 — An example plugin, `Water.Ripples` (alias `Water.波紋`), kept as export files
 
 As an example of a vocabulary plugin written to the PLUGIN specification, `docs/plugins/` now holds `Water.Ripples` (alias `Water.波紋`) as Japanese and English DDL export files (`inku.ddl-export.v1`) that load as they are. It stacks 1–6 outline-only concentric circles in thin gray brush around one point (3–4 when no count is written), each outer ring thinner, the fifth dashed and the sixth dotted. The center is one of five positions around and slightly below the middle, chosen by the composition seed. The definition passed `compile-score`, and passing the export's definition to `/api/compose` drew it under both the Japanese alias and the English name. `PLUGIN.ja.md` and `PLUGIN.md` point to it after their example. It is not bundled. No code changed.

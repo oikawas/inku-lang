@@ -1714,6 +1714,23 @@ struct LawText {
     example: &'static str,
 }
 
+/// A law's name, family and source (ja, en) and its value example.
+pub(crate) type LawWords = (
+    [&'static str; 2],
+    [&'static str; 2],
+    [&'static str; 2],
+    &'static str,
+);
+
+/// A law's name, family, source and value example, which the composition of
+/// a read-and-draw run lists as this stage does (2026-10-26).
+pub(crate) fn law_words(law: &str) -> Option<LawWords> {
+    LAW_TEXTS
+        .iter()
+        .find(|(name, _)| *name == law)
+        .map(|(_, text)| (text.name, text.family, text.source, text.example))
+}
+
 const LAW_TEXTS: [(&str, LawText); 19] = [
     (
         "B1",
@@ -5776,6 +5793,7 @@ fn edit_rebuilt(
     mark: &Instruction,
     turned: bool,
     pattern: bool,
+    numbers: bool,
     units: Units,
 ) -> Option<Edit> {
     let mut layer = layer.clone();
@@ -5837,12 +5855,15 @@ fn edit_rebuilt(
             (2.0 * largest_extent(mark, units)) / (2.0 * was)
         };
         let arc_turned = mark.primitive == Primitive::Arc && turned;
-        if reshaped || (factor - 1.0).abs() > 1e-9 || arc_turned {
+        // A layer read back from a sentence written in numbers (a read-and-draw
+        // card, 2026-10-26) keeps no size or angle word: its marks write both
+        // in numbers.
+        if numbers || reshaped || (factor - 1.0).abs() > 1e-9 || arc_turned {
             numeric.size = Some(numeric_size(mark, units)?);
             layer.attributes.remove(&WorkPlanSlot::Size);
             layer.proportion = None;
         }
-        if turned {
+        if turned || (numbers && turn_of(mark.rotation).is_some()) {
             layer.attributes.remove(&WorkPlanSlot::Angle);
             numeric.turn = turn_of(mark.rotation);
         }
@@ -5931,6 +5952,7 @@ fn print_changes(
     applied: &Applied,
     hands: &BTreeMap<usize, Hand>,
     pattern: Option<usize>,
+    numbers: bool,
 ) -> Option<LawsPrint> {
     let after = &applied.score;
     let before = layers(&context.score);
@@ -5985,6 +6007,7 @@ fn print_changes(
                         mark,
                         turned,
                         pattern == Some(index),
+                        numbers,
                         context.units,
                     )
                 })
@@ -6033,10 +6056,13 @@ fn print_changes(
 }
 
 /// Apply a conformed answer to the context (the computation and the print).
+/// With `numbers`, a rebuilt layer writes its marks' sizes and turns in
+/// numbers (its plan layer was read back without them).
 fn apply(
     answer: &Answer,
     context: &LawsContext,
     composed: &ComposedPlan,
+    numbers: bool,
 ) -> Result<Chosen, Refusal> {
     let compiler = Compiler {
         context,
@@ -6065,13 +6091,14 @@ fn apply(
         .laws
         .get("C2")
         .map(|value| layer_number(&value["layer"]));
-    let print = print_changes(composed, context, &applied, &hands, pattern).ok_or_else(|| {
-        refusal(
-            "unprintable",
-            "法則が変えた層を数の形で書けない".to_owned(),
-            "a layer the laws changed cannot be written in numbers".to_owned(),
-        )
-    })?;
+    let print =
+        print_changes(composed, context, &applied, &hands, pattern, numbers).ok_or_else(|| {
+            refusal(
+                "unprintable",
+                "法則が変えた層を数の形で書けない".to_owned(),
+                "a layer the laws changed cannot be written in numbers".to_owned(),
+            )
+        })?;
     let laws: Vec<&'static str> = LAWS
         .into_iter()
         .filter(|law| answer.laws.contains_key(law))
@@ -6164,7 +6191,7 @@ pub fn choose_laws(
             counted,
         },
     )?;
-    apply(&answer, context, composed)
+    apply(&answer, context, composed, false)
 }
 
 /// Apply an answer without the count rule: the prototype's answers measured
@@ -6186,7 +6213,22 @@ pub fn apply_laws_without_count_rule(
         }
     }
     let answer = check(&answer, context, &Rules::Prototype)?;
-    apply(&answer, context, composed)
+    apply(&answer, context, composed, false)
+}
+
+/// Apply the cards of a composed read-and-draw work (2026-10-26) as this stage
+/// applies them: `answer` names the layers of the work's DDL, its sentences
+/// read back as plan layers without their numbers, so the rebuilt layers write
+/// their marks' sizes and turns in numbers. The answer is checked as the
+/// prototype's answers are (no count rule: a card's count is the
+/// composition's).
+pub(crate) fn apply_cards(
+    answer: &Value,
+    context: &LawsContext,
+    composed: &ComposedPlan,
+) -> Result<Chosen, Refusal> {
+    let answer = check(answer, context, &Rules::Prototype)?;
+    apply(&answer, context, composed, true)
 }
 
 #[cfg(test)]

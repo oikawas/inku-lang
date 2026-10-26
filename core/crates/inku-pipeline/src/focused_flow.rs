@@ -13,8 +13,9 @@ use crate::core_boundary::{
     ResolvedPaletteColorDto, ResolvedPaletteDto,
 };
 use crate::machine::{
-    AuthoringInput, ColorsConfig, CompositionConfig, DescriptionRoute, LawsConfig, PipelineConfig,
-    PipelineInput, PipelinePhase, PipelineSnapshot, SketchRequest, SketchState, StepOutput,
+    AuthoringInput, ColorsConfig, CompositionConfig, CompositionRequest, DescriptionRoute,
+    LawsConfig, PipelineConfig, PipelineInput, PipelinePhase, PipelineSnapshot, SketchRequest,
+    SketchState, StepOutput,
 };
 use crate::prompts::PromptLimits;
 use crate::protocol::{
@@ -402,6 +403,7 @@ fn stage1_compiler_feedback_retries_before_the_corrected_ddl_commits() {
                 sketch: SketchRequest::Off,
                 route: DescriptionRoute::Stages,
                 source_labels: Vec::new(),
+                composition: CompositionRequest::Off,
             },
         },
     );
@@ -525,6 +527,7 @@ fn stage1_compiler_feedback_uses_the_shared_attempt_budget() {
                 sketch: SketchRequest::Off,
                 route: DescriptionRoute::Stages,
                 source_labels: Vec::new(),
+                composition: CompositionRequest::Off,
             },
         },
     );
@@ -595,6 +598,7 @@ fn a_retrying_stage1_reports_its_attempt_and_budget() {
                 sketch: SketchRequest::Off,
                 route: DescriptionRoute::Stages,
                 source_labels: Vec::new(),
+                composition: CompositionRequest::Off,
             },
         },
     );
@@ -644,6 +648,7 @@ fn exhausted_stage1_proposes_sealed_residual_only_after_visible_ack() {
                 sketch: SketchRequest::Off,
                 route: DescriptionRoute::Stages,
                 source_labels: Vec::new(),
+                composition: CompositionRequest::Off,
             },
         },
     );
@@ -754,6 +759,7 @@ fn stage1_does_not_correct_canonical_ddl_when_macro_expansion_exceeds_its_budget
                 sketch: SketchRequest::Off,
                 route: DescriptionRoute::Stages,
                 source_labels: Vec::new(),
+                composition: CompositionRequest::Off,
             },
         },
     );
@@ -867,6 +873,7 @@ fn committed_ddl_and_approved_hole_patch_share_one_replayable_path() {
                 sketch: SketchRequest::Off,
                 route: DescriptionRoute::Stages,
                 source_labels: Vec::new(),
+                composition: CompositionRequest::Off,
             },
         },
     )];
@@ -1914,6 +1921,7 @@ fn sketch_start(sketch: SketchRequest) -> PipelineSnapshot {
                 sketch,
                 route: DescriptionRoute::Stages,
                 source_labels: Vec::new(),
+                composition: CompositionRequest::Off,
             },
         },
     );
@@ -2022,6 +2030,7 @@ fn ground_start(pipeline_config: PipelineConfig) -> PipelineSnapshot {
                 sketch: SketchRequest::Off,
                 route: DescriptionRoute::Stages,
                 source_labels: Vec::new(),
+                composition: CompositionRequest::Off,
             },
         },
     );
@@ -2404,6 +2413,7 @@ fn started_description(pipeline_config: PipelineConfig) -> PipelineSnapshot {
                 sketch: SketchRequest::Off,
                 route: DescriptionRoute::Stages,
                 source_labels: Vec::new(),
+                composition: CompositionRequest::Off,
             },
         },
     );
@@ -3253,6 +3263,7 @@ fn started_with(pipeline_config: PipelineConfig, description: &str) -> PipelineS
                 sketch: SketchRequest::Off,
                 route: DescriptionRoute::Stages,
                 source_labels: Vec::new(),
+                composition: CompositionRequest::Off,
             },
         },
     );

@@ -197,6 +197,21 @@ fn place_name(place: &str, language: ResolvedInstructionLanguage) -> &str {
     }
 }
 
+/// The composition theory of the system text (its places, weights, roles,
+/// directions and forms), which the composition of a read-and-draw run reads
+/// too (2026-10-26): the section from its heading up to the kinds of layer.
+pub(crate) fn theory(language: ResolvedInstructionLanguage) -> &'static str {
+    let (system, head, until) = match language {
+        ResolvedInstructionLanguage::Ja => (SYSTEM_JA, "# 構図の理論", "# 層の種類"),
+        ResolvedInstructionLanguage::En => (SYSTEM_EN, "# Composition theory", "# Kinds of layer"),
+    };
+    let start = system.find(head).unwrap_or(0);
+    let end = system[start..]
+        .find(until)
+        .map_or(system.len(), |at| start + at);
+    system[start..end].trim()
+}
+
 /// The message: the description, the plan's first lines, and each layer with its
 /// kind, written without its place; a place the plan set is shown as the plan's
 /// guess, which the reader keeps only where the description states it.

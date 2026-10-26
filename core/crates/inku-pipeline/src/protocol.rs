@@ -284,6 +284,13 @@ pub enum EffectResult {
         response: String,
         elapsed_ms: DecimalU64,
     },
+    /// The composition and laws a read-and-draw run decides before it draws
+    /// (2026-10-26).
+    DescriptionComposed {
+        identity: ActionEcho,
+        response: String,
+        elapsed_ms: DecimalU64,
+    },
     DescriptionDdlWritten {
         identity: ActionEcho,
         response: String,
@@ -327,6 +334,7 @@ impl EffectResult {
             | Self::ImageReviewDrawn { identity, .. }
             | Self::ImageReviewUndrawn { identity }
             | Self::DescriptionRead { identity, .. }
+            | Self::DescriptionComposed { identity, .. }
             | Self::DescriptionDdlWritten { identity, .. }
             | Self::DescriptionDdlReviewed { identity, .. }
             | Self::ProviderFailed { identity, .. }

@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-26 — Read and draw can decide its composition and laws before it draws (shared core)
+
+At the author's request (drawing the scene the words call up faithfully is close to automation; as an artwork, composition and laws come first), the prototype (ten read-and-draw descriptions drawn with sol and Sonnet 5.5, which the author judged better with composition and laws in six of ten for both models) is now in the shared core. A read-and-draw run whose input field `composition` is `{"mode": "on"}` asks the composition stage `compose_description`, after the reading, for the composition's proposition, the form, the things, the main law and the laws; the drawer marks each sentence with its thing, and the core measures each thing against its laws and fits a thing a little off by rewriting its numbers. A thing far off or drawn by no sentence is asked about once. The core builds the cards (C1 to C6) with the laws stage's builders, places a bundle of lines stacked across a law's line by its center, and a rule keeps a thing's details. A run with the default `off` is the current read and draw byte for byte, and the Server, Web, Android and macOS do not offer the choice yet (the next step). SPEC §12.6.7.
+
 ### 2026-10-26 — PLUGIN alone is enough to write a plugin file
 
 After the author's review, three gaps in `PLUGIN.ja.md` and `PLUGIN.md` were filled. The example in §5.1 is now a complete file with its definition written out, and the guide says it can be saved and added as it is (a Server test passes the example through the check). §7.3 adds a table of the codes a plugin file check reports for its shape, taken names, examples, and pictures, with their fixes. §8 adds the limits on the file size (1,000,000 bytes), the number of words (64), the lengths of descriptions, examples, and the license, and the replacement picture. No code changed.

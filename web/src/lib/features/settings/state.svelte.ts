@@ -58,6 +58,9 @@ type SettingsControllerDeps<TActor extends SettingsActor> = {
 	requestConfirmation: (confirmation: SettingsConfirmation) => void;
 	setRenderFanoutLimit: (limit: number) => void;
 	describeApiError: (detail: unknown, status: number) => string;
+	/** A plugin was added, replaced, switched, deleted or given a picture, so
+	    the Saijiki and the DDL editor's words are read again. */
+	pluginsChanged?: () => void;
 };
 
 export type SettingsController = SettingsNavigation & ServerAdministration & ModelAdministration & {
@@ -76,7 +79,8 @@ export function createSettingsController<TActor extends SettingsActor>(
 		currentUser: deps.currentUser,
 		setRenderFanoutLimit: deps.setRenderFanoutLimit,
 		describeApiError: deps.describeApiError,
-		requestConfirmation: deps.requestConfirmation
+		requestConfirmation: deps.requestConfirmation,
+		pluginsChanged: deps.pluginsChanged
 	});
 	const modelAdministration = createModelAdministration({
 		apiFetch: deps.apiFetch,

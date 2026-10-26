@@ -162,6 +162,7 @@ type ServerAdministrationDeps<TActor extends SettingsActor> = {
 	describeApiError: (detail: unknown, status: number) => string;
 	requestConfirmation: (confirmation: SettingsConfirmation) => void;
 	reloadPage?: () => void;
+	pluginsChanged?: () => void;
 };
 
 export type ServerAdministration = {
@@ -273,6 +274,7 @@ export function createServerAdministration<TActor extends SettingsActor>(
 				return false;
 			}
 			await loadSettingsStatus();
+			deps.pluginsChanged?.();
 			return true;
 		} catch (error) {
 			pluginActionStatus = error instanceof Error ? error.message : String(error);
@@ -294,6 +296,7 @@ export function createServerAdministration<TActor extends SettingsActor>(
 				return false;
 			}
 			await loadSettingsStatus();
+			deps.pluginsChanged?.();
 			return true;
 		} catch (error) {
 			pluginActionStatus = error instanceof Error ? error.message : String(error);
@@ -343,6 +346,7 @@ export function createServerAdministration<TActor extends SettingsActor>(
 				return null;
 			}
 			await loadSettingsStatus();
+			deps.pluginsChanged?.();
 			return true;
 		} catch (error) {
 			pluginActionStatus = error instanceof Error ? error.message : String(error);
@@ -366,6 +370,7 @@ export function createServerAdministration<TActor extends SettingsActor>(
 				return false;
 			}
 			await loadSettingsStatus();
+			deps.pluginsChanged?.();
 			return true;
 		} catch (error) {
 			pluginActionStatus = error instanceof Error ? error.message : String(error);

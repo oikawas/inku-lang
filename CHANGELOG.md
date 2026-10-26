@@ -319,7 +319,7 @@ Saved works also offer random or Vision autonomous refinement. The author sets t
 
 ### 2026-10-26 — A plugin check lists everything to fix at once
 
-Three things found checking Build 1338 in Chrome were fixed. A shape problem in the file, such as a missing summary, stopped the check before the shared core's definition checks and the example drawings, so each fix needed another upload. Only a file that is not JSON, has no readable `namespace` or `name`, or has no words stops now; otherwise all three checks run and report together (a word without a definition is reported at its own place in the file). A replaced picture whose shape differs from the Saijiki frame is padded with its own corner colour instead of white. A switched-off plugin's pictures are still served, so the settings word list does not lose them.
+Three things found checking Build 1338 in Chrome were fixed. A shape problem in the file, such as a missing summary, stopped the check before the shared core's definition checks and the example drawings, so each fix needed another upload. Only a file that is not JSON, has no readable `namespace` or `name`, or has no words stops now; otherwise all three checks run and report together (a word without a definition is reported at its own place in the file). A replaced picture whose shape differs from the Saijiki frame is padded with its own corner colour instead of white. A switched-off plugin's pictures are still served, so the settings word list does not lose them. The Saijiki and DDL editor completion read their words only once after sign-in; they now read them again after a plugin is added, replaced, switched, deleted, or given a picture, without reloading the page.
 
 ## v2.15.262 (2026-10-26 / Build1338)
 

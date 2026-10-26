@@ -4,8 +4,12 @@ import test from 'node:test';
 import {
 	DEFAULT_COMPOSITION_MODE,
 	DEFAULT_DRAW_ROUTE,
+	compositionColorsChangeLabel,
+	compositionColorsChanges,
+	compositionColorsStateNote,
 	compositionFormLabel,
 	compositionMeasureSummary,
+	compositionModeHint,
 	compositionModeOf,
 	compositionOption,
 	compositionStateNote,
@@ -97,6 +101,22 @@ test('the last measure is counted and the pairs that did not fit are named', () 
 	assert.equal(compositionFormLabel('a_new_form', true), 'a_new_form');
 });
 
+test('the colors chosen after the review are counted by how each line was written', () => {
+	const colors = { state: 'used' as const, main_law: 'D5', laws: ['D5'], ground: 'black', changes: [
+		{ line: 2, how: 'color_word', before: 'a', after: ['b'] },
+		{ line: 1, how: 'ground', before: 'c', after: ['d'] },
+		{ line: 3, how: 'color_word', before: 'e', after: ['f'] },
+	] };
+	assert.deepEqual(compositionColorsChanges(colors), [['color_word', 2], ['ground', 1]]);
+	assert.equal(compositionColorsChangeLabel('ground_added', true), '背景の文を足した');
+	assert.equal(compositionColorsStateNote(colors, true), '配色を選び、当てて確定した');
+	assert.equal(compositionColorsStateNote({ state: 'fallback', fallback: 'compile' }, true),
+		'配色を当てられず、配色の前の指示書で確定した（compile）');
+	assert.equal(compositionColorsChanges(null).length, 0);
+	// The composition's hint names the colors that end it.
+	assert.match(compositionModeHint('on', true), /最後に配色を選ぶ$/);
+});
+
 test('the progress names reading, writing, revising and reviewing in both languages', () => {
 	for (const strings of [ja, en]) {
 		const attempt = { action: 'read_description', attempt: 1, max_attempts: 2 };
@@ -107,6 +127,8 @@ test('the progress names reading, writing, revising and reviewing in both langua
 		// The composition and laws, and their asking again (2026-10-26).
 		assert.equal(runningStageLabel('previous', { ...attempt, action: 'compose_description' }, strings), strings.readDrawComposing);
 		assert.equal(runningStageLabel('previous', { ...attempt, action: 'compose_description', asked_again: true }, strings), strings.readDrawRecomposing);
+		// The colors after the review say what the current stages' colors say.
+		assert.equal(runningStageLabel('previous', { ...attempt, action: 'choose_colors' }, strings), strings.stageChoosingColors);
 		assert.equal(paintStageLabel('requested', strings, { sketchOn: true, readAndDraw: true }), strings.readDrawReading);
 		assert.equal(paintStageLabel('requested', strings, { sketchOn: false, readAndDraw: true }), strings.readDrawWriting);
 		assert.equal(paintStageLabel('score', strings, { sketchOn: true, readAndDraw: true }), strings.readDrawSaving);

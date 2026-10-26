@@ -1460,6 +1460,7 @@ export interface LangPack {
 	provenanceHintReadReview: string;
 	provenanceHintComposition: string;
 	provenanceHintCompositionMeasure: string;
+	provenanceHintCompositionColors: string;
 	provenanceHintReadLabels: string;
 	provenanceHintCatalog: string;
 	provenanceHintColorMap: string;

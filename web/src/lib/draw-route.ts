@@ -76,8 +76,8 @@ export function compositionModeLabel(mode: CompositionMode, isJapanese: boolean)
 export function compositionModeHint(mode: CompositionMode, isJapanese: boolean): string {
 	if (mode === 'on') {
 		return isJapanese
-			? '記述から構図と法則を先に決め、それに沿って指示書を書き、測って合わせる'
-			: 'Decide a composition and laws from the description first, then write the DDL toward them and fit it';
+			? '記述から構図と法則を先に決め、それに沿って指示書を書き、測って合わせ、最後に配色を選ぶ'
+			: 'Decide a composition and laws from the description first, write the DDL toward them and fit it, then choose its colors';
 	}
 	return isJapanese ? '記述をそのまま画に置き換える（今の読んで描く）' : 'Turn the description straight into the picture (read and draw as before)';
 }
@@ -120,8 +120,42 @@ export type CompositionRecord = {
 	}[];
 	cards?: { law?: string; things?: number[]; motif?: string; built?: boolean; reason?: string | null }[];
 	things?: number[];
+	colors?: CompositionColorsRecord | null;
 	[key: string]: unknown;
 };
+
+/** The colors chosen after the review, before the commit (2026-10-26). */
+export type CompositionColorsRecord = {
+	state?: 'used' | 'fallback';
+	fallback?: string | null;
+	main_law?: string | null;
+	laws?: string[];
+	ground?: string | null;
+	changes?: { line?: number | null; how?: string; before?: string; after?: string[] }[];
+};
+
+const COLORS_CHANGE_LABELS: Record<string, [string, string]> = {
+	color_word: ['色の語を書き換えた', 'color word rewritten'],
+	printed: ['数つきで印字し直した', 'printed again with numbers'],
+	ground: ['背景の文を替えた', 'background sentence changed'],
+	ground_added: ['背景の文を足した', 'background sentence added'],
+};
+
+export const compositionColorsChangeLabel = (how: unknown, isJapanese: boolean) => labelOf(COLORS_CHANGE_LABELS, how, isJapanese);
+
+export function compositionColorsStateNote(record: CompositionColorsRecord, isJapanese: boolean): string {
+	if (record.state === 'used') return isJapanese ? '配色を選び、当てて確定した' : 'Colors were chosen and applied before the commit';
+	return isJapanese
+		? `配色を当てられず、配色の前の指示書で確定した（${record.fallback ?? ''}）`
+		: `No colors could be applied, so the DDL before them was committed (${record.fallback ?? ''})`;
+}
+
+/** How many lines the colors wrote, by how, in the order they first appear. */
+export function compositionColorsChanges(record: CompositionColorsRecord | null | undefined): [string, number][] {
+	const counts = new Map<string, number>();
+	for (const change of record?.changes ?? []) counts.set(change.how ?? '', (counts.get(change.how ?? '') ?? 0) + 1);
+	return [...counts.entries()];
+}
 
 const FORM_LABELS: Record<string, [string, string]> = {
 	one_corner: ['一角', 'one corner'],

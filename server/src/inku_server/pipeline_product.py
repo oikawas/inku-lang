@@ -490,8 +490,10 @@ class ProductPipelineEffects:
                 raise CandidateHostError("image_model_not_vision")
             if kind == "description" and selected.get("route") == "read_and_draw":
                 # The drawing is seen once only by a model that reads images;
-                # another's DDL is committed as written (PLAN-PRODUCT §12).
-                config["description_ddl"] = {"review": reads_images()}
+                # another's DDL is committed as written (PLAN-PRODUCT §12). A run
+                # with its composition and laws then chooses its colors before
+                # the commit (2026-10-26); the core asks no other run.
+                config["description_ddl"] = {"review": reads_images(), "colors": True}
             for stage in (() if kind == "image" else
                           (("stage1", "stage2") if kind in {"description", "saved_laws"} else ("stage2",))):
                 if not _model_offered_to(

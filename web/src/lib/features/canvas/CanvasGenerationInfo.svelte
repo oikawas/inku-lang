@@ -11,6 +11,7 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import { normalizeSketchGrain, normalizeSketchState, sketchGrainLabel, sketchStateNote } from '$lib/sketch';
 	import {
+		compositionColorsChangeLabel, compositionColorsChanges, compositionColorsStateNote,
 		compositionFormLabel, compositionKindLabel, compositionMeasureLabel, compositionMeasureSummary, compositionRoleLabel,
 		compositionStateNote, drawRouteLabel, droppedReadingLines, figureWhoLabel, readingStateNote, type DescriptionDdlRecord
 	} from '$lib/draw-route';
@@ -207,6 +208,9 @@
 	// measure came out, and which thing each sentence draws.
 	const detailComposition = $derived(detailReadRecord?.composition ?? null);
 	const detailCompositionMeasure = $derived(compositionMeasureSummary(detailComposition));
+	// The colors chosen after the review (2026-10-26), on a run that reached them.
+	const detailCompositionColors = $derived(detailComposition?.colors ?? null);
+	const detailCompositionColorsChanges = $derived(compositionColorsChanges(detailCompositionColors));
 	const detailCompositionSentences = $derived(
 		(Array.isArray(detailComposition?.known) ? detailComposition.known : []) as { thing?: number; text?: string }[]
 	);
@@ -452,6 +456,34 @@
 									<li>{card.law} · {card.built ? (isJapanese ? '作った' : 'built') : `${isJapanese ? '作らなかった' : 'not built'}${card.reason ? `（${card.reason}）` : ''}`}{card.motif ? ` · ${card.motif}` : ''}</li>
 								{/each}
 							</ul>
+						{/if}
+						{#if detailCompositionColors}
+							<p class="detail-note">{isJapanese ? '配色' : 'Colors'}</p>
+							<dl>
+								{@render term(isJapanese ? '状態' : 'State', t().provenanceHintCompositionColors)}<dd>{compositionColorsStateNote(detailCompositionColors, isJapanese)}</dd>
+								{#if detailCompositionColors.main_law}
+									{@render term(isJapanese ? '主の法則' : 'Main law', t().provenanceHintCompositionColors)}<dd>{detailCompositionColors.main_law}</dd>
+								{/if}
+								{#if detailCompositionColors.laws?.length}
+									{@render term(isJapanese ? '法則' : 'Laws', t().provenanceHintCompositionColors)}<dd>{detailCompositionColors.laws.join(isJapanese ? '、' : ', ')}</dd>
+								{/if}
+								{#if detailCompositionColors.ground}
+									{@render term(isJapanese ? '地' : 'Ground', t().provenanceHintCompositionColors)}<dd>{colorWordLabel(detailCompositionColors.ground, isJapanese)}</dd>
+								{/if}
+								{#if detailCompositionColorsChanges.length}
+									{@render term(isJapanese ? '変えた文' : 'Lines changed', t().provenanceHintCompositionColors)}<dd>{detailCompositionColorsChanges.map(([how, count]) => `${compositionColorsChangeLabel(how, isJapanese)} ${count}`).join(isJapanese ? '、' : ', ')}</dd>
+								{/if}
+							</dl>
+							{#if detailCompositionColors.changes?.length}
+								<details class="detail-read-before">
+									<summary>{isJapanese ? '配色が変えた文' : 'The lines the colors changed'}</summary>
+									<ul class="detail-read-list">
+										{#each detailCompositionColors.changes as change, index (index)}
+											<li>{change.before ? `${change.before} → ` : ''}{(change.after ?? []).join(' ')}</li>
+										{/each}
+									</ul>
+								</details>
+							{/if}
 						{/if}
 						{#if detailCompositionSentences.length}
 							<details class="detail-read-before">

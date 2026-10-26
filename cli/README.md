@@ -477,8 +477,8 @@ options:
                         with --route read_and_draw only: on first decides a
                         composition and laws from the description (and its
                         reading), then writes, measures and corrects the DDL
-                        toward them; off (the server default) draws read and
-                        draw as before
+                        toward them, and chooses its colors before the commit;
+                        off (the server default) draws read and draw as before
   --wild                remove the amplitude ceiling on the stroke performance
                         for prose or DDL input, letting the renderer swing
                         further
@@ -605,8 +605,8 @@ options:
                         with --route read_and_draw only: on first decides a
                         composition and laws from the description (and its
                         reading), then writes, measures and corrects the DDL
-                        toward them; off (the server default) draws read and
-                        draw as before
+                        toward them, and chooses its colors before the commit;
+                        off (the server default) draws read and draw as before
   --wild                remove the amplitude ceiling on the stroke performance
                         for prose or DDL input, letting the renderer swing
                         further

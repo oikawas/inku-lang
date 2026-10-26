@@ -4532,7 +4532,7 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     parser.add_argument(
         "--composition",
         choices=["off", "on"],
-        help="with --route read_and_draw only: on first decides a composition and laws from the description (and its reading), then writes, measures and corrects the DDL toward them; off (the server default) draws read and draw as before",
+        help="with --route read_and_draw only: on first decides a composition and laws from the description (and its reading), then writes, measures and corrects the DDL toward them, and chooses its colors before the commit; off (the server default) draws read and draw as before",
     )
     parser.add_argument(
         "--wild",

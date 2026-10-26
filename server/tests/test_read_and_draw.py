@@ -172,7 +172,8 @@ def test_a_model_that_reads_no_image_commits_the_written_ddl_unseen(host):
     view = _wait(service, _start(client, model="openai:fixture-text", sketch="on")["execution_id"])
     assert view["phase"]["tag"] == "score_ready", view
     assert [entry["tag"] for entry in sent] == ["read_description", "write_description_ddl"]
-    assert service.execution("owner", view["execution_id"]).config["description_ddl"] == {"review": False}
+    # The colors come only after a composition, so this run asks for none.
+    assert service.execution("owner", view["execution_id"]).config["description_ddl"] == {"review": False, "colors": True}
 
 
 def test_a_child_takes_its_parents_route_and_the_stages_send_what_they_sent(host):
@@ -243,11 +244,16 @@ def _sentences(woman: str) -> dict:
                           {"thing": 2, "text": SHADE}], "figures": []}
 
 
+# The colors chosen after the review (2026-10-26): the shade takes the blue.
+COLORS = {"main_law": "D5", "laws": {"D5": {"hue": "blue", "layer": 1}}, "reason": "青を軸に近い色でまとめる。"}
+
+
 @pytest.fixture
 def composed(monkeypatch):
     monkeypatch.setitem(ANSWERS, "compose_description", ("description_composed", COMPOSITION))
     monkeypatch.setitem(ANSWERS, "write_description_ddl", ("description_ddl_written", _sentences(WOMAN)))
     monkeypatch.setitem(ANSWERS, "review_description_ddl", ("description_ddl_reviewed", _sentences(FITTED)))
+    monkeypatch.setitem(ANSWERS, "choose_colors", ("colors_chosen", COLORS))
 
 
 def test_the_composition_is_decided_written_by_and_saved_with_the_work(host, composed):
@@ -255,21 +261,30 @@ def test_the_composition_is_decided_written_by_and_saved_with_the_work(host, com
     view = _wait(service, _start(client, sketch="on", composition="on")["execution_id"])
     assert view["phase"]["tag"] == "score_ready", view
     assert [(entry["tag"], entry["images"]) for entry in sent] == [
-        ("read_description", 0), ("compose_description", 0), ("write_description_ddl", 0), ("review_description_ddl", 1)]
+        ("read_description", 0), ("compose_description", 0), ("write_description_ddl", 0), ("review_description_ddl", 1),
+        ("choose_colors", 0)]
     # The composition is decided from the description and its reading.
     assert json.loads(sent[1]["message"]).get("reading") is not None
+    # The colors are asked with the thing each layer draws.
+    assert "## 層の物（読んで描くの構図と法則）" in sent[4]["message"]
     record = view["description_ddl"]["composition"]
     assert record["state"] == "used" and record["answer"]["main_law"] == "B1"
     assert record["things"] == [0, 1, 2]
     assert len(record["measures"]) == 2
+    colors = record["colors"]
+    assert colors["state"] == "used" and colors["main_law"] == "D5"
+    assert [change["how"] for change in colors["changes"]] == ["color_word"]
     done = service.command("owner", view["execution_id"], {"tag": "perform"})
     item = db.get_items("owner", [done["result"]["history_id"]])[0]
     assert item["description_ddl"]["composition"] == record
     assert FITTED in item["ddl"]
+    assert colors["changes"][0]["after"][0] in item["ddl"]
     prompts = client.get(f"/api/pipeline/variations/{view['variation_id']}/system-prompts", headers={"x-owner": "owner"})
     stages = prompts.json()
     assert stages["description_composition"]["system"].startswith("あなたは inku の構図の係である。")
     assert stages["description_composition"]["message"] == sent[1]["message"]
+    # The color request is kept in the colors tab, as the current stages keep it.
+    assert stages["colors"]["message"] == sent[4]["message"]
 
 
 def test_without_the_composition_read_and_draw_sends_what_it_sent(host):
@@ -303,8 +318,10 @@ def test_a_child_keeps_its_parents_composition(host, composed):
                                "options": {"save_artifacts": False}})
     assert forked.status_code == 200, forked.text
     child = _wait(service, forked.json()["execution_id"])
-    assert [entry["tag"] for entry in sent] == ["compose_description", "write_description_ddl", "review_description_ddl"]
+    assert [entry["tag"] for entry in sent] == ["compose_description", "write_description_ddl", "review_description_ddl",
+                                                "choose_colors"]
     assert child["description_ddl"]["composition"]["state"] == "used"
+    assert child["description_ddl"]["composition"]["colors"]["state"] == "used"
 
 
 def test_the_composition_is_sent_with_the_limit_and_recorded_as_read_and_draw(host, monkeypatch):

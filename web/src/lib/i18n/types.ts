@@ -57,6 +57,8 @@ export interface LangPack {
 	imageSelectingCatalog: string;
 	/** Read and draw (SPEC 12.6.7): what the run is doing. */
 	readDrawReading: string;
+	readDrawComposing: string;
+	readDrawRecomposing: string;
 	readDrawWriting: string;
 	readDrawRevising: string;
 	readDrawReviewing: string;
@@ -521,6 +523,7 @@ export interface LangPack {
 	tooltipInputClear: string;
 	tooltipInputSketch: string;
 	tooltipInputRoute: string;
+	tooltipInputComposition: string;
 	wildButton: string;
 	wildEnabled: string;
 	wildDisabled: string;
@@ -663,6 +666,8 @@ export interface LangPack {
 	promptColorsSystem: string;
 	promptReadingInput: string;
 	promptReadingSystem: string;
+	promptDescriptionCompositionInput: string;
+	promptDescriptionCompositionSystem: string;
 	promptDescriptionDdlInput: string;
 	promptDescriptionDdlSystem: string;
 	promptDescriptionReviewInput: string;
@@ -1453,6 +1458,8 @@ export interface LangPack {
 	provenanceHintDrawRoute: string;
 	provenanceHintReading: string;
 	provenanceHintReadReview: string;
+	provenanceHintComposition: string;
+	provenanceHintCompositionMeasure: string;
 	provenanceHintReadLabels: string;
 	provenanceHintCatalog: string;
 	provenanceHintColorMap: string;

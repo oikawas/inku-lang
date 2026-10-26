@@ -165,7 +165,8 @@ test('T-6: both places that put a work on screen carry its state, and the panel 
 	// Both carry the route the work was drawn by after the state (2026-10-25).
 	assert.match(work, /adoptSketch\(painted\.sketch_text \?\? null, painted\.sketch_grain, view\.description, painted\.sketch_state,\s*drawRouteOf\(/);
 	assert.match(currentWork, /sketchState: item\.sketch_state/);
-	assert.match(page, /work\.adoptSketch\(projection\.sketchText, projection\.sketchGrain, projection\.sourceText, projection\.sketchState, drawRouteOf\(it\)\)/);
+	// And after the route, whether it was drawn with the composition and laws (2026-10-26).
+	assert.match(page, /work\.adoptSketch\(projection\.sketchText, projection\.sketchGrain, projection\.sourceText, projection\.sketchState, drawRouteOf\(it\),\s*compositionModeOf\(it\)\)/);
 	assert.match(page, /sketchStateNote\(work\.sketchState, getLang\(\) === 'ja'\)/);
 	assert.match(generationInfo, /normalizeSketchState\(statusHistoryItem\?\.sketch_state \?\? result\?\.sketch_state\)/);
 });

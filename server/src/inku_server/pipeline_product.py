@@ -139,6 +139,10 @@ class RunOptions(BaseModel):
     # How a description is drawn (SPEC §12.6.7): the stages (the default) or
     # read and draw. Left out, a child takes its parent's.
     route: Literal["stages", "read_and_draw"] | None = None
+    # Whether read and draw first decides a composition and laws (SPEC
+    # §12.6.7): off (the default) or on. Only read and draw sends it; left
+    # out, a child takes its parent's, like the route.
+    composition: Literal["off", "on"] | None = None
     history_display_label: str | None = None
     batch_line_number: int | None = None
     batch_run_id: str | None = None
@@ -255,18 +259,20 @@ _SYSTEM_PROMPT_STAGES = {
     "choose_colors": "colors",
     "complete_visible_ddl_holes": "stage2",
     "read_description": "reading",
+    "compose_description": "description_composition",
     "write_description_ddl": "description_ddl",
     "review_description_ddl": "description_review",
 }
 # The stages whose message the tab shows as sent too (2026-10-13): no other
 # view shows what the sketch, the composition reading, the laws stage, the
 # color stage and read and draw's reading were given.
-_MESSAGE_STAGES = {"sketch", "composition", "laws", "colors", "reading",
+_MESSAGE_STAGES = {"sketch", "composition", "laws", "colors", "reading", "description_composition",
                    "catalog", "image_catalog", "image_ddl", "image_review"}
 # The requests given the image tab's answer limit: the image tab's DDL and
-# read and draw's three, as they were measured (8192 tokens, 2026-10-25).
-_WRITTEN_DDL_EFFECTS = frozenset({"write_image_ddl", "review_image_ddl", "read_description", "write_description_ddl",
-                                  "review_description_ddl"})
+# read and draw's, as they were measured (8192 tokens, 2026-10-25; the
+# composition and laws answered at most 1,662 tokens, 2026-10-26).
+_WRITTEN_DDL_EFFECTS = frozenset({"write_image_ddl", "review_image_ddl", "read_description", "compose_description",
+                                  "write_description_ddl", "review_description_ddl"})
 # The stages an execution saved before 2026-10-13 kept.
 _EARLIER_STAGES = ["stage1", "stage2"]
 

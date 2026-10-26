@@ -27,9 +27,11 @@ from typing import Any
 _REFUSAL_READ_BYTES = 16384
 # The effects that send an image. Read and draw's review sends its drawing.
 IMAGE_EFFECTS = frozenset({"select_image_catalog", "write_image_ddl", "review_image_ddl", "review_description_ddl"})
-# Read and draw's three requests (SPEC §12.6.7), recorded apart from Stage 1
-# and the image tab.
-READ_AND_DRAW_EFFECTS = frozenset({"read_description", "write_description_ddl", "review_description_ddl"})
+# Read and draw's requests (SPEC §12.6.7), recorded apart from Stage 1 and the
+# image tab: the reading, the composition and laws when they are on, the
+# writing and the review.
+READ_AND_DRAW_EFFECTS = frozenset({"read_description", "compose_description", "write_description_ddl",
+                                   "review_description_ddl"})
 
 
 def observation_digest(body: bytes) -> bytes:

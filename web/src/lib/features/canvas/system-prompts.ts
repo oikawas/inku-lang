@@ -13,7 +13,8 @@ export type SentSystemPrompt = {
  *  The catalog is chosen first when the description chooses it. A work from a
  *  picture calls its own three (SPEC 12.6.6), and read and draw (SPEC 12.6.7)
  *  calls the reading, the writing and the review in place of Stage 1 and the
- *  stages after it. */
+ *  stages after it, with the composition and laws between the reading and
+ *  the writing when they are on (2026-10-26). */
 export const PROMPT_STAGES = [
 	'catalog',
 	'image_catalog',
@@ -21,6 +22,7 @@ export const PROMPT_STAGES = [
 	'image_review',
 	'sketch',
 	'reading',
+	'description_composition',
 	'description_ddl',
 	'description_review',
 	'stage1',
@@ -81,6 +83,7 @@ export async function loadSystemPrompts(
 			image_review: sentPrompt(body.image_review),
 			sketch: sentPrompt(body.sketch),
 			reading: sentPrompt(body.reading),
+			description_composition: sentPrompt(body.description_composition),
 			description_ddl: sentPrompt(body.description_ddl),
 			description_review: sentPrompt(body.description_review),
 			stage1: sentPrompt(body.stage1),

@@ -172,6 +172,8 @@ While it waits, the display names the step at work.
 
 The reading appears under `Sketch from life (reading)` in the description panel. Editing it with `Edit` and drawing again writes from the edited reading without asking for a new one. `Read and draw` in Generation Info shows the reading, the items dropped because neither the description nor a label holds them, each round (writing and review, with the people drawn), and the instructions before the review. When only instructions that draw nothing could be written, the run stops with the reason.
 
+Choosing `Read and draw` shows `Composition and laws` (`Off` or `On`, `Off` by default) beside the route. With `On`, after the reading, a composition (its thesis, form, things and laws) is decided first from the description (and its reading), and the instructions are written toward it. The tool measures the written instructions against the laws thing by thing, moves a thing that is a little off into place, and has one far off written again; it builds the things that are patterns, rows and scatters. While it waits it shows "Deciding the composition and laws…". When no composition and laws can be decided, the instructions are written without them. `Composition and laws` in Generation Info shows what was decided, the last measure, the pairs that did not fit, the cards, and the thing each sentence draws. Opening a work sets the switch to whether the work was drawn with it on.
+
 ## 5. Consult the Saijiki
 
 The `Saijiki` is inku's vocabulary dictionary. Open `New instructions` or `Instruction editor` to find the shared instruction editor, with a broad Saijiki list beneath it. Close the vocabulary to make more room for the text.

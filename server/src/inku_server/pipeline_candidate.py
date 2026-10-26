@@ -33,6 +33,7 @@ _PIPELINE_FAILURE_DETAILS = {"credentials_unavailable"}
 _HOLE_COMPLETION_STATUSES = {"validated", "rejected", "unresolved"}
 _ACTION_STAGES = {
     "read_description": "read_and_draw",
+    "compose_description": "read_and_draw",
     "write_description_ddl": "read_and_draw",
     "review_description_ddl": "read_and_draw",
     "select_image_catalog": "image",

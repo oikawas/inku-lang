@@ -4,7 +4,10 @@ import { pluginWarningsToShow } from '$lib/plugin-names';
 import { limitNotesToShow } from '$lib/limitNotes';
 import { t, getLang } from '$lib/i18n/index.svelte';
 import { DEFAULT_SKETCH_MODE, normalizeSketchState, type SketchMode, type SketchState } from '$lib/sketch';
-import { DEFAULT_DRAW_ROUTE, drawRouteOf, sketchModeForRoute, type DrawRoute } from '$lib/draw-route';
+import {
+	DEFAULT_COMPOSITION_MODE, DEFAULT_DRAW_ROUTE, compositionModeOf, compositionOption, drawRouteOf, sketchModeForRoute,
+	type CompositionMode, type DrawRoute
+} from '$lib/draw-route';
 import { composeFallbackReason, composeFallbackState, composeFallbackValue } from '$lib/composeFallback';
 import { needsFallbackRefineConfirm, rememberFallbackRefineConfirm, type FallbackRefineParent } from '$lib/fallbackRefineGate';
 import { submitDerivationKind as submitDerivationKindOf, type DerivationKind } from '$lib/derivation';
@@ -195,6 +198,15 @@ export function createWorkState(deps: WorkStateDeps) {
 		drawRoute = route;
 	}
 
+	// The composition and laws inside read and draw (2026-10-26). Chosen per
+	// draw like the route and never saved as a setting; it stays as chosen when
+	// the route moves, and only read and draw sends it.
+	let compositionMode = $state<CompositionMode>(DEFAULT_COMPOSITION_MODE);
+
+	function selectCompositionMode(mode: CompositionMode): void {
+		compositionMode = mode;
+	}
+
 	// The prose the layer wrote for the run on screen, and the author's edit of
 	// it. Editing and painting again sends the edited prose instead of calling
 	// the layer, so what the author reads is what Stage 1 reads.
@@ -244,7 +256,8 @@ export function createWorkState(deps: WorkStateDeps) {
 		grain: unknown,
 		source: string | null = null,
 		state: unknown = null,
-		route: DrawRoute = DEFAULT_DRAW_ROUTE
+		route: DrawRoute = DEFAULT_DRAW_ROUTE,
+		composition: CompositionMode = DEFAULT_COMPOSITION_MODE
 	): void {
 		sketchText = text;
 		sketchSource = source;
@@ -256,6 +269,8 @@ export function createWorkState(deps: WorkStateDeps) {
 		// The route the work was drawn by. A read-and-draw work's reading is its
 		// sketch text; one drawn without a reading keeps the sketch off.
 		drawRoute = route;
+		// Drawn with the composition and laws, the work redraws with them.
+		compositionMode = composition;
 	}
 
 	let pendingCanvasAspectDerivation = $state<{ parentNodeId: string; fromAspectId: CanvasAspectId; toAspectId: CanvasAspectId; } | null>(null);
@@ -295,8 +310,10 @@ export function createWorkState(deps: WorkStateDeps) {
 
 	function pipelineOptions(options: PaintOptions = {}): PipelineOptions {
 		const render = renderSettingsPayload('paint', options.renderOverrides);
+		const route = options.route ?? drawRoute;
 		return {
-			route: options.route ?? drawRoute,
+			route,
+			...compositionOption(route, options.compositionMode ?? compositionMode),
 			sketch: options.sketchMode ?? sketchMode,
 			...(options.sketchText ? { sketch_text: options.sketchText } : {}),
 			stage1_model: options.stage1Model ?? qualifiedModelId(deps.models.stage1Provider(), deps.models.stage1Model()),
@@ -343,8 +360,9 @@ export function createWorkState(deps: WorkStateDeps) {
 		if (!view.result) return;
 		const painted = view.result;
 		result = painted;
+		const record = { route: view.route, description_ddl: view.description_ddl ?? painted.description_ddl };
 		adoptSketch(painted.sketch_text ?? null, painted.sketch_grain, view.description, painted.sketch_state,
-			drawRouteOf({ route: view.route, description_ddl: view.description_ddl ?? painted.description_ddl }));
+			drawRouteOf(record), compositionModeOf(record));
 		thinking = painted.thinking ?? null;
 		elapsedStage1Ms = painted.elapsed_stage1_ms;
 		elapsedStage2Ms = painted.elapsed_stage2_ms;
@@ -782,6 +800,7 @@ export function createWorkState(deps: WorkStateDeps) {
 				canvasAspectId: effectiveCanvasAspectId(),
 				sketchMode,
 				route: drawRoute,
+				compositionMode,
 				renderPayload: renderSettingsPayload('paint', options.renderOverrides)
 			},
 			{
@@ -1086,6 +1105,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		const batchStage2Model = qualifiedModelId(deps.models.stage2Provider(), deps.models.stage2Model());
 		const batchSketchMode = sketchMode;
 		const batchRoute = drawRoute;
+		const batchComposition = compositionMode;
 		const batchWild = wildSettings.enabled;
 		// The batch owns its line failures; the previous single-work run is no longer current.
 		pipelineController.clear();
@@ -1112,13 +1132,14 @@ export function createWorkState(deps: WorkStateDeps) {
 					wild: batchWild,
 					canvasAspectId: batchCanvasAspectId,
 					route: batchRoute,
+					composition: batchRoute === 'read_and_draw' ? batchComposition : null,
 				},
 				canvasAspectId: batchCanvasAspectId,
 				renderOverrides: { ...colorCatalogOverride(batchCatalogId), ...wildOverride(batchWild) },
 				maxRetries: batchSettings.maxRetries,
 				paintLine: (text, paintOptions) => paintOne(text, {
 					...paintOptions, stage1Model: batchStage1Model, stage2Model: batchStage2Model,
-					sketchMode: batchSketchMode, route: batchRoute,
+					sketchMode: batchSketchMode, route: batchRoute, compositionMode: batchComposition,
 				}),
 				onLatestResult: (painted) => {
 					thinking = painted.thinking;
@@ -1470,6 +1491,8 @@ export function createWorkState(deps: WorkStateDeps) {
 		set sketchMode(value) { sketchMode = value; },
 		get drawRoute() { return drawRoute; },
 		selectDrawRoute,
+		get compositionMode() { return compositionMode; },
+		selectCompositionMode,
 		get sketchText() { return sketchText; },
 		set sketchText(value) { sketchText = value; },
 		get sketchSource() { return sketchSource; },

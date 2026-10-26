@@ -387,7 +387,8 @@ usage: inku-cli paint [-h] [--base-url BASE_URL]
                       [--composition-seed COMPOSITION_SEED] [--sketch]
                       [--sketch-grain {fine,coarse}]
                       [--sketch-text SKETCH_TEXT]
-                      [--route {stages,read_and_draw}] [--wild]
+                      [--route {stages,read_and_draw}]
+                      [--composition {off,on}] [--wild]
                       [--limits KEY=VALUE [KEY=VALUE ...]]
                       [--catalog-mode {fixed,auto,random}]
                       [--instruction-lang {auto,ja,en}] [--ui-lang UI_LANG]
@@ -472,6 +473,12 @@ options:
                         drawing); with read_and_draw, --sketch reads the
                         description first and --sketch-text is an edited
                         reading
+  --composition {off,on}
+                        with --route read_and_draw only: on first decides a
+                        composition and laws from the description (and its
+                        reading), then writes, measures and corrects the DDL
+                        toward them; off (the server default) draws read and
+                        draw as before
   --wild                remove the amplitude ceiling on the stroke performance
                         for prose or DDL input, letting the renderer swing
                         further
@@ -524,7 +531,8 @@ usage: inku-cli batch [-h] [--base-url BASE_URL]
                       [--composition-seed COMPOSITION_SEED] [--sketch]
                       [--sketch-grain {fine,coarse}]
                       [--sketch-text SKETCH_TEXT]
-                      [--route {stages,read_and_draw}] [--wild]
+                      [--route {stages,read_and_draw}]
+                      [--composition {off,on}] [--wild]
                       [--limits KEY=VALUE [KEY=VALUE ...]]
                       [--catalog-mode {fixed,auto,random}]
                       [--instruction-lang {auto,ja,en}] [--ui-lang UI_LANG]
@@ -593,6 +601,12 @@ options:
                         drawing); with read_and_draw, --sketch reads the
                         description first and --sketch-text is an edited
                         reading
+  --composition {off,on}
+                        with --route read_and_draw only: on first decides a
+                        composition and laws from the description (and its
+                        reading), then writes, measures and corrects the DDL
+                        toward them; off (the server default) draws read and
+                        draw as before
   --wild                remove the amplitude ceiling on the stroke performance
                         for prose or DDL input, letting the renderer swing
                         further

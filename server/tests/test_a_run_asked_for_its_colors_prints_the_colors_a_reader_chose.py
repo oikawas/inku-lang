@@ -160,6 +160,6 @@ def test_a_run_asked_for_its_colors_prints_the_colors_its_reader_chose(author, s
     kept = prompts.json()
     assert kept["stages"] == ["catalog", "image_catalog", "image_ddl", "image_review",
                               "sketch", "stage1", "composition", "laws", "colors", "stage2",
-                              "reading", "description_ddl", "description_review"]
+                              "reading", "description_composition", "description_ddl", "description_review"]
     assert kept["colors"]["system"] == colors["system"]
     assert kept["colors"]["message"] == colors["message"]

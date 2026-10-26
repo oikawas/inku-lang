@@ -8,8 +8,9 @@
 	import CanvasAspectPlugin from './CanvasAspectPlugin.svelte';
 	import SketchSelect from './SketchSelect.svelte';
 	import RouteSelect from './RouteSelect.svelte';
+	import CompositionSelect from './CompositionSelect.svelte';
 	import { type SketchMode } from '$lib/sketch';
-	import { type DrawRoute } from '$lib/draw-route';
+	import { type CompositionMode, type DrawRoute } from '$lib/draw-route';
 	import { wildSettings } from '$lib/features/wild/settings.svelte';
 	import PaintButton from './PaintButton.svelte';
 	import RunStatus from './RunStatus.svelte';
@@ -103,6 +104,9 @@
 		/** How a description is drawn. Chosen per draw, like the sketch. */
 		drawRoute: DrawRoute;
 		onSelectDrawRoute: (route: DrawRoute) => void;
+		/** The composition and laws inside read and draw. Chosen per draw, like the route. */
+		compositionMode: CompositionMode;
+		onSelectCompositionMode: (mode: CompositionMode) => void;
 		nextStage1Model: string;
 		nextStage2Model: string;
 		nextCatalogName: string;
@@ -176,6 +180,8 @@
 		onSelectSketchMode,
 		drawRoute,
 		onSelectDrawRoute,
+		compositionMode,
+		onSelectCompositionMode,
 		nextStage1Model,
 		nextStage2Model,
 		nextCatalogName,
@@ -291,6 +297,11 @@
 				<div class="condition-compact-row">
 					<Tooltip text={t().tooltipInputRoute}><RouteSelect value={drawRoute} {isJapanese} onSelect={onSelectDrawRoute} /></Tooltip>
 				</div>
+				{#if drawRoute === 'read_and_draw'}
+				<div class="condition-compact-row">
+					<Tooltip text={t().tooltipInputComposition}><CompositionSelect value={compositionMode} {isJapanese} onSelect={onSelectCompositionMode} /></Tooltip>
+				</div>
+				{/if}
 				<div class="condition-compact-row">
 					<Tooltip text={t().tooltipInputSketch}><SketchSelect value={sketchMode} {isJapanese} showValue onSelect={onSelectSketchMode} /></Tooltip>
 				</div>

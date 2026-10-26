@@ -97,7 +97,7 @@ def test_a_drawing_shows_the_stage_1_system_prompt_it_sent(author, sent):
     assert body["colors"] is None
     assert body["stages"] == ["catalog", "image_catalog", "image_ddl", "image_review",
                               "sketch", "stage1", "composition", "laws", "colors", "stage2",
-                              "reading", "description_ddl", "description_review"]
+                              "reading", "description_composition", "description_ddl", "description_review"]
 
 
 def _action(tag: str, attempt: int, system: str) -> dict:
@@ -182,6 +182,7 @@ def test_an_execution_from_before_the_sketch_and_the_reading_kept_stage_1_and_st
         "colors": None,
         "stage2": None,
         "reading": None,
+        "description_composition": None,
         "description_ddl": None,
         "description_review": None,
     }

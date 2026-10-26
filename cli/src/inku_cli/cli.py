@@ -2039,6 +2039,7 @@ def _paint_payload(
         "sketch_grain": getattr(args, "sketch_grain", None),
         "sketch_text": getattr(args, "sketch_text", None),
         "route": getattr(args, "route", None),
+        "composition": getattr(args, "composition", None),
         "wild": bool(getattr(args, "wild", False)) or None,
         # None when the flag is absent, so the filter below drops the key: the
         # server must see no `limits` at all to run at its own settings.
@@ -2416,6 +2417,7 @@ def _image_flag_conflicts(args: argparse.Namespace) -> list[str]:
         ("--sketch-grain", args.sketch_grain),
         ("--sketch-text", args.sketch_text),
         ("--route", args.route),
+        ("--composition", args.composition),
         ("--wild", args.wild),
         ("--stage1-provider", args.stage1_provider),
         ("--stage1-model", args.stage1_model),
@@ -4526,6 +4528,11 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
         "--route",
         choices=["stages", "read_and_draw"],
         help="how a description is drawn: stages (the server default) or read_and_draw (read from the speaker's eye, written as DDL and corrected once beside its drawing); with read_and_draw, --sketch reads the description first and --sketch-text is an edited reading",
+    )
+    parser.add_argument(
+        "--composition",
+        choices=["off", "on"],
+        help="with --route read_and_draw only: on first decides a composition and laws from the description (and its reading), then writes, measures and corrects the DDL toward them; off (the server default) draws read and draw as before",
     )
     parser.add_argument(
         "--wild",

@@ -110,6 +110,7 @@ class SingleAttemptProvider:
             "write_image_ddl": "image_ddl_written",
             "review_image_ddl": "image_ddl_reviewed",
             "read_description": "description_read",
+            "compose_description": "description_composed",
             "write_description_ddl": "description_ddl_written",
             "review_description_ddl": "description_ddl_reviewed",
         }

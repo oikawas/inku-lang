@@ -70,11 +70,17 @@ def _rewords(text: str, description: str) -> bool:
 
 def _route_fields(context: dict, text: str) -> dict:
     """What a description run adds for read and draw (SPEC §12.6.7): the route
-    and the labels' words, which only the reading reads. The stages add nothing,
-    so their request is the one they always sent."""
-    if context.get("host_options", {}).get("route") != "read_and_draw":
+    and the labels' words, which only the reading reads, and the composition
+    and laws when they are on. The stages add nothing, and read and draw
+    without the composition adds no composition field, so each request is the
+    one it always sent."""
+    options = context.get("host_options", {})
+    if options.get("route") != "read_and_draw":
         return {}
-    return {"route": "read_and_draw", "source_labels": source_labels(text)}
+    fields = {"route": "read_and_draw", "source_labels": source_labels(text)}
+    if options.get("composition") == "on":
+        fields["composition"] = {"mode": "on"}
+    return fields
 
 
 def _refuse_if_locked(history_id: str) -> None:

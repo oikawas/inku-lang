@@ -32,7 +32,7 @@
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import { holeCompletionIssues } from '$lib/features/pipeline/hole-completion';
 	import { DEFAULT_SKETCH_MODE, normalizeSketchGrain, normalizeSketchState, sketchGrainLabel, sketchModeLabel, sketchModeOf, sketchStateNote, type SketchMode, type SketchState } from '$lib/sketch';
-	import { drawRouteOf, readingStateNote } from '$lib/draw-route';
+	import { compositionModeOf, drawRouteOf, readingStateNote } from '$lib/draw-route';
 	import { composeFallbackReason, composeFallbackState, composeFallbackValue } from '$lib/composeFallback';
 	import { needsFallbackRefineConfirm, rememberFallbackRefineConfirm, type FallbackRefineParent } from '$lib/fallbackRefineGate';
 	import { submitDerivationKind as submitDerivationKindOf, type DerivationKind } from '$lib/derivation';
@@ -798,6 +798,7 @@
 		// The route first: choosing read and draw turns the sketch on, and the
 		// line after puts back the sketch the run was drawn with.
 		if (conditions.route) work.selectDrawRoute(conditions.route);
+		if (conditions.composition) work.selectCompositionMode(conditions.composition);
 		// Not conditional: a work with no prose was drawn with the layer off, and
 		// leaving the switch where it is would resume under other conditions.
 		work.sketchMode = sketchModeOf(conditions.sketchGrain);
@@ -2059,7 +2060,8 @@ $effect(() => {
 			work.ddlGeneratedBaseline = projection.ddl;
 			work.thinking = projection.thinking;
 			work.stage1UserPrompt = projection.sourceText;
-			work.adoptSketch(projection.sketchText, projection.sketchGrain, projection.sourceText, projection.sketchState, drawRouteOf(it));
+			work.adoptSketch(projection.sketchText, projection.sketchGrain, projection.sourceText, projection.sketchState, drawRouteOf(it),
+				compositionModeOf(it));
 		}
 		work.result = projection.result;
 		work.error = null;
@@ -2850,6 +2852,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						onSelectSketchMode={(mode) => (work.sketchMode = mode)}
 						drawRoute={work.drawRoute}
 						onSelectDrawRoute={work.selectDrawRoute}
+						compositionMode={work.compositionMode}
+						onSelectCompositionMode={work.selectCompositionMode}
 						bind:inputMode={work.inputMode}
 						bind:imageProvenance={work.imageProvenance}
 						uploadedImage={work.uploadedImage}

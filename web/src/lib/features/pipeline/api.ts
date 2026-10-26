@@ -3,7 +3,7 @@ import type { PaintResult, Seed } from '$lib/features/run/current-work';
 import type { ApiFetch } from '$lib/transport/api-fetch';
 import type { PipelineDiagnostic, PipelineHistoryDiagnostics, PluginDiagnostic } from './diagnostics';
 import type { ImportedPlugin } from '../ddl-editor/ddl-import';
-import type { DescriptionDdlRecord, DrawRoute } from '$lib/draw-route';
+import type { CompositionMode, DescriptionDdlRecord, DrawRoute } from '$lib/draw-route';
 
 export type PipelineAuthority = {
 	revision: string;
@@ -85,6 +85,8 @@ export type PipelineOptions = {
 	imported_plugins?: ImportedPlugin[];
 	/** How a description is drawn; left out, a fork takes its parent's. */
 	route?: DrawRoute;
+	/** The composition and laws inside read and draw; left out, a fork takes its parent's. */
+	composition?: CompositionMode;
 	sketch?: 'off' | 'on';
 	sketch_text?: string;
 	stage1_model?: string;

@@ -214,3 +214,119 @@ def test_read_and_draw_sends_with_the_image_tabs_limit_and_records_apart(host, m
     assert limits == [8192, 8192, 8192]
     assert {provider_stage_record(tag) for tag in tags} == {"read_and_draw"}
     assert context["provider_failure"]["stage"] == "read_and_draw"
+
+
+# --------------------------------------------------------------------------- #
+# The composition and laws (step 2, 2026-10-26)                                #
+# --------------------------------------------------------------------------- #
+
+# The answers the core's own test gives (machine/description.rs): the woman on
+# the golden section's upper left crossing, written 0.03 off it and fitted.
+COMPOSITION = {
+    "thesis": "女の姿を黄金分割の左上の交点に置き、右下を広く空ける。",
+    "form": "one_corner",
+    "things": [
+        {"thing": 1, "what": "女の姿", "role": "focal", "kind": "cluster", "quote": "妹"},
+        {"thing": 2, "what": "紫の影", "role": "accent", "kind": "cluster", "quote": "紫"},
+    ],
+    "main_law": "B1",
+    "laws": {"B1": {"targets": [{"thing": 1, "at": "point_ul"}]}},
+    "reason": "「紫のにほへる妹」の姿を画の骨にするため、黄金分割の交点に置いた。",
+}
+WOMAN = "画面の横0.4、縦0.4の位置に、直径0.3の紫の塗りの円を1個置く。"
+FITTED = "画面の横0.381966、縦0.381966の位置に、直径0.3の紫の塗りの円を1個置く。"
+SHADE = "画面の横0.6、縦0.6の位置に、幅0.2、高さ0.15の灰の薄い塗りの三角を1個置く。"
+
+
+def _sentences(woman: str) -> dict:
+    return {"sentences": [{"thing": 0, "text": "背景を白で埋める。"}, {"thing": 1, "text": woman},
+                          {"thing": 2, "text": SHADE}], "figures": []}
+
+
+@pytest.fixture
+def composed(monkeypatch):
+    monkeypatch.setitem(ANSWERS, "compose_description", ("description_composed", COMPOSITION))
+    monkeypatch.setitem(ANSWERS, "write_description_ddl", ("description_ddl_written", _sentences(WOMAN)))
+    monkeypatch.setitem(ANSWERS, "review_description_ddl", ("description_ddl_reviewed", _sentences(FITTED)))
+
+
+def test_the_composition_is_decided_written_by_and_saved_with_the_work(host, composed):
+    client, service, _, sent = host
+    view = _wait(service, _start(client, sketch="on", composition="on")["execution_id"])
+    assert view["phase"]["tag"] == "score_ready", view
+    assert [(entry["tag"], entry["images"]) for entry in sent] == [
+        ("read_description", 0), ("compose_description", 0), ("write_description_ddl", 0), ("review_description_ddl", 1)]
+    # The composition is decided from the description and its reading.
+    assert json.loads(sent[1]["message"]).get("reading") is not None
+    record = view["description_ddl"]["composition"]
+    assert record["state"] == "used" and record["answer"]["main_law"] == "B1"
+    assert record["things"] == [0, 1, 2]
+    assert len(record["measures"]) == 2
+    done = service.command("owner", view["execution_id"], {"tag": "perform"})
+    item = db.get_items("owner", [done["result"]["history_id"]])[0]
+    assert item["description_ddl"]["composition"] == record
+    assert FITTED in item["ddl"]
+    prompts = client.get(f"/api/pipeline/variations/{view['variation_id']}/system-prompts", headers={"x-owner": "owner"})
+    stages = prompts.json()
+    assert stages["description_composition"]["system"].startswith("あなたは inku の構図の係である。")
+    assert stages["description_composition"]["message"] == sent[1]["message"]
+
+
+def test_without_the_composition_read_and_draw_sends_what_it_sent(host):
+    client, service, _, sent = host
+    view = _wait(service, _start(client, sketch="on", composition="off")["execution_id"])
+    assert [entry["tag"] for entry in sent] == ["read_description", "write_description_ddl", "review_description_ddl"]
+    assert "composition" not in view["description_ddl"]
+    run = service.execution("owner", view["execution_id"])
+    assert run.context["host_options"]["composition"] == "off"
+
+
+def test_only_read_and_draw_with_the_composition_on_asks_the_core_for_it():
+    from inku_server.pipeline_api import _route_fields
+
+    def fields(**options):
+        return _route_fields({"host_options": options}, POEM)
+
+    assert fields(route="read_and_draw", composition="on")["composition"] == {"mode": "on"}
+    assert "composition" not in fields(route="read_and_draw", composition="off")
+    assert "composition" not in fields(route="read_and_draw")
+    assert fields(route="stages", composition="on") == {}
+
+
+def test_a_child_keeps_its_parents_composition(host, composed):
+    client, service, _, sent = host
+    parent = _wait(service, _start(client, composition="on")["execution_id"])
+    parent = service.command("owner", parent["execution_id"], {"tag": "perform"})
+    sent.clear()
+    forked = client.post(f"/api/pipeline/variations/{parent['variation_id']}/fork-description", headers={"x-owner": "owner"},
+                         json={"expected_revision": parent["authority"]["revision"], "description": POEM,
+                               "options": {"save_artifacts": False}})
+    assert forked.status_code == 200, forked.text
+    child = _wait(service, forked.json()["execution_id"])
+    assert [entry["tag"] for entry in sent] == ["compose_description", "write_description_ddl", "review_description_ddl"]
+    assert child["description_ddl"]["composition"]["state"] == "used"
+
+
+def test_the_composition_is_sent_with_the_limit_and_recorded_as_read_and_draw(host, monkeypatch):
+    _, _, effects, _ = host
+    from inku_server import chatgpt_provider, pipeline_product, provider_wire
+    from inku_server.pipeline_candidate import _ACTION_STAGES
+    from inku_server.pipeline_provider import provider_stage_record
+    limits = []
+
+    class Transport:
+        def __init__(self, options, **kwargs):
+            limits.append(options.max_tokens)
+
+        def __call__(self, action):
+            return {"tag": "provider_failed", "failure": "transport_unavailable", "elapsed_ms": "0"}
+
+    monkeypatch.setattr(pipeline_product, "SingleAttemptProvider", Transport)
+    context = {"host_options": {"stage1_model": "openai:fixture-vision"}}
+    effects.provider_for("owner", context, [])({"tag": "compose_description", "identity": {"attempt": 1}})
+    assert limits == [8192]
+    assert provider_stage_record("compose_description") == "read_and_draw"
+    assert _ACTION_STAGES["compose_description"] == "read_and_draw"
+    assert "compose_description" in provider_wire.READ_AND_DRAW_EFFECTS
+    assert "compose_description" in chatgpt_provider.EFFECTS
+    assert "compose_description" not in provider_wire.IMAGE_EFFECTS

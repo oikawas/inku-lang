@@ -132,6 +132,7 @@ def _options(data: dict[str, Any], *, save_history: bool) -> dict:
         "composition_seed": "composition_seed",
         "wild": "wild",
         "route": "route",
+        "composition": "composition",
         "history_input": "history_input",
         "history_at": "history_at",
         "history_source_text": "history_source_text",

@@ -256,6 +256,14 @@ class PaintRequest(BaseModel):
             "description first and sketch_text is the author's edited reading."
         ),
     )
+    composition: Literal["off", "on"] | None = Field(
+        default=None,
+        description=(
+            "With read_and_draw only: on decides a composition and laws from the description (and its reading) "
+            "before the DDL is written, and writes, measures and corrects the DDL toward them; off or left out "
+            "draws read and draw as before. Ignored by stages."
+        ),
+    )
     limits: dict[str, int] | None = Field(default=None, description=_LIMITS_FIELD_DESCRIPTION)
 
 

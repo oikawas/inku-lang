@@ -59,6 +59,134 @@ export function workRouteLabel(
 	return drawRouteLabel(drawRouteOf(work), isJapanese);
 }
 
+// The composition and laws (2026-10-26, SPEC 12.6.7): a switch inside read and
+// draw. 'on' decides a composition and laws from the description (and its
+// reading) before the DDL is written; 'off', the default, is read and draw as
+// it was. Chosen per draw like the route and never kept as a setting; a work
+// opened from the history sets it to the way that work was drawn.
+export type CompositionMode = 'off' | 'on';
+export const COMPOSITION_MODES: CompositionMode[] = ['off', 'on'];
+export const DEFAULT_COMPOSITION_MODE: CompositionMode = 'off';
+
+export function compositionModeLabel(mode: CompositionMode, isJapanese: boolean): string {
+	if (mode === 'on') return isJapanese ? 'あり' : 'On';
+	return isJapanese ? 'なし' : 'Off';
+}
+
+export function compositionModeHint(mode: CompositionMode, isJapanese: boolean): string {
+	if (mode === 'on') {
+		return isJapanese
+			? '記述から構図と法則を先に決め、それに沿って指示書を書き、測って合わせる'
+			: 'Decide a composition and laws from the description first, then write the DDL toward them and fit it';
+	}
+	return isJapanese ? '記述をそのまま画に置き換える（今の読んで描く）' : 'Turn the description straight into the picture (read and draw as before)';
+}
+
+export function normalizeCompositionMode(value: unknown): CompositionMode | null {
+	return value === 'off' || value === 'on' ? value : null;
+}
+
+/** Whether a work was drawn with the composition and laws: its record says so,
+ *  a fallback included (it was asked for and could not be used). */
+export function compositionModeOf(work: { description_ddl?: unknown } | null | undefined): CompositionMode {
+	const record = work?.description_ddl;
+	return record && typeof record === 'object' && (record as DescriptionDdlRecord).composition ? 'on' : DEFAULT_COMPOSITION_MODE;
+}
+
+/** The run option the switch adds: only read and draw sends it. */
+export function compositionOption(route: DrawRoute, mode: CompositionMode): { composition?: CompositionMode } {
+	return route === 'read_and_draw' ? { composition: mode } : {};
+}
+
+/** The composition and laws as the core records them (SPEC 12.6.7). */
+export type CompositionRecord = {
+	state?: 'pending' | 'used' | 'fallback';
+	fallback?: string | null;
+	answer?: {
+		thesis?: string;
+		form?: string;
+		things?: { thing?: number; what?: string; role?: string; kind?: string; quote?: string }[];
+		main_law?: string;
+		laws?: Record<string, unknown>;
+		reason?: string;
+	} | null;
+	targets?: string[];
+	rounds?: { prompt_id?: string; prompt_digest?: string; asked_again?: boolean; problems?: { where?: string; reason?: string }[] }[];
+	measures?: {
+		stage?: string;
+		fit_kept?: boolean;
+		after?: { law?: string; thing?: number | number[] | null; deviation?: number | null; unit?: string; state?: string; detail?: string }[];
+		[key: string]: unknown;
+	}[];
+	cards?: { law?: string; things?: number[]; motif?: string; built?: boolean; reason?: string | null }[];
+	things?: number[];
+	[key: string]: unknown;
+};
+
+const FORM_LABELS: Record<string, [string, string]> = {
+	one_corner: ['一角', 'one corner'],
+	all_over: ['全面', 'all over'],
+	bands: ['横の帯', 'bands'],
+	dividing_line: ['場を分ける線', 'dividing line'],
+	grid: ['格子', 'grid'],
+	flock_and_stray: ['群れと一つの逸脱', 'flock and a stray'],
+	unequal_triangle: ['不等辺の三角', 'unequal triangle'],
+};
+const ROLE_LABELS: Record<string, [string, string]> = {
+	field: ['場', 'field'], focal: ['主', 'focal'], secondary: ['従', 'secondary'],
+	scattered: ['散在', 'scattered'], accent: ['添え', 'accent'],
+};
+const KIND_LABELS: Record<string, [string, string]> = {
+	cluster: ['1か所の形', 'cluster'], row: ['列', 'row'], surface: ['面', 'surface'], line: ['線', 'line'],
+};
+const MEASURE_LABELS: Record<string, [string, string]> = {
+	ok: ['合う', 'fits'], off: ['少しずれ', 'a little off'], far: ['大きくずれ', 'far off'],
+	fitted: ['合わせた', 'fitted'], clamped: ['範囲の端に合わせた', 'clamped'], off_canvas: ['画の外', 'off the canvas'],
+	unmeasurable: ['測れない', 'unmeasurable'], not_measured: ['測っていない', 'not measured'],
+};
+
+function labelOf(table: Record<string, [string, string]>, value: unknown, isJapanese: boolean): string {
+	const pair = typeof value === 'string' ? table[value] : undefined;
+	return pair ? pair[isJapanese ? 0 : 1] : typeof value === 'string' ? value : '';
+}
+
+export const compositionFormLabel = (form: unknown, isJapanese: boolean) => labelOf(FORM_LABELS, form, isJapanese);
+export const compositionRoleLabel = (role: unknown, isJapanese: boolean) => labelOf(ROLE_LABELS, role, isJapanese);
+export const compositionKindLabel = (kind: unknown, isJapanese: boolean) => labelOf(KIND_LABELS, kind, isJapanese);
+export const compositionMeasureLabel = (state: unknown, isJapanese: boolean) => labelOf(MEASURE_LABELS, state, isJapanese);
+
+export function compositionStateNote(record: CompositionRecord | null | undefined, isJapanese: boolean): string {
+	if (record?.state === 'used') return isJapanese ? '構図と法則を決め、それに沿って書いた' : 'A composition and laws were decided, and the DDL was written toward them';
+	if (record?.state === 'fallback') {
+		const reason = record.fallback === 'refused'
+			? (isJapanese ? '答えが決まりに合わなかった' : 'the answers broke the rules')
+			: (record.fallback ?? '');
+		return isJapanese
+			? `構図と法則を決められず、構図と法則なしで書いた（${reason}）`
+			: `No composition and laws could be decided, so it was written without them (${reason})`;
+	}
+	return isJapanese ? '構図と法則を決めている途中' : 'Deciding the composition and laws';
+}
+
+/** The last measure's states, counted, and the pairs that did not fit. */
+export function compositionMeasureSummary(record: CompositionRecord | null | undefined): {
+	counts: [string, number][];
+	misses: { law: string; thing: string; state: string }[];
+} {
+	const last = record?.measures?.at(-1)?.after ?? [];
+	const counts = new Map<string, number>();
+	const misses: { law: string; thing: string; state: string }[] = [];
+	for (const measure of last) {
+		const state = measure.state ?? '';
+		counts.set(state, (counts.get(state) ?? 0) + 1);
+		if (state !== 'ok' && state !== 'fitted' && state !== 'clamped') {
+			const thing = Array.isArray(measure.thing) ? measure.thing.join('・') : measure.thing == null ? '' : String(measure.thing);
+			misses.push({ law: measure.law ?? '', thing, state });
+		}
+	}
+	return { counts: [...counts.entries()], misses };
+}
+
 /** The record the core keeps for a read-and-draw run (SPEC 12.6.7). */
 export type DescriptionDdlRecord = {
 	description?: string;
@@ -75,6 +203,8 @@ export type DescriptionDdlRecord = {
 	drawing?: Record<string, unknown> | null;
 	/** Lines left out because each alone stopped the whole work. */
 	dropped?: string[];
+	/** The composition and laws, when the run was drawn with them. */
+	composition?: CompositionRecord | null;
 	[key: string]: unknown;
 };
 

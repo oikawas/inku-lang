@@ -109,6 +109,8 @@ Canvasの選択（`inku.canvas-format-registry.v1`）とRender Engine Packは、
 `5個のSky.星。`と`5 Sky.Stars.`は5つ、`Sky.星。`は書かない個数の候補から3〜5つ、`9個のSky.星。`は9つの円を、
 診断なしで描いた。`12個のSky.星。`は範囲の外なので、その語が外れた。
 
+もう一つの作例として、一点を中心に同心の輪を広げる`Water.Ripples`（別名`Water.波紋`）を、そのまま読み込める書き出しファイルの形で[docs/plugins](docs/plugins/README.ja.md)に置いてある。
+
 ## 3. 定義の形式
 
 ### 3.1 最上位の欄

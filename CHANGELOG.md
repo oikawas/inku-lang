@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-26 — An example plugin, `Water.Ripples` (alias `Water.波紋`), kept as export files
+
+As an example of a vocabulary plugin written to the PLUGIN specification, `docs/plugins/` now holds `Water.Ripples` (alias `Water.波紋`) as Japanese and English DDL export files (`inku.ddl-export.v1`) that load as they are. It stacks 1–6 outline-only concentric circles in thin gray brush around one point (3–4 when no count is written), each outer ring thinner, the fifth dashed and the sixth dotted. The center is one of five positions around and slightly below the middle, chosen by the composition seed. The definition passed `compile-score`, and passing the export's definition to `/api/compose` drew it under both the Japanese alias and the English name. `PLUGIN.ja.md` and `PLUGIN.md` point to it after their example. It is not bundled. No code changed.
+
 ### 2026-10-26 — Android also lets a purpose that gave no response be chosen as not recommended
 
 As on the Server, Android's model publication picker now lets the LLM or Vision toggle of a purpose the model gave no response for when measured be pressed, framed in red with the note that it can be chosen but the system does not recommend it. A purpose so pressed stays among the model's purposes, while the defaults from the catalog still leave it out, and select-all does not choose a model with no purpose. A ChatGPT plan connection still cannot press it. The drawing model list and the Vision model cards frame a model that gave no response for that purpose in red, say "Not recommended (no response when measured)" and place it after the models that answered. The label "No response when measured" is now set as the Server sets it (no purpose left once the unanswered ones are taken out) and keeps the warning colour though it no longer blocks publication. The core, Server and Web are unchanged.

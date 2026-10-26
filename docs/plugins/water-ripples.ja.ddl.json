@@ -1,0 +1,286 @@
+{
+  "schema": "inku.ddl-export.v1",
+  "language": "ja",
+  "ddl": "背景を青で埋める。\n5個のWater.波紋。",
+  "plugins": [
+    {
+      "definition": {
+        "schema": "inku.macro-definition.v1",
+        "namespace": "Water",
+        "heading": "Ripples",
+        "aliases": [
+          "波紋"
+        ],
+        "version": "1.0.0",
+        "parameters": {
+          "ring_count": {
+            "type": "integer",
+            "receives": "count",
+            "minimum": 1,
+            "maximum": 6,
+            "omitted": [
+              3,
+              4
+            ],
+            "counter": "general"
+          }
+        },
+        "components": {},
+        "body": [
+          {
+            "op": "vary",
+            "binding": "ripple_center",
+            "domain": "water_ripples_center",
+            "choices": [
+              {
+                "expr": "integer",
+                "value": 0
+              },
+              {
+                "expr": "integer",
+                "value": 1
+              },
+              {
+                "expr": "integer",
+                "value": 2
+              },
+              {
+                "expr": "integer",
+                "value": 3
+              },
+              {
+                "expr": "integer",
+                "value": 4
+              }
+            ],
+            "body": [
+              {
+                "op": "repeat",
+                "count": {
+                  "expr": "parameter",
+                  "name": "ring_count"
+                },
+                "maximum": 6,
+                "index": "ring_index",
+                "body": [
+                  {
+                    "op": "emit",
+                    "binding": null,
+                    "fields": {
+                      "shape": {
+                        "expr": "semantic_ref",
+                        "category": "shape",
+                        "id": "circle"
+                      },
+                      "movement": {
+                        "expr": "semantic_ref",
+                        "category": "movement",
+                        "id": "place"
+                      },
+                      "position_x": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "ripple_center"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.500"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.380"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.620"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.440"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.580"
+                          }
+                        ]
+                      },
+                      "position_y": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "ripple_center"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.560"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.620"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.580"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.680"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.460"
+                          }
+                        ]
+                      },
+                      "radius": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "ring_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.035"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.070"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.110"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.155"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.205"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.260"
+                          }
+                        ]
+                      },
+                      "color": {
+                        "expr": "semantic_ref",
+                        "category": "color",
+                        "id": "gray"
+                      },
+                      "touch": {
+                        "expr": "semantic_ref",
+                        "category": "touch",
+                        "id": "brush_thin"
+                      },
+                      "surface": {
+                        "expr": "semantic_ref",
+                        "category": "surface",
+                        "id": "none"
+                      },
+                      "thinness": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "ring_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "semantic_ref",
+                            "category": "thinness",
+                            "id": "fine"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "thinness",
+                            "id": "fine"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "thinness",
+                            "id": "fine"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "thinness",
+                            "id": "extra_fine"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "thinness",
+                            "id": "extra_fine"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "thinness",
+                            "id": "extra_fine"
+                          }
+                        ]
+                      },
+                      "continuity": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "ring_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "semantic_ref",
+                            "category": "continuity",
+                            "id": "solid"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "continuity",
+                            "id": "solid"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "continuity",
+                            "id": "solid"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "continuity",
+                            "id": "solid"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "continuity",
+                            "id": "dashed"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "continuity",
+                            "id": "dotted"
+                          }
+                        ]
+                      },
+                      "fluctuation_amplitude": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "narrowly"
+                      },
+                      "fluctuation_quality": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "undulating"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "summary": "水面に波紋を一つ広げる。一点を中心に、灰色の細筆で輪郭だけの円を内から外へ同心に重ね、外の輪ほど線が細く、五つ目は破線、六つ目は点線にほどける。輪の数を書けばその数（1〜6個）、書かなければ3〜4個。中心は画面の中央からやや下の五つの位置から一つを選ぶ。輪の線は細かく波打つ。"
+    }
+  ],
+  "exported_from": {}
+}

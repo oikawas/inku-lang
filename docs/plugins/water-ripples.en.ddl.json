@@ -1,0 +1,286 @@
+{
+  "schema": "inku.ddl-export.v1",
+  "language": "en",
+  "ddl": "Fill the background with blue.\n5 Water.Ripples.",
+  "plugins": [
+    {
+      "definition": {
+        "schema": "inku.macro-definition.v1",
+        "namespace": "Water",
+        "heading": "Ripples",
+        "aliases": [
+          "波紋"
+        ],
+        "version": "1.0.0",
+        "parameters": {
+          "ring_count": {
+            "type": "integer",
+            "receives": "count",
+            "minimum": 1,
+            "maximum": 6,
+            "omitted": [
+              3,
+              4
+            ],
+            "counter": "general"
+          }
+        },
+        "components": {},
+        "body": [
+          {
+            "op": "vary",
+            "binding": "ripple_center",
+            "domain": "water_ripples_center",
+            "choices": [
+              {
+                "expr": "integer",
+                "value": 0
+              },
+              {
+                "expr": "integer",
+                "value": 1
+              },
+              {
+                "expr": "integer",
+                "value": 2
+              },
+              {
+                "expr": "integer",
+                "value": 3
+              },
+              {
+                "expr": "integer",
+                "value": 4
+              }
+            ],
+            "body": [
+              {
+                "op": "repeat",
+                "count": {
+                  "expr": "parameter",
+                  "name": "ring_count"
+                },
+                "maximum": 6,
+                "index": "ring_index",
+                "body": [
+                  {
+                    "op": "emit",
+                    "binding": null,
+                    "fields": {
+                      "shape": {
+                        "expr": "semantic_ref",
+                        "category": "shape",
+                        "id": "circle"
+                      },
+                      "movement": {
+                        "expr": "semantic_ref",
+                        "category": "movement",
+                        "id": "place"
+                      },
+                      "position_x": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "ripple_center"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.500"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.380"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.620"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.440"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.580"
+                          }
+                        ]
+                      },
+                      "position_y": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "ripple_center"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.560"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.620"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.580"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.680"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.460"
+                          }
+                        ]
+                      },
+                      "radius": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "ring_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.035"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.070"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.110"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.155"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.205"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.260"
+                          }
+                        ]
+                      },
+                      "color": {
+                        "expr": "semantic_ref",
+                        "category": "color",
+                        "id": "gray"
+                      },
+                      "touch": {
+                        "expr": "semantic_ref",
+                        "category": "touch",
+                        "id": "brush_thin"
+                      },
+                      "surface": {
+                        "expr": "semantic_ref",
+                        "category": "surface",
+                        "id": "none"
+                      },
+                      "thinness": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "ring_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "semantic_ref",
+                            "category": "thinness",
+                            "id": "fine"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "thinness",
+                            "id": "fine"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "thinness",
+                            "id": "fine"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "thinness",
+                            "id": "extra_fine"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "thinness",
+                            "id": "extra_fine"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "thinness",
+                            "id": "extra_fine"
+                          }
+                        ]
+                      },
+                      "continuity": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "ring_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "semantic_ref",
+                            "category": "continuity",
+                            "id": "solid"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "continuity",
+                            "id": "solid"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "continuity",
+                            "id": "solid"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "continuity",
+                            "id": "solid"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "continuity",
+                            "id": "dashed"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "continuity",
+                            "id": "dotted"
+                          }
+                        ]
+                      },
+                      "fluctuation_amplitude": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "narrowly"
+                      },
+                      "fluctuation_quality": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "undulating"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "summary": "Spread one ripple on the water: concentric outline-only circles in thin gray brush around one point, from the inside out, each outer ring thinner, the fifth dashed and the sixth dotted as they break up. The written ring count (1–6), or 3–4 when none is written. The center is one of five positions around and slightly below the middle of the canvas. The ring lines undulate narrowly."
+    }
+  ],
+  "exported_from": {}
+}

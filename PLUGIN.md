@@ -115,6 +115,9 @@ shared core: `5 Sky.Stars.` and `5個のSky.星。` drew five circles, `Sky.Star
 choices, and `9個のSky.星。` drew nine, all without diagnostics. `12個のSky.星。` is outside the range, so that
 word was left out.
 
+Another example, `Water.Ripples` (alias `Water.波紋`), which spreads concentric rings around one point, is kept
+in [docs/plugins](docs/plugins/README.md) as export files that can be loaded as they are.
+
 ## 3. Definition Format
 
 ### 3.1 Top-level fields

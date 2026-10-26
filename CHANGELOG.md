@@ -8,14 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-26 — The strip above the canvas names the drawing route and the sketch
-
-At the author's instruction, the "Conditions of the displayed work" strip above the canvas gains "Drawing" and "Sketch" between the canvas and the size. Drawing names the work on screen's route, "Current stages" or "Read and draw", and "Written from a picture" for a work from a picture. Sketch says what the work's recorded state was: "On", "On, nothing added", "No answer", "Off", "Not applicable" or "Not recorded", with the drawer's full sentence on hover; a work without a record is kept apart from Off. The chips in the left panel are the conditions for the next drawing; the strip is the work on screen.
-
-### 2026-10-26 — Provenance no longer shows the interpretation seed
-
-At the author's instruction, the Web's provenance drawer drops the "Interpretation seed" row. The value named a reinterpretation of "Change the reading", removed 2026-10-14; it never reached Stage 1 or the drawing, and a new work always showed "-". Its hint, that the same seed reads the words the same way, was not true either. Saved works keep their values, and the API's `interpretation_seed` is unchanged.
-
 ### 2026-10-25 — inku-cli reads one work by its UUID
 
 inku-cli gains `history show`, which prints a work's description, DDL and JSON Score (`--part` for one of them), and `history png`, which rasterizes the saved display SVG into a PNG of the drawing alone (`--size` for the longer side, default 1024). Both take the UUID or its first few characters. There is no endpoint for one work, so the listing is asked with `anchor_id` and `limit=1` and the returned work's id is checked. A prefix is resolved against the listing without pictures, and one that fits more than one work stops with the candidates. The server is unchanged.
@@ -306,6 +298,16 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.260 (2026-10-26 / Build1336)
+
+### 2026-10-26 — The strip above the canvas names the drawing route and the sketch
+
+At the author's instruction, the "Conditions of the displayed work" strip above the canvas gains "Drawing" and "Sketch" between the canvas and the size. Drawing names the work on screen's route, "Current stages" or "Read and draw", and "Written from a picture" for a work from a picture. Sketch says what the work's recorded state was: "On", "On, nothing added", "No answer", "Off", "Not applicable" or "Not recorded", with the drawer's full sentence on hover; a work without a record is kept apart from Off. The chips in the left panel are the conditions for the next drawing; the strip is the work on screen.
+
+### 2026-10-26 — Provenance no longer shows the interpretation seed
+
+At the author's instruction, the Web's provenance drawer drops the "Interpretation seed" row. The value named a reinterpretation of "Change the reading", removed 2026-10-14; it never reached Stage 1 or the drawing, and a new work always showed "-". Its hint, that the same seed reads the words the same way, was not true either. Saved works keep their values, and the API's `interpretation_seed` is unchanged.
 
 ## v2.15.258 (2026-10-26 / Build1334)
 

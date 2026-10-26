@@ -210,8 +210,10 @@
 		modelPickerEnabledDraft = {
 			...modelPickerEnabledDraft,
 			// A retired or plan-only model is never published; the Server refuses it too.
+			// Nor is one with no purpose, so publishing everything never chooses a
+			// purpose the model did not answer.
 			...Object.fromEntries(models.map((model) => [model.id, enabled && !isModelUnselectable(model)
-				&& (modelPickerProviderId !== 'chatgpt' || (modelPickerPurposeDraft[model.id] ?? []).length > 0)])),
+				&& (modelPickerPurposeDraft[model.id] ?? model.purposes ?? ['llm']).length > 0])),
 		};
 	}
 
@@ -260,10 +262,13 @@
 	}
 
 	function modelDraft(model: ModelOption): ModelOption {
+		const purposes = modelPickerPurposeDraft[model.id] ?? model.purposes ?? ['llm'];
 		return {
 			...model,
 			...(modelPickerMetadataDraft[model.id] ?? {}),
-			purposes: modelPickerPurposeDraft[model.id] ?? model.purposes ?? ['llm'],
+			purposes,
+			// The Server keeps a purpose the model did not answer only when it is named here.
+			allowed_unsupported_purposes: purposes.filter((purpose) => purposeUnsupported(model, purpose)),
 		};
 	}
 
@@ -307,8 +312,18 @@
 		updateModelMetadata(model, { [key]: text.trim() === '' || !Number.isFinite(value) ? undefined : value });
 	}
 
-	function noResponseTitle(): string {
-		return t().code === 'ja' ? '計測で応答が無かったため選べません' : 'Not selectable: no response when measured';
+	// A purpose the model did not answer when measured can be chosen, framed in red
+	// as not recommended (the author, 2026-10-26). A ChatGPT plan model's purposes
+	// are each person's own, and that path still leaves such a purpose out.
+	function purposeLocked(model: ModelOption, purpose: 'llm' | 'vision'): boolean {
+		return modelPickerProvider?.id === 'chatgpt' && purposeUnsupported(model, purpose);
+	}
+
+	function noResponseTitle(locked: boolean): string {
+		if (locked) return t().code === 'ja' ? '計測で応答が無かったため選べません' : 'Not selectable: no response when measured';
+		return t().code === 'ja'
+			? '計測で応答が無かった用途です。選べますが、システムとしては推奨しません'
+			: 'No response when measured for this purpose. It can be chosen, but the system does not recommend it';
 	}
 
 	function serviceIdLabel(provider: Provider): string {
@@ -613,7 +628,7 @@
 								<input
 									type="checkbox"
 								checked={!isModelUnselectable(model) && modelPickerDraftEnabled(model.id)}
-									disabled={isModelUnselectable(model) || (modelPickerProvider?.id === 'chatgpt' && modelDraft(model).purposes?.length === 0)}
+									disabled={isModelUnselectable(model) || modelDraft(model).purposes?.length === 0}
 								onchange={(e) => {
 									modelPickerEnabledDraft = {
 										...modelPickerEnabledDraft,
@@ -624,8 +639,9 @@
 									<span><strong>{model.label}</strong><small>{model.id}</small>{#if modelStatusLabel(model, t().code === 'ja')}<em class="model-picker-status">{#each modelStatusParts(model, t().code === 'ja') as part, partIndex (partIndex)}{#if partIndex > 0}{' · '}{/if}<span class:unselectable={part.blocking}>{part.text}</span>{/each}</em>{/if}{#if model.notes}<em>{model.notes}</em>{/if}</span>
 								</label>
 								<div class="model-purpose-controls" aria-label={`${model.label} LLM / Vision`}>
-									<button type="button" class:active={modelPurposeSelected(model.id, 'llm')} aria-pressed={modelPurposeSelected(model.id, 'llm')} disabled={purposeUnsupported(model, 'llm')} title={purposeUnsupported(model, 'llm') ? noResponseTitle() : undefined} onclick={() => toggleModelPurpose(model.id, 'llm')}>LLM</button>
-									<button type="button" class:active={modelPurposeSelected(model.id, 'vision')} aria-pressed={modelPurposeSelected(model.id, 'vision')} disabled={purposeUnsupported(model, 'vision')} title={purposeUnsupported(model, 'vision') ? noResponseTitle() : undefined} onclick={() => toggleModelPurpose(model.id, 'vision')}>Vision</button>
+									{#each ['llm', 'vision'] as const as purpose (purpose)}
+										<button type="button" class:active={modelPurposeSelected(model.id, purpose)} class:not-recommended={purposeUnsupported(model, purpose)} aria-pressed={modelPurposeSelected(model.id, purpose)} disabled={purposeLocked(model, purpose)} title={purposeUnsupported(model, purpose) ? noResponseTitle(purposeLocked(model, purpose)) : undefined} onclick={() => toggleModelPurpose(model.id, purpose)}>{purpose === 'llm' ? 'LLM' : 'Vision'}</button>
+									{/each}
 								</div>
 							</div>
 							<!-- Assessments are shared model settings (2026-10-13): an administrator edits them. -->

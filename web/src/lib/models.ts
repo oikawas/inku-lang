@@ -6,8 +6,11 @@ export type ModelOption = {
 	notes?: string;
 	purposes?: ('llm' | 'vision')[];
 	// Purposes the model was measured not to answer (2026-10-13). The server keeps
-	// them out of purposes; an operator cannot tick them back.
+	// them out of purposes unless an administrator chose them anyway.
 	unsupported_purposes?: ('llm' | 'vision')[];
+	// The purposes an administrator chose against the measurement, as not
+	// recommended (the author, 2026-10-26). The server keeps only these of them.
+	allowed_unsupported_purposes?: ('llm' | 'vision')[];
 	// Left out of the benchmark as a kind inku does not draw with (2026-10-13).
 	// Not published; model administration folds it away.
 	not_supported?: boolean;

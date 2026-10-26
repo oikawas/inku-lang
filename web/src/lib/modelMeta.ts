@@ -21,14 +21,10 @@ export function modelPurposeBadges(model: ModelOption): { purpose: ModelPurpose;
 }
 
 // A purpose the benchmark found the model does not answer (no drawing, or no
-// Vision answer). Model administration cannot switch it on.
+// Vision answer). It can be chosen, but the system does not recommend it: every
+// control that chooses it is framed in red (the author, 2026-10-26).
 export function purposeUnsupported(model: ModelOption, purpose: ModelPurpose): boolean {
 	return (model.unsupported_purposes ?? []).includes(purpose);
-}
-
-// Measured to answer neither purpose: there is nothing to choose it for.
-function answersNothing(model: ModelOption): boolean {
-	return purposeUnsupported(model, 'llm') && purposeUnsupported(model, 'vision');
 }
 
 // Which stage is choosing the model. 'both' assigns one model to both stages.
@@ -127,6 +123,11 @@ export function sortModels(models: ModelOption[], purpose?: ModelPurpose, stage?
 	return [...models].sort((a, b) => {
 		const unselectable = Number(isModelUnselectable(a)) - Number(isModelUnselectable(b));
 		if (unselectable !== 0) return unselectable;
+		// A model chosen for a purpose it did not answer comes after those that did.
+		if (purpose) {
+			const unrecommended = Number(purposeUnsupported(a, purpose)) - Number(purposeUnsupported(b, purpose));
+			if (unrecommended !== 0) return unrecommended;
+		}
 		const level = modelRecommendationLevel(b, purpose, stage) - modelRecommendationLevel(a, purpose, stage);
 		if (level !== 0) return level;
 		return (a.label || a.id).localeCompare(b.label || b.id);
@@ -195,18 +196,20 @@ function labelText(id: string, isJapanese: boolean): string {
 // the Server answers carries the stored marks rather than labels.
 export function isModelUnselectable(model: ModelOption): boolean {
 	if (model.labels) return model.labels.some((id) => labelTable.find((entry) => entry.id === id)?.publishable === false);
-	return !!model.eol || !!model.requires_subscription || !!model.not_supported || answersNothing(model);
+	return !!model.eol || !!model.requires_subscription || !!model.not_supported;
 }
 
 // Every label of the model, in the table's order, each with whether it keeps the model
 // from publication: a row paints those in the warning colour and leaves the others
-// (older model, not measured) muted. The end of life carries its date.
+// (older model, not measured) muted. The end of life carries its date. No response
+// when measured can be published since 2026-10-26, as not recommended, and keeps
+// the warning colour.
 export type ModelStatusPart = { text: string; blocking: boolean };
 
 export function modelStatusParts(model: ModelOption, isJapanese: boolean): ModelStatusPart[] {
 	return (model.labels ?? []).map((id) => ({
 		text: id === 'eol' && model.eol_date ? `${labelText(id, isJapanese)} (${model.eol_date})` : labelText(id, isJapanese),
-		blocking: labelTable.find((entry) => entry.id === id)?.publishable === false
+		blocking: id === 'no_response' || labelTable.find((entry) => entry.id === id)?.publishable === false
 	}));
 }
 

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
 	import ModelMetaCard from '$lib/components/ModelMetaCard.svelte';
-	import { modelRecommendation, modelRecommendationStars, modelStatusLabel, modelStatusParts, isModelUnselectable, sortModels, type ModelPurpose, type ModelStage } from '$lib/modelMeta';
+	import { modelRecommendation, modelRecommendationStars, modelStatusLabel, modelStatusParts, isModelUnselectable, purposeUnsupported, sortModels, type ModelPurpose, type ModelStage } from '$lib/modelMeta';
 	import type { Provider, ProviderGroup } from '$lib/models';
 	import './model-selection-settings.css';
 
@@ -87,6 +87,8 @@
 									class:selected={modelSelected(provider.id, model.id)}
 									class:eol={model.eol}
 									class:unselectable={isModelUnselectable(model)}
+									class:not-recommended={purposeUnsupported(model, recommendationPurpose)}
+									title={purposeUnsupported(model, recommendationPurpose) ? t().modelNotRecommendedHint : undefined}
 									disabled={isModelUnselectable(model)}
 									aria-pressed={modelSelected(provider.id, model.id)}
 									onclick={() => selectGenerationModel(provider.id, model.id)}
@@ -95,6 +97,7 @@
 										<strong>{model.label}</strong>
 										<span class="model-recommendation" aria-label={`${t().settingsModelRecommendationFields[recommendationPurpose === 'vision' ? 'recommendation_vision' : 'recommendation_llm']} ${modelRecommendation(model, recommendationPurpose, recommendationStage)}`}>{modelRecommendationStars(model, recommendationPurpose, recommendationStage)}</span>
 									</div>
+									{#if purposeUnsupported(model, recommendationPurpose)}<span class="not-recommended-note">{t().modelNotRecommended}</span>{/if}
 									{#if modelStatusLabel(model, isJapanese)}<span class="model-label-mark">{#each modelStatusParts(model, isJapanese) as part, partIndex (partIndex)}{#if partIndex > 0}{' · '}{/if}<span class:eol-mark={part.blocking}>{part.text}</span>{/each}</span>{/if}
 									{#if model.notes}<span>{model.notes}</span>{/if}
 									<ModelMetaCard {model} {isJapanese} purpose={recommendationPurpose} />

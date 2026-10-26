@@ -77,7 +77,10 @@
 	.settings-feature-root .model-purpose-controls { display: inline-flex; gap: 5px; }
 	.settings-feature-root .model-purpose-controls button { min-height: 32px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--fg3); font: inherit; font-size: var(--ui-font-size-13); cursor: pointer; }
 	.settings-feature-root .model-purpose-controls button.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--fg); }
-	/* Measured not to answer this purpose: greyed and not pressable. */
+	/* Measured not to answer this purpose: pressable, but framed in red as not
+	   recommended (2026-10-26). A ChatGPT plan model's is still greyed and locked. */
+	.settings-feature-root .model-purpose-controls button.not-recommended { border: 2px solid var(--danger); color: var(--danger); }
+	.settings-feature-root .model-purpose-controls button.not-recommended.active { background: color-mix(in srgb, var(--danger) 14%, transparent); }
 	.settings-feature-root .model-purpose-controls button:disabled { border-style: dashed; opacity: .4; cursor: not-allowed; }
 	.settings-feature-root .model-metadata-editor { border-top: 1px solid var(--border); padding: 0 12px 12px; }
 	.settings-feature-root .model-metadata-editor summary { padding: 10px 0; color: var(--fg2); font-size: var(--ui-font-size-13); cursor: pointer; }

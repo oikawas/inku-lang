@@ -48,7 +48,10 @@ def catalog_models(provider_id: str) -> dict[str, dict[str, Any]]:
 def model_labels(model: dict[str, Any]) -> list[str]:
     """Every label of a model in the Server's form, in the table's order."""
     labels = {label for label, key in STORED_LABEL_KEYS.items() if model.get(key) is True}
-    if not model.get("purposes", ["llm"]):
+    # Measured to answer no purpose it is offered for: a purpose an administrator
+    # chose against the measurement (2026-10-26) does not make it answer.
+    unsupported = model.get("unsupported_purposes") or []
+    if not [purpose for purpose in model.get("purposes", ["llm"]) if purpose not in unsupported]:
         labels.add("no_response")
     if not any(key in model for key in MEASUREMENT_KEYS) and all(_PUBLISHABLE[label] for label in labels):
         labels.add("unmeasured")

@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-26 — The Mac Server tests load a wheel built with the pinned Rust 1.95.0
+
+On a Mac, `make test-server` no longer strips the native wheel it builds for the Server tests. Built with the pinned Rust 1.95.0 and Xcode 27.1, the stripped `_native.abi3.so` failed to load with "mis-aligned LINKEDIT string pool", so the suite worked only while Homebrew's newer Rust came first on PATH. Both orders of PATH now pass. Linux builds, including the published wheel, are unchanged.
+
 ### 2026-10-26 — PLUGIN alone is enough to write a plugin file
 
 After the author's review, three gaps in `PLUGIN.ja.md` and `PLUGIN.md` were filled. The example in §5.1 is now a complete file with its definition written out, and the guide says it can be saved and added as it is (a Server test passes the example through the check). §7.3 adds a table of the codes a plugin file check reports for its shape, taken names, examples, and pictures, with their fixes. §8 adds the limits on the file size (1,000,000 bytes), the number of words (64), the lengths of descriptions, examples, and the license, and the replacement picture. No code changed.

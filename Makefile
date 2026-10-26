@@ -21,8 +21,9 @@ git-setup:
 # The Server keeps the separately deployed native wheel out of its dependency
 # graph, so its suite builds the wheel from this checkout on every run and
 # injects it. `uv run --with <crate dir>` reuses a cached build after the Rust
-# sources change; a wheel built here cannot be stale. `rustup run` keeps the
-# pinned toolchain even where another cargo comes first on PATH.
+# sources change; a wheel built here cannot be stale. `rustup run` names the
+# pinned toolchain, but a cargo that comes earlier on PATH still builds the
+# wheel: with Homebrew's rust first, Homebrew's rustc built it (2026-10-26).
 #
 # `python -m pytest`, not `pytest`: the wheel lives only in the interpreter uv
 # layers over the project environment. Where the interpreter's path is too long
@@ -30,12 +31,18 @@ git-setup:
 # launchers that exec the project interpreter by name; `pytest` then ran
 # without the wheel and every test that renders failed to import it. Seen
 # 2026-09-26 with a checkout whose interpreter path was 182 characters.
+#
+# On macOS the wheel keeps its symbols. Rust 1.95's release debuginfo stripping
+# with Xcode 27.1 left the LC_SYMTAB string table off its 8-byte alignment, and
+# dyld refused `_native.abi3.so` with "mis-aligned LINKEDIT string pool"
+# (2026-10-26). Linux builds keep the default strip.
 RUST_CHANNEL := $(shell sed -n 's/^channel = "\(.*\)"/\1/p' core/rust-toolchain.toml)
 NATIVE_WHEEL_DIR := $(CURDIR)/.native-wheel
+NATIVE_WHEEL_ENV := $(if $(filter Darwin,$(shell uname -s)),CARGO_PROFILE_RELEASE_STRIP=none)
 
 test-server: git-setup
 	rm -rf "$(NATIVE_WHEEL_DIR)"
-	rustup run $(RUST_CHANNEL) uv build --wheel core/crates/inku-render-python -o "$(NATIVE_WHEEL_DIR)"
+	$(NATIVE_WHEEL_ENV) rustup run $(RUST_CHANNEL) uv build --wheel core/crates/inku-render-python -o "$(NATIVE_WHEEL_DIR)"
 	cd server && uv run --with "$$(ls "$(NATIVE_WHEEL_DIR)"/*.whl)" python -m pytest -q -rs $(PYTEST_ARGS)
 
 test-cli: git-setup

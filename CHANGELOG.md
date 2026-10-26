@@ -8,9 +8,9 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-26 — The Mac Server tests load a wheel built with the pinned Rust 1.95.0
+### 2026-10-26 — The pinned Rust is 1.99.1
 
-On a Mac, `make test-server` no longer strips the native wheel it builds for the Server tests. Built with the pinned Rust 1.95.0 and Xcode 27.1, the stripped `_native.abi3.so` failed to load with "mis-aligned LINKEDIT string pool", so the suite worked only while Homebrew's newer Rust came first on PATH. Both orders of PATH now pass. Linux builds, including the published wheel, are unchanged.
+At the author's instruction, the shared core, the Server wheel, Android and the Mac app are built with Rust 1.99.1 instead of 1.95.0. No published maturin image carries Rust 1.99.1, so the Server's Linux builder keeps the same maturin 1.13.3 image and installs the pinned toolchain in it; the wheel keeps its manylinux2014 tag. With Xcode 27.1, Rust 1.95.0's stripping left Mac libraries that would not load ("mis-aligned LINKEDIT string pool"); 1.99.1 does not, so the two stripping workarounds for 1.95 were removed. Drawings are unchanged: 5,179 saved Scores along the Server's path and 1,407 with their resources rendered the same SVG and metadata with both versions.
 
 ### 2026-10-26 — PLUGIN alone is enough to write a plugin file
 

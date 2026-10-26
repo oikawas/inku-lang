@@ -8,9 +8,9 @@
 
 ## 未リリース
 
-### 2026-10-26 — MacのServerの試験が、固定のRust 1.95.0で作ったwheelを読めるようにした
+### 2026-10-26 — 固定のRustを1.99.1にした
 
-Macでは、`make test-server`がServerの試験のために作るnativeのwheelを、stripせずに作るようにした。固定のRust 1.95.0とXcode 27.1で作り、stripした`_native.abi3.so`は「mis-aligned LINKEDIT string pool」で読み込めず、試験はHomebrewの新しいRustがPATHの先にある時だけ動いていた。今はPATHの順がどちらでも通る。公開するwheelを含め、Linuxのbuildは変わらない。
+作者の指示で、共有core、Serverのwheel、Android、Macのアプリを、Rust 1.95.0でなく1.99.1でbuildするようにした。Rust 1.99.1の入ったmaturinのimageは公開されていないので、ServerのLinuxのbuilderは同じmaturin 1.13.3のimageのまま、その中に固定の版を入れる。wheelのtagはmanylinux2014のまま。Xcode 27.1では、Rust 1.95.0がstripしたMacのlibraryが読み込めなかった（「mis-aligned LINKEDIT string pool」）。1.99.1ではそうならないので、1.95のためのstripの回避策を2つとも外した。描画は変わらない。Serverの道の保存済みの楽譜5,179件と、資源つきの1,407件を両方の版で描き、SVGとmetadataが同じだった。
 
 ### 2026-10-26 — PLUGINだけでプラグインのファイルを作れるようにした
 

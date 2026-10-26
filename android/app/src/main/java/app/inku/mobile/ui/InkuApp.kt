@@ -5029,11 +5029,22 @@ private fun ChatGptModelCard(state: InkuUiState, viewModel: InkuViewModel) {
     val provider = state.providerSettings.firstOrNull { it.providerId == "chatgpt" } ?: return
     var picker by remember(session) { mutableStateOf(false) }
     SettingsCard(S.chatGptPlan, plan.active?.label.orEmpty(), chatGptConnectionStatus(plan, S)) {
-        Text(S.publishedModels, style = MaterialTheme.typography.labelSmall)
-        if (plan.publishedModels.isEmpty()) Text(S.noPublishedModels, style = MaterialTheme.typography.bodySmall)
-        else plan.publishedModels.forEach { id -> Text(plan.models?.firstOrNull { it.id == id }?.label ?: id, style = MaterialTheme.typography.bodySmall) }
-        SecondarySmallButton(S.modelSelection, onClick = { picker = true }, enabled = session != null && (plan.canUsePlan || plan.active?.let { it.status == "quota" && it.planAllowed } == true))
-        SecondarySmallButton(S.chatGptPlan, onClick = { viewModel.setSettingsPane(SettingsPane.ChatGpt) })
+        // As the other services: the model selection first, the account below.
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(S.publishedModels, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(S.modelPublishedCount(plan.publishedModels.size), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+            }
+            PrimarySmallButton(S.modelSelection, onClick = { picker = true }, enabled = session != null && (plan.canUsePlan || plan.active?.let { it.status == "quota" && it.planAllowed } == true))
+        }
+        if (plan.publishedModels.isEmpty()) Text(S.noPublishedModels, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        else WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
+            plan.publishedModels.forEach { id -> PublishedModelChip(plan.models?.firstOrNull { it.id == id }?.label ?: id) }
+        }
+        HorizontalDivider(color = CardHairline)
+        TextButton(onClick = { viewModel.setSettingsPane(SettingsPane.ChatGpt) }, contentPadding = PaddingValues(0.dp)) {
+            Text("${S.chatGptPlan} ▸", style = MaterialTheme.typography.labelMedium)
+        }
     }
     if (picker && session != null) {
         ProviderModelPickerDialog(
@@ -5062,10 +5073,14 @@ private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mod
     ) {
         SettingsHeader(state.settingsPane, viewModel)
 
-        Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
+        Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceL)) {
             // A deleted built-in service stays in the table switched off (see
-            // `InkuRepository.deleteProvider`); it is not listed.
-            state.providerSettings.filter { it.isEnabled || it.isDefaultLocal || (it.providerId == "chatgpt" && state.chatGptPlan.active != null) }.forEach { provider ->
+            // `InkuRepository.deleteProvider`); it is not listed. The on-device
+            // LiteRT models come last, after the services and the add button
+            // (the author, 2026-10-26).
+            val listed = state.providerSettings.filter { it.isEnabled || it.isDefaultLocal || (it.providerId == "chatgpt" && state.chatGptPlan.active != null) }
+            @Composable
+            fun card(provider: app.inku.mobile.data.db.ProviderSettingEntity) {
                 if (provider.providerId == "chatgpt") {
                     ChatGptModelCard(state, viewModel)
                 } else {
@@ -5088,12 +5103,14 @@ private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mod
                 )
                 }
             }
+            listed.filterNot { it.isDefaultLocal }.forEach { card(it) }
             if (state.chatGptPlan.active == null) {
                 SettingsCard(S.chatGptPlan, S.chatGptConnectionSubtitle, chatGptConnectionStatus(state.chatGptPlan, S)) {
                     SecondarySmallButton(S.chatGptContinue, onClick = { viewModel.setSettingsPane(SettingsPane.ChatGpt) })
                 }
             }
             AddProviderCard(onAdd = viewModel::saveProviderSetting)
+            listed.filter { it.isDefaultLocal }.forEach { card(it) }
         }
     }
 }
@@ -5142,52 +5159,32 @@ private fun ProviderConnectionCard(
         parsePublishedModelIds(provider.publishedModelsJson)
     }
     val apiKeyState = if (keySet) S.apiKeySetAlready else S.apiKeyUnset
+    // Web's `model-connection-details`: the URL, key and deletion are set once
+    // and folded below the model selection, which is what is used day to day.
+    var connectionOpen by remember(provider.providerId) { mutableStateOf(false) }
     SettingsCard(
         provider.displayName,
-        "Service ID: ${provider.providerId}",
+        // Web's provider choice meta: the key state is read without opening the fold.
+        if (provider.isDefaultLocal) "Service ID: ${provider.providerId}" else "Service ID: ${provider.providerId} · $apiKeyState",
         "",
         titleAction = {
             SecondarySmallButton(text = S.change, onClick = { editNameOpen = true })
         },
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+        Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM), modifier = Modifier.testTag("ProviderCard:${provider.providerId}")) {
             saveError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall) }
-            ModelSettingValueRow(
-                label = "Base URL",
-                value = baseUrl.ifBlank { provider.baseUrl ?: "-" },
-                action = S.edit,
-                onAction = { editBaseUrlOpen = true },
-            )
             Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(S.apiKey, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), verticalAlignment = Alignment.CenterVertically) {
-                            Text(apiKeyState, style = MaterialTheme.typography.bodySmall)
-                            // Only where a key is optional; a cloud service always needs one.
-                            if (!keySet && !requiresKey) Text(S.apiKeyLocalNote, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
+                    Column(Modifier.weight(1f)) {
+                        Text(S.publishedModels, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(S.modelPublishedCount(publishedModelIds.size), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                     }
-                    SecondarySmallButton(
-                        text = if (keySet) S.delete else S.add,
-                        onClick = {
-                            if (keySet) confirmClearKey = true else editApiKeyOpen = true
-                        },
-                    )
-                }
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(S.publishedModels, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    SecondarySmallButton(text = S.modelSelection, onClick = { modelPickerOpen = true })
+                    PrimarySmallButton(text = S.modelSelection, onClick = { modelPickerOpen = true },
+                        modifier = Modifier.testTag("ProviderModelSelect:${provider.providerId}"))
                 }
                 if (publishedModelIds.isEmpty()) {
                     Text(S.noPublishedModels, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -5211,15 +5208,50 @@ private fun ProviderConnectionCard(
                     }
                 }
             }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                OutlinedButton(
-                    onClick = { confirmDeleteService = true },
-                    enabled = !provider.isDefaultLocal,
-                    modifier = Modifier.height(Dimens.controlSizeSmall),
-                    shape = RoundedCornerShape(Dimens.radiusCard),
-                    contentPadding = PaddingValues(horizontal = Dimens.spaceM, vertical = 0.dp),
+            // The on-device service has no URL or key to set, and cannot be deleted.
+            if (!provider.isDefaultLocal) {
+                HorizontalDivider(color = CardHairline)
+                TextButton(onClick = { connectionOpen = !connectionOpen }, contentPadding = PaddingValues(0.dp),
+                    modifier = Modifier.testTag("ProviderConnection:${provider.providerId}")) {
+                    Text("${S.connectionSettings} ${if (connectionOpen) "▾" else "▸"}", style = MaterialTheme.typography.labelMedium)
+                }
+            }
+            if (connectionOpen && !provider.isDefaultLocal) {
+                ModelSettingValueRow(
+                    label = "Base URL",
+                    value = baseUrl.ifBlank { provider.baseUrl ?: "-" },
+                    action = S.edit,
+                    onAction = { editBaseUrlOpen = true },
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(S.serviceDeleteTitle, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(S.apiKey, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), verticalAlignment = Alignment.CenterVertically) {
+                            Text(apiKeyState, style = MaterialTheme.typography.bodySmall)
+                            // Only where a key is optional; a cloud service always needs one.
+                            if (!keySet && !requiresKey) Text(S.apiKeyLocalNote, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                    SecondarySmallButton(
+                        text = if (keySet) S.delete else S.add,
+                        onClick = {
+                            if (keySet) confirmClearKey = true else editApiKeyOpen = true
+                        },
+                    )
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    OutlinedButton(
+                        onClick = { confirmDeleteService = true },
+                        modifier = Modifier.height(Dimens.controlSizeSmall),
+                        shape = RoundedCornerShape(Dimens.radiusCard),
+                        contentPadding = PaddingValues(horizontal = Dimens.spaceM, vertical = 0.dp),
+                    ) {
+                        Text(S.serviceDeleteTitle, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                    }
                 }
             }
         }
@@ -5434,17 +5466,33 @@ private fun ProviderModelPickerDialog(
         val query = search.trim().lowercase()
         query.isBlank() || model.id.lowercase().contains(query) || (candidateLabels[model.id] ?: model.name).lowercase().contains(query) || model.record.toString().lowercase().contains(query) || model.labels.any { it.name(S.code == "en").lowercase().contains(query) }
     }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        // As in the add dialog: the search field brings up the keyboard, and
-        // the list gives way to it instead of the save button going under it.
-        modifier = Modifier.imePadding(),
-        title = { Text(provider.displayName) },
-        text = {
+    // Web's `model-picker-dialog`: nearly the whole screen, as the list is what
+    // the dialog is for (the author, 2026-10-26: "もっと大きく").
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(
+            shape = RoundedCornerShape(Dimens.radiusCard),
+            color = MaterialTheme.colorScheme.surface,
+            // As in the add dialog: the search field brings up the keyboard, and
+            // the list gives way to it instead of the save button going under it.
+            modifier = Modifier.fillMaxWidth(0.96f).fillMaxHeight(0.94f).imePadding().testTag("ProviderModelPicker"),
+        ) {
             Column(
-                modifier = Modifier.fillMaxWidth().heightIn(max = Dimens.providerModelDialogHeight),
+                modifier = Modifier.fillMaxSize().padding(Dimens.spaceL),
                 verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
             ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(provider.displayName, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f),
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    TextButton(onClick = onDismiss) { Text(S.close) }
+                }
+                ImeAwareOutlinedTextField(
+                    value = search,
+                    onValueChange = { search = it },
+                    label = S.modelSearch,
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
+                )
                 Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), modifier = Modifier.fillMaxWidth()) {
                     ModelPickerActionButton(
                         text = S.modelListFetch,
@@ -5455,14 +5503,8 @@ private fun ProviderModelPickerDialog(
                     ModelPickerActionButton(text = S.selectAll, onClick = { selected = filtered.filter { it.id in candidateIds && hasPurpose(it) }.map { it.id }.toSet() }, modifier = Modifier.weight(1f), enabled = !fetching)
                     ModelPickerActionButton(text = S.selectNone, onClick = { selected = emptySet() }, modifier = Modifier.weight(1f), enabled = !fetching)
                 }
-                ImeAwareOutlinedTextField(
-                    value = search,
-                    onValueChange = { search = it },
-                    label = S.modelSearch,
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
-                )
+                Text(S.modelPickerCount(filtered.size, candidateModels.size), style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
                 ModelCatalogRows(catalog, filtered, selected, S,
                     onSelect = { id, checked ->
                         selected = if (checked) selected + id else selected - id
@@ -5493,18 +5535,22 @@ private fun ProviderModelPickerDialog(
                 if (selectionChanged) {
                     Text(S.modelListFetchSaveFirst, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+                // Web's `model-picker-footer`: how many would be published, whether it changed, then cancel and save.
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+                    Column(Modifier.weight(1f)) {
+                        Text(S.modelPublishedCount(selected.count { it in candidateIds }), style = MaterialTheme.typography.labelMedium)
+                        if (selectionChanged) Text(S.modelDraftChanges, style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    }
+                    TextButton(onClick = onDismiss) { Text(S.cancel) }
+                    PrimarySmallButton(text = S.save, onClick = {
+                        val published = selected.filter { it in candidateIds }
+                        onSave(published, published.associateWith { purposes[it].orEmpty() })
+                    }, enabled = !fetching)
+                }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                val published = selected.filter { it in candidateIds }
-                onSave(published, published.associateWith { purposes[it].orEmpty() })
-            }, enabled = !fetching) { Text(S.save) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(S.cancel) }
-        },
-    )
+        }
+    }
 }
 
 @Composable

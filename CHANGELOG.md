@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-26 — Android's model settings put the model selection first
+
+At the author's instruction, Android's model settings are laid out as the Server's. Each connection's card shows its service ID and API key state under the name, leads with the number of visible models and the Select models button, and lists the visible models by LLM and Vision below it. The base URL, API key and service deletion are folded under Connection settings at the bottom. The ChatGPT plan card also leads with the model selection. The on-device LiteRT models moved to the end. The model publication picker now fills nearly the whole screen, frames each model on its own, and folds the recommendation, seconds, cost and comment under Model details; its footer shows how many models would be visible and whether anything is unsaved. A pressed LLM or Vision toggle is filled and ticked and an unpressed one only outlined, so which purposes are chosen reads at a glance. The core, Server and Web are unchanged.
+
 ### 2026-10-26 — Android also lets a purpose that gave no response be chosen as not recommended
 
 As on the Server, Android's model publication picker now lets the LLM or Vision toggle of a purpose the model gave no response for when measured be pressed, framed in red with the note that it can be chosen but the system does not recommend it. A purpose so pressed stays among the model's purposes, while the defaults from the catalog still leave it out, and select-all does not choose a model with no purpose. A ChatGPT plan connection still cannot press it. The drawing model list and the Vision model cards frame a model that gave no response for that purpose in red, say "Not recommended (no response when measured)" and place it after the models that answered. The label "No response when measured" is now set as the Server sets it (no purpose left once the unanswered ones are taken out) and keeps the warning colour though it no longer blocks publication. The core, Server and Web are unchanged.

@@ -490,6 +490,11 @@ object InkuStringsEn : InkuStrings {
     override val modelPurposeNoResponse = "A greyed purpose is not selectable: no response when measured"
     override val modelPurposeNotRecommended = "A purpose framed in red gave no response when measured. It can be chosen, but the system does not recommend it"
     override val modelNotRecommended = "Not recommended (no response when measured)"
+    override val modelDetails = "Model details"
+    override val connectionSettings = "Connection settings"
+    override val modelPublishedCount: (Int) -> String = { count -> "$count models visible" }
+    override val modelPickerCount: (Int, Int) -> String = { visible, total -> "Showing $visible of $total models" }
+    override val modelDraftChanges = "Unsaved changes"
     override val publishedModels = "Models offered to the reader"
     override val licenseAndDownload = "License / download"
     override val licenseAndDownloaded = "License / downloaded"

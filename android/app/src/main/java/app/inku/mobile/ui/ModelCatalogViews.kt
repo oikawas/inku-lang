@@ -1,17 +1,23 @@
 package app.inku.mobile.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -21,10 +27,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import app.inku.mobile.data.CatalogModel
 import app.inku.mobile.data.ModelCatalog
 import app.inku.mobile.ui.i18n.InkuStrings
+import app.inku.mobile.ui.theme.ActiveRowTint
 import app.inku.mobile.ui.theme.Dimens
 import java.util.Locale
 
@@ -122,17 +133,31 @@ internal fun ModelRecommendationStars(model: CatalogModel, purpose: String, modi
         style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
 }
 
-/** Used by both the publication picker and the drawing model chooser. */
+/** The drawing model chooser's details: the labels, then the catalog's figures. */
 @Composable
 internal fun ModelCatalogDetails(model: CatalogModel, strings: InkuStrings) {
     Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs), modifier = Modifier.testTag("CatalogDetails:${model.id}")) {
-        // Web `modelStatusParts`: no response when measured is publishable since
-        // 2026-10-26, as not recommended, and keeps the warning colour.
-        model.labels.forEach { label ->
-            Text(label.name(strings.code == "en"), style = MaterialTheme.typography.labelSmall,
-                color = if (label.publishable && label.id != "no_response") MaterialTheme.colorScheme.onSurfaceVariant
-                    else MaterialTheme.colorScheme.error)
-        }
+        model.labels.forEach { label -> ModelLabelText(label, strings) }
+        ModelCatalogFigures(model, strings)
+    }
+}
+
+/**
+ * Web `modelStatusParts`: a label that keeps the model from publication in the
+ * warning colour, the others muted. No response when measured is publishable
+ * since 2026-10-26, as not recommended, and keeps the warning colour.
+ */
+@Composable
+private fun ModelLabelText(label: app.inku.mobile.data.ModelCatalogLabel, strings: InkuStrings) {
+    Text(label.name(strings.code == "en"), style = MaterialTheme.typography.labelSmall,
+        color = if (label.publishable && label.id != "no_response") MaterialTheme.colorScheme.onSurfaceVariant
+            else MaterialTheme.colorScheme.error)
+}
+
+/** Web's `model-metadata-editor` figures: recommendation, seconds, cost and comment. */
+@Composable
+private fun ModelCatalogFigures(model: CatalogModel, strings: InkuStrings) {
+    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
         val record = model.record
         listOf("llm" to "LLM", "stage1" to "Stage 1", "stage2" to "Stage 2", "vision" to "Vision").forEach { (key, name) ->
             if (record.has("recommendation_$key")) Text("${strings.modelRecommendation} $name: ${"★".repeat(record.optInt("recommendation_$key").coerceIn(0, 5))}", style = MaterialTheme.typography.labelSmall)
@@ -151,32 +176,113 @@ internal fun ModelCatalogDetails(model: CatalogModel, strings: InkuStrings) {
 
 /**
  * Web's `model-purpose-controls`: LLM and Vision pressed or not for one model.
- * A purpose it was measured not to answer is framed in red as not recommended,
- * and says why. Where [lockUnsupported] (a ChatGPT plan model, whose purposes
- * are each person's own) it still cannot be pressed.
+ * A pressed one is filled and ticked, an unpressed one only outlined, so the
+ * two cannot be mistaken at a glance (the author, 2026-10-26: Material's tinted
+ * FilterChip was hard to read). A purpose it was measured not to answer is
+ * framed in red as not recommended, and says why. Where [lockUnsupported] (a
+ * ChatGPT plan model, whose purposes are each person's own) it still cannot be
+ * pressed.
  */
 @Composable
 internal fun ModelPurposeToggles(model: CatalogModel, ticked: List<String>, enabled: Boolean, strings: InkuStrings,
-                                 lockUnsupported: Boolean = false, onToggle: (String) -> Unit) {
-    Column(Modifier.padding(start = Dimens.spaceXl), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-            listOf("llm" to "LLM", "vision" to "Vision").forEach { (purpose, label) ->
-                val unsupported = purposeUnsupported(model, purpose)
-                val chipEnabled = enabled && !(lockUnsupported && unsupported)
-                FilterChip(selected = purpose in ticked, onClick = { onToggle(purpose) },
-                    enabled = chipEnabled, label = { Text(label) },
-                    border = if (unsupported && !lockUnsupported) FilterChipDefaults.filterChipBorder(
-                        enabled = chipEnabled, selected = purpose in ticked,
-                        borderColor = MaterialTheme.colorScheme.error, selectedBorderColor = MaterialTheme.colorScheme.error,
-                        borderWidth = Dimens.notRecommendedFrame, selectedBorderWidth = Dimens.notRecommendedFrame,
-                    ) else FilterChipDefaults.filterChipBorder(enabled = chipEnabled, selected = purpose in ticked),
-                    modifier = Modifier.testTag("CatalogPurpose:${model.id}:$purpose"))
+                                 lockUnsupported: Boolean = false, modifier: Modifier = Modifier, onToggle: (String) -> Unit) {
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+        listOf("llm" to "LLM", "vision" to "Vision").forEach { (purpose, label) ->
+            PurposeToggle(label, pressed = purpose in ticked, notRecommended = purposeUnsupported(model, purpose) && !lockUnsupported,
+                enabled = enabled && !(lockUnsupported && purposeUnsupported(model, purpose)),
+                modifier = Modifier.testTag("CatalogPurpose:${model.id}:$purpose")) { onToggle(purpose) }
+        }
+    }
+}
+
+/** The note under [ModelPurposeToggles] when a purpose gave no response. */
+@Composable
+internal fun ModelPurposeNote(model: CatalogModel, strings: InkuStrings, lockUnsupported: Boolean) {
+    if (listOf("llm", "vision").none { purposeUnsupported(model, it) }) return
+    Text(if (lockUnsupported) strings.modelPurposeNoResponse else strings.modelPurposeNotRecommended,
+        style = MaterialTheme.typography.labelSmall,
+        color = if (lockUnsupported) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error)
+}
+
+@Composable
+private fun PurposeToggle(label: String, pressed: Boolean, notRecommended: Boolean, enabled: Boolean,
+                          modifier: Modifier = Modifier, onToggle: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    val accent = if (notRecommended) scheme.error else scheme.primary
+    Surface(
+        shape = RoundedCornerShape(Dimens.radiusPill),
+        color = if (pressed) accent else Color.Transparent,
+        contentColor = if (pressed) (if (notRecommended) scheme.onError else scheme.onPrimary)
+            else if (notRecommended) scheme.error else scheme.onSurfaceVariant,
+        border = BorderStroke(if (notRecommended) Dimens.notRecommendedFrame else Dimens.hairline,
+            if (notRecommended) scheme.error else if (pressed) accent else scheme.outline),
+        modifier = modifier.heightIn(min = Dimens.controlSizeSmall).alpha(if (enabled) 1f else 0.4f)
+            .toggleable(value = pressed, enabled = enabled, role = Role.Checkbox, onValueChange = { onToggle() }),
+    ) {
+        Box(Modifier.padding(horizontal = Dimens.spaceL), contentAlignment = Alignment.Center) {
+            Text(if (pressed) "✓ $label" else label, style = MaterialTheme.typography.labelLarge,
+                fontWeight = if (pressed) FontWeight.Bold else FontWeight.Normal)
+        }
+    }
+}
+
+/**
+ * One model of the publication picker, as Web's `model-picker-entry`: a card
+ * with the publish box, the name, its ID and labels, then the purpose toggles
+ * and the folded model details (figures and, where offered, the access check).
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ModelCatalogEntry(
+    model: CatalogModel,
+    name: String,
+    checked: Boolean,
+    selectable: Boolean,
+    strings: InkuStrings,
+    onSelect: (Boolean) -> Unit,
+    detailsOpen: Boolean,
+    onToggleDetails: () -> Unit,
+    toggles: (@Composable (Modifier) -> Unit)?,
+    note: (@Composable () -> Unit)?,
+    accessCheck: (@Composable () -> Unit)?,
+) {
+    val scheme = MaterialTheme.colorScheme
+    Surface(
+        shape = RoundedCornerShape(Dimens.radiusCard),
+        color = if (checked) ActiveRowTint else scheme.surface,
+        border = BorderStroke(Dimens.hairline, if (checked) scheme.primary else scheme.outlineVariant),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(end = Dimens.spaceM, bottom = Dimens.spaceXs)) {
+            Row(modifier = Modifier.fillMaxWidth().testTag("CatalogRow:${model.id}")
+                .clickable(enabled = selectable) { onSelect(!checked) }.padding(top = Dimens.spaceXs),
+                verticalAlignment = Alignment.Top) {
+                Checkbox(checked = checked, enabled = selectable,
+                    onCheckedChange = onSelect, modifier = Modifier.testTag("CatalogSelect:${model.id}"))
+                Column(Modifier.weight(1f).padding(top = Dimens.spaceM), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
+                    Text(name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                    Text(model.id, style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
+                    if (model.labels.isNotEmpty()) FlowRow(Modifier.testTag("CatalogDetails:${model.id}"),
+                        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+                        model.labels.forEach { label -> ModelLabelText(label, strings) }
+                    }
+                }
+            }
+            Column(Modifier.padding(start = Dimens.spaceL), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    toggles?.invoke(Modifier.weight(1f))
+                    if (toggles == null) Box(Modifier.weight(1f))
+                    TextButton(onClick = onToggleDetails, modifier = Modifier.testTag("CatalogMore:${model.id}")) {
+                        Text("${strings.modelDetails} ${if (detailsOpen) "▾" else "▸"}", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+                note?.invoke()
+                if (detailsOpen) {
+                    ModelCatalogFigures(model, strings)
+                    accessCheck?.invoke()
+                }
             }
         }
-        if (listOf("llm", "vision").any { purposeUnsupported(model, it) }) Text(
-            if (lockUnsupported) strings.modelPurposeNoResponse else strings.modelPurposeNotRecommended,
-            style = MaterialTheme.typography.labelSmall,
-            color = if (lockUnsupported) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error)
     }
 }
 
@@ -200,31 +306,32 @@ internal fun ModelCatalogRows(
     lockUnsupportedPurposes: Boolean = false,
 ) {
     var expanded by remember(catalog) { mutableStateOf(emptySet<String>()) }
+    // Web folds each model's details away; they open one model at a time here too.
+    var detailsOpen by remember(catalog) { mutableStateOf(emptySet<String>()) }
     val grouped = models.groupBy { it.fold }
-    LazyColumn(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
+    LazyColumn(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
         fun androidx.compose.foundation.lazy.LazyListScope.rows(rows: List<CatalogModel>) {
             items(rows, key = { "model:${it.id}" }) { model ->
-                Column {
-                    val checked = model.id in selected
-                    // Web: a model with no purpose to serve is not published.
-                    val hasPurpose = purposes == null || purposes[model.id].orEmpty().isNotEmpty() || modelPurposes(model).isNotEmpty()
-                    val selectable = enabled && model.publishable && hasPurpose && (offeredForSelection == null || model.id in offeredForSelection)
-                    Row(modifier = Modifier.fillMaxWidth().testTag("CatalogRow:${model.id}")
-                        .clickable(enabled = selectable) { onSelect(model.id, !checked) }.padding(vertical = Dimens.spaceXs),
-                        verticalAlignment = Alignment.Top) {
-                        Checkbox(checked = checked, enabled = selectable,
-                            onCheckedChange = { onSelect(model.id, it) }, modifier = Modifier.testTag("CatalogSelect:${model.id}"))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(names[model.id] ?: model.name, style = MaterialTheme.typography.bodySmall)
-                            Text(model.id, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            ModelCatalogDetails(model, strings)
-                        }
-                    }
-                    if (purposes != null && onTogglePurpose != null) ModelPurposeToggles(model, purposes[model.id].orEmpty(),
-                        enabled = enabled && model.publishable && (offeredForSelection == null || model.id in offeredForSelection),
-                        strings = strings, lockUnsupported = lockUnsupportedPurposes) { purpose -> onTogglePurpose(model.id, purpose) }
-                    if (onCheckAccess != null && model.fold != "eol") TextButton(onClick = { onCheckAccess(model.id) }, enabled = enabled) { Text(strings.modelAccessCheck) }
-                }
+                val checked = model.id in selected
+                val offered = enabled && model.publishable && (offeredForSelection == null || model.id in offeredForSelection)
+                // Web: a model with no purpose to serve is not published.
+                val hasPurpose = purposes == null || purposes[model.id].orEmpty().isNotEmpty() || modelPurposes(model).isNotEmpty()
+                val withToggles = purposes != null && onTogglePurpose != null
+                ModelCatalogEntry(
+                    model = model, name = names[model.id] ?: model.name, checked = checked,
+                    selectable = offered && hasPurpose, strings = strings,
+                    onSelect = { onSelect(model.id, it) },
+                    detailsOpen = model.id in detailsOpen,
+                    onToggleDetails = { detailsOpen = if (model.id in detailsOpen) detailsOpen - model.id else detailsOpen + model.id },
+                    toggles = if (withToggles) { rowModifier ->
+                        ModelPurposeToggles(model, purposes!![model.id].orEmpty(), enabled = offered, strings = strings,
+                            lockUnsupported = lockUnsupportedPurposes, modifier = rowModifier) { purpose -> onTogglePurpose!!(model.id, purpose) }
+                    } else null,
+                    note = if (withToggles) { { ModelPurposeNote(model, strings, lockUnsupportedPurposes) } } else null,
+                    accessCheck = if (onCheckAccess != null && model.fold != "eol") {
+                        { TextButton(onClick = { onCheckAccess(model.id) }, enabled = enabled) { Text(strings.modelAccessCheck) } }
+                    } else null,
+                )
             }
         }
         rows(grouped[null].orEmpty())

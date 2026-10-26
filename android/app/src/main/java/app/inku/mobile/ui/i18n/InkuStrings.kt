@@ -358,6 +358,16 @@ interface InkuStrings {
     val modelPurposeNotRecommended: String
     /** Web `modelNotRecommended`: the note on a drawing model card framed in red. */
     val modelNotRecommended: String
+    /** Web `settingsModelMetadataDetails`: the fold of one model's figures in the picker. */
+    val modelDetails: String
+    /** Web `settingsModelConnectionDetails`: the fold of a connection's URL, key and deletion. */
+    val connectionSettings: String
+    /** Web `settingsModelPublishedCount`. */
+    val modelPublishedCount: (Int) -> String
+    /** Web `settingsModelPickerCount`. */
+    val modelPickerCount: (Int, Int) -> String
+    /** Web `settingsModelDraftChanges`. */
+    val modelDraftChanges: String
     val publishedModels: String
     val licenseAndDownload: String
     val licenseAndDownloaded: String

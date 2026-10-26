@@ -139,6 +139,31 @@ def test_every_shape_problem_is_named_with_its_place_in_one_answer(admin):
     } <= _codes(report)
 
 
+def test_a_shape_problem_does_not_hide_the_definition_and_example_problems(admin):
+    """Found on 5173: a missing summary used to stop the check before the core
+    and the examples, so fixing one file took one upload per stage."""
+    package = _package()
+    word = package["words"][0]
+    word.update(summary_ja="", summary_en="", example_ja="12個のSky.星。")
+    report = _check(admin, package)
+    assert report["ok"] is False
+    assert ("words[0].summary_ja", "no_summary") in _codes(report)
+    assert ("words[0].example_ja", "macro_binding_count_out_of_range") in _codes(report)
+    word["definition"]["body"][0]["body"][0]["body"][0]["fields"]["color"]["id"] = "pink"
+    codes = {code for _path, code in _codes(_check(admin, package))}
+    assert {"no_summary", "unknown_semantic_id"} <= codes
+
+
+def test_a_word_without_a_definition_keeps_the_others_checked_at_their_own_place(admin):
+    package = _package()
+    package["words"] = [{"summary_ja": "定義が無い"}, package["words"][0]]
+    report = _check(admin, package)
+    assert ("words[0].definition", "not_an_object") in _codes(report)
+    [stars] = report["words"]
+    assert stars["qualified_name"] == "Sky.Stars" and stars["problems"] == [] and stars["preview_png"]
+    assert report["ok"] is False
+
+
 def test_not_json_says_where_it_broke(admin):
     response = client.post("/api/plugins/packages/validate", json={"document": '{"schema": '}, headers=admin)
     [problem] = response.json()["problems"]
@@ -203,6 +228,8 @@ def test_a_switched_off_package_leaves_new_works_and_the_saijiki(admin, reader):
     assert off.status_code == 200 and off.json()["enabled"] is False
     assert "Sky.Stars" not in {e["qualified_name"] for e in client.get("/api/saijiki", headers=reader).json()["plugins"]}
     assert client.post("/api/compose", json={"ddl": "5個のSky.星。"}, headers=admin).status_code == 422
+    # The settings list still shows the switched-off word's picture.
+    assert client.get("/api/saijiki/plugin-preview?name=Sky.Stars&scale=1", headers=admin).status_code == 200
     assert client.put("/api/plugins/Sky.night/enabled", json={"enabled": True}, headers=admin).status_code == 200
     assert client.post("/api/compose", json={"ddl": "5個のSky.星。"}, headers=admin).status_code == 200
 
@@ -239,6 +266,8 @@ def test_a_word_picture_is_replaced_kept_across_a_replace_and_put_back(admin, re
     entry = client.get("/api/saijiki", headers=reader).json()["plugins"][-1]
     picture = Image.open(io.BytesIO(client.get(entry["preview_url"], headers=reader).content)).convert("RGB")
     assert picture.getpixel((108, 46)) == (200, 0, 0)
+    # A square picture in the wide frame is padded with its own colour, not white.
+    assert picture.getpixel((4, 46)) == (200, 0, 0)
 
     assert _install(admin, _package(version="1.0.1"), replace=True).status_code == 200
     kept = [i for i in client.get("/api/plugins", headers=admin).json()["items"] if i["id"] == "Sky.night"][0]

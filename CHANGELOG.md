@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-26 — A plugin check lists everything to fix at once
+
+Three things found checking Build 1338 in Chrome were fixed. A shape problem in the file, such as a missing summary, stopped the check before the shared core's definition checks and the example drawings, so each fix needed another upload. Only a file that is not JSON, has no readable `namespace` or `name`, or has no words stops now; otherwise all three checks run and report together (a word without a definition is reported at its own place in the file). A replaced picture whose shape differs from the Saijiki frame is padded with its own corner colour instead of white. A switched-off plugin's pictures are still served, so the settings word list does not lose them.
+
 ### 2026-10-26 — Android's model settings put the model selection first
 
 At the author's instruction, Android's model settings are laid out as the Server's. Each connection's card shows its service ID and API key state under the name, leads with the number of visible models and the Select models button, and lists the visible models by LLM and Vision below it. The base URL, API key and service deletion are folded under Connection settings at the bottom. The ChatGPT plan card also leads with the model selection. The on-device LiteRT models moved to the end. The model publication picker now fills nearly the whole screen, frames each model on its own, and folds the recommendation, seconds, cost and comment under Model details; its footer shows how many models would be visible and whether anything is unsaved. A pressed LLM or Vision toggle is filled and ticked and an unpressed one only outlined, so which purposes are chosen reads at a glance. The core, Server and Web are unchanged.

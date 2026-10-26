@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-26 — The pinned Rust is 1.99.1
-
-At the author's instruction, the shared core, the Server wheel, Android and the Mac app are built with Rust 1.99.1 instead of 1.95.0. No published maturin image carries Rust 1.99.1, so the Server's Linux builder keeps the same maturin 1.13.3 image and installs the pinned toolchain in it; the wheel keeps its manylinux2014 tag. With Xcode 27.1, Rust 1.95.0's stripping left Mac libraries that would not load ("mis-aligned LINKEDIT string pool"); 1.99.1 does not, so the two stripping workarounds for 1.95 were removed. Drawings are unchanged: 5,179 saved Scores along the Server's path and 1,407 with their resources rendered the same SVG and metadata with both versions.
-
 ### 2026-10-26 — PLUGIN alone is enough to write a plugin file
 
 After the author's review, three gaps in `PLUGIN.ja.md` and `PLUGIN.md` were filled. The example in §5.1 is now a complete file with its definition written out, and the guide says it can be saved and added as it is (a Server test passes the example through the check). §7.3 adds a table of the codes a plugin file check reports for its shape, taken names, examples, and pictures, with their fixes. §8 adds the limits on the file size (1,000,000 bytes), the number of words (64), the lengths of descriptions, examples, and the license, and the replacement picture. No code changed.
@@ -322,6 +318,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.271 (2026-10-27 / Build1347)
+
+### 2026-10-26 — The pinned Rust is 1.99.1
+
+At the author's instruction, the shared core, the Server wheel, Android and the Mac app are built with Rust 1.99.1 instead of 1.95.0. No published maturin image carries Rust 1.99.1, so the Server's Linux builder keeps the same maturin 1.13.3 image and installs the pinned toolchain in it; the wheel keeps its manylinux2014 tag. With Xcode 27.1, Rust 1.95.0's stripping left Mac libraries that would not load ("mis-aligned LINKEDIT string pool"); 1.99.1 does not, so the two stripping workarounds for 1.95 were removed. Drawings are unchanged: 5,179 saved Scores along the Server's path and 1,407 with their resources rendered the same SVG and metadata with both versions.
 
 ## v2.15.270 (2026-10-27 / Build1346)
 

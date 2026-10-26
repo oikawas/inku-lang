@@ -8,10 +8,6 @@
 
 ## 未リリース
 
-### 2026-10-26 — 固定のRustを1.99.1にした
-
-作者の指示で、共有core、Serverのwheel、Android、Macのアプリを、Rust 1.95.0でなく1.99.1でbuildするようにした。Rust 1.99.1の入ったmaturinのimageは公開されていないので、ServerのLinuxのbuilderは同じmaturin 1.13.3のimageのまま、その中に固定の版を入れる。wheelのtagはmanylinux2014のまま。Xcode 27.1では、Rust 1.95.0がstripしたMacのlibraryが読み込めなかった（「mis-aligned LINKEDIT string pool」）。1.99.1ではそうならないので、1.95のためのstripの回避策を2つとも外した。描画は変わらない。Serverの道の保存済みの楽譜5,179件と、資源つきの1,407件を両方の版で描き、SVGとmetadataが同じだった。
-
 ### 2026-10-26 — PLUGINだけでプラグインのファイルを作れるようにした
 
 作者の確認で、`PLUGIN.ja.md`・`PLUGIN.md`の足りない所を3つ埋めた。§5.1の手本を、定義を省かない完全なファイルにし、そのまま保存すれば追加できることを書いた（Serverの試験が手本を検査に通す）。§7.3に、プラグインのファイルの検査が出す形・名前の重なり・例文・絵の誤りのcodeと直し方の表を足した。§8に、ファイルの大きさ（1,000,000 bytes）、語の数（64）、説明・例文・使用条件の長さ、差し替えの絵の上限を足した。コードは変えていない。
@@ -322,6 +318,12 @@ macOSの`dh1`・`rh3`と正準JSON、指示言語の判定、記述ラベルの�
 Anthropicの対象Claudeモデルは通常描画とVisionでも思考用8,192 tokenを出力枠に加え、pipeline応答が `max_tokens` で切れたときは内容が読めても拒否して診断を残す。
 
 保存作品からランダムまたはVisionの自律推敲を開始できる。世代数、色・配置の対象、Wildを指定し、直前の作品を親として各世代を保存する。途中の世代は系譜専用、最終世代は通常の作品一覧にも表示する。Visionは作品画像への限定された助言を使い、観察と次の方向を表示する。画像の送信はこの専用助言requestに限り、既存の接続・ChatGPTプランのsession pinを保つ。
+
+## v2.15.271（2026-10-27 / Build1347）
+
+### 2026-10-26 — 固定のRustを1.99.1にした
+
+作者の指示で、共有core、Serverのwheel、Android、Macのアプリを、Rust 1.95.0でなく1.99.1でbuildするようにした。Rust 1.99.1の入ったmaturinのimageは公開されていないので、ServerのLinuxのbuilderは同じmaturin 1.13.3のimageのまま、その中に固定の版を入れる。wheelのtagはmanylinux2014のまま。Xcode 27.1では、Rust 1.95.0がstripしたMacのlibraryが読み込めなかった（「mis-aligned LINKEDIT string pool」）。1.99.1ではそうならないので、1.95のためのstripの回避策を2つとも外した。描画は変わらない。Serverの道の保存済みの楽譜5,179件と、資源つきの1,407件を両方の版で描き、SVGとmetadataが同じだった。
 
 ## v2.15.270（2026-10-27 / Build1346）
 

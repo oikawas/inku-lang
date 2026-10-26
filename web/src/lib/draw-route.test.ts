@@ -84,10 +84,12 @@ test('the last measure is counted and the pairs that did not fit are named', () 
 	const summary = compositionMeasureSummary({
 		measures: [
 			{ after: [{ law: 'B1', thing: 1, state: 'far' }] },
-			{ after: [{ law: 'B1', thing: 1, state: 'fitted' }, { law: 'B9', thing: 2, state: 'ok' }, { law: 'C1', thing: 3, state: 'off' }] },
+			{ after: [{ law: 'B1', thing: 1, state: 'fitted' }, { law: 'B9', thing: 2, state: 'ok' }, { law: 'C1', thing: 3, state: 'off' },
+				{ law: 'B21', thing: 1, state: 'not_measured' }] },
 		],
 	});
-	assert.deepEqual(summary.counts, [['fitted', 1], ['ok', 1], ['off', 1]]);
+	assert.deepEqual(summary.counts, [['fitted', 1], ['ok', 1], ['off', 1], ['not_measured', 1]]);
+	// The hand the writer draws is not measured, so it is not a pair that missed.
 	assert.deepEqual(summary.misses, [{ law: 'C1', thing: '3', state: 'off' }]);
 	assert.equal(compositionStateNote({ state: 'fallback', fallback: 'transport_timeout' }, true),
 		'構図と法則を決められず、構図と法則なしで書いた（transport_timeout）');

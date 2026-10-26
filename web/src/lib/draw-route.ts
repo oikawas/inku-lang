@@ -168,7 +168,9 @@ export function compositionStateNote(record: CompositionRecord | null | undefine
 	return isJapanese ? '構図と法則を決めている途中' : 'Deciding the composition and laws';
 }
 
-/** The last measure's states, counted, and the pairs that did not fit. */
+/** The last measure's states, counted, and the pairs that did not fit. A pair
+ * the tool does not measure (the hand of B21, drawn by the writer) is counted
+ * but did not miss. */
 export function compositionMeasureSummary(record: CompositionRecord | null | undefined): {
 	counts: [string, number][];
 	misses: { law: string; thing: string; state: string }[];
@@ -179,7 +181,7 @@ export function compositionMeasureSummary(record: CompositionRecord | null | und
 	for (const measure of last) {
 		const state = measure.state ?? '';
 		counts.set(state, (counts.get(state) ?? 0) + 1);
-		if (state !== 'ok' && state !== 'fitted' && state !== 'clamped') {
+		if (state !== 'ok' && state !== 'fitted' && state !== 'clamped' && state !== 'not_measured') {
 			const thing = Array.isArray(measure.thing) ? measure.thing.join('・') : measure.thing == null ? '' : String(measure.thing);
 			misses.push({ law: measure.law ?? '', thing, state });
 		}

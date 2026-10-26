@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-26 — The composition and laws' pairs that did not fit leave out the pairs no tool measures
+
+A live check of Build 1341 listed the hands of B21 (unity and variety) under the generation info's "Pairs that did not fit" as "not measured". The writer draws a hand and no tool measures it, so it did not miss. It stays in the last measure's counts and leaves the list of pairs that did not fit. Web only.
+
 ### 2026-10-26 — PLUGIN alone is enough to write a plugin file
 
 After the author's review, three gaps in `PLUGIN.ja.md` and `PLUGIN.md` were filled. The example in §5.1 is now a complete file with its definition written out, and the guide says it can be saved and added as it is (a Server test passes the example through the check). §7.3 adds a table of the codes a plugin file check reports for its shape, taken names, examples, and pictures, with their fixes. §8 adds the limits on the file size (1,000,000 bytes), the number of words (64), the lengths of descriptions, examples, and the license, and the replacement picture. No code changed.

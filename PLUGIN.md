@@ -396,6 +396,9 @@ Three checks run in order, and a file can be added only when all of them pass:
 
 Whatever is wrong is listed per word with its place in the file
 (e.g. `words[0].definition.body[0].body[0].body[0].fields.color`) and the reason.
+Only a file that is not JSON, has no readable `namespace` or `name`, or has no words stops at step 1. Otherwise a
+shape problem such as a missing summary does not stop steps 2 and 3, so one check lists everything to fix. A word
+whose definition has a problem is not drawn.
 
 - An added word can be drawn in every new work on that Server, appears in the Saijiki and DDL editor completion,
   and its summary reaches the underdrawing when drawing from a description.

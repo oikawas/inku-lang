@@ -74,6 +74,10 @@ class PackageWord:
     summary: dict[str, str]
     note: dict[str, str]
     example: dict[str, str]
+    # Where the word sits in the file's `words`, so its problems name the right place.
+    index: int = 0
+    # Problems with this word's own fields that still leave its definition checkable.
+    problems: tuple[Problem, ...] = ()
 
     @property
     def namespace(self) -> str:
@@ -126,10 +130,16 @@ class PluginPackage:
     authors: tuple[str, ...]
     license: str
     words: tuple[PackageWord, ...]
+    # Problems that do not stop the checks: the file is reported whole, then refused.
+    problems: tuple[Problem, ...] = ()
 
     @property
     def id(self) -> str:
         return f"{self.namespace}.{self.name}"
+
+    @property
+    def is_sound(self) -> bool:
+        return not self.problems and not any(word.problems for word in self.words)
 
     def word(self, heading: str) -> PackageWord | None:
         return next((word for word in self.words if word.heading == heading), None)
@@ -150,7 +160,10 @@ def _text(value: object, path: str, problems: list[Problem], *, limit: int = MAX
 def parse_plugin_package(text: str) -> PluginPackage:
     """Read a package file's own shape. The definitions are checked by the core later.
 
-    Every problem found is reported together, so one upload shows the whole list.
+    Only what leaves nothing to check stops here (not JSON, no readable
+    namespace or name, no words): every other problem is kept on the package
+    or its word, so the core and the examples still check the rest and one
+    upload shows the whole list. A package with any problem is not installed.
     """
     if len(text.encode("utf-8")) > MAX_PACKAGE_BYTES:
         raise PluginPackageError([Problem("", "package_too_large", str(MAX_PACKAGE_BYTES))])
@@ -161,17 +174,18 @@ def parse_plugin_package(text: str) -> PluginPackage:
     if not isinstance(raw, dict):
         raise PluginPackageError([Problem("", "not_an_object")])
     problems: list[Problem] = []
+    blocking: list[Problem] = []
     for key in sorted(set(raw) - _PACKAGE_KEYS):
         problems.append(Problem(key, "unknown_field"))
     if raw.get("schema") != PACKAGE_SCHEMA:
         problems.append(Problem("schema", "wrong_schema", PACKAGE_SCHEMA))
     namespace = raw.get("namespace")
     if not isinstance(namespace, str) or not _IDENTIFIER_RE.match(namespace):
-        problems.append(Problem("namespace", "invalid_identifier"))
+        blocking.append(Problem("namespace", "invalid_identifier"))
         namespace = ""
     name = raw.get("name")
     if not isinstance(name, str) or not _IDENTIFIER_RE.match(name):
-        problems.append(Problem("name", "invalid_identifier"))
+        blocking.append(Problem("name", "invalid_identifier"))
         name = ""
     version = raw.get("version")
     if not isinstance(version, str) or not _SEMVER_RE.match(version):
@@ -186,16 +200,16 @@ def parse_plugin_package(text: str) -> PluginPackage:
     words_raw = raw.get("words")
     words: list[PackageWord] = []
     if not isinstance(words_raw, list) or not words_raw:
-        problems.append(Problem("words", "no_words"))
+        blocking.append(Problem("words", "no_words"))
     elif len(words_raw) > MAX_PACKAGE_WORDS:
-        problems.append(Problem("words", "too_many_words", str(MAX_PACKAGE_WORDS)))
+        blocking.append(Problem("words", "too_many_words", str(MAX_PACKAGE_WORDS)))
     else:
         for index, item in enumerate(words_raw):
-            word = _parse_word(item, f"words[{index}]", namespace, problems)
+            word = _parse_word(item, index, namespace, problems)
             if word is not None:
                 words.append(word)
-    if problems:
-        raise PluginPackageError(problems)
+    if blocking:
+        raise PluginPackageError([*blocking, *problems])
     return PluginPackage(
         namespace=namespace,
         name=name,
@@ -204,21 +218,24 @@ def parse_plugin_package(text: str) -> PluginPackage:
         authors=tuple(authors_raw),
         license=license_text,
         words=tuple(words),
+        problems=tuple(problems),
     )
 
 
-def _parse_word(item: object, path: str, namespace: str, problems: list[Problem]) -> PackageWord | None:
+def _parse_word(item: object, index: int, namespace: str, file_problems: list[Problem]) -> PackageWord | None:
+    """One word; a word with no definition to check is a problem of the file instead."""
+    path = f"words[{index}]"
     if not isinstance(item, dict):
-        problems.append(Problem(path, "not_an_object"))
+        file_problems.append(Problem(path, "not_an_object"))
         return None
-    before = len(problems)
-    for key in sorted(set(item) - _WORD_KEYS):
-        problems.append(Problem(f"{path}.{key}", "unknown_field"))
     definition = item.get("definition")
     if not isinstance(definition, dict):
-        problems.append(Problem(f"{path}.definition", "not_an_object"))
-        definition = {}
-    elif namespace and definition.get("namespace") != namespace:
+        file_problems.append(Problem(f"{path}.definition", "not_an_object"))
+        return None
+    problems: list[Problem] = []
+    for key in sorted(set(item) - _WORD_KEYS):
+        problems.append(Problem(f"{path}.{key}", "unknown_field"))
+    if namespace and definition.get("namespace") != namespace:
         problems.append(Problem(f"{path}.definition.namespace", "namespace_differs_from_package", namespace))
     summary = {lang: _text(item.get(f"summary_{lang}"), f"{path}.summary_{lang}", problems, limit=MAX_SUMMARY_BYTES) for lang in LANGUAGES}
     for lang in LANGUAGES:
@@ -228,9 +245,8 @@ def _parse_word(item: object, path: str, namespace: str, problems: list[Problem]
         problems.append(Problem(f"{path}.summary_ja", "no_summary"))
     note = {lang: _text(item.get(f"note_{lang}"), f"{path}.note_{lang}", problems) for lang in LANGUAGES}
     example = {lang: _text(item.get(f"example_{lang}"), f"{path}.example_{lang}", problems, limit=500) for lang in LANGUAGES}
-    if len(problems) != before:
-        return None
-    return PackageWord(definition=definition, summary=summary, note=note, example=example)
+    return PackageWord(definition=definition, summary=summary, note=note, example=example,
+                       index=index, problems=tuple(problems))
 
 
 # --------------------------------------------------------------------------- #
@@ -272,42 +288,51 @@ def check_package(
     silently shadows or loses to another plugin.
     Returns the report the Web shows: per word, its problems and its picture.
     """
+    # Source ids count the words that reached this step; problem paths use each
+    # word's place in the file, which differs once a word was left out.
     candidates = [
-        {"source_id": f"word:{index}", "definition_json": json.dumps(word.definition, ensure_ascii=False),
+        {"source_id": f"word:{position}", "definition_json": json.dumps(word.definition, ensure_ascii=False),
          "summary": word.summary_for("en")}
-        for index, word in enumerate(package.words)
+        for position, word in enumerate(package.words)
     ]
     resolved = _resolve(binding, candidates, [])
     by_source: dict[str, dict[str, Any]] = {entry["source_id"]: entry for entry in resolved.get("entries", [])}
-    problems_by_word: dict[int, list[Problem]] = {index: [] for index in range(len(package.words))}
+    # A definition problem stops the word's examples from being drawn; a
+    # problem with its other fields does not, so both are reported at once.
+    definition_problems: dict[int, list[Problem]] = {position: [] for position in range(len(package.words))}
     for diagnostic in resolved.get("diagnostics", []):
         source = str(diagnostic.get("source_id", ""))
         if not source.startswith("word:"):
             continue
-        index = int(source.removeprefix("word:"))
+        position = int(source.removeprefix("word:"))
+        path = f"words[{package.words[position].index}].definition"
         findings = diagnostic.get("findings") or []
         if findings:
             for finding in findings:
-                problems_by_word[index].append(
-                    Problem(f"words[{index}].definition{_finding_path(str(finding.get('path', '')))}", str(finding.get("code", "")))
+                definition_problems[position].append(
+                    Problem(f"{path}{_finding_path(str(finding.get('path', '')))}", str(finding.get("code", "")))
                 )
         else:
-            problems_by_word[index].append(Problem(f"words[{index}].definition", str(diagnostic.get("reason", ""))))
-    for index, word in enumerate(package.words):
-        entry = by_source.get(f"word:{index}")
+            definition_problems[position].append(Problem(path, str(diagnostic.get("reason", ""))))
+    for position, word in enumerate(package.words):
+        entry = by_source.get(f"word:{position}")
         if entry is None:
             continue
         for name in [entry["qualified_name"], *entry.get("aliases", [])]:
             holder = taken_names.get(name)
             if holder is not None:
-                problems_by_word[index].append(Problem(f"words[{index}].definition", "name_taken", f"{name} ({holder})"))
+                definition_problems[position].append(
+                    Problem(f"words[{word.index}].definition", "name_taken", f"{name} ({holder})")
+                )
     imported = [
         {"definition": word.definition, "summary": word.summary_for("en")}
-        for index, word in enumerate(package.words)
-        if not problems_by_word[index]
+        for position, word in enumerate(package.words)
+        if not definition_problems[position]
     ]
     reports = []
-    for index, word in enumerate(package.words):
+    for position, word in enumerate(package.words):
+        index = word.index
+        problems = [*word.problems, *definition_problems[position]]
         report: dict[str, Any] = {
             "heading": word.heading,
             "qualified_name": word.qualified_name,
@@ -318,20 +343,20 @@ def check_package(
             "note_en": word.note.get("en", ""),
             "example_ja": word.example_for("ja"),
             "example_en": word.example_for("en"),
-            "digest": (by_source.get(f"word:{index}") or {}).get("digest", ""),
+            "digest": (by_source.get(f"word:{position}") or {}).get("digest", ""),
             "preview_png": "",
         }
-        if not problems_by_word[index]:
+        if not definition_problems[position]:
             for lang in LANGUAGES:
                 drawing = draw_example(word.example_for(lang), lang, imported)
                 if drawing.reasons or drawing.marks == 0:
                     for reason in drawing.reasons or ("example_draws_nothing",):
-                        problems_by_word[index].append(Problem(f"words[{index}].example_{lang}", reason))
+                        problems.append(Problem(f"words[{index}].example_{lang}", reason))
                 elif lang == "ja":
                     report["preview_svg"] = drawing.svg
-        report["problems"] = [problem.as_dict() for problem in problems_by_word[index]]
+        report["problems"] = [problem.as_dict() for problem in problems]
         reports.append(report)
-    ok = all(not report["problems"] for report in reports)
+    ok = not package.problems and all(not report["problems"] for report in reports)
     return {
         "ok": ok,
         "id": package.id,
@@ -340,7 +365,7 @@ def check_package(
         "version": package.version,
         "description_ja": package.description.get("ja", ""),
         "description_en": package.description.get("en", ""),
-        "problems": [],
+        "problems": [problem.as_dict() for problem in package.problems],
         "words": reports,
     }
 
@@ -406,7 +431,10 @@ def uploaded_preview_pngs(data: bytes) -> tuple[bytes, bytes]:
     image = image.convert("RGBA")
     background = Image.new("RGBA", image.size, (255, 255, 255, 255))
     flattened = Image.alpha_composite(background, image).convert("RGB")
-    return tuple(_fit(flattened, (255, 255, 255), scale) for scale in (1, 2))  # type: ignore[return-value]
+    # A picture whose shape differs from the frame is padded with its own
+    # corner colour, so a dark night sky is not framed by white bars.
+    paper = flattened.getpixel((0, 0))
+    return tuple(_fit(flattened, paper, scale) for scale in (1, 2))  # type: ignore[return-value]
 
 
 def data_url(png: bytes) -> str:
@@ -458,6 +486,8 @@ class PluginPackageManager:
             for path in self._package_files():
                 try:
                     package = parse_plugin_package(path.read_text(encoding="utf-8"))
+                    if not package.is_sound:
+                        raise PluginPackageError([*package.problems, *(p for w in package.words for p in w.problems)])
                     if package.id != path.parent.name:
                         raise PluginPackageError([Problem("", "id_differs_from_directory")])
                     packages.append(package)
@@ -585,7 +615,9 @@ class PluginPackageManager:
         return (self._package_dir(package.id) / "custom" / f"{word.preview_key()}{PREVIEW_SUFFIX}").is_file()
 
     def preview_path_for_qualified_name(self, qualified_name: str, *, hidpi: bool = False) -> Path | None:
-        for package in self.enabled_packages():
+        # A switched-off package's pictures are still served: the settings list
+        # shows them, and a name belongs to one installed package at most.
+        for package in self.packages():
             for word in package.words:
                 if qualified_name in word.visible_qualified_names():
                     return self.preview_path(package, word, hidpi=hidpi)

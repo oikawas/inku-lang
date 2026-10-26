@@ -4,12 +4,17 @@
 
 # プラグインの作例
 
-[PLUGIN.ja.md](../../PLUGIN.ja.md)の仕様で書いた語彙プラグインを、DDLの書き出しファイル（`inku.ddl-export.v1`）の形で置く。
-どれも製品には同梱しない。読み込むと、その新しい作品だけで使える（[PLUGIN §5.1](../../PLUGIN.ja.md#51-ddlの書き出しファイル作者がすぐ使える)）。
+[PLUGIN.ja.md](../../PLUGIN.ja.md)の仕様で書いた語彙プラグインを置く。製品には同梱しない。
+
+- **プラグインのファイル（zip）**：[water-nihonga.zip](water-nihonga.zip)。三つの語の定義・要約・説明・例文と歳時記の絵をまとめた
+  `inku.plugin-package.v1`で、ServerにWebから追加すると、そのServerの全ての新しい作品で使え、歳時記にも出る（[PLUGIN §5.1](../../PLUGIN.ja.md#51-webからプラグインのファイルを追加するserverの管理者)）。
+  中身は[water-nihonga/](water-nihonga/)にそのまま置いてある。
+- **DDLの書き出しファイル**：Serverに入れずに、読み込んだ一つの新しい作品だけで使う（[PLUGIN §5.2](../../PLUGIN.ja.md#52-ddlの書き出しファイル作者がすぐ使える)）。
 
 | ファイル | 語 | 版 |
 |---|---|---|
-| [water.ja.ddl.json](water.ja.ddl.json) / [water.en.ddl.json](water.en.ddl.json) | 下の三つをまとめたもの | — |
+| [water-nihonga.zip](water-nihonga.zip) | 下の三つをまとめたプラグイン`Water.nihonga` 1.0.0（Webから追加する） | — |
+| [water.ja.ddl.json](water.ja.ddl.json) / [water.en.ddl.json](water.en.ddl.json) | 下の三つをまとめた書き出しファイル | — |
 | [water-stream.ja.ddl.json](water-stream.ja.ddl.json) / [water-stream.en.ddl.json](water-stream.en.ddl.json) | `Water.Stream`（別名`Water.水流`） | 1.0.0 |
 | [water-ripples.ja.ddl.json](water-ripples.ja.ddl.json) / [water-ripples.en.ddl.json](water-ripples.en.ddl.json) | `Water.Ripples`（別名`Water.波紋`） | 3.0.0 |
 | [water-rings.ja.ddl.json](water-rings.ja.ddl.json) / [water-rings.en.ddl.json](water-rings.en.ddl.json) | `Water.Rings`（別名`Water.水輪`） | 2.0.0 |
@@ -113,10 +118,47 @@ inkuの九つの図形と歳時記の語の中で組み立てた。
 
 ## 読み込み方
 
+### Webからプラグインとして追加する（Serverの管理者）
+
+1. [water-nihonga.zip](water-nihonga.zip)をダウンロードする（GitHubではファイルを開いて「Download raw file」）。zipは展開しない。
+2. Webの設定「プラグイン」で「プラグインを追加」を押し、zipを選ぶ。
+3. Serverが、ファイルの形・定義・各語の日本語と英語の例文を検査する。三つの語に歳時記の絵と例が出るので、確かめて「追加する」を押す。
+4. DDLに`Water.水流。`・`8本のWater.水流。`のように書く。記述から描くときは、記述に「水流」「波紋」「水輪」などが書かれていれば下絵が選ぶ。
+
+zipの中身:
+
+```text
+water-nihonga.zip
+├── package.json          inku.plugin-package.v1（id は Water.nihonga）
+└── previews/
+    ├── stream.png        水流の歳時記の絵（432×184）
+    ├── ripples.png       波紋の歳時記の絵
+    └── rings.png         水輪の歳時記の絵
+```
+
+| 欄 | 中身 |
+|---|---|
+| `namespace`・`name`・`version` | `Water`・`nihonga`・`1.0.0` |
+| `description_ja`・`description_en` | 設定の画面に出る説明 |
+| `license` | `MIT`（このリポジトリと同じ） |
+| 各語の`summary_*` | 下の三つの節の要約（書き出しファイルの`summary`と同じ文） |
+| 各語の`note_*` | 歳時記の説明の行 |
+| 各語の`example_*` | `8本のWater.水流。`・`5個のWater.波紋。`・`5個のWater.水輪。`と、その英語 |
+| 各語の`preview` | `previews/`の絵。各語の例文を構図の種（水流1・波紋6・水輪1）で描き、Serverが例文から絵を作るときと同じ切り出し方で枠の2倍（432×184）にした |
+
+zipは[water-nihonga/](water-nihonga/)から作り直せる（同じ時刻を付ければ同じbytesになる）。
+
+```sh
+cd docs/plugins/water-nihonga
+TZ=UTC touch -t 202610260000 package.json previews previews/*.png
+zip -X -r ../water-nihonga.zip package.json previews
+```
+
+### 一つの作品だけで使う（書き出しファイル）
+
 - Web: 記述タブの下の「指示書を新規作成」を開き、「読み込む」でファイルを選ぶ。
 - CLI: `uv run inku-cli paint --input-mode ddl --file docs/plugins/water.ja.ddl.json`
-- Android: DDLの画面の「読込」でファイルを選ぶ。
-- Serverの全ての新しい作品で使うには、`definition`を`pipeline.definitions`へ、`summary`を同じ順で`pipeline.macro_summaries`へ入れる（PLUGIN §5.2）。
+- Android: DDLの画面の「読込」でファイルを選ぶ。Android・macOSはServerを呼ばないので、zipで追加した語はまだ使えず、この道で使う。
 
 三つの語を一つの作品で使うときは、`water.*.ddl.json`を読み込む。
 

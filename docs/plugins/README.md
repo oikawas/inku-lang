@@ -4,12 +4,17 @@
 
 # Example plugins
 
-Vocabulary plugins written to the specification in [PLUGIN.md](../../PLUGIN.md), kept as DDL export files (`inku.ddl-export.v1`).
-None of them is bundled with the product. Reading one in makes its definitions available to that new work only ([PLUGIN §5.1](../../PLUGIN.md#51-a-ddl-export-file-immediately-usable-by-an-author)).
+Vocabulary plugins written to the specification in [PLUGIN.md](../../PLUGIN.md). None of them is bundled with the product.
+
+- **The plugin file (zip)**: [water-nihonga.zip](water-nihonga.zip), an `inku.plugin-package.v1` holding the three words' definitions, summaries, notes,
+  examples and Saijiki pictures. Added to a Server from the Web, its words are used by every new work on that Server and appear in the Saijiki ([PLUGIN §5.1](../../PLUGIN.md#51-adding-a-plugin-file-from-the-web-a-server-administrator)).
+  Its contents are kept as they are in [water-nihonga/](water-nihonga/).
+- **DDL export files**: use the words in the one new work that reads the file in, without adding them to a Server ([PLUGIN §5.2](../../PLUGIN.md#52-a-ddl-export-file-immediately-usable-by-an-author)).
 
 | File | Word | Version |
 |---|---|---|
-| [water.en.ddl.json](water.en.ddl.json) / [water.ja.ddl.json](water.ja.ddl.json) | The three below together | — |
+| [water-nihonga.zip](water-nihonga.zip) | The plugin `Water.nihonga` 1.0.0 holding the three below (added from the Web) | — |
+| [water.en.ddl.json](water.en.ddl.json) / [water.ja.ddl.json](water.ja.ddl.json) | An export file holding the three below | — |
 | [water-stream.en.ddl.json](water-stream.en.ddl.json) / [water-stream.ja.ddl.json](water-stream.ja.ddl.json) | `Water.Stream` (alias `Water.水流`) | 1.0.0 |
 | [water-ripples.en.ddl.json](water-ripples.en.ddl.json) / [water-ripples.ja.ddl.json](water-ripples.ja.ddl.json) | `Water.Ripples` (alias `Water.波紋`) | 3.0.0 |
 | [water-rings.en.ddl.json](water-rings.en.ddl.json) / [water-rings.ja.ddl.json](water-rings.ja.ddl.json) | `Water.Rings` (alias `Water.水輪`) | 2.0.0 |
@@ -113,10 +118,47 @@ Changed from 1.0.0: the same broken rings and drop as `Ripples`, with reflection
 
 ## Reading it in
 
+### Adding it from the Web as a plugin (Server administrator)
+
+1. Download [water-nihonga.zip](water-nihonga.zip) (on GitHub, open the file and choose "Download raw file"). Do not unpack it.
+2. In the Web settings, open "Plugins", press "Add a plugin" and choose the zip.
+3. The Server checks the file's shape, the definitions and each word's Japanese and English example. The three words show their Saijiki pictures and examples; check them and press "Add".
+4. Write `Water.Stream.` or `8 Water.Stream.` in DDL. When drawing from a description, Stage 1 picks a word when the description names it (stream, ripples, rings and the like).
+
+What the zip holds:
+
+```text
+water-nihonga.zip
+├── package.json          inku.plugin-package.v1 (id Water.nihonga)
+└── previews/
+    ├── stream.png        the Saijiki picture of Stream (432×184)
+    ├── ripples.png       the Saijiki picture of Ripples
+    └── rings.png         the Saijiki picture of Rings
+```
+
+| Field | Content |
+|---|---|
+| `namespace`, `name`, `version` | `Water`, `nihonga`, `1.0.0` |
+| `description_ja`, `description_en` | The description shown in the settings |
+| `license` | `MIT` (the same as this repository) |
+| each word's `summary_*` | The summary of each word below (the same text as the export files' `summary`) |
+| each word's `note_*` | The Saijiki's description line |
+| each word's `example_*` | `8本のWater.水流。`, `5個のWater.波紋。`, `5個のWater.水輪。` and their English |
+| each word's `preview` | A picture in `previews/`: each word's example drawn with a composition seed (Stream 1, Ripples 6, Rings 1) and cut out the way the Server cuts a picture drawn from an example, at twice the frame (432×184) |
+
+The zip can be rebuilt from [water-nihonga/](water-nihonga/) (with the same timestamps it comes out byte for byte the same).
+
+```sh
+cd docs/plugins/water-nihonga
+TZ=UTC touch -t 202610260000 package.json previews previews/*.png
+zip -X -r ../water-nihonga.zip package.json previews
+```
+
+### Using it in one work (export files)
+
 - Web: open "New instructions" under the Describe tab and choose the file with "Load".
 - CLI: `uv run inku-cli paint --input-mode ddl --file docs/plugins/water.en.ddl.json`
-- Android: choose the file with "Open" on the DDL screen.
-- To use it in every new work on a Server, put `definition` in `pipeline.definitions` and `summary`, in the same order, in `pipeline.macro_summaries` (PLUGIN §5.2).
+- Android: choose the file with "Open" on the DDL screen. Android and macOS do not call the Server, so words added by zip cannot be used there yet; use this way instead.
 
 To use the three words in one work, read in `water.*.ddl.json`.
 

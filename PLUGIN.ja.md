@@ -115,7 +115,7 @@ Serverに入れずに自分の作品だけで試すなら、DDLの書き出し�
 `5個のSky.星。`と`5 Sky.Stars.`は5つ、`Sky.星。`は書かない個数の候補から3〜5つ、`9個のSky.星。`は9つの円を、
 診断なしで描いた。`12個のSky.星。`は範囲の外なので、その語が外れた。
 
-ほかの作例として、水を描く三つの語、`Water.Stream`（別名`Water.水流`）・`Water.Ripples`（別名`Water.波紋`）・`Water.Rings`（別名`Water.水輪`）を、そのまま読み込める書き出しファイルの形で[docs/plugins](docs/plugins/README.ja.md)に置いてある。部品（`use`）、算術の代わりに`transform`で全体を動かし・回し・つぶす作り、`cycle`の表で輪や線ごとに形と画材を変える作りの例でもある。
+ほかの作例として、水を描く三つの語、`Water.Stream`（別名`Water.水流`）・`Water.Ripples`（別名`Water.波紋`）・`Water.Rings`（別名`Water.水輪`）を、§5.1でそのまま追加できるzip（[docs/plugins/water-nihonga.zip](docs/plugins/water-nihonga.zip)。歳時記の絵を含む）と、書き出しファイルの形で[docs/plugins](docs/plugins/README.ja.md)に置いてある。部品（`use`）、算術の代わりに`transform`で全体を動かし・回し・つぶす作り、`cycle`の表で輪や線ごとに形と画材を変える作りの例でもある。
 
 ## 3. 定義の形式
 

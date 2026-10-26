@@ -121,9 +121,10 @@ choices, and `9個のSky.星。` drew nine, all without diagnostics. `12個のSk
 word was left out.
 
 More examples, three words that draw water, `Water.Stream` (alias `Water.水流`), `Water.Ripples` (alias `Water.波紋`)
-and `Water.Rings` (alias `Water.水輪`), are kept in [docs/plugins](docs/plugins/README.md) as export files that can be loaded
-as they are. They also show a component (`use`), a `transform` that moves, turns and flattens the whole in place of
-arithmetic, and `cycle` tables that change the form and tool per ring or line.
+and `Water.Rings` (alias `Water.水輪`), are kept in [docs/plugins](docs/plugins/README.md) as a zip that §5.1 adds as it is
+([docs/plugins/water-nihonga.zip](docs/plugins/water-nihonga.zip), with Saijiki pictures) and as export files. They also show a
+component (`use`), a `transform` that moves, turns and flattens the whole in place of arithmetic, and `cycle` tables
+that change the form and tool per ring or line.
 
 ## 3. Definition Format
 

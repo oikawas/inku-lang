@@ -53,6 +53,17 @@ test('T-335/T-337: CanvasPanel keeps coordination and lends shared derivations',
 	assert.doesNotMatch(panel, /<OutputTabsContent/);
 });
 
+test('the prompt tab shows the catalog choice for a description and a picture its own three', () => {
+	const view = read('./CanvasGenerationInfo.svelte');
+	const tabs = read('../../components/OutputTabsContent.svelte');
+
+	// A work from a picture chose its catalog from the picture, never from a description.
+	assert.match(view, /imageWork=\{!!detailImageRecord\}/);
+	assert.match(view, /catalogChosen=\{!detailImageRecord && \(statusHistoryItem\?\.catalog_mode \?\? result\?\.catalog_mode\) === 'auto'\}/);
+	assert.match(tabs, /\{#if catalogChosen \|\| catalogSystem\}/);
+	assert.match(tabs, /imageSent = \$derived\(imageWork \|\| /);
+});
+
 test('T-338: the focused view is typed and owns no route or session state', () => {
 	const view = read('./CanvasGenerationInfo.svelte');
 

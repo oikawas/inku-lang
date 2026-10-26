@@ -11,9 +11,14 @@ Canvasの選択（`inku.canvas-format-registry.v1`）とRender Engine Packは、
 ## 1. 作る手順
 
 1. 定義をJSONで書く（§2の手本、§3の形式）。
-2. 検査する（§7）。定義の誤りは、どの欄が何の理由で駄目かが出る。
-3. 読み込ませる（§5）。作者が自分で使うなら、DDLの書き出しファイル（`inku.ddl-export.v1`）に入れて読み込むのが一番早い。
-4. DDLで名前を書いて呼ぶ（§4）。記述から描くときに下絵（Stage 1）に選ばせるには、要約（§6）を書いて、Serverの設定に入れる（§5.2）。
+2. 定義と、要約（§6）・説明・例文をプラグインのファイル（`inku.plugin-package.v1`、§5.1）にまとめる。
+3. Serverの管理者は、Webの設定「プラグイン」の「プラグインを追加」でファイルを選ぶ（§5.1）。
+   Serverがすぐに検査し、駄目なところはファイルの中の場所と理由が語ごとに出る（§7）。
+   通った語には歳時記に出る絵と例が出るので、確かめて「追加する」を押す。
+4. DDLで名前を書いて呼ぶ（§4）。追加した語は、そのServerの全ての新しい作品で描け、歳時記にも出て、
+   記述から描くときは下絵（Stage 1）が要約を読んで選ぶ。
+
+Serverに入れずに自分の作品だけで試すなら、DDLの書き出しファイル（§5.2）に入れて読み込む。
 
 ## 2. 手本: `Sky.Stars`（別名 `Sky.星`）
 
@@ -88,7 +93,7 @@ Canvasの選択（`inku.canvas-format-registry.v1`）とRender Engine Packは、
 - `vary`は、決まった種から選択肢の一つを選ぶ。`repeat`の中にあるので、星ごとに選び直す。
 - `emit`が1つの図形の指示になる。ここでは鉛筆の黄で塗った円を、数で決めた位置に置く。
 
-この定義を書き出しファイルに入れたもの（§5.1）は次の形である。`ddl`は読み込んだときにDDL欄へ入る文である。
+この定義を書き出しファイルに入れたもの（§5.2）は次の形である。`ddl`は読み込んだときにDDL欄へ入る文である。
 
 ```json
 {
@@ -128,7 +133,8 @@ Canvasの選択（`inku.canvas-format-registry.v1`）とRender Engine Packは、
 
 DDLに書く名前は`namespace.heading`（例: `Sky.Stars`）か`namespace.別名`（例: `Sky.星`）である。
 同じ名前空間の語は一つの名前を一つの定義だけが持てる。すでに読み込まれた定義と同じ正式名や別名を持つ定義は、
-後から来た方が受け付けられない（§5.1の書き出しファイルの定義だけは、その作品で同名の定義より優先される）。
+後から来た方が受け付けられない（§5.2の書き出しファイルの定義だけは、その作品で同名の定義より優先される）。
+Webから追加するときは、ほかのプラグインがすでに持つ名前の語を検査が断る（§5.1）。
 名前空間の考え方は[SPEC §4.10](SPEC.ja.md#410-名前空間の規約)、正式名と別名は[SPEC §4.13](SPEC.ja.md#413-正式名と別名)にある。
 
 定義の中身を変えたら`version`を上げる。保存済みの作品は使った定義の実物とdigestを持つので、後から定義を変えても描き直しは変わらない。
@@ -310,9 +316,77 @@ productのcheckoutの最上位で走らせる。出力の行頭が`category`、�
 
 ## 5. 読み込ませる道
 
-今の仕様で新しい定義を読み込める道は三つある。設定の「プラグイン」画面で文書を足す道は無い（§5.4）。
+今の仕様で新しい定義を読み込める道は四つある。ふつうは§5.1を使う。
 
-### 5.1 DDLの書き出しファイル（作者がすぐ使える）
+### 5.1 Webからプラグインのファイルを追加する（Serverの管理者）
+
+定義と歳時記に出す情報を一つのJSONファイル（`inku.plugin-package.v1`）にまとめ、Webの設定「プラグイン」の
+「プラグインを追加」で選ぶ。§2の`Sky.Stars`をファイルにしたものは次の形である。
+
+```json
+{
+  "schema": "inku.plugin-package.v1",
+  "namespace": "Sky",
+  "name": "night",
+  "version": "1.0.0",
+  "description_ja": "夜空の語。",
+  "description_en": "Night-sky words.",
+  "words": [
+    {
+      "definition": { "…": "§2の定義をそのまま入れる" },
+      "summary_ja": "空の上半分に、黄色の星を散らす。星の数を書けばその数（1〜9個）、書かなければ3〜5個。",
+      "summary_en": "Scatters yellow stars over the upper half of the sky: the written count (1–9), or 3–5 when none is written.",
+      "note_ja": "夜の空に小さな星。",
+      "note_en": "Small stars in a night sky.",
+      "example_ja": "5個のSky.星。",
+      "example_en": "5 Sky.Stars."
+    }
+  ]
+}
+```
+
+| 欄 | 必須 | 中身 |
+|---|---|---|
+| `schema` | 必須 | 正確に`inku.plugin-package.v1` |
+| `namespace` | 必須 | 名前空間。各定義の`namespace`と同じにする（§3.1） |
+| `name` | 必須 | プラグインの名前。英字で始まり、英数字・`_`・`-`だけ。`namespace.name`（例: `Sky.night`）がプラグインのid |
+| `version` | 必須 | `1.0.0`の形 |
+| `description_ja`・`description_en` | 任意 | 設定の画面に出す説明 |
+| `authors`・`license` | 任意 | 作者（文字列の配列）と使用条件 |
+| `words` | 必須 | 語の並び（1〜64個）。各語は下の欄を持つ |
+
+各語の欄:
+
+| 欄 | 必須 | 中身と、どこに出るか |
+|---|---|---|
+| `definition` | 必須 | `inku.macro-definition.v1`の定義（§3） |
+| `summary_ja`・`summary_en` | どちらか一方 | 下絵（Stage 1）に渡す要約（§6）。片方だけなら、もう一方の言語にも使う |
+| `note_ja`・`note_en` | 任意 | 歳時記の見本の説明の行（組み込みの語の「効果」の行に当たる）。何を描く語かを短く書く |
+| `example_ja`・`example_en` | 任意 | 歳時記の見本の「例」に出すDDLの文。書かなければ`Sky.星。`（日本語は最初の別名）・`Sky.Stars.`を使う |
+
+歳時記の見本は、題（正式名か別名）・説明（`note_*`）・例（`example_*`）・絵の四つでできている。絵は書かない。
+追加するとき、Serverが日本語の例文を描き、描いたところを切り出して歳時記の枠（216×92と、その2倍）に収める。
+例文は、語の見た目が分かる個数や書き方で書く（例: `Sky.星`なら`5個のSky.星。`）。
+
+検査は三つを順に行い、全部通ったときだけ追加できる。
+
+1. ファイルの形（知らない欄、必須の欄、`namespace`の食い違い、要約の有無など）。
+2. 共有coreによる定義の検査（§7.2の誤り）と、ほかのプラグインがすでに持つ名前との重なり。
+3. 各語の日本語と英語の例文を、共有pipelineでDDLとして実際に描く。何も描けない、または診断が出たら駄目になる。
+
+駄目なところは、ファイルの中の場所（例: `words[0].definition.body[0].body[0].body[0].fields.color`）と理由で語ごとに出る。
+
+- 追加した語は、そのServerの全ての新しい作品で描け、歳時記とDDLエディタの補完に出て、記述から描くときは下絵に要約が渡る。
+- 同じid（`namespace.name`）のプラグインが入っていると、「置き換える」になる。置き換えると、新しい作品は新しい定義で描く。
+- 語ごとの「絵を差し替える」でPNGを上げると、歳時記の絵がその画像になる（枠に収めて縮める）。「自動の絵に戻す」で
+  例文から描いた絵に戻る。置き換えても、差し替えた絵は残る。
+- 無効にすると、新しい作品・歳時記・補完から外れる。削除もできる。
+- 保存済みの作品は、使った定義の写しを持つので、後から置き換え・無効・削除をしても同じに描き直せる。
+- ファイルはServerの`INKU_PLUGIN_PACKAGE_DIR`に置かれる（[Serverの設定 §2.5](manual/ja/server-configuration.md)）。
+- APIは`POST /api/plugins/packages/validate`（検査だけ）と`POST /api/plugins/packages`（追加）。どちらも管理者だけが使える。
+- Android・macOSはServerを呼ばないので、ここで追加した語はまだ使えない。
+
+### 5.2 DDLの書き出しファイル（作者がすぐ使える）
 
 §2の形のJSON（`inku.ddl-export.v1`）を作って読み込むと、`plugins`の定義がその新しい作品だけで使われる。
 
@@ -331,7 +405,7 @@ productのcheckoutの最上位で走らせる。出力の行頭が`category`、�
   （`imported_plugin_differs_from_installed`・`imported_plugin_not_installed`）で知らせる。
 - 描いた作品を書き出すと、DDLが名前を書く定義と要約が同じ形式で入るので、別の環境へ持ち運べる。
 
-### 5.2 Serverのpipeline manifest（管理者が全ての新しい作品に入れる）
+### 5.3 Serverのpipeline manifest（管理者が全ての新しい作品に入れる）
 
 Serverの`INKU_PIPELINE_CONFIG`が指すmanifestの`pipeline.definitions`に定義を、`pipeline.macro_summaries`に
 同じ順で要約を入れる。manifestの作り方は[Serverの設定 §2.4](manual/ja/server-configuration.md)にある。
@@ -343,22 +417,22 @@ Serverの`INKU_PIPELINE_CONFIG`が指すmanifestの`pipeline.definitions`に定�
 
 - そのServerの新しい作品の全てで使える。記述から描くときは、下絵（Stage 1）に名前と要約が渡り、記述に語が書かれていれば下絵が選ぶ。
 - 二つの並びの長さが違うと、新しい作品の実行が`macro_catalog_summary_mismatch`で失敗する。
-- 設定の「プラグイン」画面には出ず、そこで有効・無効を切り替えることはできない。
+- 設定の「プラグイン」画面と歳時記には出ず、そこで有効・無効を切り替えることはできない。§5.1の方が扱いやすい。
 
-### 5.3 共有coreへの同梱（開発の変更）
+### 5.4 共有coreへの同梱（開発の変更）
 
 `Nature.leaves`のように全てのhostへ同梱するには、共有coreの`core/crates/inku-ddl/assets/`に
 `inku.bundled-macro-package.v1`のpackageを置き、`inku-pipeline-uniffi/src/macro_catalog.rs`の同梱の名前に足し、
 Serverの`server/src/inku_server/plugins/__init__.py`の`_BUNDLED_DOCUMENTS`とAndroidの
 `SharedPipelineConfigBuilder.kt`がそのpackageを名指すようにする。これは製品の変更で、buildと配備が要る。
 
-### 5.4 今は使えない道
+### 5.5 今は使えない道
 
 - `server/plugins/`（`INKU_DOCUMENT_PLUGIN_DIR`）へ新しい`.inku-plugin.md`を置いても、定義にはならない。
   同梱package以外の文書は「描画には使われない」と表示され、その語は外れる。
 - 「読んで描く」と画像タブは、モデルにプラグインの一覧を渡さない。モデルがDDLに名前を書けば描けるが、
   一覧を知らないので選ばれることはまず無い。
-- 利用者が定義を導入する汎用のloaderと、installできるpackage catalogはまだ無い。
+- Android・macOSで利用者が定義を導入する道と、installできるpackageの公開の一覧はまだ無い。
 
 ## 6. 要約（summary）の書き方
 
@@ -368,10 +442,14 @@ Serverの`server/src/inku_server/plugins/__init__.py`の`_BUNDLED_DOCUMENTS`とA
 
 - 何を、画面のどこに、どんな画材・色・形で描くかを書く。
 - 個数を受けるなら、範囲と書かないときの数を書く（例:「星の数を書けばその数（1〜9個）、書かなければ3〜5個」）。
-- 日本語と英語の両方を用意する（同梱packageは`summaries.ja`と`summaries.en`を持つ。書き出しファイルとmanifestは一つの文字列）。
+- 日本語と英語の両方を用意する（プラグインのファイルは`summary_ja`と`summary_en`、同梱packageは`summaries.ja`と`summaries.en`を持つ。書き出しファイルとmanifestは一つの文字列）。
 - 長さはServerの既定で8192 bytesまで。§2の要約と、同梱の`Nature.leaves`の要約が手本になる。
 
 ## 7. 検査と、うまくいかないとき
+
+Serverの管理者は、Webの「プラグインを追加」でファイルを選ぶだけで、§5.1の三つの検査がまとめて走る。
+理由の説明は§7.2の表と同じである。追加はしないで検査だけをしたいときも、結果を見て「キャンセル」を押せばよい。
+下の§7.1は、Serverを使わずにproductのcheckoutで定義だけを確かめる道である。
 
 ### 7.1 定義だけを検査する
 

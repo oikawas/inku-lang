@@ -105,16 +105,18 @@ test('T-22: a plugin preview is built from the document, not invented', () => {
 	);
 	assert.ok(fn.length > 0, 'the page builds no plugin preview');
 	// Title, effect, example: the qualified name in the DDL's language (the
-	// Japanese alias or the canonical name), the note, the first phrase a
-	// description would use to reach the word.
+	// Japanese alias or the canonical name), the note, and the example a
+	// package installed from the Web gives (its DDL call), or else the first
+	// phrase a description would use to reach the word.
 	assert.match(fn, /word: pluginDisplayName\(entry, wordLang\)/);
 	assert.match(fn, /canonicalWord: entry\.qualified_name/);
 	assert.match(fn, /effect: \(uiLang === 'ja' \? entry\.note_ja : entry\.note_en\)/);
-	assert.match(fn, /example: firesOn\[0\]/);
+	assert.match(fn, /example: example \|\| \(firesOn\[0\] \?\? ''\)/);
 	// Both languages are read, so neither text is ever shown in the other's.
-	// The note is prose and follows the reader; the firing phrase is what a
-	// description would say, so it follows the DDL (T-92).
+	// The note is prose and follows the reader; the firing phrase and the
+	// example are what a description or DDL would say, so they follow the DDL (T-92).
 	assert.match(fn, /wordLang === 'ja' \? entry\.fires_on_ja : entry\.fires_on_en/);
+	assert.match(fn, /wordLang === 'ja' \? entry\.example_ja : entry\.example_en/);
 });
 
 test('T-22: both panels are given the builder, or one of them shows nothing', () => {

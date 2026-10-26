@@ -9,6 +9,7 @@ from typing import Any
 
 from .pipeline_candidate import CandidateHostError
 from .plugins import DOCUMENT_PLUGIN_MANAGER, bundled_package_for
+from .plugins.packages import PLUGIN_PACKAGE_MANAGER
 
 
 def _bytes(value: Mapping[str, Any]) -> bytes:
@@ -165,7 +166,9 @@ def resolve_new_work_macro_catalog(
         raise CandidateHostError("invalid_macro_catalog_source")
     legacy, bundled_packages = _installed_candidates()
     language = pipeline_config.get("language", "en")
-    installed = _canonical_candidates(definitions, summaries)
+    # The manifest's definitions first, then the packages an administrator
+    # installed from the Web; both ahead of the bundled editions.
+    installed = _canonical_candidates(definitions, summaries) + PLUGIN_PACKAGE_MANAGER.catalog_candidates(language)
     if imported:
         output = _with_imported(binding, maximum_entries, installed, legacy, bundled_packages, language, imported)
     else:
@@ -203,6 +206,8 @@ def _installed_plugin_names() -> tuple[list[str], list[str]]:
         disabled.extend(
             name for entry in document.entries for name in entry.visible_qualified_names(document.manifest.namespace)
         )
+    enabled = sorted([*enabled, *PLUGIN_PACKAGE_MANAGER.visible_names(enabled=True)])
+    disabled.extend(PLUGIN_PACKAGE_MANAGER.visible_names(enabled=False))
     return enabled, sorted(disabled)
 
 

@@ -97,7 +97,10 @@ PUBLIC = {  # every entry needs a reason
 #   retained database backup (2026-10-25).
 #   +1 for PUT /api/settings/image-upload-notice, the switch for the warning
 #   before painting from a picture (2026-10-25).
-EXPECTED_ROUTE_COUNT = 139
+#   +4 for plugin packages an administrator installs from the Web:
+#   POST /api/plugins/packages/validate, POST /api/plugins/packages, and
+#   PUT and DELETE /api/plugins/{plugin_id}/words/{heading}/preview (2026-10-26).
+EXPECTED_ROUTE_COUNT = 143
 
 
 def _guard_names(dependant, seen=None) -> set[str]:
@@ -199,6 +202,8 @@ def test_only_stronger_admin_guards_remain_as_unused_route_arguments():
 
     assert unused == {
         ("plugins.py", "api_plugin_delete", "_admin_user"),
+        ("plugins.py", "api_plugin_preview_replace", "_admin_user"),
+        ("plugins.py", "api_plugin_preview_reset", "_admin_user"),
         ("plugins.py", "api_plugin_set_enabled", "_admin_user"),
         ("plugins.py", "api_plugins_reload", "_admin_user"),
         ("plugins.py", "api_plugins_validate", "_admin_user"),

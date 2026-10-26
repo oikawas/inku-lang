@@ -26,6 +26,7 @@ from .document_format import (
     parse_plugin_document,
     validate_plugin_document,
 )
+from .packages import PLUGIN_PACKAGE_MANAGER
 
 
 def plugin_fires_on_index() -> dict[str, dict[str, list[str]]]:
@@ -93,10 +94,13 @@ def plugin_has_definitions(plugin_id: str) -> bool:
 
 
 def plugin_status_items() -> list[dict[str, object]]:
-    return [
-        {**item.as_dict(), "has_definitions": plugin_has_definitions(item.path)}
+    """The plugin documents, then the packages an administrator installed from the Web."""
+    documents = [
+        {**item.as_dict(), "kind": "document", "has_definitions": plugin_has_definitions(item.path),
+         "deletable": not plugin_has_definitions(item.path)}
         for item in DOCUMENT_PLUGIN_MANAGER.items()
     ]
+    return documents + PLUGIN_PACKAGE_MANAGER.status_items()
 
 
 __all__ = [
@@ -110,6 +114,7 @@ __all__ = [
     "canvas_size_for_aspect",
     "normalize_canvas_aspect_id",
     "DOCUMENT_PLUGIN_MANAGER",
+    "PLUGIN_PACKAGE_MANAGER",
     "PluginFormatError",
     "entries_with_fires_on",
     "parse_plugin_document",

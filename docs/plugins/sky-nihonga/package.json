@@ -1,0 +1,1476 @@
+{
+  "schema": "inku.plugin-package.v1",
+  "namespace": "Sky",
+  "name": "nihonga",
+  "version": "1.0.0",
+  "description_ja": "大和絵・浮世絵と近現代の日本画の空の描き方を参考にした、空の四つの語。雲（Sky.雲）・空（Sky.空）・雨（Sky.雨）・雪（Sky.雪）。すやり霞、一文字ぼかし、広重の雨脚、胡粉の牡丹雪。雪は暗い地に、ほかは明るい地（白・和紙）に向く。",
+  "description_en": "Four sky words after the way yamato-e, ukiyo-e and modern Japanese painting draw the sky: Sky.Clouds (雲), Sky.Heavens (空), Sky.Rain (雨) and Sky.Snow (雪). Suyari-gasumi bands, ichimonji bokashi, Hiroshige's rain and gofun peony snow. Snow belongs on a dark ground, the others on a light one (white or washi).",
+  "license": "MIT",
+  "words": [
+    {
+      "definition": {
+        "schema": "inku.macro-definition.v1",
+        "namespace": "Sky",
+        "heading": "Clouds",
+        "version": "1.0.0",
+        "parameters": {
+          "band_count": {
+            "type": "integer",
+            "receives": "count",
+            "minimum": 1,
+            "maximum": 5,
+            "omitted": [
+              3,
+              4
+            ],
+            "counter": "long"
+          }
+        },
+        "components": {},
+        "body": [
+          {
+            "op": "vary",
+            "binding": "cloud_lie",
+            "domain": "cloud_lie",
+            "choices": [
+              {
+                "expr": "integer",
+                "value": 0
+              },
+              {
+                "expr": "integer",
+                "value": 1
+              },
+              {
+                "expr": "integer",
+                "value": 2
+              },
+              {
+                "expr": "integer",
+                "value": 3
+              }
+            ],
+            "body": [
+              {
+                "op": "transform",
+                "transform": {
+                  "scale_x": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "cloud_lie"
+                    },
+                    "items": [
+                      {
+                        "expr": "number",
+                        "value": 1.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": -1.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": 1.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": -1.0
+                      }
+                    ]
+                  },
+                  "translate_y": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "cloud_lie"
+                    },
+                    "items": [
+                      {
+                        "expr": "number",
+                        "value": 0.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.04
+                      },
+                      {
+                        "expr": "number",
+                        "value": 0.08
+                      },
+                      {
+                        "expr": "number",
+                        "value": -0.02
+                      }
+                    ]
+                  }
+                },
+                "body": [
+                  {
+                    "op": "repeat",
+                    "count": {
+                      "expr": "parameter",
+                      "name": "band_count"
+                    },
+                    "maximum": 5,
+                    "index": "band_index",
+                    "body": [
+                      {
+                        "op": "emit",
+                        "binding": null,
+                        "fields": {
+                          "movement": {
+                            "expr": "semantic_ref",
+                            "category": "movement",
+                            "id": "place"
+                          },
+                          "shape": {
+                            "expr": "semantic_ref",
+                            "category": "shape",
+                            "id": "line"
+                          },
+                          "position_x": {
+                            "expr": "cycle",
+                            "index": {
+                              "expr": "local",
+                              "name": "band_index"
+                            },
+                            "items": [
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.360"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.650"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.280"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.690"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.370"
+                              }
+                            ]
+                          },
+                          "position_y": {
+                            "expr": "cycle",
+                            "index": {
+                              "expr": "local",
+                              "name": "band_index"
+                            },
+                            "items": [
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.164"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.278"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.402"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.514"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.616"
+                              }
+                            ]
+                          },
+                          "length": {
+                            "expr": "cycle",
+                            "index": {
+                              "expr": "local",
+                              "name": "band_index"
+                            },
+                            "items": [
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.520"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.540"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.440"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.380"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.380"
+                              }
+                            ]
+                          },
+                          "color": {
+                            "expr": "semantic_ref",
+                            "category": "color",
+                            "id": "gray"
+                          },
+                          "touch": {
+                            "expr": "semantic_ref",
+                            "category": "touch",
+                            "id": "brush_thin"
+                          },
+                          "fluctuation_amplitude": {
+                            "expr": "semantic_ref",
+                            "category": "variation",
+                            "id": "narrowly"
+                          },
+                          "fluctuation_frequency": {
+                            "expr": "semantic_ref",
+                            "category": "variation",
+                            "id": "loosely"
+                          },
+                          "fluctuation_quality": {
+                            "expr": "semantic_ref",
+                            "category": "variation",
+                            "id": "swaying"
+                          }
+                        }
+                      },
+                      {
+                        "op": "emit",
+                        "binding": null,
+                        "fields": {
+                          "movement": {
+                            "expr": "semantic_ref",
+                            "category": "movement",
+                            "id": "place"
+                          },
+                          "shape": {
+                            "expr": "semantic_ref",
+                            "category": "shape",
+                            "id": "line"
+                          },
+                          "position_x": {
+                            "expr": "cycle",
+                            "index": {
+                              "expr": "local",
+                              "name": "band_index"
+                            },
+                            "items": [
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.360"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.650"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.280"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.690"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.370"
+                              }
+                            ]
+                          },
+                          "position_y": {
+                            "expr": "cycle",
+                            "index": {
+                              "expr": "local",
+                              "name": "band_index"
+                            },
+                            "items": [
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.236"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.342"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.458"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.566"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.664"
+                              }
+                            ]
+                          },
+                          "length": {
+                            "expr": "cycle",
+                            "index": {
+                              "expr": "local",
+                              "name": "band_index"
+                            },
+                            "items": [
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.520"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.540"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.440"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.380"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.380"
+                              }
+                            ]
+                          },
+                          "color": {
+                            "expr": "semantic_ref",
+                            "category": "color",
+                            "id": "gray"
+                          },
+                          "touch": {
+                            "expr": "semantic_ref",
+                            "category": "touch",
+                            "id": "brush_thin"
+                          },
+                          "fluctuation_amplitude": {
+                            "expr": "semantic_ref",
+                            "category": "variation",
+                            "id": "narrowly"
+                          },
+                          "fluctuation_frequency": {
+                            "expr": "semantic_ref",
+                            "category": "variation",
+                            "id": "loosely"
+                          },
+                          "fluctuation_quality": {
+                            "expr": "semantic_ref",
+                            "category": "variation",
+                            "id": "swaying"
+                          }
+                        }
+                      },
+                      {
+                        "op": "transform",
+                        "transform": {
+                          "rotate_degrees": {
+                            "expr": "number",
+                            "value": -90
+                          }
+                        },
+                        "body": [
+                          {
+                            "op": "emit",
+                            "binding": null,
+                            "fields": {
+                              "movement": {
+                                "expr": "semantic_ref",
+                                "category": "movement",
+                                "id": "place"
+                              },
+                              "shape": {
+                                "expr": "semantic_ref",
+                                "category": "shape",
+                                "id": "arc"
+                              },
+                              "position_x": {
+                                "expr": "cycle",
+                                "index": {
+                                  "expr": "local",
+                                  "name": "band_index"
+                                },
+                                "items": [
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.082"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.364"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.046"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.487"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.168"
+                                  }
+                                ]
+                              },
+                              "position_y": {
+                                "expr": "cycle",
+                                "index": {
+                                  "expr": "local",
+                                  "name": "band_index"
+                                },
+                                "items": [
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.218"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.326"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.444"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.553"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.652"
+                                  }
+                                ]
+                              },
+                              "chord": {
+                                "expr": "cycle",
+                                "index": {
+                                  "expr": "local",
+                                  "name": "band_index"
+                                },
+                                "items": [
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.072"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.064"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.056"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.052"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.048"
+                                  }
+                                ]
+                              },
+                              "sagitta": {
+                                "expr": "cycle",
+                                "index": {
+                                  "expr": "local",
+                                  "name": "band_index"
+                                },
+                                "items": [
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.036"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.032"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.028"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.026"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.024"
+                                  }
+                                ]
+                              },
+                              "color": {
+                                "expr": "semantic_ref",
+                                "category": "color",
+                                "id": "gray"
+                              },
+                              "touch": {
+                                "expr": "semantic_ref",
+                                "category": "touch",
+                                "id": "brush_thin"
+                              },
+                              "fluctuation_amplitude": {
+                                "expr": "semantic_ref",
+                                "category": "variation",
+                                "id": "narrowly"
+                              },
+                              "fluctuation_frequency": {
+                                "expr": "semantic_ref",
+                                "category": "variation",
+                                "id": "loosely"
+                              },
+                              "fluctuation_quality": {
+                                "expr": "semantic_ref",
+                                "category": "variation",
+                                "id": "swaying"
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "op": "transform",
+                        "transform": {
+                          "rotate_degrees": {
+                            "expr": "number",
+                            "value": 90
+                          }
+                        },
+                        "body": [
+                          {
+                            "op": "emit",
+                            "binding": null,
+                            "fields": {
+                              "movement": {
+                                "expr": "semantic_ref",
+                                "category": "movement",
+                                "id": "place"
+                              },
+                              "shape": {
+                                "expr": "semantic_ref",
+                                "category": "shape",
+                                "id": "arc"
+                              },
+                              "position_x": {
+                                "expr": "cycle",
+                                "index": {
+                                  "expr": "local",
+                                  "name": "band_index"
+                                },
+                                "items": [
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.638"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.936"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.514"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.893"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.572"
+                                  }
+                                ]
+                              },
+                              "position_y": {
+                                "expr": "cycle",
+                                "index": {
+                                  "expr": "local",
+                                  "name": "band_index"
+                                },
+                                "items": [
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.218"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.326"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.444"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.553"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.652"
+                                  }
+                                ]
+                              },
+                              "chord": {
+                                "expr": "cycle",
+                                "index": {
+                                  "expr": "local",
+                                  "name": "band_index"
+                                },
+                                "items": [
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.072"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.064"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.056"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.052"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.048"
+                                  }
+                                ]
+                              },
+                              "sagitta": {
+                                "expr": "cycle",
+                                "index": {
+                                  "expr": "local",
+                                  "name": "band_index"
+                                },
+                                "items": [
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.036"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.032"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.028"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.026"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.024"
+                                  }
+                                ]
+                              },
+                              "color": {
+                                "expr": "semantic_ref",
+                                "category": "color",
+                                "id": "gray"
+                              },
+                              "touch": {
+                                "expr": "semantic_ref",
+                                "category": "touch",
+                                "id": "brush_thin"
+                              },
+                              "fluctuation_amplitude": {
+                                "expr": "semantic_ref",
+                                "category": "variation",
+                                "id": "narrowly"
+                              },
+                              "fluctuation_frequency": {
+                                "expr": "semantic_ref",
+                                "category": "variation",
+                                "id": "loosely"
+                              },
+                              "fluctuation_quality": {
+                                "expr": "semantic_ref",
+                                "category": "variation",
+                                "id": "swaying"
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "op": "emit",
+                        "binding": null,
+                        "fields": {
+                          "movement": {
+                            "expr": "semantic_ref",
+                            "category": "movement",
+                            "id": "place"
+                          },
+                          "shape": {
+                            "expr": "semantic_ref",
+                            "category": "shape",
+                            "id": "line"
+                          },
+                          "position_x": {
+                            "expr": "cycle",
+                            "index": {
+                              "expr": "local",
+                              "name": "band_index"
+                            },
+                            "items": [
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.360"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.650"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.280"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.690"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.370"
+                              }
+                            ]
+                          },
+                          "position_y": {
+                            "expr": "cycle",
+                            "index": {
+                              "expr": "local",
+                              "name": "band_index"
+                            },
+                            "items": [
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.200"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.310"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.430"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.540"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.640"
+                              }
+                            ]
+                          },
+                          "length": {
+                            "expr": "cycle",
+                            "index": {
+                              "expr": "local",
+                              "name": "band_index"
+                            },
+                            "items": [
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.426"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.443"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.361"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.312"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.312"
+                              }
+                            ]
+                          },
+                          "color": {
+                            "expr": "semantic_ref",
+                            "category": "color",
+                            "id": "yellow"
+                          },
+                          "touch": {
+                            "expr": "semantic_ref",
+                            "category": "touch",
+                            "id": "brush_thick"
+                          },
+                          "fluctuation_amplitude": {
+                            "expr": "semantic_ref",
+                            "category": "variation",
+                            "id": "narrowly"
+                          },
+                          "fluctuation_frequency": {
+                            "expr": "semantic_ref",
+                            "category": "variation",
+                            "id": "loosely"
+                          },
+                          "fluctuation_quality": {
+                            "expr": "semantic_ref",
+                            "category": "variation",
+                            "id": "swaying"
+                          },
+                          "ink_spread": {
+                            "expr": "semantic_ref",
+                            "category": "variation",
+                            "id": "bleeding"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "aliases": [
+          "雲"
+        ]
+      },
+      "summary_ja": "大和絵や琳派のすやり霞のような雲を、画面の上から中ほどに横長の帯で重ねる。帯は両端が丸い細長い輪郭で、淡い墨（灰）の細筆で描き、帯の芯に金（黄）の太筆の線を一本ずつ、滲ませて通す。帯は左右にずらしながら下へ重なり、下の帯ほど短く細い。帯の数を書けばその数（1〜5本）、書かなければ3〜4本。帯の並びの左右の向きと上下の位置は四通りから選ぶ。",
+      "summary_en": "Layer clouds like the suyari-gasumi bands of yamato-e and Rinpa across the upper to middle canvas as long horizontal bands. Each band is a long outline with rounded ends in thin pale-ink (gray) brush, with one bleeding thick-brush gold (yellow) line through its core. The bands overlap downward, shifted left and right, the lower ones shorter and narrower. The written band count (1–5), or 3–4 when none is written. The left-right direction and the height of the bands come from four arrangements.",
+      "note_ja": "すやり霞の雲。金の芯を通した横長の帯。",
+      "note_en": "Suyari-gasumi clouds: long bands with gold cores.",
+      "example_ja": "4本のSky.雲。",
+      "example_en": "4 Sky.Clouds.",
+      "preview": "previews/clouds.png"
+    },
+    {
+      "definition": {
+        "schema": "inku.macro-definition.v1",
+        "namespace": "Sky",
+        "heading": "Heavens",
+        "version": "1.0.0",
+        "parameters": {
+          "stroke_count": {
+            "type": "integer",
+            "receives": "count",
+            "minimum": 1,
+            "maximum": 12,
+            "omitted": [
+              8,
+              9,
+              10
+            ],
+            "counter": "long"
+          }
+        },
+        "components": {},
+        "body": [
+          {
+            "op": "repeat",
+            "count": {
+              "expr": "parameter",
+              "name": "stroke_count"
+            },
+            "maximum": 12,
+            "index": "stroke_index",
+            "body": [
+              {
+                "op": "emit",
+                "binding": null,
+                "fields": {
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "line"
+                  },
+                  "position_x": {
+                    "expr": "exact_decimal",
+                    "value": "0.500"
+                  },
+                  "position_y": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "stroke_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.010"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.022"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.036"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.052"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.070"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.092"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.118"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.148"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.184"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.226"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.276"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.334"
+                      }
+                    ]
+                  },
+                  "length": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "stroke_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.980"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.980"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.980"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.980"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.980"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.980"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.980"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.980"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.980"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.900"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.820"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.740"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "stroke_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "semantic_ref",
+                        "category": "color",
+                        "id": "blue"
+                      },
+                      {
+                        "expr": "semantic_ref",
+                        "category": "color",
+                        "id": "blue"
+                      },
+                      {
+                        "expr": "semantic_ref",
+                        "category": "color",
+                        "id": "blue"
+                      },
+                      {
+                        "expr": "semantic_ref",
+                        "category": "color",
+                        "id": "blue"
+                      },
+                      {
+                        "expr": "semantic_ref",
+                        "category": "color",
+                        "id": "blue"
+                      },
+                      {
+                        "expr": "semantic_ref",
+                        "category": "color",
+                        "id": "blue"
+                      },
+                      {
+                        "expr": "semantic_ref",
+                        "category": "color",
+                        "id": "gray"
+                      },
+                      {
+                        "expr": "semantic_ref",
+                        "category": "color",
+                        "id": "gray"
+                      },
+                      {
+                        "expr": "semantic_ref",
+                        "category": "color",
+                        "id": "gray"
+                      },
+                      {
+                        "expr": "semantic_ref",
+                        "category": "color",
+                        "id": "gray"
+                      },
+                      {
+                        "expr": "semantic_ref",
+                        "category": "color",
+                        "id": "gray"
+                      },
+                      {
+                        "expr": "semantic_ref",
+                        "category": "color",
+                        "id": "gray"
+                      }
+                    ]
+                  },
+                  "touch": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "stroke_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "semantic_ref",
+                        "category": "touch",
+                        "id": "brush_thick"
+                      },
+                      {
+                        "expr": "semantic_ref",
+                        "category": "touch",
+                        "id": "brush_thick"
+                      },
+                      {
+                        "expr": "semantic_ref",
+                        "category": "touch",
+                        "id": "brush_thick"
+                      },
+                      {
+                        "expr": "semantic_ref",
+                        "category": "touch",
+                        "id": "brush_thin"
+                      },
+                      {
+                        "expr": "semantic_ref",
+                        "category": "touch",
+                        "id": "brush_thin"
+                      },
+                      {
+                        "expr": "semantic_ref",
+                        "category": "touch",
+                        "id": "brush_thin"
+                      },
+                      {
+                        "expr": "semantic_ref",
+                        "category": "touch",
+                        "id": "brush_thin"
+                      },
+                      {
+                        "expr": "semantic_ref",
+                        "category": "touch",
+                        "id": "brush_thin"
+                      },
+                      {
+                        "expr": "semantic_ref",
+                        "category": "touch",
+                        "id": "brush_thin"
+                      },
+                      {
+                        "expr": "semantic_ref",
+                        "category": "touch",
+                        "id": "brush_thin"
+                      },
+                      {
+                        "expr": "semantic_ref",
+                        "category": "touch",
+                        "id": "brush_thin"
+                      },
+                      {
+                        "expr": "semantic_ref",
+                        "category": "touch",
+                        "id": "brush_thin"
+                      }
+                    ]
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_frequency": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "loosely"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "swaying"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "aliases": [
+          "空"
+        ]
+      },
+      "summary_ja": "浮世絵や日本画の一文字ぼかしのように、画面の上端から空を暈す。横いっぱいの滲む筆を上から重ね、上ほど詰まって濃く（太筆の群青）、下へ行くほど間が開き、細筆の群青から淡い墨（灰）へ薄れる。いちばん下の三本は少しずつ短い。筆の数を書けばその数（1〜12本）、書かなければ8〜10本で、上から順に描く。",
+      "summary_en": "Shade the sky down from the top edge like the ichimonji bokashi of ukiyo-e and nihonga. Bleeding strokes the full width are laid from the top down: close together and dark at the top (thick-brush ultramarine), opening out lower down and fading from thin-brush ultramarine to pale ink (gray); the lowest three are a little shorter. The written stroke count (1–12), or 8–10 when none is written, drawn from the top down.",
+      "note_ja": "一文字ぼかしの空。上端から暈す群青。",
+      "note_en": "An ichimonji-bokashi sky: ultramarine shaded down from the top.",
+      "example_ja": "10本のSky.空。",
+      "example_en": "10 Sky.Heavens.",
+      "preview": "previews/heavens.png"
+    },
+    {
+      "definition": {
+        "schema": "inku.macro-definition.v1",
+        "namespace": "Sky",
+        "heading": "Rain",
+        "version": "1.0.0",
+        "parameters": {
+          "rain_count": {
+            "type": "integer",
+            "receives": "count",
+            "minimum": 1,
+            "maximum": 80,
+            "omitted": [
+              36,
+              42,
+              48
+            ],
+            "counter": "long"
+          }
+        },
+        "components": {},
+        "body": [
+          {
+            "op": "emit",
+            "binding": null,
+            "fields": {
+              "shape": {
+                "expr": "semantic_ref",
+                "category": "shape",
+                "id": "line"
+              },
+              "movement": {
+                "expr": "semantic_ref",
+                "category": "movement",
+                "id": "scatter"
+              },
+              "count": {
+                "expr": "parameter",
+                "name": "rain_count"
+              },
+              "angle": {
+                "expr": "semantic_ref",
+                "category": "angle",
+                "id": "vertical"
+              },
+              "length": {
+                "expr": "exact_decimal",
+                "value": "0.380"
+              },
+              "color": {
+                "expr": "semantic_ref",
+                "category": "color",
+                "id": "gray"
+              },
+              "touch": {
+                "expr": "semantic_ref",
+                "category": "touch",
+                "id": "pen"
+              },
+              "thinness": {
+                "expr": "semantic_ref",
+                "category": "thinness",
+                "id": "fine"
+              }
+            }
+          },
+          {
+            "op": "emit",
+            "binding": null,
+            "fields": {
+              "shape": {
+                "expr": "semantic_ref",
+                "category": "shape",
+                "id": "line"
+              },
+              "movement": {
+                "expr": "semantic_ref",
+                "category": "movement",
+                "id": "scatter"
+              },
+              "count": {
+                "expr": "integer",
+                "value": 12
+              },
+              "angle": {
+                "expr": "semantic_ref",
+                "category": "angle",
+                "id": "vertical"
+              },
+              "length": {
+                "expr": "exact_decimal",
+                "value": "0.520"
+              },
+              "color": {
+                "expr": "semantic_ref",
+                "category": "color",
+                "id": "blue"
+              },
+              "touch": {
+                "expr": "semantic_ref",
+                "category": "touch",
+                "id": "pen"
+              },
+              "thinness": {
+                "expr": "semantic_ref",
+                "category": "thinness",
+                "id": "fine"
+              }
+            }
+          }
+        ],
+        "aliases": [
+          "雨"
+        ]
+      },
+      "summary_ja": "広重の夕立のように、画面いっぱいに雨脚を降らせる。雨脚は細いペンの縦の線で、淡い墨（灰）の長さ0.38の線を散らし、その間に群青のやや長い線を12本散らす。雨脚の数（淡い墨の線の数）を書けばその数（1〜80本）、書かなければ36〜48本。群青の12本はいつも描く。",
+      "summary_en": "Let rain fall over the whole canvas like Hiroshige's sudden shower. The rain is thin vertical pen lines: pale-ink (gray) lines 0.38 long scattered over the canvas, with 12 somewhat longer ultramarine lines scattered among them. The written rain count (the pale-ink lines, 1–80), or 36–48 when none is written; the 12 ultramarine lines are always drawn.",
+      "note_ja": "広重の夕立のような、細い縦の雨脚。",
+      "note_en": "Thin vertical rain like Hiroshige's sudden shower.",
+      "example_ja": "48本のSky.雨。",
+      "example_en": "48 Sky.Rain.",
+      "preview": "previews/rain.png"
+    },
+    {
+      "definition": {
+        "schema": "inku.macro-definition.v1",
+        "namespace": "Sky",
+        "heading": "Snow",
+        "version": "1.0.0",
+        "parameters": {
+          "flake_count": {
+            "type": "integer",
+            "receives": "count",
+            "minimum": 1,
+            "maximum": 80,
+            "omitted": [
+              36,
+              42,
+              48
+            ],
+            "counter": "general"
+          }
+        },
+        "components": {},
+        "body": [
+          {
+            "op": "emit",
+            "binding": null,
+            "fields": {
+              "shape": {
+                "expr": "semantic_ref",
+                "category": "shape",
+                "id": "point"
+              },
+              "movement": {
+                "expr": "semantic_ref",
+                "category": "movement",
+                "id": "scatter"
+              },
+              "count": {
+                "expr": "parameter",
+                "name": "flake_count"
+              },
+              "radius": {
+                "expr": "exact_decimal",
+                "value": "0.005"
+              },
+              "color": {
+                "expr": "semantic_ref",
+                "category": "color",
+                "id": "white"
+              },
+              "touch": {
+                "expr": "semantic_ref",
+                "category": "touch",
+                "id": "brush_thick"
+              },
+              "ink_spread": {
+                "expr": "semantic_ref",
+                "category": "variation",
+                "id": "bleeding"
+              }
+            }
+          },
+          {
+            "op": "emit",
+            "binding": null,
+            "fields": {
+              "shape": {
+                "expr": "semantic_ref",
+                "category": "shape",
+                "id": "point"
+              },
+              "movement": {
+                "expr": "semantic_ref",
+                "category": "movement",
+                "id": "scatter"
+              },
+              "count": {
+                "expr": "integer",
+                "value": 14
+              },
+              "radius": {
+                "expr": "exact_decimal",
+                "value": "0.010"
+              },
+              "color": {
+                "expr": "semantic_ref",
+                "category": "color",
+                "id": "white"
+              },
+              "touch": {
+                "expr": "semantic_ref",
+                "category": "touch",
+                "id": "brush_thick"
+              },
+              "ink_spread": {
+                "expr": "semantic_ref",
+                "category": "variation",
+                "id": "bleeding"
+              }
+            }
+          },
+          {
+            "op": "emit",
+            "binding": null,
+            "fields": {
+              "shape": {
+                "expr": "semantic_ref",
+                "category": "shape",
+                "id": "point"
+              },
+              "movement": {
+                "expr": "semantic_ref",
+                "category": "movement",
+                "id": "scatter"
+              },
+              "count": {
+                "expr": "integer",
+                "value": 6
+              },
+              "radius": {
+                "expr": "exact_decimal",
+                "value": "0.017"
+              },
+              "color": {
+                "expr": "semantic_ref",
+                "category": "color",
+                "id": "white"
+              },
+              "touch": {
+                "expr": "semantic_ref",
+                "category": "touch",
+                "id": "brush_thick"
+              },
+              "ink_spread": {
+                "expr": "semantic_ref",
+                "category": "variation",
+                "id": "bleeding"
+              }
+            }
+          }
+        ],
+        "aliases": [
+          "雪"
+        ]
+      },
+      "summary_ja": "胡粉の牡丹雪のように、画面いっぱいに雪を散らす。雪片は滲む白い点で、小さい雪片を書いた数だけ、中くらいを14、大きい牡丹雪を6散らす。白なので、薄墨地・木炭地や青・黒の地のような暗い地に描く。雪片の数（小さい雪片の数）を書けばその数（1〜80個）、書かなければ36〜48個。",
+      "summary_en": "Scatter snow over the whole canvas like gofun peony snow. The flakes are bleeding white points: the written number of small flakes, 14 middle ones and 6 large peony flakes. Being white, they belong on a dark ground such as ink wash, charcoal, blue or black. The written flake count (the small flakes, 1–80), or 36–48 when none is written.",
+      "note_ja": "胡粉の牡丹雪。暗い地に向く。",
+      "note_en": "Gofun peony snow, for a dark ground.",
+      "example_ja": "薄墨地。48個のSky.雪。",
+      "example_en": "Ink wash ground. 48 Sky.Snow.",
+      "preview": "previews/snow.png"
+    }
+  ]
+}

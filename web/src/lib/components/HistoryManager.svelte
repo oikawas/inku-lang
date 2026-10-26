@@ -884,6 +884,12 @@
 					{groupDigits(historyManagerOffset + 1)}-{groupDigits(historyManagerShownTo)} / {groupDigits(managedHistoryTotal)}
 				{/if}
 			</span>
+			<!-- A search left in the box from an earlier visit narrowed the library
+			     with nothing near the count to say so (2026-10-27). -->
+			{#if historySearch.trim()}
+				<button class="history-search-active" type="button" title={t().historySearchClear}
+					onclick={() => { historySearch = ''; }}>{t().historySearchActive(historySearch.trim())} ×</button>
+			{/if}
 		</div>
 		<div class="history-head-actions">
 			<div class="history-manager-pager">
@@ -1001,7 +1007,7 @@
 		</div>
 		<!-- Drawn like the history strip's search, which searches differently. -->
 		<div class="history-search" role="search" aria-label={t().historySearchLabel}>
-			<div class="history-search-input">
+			<div class="history-search-input" class:searching={!!historySearch.trim()}>
 				<input id="library-history-search" type="search" bind:this={searchInputEl} bind:value={historySearch}
 					aria-label={t().historySearchLabel} placeholder={t().historySearchPlaceholder} title={t().historySearchHint} />
 				<button
@@ -1598,6 +1604,24 @@
 		background: var(--panel);
 	}
 	.history-search-input:focus-within { outline: 1px solid var(--fg3); }
+	.history-search-input.searching { border-color: var(--accent); }
+	.history-search-active {
+		flex: 0 1 auto;
+		min-width: 0;
+		max-width: 16rem;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		border: 1px solid var(--accent);
+		border-radius: var(--btn-sm-radius);
+		padding: var(--btn-sm-padding);
+		background: transparent;
+		color: var(--accent);
+		font: inherit;
+		font-size: var(--ui-font-size-12);
+		cursor: pointer;
+	}
+	.history-search-active:hover { background: var(--bg2); }
 	.history-search input {
 		flex: 1;
 		min-width: 0;

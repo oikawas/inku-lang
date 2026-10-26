@@ -1354,6 +1354,7 @@ export interface LangPack {
 	historyPageJumpLabel: (total: number) => string;
 	historySearchHint: string;
 	historySearchClear: string;
+	historySearchActive: (query: string) => string;
 	canvasSearchLabel: string;
 	canvasSearchPlaceholder: string;
 	canvasSearchHint: string;

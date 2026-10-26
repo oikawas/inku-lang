@@ -1545,6 +1545,7 @@ export const ja: LangPack = {
 	historyPageJumpLabel: (total) => `ページ番号（1〜${total}）を入力してEnterで移動`,
 	historySearchHint: 'ハッシュ値と作品IDは全体か先頭部分、ハッシュ値は下位4桁でも検索できます。',
 	historySearchClear: '検索をクリア',
+	historySearchActive: (query) => `検索中「${query}」`,
 	canvasSearchLabel: '作品を検索',
 	canvasSearchPlaceholder: 'UUID・記述・ハッシュ',
 	canvasSearchHint: 'UUIDは全文一致、記述は部分一致、ハッシュは前方・後方・全文一致で検索します。結果はこの履歴に表示します。',

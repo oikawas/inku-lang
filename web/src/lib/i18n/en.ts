@@ -1547,6 +1547,7 @@ export const en: LangPack = {
 	historyPageJumpLabel: (total) => `Type a page number (1-${total}) and press Enter to go to it`,
 	historySearchHint: 'Enter a whole hash or work ID, or its beginning. A hash also matches its last 4 characters.',
 	historySearchClear: 'Clear search',
+	historySearchActive: (query) => `Searching “${query}”`,
 	canvasSearchLabel: 'Search works',
 	canvasSearchPlaceholder: 'UUID, description or hash',
 	canvasSearchHint: 'Match a whole UUID, part of a description, or the beginning, end or whole of a hash. Results appear in this history strip.',

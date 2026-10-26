@@ -495,7 +495,7 @@
 				{stage1PromptText}
 				{systemPrompts}
 				imageWork={!!detailImageRecord}
-				catalogChosen={(statusHistoryItem?.catalog_mode ?? result?.catalog_mode) === 'auto'}
+				catalogChosen={!detailImageRecord && (statusHistoryItem?.catalog_mode ?? result?.catalog_mode) === 'auto'}
 				{ddl}
 				{copiedPrompt}
 				{scoreJsonText}

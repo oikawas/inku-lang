@@ -339,7 +339,8 @@ The current specification loads new definitions in four ways. §5.1 is the usual
 ### 5.1 Adding a plugin file from the Web (a Server administrator)
 
 Put the definitions and what the Saijiki shows in one JSON file (`inku.plugin-package.v1`) and choose it under
-"Add a plugin" in the Web settings "Plugins". The `Sky.Stars` of §2 as a file looks like this:
+"Add a plugin" in the Web settings "Plugins". The `Sky.Stars` of §2 as a file looks like this. Saved as it is to a
+UTF-8 file, for example `sky-night.json`, it passes the checks and can be added (checked on 5173, Build 1338, 2026-10-26).
 
 ```json
 {
@@ -351,7 +352,64 @@ Put the definitions and what the Saijiki shows in one JSON file (`inku.plugin-pa
   "description_en": "Night-sky words.",
   "words": [
     {
-      "definition": { "…": "the definition of §2 as it is" },
+      "definition": {
+        "schema": "inku.macro-definition.v1",
+        "namespace": "Sky",
+        "heading": "Stars",
+        "aliases": ["星"],
+        "version": "1.0.0",
+        "parameters": {
+          "star_count": {"type": "integer", "receives": "count", "minimum": 1, "maximum": 9, "omitted": [3, 4, 5], "counter": "general"}
+        },
+        "components": {},
+        "body": [
+          {
+            "op": "repeat",
+            "count": {"expr": "parameter", "name": "star_count"},
+            "maximum": 9,
+            "index": "star_index",
+            "body": [
+              {
+                "op": "vary",
+                "binding": "star_size",
+                "domain": "sky_stars_size",
+                "choices": [
+                  {"expr": "semantic_ref", "category": "relative_scale", "id": "very_small"},
+                  {"expr": "semantic_ref", "category": "relative_scale", "id": "small"}
+                ],
+                "body": [
+                  {
+                    "op": "emit",
+                    "binding": null,
+                    "fields": {
+                      "shape": {"expr": "semantic_ref", "category": "shape", "id": "circle"},
+                      "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
+                      "position_x": {"expr": "cycle", "index": {"expr": "local", "name": "star_index"}, "items": [
+                        {"expr": "exact_decimal", "value": "0.170"}, {"expr": "exact_decimal", "value": "0.830"},
+                        {"expr": "exact_decimal", "value": "0.500"}, {"expr": "exact_decimal", "value": "0.330"},
+                        {"expr": "exact_decimal", "value": "0.670"}, {"expr": "exact_decimal", "value": "0.170"},
+                        {"expr": "exact_decimal", "value": "0.830"}, {"expr": "exact_decimal", "value": "0.500"},
+                        {"expr": "exact_decimal", "value": "0.330"}
+                      ]},
+                      "position_y": {"expr": "cycle", "index": {"expr": "local", "name": "star_index"}, "items": [
+                        {"expr": "exact_decimal", "value": "0.100"}, {"expr": "exact_decimal", "value": "0.140"},
+                        {"expr": "exact_decimal", "value": "0.280"}, {"expr": "exact_decimal", "value": "0.180"},
+                        {"expr": "exact_decimal", "value": "0.080"}, {"expr": "exact_decimal", "value": "0.380"},
+                        {"expr": "exact_decimal", "value": "0.340"}, {"expr": "exact_decimal", "value": "0.120"},
+                        {"expr": "exact_decimal", "value": "0.420"}
+                      ]},
+                      "relative_scale": {"expr": "local", "name": "star_size"},
+                      "color": {"expr": "semantic_ref", "category": "color", "id": "yellow"},
+                      "touch": {"expr": "semantic_ref", "category": "touch", "id": "pencil"},
+                      "surface": {"expr": "semantic_ref", "category": "surface", "id": "solid"}
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
       "summary_ja": "空の上半分に、黄色の星を散らす。星の数を書けばその数（1〜9個）、書かなければ3〜5個。",
       "summary_en": "Scatters yellow stars over the upper half of the sky: the written count (1–9), or 3–5 when none is written.",
       "note_ja": "夜の空に小さな星。",
@@ -524,10 +582,44 @@ aliases to a lock, so call the canonical name here; the product also accepts ali
   the count is in range, and that the expansion stays within the limits (§8). If the DDL holds only that word,
   leaving it out leaves nothing to draw and no work is made.
 
+### 7.3 Problems a plugin file check reports
+
+"Add a plugin" in the Web reports these codes besides the definition mistakes of §7.2. The screen shows an
+explanation with the same meaning.
+
+| Step | Diagnostic code | Meaning and fix |
+|---|---|---|
+| shape | `invalid_json` | not valid JSON; the detail gives the line and column |
+| shape | `unknown_field` | a key not in the tables of §5.1; fix its spelling or remove it |
+| shape | `wrong_schema` | `schema` is not `inku.plugin-package.v1` |
+| shape | `invalid_identifier` | `namespace` or `name` is not a letter followed by letters, digits, `_`, `-` |
+| shape | `invalid_semantic_version` | `version` is not in the form `1.0.0` |
+| shape | `not_an_object` | a word, or its `definition`, is not an object (`{ }`) |
+| shape | `no_words`, `too_many_words` | `words` is empty or has more than 64 |
+| shape | `namespace_differs_from_package` | a definition's `namespace` differs from the file's |
+| shape | `no_summary` | neither `summary_ja` nor `summary_en` is written |
+| shape | `not_a_string`, `text_too_long` | not a string, or too long (§8) |
+| definition | `unknown_json_field` | the definition has an unknown field (the place points at the definition's start) |
+| definition | `duplicate_qualified_name` | two words in the file share a canonical name or alias |
+| definition | `name_taken` | another installed plugin (the bundled `Nature.leaves` included) holds the name; the detail gives the name and its holder |
+| example | `macro_binding_count_out_of_range` | the example's count is outside the range the definition takes |
+| example | `macro_resolution_missing_lock` | the example's word is not found (a misspelt name) |
+| example | `example_draws_nothing`, `example_not_drawn` | the example draws nothing, or cannot be drawn |
+| picture | `not_a_png`, `image_too_large` | a replacement picture is not a PNG, or is too large (§8) |
+
+A shape problem does not stop the definition and example checks (§5.1). A word whose definition has a problem
+is not drawn.
+
 ## 8. Limits
 
 | Limit | Default | Set by |
 |---|---|---|
+| plugin file size | 1,000,000 bytes (UTF-8) | the Server (fixed) |
+| words in a plugin file | 64 | the Server (fixed) |
+| length of `description_*` and `note_*` | 2000 characters | the Server (fixed) |
+| length of `example_*` | 500 characters | the Server (fixed) |
+| length of `license` | 200 characters | the Server (fixed) |
+| replacement picture | PNG, up to 2 MiB and 4096×4096 pixels | the Server (fixed); fitted to the frame (216×92 and twice that) |
 | definitions in an export file | 64 | the Web, Android, and macOS readers |
 | definitions given to the underdrawing | 64 | Server manifest `prompt_limits.max_catalog_entries` |
 | summary length | 8192 bytes | Server manifest `prompt_limits.max_summary_bytes` |

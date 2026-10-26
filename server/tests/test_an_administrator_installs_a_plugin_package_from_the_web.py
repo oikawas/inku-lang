@@ -122,6 +122,16 @@ def test_a_sound_package_checks_clean_shows_its_picture_and_installs_nothing(adm
     assert not package_directory.exists()
 
 
+@pytest.mark.parametrize("guide", ["PLUGIN.ja.md", "PLUGIN.md"])
+def test_the_file_the_guide_shows_passes_as_it_is(admin, guide):
+    """PLUGIN §5.1 says its file can be saved and added as it is."""
+    text = (ROOT / guide).read_text(encoding="utf-8")
+    section = text[text.index("### 5.1"):]
+    start = section.index("```json") + len("```json")
+    report = _check(admin, json.loads(section[start:section.index("```", start)]))
+    assert report["ok"] is True, report
+
+
 def test_every_shape_problem_is_named_with_its_place_in_one_answer(admin):
     word = _package()["words"][0]
     broken = _package(schema="inku.plugin-package.v0", extra=1, words=[

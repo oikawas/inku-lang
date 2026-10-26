@@ -321,7 +321,8 @@ productのcheckoutの最上位で走らせる。出力の行頭が`category`、�
 ### 5.1 Webからプラグインのファイルを追加する（Serverの管理者）
 
 定義と歳時記に出す情報を一つのJSONファイル（`inku.plugin-package.v1`）にまとめ、Webの設定「プラグイン」の
-「プラグインを追加」で選ぶ。§2の`Sky.Stars`をファイルにしたものは次の形である。
+「プラグインを追加」で選ぶ。§2の`Sky.Stars`をファイルにしたものは次の形である。このまま`sky-night.json`などの名前で
+UTF-8のファイルに保存すれば、検査に通って追加できる（2026-10-26に5173のBuild 1338で確かめた）。
 
 ```json
 {
@@ -333,7 +334,64 @@ productのcheckoutの最上位で走らせる。出力の行頭が`category`、�
   "description_en": "Night-sky words.",
   "words": [
     {
-      "definition": { "…": "§2の定義をそのまま入れる" },
+      "definition": {
+        "schema": "inku.macro-definition.v1",
+        "namespace": "Sky",
+        "heading": "Stars",
+        "aliases": ["星"],
+        "version": "1.0.0",
+        "parameters": {
+          "star_count": {"type": "integer", "receives": "count", "minimum": 1, "maximum": 9, "omitted": [3, 4, 5], "counter": "general"}
+        },
+        "components": {},
+        "body": [
+          {
+            "op": "repeat",
+            "count": {"expr": "parameter", "name": "star_count"},
+            "maximum": 9,
+            "index": "star_index",
+            "body": [
+              {
+                "op": "vary",
+                "binding": "star_size",
+                "domain": "sky_stars_size",
+                "choices": [
+                  {"expr": "semantic_ref", "category": "relative_scale", "id": "very_small"},
+                  {"expr": "semantic_ref", "category": "relative_scale", "id": "small"}
+                ],
+                "body": [
+                  {
+                    "op": "emit",
+                    "binding": null,
+                    "fields": {
+                      "shape": {"expr": "semantic_ref", "category": "shape", "id": "circle"},
+                      "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
+                      "position_x": {"expr": "cycle", "index": {"expr": "local", "name": "star_index"}, "items": [
+                        {"expr": "exact_decimal", "value": "0.170"}, {"expr": "exact_decimal", "value": "0.830"},
+                        {"expr": "exact_decimal", "value": "0.500"}, {"expr": "exact_decimal", "value": "0.330"},
+                        {"expr": "exact_decimal", "value": "0.670"}, {"expr": "exact_decimal", "value": "0.170"},
+                        {"expr": "exact_decimal", "value": "0.830"}, {"expr": "exact_decimal", "value": "0.500"},
+                        {"expr": "exact_decimal", "value": "0.330"}
+                      ]},
+                      "position_y": {"expr": "cycle", "index": {"expr": "local", "name": "star_index"}, "items": [
+                        {"expr": "exact_decimal", "value": "0.100"}, {"expr": "exact_decimal", "value": "0.140"},
+                        {"expr": "exact_decimal", "value": "0.280"}, {"expr": "exact_decimal", "value": "0.180"},
+                        {"expr": "exact_decimal", "value": "0.080"}, {"expr": "exact_decimal", "value": "0.380"},
+                        {"expr": "exact_decimal", "value": "0.340"}, {"expr": "exact_decimal", "value": "0.120"},
+                        {"expr": "exact_decimal", "value": "0.420"}
+                      ]},
+                      "relative_scale": {"expr": "local", "name": "star_size"},
+                      "color": {"expr": "semantic_ref", "category": "color", "id": "yellow"},
+                      "touch": {"expr": "semantic_ref", "category": "touch", "id": "pencil"},
+                      "surface": {"expr": "semantic_ref", "category": "surface", "id": "solid"}
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
       "summary_ja": "空の上半分に、黄色の星を散らす。星の数を書けばその数（1〜9個）、書かなければ3〜5個。",
       "summary_en": "Scatters yellow stars over the upper half of the sky: the written count (1–9), or 3–5 when none is written.",
       "note_ja": "夜の空に小さな星。",
@@ -490,10 +548,42 @@ JSON
 - 名前は解決したのに何も描かれないときは、宣言した引数を呼出しに書いたか（§3.4）、個数が範囲の中か、
   展開の上限（§8）を超えていないかを見る。DDLにその語の文しか無いと、外れた結果、描くものが無くなり作品が作られない。
 
+### 7.3 プラグインのファイルの検査で出る誤り
+
+Webの「プラグインを追加」は、§7.2の定義の誤りに加えて、次のcodeを出す。画面には同じ意味の説明が出る。
+
+| 段 | 診断のcode | 意味と直し方 |
+|---|---|---|
+| 形 | `invalid_json` | JSONとして読めない。説明に行と列が出る |
+| 形 | `unknown_field` | 知らない欄（§5.1の表に無い鍵）。綴りを直すか消す |
+| 形 | `wrong_schema` | `schema`が`inku.plugin-package.v1`でない |
+| 形 | `invalid_identifier` | `namespace`・`name`が英字で始まる英数字・`_`・`-`でない |
+| 形 | `invalid_semantic_version` | `version`が`1.0.0`の形でない |
+| 形 | `not_an_object` | 語、またはその`definition`が`{ }`のオブジェクトでない |
+| 形 | `no_words`・`too_many_words` | `words`が空か、64個を超える |
+| 形 | `namespace_differs_from_package` | 定義の`namespace`がファイルの`namespace`と違う |
+| 形 | `no_summary` | `summary_ja`も`summary_en`も無い |
+| 形 | `not_a_string`・`text_too_long` | 文字列でない、または長すぎる（§8） |
+| 定義 | `unknown_json_field` | 定義に知らない欄がある（場所は定義の先頭を指す） |
+| 定義 | `duplicate_qualified_name` | ファイルの中の二つの語が、同じ正式名か別名を持つ |
+| 定義 | `name_taken` | ほかの入っているプラグイン（同梱の`Nature.leaves`を含む）がその名前を持つ。説明に名前と持ち主が出る |
+| 例文 | `macro_binding_count_out_of_range` | 例文の個数が、定義の受ける範囲の外 |
+| 例文 | `macro_resolution_missing_lock` | 例文の語が見つからない（名前の綴り違い） |
+| 例文 | `example_draws_nothing`・`example_not_drawn` | 例文を描いても何も描かれない、または描けない |
+| 絵 | `not_a_png`・`image_too_large` | 差し替えの絵がPNGでない、または大きすぎる（§8） |
+
+形の誤りがあっても、定義と例文の検査は続く（§5.1）。定義に誤りのある語は、例文を描かない。
+
 ## 8. 上限
 
 | 上限 | 既定 | 決める所 |
 |---|---|---|
+| プラグインのファイルの大きさ | 1,000,000 bytes（UTF-8） | Server（固定） |
+| プラグインのファイルの語の数 | 64 | Server（固定） |
+| `description_*`・`note_*`の長さ | 2000字 | Server（固定） |
+| `example_*`の長さ | 500字 | Server（固定） |
+| `license`の長さ | 200字 | Server（固定） |
+| 差し替えの絵 | PNG、2 MiBまで、4096×4096画素まで | Server（固定）。枠（216×92と2倍）に収めて縮める |
 | 書き出しファイルの定義の数 | 64 | Web・Android・macOSの読み込み |
 | 下絵に渡す定義の数 | 64 | Server manifestの`prompt_limits.max_catalog_entries` |
 | 要約の長さ | 8192 bytes | Server manifestの`prompt_limits.max_summary_bytes` |

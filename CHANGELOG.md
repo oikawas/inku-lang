@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-26 — PLUGIN now teaches how to make a plugin the current specification loads
+
+`PLUGIN.md` and `PLUGIN.ja.md` are rewritten in this order: steps, an example, the definition format, calling from DDL, ways to load, writing the summary, checking, limits, and what a definition cannot do. The example `Sky.Stars` (alias `Sky.星`) was passed to `/api/compose` as an export file and drew through the shared core. The guide states the three ways the current specification loads a new definition, a DDL export file (`inku.ddl-export.v1`), the `definitions` / `macro_summaries` of the Server's pipeline manifest, and bundling with the shared core, and that a new `.inku-plugin.md` placed in `server/plugins/` does not become a definition. It also states that a `vary` inside `repeat` chooses again for every repetition, gives a command that prints the meaning words from the Saijiki and the use of `compile-score` to check a definition alone, and lists the expansion limits. The previous text stays as Appendix A, with the bundled `Nature.leaves` version (2.1.0) and the sway fields reaching the drawing brought up to date. No code changed.
+
 ### 2026-10-25 — inku-cli reads one work by its UUID
 
 inku-cli gains `history show`, which prints a work's description, DDL and JSON Score (`--part` for one of them), and `history png`, which rasterizes the saved display SVG into a PNG of the drawing alone (`--size` for the longer side, default 1024). Both take the UUID or its first few characters. There is no endpoint for one work, so the listing is asked with `anchor_id` and `limit=1` and the returned work's id is checked. A prefix is resolved against the listing without pictures, and one that fits more than one work stops with the candidates. The server is unchanged.

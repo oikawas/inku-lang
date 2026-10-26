@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+### 2026-10-26 — PLUGINを、読めば今の仕様で読み込めるプラグインを作れる手引きにした
+
+`PLUGIN.ja.md`・`PLUGIN.md`を、作る手順・手本・定義の形式・DDLでの呼び方・読み込ませる道・要約の書き方・検査・上限・作れないものの順に書き直した。手本の`Sky.Stars`（別名`Sky.星`）は、書き出しファイルとして`/api/compose`へ渡し、共有coreで描けることを確かめた。今の仕様で新しい定義を読み込める道は、DDLの書き出しファイル（`inku.ddl-export.v1`）、Serverのpipeline manifestの`definitions`・`macro_summaries`、共有coreへの同梱の三つで、`server/plugins/`へ置く新しい`.inku-plugin.md`は定義にならないことを書いた。`repeat`の中の`vary`は繰り返しのたびに選び直すこと、意味の語の一覧を歳時記から出すコマンド、定義だけを検査する`compile-score`の使い方、展開の上限も書いた。前の本文は付録Aに残し、同梱の`Nature.leaves`の版（2.1.0）と、揺らぎの欄が描画に届いていることを今の実装に合わせた。コードは変えていない。
+
 ### 2026-10-25 — inku-cliはUUIDで1作品を読み出す
 
 inku-cliに、UUID（全体か先頭の数文字）で1作品を読む `history show`（記述・DDL・JSON Scoreを出す。`--part`で1つだけ）と `history png`（保存された表示用SVGを画だけのPNGに焼く。`--size`で長い辺、既定1024）を足した。1作品を返すAPIは無いので、一覧のAPIに `anchor_id` と `limit=1` を渡して引き、返った作品のIDを確かめる。先頭の数文字は絵を除いた一覧で引き当て、2つ以上に当たれば候補を示して止まる。Serverは変えない。

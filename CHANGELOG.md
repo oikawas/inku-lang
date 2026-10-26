@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-26 — Read and draw by the composition and laws chooses its colors before the commit (core)
+
+At the author's choice, arm B of the colors in the prototype read-draw-laws-20261026 (the colors chosen on the drawing the review left; in the author's view better than the drawing without them in 8 of 10 works with each model) is in the shared core. A read-and-draw run by the composition and laws passes the color request before its commit (the color stage's `choose_colors`, with its request, checks and budget) when its host sets the field `colors` of `description_ddl` to true and the run has the color stage. Each sentence of the DDL is read as one layer, and the request is followed by a table of the thing each layer draws. A sentence whose color alone changes has its color word rewritten in place; only a sentence whose shape changes is printed again with its numbers; a ground prints the background sentence again. A sentence the colors keep is not touched. When the written DDL does not compile to the chosen colors, the DDL before them is committed. The record is `description_ddl.composition.colors`. The Server and Web do not pass the field yet, so today's works keep their bytes.
+
 ### 2026-10-26 — PLUGIN alone is enough to write a plugin file
 
 After the author's review, three gaps in `PLUGIN.ja.md` and `PLUGIN.md` were filled. The example in §5.1 is now a complete file with its definition written out, and the guide says it can be saved and added as it is (a Server test passes the example through the check). §7.3 adds a table of the codes a plugin file check reports for its shape, taken names, examples, and pictures, with their fixes. §8 adds the limits on the file size (1,000,000 bytes), the number of words (64), the lengths of descriptions, examples, and the license, and the replacement picture. No code changed.

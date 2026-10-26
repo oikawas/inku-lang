@@ -12,6 +12,7 @@ pub mod composition;
 pub mod composition_reading;
 pub mod core_boundary;
 pub mod ddl3d;
+pub mod description_colors;
 pub mod description_composition;
 pub mod description_ddl;
 pub mod description_laws;

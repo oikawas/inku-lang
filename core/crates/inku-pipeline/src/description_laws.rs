@@ -42,7 +42,7 @@ pub const FAR_SCALE: f64 = 1.5;
 /// A moved center stays this far inside the edges (the laws stage's).
 const EDGE: f64 = 0.06;
 
-const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
+pub(crate) const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 64,
     max_depth: 16,
     max_evaluation_steps: 8_192,
@@ -141,7 +141,7 @@ fn span_of(span: &SourceSpan) -> (usize, usize) {
 }
 
 #[allow(clippy::cast_precision_loss)]
-fn fraction(value: ExactFraction) -> f64 {
+pub(crate) fn fraction(value: ExactFraction) -> f64 {
     value.numerator() as f64 / value.denominator() as f64
 }
 
@@ -1575,7 +1575,7 @@ pub struct CardGround<'a> {
 /// A sentence's instruction read as a plan layer without its numbers (a
 /// numeric place, two points, a turn, sizes and a colour cycle): the words a
 /// layer the laws stage prints again keeps.
-fn layer_without_numbers(instruction: &SemanticInstruction) -> Option<WorkPlanLayer> {
+pub(crate) fn layer_without_numbers(instruction: &SemanticInstruction) -> Option<WorkPlanLayer> {
     let mut cleared = SemanticInstruction {
         relation: None,
         sequence: None,

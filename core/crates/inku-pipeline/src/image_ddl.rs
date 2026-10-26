@@ -520,7 +520,7 @@ const NINE_COLORS: [Color; 9] = [
 
 /// The colour word a sentence in `language` writes for `color`, from the
 /// Saijiki's いろ row.
-fn color_word(color: Color, language: ResolvedInstructionLanguage) -> String {
+pub(crate) fn color_word(color: Color, language: ResolvedInstructionLanguage) -> String {
     saijiki_asset()
         .categories
         .iter()

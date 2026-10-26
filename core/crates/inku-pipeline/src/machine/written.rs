@@ -639,9 +639,8 @@ impl PipelineSnapshot {
         }
     }
 
-    /// Commit the DDL a run is left with: an image's as a DDL edit, a
-    /// description's as a description's work, whose description stays the
-    /// work's own and can be drawn again.
+    /// Commit the DDL a run is left with; a composed description's work
+    /// chooses its colors first when the run does.
     fn commit_written(
         &mut self,
         written: Written,
@@ -649,6 +648,21 @@ impl PipelineSnapshot {
         events: &mut Vec<PipelineEvent>,
     ) -> Result<(), ProtocolError> {
         self.image_fallback = None;
+        if written == Written::Description && self.colors_before_commit() {
+            return self.begin_description_colors(document, events);
+        }
+        self.commit_written_document(written, document, events)
+    }
+
+    /// Commit a written DDL: an image's as a DDL edit, a description's as a
+    /// description's work, whose description stays the work's own and can be
+    /// drawn again.
+    pub(super) fn commit_written_document(
+        &mut self,
+        written: Written,
+        document: VisibleDocument,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<(), ProtocolError> {
         if written == Written::Description && self.composed().is_some() {
             let (_, sentences) = self.thing_sentences(&document.source);
             self.composition_mut()?.things = sentences.iter().map(|item| item.thing).collect();

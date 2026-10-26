@@ -252,6 +252,10 @@ pub struct DescriptionDdlConfig {
     /// Show the written DDL's drawing to the model and ask once more. A host
     /// sets it when the model that writes reads images.
     pub review: bool,
+    /// Choose a composed work's colors before its commit (2026-10-26), when
+    /// the run has the color stage. A host sets it to draw with them.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub colors: bool,
 }
 
 /// The image a work is written from: the image the host sends, by
@@ -460,6 +464,30 @@ pub struct DescriptionCompositionRecord {
     /// Each sentence's thing in the committed DDL, after its ratio sentence.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub things: Vec<u64>,
+    /// The colors chosen before the commit, when the run chose them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub colors: Option<DescriptionColorsRecord>,
+}
+
+/// What the colors did to a composed read-and-draw work (2026-10-26): the
+/// laws they chose and the lines they wrote, or why the work was committed
+/// without them.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DescriptionColorsRecord {
+    /// `used`, or `fallback` when the work was committed without its colors.
+    pub state: CompositionState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fallback: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub main_law: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub laws: Vec<String>,
+    /// The ground the colors chose, when they changed it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ground: Option<inku_score::Color>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub changes: Vec<crate::description_colors::ColorsChange>,
 }
 
 /// How a run chooses its colors: present, the run asks `choose_colors` once
@@ -1015,6 +1043,10 @@ impl PipelineSnapshot {
                     ..
                 }
             ) {
+                return Err(ProtocolError::InvalidState);
+            }
+            // A description run asks for the colors of its composed work only.
+            if self.description_ddl.is_some() && self.composed().is_none() {
                 return Err(ProtocolError::InvalidState);
             }
         }
@@ -2659,6 +2691,9 @@ impl PipelineSnapshot {
         description: Option<String>,
         events: &mut Vec<PipelineEvent>,
     ) -> Result<(), ProtocolError> {
+        if self.description_ddl.is_some() {
+            return self.description_colors_response(response, spent_ms, description, events);
+        }
         let pending = self
             .colors
             .as_ref()
@@ -2772,6 +2807,7 @@ impl PipelineSnapshot {
                 self.config.language,
                 self.config.prompt_limits,
             )
+            .and_then(|prompt| self.with_described_things(prompt))
             .and_then(|prompt| {
                 colors::with_colors_feedback(prompt, refusal, self.config.prompt_limits)
             })
@@ -2800,7 +2836,8 @@ impl PipelineSnapshot {
         )
     }
 
-    /// Commit the document the laws left without colors and say why.
+    /// Commit the document the laws left without colors and say why; a
+    /// composed read-and-draw work is committed as its review left it.
     fn colors_fallback(
         &mut self,
         payload: serde_json::Value,
@@ -2808,6 +2845,9 @@ impl PipelineSnapshot {
     ) -> Result<(), ProtocolError> {
         self.action = None;
         let pending = self.colors.take().ok_or(ProtocolError::InternalInvariant)?;
+        if self.description_ddl.is_some() {
+            return self.description_colors_fallback(pending.document, payload, events);
+        }
         self.event(events, "colors_fallback", payload)?;
         self.commit_stage1(pending.document, &pending.reason, events)
     }

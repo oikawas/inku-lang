@@ -11,11 +11,17 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use inku_ddl::CanvasRatioWriting;
-use serde_json::json;
+use serde_json::{Value, json};
 
+use super::written::Written;
 use super::{
-    CompositionRequest, CompositionRound, CompositionState, DescriptionCompositionRecord,
-    DescriptionDdlRecord, PipelineSnapshot, ReadingState, SketchRequest, message_names,
+    CompositionRequest, CompositionRound, CompositionState, DescriptionColorsRecord,
+    DescriptionCompositionRecord, DescriptionDdlRecord, PendingColors, PipelineSnapshot,
+    ReadingState, SketchRequest, VisibleDocument, message_names,
+};
+use crate::colors::{self, LawsHandoff};
+use crate::description_colors::{
+    ColorsChangeHow, DescribedPlan, LayerThing, apply_colors, plan_of, with_layer_things,
 };
 use crate::description_composition::{
     build_description_composition_prompt, check_composition, composition_targets, laws_text,
@@ -29,7 +35,7 @@ use crate::description_ddl::{
 };
 use crate::description_laws::ThingSentence;
 use crate::image_ddl::ImageDdlLimits;
-use crate::prompts::{LlmPrompt, LlmStage, PromptImage};
+use crate::prompts::{LlmPrompt, LlmStage, PromptError, PromptImage};
 use crate::protocol::{PipelineEvent, ProtocolError, ProviderFailure};
 
 impl DescriptionCompositionRecord {
@@ -45,6 +51,7 @@ impl DescriptionCompositionRecord {
             known: Vec::new(),
             drawn: Vec::new(),
             things: Vec::new(),
+            colors: None,
         }
     }
 
@@ -450,6 +457,199 @@ impl PipelineSnapshot {
         .map_err(|_| ProtocolError::SchemaViolation)
     }
 
+    /// Whether a description run chooses its colors before its commit: a
+    /// composed run whose host asks for them and whose run has the color stage.
+    pub(super) fn colors_before_commit(&self) -> bool {
+        self.composed().is_some()
+            && self
+                .config
+                .description_ddl
+                .is_some_and(|config| config.colors)
+            && self.config.colors.is_some()
+    }
+
+    /// What each layer of a composed DDL draws: the thing its sentence draws,
+    /// as the answers that wrote it said, and the thing's name.
+    fn layer_things(&self, source: &str, plan: &DescribedPlan) -> Vec<LayerThing> {
+        let composition = self.composed();
+        let lines: Vec<&str> = source.lines().collect();
+        plan.lines
+            .iter()
+            .map(|line| {
+                let text = lines.get(*line).map_or("", |text| text.trim());
+                let thing = composition.map_or(0, |composition| composition.thing_of(text));
+                let what = composition
+                    .and_then(|composition| composition.answer.as_ref())
+                    .and_then(|answer| answer.thing(thing))
+                    .map(|item| item.what.clone())
+                    .unwrap_or_default();
+                LayerThing { thing, what }
+            })
+            .collect()
+    }
+
+    /// The color request with the thing each layer of the document waiting
+    /// for its colors draws, in a description run; any other run's as it is.
+    pub(super) fn with_described_things(
+        &self,
+        prompt: LlmPrompt,
+    ) -> Result<LlmPrompt, PromptError> {
+        let (Some(_), Some(pending)) = (&self.description_ddl, &self.colors) else {
+            return Ok(prompt);
+        };
+        let source = &pending.document.source;
+        let plan = plan_of(source, self.config.language)
+            .ok_or(PromptError::EmptyField { field: "colors" })?;
+        with_layer_things(
+            prompt,
+            &self.layer_things(source, &plan),
+            self.config.prompt_limits,
+        )
+    }
+
+    /// Ask for a composed work's colors before its commit, with the thing each
+    /// layer draws; when the request cannot be made, commit the work as it is.
+    pub(super) fn begin_description_colors(
+        &mut self,
+        document: VisibleDocument,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<(), ProtocolError> {
+        let description = self.description_record()?.description.clone();
+        let (language, limits) = (self.config.language, self.config.prompt_limits);
+        let asked = plan_of(&document.source, language).and_then(|plan| {
+            let handoff = LawsHandoff::default();
+            let (context, _) =
+                self.colors_context(&document, &plan.printed, &handoff, &description)?;
+            let prompt = colors::build_colors_prompt(&description, &context, language, limits)
+                .and_then(|prompt| {
+                    with_layer_things(prompt, &self.layer_things(&document.source, &plan), limits)
+                })
+                .ok()?;
+            Some((plan, prompt))
+        });
+        let Some((plan, prompt)) = asked else {
+            return self.description_colors_fallback(
+                document,
+                json!({"failure": "prompt"}),
+                events,
+            );
+        };
+        self.colors = Some(PendingColors {
+            printed: plan.printed,
+            document,
+            reason: "description_ddl".to_owned(),
+            handoff: LawsHandoff::default(),
+        });
+        self.begin_llm(prompt, Some(description), Vec::new(), events)
+    }
+
+    /// Read the colors reply for a composed work, write the colors into its
+    /// DDL and commit it. A reply the tool refuses is asked again with the
+    /// reason within the stage's budget. When the written DDL does not compile
+    /// to the colors chosen, or with more problems, the work is committed
+    /// without them.
+    pub(super) fn description_colors_response(
+        &mut self,
+        response: &str,
+        spent_ms: u64,
+        description: Option<String>,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<(), ProtocolError> {
+        let pending = self
+            .colors
+            .as_ref()
+            .ok_or(ProtocolError::InternalInvariant)?;
+        let language = self.config.language;
+        let read = description
+            .zip(plan_of(&pending.document.source, language))
+            .and_then(|(text, plan)| {
+                let (context, before) =
+                    self.colors_context(&pending.document, &plan.printed, &pending.handoff, &text)?;
+                Some((text, plan, context, before))
+            });
+        let Some((text, plan, context, before)) = read else {
+            return self.colors_fallback(json!({"failure": "context"}), events);
+        };
+        let chosen = match colors::choose_colors(response, &context, self.config.prompt_limits) {
+            Ok(chosen) => chosen,
+            Err(refusal) => {
+                return self.ask_colors_again(&context, &refusal, text, spent_ms, events);
+            }
+        };
+        let (source, changes) = apply_colors(&pending.document.source, &plan, &chosen, language);
+        let Some((document, compiled)) = self.laws_document(source) else {
+            return self.colors_fallback(json!({"failure": "compile"}), events);
+        };
+        if compiled
+            .score()
+            .is_none_or(|score| !chosen.compiled_as_chosen(score))
+            || super::shortfalls(&compiled) > before
+        {
+            return self.colors_fallback(json!({"failure": "compile"}), events);
+        }
+        self.action = None;
+        self.colors = None;
+        self.event(
+            events,
+            "colors_chosen",
+            json!({
+                "laws": chosen.laws,
+                "main_law": chosen.main_law,
+                "main_layer": null,
+                "ground": chosen.ground.map(inku_score::Color::as_str),
+                "notes": chosen.notes,
+            }),
+        )?;
+        let composition = self.composition_mut()?;
+        for change in &changes {
+            if matches!(
+                change.how,
+                ColorsChangeHow::ColorWord | ColorsChangeHow::Printed
+            ) {
+                let thing = composition.thing_of(change.before.trim());
+                composition
+                    .known
+                    .extend(change.after.iter().map(|text| ThingSentence {
+                        thing,
+                        text: text.clone(),
+                    }));
+            }
+        }
+        composition.colors = Some(DescriptionColorsRecord {
+            state: CompositionState::Used,
+            fallback: None,
+            main_law: Some(chosen.main_law.clone()),
+            laws: chosen.laws.iter().map(|law| (*law).to_owned()).collect(),
+            ground: chosen.ground,
+            changes,
+        });
+        self.commit_written_document(Written::Description, document, events)
+    }
+
+    /// Commit a composed work without its colors and say why.
+    pub(super) fn description_colors_fallback(
+        &mut self,
+        document: VisibleDocument,
+        payload: Value,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<(), ProtocolError> {
+        let reason = payload["detail"]
+            .as_str()
+            .or_else(|| payload["failure"].as_str())
+            .unwrap_or("failed")
+            .to_owned();
+        self.event(events, "colors_fallback", payload)?;
+        self.composition_mut()?.colors = Some(DescriptionColorsRecord {
+            state: CompositionState::Fallback,
+            fallback: Some(reason),
+            main_law: None,
+            laws: Vec::new(),
+            ground: None,
+            changes: Vec::new(),
+        });
+        self.commit_written_document(Written::Description, document, events)
+    }
+
     /// The source a written DDL becomes: the paper's ratio declared as its
     /// first sentence, in place of any declaration the model wrote.
     pub(super) fn description_ddl_source(&self, ddl: &str) -> Result<String, ProtocolError> {
@@ -478,9 +678,9 @@ mod tests {
     use crate::image_ddl::tests::{a4_compiler, palette};
     use crate::machine::written::DRAW_IMAGE_REVIEW;
     use crate::machine::{
-        AuthoringInput, CatalogCandidate, CompositionRequest, CompositionState,
-        DescriptionDdlConfig, DescriptionRoute, PipelineConfig, PipelineInput, PipelinePhase,
-        PipelineSnapshot, ReadingState, SketchRequest, StepOutput,
+        AuthoringInput, CatalogCandidate, ColorsConfig, CompositionRequest, CompositionState,
+        DescriptionColorsRecord, DescriptionDdlConfig, DescriptionRoute, PipelineConfig,
+        PipelineInput, PipelinePhase, PipelineSnapshot, ReadingState, SketchRequest, StepOutput,
     };
     use crate::prompts::{DescriptionCatalogEntry, LlmStage, PromptImage};
     use crate::protocol::{DecimalU64, EffectResult, ProviderFailure};
@@ -500,7 +700,10 @@ mod tests {
         let mut pipeline_config = config();
         pipeline_config.language = ResolvedInstructionLanguage::Ja;
         pipeline_config.compiler = a4_compiler();
-        pipeline_config.description_ddl = Some(DescriptionDdlConfig { review });
+        pipeline_config.description_ddl = Some(DescriptionDdlConfig {
+            review,
+            colors: false,
+        });
         pipeline_config
     }
 
@@ -1301,5 +1504,206 @@ mod tests {
             message(&reviewing)["current_sentences"][2],
             json!({"thing": 2, "text": scatter})
         );
+    }
+
+    const FITTED: &str = "画面の横0.381966、縦0.381966の位置に、直径0.3の紫の塗りの円を1個置く。";
+
+    /// A composed run whose host has the colors chosen before the commit.
+    fn colored_config() -> PipelineConfig {
+        let mut pipeline_config = read_config(true);
+        pipeline_config.description_ddl = Some(DescriptionDdlConfig {
+            review: true,
+            colors: true,
+        });
+        pipeline_config.colors = Some(ColorsConfig::default());
+        pipeline_config
+    }
+
+    fn composed_with(pipeline_config: PipelineConfig) -> PipelineSnapshot {
+        let AuthoringInput::Description {
+            description,
+            auto_catalog,
+            sketch,
+            route,
+            source_labels,
+            ..
+        } = authoring(SketchRequest::Off, false)
+        else {
+            unreachable!()
+        };
+        start_with(
+            pipeline_config,
+            AuthoringInput::Description {
+                description,
+                auto_catalog,
+                sketch,
+                route,
+                source_labels,
+                composition: CompositionRequest::On,
+            },
+        )
+        .snapshot
+    }
+
+    /// The run composed by the golden section, written, shown its drawing and
+    /// reviewed as the woman fitted and the shade.
+    fn reviewed(pipeline_config: PipelineConfig) -> StepOutput {
+        let state = composed_with(pipeline_config);
+        let state = answer_text(&state, &composition(golden()).to_string()).snapshot;
+        let state =
+            sentences(&state, &[(0, "背景を白で埋める。"), (1, WOMAN), (2, SHADE)]).snapshot;
+        let state = reply(&state, drawn(&state)).snapshot;
+        sentences(
+            &state,
+            &[(0, "背景を白で埋める。"), (1, FITTED), (2, SHADE)],
+        )
+    }
+
+    fn colors_answer(state: &PipelineSnapshot, answer: &Value) -> StepOutput {
+        let action = state.action.as_ref().unwrap();
+        assert_eq!(action.tag, "choose_colors");
+        reply(
+            state,
+            EffectResult::ColorsChosen {
+                identity: action.identity.clone(),
+                response: answer.to_string(),
+                elapsed_ms: DecimalU64::new(20),
+            },
+        )
+    }
+
+    fn colors_record(state: &PipelineSnapshot) -> &DescriptionColorsRecord {
+        composition_record(state).colors.as_ref().unwrap()
+    }
+
+    #[test]
+    fn a_composed_runs_colors_are_asked_with_the_thing_each_layer_draws() {
+        let state = reviewed(colored_config()).snapshot;
+        assert_eq!(tag(&state), "choose_colors");
+        let prompt = prompt(&state);
+        assert_eq!(prompt["prompt_id"], "inku.colors-prompt.v2");
+        let message = prompt["message"].as_str().unwrap();
+        assert!(
+            message.ends_with(
+                "\n\n## 層の物（読んで描くの構図と法則）\n層の表の番号の層が、どの物を描くか。一つの物が何層にも分かれることがある。\n- layer 0: 物 1（女の姿）\n- layer 1: 物 2（紫の影）\n"
+            ),
+            "{message}"
+        );
+        // The description's purple is the woman's, which the colors keep.
+        assert!(message.contains("- layer 0: 「紫」（purple）"), "{message}");
+    }
+
+    #[test]
+    fn the_chosen_colors_rewrite_only_the_color_word_of_the_sentence_they_change() {
+        let state = reviewed(colored_config()).snapshot;
+        let answer = json!({"main_law": "D5", "laws": {"D5": {"hue": "blue", "layer": 1}},
+                            "reason": "影を青に寄せる。"});
+        let chosen = colors_answer(&state, &answer);
+        assert_eq!(event(&chosen, "colors_chosen").unwrap()["main_law"], "D5");
+        let state = chosen.snapshot;
+        let shade = "画面の横0.6、縦0.6の位置に、幅0.2、高さ0.15の青の薄い塗りの三角を1個置く。";
+        assert_eq!(
+            committed_source(&state),
+            declared(&format!("背景を白で埋める。\n{FITTED}\n{shade}"))
+        );
+        let record = colors_record(&state);
+        assert_eq!(record.state, CompositionState::Used);
+        assert_eq!(record.main_law.as_deref(), Some("D5"));
+        assert_eq!(record.changes.len(), 1);
+        assert_eq!(record.changes[0].line, Some(3));
+        assert_eq!(record.changes[0].before, SHADE);
+        assert_eq!(record.changes[0].after, [shade]);
+        // The rewritten sentence still draws its thing.
+        assert_eq!(composition_record(&state).things, [0, 1, 2]);
+    }
+
+    #[test]
+    fn a_chosen_ground_prints_the_background_sentence() {
+        let state = reviewed(colored_config()).snapshot;
+        let answer = json!({"main_law": "D5", "laws": {"D5": {"hue": "blue", "layer": 1}},
+                            "ground": "black", "reason": "夜の地にする。"});
+        let state = colors_answer(&state, &answer).snapshot;
+        let source = committed_source(&state);
+        assert!(source.contains("\n背景を黒で埋める。\n"), "{source}");
+        let record = colors_record(&state);
+        assert_eq!(record.ground, Some(Color::Black));
+        assert_eq!(record.changes[0].before, "背景を白で埋める。");
+        // A DDL without a background sentence is given one after its ratio.
+        let state = composed_with(colored_config());
+        let state = answer_text(&state, &composition(golden()).to_string()).snapshot;
+        let state = sentences(&state, &[(1, WOMAN), (2, SHADE)]).snapshot;
+        let state = reply(&state, drawn(&state)).snapshot;
+        let state = sentences(&state, &[(1, FITTED), (2, SHADE)]).snapshot;
+        let state = colors_answer(&state, &answer).snapshot;
+        let source = committed_source(&state);
+        assert_eq!(
+            source.lines().nth(1),
+            Some("背景を黒で埋める。"),
+            "{source}"
+        );
+        assert_eq!(composition_record(&state).things, [0, 1, 2]);
+    }
+
+    #[test]
+    fn a_refused_answer_is_asked_again_with_the_things_and_the_reason() {
+        let state = reviewed(colored_config()).snapshot;
+        let first = prompt(&state)["message"].as_str().unwrap().to_owned();
+        // D2 already holds in the picture: it cannot be the main law.
+        let refused = json!({"main_law": "D2", "laws": {"D2": {"layer": 0, "vivid": "purple"}},
+                             "reason": "紫を鮮やかに。"});
+        let asked = colors_answer(&state, &refused);
+        assert!(event(&asked, "retry_scheduled").is_some());
+        let state = asked.snapshot;
+        let message = prompt(&state)["message"].as_str().unwrap();
+        assert!(message.starts_with(&first), "{message}");
+        assert!(
+            message[first.len()..]
+                .starts_with("\n\n## 前の答えへの道具の返事\n前の答えは使えなかった: "),
+            "{message}"
+        );
+        assert!(message.ends_with("\n直した答えを返す。"), "{message}");
+        let answer = json!({"main_law": "D5", "laws": {"D5": {"hue": "blue", "layer": 1}},
+                            "reason": "影を青に寄せる。"});
+        let state = colors_answer(&state, &answer).snapshot;
+        assert!(committed_source(&state).contains("の青の薄い塗りの三角"));
+    }
+
+    #[test]
+    fn colors_whose_attempts_are_spent_leave_the_work_as_its_review_left_it() {
+        let mut step = reviewed(colored_config());
+        while tag(&step.snapshot) == "choose_colors" {
+            step = failed(&step.snapshot);
+        }
+        assert_eq!(
+            event(&step, "colors_fallback").unwrap()["failure"],
+            "transport_timeout"
+        );
+        let state = step.snapshot;
+        assert_eq!(
+            committed_source(&state),
+            declared(&format!("背景を白で埋める。\n{FITTED}\n{SHADE}"))
+        );
+        let record = colors_record(&state);
+        assert_eq!(record.state, CompositionState::Fallback);
+        assert_eq!(record.fallback.as_deref(), Some("transport_timeout"));
+        assert_eq!(composition_record(&state).things, [0, 1, 2]);
+    }
+
+    #[test]
+    fn a_run_without_the_color_stage_commits_after_its_review() {
+        let mut pipeline_config = colored_config();
+        pipeline_config.colors = None;
+        let state = reviewed(pipeline_config).snapshot;
+        assert!(committed_source(&state).contains(SHADE));
+        assert!(composition_record(&state).colors.is_none());
+        // Without the host's word, the same: the run commits as it did.
+        let mut pipeline_config = colored_config();
+        pipeline_config.description_ddl = Some(DescriptionDdlConfig {
+            review: true,
+            colors: false,
+        });
+        let state = reviewed(pipeline_config).snapshot;
+        assert!(committed_source(&state).contains(SHADE));
+        assert!(composition_record(&state).colors.is_none());
     }
 }

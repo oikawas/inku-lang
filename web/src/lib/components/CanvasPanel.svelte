@@ -17,7 +17,8 @@
 	import CanvasRefinementWorkspace from '$lib/features/canvas/CanvasRefinementWorkspace.svelte';
 	import type { LineageGraph, LineageNode } from '$lib/features/history/types';
 	import type { HistoryMutations } from '$lib/features/history/mutations';
-	import type { SketchMode } from '$lib/sketch';
+	import { normalizeSketchState, sketchStateNote, sketchStateShort, type SketchMode } from '$lib/sketch';
+	import { workRouteLabel } from '$lib/draw-route';
 	import type { LineageBrowsingState } from '$lib/features/history/lineage-state.svelte';
 	import { measureSvgWeight } from '$lib/svgWeight';
 	import { formatCanvasCapacity, groupDigits } from '$lib/formatNumber';
@@ -452,6 +453,11 @@
 			? (isJapanese ? `第${statusGeneration}世代` : `Gen. ${statusGeneration}`)
 			: (isJapanese ? '独立作品' : 'Standalone')
 	);
+	// How the work on screen was drawn and what its sketch did, from the saved
+	// work when there is one, as the generation information reads them.
+	const statusWork = $derived(statusHistoryItem ?? result);
+	const statusDrawRoute = $derived(workRouteLabel(statusWork, isJapanese));
+	const statusSketchState = $derived(normalizeSketchState(statusWork?.sketch_state));
 	async function openLineageRefinement(node: LineageNode, view: RefinementView): Promise<void> {
 		await onOpenLineageNode(node);
 		refineView = view;
@@ -755,6 +761,14 @@
 					<span class="render-meta-item render-meta-canvas">
 						<span class="render-meta-label">{isJapanese ? '\u30ad\u30e3\u30f3\u30d0\u30b9' : 'Canvas'}</span>
 						<strong title={statusCanvasName}>{statusCanvasName}</strong>
+					</span>
+					<span class="render-meta-item render-meta-route">
+						<span class="render-meta-label">{isJapanese ? '描き方' : 'Drawing'}</span>
+						<strong title={statusDrawRoute}>{statusDrawRoute}</strong>
+					</span>
+					<span class="render-meta-item render-meta-sketch">
+						<span class="render-meta-label">{isJapanese ? '写生' : 'Sketch'}</span>
+						<strong title={sketchStateNote(statusSketchState, isJapanese) || sketchStateShort(statusSketchState, isJapanese)}>{sketchStateShort(statusSketchState, isJapanese)}</strong>
 					</span>
 					<!-- The same byte measurement the drawer shows, rounded to a compact
 					     whole-kilobyte capacity in this narrow strip. -->
@@ -1140,7 +1154,7 @@
 	.render-meta-generation strong { color: var(--fg2); font-size: var(--ui-font-size-13); font-weight: 450; line-height: 1.2; }
 	.render-meta-fields {
 		display: grid;
-		grid-template-columns: minmax(0, 1.8fr) minmax(calc(84px * var(--ui-text-scale)), 1fr) minmax(calc(84px * var(--ui-text-scale)), 0.8fr) max-content max-content;
+		grid-template-columns: minmax(0, 1.8fr) minmax(calc(84px * var(--ui-text-scale)), 1fr) minmax(calc(84px * var(--ui-text-scale)), 0.8fr) max-content max-content max-content max-content;
 		min-width: 0;
 		padding-block: 7px;
 	}
@@ -1219,7 +1233,7 @@
 			overflow: visible;
 		}
 		.render-meta-context { padding-right: 10px; }
-		.render-meta-fields { grid-template-columns: minmax(0, 1.8fr) minmax(calc(84px * var(--ui-text-scale)), 1fr) minmax(calc(84px * var(--ui-text-scale)), 0.8fr) max-content max-content; }
+		.render-meta-fields { grid-template-columns: minmax(0, 1.8fr) minmax(calc(84px * var(--ui-text-scale)), 1fr) minmax(calc(84px * var(--ui-text-scale)), 0.8fr) max-content max-content max-content max-content; }
 		.render-meta-item { padding: 0 10px; }
 		.render-meta-strip.english { grid-template-columns: 1fr; }
 		.render-meta-strip.english .render-meta-context {
@@ -1241,7 +1255,7 @@
 			overflow: visible;
 		}
 		.render-meta-strip.english .render-meta-fields {
-			grid-template-columns: minmax(150px, 1.8fr) minmax(112px, 1fr) minmax(92px, 0.8fr) max-content max-content;
+			grid-template-columns: minmax(150px, 1.8fr) minmax(112px, 1fr) minmax(92px, 0.8fr) max-content max-content max-content max-content;
 		}
 	}
 	@container canvas-panel (max-width: 50em) {

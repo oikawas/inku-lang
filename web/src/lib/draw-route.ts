@@ -49,6 +49,16 @@ export function drawRouteOf(work: { route?: unknown; description_ddl?: unknown }
 	return work?.description_ddl && typeof work.description_ddl === 'object' ? 'read_and_draw' : DEFAULT_DRAW_ROUTE;
 }
 
+/** How the work on screen was drawn, as the strip above the canvas names it:
+ *  a work written from a picture went through neither route. */
+export function workRouteLabel(
+	work: { route?: unknown; description_ddl?: unknown; image_ddl?: unknown } | null | undefined,
+	isJapanese: boolean
+): string {
+	if (work?.image_ddl && typeof work.image_ddl === 'object') return isJapanese ? '画像から書く' : 'Written from a picture';
+	return drawRouteLabel(drawRouteOf(work), isJapanese);
+}
+
 /** The record the core keeps for a read-and-draw run (SPEC 12.6.7). */
 export type DescriptionDdlRecord = {
 	description?: string;

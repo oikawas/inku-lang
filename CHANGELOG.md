@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-26 — The strip above the canvas names the drawing route and the sketch
+
+At the author's instruction, the "Conditions of the displayed work" strip above the canvas gains "Drawing" and "Sketch" between the canvas and the size. Drawing names the work on screen's route, "Current stages" or "Read and draw", and "Written from a picture" for a work from a picture. Sketch says what the work's recorded state was: "On", "On, nothing added", "No answer", "Off", "Not applicable" or "Not recorded", with the drawer's full sentence on hover; a work without a record is kept apart from Off. The chips in the left panel are the conditions for the next drawing; the strip is the work on screen.
+
 ### 2026-10-26 — Provenance no longer shows the interpretation seed
 
 At the author's instruction, the Web's provenance drawer drops the "Interpretation seed" row. The value named a reinterpretation of "Change the reading", removed 2026-10-14; it never reached Stage 1 or the drawing, and a new work always showed "-". Its hint, that the same seed reads the words the same way, was not true either. Saved works keep their values, and the API's `interpretation_seed` is unchanged.

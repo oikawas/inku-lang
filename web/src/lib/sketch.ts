@@ -80,6 +80,17 @@ export function sketchStateNote(state: SketchState | null, isJapanese: boolean):
 	return isJapanese ? '写生が記録される前に描かれた（切って描いたのではない）' : 'Drawn before the layer was recorded, which is not the same as off';
 }
 
+/** The sketch of the work on screen in a word or two, for the strip above the
+ *  canvas; `sketchStateNote` says it in full. A missing record is not Off. */
+export function sketchStateShort(state: SketchState | null, isJapanese: boolean): string {
+	if (state === 'fine' || state === 'coarse' || state === 'supplemented') return isJapanese ? 'あり' : 'On';
+	if (state === 'not_needed') return isJapanese ? 'あり（補いなし）' : 'On, nothing added';
+	if (state === 'fallback') return isJapanese ? '届かず' : 'No answer';
+	if (state === 'off') return isJapanese ? 'なし' : 'Off';
+	if (state === 'not_applicable') return isJapanese ? '対象外' : 'Not applicable';
+	return isJapanese ? '記録なし' : 'Not recorded';
+}
+
 // Works saved before v2.10 have no grain recorded.
 export function normalizeSketchGrain(value: unknown): SketchGrain | null {
 	return value === 'fine' || value === 'coarse' ? value : null;

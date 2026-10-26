@@ -1,14 +1,14 @@
 {
   "schema": "inku.ddl-export.v1",
   "language": "ja",
-  "ddl": "背景を青で埋める。\n5個のWater.波紋。",
+  "ddl": "和紙。\n5個のWater.波紋。",
   "plugins": [
     {
       "definition": {
         "schema": "inku.macro-definition.v1",
         "namespace": "Water",
         "heading": "Ripples",
-        "version": "2.0.0",
+        "version": "3.0.0",
         "parameters": {
           "ring_count": {
             "type": "integer",
@@ -16,8 +16,8 @@
             "minimum": 1,
             "maximum": 6,
             "omitted": [
-              3,
-              4
+              4,
+              5
             ],
             "counter": "general"
           }
@@ -52,444 +52,693 @@
             ],
             "body": [
               {
-                "op": "repeat",
-                "count": {
-                  "expr": "parameter",
-                  "name": "ring_count"
-                },
-                "maximum": 6,
-                "index": "ring_index",
+                "op": "vary",
+                "binding": "ripple_turn",
+                "domain": "ripple_turn",
+                "choices": [
+                  {
+                    "expr": "number",
+                    "value": 0.0
+                  },
+                  {
+                    "expr": "number",
+                    "value": 40.0
+                  },
+                  {
+                    "expr": "number",
+                    "value": 80.0
+                  },
+                  {
+                    "expr": "number",
+                    "value": 120.0
+                  },
+                  {
+                    "expr": "number",
+                    "value": 160.0
+                  }
+                ],
                 "body": [
                   {
-                    "op": "vary",
-                    "binding": "ring_width",
-                    "domain": "ring_width",
-                    "choices": [
-                      {
+                    "op": "transform",
+                    "transform": {
+                      "translate_x": {
                         "expr": "cycle",
                         "index": {
                           "expr": "local",
-                          "name": "ring_index"
+                          "name": "ripple_center"
                         },
                         "items": [
                           {
-                            "expr": "exact_decimal",
-                            "value": "0.067"
+                            "expr": "number",
+                            "value": 0.0
                           },
                           {
-                            "expr": "exact_decimal",
-                            "value": "0.134"
+                            "expr": "number",
+                            "value": -0.12
                           },
                           {
-                            "expr": "exact_decimal",
-                            "value": "0.211"
+                            "expr": "number",
+                            "value": 0.12
                           },
                           {
-                            "expr": "exact_decimal",
-                            "value": "0.298"
+                            "expr": "number",
+                            "value": -0.06
                           },
                           {
-                            "expr": "exact_decimal",
-                            "value": "0.394"
-                          },
-                          {
-                            "expr": "exact_decimal",
-                            "value": "0.499"
+                            "expr": "number",
+                            "value": 0.07999999999999996
                           }
                         ]
                       },
-                      {
+                      "translate_y": {
                         "expr": "cycle",
                         "index": {
                           "expr": "local",
-                          "name": "ring_index"
+                          "name": "ripple_center"
                         },
                         "items": [
                           {
-                            "expr": "exact_decimal",
-                            "value": "0.070"
+                            "expr": "number",
+                            "value": 0.06000000000000005
                           },
                           {
-                            "expr": "exact_decimal",
-                            "value": "0.140"
+                            "expr": "number",
+                            "value": 0.12
                           },
                           {
-                            "expr": "exact_decimal",
-                            "value": "0.220"
+                            "expr": "number",
+                            "value": 0.07999999999999996
                           },
                           {
-                            "expr": "exact_decimal",
-                            "value": "0.310"
+                            "expr": "number",
+                            "value": 0.18000000000000005
                           },
                           {
-                            "expr": "exact_decimal",
-                            "value": "0.410"
-                          },
-                          {
-                            "expr": "exact_decimal",
-                            "value": "0.520"
+                            "expr": "number",
+                            "value": -0.03999999999999998
                           }
                         ]
                       },
-                      {
-                        "expr": "cycle",
-                        "index": {
-                          "expr": "local",
-                          "name": "ring_index"
-                        },
-                        "items": [
-                          {
-                            "expr": "exact_decimal",
-                            "value": "0.073"
-                          },
-                          {
-                            "expr": "exact_decimal",
-                            "value": "0.146"
-                          },
-                          {
-                            "expr": "exact_decimal",
-                            "value": "0.229"
-                          },
-                          {
-                            "expr": "exact_decimal",
-                            "value": "0.322"
-                          },
-                          {
-                            "expr": "exact_decimal",
-                            "value": "0.426"
-                          },
-                          {
-                            "expr": "exact_decimal",
-                            "value": "0.541"
-                          }
-                        ]
+                      "rotate_degrees": {
+                        "expr": "local",
+                        "name": "ripple_turn"
                       }
-                    ],
+                    },
                     "body": [
                       {
-                        "op": "vary",
-                        "binding": "ring_height",
-                        "domain": "ring_height",
-                        "choices": [
-                          {
-                            "expr": "cycle",
-                            "index": {
-                              "expr": "local",
-                              "name": "ring_index"
-                            },
-                            "items": [
-                              {
-                                "expr": "exact_decimal",
-                                "value": "0.065"
-                              },
-                              {
-                                "expr": "exact_decimal",
-                                "value": "0.130"
-                              },
-                              {
-                                "expr": "exact_decimal",
-                                "value": "0.205"
-                              },
-                              {
-                                "expr": "exact_decimal",
-                                "value": "0.288"
-                              },
-                              {
-                                "expr": "exact_decimal",
-                                "value": "0.381"
-                              },
-                              {
-                                "expr": "exact_decimal",
-                                "value": "0.484"
-                              }
-                            ]
+                        "op": "emit",
+                        "binding": null,
+                        "fields": {
+                          "movement": {
+                            "expr": "semantic_ref",
+                            "category": "movement",
+                            "id": "place"
                           },
-                          {
-                            "expr": "cycle",
-                            "index": {
-                              "expr": "local",
-                              "name": "ring_index"
-                            },
-                            "items": [
-                              {
-                                "expr": "exact_decimal",
-                                "value": "0.068"
-                              },
-                              {
-                                "expr": "exact_decimal",
-                                "value": "0.136"
-                              },
-                              {
-                                "expr": "exact_decimal",
-                                "value": "0.213"
-                              },
-                              {
-                                "expr": "exact_decimal",
-                                "value": "0.301"
-                              },
-                              {
-                                "expr": "exact_decimal",
-                                "value": "0.398"
-                              },
-                              {
-                                "expr": "exact_decimal",
-                                "value": "0.504"
-                              }
-                            ]
+                          "shape": {
+                            "expr": "semantic_ref",
+                            "category": "shape",
+                            "id": "point"
                           },
-                          {
-                            "expr": "cycle",
-                            "index": {
-                              "expr": "local",
-                              "name": "ring_index"
-                            },
-                            "items": [
-                              {
-                                "expr": "exact_decimal",
-                                "value": "0.071"
-                              },
-                              {
-                                "expr": "exact_decimal",
-                                "value": "0.141"
-                              },
-                              {
-                                "expr": "exact_decimal",
-                                "value": "0.222"
-                              },
-                              {
-                                "expr": "exact_decimal",
-                                "value": "0.313"
-                              },
-                              {
-                                "expr": "exact_decimal",
-                                "value": "0.414"
-                              },
-                              {
-                                "expr": "exact_decimal",
-                                "value": "0.525"
-                              }
-                            ]
+                          "position_x": {
+                            "expr": "exact_decimal",
+                            "value": "0.500"
+                          },
+                          "position_y": {
+                            "expr": "exact_decimal",
+                            "value": "0.500"
+                          },
+                          "radius": {
+                            "expr": "exact_decimal",
+                            "value": "0.007"
+                          },
+                          "color": {
+                            "expr": "semantic_ref",
+                            "category": "color",
+                            "id": "blue"
+                          },
+                          "touch": {
+                            "expr": "semantic_ref",
+                            "category": "touch",
+                            "id": "brush_thick"
+                          },
+                          "ink_spread": {
+                            "expr": "semantic_ref",
+                            "category": "variation",
+                            "id": "bleeding"
                           }
-                        ],
+                        }
+                      },
+                      {
+                        "op": "repeat",
+                        "count": {
+                          "expr": "parameter",
+                          "name": "ring_count"
+                        },
+                        "maximum": 6,
+                        "index": "ring_index",
                         "body": [
                           {
-                            "op": "emit",
-                            "binding": null,
-                            "fields": {
-                              "shape": {
-                                "expr": "semantic_ref",
-                                "category": "shape",
-                                "id": "ellipse"
-                              },
-                              "movement": {
-                                "expr": "semantic_ref",
-                                "category": "movement",
-                                "id": "place"
-                              },
-                              "position_x": {
+                            "op": "transform",
+                            "transform": {
+                              "rotate_degrees": {
                                 "expr": "cycle",
                                 "index": {
                                   "expr": "local",
-                                  "name": "ripple_center"
+                                  "name": "ring_index"
                                 },
                                 "items": [
                                   {
+                                    "expr": "number",
+                                    "value": 0
+                                  },
+                                  {
+                                    "expr": "number",
+                                    "value": 30
+                                  },
+                                  {
+                                    "expr": "number",
+                                    "value": -8
+                                  },
+                                  {
+                                    "expr": "number",
+                                    "value": 14
+                                  },
+                                  {
+                                    "expr": "number",
+                                    "value": -22
+                                  },
+                                  {
+                                    "expr": "number",
+                                    "value": 34
+                                  }
+                                ]
+                              }
+                            },
+                            "body": [
+                              {
+                                "op": "emit",
+                                "binding": null,
+                                "fields": {
+                                  "movement": {
+                                    "expr": "semantic_ref",
+                                    "category": "movement",
+                                    "id": "place"
+                                  },
+                                  "shape": {
+                                    "expr": "semantic_ref",
+                                    "category": "shape",
+                                    "id": "arc"
+                                  },
+                                  "position_x": {
                                     "expr": "exact_decimal",
                                     "value": "0.500"
                                   },
-                                  {
-                                    "expr": "exact_decimal",
-                                    "value": "0.380"
+                                  "chord": {
+                                    "expr": "cycle",
+                                    "index": {
+                                      "expr": "local",
+                                      "name": "ring_index"
+                                    },
+                                    "items": [
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.070"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.140"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.213"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.286"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.355"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.398"
+                                      }
+                                    ]
                                   },
-                                  {
-                                    "expr": "exact_decimal",
-                                    "value": "0.620"
+                                  "sagitta": {
+                                    "expr": "cycle",
+                                    "index": {
+                                      "expr": "local",
+                                      "name": "ring_index"
+                                    },
+                                    "items": [
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.035"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.070"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.082"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.096"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.102"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.093"
+                                      }
+                                    ]
                                   },
-                                  {
-                                    "expr": "exact_decimal",
-                                    "value": "0.440"
+                                  "color": {
+                                    "expr": "cycle",
+                                    "index": {
+                                      "expr": "local",
+                                      "name": "ring_index"
+                                    },
+                                    "items": [
+                                      {
+                                        "expr": "semantic_ref",
+                                        "category": "color",
+                                        "id": "blue"
+                                      },
+                                      {
+                                        "expr": "semantic_ref",
+                                        "category": "color",
+                                        "id": "blue"
+                                      },
+                                      {
+                                        "expr": "semantic_ref",
+                                        "category": "color",
+                                        "id": "blue"
+                                      },
+                                      {
+                                        "expr": "semantic_ref",
+                                        "category": "color",
+                                        "id": "gray"
+                                      },
+                                      {
+                                        "expr": "semantic_ref",
+                                        "category": "color",
+                                        "id": "gray"
+                                      },
+                                      {
+                                        "expr": "semantic_ref",
+                                        "category": "color",
+                                        "id": "gray"
+                                      }
+                                    ]
                                   },
-                                  {
-                                    "expr": "exact_decimal",
-                                    "value": "0.580"
+                                  "touch": {
+                                    "expr": "cycle",
+                                    "index": {
+                                      "expr": "local",
+                                      "name": "ring_index"
+                                    },
+                                    "items": [
+                                      {
+                                        "expr": "semantic_ref",
+                                        "category": "touch",
+                                        "id": "brush_thin"
+                                      },
+                                      {
+                                        "expr": "semantic_ref",
+                                        "category": "touch",
+                                        "id": "brush_thick"
+                                      },
+                                      {
+                                        "expr": "semantic_ref",
+                                        "category": "touch",
+                                        "id": "brush_thin"
+                                      },
+                                      {
+                                        "expr": "semantic_ref",
+                                        "category": "touch",
+                                        "id": "brush_thin"
+                                      },
+                                      {
+                                        "expr": "semantic_ref",
+                                        "category": "touch",
+                                        "id": "brush_thin"
+                                      },
+                                      {
+                                        "expr": "semantic_ref",
+                                        "category": "touch",
+                                        "id": "brush_thin"
+                                      }
+                                    ]
+                                  },
+                                  "fluctuation_amplitude": {
+                                    "expr": "cycle",
+                                    "index": {
+                                      "expr": "local",
+                                      "name": "ring_index"
+                                    },
+                                    "items": [
+                                      {
+                                        "expr": "semantic_ref",
+                                        "category": "variation",
+                                        "id": "narrowly"
+                                      },
+                                      {
+                                        "expr": "semantic_ref",
+                                        "category": "variation",
+                                        "id": "narrowly"
+                                      },
+                                      {
+                                        "expr": "semantic_ref",
+                                        "category": "variation",
+                                        "id": "broadly"
+                                      },
+                                      {
+                                        "expr": "semantic_ref",
+                                        "category": "variation",
+                                        "id": "broadly"
+                                      },
+                                      {
+                                        "expr": "semantic_ref",
+                                        "category": "variation",
+                                        "id": "broadly"
+                                      },
+                                      {
+                                        "expr": "semantic_ref",
+                                        "category": "variation",
+                                        "id": "broadly"
+                                      }
+                                    ]
+                                  },
+                                  "fluctuation_frequency": {
+                                    "expr": "semantic_ref",
+                                    "category": "variation",
+                                    "id": "loosely"
+                                  },
+                                  "fluctuation_quality": {
+                                    "expr": "semantic_ref",
+                                    "category": "variation",
+                                    "id": "swaying"
+                                  },
+                                  "position_y": {
+                                    "expr": "cycle",
+                                    "index": {
+                                      "expr": "local",
+                                      "name": "ring_index"
+                                    },
+                                    "items": [
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.500"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.500"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.472"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.441"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.397"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.333"
+                                      }
+                                    ]
                                   }
-                                ]
+                                }
                               },
-                              "position_y": {
-                                "expr": "cycle",
-                                "index": {
-                                  "expr": "local",
-                                  "name": "ripple_center"
+                              {
+                                "op": "transform",
+                                "transform": {
+                                  "rotate_degrees": {
+                                    "expr": "number",
+                                    "value": 180
+                                  }
                                 },
-                                "items": [
+                                "body": [
                                   {
-                                    "expr": "exact_decimal",
-                                    "value": "0.560"
-                                  },
-                                  {
-                                    "expr": "exact_decimal",
-                                    "value": "0.620"
-                                  },
-                                  {
-                                    "expr": "exact_decimal",
-                                    "value": "0.580"
-                                  },
-                                  {
-                                    "expr": "exact_decimal",
-                                    "value": "0.680"
-                                  },
-                                  {
-                                    "expr": "exact_decimal",
-                                    "value": "0.460"
+                                    "op": "emit",
+                                    "binding": null,
+                                    "fields": {
+                                      "movement": {
+                                        "expr": "semantic_ref",
+                                        "category": "movement",
+                                        "id": "place"
+                                      },
+                                      "shape": {
+                                        "expr": "semantic_ref",
+                                        "category": "shape",
+                                        "id": "arc"
+                                      },
+                                      "position_x": {
+                                        "expr": "exact_decimal",
+                                        "value": "0.500"
+                                      },
+                                      "chord": {
+                                        "expr": "cycle",
+                                        "index": {
+                                          "expr": "local",
+                                          "name": "ring_index"
+                                        },
+                                        "items": [
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.070"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.140"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.213"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.286"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.355"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.398"
+                                          }
+                                        ]
+                                      },
+                                      "sagitta": {
+                                        "expr": "cycle",
+                                        "index": {
+                                          "expr": "local",
+                                          "name": "ring_index"
+                                        },
+                                        "items": [
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.035"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.070"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.082"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.096"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.102"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.093"
+                                          }
+                                        ]
+                                      },
+                                      "color": {
+                                        "expr": "cycle",
+                                        "index": {
+                                          "expr": "local",
+                                          "name": "ring_index"
+                                        },
+                                        "items": [
+                                          {
+                                            "expr": "semantic_ref",
+                                            "category": "color",
+                                            "id": "blue"
+                                          },
+                                          {
+                                            "expr": "semantic_ref",
+                                            "category": "color",
+                                            "id": "blue"
+                                          },
+                                          {
+                                            "expr": "semantic_ref",
+                                            "category": "color",
+                                            "id": "blue"
+                                          },
+                                          {
+                                            "expr": "semantic_ref",
+                                            "category": "color",
+                                            "id": "gray"
+                                          },
+                                          {
+                                            "expr": "semantic_ref",
+                                            "category": "color",
+                                            "id": "gray"
+                                          },
+                                          {
+                                            "expr": "semantic_ref",
+                                            "category": "color",
+                                            "id": "gray"
+                                          }
+                                        ]
+                                      },
+                                      "touch": {
+                                        "expr": "cycle",
+                                        "index": {
+                                          "expr": "local",
+                                          "name": "ring_index"
+                                        },
+                                        "items": [
+                                          {
+                                            "expr": "semantic_ref",
+                                            "category": "touch",
+                                            "id": "brush_thin"
+                                          },
+                                          {
+                                            "expr": "semantic_ref",
+                                            "category": "touch",
+                                            "id": "brush_thick"
+                                          },
+                                          {
+                                            "expr": "semantic_ref",
+                                            "category": "touch",
+                                            "id": "brush_thin"
+                                          },
+                                          {
+                                            "expr": "semantic_ref",
+                                            "category": "touch",
+                                            "id": "brush_thin"
+                                          },
+                                          {
+                                            "expr": "semantic_ref",
+                                            "category": "touch",
+                                            "id": "brush_thin"
+                                          },
+                                          {
+                                            "expr": "semantic_ref",
+                                            "category": "touch",
+                                            "id": "brush_thin"
+                                          }
+                                        ]
+                                      },
+                                      "fluctuation_amplitude": {
+                                        "expr": "cycle",
+                                        "index": {
+                                          "expr": "local",
+                                          "name": "ring_index"
+                                        },
+                                        "items": [
+                                          {
+                                            "expr": "semantic_ref",
+                                            "category": "variation",
+                                            "id": "narrowly"
+                                          },
+                                          {
+                                            "expr": "semantic_ref",
+                                            "category": "variation",
+                                            "id": "narrowly"
+                                          },
+                                          {
+                                            "expr": "semantic_ref",
+                                            "category": "variation",
+                                            "id": "broadly"
+                                          },
+                                          {
+                                            "expr": "semantic_ref",
+                                            "category": "variation",
+                                            "id": "broadly"
+                                          },
+                                          {
+                                            "expr": "semantic_ref",
+                                            "category": "variation",
+                                            "id": "broadly"
+                                          },
+                                          {
+                                            "expr": "semantic_ref",
+                                            "category": "variation",
+                                            "id": "broadly"
+                                          }
+                                        ]
+                                      },
+                                      "fluctuation_frequency": {
+                                        "expr": "semantic_ref",
+                                        "category": "variation",
+                                        "id": "loosely"
+                                      },
+                                      "fluctuation_quality": {
+                                        "expr": "semantic_ref",
+                                        "category": "variation",
+                                        "id": "swaying"
+                                      },
+                                      "position_y": {
+                                        "expr": "cycle",
+                                        "index": {
+                                          "expr": "local",
+                                          "name": "ring_index"
+                                        },
+                                        "items": [
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.535"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.570"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.610"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.655"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.705"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.760"
+                                          }
+                                        ]
+                                      }
+                                    }
                                   }
                                 ]
-                              },
-                              "width": {
-                                "expr": "local",
-                                "name": "ring_width"
-                              },
-                              "height": {
-                                "expr": "local",
-                                "name": "ring_height"
-                              },
-                              "color": {
-                                "expr": "semantic_ref",
-                                "category": "color",
-                                "id": "gray"
-                              },
-                              "touch": {
-                                "expr": "semantic_ref",
-                                "category": "touch",
-                                "id": "brush_thin"
-                              },
-                              "surface": {
-                                "expr": "semantic_ref",
-                                "category": "surface",
-                                "id": "none"
-                              },
-                              "thinness": {
-                                "expr": "cycle",
-                                "index": {
-                                  "expr": "local",
-                                  "name": "ring_index"
-                                },
-                                "items": [
-                                  {
-                                    "expr": "semantic_ref",
-                                    "category": "thinness",
-                                    "id": "fine"
-                                  },
-                                  {
-                                    "expr": "semantic_ref",
-                                    "category": "thinness",
-                                    "id": "fine"
-                                  },
-                                  {
-                                    "expr": "semantic_ref",
-                                    "category": "thinness",
-                                    "id": "fine"
-                                  },
-                                  {
-                                    "expr": "semantic_ref",
-                                    "category": "thinness",
-                                    "id": "extra_fine"
-                                  },
-                                  {
-                                    "expr": "semantic_ref",
-                                    "category": "thinness",
-                                    "id": "extra_fine"
-                                  },
-                                  {
-                                    "expr": "semantic_ref",
-                                    "category": "thinness",
-                                    "id": "extra_fine"
-                                  }
-                                ]
-                              },
-                              "continuity": {
-                                "expr": "cycle",
-                                "index": {
-                                  "expr": "local",
-                                  "name": "ring_index"
-                                },
-                                "items": [
-                                  {
-                                    "expr": "semantic_ref",
-                                    "category": "continuity",
-                                    "id": "solid"
-                                  },
-                                  {
-                                    "expr": "semantic_ref",
-                                    "category": "continuity",
-                                    "id": "solid"
-                                  },
-                                  {
-                                    "expr": "semantic_ref",
-                                    "category": "continuity",
-                                    "id": "solid"
-                                  },
-                                  {
-                                    "expr": "semantic_ref",
-                                    "category": "continuity",
-                                    "id": "solid"
-                                  },
-                                  {
-                                    "expr": "semantic_ref",
-                                    "category": "continuity",
-                                    "id": "dashed"
-                                  },
-                                  {
-                                    "expr": "semantic_ref",
-                                    "category": "continuity",
-                                    "id": "dotted"
-                                  }
-                                ]
-                              },
-                              "fluctuation_amplitude": {
-                                "expr": "cycle",
-                                "index": {
-                                  "expr": "local",
-                                  "name": "ring_index"
-                                },
-                                "items": [
-                                  {
-                                    "expr": "semantic_ref",
-                                    "category": "variation",
-                                    "id": "narrowly"
-                                  },
-                                  {
-                                    "expr": "semantic_ref",
-                                    "category": "variation",
-                                    "id": "narrowly"
-                                  },
-                                  {
-                                    "expr": "semantic_ref",
-                                    "category": "variation",
-                                    "id": "broadly"
-                                  },
-                                  {
-                                    "expr": "semantic_ref",
-                                    "category": "variation",
-                                    "id": "broadly"
-                                  },
-                                  {
-                                    "expr": "semantic_ref",
-                                    "category": "variation",
-                                    "id": "broadly"
-                                  },
-                                  {
-                                    "expr": "semantic_ref",
-                                    "category": "variation",
-                                    "id": "broadly"
-                                  }
-                                ]
-                              },
-                              "fluctuation_quality": {
-                                "expr": "semantic_ref",
-                                "category": "variation",
-                                "id": "undulating"
                               }
-                            }
+                            ]
                           }
                         ]
                       }
@@ -504,7 +753,7 @@
           "波紋"
         ]
       },
-      "summary": "水面を真上から見た波紋を一つ広げる。一点を中心に、灰色の細筆で輪郭だけの輪を内から外へ同心に重ねる。輪は正円でなく、輪ごとに縦横の比が少しずつ違い、線が波打つ。内の二つは細かく、三つ目から外は大きく揺らぐ。外の輪ほど線が細く、五つ目は破線、六つ目は点線にほどける。輪の数を書けばその数（1〜6個）、書かなければ3〜4個。中心は画面の中央からやや下の五つの位置から一つを選ぶ。"
+      "summary": "水面を真上から見た波紋を一つ広げる。中心に群青の雫を一滴、たらしこみのように滲ませて置き、そのまわりに輪を内から外へ重ねる。輪は上下二つの弧でできていて、内の二つは閉じ、三つ目から外は途切れ、途切れ目が輪ごとに少しずつ回る。輪の線はゆるやかに揺れ、内の二つは細かく、三つ目から外は大きく揺らぐ。内の三つは群青、外の三つは淡い墨（灰）で、二つ目の輪だけが太筆、ほかは細筆。輪の数を書けばその数（1〜6個）、書かなければ4〜5個。中心は画面の中央からやや下の五つの位置から一つを選び、全体の向きも回す。"
     }
   ],
   "exported_from": {}

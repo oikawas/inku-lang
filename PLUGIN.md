@@ -115,9 +115,10 @@ shared core: `5 Sky.Stars.` and `5個のSky.星。` drew five circles, `Sky.Star
 choices, and `9個のSky.星。` drew nine, all without diagnostics. `12個のSky.星。` is outside the range, so that
 word was left out.
 
-More examples, `Water.Ripples` (alias `Water.波紋`), a ripple on the water seen from straight above, and `Water.Rings`
-(alias `Water.水輪`), one seen at a low angle, are kept in [docs/plugins](docs/plugins/README.md) as export files that can be
-loaded as they are. They also show rings drawn as wavering ellipses and a `transform` that moves and tilts the whole.
+More examples, three words that draw water, `Water.Stream` (alias `Water.水流`), `Water.Ripples` (alias `Water.波紋`)
+and `Water.Rings` (alias `Water.水輪`), are kept in [docs/plugins](docs/plugins/README.md) as export files that can be loaded
+as they are. They also show a component (`use`), a `transform` that moves, turns and flattens the whole in place of
+arithmetic, and `cycle` tables that change the form and tool per ring or line.
 
 ## 3. Definition Format
 

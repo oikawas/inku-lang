@@ -640,7 +640,10 @@
 		cancelModelSelection: restoreModelSelection,
 		requestConfirmation: (confirmation) => { confirmAction = confirmation; },
 		setRenderFanoutLimit: (limit) => { renderFanoutLimit = limit; },
-		describeApiError
+		describeApiError,
+		// Read only once after sign-in otherwise, so a plugin added in the
+		// settings would not reach the Saijiki until the page was reloaded.
+		pluginsChanged: () => { void loadPluginVocabulary(); }
 	});
 	let chatgptActor: string | undefined;
 	$effect(() => {

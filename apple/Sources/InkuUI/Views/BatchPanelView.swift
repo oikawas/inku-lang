@@ -555,7 +555,7 @@ struct BatchPanelView: View {
                 model.display.localized("色カタログ") + ": " + catalog,
                 model.display.localized("用紙") + ": " + paper,
                 model.display.localized("写生") + ": " + sketch,
-                model.display.localized("暴れる") + ": " + wild].joined(separator: " · ")
+                model.display.localized("筆致制限を外す") + ": " + wild].joined(separator: " · ")
     }
 
     private var observation: some View {

@@ -120,7 +120,7 @@ struct CreationWorkInfoView: View {
                     row(model.display.localized("配置 seed"), work.compositionSeed, hint: "provenanceHintCompositionSeed")
                     row("render seed", work.renderSeed, hint: "provenanceHintRenderSeed")
                     row(copy("provenanceLabelSeedText", "種テキスト"), work.seedText, hint: "provenanceHintSeedText")
-                    row(copy("provenanceLabelWild", "暴れる"), work.renderWild.map { copy($0 ? "provenanceWildOn" : "provenanceWildOff", $0 ? "あり" : "なし") }, hint: "provenanceHintWild")
+                    row(copy("provenanceLabelWild", "筆致制限を外す"), work.renderWild.map { copy($0 ? "provenanceWildOn" : "provenanceWildOff", $0 ? "外した" : "外さない") }, hint: "provenanceHintWild")
                     row(model.display.localized("色カタログ"), work.renderColorCatalogName ?? work.renderColorCatalogID ?? work.catalogID, hint: "provenanceHintCatalog")
                     colorMap(work)
                     row(model.display.localized("キャンバス"), work.renderCanvasAspect ?? work.renderCanvasAspectID, hint: "provenanceHintCanvas")

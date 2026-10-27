@@ -96,12 +96,12 @@ public struct ComparisonView: View {
     private var modelChoices: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(model.display.localized(comparison.inheritWild ? "筆致制限（継承）" : "筆致制限")).inkuFont(12).foregroundStyle(.secondary)
-                Button(model.display.localized("暴れる")) {
+                Button(model.display.localized("筆致制限を外す")) {
                     comparison.wildOverride = !effectiveWild; comparison.inheritWild = false
                 }.disabled(comparison.running || model.isBusy)
                     .buttonStyle(.bordered).tint(effectiveWild ? Color.accentColor : Color.secondary)
                     .accessibilityValue(model.display.localized(effectiveWild ? "入" : "切"))
+                if comparison.inheritWild { Text(model.display.localized("（継承）")).inkuFont(11).foregroundStyle(.secondary) }
                 Spacer()
                 Button(model.display.webCopy("modelCompareButton", "選んだモデルで描く"), systemImage: "play.fill") {
                     Task { await comparison.generate(app: model) }

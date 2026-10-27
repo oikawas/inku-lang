@@ -336,7 +336,7 @@ struct CreationView: View {
             .buttonStyle(InkuGhostButtonStyle())
             .inkuTooltip(display.tooltip("次の作品で写生を使うかを選びます。", serverKey: "tooltipInputSketch"))
             .popover(isPresented: $showSketchMenu, arrowEdge: .bottom) { sketchMenu }
-        Button(display.webCopy("wildButton", "暴れる") + " " + display.webCopy(model.wild ? "wildEnabled" : "wildDisabled", model.wild ? "入" : "切")) {
+        Button(display.webCopy("wildButton", "筆致制限を外す") + " " + display.webCopy(model.wild ? "wildEnabled" : "wildDisabled", model.wild ? "入" : "切")) {
             model.wild.toggle()
         }
         .buttonStyle(InkuGhostButtonStyle(active: model.wild))

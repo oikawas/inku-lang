@@ -94,8 +94,8 @@ public struct AutonomousRefinementView: View {
             }
             HStack(spacing: 24) {
                 Stepper(copy("aiRefineMovesLabel") + ": \(refinement.moves)", value: $refinement.moves, in: 1...10)
-                Toggle(model.display.localized("元のワイルド設定を引き継ぐ"), isOn: $refinement.inheritWild)
-                if !refinement.inheritWild { Toggle(model.display.localized("ワイルド"), isOn: $refinement.wild) }
+                Toggle(model.display.localized("筆致制限を外すかを元の作品から引き継ぐ"), isOn: $refinement.inheritWild)
+                if !refinement.inheritWild { Toggle(model.display.localized("筆致制限を外す"), isOn: $refinement.wild) }
             }
             Text(copy("aiRefineDirectionLabel")).inkuFont(12, weight: .semibold)
             TextField(copy("aiRefineDirectionPlaceholder"), text: $refinement.note, axis: .vertical).lineLimit(3...5)

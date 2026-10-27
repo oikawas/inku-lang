@@ -116,12 +116,11 @@ public struct WorkEditView: View {
     private var wildControl: some View {
         let wild = editor.inheritWild ? editor.work.renderWild ?? false : editor.wildOverride
         return HStack(spacing: 4) {
-            Text(model.display.localized(editor.inheritWild ? "筆致制限（継承）" : "筆致制限") + ":")
-                .inkuFont(11).foregroundStyle(.secondary)
-            Button(model.display.localized("暴れる")) {
+            Button(model.display.localized("筆致制限を外す")) {
                 editor.wildOverride = !wild; editor.inheritWild = false
             }.buttonStyle(.bordered).tint(wild ? Color.accentColor : Color.secondary)
                 .accessibilityValue(model.display.localized(wild ? "入" : "切"))
+            if editor.inheritWild { Text(model.display.localized("（継承）")).inkuFont(11).foregroundStyle(.secondary) }
         }.disabled(model.isBusy)
     }
 

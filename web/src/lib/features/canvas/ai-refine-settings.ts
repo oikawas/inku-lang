@@ -6,6 +6,8 @@
 // which moves, and the direction the laws move is given. The generations kept
 // before are read as the moves; the colour and layout elements and the Vision
 // direction went with the browser's loop, and are dropped like any unknown field.
+// The chunk move (2026-10-27) runs alone, so a kept chunk choice opens with the
+// other two moves off.
 
 import { AUTONOMOUS_MOVES_DEFAULT, AUTONOMOUS_NOTE_LIMIT } from '../autonomous/runs.ts';
 
@@ -13,6 +15,7 @@ export type AiRefineSettings = {
 	moves: number;
 	laws: boolean;
 	juxtaposition: boolean;
+	chunks: boolean;
 	note: string;
 };
 
@@ -20,6 +23,7 @@ export const DEFAULT_AI_REFINE_SETTINGS: AiRefineSettings = {
 	moves: AUTONOMOUS_MOVES_DEFAULT,
 	laws: true,
 	juxtaposition: true,
+	chunks: false,
 	note: ''
 };
 
@@ -39,11 +43,13 @@ export function parseAiRefineSettings(raw: string | null): AiRefineSettings {
 		/* a damaged entry reads as nothing stored */
 	}
 	const d = DEFAULT_AI_REFINE_SETTINGS;
-	const flag = (key: 'laws' | 'juxtaposition') => (typeof stored[key] === 'boolean' ? stored[key] as boolean : d[key]);
+	const flag = (key: 'laws' | 'juxtaposition' | 'chunks') => (typeof stored[key] === 'boolean' ? stored[key] as boolean : d[key]);
+	const chunks = flag('chunks');
 	return {
 		moves: movesOf(stored.moves) ?? movesOf(stored.generations) ?? d.moves,
-		laws: flag('laws'),
-		juxtaposition: flag('juxtaposition'),
+		laws: !chunks && flag('laws'),
+		juxtaposition: !chunks && flag('juxtaposition'),
+		chunks,
 		note: typeof stored.note === 'string' ? stored.note.slice(0, AUTONOMOUS_NOTE_LIMIT) : d.note
 	};
 }

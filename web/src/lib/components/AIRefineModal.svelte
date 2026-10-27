@@ -9,8 +9,8 @@
 	import WildToggle from './WildToggle.svelte';
 	import { loadAiRefineSettings, saveAiRefineSettings } from '$lib/features/canvas/ai-refine-settings';
 	import {
-		AUTONOMOUS_NOTE_LIMIT, AUTONOMOUS_POLL_MS, runToResume, sharePercent, triesOf,
-		type AutonomousKind, type AutonomousOutcome, type AutonomousRun, type AutonomousRunsApi
+		AUTONOMOUS_NOTE_LIMIT, AUTONOMOUS_POLL_MS, chunkMoveText, kindsOf, runToResume, sharePercent, triesOf,
+		type AutonomousKind, type AutonomousOutcome, type AutonomousRun, type AutonomousRunsApi, type AutonomousTry
 	} from '$lib/features/autonomous/runs';
 	import { restoreWorkActionFocus } from './WorkActionMenu.svelte';
 
@@ -35,8 +35,10 @@
 	let moves = $state(saved.moves);
 	let useLaws = $state(saved.laws);
 	let useJuxtaposition = $state(saved.juxtaposition);
+	// The chunk move runs alone: ticking it clears the other two, and either of them clears it.
+	let useChunks = $state(saved.chunks);
 	let note = $state(saved.note);
-	$effect(() => { saveAiRefineSettings({ moves, laws: useLaws, juxtaposition: useJuxtaposition, note }); });
+	$effect(() => { saveAiRefineSettings({ moves, laws: useLaws, juxtaposition: useJuxtaposition, chunks: useChunks, note }); });
 	// One model chooses the sentence, takes the laws stage and draws every child.
 	let selectedModel = $state('');
 	$effect(() => { if (!selectedModel) selectedModel = visionModel; });
@@ -56,7 +58,9 @@
 	let controller: AbortController | null = null;
 	let closed = false;
 
-	const kinds = $derived([...(useLaws ? ['laws'] : []), ...(useJuxtaposition ? ['juxtaposition'] : [])] as AutonomousKind[]);
+	const kinds = $derived(kindsOf({ laws: useLaws, juxtaposition: useJuxtaposition, chunks: useChunks }));
+	// The chunk move goes toward the direction, so it does not start without one.
+	const noteMissing = $derived(useChunks && !note.trim());
 	const running = $derived(run?.state === 'running');
 	const tries = $derived(run ? triesOf(run) : []);
 
@@ -121,6 +125,10 @@
 			error = t().aiRefineKindsError;
 			return;
 		}
+		if (noteMissing) {
+			error = t().aiRefineChunksNoteRequired;
+			return;
+		}
 		starting = true;
 		error = null;
 		try {
@@ -160,7 +168,13 @@
 	}
 
 	function kindLabel(kind: AutonomousKind): string {
-		return kind === 'laws' ? t().aiRefineKindLaws : t().aiRefineKindJuxtaposition;
+		return { laws: t().aiRefineKindLaws, juxtaposition: t().aiRefineKindJuxtaposition, chunks: t().aiRefineKindChunks }[kind];
+	}
+
+	/** What a try did: the chunk move and its chunks, the sentence added, or the main law. */
+	function tryDetail(attempt: AutonomousTry): string | null {
+		if (attempt.kind === 'chunks') return chunkMoveText(t(), attempt.move, attempt.targets, attempt.title);
+		return attempt.sentence || attempt.main_law || null;
 	}
 
 	function outcomeLabel(outcome: AutonomousOutcome): string {
@@ -178,10 +192,12 @@
 			if (run.stopping) return t().aiRefineStopping;
 			return run.current ? t().aiRefineTaking(run.current.turn, kindLabel(run.current.kind)) : t().pipelineWorking;
 		}
+		// A chunk run has one move and no gate: it stops when that move cannot start, or keeps nothing twice.
+		const chunkRun = run.settings.kinds.includes('chunks');
 		const ended = {
 			moves_done: t().aiRefineEndedMovesDone,
-			nothing_available: t().aiRefineEndedNothingAvailable,
-			stalled: t().aiRefineEndedStalled,
+			nothing_available: chunkRun ? t().aiRefineEndedNothingAvailableChunks : t().aiRefineEndedNothingAvailable,
+			stalled: chunkRun ? t().aiRefineEndedStalledChunks : t().aiRefineEndedStalled,
 			stopped: t().aiRefineEndedStopped,
 			interrupted: t().aiRefineEndedInterrupted
 		}[run.stop_reason ?? ''] ?? t().aiRefineEndedFailed;
@@ -216,7 +232,7 @@
 							</div>
 							<div class="ai-refine-try-text">
 								<span class="ai-refine-try-head">{t().aiRefineTurn(turn)} · {kindLabel(attempt.kind)} · {outcomeLabel(attempt.outcome)}{#if sharePercent(attempt.share)} · {t().aiRefineShare(sharePercent(attempt.share) ?? '')}{/if}</span>
-								{#if attempt.sentence}<span class="ai-refine-try-detail">{attempt.sentence}</span>{:else if attempt.main_law}<span class="ai-refine-try-detail">{attempt.main_law}</span>{/if}
+								{#if tryDetail(attempt)}<span class="ai-refine-try-detail">{tryDetail(attempt)}</span>{/if}
 								{#if attempt.reason && (attempt.outcome === 'unavailable' || attempt.outcome === 'failed')}<span class="ai-refine-try-reason">{attempt.reason}</span>{/if}
 							</div>
 						</li>
@@ -225,13 +241,16 @@
 			{/if}
 			{#if running}<p class="ai-refine-note">{t().aiRefineGoesOn}</p>{/if}
 		{:else}
-			{#if held}<p class="ai-refine-note">{t().aiRefineHeldNote}</p>{/if}
+			<!-- A chunk run takes chunk moves, which an edited DDL does not hold back. -->
+			{#if held && !useChunks}<p class="ai-refine-note">{t().aiRefineHeldNote}</p>{/if}
 			<ModelCardPicker label={t().aiRefineModel} {selectedModel} providerGroups={visionProviderGroups} purpose="vision" disabled={starting} onSelect={(provider: Provider, model: string) => { selectedModel = qualifiedModelId(provider, model); void onSaveVisionModel(provider, model); }} />
 			<fieldset class="ai-refine-kinds" disabled={starting}>
 				<legend>{t().aiRefineKindsLabel}</legend>
-				<label><input type="checkbox" bind:checked={useLaws} /><span>{t().aiRefineKindLaws}</span></label>
-				<label><input type="checkbox" bind:checked={useJuxtaposition} /><span>{t().aiRefineKindJuxtaposition}</span></label>
+				<label><input type="checkbox" bind:checked={useLaws} onchange={(event) => { if (event.currentTarget.checked) useChunks = false; }} /><span>{t().aiRefineKindLaws}</span></label>
+				<label><input type="checkbox" bind:checked={useJuxtaposition} onchange={(event) => { if (event.currentTarget.checked) useChunks = false; }} /><span>{t().aiRefineKindJuxtaposition}</span></label>
+				<label><input type="checkbox" bind:checked={useChunks} onchange={(event) => { if (event.currentTarget.checked) { useLaws = false; useJuxtaposition = false; } }} /><span>{t().aiRefineKindChunks}</span></label>
 			</fieldset>
+			{#if useChunks}<p class="ai-refine-note">{t().aiRefineChunksNote}</p>{/if}
 			<div class="ai-refine-row">
 				<div class="ai-refine-field">
 					<span class="ai-refine-label">{t().aiRefineMovesLabel}</span>
@@ -244,8 +263,8 @@
 				<WildToggle value={wildOverride ?? parentWild} {isJapanese} inherited={wildOverride === null} onSelect={(next) => (wildOverride = next)} />
 			</div>
 			<label class="ai-refine-field">
-				<span class="ai-refine-label">{t().aiRefineDirectionLabel}</span>
-				<textarea bind:value={note} maxlength={AUTONOMOUS_NOTE_LIMIT} rows="3" placeholder={t().aiRefineDirectionPlaceholder} disabled={starting}></textarea>
+				<span class="ai-refine-label">{useChunks ? t().aiRefineChunksDirectionLabel : t().aiRefineDirectionLabel}</span>
+				<textarea bind:value={note} maxlength={AUTONOMOUS_NOTE_LIMIT} rows="3" placeholder={useChunks ? t().aiRefineChunksDirectionPlaceholder : t().aiRefineDirectionPlaceholder} disabled={starting}></textarea>
 			</label>
 		{/if}
 		{#if error}<div class="ai-refine-error">{error}</div>{/if}
@@ -259,7 +278,7 @@
 			{#if run.last_kept_history_id}<button type="button" class="ai-refine-primary" onclick={openLast}>{t().aiRefineOpenLast}</button>{/if}
 		{:else}
 			<button type="button" onclick={close}>{t().pipelineCancel}</button>
-			<button type="button" class="ai-refine-primary" disabled={starting || kinds.length === 0 || !selectedModel || !node.history?.id} onclick={start}>{t().aiRefineStartButton}</button>
+			<button type="button" class="ai-refine-primary" disabled={starting || kinds.length === 0 || noteMissing || !selectedModel || !node.history?.id} onclick={start}>{t().aiRefineStartButton}</button>
 		{/if}
 	</footer>
 </dialog>

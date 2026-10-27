@@ -595,6 +595,13 @@ export interface LangPack {
 	aiRefineKindsLabel: string;
 	aiRefineKindLaws: string;
 	aiRefineKindJuxtaposition: string;
+	aiRefineKindChunks: string;
+	aiRefineChunksNote: string;
+	aiRefineChunksDirectionLabel: string;
+	aiRefineChunksDirectionPlaceholder: string;
+	aiRefineChunksNoteRequired: string;
+	aiRefineChunkMoveName: (move: string) => string;
+	aiRefineChunkMove: (name: string, targets: string[], title: string | null) => string;
 	aiRefineKindsError: string;
 	aiRefineStartButton: string;
 	aiRefineGoesOn: string;
@@ -609,7 +616,9 @@ export interface LangPack {
 	aiRefineShare: (percent: string) => string;
 	aiRefineEndedMovesDone: string;
 	aiRefineEndedNothingAvailable: string;
+	aiRefineEndedNothingAvailableChunks: string;
 	aiRefineEndedStalled: string;
+	aiRefineEndedStalledChunks: string;
 	aiRefineEndedStopped: string;
 	aiRefineEndedInterrupted: string;
 	aiRefineEndedFailed: string;

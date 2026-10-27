@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { AutonomousRunsApi } from '$lib/features/autonomous/runs';
+	import { aiMoveOf, chunkMoveText, sharePercent, type AiMoveRecord, type AutonomousRunsApi } from '$lib/features/autonomous/runs';
 	import { hashDigest, hashSchemeLabel } from '$lib/hashIdentity';
 	import { onMount, tick, untrack } from 'svelte';
 	import type { HistoryItem } from '$lib/historyManagerState.svelte';
@@ -322,6 +322,14 @@
 	// says that more quietly than a bare slash.
 	function operationLabel(kind?: string): string {
 		return derivationKindLabel(kind, isJapanese);
+	}
+
+	// The AI refinement's move a child's edge records, shown since 2026-10-27:
+	// its turn, its kind and what it did.
+	function aiMoveText(move: AiMoveRecord): string {
+		const kind = { laws: t().aiRefineKindLaws, juxtaposition: t().aiRefineKindJuxtaposition, chunks: t().aiRefineKindChunks }[move.kind];
+		const did = move.kind === 'chunks' ? chunkMoveText(t(), move.move, move.targets, move.title) : move.sentence ?? move.mainLaw;
+		return [move.turn ? t().aiRefineTurn(move.turn) : null, kind, did].filter(Boolean).join(' · ');
 	}
 
 // The short name is for the card; the full "provider / model" stays in the
@@ -911,6 +919,7 @@ $effect(() => {
 
 {#if detailsNode && detailsNode.history}
 	{@const detailEdge = edgeByChild.get(detailsNode.id)}
+	{@const detailMove = aiMoveOf(detailEdge?.metadata)}
 	<dialog bind:this={detailsDialogEl} class="lineage-details-dialog" aria-labelledby="lineage-details-title" onclose={handleNodeDetailsClose}>
 		<header>
 			<div>
@@ -947,6 +956,11 @@ $effect(() => {
 				<dt>Stage 2</dt><dd>{detailsNode.history.stage2_model ? modelDisplayName(detailsNode.history.stage2_model) : '—'}</dd>
 				<dt>seed</dt><dd>{detailsNode.history.render_seed ?? '—'} / {detailsNode.history.composition_seed ?? '—'} / {detailsNode.history.interpretation_seed ?? '—'}</dd>
 				<dt>{isJapanese ? '派生' : 'Derived by'}</dt><dd>{operationLabel(detailEdge?.derivation_kind)}</dd>
+				{#if detailMove}
+					<dt>{isJapanese ? 'AIの手' : 'AI move'}</dt><dd>{aiMoveText(detailMove)}</dd>
+					{#if detailMove.reason}<dt>{isJapanese ? '手の理由' : 'Why this move'}</dt><dd>{detailMove.reason}</dd>{/if}
+					{#if sharePercent(detailMove.share)}<dt>{isJapanese ? '親との差' : 'Change from the parent'}</dt><dd>{sharePercent(detailMove.share)}%</dd>{/if}
+				{/if}
 			</dl>
 			<div class="note-editor">
 				<label for={`lineage-note-${detailsNode.id}`}>{isJapanese ? '作品へのコメント' : 'Comment on the work'}</label>

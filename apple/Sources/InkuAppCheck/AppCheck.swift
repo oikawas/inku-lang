@@ -8,6 +8,12 @@ import InkuHost
 struct AppCheck {
     @MainActor
     static func main() async throws {
+        if CommandLine.arguments.contains("--image-run-only") {
+            try await runImageChecks(); return
+        }
+        if CommandLine.arguments.contains("--image-opus-only") {
+            try await runImageChecks(realOpus: true); return
+        }
         if CommandLine.arguments.contains("--core-version-only") {
             print(InkuCore.versionReport); return
         }

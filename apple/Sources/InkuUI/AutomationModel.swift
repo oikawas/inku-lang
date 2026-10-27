@@ -37,6 +37,8 @@ public struct BatchDrawingConditions: Codable, Sendable {
         case .description(_, let auto, let sketch):
             inputMode = "description"; self.catalogMode = catalogMode ?? (auto ? "auto" : "fixed")
             switch sketch { case .off: sketchMode = "off"; case .on: sketchMode = "on"; case .supplied: sketchMode = "supplied" }
+        case .image(_, let auto):
+            inputMode = "image"; sketchMode = "off"; self.catalogMode = catalogMode ?? (auto ? "auto" : "fixed")
         }
     }
 }
@@ -105,6 +107,7 @@ public enum DemoIntervalPolicy {
 /// Requests are pinned before the first row. A restart never resends an ambiguous row.
 @MainActor @Observable
 public final class AutomationModel {
+    let imageFolderBatch = ImageFolderBatch()
     public var workspaceInputMode = "description"
     public var batchText = ""
     public var batchSketchMode = "off"
@@ -158,7 +161,7 @@ public final class AutomationModel {
     @ObservationIgnored private var batchObservationToken = UUID()
 
     public init() {}
-    public var isOccupied: Bool { running || preparing }
+    public var isOccupied: Bool { running || preparing || imageFolderBatch.running }
     public var nonEmptyBatchCount: Int { BatchInputLines.entries(in: batchText).count }
     public var completedCount: Int { rows.filter { $0.state == .succeeded || $0.state == .skipped }.count }
     public var successfulCount: Int { rows.filter { $0.state == .succeeded }.count }
@@ -290,7 +293,7 @@ public final class AutomationModel {
     }
 
     public func startBatch(app: AppModel) async {
-        guard !running, !preparing, !app.isBusy else { return }
+        guard !isOccupied, !app.isBusy else { return }
         preparing = true
         batchObservationToken = UUID()
         defer { preparing = false }

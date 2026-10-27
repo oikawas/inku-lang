@@ -5,6 +5,107 @@ import InkuPersistence
 @testable import InkuHost
 
 final class HostBoundaryTests: XCTestCase, @unchecked Sendable {
+    func testImageIsWrittenAndReviewedWithTransientImages() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-image-run-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let db = try InkuDatabase(url: folder.appendingPathComponent("works.sqlite"))
+        let transport = ImageProvider()
+        let host = PipelineHost(database: db, transport: transport, credentials: EmptyCredentials())
+        let old = try await host.generate(fixture(.directDDL("place one blue circle at center.")))
+        let oldID = try XCTUnwrap(old.savedWorkID)
+        let before = try await host.restoreSavedWork(workID: oldID)
+        let image = PreparedImageInput(jpeg: Data("fixture".utf8), width: 800, height: 600,
+                                       originalWidth: 800, originalHeight: 600, nearestFormatID: "square")
+        var request = try fixture(.image(input: image.authoringJSON, autoCatalog: false))
+        request.imageProvenance = "fixture provenance"
+        let view = try await host.generate(request, image: image)
+        XCTAssertEqual(view.phase, "completed")
+        XCTAssertTrue(String(decoding: view.eventsJSON, as: UTF8.self).contains("image_ddl"))
+        XCTAssertNotNil(view.savedWorkID)
+        XCTAssertTrue(view.visibleDDL?.contains("Aspect ratio 4:3") == true)
+        let actions = await transport.actions
+        XCTAssertEqual(actions.map { $0["tag"].string }, ["write_image_ddl", "review_image_ddl"])
+        XCTAssertEqual(actions[0]["_transient_images"].array?.count, 1)
+        XCTAssertEqual(actions[1]["_transient_images"].array?.count, 2)
+        XCTAssertTrue(actions[1]["_transient_images"].array?[1].string?.hasPrefix("data:image/png;base64,") == true)
+        let provider = ProviderSettings(id: "anthropic", kind: .anthropic,
+            baseURL: URL(string: "https://api.anthropic.com")!, requiresAPIKey: false)
+        let wire = try ProviderWire.request(action: actions[1].data, provider: provider, model: "fixture", maxTokens: 8192, key: nil)
+        let wireBody = String(decoding: try XCTUnwrap(wire.httpBody), as: UTF8.self)
+        XCTAssertTrue(wireBody.contains(image.jpeg.base64EncodedString()))
+        XCTAssertTrue(wireBody.contains("image/png"))
+        let chatGPT = try ChatGPTPlanRuntime.request(action: actions[1].data, model: "fixture", argumentLimit: 1048576)
+        let chatBody = String(decoding: chatGPT.body, as: UTF8.self)
+        XCTAssertTrue(chatBody.contains("data:image/jpeg;base64,"))
+        XCTAssertTrue(chatBody.contains("data:image/png;base64,"))
+        let context = try await host.savedAuthoringContext(workID: XCTUnwrap(view.savedWorkID))
+        XCTAssertEqual(context.authority, "ddl_authoritative")
+        XCTAssertEqual(context.imageProvenance, "fixture provenance")
+        let presentation = try await host.savedWorkPresentation(workID: XCTUnwrap(view.savedWorkID))
+        let promptText = String(decoding: try XCTUnwrap(presentation.promptJSON), as: UTF8.self)
+        XCTAssertTrue(promptText.contains("write_image_ddl")); XCTAssertTrue(promptText.contains("review_image_ddl"))
+        XCTAssertFalse(promptText.contains("data:image")); XCTAssertFalse(promptText.contains("fixture provenance"))
+        let summaries = try await host.savedAuthoringSummaries(workIDs: [XCTUnwrap(view.savedWorkID)])
+        XCTAssertEqual(summaries[try XCTUnwrap(view.savedWorkID)]?.isImage, true)
+        XCTAssertEqual(summaries[try XCTUnwrap(view.savedWorkID)]?.imageProvenance, "fixture provenance")
+        let record = try ExactJSON(data: XCTUnwrap(context.imageDDL))
+        XCTAssertEqual(record["image"]["sent"]["sha256"].string, image.sha256)
+        XCTAssertFalse(String(decoding: try XCTUnwrap(context.imageDDL), as: UTF8.self).contains("data:image"))
+        var childRequest = try fixture(.directDDL("place one blue circle at center."))
+        childRequest.parentWorkID = view.savedWorkID
+        childRequest.derivationKind = "ddl_edit"
+        childRequest.inheritedImageDDL = context.imageDDL
+        childRequest.imageProvenance = context.imageProvenance
+        let child = try await host.generate(childRequest)
+        let childContext = try await host.savedAuthoringContext(workID: XCTUnwrap(child.savedWorkID))
+        XCTAssertEqual(childContext.imageDDL, context.imageDDL)
+        XCTAssertEqual(childContext.imageProvenance, context.imageProvenance)
+        let after = try await host.restoreSavedWork(workID: oldID)
+        XCTAssertEqual(before.ddl, after.ddl)
+        XCTAssertEqual(before.score, after.score)
+        XCTAssertEqual(before.svg, after.svg)
+        let replay = try await host.prepareReplayComparison(work: after)
+        XCTAssertEqual(replay.replayedSVG, before.svg)
+    }
+    func testImageAutoCatalogUsesThreeProviderCalls() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-image-auto-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let db = try InkuDatabase(url: folder.appendingPathComponent("works.sqlite"))
+        let transport = ImageProvider()
+        let host = PipelineHost(database: db, transport: transport, credentials: EmptyCredentials())
+        let image = PreparedImageInput(jpeg: Data("fixture".utf8), width: 800, height: 600,
+                                       originalWidth: 800, originalHeight: 600, nearestFormatID: "square")
+        var request = try fixture(.image(input: image.authoringJSON, autoCatalog: true))
+        var config = try ExactJSON(data: request.configuration)
+        config["catalogs"] = .array([.object(["prompt": .object(["catalog_id": .string("default"),
+            "label": .string("Default"), "description": .string("")]), "resolved": config["compiler"]["host"]])])
+        request.configuration = config.data
+        let view = try await host.generate(request, image: image)
+        XCTAssertEqual(view.phase, "completed")
+        let actions = await transport.actions
+        XCTAssertEqual(actions.compactMap { $0["tag"].string }, ["select_image_catalog", "write_image_ddl", "review_image_ddl"])
+        let presentation = try await host.savedWorkPresentation(workID: XCTUnwrap(view.savedWorkID))
+        XCTAssertTrue(String(decoding: try XCTUnwrap(presentation.promptJSON), as: UTF8.self).contains("select_image_catalog"))
+    }
+    func testMissingImageCancelsBeforeSending() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-image-missing-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let db = try InkuDatabase(url: folder.appendingPathComponent("works.sqlite"))
+        let transport = ImmediateProvider()
+        let host = PipelineHost(database: db, transport: transport, credentials: EmptyCredentials())
+        let input = PreparedImageInput(jpeg: Data("fixture".utf8), width: 800, height: 600,
+                                       originalWidth: 800, originalHeight: 600, nearestFormatID: "square")
+        let capture = ViewCapture()
+        do {
+            _ = try await host.generate(fixture(.image(input: input.authoringJSON, autoCatalog: false))) { capture.receive($0) }
+            XCTFail("missing image accepted")
+        } catch let error as HostError { XCTAssertEqual(error.code, "image_missing") }
+        let calls = await transport.calls
+        XCTAssertEqual(calls, 0)
+        let id = try XCTUnwrap(capture.executionID)
+        let restored = try await host.restore(executionID: id)
+        XCTAssertEqual(restored.phase, "cancelled")
+    }
     // Failure: converting a transport JSON number through Double silently rounds a saved seed.
     func testExactSeedAndMLXWire() throws {
         let value = try ExactJSON(data: Data(#"{"seed":18446744073709551615}"#.utf8))
@@ -184,6 +285,22 @@ private actor ImmediateProvider: ProviderTransport {
                  onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {
         calls += 1
         return try response(action)
+    }
+}
+private actor ImageProvider: ProviderTransport {
+    var actions: [ExactJSON] = []
+    func perform(action: Data, models: ModelSelection, providers: [ProviderSettings], credentials: any CredentialStore,
+                 onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {
+        let effect = try ExactJSON(data: action)
+        actions.append(effect)
+        let tag: String, response: String
+        switch effect["tag"].string {
+        case "select_image_catalog": tag = "image_catalog_selected"; response = #"{"catalog_id":"default"}"#
+        case "write_image_ddl": tag = "image_ddl_written"; response = #"{"ddl":"place one red circle at center."}"#
+        default: tag = "image_ddl_reviewed"; response = #"{"ddl":"place one red circle at center."}"#
+        }
+        return ExactJSON.object(["tag": .string(tag), "identity": effect["identity"],
+            "response": .string(response), "elapsed_ms": .string("1")]).data
     }
 }
 private actor SuspendedProvider: ProviderTransport {

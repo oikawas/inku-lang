@@ -331,6 +331,9 @@ import SwiftUI
     }
 
     private func title(_ work: SavedWork) -> String {
+        if let provenance = model.imageWorkProvenance[work.id] {
+            return display.label("画像", "Image") + (provenance.isEmpty ? "" : " · " + provenance)
+        }
         let source = work.effectiveSourceText
         if !source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return source }
         // Without its title lines (DDL 27), which draw nothing.

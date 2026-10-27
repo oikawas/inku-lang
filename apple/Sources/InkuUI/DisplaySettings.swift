@@ -26,6 +26,8 @@ public struct DisplayPreferences: Codable, Sendable, Equatable {
     public var clipboardBackground = "original"
     public var clipboardFormat: String?
     public var visionModelReference: String?
+    public var imageIncludeFileName: Bool?
+    public var imageIncludeExif: Bool?
     public var colophonModelReference: String?
     public var automaticBackup = false
     public var backupIntervalHours = 24

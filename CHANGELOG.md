@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-27 — Paint from an image on macOS
+
+The image tab and image-folder batch prepare images with ImageIO and the shared core's image policy, then send them to a Vision model. Provenance is saved with the work and is not used for drawing; image bytes are not saved. The app warns before the first image send after launch. Folder progress is recorded for reselection and resumption.
+
 ### 2026-10-27 — The three image functions can be called through UniFFI too
 
 The shared core's `image_input_policy`, `image_canvas` and `image_review_svg` can now be called through UniFFI (macOS's bindings) as well. The Server's CPython and Android's JNI calls, and what the functions do, are unchanged. This prepares drawing from an image on macOS.

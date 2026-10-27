@@ -63,14 +63,15 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
         let results = ["generate_sketch": "sketch_generated", "select_description_catalog": "description_catalog_selected",
                        "generate_normalized_ddl": "normalized_ddl_generated", "read_composition": "composition_read",
                        "choose_laws": "laws_chosen", "choose_colors": "colors_chosen",
-                       "complete_visible_ddl_holes": "visible_ddl_hole_patch_generated"]
+                       "complete_visible_ddl_holes": "visible_ddl_hole_patch_generated", "select_image_catalog": "image_catalog_selected",
+                       "write_image_ddl": "image_ddl_written", "review_image_ddl": "image_ddl_reviewed"]
         guard let resultTag = results[tag],
               let timeoutMS = UInt64(try effect.requiredString("timeout_ms")),
               timeoutMS <= UInt64.max / 1_000_000 else { throw HostError("pipeline_schema_violation") }
         let began = ContinuousClock.now
         let deadline = budget.now().addingTimeInterval(Double(timeoutMS) / 1000)
         let modelReference = tag == "complete_visible_ddl_holes" ? models.stage2Model : models.stage1Model
-        let maxTokens = tag == "complete_visible_ddl_holes" ? models.holeMaxTokens : models.stage1MaxTokens
+        let maxTokens = tag == "complete_visible_ddl_holes" ? models.holeMaxTokens : (["write_image_ddl", "review_image_ddl"].contains(tag) ? 8192 : models.stage1MaxTokens)
         var failure: String?
         var response: String?
         let rateWait = ProviderRateWait()

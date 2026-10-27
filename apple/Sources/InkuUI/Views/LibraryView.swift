@@ -431,7 +431,7 @@ struct LibraryView: View {
         let selected = library.selectedIDs.contains(work.id)
         return Button { library.toggleSelection(work.id) } label: { LibrarySelectionBox(selected: selected) }
             .buttonStyle(.plain)
-            .accessibilityLabel(display.localizedFormat("%@ を選択", LibraryWorkPresentation.title(work, untitled: display.localized("無題"))))
+            .accessibilityLabel(display.localizedFormat("%@ を選択", model.workPresentationTitle(work)))
             .accessibilityValue(display.localized(selected ? "選択済み" : "未選択"))
             .disabled(library.mutating || model.isBrowsingLocked)
             .inkuTooltip(display.tooltip(selected ? "作品の選択を解除" : "作品を選択"))
@@ -571,7 +571,7 @@ struct LibraryView: View {
                     .inkuTooltip(display.tooltip("作品プレビュー", serverKey: "historyPreviewTitle"))
                 }
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(LibraryWorkPresentation.title(group.representative.work, untitled: display.localized("無題")))
+                    Text(model.workPresentationTitle(group.representative.work))
                         .inkuFont(12, weight: .semibold).lineLimit(1)
                     Text(groupSummary(group)).inkuFont(10).foregroundStyle(.tertiary).lineLimit(1)
                     if current {
@@ -666,7 +666,7 @@ struct LibraryView: View {
                     ArtworkThumbnail(work: work, thumbnails: model.thumbnails)
                         .aspectRatio(82.0 / 58.0, contentMode: .fit)
                         .frame(maxWidth: .infinity, maxHeight: 110)
-                    Text(LibraryWorkPresentation.title(work, untitled: display.localized("無題")))
+                    Text(model.workPresentationTitle(work))
                         .inkuFont(10).foregroundStyle(.secondary).lineLimit(1)
                 }
             }
@@ -702,7 +702,7 @@ struct LibraryView: View {
             Button { openWork(work) } label: {
                 HStack(spacing: 8) {
                     ArtworkThumbnail(work: work, thumbnails: model.thumbnails).frame(width: 48, height: 48)
-                    Text(LibraryWorkPresentation.title(work, untitled: display.localized("無題")))
+                    Text(model.workPresentationTitle(work))
                         .inkuFont(10).foregroundStyle(.secondary).lineLimit(1)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }.contentShape(Rectangle())
@@ -1263,7 +1263,7 @@ private struct LibraryGridCard: View, Equatable {
 
     var body: some View {
         LibraryPerformanceProbe.cardBody()
-        let title = LibraryWorkPresentation.title(work, untitled: display.localized("無題"))
+        let title = model.workPresentationTitle(work)
         return VStack(alignment: .leading, spacing: 5) {
             Button { actions.open(work) } label: {
                 ArtworkThumbnail(work: work, thumbnails: model.thumbnails)
@@ -1396,7 +1396,8 @@ struct LibraryWorkDetails: View {
                 HStack(alignment: .top, spacing: 14) { heading; Spacer(minLength: 12); workActions }
                 VStack(alignment: .leading, spacing: 10) { heading; workActions }
             }
-            ArtworkCanvas(svg: work.svg, renderer: model.displayRenderer, caption: work.effectiveSourceText)
+            ArtworkCanvas(svg: work.svg, renderer: model.displayRenderer,
+                          caption: model.imageWorkProvenance[work.id] == nil ? work.effectiveSourceText : model.workPresentationTitle(work))
                 .frame(height: 280)
                 // HistoryManager.svelte:915-921: a double click on the preview opens the work.
                 .simultaneousGesture(TapGesture(count: 2).onEnded {
@@ -1440,7 +1441,11 @@ struct LibraryWorkDetails: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 10) {
                         OutputView(ddl: work.ddl ?? "", score: work.score).frame(height: 160)
-                        if !work.effectiveSourceText.isEmpty { Text(model.display.localizedFormat("記述: %@", work.effectiveSourceText)).textSelection(.enabled) }
+                        if model.imageWorkProvenance[work.id] != nil {
+                            Text(model.workPresentationTitle(work)).textSelection(.enabled)
+                        } else if !work.effectiveSourceText.isEmpty {
+                            Text(model.display.localizedFormat("記述: %@", work.effectiveSourceText)).textSelection(.enabled)
+                        }
                         Text(Date(timeIntervalSince1970: Double(work.at) / 1000), format: .dateTime.year().month().day().hour().minute().second())
                             .inkuFont(12).foregroundStyle(.secondary)
                         Text(model.display.localizedFormat("作品 ID: %@", work.id)).inkuFont(12, design: .monospaced).textSelection(.enabled)

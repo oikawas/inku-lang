@@ -2,7 +2,7 @@ import InkuHost
 import SwiftUI
 
 enum SettingsSection: String, CaseIterable, Identifiable {
-    case display, making, demo, models, personalPlan, database, export, clipboard, plugins, unread, limits, other, native
+    case display, making, image, demo, models, personalPlan, database, export, clipboard, plugins, unread, limits, other, native
     #if !os(macOS)
     case about
     #endif
@@ -11,6 +11,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .display: "表示と操作"; case .making: "バッチの再試行"; case .models: "モデル設定"
         case .demo: "デモ"
+        case .image: "画像"
         case .personalPlan: "ChatGPTプラン"
         case .database: "DB設定"; case .clipboard: "クリップボード"; case .plugins: "プラグイン"
         case .export: "エクスポート"
@@ -27,6 +28,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .display: "slider.horizontal.3"; case .making: "paintbrush.pointed"
         case .demo: "play.rectangle"
+        case .image: "photo"
         case .models: "cpu"; case .personalPlan: "person.crop.circle"
         case .database: "externaldrive"; case .export: "square.and.arrow.up"
         case .clipboard: "doc.on.clipboard"; case .plugins: "puzzlepiece.extension"
@@ -121,7 +123,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     private var groups: [(label: String, items: [SettingsSection])] {
         var result: [(label: String, items: [SettingsSection])] = [
             (model.display.webCopy("settingsCategoryDisplayOperation", "表示と操作"), [.display]),
-            (model.display.webCopy("settingsCategoryMaking", "制作"), [.making, .demo]),
+            (model.display.webCopy("settingsCategoryMaking", "制作"), [.making, .image, .demo]),
             (title(.personalPlan), [.personalPlan]),
             (model.display.webCopy("settingsTabExport", "エクスポート"), [.export, .clipboard]),
             (model.display.webCopy("settingsCategoryAdministration", "接続と管理"), [.models, .database] + (detailed ? [.limits] : [])),
@@ -191,6 +193,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch section {
         case .display: model.display.webCopy("settingsDisplayHint", "")
         case .making: model.display.webCopy("settingsMakingHint", "")
+        case .image: ""
         case .demo: model.display.webCopy("tooltipInputTabDemo", "")
         case .models: model.display.webCopy("settingsModelsHint", "")
         case .personalPlan: model.display.webCopy("chatgptPlanNotice", "")
@@ -232,6 +235,13 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                 switch section {
                 case .display: appearance
                 case .making: making
+                case .image:
+                    Toggle(model.display.localized("ファイル名を来歴に入れる"), isOn: Binding(
+                        get: { model.display.preferences.imageIncludeFileName ?? true },
+                        set: { model.display.preferences.imageIncludeFileName = $0 }))
+                    Toggle(model.display.localized("Exifを来歴に入れる"), isOn: Binding(
+                        get: { model.display.preferences.imageIncludeExif ?? true },
+                        set: { model.display.preferences.imageIncludeExif = $0 }))
                 case .other: localOther
                 case .native: nativeSettings
                 case .demo: EmptyView()

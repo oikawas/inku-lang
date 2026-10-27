@@ -402,7 +402,8 @@ public actor ChatGPTPlanRuntime {
 
     /// The bytes recorded and sent: the effect's prompt as written, so the schema keeps its member order.
     static func request(action: Data, model: String, argumentLimit: Int) throws -> ChatGPTWire.Request {
-        try ChatGPTWire.request(model: model, prompt: ExactJSON.rawMember("prompt", in: ExactJSON.rawMember("payload", in: action)), answerLimit: argumentLimit)
+        let images = try ExactJSON(data: action)["_transient_images"].array?.compactMap(\.string) ?? []
+        return try ChatGPTWire.request(model: model, prompt: ExactJSON.rawMember("prompt", in: ExactJSON.rawMember("payload", in: action)), answerLimit: argumentLimit, images: images)
     }
 
     private func offeredModels(session: ChatGPTPlanSession, force: Bool, deadline: Date, operationEpoch: UInt64) async throws -> [ChatGPTPlanModel] {

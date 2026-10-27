@@ -32,7 +32,9 @@ public enum ProviderWire {
         let envelope: ExactJSON = .object(["action": .string("pipeline_request"), "connection": connection(provider),
             "model": .string(model), "max_tokens": .integer(maxTokens)])
         // Passing the original prompt preserves variant member order as well as propertyOrdering.
-        let input = Data((String(envelope.text.dropLast()) + ",\"prompt\":" + String(decoding: prompt, as: UTF8.self) + "}").utf8)
+        let transient = try ExactJSON(data: action)["_transient_images"]
+        let images = transient.array == nil ? "" : ",\"images\":" + transient.text
+        let input = Data((String(envelope.text.dropLast()) + ",\"prompt\":" + String(decoding: prompt, as: UTF8.self) + images + "}").utf8)
         return try prepared(evaluate(input), provider: provider, key: key)
     }
 

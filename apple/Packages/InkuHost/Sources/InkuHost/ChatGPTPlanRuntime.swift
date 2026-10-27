@@ -191,20 +191,37 @@ public actor ChatGPTPlanRuntime {
 
     /// Local invalidation commits before a best-effort remote revocation, including during blocked refresh.
     public func signOut(_ id: String) async throws -> Bool {
+        try await signOutProfile(id).confirmed
+    }
+
+    /// Delete the registration only if no newer authorization replaced the signed-out generation.
+    public func deleteProfile(_ id: String) async throws -> Bool {
+        let result = try await signOutProfile(id)
+        try await mutate { value in
+            guard let profile = value.profiles[id], profile.state == "signed_out",
+                  profile.generation == result.generation else { throw HostError("chatgpt_session_changed") }
+            value.profiles.removeValue(forKey: id)
+            value.pendingRegistrations.removeValue(forKey: id)
+            if value.activeProfileID == id { value.activeProfileID = nil }
+        }
+        return result.confirmed
+    }
+
+    private func signOutProfile(_ id: String) async throws -> (confirmed: Bool, generation: Int64) {
         try checkOpen()
-        let old = try await mutate { value in
+        let (old, generation) = try await mutate { value in
             guard var profile = value.profiles[id] else { throw HostError("chatgpt_not_connected") }
             let old = profile
             profile.state = "signed_out"; profile.generation = try Self.nextGeneration(profile.generation); profile.removeTokens()
-            value.profiles[id] = profile; return old
+            value.profiles[id] = profile; return (old, profile.generation)
         }
         for attempt in Array(attempts.values) where attempt.profileID == id { await cancelAuthorization(attempt.id) }
-        guard let refresh = old.refreshToken else { return false }
+        guard let refresh = old.refreshToken else { return (false, generation) }
         do {
             let deadline = Date().addingTimeInterval(10)
             let check: @Sendable () async throws -> Void = { try await self.checkOpen() }
             let discovery = try await authJSON(url: ChatGPTEndpoints.discovery, deadline: deadline, check: check)
-            guard let endpoint = URL(string: try discovery.requiredString("revocation_endpoint")) else { return false }
+            guard let endpoint = URL(string: try discovery.requiredString("revocation_endpoint")) else { return (false, generation) }
             try ChatGPTEndpoints.validate(endpoint, authenticationOnly: true)
             var request = URLRequest(url: endpoint); request.httpMethod = "POST"; request.timeoutInterval = 10
             request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
@@ -213,8 +230,8 @@ public actor ChatGPTPlanRuntime {
             let result = try await guarded(deadline: deadline, check: check) {
                 try await self.http.send(boundedRequest, maximumBytes: 65_536, onBytes: { _ in })
             }
-            return result.status == 200
-        } catch { return false }
+            return (result.status == 200, generation)
+        } catch { return (false, generation) }
     }
 
     public func models(session: ChatGPTPlanSession? = nil, force: Bool = false) async throws -> [ChatGPTPlanModel] {

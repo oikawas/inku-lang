@@ -6,6 +6,7 @@ public struct ChatGPTPlanSettingsView: View {
     @Bindable private var app: AppModel
     private let onOpenModelSettings: () -> Void
     @State private var controller = ChatGPTPlanSettingsModel()
+    @State private var confirmingDelete: String?
     @Environment(\.openURL) private var openURL
     public init(model: AppModel, onOpenModelSettings: @escaping () -> Void) { app = model; self.onOpenModelSettings = onOpenModelSettings }
     public var body: some View {
@@ -27,6 +28,9 @@ public struct ChatGPTPlanSettingsView: View {
                         Button(app.display.localized("認証を停止")) { Task { await controller.cancel(app: app) } }
                     }
                 }
+                Button(app.display.webCopy("chatgptCheckConnection", "接続状態を確認")) {
+                    Task { await controller.checkConnection(app: app) }
+                }.disabled(controller.busy)
             }
             if let state = controller.state {
                 Section(app.display.localized("保存された接続")) {
@@ -36,16 +40,34 @@ public struct ChatGPTPlanSettingsView: View {
                                 Text(profile.label).inkuFont(14, weight: .semibold)
                                 if state.activeProfileID == profile.id { Text(app.display.localized("次の描画で使用")).inkuFont(12).foregroundStyle(.secondary) }
                             }
-                            Text(app.display.localizedFormat("%@ · 接続世代 %ld", profile.state, profile.generation)).inkuFont(12).textSelection(.enabled)
-                            HStack {
+                            Text(ChatGPTStatusCopy.text(profile.state == "connected" && !profile.scopes.contains("chatgpt.tokens.use.direct")
+                                ? "chatgpt_scope_required" : "chatgpt_" + profile.state, language: app.display.preferences.language))
+                                .inkuFont(12).textSelection(.enabled)
+                            WrappingHStack(spacing: 6) {
                                 Button(app.display.localized("選択")) { Task { await controller.selectProfile(profile.id, app: app) } }
                                 Button(app.display.localized("再認証")) { Task { await controller.authorize(profileID: profile.id, app: app) { openURL($0) } } }
-                                Button(app.display.localized("同意を更新")) { Task { await controller.authorize(profileID: profile.id, consent: true, app: app) { openURL($0) } } }
+                                if !profile.scopes.contains("chatgpt.tokens.use.direct") {
+                                    Button(app.display.localized("同意を更新")) { Task { await controller.authorize(profileID: profile.id, consent: true, app: app) { openURL($0) } } }
+                                }
                                 Button(app.display.localized("接続解除")) { Task { await controller.signOut(profile.id, app: app) } }
+                                if confirmingDelete != profile.id {
+                                    Button(app.display.webCopy("chatgptDelete", "削除")) { confirmingDelete = profile.id }
+                                }
                                 if profile.state == "quota" {
                                     Button(app.display.localized("明示的に再試行")) { Task { await controller.retryQuota(profile.id, app: app) } }
                                 }
                             }.disabled(controller.busy)
+                            if confirmingDelete == profile.id {
+                                Text(app.display.webCopy("chatgptDeleteConfirmText", "この登録と、公開モデルの設定を削除します。接続中なら先に接続を解除します。"))
+                                    .inkuFont(12).foregroundStyle(.secondary)
+                                HStack {
+                                    Button(app.display.webCopy("chatgptDeleteConfirm", "削除する"), role: .destructive) {
+                                        confirmingDelete = nil
+                                        Task { await controller.deleteProfile(profile.id, app: app) }
+                                    }.disabled(controller.busy)
+                                    Button(app.display.webCopy("chatgptDeleteCancel", "やめる")) { confirmingDelete = nil }
+                                }
+                            }
                         }.padding(.vertical, 4)
                     }
                     ForEach(state.pendingRegistrations, id: \.self) { id in

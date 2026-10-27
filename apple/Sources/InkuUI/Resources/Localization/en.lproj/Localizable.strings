@@ -1,4 +1,6 @@
 /* Native interface text only. Artwork source, names and provider responses stay verbatim. */
+"登録を削除し、提供元での失効を確認しました。" = "Registration deleted and provider revocation confirmed.";
+"登録を削除しました。提供元での失効は確認できていません。" = "Registration deleted locally. Provider revocation could not be confirmed.";
 "画像の縦横比を使う" = "Use image aspect ratio";
 "作品の系譜" = "Lineage of the work";
 "作品の詳細" = "Work details";

@@ -51,6 +51,7 @@ public final class AppModel {
     @ObservationIgnored private var canvasFitContinuation: CheckedContinuation<CanvasFitChoice, Never>?
     public var inputMode = "description"
     public var imageInput: PreparedImageInput?
+    public var imageCanvasID = "image"
     public var imageProvenance = ""
     public var imageFileName = ""
     public var imageWarningAcknowledged = false
@@ -379,7 +380,7 @@ public final class AppModel {
         do {
             var freshRequest: GenerationRequest
             if inputMode == "image", let image = imageInput {
-                freshRequest = try requestForImage(image, provenance: imageProvenance, canvasID: canvasID)
+                freshRequest = try requestForImage(image, provenance: imageProvenance)
             } else {
                 freshRequest = try requestForCurrentInput(parentWorkID: parentWorkID,
                     derivationKind: parentWorkID == nil ? "new" : inputMode == "ddl" ? "ddl_edit" : "description_edit")
@@ -935,12 +936,18 @@ public final class AppModel {
         return request
     }
 
+    public func setImageInput(_ image: PreparedImageInput, fileName: String) {
+        imageInput = image; imageFileName = fileName
+    }
+
     public func requestForImage(_ image: PreparedImageInput, provenance: String, canvasID: String? = nil) throws -> GenerationRequest {
         guard let bootstrap else { throw HostError("installation_unavailable") }
         let vision = imageVisionModel
         guard SettingsModel.isRegisteredModelAvailable(vision, purpose: "vision", settings: settings) else { throw HostError("vision_model_not_available") }
+        let selectedCanvasID = canvasID ?? imageCanvasID
+        let resolvedCanvasID = selectedCanvasID == "image" ? image.nearestFormatID : selectedCanvasID
         var request = try bootstrap.request(inputMode: "description", source: "", description: "", language: "ja",
-            catalogID: catalogID, canvasID: canvasID ?? image.nearestFormatID, seed: seedText, wild: false,
+            catalogID: catalogID, canvasID: resolvedCanvasID, seed: seedText, wild: false,
             settings: nextGenerationHostSettings, parentWorkID: nil, derivationKind: "new",
             catalogMode: catalogMode, sketch: .off)
         request.authoring = .image(input: image.authoringJSON, autoCatalog: catalogMode == "auto")

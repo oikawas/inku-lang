@@ -3,6 +3,7 @@ import CoreGraphics
 import ImageIO
 import UniformTypeIdentifiers
 import InkuHost
+import InkuPersistence
 @testable import InkuUI
 
 @MainActor final class ImageFolderBatchTests: XCTestCase {
@@ -32,21 +33,34 @@ import InkuHost
         app.display.preferences.visionModelReference = "fixture:vision"
         let batch = ImageFolderBatch(); try batch.select(input, app: app)
         XCTAssertEqual(batch.total, 3)
+        app.imageCanvasID = "square"
         await batch.run(app: app, restart: false) { _ in "fixture" }
         XCTAssertEqual(batch.completed, 2); XCTAssertEqual(batch.failed, 1)
+        let db = try InkuDatabase(url: root.appendingPathComponent("works.sqlite"))
+        let fixedWorks = try await db.libraryPage(limit: 10).items.map(\.work)
+        XCTAssertEqual(fixedWorks.count, 2)
+        XCTAssertTrue(fixedWorks.allSatisfy { $0.renderCanvasAspectID == "square" })
         try png.write(to: bad)
+        let portrait = try makePNG(width: 48, height: 64)
+        try portrait.write(to: input.appendingPathComponent("4.png"))
+        let portraitPaper = try ImageInput.prepare(portrait).nearestFormatID
+        XCTAssertNotEqual(portraitPaper, "sd_monitor")
         let reopened = ImageFolderBatch(); try reopened.select(input, app: app)
         XCTAssertEqual(reopened.completed, 2)
+        app.imageCanvasID = "image"
         await reopened.run(app: app, restart: false) { _ in "fixture" }
-        XCTAssertEqual(reopened.completed, 3); XCTAssertEqual(reopened.failed, 0)
+        XCTAssertEqual(reopened.completed, 4); XCTAssertEqual(reopened.failed, 0)
+        let works = try await db.libraryPage(limit: 10).items.map(\.work)
+        XCTAssertEqual(works.filter { $0.renderCanvasAspectID == "sd_monitor" }.count, 1)
+        XCTAssertEqual(works.filter { $0.renderCanvasAspectID == portraitPaper }.count, 1)
         let calls = await transport.calls
-        XCTAssertEqual(calls, 6)
+        XCTAssertEqual(calls, 8)
     }
 
-    private func makePNG() throws -> Data {
-        let context = try XCTUnwrap(CGContext(data: nil, width: 64, height: 48, bitsPerComponent: 8, bytesPerRow: 0,
+    private func makePNG(width: Int = 64, height: Int = 48) throws -> Data {
+        let context = try XCTUnwrap(CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
             space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue))
-        context.setFillColor(CGColor(gray: 1, alpha: 1)); context.fill(CGRect(x: 0, y: 0, width: 64, height: 48))
+        context.setFillColor(CGColor(gray: 1, alpha: 1)); context.fill(CGRect(x: 0, y: 0, width: width, height: height))
         let bytes = NSMutableData()
         let destination = try XCTUnwrap(CGImageDestinationCreateWithData(bytes, UTType.png.identifier as CFString, 1, nil))
         CGImageDestinationAddImage(destination, try XCTUnwrap(context.makeImage()), nil)

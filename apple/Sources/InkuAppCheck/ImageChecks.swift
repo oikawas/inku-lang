@@ -42,13 +42,27 @@ func runImageChecks(realOpus: Bool = false) async throws {
     try (bytes as Data).write(to: imageURL)
     let prepared = try ImageInput.prepare(bytes as Data)
     guard prepared.width == 1568, prepared.height == 1176, prepared.nearestFormatID == "sd_monitor" else { throw CheckFailure.message("image canvas") }
-    app.newWork(); app.inputMode = "image"; app.imageInput = prepared; app.canvasID = prepared.nearestFormatID
+    app.newWork(); app.inputMode = "image"; app.canvasID = "square"
+    guard app.imageCanvasID == "image" else { throw CheckFailure.message("image paper default") }
+    app.setImageInput(prepared, fileName: imageURL.lastPathComponent)
+    guard app.canvasID == "square" else { throw CheckFailure.message("image changed description paper") }
+    let automatic = try app.requestForImage(prepared, provenance: "")
+    guard try ExactJSON(data: automatic.renderOptions)["canvas_aspect_id"].string == "sd_monitor" else {
+        throw CheckFailure.message("automatic image paper")
+    }
+    app.imageCanvasID = "square"
+    let fixed = try app.requestForImage(prepared, provenance: "")
+    guard try ExactJSON(data: fixed.renderOptions)["canvas_aspect_id"].string == "square" else {
+        throw CheckFailure.message("fixed image paper")
+    }
+    app.imageCanvasID = "image"
     app.imageProvenance = ImageProvenance.text(url: imageURL, includeFileName: true, includeExif: true, language: "ja")
     guard app.imageProvenance.contains("撮影日時: 2026:10:27 12:34:56"),
           app.imageProvenance.contains("ファイル名: example.jpg"), !app.imageProvenance.contains("35.1234"),
           !app.imageProvenance.contains("139.1234") else { throw CheckFailure.message("image Exif provenance") }
     await app.generate()
-    guard let work = app.selectedWork, let ddl = work.ddl, ddl.contains("画面比4:3"), work.effectiveSourceText.isEmpty else {
+    guard let work = app.selectedWork, let ddl = work.ddl, ddl.contains("画面比4:3"), work.effectiveSourceText.isEmpty,
+          work.renderCanvasAspectID == "sd_monitor" else {
         throw CheckFailure.message("image run: \(app.errorText ?? app.status)")
     }
     let context = try await app.savedConfiguration(workID: work.id)

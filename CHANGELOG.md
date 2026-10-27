@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+macOS image drawing and image-folder batches can use the image aspect ratio or a fixed paper, separately from the description canvas.
+
 ### 2026-10-27 — Paint from an image on macOS
 
 The image tab and image-folder batch prepare images with ImageIO and the shared core's image policy, then send them to a Vision model. Provenance is saved with the work and is not used for drawing; image bytes are not saved. The app warns before the first image send after launch. Folder progress is recorded for reselection and resumption.

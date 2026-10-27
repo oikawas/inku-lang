@@ -1,4 +1,5 @@
 /* Native interface text only. Artwork source, names and provider responses stay verbatim. */
+"画像の縦横比を使う" = "Use image aspect ratio";
 "作品の系譜" = "Lineage of the work";
 "作品の詳細" = "Work details";
 "作品へのコメント" = "Comment on the work";

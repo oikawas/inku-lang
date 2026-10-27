@@ -79,6 +79,7 @@ private struct ImageFolderJournal: Codable {
             }
         }
         journal = current
+        let canvasID = app.imageCanvasID
         running = true; stopRequested = false; error = nil
         defer { running = false; refresh() }
         do {
@@ -96,7 +97,7 @@ private struct ImageFolderJournal: Codable {
                         throw HostError("image_changed")
                     }
                     let image = try ImageInput.prepare(Data(contentsOf: url))
-                    let request = try app.requestForImage(image, provenance: provenance(url))
+                    let request = try app.requestForImage(image, provenance: provenance(url), canvasID: canvasID)
                     let pinned = try await app.pinPersonalPlanRequests([request])[0]
                     let work = await app.runAutomation(request: pinned, image: image, allowsBrowsing: true)
                     if stopRequested || Task.isCancelled { journal?.rows[index].state = "uncertain" }

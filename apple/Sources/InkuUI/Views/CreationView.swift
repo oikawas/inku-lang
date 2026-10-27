@@ -316,6 +316,7 @@ struct CreationView: View {
             conditionRow(display.webCopy("colorCatalogButton", "色カタログ"), value: catalogSummary, help: "") {
                 showColorCatalogs = true
             }.disabled(controlsDisabled || model.catalogs.isEmpty)
+            imagePaperCondition
             if imageBatch.hasJournal {
                 Text("\(imageBatch.completed) / \(imageBatch.total) · \(display.localized("失敗")) \(imageBatch.failed)")
                 ForEach(imageBatch.failures, id: \.self) { failure in
@@ -381,9 +382,7 @@ struct CreationView: View {
             conditionRow(display.webCopy("colorCatalogButton", "色カタログ"), value: catalogSummary, help: "") {
                 showColorCatalogs = true
             }.disabled(controlsDisabled || model.catalogs.isEmpty)
-            conditionRow(display.localized("画面比"), value: model.canvasID, help: "") { showPaperPicker = true }
-                .disabled(controlsDisabled)
-                .popover(isPresented: $showPaperPicker) { CreationPaperPicker(model: model) { showPaperPicker = false }.environment(display) }
+            imagePaperCondition
             Button(display.webCopy("generateButton", "描画する")) {
                 if model.imageWarningAcknowledged { Task { await model.generate() } }
                 else { showImageNotice = true }
@@ -394,6 +393,16 @@ struct CreationView: View {
             loadImage(url)
             return true
         }
+    }
+
+    private var imagePaperCondition: some View {
+        let value = model.imageCanvasID == "image" ? display.localized("画像の縦横比を使う") :
+            (model.canvases.first { $0.id == model.imageCanvasID }?.label ?? model.imageCanvasID)
+        return conditionRow(display.localized("画面比"), value: value, help: "") { showPaperPicker = true }
+            .disabled(controlsDisabled)
+            .popover(isPresented: $showPaperPicker) {
+                CreationPaperPicker(model: model, imageSelection: true) { showPaperPicker = false }.environment(display)
+            }
     }
 
     private func chooseImage() {
@@ -418,8 +427,7 @@ struct CreationView: View {
             automaticImageProvenance = imageProvenance(url: url)
             if !model.imageProvenance.isEmpty && !automaticImageProvenance.isEmpty { model.imageProvenance += "\n" }
             model.imageProvenance += automaticImageProvenance
-            model.imageInput = image; model.imageFileName = url.lastPathComponent
-            model.canvasID = image.nearestFormatID
+            model.setImageInput(image, fileName: url.lastPathComponent)
             imageLoadError = nil
         } catch { imageLoadError = model.failureMessage(error) }
     }

@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-27 — macOS shows DDL title lines (DDL 27) as headings
+
+macOS DDL views show a title line in the heading colour with an underline, colour no word in it, and offer no word on it. The library and history strip titles skip title lines, and the unread-word reading takes the DDL without them. The rule is the core's `chunk_title.rs`, copied as `DdlTitles`. The Web copy (`ui-reference.json`) was exported again from Build 1352 (DDL 27, engine 72). Drawing is unchanged.
+
 ### 2026-10-27 — macOS calls Wild "Lift the stroke limit"
 
 By the author's decision, macOS follows Web. The Creation and Batch conditions, the switch in refine, compare, work-editing and DDL-editing dialogs, autonomous refinement, and the work's provenance (Lifted / Not lifted) now say Lift the stroke limit. The dialogs drop the Stroke limit label before the button and show (inherited) after it when the setting is inherited. The Web copy (`ui-reference.json`) was exported again from Build 1351, which also brings other Web wording changed since Build 1316 (plugin and image-import settings, among others). The switch is still off by default; the `render_wild` record and drawing are unchanged.

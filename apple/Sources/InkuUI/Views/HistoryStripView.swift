@@ -333,7 +333,8 @@ import SwiftUI
     private func title(_ work: SavedWork) -> String {
         let source = work.effectiveSourceText
         if !source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return source }
-        if let ddl = work.ddl, !ddl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return ddl }
+        // Without its title lines (DDL 27), which draw nothing.
+        if let ddl = work.ddl.map(DdlTitles.withoutTitleLines), !ddl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return ddl }
         return work.id
     }
 

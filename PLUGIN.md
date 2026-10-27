@@ -120,6 +120,13 @@ shared core: `5 Sky.Stars.` and `5個のSky.星。` drew five circles, `Sky.Star
 choices, and `9個のSky.星。` drew nine, all without diagnostics. `12個のSky.星。` is outside the range, so that
 word was left out.
 
+More examples, five water words (`Water.Stream` (alias `Water.水流`), `Water.Ripples` (`Water.波紋`), `Water.Rings` (`Water.水輪`),
+`Water.River` (`Water.川`) and `Water.Sea` (`Water.海`)) and four sky words (`Sky.Clouds` (`Sky.雲`), `Sky.Heavens` (`Sky.空`),
+`Sky.Rain` (`Sky.雨`) and `Sky.Snow` (`Sky.雪`)), are kept in [docs/plugins](docs/plugins/README.md) as zips that §5.1 adds as they are
+([docs/plugins/water-nihonga.zip](docs/plugins/water-nihonga.zip) and [docs/plugins/sky-nihonga.zip](docs/plugins/sky-nihonga.zip), with Saijiki pictures)
+and as export files. They also show a component (`use`), a `transform` that moves, turns and flattens the whole in place of
+arithmetic, `cycle` tables that change the form and tool per ring or line, and `scatter` drawing many marks from one instruction.
+
 ## 3. Definition Format
 
 ### 3.1 Top-level fields

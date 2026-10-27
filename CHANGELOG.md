@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-27 — A chunk move names the lines that would not be drawn when it asks again
+
+A chunk move now compiles its child before drawing it, as the image tab's writing request is compiled. When the child has a line the compiler would not draw as written and the parent does not, the child is not drawn and the choose or rewrite request is asked again once with the line, the reason and a hint. A rewrite had written two colors on one shape and the compile left the shape out, and asking again without naming the line repeated it: three of the five turns in the author's run kept nothing.
+
 ### 2026-10-27 — Paint from an image on macOS
 
 The image tab and image-folder batch prepare images with ImageIO and the shared core's image policy, then send them to a Vision model. Provenance is saved with the work and is not used for drawing; image bytes are not saved. The app warns before the first image send after launch. Folder progress is recorded for reselection and resumption.

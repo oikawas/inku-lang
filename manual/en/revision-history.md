@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-10-27 — The chunk move's check before drawing
+
+The chunk move now checks the instructions a move made before drawing them and asks again naming the lines that would not be drawn, so the paragraph on checks in section 9 of "Creating Images" gains a sentence, in Japanese and English.
+
 ## 2026-10-27 — The chunk move of autonomous refinement
 
 Autonomous refinement has a third move, the chunk move, which takes a move on a chunk the title lines divide the work into, so section 9 of "Creating Images" describes, in Japanese and English, its six moves, the works it can be taken from, its checks and asking again, that no child is dropped for too little change, that it needs a direction, that it cannot be chosen with the other two moves, how its progress shows, and the AI move a lineage card's `Details` show. The held-work list of section 6 says that chunk moves can be taken too.

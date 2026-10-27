@@ -525,6 +525,7 @@ For the first macOS distribution, screens, controls, and remembered choices foll
 - A work whose DDL was edited keeps its description locked; "Create a new work from this description" makes a child of the original, as the Server's `fork_linked_history` does.
 - The sketch of the shown work can be edited in place, and the edited text is passed to interpretation as is.
 - The DDL editor shows line and character counts, line numbers, highlighting, the language label, unregistered plugin names, and a short guide, and inserts words at the caret.
+- A title line (DDL 27: the whole line, without the spaces around it, is `「name」`, `"name"` or `“name”`) draws nothing, so DDL views show it in the heading colour with an underline, colour no word in it, and offer no word on it. It never names a work in the library, an empty `「」` included, and the history strip's title and the unread-word reading take the DDL without its title lines (the rule is the core's `chunk_title.rs`, copied as `DdlTitles`).
 - Batch runs skip lines that contain only numbering or comments, and the count also includes only lines with text, as on the Web. Line numbers are preserved.
 - Tooltips appear 0.12 s after hover and on keyboard focus, as on the Web, and disabled controls show the reason. As with native tool tips, they appear only over the key window, never over a window behind it. All 173 Web tooltip places are covered except 9 that have no counterpart in a single-user app. Menu items keep the standard macOS tool tip.
 

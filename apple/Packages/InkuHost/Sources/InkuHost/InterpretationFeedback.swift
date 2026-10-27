@@ -20,6 +20,9 @@ public enum InterpretationFeedback {
     private static let emotions = ["美しい", "美しく", "激しい", "激しく", "静かな", "静かに", "素敵", "きれい", "やさしい", "切ない", "哀しい", "儚い", "神秘的", "幻想的", "寂しい", "爽やか"]
 
     public static func parts(description: String, ddl: String, vocabulary: [FeedbackLexeme]) -> [FeedbackPart] {
+        // A title line quotes the description's words without drawing them, so a word is read only where
+        // a drawing sentence carries it (DDL 27).
+        let ddl = DdlTitles.withoutTitleLines(ddl)
         guard !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               !ddl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return [] }
         let entries = vocabulary.enumerated().sorted {

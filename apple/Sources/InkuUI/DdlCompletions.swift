@@ -1,4 +1,5 @@
 import Foundation
+import InkuHost
 
 /// Web `ddlCompletions`: the saijiki words of the instruction language and the macro names as they are shown
 /// (`pluginDisplayName`: the Japanese alias for Japanese DDL, the qualified name otherwise).
@@ -28,11 +29,13 @@ public struct DdlCompletions {
 
     /// The word being typed before the caret: the longest run that ends at the caret, holds no space or
     /// punctuation, does not start inside a Latin word, and starts some candidate (ignoring case). Nil inside
-    /// `excluded` (an open range's numbers, Web) or when nothing starts with it.
+    /// `excluded` (an open range's numbers, Web), on a title line, or when nothing starts with it.
     public static func match(text: String, caret: Int, words: [String], excluded: NSRange? = nil) -> Match? {
         let ns = text as NSString
         guard caret > 0, caret <= ns.length else { return nil }
         if let excluded, caret >= excluded.location, caret <= NSMaxRange(excluded) { return nil }
+        // A title line names a chunk and draws nothing, so it offers no word (DDL 27).
+        if DdlTitles.lineRanges(text).contains(where: { caret >= $0.location && caret <= NSMaxRange($0) }) { return nil }
         let longest = words.map { ($0 as NSString).length }.max() ?? 0
         // `.` and `_` stay inside a word: macro names are qualified (`Nature.wakaba`).
         let stops = CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters).union(.symbols).subtracting(CharacterSet(charactersIn: "._"))

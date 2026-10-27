@@ -109,8 +109,9 @@ struct PluginNameIndex: Sendable {
     }
 }
 
-/// Web `annotate`: plugin references first, then saijiki words longest first (an ASCII word only on word
-/// boundaries), then emotion words. Returns the painted ranges; plain text is left alone.
+/// Web `annotate` for a DDL: a title line (DDL 27) whole, then plugin references, then saijiki words longest
+/// first (an ASCII word only on word boundaries), then emotion words. Returns the painted ranges; plain text
+/// is left alone.
 struct DdlHighlighter: Sendable {
     private struct Entry: Sendable { let word: String; let lower: String; let length: Int; let token: DdlTokenClass; let ascii: Bool }
     private let buckets: [Character: [Entry]]
@@ -144,9 +145,16 @@ struct DdlHighlighter: Sendable {
     func marks(_ text: String) -> [InkuEditorMark] {
         let source = text as NSString
         let references = Dictionary(plugins.references(in: text).map { ($0.range.location, $0) }, uniquingKeysWith: { first, _ in first })
+        let titles = Dictionary(DdlTitles.lineRanges(text).map { ($0.location, $0) }, uniquingKeysWith: { first, _ in first })
         var marks: [InkuEditorMark] = []
         var index = 0
         while index < source.length {
+            // A title draws nothing, so no word in it is coloured.
+            if let title = titles[index], title.length > 0 {
+                marks.append(InkuEditorMark(range: title, style: .title))
+                index = NSMaxRange(title)
+                continue
+            }
             if let reference = references[index] {
                 marks.append(InkuEditorMark(range: reference.range, style: reference.known ? .token(.plugin) : .unknownName))
                 index = NSMaxRange(reference.range)
@@ -186,6 +194,20 @@ struct DdlHighlighter: Sendable {
     }
 }
 
+/// InkuAppCheck `--ddl-title-only`: the highlighter's marks as plain values, with no plugin words.
+public enum DdlHighlightProbe {
+    public static func marks(_ text: String, saijiki: [SaijikiCategory]) -> [(range: NSRange, style: String)] {
+        DdlHighlighter(saijiki: saijiki, plugins: PluginNameIndex(words: [])).marks(text).map { mark in
+            let style = switch mark.style {
+            case .title: "title"
+            case .token(let token): token.rawValue
+            default: "other"
+            }
+            return (mark.range, style)
+        }
+    }
+}
+
 #if os(macOS)
 extension InkuEditorMark.Style {
     /// Web `.label-muted` (fg3 at 22%), the `.ddl-token-*` palette in both themes, and the amber unknown name.
@@ -201,6 +223,12 @@ extension InkuEditorMark.Style {
                     .backgroundColor: Self.dynamic(0xbf8820, 0xbf8820, lightAlpha: 0.12, darkAlpha: 0.26),
                     .underlineStyle: NSUnderlineStyle.single.rawValue | NSUnderlineStyle.patternDot.rawValue,
                     .underlineColor: Self.dynamic(0xbf8820, 0xf0c368, lightAlpha: 0.42, darkAlpha: 0.48)]
+        case .title:
+            // Web `.ddl-title` (weight 600 in that colour). Temporary attributes cannot change the font, so the
+            // heading is the colour with a line under it.
+            return [.foregroundColor: Self.dynamic(0x3d4650, 0xd6dde4),
+                    .underlineStyle: NSUnderlineStyle.single.rawValue,
+                    .underlineColor: Self.dynamic(0x3d4650, 0xd6dde4, lightAlpha: 0.45, darkAlpha: 0.45)]
         case .token(let token):
             let palette = Self.palette[token] ?? Self.palette[.word]!
             var attributes: [NSAttributedString.Key: Any] = [.foregroundColor: Self.dynamic(palette.light, palette.dark)]

@@ -1,11 +1,11 @@
 {
   "schema": "inku.apple-ui-reference.v1",
-  "version": "v2.15.275",
-  "build": "1351",
-  "buildDate": "2026-10-27T07:46:30.500Z",
+  "version": "v2.15.276",
+  "build": "1352",
+  "buildDate": "2026-10-27T08:08:23.478Z",
   "versions": {
-    "ddlSpec": "26",
-    "ddlEngine": "71",
+    "ddlSpec": "27",
+    "ddlEngine": "72",
     "renderEngine": "93"
   },
   "canvasMetadata": {
@@ -4067,15 +4067,15 @@
     }
   },
   "source": {
-    "commit": "66bcd88311d31dd5bf564c8e4304f442b0953125",
+    "commit": "3b8332e8bfdbec5e21844f6079f2bf155a5e1141",
     "files": {
       "web/src/lib/plugins/system/canvas-aspect/index.ts": "51431fe06ed38cfb11f7e08a87b85b68dacdeda646525242fb561c234cf0c9ff",
-      "web/src/routes/+page.svelte": "ea140b462fdd056bb9c3d882265b8590b5172fb640ba1eedffc66314aafea355",
+      "web/src/routes/+page.svelte": "dfc9ac6c1d603c69be860e63934f257b963767cb13d4156de995876bc57e8f64",
       "web/src/lib/saijiki-surface.ts": "d04c5d559cd1ed0889b7e93da0893c2600c158f81cc81ea1d04b0647982469fd",
-      "web/src/lib/instructionLang.ts": "2af540a1b98d4aa688fcf96632de1309b30c3f137137a66596f1285e09f2dcbe",
-      "web/APP_VERSION": "2dbb131592cc1b33cc5b12d470f0c84c01891d167d0d358ee45b50f39c122611",
-      "web/BUILD_NUMBER": "40b6fa2a448fb7656a208317d4d8783d8670ced279509d05317736cb8c9a495c",
-      "server/src/inku_server/layer_versions.py": "ba92a01b6462de51c19f7c59469fc87627972ae20a96ea70b2aee0bf6246d212",
+      "web/src/lib/instructionLang.ts": "871891775120d2dbddabb516c2a18765e7ff5c44612a6d2fca3473fa3f3e46cb",
+      "web/APP_VERSION": "b448857d09c6f9a5fd000f3de0d7d9eead9f32ca60ae8e420c24e1e67b2d88e6",
+      "web/BUILD_NUMBER": "fcb06cb317e100d99e715df1664b56664926057ddc806b367d6bf765af267bbc",
+      "server/src/inku_server/layer_versions.py": "4e388044fa8a3188759dcaa22dc33ee6632f92472a7dda14422813e332f8b42f",
       "core/crates/inku-render/src/lib.rs": "c4ea71cbaa469e25d2c7b63d92543975eaa6de02605491b379303c3aab23b504",
       "web/src/lib/i18n/ja.ts": "afb48df6720b076bd380f74f98d531eba244b346a80ab9016aade9a8c9abf466",
       "web/src/lib/i18n/en.ts": "a36afe93a716517f70c0fc3307f0161f3b0d4d5107bf899e27bb98f2e8cbcac3"

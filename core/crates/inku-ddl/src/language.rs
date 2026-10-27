@@ -116,6 +116,9 @@ pub fn resolve_instruction_language(
         RequestedInstructionLanguage::Ja => Ok(ResolvedInstructionLanguage::Ja),
         RequestedInstructionLanguage::En => Ok(ResolvedInstructionLanguage::En),
         RequestedInstructionLanguage::Auto => {
+            // A title line (DDL 27) quotes a name in any script, so the
+            // language is read from the other lines.
+            let text = crate::without_ddl_title_lines(text);
             if text.chars().any(is_japanese_script) {
                 return Ok(ResolvedInstructionLanguage::Ja);
             }

@@ -4088,6 +4088,48 @@ fn the_laws_from_a_saved_work_print_what_a_description_run_printed() {
 }
 
 #[test]
+fn the_laws_from_a_titled_saved_work_title_the_child_again() {
+    // A work whose DDL has title lines (DDL 27): the laws read its sentences
+    // without the titles, and the child is titled as the work was, after its
+    // declaration.
+    let asked = plan_answer(&laws_start(Some(LawsConfig {}))).snapshot;
+    let composed = asked.laws.as_ref().unwrap().document.source.clone();
+    let described = laws_answer(&asked, &two_laws());
+    let saved = declared(&composed);
+    let lines = saved.split('\n').collect::<Vec<_>>();
+    let chunks = (0..lines.len())
+        .map(|line| match line {
+            0 => None,
+            1 => Some("the first"),
+            _ => Some("the rest"),
+        })
+        .collect::<Vec<_>>();
+    let titled =
+        inku_ddl::print_ddl_titles(&lines, &chunks, inku_ddl::ResolvedInstructionLanguage::En);
+    let from_work =
+        saved_laws_start(&titled, crate::laws::LawsDirection::default(), None, None).snapshot;
+    assert_eq!(from_work.action.as_ref().unwrap().tag, "choose_laws");
+    let moved = laws_answer(&from_work, &two_laws());
+    let child = committed_source(&described.snapshot);
+    let child_lines = child.split('\n').collect::<Vec<_>>();
+    assert_eq!(child_lines.len(), lines.len());
+    assert_eq!(
+        committed_source(&moved.snapshot),
+        inku_ddl::print_ddl_titles(
+            &child_lines,
+            &chunks,
+            inku_ddl::ResolvedInstructionLanguage::En
+        )
+    );
+    let basis = moved.snapshot.laws_basis.as_ref().expect("a laws basis");
+    assert_eq!(basis.composed, composed);
+    let PipelinePhase::AwaitingVisibleDdlCommit { document, .. } = &moved.snapshot.phase else {
+        panic!("not committing: {:?}", moved.snapshot.phase);
+    };
+    assert_eq!(basis.committed_digest, document.source_digest());
+}
+
+#[test]
 fn the_laws_a_refinement_leaves_out_are_not_offered() {
     let asked = plan_answer(&laws_start(Some(LawsConfig {}))).snapshot;
     let composed = asked.laws.as_ref().unwrap().document.source.clone();

@@ -940,6 +940,11 @@ pub struct LawsMove {
     /// to the DDL without its declaration, and the child declares it again.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub canvas_ratio: Option<inku_score::CanvasRatio>,
+    /// The chunk of each sentence of the saved work's DDL, when it has titles
+    /// (DDL 27). The laws are applied to the sentences without the titles,
+    /// and the child is titled again.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub titles: Vec<Option<String>>,
 }
 
 /// The provider attempt a host is running, for showing retry progress.
@@ -1942,6 +1947,35 @@ impl PipelineSnapshot {
         Ok(VisibleDocument::from_document(&wire.document()?))
     }
 
+    /// A laws child titled as its saved work was (DDL 27): `titles` gives the
+    /// chunk of each of the work's sentences, and the child keeps them in
+    /// order after its ratio sentence. A child whose sentences no longer line
+    /// up, or that the titles would carry past the source limit, is committed
+    /// without them.
+    fn with_carried_titles(
+        &self,
+        document: VisibleDocument,
+        titles: &[Option<String>],
+    ) -> Result<VisibleDocument, ProtocolError> {
+        let lines = document.source.split('\n').collect::<Vec<_>>();
+        let Some(head) = lines
+            .len()
+            .checked_sub(titles.len())
+            .filter(|head| *head <= 1)
+        else {
+            return Ok(document);
+        };
+        let chunks = std::iter::repeat_n(None, head)
+            .chain(titles.iter().map(Option::as_deref))
+            .collect::<Vec<_>>();
+        let source = inku_ddl::print_ddl_titles(&lines, &chunks, document.language);
+        if source == document.source || source.len() > self.config.prompt_limits.max_source_bytes {
+            return Ok(document);
+        }
+        let wire = VisibleDocument { source, ..document };
+        Ok(VisibleDocument::from_document(&wire.document()?))
+    }
+
     fn commit_stage1(
         &mut self,
         document: VisibleDocument,
@@ -1958,6 +1992,11 @@ impl PipelineSnapshot {
                 ..
             }) => self.with_ratio(document, *ratio, CanvasRatioWriting::ReplaceDeclared)?,
             Some(_) => document,
+        };
+        // ... and the work's titles, after the declaration (DDL 27).
+        let document = match self.laws_move.as_ref().map(|laws_move| &laws_move.titles) {
+            Some(titles) if !titles.is_empty() => self.with_carried_titles(document, titles)?,
+            _ => document,
         };
         if let Some(basis) = self
             .laws_basis
@@ -2146,11 +2185,23 @@ impl PipelineSnapshot {
             .map_err(|_| ProtocolError::SchemaViolation)?;
         self.completion_ranges = work.completion_ranges.filter(|record| !record.is_empty());
         // The laws read the DDL's sentences; its ratio declaration is carried
-        // apart and written again on the child (DDL 26).
+        // apart and written again on the child (DDL 26), and so are its title
+        // lines (DDL 27).
         let canvas_ratio = inku_ddl::source_canvas_ratio(&work.source, self.config.language);
+        let (sentences, titles) = inku_ddl::split_ddl_titles(&inku_ddl::without_canvas_ratio(
+            &work.source,
+            self.config.language,
+        ));
+        let titles = if titles.iter().any(Option::is_some) {
+            titles
+        } else {
+            Vec::new()
+        };
+        let untitled = (!titles.is_empty()).then(|| sentences.join("\n"));
         self.laws_move = Some(LawsMove {
             direction,
             canvas_ratio,
+            titles,
         });
         if work.description.trim().is_empty() {
             return self.fail_laws_move("no_description", None, events);
@@ -2164,7 +2215,9 @@ impl PipelineSnapshot {
                 basis.composed
             }
             (None, Some(_)) => return self.fail_laws_move("laws_without_basis", None, events),
-            (None, None) => inku_ddl::without_canvas_ratio(&work.source, self.config.language),
+            (None, None) => untitled.unwrap_or_else(|| {
+                inku_ddl::without_canvas_ratio(&work.source, self.config.language)
+            }),
         };
         let document = self.new_document(base)?;
         let plugins = crate::prompts::work_plan_plugins(&self.config.definitions);

@@ -163,6 +163,35 @@ impl PipelineSnapshot {
         })
     }
 
+    /// A composed run's committed source with a title before each thing's
+    /// sentences (DDL 27). The run reaches its commit without titles, so its
+    /// requests and records read the sentences as they were written. A source
+    /// the titles would carry past the source limit is committed without them,
+    /// as one the ratio declaration would.
+    fn with_thing_titles(
+        &self,
+        document: VisibleDocument,
+        owners: &[u64],
+    ) -> Result<VisibleDocument, ProtocolError> {
+        let Some(answer) = self
+            .composed()
+            .and_then(|composition| composition.answer.as_ref())
+        else {
+            return Ok(document);
+        };
+        let source = crate::description_composition::titled_composed_source(
+            &document.source,
+            owners,
+            &answer.things,
+            self.config.language,
+        );
+        if source == document.source || source.len() > self.config.prompt_limits.max_source_bytes {
+            return Ok(document);
+        }
+        let wire = VisibleDocument { source, ..document };
+        Ok(VisibleDocument::from_document(&wire.document()?))
+    }
+
     /// A composed source's ratio sentence and its other sentences, each with
     /// the thing the answers that wrote it said it draws.
     fn thing_sentences(&self, source: &str) -> (String, Vec<ThingSentence>) {
@@ -660,12 +689,14 @@ impl PipelineSnapshot {
     pub(super) fn commit_written_document(
         &mut self,
         written: Written,
-        document: VisibleDocument,
+        mut document: VisibleDocument,
         events: &mut Vec<PipelineEvent>,
     ) -> Result<(), ProtocolError> {
         if written == Written::Description && self.composed().is_some() {
             let (_, sentences) = self.thing_sentences(&document.source);
-            self.composition_mut()?.things = sentences.iter().map(|item| item.thing).collect();
+            let things = sentences.iter().map(|item| item.thing).collect::<Vec<_>>();
+            document = self.with_thing_titles(document, &things)?;
+            self.composition_mut()?.things = things;
         }
         let revision = self.authority.revision();
         let (outcome, reason) = match written {

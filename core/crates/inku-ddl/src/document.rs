@@ -134,6 +134,17 @@ impl NormalizedDdlDocument {
     pub fn macro_locks(&self) -> &[MacroLock] {
         &self.macro_locks
     }
+
+    /// The same document over other bytes of the same length: its source with
+    /// the title lines blanked, as the lexer reads it (DDL 27).
+    pub(crate) fn with_source(&self, source: String) -> Self {
+        debug_assert_eq!(source.len(), self.source.len());
+        Self {
+            source,
+            language: self.language,
+            macro_locks: self.macro_locks.clone(),
+        }
+    }
 }
 
 /// Stable metadata validation diagnostic.

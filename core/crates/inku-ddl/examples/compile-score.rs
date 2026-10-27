@@ -97,6 +97,20 @@ struct Response {
     #[serde(skip_serializing_if = "Option::is_none")]
     failure: Option<String>,
     definition_identities: Vec<DefinitionIdentity>,
+    /// The chunks the title lines name (DDL 27), over the semantic document's
+    /// instructions; absent for a DDL without titles.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    chunks: Vec<Chunk>,
+    /// Each semantic instruction's shape head, by its first byte, when the DDL
+    /// has chunks.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    instruction_heads: Vec<usize>,
+}
+
+#[derive(Serialize)]
+struct Chunk {
+    name: String,
+    instruction_indices: Vec<usize>,
 }
 
 #[derive(Serialize)]
@@ -192,7 +206,7 @@ fn compile(request: Request) -> Result<Response, String> {
         None => ScoreLoweringContext::resolve(&request.canvas, Color::White),
     }
     .map_err(|error| format!("resolve canvas: {error:?}"))?;
-    let (outcome, score, upstream, downstream, resource_omissions, failure) =
+    let (outcome, score, upstream, downstream, resource_omissions, failure, ast) =
         if let Some(resources) = request.resources {
             let execution = compile_ddl_to_score_with_resources(
                 document,
@@ -215,6 +229,11 @@ fn compile(request: Request) -> Result<Response, String> {
                     .map(|item| format!("{item:?}"))
                     .collect(),
                 execution.failure().map(|failure| format!("{failure:?}")),
+                execution
+                    .compilation()
+                    .semantic_document
+                    .as_ref()
+                    .map(|document| document.ast.clone()),
             )
         } else {
             let execution = compile_ddl_to_score(
@@ -232,10 +251,33 @@ fn compile(request: Request) -> Result<Response, String> {
                 execution.downstream_diagnostics().to_vec(),
                 Vec::new(),
                 None,
+                execution
+                    .compilation()
+                    .semantic_document
+                    .as_ref()
+                    .map(|document| document.ast.clone()),
             )
         };
     let mut diagnostics = upstream.iter().map(upstream_diagnostic).collect::<Vec<_>>();
     diagnostics.extend(downstream.iter().map(downstream_diagnostic));
+    let (chunks, instruction_heads) = ast
+        .filter(|ast| !ast.chunks.is_empty())
+        .map(|ast| {
+            (
+                ast.chunks
+                    .iter()
+                    .map(|chunk| Chunk {
+                        name: chunk.name.clone(),
+                        instruction_indices: chunk.instruction_indices.clone(),
+                    })
+                    .collect(),
+                ast.instructions
+                    .iter()
+                    .map(|instruction| instruction.entity.head.source().span.start_byte)
+                    .collect(),
+            )
+        })
+        .unwrap_or_default();
     Ok(Response {
         original_source: request.source,
         outcome: format!("{outcome:?}"),
@@ -247,6 +289,8 @@ fn compile(request: Request) -> Result<Response, String> {
         resource_omissions,
         failure,
         definition_identities,
+        chunks,
+        instruction_heads,
     })
 }
 

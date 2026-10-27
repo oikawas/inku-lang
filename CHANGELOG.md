@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-27 — Wild is now "Lift the stroke limit" (Web)
-
-At the author's word (Wild was hard to read, and the label `Stroke limit` read as heading the canvas after it too), the Web renames it. The chip and the button say `Lift the stroke limit`; lit, the limit is lifted (off by default, as before). The line in the next work's conditions is labelled `Options`. The refine, instruction and redraw dialogs' switch is a button of the same name, without the `Stroke limit:` label before it. Generation Info shows `Lift the stroke limit` as `Lifted` or `Not lifted`. The manual follows. A work's record (`render_wild`) and how it is drawn do not change. Android and macOS still show Wild.
-
 ### 2026-10-26 — PLUGIN alone is enough to write a plugin file
 
 After the author's review, three gaps in `PLUGIN.ja.md` and `PLUGIN.md` were filled. The example in §5.1 is now a complete file with its definition written out, and the guide says it can be saved and added as it is (a Server test passes the example through the check). §7.3 adds a table of the codes a plugin file check reports for its shape, taken names, examples, and pictures, with their fixes. §8 adds the limits on the file size (1,000,000 bytes), the number of words (64), the lengths of descriptions, examples, and the license, and the replacement picture. No code changed.
@@ -322,6 +318,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.275 (2026-10-27 / Build1351)
+
+### 2026-10-27 — Wild is now "Lift the stroke limit" (Web)
+
+At the author's word (Wild was hard to read, and the label `Stroke limit` read as heading the canvas after it too), the Web renames it. The chip and the button say `Lift the stroke limit`; lit, the limit is lifted (off by default, as before). The line in the next work's conditions is labelled `Options`. The refine, instruction and redraw dialogs' switch is a button of the same name, without the `Stroke limit:` label before it. Generation Info shows `Lift the stroke limit` as `Lifted` or `Not lifted`. The manual follows. A work's record (`render_wild`) and how it is drawn do not change. Android and macOS still show Wild.
 
 ## v2.15.274 (2026-10-27 / Build1350)
 

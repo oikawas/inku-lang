@@ -62,6 +62,10 @@ LINEAGE_DERIVATION_KINDS = {
     # The AI refinement's laws move: the laws stage again on the parent's saved
     # DDL (2026-10-21). The Server's run saves it; no client sends it.
     "laws_change",
+    # The AI refinement's chunk move (まとまりの手, 2026-10-27): one move on
+    # one chunk of the parent's titled DDL. The Server's run saves it; no
+    # client sends it.
+    "chunk_move",
 }
 
 

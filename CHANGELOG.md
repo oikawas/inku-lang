@@ -8,6 +8,16 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-27 — Title lines name chunks of sentences (DDL 27, DDL engine 72)
+
+The plan the author chose, to make titles grammar (step 1 after the prototypes of revising toward abstraction). A line that is only a bracketed name, such as `"lighthouse"` (curly quotes read the same; `「灯台」` in Japanese), is read as a title that names the chunk of sentences up to the next title. Blank lines are decoration, an empty title ends a chunk, and a name used again goes on with its chunk.
+
+- **A title draws nothing.** The lexer reads a title line as blank bytes of the same length, so a title makes no instruction, takes no sentence number, adds no diagnostic and is no seed material; a titled DDL lowers to the Score of the same DDL without titles. Until now a title's words were read as drawing words, joined to the next sentence or taken as an undrawn shape with a sentence number (adding titles changed the Score of 32 of the author's 284 composed works). The semantic document names each chunk's instructions.
+- **A composed read-and-draw run prints each thing's title when it commits.** The name is the thing's words from the description, numbered from the second where two things share it. The writing, review and color requests do not change. The record's `things` stays each sentence's thing (title and blank lines are not counted).
+- The laws stage from a saved work applies the laws without the titles and titles the child again. The language of a text is read without its title lines (the Web's copy of the rule too).
+- The Web's DDL views and instruction editor show a title line as a heading, colour no word in it and offer no word on it, and the unread words are read without the titles. The CLI's `batch --input-mode ddl` makes no work of a title line.
+- No saved DDL changes: of the 6,270 DDLs on 5173, no line is a title and no compile result changes. Android and macOS highlighting follow in their own steps.
+
 ### 2026-10-26 — PLUGIN alone is enough to write a plugin file
 
 After the author's review, three gaps in `PLUGIN.ja.md` and `PLUGIN.md` were filled. The example in §5.1 is now a complete file with its definition written out, and the guide says it can be saved and added as it is (a Server test passes the example through the check). §7.3 adds a table of the codes a plugin file check reports for its shape, taken names, examples, and pictures, with their fixes. §8 adds the limits on the file size (1,000,000 bytes), the number of words (64), the lengths of descriptions, examples, and the license, and the replacement picture. No code changed.

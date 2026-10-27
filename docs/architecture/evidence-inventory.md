@@ -11,7 +11,7 @@
 | Japanese specification | `SPEC.ja.md`, document version `v1.92.0` |
 | Web / app | `web/APP_VERSION` = `v2.15.244`; `web/BUILD_NUMBER` = `1320` |
 | Render Engine | `default` / `93` (`core/crates/inku-render/src/lib.rs`); core API `0.1.0` |
-| DDL | `ddl_version=26`; `ddl_engine_version=71` (`server/src/inku_server/layer_versions.py`) |
+| DDL | `ddl_version=27`; `ddl_engine_version=72` (`server/src/inku_server/layer_versions.py`) |
 | Shared pipeline binding | binding `1.1.0`, protocol `1.0.0` (`pipeline_candidate.py:PipelineBinding` requires both) |
 | Score | New works use the minimum version the forms they use need, from the resource-aware compact 0.10 baseline up to 0.22. Saved 0.1.0 through 0.9.0 Scores and versionless artifacts remain readable |
 | Android | `android/VERSION` = `2.1.4-android.105`; `android/BUILD_NUMBER` = `148446`; Room schema 14; the shared Rust pipeline and the bundled core's Render Engine |

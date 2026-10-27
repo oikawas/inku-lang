@@ -136,6 +136,19 @@ English core words and grammar are ASCII case-insensitive. `Place` and `place`, 
 
 Keep each command on one line. Close separate commands with a sentence terminator before a line break. Parentheses do not introduce command blocks or nested programs. Numeric-range annotations and noun-phrase groups have their own constructions.
 
+A **title line** (DDL 27) is a line of only a quoted name, such as `"lighthouse"` (`「灯台」` in Japanese), and names the chunk of sentences up to the next title. A title draws nothing and takes no sentence number. Blank lines are decoration, an empty `""` ends a chunk, and a title whose name is already used goes on with that chunk. A title makes no block and nests nothing: each sentence in a chunk is still one command. A composed read-and-draw run writes each thing's title when it commits.
+
+```text
+Aspect ratio 1:1.
+fill the background with white.
+
+"upon a hill"
+place one gray flat ellipse width 0.72, height 0.4 at horizontal 0.5, vertical 0.76.
+
+"a jar in Tennessee"
+place one red flat circle diameter 0.17 at horizontal 0.5, vertical 0.5.
+```
+
 ### 3.2 Standalone shapes, modifiers, and counts
 
 A reliable Japanese skeleton is:
@@ -1125,6 +1138,7 @@ The following constructions are available grammar, rather than new rows in the 1
 | Numeric geometry | Radius, diameter, length, side, width and height, chord and sagitta, numeric position, range, endpoints, and rotation in degrees | Finite constructions connecting numbers to dimensions and owners. Distinguish the rotated word from a numeric angle. |
 | Groups, repetition, fading, color shift | 組, 繰り返して, 左から右へ薄れさせて, 順に段々に移して | Instructions about structure and distribution; no additional category or word chip. |
 | Canvas formats | Host options such as `square`, `a4`, and `wide` | The paper, selected outside the DDL text; a format name is not written in DDL. What a DDL writes is the declaration of the ratio it was laid out in, `Aspect ratio W:H.` (3.27). Distinct from form and proportion words with the same spelling. |
+| Title lines | `"lighthouse"`, `""` / `「灯台」`, `「」` | A line of only a quoted name; it names the chunk of sentences up to the next title (3.1). It draws nothing and takes no sentence number, and its words are not read as drawing words. |
 | Vocabulary Macros | Qualified names such as `Nature.YoungLeaves` | A separate registered vocabulary catalog, outside the core Saijiki's 102 rows. |
 
 ### Sources and verification scope

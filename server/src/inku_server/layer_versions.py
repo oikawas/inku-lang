@@ -420,7 +420,15 @@
 # document with an unnamed `missing_canonical_semantic_identity`. 14 saved works
 # change, each from that stop to drawing its other sentences (the 5,157 DDLs of
 # the 2026-10-17 5173 export).
-DDL_ENGINE_VERSION = "71"
+# 72: A title line (DDL 27) is lexed as blank bytes of the same length, so it
+# makes no instruction, takes no sentence number, adds no diagnostic and is no
+# seed material, and the semantic document names each chunk's instructions. A
+# title's words were read as drawing words: joined to the next sentence, or as
+# a shape that took a sentence number and moved the seeds after it (32 of 284
+# composed works changed when the prototype's titles were added); a titled DDL
+# now lowers to its untitled Score. No saved DDL's compile changes (the 6,270
+# DDLs of the 2026-10-27 5173 listing, none of whose lines is a title).
+DDL_ENGINE_VERSION = "72"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write
@@ -492,4 +500,10 @@ DDL_ENGINE_VERSION = "71"
 # `Aspect ratio W:H.` (the author retired the rule that a DDL carries no
 # ratio). A host writes the paper's ratio into a new DDL. It is grammar, not a
 # Saijiki word, and is not offered to a model; the saijiki lists it.
-DDL_VERSION = "26"
+# 27 (2026-10-27): A title line, a whole line of one bracketed name (「灯台」,
+# `"lighthouse"` or `“lighthouse”`), names the chunk of sentences up to the
+# next title; an empty title ends a chunk and a name used again goes on with
+# its chunk. It draws nothing. A composed read-and-draw run prints each thing's
+# title when it commits. It is grammar, not a Saijiki word, and is not offered
+# to a model.
+DDL_VERSION = "27"

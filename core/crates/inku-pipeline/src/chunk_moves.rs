@@ -22,7 +22,8 @@
 //! work is asked in English.
 //!
 //! One JSON request with an `action`, one JSON answer (`inku.chunk-moves.v1`):
-//! `start` a turn from the parent's DDL, give the `answer` to the request it
+//! the `units` (chunks) a work has, for a host to tell the run whether a chunk
+//! move can start; `start` a turn from the parent's DDL, give the `answer` to the request it
 //! asked the host to send, and say how the child it asked to have drawn came
 //! out (`drawn`). Each answer carries the turn's `state`, which the host gives
 //! back with the next request, and what to do (`todo`): `send` a request,
@@ -1497,9 +1498,21 @@ struct DrawnRequest {
     drawn: Drawn,
 }
 
+/// A work's chunks, for a host to tell the run whether a chunk move can
+/// start: its title lines, or its composition record's things.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct UnitsRequest {
+    ddl: String,
+    #[serde(default)]
+    composition: Option<Composition>,
+    language: ResolvedInstructionLanguage,
+}
+
 #[derive(Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case")]
 enum Request {
+    Units(Box<UnitsRequest>),
     Start(Box<StartRequest>),
     Answer(Box<AnswerRequest>),
     Drawn(Box<DrawnRequest>),
@@ -1519,6 +1532,11 @@ fn turn_json(state: &TurnState, todo: Todo) -> Value {
 
 fn respond(request: Request) -> Result<Value, Refusal> {
     let (state, todo) = match request {
+        Request::Units(request) => {
+            let source =
+                titled_source(&request.ddl, request.composition.as_ref(), request.language);
+            return Ok(json!({"units": Doc::of(&source).units()}));
+        }
         Request::Start(request) => start(
             &request.config,
             &request.ddl,
@@ -1974,5 +1992,9 @@ mod tests {
             chunk_moves_json(br#"{"action": "start"}"#),
             br#"{"error":"invalid_request"}"#.to_vec()
         );
+        let units = ask(json!({"action": "units", "ddl": LIGHTHOUSE, "language": "ja"}));
+        assert_eq!(units["units"], json!(["灯台", "波の筋"]));
+        let none = ask(json!({"action": "units", "ddl": plain, "language": "ja"}));
+        assert_eq!(none["units"], json!([]));
     }
 }

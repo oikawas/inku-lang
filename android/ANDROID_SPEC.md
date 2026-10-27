@@ -10,6 +10,8 @@ Last updated: 2026-10-27.
 
 The studio and batch conditions default to drawing in words; selecting it turns sketching on. It is unavailable for on-device LiteRT, which uses the plan route. Composition, laws, and colors are optional for drawing in words and always run with the plan route. The route and composition are not persisted as settings; opening a work restores them from its record. The stroke-limit switch is in the drawing conditions.
 
+Model, color catalog and canvas names appear beneath their heading and change action. The drawing route is a segmented control; steps and options use switches with drawn on, off and lock marks. The flow lists each step separately, with optional steps in the accent color and the endpoints subdued. Wording comes from the Japanese and English language packs.
+
 The shared core receives `read_and_draw`, source labels, sketch and optional composition. When the published drawing model serves Vision, it reviews the instructions beside a PNG of the drawing. Reading, rounds, composition and colors are saved as `description_ddl`, and the reading text is the work's sketch. The Room schema is unchanged.
 
 ## 2026-10-27 DDL title lines (DDL 27) show as headings

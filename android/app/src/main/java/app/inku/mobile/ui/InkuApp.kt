@@ -2645,46 +2645,85 @@ internal fun providerAttemptText(attempt: ProviderAttempt?, strings: InkuStrings
  */
 @Composable
 private fun DrawSettingsRow(state: InkuUiState, viewModel: InkuViewModel) {
-    val ja = state.uiLanguage.code == "ja"
     val local = app.inku.mobile.llm.isLocalVisionModel(state.selectedModelId)
     val route = if (local) DrawRoute.Stages else state.drawRoute
-    fun label(jaText: String, enText: String) = if (ja) jaText else enText
+    val strings = S
     Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-        Text(label("次に描く条件", "Conditions for the next drawing"), style = MaterialTheme.typography.titleSmall)
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(shortModelLabel(state), modifier = Modifier.weight(1f))
-            TextButton(onClick = viewModel::openModelSelection) { Text(label("変更", "Change")) }
+        Text(strings.nextDrawConditions, style = MaterialTheme.typography.titleSmall)
+        DrawConditionChoice(strings.conditionModel, shortModelLabel(state), strings.conditionChange, viewModel::openModelSelection)
+        DrawConditionChoice(strings.conditionCatalog, shortCatalogLabel(state), strings.conditionChange, viewModel::openCatalogSelection)
+        CompactLabel(strings.drawRouteHeading)
+        Row(Modifier.fillMaxWidth().border(Dimens.hairline, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Dimens.radiusCard)).padding(Dimens.spaceXs)) {
+            listOf(DrawRoute.ReadAndDraw to strings.drawRouteWords, DrawRoute.Stages to strings.drawRoutePlan).forEach { (option, name) ->
+                val enabled = !state.isDrawing && (option != DrawRoute.ReadAndDraw || !local)
+                Box(Modifier.weight(1f).background(if (route == option) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent, RoundedCornerShape(Dimens.radiusCard))
+                    .semantics { selected = route == option }.clickable(enabled = enabled, role = Role.RadioButton) { viewModel.setDrawRoute(option) }
+                    .padding(Dimens.spaceM), contentAlignment = Alignment.Center) {
+                    Text(name, style = MaterialTheme.typography.labelMedium, color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
         }
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(shortCatalogLabel(state), modifier = Modifier.weight(1f))
-            TextButton(onClick = viewModel::openCatalogSelection) { Text(label("変更", "Change")) }
-        }
-        CompactLabel(label("描き方", "How to draw"))
+        if (local) Text(strings.drawRouteLocalUnavailable, style = MaterialTheme.typography.bodySmall)
+        CompactLabel(strings.drawSteps)
         WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceXs) {
-            ChipButton(label("言葉で描く", "In words"), selected = route == DrawRoute.ReadAndDraw,
-                enabled = !local && !state.isDrawing, onClick = { viewModel.setDrawRoute(DrawRoute.ReadAndDraw) })
-            ChipButton(label("型で描く", "With a plan"), selected = route == DrawRoute.Stages,
-                enabled = !state.isDrawing, onClick = { viewModel.setDrawRoute(DrawRoute.Stages) })
-        }
-        if (local) Text(label("端末内モデルでは言葉で描くを選べません。", "In words is unavailable for on-device models."), style = MaterialTheme.typography.bodySmall)
-        CompactLabel(label("通す段", "Steps"))
-        WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceXs) {
-            ChipButton((if (state.sketchMode == SketchMode.On) "✓ " else "○ ") + label("写生", "Sketch from life"),
-                selected = state.sketchMode == SketchMode.On, enabled = !state.isDrawing,
+            DrawSwitchChip(strings.drawSketch, on = state.sketchMode == SketchMode.On, enabled = !state.isDrawing,
                 onClick = { viewModel.setSketchMode(if (state.sketchMode == SketchMode.On) SketchMode.Off else SketchMode.On) })
             val composed = route == DrawRoute.Stages || state.descriptionComposition
-            ChipButton((if (composed) "✓ " else "○ ") + label("構図・法則・配色", "Composition, laws, colors") + if (route == DrawRoute.Stages) " 🔒" else "",
-                selected = composed, enabled = route == DrawRoute.ReadAndDraw && !state.isDrawing,
+            DrawSwitchChip(strings.drawCompositionSwitch, on = composed, locked = route == DrawRoute.Stages, enabled = !state.isDrawing,
                 onClick = { viewModel.setDescriptionComposition(!state.descriptionComposition) })
         }
-        Text(label("流れ: ", "Flow: ") + drawFlow(route, state.sketchMode == SketchMode.On, state.descriptionComposition, ja), style = MaterialTheme.typography.bodySmall)
-        CompactLabel(label("オプション", "Options"))
-        ChipButton((if (state.renderWild) "✓ " else "○ ") + S.wildToggle, selected = state.renderWild,
-            enabled = !state.isDrawing, onClick = { viewModel.setRenderWild(!state.renderWild) })
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(shortCanvasLabel(state), modifier = Modifier.weight(1f))
-            TextButton(onClick = viewModel::openCanvasSelection) { Text(label("変更", "Change")) }
+        CompactLabel(strings.drawFlowLabel)
+        WrapRow(horizontal = Dimens.spaceXs, vertical = Dimens.spaceXs) {
+            drawFlow(route, state.sketchMode == SketchMode.On, state.descriptionComposition, strings).forEachIndexed { index, step ->
+                if (index > 0) Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
+                Text(step.label, color = when (step.kind) {
+                    DrawFlowKind.End -> MaterialTheme.colorScheme.onSurfaceVariant
+                    DrawFlowKind.Switch -> MaterialTheme.colorScheme.primary
+                    DrawFlowKind.Fixed -> MaterialTheme.colorScheme.onSurface
+                }, style = MaterialTheme.typography.labelSmall)
+            }
         }
+        CompactLabel(strings.drawOptions)
+        DrawSwitchChip(strings.wildToggle, on = state.renderWild,
+            enabled = !state.isDrawing, onClick = { viewModel.setRenderWild(!state.renderWild) })
+        DrawConditionChoice(strings.conditionCanvas, shortCanvasLabel(state), strings.conditionChange, viewModel::openCanvasSelection)
+    }
+}
+
+@Composable
+private fun DrawConditionChoice(heading: String, value: String, change: String, onChange: () -> Unit) {
+    Column {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            CompactLabel(heading)
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = onChange) { Text(change) }
+        }
+        Text(value, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+@Composable
+private fun DrawSwitchChip(label: String, on: Boolean, enabled: Boolean, locked: Boolean = false, onClick: () -> Unit) {
+    val accent = MaterialTheme.colorScheme.primary
+    val mark = if (on) accent else MaterialTheme.colorScheme.onSurfaceVariant
+    Row(Modifier.border(Dimens.hairline, if (on) accent else MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(100))
+        .background(if (on) MaterialTheme.colorScheme.primaryContainer else Color.Transparent, RoundedCornerShape(100))
+        .semantics { selected = on }
+        .clickable(enabled = enabled && !locked, role = Role.Switch, onClick = onClick)
+        .padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceXs),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
+        Canvas(Modifier.size(Dimens.spaceL)) {
+            val w = size.width
+            val stroke = w * 0.10f
+            if (locked) {
+                drawRoundRect(mark, topLeft = Offset(w * .2f, w * .45f), size = Size(w * .6f, w * .4f), cornerRadius = CornerRadius(w * .08f), style = Stroke(stroke))
+                drawArc(mark, 180f, 180f, false, topLeft = Offset(w * .3f, w * .1f), size = Size(w * .4f, w * .6f), style = Stroke(stroke))
+            } else if (on) {
+                val path = Path().apply { moveTo(w * .18f, w * .52f); lineTo(w * .42f, w * .75f); lineTo(w * .82f, w * .25f) }
+                drawPath(path, mark, style = Stroke(stroke))
+            } else drawCircle(mark, radius = w * .32f, style = Stroke(stroke))
+        }
+        Text(label, style = MaterialTheme.typography.labelMedium)
     }
 }
 
@@ -2814,11 +2853,8 @@ private fun CanvasHeroCard(
                                 },
                             )
                             val routeMetadata = remember(it.id, it.renderMetadataJson) { runCatching { JSONObject(it.renderMetadataJson) }.getOrElse { JSONObject() } }
-                            val routeLabel = if (routeMetadata.optJSONObject("image_ddl") != null) {
-                                if (state.uiLanguage.code == "ja") "画像から書く" else "Written from a picture"
-                            } else if (drawRouteOf(routeMetadata) == DrawRoute.ReadAndDraw) {
-                                if (state.uiLanguage.code == "ja") "言葉で描く" else "In words"
-                            } else if (state.uiLanguage.code == "ja") "型で描く" else "With a plan"
+                            val routeLabel = if (routeMetadata.optJSONObject("image_ddl") != null) S.drawRouteImage
+                            else if (drawRouteOf(routeMetadata) == DrawRoute.ReadAndDraw) S.drawRouteWords else S.drawRoutePlan
                             Text(routeLabel, style = MaterialTheme.typography.labelSmall)
                             // Next to the hash, as on web; it names where it goes.
                             if (ddl3dOffered) {
@@ -3283,7 +3319,7 @@ private fun DrawPanel(
             Text(S.description, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             TextButton(onClick = viewModel::clearPrompt, enabled = !state.isDrawing) { Text(S.newWork) }
         }
-        Text(if (state.uiLanguage.code == "ja") "短い文章で、表現したいものを入力。" else "Enter a short description of what you want to express.", style = MaterialTheme.typography.bodySmall)
+        Text(S.descriptionHint, style = MaterialTheme.typography.bodySmall)
         if (state.descriptionLocked && !state.historyAuthorityLoading) {
             Text(S.pipelineDdlAuthority, style = MaterialTheme.typography.bodySmall)
             TextButton(onClick = viewModel::startDescriptionVariation, enabled = !state.historyAuthorityLoading && !state.isDrawing) {
@@ -3309,7 +3345,7 @@ private fun DrawPanel(
             )
             CameraOriginalPhotoThumbnail(state.cameraSourcePhotoPath, state.uiLanguage.isEnglish)
         }
-        Text(if (state.uiLanguage.code == "ja") "[括弧内文字列はコメント扱い]" else "[Text in brackets is treated as a comment]", style = MaterialTheme.typography.bodySmall)
+        Text(S.descriptionCommentHint, style = MaterialTheme.typography.bodySmall)
         cameraStatusText(state.cameraCaptureState)?.let { cameraStatus ->
             Text(
                 cameraStatus,
@@ -6695,14 +6731,13 @@ private fun GenerationInfoSheet(item: HistoryItemEntity, onDismiss: () -> Unit) 
             verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
         ) {
             Text(S.generationInfoTitle, style = MaterialTheme.typography.titleMedium)
-            val ja = LocalUiLanguage.current.code == "ja"
             val descriptionRecord = remember(item.id, item.renderMetadataJson) {
                 runCatching { JSONObject(item.renderMetadataJson).optJSONObject("description_ddl") }.getOrNull()
             }
             descriptionRecord?.let { record ->
                 Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-                    CompactLabel(if (ja) "言葉で描く" else "In words")
-                    descriptionDetails(record, ja).forEach { (name, value) ->
+                    CompactLabel(S.drawRouteWords)
+                    descriptionDetails(record, S).forEach { (name, value) ->
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                             Text(name, Modifier.weight(0.42f), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(value, Modifier.weight(0.58f), style = MaterialTheme.typography.bodySmall)

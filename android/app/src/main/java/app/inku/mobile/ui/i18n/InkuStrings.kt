@@ -32,6 +32,51 @@ import androidx.compose.runtime.compositionLocalOf
  * (`errorModelGone: (stage) => ...`).
  */
 interface InkuStrings {
+    val nextDrawConditions: String
+    val conditionModel: String
+    val conditionCatalog: String
+    val conditionCanvas: String
+    val conditionChange: String
+    val drawRouteHeading: String
+    val drawRouteWords: String
+    val drawRoutePlan: String
+    val drawRouteImage: String
+    val drawRouteLocalUnavailable: String
+    val drawSteps: String
+    val drawSketch: String
+    val drawCompositionSwitch: String
+    val drawFlowLabel: String
+    val drawOptions: String
+    val descriptionHint: String
+    val descriptionCommentHint: String
+    val flowDescription: String
+    val flowSketch: String
+    val flowFillPlan: String
+    val flowComposition: String
+    val flowColors: String
+    val flowWrite: String
+    val flowReview: String
+    val flowPicture: String
+    val readingRead: String
+    val readingSupplied: String
+    val readingFallback: String
+    val readingOff: String
+    val readingLabel: String
+    val readingText: String
+    val readingDropped: String
+    val roundReviewed: String
+    val roundWritten: String
+    val roundAskedAgain: String
+    val roundLabel: String
+    val roundInstructions: String
+    val roundProblems: String
+    val compositionThesis: String
+    val compositionForm: String
+    val compositionMainLaw: String
+    val compositionReason: String
+    val compositionThings: String
+    val compositionMeasure: String
+    val compositionChangedLines: String
     val code: String
     val label: String
     val modelRecommendation: String

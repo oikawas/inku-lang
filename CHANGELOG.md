@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-27 — Android drawing conditions and wording
+
+The studio and batch conditions now label the model, color catalog and canvas; the drawing route uses a segmented control and the steps and options use stateful switches. The flow shows its steps separately with their colors. Interface wording comes from the Japanese and English language packs.
+
 ### 2026-10-27 — Draw in words on Android
 
 The studio and batch conditions now offer drawing in words or with a plan, sketching, composition and laws, and the stroke limit. The shared core reads the description and writes instructions; a model offered for Vision can review them beside the drawing. On-device LiteRT uses the plan route. The work retains its reading and round records.

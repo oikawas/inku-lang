@@ -8,17 +8,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-27 — The drawing is now With a plan or In words, and the sketch and the composition and laws are chips of the steps it passes (Web)
-
-At the author's word (Current stages and Read and draw, and the sketch's and the composition and laws' On and Off, were hard to read), the Describe and Batch tabs' `Conditions for the next work` take the author's chosen plan C. Nothing a run does changes, and nothing it sends.
-
-- `Drawing` is two buttons: `Current stages` is now `With a plan` (the model fills the fields of a fixed plan and the program writes the instructions), and `Read and draw` is `In words` (the model writes the instructions itself and corrects them once beside the drawing).
-- A `Steps` line holds the chips `Sketch from life` and `Composition and laws`. A press lights one (passed); another turns it off. Their names and hints are the same on both drawings. With a plan always passes the composition and laws, so that chip stays lit with a lock (it was hidden before).
-- A `Flow` line shows the steps the current choices pass, in their order (for example `Description › Sketch › Composition and laws › Write in words › Look and correct › Colors › Picture`).
-- `Wild` is the same kind of chip, and the `Canvas` button has round ends.
-- The strip above the canvas names the drawing by its new name and, in Japanese, the sketch as 通した or 通さない (No answer, Not applicable and Not recorded are unchanged). Generation Info and the manual use the same names.
-
-### 2026-10-26 — PLUGIN alone is enough to write a plugin file### 2026-10-26 — PLUGIN alone is enough to write a plugin file
+### 2026-10-26 — PLUGIN alone is enough to write a plugin file
 
 After the author's review, three gaps in `PLUGIN.ja.md` and `PLUGIN.md` were filled. The example in §5.1 is now a complete file with its definition written out, and the guide says it can be saved and added as it is (a Server test passes the example through the check). §7.3 adds a table of the codes a plugin file check reports for its shape, taken names, examples, and pictures, with their fixes. §8 adds the limits on the file size (1,000,000 bytes), the number of words (64), the lengths of descriptions, examples, and the license, and the replacement picture. No code changed.
 
@@ -328,6 +318,18 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.273 (2026-10-27 / Build1349)
+
+### 2026-10-27 — The drawing is now With a plan or In words, and the sketch and the composition and laws are chips of the steps it passes (Web)
+
+At the author's word (Current stages and Read and draw, and the sketch's and the composition and laws' On and Off, were hard to read), the Describe and Batch tabs' `Conditions for the next work` take the author's chosen plan C. Nothing a run does changes, and nothing it sends.
+
+- `Drawing` is two buttons: `Current stages` is now `With a plan` (the model fills the fields of a fixed plan and the program writes the instructions), and `Read and draw` is `In words` (the model writes the instructions itself and corrects them once beside the drawing).
+- A `Steps` line holds the chips `Sketch from life` and `Composition and laws`. A press lights one (passed); another turns it off. Their names and hints are the same on both drawings. With a plan always passes the composition and laws, so that chip stays lit with a lock (it was hidden before).
+- A `Flow` line shows the steps the current choices pass, in their order (for example `Description › Sketch › Composition and laws › Write in words › Look and correct › Colors › Picture`).
+- `Wild` is the same kind of chip, and the `Canvas` button has round ends.
+- The strip above the canvas names the drawing by its new name and, in Japanese, the sketch as 通した or 通さない (No answer, Not applicable and Not recorded are unchanged). Generation Info and the manual use the same names.
 
 ## v2.15.272 (2026-10-27 / Build1348)
 

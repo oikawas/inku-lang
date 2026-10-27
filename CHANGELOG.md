@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-27 — Delete a ChatGPT plan registration on macOS
+
+The connection settings can recheck the state and delete a registration together with its published model settings. Deletion asks for confirmation and reports if provider revocation could not be confirmed.
+
 ### 2026-10-27 — Paint from an image on macOS
 
 The image tab and image-folder batch prepare images with ImageIO and the shared core's image policy, then send them to a Vision model. Provenance is saved with the work and is not used for drawing; image bytes are not saved. The app warns before the first image send after launch. Folder progress is recorded for reselection and resumption.

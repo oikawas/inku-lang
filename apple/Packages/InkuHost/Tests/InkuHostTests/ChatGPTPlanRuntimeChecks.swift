@@ -47,6 +47,64 @@ final class ChatGPTPlanRuntimeChecks: XCTestCase {
         XCTAssertFalse(sealed.range(of: Data("fixture-refresh-token".utf8)) != nil)
     }
 
+    // A deleted registration must not leave a selected session, model publication or a pending registration.
+    func testDeleteRegistrationInvalidatesSessionAndKeepsOtherProfiles() async throws {
+        let other = UUID().uuidString
+        let fixture = try RuntimeFixture(expired: false, otherProfileID: other)
+        defer { fixture.remove() }
+        var value = try fixture.store.load()
+        value.pendingRegistrations[fixture.activeID] = "fixture-client"
+        try fixture.store.write(value)
+        let runtime = ChatGPTPlanRuntime(store: fixture.store, http: RuntimeHTTP(blockRefresh: false))
+        let session = try await runtime.pin()
+        let confirmed = try await runtime.deleteProfile(session.profileID)
+        XCTAssertFalse(confirmed)
+        let after = try fixture.store.load()
+        XCTAssertNil(after.profiles[session.profileID]); XCTAssertNil(after.pendingRegistrations[session.profileID])
+        XCTAssertNil(after.activeProfileID); XCTAssertNotNil(after.profiles[other])
+        do { try await runtime.validate(session); XCTFail("Deleted session remained valid") }
+        catch { XCTAssertEqual((error as? HostError)?.code, "chatgpt_not_connected") }
+        do { _ = try await runtime.publication(); XCTFail("Deleted publication remained available") }
+        catch { XCTAssertEqual((error as? HostError)?.code, "chatgpt_not_connected") }
+    }
+
+    // A newer connection arriving while remote revocation is pending must survive the delete request.
+    func testDeleteDoesNotEraseNewerConnection() async throws {
+        let fixture = try RuntimeFixture(expired: false)
+        defer { fixture.remove() }
+        let client = BlockingRevocationHTTP()
+        let runtime = ChatGPTPlanRuntime(store: fixture.store, http: client)
+        let task = Task { try await runtime.deleteProfile(fixture.activeID) }
+        await client.waitForDiscovery()
+        var value = try fixture.store.load()
+        var profile = try XCTUnwrap(value.profiles[fixture.activeID])
+        XCTAssertEqual(profile.state, "signed_out")
+        profile.state = "connected"; profile.generation += 1
+        profile.accessToken = "new-access"; profile.refreshToken = "new-refresh"
+        value.profiles[fixture.activeID] = profile
+        try fixture.store.write(value)
+        await client.resume()
+        do { _ = try await task.value; XCTFail("Deleted a newer connection") }
+        catch { XCTAssertEqual((error as? HostError)?.code, "chatgpt_session_changed") }
+        XCTAssertEqual(try fixture.store.load().profiles[fixture.activeID]?.generation, profile.generation)
+        XCTAssertEqual(try fixture.store.load().profiles[fixture.activeID]?.state, "connected")
+    }
+
+    // Deleting a different registration must not change the active profile or its published models.
+    func testDeleteInactiveRegistrationKeepsActivePublication() async throws {
+        let other = UUID().uuidString
+        let fixture = try RuntimeFixture(expired: false, otherProfileID: other)
+        defer { fixture.remove() }
+        let runtime = ChatGPTPlanRuntime(store: fixture.store, http: SuccessfulRevocationHTTP())
+        let confirmed = try await runtime.deleteProfile(other)
+        XCTAssertTrue(confirmed)
+        let state = try await runtime.state()
+        XCTAssertEqual(state.activeProfileID, fixture.activeID)
+        XCTAssertEqual(state.profiles.map(\.id), [fixture.activeID])
+        let publication = try await runtime.publication()
+        XCTAssertEqual(publication.publishedModels.map(\.id), ["offered"])
+    }
+
     // Failure: a completed SSE frame hid a late quota error, and subsequent requests bypassed the quota pause.
     func testLateQuotaPausesUntilExplicitRetryAndUsesOnlyCanonicalResponsesBody() async throws {
         let fixture = try RuntimeFixture(expired: false)
@@ -360,6 +418,30 @@ private final class RuntimeKeyStore: ChatGPTVaultKeyStore, @unchecked Sendable {
     private var value: Data?
     func readKey() -> Data? { lock.withLock { value } }
     func saveKey(_ key: Data) { lock.withLock { value = key } }
+}
+
+private actor SuccessfulRevocationHTTP: ChatGPTHTTPClient {
+    func send(_ request: URLRequest, maximumBytes: Int, onBytes: @escaping @Sendable (Int) -> Void) async throws -> ChatGPTHTTPResponse {
+        if request.url?.path == "/.well-known/openid-configuration" {
+            return .init(status: 200, data: Data(#"{"revocation_endpoint":"https://auth.openai.com/api/accounts/oauth/revoke"}"#.utf8))
+        }
+        guard request.url?.path == "/api/accounts/oauth/revoke" else { throw HostError("unexpected_fixture_route") }
+        return .init(status: 200, data: Data())
+    }
+}
+
+private actor BlockingRevocationHTTP: ChatGPTHTTPClient {
+    private var entered = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    private var gate: CheckedContinuation<Void, Never>?
+    func waitForDiscovery() async { if !entered { await withCheckedContinuation { waiters.append($0) } } }
+    func resume() { gate?.resume(); gate = nil }
+    func send(_ request: URLRequest, maximumBytes: Int, onBytes: @escaping @Sendable (Int) -> Void) async throws -> ChatGPTHTTPResponse {
+        entered = true
+        let pending = waiters; waiters = []; pending.forEach { $0.resume() }
+        await withCheckedContinuation { gate = $0 }
+        return .init(status: 200, data: Data(#"{"issuer":"https://auth.openai.com"}"#.utf8))
+    }
 }
 
 private actor RuntimeHTTP: ChatGPTHTTPClient {

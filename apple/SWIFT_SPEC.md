@@ -18,6 +18,10 @@ Options and replacements for Change the touches, Change the ground and Change th
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-27 Managing ChatGPT plan registrations
+
+ChatGPT plan settings can recheck the connection and delete a registration separately from signing out. Deletion asks for confirmation that the published model settings will also be removed. It first invalidates the local connection, attempts provider revocation, and reports if revocation could not be confirmed. It removes the registration, its published model settings and any matching pending registration; if it was selected, the selection is cleared. Other registrations and saved works remain. A newer connection that arrives during revocation is not deleted.
+
 ## 2026-10-27 Painting from an image on macOS
 
 The image tab accepts JPEG, PNG, GIF and TIFF. ImageIO reads the first GIF frame, applies Exif orientation and composites transparency on white. The host prepares a JPEG at the size and quality specified by the shared core and sends it to the Vision model; the instruction language is Japanese. Image pixels stay in memory during the run. If a referenced image is missing, the run cancels with `image_missing` before sending. The host turns the core's review SVG into a PNG for the same run. Developer raw provider capture does not save image requests.

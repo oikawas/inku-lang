@@ -1001,7 +1001,8 @@ public final class AppModel {
     }
 
     public func drawEditedDDL(work: SavedWork, source: String, wildOverride: Bool? = nil,
-                              paperID: String? = nil, presentation: CanvasFitPresentation = .workspace) async -> Bool {
+                              paperID: String? = nil, presentation: CanvasFitPresentation = .workspace,
+                              forceEdit: Bool = false) async -> Bool {
         guard !isBusy, canvasFitQuestion == nil, !work.trashed,
               !source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
         do {
@@ -1009,7 +1010,7 @@ public final class AppModel {
             let saved = try await savedConfiguration(workID: work.id)
             var options = try ExactJSON(data: saved.renderOptions)
             let target = paperID ?? options["canvas_aspect_id"].string ?? work.renderCanvasAspectID ?? canvasID
-            let unchanged = source == work.ddl && wildOverride == nil
+            let unchanged = !forceEdit && source == work.ddl && wildOverride == nil
             let fit = await chooseCanvasFit(source: source, recordedWork: unchanged ? work : nil,
                                              paperID: target, presentation: presentation)
             guard fit != .cancel, !isBusy else { return false }

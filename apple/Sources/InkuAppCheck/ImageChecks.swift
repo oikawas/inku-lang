@@ -60,6 +60,22 @@ func runImageChecks(realOpus: Bool = false) async throws {
     let calls = await transport.tags
     if !realOpus, calls != ["write_image_ddl", "review_image_ddl"] { throw CheckFailure.message("image provider stages: \(calls)") }
     if !realOpus, await transport.provenanceLeaked { throw CheckFailure.message("image provenance entered provider action") }
+    if !realOpus {
+        let imageRecord = try ExactJSON(data: record)
+        guard let before = imageRecord["before_review"].string, before == ddl else { throw CheckFailure.message("pre-review same-DDL fixture") }
+        app.canvasFitChoiceHandler = { _ in .contain }
+        guard await app.drawEditedDDL(work: work, source: before, paperID: "square", forceEdit: true),
+              let child = app.selectedWork, child.id != work.id, let node = child.lineageNodeID else {
+            throw CheckFailure.message("pre-review DDL child: \(app.errorText ?? app.status)")
+        }
+        let db = try InkuDatabase(url: url)
+        let edge = try await db.edge(childNodeID: node)
+        let childContext = try await app.savedConfiguration(workID: child.id)
+        guard edge?.derivationKind == "ddl_edit", childContext.imageProvenance == context.imageProvenance,
+              childContext.imageDDL == context.imageDDL, try await db.work(id: work.id) == work else {
+            throw CheckFailure.message("pre-review child did not preserve its parent and provenance")
+        }
+    }
     print(realOpus ? "Opus image run: one synthetic image, saved image metadata and 4:3 declaration." :
           "Image run: 1568×1176, nearest 4:3 paper, image write/review and saved metadata; no external provider.")
 }

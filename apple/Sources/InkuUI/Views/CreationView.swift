@@ -368,7 +368,7 @@ struct CreationView: View {
                         Text(before).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
                         if let work = model.selectedWork {
                             Button(display.localized("この指示書で子を描く")) {
-                                Task { _ = await model.drawEditedDDL(work: work, source: before) }
+                                Task { _ = await model.drawEditedDDL(work: work, source: before, forceEdit: true) }
                             }.disabled(controlsDisabled)
                         }
                     }

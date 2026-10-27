@@ -109,6 +109,18 @@ public enum DemoIntervalPolicy {
 public final class AutomationModel {
     let imageFolderBatch = ImageFolderBatch()
     public var workspaceInputMode = "description"
+    public func selectInputTab(_ mode: String, app: AppModel) {
+        workspaceInputMode = mode
+        if mode == "description" || mode == "image" { app.inputMode = mode }
+    }
+
+    public func inputTabRunning(_ mode: String, app: AppModel) -> Bool {
+        let batchRunning = (running && self.mode == "batch") || imageFolderBatch.running
+        if mode == "batch" { return batchRunning }
+        guard app.isBusy, !isOccupied, !imageFolderBatch.running else { return false }
+        if mode == "image" { return app.activeSingleInputMode == "image" }
+        return mode == "description" && app.activeSingleInputMode != "image"
+    }
     public var batchText = ""
     public var batchSketchMode = "off"
     public var demoSeedPhrase = "日本の四季を感じさせる文章を40語以内で生成" { didSet { persistDemoPreferences() } }

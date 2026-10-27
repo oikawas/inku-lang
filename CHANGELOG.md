@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+On macOS, image provenance now follows the chosen image, and input tabs remain browsable with the running indicator on the active operation.
+
 macOS image drawing and image-folder batches can use the image aspect ratio or a fixed paper, separately from the description canvas.
 
 ### 2026-10-27 — Paint from an image on macOS

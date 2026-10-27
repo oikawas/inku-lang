@@ -31,10 +31,24 @@ import InkuPersistence
         settings.models.stage1Model = "fixture:vision"; settings.models.stage2Model = "fixture:vision"
         try await app.updateHostSettings(settings)
         app.display.preferences.visionModelReference = "fixture:vision"
-        let batch = ImageFolderBatch(); try batch.select(input, app: app)
+        let automation = AutomationModel()
+        let batch = automation.imageFolderBatch; try batch.select(input, app: app)
         XCTAssertEqual(batch.total, 3)
         app.imageCanvasID = "square"
-        await batch.run(app: app, restart: false) { _ in "fixture" }
+        await transport.blockFirstRequest()
+        let operation = Task { await batch.run(app: app, restart: false) { _ in "fixture" } }
+        for _ in 0..<500 {
+            if await transport.isBlocked { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let blocked = await transport.isBlocked
+        automation.selectInputTab("image", app: app)
+        XCTAssertTrue(blocked)
+        XCTAssertTrue(automation.inputTabRunning("batch", app: app))
+        XCTAssertFalse(automation.inputTabRunning("image", app: app))
+        XCTAssertFalse(automation.inputTabRunning("description", app: app))
+        await transport.resume()
+        await operation.value
         XCTAssertEqual(batch.completed, 2); XCTAssertEqual(batch.failed, 1)
         let db = try InkuDatabase(url: root.appendingPathComponent("works.sqlite"))
         let fixedWorks = try await db.libraryPage(limit: 10).items.map(\.work)
@@ -69,9 +83,18 @@ import InkuPersistence
 }
 private actor FolderProvider: ProviderTransport {
     var calls = 0
+    var isBlocked = false
+    private var shouldBlock = false
+    private var continuation: CheckedContinuation<Void, Never>?
+    func blockFirstRequest() { shouldBlock = true }
+    func resume() { continuation?.resume(); continuation = nil; shouldBlock = false; isBlocked = false }
     func perform(action: Data, models: ModelSelection, providers: [ProviderSettings], credentials: any CredentialStore,
                  onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {
         calls += 1
+        if shouldBlock {
+            shouldBlock = false; isBlocked = true
+            await withCheckedContinuation { continuation = $0 }
+        }
         let effect = try ExactJSON(data: action)
         let result = effect["tag"].string == "write_image_ddl" ? "image_ddl_written" : "image_ddl_reviewed"
         return ExactJSON.object(["tag": .string(result), "identity": effect["identity"],

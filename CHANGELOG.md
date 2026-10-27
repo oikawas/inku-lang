@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-27 — macOS calls Wild "Lift the stroke limit"
+
+By the author's decision, macOS follows Web. The Creation and Batch conditions, the switch in refine, compare, work-editing and DDL-editing dialogs, autonomous refinement, and the work's provenance (Lifted / Not lifted) now say Lift the stroke limit. The dialogs drop the Stroke limit label before the button and show (inherited) after it when the setting is inherited. The Web copy (`ui-reference.json`) was exported again from Build 1351, which also brings other Web wording changed since Build 1316 (plugin and image-import settings, among others). The switch is still off by default; the `render_wild` record and drawing are unchanged.
+
 ### 2026-10-27 — Android also calls Wild "Lift the stroke limit"
 
 Android's labels follow Web. The rendering switch in Settings, the Inherit / On / Off heading in refinement, the autonomous refinement heading and the Generation Info row now say `Lift the stroke limit` (`筆致制限を外す` in Japanese). Lighting it lifts the limit; it stays off by default. Generation Info and the settings card show `Lifted` or `Not lifted` (`外した`・`外さない`). The record `render_wild` and the drawing are unchanged.

@@ -129,7 +129,6 @@
 "ライブ用" = "Live";
 "ランダム" = "Random";
 "レート制限" = "Rate limits";
-"ワイルド" = "Wild";
 "一巡したあと失敗した行だけを再試行します。0なら再試行せず、中断したときも再試行しません。" = "After the first pass, retries only failed rows. 0 disables retries; interrupted runs are not retried.";
 "一覧" = "List";
 "一覧から保存作品を選択してください。" = "Select a saved work from the list.";
@@ -174,7 +173,7 @@
 "候補を閉じる" = "Close candidate";
 "停止" = "Stop";
 "停止中" = "Stopping";
-"元のワイルド設定を引き継ぐ" = "Keep the source work's Wild setting";
+"筆致制限を外すかを元の作品から引き継ぐ" = "Keep whether the source work lifted the stroke limit";
 "元の作品" = "Source work";
 "元の作品は保持し、新しい子を系譜に保存します。" = "The source work is kept; a new child is saved in the lineage.";
 "元の節点と接続を保持しています。作品本文は削除されています。" = "The original node and edges are kept. The work contents have been deleted.";
@@ -256,7 +255,7 @@
 "日本語" = "日本語";
 "日本語の形式を判定する（読み辞書の音数）" = "Judge Japanese forms (dictionary sound count)";
 "旧Markdownの語です。共通コアの定義がないため描画では省略されます。" = "A legacy Markdown word. It has no shared-core definition and is omitted during drawing.";
-"暴れる" = "Wild";
+"筆致制限を外す" = "Lift the stroke limit";
 "更新" = "Refresh";
 "書き出し" = "Export";
 "書き出しの初期設定" = "Export defaults";
@@ -534,7 +533,7 @@
 "間隔: %ld時間" = "Interval: %ld hours";
 "保持: %ld世代" = "Keep: %ld generations";
 "旧写生の区切り: %@（保存記録）" = "Legacy sketch division: %@ (saved record)";
-"シード: %@ · 暴れる: %@" = "Seed: %@ · Wild: %@";
+"シード: %@ · 筆致制限を外す: %@" = "Seed: %@ · Lift the stroke limit: %@";
 "ごみ箱 (%ld)" = "Trash (%ld)";
 "%ld 件選択" = "%ld selected";
 "%ld 作品 · お気に入り %ld · 推敲 %ld" = "%ld works · %ld starred · %ld marked for refinement";
@@ -786,7 +785,7 @@
 "中程度の変奏" = "Moderate";
 "大きな変奏" = "Sweeping";
 "変奏では元の作品のモデルを保ちます。" = "Variation keeps the original work’s models.";
-"変奏で動くものはありませんが、ワイルド設定は元の作品から変更します。" = "Variation moves nothing; the Wild setting will change from the original work.";
+"変奏で動くものはありませんが、筆致制限を外すかは元の作品から変更します。" = "Variation moves nothing; whether the stroke limit is lifted will change from the original work.";
 "この操作では、選んだモデルを構造化に使います。" = "This operation uses the selected model for the score.";
 "制作で選んだ次のモデルを使う" = "Use the next model selected for painting";
 "制作で選んだ次の描画モデルを、読み取りと構造化の両方に使います。" = "Use the next drawing model selected for painting for both reading and the score.";
@@ -1312,8 +1311,7 @@
 "比較の元になる保存作品を選択してください。" = "Choose the saved work to compare.";
 "比較する候補を指定してください。" = "Choose the comparison options.";
 "比較候補を生成中" = "Painting comparison options";
-"筆致制限（継承）" = "Stroke limit (inherited)";
-"筆致制限" = "Stroke limit";
+"（継承）" = "(inherited)";
 "超高速（LLM不要）" = "Very fast (no LLM)";
 "高速（補完の穴があるときだけLLM）" = "Fast (LLM only for holes to complete)";
 "低速（LLM・API使用）" = "Slow (LLM and API)";

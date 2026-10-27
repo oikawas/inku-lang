@@ -40,11 +40,11 @@ public struct RefinementView: View {
                     .inkuFont(11).foregroundStyle(.secondary)
                 RefinementDrawingModelPicker(model: model, reference: $refinement.modelReference, disabled: controlsDisabled)
                 HStack {
-                    Text(model.display.localized(self.refinement.inheritWild ? "筆致制限（継承）" : "筆致制限")).inkuFont(12).foregroundStyle(.secondary)
-                    Button(model.display.localized("暴れる")) {
+                    Button(model.display.localized("筆致制限を外す")) {
                         refinement.wildOverride = !effectiveWild; refinement.inheritWild = false
                     }.buttonStyle(.bordered).tint(effectiveWild ? Color.accentColor : Color.secondary)
                         .accessibilityValue(model.display.localized(effectiveWild ? "入" : "切"))
+                    if self.refinement.inheritWild { Text(model.display.localized("（継承）")).inkuFont(11).foregroundStyle(.secondary) }
                 }.disabled(controlsDisabled)
                 if refinement.running {
                     RunStatusView(display: model.display, label: refinement.saving ? "選択した候補を保存中" : "候補の準備中",

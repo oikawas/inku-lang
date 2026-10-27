@@ -25,10 +25,10 @@ struct DdlAuthoringEditorSheet: View {
                 HStack(spacing: 18) {
                     DdlDrawingModelCard(model: model, reference: drawingModel, providers: providers) { showModels = true }
                     HStack(spacing: 8) {
-                        Text(model.display.localized(wildOverride == nil ? "筆致制限（継承）" : "筆致制限")).inkuFont(12).foregroundStyle(.secondary)
-                        Button(model.display.localized("暴れる")) { wildOverride = !(wildOverride ?? inheritedWild) }
+                        Button(model.display.localized("筆致制限を外す")) { wildOverride = !(wildOverride ?? inheritedWild) }
                             .buttonStyle(InkuGhostButtonStyle(active: wildOverride ?? inheritedWild))
                             .accessibilityValue(model.display.localized((wildOverride ?? inheritedWild) ? "オン" : "オフ"))
+                        if wildOverride == nil { Text(model.display.localized("（継承）")).inkuFont(11).foregroundStyle(.secondary) }
                     }.fixedSize()
                 }.disabled(model.isBusy)
             } actions: {

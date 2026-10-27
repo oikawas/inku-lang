@@ -151,11 +151,11 @@ struct BatchConditionsView: View {
             guard !disabled else { return }
             model.wild.toggle()
         } label: {
-            Text(model.display.localized("暴れる") + " " + model.display.localized(shownWild.map { $0 ? "入" : "切" } ?? "未記録"))
+            Text(model.display.localized("筆致制限を外す") + " " + model.display.localized(shownWild.map { $0 ? "入" : "切" } ?? "未記録"))
         }
         .buttonStyle(InkuGhostButtonStyle(active: shownWild == true))
         .inkuTooltip(tip("次の作品の筆致を規則から外します。"))
-        .accessibilityLabel(model.display.localized("暴れる"))
+        .accessibilityLabel(model.display.localized("筆致制限を外す"))
         .accessibilityValue(model.display.localized(shownWild.map { $0 ? "入" : "切" } ?? "未記録"))
     }
 

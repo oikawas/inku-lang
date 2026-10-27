@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-27 — Android shows DDL title lines as headings
+
+Android's DDL editor and ranged DDL view set a DDL title line (DDL 27) in bold and colour no word in it, and the vocabulary bar's detected words leave title lines out. Lines are recognised by a port of the shared core's `ddl_title_name` (`ui/DdlTitles.kt`). The drawing is unchanged.
+
 ### 2026-10-27 — macOS calls Wild "Lift the stroke limit"
 
 By the author's decision, macOS follows Web. The Creation and Batch conditions, the switch in refine, compare, work-editing and DDL-editing dialogs, autonomous refinement, and the work's provenance (Lifted / Not lifted) now say Lift the stroke limit. The dialogs drop the Stroke limit label before the button and show (inherited) after it when the setting is inherited. The Web copy (`ui-reference.json`) was exported again from Build 1351, which also brings other Web wording changed since Build 1316 (plugin and image-import settings, among others). The switch is still off by default; the `render_wild` record and drawing are unchanged.

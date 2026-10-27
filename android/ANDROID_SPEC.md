@@ -4,7 +4,11 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-10-26.
+Last updated: 2026-10-27.
+
+## 2026-10-27 DDL title lines (DDL 27) show as headings
+
+A line that, without the spaces around it, is wholly `「name」`, `"name"` or `“name”` is a title and draws nothing (the shared core's `ddl_title_name` in `chunk_title.rs`, ported from Web's `ddl-titles.ts` into `ui/DdlTitles.kt`). The DDL editor and the ranged DDL view set a title line in bold and colour no word in it. The vocabulary bar's detected words come from the DDL without its title lines. The drawing and the Score are the same as for the DDL without titles.
 
 ## 2026-10-26 Model settings lead with the model selection
 

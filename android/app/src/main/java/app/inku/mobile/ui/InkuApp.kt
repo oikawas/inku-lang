@@ -867,7 +867,8 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
     val vocabularyTokens = rememberDdlVocabularyTokens(lang)
     val allVocabularyWords = remember(vocabularyTokens) { vocabularyTokens.map { it.word } }
     val detectedWords = remember(editorValue.text, vocabularyTokens) {
-        vocabularyTokens.filter { editorValue.text.contains(it.word) }
+        val drawn = withoutDdlTitleLines(editorValue.text)
+        vocabularyTokens.filter { drawn.contains(it.word) }
     }
     val selectedWord = remember(editorValue.selection, editorValue.text, vocabularyTokens) {
         selectedVocabularyToken(editorValue, vocabularyTokens)
@@ -7397,37 +7398,25 @@ internal fun androidx.compose.ui.graphics.drawscope.DrawScope.drawDdlKeywordHigh
     tokens: List<DdlVocabularyToken>,
 ) {
     if (text.isBlank() || tokens.isEmpty()) return
-    val occupied = BooleanArray(text.length)
     val horizontalPad = Dimens.hairline.toPx()
     val verticalPad = Dimens.hairline.toPx()
     val radius = Dimens.highlightCorner.toPx()
-    tokens.forEach { token ->
-        val word = token.word
-        if (word.isBlank()) return@forEach
-        var start = text.indexOf(word)
-        while (start >= 0) {
-            val end = start + word.length
-            val overlaps = (start until end).any { occupied[it] }
-            if (!overlaps) {
-                var segmentStart = start
-                while (segmentStart < end) {
-                    val line = layout.getLineForOffset(segmentStart)
-                    val segmentEnd = minOf(end, layout.getLineEnd(line, visibleEnd = false))
-                    val firstBox = layout.getBoundingBox(segmentStart)
-                    val lastBox = layout.getBoundingBox(segmentEnd - 1)
-                    val top = minOf(firstBox.top, lastBox.top) + verticalPad
-                    val bottom = maxOf(firstBox.bottom, lastBox.bottom) - verticalPad
-                    drawRoundRect(
-                        color = token.color.copy(alpha = 0.92f),
-                        topLeft = Offset(firstBox.left - horizontalPad, top),
-                        size = Size((lastBox.right - firstBox.left) + horizontalPad * 2f, bottom - top),
-                        cornerRadius = CornerRadius(radius, radius),
-                    )
-                    segmentStart = segmentEnd
-                }
-                for (i in start until end) occupied[i] = true
-            }
-            start = text.indexOf(word, startIndex = end)
+    ddlKeywordSpans(text, tokens.map { it.word }).forEach { (index, start, end) ->
+        var segmentStart = start
+        while (segmentStart < end) {
+            val line = layout.getLineForOffset(segmentStart)
+            val segmentEnd = minOf(end, layout.getLineEnd(line, visibleEnd = false))
+            val firstBox = layout.getBoundingBox(segmentStart)
+            val lastBox = layout.getBoundingBox(segmentEnd - 1)
+            val top = minOf(firstBox.top, lastBox.top) + verticalPad
+            val bottom = maxOf(firstBox.bottom, lastBox.bottom) - verticalPad
+            drawRoundRect(
+                color = tokens[index].color.copy(alpha = 0.92f),
+                topLeft = Offset(firstBox.left - horizontalPad, top),
+                size = Size((lastBox.right - firstBox.left) + horizontalPad * 2f, bottom - top),
+                cornerRadius = CornerRadius(radius, radius),
+            )
+            segmentStart = segmentEnd
         }
     }
 }
@@ -7440,26 +7429,12 @@ internal class DdlKeywordHighlightTransformation(
             return TransformedText(text, OffsetMapping.Identity)
         }
         val builder = AnnotatedString.Builder(text)
-        val occupied = BooleanArray(text.text.length)
-        tokens.forEach { token ->
-            val word = token.word
-            if (word.isBlank()) return@forEach
-            var start = text.text.indexOf(word)
-            while (start >= 0) {
-                val end = start + word.length
-                val overlaps = (start until end).any { occupied[it] }
-                if (!overlaps) {
-                    builder.addStyle(
-                        SpanStyle(
-                            color = if (isLightColor(token.color)) PillInkOnLight else PillInkOnDark,
-                        ),
-                        start,
-                        end,
-                    )
-                    for (i in start until end) occupied[i] = true
-                }
-                start = text.text.indexOf(word, startIndex = end)
-            }
+        ddlTitleLineSpans(text.text).forEach { span ->
+            builder.addStyle(SpanStyle(fontWeight = FontWeight.Bold), span.first, span.last + 1)
+        }
+        ddlKeywordSpans(text.text, tokens.map { it.word }).forEach { (index, start, end) ->
+            val color = tokens[index].color
+            builder.addStyle(SpanStyle(color = if (isLightColor(color)) PillInkOnLight else PillInkOnDark), start, end)
         }
         return TransformedText(builder.toAnnotatedString(), OffsetMapping.Identity)
     }

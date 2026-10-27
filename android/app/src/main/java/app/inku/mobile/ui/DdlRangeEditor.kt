@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.font.FontWeight
 import app.inku.mobile.ui.theme.Dimens
 import app.inku.mobile.ui.theme.InputWellSurface
 import app.inku.mobile.ui.theme.LocalUiTextScale
@@ -83,21 +84,15 @@ internal fun DdlRangeEditor(
             ), table, currentCompletionTags)
             displayed.applyTo(this)
             val text = asCharSequence().toString()
-            val occupied = BooleanArray(text.length)
-            tokens.forEach { token ->
-                if (token.word.isEmpty()) return@forEach
-                var start = text.indexOf(token.word)
-                while (start >= 0) {
-                    val end = start + token.word.length
-                    if ((start until end).none { occupied[it] }) {
-                        addStyle(SpanStyle(
-                            background = token.color,
-                            color = if (isLightColor(token.color)) PillInkOnLight else PillInkOnDark,
-                        ), start, end)
-                        for (index in start until end) occupied[index] = true
-                    }
-                    start = text.indexOf(token.word, end)
-                }
+            ddlTitleLineSpans(text).forEach { span ->
+                addStyle(SpanStyle(fontWeight = FontWeight.Bold), span.first, span.last + 1)
+            }
+            ddlKeywordSpans(text, tokens.map { it.word }).forEach { (index, start, end) ->
+                val color = tokens[index].color
+                addStyle(SpanStyle(
+                    background = color,
+                    color = if (isLightColor(color)) PillInkOnLight else PillInkOnDark,
+                ), start, end)
             }
             displayed.labels.forEach { label ->
                 addStyle(SpanStyle(background = placeColor, color = placeInk), label.start, label.end)

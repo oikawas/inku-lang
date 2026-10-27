@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-27 — All saved works appear in history
-
-The Server and Web now save refinement intermediates, including children that did not pass the visual gate, as ordinary works. Existing lineage-only works and nodes are converted at startup after a verified database snapshot; works and lineage edges are retained. The hidden-history option and promotion action have been removed.
-
 ### 2026-10-27 — Paint from an image on macOS
 
 The image tab and image-folder batch prepare images with ImageIO and the shared core's image policy, then send them to a Vision model. Provenance is saved with the work and is not used for drawing; image bytes are not saved. The app warns before the first image send after launch. Folder progress is recorded for reselection and resumption.
@@ -382,6 +378,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.282 (2026-10-27 / Build1358)
+
+### 2026-10-27 — All saved works appear in history
+
+The Server and Web now save refinement intermediates, including children that did not pass the visual gate, as ordinary works. Existing lineage-only works and nodes are converted at startup after a verified database snapshot; works and lineage edges are retained. The hidden-history option and promotion action have been removed.
 
 ## v2.15.281 (2026-10-27 / Build1357)
 

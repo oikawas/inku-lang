@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+### 2026-10-27 — 画像の3つの関数をUniFFIからも呼べるようにする
+
+共有coreの`image_input_policy`・`image_canvas`・`image_review_svg`を、UniFFI（macOSの包み）からも呼べるようにした。ServerのCPythonとAndroidのJNIの呼び方と、関数の振る舞いは変わらない。macOSの画像から描くの準備。
+
 ### 2026-10-27 — AndroidのDDLの題の行を見出しとして見せる
 
 DDLの題の行（DDL 27）を、Androidの編集欄と範囲つきのDDL表示では太字にし、中の語に色を付けないようにした。語彙バーの「検出した語」も題の行を除いて拾う。見分けは共有coreの`ddl_title_name`の写し（`ui/DdlTitles.kt`）。描く画は変わらない。

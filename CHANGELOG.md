@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-27 — Give the stroke limit switch its own default
-
-Settings → Display and operation now holds the browser default for `Lift the stroke limit`, initially off. The input chip changes only the current drawing. Derived works start from the default, not the parent, and use their own choice. For new Server runs, autonomous refinement, color arrangements, ground changes and touch changes, omitted or null `wild` means off. Replaying or fitting a saved work as it stands uses its recorded value. The former input-chip preference is not migrated into the new default.
-
 ### 2026-10-27 — Paint from an image on macOS
 
 The image tab and image-folder batch prepare images with ImageIO and the shared core's image policy, then send them to a Vision model. Provenance is saved with the work and is not used for drawing; image bytes are not saved. The app warns before the first image send after launch. Folder progress is recorded for reselection and resumption.
@@ -382,6 +378,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.281 (2026-10-27 / Build1357)
+
+### 2026-10-27 — Give the stroke limit switch its own default
+
+Settings → Display and operation now holds the browser default for `Lift the stroke limit`, initially off. The input chip changes only the current drawing. Derived works start from the default, not the parent, and use their own choice. For new Server runs, autonomous refinement, color arrangements, ground changes and touch changes, omitted or null `wild` means off. Replaying or fitting a saved work as it stands uses its recorded value. The former input-chip preference is not migrated into the new default.
 
 ## v2.15.280 (2026-10-27 / Build1356)
 

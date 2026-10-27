@@ -113,7 +113,7 @@ pub struct ThingProblem {
 // --- a sentence's numbers ----------------------------------------------------------------------
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum PlaceKind {
+pub(crate) enum PlaceKind {
     /// A point: horizontal, vertical.
     Point,
     /// A range as it is written: horizontal from, to, vertical from, to.
@@ -125,15 +125,18 @@ enum PlaceKind {
 /// A sentence's numbers as the parser reads them, each with its place in the
 /// sentence.
 #[derive(Clone, Debug, PartialEq)]
-struct Numbers {
-    kind: PlaceKind,
-    values: Vec<f64>,
-    spans: Vec<(usize, usize)>,
+pub(crate) struct Numbers {
+    pub(crate) kind: PlaceKind,
+    pub(crate) values: Vec<f64>,
+    pub(crate) spans: Vec<(usize, usize)>,
     /// Each size written, by name, with its place.
-    sizes: BTreeMap<&'static str, (f64, (usize, usize))>,
-    rotation: f64,
+    pub(crate) sizes: BTreeMap<&'static str, (f64, (usize, usize))>,
+    pub(crate) rotation: f64,
+    /// Where the rotation's degrees are written, when the sentence writes one
+    /// (a chunk move turns a mark by rewriting them).
+    pub(crate) rotation_span: Option<(usize, usize)>,
     /// The sentence lines its marks up (one sentence's row).
-    row: bool,
+    pub(crate) row: bool,
 }
 
 fn span_of(span: &SourceSpan) -> (usize, usize) {
@@ -148,7 +151,7 @@ pub(crate) fn fraction(value: ExactFraction) -> f64 {
 /// The numbers of one sentence, or `None` when it has no numeric place (a
 /// ground, a background, a place in words) or when a number is not found
 /// where the parser says it is.
-fn parse(line: &str, language: ResolvedInstructionLanguage) -> Option<Numbers> {
+pub(crate) fn parse(line: &str, language: ResolvedInstructionLanguage) -> Option<Numbers> {
     let document = NormalizedDdlDocument::new(line, language, Vec::new()).ok()?;
     let compilation = compile_typed_ddl(document, &[], None, LIMITS);
     let semantic = compilation.semantic_document.as_ref()?;
@@ -249,6 +252,10 @@ fn numbers_of(
         .numeric_angle
         .as_ref()
         .map_or(0.0, |angle| fraction(angle.degrees));
+    let rotation_span = entity
+        .numeric_angle
+        .as_ref()
+        .map(|angle| span_of(&angle.degrees_span));
     let row = match language {
         ResolvedInstructionLanguage::Ja => {
             let text = line.trim_end();
@@ -265,6 +272,7 @@ fn numbers_of(
         spans,
         sizes,
         rotation,
+        rotation_span,
         row,
     })
 }
@@ -295,7 +303,7 @@ fn mark_size(numbers: &Numbers) -> Option<(f64, f64)> {
 
 /// The box (left, top, right, bottom, in canvas fractions) a sentence's marks
 /// take, as the prototype measured it.
-fn sentence_box(numbers: &Numbers, units: [f64; 2]) -> [f64; 4] {
+pub(crate) fn sentence_box(numbers: &Numbers, units: [f64; 2]) -> [f64; 4] {
     let [ux, uy] = units;
     let values = &numbers.values;
     let size = mark_size(numbers);
@@ -333,7 +341,7 @@ fn sentence_box(numbers: &Numbers, units: [f64; 2]) -> [f64; 4] {
     }
 }
 
-fn union(boxes: impl IntoIterator<Item = [f64; 4]>) -> Option<[f64; 4]> {
+pub(crate) fn union(boxes: impl IntoIterator<Item = [f64; 4]>) -> Option<[f64; 4]> {
     boxes.into_iter().reduce(|a, b| {
         [
             a[0].min(b[0]),
@@ -344,21 +352,26 @@ fn union(boxes: impl IntoIterator<Item = [f64; 4]>) -> Option<[f64; 4]> {
     })
 }
 
-fn center(b: [f64; 4]) -> [f64; 2] {
+pub(crate) fn center(b: [f64; 4]) -> [f64; 2] {
     [(b[0] + b[2]) / 2.0, (b[1] + b[3]) / 2.0]
 }
 
 /// A box's long side in short-edge units: the size the laws compare.
-fn extent(b: [f64; 4], units: [f64; 2]) -> f64 {
+pub(crate) fn extent(b: [f64; 4], units: [f64; 2]) -> f64 {
     ((b[2] - b[0]) * units[0]).max((b[3] - b[1]) * units[1])
 }
 
-fn inside(b: [f64; 4]) -> bool {
+pub(crate) fn inside(b: [f64; 4]) -> bool {
     b[0] >= -1e-6 && b[1] >= -1e-6 && b[2] <= 1.0 + 1e-6 && b[3] <= 1.0 + 1e-6
 }
 
 /// The sentence with its place's numbers replaced and its sizes multiplied.
-fn rewritten(line: &str, numbers: &Numbers, values: Option<&[f64]>, scale: Option<f64>) -> String {
+pub(crate) fn rewritten(
+    line: &str,
+    numbers: &Numbers,
+    values: Option<&[f64]>,
+    scale: Option<f64>,
+) -> String {
     let mut edits: Vec<((usize, usize), String)> = Vec::new();
     if let Some(values) = values {
         edits.extend(
@@ -386,7 +399,13 @@ fn rewritten(line: &str, numbers: &Numbers, values: Option<&[f64]>, scale: Optio
 }
 
 /// The place's numbers moved by `(dx, dy)` and scaled by `s` about a point.
-fn moved_values(numbers: &Numbers, dx: f64, dy: f64, s: f64, about: [f64; 2]) -> Vec<f64> {
+pub(crate) fn moved_values(
+    numbers: &Numbers,
+    dx: f64,
+    dy: f64,
+    s: f64,
+    about: [f64; 2],
+) -> Vec<f64> {
     let point = |x: f64, y: f64| {
         (
             about[0] + s * (x - about[0]) + dx,

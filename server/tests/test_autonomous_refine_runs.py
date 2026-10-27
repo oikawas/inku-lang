@@ -108,7 +108,7 @@ def _fake_moves(runner, monkeypatch, outcome: dict[str, str]) -> list[str]:
     kept child of a laws move is held by its DDL."""
     taken: list[str] = []
 
-    def work(_owner, history_id):
+    def work(_owner, history_id, **_kwargs):
         return {"id": history_id, "item": {"svg": "<svg/>"},
                 "facts": {"description_locked": history_id.startswith("laws"), "ddl_work": False, "laws": []}}
 
@@ -263,7 +263,7 @@ def test_an_owner_takes_one_run_at_a_time(author, runner, monkeypatch):
     monkeypatch.setattr(autonomous_refine, "_runner", runner)
     started = threading.Event()
 
-    def work(_owner, history_id):
+    def work(_owner, history_id, **_kwargs):
         return {"id": history_id, "item": {"svg": "<svg/>"},
                 "facts": {"description_locked": False, "ddl_work": False, "laws": []}}
 

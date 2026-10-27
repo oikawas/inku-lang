@@ -25,18 +25,21 @@ class AutonomousRunBody(BaseModel):
         default=MOVES_DEFAULT, ge=1, le=10,
         description="Number of moves the run takes, from 1 to 10. Defaults to 5.",
     )
-    kinds: list[Literal["laws", "juxtaposition"]] = Field(
+    kinds: list[Literal["laws", "juxtaposition", "chunks"]] = Field(
         default_factory=lambda: ["laws", "juxtaposition"], min_length=1, max_length=2,
         description=(
             "Move kinds the run may take: laws (the laws stage again on the saved work, leaving out the "
-            "laws its parent used) and juxtaposition (adds a sentence from another of the author's works "
-            "after the description). Defaults to both; at least one is required."
+            "laws its parent used), juxtaposition (adds a sentence from another of the author's works "
+            "after the description), and chunks (one move a turn on one chunk of the work's titled DDL: "
+            "omit, simplify, place, break, repeat or merge, toward the note). Defaults to laws and "
+            "juxtaposition; at least one is required. chunks runs alone (422, autonomous_chunks_alone) and "
+            "needs the note (422, autonomous_note_required)."
         ),
     )
-    # The author's direction; it reaches the laws move only.
+    # The author's direction; the laws move and the chunk move read it.
     note: str | None = Field(
         default=None, max_length=NOTE_LIMIT,
-        description="The author's direction for the laws move, up to 1,000 characters. Only the laws move reads it, though it is kept on each child's lineage record. Blank text is treated as no note.",
+        description="The author's direction, up to 1,000 characters. The laws move and the chunk move read it (the chunk move needs it); it is kept on each child's lineage record. Blank text is treated as no note.",
     )
     # One model takes every move and draws every child; none takes the account's Vision model.
     model: str | None = Field(
@@ -56,13 +59,14 @@ class AutonomousRunBody(BaseModel):
 
 class AutonomousTry(BaseModel):
     attempt: int = Field(description="Number of this try within its turn.")
-    kind: str = Field(description="Move kind of this try: laws or juxtaposition.")
+    kind: str = Field(description="Move kind of this try: laws, juxtaposition or chunks.")
     # kept, not_visible, unavailable or failed.
     outcome: str = Field(
         description=(
-            "Result of the try: kept (the child differs visibly from its parent and becomes the next parent), "
-            "not_visible (the child does not differ visibly enough and stays in the lineage only), "
-            "unavailable (the move could not be taken), or failed (an error ended the try)."
+            "Result of the try: kept (the child differs visibly from its parent, or a chunk move's child passed "
+            "its checks, and becomes the next parent), not_visible (the child does not differ visibly enough "
+            "and stays in the lineage only), unavailable (the move could not be taken), or failed (an error, "
+            "or a chunk move that kept nothing, ended the try)."
         ),
     )
     reason: str | None = Field(default=None, description="Reason for the outcome, when one is recorded. Null otherwise.")
@@ -74,6 +78,9 @@ class AutonomousTry(BaseModel):
     main_law: str | None = Field(default=None, description="Main law that the laws move's basis named for the child, when recorded. Null for other moves.")
     sentence: str | None = Field(default=None, description="Sentence the juxtaposition move chose, when recorded. On a failed try it may not have been added to the description. Null for laws moves.")
     rank: int | None = Field(default=None, description="Rank of the chosen sentence among the juxtaposition candidates, counted from 1, when recorded.")
+    move: str | None = Field(default=None, description="The chunk move's move (omit, simplify, place, break, repeat or merge), when recorded. Null for other moves.")
+    targets: list[str] | None = Field(default=None, description="Titles of the chunks the chunk move took, when it kept a child. Null otherwise.")
+    title: str | None = Field(default=None, description="The new title a chunk move's simplify or merge gave the chunk it redrew. Null otherwise.")
     history_id: str | None = Field(default=None, description="ID of the child work this try saved, when it saved one.")
     lineage_node_id: str | None = Field(default=None, description="ID of the lineage node that records this try's move on its edge.")
 
@@ -85,13 +92,13 @@ class AutonomousTurn(BaseModel):
 class AutonomousCurrent(BaseModel):
     turn: int = Field(description="Turn now under way, counted from 1.")
     attempt: int = Field(description="Try now under way within the turn.")
-    kind: str = Field(description="Move kind now being taken: laws or juxtaposition.")
+    kind: str = Field(description="Move kind now being taken: laws, juxtaposition or chunks.")
 
 
 class AutonomousSettings(BaseModel):
     moves: int = Field(description="Number of moves the run was started with.")
     kinds: list[str] = Field(description="Move kinds the run was started with.")
-    note: str | None = Field(default=None, description="The author's direction the run was started with. Null when none was given.")
+    note: str | None = Field(default=None, description="The author's direction the run was started with. Null when none was given (a chunk run always has one).")
     model: str = Field(description="Model the run was started with, used for every move and every child drawing.")
     language: str = Field(description="Language of the run's instructions: ja or en.")
     wild: bool | None = Field(default=None, description="Wild setting applied to every child. Null keeps each parent's setting.")

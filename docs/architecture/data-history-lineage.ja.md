@@ -151,7 +151,7 @@ flowchart TD
     SAME_VAR["同じvariation"] -.->|"自動edgeにしない"| EDGE
 ```
 
-`db.add_item` はparentがあるのにkindが無い場合、またはkindだけの場合を拒否する。parentがあれば同じuserの非tombstone nodeを確認し、history、node、edgeを1 transactionで書く。類似度、時刻、hash一致、同じvariationであることからedgeは作らない。共有pipelineの派生（記述fork、DDL fork、旧作品からのfork）は、元作品のlineage nodeを明示parentとして渡したときだけedgeになり、kindを明示しなければ`description_edit`または`ddl_edit`になる。保存作品の差し替え・はめ込み・法則の手・取り合わせ・見比べる前の指示書からの子も、明示したparentとkindでだけedgeになる。AI自動推敲の子は系譜にだけ保存され（`lineage_only`）、測った後に辺へ手の記録（`ai_move`）を書く。見える差の門を通った子が次の手番の親になり、最後に残った子をrunの終わりに通常履歴へ出す。
+`db.add_item` はparentがあるのにkindが無い場合、またはkindだけの場合を拒否する。parentがあれば同じuserの非tombstone nodeを確認し、history、node、edgeを1 transactionで書く。類似度、時刻、hash一致、同じvariationであることからedgeは作らない。共有pipelineの派生（記述fork、DDL fork、旧作品からのfork）は、元作品のlineage nodeを明示parentとして渡したときだけedgeになり、kindを明示しなければ`description_edit`または`ddl_edit`になる。保存作品の差し替え・はめ込み・法則の手・取り合わせ・まとまりの手（`chunk_move`）・見比べる前の指示書からの子も、明示したparentとkindでだけedgeになる。AI自動推敲の子は系譜にだけ保存され（`lineage_only`）、測った後に辺へ手の記録（`ai_move`）を書く。見える差のゲートを通った子（まとまりの手はゲートを当てず、確かめを通った子）が次の手番の親になり、最後に残った子をrunの終わりに通常履歴へ出す。まとまりの手で確かめを通らなかった子は、`ai_move`の無い辺で系譜に残る。
 
 ## 保存済みSVGと再描画
 

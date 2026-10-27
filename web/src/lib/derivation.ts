@@ -37,8 +37,9 @@ const JA: Record<string, string> = {
 	canvas_fit: 'はめ込み',
 	variation: '変奏（旧）',
 	sketch_grain_change: '写生の有無',
-	// The AI refinement's laws move; the Server's run writes it, no screen sends it.
-	laws_change: '法則'
+	// The AI refinement's laws move and chunk move; the Server's run writes them, no screen sends them.
+	laws_change: '法則',
+	chunk_move: 'まとまりの手'
 };
 
 const EN: Record<string, string> = {
@@ -58,7 +59,8 @@ const EN: Record<string, string> = {
 	canvas_fit: 'Fit',
 	variation: 'Variation (retired)',
 	sketch_grain_change: 'Sketch from life',
-	laws_change: 'Laws'
+	laws_change: 'Laws',
+	chunk_move: 'Chunk move'
 };
 
 export function derivationKindLabel(kind: string | null | undefined, isJapanese: boolean): string {

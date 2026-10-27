@@ -133,6 +133,7 @@ ServerのPython adapter、AndroidのKotlin/JNI adapter、macOSのSwift/UniFFI ad
 | はめ込み | 保存Score、版、指示書、種 | 宣言と違う比の紙へ、保存Scoreを版を変えずに枠へ描き直す（`fit_render`）。系譜は`はめ込み`の子 |
 | 法則の手（AI自動推敲、保存作品から） | 親の指示書と記述、設定・種・色・比・限り、補完の控え、法則の記録 | 入力`SavedLaws`で法則の段をやり直す。Stage 1と構図の読みはやり直さず、親の設定に配色の段があれば続けて行う |
 | 取り合わせ（推敲、AI自動推敲の手） | 元作品 | 共有coreの`juxtaposition`が選ばせた一文を記述の後ろに足し、`description_edit`の子を描く |
+| まとまりの手（AI自動推敲、保存作品から） | 親の題つきの指示書（題が無ければ構図の記録から印字）、色カタログ・描きの種・画面比・`render_wild` | 共有coreの`chunk_moves`が手を当てた指示書を、親付きのdirect DDLとして描く。派生は`chunk_move`。手を選ぶ回と描き直す回の送信はServerのrunが行い、pipelineのLLMのstageではない |
 | 見比べる前の指示書から描く（画像起点の作品） | 元作品と記録の`image_ddl.before_review` | その本文を作品の親付きDDL編集（`ddl_edit`）として描く |
 | 旧作品からの派生 | 元history行を変更しない | `legacy/{history_id}/fork`で`legacy_description_fork` / `legacy_ddl_fork`の新variation |
 
@@ -173,7 +174,7 @@ ServerのPython adapter、AndroidのKotlin/JNI adapter、macOSのSwift/UniFFI ad
 | 構図の読み・法則・配色 | `inku-pipeline/src/{composition_reading,composition,recompose,laws,laws_entry,laws_record,colors,appearance}.rs` |
 | 画像から書く作品 | `inku-pipeline/src/{image_ddl,machine/image}.rs` |
 | providerへの要求本文と答えの読み | `inku-pipeline/src/provider_wire.rs`、`provider_wire/chatgpt.rs` |
-| 保存作品の推敲の規則 | `inku-pipeline/src/{saved_variants,retouch,juxtaposition,autonomous_refine}.rs` |
+| 保存作品の推敲の規則 | `inku-pipeline/src/{saved_variants,retouch,juxtaposition,autonomous_refine,chunk_moves}.rs` |
 | 作品の同一性 | `inku-pipeline/src/identity.rs` |
 | Typed compiler / 下絵 / Stage 1.5 / lowerer / 画面比の宣言 | `core/crates/inku-ddl`（`canvas_ratio.rs`、`completion_record.rs`を含む） |
 | Score schema / compatibility / resource policy | `core/crates/inku-score` |

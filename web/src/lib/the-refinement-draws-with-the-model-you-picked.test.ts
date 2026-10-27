@@ -45,8 +45,9 @@ test('T-167  the picker is always offered', () => {
 
 test('a work its edited DDL holds is offered the run too, with a note (2026-10-21)', () => {
 	// It takes no sentence, so its run takes laws moves; the hold only adds its
-	// note and disables nothing.
-	assert.match(MODAL, /\{#if held\}<p class="ai-refine-note">\{t\(\)\.aiRefineHeldNote\}<\/p>\{\/if\}/);
+	// note and disables nothing. A chunk run (2026-10-27) takes chunk moves,
+	// which the hold does not touch, so the note is left out there.
+	assert.match(MODAL, /\{#if held && !useChunks\}<p class="ai-refine-note">\{t\(\)\.aiRefineHeldNote\}<\/p>\{\/if\}/);
 	const start = MODAL.match(/<button type="button" class="ai-refine-primary" disabled=\{starting[^>]*>/)?.[0] ?? '';
 	assert.ok(start, 'the start button was not found');
 	assert.doesNotMatch(start, /held/);

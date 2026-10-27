@@ -71,7 +71,7 @@ flowchart LR
     COMPAT["pipeline_compat.py\nrequest → options・結果の投影・冪等再送"]
     SERVICE["PipelineService\nthread pool・保持run・effect段数"]
     EXEC["CandidateExecution\n1 executionの直列化"]
-    BINDING["PipelineBinding\ninku_render wheel\nstep / render_saved / palette / canvas / macro catalog\nsaved_variants / juxtaposition / autonomous_refine / image"]
+    BINDING["PipelineBinding\ninku_render wheel\nstep / render_saved / palette / canvas / macro catalog\nsaved_variants / juxtaposition / autonomous_refine / chunk_moves / image"]
     IMAGES["pipeline_images.py\n画像の受取・見比べの画"]
     VARIANT_ROUTE["render router\n差し替え・はめ込み・取り合わせ・構図の範囲"]
     CORE["共有Rust core\ninku-pipeline + inku-ddl + inku-render"]
@@ -152,8 +152,8 @@ flowchart TD
 flowchart LR
     PYBIND["inku-render-python\nCPython: render + pipeline_*"]
     JNI["inku-render-android\nJNI: render + raster + pipeline"]
-    UNIFFI["inku-pipeline-uniffi\nbyte facade\nstep / canvas / palette / Macro catalog\nStage 1 projection / render_saved\nsaved_variants / autonomous_refine / provider_wire / display"]
-    PIPE["inku-pipeline\nmachine / protocol / authority\nprompts / core_boundary / hole_completion / replay\ncomposition / laws / colors / image_ddl / provider_wire\nsaved_variants / juxtaposition / autonomous_refine / identity"]
+    UNIFFI["inku-pipeline-uniffi\nbyte facade\nstep / canvas / palette / Macro catalog\nStage 1 projection / render_saved\nsaved_variants / autonomous_refine / chunk_moves / provider_wire / display"]
+    PIPE["inku-pipeline\nmachine / protocol / authority\nprompts / core_boundary / hole_completion / replay\ncomposition / laws / colors / image_ddl / provider_wire\nsaved_variants / juxtaposition / autonomous_refine / chunk_moves / identity"]
     DDL["inku-ddl\ntyped compiler / Stage 1.5 / Plan / materializer\n下絵 / visible patch / 画面比の宣言 / 歳時記asset"]
     DISPLAY["inku-display\nSkiaの画面表示（skia featureは任意）"]
     DISPLAY_GPU["inku-display-gpu\nmacOSの拡大の窓（Graphite、別process）"]
@@ -235,7 +235,7 @@ router別の件数は、live appのrouteを`test_route_authorization.py`と同�
 
 - `/api/paint`、`/api/paint/stream`、`/api/interpret`、`/api/compose`は`pipeline_compat.py`を通って同じ`PipelineService`を使う。streamは実行を読み直して`sketch`・`stage1`・`score`・`done`を順に知らせ、最初のeventの後の失敗を本文の`error` eventで返す。補完案の承認が要る場合、stream以外の3つは409と現在のviewを返し、streamは最初のeventより前なら409、後なら`error` eventを返す。記述起点の開始は札を切った記述だけをcoreへ渡し、札だけの記述を400で断る。
 - `/api/pipeline/variations`は記述、direct DDL、画像（`kind: image`、`/api/pipeline/images`が預けた一時ID）からvariationを始め、`/executions/{id}/commands`が作者の操作（承認・辞退・補完要求・再生成・演奏・取消し）を、`/executions/{id}/author-ddl`がDDL編集を受ける。設定が変わるDDL編集は元を変えず親付きのvariationを新設する。`/variations/{id}/fork-description`は記述を変えた子を、`/completion-range-states`はDDLエディタが示す補完の範囲の状態を返す。
-- `/api/refine/autonomous`はAI自動推敲のrunを始め・一覧し・停止する。runはServerが進め、子は通常のpipeline runで描かれる。
+- `/api/refine/autonomous`はAI自動推敲のrunを始め・一覧し・停止する。runはServerが進め、子は通常のpipeline runで描かれる。まとまりの手（`kinds: ["chunks"]`、単独）では、共有coreの`chunk_moves`が作った手を選ぶ回と描き直す回の要求をrunがproviderへ送り、coreが当てたDDLをdirect DDLとして描く。
 - 保存作品の差し替え（`/api/render-tool-variant`等）とはめ込み（`/api/render-canvas-fit`）は共有coreの`saved_variants`で、runを作らずに子を描く。
 - `/api/pipeline/history/{id}`は共有pipelineで保存した作品のvariation・revisionを返し、`/history/{id}/fork`はその時点のconfig・host context・Macro定義から派生する。`/history/{id}/ddl-export`は作品の可視DDLを、それが名指すplugin定義とともに書き出す。`/legacy/{id}`と`/legacy/{id}/fork`はlinkを持たない旧作品を読み、元行を変えずに派生する。
 - `/api/render-score`と`/api/render-svg`はScoreの版で分かれ、compact Scoreは`ProductPipelineEffects.replay`、0.10未満は`saved_score_compat.py`を通る。

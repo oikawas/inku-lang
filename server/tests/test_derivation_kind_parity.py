@@ -37,6 +37,8 @@ EXPECTED_KINDS = {
     # The saved Score fitted into another paper (DDL 26, 2026-10-23).
     "canvas_fit",
     "catalog_change",
+    # The AI refinement's chunk move (まとまりの手, 2026-10-27).
+    "chunk_move",
     "color_arrangement_change",
     "ddl_edit",
     "description_edit",
@@ -60,10 +62,11 @@ EXPECTED_KINDS = {
 # Kinds the server names but no web screen sends. Four are reserved for
 # operations that do not exist yet on either side (`hacho` / `renga` / `age`
 # have no implementation anywhere); `render_engine_change` and
-# `external_seed_change` are written by other paths, and `laws_change` by the
-# Server's AI refinement run (2026-10-21).
+# `external_seed_change` are written by other paths, and `laws_change` and
+# `chunk_move` by the Server's AI refinement run (2026-10-21, 2026-10-27).
 RESERVED_WITHOUT_A_WEB_SENDER = {
     "age_change",
+    "chunk_move",
     "external_seed_change",
     "hacho_change",
     "laws_change",

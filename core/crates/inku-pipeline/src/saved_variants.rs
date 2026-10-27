@@ -166,6 +166,14 @@ impl Draw {
         // bias is far below a difference anyone could see between offered options.
         (self.next() % bound as u64) as usize
     }
+
+    /// A value from `low` up to `high`: the top 53 bits of the next draw, so
+    /// every step is a float (a chunk move's break draws its shifts and turns).
+    #[allow(clippy::cast_precision_loss)]
+    pub(crate) fn between(&mut self, low: f64, high: f64) -> f64 {
+        let unit = (self.next() >> 11) as f64 / (1_u64 << 53) as f64;
+        low + (high - low) * unit
+    }
 }
 
 /// Up to four tool assignments, each changing at least one sentence

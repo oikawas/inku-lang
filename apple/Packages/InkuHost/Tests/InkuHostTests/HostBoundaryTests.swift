@@ -88,12 +88,19 @@ final class HostBoundaryTests: XCTestCase, @unchecked Sendable {
         var childRequest = try fixture(.directDDL("place one blue circle at center."))
         childRequest.parentWorkID = view.savedWorkID
         childRequest.derivationKind = "ddl_edit"
-        childRequest.inheritedImageDDL = context.imageDDL
-        childRequest.imageProvenance = context.imageProvenance
         let child = try await host.generate(childRequest)
         let childContext = try await host.savedAuthoringContext(workID: XCTUnwrap(child.savedWorkID))
         XCTAssertEqual(childContext.imageDDL, context.imageDDL)
         XCTAssertEqual(childContext.imageProvenance, context.imageProvenance)
+        var retainedRequest = try fixture(.directDDL(try XCTUnwrap(view.visibleDDL)))
+        retainedRequest.parentWorkID = view.savedWorkID
+        retainedRequest.derivationKind = "catalog_change"
+        retainedRequest.retainedDocument = context.document
+        retainedRequest.retainedAuthority = context.authorityJSON
+        let retained = try await host.generate(retainedRequest)
+        let retainedContext = try await host.savedAuthoringContext(workID: XCTUnwrap(retained.savedWorkID))
+        XCTAssertEqual(retainedContext.imageDDL, context.imageDDL)
+        XCTAssertEqual(retainedContext.imageProvenance, context.imageProvenance)
         let after = try await host.restoreSavedWork(workID: oldID)
         XCTAssertEqual(before.ddl, after.ddl)
         XCTAssertEqual(before.score, after.score)

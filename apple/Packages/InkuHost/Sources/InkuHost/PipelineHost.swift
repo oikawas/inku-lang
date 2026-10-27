@@ -23,11 +23,16 @@ public actor PipelineHost {
     }
 
     public func generate(_ request: GenerationRequest, image: PreparedImageInput? = nil, progress: @escaping PipelineProgressHandler = { _ in }) async throws -> PipelineView {
-        let request = try request.normalizedForNewWork()
+        var request = try request.normalizedForNewWork()
         if request.captureProviderIO == true, !ProviderObservationPolicy.developerModeEnabled {
             throw HostError("developer_provider_observations_not_available")
         }
         guard ["normal", "lineage_only"].contains(request.historyVisibility) else { throw HostError("invalid_history_visibility") }
+        if request.authoring.isDirect, let parentID = request.parentWorkID,
+           let parent = try? await savedAuthoringContext(workID: parentID), let imageDDL = parent.imageDDL {
+            request.inheritedImageDDL = imageDDL
+            request.imageProvenance = parent.imageProvenance
+        }
         // Server `fork_linked_history`/`fork_description`: a work its edited DDL holds refuses a description that
         // rewords it (`_refuse_if_locked`), while its own description starts a new child (the description fork).
         if !request.authoring.isDirect, let parentID = request.parentWorkID,
@@ -493,6 +498,8 @@ public actor PipelineHost {
             derivationKind: request.derivationKind, metadataJSON: try metadataText(request.derivationMetadata), at: now)
         var context = SavedPerformance.context(score: score, options: options, compiler: compiler, clip: clip)
         context["configuration"] = config; context["document"] = document; context["authority"] = authority
+        if let imageDDL = saved.imageDDL { context["image_ddl"] = try ExactJSON(data: imageDDL) }
+        if let imageProvenance = saved.imageProvenance { context["image_provenance"] = .string(imageProvenance) }
         // Server fork: a changed performance of a saved work keeps the parent's completion range record.
         if let record = request.completionRanges { context["completion_ranges"] = try ExactJSON(data: record) }
         // Server: the child drawn from its parent without a run keeps the parent's laws records.

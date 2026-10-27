@@ -347,7 +347,7 @@ struct CreationView: View {
     private var imageInputPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(display.webCopy("imageProvenanceLabel", "来歴")).inkuFont(14, weight: .semibold)
-            editor(text: $model.imageProvenance, readOnly: false)
+            editor(text: $model.imageProvenance, readOnly: model.savedImageDDL != nil && model.imageInput == nil)
             HStack {
                 Text(display.webCopy("imageTab", "画像")).inkuFont(14, weight: .semibold)
                 Spacer()

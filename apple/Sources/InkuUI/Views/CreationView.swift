@@ -48,7 +48,6 @@ struct CreationView: View {
     @State private var showImageModelPicker = false
     @State private var showImageNotice = false
     @State private var imageLoadError: String?
-    @State private var automaticImageProvenance = ""
     private var imageBatch: ImageFolderBatch { automation.imageFolderBatch }
     @State private var batchKind = "description"
     @State private var pendingImageBatchRestart: Bool?
@@ -149,7 +148,7 @@ struct CreationView: View {
         }
         .onChange(of: automation.workspaceInputMode) { _, _ in batchWorkspace.invalidateReads() }
         .onChange(of: model.savedImageDDL) { _, value in
-            if value != nil { automation.workspaceInputMode = "image"; automaticImageProvenance = "" }
+            if value != nil && !model.isBusy { automation.workspaceInputMode = "image" }
         }
         .onChange(of: model.inputMode) { _, value in
             if value == "description", isImage, model.selectedWork != nil { automation.workspaceInputMode = "description" }
@@ -221,26 +220,23 @@ struct CreationView: View {
     private var inputTabs: some View {
         HStack(spacing: 0) {
             InkuPanelTab(title: display.webCopy("modeSingle", "記述"), selected: !isBatch && !isImage,
-                         running: model.isBusy && !automation.isOccupied) {
-                automation.workspaceInputMode = "description"
-                model.inputMode = "description"
+                         running: automation.inputTabRunning("description", app: model)) {
+                automation.selectInputTab("description", app: model)
             }
             .inkuTooltip(display.tooltip("自由な自然言語で記述を入力して1枚ずつ描画します", serverKey: "tooltipInputTabSingle"))
             #if os(macOS)
             InkuPanelTab(title: display.webCopy("imageTab", "画像"), selected: isImage,
-                         running: model.isBusy && isImage) {
-                automation.workspaceInputMode = "image"
-                model.inputMode = "image"
+                         running: automation.inputTabRunning("image", app: model)) {
+                automation.selectInputTab("image", app: model)
             }
             #endif
             InkuPanelTab(title: display.webCopy("modeBatch", "バッチ"), selected: isBatch,
-                         running: automation.running && automation.mode == "batch", progress: batchProgress) {
-                automation.workspaceInputMode = "batch"
+                         running: automation.inputTabRunning("batch", app: model), progress: batchProgress) {
+                automation.selectInputTab("batch", app: model)
             }
             .inkuTooltip(display.tooltip("改行区切りで複数の記述を入力し、順次連続して描画します", serverKey: "tooltipInputTabBatch"))
         }
         .overlay(alignment: .bottom) { Rectangle().fill(InkuColor.border).frame(height: 1).allowsHitTesting(false) }
-        .disabled(browsingDisabled)
     }
 
     private var batchProgress: String {
@@ -348,7 +344,8 @@ struct CreationView: View {
     private var imageInputPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(display.webCopy("imageProvenanceLabel", "来歴")).inkuFont(14, weight: .semibold)
-            editor(text: $model.imageProvenance, readOnly: model.savedImageDDL != nil && model.imageInput == nil)
+            editor(text: Binding(get: { model.imageProvenance }, set: { model.setImageProvenanceFromUser($0) }),
+                   readOnly: model.savedImageDDL != nil && model.imageInput == nil)
             HStack {
                 Text(display.webCopy("imageTab", "画像")).inkuFont(14, weight: .semibold)
                 Spacer()
@@ -416,18 +413,7 @@ struct CreationView: View {
     private func loadImage(_ url: URL) {
         do {
             let image = try ImageInput.prepare(Data(contentsOf: url))
-            if model.selectedWork != nil {
-                let provenance = model.imageProvenance
-                model.newWork(); model.inputMode = "image"; model.imageProvenance = provenance
-            }
-            if !automaticImageProvenance.isEmpty {
-                model.imageProvenance = model.imageProvenance.replacingOccurrences(of: automaticImageProvenance, with: "")
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-            }
-            automaticImageProvenance = imageProvenance(url: url)
-            if !model.imageProvenance.isEmpty && !automaticImageProvenance.isEmpty { model.imageProvenance += "\n" }
-            model.imageProvenance += automaticImageProvenance
-            model.setImageInput(image, fileName: url.lastPathComponent)
+            model.setImageInput(image, fileName: url.lastPathComponent, automaticProvenance: imageProvenance(url: url))
             imageLoadError = nil
         } catch { imageLoadError = model.failureMessage(error) }
     }

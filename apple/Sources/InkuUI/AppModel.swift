@@ -52,7 +52,8 @@ public final class AppModel {
     public var inputMode = "description"
     public var imageInput: PreparedImageInput?
     public var imageCanvasID = "image"
-    public var imageProvenance = ""
+    public private(set) var imageProvenance = ""
+    public private(set) var imageProvenanceTyped = false
     public var imageFileName = ""
     public var imageWarningAcknowledged = false
     public var savedImageDDL: Data?
@@ -86,6 +87,7 @@ public final class AppModel {
     /// Metrics of the displayed saved work, frozen to that work's save identity.
     public private(set) var providerMetrics: [ProviderAttemptMetric] = []
     public private(set) var isBusy = false
+    public private(set) var activeSingleInputMode: String?
     /// Failure of this automation request, independent of errors from concurrent browsing.
     public private(set) var automationFailureMessage: String?
     /// Retained between batch rows so browsing does not clear the last row's progress or failure.
@@ -358,6 +360,9 @@ public final class AppModel {
             return
         }
         let token = UUID()
+        let runningMode = inputMode
+        let runningImage = runningMode == "image" ? imageInput : nil
+        activeSingleInputMode = runningMode
         generationToken = token
         providerProgress = nil
         activeExecutionID = nil
@@ -369,24 +374,26 @@ public final class AppModel {
         status = "生成中"
         let operation = Task { @MainActor [weak self] in
             guard let self else { return }
-            await self.runGeneration(host: host, bootstrap: bootstrap, token: token, parentWorkID: parentWorkID)
+            await self.runGeneration(host: host, bootstrap: bootstrap, token: token, parentWorkID: parentWorkID,
+                                     runningMode: runningMode, image: runningImage)
         }
         activeOperation = operation
         await operation.value
         finishOperation(token: token)
     }
 
-    private func runGeneration(host: PipelineHost, bootstrap: Bootstrap, token: UUID, parentWorkID: String?) async {
+    private func runGeneration(host: PipelineHost, bootstrap: Bootstrap, token: UUID, parentWorkID: String?,
+                               runningMode: String, image: PreparedImageInput?) async {
         do {
             var freshRequest: GenerationRequest
-            if inputMode == "image", let image = imageInput {
+            if runningMode == "image", let image {
                 freshRequest = try requestForImage(image, provenance: imageProvenance)
             } else {
-                freshRequest = try requestForCurrentInput(parentWorkID: parentWorkID,
-                    derivationKind: parentWorkID == nil ? "new" : inputMode == "ddl" ? "ddl_edit" : "description_edit")
+                freshRequest = try requestForCurrentInput(inputMode: runningMode, parentWorkID: parentWorkID,
+                    derivationKind: parentWorkID == nil ? "new" : runningMode == "ddl" ? "ddl_edit" : "description_edit")
             }
             let request = try await pinPersonalPlanRequests([freshRequest])[0]
-            let view = try await host.generate(request, image: inputMode == "image" ? imageInput : nil) { [weak self] progress in
+            let view = try await host.generate(request, image: image) { [weak self] progress in
                 Task { @MainActor in self?.receive(progress, token: token, models: request.models) }
             }
             await recordDescriptionFeedback(request: request, view: view)
@@ -398,7 +405,7 @@ public final class AppModel {
                 displayWork(work)
                 selectedContext = try await host.savedAuthoringContext(workID: id)
                 savedImageDDL = selectedContext?.imageDDL
-                if savedImageDDL != nil { imageInput = nil; imageFileName = "" }
+                if savedImageDDL != nil { imageInput = nil; imageFileName = ""; imageProvenanceTyped = false }
             }
         } catch {
             guard generationToken == token, !Task.isCancelled else { return }
@@ -454,6 +461,7 @@ public final class AppModel {
             guard displayToken == selectionToken, selectedWorkID == work.id, !isBrowsingLocked else { return }
             selectedContext = context
             savedImageDDL = context.imageDDL
+            imageProvenanceTyped = false
             if context.imageDDL != nil {
                 imageInput = nil; imageFileName = ""; imageProvenance = context.imageProvenance ?? ""
                 inputMode = "image"
@@ -567,6 +575,7 @@ public final class AppModel {
         activeOperation = nil
         activeExecutionID = nil
         generationToken = nil
+        activeSingleInputMode = nil
         stopping = false
         isBusy = false
     }
@@ -936,7 +945,17 @@ public final class AppModel {
         return request
     }
 
-    public func setImageInput(_ image: PreparedImageInput, fileName: String) {
+    public func setImageProvenanceFromUser(_ text: String) {
+        imageProvenance = text
+        imageProvenanceTyped = true
+    }
+
+    public func setImageInput(_ image: PreparedImageInput, fileName: String, automaticProvenance: String = "") {
+        let typed = imageProvenanceTyped && !imageProvenance.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? imageProvenance : nil
+        if selectedWork != nil { newWork(); inputMode = "image" }
+        imageProvenance = typed ?? automaticProvenance
+        imageProvenanceTyped = typed != nil
         imageInput = image; imageFileName = fileName
     }
 
@@ -1768,7 +1787,7 @@ public final class AppModel {
         importedDDL = nil; importedMacroNames = []
         selectedContext = nil
         currentView = nil
-        savedImageDDL = nil; imageInput = nil; imageFileName = ""; imageProvenance = ""
+        savedImageDDL = nil; imageInput = nil; imageFileName = ""; imageProvenance = ""; imageProvenanceTyped = false
         currentExecutionID = nil
         currentSVG = ""
         visibleDDL = ""

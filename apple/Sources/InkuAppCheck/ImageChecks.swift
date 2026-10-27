@@ -44,7 +44,8 @@ func runImageChecks(realOpus: Bool = false) async throws {
     guard prepared.width == 1568, prepared.height == 1176, prepared.nearestFormatID == "sd_monitor" else { throw CheckFailure.message("image canvas") }
     app.newWork(); app.inputMode = "image"; app.canvasID = "square"
     guard app.imageCanvasID == "image" else { throw CheckFailure.message("image paper default") }
-    app.setImageInput(prepared, fileName: imageURL.lastPathComponent)
+    let provenance = ImageProvenance.text(url: imageURL, includeFileName: true, includeExif: true, language: "ja")
+    app.setImageInput(prepared, fileName: imageURL.lastPathComponent, automaticProvenance: provenance)
     guard app.canvasID == "square" else { throw CheckFailure.message("image changed description paper") }
     let automatic = try app.requestForImage(prepared, provenance: "")
     guard try ExactJSON(data: automatic.renderOptions)["canvas_aspect_id"].string == "sd_monitor" else {
@@ -56,11 +57,33 @@ func runImageChecks(realOpus: Bool = false) async throws {
         throw CheckFailure.message("fixed image paper")
     }
     app.imageCanvasID = "image"
-    app.imageProvenance = ImageProvenance.text(url: imageURL, includeFileName: true, includeExif: true, language: "ja")
     guard app.imageProvenance.contains("撮影日時: 2026:10:27 12:34:56"),
           app.imageProvenance.contains("ファイル名: example.jpg"), !app.imageProvenance.contains("35.1234"),
           !app.imageProvenance.contains("139.1234") else { throw CheckFailure.message("image Exif provenance") }
-    await app.generate()
+    if realOpus { await app.generate() }
+    else {
+        let tabs = AutomationModel()
+        tabs.selectInputTab("image", app: app)
+        await transport.blockFirstRequest()
+        let operation = Task { await app.generate() }
+        for _ in 0..<500 {
+            if await transport.isBlocked { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let blocked = await transport.isBlocked
+        let initialIndicators = tabs.inputTabRunning("image", app: app) && !tabs.inputTabRunning("description", app: app)
+        tabs.selectInputTab("description", app: app)
+        let switchedIndicators = tabs.inputTabRunning("image", app: app) && !tabs.inputTabRunning("description", app: app)
+        let blockedNewRun = !app.canGenerate
+        tabs.selectInputTab("batch", app: app)
+        let batchIndicators = tabs.inputTabRunning("image", app: app) && !tabs.inputTabRunning("batch", app: app)
+        await transport.resume()
+        await operation.value
+        guard blocked, initialIndicators, switchedIndicators, blockedNewRun, batchIndicators,
+              tabs.workspaceInputMode == "batch", !app.isBusy else {
+            throw CheckFailure.message("image execution tab switching")
+        }
+    }
     guard let work = app.selectedWork, let ddl = work.ddl, ddl.contains("画面比4:3"), work.effectiveSourceText.isEmpty,
           work.renderCanvasAspectID == "sd_monitor" else {
         throw CheckFailure.message("image run: \(app.errorText ?? app.status)")
@@ -89,6 +112,18 @@ func runImageChecks(realOpus: Bool = false) async throws {
               childContext.imageDDL == context.imageDDL, try await db.work(id: work.id) == work else {
             throw CheckFailure.message("pre-review child did not preserve its parent and provenance")
         }
+        await app.selectWork(work)
+        guard app.imageProvenance == provenance, !app.imageProvenanceTyped else { throw CheckFailure.message("saved image provenance") }
+        app.setImageInput(prepared, fileName: "new.jpg", automaticProvenance: "new image")
+        guard app.imageProvenance == "new image", app.selectedWork == nil else { throw CheckFailure.message("old image provenance remained") }
+        app.setImageProvenanceFromUser("author note")
+        app.setImageInput(prepared, fileName: "another.jpg", automaticProvenance: "another image")
+        guard app.imageProvenance == "author note" else { throw CheckFailure.message("typed image provenance lost") }
+        app.setImageProvenanceFromUser("  ")
+        app.setImageInput(prepared, fileName: "last.jpg", automaticProvenance: "last image")
+        guard app.imageProvenance == "last image", !app.imageProvenanceTyped else { throw CheckFailure.message("empty typed provenance") }
+        app.newWork()
+        guard app.imageProvenance.isEmpty, !app.imageProvenanceTyped else { throw CheckFailure.message("new image provenance") }
     }
     print(realOpus ? "Opus image run: one synthetic image, saved image metadata and 4:3 declaration." :
           "Image run: 1568×1176, nearest 4:3 paper, image write/review and saved metadata; no external provider.")
@@ -104,11 +139,20 @@ private enum XCTImage {
 private actor ImageCheckProvider: ProviderTransport {
     var tags: [String] = []
     var provenanceLeaked = false
+    var isBlocked = false
+    private var shouldBlock = false
+    private var continuation: CheckedContinuation<Void, Never>?
+    func blockFirstRequest() { shouldBlock = true }
+    func resume() { continuation?.resume(); continuation = nil; isBlocked = false; shouldBlock = false }
     func perform(action: Data, models: ModelSelection, providers: [ProviderSettings], credentials: any CredentialStore,
                  onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {
         let value = try ExactJSON(data: action)
         if String(decoding: action, as: UTF8.self).contains("2026:10:27 12:34:56") { provenanceLeaked = true }
         let actionTag = try value.requiredString("tag"); tags.append(actionTag)
+        if shouldBlock {
+            shouldBlock = false; isBlocked = true
+            await withCheckedContinuation { continuation = $0 }
+        }
         let tag = actionTag == "write_image_ddl" ? "image_ddl_written" : "image_ddl_reviewed"
         return ExactJSON.object(["tag": .string(tag), "identity": value["identity"],
             "response": .string(#"{"ddl":"赤い円を1個置く。"}"#), "elapsed_ms": .string("1")]).data

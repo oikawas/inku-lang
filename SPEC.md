@@ -2656,7 +2656,7 @@ Note that **`thinness` is not a Saijiki word** (author's ruling, 2026-07-29). St
 
 #### Wild (engine 12; its reach in engine 14)
 
-**Separate from the three layers, one switch lifts the ceiling on the performance itself.** The UI calls it 筆致制限を外す — Lift the stroke limit (lit, the limit is lifted; the author renamed it from 暴れる, Wild, on 2026-10-27; the Web's next-work conditions put it on the `Options` line; Android and macOS still show 暴れる). This document still calls it wild below.
+**Separate from the three layers, one switch lifts the ceiling on the performance itself.** The UI calls it 筆致制限を外す — Lift the stroke limit (lit, the limit is lifted; the author renamed it from 暴れる, Wild, on 2026-10-27; the Web's next-work conditions put it on the `Options` line; Android and macOS use the same name). This document still calls it wild below.
 
 - **One switch for the whole work**, not per stroke and not per tool. **In engine 12 it reached only the line primitive** (circles, ellipses, triangles, squares, polygons, arcs, fills and hatches came out byte-identical with it on). **Engine 14 extends it to contours, arcs, fills and hatches**, so the implementation now matches the description
 - **It removes only the amplitude ceiling and the ban on self-intersection.** Endpoint pinning and determinism hold when it is on: the same Score, the same seed, and the same state render the same SVG every time

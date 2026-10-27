@@ -9,13 +9,15 @@ import {
 	compositionColorsStateNote,
 	compositionFormLabel,
 	compositionMeasureSummary,
-	compositionModeHint,
 	compositionModeOf,
 	compositionOption,
+	compositionPassed,
 	compositionStateNote,
 	droppedReadingLines,
+	drawFlow,
 	drawRouteLabel,
 	drawRouteOf,
+	drawSwitchLabel,
 	readingStateNote,
 	sketchModeForRoute,
 } from './draw-route.ts';
@@ -26,11 +28,13 @@ import { en } from './i18n/en.ts';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
-test('a description is drawn by the current stages unless the author chooses read and draw', () => {
+test('a description is drawn with a plan unless the author chooses in words', () => {
 	assert.equal(DEFAULT_DRAW_ROUTE, 'stages');
-	assert.equal(drawRouteLabel('stages', true), '今の流れ');
-	assert.equal(drawRouteLabel('read_and_draw', true), '読んで描く');
-	assert.equal(drawRouteLabel('read_and_draw', false), 'Read and draw');
+	// The author's names (2026-10-27): by what the AI writes, not by a time.
+	assert.equal(drawRouteLabel('stages', true), '型で描く');
+	assert.equal(drawRouteLabel('read_and_draw', true), '言葉で描く');
+	assert.equal(drawRouteLabel('stages', false), 'With a plan');
+	assert.equal(drawRouteLabel('read_and_draw', false), 'In words');
 	// Read and draw starts with the sketch on; the current stages leave it as it is.
 	assert.equal(sketchModeForRoute('read_and_draw', 'off'), 'on');
 	assert.equal(sketchModeForRoute('stages', 'off'), 'off');
@@ -77,8 +81,10 @@ test('the composition and laws are sent only by read and draw, and a work says w
 	assert.equal(compositionModeOf({ description_ddl: { reading_state: 'read' } }), 'off');
 	assert.equal(compositionModeOf(null), DEFAULT_COMPOSITION_MODE);
 	assert.equal(DEFAULT_COMPOSITION_MODE, 'off');
-	const panel = read('./components/InputPanel.svelte');
-	assert.match(panel, /\{#if drawRoute === 'read_and_draw'\}\s*<div class="condition-compact-row">\s*<Tooltip text=\{t\(\)\.tooltipInputComposition\}><CompositionSelect/);
+	// The stages always pass theirs, so the switch shows on there.
+	assert.equal(compositionPassed('stages', 'off'), true);
+	assert.equal(compositionPassed('read_and_draw', 'off'), false);
+	assert.equal(compositionPassed('read_and_draw', 'on'), true);
 	const page = read('../routes/+page.svelte');
 	assert.match(page, /onSelectCompositionMode=\{work\.selectCompositionMode\}/);
 	assert.match(page, /drawRouteOf\(it\),\s*compositionModeOf\(it\)\)/);
@@ -113,8 +119,35 @@ test('the colors chosen after the review are counted by how each line was writte
 	assert.equal(compositionColorsStateNote({ state: 'fallback', fallback: 'compile' }, true),
 		'配色を当てられず、配色の前の指示書で確定した（compile）');
 	assert.equal(compositionColorsChanges(null).length, 0);
-	// The composition's hint names the colors that end it.
-	assert.match(compositionModeHint('on', true), /最後に配色を選ぶ$/);
+});
+
+test('the flow under the switches names the steps a run passes, in their order', () => {
+	const labels = (route: 'stages' | 'read_and_draw', sketch: 'on' | 'off', composition: 'on' | 'off') =>
+		drawFlow(route, sketch, composition, true).map((step) => step.label).join(' › ');
+	// The stages pass the composition and laws and the colors after the plan, whatever the switch says.
+	assert.equal(labels('stages', 'off', 'off'), '記述 › 型を埋める › 構図と法則 › 配色 › 画');
+	assert.equal(labels('stages', 'on', 'on'), '記述 › 写生 › 型を埋める › 構図と法則 › 配色 › 画');
+	// In words decides the composition and laws before it writes, and their colors end it.
+	assert.equal(labels('read_and_draw', 'on', 'off'), '記述 › 写生 › 言葉で書く › 見て直す › 画');
+	assert.equal(labels('read_and_draw', 'on', 'on'), '記述 › 写生 › 構図と法則 › 言葉で書く › 見て直す › 配色 › 画');
+	// A step a switch put there is marked so; the stages' own steps are not.
+	const kinds = drawFlow('read_and_draw', 'on', 'on', false).map((step) => `${step.label}:${step.kind}`);
+	assert.deepEqual(kinds, ['Description:end', 'Sketch:switch', 'Composition and laws:switch', 'Write in words:fixed',
+		'Look and correct:fixed', 'Colors:switch', 'Picture:end']);
+	assert.ok(drawFlow('stages', 'off', 'on', true).every((step) => step.kind !== 'switch'));
+});
+
+test('the switches keep their names on both routes, and the panel shows them as one block', () => {
+	assert.equal(drawSwitchLabel('sketch', true), '写生');
+	assert.equal(drawSwitchLabel('composition', true), '構図と法則');
+	const panel = read('./components/InputPanel.svelte');
+	assert.match(panel, /<DrawConditions route=\{drawRoute\} \{sketchMode\} \{compositionMode\} \{isJapanese\}/);
+	assert.doesNotMatch(panel, /RouteSelect|CompositionSelect|SketchSelect/);
+	const block = read('./components/DrawConditions.svelte');
+	// The composition switch is locked on the stages, never hidden or disabled.
+	assert.match(block, /on=\{compositionOn\} locked=\{compositionLocked\}/);
+	assert.match(block, /const compositionLocked = \$derived\(route === 'stages'\)/);
+	assert.doesNotMatch(block, /\{#if route === 'read_and_draw'\}/);
 });
 
 test('the progress names reading, writing, revising and reviewing in both languages', () => {

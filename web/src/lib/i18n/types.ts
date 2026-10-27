@@ -525,8 +525,6 @@ export interface LangPack {
 	tooltipInputRoute: string;
 	tooltipInputComposition: string;
 	wildButton: string;
-	wildEnabled: string;
-	wildDisabled: string;
 	tooltipInputWild: string;
 	tooltipInputCanvas: string;
 	tooltipDdlNew: string;

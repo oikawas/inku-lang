@@ -89,7 +89,7 @@ can show those instructions after painting and use the existing DDL edit path
 to paint a child. Schema v5 adds the two nullable columns to
 v4 after making a verified backup.
 
-`Drawing` set to Read and draw in the Describe and Batch tabs reads the
+`Drawing` set to In words in the Describe and Batch tabs reads the
 description from the speaker's eye, writes what that eye sees as DDL directly,
 and corrects it once beside its drawing (SPEC §12.6.7; the run option `route`).
 The composition reading, the laws and the colors are not passed through. The

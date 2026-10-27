@@ -543,7 +543,7 @@ and having the Server's `_BUNDLED_DOCUMENTS` in `server/src/inku_server/plugins/
 
 - A new `.inku-plugin.md` in `server/plugins/` (`INKU_DOCUMENT_PLUGIN_DIR`) does not become a definition.
   Documents other than the bundled package show "not used for drawing", and their words are left out.
-- "Read and draw" and the image tab do not give the model a list of plugins. A name the model writes in DDL
+- "In words" and the image tab do not give the model a list of plugins. A name the model writes in DDL
   draws, but without the list the model will rarely choose one.
 - Android and macOS have no way yet for users to install definitions, and there is no public catalog of installable packages.
 

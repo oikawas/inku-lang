@@ -1,16 +1,20 @@
 // How a description is drawn (2026-10-25, SPEC 12.6.7). Single source for the
 // values and labels.
 //
-// 'stages' is the drawing as it was: Stage 1, the composition reading, the laws
-// and the colors. 'read_and_draw' reads the description from the speaker's eye,
-// writes what that eye sees as DDL, and corrects it once beside its drawing.
-// Chosen per draw, like the sketch, and never kept as a setting: a work opened
-// from the history sets it to the way that work was drawn.
+// 'stages' fills a fixed plan (Stage 1), then passes the composition reading,
+// the laws and the colors. 'read_and_draw' reads the description from the
+// speaker's eye, writes what that eye sees as DDL, and corrects it once beside
+// its drawing. Chosen per draw, like the sketch, and never kept as a setting: a
+// work opened from the history sets it to the way that work was drawn.
 //
 // The sketch keeps its two choices on both routes. On read_and_draw, 'on' is
 // the reading and 'off' writes from the description alone; choosing
 // read_and_draw starts the sketch on (the author's answer, 2026-10-25), and the
-// current stages keep their default, off.
+// stages keep their default, off.
+//
+// The names (the author's choice, 2026-10-27): 型で描く and 言葉で描く, by what
+// the AI writes -- the fields of a plan, or the instructions themselves. They
+// replaced 今の流れ and 読んで描く, which named a time and a thing both routes do.
 import type { SketchMode } from './sketch';
 
 export type DrawRoute = 'stages' | 'read_and_draw';
@@ -18,19 +22,55 @@ export const DRAW_ROUTES: DrawRoute[] = ['stages', 'read_and_draw'];
 export const DEFAULT_DRAW_ROUTE: DrawRoute = 'stages';
 
 export function drawRouteLabel(route: DrawRoute, isJapanese: boolean): string {
-	if (route === 'read_and_draw') return isJapanese ? '読んで描く' : 'Read and draw';
-	return isJapanese ? '今の流れ' : 'Current stages';
+	if (route === 'read_and_draw') return isJapanese ? '言葉で描く' : 'In words';
+	return isJapanese ? '型で描く' : 'With a plan';
 }
 
 export function drawRouteHint(route: DrawRoute, isJapanese: boolean): string {
 	if (route === 'read_and_draw') {
 		return isJapanese
-			? '記述を語り手の目から読み、見えた景を指示書に書いて、描いた画を見て一度直す'
-			: "Read the description from the speaker's eye, write what that eye sees, and correct it once beside its drawing";
+			? 'AI が指示書を自分で書き、描けた画を見て一度直す'
+			: 'The AI writes the instructions itself and corrects them once beside the drawing';
 	}
 	return isJapanese
-		? '解釈・構図の読み・法則・配色の段を通して描く'
-		: 'Draw through interpretation, the composition reading, the laws and the colors';
+		? 'AI が決まった型の欄を選び、プログラムが指示書にする'
+		: 'The AI fills the fields of a fixed plan, and the program writes the instructions from it';
+}
+
+/** The two steps a run can leave out, named the same on both routes. */
+export type DrawSwitch = 'sketch' | 'composition';
+
+export function drawSwitchLabel(name: DrawSwitch, isJapanese: boolean): string {
+	if (name === 'composition') return isJapanese ? '構図と法則' : 'Composition and laws';
+	return isJapanese ? '写生' : 'Sketch from life';
+}
+
+/** Whether a route passes the composition and laws: the stages always do. */
+export function compositionPassed(route: DrawRoute, mode: CompositionMode): boolean {
+	return route === 'stages' || mode === 'on';
+}
+
+export type DrawFlowStep = { label: string; kind: 'end' | 'switch' | 'fixed' };
+
+/** The steps a run passes, in the order it passes them (2026-10-27), for the
+ *  line under the switches. The stages fill the plan, then pass the
+ *  composition reading, the laws and the colors; read and draw decides its
+ *  composition and laws before it writes, and chooses their colors after the
+ *  review, only when they are on. 'switch' marks a step a switch put there. */
+export function drawFlow(route: DrawRoute, sketch: SketchMode, composition: CompositionMode, isJapanese: boolean): DrawFlowStep[] {
+	const step = (ja: string, en: string, kind: DrawFlowStep['kind']): DrawFlowStep => ({ label: isJapanese ? ja : en, kind });
+	const steps = [step('記述', 'Description', 'end')];
+	if (sketch === 'on') steps.push(step('写生', 'Sketch', 'switch'));
+	if (route === 'stages') {
+		steps.push(step('型を埋める', 'Fill the plan', 'fixed'), step('構図と法則', 'Composition and laws', 'fixed'), step('配色', 'Colors', 'fixed'));
+	} else {
+		const composed = composition === 'on';
+		if (composed) steps.push(step('構図と法則', 'Composition and laws', 'switch'));
+		steps.push(step('言葉で書く', 'Write in words', 'fixed'), step('見て直す', 'Look and correct', 'fixed'));
+		if (composed) steps.push(step('配色', 'Colors', 'switch'));
+	}
+	steps.push(step('画', 'Picture', 'end'));
+	return steps;
 }
 
 /** The sketch a route starts from when the author chooses it. */
@@ -61,26 +101,12 @@ export function workRouteLabel(
 
 // The composition and laws (2026-10-26, SPEC 12.6.7): a switch inside read and
 // draw. 'on' decides a composition and laws from the description (and its
-// reading) before the DDL is written; 'off', the default, is read and draw as
-// it was. Chosen per draw like the route and never kept as a setting; a work
-// opened from the history sets it to the way that work was drawn.
+// reading) before the DDL is written; 'off', the default, writes without them.
+// The stages always pass theirs, so the switch shows on and locked there.
+// Chosen per draw like the route and never kept as a setting; a work opened
+// from the history sets it to the way that work was drawn.
 export type CompositionMode = 'off' | 'on';
-export const COMPOSITION_MODES: CompositionMode[] = ['off', 'on'];
 export const DEFAULT_COMPOSITION_MODE: CompositionMode = 'off';
-
-export function compositionModeLabel(mode: CompositionMode, isJapanese: boolean): string {
-	if (mode === 'on') return isJapanese ? 'あり' : 'On';
-	return isJapanese ? 'なし' : 'Off';
-}
-
-export function compositionModeHint(mode: CompositionMode, isJapanese: boolean): string {
-	if (mode === 'on') {
-		return isJapanese
-			? '記述から構図と法則を先に決め、それに沿って指示書を書き、測って合わせ、最後に配色を選ぶ'
-			: 'Decide a composition and laws from the description first, write the DDL toward them and fit it, then choose its colors';
-	}
-	return isJapanese ? '記述をそのまま画に置き換える（今の読んで描く）' : 'Turn the description straight into the picture (read and draw as before)';
-}
 
 export function normalizeCompositionMode(value: unknown): CompositionMode | null {
 	return value === 'off' || value === 'on' ? value : null;

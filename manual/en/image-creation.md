@@ -149,14 +149,22 @@ If the layer does not answer, the description goes to interpretation unchanged a
 
 `Sketch from life (Stage 0.5)` folds from the triangle in its heading. This state is saved on the account and starts open. The instructions box stays visible. Folding numeric ranges within its editor is separate from collapsing the whole box.
 
-### Read and Draw a Description
+### The Drawing and the Steps It Passes (With a Plan, In Words)
 
-`Drawing` under `Conditions for the next work` in the Describe and Batch tabs chooses `Current stages` (the default) or `Read and draw`. With `Read and draw`, the model reads the description from the speaker's eye, writes what that eye sees as instructions, and corrects them once beside their drawing before the work is made. The composition reading, the laws stage and the color stage are not passed through. The work stays a description's work and can be drawn again from its description or an edited reading. Editing it in the DDL tab holds its description, as it does for any work.
+`Conditions for the next work` in the Describe and Batch tabs has three lines: `Drawing`, `Steps` and `Flow`.
 
-| Sketch | Meaning with `Read and draw` |
+| Line | What it holds |
 |---|---|
-| On | The description is read before the instructions are written. Choosing `Read and draw` turns the sketch on |
-| Off | The instructions are written from the description alone, without a reading |
+| Drawing | `With a plan` (the default) or `In words`. With a plan, the model fills the fields of a fixed plan and the program writes the instructions from it. In words, the model writes the instructions itself and corrects them once beside the drawing |
+| Steps | The chips `Sketch from life` and `Composition and laws`. A press lights one (passed); another press turns it off. Their names and hints are the same on both drawings. With a plan always passes the composition and laws, so that chip stays lit with a lock |
+| Flow | The steps the current choices pass, in their order, on one line, such as `Description › Sketch › Composition and laws › Write in words › Look and correct › Colors › Picture`. A step a chip added is colored |
+
+With a plan passes the sketch (when lit), the plan, then the composition reading, the laws stage and the color stage. The rest of this section is about In words. With `In words`, the model reads the description from the speaker's eye, writes what that eye sees as instructions, and corrects them once beside their drawing before the work is made. The composition reading, the laws stage and the color stage of With a plan are not passed through. The work stays a description's work and can be drawn again from its description or an edited reading. Editing it in the DDL tab holds its description, as it does for any work.
+
+| Sketch | Meaning with `In words` |
+|---|---|
+| Passed | The description is read before the instructions are written. Choosing `In words` lights the sketch |
+| Not passed | The instructions are written from the description alone, without a reading |
 
 Only the reading reads what the description's bracketed labels hold (such as `[Ki no Tomonori / Kokinshū]`). The choice is not kept as a setting. Opening a work from the history sets it to the way that work was drawn. A child drawn again by a pairing or by AI refinement takes its parent's way.
 
@@ -170,9 +178,9 @@ While it waits, the display names the step at work.
 | `Correcting the instructions beside the drawing…` | The model is shown the drawing of its instructions and corrects them once. A model that cannot read images is not shown it |
 | `Saving the work…` | The committed instructions are drawn and saved |
 
-The reading appears under `Sketch from life (reading)` in the description panel. Editing it with `Edit` and drawing again writes from the edited reading without asking for a new one. `Read and draw` in Generation Info shows the reading, the items dropped because neither the description nor a label holds them, each round (writing and review, with the people drawn), and the instructions before the review. When only instructions that draw nothing could be written, the run stops with the reason.
+The reading appears under `Sketch from life (reading)` in the description panel. Editing it with `Edit` and drawing again writes from the edited reading without asking for a new one. `In words` in Generation Info shows the reading, the items dropped because neither the description nor a label holds them, each round (writing and review, with the people drawn), and the instructions before the review. When only instructions that draw nothing could be written, the run stops with the reason.
 
-Choosing `Read and draw` shows `Composition and laws` (`Off` or `On`, `Off` by default) beside the route. With `On`, after the reading, a composition (its thesis, form, things and laws) is decided first from the description (and its reading), and the instructions are written toward it. The tool measures the written instructions against the laws thing by thing, moves a thing that is a little off into place, and has one far off written again; it builds the things that are patterns, rows and scatters. While it waits it shows "Deciding the composition and laws…". When no composition and laws can be decided, the instructions are written without them. After the review and before the commit, the colors (the colors and the ground) are chosen while the drawing's shapes and places stay ("Choosing the colors…"). When the colors cannot be applied, the instructions before them are committed. `Composition and laws` in Generation Info shows what was decided, the last measure, the pairs that did not fit, the cards, the colors, and the thing each sentence draws. Opening a work sets the switch to whether the work was drawn with it on.
+With `In words`, the `Composition and laws` chip can be lit or left off (off by default). Lit, after the reading, a composition (its thesis, form, things and laws) is decided first from the description (and its reading), and the instructions are written toward it. The tool measures the written instructions against the laws thing by thing, moves a thing that is a little off into place, and has one far off written again; it builds the things that are patterns, rows and scatters. While it waits it shows "Deciding the composition and laws…". When no composition and laws can be decided, the instructions are written without them. After the review and before the commit, the colors (the colors and the ground) are chosen while the drawing's shapes and places stay ("Choosing the colors…"). When the colors cannot be applied, the instructions before them are committed. `Composition and laws` in Generation Info shows what was decided, the last measure, the pairs that did not fit, the cards, the colors, and the thing each sentence draws. Opening a work sets the chip to whether the work was drawn with the composition and laws passed.
 
 ## 5. Consult the Saijiki
 

@@ -511,7 +511,7 @@ Serverの`server/src/inku_server/plugins/__init__.py`の`_BUNDLED_DOCUMENTS`とA
 
 - `server/plugins/`（`INKU_DOCUMENT_PLUGIN_DIR`）へ新しい`.inku-plugin.md`を置いても、定義にはならない。
   同梱package以外の文書は「描画には使われない」と表示され、その語は外れる。
-- 「読んで描く」と画像タブは、モデルにプラグインの一覧を渡さない。モデルがDDLに名前を書けば描けるが、
+- 「言葉で描く」と画像タブは、モデルにプラグインの一覧を渡さない。モデルがDDLに名前を書けば描けるが、
   一覧を知らないので選ばれることはまず無い。
 - Android・macOSで利用者が定義を導入する道と、installできるpackageの公開の一覧はまだ無い。
 

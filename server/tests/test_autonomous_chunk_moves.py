@@ -16,7 +16,7 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 
-from inku_server import autonomous_refine, db, pipeline_product
+from inku_server import autonomous_refine, db, pipeline_product, provider_wire
 from inku_server.api import app
 from inku_server.autonomous_refine import AutonomousRunner, RunStore
 from inku_server.pipeline_compat import _settled
@@ -60,8 +60,14 @@ def answers(monkeypatch):
             self.images = kwargs.get("images")
 
         def __call__(self, action):
+            prompt = action["payload"]["prompt"]
+            # The body is built as a provider builds it. Failure (2026-10-27, on 5173): the picture went without
+            # the prompt naming it, the core refused every choose request, and the run kept nothing.
+            provider_wire.pipeline_request({"id": "test", "kind": "openai_compatible",
+                                            "base_url": "http://127.0.0.1:1/v1"}, "test-model", prompt, 64,
+                                           images=self.images)
             sent.append({"tag": action["tag"], "images": len(self.images or []),
-                         "message": json.loads(action["payload"]["prompt"]["message"])})
+                         "named": len(prompt.get("images") or []), "message": json.loads(prompt["message"])})
             answer = queue.pop(0)
             return {"tag": "normalized_ddl_generated", "identity": action["identity"],
                     "response": answer if isinstance(answer, str) else json.dumps(answer, ensure_ascii=False),
@@ -98,8 +104,9 @@ def test_a_chunk_child_is_kept_with_its_move_whatever_the_gate(author, answers):
     taken = runner._chunks(_chunk_run(owner), parent, STEP, threading.Event())
     assert taken["outcome"] == "kept", taken
     assert (taken["move"], taken["targets"]) == ("place", ["灯台"])
-    # The choose request carries the parent's picture.
-    assert [(item["tag"], item["images"]) for item in answers["sent"]] == [("generate_normalized_ddl", 1)]
+    # The choose request carries the parent's picture, and its prompt names it.
+    assert [(item["tag"], item["images"], item["named"]) for item in answers["sent"]] == [
+        ("generate_normalized_ddl", 1, 1)]
     assert answers["sent"][0]["message"]["units"][0]["title"] == "灯台"
     child = db.get_items(owner, [taken["history_id"]])[0]
     assert child["derivation_kind"] == "chunk_move"

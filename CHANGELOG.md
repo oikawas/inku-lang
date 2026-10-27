@@ -8,14 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-27 — The Web's drawing starts In words, placed first (Web)
-
-At the author's instruction, the next work's drawing starts on `In words`, and its buttons read `In words`, then `With a plan`. The sketch starts lit, as choosing In words lights it. A run in the image tab leaves the description's drawing and sketch as they were. The Server's and CLI's default (`stages`), and reading a saved work with no record of its route as With a plan, are unchanged. The hints of the drawing, the sketch, the composition, laws and colors, and Wild, which showed away from their buttons, now show above each button, and Wild has a label to its left, `Stroke limit` (the name the refine dialogs give it).
-
-### 2026-10-27 — The chip "Composition and laws" is now "Composition, laws, colors" (Web)
-
-At the author's word, the chip in the next work's conditions names what it leaves out: the colors come with the composition and laws, and no switch leaves them out alone. Its hint and the manual follow. The flow line's steps and what a run sends do not change.
-
 ### 2026-10-26 — PLUGIN alone is enough to write a plugin file
 
 After the author's review, three gaps in `PLUGIN.ja.md` and `PLUGIN.md` were filled. The example in §5.1 is now a complete file with its definition written out, and the guide says it can be saved and added as it is (a Server test passes the example through the check). §7.3 adds a table of the codes a plugin file check reports for its shape, taken names, examples, and pictures, with their fixes. §8 adds the limits on the file size (1,000,000 bytes), the number of words (64), the lengths of descriptions, examples, and the license, and the replacement picture. No code changed.
@@ -326,6 +318,16 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.274 (2026-10-27 / Build1350)
+
+### 2026-10-27 — The Web's drawing starts In words, placed first (Web)
+
+At the author's instruction, the next work's drawing starts on `In words`, and its buttons read `In words`, then `With a plan`. The sketch starts lit, as choosing In words lights it. A run in the image tab leaves the description's drawing and sketch as they were. The Server's and CLI's default (`stages`), and reading a saved work with no record of its route as With a plan, are unchanged. The hints of the drawing, the sketch, the composition, laws and colors, and Wild, which showed away from their buttons, now show above each button, and Wild has a label to its left, `Stroke limit` (the name the refine dialogs give it).
+
+### 2026-10-27 — The chip "Composition and laws" is now "Composition, laws, colors" (Web)
+
+At the author's word, the chip in the next work's conditions names what it leaves out: the colors come with the composition and laws, and no switch leaves them out alone. Its hint and the manual follow. The flow line's steps and what a run sends do not change.
 
 ## v2.15.273 (2026-10-27 / Build1349)
 

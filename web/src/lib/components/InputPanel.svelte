@@ -327,13 +327,6 @@
 						{/if}
 					</Tooltip>
 				</div>
-				{#if inputMode === 'batch' && !pictureConditions}
-					<div class="condition-compact-row">
-						<Tooltip text={t().tooltipInputClear}>
-							<button class="ghost-btn" onclick={onClearInput}>{t().clearInputBtn}</button>
-						</Tooltip>
-					</div>
-				{/if}
 			</div>
 		</div>
 	{/snippet}
@@ -510,6 +503,7 @@
 			{stage1ModelLabel}
 			{stage2ModelLabel}
 			{onRememberBatchPrompt}
+			{onClearInput}
 			onSubmit={onSubmit}
 			onStop={onStop}
 		/>

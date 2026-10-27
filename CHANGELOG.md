@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-27 — The batch's New stands left of the history picker (Web)
+
+At the author's instruction, the Batch tab's `New` leaves the chips of the next work's conditions and stands left of `Select from history`, the same button as the Describe tab's `New` (no longer round like a chip). With no past batch, `New` stands alone. What it does is unchanged.
+
 ### 2026-10-27 — Android shows DDL title lines as headings
 
 Android's DDL editor and ranged DDL view set a DDL title line (DDL 27) in bold and colour no word in it, and the vocabulary bar's detected words leave title lines out. Lines are recognised by a port of the shared core's `ddl_title_name` (`ui/DdlTitles.kt`). The drawing is unchanged.

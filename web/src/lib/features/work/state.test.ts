@@ -29,6 +29,7 @@ runeHost.$derived = derivedShim;
 const { BatchState } = await import('../batch/state.svelte.ts');
 const { batchSettings } = await import('../batch/settings.svelte.ts');
 const { createWorkState } = await import('./state.svelte.ts');
+const { wildSettings } = await import('../wild/settings.svelte.ts');
 const { pipelineAttentionReason } = await import('../pipeline/attention.ts');
 
 function imageWork(apiFetch: WorkStateDeps['apiFetch'], overrides: Partial<WorkStateDeps> = {}) {
@@ -80,7 +81,8 @@ test('before-review instructions belong only to the displayed completed image wo
 for (const unchanged of [false, true]) {
 	test(`before-review redraw forks the original through DDL editing (${unchanged ? 'same' : 'different'} final DDL)`, async () => {
 		const requests: Array<Record<string, unknown>> = [];
-		const original = recordedImage(unchanged ? beforeReview : afterReview);
+		const original = { ...recordedImage(unchanged ? beforeReview : afterReview), render_wild: !unchanged };
+		wildSettings.enabled = unchanged;
 		const work = imageWork(async (path, init) => {
 			assert.equal(path, '/api/pipeline/history/image-work/fork');
 			requests.push(JSON.parse(String(init?.body)));
@@ -100,9 +102,11 @@ for (const unchanged of [false, true]) {
 		assert.equal(options.lineage_parent_node_id, 'image-node');
 		assert.equal(options.derivation_kind, 'ddl_edit');
 		assert.equal(options.canvas_fit, 'contain');
+		assert.equal(options.wild, unchanged);
 		assert.equal(original.ddl, unchanged ? beforeReview : afterReview);
 		assert.equal(work.ddlGeneratedBaseline, original.ddl);
 		assert.equal(work.input, '');
+		wildSettings.enabled = false;
 	});
 }
 

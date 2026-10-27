@@ -1129,7 +1129,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		const batchSketchMode = sketchMode;
 		const batchRoute = drawRoute;
 		const batchComposition = compositionMode;
-		const batchWild = wildSettings.enabled;
+		const batchWild = wildSettings.selected;
 		// The batch owns its line failures; the previous single-work run is no longer current.
 		pipelineController.clear();
 		loading = true; error = null;
@@ -1279,6 +1279,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		const paperId = effectiveCanvasAspectId();
 		const unedited = !options.ddlEdit && replayParentNodeId !== null && ddlGeneratedBaseline !== null && ddl === ddlGeneratedBaseline;
 		const parentWorkId = displayedHistoryItem?.id ?? result?.history_id ?? null;
+		const recordedWild = displayedHistoryItem?.render_wild ?? result?.render_wild ?? false;
 		const parentAspectId = canvasAspectDerivation?.fromAspectId
 			?? displayedHistoryItem?.render_canvas_aspect_id ?? result?.render_canvas_aspect_id ?? null;
 		const declared = declaredCanvasRatio(ddl);
@@ -1327,6 +1328,7 @@ export function createWorkState(deps: WorkStateDeps) {
 				lineageParentNodeId: replayParentNodeId,
 				derivationKind: replayKind,
 				derivationMetadata: replayDerivationMetadata,
+				renderOverrides: wildOverride(unedited ? recordedWild : wildSettings.enabled),
 			}, abortController.signal);
 			if (view.result) {
 				if (canvasAspectDerivation) pendingCanvasAspectDerivation = null;

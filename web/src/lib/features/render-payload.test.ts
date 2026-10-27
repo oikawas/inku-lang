@@ -52,7 +52,7 @@ test('an override replaces the live value without naming a request field', () =>
 	});
 });
 
-test('a null override omits the field, which is how inheriting is expressed', () => {
+test('a null override omits the field, so the server applies its OFF default', () => {
 	assert.deepEqual(renderSettingsPayload('paint', wildOverride(false)), {
 		catalog_id: 'live-catalog',
 		catalog_mode: 'fixed',

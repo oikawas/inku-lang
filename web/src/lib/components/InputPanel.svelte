@@ -302,7 +302,7 @@
 					     after it too, so it names no one switch. -->
 					<span class="condition-inline-label">{isJapanese ? 'オプション' : 'Options'}</span>
 					<Tooltip text={t().tooltipInputWild} placement="top-right">
-						<SwitchChip label={t().wildButton} on={wildSettings.enabled} onToggle={() => wildSettings.set(!wildSettings.enabled)} />
+						<SwitchChip label={t().wildButton} on={wildSettings.selected} onToggle={() => wildSettings.setSelected(!wildSettings.selected)} />
 					</Tooltip>
 				</div>
 				{/if}

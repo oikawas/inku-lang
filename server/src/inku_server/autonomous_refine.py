@@ -497,8 +497,7 @@ class AutonomousRunner:
             options["catalog_id"] = catalog
         if item.get("render_canvas_aspect_id"):
             options["canvas_aspect"] = item["render_canvas_aspect_id"]
-        if settings.get("wild") is not None:
-            options["wild"] = settings["wild"]
+        options["wild"] = settings.get("wild") is True
         return options
 
     def _settle(self, owner: str, start: Callable[[], dict], stop: threading.Event) -> dict:

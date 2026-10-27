@@ -50,10 +50,10 @@ class AutonomousRunBody(BaseModel):
         default="ja", pattern="^(ja|en)$",
         description="Language of the run's instructions: ja or en. Defaults to ja.",
     )
-    # The Wild switch for every child; none keeps each parent's.
+    # The switch for every child; omission and null mean OFF.
     wild: bool | None = Field(
         default=None,
-        description="Wild setting applied to every child. Omitted keeps each parent's setting.",
+        description="Stroke limit switch applied to every child. Omitted or null means off.",
     )
 
 
@@ -101,7 +101,7 @@ class AutonomousSettings(BaseModel):
     note: str | None = Field(default=None, description="The author's direction the run was started with. Null when none was given (a chunk run always has one).")
     model: str = Field(description="Model the run was started with, used for every move and every child drawing.")
     language: str = Field(description="Language of the run's instructions: ja or en.")
-    wild: bool | None = Field(default=None, description="Wild setting applied to every child. Null keeps each parent's setting.")
+    wild: bool | None = Field(default=None, description="Stroke limit switch applied to every child. Null means off.")
 
 
 class AutonomousRunResponse(BaseModel):

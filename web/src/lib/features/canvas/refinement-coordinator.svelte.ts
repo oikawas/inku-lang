@@ -117,8 +117,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		return workId ? { work_id: workId } : {};
 	}
 
-	// A refinement redraws against the artwork it refines: its catalog, the level
-	// the author chose for this round, and the switch the artwork was drawn with.
+	// A refinement uses the saved work's catalog and the chosen switch for this round.
 	function refinementRenderOverrides(): RenderOverrides {
 		return {
 			...colorCatalogOverride(refinementCatalogId()),
@@ -167,6 +166,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 				canvas_aspect: refinementCanvasAspectId(),
 				render_seed: work.result.render_seed,
 				composition_seed: work.result.composition_seed,
+				wild: deps.render.wild(),
 				...renderSettingsPayload('render-score', colorCatalogOverride(catalogId)),
 			}),
 		});
@@ -243,7 +243,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 			const candidates = await runRefinementFanout(plan.entries.map((entry, index) => async (): Promise<VariationCandidate> => {
 				const rendered = await apiFetch('/api/render-tool-variant', {
 					method: 'POST', signal: controller.signal, headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ work_id: workId, mode, tools: entry.tools })
+					body: JSON.stringify({ work_id: workId, mode, tools: entry.tools, wild: deps.render.wild() })
 				});
 				if (!rendered.ok) throw await apiError(rendered);
 				const data = await rendered.json() as Partial<PaintResult> & Pick<PaintResult, 'svg' | 'score'> & { ddl: string };
@@ -362,7 +362,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 			const candidates = await runRefinementFanout(plan.entries.map((entry) => async (): Promise<VariationCandidate> => {
 				const rendered = await apiFetch('/api/render-color-arrangement', {
 					method: 'POST', signal: controller.signal, headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ work_id: workId, index: entry.index })
+					body: JSON.stringify({ work_id: workId, index: entry.index, wild: deps.render.wild() })
 				});
 				if (!rendered.ok) throw await apiError(rendered);
 				const data = await rendered.json() as Partial<PaintResult> & Pick<PaintResult, 'svg' | 'score'>;
@@ -426,7 +426,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 			const candidates = await runRefinementFanout(plan.entries.map((entry) => async (): Promise<VariationCandidate> => {
 				const rendered = await apiFetch('/api/render-ground-variant', {
 					method: 'POST', signal: controller.signal, headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ work_id: workId, material: entry.material })
+					body: JSON.stringify({ work_id: workId, material: entry.material, wild: deps.render.wild() })
 				});
 				if (!rendered.ok) throw await apiError(rendered);
 				const data = await rendered.json() as Partial<PaintResult> & Pick<PaintResult, 'svg' | 'score'> & { ddl: string };

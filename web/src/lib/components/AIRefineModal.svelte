@@ -7,6 +7,7 @@
 	import HistoryThumbnail from './HistoryThumbnail.svelte';
 	import ModelCardPicker from './ModelCardPicker.svelte';
 	import WildToggle from './WildToggle.svelte';
+	import { wildSettings } from '$lib/features/wild/settings.svelte';
 	import { loadAiRefineSettings, saveAiRefineSettings } from '$lib/features/canvas/ai-refine-settings';
 	import {
 		AUTONOMOUS_NOTE_LIMIT, AUTONOMOUS_POLL_MS, chunkMoveText, kindsOf, runToResume, sharePercent, triesOf,
@@ -42,9 +43,7 @@
 	// One model chooses the sentence, takes the laws stage and draws every child.
 	let selectedModel = $state('');
 	$effect(() => { if (!selectedModel) selectedModel = visionModel; });
-	// null = each child keeps its parent work's setting.
-	let wildOverride = $state<boolean | null>(null);
-	const parentWild = $derived(node.history?.render_wild === true);
+	let wildOverride = $state(wildSettings.enabled);
 	// A work its edited DDL holds takes no sentence; the run takes laws moves from it.
 	const held = $derived(node.history?.description_locked === true);
 	const isJapanese = $derived(t().code === 'ja');
@@ -260,7 +259,7 @@
 						<button type="button" aria-label="＋" onclick={() => (moves = Math.min(10, moves + 1))} disabled={starting || moves >= 10}>＋</button>
 					</div>
 				</div>
-				<WildToggle value={wildOverride ?? parentWild} {isJapanese} inherited={wildOverride === null} onSelect={(next) => (wildOverride = next)} />
+				<WildToggle value={wildOverride} onSelect={(next) => (wildOverride = next)} />
 			</div>
 			<label class="ai-refine-field">
 				<span class="ai-refine-label">{useChunks ? t().aiRefineChunksDirectionLabel : t().aiRefineDirectionLabel}</span>

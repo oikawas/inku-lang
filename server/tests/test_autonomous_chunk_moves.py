@@ -94,6 +94,14 @@ def _chunk_run(owner: str, *, moves: int = 3) -> dict:
 STEP = {"turn": 1, "attempt": 1, "kind": "chunks", "note": DIRECTION}
 
 
+@pytest.mark.parametrize("wild, expected", [(None, False), (False, False), (True, True)])
+def test_a_run_uses_its_own_stroke_choice_not_its_parent(wild, expected):
+    run = {"settings": {"model": MODEL, "language": "ja", "wild": wild}}
+    parent = {"item": {"render_wild": not expected, "lineage_node_id": "parent"}}
+    options = AutonomousRunner._options(None, run, parent, kind="chunk_move", metadata={})
+    assert options["wild"] is expected
+
+
 def test_a_chunk_child_is_kept_with_its_move_whatever_the_gate(author, answers):
     """Failure: the gate drops a chunk move's child, or the child keeps no move on its edge."""
     owner = author["user"]["id"]

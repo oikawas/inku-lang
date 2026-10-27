@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onDestroy, onMount, tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
+	import { wildSettings } from '$lib/features/wild/settings.svelte';
+	import WildToggle from './WildToggle.svelte';
 	import { qualifiedModelId, type Provider, type ProviderGroup } from '$lib/models';
 	import ModelCardPicker from './ModelCardPicker.svelte';
 	import RunStatus from './RunStatus.svelte';
@@ -28,6 +30,7 @@
 
 	let { node, visionModel, visionProviderGroups, stageLabel, stage1ModelLabel, stage2ModelLabel, tokensIn, tokensOut, attempt = null, onClose, onSaveVisionModel, onJuxtapose, onDrawDescription }: Props = $props();
 	let selectedModel = $state('');
+	let wild = $state(wildSettings.enabled);
 	$effect(() => { if (!selectedModel) selectedModel = visionModel; });
 	let result = $state<JuxtapositionResult | null>(null);
 	let shown = $state<string[]>([]);
@@ -98,8 +101,7 @@
 		controller = new AbortController();
 		let saved = false;
 		try {
-			// null wild = inherit the parent work's setting, as the description edit does.
-			await onDrawDescription(node, joined, controller.signal, null, juxtapositionMetadata(choice, result));
+			await onDrawDescription(node, joined, controller.signal, wild, juxtapositionMetadata(choice, result));
 			saved = true;
 		} catch (cause) {
 			error = failure(cause);
@@ -146,6 +148,7 @@
 		{#if error}<div class="juxtapose-error">{error}</div>{/if}
 	</div>
 	<footer>
+		<WildToggle value={wild} disabled={busy} onSelect={(next) => (wild = next)} />
 		{#if busy}
 			<RunStatus variant="inline" label={asking ? t().juxtaposeAsking : (stageLabel || t().pipelineWorking)} stage1Model={asking ? null : stage1ModelLabel} stage2Model={asking ? null : stage2ModelLabel} {elapsedMs} tokensIn={asking ? null : tokensIn} tokensOut={asking ? null : tokensOut} attempt={asking ? null : attempt} onStop={() => controller?.abort()} />
 		{:else}

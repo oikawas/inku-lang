@@ -1040,6 +1040,8 @@ export const en: LangPack = {
 	clipboardUnsupported: 'This browser cannot copy a picture to the clipboard.',
 	clipboardNeedsSavedWork: 'Only a saved work can be copied as a card.',
 	settingsTabMisc: 'Other',
+	settingsWildDefault: 'Default for lifting the stroke limit',
+	settingsWildDefaultDescription: 'The starting choice for new drawings and derived works in this browser. Changing the chip in the input area does not change this setting.',
 	uiModeLabel: 'UI mode',
 	uiModeDescription: 'Simple UI shows only what is essential to the main workflow.',
 	uiModeSimple: 'Simple UI',

@@ -15,6 +15,12 @@ import InkuHost
         try Data("invalid".utf8).write(to: bad)
         let png = try makePNG(); try png.write(to: good)
         try png.write(to: input.appendingPathComponent(".hidden.png"))
+        let nested = input.appendingPathComponent("nested")
+        try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
+        try png.write(to: nested.appendingPathComponent("3.png"))
+        let hidden = input.appendingPathComponent(".hidden-folder")
+        try FileManager.default.createDirectory(at: hidden, withIntermediateDirectories: true)
+        try png.write(to: hidden.appendingPathComponent("4.png"))
         let transport = FolderProvider()
         let app = AppModel(databaseURL: root.appendingPathComponent("works.sqlite"), transport: transport)
         await app.initialize()
@@ -25,16 +31,16 @@ import InkuHost
         try await app.updateHostSettings(settings)
         app.display.preferences.visionModelReference = "fixture:vision"
         let batch = ImageFolderBatch(); try batch.select(input, app: app)
-        XCTAssertEqual(batch.total, 2)
+        XCTAssertEqual(batch.total, 3)
         await batch.run(app: app, restart: false) { _ in "fixture" }
-        XCTAssertEqual(batch.completed, 1); XCTAssertEqual(batch.failed, 1)
+        XCTAssertEqual(batch.completed, 2); XCTAssertEqual(batch.failed, 1)
         try png.write(to: bad)
         let reopened = ImageFolderBatch(); try reopened.select(input, app: app)
-        XCTAssertEqual(reopened.completed, 1)
+        XCTAssertEqual(reopened.completed, 2)
         await reopened.run(app: app, restart: false) { _ in "fixture" }
-        XCTAssertEqual(reopened.completed, 2); XCTAssertEqual(reopened.failed, 0)
+        XCTAssertEqual(reopened.completed, 3); XCTAssertEqual(reopened.failed, 0)
         let calls = await transport.calls
-        XCTAssertEqual(calls, 4)
+        XCTAssertEqual(calls, 6)
     }
 
     private func makePNG() throws -> Data {

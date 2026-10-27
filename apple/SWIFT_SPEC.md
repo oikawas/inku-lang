@@ -24,7 +24,7 @@ The image tab accepts JPEG, PNG, GIF and TIFF. ImageIO reads the first GIF frame
 
 Image provenance is saved with the work and is not used as drawing input. The Image settings independently control automatic file-name and Exif notes; GPS is excluded. The upload warning appears on the first image run after each app launch. The saved record retains image references and `image_ddl`, not the image bytes. Instruction edits and appearance children inherit that provenance and image record. When the pre-review instructions exist, the app shows them and can draw a child from them.
 
-An image-folder batch skips hidden files and processes names in natural order, recording failures while continuing. A per-folder journal records paths, sizes, modification times and results for reselection and resumption. An image whose result is uncertain after interruption remains uncertain and is not automatically resent. Start over explicitly repeats every image. `InkuAppCheck --image-run-only` checks image preparation, saving and provenance separation with an isolated database and fake provider.
+An image-folder batch includes subfolders, skips hidden entries and processes paths in natural order, recording failures while continuing. A per-folder journal records paths, sizes, modification times and results for reselection and resumption. An image whose result is uncertain after interruption remains uncertain and is not automatically resent. Start over explicitly repeats every image. `InkuAppCheck --image-run-only` checks image preparation, saving and provenance separation with an isolated database and fake provider.
 
 ## 2026-10-23 Aspect ratio declarations and fitting
 

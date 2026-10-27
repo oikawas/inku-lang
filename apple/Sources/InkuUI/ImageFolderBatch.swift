@@ -38,9 +38,15 @@ private struct ImageFolderJournal: Codable {
         let folderDigest = SHA256.hash(data: Data(folder.utf8)).map { String(format: "%02x", $0) }.joined()
         let journalURL = root.appendingPathComponent("image-folder-\(folderDigest).json")
         let keys: Set<URLResourceKey> = [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey, .isHiddenKey]
-        let files = try FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: Array(keys), options: [.skipsHiddenFiles])
+        var enumerationError: Error?
+        guard let enumerator = FileManager.default.enumerator(at: url, includingPropertiesForKeys: Array(keys), options: [.skipsHiddenFiles],
+            errorHandler: { _, error in enumerationError = error; return false }) else {
+            throw HostError("image_folder_unavailable")
+        }
+        let files = enumerator.compactMap { $0 as? URL }
             .filter { ["jpg", "jpeg", "png", "gif", "tif", "tiff"].contains($0.pathExtension.lowercased()) }
             .sorted { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
+        if let enumerationError { throw enumerationError }
         var rows = try files.compactMap { file -> ImageFolderRow? in
             let values = try file.resourceValues(forKeys: keys)
             guard values.isRegularFile == true, values.isHidden != true, let size = values.fileSize,

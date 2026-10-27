@@ -891,6 +891,8 @@ export interface LangPack {
 	clipboardUnsupported: string;
 	clipboardNeedsSavedWork: string;
 	settingsTabMisc: string;
+	settingsWildDefault: string;
+	settingsWildDefaultDescription: string;
 	uiModeLabel: string;
 	uiModeDescription: string;
 	uiModeSimple: string;

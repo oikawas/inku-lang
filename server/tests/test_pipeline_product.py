@@ -428,6 +428,25 @@ def test_one_model_draws_both_stages(tmp_path, monkeypatch, requested, expected)
     engine.dispose()
 
 
+@pytest.mark.parametrize("supplied, expected", [({}, False), ({"wild": None}, False), ({"wild": False}, False), ({"wild": True}, True)])
+def test_fork_does_not_inherit_the_parent_stroke_limit(tmp_path, monkeypatch, supplied, expected):
+    from inku_server import db
+    from inku_server.api_core import common
+
+    binding = PipelineBinding()
+    engine = create_engine(f"sqlite:///{tmp_path / 'wild.db'}")
+    Base.metadata.create_all(engine)
+    monkeypatch.setattr(db, "engine", engine)
+    monkeypatch.setattr(db, "SessionLocal", sessionmaker(bind=engine))
+    monkeypatch.setattr(common, "_model_offered_to", lambda *args, **kwargs: True)
+    effects = ProductPipelineEffects(binding, default_manifest(binding))
+    parent = {"host_options": {"wild": True}, "metadata": {"render_wild": True}}
+    _config, context = effects.prepare("author", "direct_ddl", "Nature.青葉。",
+        {"instruction_lang": "ja", "catalog_id": "default", "stage1_model": "fixture:one", **supplied}, parent)
+    assert context["host_options"]["wild"] is expected
+    engine.dispose()
+
+
 def test_compact_delivery_preserves_authority_in_normal_history(tmp_path, monkeypatch, caplog):
     from inku_server import db
     from inku_server.api_core import rendering, thumbnails

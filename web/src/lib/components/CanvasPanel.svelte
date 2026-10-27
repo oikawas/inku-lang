@@ -187,7 +187,6 @@
 		refineDrawingModelGroups: ProviderGroup[];
 		onSelectRefineDrawingModel: (provider: Provider, model: string) => void | Promise<void>;
 		refineWildValue: boolean;
-		refineWildInherited: boolean;
 		onSetRefineWild: (value: boolean | null) => void;
 		onSaveOkugakiModel: (provider: Provider, model: string) => void | Promise<void>;
 		onSaveVisionModel: (provider: Provider, model: string) => void | Promise<void>;
@@ -315,7 +314,6 @@
 		refineDrawingModelGroups,
 		onSelectRefineDrawingModel,
 		refineWildValue,
-		refineWildInherited,
 		onSetRefineWild,
 		onSaveOkugakiModel,
 		onSaveVisionModel,
@@ -460,6 +458,7 @@
 	const statusSketchState = $derived(normalizeSketchState(statusWork?.sketch_state));
 	async function openLineageRefinement(node: LineageNode, view: RefinementView): Promise<void> {
 		await onOpenLineageNode(node);
+		onSetRefineWild(null);
 		refineView = view;
 		refineReturnTab = 'lineage';
 		directRefinementActive = false;
@@ -489,6 +488,7 @@
 	}
 
 	function startDirectRefinement(node: LineageNode, view: RefinementView): void {
+		onSetRefineWild(null);
 		refineView = view;
 		refineReturnTab = 'canvas';
 		directRefinementActive = true;
@@ -913,7 +913,6 @@
 					{refineDrawingModelId}
 					{refineDrawingModelGroups}
 					{refineWildValue}
-					{refineWildInherited}
 					onClose={requestCloseRefineModal}
 					{onGenerateVariationCandidates}
 					{onGenerateColorCatalogCandidates}

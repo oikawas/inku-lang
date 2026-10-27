@@ -58,7 +58,7 @@
 		/** Open a child an AI refinement run kept. */
 		onOpenAutonomousChild: (historyId: string, nodeId: string | null) => void | Promise<void>;
 		/** Redraw a work with the sketch off or on, as its child. */
-		onDrawSketchGrain: (node: LineageNode, mode: SketchMode, signal?: AbortSignal) => Promise<void>;
+		onDrawSketchGrain: (node: LineageNode, mode: SketchMode, signal?: AbortSignal, wild?: boolean) => Promise<void>;
 		onJuxtapose: (historyId: string, model: string, exclude: string[], signal: AbortSignal) => Promise<JuxtapositionResult>;
 		onSaveVisionModel: (provider: Provider, model: string) => void | Promise<void>;
 		visionModel: string;

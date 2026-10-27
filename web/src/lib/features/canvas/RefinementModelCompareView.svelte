@@ -21,7 +21,6 @@
 		refinementSession: RefinementSession;
 		modelInspection: ModelInspection;
 		refineWildValue: boolean;
-		refineWildInherited: boolean;
 		onSetRefineWild: (value: boolean | null) => void;
 		/** Draws the work with each picked model, as options like the color change's. */
 		onGenerateModelCandidates: () => void | Promise<void>;
@@ -39,7 +38,6 @@
 		refinementSession,
 		modelInspection,
 		refineWildValue,
-		refineWildInherited,
 		onSetRefineWild,
 		onGenerateModelCandidates,
 		onSaveAndClose,
@@ -53,7 +51,7 @@
 	<!-- The picker spans the dialog, as it did before the options: the models
 	     sit side by side rather than in a column the button hides below. -->
 	<div class="compare-head">
-		<div class="compare-head-settings"><WildToggle value={refineWildValue} {isJapanese} inherited={refineWildInherited} onSelect={(next) => onSetRefineWild(next)} /></div>
+		<div class="compare-head-settings"><WildToggle value={refineWildValue} onSelect={(next) => onSetRefineWild(next)} /></div>
 		<div class="compare-action-wrap">
 			<Tooltip placement="bottom-left" text={t().tooltipModelCompare}>
 				<PaintButton onclick={onGenerateModelCandidates} disabled={busy || !resultAvailable || modelInspection.drawableModels().length === 0}>

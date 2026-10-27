@@ -1038,6 +1038,8 @@ export const ja: LangPack = {
 	clipboardUnsupported: 'このブラウザは画像のコピーに対応していません。',
 	clipboardNeedsSavedWork: 'カード形式は保存した作品だけコピーできます。',
 	settingsTabMisc: 'その他',
+	settingsWildDefault: '筆致制限を外すの既定値',
+	settingsWildDefaultDescription: 'このブラウザで、新しい描画や派生の条件を開くときの既定値です。入力欄の札を変えても、この設定は変わりません。',
 	uiModeLabel: 'UIモード',
 	uiModeDescription: 'シンプルUIは主要な作業に不可欠な項目だけを表示します。',
 	uiModeSimple: 'シンプルUI',

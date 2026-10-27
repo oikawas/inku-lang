@@ -32,7 +32,6 @@
 		refineDrawingModelId: string;
 		refineDrawingModelGroups: ProviderGroup[];
 		refineWildValue: boolean;
-		refineWildInherited: boolean;
 		/** The catalog the work uses, named in the color change dialog. */
 		catalogName: string;
 		onClose: () => void;
@@ -65,7 +64,6 @@
 		refineDrawingModelId,
 		refineDrawingModelGroups,
 		refineWildValue,
-		refineWildInherited,
 		catalogName,
 		onClose,
 		onGenerateVariationCandidates,
@@ -122,7 +120,6 @@
 			{refineDrawingModelId}
 			{refineDrawingModelGroups}
 			{refineWildValue}
-			{refineWildInherited}
 			{onGenerateVariationCandidates}
 			{onSaveAndClose}
 			{onDiscardAndClose}
@@ -187,7 +184,6 @@
 			{refinementSession}
 			{modelInspection}
 			{refineWildValue}
-			{refineWildInherited}
 			{onSetRefineWild}
 			{onGenerateModelCandidates}
 			{onSaveAndClose}

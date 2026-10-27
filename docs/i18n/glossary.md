@@ -115,7 +115,7 @@ composition / color catalog と食い違って見える（→ §8）。
 | リーダー（グループ名） | **Leaders** | 権限グループ `leaders` の表示形 | ~~Group lead~~、~~Manager~~ |
 | ユーザー（グループ名） | **Users** | 権限グループ `users` の表示形 | ~~User~~（単数）、~~Member~~ |
 | ユーザーグループ | **user group** | 組織のまとまり・1 人 1 つ。**権限とは独立** | ~~permission group~~（別の実体） |
-| 筆致制限を外す | **Lift the stroke limit** | トグルラベル・**lint 固定**。点けると外れる。2026-10-27 に作者が「暴れる」／`Wild` から改めた（実装名 `WILD_GAIN`・記録 `render_wild` はそのまま。Android・macOS も同じ名前） | ~~Wild~~（Web）・~~Unleashed~~ |
+| 筆致制限を外す | **Lift the stroke limit** | トグルラベル・**lint 固定**。点けると外れる。Webの既定値はOFFで、設定で変更できる。入力欄の札と派生の選択は既定値を書き換えない。2026-10-27 に作者が「暴れる」／`Wild` から改めた（実装名 `WILD_GAIN`・記録 `render_wild` はそのまま。Android・macOS も同じ名前） | ~~Wild~~（Web）・~~Unleashed~~ |
 | 筆致制限 | **Stroke limit** | 筆致制限を外すトグルが外すもの。見出し語としては使わない（後ろの条件まで指すように読めるため。次に描く条件の行のラベルは「オプション」／`Options`） | ~~Brush limit~~ |
 | 制限値 | **Limits** | 設定タブ名。一枚が持てる墨の数を決める数の組 | ~~Caps~~・~~Quotas~~・~~Thresholds~~ |
 | 描画表現（設定カード） | **Stroke** | 見出し語。筆致制限を外すトグルと同じ軸 | — |

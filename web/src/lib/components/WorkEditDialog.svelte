@@ -4,6 +4,7 @@
 	import SketchSelect from './SketchSelect.svelte';
 	import RunStatus from './RunStatus.svelte';
 	import WildToggle from './WildToggle.svelte';
+	import { wildSettings } from '$lib/features/wild/settings.svelte';
 	import DescriptionMeter from './DescriptionMeter.svelte';
 	import { normalizeSketchState, sketchStateNote, type SketchMode } from '$lib/sketch';
 	import type { LineageNode } from '$lib/features/history/types';
@@ -22,12 +23,12 @@
 		attempt?: ProviderAttemptCount | null;
 		onClose: () => void;
 		onDrawDescription: (node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null) => void | Promise<void>;
-		onDrawSketchGrain: (node: LineageNode, mode: SketchMode, signal?: AbortSignal) => void | Promise<void>;
+		onDrawSketchGrain: (node: LineageNode, mode: SketchMode, signal?: AbortSignal, wild?: boolean) => void | Promise<void>;
 	};
 
 	let { node, mode, isJapanese, stageLabel, stage1ModelLabel, stage2ModelLabel, tokensIn, tokensOut, attempt = null, onClose, onDrawDescription, onDrawSketchGrain }: Props = $props();
 	let draft = $state('');
-	let wildOverride = $state<boolean | null>(null);
+	let wildOverride = $state(wildSettings.enabled);
 	let sketchMode = $state<SketchMode>('on');
 	let drawing = $state(false);
 	let error = $state<string | null>(null);
@@ -49,7 +50,7 @@
 		if (nextKey === initializedKey) return;
 		initializedKey = nextKey;
 		draft = mode === 'description' ? (node.history?.source_text ?? node.history?.input ?? '') : '';
-		wildOverride = null;
+		wildOverride = wildSettings.enabled;
 		// Offer the other side of what the work was drawn with.
 		sketchMode = node.history?.sketch_text ? 'off' : 'on';
 		error = null;
@@ -79,7 +80,7 @@
 		let saved = false;
 		try {
 			if (mode === 'description') await onDrawDescription(node, draft, controller.signal, wildOverride);
-			else await onDrawSketchGrain(node, sketchMode, controller.signal);
+			else await onDrawSketchGrain(node, sketchMode, controller.signal, wildOverride);
 			saved = true;
 		} catch (cause) {
 			if (!(cause instanceof Error && cause.name === 'AbortError')) error = cause instanceof Error ? cause.message : String(cause);
@@ -117,9 +118,8 @@
 		{#if drawing}
 			<RunStatus variant="inline" label={stageLabel || t().pipelineWorking} stage1Model={stage1ModelLabel} stage2Model={stage2ModelLabel} {elapsedMs} tokensIn={tokensIn} tokensOut={tokensOut} {attempt} onStop={() => controller?.abort()} />
 		{:else}
-			{#if mode === 'description'}
-				<WildToggle value={wildOverride ?? (node.history?.render_wild === true)} {isJapanese} inherited={wildOverride === null} onSelect={(next) => (wildOverride = next)} />
-			{:else}
+				<WildToggle value={wildOverride} onSelect={(next) => (wildOverride = next)} />
+			{#if mode !== 'description'}
 				<span class="sketch-current">{t().workEditParentGrain}: {node.history?.sketch_text ? (isJapanese ? 'あり' : 'With sketch') : (sketchStateNote(normalizeSketchState(node.history?.sketch_state), isJapanese) || (isJapanese ? 'なし' : 'None'))}</span>
 			{/if}
 			<button type="button" onclick={close}>{t().pipelineCancel}</button>

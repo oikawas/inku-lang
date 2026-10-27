@@ -525,7 +525,7 @@
 	}
 
 	// ── Color catalog ────────────────────────────────────────
-	// Refine dialogs: null = inherit from the parent artwork (field omitted).
+	// Null means the saved default, until this dialog chooses a value.
 	let refineWildOverride = $state<boolean | null>(null);
 	function setRefineWild(value: boolean | null) { refineWildOverride = value; }
 	let colorCatalogs = $state<ColorCatalog[]>([FALLBACK_CATALOG]);
@@ -802,7 +802,7 @@
 		// Not conditional: a work with no prose was drawn with the layer off, and
 		// leaving the switch where it is would resume under other conditions.
 		work.sketchMode = sketchModeOf(conditions.sketchGrain);
-		if (conditions.wild !== null) wildSettings.set(conditions.wild);
+		if (conditions.wild !== null) wildSettings.setSelected(conditions.wild);
 		if (conditions.canvasAspectId) canvasAspectId = normalizeCanvasAspectId(conditions.canvasAspectId);
 	}
 
@@ -1739,10 +1739,10 @@ async function drawLineageDescriptionEdit(node: LineageNode, text: string, signa
 			derivationKind: 'description_edit',
 			// A juxtaposition adds what it added, so the lineage can leave it out next time.
 			derivationMetadata: { edited_from_history_id: node.history.id ?? null, ...(metadata ?? {}) },
-			// null override = inherit the parent work's setting.
+			// The dialog supplies its own choice; otherwise use the saved default.
 			renderOverrides: {
 				...colorCatalogOverride(lineageCatalogId(node)),
-				...wildOverride(wild ?? node.history.render_wild === true)
+				...wildOverride(wild ?? wildSettings.enabled)
 			},
 		}, signal);
 		// A cancelled run hands back its last view instead of throwing; a stop
@@ -1757,7 +1757,7 @@ async function drawLineageDescriptionEdit(node: LineageNode, text: string, signa
 /** Redraw a saved work with the sketch off or on, as its child. The
  *  sketch is asked again (or dropped) -- replaying the stored one would leave
  *  the choice dead. */
-async function drawLineageSketchGrain(node: LineageNode, mode: SketchMode, signal?: AbortSignal): Promise<void> {
+async function drawLineageSketchGrain(node: LineageNode, mode: SketchMode, signal?: AbortSignal, wild = wildSettings.enabled): Promise<void> {
 	if (!node.history) return;
 	// Ask before the words are carried into a child (contract § stage 4).
 	if (!(await work.confirmFallbackRefine(node.history))) return;
@@ -1778,7 +1778,7 @@ async function drawLineageSketchGrain(node: LineageNode, mode: SketchMode, signa
 		signal,
 		renderOverrides: {
 			...colorCatalogOverride(lineageCatalogId(node)),
-			...wildOverride(node.history.render_wild === true)
+			...wildOverride(wild)
 		},
 	});
 	await showNewLineageChild(rendered.history_id, rendered.lineage_node_id);
@@ -1806,7 +1806,7 @@ async function drawLineageDdlEdit(node: LineageNode, editedDdl: string, signal?:
 		derivationMetadata: { edited_from_history_id: node.history.id ?? null },
 		renderOverrides: {
 			...colorCatalogOverride(lineageCatalogId(node)),
-			...wildOverride(ddlDialogWildOverride ?? node.history.render_wild === true)
+			...wildOverride(ddlDialogWildOverride ?? wildSettings.enabled)
 		},
 	}, signal);
 	await showNewLineageChild(view.result?.history_id, view.result?.lineage_node_id);
@@ -2531,10 +2531,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			? statusHistoryItem as Iteration
 			: null
 	);
-	// What a refine inherits when nothing is overridden: the work on screen, or
-	// the global setting when nothing is on screen.
-	const targetWild = $derived(work.displayedHistoryItem?.render_wild ?? work.result?.render_wild ?? wildSettings.enabled);
-	const effectiveRefineWild = $derived(refineWildOverride ?? targetWild === true);
+	const effectiveRefineWild = $derived(refineWildOverride ?? wildSettings.enabled);
 	const statusGeneration = $derived(((statusHistoryItem as { lineage_generation?: number | null } | null)?.lineage_generation) ?? null);
 
 	function formatHistoryDate(at: number): string {
@@ -3257,7 +3254,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				refineDrawingModelGroups={availableModelCatalog}
 				onSelectRefineDrawingModel={selectDdlDialogDrawingModel}
 				refineWildValue={effectiveRefineWild}
-				refineWildInherited={refineWildOverride === null}
 				onSetRefineWild={setRefineWild}
 				onSaveOkugakiModel={persistOkugakiModel}
 				onSaveVisionModel={persistVisionModel}
@@ -3366,8 +3362,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			previewForWord={saijikiPreview}
 			previewForPlugin={pluginPreview}
 			{pluginEntries}
-			wildValue={ddlDialogWildOverride ?? (ddlDialogNode?.history?.render_wild === true)}
-			wildInherited={ddlDialogWildOverride === null}
+			wildValue={ddlDialogWildOverride ?? wildSettings.enabled}
 			onSelectWild={(next) => (ddlDialogWildOverride = next)}
 			onDraw={handleDdlDialogDraw}
 			onClose={closeDdlDialog}

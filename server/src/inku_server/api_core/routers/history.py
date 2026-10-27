@@ -674,13 +674,13 @@ def api_history_post(
         # laws move read (2026-10-20).
         laws_records = laws_records_of(VariationAuthorityStore(_db.engine), actor["id"], parent_id)
         if body.derivation_kind == "color_arrangement_change":
-            replayed = _render_color_arrangement_for_work(actor, parent, index, laws_records).model_dump(exclude_none=True, by_alias=True)
+            replayed = _render_color_arrangement_for_work(actor, parent, index, laws_records, wild=body.render_wild).model_dump(exclude_none=True, by_alias=True)
         elif body.derivation_kind == "canvas_fit":
             replayed = _render_canvas_fit_for_work(actor, parent, paper, laws_records).model_dump(exclude_none=True, by_alias=True)
         elif body.derivation_kind == "ground_change":
-            replayed = _render_ground_variant_for_work(actor, parent, material, laws_records).model_dump(exclude_none=True, by_alias=True)
+            replayed = _render_ground_variant_for_work(actor, parent, material, laws_records, wild=body.render_wild).model_dump(exclude_none=True, by_alias=True)
         else:
-            replayed = _render_tool_variant_for_work(actor, parent, tool_mode, tools, laws_records).model_dump(exclude_none=True, by_alias=True)
+            replayed = _render_tool_variant_for_work(actor, parent, tool_mode, tools, laws_records, wild=body.render_wild).model_dump(exclude_none=True, by_alias=True)
         # Only the parent and the server-derived index decide this child. Sent
         # Score, map, seeds and limits cannot rewrite the work being recolored.
         inherited = {key: parent.get(key) for key in (

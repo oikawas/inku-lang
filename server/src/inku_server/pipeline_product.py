@@ -372,8 +372,9 @@ class ProductPipelineEffects:
                      "instruction_lang_requested", "ui_lang"):
             if metadata.get(name) is not None:
                 previous["instruction_lang" if name == "instruction_lang_requested" else name] = metadata[name]
-        if metadata.get("render_wild") is not None:
-            previous["wild"] = str(metadata["render_wild"]).lower() in {"true", "1"}
+        # Each new run starts with the requested switch, not the parent's.
+        # None and omission both mean OFF; saved-score replay has its own path.
+        options["wild"] = options.get("wild") is True
         imported_plugins = options.pop("imported_plugins", None)
         if imported_plugins and work and "saved_config" in work:
             raise CandidateHostError("imported_plugins_require_new_work")

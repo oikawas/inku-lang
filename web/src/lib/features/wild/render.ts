@@ -11,9 +11,8 @@ type WildOverride = {
 };
 
 /**
- * Override the switch for one request.  `null` means "omit the field": a
- * compose or a re-render of a stored score inherits what the artwork was drawn
- * with rather than what is switched on now.
+ * Override the switch for one request. Stored-score replay uses its separate
+ * server-owned replay path, which reads the recorded setting.
  */
 export function wildOverride(enabled: boolean | null | undefined): RenderOverrides {
 	return { [WILD_CONTRIBUTOR_ID]: { enabled: enabled ?? null } };
@@ -31,8 +30,7 @@ export const wildContributor: RenderContributor = {
 		if (kind === 'render-score') return {};
 		const given = override as WildOverride | undefined;
 		const explicit = given && 'enabled' in given ? given.enabled : undefined;
-		// A fresh paint always states the switch; the others carry it only when
-		// the caller resolved one, so an omission still means "inherit".
+		// A fresh paint states the switch; other paths may supply an explicit value.
 		if (kind === 'paint') return { wild: (explicit === undefined ? readEnabled() : explicit) ?? false };
 		return explicit != null ? { wild: explicit } : {};
 	}

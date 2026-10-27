@@ -578,6 +578,29 @@ fn writing_system(
     ))
 }
 
+/// The writing request's guide from its canvas section up to its answer: what
+/// a chunk move's rewrite request copies, as the second chunk prototype copied
+/// it (`chunk_proto.py`'s `guide_text`: the read-and-draw writing request with a
+/// reading, from `# 画面と数` up to `# 答え`).
+pub(crate) fn writing_guide(language: ResolvedInstructionLanguage) -> Result<String, PromptError> {
+    let (header, answer, from, to) = match language {
+        ResolvedInstructionLanguage::Ja => (WRITING_JA, ANSWER_JA, "# 画面と数", "# 答え"),
+        ResolvedInstructionLanguage::En => {
+            (WRITING_EN, ANSWER_EN, "# Canvas and numbers", "# Answer")
+        }
+    };
+    let system = format!("{header}\n\n{}\n\n{answer}", writing_tail(language)?);
+    let missing = || PromptError::EmptyField {
+        field: "writing_guide",
+    };
+    let start = system.find(from).ok_or_else(missing)?;
+    let end = system[start..]
+        .find(to)
+        .map(|end| start + end)
+        .ok_or_else(missing)?;
+    Ok(system[start..end].to_owned())
+}
+
 pub(crate) fn description_message(
     context: &DescriptionDdlContext<'_>,
     language: ResolvedInstructionLanguage,

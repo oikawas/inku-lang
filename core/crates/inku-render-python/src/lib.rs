@@ -330,6 +330,17 @@ fn pipeline_juxtaposition<'py>(
     PyBytes::new(py, &output)
 }
 
+/// The chunk moves (まとまりの手) from the shared core: start, answer, drawn.
+#[pyfunction]
+fn pipeline_chunk_moves<'py>(
+    py: Python<'py>,
+    input_bytes: &Bound<'py, PyBytes>,
+) -> Bound<'py, PyBytes> {
+    let input = input_bytes.as_bytes().to_vec();
+    let output = py.detach(|| inku_pipeline_uniffi::chunk_moves(input));
+    PyBytes::new(py, &output)
+}
+
 /// The autonomous refinement (AI自動推敲) from the shared core: next, record, measure.
 #[pyfunction]
 fn pipeline_autonomous_refine<'py>(
@@ -476,6 +487,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(pipeline_saved_variants, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_juxtaposition, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_autonomous_refine, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_chunk_moves, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_provider_wire, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_image_input_policy, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_image_canvas, module)?)?;

@@ -17,6 +17,11 @@
 //!     used, is followed once by the other move from the same parent, or by
 //!     the same move with what it used left out when the other cannot start.
 //!   - Two turns in a row that keep nothing stop the run.
+//!   - A chunk move (まとまりの手, the author 2026-10-27) runs alone. Its turn
+//!     counts one try: `chunk_moves` asks again inside the try, as the second
+//!     chunk prototype did. It keeps every drawn child that passes its checks,
+//!     with no visible-difference gate, and it needs the run's note (its
+//!     direction) and a parent with chunks (title lines, or a composition).
 //! - [`visible_count`]: the visible-difference gate on two drawings, the share
 //!   of the drawn cells that changed.
 //! - [`record`]: the `ai_move` a child keeps on its lineage edge.
@@ -64,12 +69,13 @@ pub const GATE_THRESHOLD: f64 = 0.2;
 const GATE_SHARE_NUMERATOR: u64 = 1;
 const GATE_SHARE_DENOMINATOR: u64 = 5;
 
-/// The two moves.
+/// The moves. A chunk move runs alone, so it has no other.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Kind {
     Laws,
     Juxtaposition,
+    Chunks,
 }
 
 impl Kind {
@@ -78,6 +84,7 @@ impl Kind {
         match self {
             Self::Laws => Self::Juxtaposition,
             Self::Juxtaposition => Self::Laws,
+            Self::Chunks => Self::Chunks,
         }
     }
 
@@ -85,9 +92,13 @@ impl Kind {
         match self {
             Self::Laws => "laws",
             Self::Juxtaposition => "juxtaposition",
+            Self::Chunks => "chunks",
         }
     }
 }
+
+/// The moves a chunk move's record may name.
+const CHUNK_MOVES: [&str; 6] = ["omit", "simplify", "place", "break", "repeat", "merge"];
 
 /// How a try ended, as the host reports it.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -156,6 +167,10 @@ pub struct Parent {
     pub main_law: Option<String>,
     #[serde(default)]
     pub laws: Vec<String>,
+    /// The chunks a chunk move could take: those of the parent's title lines,
+    /// or of its composition record. Absent or none, no chunk move starts.
+    #[serde(default)]
+    pub chunks: Option<usize>,
 }
 
 /// What [`next`] reads.
@@ -200,6 +215,12 @@ pub enum Next {
         reuse: bool,
         exclude: Vec<String>,
     },
+    /// A chunk move toward `note`, the run's direction.
+    Chunks {
+        turn: usize,
+        attempt: usize,
+        note: String,
+    },
     Stop {
         reason: &'static str,
         turns: usize,
@@ -228,7 +249,7 @@ enum TurnState {
     Open,
 }
 
-fn read_turn(turn: &Turn, kinds: &[Kind]) -> Result<TurnState, Refusal> {
+fn read_turn(turn: &Turn, kinds: &[Kind], tries: usize) -> Result<TurnState, Refusal> {
     let out_of_order = |detail: &str| refuse("turns_out_of_order", detail);
     let Some(last) = turn.attempts.last() else {
         return Err(out_of_order("a turn has no tries"));
@@ -263,13 +284,17 @@ fn read_turn(turn: &Turn, kinds: &[Kind]) -> Result<TurnState, Refusal> {
             }
             Outcome::Kept | Outcome::NotVisible | Outcome::Failed => counted += 1,
         }
-        if counted > TRIES_PER_TURN {
-            return Err(out_of_order("a turn counts at most two tries"));
+        if counted > tries {
+            return Err(out_of_order(if tries == 1 {
+                "a chunk move's turn counts one try"
+            } else {
+                "a turn counts at most two tries"
+            }));
         }
     }
     Ok(if last.outcome == Outcome::Kept {
         TurnState::Kept(last.kind)
-    } else if counted == TRIES_PER_TURN {
+    } else if counted == tries {
         TurnState::Empty
     } else {
         TurnState::Open
@@ -294,12 +319,29 @@ pub fn next(request: &NextRequest) -> Result<Next, Refusal> {
         ));
     }
     let kinds = &request.kinds;
-    if kinds.is_empty() || kinds.len() > 2 || (kinds.len() == 2 && kinds[0] == kinds[1]) {
+    if kinds.is_empty()
+        || kinds.len() > 2
+        || (kinds.len() == 2 && kinds[0] == kinds[1])
+        || (kinds.contains(&Kind::Chunks) && kinds.len() != 1)
+    {
         return Err(refuse(
             "kinds",
-            "kinds names laws, juxtaposition or both, once each",
+            "kinds names laws, juxtaposition or both, once each, or chunks alone",
         ));
     }
+    let chunks_only = kinds.as_slice() == [Kind::Chunks];
+    let note = request
+        .note
+        .as_deref()
+        .map(str::trim)
+        .filter(|note| !note.is_empty());
+    if chunks_only && note.is_none() {
+        return Err(refuse(
+            "note_required",
+            "a chunk move needs the run's note, its direction",
+        ));
+    }
+    let tries = if chunks_only { 1 } else { TRIES_PER_TURN };
     if request
         .note
         .as_ref()
@@ -321,7 +363,7 @@ pub fn next(request: &NextRequest) -> Result<Next, Refusal> {
     let mut sentences: Vec<String> = Vec::new();
     let mut open: Option<&Turn> = None;
     for (place, turn) in request.turns.iter().enumerate() {
-        let state = read_turn(turn, kinds)?;
+        let state = read_turn(turn, kinds, tries)?;
         for attempt in &turn.attempts {
             if attempt.kind == Kind::Juxtaposition
                 && let Some(sentence) = &attempt.sentence
@@ -368,6 +410,7 @@ pub fn next(request: &NextRequest) -> Result<Next, Refusal> {
     let blocked = |kind: Kind| {
         !kinds.contains(&kind)
             || (kind == Kind::Juxtaposition && (parent.description_locked || parent.ddl_work))
+            || (kind == Kind::Chunks && parent.chunks.is_none_or(|chunks| chunks == 0))
             || attempts
                 .iter()
                 .any(|attempt| attempt.kind == kind && attempt.outcome == Outcome::Unavailable)
@@ -377,6 +420,12 @@ pub fn next(request: &NextRequest) -> Result<Next, Refusal> {
         .filter(|attempt| attempt.outcome != Outcome::Unavailable)
         .collect();
     let kind = match counted.as_slice() {
+        _ if chunks_only => {
+            if blocked(Kind::Chunks) {
+                return Ok(stop("nothing_available"));
+            }
+            Kind::Chunks
+        }
         [] => {
             let first = last_kept.map_or(Kind::Juxtaposition, Kind::other);
             if !blocked(first) {
@@ -422,15 +471,15 @@ pub fn next(request: &NextRequest) -> Result<Next, Refusal> {
                 direction: LawsDirection {
                     exclude,
                     cards: LAWS_CARDS,
-                    note: request
-                        .note
-                        .as_deref()
-                        .map(str::trim)
-                        .filter(|note| !note.is_empty())
-                        .map(str::to_owned),
+                    note: note.map(str::to_owned),
                 },
             }
         }
+        Kind::Chunks => Next::Chunks {
+            turn,
+            attempt,
+            note: note.unwrap_or_default().to_owned(),
+        },
         Kind::Juxtaposition => {
             let (rank, reuse) = match counted.last() {
                 Some(tried)
@@ -474,6 +523,11 @@ fn next_json(next: &Next) -> Value {
             "kind": "juxtaposition", "turn": turn, "attempt": attempt,
             "rank": rank, "reuse": reuse, "exclude": exclude,
         }}),
+        Next::Chunks {
+            turn,
+            attempt,
+            note,
+        } => json!({"next": {"kind": "chunks", "turn": turn, "attempt": attempt, "note": note}}),
         Next::Stop {
             reason,
             turns,
@@ -732,6 +786,26 @@ pub struct JuxtapositionMove {
     pub candidates: usize,
 }
 
+/// What a chunk move did: the record `chunk_moves` gave its kept child (the
+/// move, the titles of the chunks it took, the options it wrote, the reader's
+/// reason, a rewrite's new title and sentences, and the tries of the request
+/// that gave it).
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ChunkMove {
+    #[serde(rename = "move")]
+    pub moved: String,
+    pub targets: Vec<String>,
+    #[serde(default)]
+    pub params: Map<String, Value>,
+    pub reason: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sentences: Option<usize>,
+    pub tries: usize,
+}
+
 /// What [`record`] reads: one drawn child of a run.
 #[derive(Clone, Debug, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -750,6 +824,8 @@ pub struct RecordRequest {
     pub laws: Option<LawsMove>,
     #[serde(default)]
     pub juxtaposition: Option<JuxtapositionMove>,
+    #[serde(default)]
+    pub chunks: Option<ChunkMove>,
 }
 
 fn clipped(text: &str, limit: usize) -> String {
@@ -776,7 +852,17 @@ pub fn record(request: &RecordRequest) -> Result<Map<String, Value>, Refusal> {
         return Err(refuse("share_out_of_range", "a share is between 0 and 1"));
     }
     let passes = request.share >= GATE_THRESHOLD;
+    // A chunk move keeps every drawn child that passed its checks: the gate
+    // is measured for the record, not applied (the author, 2026-10-27).
+    let gated = request.kind != Kind::Chunks;
     match (request.outcome, passes) {
+        (Outcome::Kept, _) if !gated => {}
+        (Outcome::NotVisible, _) if !gated => {
+            return Err(refuse(
+                "record_shape",
+                "a chunk move keeps a drawn child: kept",
+            ));
+        }
         (Outcome::Kept, true) | (Outcome::NotVisible, false) => {}
         (Outcome::Kept | Outcome::NotVisible, _) => {
             return Err(refuse(
@@ -812,23 +898,29 @@ pub fn record(request: &RecordRequest) -> Result<Map<String, Value>, Refusal> {
     ai_move.insert("kind".to_owned(), json!(request.kind.name()));
     ai_move.insert("model".to_owned(), json!(request.model.trim()));
     ai_move.insert("outcome".to_owned(), json!(request.outcome.name()));
-    ai_move.insert(
-        "visible".to_owned(),
-        json!({
-            "share": (request.share * 10_000.0).round() / 10_000.0,
-            "passes": passes,
-            "level": GATE_LEVEL,
-            "threshold": GATE_THRESHOLD,
-            "grid": GATE_GRID,
-            "size": GATE_SIZE,
-        }),
-    );
+    let mut visible = json!({
+        "share": (request.share * 10_000.0).round() / 10_000.0,
+        "passes": passes,
+        "level": GATE_LEVEL,
+        "threshold": GATE_THRESHOLD,
+        "grid": GATE_GRID,
+        "size": GATE_SIZE,
+    });
+    if !gated {
+        visible["gate"] = json!(false);
+    }
+    ai_move.insert("visible".to_owned(), visible);
     if let Some(note) = note {
         ai_move.insert("note".to_owned(), json!(note));
     }
     let mut metadata = Map::new();
-    match (request.kind, &request.laws, &request.juxtaposition) {
-        (Kind::Laws, Some(laws), None) => {
+    match (
+        request.kind,
+        &request.laws,
+        &request.juxtaposition,
+        &request.chunks,
+    ) {
+        (Kind::Laws, Some(laws), None, None) => {
             if laws.main_law.trim().is_empty() {
                 return Err(refuse("record_shape", "a laws move names its main law"));
             }
@@ -844,7 +936,7 @@ pub fn record(request: &RecordRequest) -> Result<Map<String, Value>, Refusal> {
                 }),
             );
         }
-        (Kind::Juxtaposition, None, Some(added)) => {
+        (Kind::Juxtaposition, None, Some(added), None) => {
             if added.sentence.trim().is_empty()
                 || added.history_ids.is_empty()
                 || !(1..=JUXTAPOSITION_CHOICES).contains(&added.rank)
@@ -880,6 +972,33 @@ pub fn record(request: &RecordRequest) -> Result<Map<String, Value>, Refusal> {
                     "model": request.model.trim(),
                 }),
             );
+        }
+        (Kind::Chunks, None, None, Some(chunk)) => {
+            if !CHUNK_MOVES.contains(&chunk.moved.as_str())
+                || chunk.targets.is_empty()
+                || chunk.targets.iter().any(|title| title.trim().is_empty())
+                || chunk.reason.trim().is_empty()
+                || !(1..=TRIES_PER_TURN).contains(&chunk.tries)
+            {
+                return Err(refuse(
+                    "record_shape",
+                    "a chunk move names one of its six moves, the titles it took, a reason and its tries (1 or 2)",
+                ));
+            }
+            let mut block = json!({
+                "move": chunk.moved,
+                "targets": chunk.targets,
+                "params": chunk.params,
+                "reason": clipped(&chunk.reason, REASON_LIMIT),
+                "tries": chunk.tries,
+            });
+            if let Some(title) = chunk.title.as_deref().map(str::trim) {
+                block["title"] = json!(title);
+            }
+            if let Some(sentences) = chunk.sentences {
+                block["sentences"] = json!(sentences);
+            }
+            ai_move.insert("chunks".to_owned(), block);
         }
         _ => {
             return Err(refuse(
@@ -1024,6 +1143,7 @@ mod tests {
             }
             Next::Laws { turn, .. } => (Kind::Laws, turn),
             Next::Juxtaposition { turn, .. } => (Kind::Juxtaposition, turn),
+            Next::Chunks { turn, .. } => (Kind::Chunks, turn),
         };
         assert!(turn <= request.moves as usize, "a try past the last turn");
         for outcome in [
@@ -1052,6 +1172,27 @@ mod tests {
         }
     }
 
+    /// The runs the walks start: each choice of moves, and a chunk run (with
+    /// its note and a parent with chunks).
+    fn runs(moves: u32) -> Vec<NextRequest> {
+        let run = |kinds: Vec<Kind>| NextRequest {
+            moves,
+            kinds,
+            parent: Parent::default(),
+            note: None,
+            turns: Vec::new(),
+        };
+        let mut chunks = run(vec![Kind::Chunks]);
+        chunks.parent.chunks = Some(3);
+        chunks.note = Some("具象から抽象へ寄せる。".to_owned());
+        vec![
+            run(vec![Kind::Laws, Kind::Juxtaposition]),
+            run(vec![Kind::Laws]),
+            run(vec![Kind::Juxtaposition]),
+            chunks,
+        ]
+    }
+
     /// The plan's prediction R1 (one to six moves); slow without optimisation:
     /// `cargo test --release -p inku-pipeline every_run_of_one_to_six -- --ignored --nocapture`.
     #[test]
@@ -1060,18 +1201,7 @@ mod tests {
         for moves in 1..=6 {
             let started = std::time::Instant::now();
             let mut counted = Walk { calls: 0, paths: 0 };
-            for kinds in [
-                vec![Kind::Laws, Kind::Juxtaposition],
-                vec![Kind::Laws],
-                vec![Kind::Juxtaposition],
-            ] {
-                let mut request = NextRequest {
-                    moves,
-                    kinds,
-                    parent: Parent::default(),
-                    note: None,
-                    turns: Vec::new(),
-                };
+            for mut request in runs(moves) {
                 walk(&mut request, &mut counted);
             }
             println!(
@@ -1086,23 +1216,122 @@ mod tests {
     #[test]
     fn every_run_of_one_to_four_moves_stops_within_its_turns() {
         for moves in 1..=4 {
-            for kinds in [
-                vec![Kind::Laws, Kind::Juxtaposition],
-                vec![Kind::Laws],
-                vec![Kind::Juxtaposition],
-            ] {
-                let mut request = NextRequest {
-                    moves,
-                    kinds,
-                    parent: Parent::default(),
-                    note: None,
-                    turns: Vec::new(),
-                };
+            for mut request in runs(moves) {
                 let mut counted = Walk { calls: 0, paths: 0 };
                 walk(&mut request, &mut counted);
                 assert!(counted.paths > 0);
             }
         }
+    }
+
+    fn chunk_run(turns: Vec<Turn>, chunks: Option<usize>, note: &str) -> NextRequest {
+        NextRequest {
+            moves: 3,
+            kinds: vec![Kind::Chunks],
+            parent: Parent {
+                chunks,
+                ..Parent::default()
+            },
+            note: Some(note.to_owned()),
+            turns,
+        }
+    }
+
+    fn chunk_try(outcome: Outcome) -> Turn {
+        Turn {
+            attempts: vec![Attempt {
+                kind: Kind::Chunks,
+                outcome,
+                reason: None,
+                share: None,
+                main_law: None,
+                sentence: None,
+                rank: None,
+            }],
+        }
+    }
+
+    #[test]
+    fn a_chunk_run_takes_one_try_a_turn_and_needs_its_note_and_chunks() {
+        let chunks_next = |turn| Next::Chunks {
+            turn,
+            attempt: 1,
+            note: "抽象へ".to_owned(),
+        };
+        assert_eq!(
+            next(&chunk_run(Vec::new(), Some(2), " 抽象へ ")).unwrap(),
+            chunks_next(1)
+        );
+        let failed = chunk_try(Outcome::Failed);
+        assert_eq!(
+            next(&chunk_run(vec![failed.clone()], Some(2), "抽象へ")).unwrap(),
+            chunks_next(2),
+            "a try the turn could not keep ends the turn"
+        );
+        assert_eq!(
+            next(&chunk_run(vec![failed.clone(), failed], Some(2), "抽象へ")).unwrap(),
+            Next::Stop {
+                reason: "stalled",
+                turns: 2,
+                kept: 0
+            }
+        );
+        assert_eq!(
+            next(&chunk_run(Vec::new(), Some(0), "抽象へ")).unwrap(),
+            Next::Stop {
+                reason: "nothing_available",
+                turns: 0,
+                kept: 0
+            }
+        );
+        assert_eq!(
+            next(&chunk_run(Vec::new(), Some(2), "  "))
+                .unwrap_err()
+                .reason,
+            "note_required"
+        );
+        let mut mixed = chunk_run(Vec::new(), Some(2), "抽象へ");
+        mixed.kinds.push(Kind::Laws);
+        assert_eq!(next(&mixed).unwrap_err().reason, "kinds");
+        let two = Turn {
+            attempts: [chunk_try(Outcome::Failed), chunk_try(Outcome::Failed)]
+                .into_iter()
+                .flat_map(|turn| turn.attempts)
+                .collect(),
+        };
+        assert_eq!(
+            next(&chunk_run(vec![two], Some(2), "抽象へ"))
+                .unwrap_err()
+                .reason,
+            "turns_out_of_order"
+        );
+    }
+
+    #[test]
+    fn a_chunk_record_keeps_a_child_the_gate_would_not() {
+        let request = |outcome: &str| {
+            json!({
+                "action": "record", "run": "r1", "turn": 1, "moves": 5, "attempt": 1,
+                "kind": "chunks", "model": "chatgpt:gpt-6.1-sol", "outcome": outcome, "share": 0.05,
+                "note": "抽象へ",
+                "chunks": {"move": "simplify", "targets": ["灯台"], "reason": " 面にする ",
+                           "title": "白い縦の面", "sentences": 1, "tries": 1},
+            })
+        };
+        let kept = ask(&request("kept"));
+        assert_eq!(kept["outcome"], "ok");
+        let ai_move = &kept["metadata"]["ai_move"];
+        assert_eq!(ai_move["kind"], "chunks");
+        assert_eq!(
+            (&ai_move["visible"]["passes"], &ai_move["visible"]["gate"]),
+            (&json!(false), &json!(false))
+        );
+        assert_eq!(
+            ai_move["chunks"],
+            json!({"move": "simplify", "targets": ["灯台"], "params": {}, "reason": "面にする",
+                   "title": "白い縦の面", "sentences": 1, "tries": 1})
+        );
+        assert_eq!(ask(&request("not_visible"))["reason"], "record_shape");
     }
 
     /// A square drawing that covers all of the gate's square.

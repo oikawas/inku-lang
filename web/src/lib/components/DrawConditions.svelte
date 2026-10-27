@@ -50,7 +50,7 @@
 
 	<span class="draw-label">{isJapanese ? '通す段' : 'Steps'}</span>
 	<div class="draw-switches">
-		<Tooltip text={t().tooltipInputSketch}>
+		<Tooltip text={t().tooltipInputSketch} placement="top-right">
 			<SwitchChip label={drawSwitchLabel('sketch', isJapanese)} on={sketchOn}
 				onToggle={() => onSelectSketchMode(sketchOn ? 'off' : 'on')} />
 		</Tooltip>
@@ -77,9 +77,10 @@
 		gap: 8px 10px;
 		min-width: 0;
 	}
-	/* Bubbles anchor to the whole block, as the compact rows' do, so a long
-	   one stays inside the narrow input panel. */
-	.draw-conditions :global(.tooltip-wrap) { position: static; min-width: 0; }
+	/* Each bubble anchors to its own control (the author, 2026-10-27: anchored
+	   to the whole block, they stood apart from the buttons). The first chip's
+	   opens rightward so it stays inside the narrow input panel. */
+	.draw-conditions :global(.tooltip-wrap) { min-width: 0; }
 	.draw-label {
 		color: var(--fg3);
 		font-size: var(--ui-font-size-11);

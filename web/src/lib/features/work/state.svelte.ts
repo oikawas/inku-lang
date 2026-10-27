@@ -187,7 +187,8 @@ export function createWorkState(deps: WorkStateDeps) {
 
 	// Sketching (Stage 0.5). Chosen per draw, so it is plain state -- not persisted the
 	// way a user setting like the color catalog is (contract section 0.3.1).
-	let sketchMode = $state<SketchMode>(DEFAULT_SKETCH_MODE);
+	// It starts the way choosing the default route starts it: on, for read and draw.
+	let sketchMode = $state<SketchMode>(sketchModeForRoute(DEFAULT_DRAW_ROUTE, DEFAULT_SKETCH_MODE));
 
 	// How a description is drawn (SPEC 12.6.7). Chosen per draw like the sketch,
 	// never saved as a setting; a work opened from the history sets it.
@@ -258,7 +259,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		grain: unknown,
 		source: string | null = null,
 		state: unknown = null,
-		route: DrawRoute = DEFAULT_DRAW_ROUTE,
+		route?: DrawRoute,
 		composition: CompositionMode = DEFAULT_COMPOSITION_MODE
 	): void {
 		sketchText = text;
@@ -267,6 +268,12 @@ export function createWorkState(deps: WorkStateDeps) {
 		sketchEditing = false;
 		void grain;
 		sketchState = normalizeSketchState(state);
+		// A picture's run names no route: the next description keeps the
+		// author's choices (2026-10-27, when the default became read and draw).
+		if (route === undefined) {
+			if (text) sketchMode = 'on';
+			return;
+		}
 		sketchMode = text ? 'on' : DEFAULT_SKETCH_MODE;
 		// The route the work was drawn by. A read-and-draw work's reading is its
 		// sketch text; one drawn without a reading keeps the sketch off.

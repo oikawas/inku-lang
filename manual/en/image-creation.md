@@ -155,7 +155,7 @@ If the layer does not answer, the description goes to interpretation unchanged a
 
 | Line | What it holds |
 |---|---|
-| Drawing | `With a plan` (the default) or `In words`. With a plan, the model fills the fields of a fixed plan and the program writes the instructions from it. In words, the model writes the instructions itself and corrects them once beside the drawing |
+| Drawing | `In words` (the default, which starts with the sketch lit) or `With a plan`. In words, the model writes the instructions itself and corrects them once beside the drawing. With a plan, the model fills the fields of a fixed plan and the program writes the instructions from it |
 | Steps | The chips `Sketch from life` and `Composition, laws, colors`. A press lights one (passed); another press turns it off. Their names and hints are the same on both drawings. The colors come with the composition and laws and cannot be left out alone. With a plan always passes all three, so that chip stays lit with a lock |
 | Flow | The steps the current choices pass, in their order, on one line, such as `Description › Sketch › Composition and laws › Write in words › Look and correct › Colors › Picture`. A step a chip added is colored |
 

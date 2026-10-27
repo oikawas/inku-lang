@@ -297,8 +297,10 @@
 					<DrawConditions route={drawRoute} {sketchMode} {compositionMode} {isJapanese}
 						onSelectRoute={onSelectDrawRoute} {onSelectSketchMode} {onSelectCompositionMode} />
 				</div>
-				<div class="condition-compact-row">
-					<Tooltip text={t().tooltipInputWild}>
+				<div class="condition-compact-row wild-row">
+					<!-- Named as the refine dialogs' WildToggle names it. -->
+					<span class="condition-inline-label">{isJapanese ? '筆致制限' : 'Stroke limit'}</span>
+					<Tooltip text={t().tooltipInputWild} placement="top-right">
 						<SwitchChip label={t().wildButton} on={wildSettings.enabled} onToggle={() => wildSettings.set(!wildSettings.enabled)} />
 					</Tooltip>
 				</div>
@@ -661,6 +663,15 @@
 	.condition-compact-row :global(.sketch-menu),
 	.condition-compact-row :global(.aspect-menu) { width: min(310px, 100%); }
 	.condition-compact-row :global(.ghost-btn) { white-space: normal; text-align: left; border-radius: 13px; }
+	/* Its bubble anchors to the chip, not to the whole row of chips. */
+	.condition-compact-row.wild-row { gap: 8px; }
+	.condition-compact-row.wild-row :global(.tooltip-wrap) { position: relative; }
+	.condition-inline-label {
+		color: var(--fg3);
+		font-size: var(--ui-font-size-11);
+		line-height: 1.35;
+		white-space: nowrap;
+	}
 	/* The route and the steps it passes sit apart from the chips below them. */
 	.condition-draw {
 		flex: 1 0 100%;

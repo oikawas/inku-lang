@@ -15,11 +15,18 @@
 // The names (the author's choice, 2026-10-27): 型で描く and 言葉で描く, by what
 // the AI writes -- the fields of a plan, or the instructions themselves. They
 // replaced 今の流れ and 読んで描く, which named a time and a thing both routes do.
+//
+// The Web starts on read_and_draw, listed first (the author, 2026-10-27). The
+// Server's and CLI's default stays 'stages', and a work with no record of a
+// route was drawn by the stages (`SAVED_WORK_ROUTE`).
 import type { SketchMode } from './sketch';
 
 export type DrawRoute = 'stages' | 'read_and_draw';
-export const DRAW_ROUTES: DrawRoute[] = ['stages', 'read_and_draw'];
-export const DEFAULT_DRAW_ROUTE: DrawRoute = 'stages';
+export const DRAW_ROUTES: DrawRoute[] = ['read_and_draw', 'stages'];
+export const DEFAULT_DRAW_ROUTE: DrawRoute = 'read_and_draw';
+/** The route of a saved work or run that names none: the stages, which drew
+ *  every work before read and draw and every one that keeps no record. */
+export const SAVED_WORK_ROUTE: DrawRoute = 'stages';
 
 export function drawRouteLabel(route: DrawRoute, isJapanese: boolean): string {
 	if (route === 'read_and_draw') return isJapanese ? '言葉で描く' : 'In words';
@@ -88,7 +95,7 @@ export function normalizeDrawRoute(value: unknown): DrawRoute | null {
 export function drawRouteOf(work: { route?: unknown; description_ddl?: unknown } | null | undefined): DrawRoute {
 	const named = normalizeDrawRoute(work?.route);
 	if (named) return named;
-	return work?.description_ddl && typeof work.description_ddl === 'object' ? 'read_and_draw' : DEFAULT_DRAW_ROUTE;
+	return work?.description_ddl && typeof work.description_ddl === 'object' ? 'read_and_draw' : SAVED_WORK_ROUTE;
 }
 
 /** How the work on screen was drawn, as the strip above the canvas names it:

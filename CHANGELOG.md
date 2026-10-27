@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-27 — The Web's drawing starts In words, placed first (Web)
+
+At the author's instruction, the next work's drawing starts on `In words`, and its buttons read `In words`, then `With a plan`. The sketch starts lit, as choosing In words lights it. A run in the image tab leaves the description's drawing and sketch as they were. The Server's and CLI's default (`stages`), and reading a saved work with no record of its route as With a plan, are unchanged. The hints of the drawing, the sketch, the composition, laws and colors, and Wild, which showed away from their buttons, now show above each button, and Wild has a label to its left, `Stroke limit` (the name the refine dialogs give it).
+
 ### 2026-10-27 — The chip "Composition and laws" is now "Composition, laws, colors" (Web)
 
 At the author's word, the chip in the next work's conditions names what it leaves out: the colors come with the composition and laws, and no switch leaves them out alone. Its hint and the manual follow. The flow line's steps and what a run sends do not change.

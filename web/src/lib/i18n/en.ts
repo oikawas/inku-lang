@@ -626,7 +626,7 @@ export const en: LangPack = {
 	tooltipInputLang: 'Text input language detection',
 	tooltipInputModel: 'Select the LLM models for Stage 1 and Stage 2',
 	tooltipInputSketch: 'Before the writing, the AI puts the scene of the description into prose. The prose appears in the description panel, where it can be edited and drawn again. Choosing In words turns it on; it never stops to ask.',
-	tooltipInputRoute: 'With a plan: the AI fills the fields of a fixed plan, and the program writes the instructions from it; the composition and laws and the colors always follow. In words: the AI writes the instructions itself and corrects them once beside the drawing. With a plan by default.',
+	tooltipInputRoute: 'In words: the AI writes the instructions itself and corrects them once beside the drawing. With a plan: the AI fills the fields of a fixed plan, and the program writes the instructions from it; the composition, laws and colors always follow. In words by default.',
 	tooltipInputComposition: 'Decides a composition and laws, fits the picture to them, and chooses its colors last. The colors cannot be left out alone. In words decides the composition and laws before the writing and measures the writing against them; With a plan always passes all three.',
 	wildButton: 'Wild',
 	tooltipInputWild: 'Lifts the amplitude cap on the stroke. Off stays predictable; on lets strokes bend, curl and cross freely — endpoints and determinism are kept (whole work; recorded and replayed).',

@@ -4,6 +4,8 @@ import test from 'node:test';
 import {
 	DEFAULT_COMPOSITION_MODE,
 	DEFAULT_DRAW_ROUTE,
+	DRAW_ROUTES,
+	SAVED_WORK_ROUTE,
 	compositionColorsChangeLabel,
 	compositionColorsChanges,
 	compositionColorsStateNote,
@@ -28,8 +30,12 @@ import { en } from './i18n/en.ts';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
-test('a description is drawn with a plan unless the author chooses in words', () => {
-	assert.equal(DEFAULT_DRAW_ROUTE, 'stages');
+test('a description is drawn in words unless the author chooses a plan', () => {
+	// The Web starts on read and draw, listed first (the author, 2026-10-27);
+	// a work with no record of its route is still the stages'.
+	assert.equal(DEFAULT_DRAW_ROUTE, 'read_and_draw');
+	assert.deepEqual(DRAW_ROUTES, ['read_and_draw', 'stages']);
+	assert.equal(SAVED_WORK_ROUTE, 'stages');
 	// The author's names (2026-10-27): by what the AI writes, not by a time.
 	assert.equal(drawRouteLabel('stages', true), '型で描く');
 	assert.equal(drawRouteLabel('read_and_draw', true), '言葉で描く');
@@ -42,6 +48,8 @@ test('a description is drawn with a plan unless the author chooses in words', ()
 	// Neither the route nor the sketch is a stored setting.
 	const work = read('./features/work/state.svelte.ts');
 	assert.match(work, /let drawRoute = \$state<DrawRoute>\(DEFAULT_DRAW_ROUTE\)/);
+	// The page opens on read and draw with the sketch on, as choosing it would.
+	assert.match(work, /let sketchMode = \$state<SketchMode>\(sketchModeForRoute\(DEFAULT_DRAW_ROUTE, DEFAULT_SKETCH_MODE\)\)/);
 	assert.match(work, /if \(route !== drawRoute\) sketchMode = sketchModeForRoute\(route, sketchMode\)/);
 	assert.doesNotMatch(work, /persist\(\{[^}]*drawRoute/);
 });

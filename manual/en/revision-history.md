@@ -4,7 +4,7 @@ This file records revisions to user and operations documents under `manual/`. Se
 
 ## 2026-10-27 — Title lines (DDL 27)
 
-DDL now has title lines, a line of only a quoted name such as `"lighthouse"` that names a chunk of sentences, and a composed read-and-draw run writes each thing's title, so section 3.1 of the "DDL Reference" describes the title line with an example and the table of finite grammar outside the Saijiki lists it, in Japanese and English. The `--file` row of the "CLI Reference" says that a batch with `--input-mode ddl` makes no work of a title line.
+DDL now has title lines, a line of only a quoted name such as `"lighthouse"` that names a chunk of sentences, and a work drawn `In words` with `Composition, laws, colors` passed gets each thing's title, so section 3.1 of the "DDL Reference" describes the title line with an example and the table of finite grammar outside the Saijiki lists it, in Japanese and English. The `--file` row of the "CLI Reference" says that a batch with `--input-mode ddl` makes no work of a title line.
 
 ## 2026-10-26 — A purpose that gave no response can be chosen, framed in red
 

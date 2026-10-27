@@ -136,7 +136,7 @@ English core words and grammar are ASCII case-insensitive. `Place` and `place`, 
 
 Keep each command on one line. Close separate commands with a sentence terminator before a line break. Parentheses do not introduce command blocks or nested programs. Numeric-range annotations and noun-phrase groups have their own constructions.
 
-A **title line** (DDL 27) is a line of only a quoted name, such as `"lighthouse"` (`「灯台」` in Japanese), and names the chunk of sentences up to the next title. A title draws nothing and takes no sentence number. Blank lines are decoration, an empty `""` ends a chunk, and a title whose name is already used goes on with that chunk. A title makes no block and nests nothing: each sentence in a chunk is still one command. A composed read-and-draw run writes each thing's title when it commits.
+A **title line** (DDL 27) is a line of only a quoted name, such as `"lighthouse"` (`「灯台」` in Japanese), and names the chunk of sentences up to the next title. A title draws nothing and takes no sentence number. Blank lines are decoration, an empty `""` ends a chunk, and a title whose name is already used goes on with that chunk. A title makes no block and nests nothing: each sentence in a chunk is still one command. Drawing `In words` with `Composition, laws, colors` passed writes each thing's title when the work is committed.
 
 ```text
 Aspect ratio 1:1.

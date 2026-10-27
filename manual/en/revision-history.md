@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-10-27 — The chunk move of autonomous refinement
+
+Autonomous refinement has a third move, the chunk move, which takes a move on a chunk the title lines divide the work into, so section 9 of "Creating Images" describes, in Japanese and English, its six moves, the works it can be taken from, its checks and asking again, that no child is dropped for too little change, that it needs a direction, that it cannot be chosen with the other two moves, how its progress shows, and the AI move a lineage card's `Details` show. The held-work list of section 6 says that chunk moves can be taken too.
+
 ## 2026-10-27 — Title lines (DDL 27)
 
 DDL now has title lines, a line of only a quoted name such as `"lighthouse"` that names a chunk of sentences, and a work drawn `In words` with `Composition, laws, colors` passed gets each thing's title, so section 3.1 of the "DDL Reference" describes the title line with an example and the table of finite grammar outside the Saijiki lists it, in Japanese and English. The `--file` row of the "CLI Reference" says that a batch with `--input-mode ddl` makes no work of a title line.

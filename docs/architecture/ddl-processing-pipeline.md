@@ -133,6 +133,7 @@ The Server's Python adapter, Android's Kotlin/JNI adapter and macOS's Swift/UniF
 | Fit | Saved Score, version, instructions and seeds | Draws the saved Score into the frame of a paper of another ratio without changing its version (`fit_render`); the lineage records a `Fit` child |
 | Laws move (autonomous refinement, from a saved work) | The parent's instructions and description, settings, seeds, colors, ratio and limits, the completion record and the laws record | Runs the laws stage again with the `SavedLaws` input. Stage 1 and the composition reading are not run again; a color stage follows when the parent's settings carry one |
 | Juxtaposition (a refinement, and a move of autonomous refinement) | The original work | The sentence the shared core's `juxtaposition` had chosen is added after the description, and a `description_edit` child is drawn |
+| Chunk move (autonomous refinement, from a saved work) | The parent's titled instructions (titles printed from its composition record when it has none), color catalog, seed, canvas ratio and `render_wild` | The instructions the shared core's `chunk_moves` applied the move to are drawn as a parent-linked direct DDL; the kind is `chunk_move`. The Server's run sends the requests that choose the move and rewrite the chunk; they are not pipeline LLM stages |
 | Paint from the instructions before review (a work written from an image) | The original work and its record's `image_ddl.before_review` | Draws that text as the work's parent-linked DDL edit (`ddl_edit`) |
 | Derivation from an older work | The original history row is never changed | A new `legacy_description_fork` / `legacy_ddl_fork` variation through `legacy/{history_id}/fork` |
 
@@ -173,7 +174,7 @@ The direct inputs to `rh3` are Score, render seed, wild, engine identity, and th
 | Composition reading, laws and colors | `inku-pipeline/src/{composition_reading,composition,recompose,laws,laws_entry,laws_record,colors,appearance}.rs` |
 | Works written from an image | `inku-pipeline/src/{image_ddl,machine/image}.rs` |
 | Provider request bodies and answer reading | `inku-pipeline/src/provider_wire.rs`, `provider_wire/chatgpt.rs` |
-| Rules of saved-work refinements | `inku-pipeline/src/{saved_variants,retouch,juxtaposition,autonomous_refine}.rs` |
+| Rules of saved-work refinements | `inku-pipeline/src/{saved_variants,retouch,juxtaposition,autonomous_refine,chunk_moves}.rs` |
 | Work identity | `inku-pipeline/src/identity.rs` |
 | Typed compiler / underdrawing / Stage 1.5 / lowerer / canvas ratio declaration | `core/crates/inku-ddl` (including `canvas_ratio.rs` and `completion_record.rs`) |
 | Score schema / compatibility / resource policy | `core/crates/inku-score` |

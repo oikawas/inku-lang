@@ -557,8 +557,8 @@ interface InkuStrings {
     val generationInfoRenderEngineVersion: String
     val generationInfoCreated: String
     val generationInfoElapsed: String
-    val generationInfoOn: String
-    val generationInfoOff: String
+    val generationInfoWildLifted: String
+    val generationInfoWildNotLifted: String
     val parentSuffix: (String, String) -> String
     val downloadOf: (String) -> String
     val choiceSameAsTarget: (String) -> String

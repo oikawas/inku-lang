@@ -4767,7 +4767,7 @@ private fun DemoSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
                 )
             }
         }
-        SettingsCard(S.renderExpression, S.renderExpressionSubtitle, if (state.renderWild) "ON (Wild)" else "OFF (Standard)") {
+        SettingsCard(S.renderExpression, S.renderExpressionSubtitle, if (state.renderWild) S.generationInfoWildLifted else S.generationInfoWildNotLifted) {
             SettingCheckRow(
                 checked = state.renderWild,
                 text = S.wildToggle,
@@ -6827,8 +6827,8 @@ internal fun generationInfoDisplayValue(row: GenerationInfoRow, strings: InkuStr
     row.field == GenerationInfoField.InputRoute && row.value == "image_ddl_to_pipeline" -> strings.generationInfoInputRouteImageDdlToPipeline
     row.field == GenerationInfoField.VisionOutputMode && row.value == "description" -> strings.generationInfoVisionOutputModeDescription
     row.field == GenerationInfoField.VisionOutputMode && row.value == "ddl" -> strings.generationInfoVisionOutputModeDdl
-    row.field == GenerationInfoField.RenderWild && row.value == "true" -> strings.generationInfoOn
-    row.field == GenerationInfoField.RenderWild && row.value == "false" -> strings.generationInfoOff
+    row.field == GenerationInfoField.RenderWild && row.value == "true" -> strings.generationInfoWildLifted
+    row.field == GenerationInfoField.RenderWild && row.value == "false" -> strings.generationInfoWildNotLifted
     row.field == GenerationInfoField.VariationAmplitude && row.value != "—" -> strings.variationAmplitudeLabel(row.value)
     else -> row.value
 }

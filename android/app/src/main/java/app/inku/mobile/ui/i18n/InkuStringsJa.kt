@@ -545,7 +545,7 @@ object InkuStringsJa : InkuStrings {
     override val newApiKey = "新しいAPIキー"
     override val makeNewOrigin = "新しい起点にする"
     override val newWork = "新規作成"
-    override val wildToggle = "暴れる（演奏上限の解除） / Wild (unleashed performance)"
+    override val wildToggle = "筆致制限を外す"
     override val latest = "最新"
     override val tapSaijikiWord = "本文の歳時記語をタップ"
     override val tapWordToSelect = "本文の語をタップで選択"
@@ -661,7 +661,7 @@ object InkuStringsJa : InkuStrings {
     override val generationInfoCompositionSeed = "配置 seed"
     override val generationInfoRenderSeed = "render seed"
     override val generationInfoSeedText = "種テキスト"
-    override val generationInfoRenderWild = "暴れる"
+    override val generationInfoRenderWild = "筆致制限を外す"
     override val generationInfoColorCatalog = "色カタログ"
     override val generationInfoColorMap = "色の対応"
     override val generationInfoCanvasAspect = "キャンバス"
@@ -671,8 +671,8 @@ object InkuStringsJa : InkuStrings {
     override val generationInfoRenderEngineVersion = "Render engine version"
     override val generationInfoCreated = "作成日"
     override val generationInfoElapsed = "処理時間"
-    override val generationInfoOn = "あり"
-    override val generationInfoOff = "なし"
+    override val generationInfoWildLifted = "外した"
+    override val generationInfoWildNotLifted = "外さない"
     override val parentSuffix: (String, String) -> String = { hash, catalog -> " 親: $hash / $catalog" }
     override val downloadOf: (String) -> String = { name -> "$name の取得" }
     override val choiceSameAsTarget: (String) -> String = { label -> "$label（対象と同じ）" }

@@ -1,10 +1,13 @@
 // Which language a description or a DDL is written in.
 //
-// The rule is the server's, ported one for one from
-// `server/src/inku_server/language_support/registry.py`:
+// The rule is the shared core's `resolve_instruction_language`, which the
+// server calls (`server/src/inku_server/language_support/registry.py`), ported
+// one for one:
 //
-//     if _JAPANESE_TEXT_RE.search(text): return "ja"
-//     if _LATIN_TEXT_RE.search(text):    return "en"
+//     text = text without its title lines (DDL 27; a title quotes a name in
+//            any script)
+//     if Japanese script in text: return "ja"
+//     if Latin letters in text:   return "en"
 //     return fallback
 //
 // Japanese wins over Latin, so a description that mixes the two is Japanese --
@@ -19,6 +22,8 @@
 // requested language has no caller here. Porting it would add a branch nothing
 // reaches.
 
+import { withoutDdlTitleLines } from './ddl-titles';
+
 /** A language a DDL can actually be in. `auto` is a request, never an answer. */
 export type ResolvedInstructionLang = 'ja' | 'en';
 
@@ -30,8 +35,9 @@ export function resolveInstructionLang(
 	text: string,
 	fallback: ResolvedInstructionLang
 ): ResolvedInstructionLang {
-	if (JAPANESE_TEXT_RE.test(text)) return 'ja';
-	if (LATIN_TEXT_RE.test(text)) return 'en';
+	const body = withoutDdlTitleLines(text);
+	if (JAPANESE_TEXT_RE.test(body)) return 'ja';
+	if (LATIN_TEXT_RE.test(body)) return 'en';
 	return fallback;
 }
 

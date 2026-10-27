@@ -3949,6 +3949,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	}
 	:global(.ddl-token-word) { color: #2c3e91; background: rgba(44, 62, 145, 0.08); }
 	:global(.ddl-token-emotion) { color: #9b7a66; font-style: inherit; }
+	/* A title line (DDL 27) names the chunk below it and draws nothing: a
+	   heading, with no word inside coloured. */
+	:global(.ddl-title) { color: #3d4650; font-weight: 600; }
+	:global(html[data-theme='dark'] .ddl-title) { color: #d6dde4; }
 	:global(html[data-theme='dark'] .ddl-token-shape) { color: #9cc4ff; background: rgba(92, 143, 220, 0.26); }
 	:global(html[data-theme='dark'] .ddl-token-touch) { color: #e2bf82; background: rgba(188, 139, 62, 0.24); }
 	:global(html[data-theme='dark'] .ddl-token-line) { color: #c4ccd5; background: rgba(147, 160, 176, 0.22); }

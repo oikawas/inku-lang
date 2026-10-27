@@ -79,6 +79,9 @@ pub struct SemanticDocumentAst {
     /// The declared canvas ratio (DDL 26). It is kept out of the canonical
     /// bytes, so declaring a ratio moves no seed.
     pub canvas_ratio: Option<inku_score::CanvasRatio>,
+    /// The chunks the title lines name (DDL 27). Kept out of the canonical
+    /// bytes like the ratio, so titling a DDL moves no seed.
+    pub chunks: Vec<crate::DdlChunk>,
     pub instructions: Vec<SemanticInstruction>,
     pub coordinated_head_groups: Vec<crate::SemanticCoordinatedHeadGroup>,
     pub group_predicates: Vec<crate::SemanticGroupPredicateEdge>,
@@ -389,10 +392,18 @@ fn build_semantic_document(
         .clause_stream
         .canvas_ratio_declaration
         .map(|declaration| declaration.ratio);
+    let chunks = crate::chunk_title::instruction_chunks(
+        &instruction_association
+            .association
+            .clause_stream
+            .title_lines,
+        &instructions,
+    );
     let ast = SemanticDocumentAst {
         background,
         ground,
         canvas_ratio,
+        chunks,
         instructions,
         coordinated_head_groups,
         group_predicates,

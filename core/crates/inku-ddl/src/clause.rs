@@ -4,7 +4,7 @@ use std::fmt;
 
 use crate::{
     CanonicalRelationIdentity, CanvasRatioDeclaration, CoreModifierTerm, CoreRoleTerm,
-    ExactDecimal, GeometryKeyword, NeutralDiagnostic, NeutralToken, NeutralTokenKind,
+    DdlTitleLine, ExactDecimal, GeometryKeyword, NeutralDiagnostic, NeutralToken, NeutralTokenKind,
     NormalizedDdlDocument, RemainingRoleTerm, SourceSpan, UnattachedExactNumber,
     compose_core_roles, compose_remaining_roles, parse_neutral_lexemes,
 };
@@ -94,6 +94,9 @@ pub struct ClauseStream {
     /// sentence. Its fragment holds no clause. A later declaration stays in the
     /// stream and is read like any unread sentence, with its diagnostic.
     pub canvas_ratio_declaration: Option<CanvasRatioDeclaration>,
+    /// The document's title lines (DDL 27). The stream is read with each of
+    /// them blanked, so they hold no clause and no separator.
+    pub title_lines: Vec<DdlTitleLine>,
 }
 
 /// Stable source-integrity failures that cannot be silently reordered or dropped.
@@ -184,6 +187,16 @@ impl std::error::Error for ClauseStreamError {}
 pub fn parse_clause_stream(
     document: &NormalizedDdlDocument,
 ) -> Result<ClauseStream, ClauseStreamError> {
+    // A title line is read as a blank line of the same bytes, so the lexer's
+    // look back across line breaks never reaches a title's words (DDL 27).
+    let title_lines = crate::ddl_title_lines(document.source());
+    let blanked = (!title_lines.is_empty()).then(|| {
+        document.with_source(crate::chunk_title::blank_title_lines(
+            document.source(),
+            &title_lines,
+        ))
+    });
+    let document = blanked.as_ref().unwrap_or(document);
     let composition = compose_remaining_roles(compose_core_roles(parse_neutral_lexemes(document)));
     let mut delivery_conservation_count = composition.delivery_conservation_count;
     let mut atoms = Vec::new();
@@ -320,6 +333,7 @@ pub fn parse_clause_stream(
         separators,
         delivery_conservation_count,
         canvas_ratio_declaration,
+        title_lines,
     })
 }
 

@@ -253,6 +253,32 @@ def test_ddl_commands_send_performance_options_only_when_requested(command, flag
     capsys.readouterr()
 
 
+def test_a_ddl_batch_draws_no_title_line(monkeypatch, tmp_path, capsys):
+    """A title line (DDL 27) names a chunk and draws nothing, so it is no work."""
+    sent = []
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def request(self, method, path, *, data=None, **kwargs):
+            if (method, path) == ("GET", "/api/color-catalogs"):
+                return {"default_catalog_id": "default", "catalogs": list(CATALOG_DATA["catalogs"].values())}, None
+            assert (method, path) == ("POST", "/api/compose")
+            sent.append(data)
+            return {"svg": "<svg/>", "score": {}}, None
+
+    monkeypatch.setattr(cli, "ApiClient", FakeClient)
+    monkeypatch.setattr(cli, "load_config", lambda: cli.CliConfig())
+    source = tmp_path / "input.ddl"
+    source.write_text("「線」\n白い背景に黒い線を一本引く。\n\n\"circle\"\nplace one red circle at center.\n", encoding="utf-8")
+    base = ["batch", "--file", str(source), "--out-dir", str(tmp_path / "outputs"), "--input-mode", "ddl", "--no-progress"]
+
+    assert cli.main(base) == 0
+    assert [item["ddl"] for item in sent] == ["白い背景に黒い線を一本引く。", "place one red circle at center."]
+    capsys.readouterr()
+
+
 def test_history_payload_from_compose_result():
     parser = cli.build_parser()
     args = parser.parse_args(["paint", "白い背景に黒い線を一本引く。", "--input-mode", "ddl", "--save-history"])

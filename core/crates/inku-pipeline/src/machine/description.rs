@@ -1627,9 +1627,12 @@ mod tests {
         assert_eq!(event(&chosen, "colors_chosen").unwrap()["main_law"], "D5");
         let state = chosen.snapshot;
         let shade = "画面の横0.6、縦0.6の位置に、幅0.2、高さ0.15の青の薄い塗りの三角を1個置く。";
+        // Each thing's sentences are committed under its title (DDL 27).
         assert_eq!(
             committed_source(&state),
-            declared(&format!("背景を白で埋める。\n{FITTED}\n{shade}"))
+            declared(&format!(
+                "背景を白で埋める。\n\n「妹」\n{FITTED}\n\n「紫」\n{shade}"
+            ))
         );
         let record = colors_record(&state);
         assert_eq!(record.state, CompositionState::Used);
@@ -1706,7 +1709,9 @@ mod tests {
         let state = step.snapshot;
         assert_eq!(
             committed_source(&state),
-            declared(&format!("背景を白で埋める。\n{FITTED}\n{SHADE}"))
+            declared(&format!(
+                "背景を白で埋める。\n\n「妹」\n{FITTED}\n\n「紫」\n{SHADE}"
+            ))
         );
         let record = colors_record(&state);
         assert_eq!(record.state, CompositionState::Fallback);

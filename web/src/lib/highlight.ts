@@ -1,13 +1,16 @@
 import { SAIJIKI, SAIJIKI_EN, type SaijikiCategory } from './saijiki';
 import { scanPluginReferences, type PluginNameIndex } from './plugin-names';
 import { scanNumericRanges } from './composition-ranges';
+import { ddlTitleLineSpans, withoutDdlTitleLines } from './ddl-titles';
 
 export type Part = {
 	text: string;
 	// 'plugin-name' is a namespaced reference (`Nature.下草`) and only appears
 	// when the caller hands over the list of names the server holds; without
 	// it the reference is scanned as ordinary text, exactly as before.
-	kind: 'saijiki' | 'emotion' | 'plain' | 'plugin-name';
+	// 'title' is a whole title line of a DDL (DDL 27): it draws nothing, so no
+	// word in it is coloured.
+	kind: 'saijiki' | 'emotion' | 'plain' | 'plugin-name' | 'title';
 	category?: string;
 	categoryKey?: string;
 	/** For 'plugin-name': whether the server holds this qualified name. */
@@ -99,9 +102,13 @@ const EMOTION_WORDS = [
  * With a plugin name index, namespaced references are cut out first: they are
  * one word to the server, and letting the greedy saijiki match run inside them
  * splits `Nature.青葉` into a color word and two loose characters.
+ *
+ * `ddl` marks the text as a DDL, whose title lines are cut out whole; a
+ * description's quoted line stays ordinary text.
  */
-export function annotate(text: string, pluginNames: PluginNameIndex | null = null): Part[] {
+export function annotate(text: string, pluginNames: PluginNameIndex | null = null, ddl = false): Part[] {
 	const parts: Part[] = [];
+	const titleAt = new Map(ddl ? ddlTitleLineSpans(text).map((span) => [span.start, span.end]) : []);
 	const references = pluginNames ? scanPluginReferences(text, pluginNames) : [];
 	const referenceAt = new Map(references.map((reference) => [reference.start, reference]));
 	const placeAt = new Map(scanNumericRanges(text).map((range) => [
@@ -122,6 +129,12 @@ export function annotate(text: string, pluginNames: PluginNameIndex | null = nul
 	while (i < text.length) {
 		let matched = false;
 
+		const titleEnd = titleAt.get(i);
+		if (titleEnd !== undefined && titleEnd > i) {
+			parts.push({ text: text.slice(i, titleEnd), kind: 'title' });
+			i = titleEnd;
+			continue;
+		}
 		const reference = referenceAt.get(i);
 		if (reference) {
 			parts.push({ text: reference.text, kind: 'plugin-name', known: reference.known });
@@ -215,6 +228,7 @@ function ddlCaretMarkup(): string {
 
 /** The reading view and the CodeMirror editor share exactly the same palette. */
 export function ddlPartClass(part: Part): string | null {
+	if (part.kind === 'title') return 'ddl-title';
 	if (part.kind === 'plugin-name') return `ddl-token ddl-token-${part.known ? 'plugin' : 'unknown'}`;
 	if (part.kind === 'saijiki') return `ddl-token ddl-token-${part.categoryKey ? saijikiCategoryClassByKey(part.categoryKey) : saijikiCategoryClass(part.category)}`;
 	if (part.kind === 'emotion') return 'ddl-token-emotion';
@@ -240,7 +254,7 @@ function renderDDLPart(part: Part, caretOffset: number | null): string {
 export function highlightDDL(text: string, caretIndex: number | null = null, pluginNames: PluginNameIndex | null = null): string {
 	const clampedCaret = caretIndex === null ? null : Math.max(0, Math.min(text.length, caretIndex));
 	let offset = 0;
-	const html = annotate(text, pluginNames).map((part) => {
+	const html = annotate(text, pluginNames, true).map((part) => {
 		const nextOffset = offset + part.text.length;
 		const localCaret = clampedCaret !== null
 			&& clampedCaret >= offset
@@ -268,7 +282,9 @@ function normalizedIncludes(haystack: string, needle: string): boolean {
 
 export function interpretationFeedback(text: string, ddl: string | null | undefined): InterpretationFeedbackPart[] {
 	const source = text || '';
-	const normalizedDdl = ddl || '';
+	// A title line quotes the description's words without drawing them, so a
+	// word is read only where a drawing sentence carries it (DDL 27).
+	const normalizedDdl = withoutDdlTitleLines(ddl || '');
 	if (!source.trim() || !normalizedDdl.trim()) return [];
 	return annotate(source).map((part) => {
 		if (part.kind === 'saijiki' && (normalizedIncludes(normalizedDdl, part.text) || normalizedIncludes(normalizedDdl, part.category || ''))) {

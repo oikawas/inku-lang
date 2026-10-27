@@ -980,6 +980,7 @@ fn retain_ast(
             background: ast.background.clone(),
             ground: ast.ground.clone(),
             canvas_ratio: ast.canvas_ratio,
+            chunks: crate::chunk_title::remap_chunks(&ast.chunks, &index_map),
             instructions,
             coordinated_head_groups,
             group_predicates,

@@ -209,6 +209,10 @@ def _normalized_ddl_phrases() -> dict[str, Any]:
             "Ground texture comes from a ground sentence such as '和紙。' and "
             "surface texture from a modifier of its shape; headed '地: ...' / "
             "'面: ...' forms are not accepted, and neither is inferred from scenery.",
+            "A title line, a whole line of one bracketed name such as '「灯台」' or "
+            "'\"lighthouse\"', names the chunk of sentences up to the next title "
+            "(an empty '「」' ends a chunk) and carries no attribute; it draws "
+            "nothing and takes no sentence number (DDL 27).",
             "background accepts every one of the nine abstract colors, "
             "background='gray' included.",
         ],

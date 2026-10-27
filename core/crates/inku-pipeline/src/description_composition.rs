@@ -875,6 +875,67 @@ pub fn laws_text(
         .collect()
 }
 
+/// A composed work's committed source with a title line before each thing's
+/// sentences (DDL 27). `source` is the ratio sentence and then one sentence a
+/// line; `owners` gives each sentence's thing, 0 for a sentence of no thing.
+/// A thing is titled by its words from the description, or else by what it
+/// is; a name two things share is numbered from the second (「月」「月2」). A
+/// source whose lines are not one a thing number is returned as it is.
+#[must_use]
+pub fn titled_composed_source(
+    source: &str,
+    owners: &[u64],
+    things: &[CompositionThing],
+    language: ResolvedInstructionLanguage,
+) -> String {
+    let lines = source.split('\n').collect::<Vec<_>>();
+    if lines.len() != owners.len() + 1 {
+        return source.to_owned();
+    }
+    let fallback = |thing: u64| match language {
+        ResolvedInstructionLanguage::Ja => format!("物{thing}"),
+        ResolvedInstructionLanguage::En => format!("thing {thing}"),
+    };
+    let mut ordered = things
+        .iter()
+        .map(|thing| thing.thing)
+        .collect::<BTreeSet<_>>();
+    ordered.extend(owners.iter().copied().filter(|owner| *owner != 0));
+    let mut seen = BTreeMap::<String, usize>::new();
+    let mut names = BTreeMap::new();
+    for number in ordered {
+        let thing = things.iter().find(|thing| thing.thing == number);
+        let name = thing
+            .map(|thing| {
+                if thing.quote.is_empty() {
+                    inku_ddl::ddl_title_text(&thing.what)
+                } else {
+                    inku_ddl::ddl_title_text(&thing.quote)
+                }
+            })
+            .filter(|name| !name.is_empty())
+            .unwrap_or_else(|| fallback(number));
+        let count = seen.entry(name.clone()).or_insert(0);
+        *count += 1;
+        names.insert(
+            number,
+            if *count == 1 {
+                name
+            } else {
+                format!("{name}{count}")
+            },
+        );
+    }
+    let chunks = std::iter::once(None)
+        .chain(
+            owners
+                .iter()
+                .map(|owner| names.get(owner).map(String::as_str)),
+        )
+        .collect::<Vec<_>>();
+    inku_ddl::print_ddl_titles(&lines, &chunks, language)
+}
+
 fn pick<'a>(table: &[(&str, &'a str, &'a str)], key: &str, ja: bool) -> &'a str {
     table.iter().find(|(name, _, _)| *name == key).map_or(
         "",
@@ -1917,6 +1978,49 @@ const THING_LAWS: [(&str, [&str; 2], [&str; 2]); 19] = [
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn thing(number: u64, what: &str, quote: &str) -> CompositionThing {
+        CompositionThing {
+            thing: number,
+            what: what.into(),
+            role: "focal".into(),
+            kind: "cluster".into(),
+            quote: quote.into(),
+        }
+    }
+
+    #[test]
+    fn a_composed_source_is_titled_by_the_words_of_each_thing() {
+        let things = [
+            thing(1, "満月", "「月」"),
+            thing(2, "水面に映る月", "月"),
+            thing(3, "歩く人", ""),
+        ];
+        let source = "画面比1:1。\n背景を黒で埋める。\na\nb\nc\nd\ne";
+        assert_eq!(
+            titled_composed_source(
+                source,
+                &[0, 1, 1, 2, 0, 3],
+                &things,
+                ResolvedInstructionLanguage::Ja
+            ),
+            "画面比1:1。\n背景を黒で埋める。\n\n「月」\na\nb\n\n「月2」\nc\n\n「」\nd\n\n「歩く人」\ne"
+        );
+        // Lines that are not one a thing number are left as they are.
+        assert_eq!(
+            titled_composed_source(source, &[0, 1], &things, ResolvedInstructionLanguage::Ja),
+            source
+        );
+        assert_eq!(
+            titled_composed_source(
+                "Aspect ratio 1:1.\nx\ny",
+                &[4, 4],
+                &[],
+                ResolvedInstructionLanguage::En
+            ),
+            "Aspect ratio 1:1.\n\n\"thing 4\"\nx\ny"
+        );
+    }
 
     #[test]
     fn an_example_numbers_its_layers_as_things() {

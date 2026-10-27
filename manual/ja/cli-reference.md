@@ -63,7 +63,7 @@ JSON成果物は、その絵を描いたDDL層の版を `ddl_version` と `ddl_e
 
 | 旗 | 内容 |
 |---|---|
-| `--file FILE` / `-f` | 記述またはDDLをUTF-8ファイルから読む。`-` で標準入力を読みます（paintとbatchの両方）。batchは空行以外の1行が1作品 |
+| `--file FILE` / `-f` | 記述またはDDLをUTF-8ファイルから読む。`-` で標準入力を読みます（paintとbatchの両方）。batchは空行以外の1行が1作品。`--input-mode ddl`のbatchは、題の行（`「灯台」`だけの行）を作品にしない |
 | `--out-dir DIR` / `-o` | JSON / SVG / PNGの出力先 |
 | `--prefix P` | 出力ファイル名の接頭辞 |
 | `--png` | `--out-dir` を指定したとき、PNGも書き出す |

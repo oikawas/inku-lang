@@ -323,6 +323,18 @@ Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal 
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
 
+## v2.15.276 (2026-10-27 / Build1352)
+
+### 2026-10-27 — Title lines name chunks of sentences (DDL 27, DDL engine 72)
+
+The plan the author chose, to make titles grammar (step 1 after the prototypes of revising toward abstraction). A line that is only a bracketed name, such as `"lighthouse"` (curly quotes read the same; `「灯台」` in Japanese), is read as a title that names the chunk of sentences up to the next title. Blank lines are decoration, an empty title ends a chunk, and a name used again goes on with its chunk.
+
+- **A title draws nothing.** The lexer reads a title line as blank bytes of the same length, so a title makes no instruction, takes no sentence number, adds no diagnostic and is no seed material; a titled DDL lowers to the Score of the same DDL without titles. Until now a title's words were read as drawing words, joined to the next sentence or taken as an undrawn shape with a sentence number (adding titles changed the Score of 32 of the author's 284 composed works). The semantic document names each chunk's instructions.
+- **A work drawn `In words` (`read_and_draw`) with `Composition, laws, colors` passed gets each thing's title printed when it commits.** The name is the thing's words from the description, numbered from the second where two things share it. The writing, review and color requests do not change. The record's `things` stays each sentence's thing (title and blank lines are not counted).
+- The laws stage from a saved work applies the laws without the titles and titles the child again. The language of a text is read without its title lines (the Web's copy of the rule too).
+- The Web's DDL views and instruction editor show a title line as a heading, colour no word in it and offer no word on it, and the unread words are read without the titles. The CLI's `batch --input-mode ddl` makes no work of a title line.
+- No saved DDL changes: of the 6,270 DDLs on 5173, no line is a title and no compile result changes. Android and macOS highlighting follow in their own steps.
+
 ## v2.15.275 (2026-10-27 / Build1351)
 
 ### 2026-10-27 — Wild is now "Lift the stroke limit" (Web)

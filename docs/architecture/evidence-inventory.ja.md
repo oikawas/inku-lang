@@ -11,7 +11,7 @@
 | 日本語仕様 | `SPEC.ja.md`、文書版 `v1.92.0` |
 | Web / app | `web/APP_VERSION` = `v2.15.244`、`web/BUILD_NUMBER` = `1320` |
 | Render Engine | `default` / `93`（`core/crates/inku-render/src/lib.rs`）、core API `0.1.0` |
-| DDL | `ddl_version=26` / `ddl_engine_version=71`（`server/src/inku_server/layer_versions.py`） |
+| DDL | `ddl_version=27` / `ddl_engine_version=72`（`server/src/inku_server/layer_versions.py`） |
 | 共有pipeline binding | binding `1.1.0`、protocol `1.0.0`（`pipeline_candidate.py:PipelineBinding`が一致を要求） |
 | Score | 新作はresource-awareなcompact 0.10を基準に、使う表現に応じた最小版（0.10〜0.22）。旧作品の0.1.0〜0.9.0とversionなしartifactは互換読取 |
 | Android | `android/VERSION` = `2.1.4-android.105`、`android/BUILD_NUMBER` = `148446`、Room schema 14、共有Rust pipelineと同梱coreのRender Engine |

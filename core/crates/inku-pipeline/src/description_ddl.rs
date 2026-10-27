@@ -549,7 +549,8 @@ fn sentences_response_schema() -> Value {
 
 /// The image tab's hints, with counts named: a decimal no shape owns is
 /// usually a count written as a decimal ("1.0個"), and an unclear owner may be.
-fn hint(kind: &str, language: ResolvedInstructionLanguage) -> &'static str {
+/// A chunk move's rewrite is given the same hints.
+pub(crate) fn hint(kind: &str, language: ResolvedInstructionLanguage) -> &'static str {
     let ja = language == ResolvedInstructionLanguage::Ja;
     match kind {
         "unowned_exact_decimal" if ja => UNOWNED_DECIMAL_HINT_JA,

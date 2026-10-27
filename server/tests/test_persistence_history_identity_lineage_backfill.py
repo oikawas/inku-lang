@@ -196,7 +196,7 @@ def test_owned_backfill_preserves_candidate_fill_lookup_create_and_commit() -> N
         "id": "new-node",
         "user_id": "user-id",
         "history_id": "created-row",
-        "state": "lineage_only",
+        "state": "active",
         "description_hash": "hash:input-created-row",
         "render_hash": "rh3:created-row",
         "at": 10,

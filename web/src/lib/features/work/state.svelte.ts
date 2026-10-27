@@ -339,7 +339,6 @@ export function createWorkState(deps: WorkStateDeps) {
 			history_display_label: options.displayLabel,
 			batch_line_number: options.batchLineNumber,
 			batch_run_id: options.batchRunId,
-			history_visibility: options.historyVisibility,
 			lineage_parent_node_id: options.lineageParentNodeId ?? undefined,
 			derivation_kind: options.derivationKind ?? undefined,
 			derivation_metadata: options.derivationMetadata,

@@ -134,7 +134,6 @@ export async function saveReplayComparison(
 	try {
 		const saved = await pushHistory(comparison.replayedItem, {
 			countGeneration: false,
-			historyVisibility: 'normal',
 			lineageParentNodeId: comparison.originalItem.lineage_node_id,
 			derivationKind: 'replay',
 			replayWorkId: comparison.originalItem.id,

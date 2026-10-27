@@ -950,10 +950,9 @@ export const ja: LangPack = {
 	historyRenderedAtLabel: 'レンダリング日時：',
 
 	unsavedRefinementPreviewLabel: '未保存の推敲候補',
-	lineageIntermediateSavedNotice: '未保存の推敲候補を中間作品として系譜に記録しました。通常履歴には表示されません。',
 	historyStarredFilterClearedNotice: '星付きの絞り込みを解除しました（選んだ作品を表示するため）',
 	historyForRevisionFilterClearedNotice: '推敲マークの絞り込みを解除しました（選んだ作品を表示するため）',
-	lineageIntermediateSaveFailed: '推敲候補を系譜へ保存できなかったため、描画を開始しませんでした。',
+	lineageIntermediateSaveFailed: '推敲候補を履歴へ保存できなかったため、描画を開始しませんでした。',
 
 	settingsTitle: '設定',
 	settingsDisplayHint: '作品の見せ方と、制作画面に表示する情報を整えます。',

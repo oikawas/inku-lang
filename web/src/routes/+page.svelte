@@ -144,7 +144,6 @@
 	import { projectHistoryCurrentWork } from '$lib/features/history/current-work';
 	import {
 		focusSavedLineageChild,
-		promoteLineageNode as promoteSavedLineageNode,
 		saveLineageNote as saveSavedLineageNote
 	} from '$lib/features/history/lineage-actions';
 	import { hashDigest } from '$lib/hashIdentity';
@@ -195,8 +194,6 @@
 	let previousInputMode = $state<'single' | 'image' | 'batch'>('single');
 	type TextDiffPart = { kind: "same" | "removed" | "added"; text: string };
 	const refinementSession = new RefinementSessionState();
-	let lineageIntermediateNotice = $state<string | null>(null);
-	let lineageIntermediateNoticeTimer: number | null = null;
 	let historyStarredFilterNotice = $state<string | null>(null);
 	let historyStarredFilterNoticeTimer: number | null = null;
 
@@ -1949,20 +1946,6 @@ async function handleDdlDialogDraw(nextDdl: string, signal?: AbortSignal, import
 	}
 }
 
-async function promoteLineageNode(node: LineageNode): Promise<void> {
-	await promoteSavedLineageNode(node, {
-		apiFetch,
-		contextVersion: () => refinement.contextVersion,
-		currentItem: () => work.displayedHistoryItem,
-		setCurrentItem: (item) => { work.displayedHistoryItem = item; },
-		activeHistoryId: () => work.displayedHistoryItem?.id ?? work.result?.history_id ?? historyItems[historyCursor]?.id ?? null,
-		currentOffset: () => historyOffset,
-		syncToItem: (item) => history.syncToItem(item),
-		fetchOffset: (offset, options) => history.fetchOffset(offset, options),
-		loadLineage: (id) => lineageState.load(id, true)
-	});
-}
-
 async function saveLineageNote(node: LineageNode, note: string): Promise<void> {
 	await saveSavedLineageNote(node, note, {
 		apiFetch,
@@ -2028,11 +2011,6 @@ $effect(() => {
 
 		work.reloadError = null;
 		work.replayComparison = null;
-		if (lineageIntermediateNoticeTimer !== null) {
-			window.clearTimeout(lineageIntermediateNoticeTimer);
-			lineageIntermediateNoticeTimer = null;
-		}
-		lineageIntermediateNotice = null;
 
 		lineageState.reset();
 		if (!options.preserveLineageBrowsing) lineageBrowsingState.reset();
@@ -2239,15 +2217,6 @@ $effect(() => {
 
 	const unsavedRefinementPreview = $derived(!!work.result && !work.result.lineage_node_id && !!work.result.lineage_parent_node_id && !!work.result.derivation_kind);
 
-	function showLineageIntermediateNotice(): void {
-		lineageIntermediateNotice = t().lineageIntermediateSavedNotice;
-		if (lineageIntermediateNoticeTimer !== null) window.clearTimeout(lineageIntermediateNoticeTimer);
-		lineageIntermediateNoticeTimer = window.setTimeout(() => {
-			lineageIntermediateNotice = null;
-			lineageIntermediateNoticeTimer = null;
-		}, 5000);
-	}
-
 	/**
 	 * Say that a strip filter was cleared, because nothing else says it.
 	 *
@@ -2290,7 +2259,7 @@ async function ensureLineageParentId(): Promise<string | null> {
 		tokens_in: (work.result.tokens_in_stage1 ?? 0) + (work.result.tokens_in_stage2 ?? 0) || null,
 		tokens_out: (work.result.tokens_out_stage1 ?? 0) + (work.result.tokens_out_stage2 ?? 0) || null,
 	}, {
-		sourceText: work.input.trim(), historyVisibility: 'lineage_only',
+		sourceText: work.input.trim(), selectSaved: true,
 		lineageParentNodeId: work.result.lineage_parent_node_id,
 		derivationKind: work.result.derivation_kind,
 		derivationMetadata: work.result.derivation_metadata ?? {},
@@ -2307,7 +2276,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		work.error = t().lineageIntermediateSaveFailed;
 		throw new Error(work.error);
 	}
-	if (materializingIntermediate) showLineageIntermediateNotice();
 	return nodeId;
 }
 
@@ -3157,7 +3125,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				result={work.result}
 				rangePreview={ddlRangePreview}
 				{unsavedRefinementPreview}
-				{lineageIntermediateNotice}
 				allowEmptyOutputTabs={work.showingDemo}
 				{currentRenderedAt}
 				navLatestDisabled={historyNavButtonsDisabled.latest}
@@ -3257,7 +3224,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onSetRefineWild={setRefineWild}
 				onSaveOkugakiModel={persistOkugakiModel}
 				onSaveVisionModel={persistVisionModel}
-				onPromoteLineageNode={promoteLineageNode}
 				onSaveLineageNote={saveLineageNote}
 				onAskTrashLineage={askTrash}
 				onDetachLineage={detachLineage}

@@ -952,10 +952,9 @@ export const en: LangPack = {
 	historyRenderedAtLabel: 'Performed:',
 
 	unsavedRefinementPreviewLabel: 'Unsaved refinement candidate',
-	lineageIntermediateSavedNotice: 'The unsaved refinement candidate was recorded as an intermediate lineage work. It is hidden from regular history.',
 	historyStarredFilterClearedNotice: 'The starred filter was cleared to show the selected work',
 	historyForRevisionFilterClearedNotice: 'The revision marks filter was cleared to show the selected work',
-	lineageIntermediateSaveFailed: 'Drawing was not started because the refinement candidate could not be saved to lineage.',
+	lineageIntermediateSaveFailed: 'Drawing was not started because the refinement candidate could not be saved to history.',
 
 	settingsTitle: 'Settings',
 	settingsDisplayHint: 'Arrange how works and supporting information appear in your workspace.',

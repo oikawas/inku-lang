@@ -65,7 +65,7 @@ class AutonomousTry(BaseModel):
         description=(
             "Result of the try: kept (the child differs visibly from its parent, or a chunk move's child passed "
             "its checks, and becomes the next parent), not_visible (the child does not differ visibly enough "
-            "and stays in the lineage only), unavailable (the move could not be taken), or failed (an error, "
+            "but remains in history), unavailable (the move could not be taken), or failed (an error, "
             "or a chunk move that kept nothing, ended the try)."
         ),
     )
@@ -118,7 +118,7 @@ class AutonomousRunResponse(BaseModel):
     turns: list[AutonomousTurn] = Field(description="Turns taken so far, each with its tries.")
     current: AutonomousCurrent | None = Field(default=None, description="The turn, try and move kind now under way. Null when no try is being taken.")
     last_kept_history_id: str | None = Field(
-        default=None, description="ID of the last child the run kept. The work's history shows it when the run ends.",
+        default=None, description="ID of the last child the run kept as a parent.",
     )
     error: str | None = Field(default=None, description="Error message when the run failed. Null otherwise.")
     created_at: int = Field(description="When the run started, as Unix time in milliseconds.")

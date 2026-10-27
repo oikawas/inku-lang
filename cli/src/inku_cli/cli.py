@@ -3474,7 +3474,6 @@ def command_replay(args: argparse.Namespace) -> int:
                 "at": int(time.time() * 1000),
                 "input": work.get("input") or "",
                 "count_generation": False,
-                "history_visibility": "normal",
                 "lineage_parent_node_id": work["lineage_node_id"],
                 "derivation_kind": "replay",
                 "replay_work_id": work["id"],
@@ -3774,8 +3773,6 @@ def command_lineage(args: argparse.Namespace) -> int:
                     text = "[Private]"
                 elif node.get("state") == "tombstone" or node.get("redacted") == "deleted":
                     text = "[Deleted]"
-                elif node.get("state") == "lineage_only":
-                    text = "[Intermediate]"
                 
                 print("  " * indent + f"- {op} {node_id[:8]} {is_focus} : {text}")
                 for child_edge in sorted(edges_by_parent.get(node_id, []), key=lambda e: e.get("at", 0)):
@@ -3784,9 +3781,6 @@ def command_lineage(args: argparse.Namespace) -> int:
             print("Work lineage:")
             for root in roots:
                 print_tree(root["id"])
-    elif args.lineage_cmd == "promote":
-        data, _ = client.request("POST", f"/api/lineage/{args.node_id}/promote")
-        _print_json(data)
     return 0
 
 
@@ -3929,7 +3923,6 @@ def _refinement_history_body(target: dict[str, Any], data: dict[str, Any], kind:
         "sketch_text": target.get("sketch_text"),
         "sketch_grain": target.get("sketch_grain"),
         "save_artifacts": True,
-        "history_visibility": "normal",
         "lineage_parent_node_id": target.get("lineage_node_id"),
         "derivation_kind": _DERIVATION_KIND_BY_REFINE_KIND[kind],
         "derivation_metadata": metadata,
@@ -4031,7 +4024,6 @@ def command_refine(args: argparse.Namespace) -> int:
             # none of the names the server accepts, so no value worked and the
             # subcommand had never once succeeded.
             "derivation_kind": _DERIVATION_KIND_BY_REFINE_KIND[args.kind],
-            "history_visibility": args.visibility,
         }
         data, _ = client.request("POST", "/api/history", data=params)
         _print_json(data)
@@ -5041,11 +5033,7 @@ def build_parser() -> argparse.ArgumentParser:
     lineage_show.add_argument("--limit", type=int, default=200, help="max lineage edges to load, counted outward from the work's node (default 200)")
     lineage_show.add_argument("--json", action="store_true", help="output raw JSON")
     
-    lineage_promote = lineage_sub.add_parser("promote", help="promote a lineage-only node to regular history")
-    lineage_promote.add_argument("node_id", help="lineage node ID to promote")
-    
     lineage_show.set_defaults(func=command_lineage)
-    lineage_promote.set_defaults(func=command_lineage)
 
     colophon = subparsers.add_parser("colophon", help="recite one root-to-target lineage branch as an append-only reading")
     _add_common_server_args(colophon)
@@ -5086,7 +5074,6 @@ def build_parser() -> argparse.ArgumentParser:
     refine_save.add_argument("--svg-file", help="path to SVG file")
     refine_save.add_argument("--input-text", required=True, help="original user text")
     refine_save.add_argument("--ddl-text", help="normalized DDL text")
-    refine_save.add_argument("--visibility", choices=("normal", "lineage_only"), default="normal", help="history visibility")
 
     refine_save.set_defaults(func=command_refine)
 

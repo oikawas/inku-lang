@@ -2,7 +2,7 @@ import type { HistoryItem } from '../../historyManagerState.svelte.ts';
 
 export type LineageNode = {
 	id: string;
-	state: 'active' | 'lineage_only' | 'tombstone';
+	state: 'active' | 'tombstone';
 	description_hash?: string | null;
 	render_hash?: string | null;
 	at: number;

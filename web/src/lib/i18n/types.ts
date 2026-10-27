@@ -819,7 +819,6 @@ export interface LangPack {
 
 	// Settings / catalog
 	unsavedRefinementPreviewLabel: string;
-	lineageIntermediateSavedNotice: string;
 	historyStarredFilterClearedNotice: string;
 	historyForRevisionFilterClearedNotice: string;
 	lineageIntermediateSaveFailed: string;

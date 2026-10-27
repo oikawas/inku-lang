@@ -146,7 +146,6 @@ class RunOptions(BaseModel):
     history_display_label: str | None = None
     batch_line_number: int | None = None
     batch_run_id: str | None = None
-    history_visibility: Literal["normal", "lineage_only"] | None = None
     lineage_parent_node_id: str | None = None
     derivation_kind: str | None = None
     derivation_metadata: dict = Field(default_factory=dict)
@@ -734,7 +733,7 @@ class ProductPipelineEffects:
             "elapsed_ms": result["elapsed_total_ms"], "idempotency_key": idempotency,
             "catalog_mode": settings["catalog_mode"], "display_label": settings.get("history_display_label"),
             "batch_line_number": settings.get("batch_line_number"), "batch_run_id": settings.get("batch_run_id"),
-            "history_visibility": settings.get("history_visibility") or "normal", "lineage_parent_node_id": parent,
+            "lineage_parent_node_id": parent,
             "derivation_kind": (settings.get("derivation_kind") or ("ddl_edit" if context.get("derivation_kind") in {"legacy_ddl_fork", "variation_ddl_fork"} else "description_edit")) if parent else None,
             "derivation_metadata": settings.get("derivation_metadata", {}),
         })

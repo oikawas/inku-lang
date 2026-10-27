@@ -10,10 +10,9 @@ different from its parent (``measure``), and the record a child keeps on its
 lineage edge (``record``). This module takes the tries, draws and saves the
 children through the ordinary pipeline runs, and keeps where each run stands.
 
-A child is saved as the run draws it, lineage only; its record is written to its
-edge once it is measured. A child that passes the gate is the next turn's parent,
-and the last one kept is shown in the history when the run ends. A child that
-does not pass stays in the lineage only (the author's answer, 2026-10-20).
+A child is saved in the history as the run draws it; its record is written to
+its edge once it is measured. A child that passes the gate is the next turn's
+parent. Children that do not pass also remain in the history.
 
 A chunk move (まとまりの手, 2026-10-27) runs alone, toward the run's note: the
 shared core's chunk moves (``chunk_moves.rs``) choose one move for one chunk of
@@ -376,7 +375,6 @@ class AutonomousRunner:
         """When the Server starts: the runs it was taking were cut off."""
         for run in self.store.interrupt_running():
             _logger.warning("autonomous_run_interrupted run=%s", run["id"])
-            self._show_last_kept(run)
 
     def close(self) -> None:
         """Stop every run without waiting for a model's answer; the next start marks any
@@ -465,30 +463,15 @@ class AutonomousRunner:
         self.store.save(run)
         _logger.info("autonomous_run_ended run=%s state=%s reason=%s turns=%s", run["id"], state, reason,
                      len(run["turns"]))
-        self._show_last_kept(run)
-
-    @staticmethod
-    def _show_last_kept(run: dict[str, Any]) -> None:
-        """The last child the run kept is shown in the history; the others stay in the lineage."""
-        last = run.get("last_kept_history_id")
-        if not last:
-            return
-        try:
-            items = _db.get_items(run["owner_id"], [last])
-            node = items[0].get("lineage_node_id") if items else None
-            if node:
-                _db.promote_lineage_node(run["owner_id"], node)
-        except Exception:  # noqa: BLE001
-            _logger.warning("autonomous_run_promote_failed run=%s child=%s", run["id"], last, exc_info=True)
 
     # -- the moves --------------------------------------------------------------
 
     def _options(self, run: dict[str, Any], parent: dict[str, Any], *, kind: str, metadata: dict) -> dict:
-        """The run options of a child: the parent's settings, the run's one model, kept in the lineage only."""
+        """The run options of a child: the parent's settings and the run's one model."""
         item, settings = parent["item"], run["settings"]
         options: dict[str, Any] = {
             "stage1_model": settings["model"], "stage2_model": settings["model"],
-            "catalog_mode": "fixed", "history_visibility": "lineage_only",
+            "catalog_mode": "fixed",
             "lineage_parent_node_id": item.get("lineage_node_id"), "derivation_kind": kind,
             "derivation_metadata": metadata, "count_generation": True, "ui_lang": settings["language"],
         }

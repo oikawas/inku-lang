@@ -118,7 +118,9 @@ def test_a_chunk_child_is_kept_with_its_move_whatever_the_gate(author, answers):
     assert answers["sent"][0]["message"]["units"][0]["title"] == "灯台"
     child = db.get_items(owner, [taken["history_id"]])[0]
     assert child["derivation_kind"] == "chunk_move"
-    assert child["history_visibility"] == "lineage_only"
+    assert "history_visibility" not in child
+    listed, _ = db.list_items(owner)
+    assert child["id"] in {item["id"] for item in listed}
     assert child["description_locked"] is True
     assert "「灯台」\n画面の横0.5、縦0.535の位置に" in child["ddl"]
     ai_move = child["derivation_metadata"]["ai_move"]
@@ -191,7 +193,6 @@ def test_a_chunk_run_stops_after_two_turns_that_keep_nothing(runner, monkeypatch
 
     monkeypatch.setattr(runner, "_work", work)
     monkeypatch.setattr(runner, "_chunks", chunks)
-    monkeypatch.setattr(autonomous_refine.AutonomousRunner, "_show_last_kept", staticmethod(lambda run: None))
     run = _chunk_run("owner", moves=5)
     runner.store.save(run)
     runner._drive(run, {"id": "owner"}, runner._work("owner", "start", chunks=True), threading.Event())

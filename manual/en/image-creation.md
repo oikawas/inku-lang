@@ -412,7 +412,7 @@ In the dialog you choose the model for the refinement, the moves to take, the nu
 
 After `Start refining`, the progress appears every few seconds: for each turn, the move taken, its outcome (Kept, Too little change, Could not start, Not usable), how much changed, the sentence added or the law chosen (for a chunk move, the move and the chunk's title, and a rewrite's new title; for example `Simplify “Mount Fuji” → “Overlapping slopes”`), and a thumbnail of the child. `Stop` cancels the child being drawn and keeps the children so far. Closing the dialog does not stop the refinement, and opening the work again shows its progress. One refinement of yours runs at a time.
 
-When the refinement ends (or is stopped), its last kept child enters the history and opens with `Open the last kept child`. The children before it stay in the lineage only. A refinement cut off by a Server restart reads as cut off. A lineage card's `Details` show the AI move that made the child (which move of the run, the move, what it did, the reason and the change from the parent; since 2026-10-27).
+Every drawn child enters the history, including those that did not pass the gate. When the refinement ends (or is stopped), `Open the last kept child` opens the last child kept as a parent. A refinement cut off by a Server restart reads as cut off. A lineage card's `Details` show the AI move that made the child (which move of the run, the move, what it did, the reason and the change from the parent; since 2026-10-27).
 
 ## 10. Change the Model
 
@@ -458,8 +458,8 @@ Ordinary Stage 1 generation stops as a failure if its finite retries cannot succ
 The `Lineage` tab shows which explicit action a work was derived from. Performance, composition, reading, model, language, instruction edits, description edits, repaints, canvas changes, fits, and changes of sketch-from-life grain are recorded as parent-child relations. Works made by an earlier variation keep a "Variation (retired)" edge.
 
 - Parentage is never inferred from visual similarity, an identical description, or timing alone.
-- Intermediate works stay in the lineage as `lineage_only` and do not appear in ordinary history. Promoting one moves it into ordinary history.
-- From a lineage card you can promote to ordinary history, comment, star, mark for revision, and move to trash.
+- Intermediate refinement works also appear in ordinary history.
+- From a lineage card you can comment, star, mark for revision, and move to trash.
 - Double-click a lineage card to show that work large in the Work tab.
 - You may also select a work from the lineage and repaint it from its description or instructions.
 - A work painted from an image starts a lineage. A child drawn from its edited instructions, or from `Instructions before review` (§16), is an instruction-edit child and, like color and composition children, keeps the source note.
@@ -502,7 +502,7 @@ Combine `Thumbnails` with `By lineage` to show lineages with at least two works 
 - Syncing to the displayed work and jumping to the oldest or latest page
 - **The words for moving agree everywhere.** On the canvas, the strip and Library alike, left is newer and right is older, and `prev`, `next` and `first` are not used (`← newer` / `older →` / `Latest` / `Oldest`)
 
-`By lineage` groups only on stored lineage nodes and edges. `lineage_only` intermediate works and tombstones are not counted in ordinary history.
+`By lineage` groups only on stored lineage nodes and edges. Deleted tombstones are not counted in ordinary history.
 
 The revision mark is a second mark, independent of the star. Use it for works you mean to return to.
 

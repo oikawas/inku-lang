@@ -314,13 +314,6 @@ class HistoryPostBody(BaseModel):
     batch_run_id: str | None = Field(
         default=None, description="The identifier of the batch run the work belongs to. Null when it was not a batch work.",
     )
-    history_visibility: str = Field(
-        default="normal",
-        description=(
-            "Where the work is listed: normal (in the history) or lineage_only (kept in the lineage "
-            "without being listed in the history). Omitting it means normal."
-        ),
-    )
     lineage_parent_node_id: str | None = Field(
         default=None,
         description="The identifier of the lineage node of the work this one was derived from. Null for an origin work.",
@@ -590,11 +583,11 @@ class HistoryItem(HistoryPostBody):
         ge=1,
         description="The generation of the work in its lineage, counted from the root as 1. Null when there is no lineage. Not included in a save response.",
     )
-    lineage_state: Literal["active", "lineage_only", "tombstone"] | None = Field(
+    lineage_state: Literal["active", "tombstone"] | None = Field(
         default=None,
         description=(
-            "The state of the work's lineage node: active (the work is listed), lineage_only (kept in the "
-            "lineage but not listed) or tombstone (the work was deleted and only its node remains). "
+            "The state of the work's lineage node: active (the work is listed) "
+            "or tombstone (the work was deleted and only its node remains). "
             "Not included in a save response."
         ),
     )

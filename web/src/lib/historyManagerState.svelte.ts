@@ -31,11 +31,10 @@ export type HistoryItem = {
 	batch_line_number?: number | null;
 	batch_run_id?: string | null;
 	description_hash?: string | null;
-	history_visibility?: 'normal' | 'lineage_only';
 	lineage_node_id?: string | null;
 	lineage_root_node_id?: string | null;
 	lineage_generation?: number | null;
-	lineage_state?: 'active' | 'lineage_only' | 'tombstone' | null;
+	lineage_state?: 'active' | 'tombstone' | null;
 	lineage_parent_node_id?: string | null;
 	derivation_kind?: string | null;
 	derivation_metadata?: Record<string, unknown>;

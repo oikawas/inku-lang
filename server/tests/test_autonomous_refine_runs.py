@@ -124,7 +124,6 @@ def _fake_moves(runner, monkeypatch, outcome: dict[str, str]) -> list[str]:
     monkeypatch.setattr(runner, "_work", work)
     monkeypatch.setattr(runner, "_laws", move("laws"))
     monkeypatch.setattr(runner, "_juxtaposition", move("juxtaposition"))
-    monkeypatch.setattr(autonomous_refine.AutonomousRunner, "_show_last_kept", staticmethod(lambda run: None))
     return taken
 
 
@@ -149,7 +148,7 @@ def test_a_run_stops_where_the_core_says(runner, monkeypatch, outcome, state, re
         assert ended["turns"][0]["attempts"][0]["kind"] == "juxtaposition"
 
 
-def test_a_laws_child_keeps_the_basis_the_next_laws_move_reads(author, answers):
+def test_a_laws_child_keeps_the_basis_the_next_laws_move_reads(author, answers, monkeypatch):
     """Failure: the laws move's child keeps no basis, so the next laws move stops at
     `laws_without_basis`; or the child carries no move record."""
     owner = author["user"]["id"]
@@ -164,12 +163,18 @@ def test_a_laws_child_keeps_the_basis_the_next_laws_move_reads(author, answers):
     parent = runner._work(owner, parent_id)
     assert parent["facts"]["main_law"] == "B1" and set(parent["facts"]["laws"]) == {"B1", "B21"}
     step = {"turn": 1, "attempt": 1, "kind": "laws", "direction": {"exclude": ["B1", "B21"], "cards": "invite"}}
+    real_core = autonomous_refine._core
+    monkeypatch.setattr(autonomous_refine, "_core", lambda request: (
+        {"outcome": "ok", "passes": False, "share": 0.0}
+        if request["action"] == "measure" else real_core(request)))
     taken = runner._laws(run, parent, step, threading.Event())
-    assert taken["outcome"] in {"kept", "not_visible"}, taken
+    assert taken["outcome"] == "not_visible", taken
     assert taken["main_law"] == "B3"
     child = db.get_items(owner, [taken["history_id"]])[0]
     assert child["derivation_kind"] == "laws_change"
-    assert child["history_visibility"] == "lineage_only"
+    assert "history_visibility" not in child
+    listed, _ = db.list_items(owner)
+    assert child["id"] in {item["id"] for item in listed}
     assert child["description_locked"] is True
     assert child["derivation_metadata"]["ai_move"]["kind"] == "laws"
     assert child["derivation_metadata"]["ai_move"]["visible"]["share"] == taken["share"]
@@ -242,18 +247,13 @@ def test_a_stop_cancels_the_drawing_under_way(runner, monkeypatch):
     assert commands == [{"tag": "cancel"}]
 
 
-def test_a_run_cut_off_by_a_restart_reads_as_interrupted(runner, monkeypatch):
-    """Failure: a run the Server was taking stays "running" after a restart, and its
-    last kept child never reaches the history."""
-    promoted: list[tuple[str, str]] = []
-    monkeypatch.setattr(autonomous_refine._db, "get_items", lambda owner, ids: [{"lineage_node_id": f"node-{ids[0]}"}])
-    monkeypatch.setattr(autonomous_refine._db, "promote_lineage_node", lambda owner, node: promoted.append((owner, node)))
+def test_a_run_cut_off_by_a_restart_reads_as_interrupted(runner):
+    """A run the Server was taking must not stay running after a restart."""
     run = {**_run("owner"), "last_kept_history_id": "child", "current": {"turn": 2, "attempt": 1, "kind": "laws"}}
     runner.store.save(run)
     runner.recover()
     cut = runner.get("owner", run["id"])
     assert (cut["state"], cut["stop_reason"], cut["current"]) == ("interrupted", "interrupted", None)
-    assert promoted == [("owner", "node-child")]
 
 
 def test_an_owner_takes_one_run_at_a_time(author, runner, monkeypatch):

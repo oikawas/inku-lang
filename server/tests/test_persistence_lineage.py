@@ -173,7 +173,6 @@ def test_persistence_lineage_owns_exact_imports_and_db_keeps_eight_facades() -> 
         "_lineage_generations",
         "get_lineage",
         "set_lineage_edge_metadata",
-        "promote_lineage_node",
         "get_lineage_branch",
     )
     store_tree = next(
@@ -207,7 +206,6 @@ def test_db_facades_keep_exact_signatures_and_resolve_dependencies_at_call_time(
             "_lineage_node_payload",
             "_lineage_generations",
             "get_lineage",
-            "promote_lineage_node",
             "get_lineage_branch",
         )
     }
@@ -218,7 +216,6 @@ def test_db_facades_keep_exact_signatures_and_resolve_dependencies_at_call_time(
         "_lineage_node_payload": "(node: 'LineageNodeRow', readable: 'bool', child_counts: 'dict', history_by_id: 'dict', generations: 'dict') -> 'dict'",
         "_lineage_generations": "(session, actor: 'dict', node_ids: 'list[str]') -> 'dict[str, int]'",
         "get_lineage": "(user_id: 'str', focus_node_id: 'str', descendant_depth: 'int' = 2, node_limit: 'int' = 200, include_svg: 'bool' = True) -> 'dict | None'",
-        "promote_lineage_node": "(user_id: 'str', node_id: 'str') -> 'dict | None'",
         "get_lineage_branch": "(user_id: 'str', target_node_id: 'str') -> 'dict | None'",
     }
 
@@ -255,9 +252,8 @@ def test_db_facades_keep_exact_signatures_and_resolve_dependencies_at_call_time(
     assert db._lineage_node_payload(row, True, {}, {}, {}) == "_lineage_node_payload"
     assert db._lineage_generations(session, actor, ["node"]) == "_lineage_generations"
     assert db.get_lineage("user", "focus", 4, 5) == "get_lineage"
-    assert db.promote_lineage_node("user", "node") == "promote_lineage_node"
     assert db.get_lineage_branch("user", "target") == "get_lineage_branch"
-    assert initializations == [dependencies] * 8
+    assert initializations == [dependencies] * 7
     assert [name for name, _, _ in calls] == list(signatures)
     assert calls[5] == ("get_lineage", ("user", "focus", 4, 5, True), {})
     assert db.get_lineage("user", "focus", include_svg=False) == "get_lineage"
@@ -484,57 +480,3 @@ def test_branch_keeps_unreadable_ancestor_topology_and_withholds_child_count(
     }
     assert result["nodes"][1]["history"]["lineage_generation"] == 2
     assert [item["id"] for item in result["edges"]] == ["edge"]
-
-
-@pytest.mark.parametrize(
-    ("outcomes", "writable_count"),
-    [
-        ([None], 1),
-        ([_node("node", 1, history_id=None)], 1),
-        ([_node("node", 1), None], 2),
-    ],
-)
-def test_promotion_none_paths_do_not_write(
-    monkeypatch: pytest.MonkeyPatch,
-    outcomes: list[object],
-    writable_count: int,
-) -> None:
-    writable_calls: list[tuple] = []
-    monkeypatch.setattr(
-        lineage.access,
-        "_writable_by",
-        lambda *args: writable_calls.append(args) or object(),
-    )
-    session = SequentialSession(outcomes)
-    assert _store(session).promote_lineage_node("user", "node") is None
-    assert len(writable_calls) == writable_count
-    assert session.commit_calls == 0
-    assert session.refresh_calls == []
-
-
-def test_promotion_requires_both_writable_gates_then_commits_refreshes_and_projects(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    node = _node("node", 1)
-    row = SimpleNamespace(id="history:node", history_visibility="lineage_only")
-    writable_calls: list[tuple] = []
-    monkeypatch.setattr(
-        lineage.access,
-        "_writable_by",
-        lambda *args: writable_calls.append(args) or object(),
-    )
-    session = SequentialSession([node, row])
-    result = _store(session, row_to_dict=lambda item: {"projected": item.id}).promote_lineage_node(
-        "user", "node"
-    )
-    assert result == {"projected": "history:node"}
-    assert len(writable_calls) == 2
-    assert writable_calls[0][1:] == (
-        LineageNodeRow.user_id,
-        LineageNodeRow.history_id,
-    )
-    assert writable_calls[1][1:] == (HistoryRow.user_id, HistoryRow.id)
-    assert node.state == "active"
-    assert row.history_visibility == "normal"
-    assert session.commit_calls == 1
-    assert session.refresh_calls == [row]

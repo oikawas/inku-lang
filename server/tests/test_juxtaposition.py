@@ -114,7 +114,7 @@ def test_only_the_authors_own_usable_works_lend_a_sentence(monkeypatch):
     session.commit()
     monkeypatch.setattr(sources_module, "locked_history_ids", lambda _session, ids: {"held"} & set(ids))
     assert sorted(sources_module.owned_description_sources(session, {"id": "u"})) == [
-        ("input-only", "入力。"), ("own", "作者の文。")]
+        ("input-only", "入力。"), ("lineage-only", "系譜だけの文。"), ("own", "作者の文。")]
 
 
 def test_the_route_refuses_a_held_work_and_keeps_the_lineage_out_of_the_candidates(monkeypatch):

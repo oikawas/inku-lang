@@ -215,7 +215,6 @@ class HistoryLineageGroupReader:
     def _visible_query(self, session, actor, trashed, query_text, starred, for_revision, for_share):
         listed = select(HistoryRow.id).where(
             HistoryRow.trashed == (1 if trashed else 0),
-            HistoryRow.history_visibility == "normal",
         )
         query = session.query(HistoryRow).join(
             LineageNodeRow, LineageNodeRow.history_id == HistoryRow.id
@@ -283,12 +282,7 @@ class HistoryLineageGroupReader:
         """
         actor = self.actor_of_fn(user_id)
         with self.session_factory() as session:
-            # Joined through the node's history_id and filtered through the ids
-            # the visibility index names, so no work's row is read past its SVG.
-            # SQLite keeps a row in order and an SVG overflows into a chain of
-            # pages: reading lineage_node_id or history_visibility from every
-            # work walked each chain, about 0.2 s per statement (three of them)
-            # on production, against 17 ms this way for the same aggregates.
+            # Join by history id and count matching lineage members before paging.
             query = self._visible_query(session, actor, trashed, query_text, starred, for_revision, for_share)
             root_id = func.coalesce(LineageNodeRow.root_node_id, LineageNodeRow.id)
             grouped = query.with_entities(
@@ -418,10 +412,6 @@ class HistoryLineageGroupReader:
                     access._readable_node(actor),
                     HistoryRow.lineage_node_id.in_(member_node_ids),
                     HistoryRow.trashed == (1 if trashed else 0),
-                    # Not a bare == (the column is NOT NULL, so the same test): with
-                    # no statistics SQLite 3.37 takes the visibility index for the
-                    # likelier path and walks every visible work again.
-                    func.coalesce(HistoryRow.history_visibility, "") == "normal",
                 )
             )
             if starred:
@@ -881,7 +871,6 @@ class HistoryListStateReader:
             query = session.query(HistoryRow).filter(
                 access._readable_by(actor, HistoryRow.user_id, HistoryRow.id),
                 HistoryRow.trashed == (1 if trashed else 0),
-                HistoryRow.history_visibility == "normal",
             )
             total: int = query.with_entities(func.count(HistoryRow.id)).scalar() or 0
             newest = (
@@ -916,7 +905,6 @@ class HistoryItemPositionReader:
             visible = session.query(HistoryRow.id, HistoryRow.at).filter(
                 access._readable_by(actor, HistoryRow.user_id, HistoryRow.id),
                 HistoryRow.trashed == (1 if trashed else 0),
-                HistoryRow.history_visibility == "normal",
             )
             if starred:
                 visible = visible.filter(HistoryRow.starred == 1)
@@ -1106,9 +1094,6 @@ class HistoryWriter:
         if source_text is None:
             source_text = item.get("input", "")
         desc_hash = self.description_hash_fn(source_text)
-        visibility = item.get("history_visibility") or "normal"
-        if visibility not in {"normal", "lineage_only"}:
-            raise ValueError("invalid history visibility")
         parent_node_id = item.get("lineage_parent_node_id")
         derivation_kind = item.get("derivation_kind")
         derivation_metadata = item.get("derivation_metadata") or {}
@@ -1177,11 +1162,11 @@ class HistoryWriter:
             coerce_trace=json.dumps(item.get("coerce_trace"), ensure_ascii=False) if item.get("coerce_trace") is not None else None,
             source_text=source_text, display_label=item.get("display_label"),
             batch_line_number=item.get("batch_line_number"), batch_run_id=item.get("batch_run_id"),
-            description_hash=desc_hash, history_visibility=visibility, lineage_node_id=node_id,
+            description_hash=desc_hash, history_visibility="normal", lineage_node_id=node_id,
         )
         node = LineageNodeRow(
             id=node_id, user_id=item["user_id"], history_id=item["id"],
-            state="lineage_only" if visibility == "lineage_only" else "active",
+            state="active",
             description_hash=desc_hash, render_hash=render_hash, at=item["at"],
             root_node_id=node_id,
         )
@@ -1336,7 +1321,6 @@ def row_to_dict(
     "batch_line_number": row.batch_line_number,
     "batch_run_id": row.batch_run_id,
     "description_hash": row.description_hash,
-    "history_visibility": row.history_visibility or "normal",
     "lineage_node_id": row.lineage_node_id,
 }
     image_ddl = getattr(row, "image_ddl", None)

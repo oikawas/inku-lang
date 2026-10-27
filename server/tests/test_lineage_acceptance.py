@@ -112,7 +112,7 @@ def test_all_derivation_kinds_siblings_and_history_provenance():
         _cleanup(user)
 
 
-def test_lineage_only_trash_restore_tombstone_and_limits():
+def test_intermediate_work_trash_restore_tombstone_and_limits():
     user = _user()
     try:
         root = db.add_item(_item(user["id"], "根", 300))
@@ -132,8 +132,8 @@ def test_lineage_only_trash_restore_tombstone_and_limits():
             derivation_kind="description_edit",
         ))
         items, total = db.list_items(user["id"], limit=100)
-        assert total == 2
-        assert hidden["id"] not in {item["id"] for item in items}
+        assert total == 3
+        assert hidden["id"] in {item["id"] for item in items}
 
         assert db.trash_items(user["id"], [child["id"]]) == 1
         trashed, trashed_total = db.list_items(user["id"], trashed=True, limit=100)

@@ -172,7 +172,7 @@ def test_lineage_nodes_carry_lineage_generation():
         assert db.delete_user(user["id"])
 
 
-def test_lineage_only_history_is_hidden_and_can_be_promoted():
+def test_legacy_visibility_input_cannot_hide_a_new_work():
     user = _user()
     try:
         hidden = db.add_item(_item(
@@ -182,15 +182,11 @@ def test_lineage_only_history_is_hidden_and_can_be_promoted():
             history_visibility="lineage_only",
         ))
         items, total = db.list_items(user["id"])
-        assert items == []
-        assert total == 0
-
-        promoted = db.promote_lineage_node(user["id"], hidden["lineage_node_id"])
-        assert promoted is not None
-        items, total = db.list_items(user["id"])
         assert total == 1
         assert items[0]["id"] == hidden["id"]
-        assert items[0]["history_visibility"] == "normal"
+        assert "history_visibility" not in items[0]
+        graph = db.get_lineage(user["id"], hidden["lineage_node_id"])
+        assert graph["nodes"][0]["state"] == "active"
     finally:
         db.delete_all(user["id"])
         assert db.delete_user(user["id"])

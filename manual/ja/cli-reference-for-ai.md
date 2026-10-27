@@ -118,8 +118,6 @@ uv run inku-cli paint "TEXT" --stage1-model chatgpt:gpt-6-luna --sketch --catalo
 * **`lineage show <ITEM_ID> [--depth D] [--limit L] [--json]`**
   * 指定したIDを基点とする系譜ツリーを表示します。
   * `--json` を指定すると、ツリーに含まれる全ノードとエッジの接続情報（`parent_node_id`, `child_node_id`）を取得できます。
-* **`lineage promote <NODE_ID>`**
-  * 中間ノード（通常履歴に表示されない `lineage_only`）を通常履歴に昇格させます。
 
 ### 2. `refine`
 * **`refine perform <ITEM_ID> --kind {layout|color} [-o DIR] [--png] [--no-save]`**

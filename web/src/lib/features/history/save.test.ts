@@ -63,7 +63,6 @@ test('T-292/T-293: save owns the payload and selects the saved identity after re
 		selectSaved: true,
 		countGeneration: true,
 		sourceText: 'source',
-		historyVisibility: 'normal',
 		lineageParentNodeId: 'node-1',
 		derivationKind: 'replay'
 	}, {
@@ -115,6 +114,7 @@ test('T-292/T-293: save owns the payload and selects the saved identity after re
 	assert.equal(body.source_text, 'source');
 	assert.equal(body.lineage_parent_node_id, 'node-1');
 	assert.equal(body.derivation_kind, 'replay');
+	assert.equal('history_visibility' in body, false);
 });
 
 test('T-292: old records preserve absent compose/sketch fields and reconcile the current offset', async () => {

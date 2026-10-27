@@ -148,7 +148,7 @@ def test_history_list_state_reader_filters_and_projects_only_state_columns() -> 
         session_factory,
         lambda user_id: {"id": user_id, "permission_groups": [], "group_id": None},
     )
-    assert reader.list_state("owner") == (2, 10, "a")
+    assert reader.list_state("owner") == (3, 12, "hidden")
     assert reader.list_state("owner", trashed=True) == (1, 11, "trash")
     assert reader.list_state("nobody") == (0, None, None)
     assert reader.list_state("recipient") == (1, 14, "granted")

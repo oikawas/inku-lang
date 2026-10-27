@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-27 — All saved works appear in history
+
+The Server and Web now save refinement intermediates, including children that did not pass the visual gate, as ordinary works. Existing lineage-only works and nodes are converted at startup after a verified database snapshot; works and lineage edges are retained. The hidden-history option and promotion action have been removed.
+
 ### 2026-10-27 — Paint from an image on macOS
 
 The image tab and image-folder batch prepare images with ImageIO and the shared core's image policy, then send them to a Vision model. Provenance is saved with the work and is not used for drawing; image bytes are not saved. The app warns before the first image send after launch. Folder progress is recorded for reselection and resumption.

@@ -26,7 +26,7 @@ from .persistence.variation_authority import (
 
 
 _RECORD_OPTIONS = frozenset({
-    "history_display_label", "batch_line_number", "batch_run_id", "history_visibility",
+    "history_display_label", "batch_line_number", "batch_run_id",
     "lineage_parent_node_id", "derivation_kind", "derivation_metadata", "count_generation",
     "save_history", "save_artifacts", "history_input", "history_source_text", "history_at",
     "request_idempotency_key",

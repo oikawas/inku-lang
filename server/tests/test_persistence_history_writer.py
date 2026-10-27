@@ -493,15 +493,6 @@ def test_child_save_reads_parent_inherits_root_and_writes_canonical_edge(
     [
         (
             {
-                "history_visibility": "hidden",
-                "lineage_parent_node_id": "parent",
-                "derivation_kind": "invalid",
-                "derivation_metadata": ["invalid"],
-            },
-            "invalid history visibility",
-        ),
-        (
-            {
                 "lineage_parent_node_id": "parent",
                 "derivation_kind": "invalid",
                 "derivation_metadata": ["invalid"],

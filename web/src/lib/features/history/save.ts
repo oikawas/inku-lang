@@ -9,7 +9,6 @@ export type SaveHistoryOptions = {
 	displayLabel?: string;
 	batchLineNumber?: number;
 	batchRunId?: string;
-	historyVisibility?: 'normal' | 'lineage_only';
 	lineageParentNodeId?: string | null;
 	derivationKind?: DerivationKind | null;
 	derivationMetadata?: Record<string, unknown>;
@@ -112,7 +111,6 @@ export async function saveHistoryItem(
 				display_label: options.displayLabel ?? item.display_label ?? null,
 				batch_line_number: options.batchLineNumber ?? item.batch_line_number ?? null,
 				batch_run_id: options.batchRunId ?? item.batch_run_id ?? null,
-				history_visibility: options.historyVisibility ?? 'normal',
 				lineage_parent_node_id: options.lineageParentNodeId ?? null,
 				derivation_kind: options.derivationKind ?? null,
 				derivation_metadata: options.derivationMetadata ?? {},
@@ -139,7 +137,7 @@ export async function saveHistoryItem(
 
 	if (options.reconcile === false && saved) return saved;
 	if (options.countGeneration) await deps.refreshCountedUser();
-	if (options.selectSaved && saved?.id && options.historyVisibility !== 'lineage_only') {
+	if (options.selectSaved && saved?.id) {
 		await deps.fetchOffset(0, { anchorId: saved.id });
 		return saved;
 	}

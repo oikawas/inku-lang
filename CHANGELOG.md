@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-27 — Paint from an image on macOS
+
+The image tab and image-folder batch prepare images with ImageIO and the shared core's image policy, then send them to a Vision model. Provenance is saved with the work and is not used for drawing; image bytes are not saved. The app warns before the first image send after launch. Folder progress is recorded for reselection and resumption.
+
 ### 2026-10-27 — Android drawing conditions and wording
 
 The studio and batch conditions now label the model, color catalog and canvas; the drawing route uses a segmented control and the steps and options use stateful switches. The flow shows its steps separately with their colors. Interface wording comes from the Japanese and English language packs.

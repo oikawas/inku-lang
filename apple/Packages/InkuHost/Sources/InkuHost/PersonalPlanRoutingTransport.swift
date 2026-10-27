@@ -86,7 +86,8 @@ public final class PersonalPlanRoutingTransport: ObservedProviderTransport, Obse
         let results = ["generate_sketch": "sketch_generated", "select_description_catalog": "description_catalog_selected",
             "generate_normalized_ddl": "normalized_ddl_generated", "read_composition": "composition_read",
             "choose_laws": "laws_chosen", "choose_colors": "colors_chosen",
-            "complete_visible_ddl_holes": "visible_ddl_hole_patch_generated"]
+            "complete_visible_ddl_holes": "visible_ddl_hole_patch_generated", "select_image_catalog": "image_catalog_selected",
+            "write_image_ddl": "image_ddl_written", "review_image_ddl": "image_ddl_reviewed"]
         guard let resultTag = results[try effect.requiredString("tag")] else { throw HostError("chatgpt_operation_not_supported") }
         let recorder = try observation.map { try ProviderAttemptRecorder(action: action, reference: reference, options: $0) }
         var failure: String?

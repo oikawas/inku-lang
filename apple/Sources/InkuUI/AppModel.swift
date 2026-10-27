@@ -50,6 +50,11 @@ public final class AppModel {
     @ObservationIgnored public var canvasFitChoiceHandler: (@MainActor (CanvasFitQuestion) async -> CanvasFitChoice)?
     @ObservationIgnored private var canvasFitContinuation: CheckedContinuation<CanvasFitChoice, Never>?
     public var inputMode = "description"
+    public var imageInput: PreparedImageInput?
+    public var imageProvenance = ""
+    public var imageFileName = ""
+    public var imageWarningAcknowledged = false
+    public var savedImageDDL: Data?
     public var descriptionText = ""
     public var ddlText = ""
     /// The Web always requests `auto`; an explicit language remains possible for restored inputs.
@@ -134,6 +139,7 @@ public final class AppModel {
     }
     public private(set) var unreadOutputs: Set<String> = []
     private var workActionStates: [String: SavedWorkActionState] = [:]
+    public private(set) var imageWorkProvenance: [String: String] = [:]
     public private(set) var savedDisplayLabels: [String: String] = [:]
     @ObservationIgnored private var displayLabelReads: Set<String> = []
     @ObservationIgnored private var workActionReadToken = UUID()
@@ -225,11 +231,17 @@ public final class AppModel {
     /// A description is drawable only when something is left once the author's numbers and comments are cut
     /// (Web `canSubmit`, state.svelte.ts:363-364).
     public var canGenerate: Bool {
-        database != nil && !isBusy && !isPreview
+        if inputMode == "image" {
+            return database != nil && !isBusy && !isPreview && imageInput != nil && !imageVisionModel.isEmpty
+        }
+        return database != nil && !isBusy && !isPreview
             && (inputMode == "ddl" ? !ddlText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                                    : DescriptionLabels.hasDrawableText(descriptionText))
             && (inputMode == "ddl" || (hasAvailableNextDrawingModel
                 && !(selectedWorkID != nil && sourceLocked)))
+    }
+    public var imageVisionModel: String {
+        AuxiliaryModel.defaultVisionModel(saved: display.preferences.visionModelReference, settings: settings)
     }
     public var canGenerateDescription: Bool {
         database != nil && !isBusy && !isPreview && hasAvailableNextDrawingModel
@@ -365,10 +377,15 @@ public final class AppModel {
 
     private func runGeneration(host: PipelineHost, bootstrap: Bootstrap, token: UUID, parentWorkID: String?) async {
         do {
-            let freshRequest = try requestForCurrentInput(parentWorkID: parentWorkID,
-                derivationKind: parentWorkID == nil ? "new" : inputMode == "ddl" ? "ddl_edit" : "description_edit")
+            var freshRequest: GenerationRequest
+            if inputMode == "image", let image = imageInput {
+                freshRequest = try requestForImage(image, provenance: imageProvenance, canvasID: canvasID)
+            } else {
+                freshRequest = try requestForCurrentInput(parentWorkID: parentWorkID,
+                    derivationKind: parentWorkID == nil ? "new" : inputMode == "ddl" ? "ddl_edit" : "description_edit")
+            }
             let request = try await pinPersonalPlanRequests([freshRequest])[0]
-            let view = try await host.generate(request) { [weak self] progress in
+            let view = try await host.generate(request, image: inputMode == "image" ? imageInput : nil) { [weak self] progress in
                 Task { @MainActor in self?.receive(progress, token: token, models: request.models) }
             }
             await recordDescriptionFeedback(request: request, view: view)
@@ -379,6 +396,8 @@ public final class AppModel {
             if let id = view.savedWorkID, let work = works.first(where: { $0.id == id }) {
                 displayWork(work)
                 selectedContext = try await host.savedAuthoringContext(workID: id)
+                savedImageDDL = selectedContext?.imageDDL
+                if savedImageDDL != nil { imageInput = nil; imageFileName = "" }
             }
         } catch {
             guard generationToken == token, !Task.isCancelled else { return }
@@ -412,6 +431,7 @@ public final class AppModel {
         currentExecutionID = nil
         currentView = nil
         selectedContext = nil
+        savedImageDDL = nil
         holeIDs = []
         selectedHoleIDs = []
         patchProposalJSON = ""
@@ -432,6 +452,14 @@ public final class AppModel {
             let context = try await host.savedAuthoringContext(workID: work.id)
             guard displayToken == selectionToken, selectedWorkID == work.id, !isBrowsingLocked else { return }
             selectedContext = context
+            savedImageDDL = context.imageDDL
+            if context.imageDDL != nil {
+                imageInput = nil; imageFileName = ""; imageProvenance = context.imageProvenance ?? ""
+                inputMode = "image"
+            } else if inputMode == "image" {
+                imageInput = nil; imageFileName = ""; imageProvenance = ""
+                inputMode = "description"
+            }
             authoringAuthority = context.authority
             authoringOrigin = context.origin
             authoringRevision = context.revision
@@ -723,7 +751,7 @@ public final class AppModel {
                 guard freshPin == nil || freshPin == session else { throw HostError("chatgpt_session_pin_conflict") }
                 freshPin = session
             }
-            else if case .description = request.authoring {
+            else if !request.authoring.isDirect {
                 if freshPin == nil { freshPin = try await personalRuntime.pin() }
                 request.chatGPTSession = freshPin
             } else {
@@ -745,7 +773,7 @@ public final class AppModel {
         let usesPersonal = stage1 != nil || stage2 != nil
         guard usesPersonal else { return }
         if let session = request.chatGPTSession { try await personalPlanRuntime().validate(session) }
-        else if case .description = request.authoring { throw HostError("chatgpt_session_pin_required") }
+        else if !request.authoring.isDirect { throw HostError("chatgpt_session_pin_required") }
     }
 
     public func clearPreview() async {
@@ -773,6 +801,7 @@ public final class AppModel {
         guard let host else { throw HostError("pipeline_unavailable") }
         let context = try await host.savedAuthoringContext(workID: workID)
         workActionStates[workID] = SavedWorkActionState(context)
+        if context.imageDDL != nil { imageWorkProvenance[workID] = context.imageProvenance ?? "" }
         return context
     }
 
@@ -802,6 +831,13 @@ public final class AppModel {
         return nil
     }
 
+    public func workPresentationTitle(_ work: SavedWork) -> String {
+        if let provenance = imageWorkProvenance[work.id] {
+            return display.label("画像", "Image") + (provenance.isEmpty ? "" : " · " + provenance)
+        }
+        return LibraryWorkPresentation.title(work, untitled: display.localized("無題"))
+    }
+
     public func loadWorkActionState(_ work: SavedWork) async {
         await loadWorkActionStates(workIDs: [work.id])
     }
@@ -822,11 +858,15 @@ public final class AppModel {
             let labels = try await host.savedDisplayLabels(workIDs: Array(labelIDs))
             guard token == workActionReadToken, !Task.isCancelled else { return }
             let states = Dictionary(uniqueKeysWithValues: missing.map { id in
-                (id, summaries[id].map { SavedWorkActionState(origin: $0.origin, authority: $0.authority) } ?? .unavailable)
+                (id, summaries[id].map { $0.isImage ? .image : SavedWorkActionState(origin: $0.origin, authority: $0.authority) } ?? .unavailable)
             })
             // Every menu observes this dictionary. Publish the page once, not once per card, and not at all when
             // nothing new came back: an unchanged write still redraws every reader.
             if !states.isEmpty { workActionStates.merge(states) { _, new in new } }
+            let imageLabels = summaries.reduce(into: [String: String]()) { values, item in
+                if item.value.isImage { values[item.key] = item.value.imageProvenance ?? "" }
+            }
+            if !imageLabels.isEmpty { imageWorkProvenance.merge(imageLabels) { _, new in new } }
             if !labels.isEmpty { savedDisplayLabels.merge(labels) { _, new in new } }
             displayLabelReads.formUnion(labelIDs)
         } catch {
@@ -895,6 +935,23 @@ public final class AppModel {
         return request
     }
 
+    public func requestForImage(_ image: PreparedImageInput, provenance: String, canvasID: String? = nil) throws -> GenerationRequest {
+        guard let bootstrap else { throw HostError("installation_unavailable") }
+        let vision = imageVisionModel
+        guard SettingsModel.isRegisteredModelAvailable(vision, purpose: "vision", settings: settings) else { throw HostError("vision_model_not_available") }
+        var request = try bootstrap.request(inputMode: "description", source: "", description: "", language: "ja",
+            catalogID: catalogID, canvasID: canvasID ?? image.nearestFormatID, seed: seedText, wild: false,
+            settings: nextGenerationHostSettings, parentWorkID: nil, derivationKind: "new",
+            catalogMode: catalogMode, sketch: .off)
+        request.authoring = .image(input: image.authoringJSON, autoCatalog: catalogMode == "auto")
+        request.imageProvenance = provenance
+        request.models.stage1Model = vision; request.models.stage2Model = vision
+        var config = try ExactJSON(data: request.configuration)
+        config["compiler"]["host"]["canvas_fit"] = .string("contain")
+        request.configuration = config.data
+        return request
+    }
+
     /// Web `sketchTextFor`: prose written for this very description, as the author left it. Unedited prose is not
     /// sent, so an ordinary redraw still asks the layer as before.
     private func editedSketch(parentWorkID: String?, mode: String, description: String) -> SketchRequest? {
@@ -944,7 +1001,8 @@ public final class AppModel {
     }
 
     public func drawEditedDDL(work: SavedWork, source: String, wildOverride: Bool? = nil,
-                              paperID: String? = nil, presentation: CanvasFitPresentation = .workspace) async -> Bool {
+                              paperID: String? = nil, presentation: CanvasFitPresentation = .workspace,
+                              forceEdit: Bool = false) async -> Bool {
         guard !isBusy, canvasFitQuestion == nil, !work.trashed,
               !source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
         do {
@@ -952,7 +1010,7 @@ public final class AppModel {
             let saved = try await savedConfiguration(workID: work.id)
             var options = try ExactJSON(data: saved.renderOptions)
             let target = paperID ?? options["canvas_aspect_id"].string ?? work.renderCanvasAspectID ?? canvasID
-            let unchanged = source == work.ddl && wildOverride == nil
+            let unchanged = !forceEdit && source == work.ddl && wildOverride == nil
             let fit = await chooseCanvasFit(source: source, recordedWork: unchanged ? work : nil,
                                              paperID: target, presentation: presentation)
             guard fit != .cancel, !isBusy else { return false }
@@ -976,6 +1034,8 @@ public final class AppModel {
                 parentWorkID: work.id, derivationKind: "ddl_edit")
             request.completionRanges = saved.completionRanges
             request.lawsRecords = saved.lawsRecords
+            request.inheritedImageDDL = saved.imageDDL
+            request.imageProvenance = saved.imageProvenance
             request = try await pinPersonalPlanRequests([request])[0]
             return await runAutomation(request: request) != nil
         } catch { report(error); return false }
@@ -1627,14 +1687,14 @@ public final class AppModel {
         return succeeded
     }
 
-    public func runAutomation(request: GenerationRequest, allowsBrowsing: Bool = false) async -> SavedWork? {
+    public func runAutomation(request: GenerationRequest, image: PreparedImageInput? = nil, allowsBrowsing: Bool = false) async -> SavedWork? {
         guard let host else { return nil }
         var result: SavedWork?
         _ = await performSerialized(status: "生成中", allowsBrowsing: allowsBrowsing) { [weak self] token in
             guard let self else { return }
             self.automationFailureMessage = nil
             try await self.validatePinnedRequest(request)
-            let view = try await host.generate(request) { [weak self] progress in
+            let view = try await host.generate(request, image: image) { [weak self] progress in
                 Task { @MainActor in self?.receive(progress, token: token, models: request.models) }
             }
             if self.generationToken == token, !self.stopping {
@@ -1701,6 +1761,7 @@ public final class AppModel {
         importedDDL = nil; importedMacroNames = []
         selectedContext = nil
         currentView = nil
+        savedImageDDL = nil; imageInput = nil; imageFileName = ""; imageProvenance = ""
         currentExecutionID = nil
         currentSVG = ""
         visibleDDL = ""
@@ -1949,6 +2010,7 @@ public final class AppModel {
             selectedContext = nil
             currentView = nil
             workActionStates = [:]
+            imageWorkProvenance = [:]
             savedDisplayLabels = [:]
             displayLabelReads = []
             workActionReadToken = UUID()
@@ -2216,7 +2278,14 @@ public final class AppModel {
     }
     /// Web PipelineStatus prints `pipelineAttentionText` for a failed run, not a bare "failed".
     private func statusText(for view: PipelineView) -> String {
-        drawingFailureText(view) ?? Self.phaseStatus(view.phase)
+        if let failure = drawingFailureText(view) { return failure }
+        switch view.actionTag {
+        case "select_image_catalog": return display.webCopy("imageSelectingCatalog", "画像から色カタログを選んでいます…")
+        case "write_image_ddl": return display.webCopy("imageWritingDdl", "画像から指示書を書いています…")
+        case "draw_image_review": return display.localized("見比べる画を描いています…")
+        case "review_image_ddl": return display.webCopy("imageReviewingDdl", "画像と描いた画を見比べています…")
+        default: return Self.phaseStatus(view.phase)
+        }
     }
     func drawingFailureText(_ view: PipelineView) -> String? {
         DrawingFailureMessage.text(for: view, language: display.preferences.language,
@@ -2259,6 +2328,14 @@ public final class AppModel {
     }
 
     public func failureMessage(_ error: Error) -> String {
+        switch (error as? HostError)?.code {
+        case "image_missing", "image_expired": return display.webCopy("imageMissing", "画像を読み直してください。画像ファイルを選び直してから描いてください。")
+        case "image_invalid": return display.webCopy("imageInvalid", "画像を読めません。JPEG・PNG・GIF・TIFF のファイルを選んでください。")
+        case "image_too_large": return display.webCopy("imageTooLarge", "画像が大きすぎます。小さくしてから選んでください。")
+        case "vision_model_not_available", "image_model_not_vision": return display.webCopy("imageVisionRequired", "画像を見る Vision のモデルを選んでください。")
+        case "image_ddl_failed", "image_ddl_undrawable": return display.webCopy("imageDdlFailed", "画像から指示書を書けませんでした。モデルを変えて、もう一度描いてください。")
+        default: break
+        }
         if (error as? HostError)?.code == "touch_change_unavailable" {
             return display.localized("この作品のてざわりを替えられません。")
         }

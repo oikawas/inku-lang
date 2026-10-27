@@ -785,7 +785,9 @@ public actor InkuDatabase {
                         ON a.execution_id = wanted.execution_id AND a.effect_id = wanted.effect_id
                     )
                     SELECT work_id, json_extract(document, '$.performance.authority.authority') AS authority,
-                           json_extract(document, '$.performance.authority.origin') AS origin
+                           json_extract(document, '$.performance.authority.origin') AS origin,
+                           json_type(document, '$.performance.image_ddl') = 'object' AS is_image,
+                           json_extract(document, '$.performance.image_provenance') AS image_provenance
                     FROM records
                     WHERE json_extract(document, '$.work_id') = work_id
                     AND json_type(document, '$.performance.configuration') = 'object'
@@ -797,7 +799,8 @@ public actor InkuDatabase {
                     AND json_type(document, '$.performance.authority.revision') = 'text'
                     """, arguments: StatementArguments(arguments))
                 for row in rows {
-                    result[row["work_id"]] = SavedAuthoringSummary(authority: row["authority"], origin: row["origin"])
+                    result[row["work_id"]] = SavedAuthoringSummary(authority: row["authority"], origin: row["origin"],
+                        isImage: (row["is_image"] as Bool?) ?? false, imageProvenance: row["image_provenance"])
                 }
             }
             return result

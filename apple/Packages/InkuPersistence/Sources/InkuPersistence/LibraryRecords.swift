@@ -4,7 +4,11 @@ import Foundation
 public struct SavedAuthoringSummary: Sendable, Equatable {
     public let authority: String
     public let origin: String
-    public init(authority: String, origin: String) { self.authority = authority; self.origin = origin }
+    public let isImage: Bool
+    public let imageProvenance: String?
+    public init(authority: String, origin: String, isImage: Bool = false, imageProvenance: String? = nil) {
+        self.authority = authority; self.origin = origin; self.isImage = isImage; self.imageProvenance = imageProvenance
+    }
 }
 
 /// These local annotations never alter portable source, Score, SVG or identities.

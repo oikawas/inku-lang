@@ -33,6 +33,7 @@ let package = Package(
                             .process("Resources/Localization")] + (ddl3dCopied ? [.copy("Resources/ddl3d")] : [])),
         .executableTarget(name: "InkuMac", dependencies: ["InkuUI"]),
         .executableTarget(name: "InkuAppCheck", dependencies: ["InkuUI", "InkuPersistence", "InkuCore", "InkuHost", "InkuExport"]),
+        .testTarget(name: "InkuUITests", dependencies: ["InkuUI", "InkuHost", "InkuPersistence"]),
     ],
     swiftLanguageModes: [.v6]
 )

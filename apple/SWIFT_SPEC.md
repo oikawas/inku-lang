@@ -18,6 +18,14 @@ Options and replacements for Change the touches, Change the ground and Change th
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-27 Painting from an image on macOS
+
+The image tab accepts JPEG, PNG, GIF and TIFF. ImageIO reads the first GIF frame, applies Exif orientation and composites transparency on white. The host prepares a JPEG at the size and quality specified by the shared core and sends it to the Vision model; the instruction language is Japanese. Image pixels stay in memory during the run. If a referenced image is missing, the run cancels with `image_missing` before sending. The host turns the core's review SVG into a PNG for the same run. Developer raw provider capture does not save image requests.
+
+Image provenance is saved with the work and is not used as drawing input. The Image settings independently control automatic file-name and Exif notes; GPS is excluded. The upload warning appears on the first image run after each app launch. The saved record retains image references and `image_ddl`, not the image bytes. Instruction edits and appearance children inherit that provenance and image record. When the pre-review instructions exist, the app shows them and can draw a child from them.
+
+An image-folder batch includes subfolders, skips hidden entries and processes paths in natural order, recording failures while continuing. A per-folder journal records paths, sizes, modification times and results for reselection and resumption. An image whose result is uncertain after interruption remains uncertain and is not automatically resent. Start over explicitly repeats every image. `InkuAppCheck --image-run-only` checks image preparation, saving and provenance separation with an isolated database and fake provider.
+
 ## 2026-10-23 Aspect ratio declarations and fitting
 
 A new parentless direct DDL sends `declare_canvas: true` in the core authoring input to record the chosen paper's ratio at the start. The core keeps a declaration the author wrote. Drawing or editing a saved work does not send this flag. The core writes declarations for Stage 1 itself.

@@ -19,9 +19,10 @@ enum ChatGPTWire {
     private static let log = Logger(subsystem: "app.inku", category: "chatgpt")
 
     /// `prompt` is the effect's original JSON, so the schema keeps its member order.
-    static func request(model: String, prompt: Data, answerLimit: Int) throws -> Request {
+    static func request(model: String, prompt: Data, answerLimit: Int, images: [String] = []) throws -> Request {
         let envelope: ExactJSON = .object(["action": .string("chatgpt_request"), "model": .string(model), "answer_limit": .integer(answerLimit)])
-        let input = Data((String(envelope.text.dropLast()) + ",\"prompt\":" + String(decoding: prompt, as: UTF8.self) + "}").utf8)
+        let imageMember = images.isEmpty ? "" : ",\"images\":" + ExactJSON.array(images.map(ExactJSON.string)).text
+        let input = Data((String(envelope.text.dropLast()) + ",\"prompt\":" + String(decoding: prompt, as: UTF8.self) + imageMember + "}").utf8)
         return try prepared(ProviderWire.evaluate(input))
     }
 

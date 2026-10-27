@@ -5,7 +5,7 @@ import InkuHost
 public struct ProviderProgressSnapshot: Sendable, Equatable {
     public enum Outcome: Sendable, Equatable { case running, succeeded, failed, cancelled, awaitingReview }
     public enum Stage: Sendable, Equatable {
-        case sketch, catalog, interpretation, composition, laws, colors, completion
+        case sketch, catalog, interpretation, composition, laws, colors, completion, imageCatalog, imageWriting, imageReview
         init?(action: String) {
             switch action {
             case "generate_sketch": self = .sketch
@@ -15,6 +15,9 @@ public struct ProviderProgressSnapshot: Sendable, Equatable {
             case "choose_laws": self = .laws
             case "choose_colors": self = .colors
             case "complete_visible_ddl_holes": self = .completion
+            case "select_image_catalog": self = .imageCatalog
+            case "write_image_ddl": self = .imageWriting
+            case "review_image_ddl": self = .imageReview
             default: return nil
             }
         }
@@ -27,6 +30,9 @@ public struct ProviderProgressSnapshot: Sendable, Equatable {
             case .laws: "法則の選択"
             case .colors: "配色の選択"
             case .completion: "指示書の補完"
+            case .imageCatalog: "画像から色カタログを選んでいます…"
+            case .imageWriting: "画像から指示書を書いています…"
+            case .imageReview: "画像と描いた画を見比べています…"
             }
         }
     }
@@ -73,7 +79,7 @@ public struct ProviderProgressSnapshot: Sendable, Equatable {
         let reference: String?
         switch stage {
         case .some(.completion): reference = models?.stage2Model
-        case .some(.sketch), .some(.catalog), .some(.interpretation), .some(.composition), .some(.laws), .some(.colors):
+        case .some(.sketch), .some(.catalog), .some(.interpretation), .some(.composition), .some(.laws), .some(.colors), .some(.imageCatalog), .some(.imageWriting), .some(.imageReview):
             reference = models?.stage1Model
         case .none: reference = nil
         }

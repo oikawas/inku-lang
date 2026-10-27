@@ -1,6 +1,11 @@
 import InkuPersistence
 import InkuHost
 import SwiftUI
+#if os(macOS)
+import AppKit
+import ImageIO
+import UniformTypeIdentifiers
+#endif
 
 struct BatchWorkspaceSelection {
     private enum Display { case history, latest, row(SavedWork, String) }
@@ -36,10 +41,17 @@ struct CreationView: View {
     let onLineageExport: (LineageExportRequest) -> Void
     var onPresentWork: () -> Void = {}
     var onWorkspaceWorkChange: (SavedWork?) -> Void = { _ in }
-    private var controlsDisabled: Bool { model.isBusy || automation.isOccupied }
+    private var controlsDisabled: Bool { model.isBusy || automation.isOccupied || imageBatch.running }
     private var browsingDisabled: Bool { model.isBrowsingLocked }
     @State private var showColorCatalogs = false
     @State private var showModelPicker = false
+    @State private var showImageModelPicker = false
+    @State private var showImageNotice = false
+    @State private var imageLoadError: String?
+    @State private var automaticImageProvenance = ""
+    private var imageBatch: ImageFolderBatch { automation.imageFolderBatch }
+    @State private var batchKind = "description"
+    @State private var pendingImageBatchRestart: Bool?
     @State private var showConditionDetails = false
     @State private var showPaperPicker = false
     @State private var showSketchMenu = false
@@ -51,6 +63,7 @@ struct CreationView: View {
     @State private var ddl3d = Ddl3DController()
     @Environment(\.inkuWindowSize) private var windowSize
     private var isBatch: Bool { automation.workspaceInputMode == "batch" }
+    private var isImage: Bool { automation.workspaceInputMode == "image" }
     private var batchWork: SavedWork? { batchWorkspace.pinnedWork ?? (batchWorkspace.followsLatest ? automation.observedWork : nil) }
     private var usesBatchWork: Bool { isBatch && batchWork != nil }
     private var workspaceWork: SavedWork? { usesBatchWork ? batchWork : model.displayedWork }
@@ -108,11 +121,39 @@ struct CreationView: View {
             BatchModelPickerView(model: model)
                 .environment(\.inkuWindowSize, windowSize).inkuDialogFrame(.modelSelection)
         }
+        .sheet(isPresented: $showImageModelPicker) {
+            BatchModelPickerView(model: model, initialReference: model.imageVisionModel, immediateSelection: true,
+                title: "Visionモデル", purpose: "vision", onSelection: { reference in
+                    model.display.preferences.visionModelReference = reference
+                }).environment(\.inkuWindowSize, windowSize).inkuDialogFrame(.modelSelection)
+        }
+        .alert(display.webCopy("imageTab", "画像"), isPresented: $showImageNotice) {
+            Button(display.webCopy("imageUploadNoticeContinue", "了解して描画する")) {
+                model.imageWarningAcknowledged = true
+                #if os(macOS)
+                if let restart = pendingImageBatchRestart {
+                    pendingImageBatchRestart = nil
+                    Task { await imageBatch.run(app: model, restart: restart, provenance: imageProvenance) }
+                } else { Task { await model.generate() } }
+                #else
+                Task { await model.generate() }
+                #endif
+            }
+            Button(display.localized("キャンセル"), role: .cancel) { pendingImageBatchRestart = nil }
+        } message: {
+            Text(display.webCopy("imageUploadNoticeMessage", "画像から描画を行う場合、画像データがAIにアップロードされます。アップロードされたデータの扱いは、ユーザーが指定したモデルと、それをホストするプロバイダの規約に準じます。\nセンシティブなデータをアップロードしないでください。"))
+        }
         .sheet(isPresented: $showNewDDL) {
             NewDdlAuthoringSheet(model: model)
                 .environment(\.inkuWindowSize, windowSize).inkuDialogFrame(.ddlEditor)
         }
         .onChange(of: automation.workspaceInputMode) { _, _ in batchWorkspace.invalidateReads() }
+        .onChange(of: model.savedImageDDL) { _, value in
+            if value != nil { automation.workspaceInputMode = "image"; automaticImageProvenance = "" }
+        }
+        .onChange(of: model.inputMode) { _, value in
+            if value == "description", isImage, model.selectedWork != nil { automation.workspaceInputMode = "description" }
+        }
         .onChange(of: ui.workspaceTab) { _, tab in
             batchWorkspace.invalidateReads()
             if tab == "lineage", isBatch, batchWorkspace.followsLatest,
@@ -179,11 +220,19 @@ struct CreationView: View {
     /// InputPanel.svelte:180-198: two equal underline tabs; a running tab carries a dot and `(n/N ↻r)`.
     private var inputTabs: some View {
         HStack(spacing: 0) {
-            InkuPanelTab(title: display.webCopy("modeSingle", "記述"), selected: !isBatch,
+            InkuPanelTab(title: display.webCopy("modeSingle", "記述"), selected: !isBatch && !isImage,
                          running: model.isBusy && !automation.isOccupied) {
                 automation.workspaceInputMode = "description"
+                model.inputMode = "description"
             }
             .inkuTooltip(display.tooltip("自由な自然言語で記述を入力して1枚ずつ描画します", serverKey: "tooltipInputTabSingle"))
+            #if os(macOS)
+            InkuPanelTab(title: display.webCopy("imageTab", "画像"), selected: isImage,
+                         running: model.isBusy && isImage) {
+                automation.workspaceInputMode = "image"
+                model.inputMode = "image"
+            }
+            #endif
             InkuPanelTab(title: display.webCopy("modeBatch", "バッチ"), selected: isBatch,
                          running: automation.running && automation.mode == "batch", progress: batchProgress) {
                 automation.workspaceInputMode = "batch"
@@ -219,17 +268,167 @@ struct CreationView: View {
     private var inputContents: some View {
         VStack(alignment: .leading, spacing: 6) {
             if isBatch {
+                #if os(macOS)
+                Picker(display.localized("入力"), selection: $batchKind) {
+                    Text(display.webCopy("modeSingle", "記述")).tag("description")
+                    Text(display.webCopy("imageTab", "画像")).tag("image")
+                }.pickerStyle(.segmented).disabled(controlsDisabled)
+                if batchKind == "image" { imageFolderPanel }
+                else {
+                    BatchPanelView(model: model, automation: automation, inputOnly: true,
+                                   onObserveWork: { work, rowID in batchWorkspace.pin(work, rowID: rowID) },
+                                   followsLatestWork: batchWorkspace.followsLatest,
+                                   selectedRowID: batchWorkspace.rowID, observationRevision: $batchWorkspace.revision, ui: ui)
+                }
+                #else
                 BatchPanelView(model: model, automation: automation, inputOnly: true,
-                               onObserveWork: { work, rowID in batchWorkspace.pin(work, rowID: rowID) },
-                               followsLatestWork: batchWorkspace.followsLatest,
-                               selectedRowID: batchWorkspace.rowID, observationRevision: $batchWorkspace.revision, ui: ui)
+                    onObserveWork: { work, rowID in batchWorkspace.pin(work, rowID: rowID) },
+                    followsLatestWork: batchWorkspace.followsLatest,
+                    selectedRowID: batchWorkspace.rowID, observationRevision: $batchWorkspace.revision, ui: ui)
+                #endif
             } else {
+                #if os(macOS)
+                if isImage { imageInputPanel } else {
+                    input
+                    if display.visible("drawing_settings") { nextConditions }
+                    generationAction.padding(.top, 8)
+                }
+                #else
                 input
                 if display.visible("drawing_settings") { nextConditions }
                 generationAction.padding(.top, 8)
+                #endif
             }
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
+
+    #if os(macOS)
+    private var imageFolderPanel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Button(display.localized("画像フォルダを選ぶ")) {
+                let panel = NSOpenPanel(); panel.canChooseFiles = false; panel.canChooseDirectories = true
+                guard panel.runModal() == .OK, let url = panel.url else { return }
+                do { try imageBatch.select(url, app: model) } catch { imageLoadError = error.localizedDescription }
+            }.disabled(controlsDisabled)
+            if !imageBatch.folder.isEmpty { Text(imageBatch.folder).textSelection(.enabled).inkuFont(12) }
+            conditionRow("Vision", value: model.imageVisionModel.isEmpty ? display.localized("選択してください") : model.imageVisionModel,
+                         help: "Vision") { showImageModelPicker = true }.disabled(controlsDisabled)
+            conditionRow(display.webCopy("colorCatalogButton", "色カタログ"), value: catalogSummary, help: "") {
+                showColorCatalogs = true
+            }.disabled(controlsDisabled || model.catalogs.isEmpty)
+            if imageBatch.hasJournal {
+                Text("\(imageBatch.completed) / \(imageBatch.total) · \(display.localized("失敗")) \(imageBatch.failed)")
+                ForEach(imageBatch.failures, id: \.self) { failure in
+                    Text(failure).foregroundStyle(.red).inkuFont(12).textSelection(.enabled)
+                }
+                if imageBatch.uncertain > 0 {
+                    Text(display.localized("前回の処理結果を確認できない画像があります。履歴を確認してください。"))
+                        .foregroundStyle(.orange)
+                }
+                if imageBatch.running {
+                    Button(display.localized("停止")) { Task { await imageBatch.stop(app: model) } }
+                } else {
+                    HStack {
+                        Button(display.localized("続きから描く")) { startImageBatch(restart: false) }
+                        Button(display.localized("最初から描く")) { startImageBatch(restart: true) }
+                    }.disabled(model.isBusy || automation.isOccupied || imageBatch.total == 0 || model.imageVisionModel.isEmpty)
+                }
+            }
+            if !imageBatch.status.isEmpty { Text(imageBatch.status).inkuFont(12) }
+            if let error = imageBatch.error ?? imageLoadError { Text(error).foregroundStyle(.red).inkuFont(12) }
+        }
+    }
+
+    private func startImageBatch(restart: Bool) {
+        if model.imageWarningAcknowledged { Task { await imageBatch.run(app: model, restart: restart, provenance: imageProvenance) } }
+        else { pendingImageBatchRestart = restart; showImageNotice = true }
+    }
+
+    private var imageInputPanel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(display.webCopy("imageProvenanceLabel", "来歴")).inkuFont(14, weight: .semibold)
+            editor(text: $model.imageProvenance, readOnly: model.savedImageDDL != nil && model.imageInput == nil)
+            HStack {
+                Text(display.webCopy("imageTab", "画像")).inkuFont(14, weight: .semibold)
+                Spacer()
+                Button(display.webCopy("imageChooseFile", "画像を選ぶ")) { chooseImage() }
+                    .buttonStyle(InkuGhostButtonStyle()).disabled(controlsDisabled)
+            }
+            if let image = model.imageInput, let preview = NSImage(data: image.jpeg) {
+                Image(nsImage: preview).resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: 220)
+                Text(model.imageFileName).inkuFont(12).foregroundStyle(.secondary)
+            }
+            if let data = model.savedImageDDL, let record = try? ExactJSON(data: data) {
+                if let ddl = model.selectedWork?.ddl {
+                    Text(display.localized("指示書")).inkuFont(14, weight: .semibold)
+                    Text(ddl).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+                }
+                if let before = record["before_review"].string, !before.isEmpty {
+                    DisclosureGroup(display.localized("見比べる前の指示書")) {
+                        Text(before).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+                        if let work = model.selectedWork {
+                            Button(display.localized("この指示書で子を描く")) {
+                                Task { _ = await model.drawEditedDDL(work: work, source: before, forceEdit: true) }
+                            }.disabled(controlsDisabled)
+                        }
+                    }
+                }
+                Text(display.localized("描き直すには画像を選び直してください。")).foregroundStyle(.secondary).inkuFont(12)
+            }
+            if let imageLoadError { Text(imageLoadError).foregroundStyle(.red).inkuFont(12) }
+            conditionRow("Vision", value: model.imageVisionModel.isEmpty ? display.localized("選択してください") : model.imageVisionModel,
+                         help: "Vision") { showImageModelPicker = true }.disabled(controlsDisabled)
+            conditionRow(display.webCopy("colorCatalogButton", "色カタログ"), value: catalogSummary, help: "") {
+                showColorCatalogs = true
+            }.disabled(controlsDisabled || model.catalogs.isEmpty)
+            conditionRow(display.localized("画面比"), value: model.canvasID, help: "") { showPaperPicker = true }
+                .disabled(controlsDisabled)
+                .popover(isPresented: $showPaperPicker) { CreationPaperPicker(model: model) { showPaperPicker = false }.environment(display) }
+            Button(display.webCopy("generateButton", "描画する")) {
+                if model.imageWarningAcknowledged { Task { await model.generate() } }
+                else { showImageNotice = true }
+            }.buttonStyle(.borderedProminent).disabled(!model.canGenerate || controlsDisabled)
+        }
+        .dropDestination(for: URL.self) { urls, _ in
+            guard !controlsDisabled, let url = urls.first, url.isFileURL else { return false }
+            loadImage(url)
+            return true
+        }
+    }
+
+    private func chooseImage() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.jpeg, .png, .gif, .tiff]
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        loadImage(url)
+    }
+
+    private func loadImage(_ url: URL) {
+        do {
+            let image = try ImageInput.prepare(Data(contentsOf: url))
+            if model.selectedWork != nil {
+                let provenance = model.imageProvenance
+                model.newWork(); model.inputMode = "image"; model.imageProvenance = provenance
+            }
+            if !automaticImageProvenance.isEmpty {
+                model.imageProvenance = model.imageProvenance.replacingOccurrences(of: automaticImageProvenance, with: "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            automaticImageProvenance = imageProvenance(url: url)
+            if !model.imageProvenance.isEmpty && !automaticImageProvenance.isEmpty { model.imageProvenance += "\n" }
+            model.imageProvenance += automaticImageProvenance
+            model.imageInput = image; model.imageFileName = url.lastPathComponent
+            model.canvasID = image.nearestFormatID
+            imageLoadError = nil
+        } catch { imageLoadError = model.failureMessage(error) }
+    }
+
+    private func imageProvenance(url: URL) -> String {
+        ImageProvenance.text(url: url, includeFileName: display.preferences.imageIncludeFileName ?? true,
+                             includeExif: display.preferences.imageIncludeExif ?? true, language: display.preferences.language)
+    }
+    #endif
 
     private var descriptionLocked: Bool { model.sourceLocked && model.selectedWork != nil }
 

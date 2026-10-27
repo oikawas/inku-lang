@@ -3,6 +3,9 @@ import SwiftUI
 
 enum SettingsSection: String, CaseIterable, Identifiable {
     case display, making, demo, models, personalPlan, database, export, clipboard, plugins, unread, limits, other, native
+    #if os(macOS)
+    case image
+    #endif
     #if !os(macOS)
     case about
     #endif
@@ -11,6 +14,9 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .display: "表示と操作"; case .making: "バッチの再試行"; case .models: "モデル設定"
         case .demo: "デモ"
+        #if os(macOS)
+        case .image: "画像"
+        #endif
         case .personalPlan: "ChatGPTプラン"
         case .database: "DB設定"; case .clipboard: "クリップボード"; case .plugins: "プラグイン"
         case .export: "エクスポート"
@@ -27,6 +33,9 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .display: "slider.horizontal.3"; case .making: "paintbrush.pointed"
         case .demo: "play.rectangle"
+        #if os(macOS)
+        case .image: "photo"
+        #endif
         case .models: "cpu"; case .personalPlan: "person.crop.circle"
         case .database: "externaldrive"; case .export: "square.and.arrow.up"
         case .clipboard: "doc.on.clipboard"; case .plugins: "puzzlepiece.extension"
@@ -121,7 +130,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     private var groups: [(label: String, items: [SettingsSection])] {
         var result: [(label: String, items: [SettingsSection])] = [
             (model.display.webCopy("settingsCategoryDisplayOperation", "表示と操作"), [.display]),
-            (model.display.webCopy("settingsCategoryMaking", "制作"), [.making, .demo]),
+            (model.display.webCopy("settingsCategoryMaking", "制作"), makingSections),
             (title(.personalPlan), [.personalPlan]),
             (model.display.webCopy("settingsTabExport", "エクスポート"), [.export, .clipboard]),
             (model.display.webCopy("settingsCategoryAdministration", "接続と管理"), [.models, .database] + (detailed ? [.limits] : [])),
@@ -132,6 +141,14 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         result.append((model.display.localized("inkuについて"), [.about]))
         #endif
         return result
+    }
+
+    private var makingSections: [SettingsSection] {
+        #if os(macOS)
+        [.making, .image, .demo]
+        #else
+        [.making, .demo]
+        #endif
     }
 
     private var navigation: some View {
@@ -191,6 +208,9 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch section {
         case .display: model.display.webCopy("settingsDisplayHint", "")
         case .making: model.display.webCopy("settingsMakingHint", "")
+        #if os(macOS)
+        case .image: ""
+        #endif
         case .demo: model.display.webCopy("tooltipInputTabDemo", "")
         case .models: model.display.webCopy("settingsModelsHint", "")
         case .personalPlan: model.display.webCopy("chatgptPlanNotice", "")
@@ -232,6 +252,15 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                 switch section {
                 case .display: appearance
                 case .making: making
+                #if os(macOS)
+                case .image:
+                    Toggle(model.display.localized("ファイル名を来歴に入れる"), isOn: Binding(
+                        get: { model.display.preferences.imageIncludeFileName ?? true },
+                        set: { model.display.preferences.imageIncludeFileName = $0 }))
+                    Toggle(model.display.localized("Exifを来歴に入れる"), isOn: Binding(
+                        get: { model.display.preferences.imageIncludeExif ?? true },
+                        set: { model.display.preferences.imageIncludeExif = $0 }))
+                #endif
                 case .other: localOther
                 case .native: nativeSettings
                 case .demo: EmptyView()

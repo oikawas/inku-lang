@@ -151,6 +151,11 @@ extension CoreFailure {
 
 /// A synchronous owned-byte facade. Hosts schedule heavy calls off MainActor.
 public enum InkuCore {
+    public static func imageInputPolicy() -> String { InkuCoreBindings.imageInputPolicy() }
+    public static func imageCanvas(_ input: Data) -> Data { InkuCoreBindings.imageCanvas(inputBytes: input) }
+    public static func imageReviewSvg(snapshot: Data, request: Data) -> Data {
+        InkuCoreBindings.imageReviewSvg(snapshotBytes: snapshot, requestBytes: request)
+    }
     public static let svgConsumerMaximumBytes: UInt64 = 64 * 1_024 * 1_024
     public static var versionReport: String { InkuCoreBindings.versionReport() }
     public static var rasterAPIVersion: String { InkuCoreBindings.rasterApiVersion() }

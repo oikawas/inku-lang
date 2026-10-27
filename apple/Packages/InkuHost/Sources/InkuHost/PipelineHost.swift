@@ -1,5 +1,7 @@
 import Foundation
 import CryptoKit
+import ImageIO
+import UniformTypeIdentifiers
 import InkuCore
 import InkuPersistence
 
@@ -20,12 +22,17 @@ public actor PipelineHost {
         self.svgLimitBytes = svgLimitBytes
     }
 
-    public func generate(_ request: GenerationRequest, progress: @escaping PipelineProgressHandler = { _ in }) async throws -> PipelineView {
-        let request = try request.normalizedForNewWork()
+    public func generate(_ request: GenerationRequest, image: PreparedImageInput? = nil, progress: @escaping PipelineProgressHandler = { _ in }) async throws -> PipelineView {
+        var request = try request.normalizedForNewWork()
         if request.captureProviderIO == true, !ProviderObservationPolicy.developerModeEnabled {
             throw HostError("developer_provider_observations_not_available")
         }
         guard ["normal", "lineage_only"].contains(request.historyVisibility) else { throw HostError("invalid_history_visibility") }
+        if request.authoring.isDirect, let parentID = request.parentWorkID,
+           let parent = try? await savedAuthoringContext(workID: parentID), let imageDDL = parent.imageDDL {
+            request.inheritedImageDDL = imageDDL
+            request.imageProvenance = parent.imageProvenance
+        }
         // Server `fork_linked_history`/`fork_description`: a work its edited DDL holds refuses a description that
         // rewords it (`_refuse_if_locked`), while its own description starts a new child (the description fork).
         if !request.authoring.isDirect, let parentID = request.parentWorkID,
@@ -40,9 +47,10 @@ public actor PipelineHost {
         }
         let report = try ExactJSON(data: Data(InkuCore.versionReport.utf8))
         guard report["binding_version"].string == "1.1.0", report["protocol_version"].string == "1.0.0" else { throw HostError("binding_protocol_mismatch") }
-        let driver = try ExecutionDriver(request: request, database: database, transport: transport, credentials: credentials, svgLimitBytes: svgLimitBytes)
+        let driver = try ExecutionDriver(request: request, image: image, database: database, transport: transport, credentials: credentials, svgLimitBytes: svgLimitBytes)
         let started = try await driver.start(progress: progress)
         executions[started.executionID] = driver
+        defer { Task { await driver.clearImages() } }
         return try await withTaskCancellationHandler {
             try await driver.drive(progress: progress)
         } onCancel: {
@@ -158,7 +166,9 @@ public actor PipelineHost {
             authority: try context["authority"].requiredString("authority"),
             origin: try context["authority"].requiredString("origin"), revision: try context["authority"].requiredString("revision"), authorityJSON: context["authority"].data,
             completionRanges: context["completion_ranges"].object == nil ? nil : context["completion_ranges"].data,
-            lawsRecords: LawsRecords.of(context)?.data)
+            lawsRecords: LawsRecords.of(context)?.data,
+            imageDDL: context["image_ddl"].object == nil ? nil : context["image_ddl"].data,
+            imageProvenance: context["image_provenance"].string)
     }
 
     public func savedAuthoringSummaries(workIDs: [String]) async throws -> [String: SavedAuthoringSummary] {
@@ -488,6 +498,8 @@ public actor PipelineHost {
             derivationKind: request.derivationKind, metadataJSON: try metadataText(request.derivationMetadata), at: now)
         var context = SavedPerformance.context(score: score, options: options, compiler: compiler, clip: clip)
         context["configuration"] = config; context["document"] = document; context["authority"] = authority
+        if let imageDDL = saved.imageDDL { context["image_ddl"] = try ExactJSON(data: imageDDL) }
+        if let imageProvenance = saved.imageProvenance { context["image_provenance"] = .string(imageProvenance) }
         // Server fork: a changed performance of a saved work keeps the parent's completion range record.
         if let record = request.completionRanges { context["completion_ranges"] = try ExactJSON(data: record) }
         // Server: the child drawn from its parent without a run keeps the parent's laws records.
@@ -575,6 +587,8 @@ private struct StoredExecution: Codable, Sendable {
     var captureProviderIO: Bool? = nil
     var disabledPluginNames: [String]? = nil
     var provenance: GenerationProvenance? = nil
+    var imageProvenance: String? = nil
+    var inheritedImageDDL: Data? = nil
     var providerObservations: [ProviderAttemptObservation]? = nil
     var startedAt: Date
 }
@@ -624,11 +638,13 @@ private actor ExecutionDriver {
     var providerTask: Task<Data, Error>?
     var driving = false
     var restored = false
+    var images: [String: String] = [:]
+    func clearImages() { images.removeAll() }
     let maximumEffectSteps = 32
     // A native private-capture lifetime budget; normal metrics do not consume this budget.
     let maximumExecutionRawBodyBytes = 64 * 1_024 * 1_024
 
-    init(request: GenerationRequest, database: InkuDatabase, transport: any ProviderTransport, credentials: any CredentialStore,
+    init(request: GenerationRequest, image: PreparedImageInput?, database: InkuDatabase, transport: any ProviderTransport, credentials: any CredentialStore,
          svgLimitBytes: @escaping @Sendable () async throws -> UInt64) throws {
         guard try ExactJSON(data: request.configuration).object != nil,
               try ExactJSON(data: request.renderOptions).object != nil,
@@ -645,14 +661,18 @@ private actor ExecutionDriver {
         self.state.historyVisibility = request.historyVisibility
         self.state.chatGPTSession = request.chatGPTSession
         self.state.captureProviderIO = request.captureProviderIO
+        if case .image = request.authoring { self.state.captureProviderIO = false }
         self.state.disabledPluginNames = request.disabledPluginNames
         self.state.provenance = request.provenance
+        self.state.imageProvenance = request.imageProvenance
+        self.state.inheritedImageDDL = request.inheritedImageDDL
         self.state.providerObservations = []
         if let metadata = request.derivationMetadata {
             guard try ExactJSON(data: metadata).object != nil else { throw HostError("invalid_derivation_metadata") }
         }
         self.state.derivationMetadata = request.derivationMetadata
         self.state.interpretationSeed = request.interpretationSeed
+        if let image { self.images[image.sha256] = "data:image/jpeg;base64," + image.jpeg.base64EncodedString() }
     }
     init(record: ExecutionSnapshot, database: InkuDatabase, transport: any ProviderTransport, credentials: any CredentialStore,
          svgLimitBytes: @escaping @Sendable () async throws -> UInt64) throws {
@@ -685,8 +705,10 @@ private actor ExecutionDriver {
     func start(progress: PipelineProgressHandler) async throws -> PipelineView {
         await gate.lock(); defer { Task { await gate.unlock() } }
         guard let request = initialRequest else { throw HostError("execution_already_started") }
+        var config = try ExactJSON(data: request.configuration)
+        if case .image = request.authoring { config["image"] = .object(["review": .bool(true)]) }
         let payload: ExactJSON = .object(["tag": .string("start"), "variation_id": .string(newID()), "authoring_nonce": .string(newID()),
-                                         "config": try ExactJSON(data: request.configuration),
+                                         "config": config,
                                          "authority": .object(["protocol_version": .string("inku.variation-authority.v1"), "revision": .string("0"),
                                                                 "origin": .string(request.authoring.isDirect ? "user_authored_ddl" : "stage1_generated"),
                                                                 "authority": .string(request.authoring.isDirect ? "ddl_authoritative" : "description_authoritative")]),
@@ -785,8 +807,42 @@ private actor ExecutionDriver {
                 if tag == "commit_visible_normalized_ddl" {
                     do { try await commitVisibleDDL(action); progress(.changed(try makeView())); await gate.unlock() }
                     catch { await gate.unlock(); throw error }
+                } else if tag == "draw_image_review" {
+                    do {
+                        let result: ExactJSON
+                        do {
+                            let maxBytes = try await svgLimitBytes()
+                            let request: ExactJSON = .object(["options": try renderOptionsForDelivery(),
+                                "clip": try ExactJSON(data: state.clipPolicy), "max_svg_bytes": .integer(maxBytes)])
+                            let answer = try ExactJSON(data: InkuCore.imageReviewSvg(snapshot: state.snapshot, request: request.data))
+                            let svg = try answer.requiredString("svg")
+                            guard svg.utf8.count <= maxBytes,
+                                  let width = action["payload"]["width"].number.flatMap(UInt32.init),
+                                  let height = action["payload"]["height"].number.flatMap(UInt32.init), width > 0, height > 0,
+                                  let image = try InkuCore.rasterize(svg: svg, targetWidth: width, targetHeight: height).makeCGImage() else {
+                                throw HostError("image_review_undrawn")
+                            }
+                            let png = NSMutableData()
+                            guard let destination = CGImageDestinationCreateWithData(png, UTType.png.identifier as CFString, 1, nil) else { throw HostError("image_review_undrawn") }
+                            CGImageDestinationAddImage(destination, image, nil)
+                            guard CGImageDestinationFinalize(destination) else { throw HostError("image_review_undrawn") }
+                            let data = png as Data
+                            let hash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+                            images[hash] = "data:image/png;base64," + data.base64EncodedString()
+                            result = .object(["tag": .string("image_review_drawn"), "identity": action["identity"],
+                                "drawing": .object(["media_type": .string("image/png"), "width": .integer(Int(width)),
+                                    "height": .integer(Int(height)), "sha256": .string(hash), "byte_len": .integer(data.count)])])
+                        } catch is CancellationError {
+                            throw CancellationError()
+                        } catch {
+                            result = .object(["tag": .string("image_review_undrawn"), "identity": action["identity"]])
+                        }
+                        try Task.checkCancellation()
+                        try await advance(.object(["tag": .string("effect_result"), "result": result]))
+                        progress(.changed(try makeView())); await gate.unlock()
+                    } catch { await gate.unlock(); throw error }
                 } else if ["generate_sketch", "select_description_catalog", "generate_normalized_ddl", "read_composition",
-                           "choose_laws", "choose_colors", "complete_visible_ddl_holes"].contains(tag) {
+                           "choose_laws", "choose_colors", "complete_visible_ddl_holes", "select_image_catalog", "write_image_ddl", "review_image_ddl"].contains(tag) {
                     if !allowProvider {
                         restored = true; driving = false
                         do {
@@ -795,6 +851,20 @@ private actor ExecutionDriver {
                     }
                     let task: Task<Data, Error>
                     do {
+                        var sendAction = action
+                        if ["select_image_catalog", "write_image_ddl", "review_image_ddl"].contains(tag) {
+                            let references = action["payload"]["prompt"]["images"].array ?? []
+                            guard !references.isEmpty else { throw HostError("pipeline_schema_violation") }
+                            var urls: [ExactJSON] = []
+                            for reference in references {
+                                guard let hash = reference["sha256"].string, let url = images[hash] else {
+                                    try await advance(.object(["tag": .string("cancel")]))
+                                    throw HostError("image_missing")
+                                }
+                                urls.append(.string(url))
+                            }
+                            sendAction["_transient_images"] = .array(urls)
+                        }
                         guard providerTask == nil, state.pendingProviderAction == nil else { throw HostError("provider_effect_in_flight") }
                         // Persist the send claim before starting transport; restore can never infer a safe resend.
                         var claimed = state; claimed.pendingProviderAction = action.data
@@ -808,14 +878,14 @@ private actor ExecutionDriver {
                         let timeoutMS = try canonicalUnsigned(action, key: "timeout_ms")
                         progress(.providerAttempt(executionID: try executionID(), report: InkuCore.providerAttempt(snapshot: state.snapshot), beganAt: began,
                                                   deadline: began.addingTimeInterval(Double(delayMS) / 1000 + Double(timeoutMS) / 1000)))
-                        let bytes = action.data; let models = state.models; let providers = state.providers
+                        let bytes = sendAction.data; let models = state.models; let providers = state.providers
                         let personalSession = state.chatGPTSession
                         let limitValue = snapshot["config"]["prompt_limits"]["max_response_bytes"]
                         guard let argumentLimit = (limitValue.number ?? limitValue.string).flatMap(Int.init), argumentLimit > 0 else {
                             throw HostError("pipeline_schema_violation")
                         }
                         let id = try executionID(); let transport = self.transport; let credentials = self.credentials
-                        let observation = ProviderObservationOptions(captureRaw: state.captureProviderIO == true)
+                        let observation = ProviderObservationOptions(captureRaw: state.captureProviderIO == true && sendAction["_transient_images"] == .null)
                         task = Task {
                             if delayMS > 0 {
                                 guard delayMS <= UInt64.max / 1_000_000 else { throw HostError("pipeline_schema_violation") }
@@ -1038,7 +1108,9 @@ private actor ExecutionDriver {
 
     private func renderOptionsForDelivery() throws -> ExactJSON {
         var options = try ExactJSON(data: state.renderOptions)
-        let compiler = try snapshot.requiredObject("delivery").requiredObject("compiler_options")
+        let compiler = snapshot["delivery"]["compiler_options"].object != nil
+            ? try snapshot["delivery"].requiredObject("compiler_options")
+            : try snapshot["config"].requiredObject("compiler")
         let host = try compiler.requiredObject("host")
         // Auto catalog selection changes the resolved compiler host. Its palette stays authoritative.
         let catalog = try host.requiredString("resolved_catalog_id")
@@ -1114,6 +1186,9 @@ private actor ExecutionDriver {
         performance["configuration"] = snapshot["config"]
         performance["document"] = snapshot["document"]
         performance["authority"] = snapshot["authority"]
+        if snapshot["image_ddl"].object != nil { performance["image_ddl"] = snapshot["image_ddl"] }
+        else if let inherited = state.inheritedImageDDL { performance["image_ddl"] = try ExactJSON(data: inherited) }
+        if let provenance = state.imageProvenance { performance["image_provenance"] = .string(provenance) }
         if snapshot["completion_ranges"].object != nil { performance["completion_ranges"] = snapshot["completion_ranges"] }
         // Core README: a run that applies its laws keeps their basis in its snapshot, which a host saves with the work.
         try LawsRecords.write(LawsRecords.of(snapshot)?.data, into: &performance)
@@ -1198,7 +1273,8 @@ private actor ExecutionDriver {
                             holeIDs: snapshot["delivery"]["compiler_lock"]["hole_identities"].array?.compactMap(\.string) ?? [], candidateWork: state.candidate?.work,
                             providerMetrics: state.providerObservations?.map(\.metric) ?? [],
                             completionRangesJSON: snapshot["completion_ranges"].object == nil ? nil : snapshot["completion_ranges"].data,
-                            completionIssues: state.svgFailure == nil ? HoleCompletionIssue.issues(snapshot: snapshot) : [])
+                            completionIssues: state.svgFailure == nil ? HoleCompletionIssue.issues(snapshot: snapshot) : [],
+                            actionTag: snapshot["action"]["tag"].string)
     }
     private func executionID() throws -> String { try snapshot.requiredString("execution_id") }
     private func canonicalUnsigned(_ value: ExactJSON, key: String) throws -> UInt64 {

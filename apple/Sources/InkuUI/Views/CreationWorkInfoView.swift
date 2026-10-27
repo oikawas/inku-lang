@@ -51,7 +51,9 @@ struct CreationWorkInfoView: View {
                     .inkuTooltip(model.display.tooltip("閉じる"))
             }
             if let work {
-                Text(LibraryWorkPresentation.title(work, untitled: model.display.localized("無題")))
+                Text(information?.context?.imageDDL != nil
+                     ? model.display.label("画像", "Image") + ((information?.context?.imageProvenance ?? "").isEmpty ? "" : " · " + (information?.context?.imageProvenance ?? ""))
+                     : model.workPresentationTitle(work))
                     .inkuFont(13).lineLimit(2).frame(maxWidth: .infinity, alignment: .leading).textSelection(.enabled)
                 // CanvasGenerationInfo `.generation-info-tabs`: underline text tabs over the page.
                 VStack(spacing: 0) {
@@ -169,6 +171,14 @@ struct CreationWorkInfoView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 // OutputTabsContent.svelte: the stages in the order a work calls them.
+                if information?.context?.imageDDL != nil {
+                sentStage("select_image_catalog", stage: "image_catalog", input: model.display.localized("画像の色カタログ選択 送った入力"),
+                          system: model.display.localized("画像の色カタログ選択 システムプロンプト"))
+                sentStage("write_image_ddl", stage: "image_ddl", input: model.display.localized("画像から指示書を書く 送った入力"),
+                          system: model.display.localized("画像から指示書を書く システムプロンプト"))
+                sentStage("review_image_ddl", stage: "image_review", input: model.display.localized("画像の見比べ 送った入力"),
+                          system: model.display.localized("画像の見比べ システムプロンプト"))
+                } else {
                 sentStage("generate_sketch", stage: "sketch", input: copy("promptSketchInput", "写生（Stage 0.5） 送った入力"),
                           system: copy("promptSketchSystem", "写生（Stage 0.5） システムプロンプト"))
                 promptText(copy("promptStage1Input", "Stage 1 ユーザー入力"), work.effectiveSourceText, id: "stage1-input")
@@ -181,6 +191,7 @@ struct CreationWorkInfoView: View {
                           system: copy("promptColorsSystem", "配色の段 システムプロンプト"))
                 if let ddl = work.ddl, !ddl.isEmpty { promptText(copy("promptStage2Input", "Stage 2 ユーザー入力 (正規化DDL)"), ddl, id: "stage2-input") }
                 systemPrompt("complete_visible_ddl_holes", stage: "stage2", title: copy("promptStage2System", "Stage 2 システムプロンプト"))
+                }
             }.padding(14)
         }
     }

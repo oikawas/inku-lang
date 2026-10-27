@@ -3,10 +3,11 @@ import InkuPersistence
 import SwiftUI
 
 public enum SavedWorkActionState: Sendable, Equatable {
-    case description, lockedDescription, userDDL, unavailable
+    case description, lockedDescription, userDDL, image, unavailable
 
     init(_ context: SavedAuthoringContext) {
-        self.init(origin: context.origin, authority: context.authority)
+        if context.imageDDL != nil { self = .image }
+        else { self.init(origin: context.origin, authority: context.authority) }
     }
 
     init(origin: String, authority: String) {
@@ -16,7 +17,7 @@ public enum SavedWorkActionState: Sendable, Equatable {
         } else { self = .unavailable }
     }
 
-    var showsDescriptionActions: Bool { self != .userDDL }
+    var showsDescriptionActions: Bool { self != .userDDL && self != .image }
     var canReadDescription: Bool { self == .description }
 
     static func isBrowsingAction(_ action: String) -> Bool {

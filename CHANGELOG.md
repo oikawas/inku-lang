@@ -8,12 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-27 — The chunk move stopped before it could send the parent's picture
-
-In v2.15.278 (Build 1354) every request that chooses a chunk move was refused before it was sent, and a run stopped after two turns with nothing kept (the author's run on 5173 showed it). The shared core asks a request's images to be named in its prompt too (type, length and SHA-256; the image stages, 2026-10-24), and the Server attached the parent's picture without naming it. The Server now names the parent's PNG it sends. The stand-in provider of the Server's tests now builds the request body with the core as a real one does, where an image not named is refused.
-
-macOS image drawing and image-folder batches can use the image aspect ratio or a fixed paper, separately from the description canvas.
-
 ### 2026-10-27 — Paint from an image on macOS
 
 The image tab and image-folder batch prepare images with ImageIO and the shared core's image policy, then send them to a Vision model. Provenance is saved with the work and is not used for drawing; image bytes are not saved. The app warns before the first image send after launch. Folder progress is recorded for reselection and resumption.
@@ -376,6 +370,14 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.279 (2026-10-27 / Build1355)
+
+### 2026-10-27 — The chunk move stopped before it could send the parent's picture
+
+In v2.15.278 (Build 1354) every request that chooses a chunk move was refused before it was sent, and a run stopped after two turns with nothing kept (the author's run on 5173 showed it). The shared core asks a request's images to be named in its prompt too (type, length and SHA-256; the image stages, 2026-10-24), and the Server attached the parent's picture without naming it. The Server now names the parent's PNG it sends. The stand-in provider of the Server's tests now builds the request body with the core as a real one does, where an image not named is refused.
+
+macOS image drawing and image-folder batches can use the image aspect ratio or a fixed paper, separately from the description canvas.
 
 ## v2.15.278 (2026-10-27 / Build1354)
 

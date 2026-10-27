@@ -32,8 +32,7 @@ targets:
       - package: InkuApple
         product: InkuUI
     preBuildScripts:
-      # apple/VERSION and apple/BUILD_NUMBER are the only bundle version source.
-      # The build scripts pass them as settings; a build without them stops here.
+      # The build script supplies a freshly allocated number above BUILD_NUMBER.
       - name: Check bundle version
         basedOnDependencyAnalysis: false
         inputFiles:
@@ -42,8 +41,10 @@ targets:
         script: |
           version="$(tr -d '[:space:]' < "$SRCROOT/VERSION")"
           build="$(tr -d '[:space:]' < "$SRCROOT/BUILD_NUMBER")"
-          if [ "$MARKETING_VERSION" != "$version" ] || [ "$CURRENT_PROJECT_VERSION" != "$build" ]; then
-              echo "error: pass MARKETING_VERSION=$version CURRENT_PROJECT_VERSION=$build (apple/scripts/build-macos.sh does)"
+          if [ "$MARKETING_VERSION" != "$version" ] || [ -z "$INKU_ALLOCATED_BUILD_NUMBER" ] || \
+             [ "$CURRENT_PROJECT_VERSION" != "$INKU_ALLOCATED_BUILD_NUMBER" ] || \
+             ! [ "$CURRENT_PROJECT_VERSION" -gt "$build" ] 2>/dev/null; then
+              echo "error: use apple/scripts/build-macos.sh to allocate a fresh build number"
               exit 1
           fi
     settings:

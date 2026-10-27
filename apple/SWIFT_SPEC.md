@@ -4,7 +4,7 @@ This directory contains the native SwiftUI client, developed for macOS first, an
 
 Last updated: 2026-10-23.
 
-Binding and protocol identities come from the bundled Rust core's version report; rendering layer identities use render metadata and the [Server layer definitions](../server/src/inku_server/layer_versions.py). Do not duplicate shared engine version constants in this document. The macOS app has its own version, defined by `apple/VERSION` and `apple/BUILD_NUMBER` and allocated separately from the Server and Web versions (the first release is 1.0.0, Build 1). The corresponding Server version is shown in the app's About inku window and in the changelog. Matching shared layer versions does not establish that host features and the native UI port are complete.
+Binding and protocol identities come from the bundled Rust core's version report; rendering layer identities use render metadata and the [Server layer definitions](../server/src/inku_server/layer_versions.py). Do not duplicate shared engine version constants in this document. The macOS app has its own version in `apple/VERSION` and build-number floor in `apple/BUILD_NUMBER`, separate from the Server and Web versions (the first release is 1.0.0, Build 1). The corresponding Server version is shown in the app's About inku window and in the changelog. Matching shared layer versions does not establish that host features and the native UI port are complete.
 
 Work identities `dh1`/`rh3`, canonical JSON, instruction-language normalization and resolution, and description-label text and excluded spans call the shared core through UniFFI. Swift keeps no copies of these rules and only converts the core's Unicode scalar offsets to the macOS editor's UTF-16 offsets. Existing stored identities are not rewritten. `ExactJSON.text` preserves number lexemes for transport, `canonicalText` exposes the core's canonical form, and the space-separated prompt format `pythonText` remains separate.
 
@@ -17,6 +17,10 @@ Options and replacements for Change the touches, Change the ground and Change th
 - Record confirmed implementation changes and remaining scope in dated sections of this specification. Maintain product history in the shared [CHANGELOG.ja.md](../CHANGELOG.ja.md) and [CHANGELOG.md](../CHANGELOG.md). Do not create a separate Swift changelog.
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
+
+## 2026-10-27 macOS build numbers
+
+The bottom left shows only the app's build number in a brighter color. Each invocation of `build-macos.sh` allocates a new number even when the source is unchanged and writes it into Info.plist. The counter is stored on this Mac in `~/Library/Application Support/Inku/build-numbers` and shared across worktrees. Locking and atomic storage prevent concurrent allocations from colliding; `apple/BUILD_NUMBER` is the floor for compatibility with existing builds. A failed build does not reuse its number. Direct Xcode builds fail unless a number is supplied. Release packaging reads the finished app's number. Continuity is not guaranteed after removing the counter or on another Mac.
 
 ## 2026-10-27 Managing ChatGPT plan registrations
 

@@ -4,7 +4,7 @@
 
 最終更新: 2026-10-23。
 
-binding／protocolの版は同梱Rust coreのversion report、描画層の版はrender metadataと[Serverの層定義](../server/src/inku_server/layer_versions.py)を参照する。本書へ共通engineの版定数を複製しない。macOSアプリの版は`apple/VERSION`と`apple/BUILD_NUMBER`を正本とする独自の版で、Server／Webの版とは別に採番する（初回は1.0.0／Build 1）。対応するServerの版はアプリの「inkuについて」と変更履歴に併記する。共有層の版が一致しても、host機能とnative UIの移植が完了したことにはならない。
+binding／protocolの版は同梱Rust coreのversion report、描画層の版はrender metadataと[Serverの層定義](../server/src/inku_server/layer_versions.py)を参照する。本書へ共通engineの版定数を複製しない。macOSアプリの版は`apple/VERSION`、Build番号の下限は`apple/BUILD_NUMBER`を正本とし、Server／Webの版とは別に採番する（初回は1.0.0／Build 1）。対応するServerの版はアプリの「inkuについて」と変更履歴に併記する。共有層の版が一致しても、host機能とnative UIの移植が完了したことにはならない。
 
 作品識別`dh1`／`rh3`・正準JSON、指示言語の正規化と判定、記述ラベルの本文と除外位置はUniFFI経由で共有coreを呼ぶ。Swiftには同じ規則を複製せず、coreが返すUnicode scalar位置だけをmacOSエディタのUTF-16位置へ変換する。保存済みの識別値を書き換えない。`ExactJSON.text`は数値の表記を保持する転送用、`canonicalText`はcoreによる正準形とし、prompt用の空白付き`pythonText`は別の書式として保持する。
 
@@ -17,6 +17,10 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 確定した実装変更と残る範囲は本書の日付付き節へ記し、製品の変更履歴は共通の[CHANGELOG.ja.md](../CHANGELOG.ja.md)／[CHANGELOG.md](../CHANGELOG.md)へ同期して記す。Swift専用CHANGELOGを分けない。
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
+
+## 2026-10-27 macOSのBuild番号
+
+左下にはアプリのBuild番号だけを明るく表示する。`build-macos.sh`は変更の有無にかかわらず開始ごとに新しい番号を確保し、Info.plistへ入れる。番号はこのMacの`~/Library/Application Support/Inku/build-numbers`に保存し、作業木間で共有する。排他と原子的な保存で同時buildの重複を防ぎ、`apple/BUILD_NUMBER`は既存版との下限とする。失敗したbuildの番号は再使用しない。直接のXcode buildは番号が渡されなければ失敗する。配布用のpackageは完成appの番号を読む。採番記録を消した場合や別のMacでは、それまでの番号の継続は保証しない。
 
 ## 2026-10-27 ChatGPTプラン登録の管理
 

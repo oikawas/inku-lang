@@ -109,25 +109,13 @@ struct AppRailView: View {
         #endif
     }
 
-    /// AppRail.svelte:198 (`.rail-build`): the rail's foot, the window's bottom-left corner. The Web shows its build
-    /// there in developer mode; the app always shows its own version and build (apple/VERSION, apple/BUILD_NUMBER),
-    /// at the author's instruction (2026-10-12).
+    /// The window's bottom-left corner shows the app's build number.
     private var versionFoot: some View {
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
-        return Group {
-            if expanded {
-                Text("\(version) · Build \(build)")
-            } else {
-                VStack(spacing: 1) {
-                    Text(version)
-                    Text("Build \(build)")
-                }
-            }
-        }
-        .inkuFont(10)
+        return Text(build)
+        .inkuFont(11, weight: .medium)
         .monospacedDigit()
-        .foregroundStyle(.tertiary)
+        .foregroundStyle(.primary)
         .lineLimit(1)
         .minimumScaleFactor(0.7)
         .padding(.vertical, 4).padding(.horizontal, 2)

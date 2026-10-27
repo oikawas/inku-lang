@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-27 — Android also calls Wild "Lift the stroke limit"
+
+Android's labels follow Web. The rendering switch in Settings, the Inherit / On / Off heading in refinement, the autonomous refinement heading and the Generation Info row now say `Lift the stroke limit` (`筆致制限を外す` in Japanese). Lighting it lifts the limit; it stays off by default. Generation Info and the settings card show `Lifted` or `Not lifted` (`外した`・`外さない`). The record `render_wild` and the drawing are unchanged.
+
 ### 2026-10-26 — Android's model settings put the model selection first
 
 At the author's instruction, Android's model settings are laid out as the Server's. Each connection's card shows its service ID and API key state under the name, leads with the number of visible models and the Select models button, and lists the visible models by LLM and Vision below it. The base URL, API key and service deletion are folded under Connection settings at the bottom. The ChatGPT plan card also leads with the model selection. The on-device LiteRT models moved to the end. The model publication picker now fills nearly the whole screen, frames each model on its own, and folds the recommendation, seconds, cost and comment under Model details; its footer shows how many models would be visible and whether anything is unsaved. A pressed LLM or Vision toggle is filled and ticked and an unpressed one only outlined, so which purposes are chosen reads at a glance. The core, Server and Web are unchanged.

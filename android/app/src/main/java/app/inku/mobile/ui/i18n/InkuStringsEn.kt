@@ -572,7 +572,7 @@ object InkuStringsEn : InkuStrings {
     override val newApiKey = "New API key"
     override val makeNewOrigin = "Make this a new origin"
     override val newWork = "New"
-    override val wildToggle = "Wild (unleashed performance)"
+    override val wildToggle = "Lift the stroke limit"
     override val latest = "Latest"
     override val tapSaijikiWord = "Tap a Saijiki word in the text"
     override val tapWordToSelect = "Tap a word in the text to select it"
@@ -691,7 +691,7 @@ object InkuStringsEn : InkuStrings {
     override val generationInfoCompositionSeed = "Composition seed"
     override val generationInfoRenderSeed = "Render seed"
     override val generationInfoSeedText = "Seed text"
-    override val generationInfoRenderWild = "Wild"
+    override val generationInfoRenderWild = "Lift the stroke limit"
     override val generationInfoColorCatalog = "Color catalog"
     override val generationInfoColorMap = "Color map"
     override val generationInfoCanvasAspect = "Canvas"
@@ -701,8 +701,8 @@ object InkuStringsEn : InkuStrings {
     override val generationInfoRenderEngineVersion = "Render engine version"
     override val generationInfoCreated = "Created"
     override val generationInfoElapsed = "Elapsed"
-    override val generationInfoOn = "On"
-    override val generationInfoOff = "Off"
+    override val generationInfoWildLifted = "Lifted"
+    override val generationInfoWildNotLifted = "Not lifted"
     override val parentSuffix: (String, String) -> String = { hash, catalog -> " parent: $hash / $catalog" }
     override val downloadOf: (String) -> String = { name -> "Download $name" }
     override val choiceSameAsTarget: (String) -> String = { label -> "$label (same as the target)" }

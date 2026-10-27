@@ -65,7 +65,7 @@ The new password must be at least eight characters. **It does not change unless 
 
 1. Open the `Describe` tab.
 2. Write a short sentence in the description area.
-3. Under `Conditions for the next work`, set `Model`, `Color catalog`, `Sketch from life`, `Wild`, and `Canvas` if needed.
+3. Under `Conditions for the next work`, set `Model`, `Color catalog`, `Sketch from life`, `Lift the stroke limit`, and `Canvas` if needed.
 4. Press `Paint`.
 5. Confirm that the performance appears in the `Work` tab and is saved to history.
 
@@ -217,7 +217,7 @@ The instructions box on the Describe tab also lets you edit the whole text direc
 
 `Discard edits` in the box and `Instruction editor` asks for confirmation. Press `Discard` to return to the saved instructions the target work was drawn from. Opening the editor from the box still returns to that work's instructions, rather than the box's draft. The box returns its draft; the editor returns only its own text and leaves the box's draft unchanged. Returning never draws. The button is disabled when the text matches, while read-only or while drawing, and is absent from `New instructions`. Cancel leaves the text unchanged. After discarding, ⌘Z (Ctrl+Z) in that editor restores the text from before the discard.
 
-There are two entrances to the instruction dialog. Both use the same dialog and editor. The text shows line numbers, syntax color, line and character counts; choose the painting model and `Wild` outside the text. While painting, the text, Saijiki, condition changes and close control are unavailable. A failed or stopped painting keeps the text.
+There are two entrances to the instruction dialog. Both use the same dialog and editor. The text shows line numbers, syntax color, line and character counts; choose the painting model and `Lift the stroke limit` outside the text. While painting, the text, Saijiki, condition changes and close control are unavailable. A failed or stopped painting keeps the text.
 
 | Action | Contents |
 |---|---|
@@ -273,7 +273,7 @@ A work whose instructions (DDL) were edited follows its DDL, not its description
 - The history strip shows a lock mark, and a lineage card shows `Held (DDL edited)`.
 - Autonomous refinement takes laws moves only (a juxtaposition move adds a sentence to the description, so it cannot be taken).
 
-## 7. Choose Model, Color Catalog, Sketch, Wild, and Canvas
+## 7. Choose Model, Color Catalog, Sketch, Stroke Limit, and Canvas
 
 `Conditions for the next work` on the Describe tab apply to the next painting. The input tabs are `Describe`, `Image`, and `Batch`. Batch shows the same kind of choices as its own `Drawing conditions for the next batch`. See §16 for the Image tab's conditions.
 
@@ -282,7 +282,7 @@ A work whose instructions (DDL) were edited follows its DDL, not its description
 | Model | The drawing model used for both Stage 1 and Stage 2 |
 | Color catalog | The catalog that maps abstract color names such as `red`, `blue`, and `gray` onto actual colors |
 | Sketch from life | The grain for Stage 0.5, described in §4 |
-| Wild | Removes the stroke limit |
+| Lift the stroke limit | Removes the stroke limit |
 | Canvas | The aspect ratio |
 
 Drawing uses the same model for Stage 1 and Stage 2. Models measured per stage are ordered by the lower of the two stages. The model for Vision, which reads images, is chosen separately. The Image tab (§16) paints with this Vision model.
@@ -291,7 +291,7 @@ The color catalog list includes `From the description`. Choose it and the server
 
 A work records the colors it was drawn in on its own row. **Redrawing an older work therefore draws it in those colors, not in today's definition of its catalog.** It still draws if the catalog has since been renamed, and it still draws if the catalog has been retired. The catalog name in the status area carries a note in those cases: `Retired` when the catalog is gone, and `No record of its colors` for an older work that has no recorded colors — that one is drawn from the current definition.
 
-`Wild` off is the predictable standard; on, the strokes break, curl, and overlap freely. It applies to the whole work, is recorded on it, and replays.
+`Lift the stroke limit` left off is the predictable standard; lit, the strokes break, curl, and overlap freely. In the next work's conditions it sits on the `Options` line (named `Wild` until 2026-10-27). It applies to the whole work, is recorded on it, and replays.
 
 There are eleven canvases.
 
@@ -403,7 +403,7 @@ The AI takes two moves.
 
 A turn makes at most two tries. The first turn starts with the juxtaposition move, and each later turn first tries the move its last kept child was not made by (a laws move's child takes no juxtaposition). A child is kept, and becomes the next turn's parent, only when it looks different from its parent (when a fifth or more of what is drawn changed). A child with too little change stays in the lineage too. The refinement stops when its moves are done, when neither move can start, and when two turns in a row keep no child.
 
-In the dialog you choose the model for the refinement, the moves to take, the number of moves (1 to 10, 5 by default), Wild and a direction. **The model you choose picks the sentences, takes the laws stage and draws the children.** The direction (up to 1,000 characters) reaches the laws move only, not the juxtaposition move's request. The dialog remembers the number of moves, the moves to take and the direction you chose last time, and opens with them next time (kept in this browser). The wild switch is not remembered; it starts from the work being refined.
+In the dialog you choose the model for the refinement, the moves to take, the number of moves (1 to 10, 5 by default), Lift the stroke limit and a direction. **The model you choose picks the sentences, takes the laws stage and draws the children.** The direction (up to 1,000 characters) reaches the laws move only, not the juxtaposition move's request. The dialog remembers the number of moves, the moves to take and the direction you chose last time, and opens with them next time (kept in this browser). The wild switch is not remembered; it starts from the work being refined.
 
 After `Start refining`, the progress appears every few seconds: for each turn, the move taken, its outcome (Kept, Too little change, Could not start, Not usable), how much changed, the sentence added or the law chosen, and a thumbnail of the child. `Stop` cancels the child being drawn and keeps the children so far. Closing the dialog does not stop the refinement, and opening the work again shows its progress. One refinement of yours runs at a time.
 
@@ -429,7 +429,7 @@ Open the provenance drawer at the bottom of the work tab to see the record of th
 |---|---|
 | Sketch | The sketch record and the paper grain (**the record of the work on screen**, not the setting for the next painting) |
 | Interpretation | Stage 1 model, Stage 1 language, requested language, interpretation seed, interpretation fallback and Score fallback records |
-| Performance | Stage 2 model, Stage 2 language, focus, Variation (retired) and its seed (old works only), composition seed, render seed, seed text, Wild, the colour words this work was drawn in, the colour catalogue, the canvas and its ratio, and **three rows for how heavy the drawing is** (`SVG size` / `SVG objects` / `SVG points`) |
+| Performance | Stage 2 model, Stage 2 language, focus, Variation (retired) and its seed (old works only), composition seed, render seed, seed text, Lift the stroke limit, the colour words this work was drawn in, the colour catalogue, the canvas and its ratio, and **three rows for how heavy the drawing is** (`SVG size` / `SVG objects` / `SVG points`) |
 | Identity | work ID (UUID), render hash, description hash, render engine, DDL specification, transform layer, Build |
 | Origin | generation, derivation, batch run ID and line number, comment, UI language |
 | Run | elapsed time, token counts |
@@ -605,7 +605,7 @@ The first time you paint from a picture after signing in, a warning says that pa
 | Color catalog | `Choose from image automatically` lets the model read the image and choose the work's color catalog. Choose another catalog to paint with it |
 | Canvas | `Use image aspect ratio` (the default) chooses, from the eleven papers (§7), the one closest to the image's ratio. Another paper can be chosen as well |
 
-Sketch from life and Wild do not appear on the Image tab; both are off. The instructions are written in Japanese whatever the UI language.
+Sketch from life and Lift the stroke limit do not appear on the Image tab; both are off. The instructions are written in Japanese whatever the UI language.
 
 While you wait, the indicator names the step at work.
 
@@ -737,7 +737,7 @@ Flags you omit fall back to the server defaults. Sketch from life defaults to of
 | Not what you meant | Read the instructions and make place, count, shape, and material concrete |
 | The description is read too coarsely | Turn the sketch on to supplement place and light; review its text and edit it before drawing again if needed |
 | The picture is monotonous | Add one of touch, sway, composition, or color. Or try `Another composition` |
-| The lines are too tidy | Turn `Wild` on |
+| The lines are too tidy | Light `Lift the stroke limit` |
 | Too many elements | State the count explicitly, as in `three lines` or `twelve` |
 | A stated count is reduced | Check the literal ceiling under `Limits` in the settings |
 | Painting is slow | If the running indicator says `Retrying (try 2/4)`, an earlier attempt timed out or its answer could not be used. Wait on the provider's queue, or choose a lighter model |

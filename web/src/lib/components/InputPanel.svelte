@@ -298,8 +298,9 @@
 						onSelectRoute={onSelectDrawRoute} {onSelectSketchMode} {onSelectCompositionMode} />
 				</div>
 				<div class="condition-compact-row wild-row">
-					<!-- Named as the refine dialogs' WildToggle names it. -->
-					<span class="condition-inline-label">{isJapanese ? '筆致制限' : 'Stroke limit'}</span>
+					<!-- The line's label (the author, 2026-10-27): it heads the canvas
+					     after it too, so it names no one switch. -->
+					<span class="condition-inline-label">{isJapanese ? 'オプション' : 'Options'}</span>
 					<Tooltip text={t().tooltipInputWild} placement="top-right">
 						<SwitchChip label={t().wildButton} on={wildSettings.enabled} onToggle={() => wildSettings.set(!wildSettings.enabled)} />
 					</Tooltip>

@@ -8,7 +8,7 @@ Settings belong to three boundaries.
 
 1. OS and service: `/etc/inku/inku-api.env`, systemd, reverse proxy, and filesystem permissions
 2. Administrator: provider connections, published models, limits, DB backups, artifacts, log policy, and users
-3. User: one drawing model shared by Stage 1/2, Vision model, UI language, UI mode, theme, text size, canvas, color catalog, sketch, Wild, download folder, and history-selection behavior
+3. User: one drawing model shared by Stage 1/2, Vision model, UI language, UI mode, theme, text size, canvas, color catalog, sketch, Lift the stroke limit, download folder, and history-selection behavior
 
 Provider API key environment variables are initial values. A provider key saved from the admin UI is stored encrypted in the DB. Never put host-specific details or secrets in Git-tracked documentation.
 
@@ -338,7 +338,7 @@ Variation is retired. Its seed, amplitude and focus columns and saved values sta
 
 The API's JSON answers carry `render_seed` and `composition_seed` as decimal strings (`"1553303611486672067"`). A seed can take 64 bits (one made from `seed_text` before it was removed, for example), past what a JavaScript number holds exactly, and a rounded seed sent back draws another picture. Send a seed back as it came; requests take either a number or a decimal string.
 
-`render_wild` applies to the whole work and is part of the `rh3` material. The same score and the same seed with a different Wild setting is a different edition.
+`render_wild` applies to the whole work and is part of the `rh3` material. The same score and the same seed with the stroke limit lifted in one and not the other is a different edition.
 
 History replay uses the saved Score, color catalog, canvas, seeds, and render-engine version. Engine version is recorded for audit; bit-identical output across different engine versions is not assumed.
 

@@ -8,7 +8,7 @@
 
 1. OS／service設定: `/etc/inku/inku-api.env`、systemd、reverse proxy、filesystem権限
 2. 管理者設定: provider接続、公開モデル、制限値、DB backup、artifact、ログ方針、ユーザー管理
-3. ユーザー設定: Stage 1/2共通の描画モデル、Visionモデル、UI言語、UIモード、テーマ、文字サイズ、キャンバス、色カタログ、写生、暴れる、保存先フォルダ、履歴選択動作
+3. ユーザー設定: Stage 1/2共通の描画モデル、Visionモデル、UI言語、UIモード、テーマ、文字サイズ、キャンバス、色カタログ、写生、筆致制限を外す、保存先フォルダ、履歴選択動作
 
 API keyの環境変数は初期値です。管理UIでDBへ保存したprovider keyがある場合は暗号化して利用します。ホスト固有情報と秘密をGit追跡文書へ書かないでください。
 
@@ -326,7 +326,7 @@ passwordを設定し直すと、そのアカウントのほかのsessionは終�
 
 APIのJSONの応答は、`render_seed`と`composition_seed`を10進の文字列（`"1553303611486672067"`）で返します。seedは64bitになることがあり（前に`seed_text`から作ったseedなど）、JavaScriptの数では正確に持てず、丸めたseedを送り返すと別の絵になるためです。seedは受け取ったまま送り返してください。要求は数と10進の文字列のどちらも受けます。
 
-`render_wild`は作品全体に効き、`rh3`の材料に入ります。同じScore・同じseedでも、暴れるの有無が違えば別のeditionです。
+`render_wild`は作品全体に効き、`rh3`の材料に入ります。同じScore・同じseedでも、筆致制限を外したかどうかが違えば別のeditionです。
 
 履歴再現では保存済みScore、色カタログ、キャンバス、seed、render engine versionを使用します。engine変更後のbit一致を保証するのではなく、version情報を監査可能にします。
 

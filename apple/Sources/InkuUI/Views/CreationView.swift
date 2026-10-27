@@ -210,7 +210,7 @@ struct CreationView: View {
                 }
                 statusFooter
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(width: max(0, leftPanelWidth - (compactWindow ? 24 : 32)), alignment: .leading)
             .padding(.vertical, 14).padding(.horizontal, compactWindow ? 12 : 16)
         }
         .background(InkuColor.bg)

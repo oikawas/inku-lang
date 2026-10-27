@@ -18,6 +18,8 @@ On macOS, image provenance now follows the chosen image, and input tabs remain b
 
 macOS now shows image drawing progress and its stop control on the image tab.
 
+macOS running tabs now animate their underline and dot, and progress details stay within the input panel.
+
 ### 2026-10-27 — Android drawing conditions and wording
 
 The studio and batch conditions now label the model, color catalog and canvas; the drawing route uses a segmented control and the steps and options use stateful switches. The flow shows its steps separately with their colors. Interface wording comes from the Japanese and English language packs.

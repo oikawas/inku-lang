@@ -47,7 +47,7 @@ public struct ProviderProgressView: View {
             if snapshot.outcome != .running {
                 Text(model.display.localized(outcomeKey(snapshot.outcome))).inkuFont(12).foregroundStyle(.secondary)
             }
-        }.fixedSize(horizontal: true, vertical: false)
+        }.lineLimit(1).minimumScaleFactor(0.75)
     }
 
     @ViewBuilder private func requestedModel(_ snapshot: ProviderProgressSnapshot) -> some View {
@@ -71,14 +71,14 @@ public struct ProviderProgressView: View {
             if let elapsed = snapshot.providerElapsedMS {
                 Text(model.display.localizedFormat("呼出し %.1f秒", Double(elapsed) / 1_000))
             }
-        }.fixedSize(horizontal: true, vertical: false)
+        }.lineLimit(1).minimumScaleFactor(0.75)
     }
 
     private func tokens(_ snapshot: ProviderProgressSnapshot) -> some View {
         let absent = model.display.localized("記録なし")
         return Text(model.display.localizedFormat("トークン 入力 %@・出力 %@",
             snapshot.tokensIn.map(String.init) ?? absent, snapshot.tokensOut.map(String.init) ?? absent))
-            .fixedSize(horizontal: true, vertical: false)
+            .lineLimit(1).minimumScaleFactor(0.75)
     }
 
     private func outcomeKey(_ outcome: ProviderProgressSnapshot.Outcome) -> String {

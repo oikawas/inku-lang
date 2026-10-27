@@ -6,6 +6,12 @@ secrets must remain outside tracked files.
 
 Last updated: 2026-10-27.
 
+## 2026-10-27 Draw in words
+
+The studio and batch conditions default to drawing in words; selecting it turns sketching on. It is unavailable for on-device LiteRT, which uses the plan route. Composition, laws, and colors are optional for drawing in words and always run with the plan route. The route and composition are not persisted as settings; opening a work restores them from its record. The stroke-limit switch is in the drawing conditions.
+
+The shared core receives `read_and_draw`, source labels, sketch and optional composition. When the published drawing model serves Vision, it reviews the instructions beside a PNG of the drawing. Reading, rounds, composition and colors are saved as `description_ddl`, and the reading text is the work's sketch. The Room schema is unchanged.
+
 ## 2026-10-27 DDL title lines (DDL 27) show as headings
 
 A line that, without the spaces around it, is wholly `「name」`, `"name"` or `“name”` is a title and draws nothing (the shared core's `ddl_title_name` in `chunk_title.rs`, ported from Web's `ddl-titles.ts` into `ui/DdlTitles.kt`). The DDL editor and the ranged DDL view set a title line in bold and colour no word in it. The vocabulary bar's detected words come from the DDL without its title lines. The drawing and the Score are the same as for the DDL without titles.

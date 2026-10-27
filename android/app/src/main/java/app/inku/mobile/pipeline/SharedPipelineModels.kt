@@ -62,6 +62,9 @@ sealed interface PipelineAuthoring {
         val text: String,
         val autoCatalog: Boolean,
         val sketch: PipelineSketchRequest = PipelineSketchRequest.Off,
+        val route: String? = null,
+        val sourceLabelsJson: String? = null,
+        val compositionJson: String? = null,
     ) : PipelineAuthoring
     data class DirectDdl(
         val source: String,
@@ -137,6 +140,9 @@ sealed interface PipelineCommand {
         val description: String,
         val autoCatalog: Boolean,
         val sketch: PipelineSketchRequest = PipelineSketchRequest.Off,
+        val route: String? = null,
+        val sourceLabelsJson: String? = null,
+        val compositionJson: String? = null,
     ) : PipelineCommand
     data class ApprovePatch(val expectedRevision: String, val proposalDigest: String) : PipelineCommand
     data class DeclinePatch(val proposalDigest: String) : PipelineCommand

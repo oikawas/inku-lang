@@ -32,6 +32,7 @@ object NativePipelineBridge : SharedPipelineBinding {
     external override fun providerAttempt(snapshotBytes: ByteArray): ByteArray
     external override fun pipelineDescription(text: String): String
     external override fun descriptionHash(text: String): String
+    external override fun descriptionLabelSpans(text: String): String
     external override fun renderHash(itemJson: String): String?
     external override fun canonicalJson(valueJson: String): String?
     external override fun resolveInstructionLanguage(text: String, requested: String?, fallback: String): String?

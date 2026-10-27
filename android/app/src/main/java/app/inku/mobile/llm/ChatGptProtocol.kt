@@ -141,7 +141,8 @@ private fun ecdsaDer(raw: ByteArray): ByteArray {
 internal val CHATGPT_EFFECTS = setOf("generate_sketch", "select_description_catalog", "generate_normalized_ddl", "read_composition",
     "choose_laws", "choose_colors", "complete_visible_ddl_holes",
     // The image stages send the photo, and then the drawing, with the request (server `IMAGE_EFFECTS`).
-    "select_image_catalog", "write_image_ddl", "review_image_ddl")
+    "select_image_catalog", "write_image_ddl", "review_image_ddl",
+    "read_description", "compose_description", "write_description_ddl", "review_description_ddl")
 
 /** Server `request_vision`: the assistant text read up to 512 KiB. */
 private const val CHATGPT_VISION_ANSWER_LIMIT = 512 * 1024

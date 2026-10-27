@@ -8,6 +8,10 @@ internal data class BatchConditions(
     val stage2ModelId: String,
     val languageCode: String,
     val renderWild: Boolean,
+    val readAndDraw: Boolean = false,
+    val composition: Boolean = false,
+    val sketch: Boolean = false,
+    val review: Boolean = false,
 )
 
 internal data class NumberedBatchLine(val number: Int, val input: String)

@@ -51,6 +51,7 @@ data class SharedPipelineConfigRequest(
     val canvasFit: String? = null,
     /** Set for a run written from an image: whether its DDL is reviewed beside its drawing. */
     val imageReview: Boolean? = null,
+    val descriptionReview: Boolean? = null,
 )
 
 data class PreparedPipelineConfig(
@@ -228,6 +229,7 @@ class SharedPipelineConfigBuilder(
             // A run written from an image (SPEC §12.6.6) has the image stages;
             // the server sets the review round on for every such run.
             .also { config -> request.imageReview?.let { config.put("image", JSONObject().put("review", it)) } }
+            .also { config -> request.descriptionReview?.let { config.put("description_ddl", JSONObject().put("review", it).put("colors", true)) } }
 
         return PreparedPipelineConfig(
             configJson = config.toString(),

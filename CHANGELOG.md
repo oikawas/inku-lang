@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-27 — Draw in words on Android
+
+The studio and batch conditions now offer drawing in words or with a plan, sketching, composition and laws, and the stroke limit. The shared core reads the description and writes instructions; a model offered for Vision can review them beside the drawing. On-device LiteRT uses the plan route. The work retains its reading and round records.
+
 ### 2026-10-27 — The three image functions can be called through UniFFI too
 
 The shared core's `image_input_policy`, `image_canvas` and `image_review_svg` can now be called through UniFFI (macOS's bindings) as well. The Server's CPython and Android's JNI calls, and what the functions do, are unchanged. This prepares drawing from an image on macOS.

@@ -2,7 +2,7 @@ package app.inku.mobile.data.refinement
 
 import org.json.JSONObject
 
-enum class PromptStage { Sketch, Stage1, Composition, Laws, Colors, Stage2 }
+enum class PromptStage { Sketch, Stage1, Composition, Laws, Colors, Stage2, Reading, DescriptionComposition, DescriptionDdl, DescriptionReview }
 
 data class SentPrompt(
     val system: String,
@@ -46,6 +46,10 @@ fun sentPromptsFromHistoryRecord(
         PromptStage.Laws to "laws",
         PromptStage.Colors to "colors",
         PromptStage.Stage2 to "stage2",
+        PromptStage.Reading to "reading",
+        PromptStage.DescriptionComposition to "description_composition",
+        PromptStage.DescriptionDdl to "description_ddl",
+        PromptStage.DescriptionReview to "description_review",
     )
     val records = names.mapValues { (_, name) ->
         prompts.optJSONObject(name)?.let { prompt ->

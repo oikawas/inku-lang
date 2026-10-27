@@ -355,6 +355,19 @@ pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_pipeli
 
 #[unsafe(no_mangle)]
 #[allow(non_snake_case)]
+pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_descriptionLabelSpans(
+    env: JNIEnv<'_>,
+    _receiver: JObject<'_>,
+    text: JString<'_>,
+) -> jstring {
+    jni_boundary(env, null_mut(), |env| {
+        let text = java_string(env, text)?;
+        new_java_string(env, &inku_pipeline_uniffi::description_label_spans(text))
+    })
+}
+
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
 pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_descriptionHash(
     env: JNIEnv<'_>,
     _receiver: JObject<'_>,

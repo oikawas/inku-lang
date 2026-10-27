@@ -137,6 +137,8 @@ object InkuStringsEn : InkuStrings {
         "svg_output_too_large" -> "the SVG exceeds the size limit; the work is not saved automatically"
         "image_ddl_failed" -> "instructions could not be written from the photo"
         "image_ddl_undrawable" -> "the instructions written from the photo drew nothing"
+        "description_ddl_problems", "description_ddl_failed" -> "instructions could not be written from the description"
+        "description_ddl_undrawable" -> "the instructions written drew nothing; change the description or the model and draw again"
         else -> reason
     }
     override fun pipelineFailureCause(failure: String, attempts: Int, detail: String?): String {

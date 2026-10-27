@@ -662,12 +662,20 @@ class AndroidWorkPipeline(
             throw PipelineInteractionRequired(view)
         }
         val execution = host.executionContext(OWNER_ID, view.executionId)
-        val sketch = savedSketchResult(view.sketch)
         val hostContext = JSONObject(execution.hostContextJson)
         val resultOptions = hostContext.requiredObject("result_options")
         val hostOptions = hostContext.requiredObject("host_options")
         val colorMaps = hostContext.requiredObject("color_maps")
         val snapshot = JSONObject(execution.snapshotJson)
+        val descriptionRecord = snapshot.optJSONObject("description_ddl")
+        val sketch = descriptionRecord?.let { record ->
+            val text = record.optString("reading_text").takeIf { it.isNotBlank() }
+            when (record.optString("reading_state")) {
+                "read", "supplied" -> if (text != null) PipelineSketchResult(text, "supplemented") else PipelineSketchResult()
+                "fallback" -> PipelineSketchResult(state = "fallback")
+                else -> PipelineSketchResult()
+            }
+        } ?: savedSketchResult(view.sketch)
         require(snapshot.optString("sequence") == view.sequence) { "pipeline view changed before its prompt record was saved" }
         val document = snapshot.requiredObject("document")
         val delivery = snapshot.requiredObject("delivery")
@@ -740,6 +748,10 @@ class AndroidWorkPipeline(
         // server keeps `image_ddl`: references and rounds, no image or SVG.
         snapshot.optJSONObject("image_ddl")?.let { record ->
             metadata.put("image_ddl", record).put("elapsed_image_ms", execution.metrics["image"] ?: 0L)
+        }
+        descriptionRecord?.let { record ->
+            metadata.put("description_ddl", record).put("route", "read_and_draw")
+                .put("elapsed_read_and_draw_ms", execution.metrics["read_and_draw"] ?: 0L)
         }
         val renderHash = renderHash(delivery.requiredObject("score"), metadata, catalogId)
         metadata.put("render_hash", renderHash).put("render_hash_short", renderHash.takeLast(4).uppercase())
@@ -930,6 +942,7 @@ class AndroidWorkPipeline(
                     drawingModelId = request.drawingModel,
                     canvasFit = request.canvasFit,
                     imageReview = imageReview,
+                    descriptionReview = request.descriptionReview.takeIf { descriptionFlow && request.readAndDraw },
                 ),
             )
             else -> {
@@ -943,7 +956,12 @@ class AndroidWorkPipeline(
                 if (preserveSavedConfig) parentConfig else deriveSavedConfig(parentConfig, request, renderSeed, language)
             }
         }
-        val resolvedLang = JSONObject(config.configJson).requiredString("language")
+        val effectiveConfig = if (descriptionFlow && request.readAndDraw) {
+            config.copy(configJson = JSONObject(config.configJson).put(
+                "description_ddl", JSONObject().put("review", request.descriptionReview).put("colors", true),
+            ).toString())
+        } else config
+        val resolvedLang = JSONObject(effectiveConfig.configJson).requiredString("language")
         val context = when {
             parentVariationId != null -> AuthoringContext(
                 description = request.description,
@@ -967,7 +985,7 @@ class AndroidWorkPipeline(
                 ownerId = OWNER_ID,
                 text = drawn,
                 originalInput = request.originalText,
-                config = config,
+                config = effectiveConfig,
                 models = pinModelSession(PipelineModelSelection(request.drawingModel, request.drawingModel)),
                 context = context,
                 renderSeed = renderSeed,
@@ -978,6 +996,9 @@ class AndroidWorkPipeline(
                 renderLimitsSource = if (inherited != null || saved != null) "work" else "settings",
                 saveHistory = request.saveHistory,
                 sketch = PipelineSketchRequest.from(request.sketch),
+                route = "read_and_draw".takeIf { descriptionFlow && request.readAndDraw },
+                sourceLabelsJson = if (descriptionFlow && request.readAndDraw) descriptionSourceLabels(binding, text).toString() else null,
+                compositionJson = "{\"mode\":\"on\"}".takeIf { descriptionFlow && request.readAndDraw && request.descriptionComposition },
                 parentHistoryId = request.parentHistoryId,
                 inputProvenanceJson = request.inputProvenance?.toJson()?.toString(),
                 completionRangesJson = when {

@@ -2645,13 +2645,46 @@ internal fun providerAttemptText(attempt: ProviderAttempt?, strings: InkuStrings
  */
 @Composable
 private fun DrawSettingsRow(state: InkuUiState, viewModel: InkuViewModel) {
+    val ja = state.uiLanguage.code == "ja"
+    val local = app.inku.mobile.llm.isLocalVisionModel(state.selectedModelId)
+    val route = if (local) DrawRoute.Stages else state.drawRoute
+    fun label(jaText: String, enText: String) = if (ja) jaText else enText
     Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-        WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceXs) {
-            MiniPill(text = shortModelLabel(state), onClick = viewModel::openModelSelection)
-            MiniPill(text = shortCatalogLabel(state), onClick = viewModel::openCatalogSelection)
-            MiniPill(text = shortCanvasLabel(state), onClick = viewModel::openCanvasSelection)
+        Text(label("次に描く条件", "Conditions for the next drawing"), style = MaterialTheme.typography.titleSmall)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(shortModelLabel(state), modifier = Modifier.weight(1f))
+            TextButton(onClick = viewModel::openModelSelection) { Text(label("変更", "Change")) }
         }
-        SketchModeRow(state, viewModel)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(shortCatalogLabel(state), modifier = Modifier.weight(1f))
+            TextButton(onClick = viewModel::openCatalogSelection) { Text(label("変更", "Change")) }
+        }
+        CompactLabel(label("描き方", "How to draw"))
+        WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceXs) {
+            ChipButton(label("言葉で描く", "In words"), selected = route == DrawRoute.ReadAndDraw,
+                enabled = !local && !state.isDrawing, onClick = { viewModel.setDrawRoute(DrawRoute.ReadAndDraw) })
+            ChipButton(label("型で描く", "With a plan"), selected = route == DrawRoute.Stages,
+                enabled = !state.isDrawing, onClick = { viewModel.setDrawRoute(DrawRoute.Stages) })
+        }
+        if (local) Text(label("端末内モデルでは言葉で描くを選べません。", "In words is unavailable for on-device models."), style = MaterialTheme.typography.bodySmall)
+        CompactLabel(label("通す段", "Steps"))
+        WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceXs) {
+            ChipButton((if (state.sketchMode == SketchMode.On) "✓ " else "○ ") + label("写生", "Sketch from life"),
+                selected = state.sketchMode == SketchMode.On, enabled = !state.isDrawing,
+                onClick = { viewModel.setSketchMode(if (state.sketchMode == SketchMode.On) SketchMode.Off else SketchMode.On) })
+            val composed = route == DrawRoute.Stages || state.descriptionComposition
+            ChipButton((if (composed) "✓ " else "○ ") + label("構図・法則・配色", "Composition, laws, colors") + if (route == DrawRoute.Stages) " 🔒" else "",
+                selected = composed, enabled = route == DrawRoute.ReadAndDraw && !state.isDrawing,
+                onClick = { viewModel.setDescriptionComposition(!state.descriptionComposition) })
+        }
+        Text(label("流れ: ", "Flow: ") + drawFlow(route, state.sketchMode == SketchMode.On, state.descriptionComposition, ja), style = MaterialTheme.typography.bodySmall)
+        CompactLabel(label("オプション", "Options"))
+        ChipButton((if (state.renderWild) "✓ " else "○ ") + S.wildToggle, selected = state.renderWild,
+            enabled = !state.isDrawing, onClick = { viewModel.setRenderWild(!state.renderWild) })
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(shortCanvasLabel(state), modifier = Modifier.weight(1f))
+            TextButton(onClick = viewModel::openCanvasSelection) { Text(label("変更", "Change")) }
+        }
     }
 }
 
@@ -2780,6 +2813,13 @@ private fun CanvasHeroCard(
                                     canvasMessage = strings.hashCopied
                                 },
                             )
+                            val routeMetadata = remember(it.id, it.renderMetadataJson) { runCatching { JSONObject(it.renderMetadataJson) }.getOrElse { JSONObject() } }
+                            val routeLabel = if (routeMetadata.optJSONObject("image_ddl") != null) {
+                                if (state.uiLanguage.code == "ja") "画像から書く" else "Written from a picture"
+                            } else if (drawRouteOf(routeMetadata) == DrawRoute.ReadAndDraw) {
+                                if (state.uiLanguage.code == "ja") "言葉で描く" else "In words"
+                            } else if (state.uiLanguage.code == "ja") "型で描く" else "With a plan"
+                            Text(routeLabel, style = MaterialTheme.typography.labelSmall)
                             // Next to the hash, as on web; it names where it goes.
                             if (ddl3dOffered) {
                                 MiniPill(
@@ -3179,33 +3219,6 @@ private fun exportTemplateDescription(description: String, heightPx: Int): Strin
 }
 
 /**
- * 写生 is off by default; the author can ask for it on this drawing.
- */
-@Composable
-private fun SketchModeRow(state: InkuUiState, viewModel: InkuViewModel) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
-    ) {
-        CompactLabel(S.sketchFromLife)
-        Spacer(Modifier.weight(1f))
-        Sketches.MODES.forEach { mode ->
-            MiniPill(
-                text = Sketches.modeLabel(mode, isJapanese = state.uiLanguage.code == "ja"),
-                selected = state.sketchMode == mode,
-                onClick = { viewModel.setSketchMode(mode) },
-            )
-        }
-    }
-    Text(
-        Sketches.modeHint(state.sketchMode, isJapanese = state.uiLanguage.code == "ja"),
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-}
-
-/**
  * The description and the action that draws it.
  *
  * The settings that used to head this panel -- the model, the colour catalog,
@@ -3268,7 +3281,9 @@ private fun DrawPanel(
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(S.description, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            TextButton(onClick = viewModel::clearPrompt, enabled = !state.isDrawing) { Text(S.newWork) }
         }
+        Text(if (state.uiLanguage.code == "ja") "短い文章で、表現したいものを入力。" else "Enter a short description of what you want to express.", style = MaterialTheme.typography.bodySmall)
         if (state.descriptionLocked && !state.historyAuthorityLoading) {
             Text(S.pipelineDdlAuthority, style = MaterialTheme.typography.bodySmall)
             TextButton(onClick = viewModel::startDescriptionVariation, enabled = !state.historyAuthorityLoading && !state.isDrawing) {
@@ -3294,6 +3309,7 @@ private fun DrawPanel(
             )
             CameraOriginalPhotoThumbnail(state.cameraSourcePhotoPath, state.uiLanguage.isEnglish)
         }
+        Text(if (state.uiLanguage.code == "ja") "[括弧内文字列はコメント扱い]" else "[Text in brackets is treated as a comment]", style = MaterialTheme.typography.bodySmall)
         cameraStatusText(state.cameraCaptureState)?.let { cameraStatus ->
             Text(
                 cameraStatus,
@@ -3302,7 +3318,6 @@ private fun DrawPanel(
                 style = MaterialTheme.typography.labelSmall,
             )
         }
-        Text(S.nextDrawingConditions, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         DrawSettingsRow(state, viewModel)
         // While the keyboard is up the same button is pinned above it, and two
         // 「描画する」 on one screen is a question about which one draws.
@@ -4767,13 +4782,6 @@ private fun DemoSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
                     enabled = state.demoIntervalSeconds < 999,
                 )
             }
-        }
-        SettingsCard(S.renderExpression, S.renderExpressionSubtitle, if (state.renderWild) S.generationInfoWildLifted else S.generationInfoWildNotLifted) {
-            SettingCheckRow(
-                checked = state.renderWild,
-                text = S.wildToggle,
-                onCheckedChange = viewModel::setRenderWild,
-            )
         }
     }
 }
@@ -6687,6 +6695,21 @@ private fun GenerationInfoSheet(item: HistoryItemEntity, onDismiss: () -> Unit) 
             verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
         ) {
             Text(S.generationInfoTitle, style = MaterialTheme.typography.titleMedium)
+            val ja = LocalUiLanguage.current.code == "ja"
+            val descriptionRecord = remember(item.id, item.renderMetadataJson) {
+                runCatching { JSONObject(item.renderMetadataJson).optJSONObject("description_ddl") }.getOrNull()
+            }
+            descriptionRecord?.let { record ->
+                Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+                    CompactLabel(if (ja) "言葉で描く" else "In words")
+                    descriptionDetails(record, ja).forEach { (name, value) ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+                            Text(name, Modifier.weight(0.42f), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(value, Modifier.weight(0.58f), style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
             generationInfoSections(item).forEach { section ->
                 Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                     CompactLabel(generationInfoSectionLabel(section.id))

@@ -65,6 +65,9 @@ data class PaintRequest(
      * default of `fine`.
      */
     val sketch: SketchInput = SketchInput(),
+    val readAndDraw: Boolean = false,
+    val descriptionComposition: Boolean = false,
+    val descriptionReview: Boolean = false,
     val workColorSnapshot: WorkColorSnapshot? = null,
     val renderWild: Boolean? = null,
     /** Saved work being forked; null creates an unrelated new variation. */

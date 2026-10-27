@@ -320,8 +320,9 @@ data class InkuUiState(
     val canvasPanY: Float = 0f,
     val canvasPresentationMode: Boolean = false,
     val renderWild: Boolean = false,
-    // 写生 runs only when the author chooses it; the initial choice is off.
-    val sketchMode: SketchMode = Sketches.DEFAULT_MODE,
+    val drawRoute: DrawRoute = DrawRoute.ReadAndDraw,
+    val descriptionComposition: Boolean = false,
+    val sketchMode: SketchMode = SketchMode.On,
     // 推敲 (SPEC :614). The element is one value, never a set: the radio is
     // exclusive because a lineage edge has one cause.
     val refinementOpen: Boolean = false,
@@ -753,6 +754,8 @@ class InkuViewModel @JvmOverloads constructor(
             selectedModelId = view.models?.let { drawingModelOf(it.stage1ModelId, it.stage2ModelId) } ?: localState.value.selectedModelId,
             selectedStage2ModelId = view.models?.let { drawingModelOf(it.stage1ModelId, it.stage2ModelId) } ?: localState.value.selectedStage2ModelId,
             renderWild = options?.optBoolean("wild") ?: localState.value.renderWild,
+            drawRoute = if (options?.optString("route") == "read_and_draw") DrawRoute.ReadAndDraw else DrawRoute.Stages,
+            descriptionComposition = options?.optString("composition") == "on",
             prompt = view.description ?: localState.value.prompt,
             ddl = view.visibleDdl ?: localState.value.ddl,
             pipelineView = view,
@@ -1517,7 +1520,7 @@ class InkuViewModel @JvmOverloads constructor(
             canvasPresentationMode = false,
             presentationHistory = null,
             presentationSequence = emptyList(),
-            sketchMode = Sketches.DEFAULT_MODE,
+            sketchMode = if (localState.value.drawRoute == DrawRoute.ReadAndDraw && !app.inku.mobile.llm.isLocalVisionModel(localState.value.selectedModelId)) SketchMode.On else Sketches.DEFAULT_MODE,
             cameraSourcePhotoPath = null,
             lineageDetached = true,
             ddlEditedAfterGeneration = false,
@@ -1923,6 +1926,7 @@ class InkuViewModel @JvmOverloads constructor(
         selectedHistory = source.selectedHistory, selectedCatalogId = source.selectedCatalogId,
         pendingDescriptionParent = source.pendingDescriptionParent,
         selectedCanvasAspect = source.selectedCanvasAspect, sketchMode = source.sketchMode,
+        drawRoute = source.drawRoute, descriptionComposition = source.descriptionComposition,
         lineageDetached = source.lineageDetached, cameraSourcePhotoPath = source.cameraSourcePhotoPath,
         cameraCaptureState = source.cameraCaptureState, importedPlugins = source.importedPlugins,
         importedPluginNames = source.importedPluginNames, composeMode = source.composeMode,
@@ -2037,6 +2041,7 @@ class InkuViewModel @JvmOverloads constructor(
         localState.value = current.copy(
             selectedModelId = unifiedModelId,
             selectedStage2ModelId = unifiedModelId,
+            drawRoute = if (app.inku.mobile.llm.isLocalVisionModel(unifiedModelId)) DrawRoute.Stages else current.drawRoute,
             modelSelectionOpen = false,
             modelSelectionForCamera = false,
             message = null,
@@ -2235,6 +2240,18 @@ class InkuViewModel @JvmOverloads constructor(
         localState.value = localState.value.copy(sketchMode = mode)
     }
 
+    fun setDrawRoute(route: DrawRoute) {
+        if (route == DrawRoute.ReadAndDraw && app.inku.mobile.llm.isLocalVisionModel(state.value.selectedModelId)) return
+        localState.value = localState.value.copy(
+            drawRoute = route,
+            sketchMode = if (route == DrawRoute.ReadAndDraw) SketchMode.On else localState.value.sketchMode,
+        )
+    }
+
+    fun setDescriptionComposition(enabled: Boolean) {
+        localState.value = localState.value.copy(descriptionComposition = enabled)
+    }
+
     fun addExportTemplate() {
         val templates = state.value.exportTemplates
         val index = templates.size + 1
@@ -2422,6 +2439,8 @@ class InkuViewModel @JvmOverloads constructor(
                 // (`presentPipelineView`).
                 selectedCatalogId = if (item.catalogMode == "auto") CatalogSelection.AUTO_ID else item.colorCatalogId,
                 selectedCanvasAspect = item.canvasAspect,
+                drawRoute = drawRouteOf(runCatching { JSONObject(item.renderMetadataJson) }.getOrElse { JSONObject() }),
+                descriptionComposition = compositionModeOf(runCatching { JSONObject(item.renderMetadataJson) }.getOrElse { JSONObject() }),
                 sketchMode = Sketches.modeOfWork(item.sketchState, item.sketchGrain),
                 tab = tab,
                 composeMode = ComposeMode.Write,
@@ -2909,6 +2928,9 @@ class InkuViewModel @JvmOverloads constructor(
                         inputProvenance = cameraProvenance,
                         // 取り合わせ follows its parent work's 暴れる, as on Web.
                         renderWild = juxtaposed?.wild ?: current.renderWild,
+                        readAndDraw = current.drawRoute == DrawRoute.ReadAndDraw && !app.inku.mobile.llm.isLocalVisionModel(stage1ModelId),
+                        descriptionComposition = current.descriptionComposition,
+                        descriptionReview = stage1ModelId in autonomousVisionModelIds(current),
                         onPerformanceSaved = {
                             withContext(Dispatchers.Main.immediate) { descriptionPerformanceSaved(runId) }
                         },
@@ -3061,7 +3083,10 @@ class InkuViewModel @JvmOverloads constructor(
         rememberBatchPrompt(current.batchText)
         val snapshot = BatchSnapshot(current.batchText, lines.map { NumberedBatchLine(it.first, it.second) },
             BatchConditions(current.selectedCatalogId, current.selectedCanvasAspect,
-                current.selectedModelId, current.selectedStage2ModelId, current.uiLanguage.code, current.renderWild))
+                current.selectedModelId, current.selectedStage2ModelId, current.uiLanguage.code, current.renderWild,
+                current.drawRoute == DrawRoute.ReadAndDraw && !app.inku.mobile.llm.isLocalVisionModel(current.selectedModelId),
+                current.descriptionComposition, current.sketchMode == SketchMode.On,
+                current.selectedModelId in autonomousVisionModelIds(current)))
         lastBatchSnapshot = snapshot
         lastBatchSavedWork = null
         runBatchSnapshot(snapshot, snapshot.lines, retry = false)
@@ -3140,6 +3165,10 @@ class InkuViewModel @JvmOverloads constructor(
                                 // the server keeps between `input` and `source_text`.
                                 sourceText = prompt,
                                 renderWild = conditions.renderWild,
+                                sketch = SketchInput(requested = conditions.sketch),
+                                readAndDraw = conditions.readAndDraw,
+                                descriptionComposition = conditions.composition,
+                                descriptionReview = conditions.review,
                             )
                         }
                     }.onSuccess { item ->

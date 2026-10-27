@@ -84,6 +84,7 @@ class SharedPipelineHost(
                         .put("description", authoring.text)
                         .put("auto_catalog", authoring.autoCatalog)
                         .put("sketch", authoring.sketch.toJson())
+                        .also { value -> putDescriptionRoute(value, authoring.route, authoring.sourceLabelsJson, authoring.compositionJson) }
                     is PipelineAuthoring.DirectDdl -> JSONObject()
                         .put("tag", "direct_ddl")
                         .put("source", authoring.source)
@@ -293,7 +294,16 @@ class SharedPipelineHost(
             }
             throw cancelled
         } finally {
-            withContext(NonCancellable) { session.mutex.withLock { session.drivers -= 1 } }
+            withContext(NonCancellable) {
+                session.mutex.withLock {
+                    session.drivers -= 1
+                    val snapshot = session.snapshot()
+                    val action = snapshot.optJSONObject("action")?.optString("tag")
+                    if (session.drivers == 0 && action !in setOf("draw_image_review", "review_description_ddl")) {
+                        images?.release(snapshot.optJSONObject("description_ddl"))
+                    }
+                }
+            }
         }
     }
 
@@ -321,10 +331,14 @@ class SharedPipelineHost(
                 "read_composition",
                 "choose_laws",
                 "choose_colors",
+                "read_description",
+                "compose_description",
+                "write_description_ddl",
                 -> if (!runProviderEffect(session, action)) return view(session)
                 "select_image_catalog",
                 "write_image_ddl",
                 "review_image_ddl",
+                "review_description_ddl",
                 -> {
                     stopWithoutImages(session, action)
                     if (!runProviderEffect(session, action)) return view(session)
@@ -460,7 +474,8 @@ class SharedPipelineHost(
 
     /** Keep the last attempted prompt of each sent stage in this execution's sidecar. */
     private fun recordSentPrompt(session: Session, action: JSONObject) {
-        val stage = ACTION_STAGES[action.requiredString("tag")]
+        val tag = action.requiredString("tag")
+        val stage = DESCRIPTION_PROMPT_STAGES[tag] ?: ACTION_STAGES[tag] ?: return
         if (stage !in SYSTEM_PROMPT_STAGES) return
         val prompt = action.optJSONObject("payload")?.optJSONObject("prompt") ?: return
         // A malformed or older action must not turn a completed model call into
@@ -743,6 +758,13 @@ class SharedPipelineHost(
         .toString()
         .encodeToByteArray()
 
+    private fun putDescriptionRoute(value: JSONObject, route: String?, labels: String?, composition: String?) {
+        if (route == null) return
+        value.put("route", route)
+        labels?.let { value.put("source_labels", JSONArray(it)) }
+        composition?.let { value.put("composition", JSONObject(it)) }
+    }
+
     private fun commandPayload(command: PipelineCommand): JSONObject = when (command) {
         is PipelineCommand.CommitUserDdl -> JSONObject()
             .put("tag", "commit_user_ddl")
@@ -754,6 +776,7 @@ class SharedPipelineHost(
             .put("description", command.description)
             .put("auto_catalog", command.autoCatalog)
             .put("sketch", command.sketch.toJson())
+            .also { value -> putDescriptionRoute(value, command.route, command.sourceLabelsJson, command.compositionJson) }
         is PipelineCommand.ApprovePatch -> JSONObject()
             .put("tag", "approve_patch")
             .put("expected_revision", command.expectedRevision)
@@ -908,10 +931,20 @@ class SharedPipelineHost(
             "select_image_catalog" to "image",
             "write_image_ddl" to "image",
             "review_image_ddl" to "image",
+            "read_description" to "read_and_draw",
+            "compose_description" to "read_and_draw",
+            "write_description_ddl" to "read_and_draw",
+            "review_description_ddl" to "read_and_draw",
+        )
+        val DESCRIPTION_PROMPT_STAGES = mapOf(
+            "read_description" to "reading",
+            "compose_description" to "description_composition",
+            "write_description_ddl" to "description_ddl",
+            "review_description_ddl" to "description_review",
         )
         /** The server's `_SYSTEM_PROMPT_STAGES` (`pipeline_product.py`), in the order a work calls them. */
-        val SYSTEM_PROMPT_STAGES = listOf("sketch", "stage1", "composition", "laws", "colors", "stage2")
+        val SYSTEM_PROMPT_STAGES = listOf("sketch", "stage1", "composition", "laws", "colors", "stage2", "reading", "description_composition", "description_ddl", "description_review")
         /** The server's `_MESSAGE_STAGES`: the stages whose sent message is kept too. */
-        val MESSAGE_STAGES = setOf("sketch", "composition", "laws", "colors")
+        val MESSAGE_STAGES = setOf("sketch", "composition", "laws", "colors", "reading", "description_composition", "description_ddl", "description_review")
     }
 }

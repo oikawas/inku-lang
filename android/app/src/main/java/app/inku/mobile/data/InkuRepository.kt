@@ -984,7 +984,7 @@ class InkuRepository(
         companion object Key : CoroutineContext.Key<PerformanceSaveObserver>
     }
 
-    suspend fun paint(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, historyInput: String? = null, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, uiLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput(), parentHistoryId: String? = null, inputProvenance: CameraInputProvenance? = null, renderWild: Boolean? = null, onPerformanceSaved: suspend () -> Unit = {}): HistoryItemEntity {
+    suspend fun paint(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, historyInput: String? = null, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, uiLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput(), parentHistoryId: String? = null, inputProvenance: CameraInputProvenance? = null, renderWild: Boolean? = null, readAndDraw: Boolean = false, descriptionComposition: Boolean = false, descriptionReview: Boolean = false, onPerformanceSaved: suspend () -> Unit = {}): HistoryItemEntity {
         val started = System.currentTimeMillis()
         val stage1Text = description
         val result = withContext(PerformanceSaveObserver(onPerformanceSaved)) {
@@ -1003,6 +1003,9 @@ class InkuRepository(
                     instructionLang = instructionLang,
                     uiLang = uiLang,
                     sketch = sketch,
+                    readAndDraw = readAndDraw,
+                    descriptionComposition = descriptionComposition,
+                    descriptionReview = descriptionReview,
                     parentHistoryId = parentHistoryId,
                     inputProvenance = inputProvenance,
                     renderWild = renderWild,

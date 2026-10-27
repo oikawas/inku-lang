@@ -20,7 +20,7 @@ Run inku-cli COMMAND --help for the complete option list. This document states w
 | models | Configure the default drawing model (shared Stage 1/2), Vision model and color catalog |
 | paint / batch | Paint one or many works from descriptions or instructions |
 | refine | Refine an existing work's composition or color |
-| lineage | Inspect lineage node trees and promote intermediate works |
+| lineage | Inspect lineage node trees |
 | colophon | Recite one origin-to-target lineage branch as an append-only reading |
 | inspect | Inspect and compare multiple inference models, one after another |
 | review | Evaluate works with Vision and submit unread words |
@@ -366,18 +366,13 @@ These commands serve automated painting, evaluation, and the autonomous refineme
 
 ### 1. Lineage
 
-Show a work's derivation tree, or promote an intermediate work into ordinary history.
+Show a work's derivation tree.
 
 * **Show the lineage tree**:
   ```sh
   uv run inku-cli lineage show WORK_ID --depth 3
   ```
   Prints the parent and child relations around the given work id as a text tree. `--json` prints the raw JSON instead.
-* **Promote an intermediate work**:
-  ```sh
-  uv run inku-cli lineage promote NODE_ID
-  ```
-  Promotes a `lineage_only` node, created by temporary refinement and hidden from ordinary history, into the user's ordinary history.
 
 ### 2. Refinement and derived works
 
@@ -392,7 +387,7 @@ Attach an existing work as the parent node and produce a local option, saved int
   ```sh
   uv run inku-cli refine save PARENT_NODE_ID --kind layout --file score.json --input-text "the description"
   ```
-  Imports a locally adjusted Score JSON straight into the server's history as a child attached to the given parent node. `--svg-file` attaches an SVG (omitted, the SVG is saved empty). `--visibility lineage_only` keeps the work out of normal history and places it in the lineage only (the default is `normal`).
+  Imports a locally adjusted Score JSON straight into the server's history as a child attached to the given parent node. `--svg-file` attaches an SVG (omitted, the SVG is saved empty).
 
 ### 3. Model comparison (inspect)
 

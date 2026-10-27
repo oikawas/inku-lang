@@ -1363,12 +1363,11 @@ options:
 ```
 usage: inku-cli lineage [-h] [--base-url BASE_URL]
                         [--timeout-seconds TIMEOUT_SECONDS]
-                        {show,promote} ...
+                        {show} ...
 
 positional arguments:
-  {show,promote}
+  {show}
     show                show lineage tree for a work
-    promote             promote a lineage-only node to regular history
 
 options:
   -h, --help            show this help message and exit
@@ -1393,19 +1392,6 @@ options:
   --limit LIMIT  max lineage edges to load, counted outward from the work's
                  node (default 200)
   --json         output raw JSON
-
-```
-
-### `inku-cli lineage promote`
-
-```
-usage: inku-cli lineage promote [-h] node_id
-
-positional arguments:
-  node_id     lineage node ID to promote
-
-options:
-  -h, --help  show this help message and exit
 
 ```
 
@@ -1510,7 +1496,6 @@ options:
 usage: inku-cli refine save [-h] --kind {layout,color} --file FILE
                             [--svg-file SVG_FILE] --input-text INPUT_TEXT
                             [--ddl-text DDL_TEXT]
-                            [--visibility {normal,lineage_only}]
                             parent_node_id
 
 positional arguments:
@@ -1525,8 +1510,6 @@ options:
   --input-text INPUT_TEXT
                         original user text
   --ddl-text DDL_TEXT   normalized DDL text
-  --visibility {normal,lineage_only}
-                        history visibility
 
 ```
 

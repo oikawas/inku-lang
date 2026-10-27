@@ -139,7 +139,6 @@ def _options(data: dict[str, Any], *, save_history: bool) -> dict:
         "history_display_label": "history_display_label",
         "batch_line_number": "batch_line_number",
         "batch_run_id": "batch_run_id",
-        "history_visibility": "history_visibility",
         "lineage_parent_node_id": "lineage_parent_node_id",
         "derivation_kind": "derivation_kind",
         "derivation_metadata": "derivation_metadata",

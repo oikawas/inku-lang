@@ -1,4 +1,4 @@
-"""Persistence owner for lineage graph reads and node promotion."""
+"""Persistence owner for lineage graph reads."""
 
 from __future__ import annotations
 
@@ -61,7 +61,7 @@ class HistoryIdentityLineageBackfill:
                     id=str(self.uuid_fn()),
                     user_id=row.user_id,
                     history_id=row.id,
-                    state="lineage_only" if row.history_visibility == "lineage_only" else "active",
+                    state="active",
                     description_hash=row.description_hash,
                     render_hash=row.render_hash,
                     at=row.at,
@@ -389,28 +389,6 @@ class LineageStore:
             edge.metadata_json = metadata_json
             session.commit()
             return True
-
-    def promote_lineage_node(self, user_id: str, node_id: str) -> dict | None:
-        actor = self.actor_of_fn(user_id)
-        with self.session_factory() as session:
-            node = session.query(LineageNodeRow).filter(
-                LineageNodeRow.id == node_id,
-                access._writable_by(actor, LineageNodeRow.user_id, LineageNodeRow.history_id),
-                LineageNodeRow.state == "lineage_only",
-            ).first()
-            if node is None or not node.history_id:
-                return None
-            row = session.query(HistoryRow).filter(
-                HistoryRow.id == node.history_id,
-                access._writable_by(actor, HistoryRow.user_id, HistoryRow.id),
-            ).first()
-            if row is None:
-                return None
-            node.state = "active"
-            row.history_visibility = "normal"
-            session.commit()
-            session.refresh(row)
-            return self.row_to_dict_fn(row)
 
     def get_lineage_branch(self, user_id: str, target_node_id: str) -> dict | None:
         """Return the single primary-parent path from root through target."""

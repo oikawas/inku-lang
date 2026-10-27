@@ -364,18 +364,13 @@ uv run inku-cli api GET /api/pipeline/variations/VARIATION_ID
 AIエージェントによる自動生成、評価、および系譜ツリーを辿った自律的な推敲ループで使用可能な専用コマンドです。実行手順は`inku-cli AI自律運転・テスト用リファレンス`が持ちます。
 
 ### 1. 作品系譜 (lineage)
-作品の派生ツリーを表示、または中間作品を通常履歴に昇格させます。
+作品の派生ツリーを表示します。
 
 * **系譜ツリーの表示**:
   ```sh
   uv run inku-cli lineage show WORK_ID --depth 3
   ```
   指定した作品IDを中心に、親・子ノードの関係をコンソール上にツリーテキスト表示します。`--json` を指定すると生JSONで出力します。
-* **中間作品の昇格**:
-  ```sh
-  uv run inku-cli lineage promote NODE_ID
-  ```
-  一時的な推敲で生まれた `lineage_only`（通常履歴非表示）のノードを、ユーザーの通常履歴へと昇格します。
 
 ### 2. 推敲と派生生成 (refine)
 既存作品を親ノードとして紐付け、局所的な別案を生成・保存します。
@@ -389,7 +384,7 @@ AIエージェントによる自動生成、評価、および系譜ツリーを
   ```sh
   uv run inku-cli refine save PARENT_NODE_ID --kind layout --file score.json --input-text "入力記述"
   ```
-  ローカルで調整したScore JSONを、親ノードに接続した派生（子）としてサーバー履歴へ直接インポートします。`--svg-file` でSVGを添えられます（省略するとSVGは空で保存されます）。`--visibility lineage_only` を付けると、通常の履歴には出さず系譜だけに置きます（既定は `normal`）。
+  ローカルで調整したScore JSONを、親ノードに接続した派生（子）としてサーバー履歴へ直接インポートします。`--svg-file` でSVGを添えられます（省略するとSVGは空で保存されます）。
 
 ### 3. 多モデル比較 (inspect)
 同一の記述に対して、複数のモデルがどのように解釈（DDL）および描画するかを順に実行し、比較します。

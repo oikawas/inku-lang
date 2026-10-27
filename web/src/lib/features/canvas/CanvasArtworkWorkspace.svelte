@@ -28,7 +28,6 @@
 		unsavedRefinementPreview: boolean;
 		interpretFallbackReason: string | null;
 		composeFallbackDrawnReason: string | null;
-		lineageIntermediateNotice: string | null;
 		instructionCaptionVisible: boolean;
 		canShowInstructionCaption: boolean;
 		displayInstructionText: string;
@@ -81,7 +80,6 @@
 		unsavedRefinementPreview,
 		interpretFallbackReason,
 		composeFallbackDrawnReason,
-		lineageIntermediateNotice,
 		instructionCaptionVisible,
 		canShowInstructionCaption,
 		displayInstructionText,
@@ -219,9 +217,6 @@
 			</Tooltip>
 		{/if}
 	</div>
-{/if}
-{#if lineageIntermediateNotice}
-	<div class="lineage-intermediate-notice" role="status">{lineageIntermediateNotice}</div>
 {/if}
 				<!-- The marks a reader puts on the work in front of them: it is a
 				     favourite, it wants another pass. They sit beside the caption
@@ -462,7 +457,6 @@
 	.fallback-badges { position: absolute; top: 12px; right: 12px; z-index: 5; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
 	.interpret-fallback-badge, .compose-fallback-badge { padding: 5px 9px; border: 1px solid #c08a3e; border-radius: 999px; background: color-mix(in srgb, #f6e2bd 88%, transparent); color: #6b4410; box-shadow: 0 2px 10px #0002; font-size: var(--ui-font-size-11); white-space: nowrap; }
 	:global(html[data-theme='dark']) .interpret-fallback-badge, :global(html[data-theme='dark']) .compose-fallback-badge { border-color: #d8a75c; background: color-mix(in srgb, #5a4318 88%, transparent); color: #f4dcb0; }
-	.lineage-intermediate-notice { position: absolute; top: 48px; left: 50%; transform: translateX(-50%); z-index: 6; max-width: min(520px, calc(100% - 48px)); padding: 7px 10px; border-radius: var(--r); background: var(--tooltip-bg); color: var(--tooltip-fg); box-shadow: 0 4px 18px #0004; font-size: var(--ui-font-size-11); line-height: 1.45; text-align: center; }
 	.canvas-content {
 		position: relative;
 		width: 100%;

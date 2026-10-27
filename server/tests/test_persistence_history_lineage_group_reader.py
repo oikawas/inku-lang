@@ -69,7 +69,6 @@ def test_group_reader_keeps_query_and_projection_invariants() -> None:
     for marker in (
         "access._readable_by(actor, HistoryRow.user_id, HistoryRow.id)",
         "access._readable_node(actor)",
-        'HistoryRow.history_visibility == "normal"',
         "func.coalesce(LineageNodeRow.root_node_id, LineageNodeRow.id)",
         "grouped.having(enough_members)",
         "session.query(func.count()).select_from(aggregates)",

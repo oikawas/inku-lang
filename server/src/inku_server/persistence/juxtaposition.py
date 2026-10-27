@@ -14,7 +14,7 @@ def owned_description_sources(session, actor: dict) -> list[tuple[str, str]]:
     """(id, description) of the actor's own works that may lend a sentence.
 
     Only works the actor owns: a shared work or another person's is never read.
-    Left out are works in the trash, works kept only in a lineage, DDL and demo
+    Left out are works in the trash, DDL and demo
     works, works whose comment says `test data`, works with no description, and
     works held by their DDL. The description still carries its labels.
     """
@@ -23,7 +23,6 @@ def owned_description_sources(session, actor: dict) -> list[tuple[str, str]]:
     ).filter(
         access._owned_by(actor, HistoryRow.user_id),
         HistoryRow.trashed == 0,
-        HistoryRow.history_visibility == "normal",
     ).all()
     kept = []
     for row in rows:

@@ -118,8 +118,6 @@ Variation is retired. Do not use the old amplitude or seed flags. Refinement has
 * **`lineage show <ITEM_ID> [--depth D] [--limit L] [--json]`**
   * Displays the parent-child derivation tree of the work.
   * Use `--json` to print the raw response, including all nodes and edges (each edge carries `parent_node_id` and `child_node_id`).
-* **`lineage promote <NODE_ID>`**
-  * Promotes a hidden intermediate work (`lineage_only` visibility) to standard history.
 
 ### 2. `refine`
 * **`refine perform <ITEM_ID> --kind {layout|color} [-o DIR] [--png] [--no-save]`**

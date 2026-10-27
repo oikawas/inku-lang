@@ -47,7 +47,6 @@
 		runTokensOut: number | null;
 		runAttempt?: ProviderAttemptCount | null;
 		onSaveOkugakiModel: (provider: Provider, model: string) => void | Promise<void>;
-		onPromoteNode: (node: LineageNode) => void | Promise<void>;
 		onSaveNote: (node: LineageNode, note: string) => void | Promise<void>;
 		onAskTrash: (historyIds: string[]) => void;
 		onDetach: () => void;
@@ -96,7 +95,7 @@
 	}
 
 	type ArrowPath = { id: string; path: string; tombstone: boolean };
-	let { graph, loading, focusRequest = 0, error, isJapanese, onOpenNode, onOpenNodeInCanvas, onToggleStar, onToggleForRevision, onOpenRefinement, onDrawDescription, onOpenDdlEditor, onDrawSketchGrain, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, runAttempt = null, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, autonomousRuns, onOpenAutonomousChild, onJuxtapose, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, pngTemplates = [], onDownloadSavedWorkSVG, onDownloadSavedWorkPNG, onDownloadSavedWorkCard, onDownloadSavedWorkDdl, onDownloadSavedWorkAnimation, onDownloadSavedWorkContactSheet, onValidateSavedWorkExport, browsingState }: Props = $props();
+	let { graph, loading, focusRequest = 0, error, isJapanese, onOpenNode, onOpenNodeInCanvas, onToggleStar, onToggleForRevision, onOpenRefinement, onDrawDescription, onOpenDdlEditor, onDrawSketchGrain, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, runAttempt = null, onSaveOkugakiModel, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, autonomousRuns, onOpenAutonomousChild, onJuxtapose, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, pngTemplates = [], onDownloadSavedWorkSVG, onDownloadSavedWorkPNG, onDownloadSavedWorkCard, onDownloadSavedWorkDdl, onDownloadSavedWorkAnimation, onDownloadSavedWorkContactSheet, onValidateSavedWorkExport, browsingState }: Props = $props();
 
 	let handledFocusRequest = 0;
 	$effect(() => {
@@ -860,7 +859,6 @@ $effect(() => {
 	<span class="identity-marks">
 		{#if node.id === graph.focus_node_id}<span class="active-mark">{isJapanese ? '表示中' : 'Displayed'}</span>{/if}
 		{#if node.history?.description_locked}<span class="identity-mark held-mark" title={t().descriptionLockedReason}><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>{t().descriptionLockedShort}</span>{/if}
-		{#if node.state === 'lineage_only'}<span class="identity-mark">{isJapanese ? '中間作品・履歴非表示' : 'Intermediate · hidden from history'}</span>{/if}
 		{#if node.id !== graph.focus_node_id && node.description_hash && node.description_hash === focusNode?.description_hash}<span class="identity-mark">{isJapanese ? '同じ記述' : 'Same text'}</span>{/if}
 		{#if node.id !== graph.focus_node_id && node.render_hash && node.render_hash === focusNode?.render_hash}<span class="identity-mark">{isJapanese ? '同じ版' : 'Same edition'}</span>{/if}
 	</span>
@@ -901,7 +899,6 @@ $effect(() => {
 								{#if node.history && !browsingState.overviewOpen}
 									<button class="node-details-trigger" type="button" onclick={(event) => openNodeDetails(node, event)}>{isJapanese ? '詳細' : 'Details'}</button>
 								{/if}
-								{#if node.state === 'lineage_only'}<button class="promote" type="button" onclick={() => onPromoteNode(node)}>{isJapanese ? '通常履歴に保存' : 'Save to regular history'}</button>{/if}
 							</article>
 						{/each}
 					</div>
@@ -1033,7 +1030,7 @@ $effect(() => {
 	.overview-zoom, .orientation-toggle { padding-right: 8px; border-right: 1px solid var(--border); }
 	.orientation-toggle button.active { border-color: var(--accent); background: var(--accent); color: var(--accent-fg); }
 	.overview-zoom span { min-width: 42px; color: var(--fg2); font-size: var(--ui-font-size-12); text-align: center; }
-	header button, .promote, .branch-toggle { border: 1px solid var(--border2); background: var(--panel); color: var(--fg); border-radius: var(--btn-sm-radius); padding: var(--btn-sm-padding); font-family: inherit; font-size: var(--btn-sm-font-size); cursor: pointer; }
+	header button, .branch-toggle { border: 1px solid var(--border2); background: var(--panel); color: var(--fg); border-radius: var(--btn-sm-radius); padding: var(--btn-sm-padding); font-family: inherit; font-size: var(--btn-sm-font-size); cursor: pointer; }
 	/* Dimensions follow the header button tokens; only color is overridden here. */
 	.detach-btn { background: var(--ddl-btn-bg); border-color: var(--ddl-btn-border); color: var(--ddl-btn-fg); font-weight: 600; box-shadow: var(--ddl-btn-shadow); white-space: nowrap; }
 	.detach-btn:hover { background: var(--ddl-btn-bg-hover); border-color: var(--ddl-btn-border-hover); color: var(--ddl-btn-fg-hover); }
@@ -1137,7 +1134,6 @@ $effect(() => {
 	.note-editor textarea { box-sizing: border-box; width: 100%; min-height: 4.5em; resize: vertical; border: 1px solid var(--border2); border-radius: 5px; padding: 5px 6px; background: var(--bg); color: var(--fg); font: inherit; line-height: 1.35; }
 	.note-editor button { justify-self: end; border: 1px solid var(--border2); border-radius: 5px; padding: 4px 9px; background: var(--panel); color: var(--fg); cursor: pointer; }
 	.note-editor button:disabled { opacity: .45; cursor: default; }
-	.promote { width: 100%; margin-top: 7px; font-size: var(--ui-font-size-12); }
 	.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 	.held-mark { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
 </style>

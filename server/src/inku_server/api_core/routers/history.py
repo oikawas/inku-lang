@@ -602,7 +602,7 @@ def api_history_post(
             "instruction_lang_resolved", "ui_lang", "sketch_text", "sketch_grain", "sketch_state",
             "elapsed_ms", "tokens_in", "tokens_out", "display_label", "batch_line_number", "batch_run_id",
         )}
-        inherited.update(input=inherited["input"] or "", history_visibility="normal", count_generation=False)
+        inherited.update(input=inherited["input"] or "", count_generation=False)
         body = body.model_copy(update=inherited)
         score, svg, catalog_id = replayed["score"], replayed["svg"], replayed["catalog_id"]
         coerce_observability = None
@@ -803,7 +803,6 @@ def api_history_post(
         display_label=body.display_label,
         batch_line_number=body.batch_line_number,
         batch_run_id=body.batch_run_id,
-        history_visibility=body.history_visibility,
         lineage_parent_node_id=body.lineage_parent_node_id,
         derivation_kind=body.derivation_kind,
         derivation_metadata=body.derivation_metadata,

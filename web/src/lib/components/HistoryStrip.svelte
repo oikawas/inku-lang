@@ -27,10 +27,9 @@
 		catalog_id?: string | null;
 		render_engine_id?: string | null;
 		render_engine_version?: string | null;
-		history_visibility?: 'normal' | 'lineage_only';
 		lineage_generation?: number | null;
 		tenkei?: string | null;
-		lineage_state?: 'active' | 'lineage_only' | 'tombstone' | null;
+		lineage_state?: 'active' | 'tombstone' | null;
 		trashed?: boolean;
 		starred?: boolean;
 	note?: string | null;
@@ -197,7 +196,6 @@
 	}
 
 	function lineageStateLabel(item: HistoryItem): string {
-		if (item.lineage_state === 'lineage_only' || item.history_visibility === 'lineage_only') return isJapanese ? '中間作品' : 'Intermediate';
 		if (item.lineage_state === 'tombstone') return isJapanese ? '削除済み' : 'Deleted';
 		return item.lineage_generation ? (isJapanese ? '通常作品' : 'Active') : (isJapanese ? '系譜なし' : 'No lineage');
 	}

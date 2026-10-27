@@ -292,9 +292,9 @@ export class HistoryBrowsingState {
 		}
 	}
 
-	async syncToItem(item: Pick<HistoryItem, 'id' | 'trashed' | 'history_visibility'>): Promise<void> {
+	async syncToItem(item: Pick<HistoryItem, 'id' | 'trashed'>): Promise<void> {
 		const requestId = ++this.selectionRequest;
-		if (!item.id || item.trashed || item.history_visibility === 'lineage_only') {
+		if (!item.id || item.trashed) {
 			this.cursor = -1;
 			return;
 		}

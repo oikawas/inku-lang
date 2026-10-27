@@ -166,6 +166,9 @@ def init_db() -> None:
         _logger.error("verified migration safety snapshot retained at %s", exc.snapshot.path)
         raise
     _HISTORY_FTS_ENABLED = outcome.fts_enabled
+    if outcome.mode == "registered_upgrade":
+        _logger.info("history normalization: works=%d nodes=%d; verified snapshot=%s",
+                     outcome.normalized_works, outcome.normalized_nodes, outcome.snapshot.path if outcome.snapshot else None)
     _refresh_planner_statistics()
 
 
@@ -583,14 +586,6 @@ def get_lineage(
         actor_of_fn=_actor_of,
         row_to_dict_fn=_row_to_dict,
     ).get_lineage(user_id, focus_node_id, descendant_depth, node_limit, include_svg)
-
-
-def promote_lineage_node(user_id: str, node_id: str) -> dict | None:
-    return _lineage.LineageStore(
-        session_factory=SessionLocal,
-        actor_of_fn=_actor_of,
-        row_to_dict_fn=_row_to_dict,
-    ).promote_lineage_node(user_id, node_id)
 
 
 def set_lineage_edge_metadata(user_id: str, child_node_id: str, metadata: dict) -> bool:

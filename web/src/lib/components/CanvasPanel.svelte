@@ -54,7 +54,6 @@
 		result: PaintResult | null;
 		rangePreview?: RangePreview | null;
 		unsavedRefinementPreview: boolean;
-		lineageIntermediateNotice: string | null;
 		allowEmptyOutputTabs: boolean;
 		currentRenderedAt: string | null;
 		// The three nav buttons, each with its own answer. They come decided by
@@ -190,7 +189,6 @@
 		onSetRefineWild: (value: boolean | null) => void;
 		onSaveOkugakiModel: (provider: Provider, model: string) => void | Promise<void>;
 		onSaveVisionModel: (provider: Provider, model: string) => void | Promise<void>;
-		onPromoteLineageNode: (node: LineageNode) => void | Promise<void>;
 		onSaveLineageNote: (node: LineageNode, note: string) => void | Promise<void>;
 		onAskTrashLineage: (historyIds: string[]) => void;
 		onDetachLineage: () => void;
@@ -209,7 +207,6 @@
 		result,
 		rangePreview = null,
 		unsavedRefinementPreview = false,
-		lineageIntermediateNotice = null,
 		allowEmptyOutputTabs,
 		currentRenderedAt,
 		navLatestDisabled,
@@ -317,7 +314,6 @@
 		onSetRefineWild,
 		onSaveOkugakiModel,
 		onSaveVisionModel,
-		onPromoteLineageNode,
 		onSaveLineageNote,
 		onAskTrashLineage,
 		onDetachLineage,
@@ -851,7 +847,6 @@
 				{unsavedRefinementPreview}
 				{interpretFallbackReason}
 				{composeFallbackDrawnReason}
-				{lineageIntermediateNotice}
 				{instructionCaptionVisible}
 				{canShowInstructionCaption}
 				{displayInstructionText}
@@ -935,7 +930,7 @@
 						onDrawDescription={onDrawLineageDescription} onOpenDdlEditor={onOpenLineageDdlEditor}
 						onDrawSketchGrain={onDrawLineageSketchGrain} {stageLabel} stage1ModelLabel={runStage1ModelLabel}
 						stage2ModelLabel={runStage2ModelLabel} {runTokensIn} {runTokensOut} {runAttempt} onSaveOkugakiModel={onSaveOkugakiModel}
-						{onSaveVisionModel} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote}
+						{onSaveVisionModel} onSaveNote={onSaveLineageNote}
 						onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview}
 						onLoadBranch={onLoadLineageBranch} {autonomousRuns} {onOpenAutonomousChild} {onJuxtapose} {visionModel} {okugakiModel}
 						{visionProviderGroups} {animationExportSettings} {pngTemplates}

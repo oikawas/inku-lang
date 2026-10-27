@@ -413,9 +413,9 @@ def test_canvas_search_matches_exact_uuid_description_substrings_and_hash_edges(
     try:
         for query, expected in (
             (wanted, {wanted}), (wanted.upper(), {wanted}),
-            (wanted[:8], {shadow}), ("青い円", {wanted}),
-            ("ABCDE", {wanted}), ("rh3:abcde", {wanted}), ("cba123", {wanted}),
-            (digest, {wanted}), ("rh3:" + digest, {wanted}), ("000000", set()),
+            (wanted[:8], {shadow}), ("青い円", {wanted, "lineage-only"}),
+            ("ABCDE", {wanted, "lineage-only"}), ("rh3:abcde", {wanted, "lineage-only"}), ("cba123", {wanted, "lineage-only"}),
+            (digest, {wanted, "lineage-only"}), ("rh3:" + digest, {wanted, "lineage-only"}), ("000000", set()),
             ("beef1", {wanted}), ("abcdef9", {wanted}), (description_digest, {wanted}),
             ("dh1:" + description_digest, {wanted}), ("%", {literal_id}),
             ("_", {literal_id}), ("/", {literal_id}),
@@ -466,7 +466,7 @@ def test_fts_execution_preserves_visibility_filters_order_and_hydration() -> Non
     for sql in (count_sql, list_sql):
         assert "h.user_id = :viewer" in sql
         assert "h.trashed = :trashed" in sql
-        assert "h.history_visibility = 'normal'" in sql
+        assert "history_visibility" not in sql
         assert "AND h.starred = 1" in sql
         assert "AND h.for_revision = 1" in sql
         assert "AND h.for_share = 1" in sql
@@ -541,7 +541,7 @@ def test_orm_listing_preserves_visibility_filters_search_page_and_hydration() ->
     filters = [_sql(clause) for call in query.filter_calls for clause in call]
     assert _sql(visible) in filters
     assert any("history.trashed" in clause for clause in filters)
-    assert any("history.history_visibility" in clause for clause in filters)
+    assert not any("history.history_visibility" in clause for clause in filters)
     assert any("history.starred" in clause for clause in filters)
     assert any("history.for_revision" in clause for clause in filters)
     assert any("history.for_share" in clause for clause in filters)

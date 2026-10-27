@@ -143,7 +143,7 @@ test('saving a replay child blocks repeated clicks and keeps the same key after 
 	}, 'Save failed'), child);
 	assert.deepEqual(options[0], options[1]);
 	assert.deepEqual(options[1], {
-		countGeneration: false, historyVisibility: 'normal', lineageParentNodeId: 'parent-node',
+		countGeneration: false, lineageParentNodeId: 'parent-node',
 		derivationKind: 'replay', replayWorkId: 'work-1', replayRenderHash: 'rh3:new',
 		replaySvgSha256: 'new-svg-sha256', idempotencyKey: 'save-key', rejectOnFailure: true,
 	});

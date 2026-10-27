@@ -232,7 +232,6 @@ class PaintRequest(BaseModel):
     history_display_label: str | None = Field(default=None, description="バッチ番号やdemoなどの表示ラベル")
     batch_line_number: int | None = Field(default=None, description="Line number of this drawing in a batch run, recorded with the history row. None when not part of a batch.")
     batch_run_id: str | None = Field(default=None, description="Identifier of the batch run this drawing belongs to. None when not part of a batch.")
-    history_visibility: str = Field(default="normal", description="Where the drawing appears in history: normal, or lineage_only to keep it out of the main history list. Recorded only when save_history is true.")
     lineage_parent_node_id: str | None = Field(default=None, description="Lineage node id of the work this drawing is derived from. Omitted (None) starts a new lineage. Recorded only when save_history is true.")
     derivation_kind: str | None = Field(default=None, description="How this drawing derives from its parent, recorded on the lineage edge when save_history is true (for example ddl_edit or description_edit). With a lineage parent and no kind given, the server records ddl_edit or description_edit; without a parent, no kind is recorded.")
     derivation_metadata: dict[str, object] = Field(default_factory=dict, description="Extra values stored with the lineage edge for this derivation when save_history is true. Defaults to an empty object.")

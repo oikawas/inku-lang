@@ -36,44 +36,6 @@ export async function focusSavedLineageChild(
 	await deps.loadLineage(nodeId);
 }
 
-export type PromoteLineageDependencies = {
-	apiFetch: ApiFetch;
-	contextVersion: () => number;
-	currentItem: () => HistoryItem | null;
-	setCurrentItem: (item: HistoryItem) => void;
-	activeHistoryId: () => string | null;
-	currentOffset: () => number;
-	syncToItem: (item: HistoryItem) => Promise<void>;
-	fetchOffset: FetchOffset;
-	loadLineage: (nodeId: string) => Promise<void>;
-};
-
-/** Promote one lineage node without applying a reply to a newer canvas target. */
-export async function promoteLineageNode(
-	node: Pick<LineageNode, 'id'>,
-	deps: PromoteLineageDependencies
-): Promise<void> {
-	const contextVersion = deps.contextVersion();
-	const response = await deps.apiFetch(`/api/lineage/${encodeURIComponent(node.id)}/promote`, {
-		method: 'POST'
-	});
-	if (!response.ok) return;
-	const promoted = await response.json() as HistoryItem;
-	if (contextVersion !== deps.contextVersion()) return;
-	if (deps.currentItem()?.id === promoted.id) {
-		deps.setCurrentItem(promoted);
-		await Promise.all([deps.loadLineage(node.id), deps.syncToItem(promoted)]);
-		return;
-	}
-	const activeId = deps.activeHistoryId();
-	await Promise.all([
-		deps.loadLineage(node.id),
-		activeId
-			? deps.fetchOffset(0, { anchorId: activeId })
-			: deps.fetchOffset(deps.currentOffset(), { preserveSelection: true })
-	]);
-}
-
 export type SaveLineageNoteDependencies = {
 	apiFetch: ApiFetch;
 	contextVersion: () => number;

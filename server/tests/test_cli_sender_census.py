@@ -60,7 +60,6 @@ EXCUSED: dict[str, str] = {
     "history_display_label": "history bookkeeping; does not change the drawing",
     "batch_line_number": "history bookkeeping; does not change the drawing",
     "batch_run_id": "history bookkeeping; does not change the drawing",
-    "history_visibility": "history bookkeeping; does not change the drawing",
     "lineage_parent_node_id": "lineage; `refine perform` sends it on its own path",
     "derivation_kind": "lineage; `refine perform` sends it on its own path",
     "derivation_metadata": "lineage; `refine perform` sends it on its own path",
@@ -127,6 +126,7 @@ def test_the_excuse_table_does_not_rot():
     both = sorted(set(EXCUSED) & _payload_keys())
     assert not both, f"送っているのに除外表にも載っている: {both}"
 
-    assert len(EXCUSED) == 12, f"除外表が {len(EXCUSED)} 件（数を動かしたなら理由も書く）"
+    # history_visibility was removed from the API with hidden history.
+    assert len(EXCUSED) == 11, f"除外表が {len(EXCUSED)} 件（数を動かしたなら理由も書く）"
     for name, reason in EXCUSED.items():
         assert reason.strip(), f"{name} の除外理由が空"

@@ -230,22 +230,6 @@ def api_lineage(
     return _with_json_seeds(lineage)
 
 
-@router.post("/api/lineage/{node_id}/promote", response_model=HistoryItem, response_model_exclude_none=True, summary="Promote a lineage node to a work")
-def api_lineage_promote(
-    node_id: Annotated[str, Path(description="Id of the lineage node to promote.")],
-    actor: dict = Depends(_current_user),
-) -> HistoryItem:
-    """Turn a lineage-only node into a saved work in the caller's history.
-
-    Returns the work, now visible in the caller's history. Returns 404 when the node is not found, is not
-    writable by the caller, or is not lineage-only.
-    """
-    item = _db.promote_lineage_node(actor["id"], node_id)
-    if item is None:
-        raise HTTPException(status_code=404, detail="lineage item not found")
-    return HistoryItem(**item)
-
-
 @router.get("/api/lineage/{node_id}/colophon", response_model=list[OkugakiItem], response_model_exclude_none=True, summary="List the colophon entries of a lineage")
 def api_okugaki_list(
     node_id: Annotated[str, Path(description="Id of the lineage node at the end of the branch.")],

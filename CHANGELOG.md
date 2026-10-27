@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-27 — The batch's New stands left of the history picker (Web)
-
-At the author's instruction, the Batch tab's `New` leaves the chips of the next work's conditions and stands left of `Select from history`, the same button as the Describe tab's `New` (no longer round like a chip). With no past batch, `New` stands alone. What it does is unchanged.
-
 ### 2026-10-27 — Android shows DDL title lines as headings
 
 Android's DDL editor and ranged DDL view set a DDL title line (DDL 27) in bold and colour no word in it, and the vocabulary bar's detected words leave title lines out. Lines are recognised by a port of the shared core's `ddl_title_name` (`ui/DdlTitles.kt`). The drawing is unchanged.
@@ -358,6 +354,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.277 (2026-10-27 / Build1353)
+
+### 2026-10-27 — The batch's New stands left of the history picker (Web)
+
+At the author's instruction, the Batch tab's `New` leaves the chips of the next work's conditions and stands left of `Select from history`, the same button as the Describe tab's `New` (no longer round like a chip). With no past batch, `New` stands alone. What it does is unchanged.
 
 ## v2.15.276 (2026-10-27 / Build1352)
 

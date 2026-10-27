@@ -5,6 +5,31 @@ import InkuPersistence
 @testable import InkuHost
 
 final class HostBoundaryTests: XCTestCase, @unchecked Sendable {
+    func testCancellationWhilePreparingReviewDoesNotSendReview() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-image-cancel-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let db = try InkuDatabase(url: folder.appendingPathComponent("works.sqlite"))
+        let transport = ImageProvider()
+        let wait = ImageReviewLimit(provider: transport)
+        let host = PipelineHost(database: db, transport: transport, credentials: EmptyCredentials(), svgLimitBytes: { try await wait.limit() })
+        let image = PreparedImageInput(jpeg: Data("fixture".utf8), width: 800, height: 600,
+                                       originalWidth: 800, originalHeight: 600, nearestFormatID: "square")
+        let request = try fixture(.image(input: image.authoringJSON, autoCatalog: false))
+        let capture = ViewCapture()
+        let task = Task { try await host.generate(request, image: image) { capture.receive($0) } }
+        for _ in 0..<300 {
+            if await wait.entered { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        guard await wait.entered else { task.cancel(); XCTFail("review did not begin"); return }
+        task.cancel()
+        _ = try? await task.value
+        if let id = capture.executionID { _ = try? await host.cancel(executionID: id) }
+        let tags = await transport.actions.compactMap { $0["tag"].string }
+        XCTAssertEqual(tags, ["write_image_ddl"])
+        let rows = try await db.list()
+        XCTAssertTrue(rows.isEmpty)
+    }
     func testImageIsWrittenAndReviewedWithTransientImages() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-image-run-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: folder) }
@@ -301,6 +326,19 @@ private actor ImageProvider: ProviderTransport {
         }
         return ExactJSON.object(["tag": .string(tag), "identity": effect["identity"],
             "response": .string(response), "elapsed_ms": .string("1")]).data
+    }
+}
+private actor ImageReviewLimit {
+    let provider: ImageProvider
+    var afterWrite = 0
+    var entered = false
+    init(provider: ImageProvider) { self.provider = provider }
+    func limit() async throws -> UInt64 {
+        if await provider.actions.count == 1 {
+            afterWrite += 1
+            if afterWrite == 1 { entered = true; try await Task.sleep(for: .seconds(30)) }
+        }
+        return 16 * 1024 * 1024
     }
 }
 private actor SuspendedProvider: ProviderTransport {

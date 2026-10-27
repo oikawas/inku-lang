@@ -825,9 +825,12 @@ private actor ExecutionDriver {
                             result = .object(["tag": .string("image_review_drawn"), "identity": action["identity"],
                                 "drawing": .object(["media_type": .string("image/png"), "width": .integer(Int(width)),
                                     "height": .integer(Int(height)), "sha256": .string(hash), "byte_len": .integer(data.count)])])
+                        } catch is CancellationError {
+                            throw CancellationError()
                         } catch {
                             result = .object(["tag": .string("image_review_undrawn"), "identity": action["identity"]])
                         }
+                        try Task.checkCancellation()
                         try await advance(.object(["tag": .string("effect_result"), "result": result]))
                         progress(.changed(try makeView())); await gate.unlock()
                     } catch { await gate.unlock(); throw error }

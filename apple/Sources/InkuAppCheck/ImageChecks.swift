@@ -67,19 +67,23 @@ func runImageChecks(realOpus: Bool = false) async throws {
         await transport.blockFirstRequest()
         let operation = Task { await app.generate() }
         for _ in 0..<500 {
-            if await transport.isBlocked { break }
+            if await transport.isBlocked, app.providerProgress?.stage == .imageWriting { break }
             try await Task.sleep(for: .milliseconds(10))
         }
         let blocked = await transport.isBlocked
+        let progress = app.providerProgress
         let initialIndicators = tabs.inputTabRunning("image", app: app) && !tabs.inputTabRunning("description", app: app)
+        let initialStatus = app.singleRunStatusVisible(in: "image") && !app.singleRunStatusVisible(in: "description")
         tabs.selectInputTab("description", app: app)
         let switchedIndicators = tabs.inputTabRunning("image", app: app) && !tabs.inputTabRunning("description", app: app)
+        let switchedStatus = app.singleRunStatusVisible(in: "image") && !app.singleRunStatusVisible(in: "description")
         let blockedNewRun = !app.canGenerate
         tabs.selectInputTab("batch", app: app)
         let batchIndicators = tabs.inputTabRunning("image", app: app) && !tabs.inputTabRunning("batch", app: app)
         await transport.resume()
         await operation.value
-        guard blocked, initialIndicators, switchedIndicators, blockedNewRun, batchIndicators,
+        guard blocked, progress?.stage == .imageWriting, progress?.modelReference == reference,
+              initialIndicators, initialStatus, switchedIndicators, switchedStatus, blockedNewRun, batchIndicators,
               tabs.workspaceInputMode == "batch", !app.isBusy else {
             throw CheckFailure.message("image execution tab switching")
         }

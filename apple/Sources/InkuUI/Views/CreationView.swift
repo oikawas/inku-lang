@@ -380,10 +380,17 @@ struct CreationView: View {
                 showColorCatalogs = true
             }.disabled(controlsDisabled || model.catalogs.isEmpty)
             imagePaperCondition
-            Button(display.webCopy("generateButton", "描画する")) {
-                if model.imageWarningAcknowledged { Task { await model.generate() } }
-                else { showImageNotice = true }
-            }.buttonStyle(.borderedProminent).disabled(!model.canGenerate || controlsDisabled)
+            if model.singleRunStatusVisible(in: "image") {
+                let label = model.status == display.localized("見比べる画を描いています…") ? model.status :
+                    model.providerProgress.flatMap { $0.outcome == .running ? display.localized($0.stageTitleKey) : nil }
+                    ?? display.webCopy("imageWritingDdl", "画像から指示書を書いています…")
+                runStatus(label: label, onStop: { Task { await model.cancel() } }, stopping: false)
+            } else {
+                Button(display.webCopy("generateButton", "描画する")) {
+                    if model.imageWarningAcknowledged { Task { await model.generate() } }
+                    else { showImageNotice = true }
+                }.buttonStyle(.borderedProminent).disabled(!model.canGenerate || controlsDisabled)
+            }
         }
         .dropDestination(for: URL.self) { urls, _ in
             guard !controlsDisabled, let url = urls.first, url.isFileURL else { return false }
@@ -617,7 +624,7 @@ struct CreationView: View {
                 }
                 .buttonStyle(InkuPaintButtonStyle())
                 .disabled(!automation.running || automation.stopping)
-            } else if model.isBusy {
+            } else if model.singleRunStatusVisible(in: "description") {
                 runStatus(label: model.status, onStop: { Task { await model.cancel() } }, stopping: false)
             } else if descriptionLocked {
                 // InputPanel.svelte:326-334: a held work is drawn from its description only as a new work, named as such.

@@ -88,6 +88,11 @@ public final class AppModel {
     public private(set) var providerMetrics: [ProviderAttemptMetric] = []
     public private(set) var isBusy = false
     public private(set) var activeSingleInputMode: String?
+    public func singleRunStatusVisible(in tab: String) -> Bool {
+        guard isBusy else { return false }
+        if tab == "image" { return activeSingleInputMode == "image" }
+        return tab == "description" && (activeSingleInputMode == "description" || activeSingleInputMode == "ddl")
+    }
     /// Failure of this automation request, independent of errors from concurrent browsing.
     public private(set) var automationFailureMessage: String?
     /// Retained between batch rows so browsing does not clear the last row's progress or failure.
@@ -1022,7 +1027,7 @@ public final class AppModel {
                 importedPlugins: imported?.plugins ?? [])
             request.configuration = try configuration(request.configuration, canvasFit: fit, paperID: paperID)
             request = try await pinPersonalPlanRequests([request])[0]
-            return await runAutomation(request: request) != nil
+            return await runAutomation(request: request, singleInputMode: "ddl") != nil
         } catch { report(error); return false }
     }
 
@@ -1063,7 +1068,7 @@ public final class AppModel {
             request.inheritedImageDDL = saved.imageDDL
             request.imageProvenance = saved.imageProvenance
             request = try await pinPersonalPlanRequests([request])[0]
-            return await runAutomation(request: request) != nil
+            return await runAutomation(request: request, singleInputMode: "ddl") != nil
         } catch { report(error); return false }
     }
 
@@ -1676,11 +1681,12 @@ public final class AppModel {
 
     /// The busy flag remains held until cancellation has drained the active task.
     @discardableResult
-    public func performSerialized(status: String, allowsBrowsing: Bool = false,
+    public func performSerialized(status: String, allowsBrowsing: Bool = false, singleInputMode: String? = nil,
                                   operation: @escaping @MainActor (UUID) async throws -> Void) async -> Bool {
         guard !isBusy, activeOperation == nil, database != nil else { return false }
         let token = UUID()
         generationToken = token
+        activeSingleInputMode = singleInputMode
         providerProgress = nil
         activeExecutionID = nil
         if !allowsBrowsing { currentExecutionID = nil }
@@ -1713,10 +1719,11 @@ public final class AppModel {
         return succeeded
     }
 
-    public func runAutomation(request: GenerationRequest, image: PreparedImageInput? = nil, allowsBrowsing: Bool = false) async -> SavedWork? {
+    public func runAutomation(request: GenerationRequest, image: PreparedImageInput? = nil, allowsBrowsing: Bool = false,
+                              singleInputMode: String? = nil) async -> SavedWork? {
         guard let host else { return nil }
         var result: SavedWork?
-        _ = await performSerialized(status: "生成中", allowsBrowsing: allowsBrowsing) { [weak self] token in
+        _ = await performSerialized(status: "生成中", allowsBrowsing: allowsBrowsing, singleInputMode: singleInputMode) { [weak self] token in
             guard let self else { return }
             self.automationFailureMessage = nil
             try await self.validatePinnedRequest(request)

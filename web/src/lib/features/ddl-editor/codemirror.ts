@@ -5,6 +5,7 @@ import { autocompletion, completeFromList, type Completion, type CompletionSourc
 import { annotate, ddlPartClass, type Part } from '../../highlight';
 import { pluginDisplayName, type PluginNameIndex } from '../../plugin-names';
 import { resolveInstructionLang } from '../../instructionLang';
+import { ddlTitleName } from '../../ddl-titles';
 import { SAIJIKI, saijikiWordsFor } from '../../saijiki';
 import type { CompositionRange } from '../../composition-ranges';
 import type { PluginEntry, PreviewForPlugin, PreviewForWord, SaijikiPreview } from './types';
@@ -17,7 +18,7 @@ type Token = { from: number; to: number; part: Part };
 
 function syntaxFor(state: EditorState): { tokens: Token[]; decorations: DecorationSet } {
 	let from = 0;
-	const tokens = annotate(state.doc.toString(), state.facet(pluginNames)).map((part) => {
+	const tokens = annotate(state.doc.toString(), state.facet(pluginNames), true).map((part) => {
 		const token = { from, to: from + part.text.length, part };
 		from = token.to;
 		return token;
@@ -85,6 +86,8 @@ export function ddlCompletions(options: () => CompletionOptions): CompletionSour
 		if (context.state.readOnly || context.state.field(rangeEditorState).composing) return null;
 		const active = context.state.field(rangeEditorState).active;
 		if (active && context.pos >= active.bodyStart && context.pos <= active.bodyEnd) return null;
+		// A title line names a chunk and draws nothing, so it offers no word (DDL 27).
+		if (ddlTitleName(context.state.doc.lineAt(context.pos).text) !== null) return null;
 		const settings = options();
 		const lang = resolveInstructionLang(context.state.doc.toString(), settings.isJapanese ? 'ja' : 'en');
 		const info = (read: () => SaijikiPreview) => () => {

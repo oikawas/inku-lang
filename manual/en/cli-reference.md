@@ -63,7 +63,7 @@ For limits they record the values used in `render_limits` and their origin in `r
 
 | Flag | Contents |
 |---|---|
-| `--file FILE` / `-f` | Read the description or DDL from a UTF-8 file; `-` means stdin for both paint and batch. For batch, each non-empty line is one work |
+| `--file FILE` / `-f` | Read the description or DDL from a UTF-8 file; `-` means stdin for both paint and batch. For batch, each non-empty line is one work; with `--input-mode ddl`, a title line (a line of only `"lighthouse"`) is not a work |
 | `--out-dir DIR` / `-o` | Destination for JSON, SVG, and PNG output |
 | `--prefix P` | Output filename prefix |
 | `--png` | Also write PNG when `--out-dir` is set |

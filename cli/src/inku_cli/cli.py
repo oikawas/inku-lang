@@ -973,6 +973,26 @@ def _nim_vision_chat(image_path: Path, prompt: str, *, api_key: str, model: str)
         raise CliError(f"vision request failed: {exc}") from exc
     return str(payload["choices"][0]["message"]["content"]).strip()
 
+# A DDL title line (DDL 27, the rule of the shared core's `chunk_title.rs`): a
+# whole line of one bracketed name, 「灯台」 or "lighthouse" (or “lighthouse”),
+# naming the chunk of sentences after it. It draws nothing, so the sensors
+# below read a DDL without it.
+_DDL_TITLE_BRACKETS = (("「", "」"), ('"', '"'), ("“", "”"))
+
+def _ddl_title_name(line: str) -> str | None:
+    text = line.strip()
+    for open_, close in _DDL_TITLE_BRACKETS:
+        if len(text) >= len(open_) + len(close) and text.startswith(open_) and text.endswith(close):
+            inner = text[len(open_):len(text) - len(close)]
+            if open_ not in inner and close not in inner and "\n" not in inner:
+                return inner.strip()
+    return None
+
+def _without_ddl_titles(ddl: str | None) -> str | None:
+    if not ddl:
+        return ddl
+    return "\n".join(line for line in ddl.split("\n") if _ddl_title_name(line) is None)
+
 def _ddl_relation_present(ddl: str) -> bool:
     lower = ddl.lower()
     return any(marker in lower for marker in ("前の", "直前", "沿って", "触れない", "切る", "between", "along", "not touching", "cutting"))
@@ -1011,10 +1031,11 @@ def command_ddl_compare(args: argparse.Namespace) -> int:
             payload = items.get(key) or {}
             ddl = str(payload.get("ddl") or "")
             original = original or payload.get("description") or payload.get("input") or payload.get("original_description")
+            drawn = _without_ddl_titles(ddl) or ""
             variants.append({
                 "artifact_set": str(directory), "ddl": ddl,
-                "saijiki_outside_ascii_terms": _ddl_unknown_terms(ddl),
-                "relation_phrase_present": _ddl_relation_present(ddl),
+                "saijiki_outside_ascii_terms": _ddl_unknown_terms(drawn),
+                "relation_phrase_present": _ddl_relation_present(drawn),
             })
         rows.append({"key": key, "input": original, "variants": variants})
     report = {"artifact_sets": [str(item) for item in directories], "rows": rows, "note": "Side-by-side diagnostic only; no score or automatic winner."}
@@ -1884,7 +1905,7 @@ def _color_trace(
     requested_text: str | None = None,
 ) -> dict[str, Any]:
     text = requested_text or result.get("description")
-    ddl = result.get("ddl")
+    ddl = _without_ddl_titles(result.get("ddl"))
     score = result.get("score")
     details = _score_color_details(score)
     score_colors = set(details["score_colors"])
@@ -2738,6 +2759,9 @@ def command_batch(args: argparse.Namespace) -> int:
     client = ApiClient(args.base_url or config.base_url, config.token, timeout_seconds=timeout_seconds)
     raw = _read_text_argument(None, args.file)
     lines = [line.strip() for line in raw.splitlines() if line.strip()]
+    if getattr(args, "input_mode", "paint") == "ddl":
+        # Each line is one DDL; a title line names no sentence of its own (DDL 27).
+        lines = [line for line in lines if _ddl_title_name(line) is None]
     if not lines:
         raise CliError("batch input contains no non-empty lines")
     out_dir = Path(args.out_dir) if args.out_dir else None
@@ -4490,7 +4514,7 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
         "--input-mode",
         choices=["paint", "ddl"],
         default="paint",
-        help="paint: a natural-language description through Stage 1; ddl: normalized DDL directly through Stage 2/render",
+        help="paint: a natural-language description through Stage 1; ddl: normalized DDL directly through Stage 2/render (batch: each line is one DDL, and a title line is skipped)",
     )
     parser.add_argument(
         "--stage1-provider",

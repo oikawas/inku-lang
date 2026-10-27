@@ -175,7 +175,8 @@ test('T-7: reading displays pass no index, and both instruction editors pass one
 	assert.match(dialog, /pluginNameIndex = \$derived\(buildPluginNameIndex\(pluginEntries\)\)/);
 	assert.match(dialog, /return \{ isJapanese, disabled, pluginEntries, pluginNameIndex,/);
 	const model = read('features/ddl-editor/codemirror.ts');
-	assert.match(model, /annotate\(state\.doc\.toString\(\), state\.facet\(pluginNames\)\)/);
+	// The editor's text is a DDL, whose title lines (DDL 27) colour no word.
+	assert.match(model, /annotate\(state\.doc\.toString\(\), state\.facet\(pluginNames\), true\)/);
 	assert.match(model, /pluginNames\.of\(names\)/);
 });
 

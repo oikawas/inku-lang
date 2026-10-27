@@ -139,10 +139,13 @@ def _marks(item: dict[str, Any]) -> int:
     return int(demand.get("primitive_marks") or 0)
 
 
-def _picture(svg: str) -> str:
+def _picture(svg: str) -> tuple[str, dict[str, Any]]:
+    """The parent's picture as a choose request shows it: the PNG's data URL, and the image as the prompt names it
+    (its type, length and SHA-256; the shared core sends no image its prompt does not name)."""
     from inku_analysis.rasterizer import svg_to_png
     png = svg_to_png(svg, width=CHUNK_PICTURE_SIDE, height=CHUNK_PICTURE_SIDE)
-    return "data:image/png;base64," + base64.b64encode(png).decode("ascii")
+    named = {"media_type": "image/png", "byte_len": len(png), "sha256": hashlib.sha256(png).hexdigest()}
+    return "data:image/png;base64," + base64.b64encode(png).decode("ascii"), named
 
 
 # ---------------------------------------------------------------------------
@@ -670,20 +673,23 @@ class AutonomousRunner:
         return context, _composition_of(item)
 
     def _send_chunk(self, run: dict[str, Any], step: dict[str, Any], context: dict, request: dict,
-                    picture: str | None, sent: int, stop: threading.Event,
+                    picture: tuple[str, dict[str, Any]] | None, sent: int, stop: threading.Event,
                     language: str) -> tuple[str | None, str | None]:
         """Send one request the core asked for, as the prototype sent it: the answer's text, or the failure."""
         from .pipeline_runtime import get_service
 
         prompt = {"system": request["system"], "message": request["text"],
                   "response_schema": request["response_schema"], "action_name": CHUNK_ACTION}
+        if picture is not None:
+            # The picture goes only where the prompt names it (provider_wire refuses it otherwise).
+            prompt["images"] = [picture[1]]
         digest = hashlib.sha256(json.dumps(prompt, ensure_ascii=False, sort_keys=True,
                                            separators=(",", ":")).encode("utf-8")).hexdigest()
         # What the pipeline's record of a sent system prompt reads; the provider body leaves them out.
         prompt.update(prompt_id=f"inku.chunk-moves-{request['purpose']}.v1", prompt_digest=f"sha256:{digest}",
                       instruction_language=language)
         perform = get_service().provider_with_context(run["owner_id"], context,
-                                                      [picture] if picture is not None else None)
+                                                      [picture[0]] if picture is not None else None)
         failure = None
         for attempt in (1, 2):
             if stop.is_set():

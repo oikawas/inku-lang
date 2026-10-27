@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-27 — The chunk move stopped before it could send the parent's picture
+
+In v2.15.278 (Build 1354) every request that chooses a chunk move was refused before it was sent, and a run stopped after two turns with nothing kept (the author's run on 5173 showed it). The shared core asks a request's images to be named in its prompt too (type, length and SHA-256; the image stages, 2026-10-24), and the Server attached the parent's picture without naming it. The Server now names the parent's PNG it sends. The stand-in provider of the Server's tests now builds the request body with the core as a real one does, where an image not named is refused.
+
 ### 2026-10-27 — Android drawing conditions and wording
 
 The studio and batch conditions now label the model, color catalog and canvas; the drawing route uses a segmented control and the steps and options use stateful switches. The flow shows its steps separately with their colors. Interface wording comes from the Japanese and English language packs.

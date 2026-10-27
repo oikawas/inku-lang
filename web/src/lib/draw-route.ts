@@ -37,11 +37,13 @@ export function drawRouteHint(route: DrawRoute, isJapanese: boolean): string {
 		: 'The AI fills the fields of a fixed plan, and the program writes the instructions from it';
 }
 
-/** The two steps a run can leave out, named the same on both routes. */
+/** The two steps a run can leave out, named the same on both routes. The
+ *  composition's switch names the colors too (the author, 2026-10-27): they
+ *  come and go with it, and no switch leaves them out alone. */
 export type DrawSwitch = 'sketch' | 'composition';
 
 export function drawSwitchLabel(name: DrawSwitch, isJapanese: boolean): string {
-	if (name === 'composition') return isJapanese ? '構図と法則' : 'Composition and laws';
+	if (name === 'composition') return isJapanese ? '構図・法則・配色' : 'Composition, laws, colors';
 	return isJapanese ? '写生' : 'Sketch from life';
 }
 

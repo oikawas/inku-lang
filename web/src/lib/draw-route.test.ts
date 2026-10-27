@@ -139,7 +139,9 @@ test('the flow under the switches names the steps a run passes, in their order',
 
 test('the switches keep their names on both routes, and the panel shows them as one block', () => {
 	assert.equal(drawSwitchLabel('sketch', true), '写生');
-	assert.equal(drawSwitchLabel('composition', true), '構図と法則');
+	// The colors come and go with the composition and laws, so the switch names them.
+	assert.equal(drawSwitchLabel('composition', true), '構図・法則・配色');
+	assert.equal(drawSwitchLabel('composition', false), 'Composition, laws, colors');
 	const panel = read('./components/InputPanel.svelte');
 	assert.match(panel, /<DrawConditions route=\{drawRoute\} \{sketchMode\} \{compositionMode\} \{isJapanese\}/);
 	assert.doesNotMatch(panel, /RouteSelect|CompositionSelect|SketchSelect/);

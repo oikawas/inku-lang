@@ -76,6 +76,15 @@ final class HostBoundaryTests: XCTestCase, @unchecked Sendable {
         let record = try ExactJSON(data: XCTUnwrap(context.imageDDL))
         XCTAssertEqual(record["image"]["sent"]["sha256"].string, image.sha256)
         XCTAssertFalse(String(decoding: try XCTUnwrap(context.imageDDL), as: UTF8.self).contains("data:image"))
+        let loadedExecution = try await db.loadExecution(id: view.executionID)
+        let execution = try XCTUnwrap(loadedExecution)
+        let stored = try XCTUnwrap(JSONSerialization.jsonObject(with: execution.snapshot) as? [String: Any])
+        for key in ["snapshot", "events", "prompts", "pendingProviderAction"] {
+            guard let encoded = stored[key] as? String, let bytes = Data(base64Encoded: encoded) else { continue }
+            let text = String(decoding: bytes, as: UTF8.self)
+            XCTAssertFalse(text.contains("data:image"), "image URL persisted in \(key)")
+            XCTAssertFalse(text.contains(image.jpeg.base64EncodedString()), "image bytes persisted in \(key)")
+        }
         var childRequest = try fixture(.directDDL("place one blue circle at center."))
         childRequest.parentWorkID = view.savedWorkID
         childRequest.derivationKind = "ddl_edit"

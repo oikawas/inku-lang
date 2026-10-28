@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-28 — Share input-token admission estimates
-
-The shared core now estimates input-token reservations and validates Gemini token-count replies before admission.
-
 ### 2026-10-28 — Install and remove plugin packages on macOS
 
 Settings can check and install, replace, or remove JSON and ZIP plugin packages. Enabled words are available to new works and the Saijiki; saved works retain their own definitions.
@@ -402,6 +398,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.290 (2026-10-28 / Build1366)
+
+### 2026-10-28 — Share input-token admission estimates
+
+The shared core now estimates input-token reservations and validates Gemini token-count replies before admission.
 
 ## v2.15.289 (2026-10-28 / Build1365)
 

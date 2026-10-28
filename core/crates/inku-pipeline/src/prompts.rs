@@ -1201,14 +1201,14 @@ pub fn work_plan_plugins<'a>(
             Some(WorkPlanPlugin {
                 name: definition.qualified_name()?,
                 aliases,
-                name_ja: crate::plugin_offer::primary_name(
-                    definition,
-                    ResolvedInstructionLanguage::Ja,
-                ),
-                name_en: crate::plugin_offer::primary_name(
-                    definition,
-                    ResolvedInstructionLanguage::En,
-                ),
+                // Legacy scene definitions print their qualified name. Only
+                // v2 plugin words have the brace spelling in visible DDL.
+                name_ja: v2.map_or_else(String::new, |_| {
+                    crate::plugin_offer::primary_name(definition, ResolvedInstructionLanguage::Ja)
+                }),
+                name_en: v2.map_or_else(String::new, |_| {
+                    crate::plugin_offer::primary_name(definition, ResolvedInstructionLanguage::En)
+                }),
                 object,
                 aspect: v2.and_then(|v| v.aspect.clone()),
                 appearance_slots,

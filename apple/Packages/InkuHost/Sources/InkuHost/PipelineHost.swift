@@ -734,7 +734,8 @@ private actor ExecutionDriver {
         state = changed; databaseRevision = record.revision
     }
     func personalPlanContext(stage2: Bool) async throws -> (required: Bool, session: ChatGPTPlanSession?) {
-        (PersonalPlanRoutingTransport.isPersonal(stage2 ? state.models.stage2Model : state.models.stage1Model, providers: state.providers), state.chatGPTSession)
+        (PersonalPlanRoutingTransport.isPersonal(stage2 ? state.models.stage2Model : state.models.stage1Model, providers: state.providers,
+            defaultProvider: ProviderModelReference.split(state.models.stage1Model, providers: state.providers)?.providerID ?? ProviderModelReference.stageDefaultProviderID), state.chatGPTSession)
     }
 
     func perform(_ command: PipelineCommand, parentWorkID: String?, derivationKind: String?, derivationMetadata: Data?,
@@ -918,7 +919,8 @@ private actor ExecutionDriver {
                                     onDiagnostic: { diagnostic in progress(.providerDiagnostic(executionID: id, diagnostic: diagnostic)) })
                             }
                             let reference = tag == "complete_visible_ddl_holes" ? models.stage2Model : models.stage1Model
-                            if PersonalPlanRoutingTransport.isPersonal(reference, providers: providers) { throw HostError("chatgpt_transport_unavailable") }
+                            if PersonalPlanRoutingTransport.isPersonal(reference, providers: providers,
+                                defaultProvider: ProviderModelReference.split(models.stage1Model, providers: providers)?.providerID ?? ProviderModelReference.stageDefaultProviderID) { throw HostError("chatgpt_transport_unavailable") }
                             return try await transport.perform(action: bytes, models: models, providers: providers, credentials: credentials,
                                                                onBytes: { count in progress(.transportBytes(executionID: id, count: count)) })
                         }

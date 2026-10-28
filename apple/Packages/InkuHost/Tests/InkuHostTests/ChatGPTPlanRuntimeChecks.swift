@@ -9,6 +9,7 @@ final class ChatGPTPlanRuntimeChecks: XCTestCase {
         // Server's resolver never gives a bare reference to the plan: it falls to the stage default provider.
         XCTAssertNil(try PersonalPlanRoutingTransport.personalModel("offered", providers: [.personalPlan]))
         XCTAssertEqual(try PersonalPlanRoutingTransport.personalModel("chatgpt:offered", providers: [.personalPlan]), "offered")
+        XCTAssertEqual(try PersonalPlanRoutingTransport.personalModel("offered", providers: [.personalPlan], defaultProvider: "chatgpt"), "offered")
         XCTAssertThrowsError(try PersonalPlanRoutingTransport.personalModel("chatgpt:offered", providers: [])) {
             XCTAssertEqual(($0 as? HostError)?.code, "chatgpt_provider_selection_required")
         }

@@ -85,8 +85,7 @@ public final class SettingsModel {
     public nonisolated static func mirroringPersonalPlan(_ settings: HostSettings, publication: ChatGPTPlanPublication?) -> HostSettings {
         var next = settings
         let models = (publication?.publishedModels ?? []).map {
-            let model = ProviderModelSettings(id: $0.id, label: $0.label, purposes: publication?.purposes(of: $0.id) ?? ChatGPTPlanPublication.defaultPurposes)
-            return ModelGuidanceCatalog.bundled?.applyingCatalog(to: model, providerID: "chatgpt", kind: .chatGPTPlan) ?? model
+            publication?.assessedModels[$0.id] ?? ProviderModelSettings(id: $0.id, label: $0.label, purposes: publication?.purposes(of: $0.id) ?? ChatGPTPlanPublication.defaultPurposes)
         }
         if let index = next.providers.firstIndex(where: { $0.kind == .chatGPTPlan }) {
             // A plan that never published anything keeps its settings file unchanged.

@@ -13,14 +13,14 @@ public final class PersonalPlanRoutingTransport: ObservedProviderTransport, Obse
     public let runtime: ChatGPTPlanRuntime
     public init(ordinary: any ProviderTransport, runtime: ChatGPTPlanRuntime) { self.ordinary = ordinary; self.runtime = runtime }
 
-    public static func isPersonal(_ reference: String, providers: [ProviderSettings]) -> Bool {
+    public static func isPersonal(_ reference: String, providers: [ProviderSettings], defaultProvider: String = ProviderModelReference.stageDefaultProviderID) -> Bool {
         if reference == "chatgpt" || reference.hasPrefix("chatgpt:") { return true }
-        return (try? personalModel(reference, providers: providers)) != nil
+        return (try? personalModel(reference, providers: providers, defaultProvider: defaultProvider)) != nil
     }
-    /// Uses the ordinary resolver (Server provider_for_model): only a `chatgpt:` reference reaches the plan.
-    public static func personalModel(_ reference: String, providers: [ProviderSettings]) throws -> String? {
+    /// Resolves bare references using the configured Stage 1 provider, as model settings do.
+    public static func personalModel(_ reference: String, providers: [ProviderSettings], defaultProvider: String = ProviderModelReference.stageDefaultProviderID) throws -> String? {
         if reference == "chatgpt" { throw HostError("chatgpt_provider_selection_required") }
-        let (id, model) = ProviderModelReference.resolve(reference, providers: providers)
+        let (id, model) = ProviderModelReference.resolve(reference, providers: providers, defaultProvider: defaultProvider)
         guard id == "chatgpt" || providers.contains(where: { $0.id == id && $0.kind == .chatGPTPlan }) else { return nil }
         guard let provider = providers.first(where: { $0.id == id && $0.kind == .chatGPTPlan }), !model.isEmpty else { throw HostError("chatgpt_provider_selection_required") }
         try provider.validate(); return model
@@ -29,7 +29,7 @@ public final class PersonalPlanRoutingTransport: ObservedProviderTransport, Obse
                         onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {
         let effect = try ExactJSON(data: action)
         let reference = effect["tag"].string == "complete_visible_ddl_holes" ? models.stage2Model : models.stage1Model
-        guard try Self.personalModel(reference, providers: providers) == nil else {
+        guard try Self.personalModel(reference, providers: providers, defaultProvider: ProviderModelReference.split(models.stage1Model, providers: providers)?.providerID ?? ProviderModelReference.stageDefaultProviderID) == nil else {
             throw HostError("chatgpt_session_pin_required")
         }
         return try await ordinary.perform(action: action, models: models, providers: providers, credentials: credentials, onBytes: onBytes)
@@ -39,7 +39,7 @@ public final class PersonalPlanRoutingTransport: ObservedProviderTransport, Obse
                                 didFinish: @escaping ProviderObservationHandler, onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {
         let effect = try ExactJSON(data: action)
         let reference = effect["tag"].string == "complete_visible_ddl_holes" ? models.stage2Model : models.stage1Model
-        guard try Self.personalModel(reference, providers: providers) == nil else { throw HostError("chatgpt_session_pin_required") }
+        guard try Self.personalModel(reference, providers: providers, defaultProvider: ProviderModelReference.split(models.stage1Model, providers: providers)?.providerID ?? ProviderModelReference.stageDefaultProviderID) == nil else { throw HostError("chatgpt_session_pin_required") }
         if let observed = ordinary as? any ObservedProviderTransport {
             return try await observed.performObserved(action: action, models: models, providers: providers, credentials: credentials,
                 observation: observation, willSend: willSend, didFinish: didFinish, onBytes: onBytes)
@@ -71,7 +71,7 @@ public final class PersonalPlanRoutingTransport: ObservedProviderTransport, Obse
                                         onDiagnostic: @escaping @Sendable (ChatGPTPlanDiagnostic) -> Void) async throws -> Data {
         let effect = try ExactJSON(data: action)
         let reference = effect["tag"].string == "complete_visible_ddl_holes" ? models.stage2Model : models.stage1Model
-        guard let model = try Self.personalModel(reference, providers: providers) else {
+        guard let model = try Self.personalModel(reference, providers: providers, defaultProvider: ProviderModelReference.split(models.stage1Model, providers: providers)?.providerID ?? ProviderModelReference.stageDefaultProviderID) else {
             if let observation {
                 return try await performObserved(action: action, models: models, providers: providers, credentials: credentials,
                     observation: observation, willSend: willSend, didFinish: didFinish, onBytes: onBytes)
@@ -126,7 +126,7 @@ public final class PersonalPlanRoutingTransport: ObservedProviderTransport, Obse
     /// A Vision operation on the plan fixes the active profile once and checks that it publishes the model for Vision
     /// before any image is read (Server prepare_vision_settings); a later profile switch does not move the operation.
     public func beginAuxiliaryRun(modelReference: String, settings: HostSettings) async throws -> AuxiliaryRun {
-        guard let model = try Self.personalModel(modelReference, providers: settings.providers) else {
+        guard let model = try Self.personalModel(modelReference, providers: settings.providers, defaultProvider: ProviderModelReference.split(settings.models.stage1Model, providers: settings.providers)?.providerID ?? ProviderModelReference.stageDefaultProviderID) else {
             guard let auxiliary = ordinary as? any AuxiliaryTransport else { return .unpinned }
             return try await auxiliary.beginAuxiliaryRun(modelReference: modelReference, settings: settings)
         }
@@ -136,7 +136,7 @@ public final class PersonalPlanRoutingTransport: ObservedProviderTransport, Obse
     }
     public func performAuxiliary(prompt: AuxiliaryPrompt, modelReference: String, settings: HostSettings, credentials: any CredentialStore,
                                  run: AuxiliaryRun, onBytes: @escaping @Sendable (Int) -> Void) async throws -> String {
-        if let model = try Self.personalModel(modelReference, providers: settings.providers) {
+        if let model = try Self.personalModel(modelReference, providers: settings.providers, defaultProvider: ProviderModelReference.split(settings.models.stage1Model, providers: settings.providers)?.providerID ?? ProviderModelReference.stageDefaultProviderID) {
             // Vision advice and colophons run on the plan; the demo description does not.
             guard prompt.purpose == .vision else { throw HostError("chatgpt_operation_not_supported") }
             let pinned: ChatGPTPlanSession
@@ -149,7 +149,7 @@ public final class PersonalPlanRoutingTransport: ObservedProviderTransport, Obse
                                                     credentials: credentials, run: run, onBytes: onBytes)
     }
     public func checkAuxiliaryRun(_ run: AuxiliaryRun, modelReference: String, settings: HostSettings) async throws {
-        guard let model = try Self.personalModel(modelReference, providers: settings.providers) else {
+        guard let model = try Self.personalModel(modelReference, providers: settings.providers, defaultProvider: ProviderModelReference.split(settings.models.stage1Model, providers: settings.providers)?.providerID ?? ProviderModelReference.stageDefaultProviderID) else {
             try await (ordinary as? any AuxiliaryTransport)?.checkAuxiliaryRun(run, modelReference: modelReference, settings: settings)
             return
         }

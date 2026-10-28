@@ -14,6 +14,8 @@ final class ChatGPTWireFixtureChecks: XCTestCase {
             let request = row["request"], expected = row["expect"]
             let name = row["why"].string ?? "chatgpt"
             let action = try request.requiredString("action")
+            // The 59 authentication/publication rows have their own policy check.
+            guard ["chatgpt_request", "chatgpt_vision_request", "chatgpt_stream", "chatgpt_error", "chatgpt_catalog", "chatgpt_failure"].contains(action) else { continue }
             counts[action, default: 0] += 1
             // The core itself, field by field.
             let result = try ProviderWire.evaluate(input)

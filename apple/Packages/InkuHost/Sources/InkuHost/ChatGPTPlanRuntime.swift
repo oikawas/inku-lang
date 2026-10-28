@@ -85,16 +85,16 @@ public actor ChatGPTPlanRuntime {
     public func selectProfile(_ id: String) async throws {
         try checkOpen()
         try await mutate { value in
-            guard value.profiles[id] != nil else { throw HostError("chatgpt_not_connected") }
+            _ = try ChatGPTPolicy.call("chatgpt_auth_select", ["profile_ids": .array(value.profiles.keys.map(ExactJSON.string)), "profile_id": .string(id)])
             value.activeProfileID = id
         }
     }
     public func retryQuota(_ id: String) async throws {
         try checkOpen()
         try await mutate { value in
-            guard var profile = value.profiles[id], profile.state == "quota",
-                  profile.accessToken != nil, profile.refreshToken != nil else { throw HostError("chatgpt_not_connected") }
-            profile.state = "connected"; profile.models = nil; profile.modelsExpireAt = nil
+            guard var profile = value.profiles[id] else { throw HostError("chatgpt_not_connected") }
+            _ = try ChatGPTPolicy.call("chatgpt_auth_resume_quota", ["profile": ChatGPTPolicy.profile(profile)])
+            profile.state = "connected"
             value.profiles[id] = profile
         }
     }
@@ -124,16 +124,14 @@ public actor ChatGPTPlanRuntime {
             let attempt = Attempt(id: id, profileID: selectedID, previous: previous, previousClientID: previousClientID,
                 state: state, nonce: nonce, verifier: verifier, deadline: deadline, epoch: beginEpoch, listener: listener)
             attempts[id] = attempt
-            var parts = URLComponents(url: ChatGPTEndpoints.authorize, resolvingAgainstBaseURL: false)!
-            var query = ["client_id": previousClientID ?? "dynamic_agent_client", "ext_agent_host_id": hostID,
-                "response_type": "code", "redirect_uri": listener.redirectURI.absoluteString, "scope": ChatGPTEndpoints.scope,
-                "resource": ChatGPTEndpoints.resource, "state": state, "nonce": nonce, "code_challenge_method": "S256",
-                "code_challenge": Self.base64URL(Data(SHA256.hash(data: Data(verifier.utf8))))]
-            if let email = previous?.email, !email.isEmpty { query["login_hint"] = email }
-            if previousClientID == nil { query["agent_name_hint"] = "inku" }
-            if consent { query["prompt"] = "consent" }
-            parts.queryItems = query.sorted { $0.key < $1.key }.map { .init(name: $0.key, value: $0.value) }
-            return ChatGPTAuthorization(id: id, profileID: selectedID, authorizationURL: parts.url!)
+            var previous: [String: ExactJSON] = [:]
+            if let previousClientID { previous["client_id"] = .string(previousClientID) }
+            if let email = attempt.previous?.email { previous["email"] = .string(email) }
+            let result = try ChatGPTPolicy.call("chatgpt_auth_url", ["previous": .object(previous), "host_id": .string(hostID),
+                "redirect_uri": .string(listener.redirectURI.absoluteString), "state": .string(state), "nonce": .string(nonce),
+                "verifier": .string(verifier), "consent": .bool(consent)])
+            guard let url = URL(string: try result.requiredString("url")) else { throw HostError("chatgpt_auth_unavailable") }
+            return ChatGPTAuthorization(id: id, profileID: selectedID, authorizationURL: url)
         } catch { await listener.cancel(); throw error }
     }
     public func cancelAuthorization(_ id: String) async {
@@ -148,14 +146,14 @@ public actor ChatGPTPlanRuntime {
                     try await attempt.listener.waitForCallback()
                 }
                 try checkAttempt(id)
-                guard Self.constantTime(callback.state, attempt.state) else { throw HostError("chatgpt_callback_invalid") }
+                _ = try ChatGPTPolicy.call("chatgpt_auth_callback", ["state": .string(callback.state), "expected_state": .string(attempt.state), "code": .string(callback.code)])
                 let issued = callback.clientID ?? attempt.previousClientID ?? ""
-                guard !issued.isEmpty, issued != "dynamic_agent_client", issued.utf8.count <= 1024,
-                      attempt.previousClientID == nil || attempt.previousClientID == issued else { throw HostError("chatgpt_registration_incomplete") }
+                _ = try ChatGPTPolicy.call("chatgpt_auth_callback_client", ["issued": .string(issued), "previous": attempt.previousClientID.map { .object(["client_id": .string($0)]) } ?? .null])
+                guard issued.utf8.count <= 1024 else { throw HostError("chatgpt_registration_incomplete") }
                 // Keep the issued registration even if exchange or verification fails.
                 try await mutate { value in
                     try self.checkAttempt(id)
-                    if value.pendingRegistrations[attempt.profileID] == nil && value.pendingRegistrations.count >= 8 { throw HostError("chatgpt_profile_limit") }
+                    _ = try ChatGPTPolicy.call("chatgpt_auth_pending_check", ["exists": .bool(value.pendingRegistrations[attempt.profileID] != nil), "count": .integer(value.pendingRegistrations.count)])
                     value.pendingRegistrations[attempt.profileID] = issued
                 }
                 let check: @Sendable () async throws -> Void = { try await self.checkAttempt(id) }
@@ -170,12 +168,13 @@ public actor ChatGPTPlanRuntime {
                 let profile = try await mutate { value in
                     try self.checkAttempt(id)
                     let current = value.profiles[attempt.profileID]
-                    guard current?.generation == attempt.previous?.generation,
-                          current == nil || (current?.issuer == identity.issuer && current?.subject == identity.subject && current?.clientID == issued),
-                          current != nil || value.profiles.count < 8 else { throw HostError("chatgpt_identity_mismatch") }
+                    _ = try ChatGPTPolicy.call("chatgpt_auth_save_check", ["previous": current.map(ChatGPTPolicy.profile) ?? .null,
+                        "expected_generation": attempt.previous.map { .number(String($0.generation)) } ?? .null, "count": .integer(value.profiles.count)])
+                    let proposed: ExactJSON = .object(["issuer": .string(identity.issuer), "sub": .string(identity.subject), "client_id": .string(issued)])
+                    _ = try ChatGPTPolicy.call("chatgpt_auth_preserve", ["previous": current.map(ChatGPTPolicy.profile) ?? .null, "profile": proposed])
                     let generation = try Self.nextGeneration(current?.generation ?? 0)
                     let profile = ChatGPTStoredProfile(id: attempt.profileID, issuer: identity.issuer, subject: identity.subject,
-                        email: identity.email, clientID: issued, label: (identity.email ?? "ChatGPT") + " / " + issued.suffix(8),
+                        email: identity.email, clientID: issued, label: identity.label,
                         state: "connected", generation: generation, accessToken: fields.access, refreshToken: fields.refresh,
                         idToken: fields.identity, scopes: fields.scopes, expiresAt: fields.expiry, earliestRefreshAt: fields.earliest,
                         // Server chatgpt_store.save_profile: reauthorization keeps the profile's model choices.
@@ -212,11 +211,12 @@ public actor ChatGPTPlanRuntime {
         let (old, generation) = try await mutate { value in
             guard var profile = value.profiles[id] else { throw HostError("chatgpt_not_connected") }
             let old = profile
-            profile.state = "signed_out"; profile.generation = try Self.nextGeneration(profile.generation); profile.removeTokens()
+            try Self.transition(&profile, to: "signed_out")
             value.profiles[id] = profile; return (old, profile.generation)
         }
         for attempt in Array(attempts.values) where attempt.profileID == id { await cancelAuthorization(attempt.id) }
-        guard let refresh = old.refreshToken else { return (false, generation) }
+        let revocation = try ChatGPTPolicy.call("chatgpt_auth_revocation", ["profile": ChatGPTPolicy.profile(old)])
+        guard revocation["send"].bool == true, let refresh = old.refreshToken else { return (false, generation) }
         do {
             let deadline = Date().addingTimeInterval(10)
             let check: @Sendable () async throws -> Void = { try await self.checkOpen() }
@@ -230,7 +230,8 @@ public actor ChatGPTPlanRuntime {
             let result = try await guarded(deadline: deadline, check: check) {
                 try await self.http.send(boundedRequest, maximumBytes: 65_536, onBytes: { _ in })
             }
-            return (result.status == 200, generation)
+            let decision = try ChatGPTPolicy.call("chatgpt_auth_revocation", ["profile": ChatGPTPolicy.profile(old), "status": .integer(result.status)])
+            return (decision["confirmed"].bool == true, generation)
         } catch { return (false, generation) }
     }
 
@@ -245,7 +246,7 @@ public actor ChatGPTPlanRuntime {
     /// Server chatgpt_models.saved_publication: opening model settings never starts a catalog or token refresh.
     public func publication() throws -> ChatGPTPlanPublication {
         let session = try pin()
-        return Self.publication(try checkedProfile(session))
+        return try Self.publication(try checkedProfile(session))
     }
     /// Server POST /api/me/chatgpt/models/refresh.
     public func refreshPublication() async throws -> ChatGPTPlanPublication {
@@ -253,7 +254,7 @@ public actor ChatGPTPlanRuntime {
         _ = try await models(session: session, force: true)
         let value = try checkedState()
         guard value.activeProfileID == session.profileID else { throw HostError("chatgpt_session_changed") }
-        return Self.publication(try checkedProfile(session, value: value))
+        return try Self.publication(try checkedProfile(session, value: value))
     }
     /// Server chatgpt_models.save_publication: only the active profile, only models in its saved catalog. `purposes`
     /// replaces the named models' purposes and keeps the others; a published model needs at least one purpose.
@@ -265,44 +266,46 @@ public actor ChatGPTPlanRuntime {
         let session = ChatGPTPlanSession(profileID: profileID, generation: generation)
         return try await mutate { value in
             var profile = try self.checkedProfile(session, value: value)
-            guard value.activeProfileID == profileID else { throw HostError("chatgpt_session_changed") }
-            let offered = Set((profile.models ?? []).map(\.id))
-            guard selected.allSatisfy(offered.contains), purposes.keys.allSatisfy(offered.contains) else { throw HostError("chatgpt_model_not_offered") }
-            var chosen = profile.modelPurposes ?? [:]
-            for (id, value) in purposes { chosen[id] = ChatGPTPlanPublication.ordered(value) }
-            guard selected.allSatisfy({ !(chosen[$0] ?? ChatGPTPlanPublication.defaultPurposes).isEmpty }) else {
-                throw HostError("chatgpt_model_not_offered")
-            }
-            var seen = Set<String>()
-            profile.publishedModels = selected.filter { seen.insert($0).inserted }
-            profile.modelPurposes = chosen.isEmpty ? nil : chosen
+            _ = try ChatGPTPolicy.call("chatgpt_auth_publication_active", ["active": ChatGPTPolicy.string(value.activeProfileID), "profile_id": .string(profileID)])
+            let result = try ChatGPTPolicy.call("chatgpt_publication_update", ["profile": ChatGPTPolicy.profile(profile),
+                "selected": .array(selected.map(ExactJSON.string)),
+                "model_purposes": .object(purposes.mapValues { .array($0.map(ExactJSON.string)) }),
+                "assessments": try ChatGPTPolicy.assessments()])["profile"]
+            profile.publishedModels = result["published_models"].array?.compactMap(\.string)
+            profile.modelPurposes = result["model_purposes"].object?.mapValues { $0.array?.compactMap(\.string) ?? [] }
             value.profiles[profileID] = profile
-            return Self.publication(profile)
+            return try Self.publication(profile)
         }
     }
-    private static func publication(_ profile: ChatGPTStoredProfile) -> ChatGPTPlanPublication {
-        let models = profile.models ?? []
-        let published = Set(profile.publishedModels ?? []).intersection(models.map(\.id))
-        return ChatGPTPlanPublication(profileID: profile.id, generation: profile.generation, models: models, published: published,
-                                      purposes: profile.modelPurposes ?? [:])
+    private static func publication(_ profile: ChatGPTStoredProfile) throws -> ChatGPTPlanPublication {
+        let answer = try ChatGPTPolicy.call("chatgpt_publication", ["profile": ChatGPTPolicy.profile(profile),
+            "assessments": try ChatGPTPolicy.assessments()])["publication"]
+        let rows = answer["models"].array ?? []
+        var models: [ChatGPTPlanModel] = [], published = Set<String>(), purposes: [String: [String]] = [:]
+        var assessed: [String: ProviderModelSettings] = [:]
+        for row in rows {
+            let id = try row.requiredString("id"), label = try row.requiredString("label")
+            models.append(.init(id: id, label: label))
+            if row["enabled"].bool == true { published.insert(id) }
+            purposes[id] = row["purposes"].array?.compactMap(\.string) ?? []
+            if let object = try JSONSerialization.jsonObject(with: row.data) as? [String: Any] { assessed[id] = try ProviderCoreSettings.model(object) }
+        }
+        return .init(profileID: profile.id, generation: profile.generation, models: models, published: published,
+                     purposes: purposes, assessedModels: assessed)
     }
-    /// Server chatgpt_provider.request: offered, published by this profile, and chosen for this purpose.
     private func checkOffered(_ model: String, purpose: String, session: ChatGPTPlanSession, deadline: Date, operationEpoch: UInt64) async throws {
-        let offered = try await offeredModels(session: session, force: false, deadline: deadline, operationEpoch: operationEpoch)
-        let profile = try checkedProfile(session)
-        guard offered.contains(where: { $0.id == model }), profile.publishedModels?.contains(model) == true,
-              (profile.modelPurposes?[model] ?? ChatGPTPlanPublication.defaultPurposes).contains(purpose) else {
-            throw HostError("chatgpt_model_not_offered")
-        }
+        _ = try await offeredModels(session: session, force: false, deadline: deadline, operationEpoch: operationEpoch)
+        let publication = try Self.publication(try checkedProfile(session))
+        try Self.requireOffered(model, purpose: purpose, publication: publication)
     }
-    /// Server vision_client.check_vision_access: the pinned profile still publishes the model for Vision. It reads the
-    /// saved profile only, so a cached colophon reading is checked without a request.
+    private static func requireOffered(_ model: String, purpose: String, publication: ChatGPTPlanPublication) throws {
+        let rows = publication.models.map { ExactJSON.object(["id": .string($0.id), "enabled": .bool(publication.published.contains($0.id)),
+            "purposes": .array(publication.purposes(of: $0.id).map(ExactJSON.string))]) }
+        let result = try ChatGPTPolicy.call("chatgpt_offered", ["models": .array(rows), "model": .string(model), "purpose": .string(purpose)])
+        guard result["offered"].bool == true else { throw HostError("chatgpt_model_not_offered") }
+    }
     public func checkVisionAccess(session: ChatGPTPlanSession, model: String) throws {
-        let profile = try checkedProfile(session)
-        guard (profile.models ?? []).contains(where: { $0.id == model }), profile.publishedModels?.contains(model) == true,
-              (profile.modelPurposes?[model] ?? ChatGPTPlanPublication.defaultPurposes).contains("vision") else {
-            throw HostError("chatgpt_model_not_offered")
-        }
+        try Self.requireOffered(model, purpose: "vision", publication: Self.publication(checkedProfile(session)))
     }
     public func perform(action: Data, session: ChatGPTPlanSession, model: String, argumentLimit: Int,
                         onBytes: @escaping @Sendable (Int) -> Void) async throws -> String {
@@ -377,7 +380,7 @@ public actor ChatGPTPlanRuntime {
             let answer = try stream.result.get(); try validate(session, operationEpoch: operationEpoch); return answer
         } catch {
             let diagnostic = Self.diagnostic(error)
-            if diagnostic.code == "subscription_sharing_usage_limit_exceeded" { try await pauseQuota(session) }
+            if try Self.shouldPause(diagnostic.code) { try await pauseQuota(session) }
             throw error
         }
     }
@@ -410,7 +413,7 @@ public actor ChatGPTPlanRuntime {
             try Task.checkCancellation()
             let answer = try stream.result.get(); try validate(session, operationEpoch: operationEpoch); return answer
         } catch {
-            if Self.diagnostic(error).code == "subscription_sharing_usage_limit_exceeded" { try await pauseQuota(session) }
+            if try Self.shouldPause(Self.diagnostic(error).code) { try await pauseQuota(session) }
             throw error
         }
     }
@@ -426,7 +429,8 @@ public actor ChatGPTPlanRuntime {
     private func offeredModels(session: ChatGPTPlanSession, force: Bool, deadline: Date, operationEpoch: UInt64) async throws -> [ChatGPTPlanModel] {
         try validate(session, operationEpoch: operationEpoch)
         let profile = try checkedProfile(session)
-        if !force, let models = profile.models, let expiry = profile.modelsExpireAt, expiry > Date() { return models }
+        let cache = try ChatGPTPolicy.call("chatgpt_cache", ["force": .bool(force), "cache": profile.models == nil ? .null : ChatGPTPolicy.profile(profile)["catalog"], "now": ChatGPTPolicy.number(Date().timeIntervalSince1970)])
+        if cache["fresh"].bool == true, let models = profile.models { return models }
         let token = try await accessToken(session, deadline: deadline, operationEpoch: operationEpoch)
         var request = URLRequest(url: ChatGPTEndpoints.models); request.timeoutInterval = max(0.001, deadline.timeIntervalSinceNow)
         request.setValue("Bearer " + token, forHTTPHeaderField: "Authorization")
@@ -436,7 +440,7 @@ public actor ChatGPTPlanRuntime {
         }
         if !(200...299).contains(result.status) {
             let error = try ChatGPTWire.httpFailure(result)
-            if error.diagnostic.code == "subscription_sharing_usage_limit_exceeded" { try await pauseQuota(session) }
+            if try Self.shouldPause(error.diagnostic.code) { try await pauseQuota(session) }
             throw error
         }
         guard let value = try? ExactJSON(data: result.data) else { throw HostError("chatgpt_response_invalid") }
@@ -445,7 +449,8 @@ public actor ChatGPTPlanRuntime {
             try self.validate(session, operationEpoch: operationEpoch)
             _ = try self.checkedProfile(session, value: value)
             value.profiles[session.profileID]?.models = models
-            value.profiles[session.profileID]?.modelsExpireAt = Date().addingTimeInterval(300)
+            let expires = cache["expires_at"].number.flatMap(Double.init) ?? Date().addingTimeInterval(300).timeIntervalSince1970
+            value.profiles[session.profileID]?.modelsExpireAt = Date(timeIntervalSince1970: expires)
         }
         return models
     }
@@ -453,11 +458,8 @@ public actor ChatGPTPlanRuntime {
         let lease = try await store.lease("refresh", deadline: deadline, check: { try await self.validate(session, operationEpoch: operationEpoch) })
         defer { _ = lease }
         let profile = try checkedProfile(session)
-        if profile.expiresAt > Date().addingTimeInterval(60), let token = profile.accessToken { return token }
-        if profile.earliestRefreshAt > Date() {
-            if profile.expiresAt > Date(), let token = profile.accessToken { return token }
-            throw HostError("chatgpt_refresh_not_ready")
-        }
+        let decision = try ChatGPTPolicy.call("chatgpt_auth_access", ["profile": ChatGPTPolicy.profile(profile), "now": ChatGPTPolicy.number(Date().timeIntervalSince1970)])
+        if decision["decision"].string == "use", let token = profile.accessToken { return token }
         guard let refresh = profile.refreshToken else { throw HostError("chatgpt_reauthentication_required") }
         let check: @Sendable () async throws -> Void = { try await self.validate(session, operationEpoch: operationEpoch) }
         do {
@@ -473,15 +475,22 @@ public actor ChatGPTPlanRuntime {
                 try self.validate(session, operationEpoch: operationEpoch)
                 var current = try self.checkedProfile(session, value: saved)
                 guard current.refreshToken == refresh else { throw HostError("chatgpt_session_changed") }
-                current.accessToken = fields.access; current.refreshToken = fields.refresh; current.idToken = fields.identity
-                current.scopes = fields.scopes; current.expiresAt = fields.expiry; current.earliestRefreshAt = fields.earliest
+                let tokens: ExactJSON = .object(["access_token": .string(fields.access), "refresh_token": .string(fields.refresh),
+                    "id_token": ChatGPTPolicy.string(fields.identity), "scopes": .array(fields.scopes.map(ExactJSON.string)),
+                    "expires_at": ChatGPTPolicy.number(fields.expiry.timeIntervalSince1970),
+                    "earliest_refresh_at": ChatGPTPolicy.number(fields.earliest.timeIntervalSince1970)])
+                let updated = try ChatGPTPolicy.call("chatgpt_auth_refresh_profile", ["profile": ChatGPTPolicy.profile(current), "tokens": tokens])["profile"]
+                current.accessToken = updated["access_token"].string; current.refreshToken = updated["refresh_token"].string; current.idToken = updated["id_token"].string
+                current.scopes = updated["scopes"].array?.compactMap(\.string) ?? []
+                guard let expiry = updated["expires_at"].number.flatMap(Double.init), let earliest = updated["earliest_refresh_at"].number.flatMap(Double.init) else { throw HostError("chatgpt_identity_invalid") }
+                current.expiresAt = Date(timeIntervalSince1970: expiry); current.earliestRefreshAt = Date(timeIntervalSince1970: earliest)
                 current.models = nil; current.modelsExpireAt = nil; saved.profiles[current.id] = current
             }
             return fields.access
         } catch let error as HostError where error.code == "chatgpt_reauthentication_required" {
             try await mutate { saved in
                 var current = try self.checkedProfile(session, value: saved)
-                current.state = "reauthentication_required"; current.generation = try Self.nextGeneration(current.generation); current.removeTokens()
+                try Self.transition(&current, to: "reauthentication_required")
                 saved.profiles[current.id] = current
             }
             throw error
@@ -489,30 +498,23 @@ public actor ChatGPTPlanRuntime {
     }
     private struct TokenFields { let access: String; let refresh: String; let identity: String?; let scopes: [String]; let expiry: Date; let earliest: Date }
     private func tokenFields(_ value: ExactJSON, previous: ChatGPTStoredProfile?) throws -> TokenFields {
-        let access = try value.requiredString("access_token"), refresh = try value.requiredString("refresh_token")
-        guard value["token_type"].string?.lowercased() == "bearer", !access.isEmpty, !refresh.isEmpty,
-              access.utf8.count <= 65_536, refresh.utf8.count <= 65_536,
-              let expires = (value["expires_in"].number ?? value["expires_in"].string).flatMap(Double.init), expires.isFinite, expires > 0, expires <= 86400,
-              value["scope"] == .null || value["scope"].string != nil,
-              value["id_token"] == .null || (value["id_token"].string?.utf8.count ?? Int.max) <= 65_536 else { throw HostError("chatgpt_identity_invalid") }
-        let earliest: Date
-        if value["earliest_refresh_at"] == .null { earliest = Date(timeIntervalSince1970: 0) }
-        else if let timestamp = value["earliest_refresh_at"].number.flatMap(Double.init), timestamp.isFinite { earliest = Date(timeIntervalSince1970: timestamp) }
-        else if let text = value["earliest_refresh_at"].string,
-                let date = ISO8601DateFormatter().date(from: text) ?? Self.fractionalISODate(text) { earliest = date }
-        else { throw HostError("chatgpt_identity_invalid") }
-        return TokenFields(access: access, refresh: refresh, identity: value["id_token"].string ?? previous?.idToken,
-            scopes: value["scope"].string.map { $0.split(whereSeparator: \.isWhitespace).map(String.init) } ?? previous?.scopes ?? [],
-            expiry: Date().addingTimeInterval(expires), earliest: earliest)
+        let now = Date()
+        let result = try ChatGPTPolicy.call("chatgpt_auth_tokens", ["value": value, "previous": previous.map(ChatGPTPolicy.profile) ?? .object([:]),
+            "now": ChatGPTPolicy.number(now.timeIntervalSince1970), "local_offset_seconds": .integer(TimeZone.current.secondsFromGMT(for: now))])["tokens"]
+        let access = try result.requiredString("access_token"), refresh = try result.requiredString("refresh_token")
+        guard access.utf8.count <= 65_536, refresh.utf8.count <= 65_536,
+              let expiry = result["expires_at"].number.flatMap(Double.init), let earliest = result["earliest_refresh_at"].number.flatMap(Double.init) else { throw HostError("chatgpt_identity_invalid") }
+        let identity = result["id_token"].string
+        guard identity == nil || identity!.utf8.count <= 65_536 else { throw HostError("chatgpt_identity_invalid") }
+        return TokenFields(access: access, refresh: refresh, identity: identity, scopes: result["scopes"].array?.compactMap(\.string) ?? [],
+            expiry: Date(timeIntervalSince1970: expiry), earliest: Date(timeIntervalSince1970: earliest))
     }
-    private static func fractionalISODate(_ text: String) -> Date? {
-        let formatter = ISO8601DateFormatter(); formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter.date(from: text)
-    }
+
     private func verifyIdentity(token: String, clientID: String, nonce: String?, expectedSubject: String?, deadline: Date,
                                 check: @escaping @Sendable () async throws -> Void) async throws -> ChatGPTVerifiedIdentity {
         let metadata = try await authJSON(url: ChatGPTEndpoints.discovery, deadline: deadline, check: check)
-        guard metadata["issuer"].string == ChatGPTEndpoints.issuer, let url = URL(string: try metadata.requiredString("jwks_uri")) else { throw HostError("chatgpt_identity_invalid") }
+        _ = try ChatGPTPolicy.call("chatgpt_auth_discovery", ["discovery": metadata])
+        guard let url = URL(string: try metadata.requiredString("jwks_uri")) else { throw HostError("chatgpt_identity_invalid") }
         try ChatGPTEndpoints.validate(url, authenticationOnly: true)
         let keys = try await authJSON(url: url, deadline: deadline, check: check)
         try await check()
@@ -525,20 +527,17 @@ public actor ChatGPTPlanRuntime {
         if let fields { request.httpMethod = "POST"; request.httpBody = ChatGPTEndpoints.form(fields); request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type") }
         let boundedRequest = request
         let result = try await guarded(deadline: deadline, check: check) { try await self.http.send(boundedRequest, maximumBytes: 1_048_576, onBytes: { _ in }) }
-        let value: ExactJSON
-        do { value = try ExactJSON(data: result.data) }
-        catch { throw HostError("chatgpt_auth_unavailable") }
-        if !(200...299).contains(result.status) {
-            let code = value["error"].string ?? value["error"]["code"].string
-            if ["invalid_grant", "invalid_refresh_token", "token_expired", "refresh_token_expired", "refresh_token_invalidated", "refresh_token_reused"].contains(code ?? "") { throw HostError("chatgpt_reauthentication_required") }
-            throw HostError(result.status >= 500 ? "chatgpt_auth_unavailable" : "chatgpt_auth_rejected")
-        }
-        guard value.object != nil else { throw HostError("chatgpt_identity_invalid") }; try await check(); return value
+        let value = try? ExactJSON(data: result.data)
+        _ = try ChatGPTPolicy.call("chatgpt_auth_http", ["status": .integer(result.status), "json_valid": .bool(value != nil), "value": value ?? .null])
+        guard let value else { throw HostError("chatgpt_auth_unavailable") }
+        try await check(); return value
     }
+
     private func pauseQuota(_ session: ChatGPTPlanSession) async throws {
         try await mutate { value in
-            guard var profile = value.profiles[session.profileID], profile.generation == session.generation else { throw HostError("chatgpt_session_changed") }
-            profile.state = "quota"; profile.models = nil; profile.modelsExpireAt = nil; value.profiles[profile.id] = profile
+            guard var profile = value.profiles[session.profileID] else { return }
+            let result = try ChatGPTPolicy.call("chatgpt_auth_pause_quota", ["profile": ChatGPTPolicy.profile(profile), "generation": .number(String(session.generation))])
+            if result["changed"].bool == true { profile.state = "quota"; profile.models = nil; profile.modelsExpireAt = nil; value.profiles[profile.id] = profile }
         }
     }
     private func checkedState() throws -> ChatGPTVaultState {
@@ -550,10 +549,7 @@ public actor ChatGPTPlanRuntime {
         let value = try value ?? checkedState()
         try checkOpen(); guard value.enabled else { throw HostError("chatgpt_disabled") }
         guard let profile = value.profiles[session.profileID] else { throw HostError("chatgpt_not_connected") }
-        guard profile.generation == session.generation else { throw HostError("chatgpt_session_changed") }
-        guard profile.state == "connected" else { throw HostError("chatgpt_" + profile.state) }
-        guard profile.accessToken != nil, profile.refreshToken != nil else { throw HostError("chatgpt_not_connected") }
-        guard profile.scopes.contains("chatgpt.tokens.use.direct") else { throw HostError("chatgpt_scope_required") }
+        _ = try ChatGPTPolicy.call("chatgpt_auth_session", ["profile": ChatGPTPolicy.profile(profile), "generation": .number(String(session.generation))])
         return profile
     }
     private func checkOpen() throws { try Task.checkCancellation(); guard !closed else { throw HostError("chatgpt_cancelled") } }
@@ -597,8 +593,17 @@ public actor ChatGPTPlanRuntime {
         let a = Array(first.utf8), b = Array(second.utf8)
         guard a.count == b.count else { return false }; return zip(a, b).reduce(UInt8(0)) { $0 | ($1.0 ^ $1.1) } == 0
     }
+    private static func shouldPause(_ code: String) throws -> Bool {
+        try ChatGPTPolicy.call("chatgpt_auth_quota_failure", ["code": .string(code)])["pause"].bool == true
+    }
+    private static func transition(_ profile: inout ChatGPTStoredProfile, to state: String) throws {
+        let result = try ChatGPTPolicy.call("chatgpt_auth_transition", ["profile": ChatGPTPolicy.profile(profile), "state": .string(state)])["profile"]
+        guard let generation = result["generation"].number.flatMap(Int64.init), let state = result["state"].string else { throw HostError("chatgpt_identity_invalid") }
+        profile.generation = generation; profile.state = state; profile.removeTokens()
+    }
     private static func nextGeneration(_ generation: Int64) throws -> Int64 {
-        guard generation >= 0, generation < Int64.max else { throw HostError("chatgpt_session_changed") }; return generation + 1
+        let result = try ChatGPTPolicy.call("chatgpt_auth_generation", ["previous": .object(["generation": .number(String(generation))])])
+        guard let next = result["generation"].number.flatMap(Int64.init) else { throw HostError("chatgpt_session_changed") }; return next
     }
     public static func diagnostic(_ error: Error) -> ChatGPTPlanDiagnostic {
         if let failure = error as? ChatGPTPlanFailure { return failure.diagnostic }

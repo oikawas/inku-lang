@@ -235,14 +235,15 @@ fn project_source_instruction<'a>(
     instruction_index: usize,
     instruction: &'a SemanticInstruction,
 ) -> Option<ScoreLoweringInput<'a>> {
-    let primitive = match &instruction.entity.head {
-        SemanticHead::Primitive(term) => (&term.identity).into(),
-        SemanticHead::MacroInvocation(head) if head.object_aspect.is_some() => {
+    let (primitive, object_aspect) = match &instruction.entity.head {
+        SemanticHead::Primitive(term) => ((&term.identity).into(), None),
+        SemanticHead::MacroInvocation(head) if head.object_aspect.is_some() => (
             SemanticInputIdentity {
                 category: "shape",
                 id: "square",
-            }
-        }
+            },
+            head.object_aspect,
+        ),
         SemanticHead::MacroInvocation(_) => return None,
     };
     Some(ScoreLoweringInput {
@@ -275,6 +276,7 @@ fn project_source_instruction<'a>(
             .as_ref()
             .map(|term| (&term.identity).into()),
         primitive,
+        object_aspect,
         count: instruction
             .entity
             .quantity
@@ -1934,6 +1936,7 @@ fn project_macro_emit<'a>(
         shape_constraint,
         proportion_aspect,
         primitive: primitive.expect("required macro shape field checked"),
+        object_aspect: None,
         count,
         color,
         color_cycle: &[],
@@ -5005,6 +5008,7 @@ struct ScoreLoweringInput<'a> {
     shape_constraint: Option<crate::ShapeConstraint>,
     proportion_aspect: Option<SemanticInputIdentity<'a>>,
     primitive: SemanticInputIdentity<'a>,
+    object_aspect: Option<(u8, u8)>,
     count: Option<u64>,
     color: Option<SemanticInputIdentity<'a>>,
     color_cycle: &'a [crate::SemanticTerm],
@@ -6723,8 +6727,16 @@ fn resolve_complete_object<'a>(
         }
         _ => unreachable!("checked position authority"),
     };
-    let (dimensions, _) =
+    let (mut dimensions, _) =
         resolve_size_candidates(input, context, primitive).map_err(|gap| vec![gap])?;
+    if let Some(aspect) = input.object_aspect {
+        let explicit_box = matches!(
+            input.explicit_geometry,
+            Some(crate::SemanticExplicitGeometry::WidthHeight { .. })
+        );
+        dimensions =
+            object_box_dimensions(dimensions, aspect, explicit_box).map_err(|gap| vec![gap])?;
+    }
     if let ScorePlacement::Numeric(position) = placement {
         let x = Rational::from_decimal(position.x).map_err(|gap| vec![gap])?;
         let y = Rational::from_decimal(position.y).map_err(|gap| vec![gap])?;
@@ -7245,6 +7257,77 @@ pub enum ResolvedGeometryDimensions {
     Point { radius: Rational },
     CenteredSize { width: Rational, height: Rational },
     Square { side: Rational },
+}
+
+/// A word's ordinary or side-sized box keeps the long side resolved for a
+/// square. Explicit width and height instead retain the author's dimensions.
+fn object_box_dimensions(
+    dimensions: ResolvedGeometryDimensions,
+    aspect: (u8, u8),
+    explicit_box: bool,
+) -> Result<ResolvedGeometryDimensions, ScoreFieldGap> {
+    if explicit_box {
+        return Ok(dimensions);
+    }
+    let long = match dimensions {
+        ResolvedGeometryDimensions::Square { side } => side,
+        ResolvedGeometryDimensions::Bbox { width, height } => {
+            if width.le(height)? {
+                height
+            } else {
+                width
+            }
+        }
+        _ => {
+            return Err(ScoreFieldGap::GeometryDimensionMismatch {
+                primitive: Primitive::Square,
+            });
+        }
+    };
+    let (width, height) = (i128::from(aspect.0), i128::from(aspect.1));
+    let longest = width.max(height);
+    if width == 0 || height == 0 {
+        return Err(ScoreFieldGap::GeometryRepresentationLimit);
+    }
+    Ok(ResolvedGeometryDimensions::Bbox {
+        width: reduced_ratio(long.mul_ratio(width, longest)?),
+        height: reduced_ratio(long.mul_ratio(height, longest)?),
+    })
+}
+
+#[cfg(test)]
+mod object_box_tests {
+    use super::*;
+
+    #[test]
+    fn a_box_uses_the_square_long_side_unless_width_and_height_are_explicit() {
+        let side = Rational::from_ratio(6, 25).unwrap();
+        let short = Rational::from_ratio(3, 25).unwrap();
+        assert_eq!(
+            object_box_dimensions(ResolvedGeometryDimensions::Square { side }, (2, 1), false)
+                .unwrap(),
+            ResolvedGeometryDimensions::Bbox {
+                width: side,
+                height: short
+            }
+        );
+        assert_eq!(
+            object_box_dimensions(ResolvedGeometryDimensions::Square { side }, (1, 2), false)
+                .unwrap(),
+            ResolvedGeometryDimensions::Bbox {
+                width: short,
+                height: side
+            }
+        );
+        let written = ResolvedGeometryDimensions::Bbox {
+            width: short,
+            height: side,
+        };
+        assert_eq!(
+            object_box_dimensions(written, (2, 1), true).unwrap(),
+            written
+        );
+    }
 }
 
 /// The reference extent is measured before any instruction rotation or ink variation.

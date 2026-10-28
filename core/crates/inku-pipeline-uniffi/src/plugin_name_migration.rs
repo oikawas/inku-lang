@@ -28,7 +28,11 @@ fn run(input: &[u8]) -> Option<Value> {
     let mut problems = Vec::new();
     for value in definitions {
         let old = MacroDefinition::from_json(&value.to_string()).ok()?;
-        let old_id = old.identity().ok()?;
+        let old_id = if has_document {
+            old.identity().ok()?
+        } else {
+            old.migration_identity_allow_core_name().ok()?
+        };
         let changed = !has_document && old.plugin_v2.is_none();
         let mut wire = serde_json::to_value(&old).ok()?;
         if changed {
@@ -42,11 +46,31 @@ fn run(input: &[u8]) -> Option<Value> {
             object.insert("kind".into(), json!("scene"));
         }
         let new = MacroDefinition::from_json(&wire.to_string()).ok()?;
-        let new_id = match new.identity() {
+        let validation = new.validate();
+        for finding in validation
+            .diagnostics()
+            .iter()
+            .filter(|finding| finding.code() == "name_is_core_word")
+        {
+            problems.push(json!({"qualified_name":old_id.qualified_name(),"code":finding.code(),"path":finding.path()}));
+        }
+        if has_document && old.plugin_v2.is_none() {
+            let (ja, en) = inku_ddl::plugin_names::v1_plugin_names(&old.heading, &old.aliases);
+            for (language, names) in [("ja", ja), ("en", en)] {
+                for (index, name) in names.iter().enumerate() {
+                    if inku_ddl::plugin_names::plugin_name_is_core_word(name) {
+                        problems.push(json!({"qualified_name":old_id.qualified_name(),"code":"name_is_core_word","path":format!("$.names.{language}[{index}]")}));
+                    }
+                }
+            }
+        }
+        let new_id = match new.migration_identity_allow_core_name() {
             Ok(id) => id,
             Err(validation) => {
                 for finding in validation.diagnostics() {
-                    problems.push(json!({"qualified_name":old_id.qualified_name(),"code":finding.code(),"path":finding.path()}));
+                    if finding.code() != "name_is_core_word" {
+                        problems.push(json!({"qualified_name":old_id.qualified_name(),"code":finding.code(),"path":finding.path()}));
+                    }
                 }
                 return Some(json!({"error":"definition_migration_refused","problems":problems}));
             }
@@ -190,6 +214,27 @@ mod tests {
                 .iter()
                 .any(|p| p["code"] == "missing_lock")
         );
+        let mut colliding = package["entries"][0]["definition"].clone();
+        colliding["aliases"] = json!(["円"]);
+        let result =
+            run(&serde_json::to_vec(&json!({"definitions":[colliding]})).unwrap()).unwrap();
+        assert_eq!(result["definitions"][0]["changed"], true);
+        assert!(
+            result["problems"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|p| p["code"] == "name_is_core_word")
+        );
+        let repeat = run(&serde_json::to_vec(
+            &json!({"definitions":[result["definitions"][0]["definition"]]}),
+        )
+        .unwrap())
+        .unwrap();
+        assert_eq!(repeat["definitions"][0]["changed"], false);
+        let v2 = MacroDefinition::from_json(&result["definitions"][0]["definition"].to_string())
+            .unwrap();
+        assert!(!v2.validate().is_valid());
     }
 
     #[test]

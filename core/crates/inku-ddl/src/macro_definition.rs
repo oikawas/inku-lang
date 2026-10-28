@@ -1071,6 +1071,34 @@ impl MacroDefinition {
     /// Domain-separated full SHA-256 semantic identity.
     pub fn identity(&self) -> Result<MacroDefinitionIdentity, MacroDefinitionValidation> {
         let canonical_json = self.canonical_json_bytes()?;
+        Ok(self.identity_from_canonical(canonical_json))
+    }
+
+    /// Identity for reporting a legacy-name migration that requires author repair.
+    /// This does not make the returned definition valid for catalog admission.
+    pub fn migration_identity_allow_core_name(
+        &self,
+    ) -> Result<MacroDefinitionIdentity, MacroDefinitionValidation> {
+        let validation = self.validate();
+        if validation.is_valid() {
+            return self.identity();
+        }
+        if validation.diagnostics().is_empty()
+            || validation
+                .diagnostics()
+                .iter()
+                .any(|finding| finding.code() != "name_is_core_word")
+        {
+            return Err(validation);
+        }
+        let mut canonical = self.clone();
+        normalize_definition_semantic_aliases(&mut canonical);
+        let canonical_json =
+            serde_json::to_vec(&canonical).expect("typed MacroDefinition must serialize");
+        Ok(self.identity_from_canonical(canonical_json))
+    }
+
+    fn identity_from_canonical(&self, canonical_json: Vec<u8>) -> MacroDefinitionIdentity {
         let domain = if self.plugin_v2.is_some() {
             b"inku.macro-definition.v2".as_slice()
         } else {
@@ -1085,7 +1113,7 @@ impl MacroDefinition {
             .iter()
             .map(|byte| format!("{byte:02x}"))
             .collect();
-        Ok(MacroDefinitionIdentity {
+        MacroDefinitionIdentity {
             qualified_name: self
                 .qualified_name()
                 .expect("validated definition must have a qualified name"),
@@ -1093,7 +1121,7 @@ impl MacroDefinition {
             canonical_json,
             full_digest,
             full_digest_hex,
-        })
+        }
     }
 }
 

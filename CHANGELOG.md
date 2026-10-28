@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-28 — Install and remove plugin packages on macOS
+
+Settings can check and install, replace, or remove JSON and ZIP plugin packages. Enabled words are available to new works and the Saijiki; saved works retain their own definitions.
+
 ### 2026-10-28 — Android reads model catalog and selection from the shared core
 
 Android receives the embedded model catalog, labels, selectability and ordering through JNI instead of maintaining a second classification. Model names now sort with the same collation as Web. Local observations and purpose choices remain unchanged.

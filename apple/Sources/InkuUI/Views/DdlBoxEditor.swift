@@ -9,7 +9,7 @@ struct DdlBoxEditor: View {
     @Bindable var model: AppModel
     let work: SavedWork
     let editable: Bool
-    @State private var highlighter: DdlHighlighter
+    private var highlighter: DdlHighlighter { DdlHighlighter(saijiki: model.saijiki, plugins: PluginNameIndex(words: model.pluginWords)) }
     @State private var completionStates: [CompletionRangeState] = []
     @State private var completionSource = ""
     @State private var rangeStatus = RangeEditorStatus()
@@ -20,7 +20,6 @@ struct DdlBoxEditor: View {
         self.model = model
         self.work = work
         self.editable = editable
-        _highlighter = State(initialValue: DdlHighlighter(saijiki: model.saijiki, plugins: PluginNameIndex(words: model.pluginWords)))
     }
 
     private var text: String { model.ddlBoxText(for: work) }

@@ -8,6 +8,14 @@ import InkuHost
 struct AppCheck {
     @MainActor
     static func main() async throws {
+        if let index = CommandLine.arguments.firstIndex(of: "--plugin-package-check") {
+            guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Expected package path") }
+            try await checkPluginPackageFile(url: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return
+        }
+        if let index = CommandLine.arguments.firstIndex(of: "--plugin-package-only") {
+            guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Expected PLUGIN.ja.md path") }
+            try await runPluginPackageChecks(specURL: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return
+        }
         if CommandLine.arguments.contains("--image-run-only") {
             try await runImageChecks(); return
         }

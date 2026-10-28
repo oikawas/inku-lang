@@ -12,6 +12,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 Settings can check and install, replace, or remove JSON and ZIP plugin packages. Enabled words are available to new works and the Saijiki; saved works retain their own definitions.
 
+### 2026-10-28 — Android uses shared provider settings
+
+Android uses the shared core for provider definitions, settings, model references, list refresh and access decisions. On-device model assets and encrypted keys remain on the device, and Android retains its URL restrictions.
+
 ### 2026-10-28 — Android reads model catalog and selection from the shared core
 
 Android receives the embedded model catalog, labels, selectability and ordering through JNI instead of maintaining a second classification. Model names now sort with the same collation as Web. Local observations and purpose choices remain unchanged.

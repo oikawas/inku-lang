@@ -13,7 +13,7 @@ class RoutingModelProviderTest {
         val api = provider("openai", models = "[\"personal-model\"]")
         val plan = provider("chatgpt", models = "[\"plan-only\"]")
         assertNull(RoutingModelProvider.resolveProviderForRouting(listOf(local, api), "chatgpt:personal-model", "local-litert-lm"))
-        assertNull(RoutingModelProvider.resolveProviderForRouting(listOf(local, api), "ChatGPT:personal-model", "local-litert-lm"))
+        assertSame(local, RoutingModelProvider.resolveProviderForRouting(listOf(local, api), "ChatGPT:personal-model", "local-litert-lm"))
         assertSame(plan, RoutingModelProvider.resolveProviderForRouting(listOf(local, plan), "plan-only", "local-litert-lm"))
         assertSame(api, RoutingModelProvider.resolveProviderForRouting(listOf(local, plan, api), "personal-model", "local-litert-lm"))
     }

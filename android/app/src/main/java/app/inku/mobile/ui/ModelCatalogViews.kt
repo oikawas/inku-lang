@@ -34,10 +34,15 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import app.inku.mobile.data.CatalogModel
 import app.inku.mobile.data.ModelCatalog
+import app.inku.mobile.data.catalogRequest
+import app.inku.mobile.data.strings
 import app.inku.mobile.ui.i18n.InkuStrings
 import app.inku.mobile.ui.theme.ActiveRowTint
 import app.inku.mobile.ui.theme.Dimens
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
+import org.json.JSONArray
+import org.json.JSONObject
 
 /** Matches the Web picker: purpose first, then the legacy score for old catalog rows. */
 internal fun modelRecommendationStars(model: CatalogModel, purpose: String? = null, stage: String? = null): String {
@@ -58,8 +63,7 @@ internal fun modelRecommendationLevel(model: CatalogModel, purpose: String? = nu
     return model.selection.getJSONObject("levels").getJSONObject(p).getDouble(s)
 }
 
-private fun CatalogModel.listed(key: String): List<String> =
-    record.optJSONArray(key)?.let { array -> (0 until array.length()).map(array::optString) }.orEmpty()
+private val purposeCache = ConcurrentHashMap<String, List<String>>()
 
 /**
  * Web `purposeUnsupported`: the benchmark found the model does not answer this
@@ -77,11 +81,18 @@ internal fun purposeUnsupported(model: CatalogModel, purpose: String): Boolean =
  * A catalog row with neither purpose and nothing measured serves LLM.
  */
 internal fun modelPurposes(model: CatalogModel, ticked: List<String>? = null): List<String> {
-    if (ticked != null) return listOf("llm", "vision").filter { it in ticked }
-    val unsupported = model.listed("unsupported_purposes")
-    val chosen = model.record.optJSONArray("purposes")?.let { model.listed("purposes") }
-        ?.takeIf { it.isNotEmpty() || unsupported.isNotEmpty() } ?: listOf("llm")
-    return listOf("llm", "vision").filter { it in chosen && it !in unsupported }
+    val record = JSONObject(model.record.toString())
+    if (ticked != null) record.put("purposes", JSONArray(ticked)).put("allowed_unsupported_purposes", JSONArray(ticked))
+    return purposeCache.computeIfAbsent(record.toString()) {
+        val normalized = catalogRequest("normalize_models", JSONObject().put("models", JSONArray().put(record))).getJSONArray("models")
+        // An explicit empty selection is a host preference, not missing catalog metadata.
+        if (ticked != null && ticked.isEmpty()) normalized.getJSONObject(0).put("purposes", JSONArray())
+        val provider = JSONObject().put("id", "android").put("active", true).put("models", normalized)
+        val settings = JSONObject().put("providers", JSONObject().put("android", provider))
+        val groups = catalogRequest("provider_catalog", JSONObject().put("settings", settings)
+            .put("order", JSONArray().put("android"))).getJSONArray("providers")
+        groups.getJSONObject(0).getJSONArray("models").getJSONObject(0).optJSONArray("purposes").strings()
+    }
 }
 
 /**

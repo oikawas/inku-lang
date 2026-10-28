@@ -67,7 +67,22 @@ pub fn offer_line(entry: &MacroPromptEntry<'_>, language: ResolvedInstructionLan
         ResolvedInstructionLanguage::En => summary.find(". ").map(|i| i + 1),
     }
     .unwrap_or(summary.len());
-    let summary: String = summary[..end].chars().take(100).collect();
+    let sentence = &summary[..end];
+    let summary = if let Some((cut, next)) = sentence.char_indices().nth(99)
+        && sentence.chars().count() > 100
+    {
+        let prefix = &sentence[..cut];
+        let prefix = match language {
+            ResolvedInstructionLanguage::Ja => prefix,
+            ResolvedInstructionLanguage::En if next.is_whitespace() => prefix.trim_end(),
+            ResolvedInstructionLanguage::En => prefix
+                .rfind(char::is_whitespace)
+                .map_or("", |boundary| prefix[..boundary].trim_end()),
+        };
+        format!("{prefix}…")
+    } else {
+        sentence.to_owned()
+    };
     let object = definition
         .plugin_v2
         .as_ref()
@@ -120,10 +135,15 @@ pub fn offer_line(entry: &MacroPromptEntry<'_>, language: ResolvedInstructionLan
     } else {
         format!(" [{}]", appearance.join(", "))
     };
+    let separator = match language {
+        ResolvedInstructionLanguage::Ja => "",
+        ResolvedInstructionLanguage::En => " ",
+    };
     format!(
-        "{} {}{}{}",
+        "{} {}{}{}{}",
         primary_name(definition, language),
         summary,
+        separator,
         category,
         extra
     )
@@ -333,6 +353,53 @@ pub fn with_plugin_offer(
 mod tests {
     use super::*;
     use serde_json::Value;
+
+    #[test]
+    fn summary_lines_separate_english_and_mark_truncated_sentences() {
+        let asset: Value = serde_json::from_str(inku_ddl::NATURE_LEAVES_V1_JSON).unwrap();
+        let definition =
+            MacroDefinition::from_json(&asset["entries"][0]["definition"].to_string()).unwrap();
+        let summary = "Scatter fallen leaves widely and unevenly to both sides of a drift from upper left to lower right, gently gathering near the edge.";
+        let entry = MacroPromptEntry {
+            definition: &definition,
+            localized_summary: summary,
+        };
+        let line = offer_line(&entry, ResolvedInstructionLanguage::En);
+        let text = line
+            .strip_prefix("{young leaves} ")
+            .unwrap()
+            .split_once(" scene word")
+            .unwrap()
+            .0;
+        assert!(text.ends_with('…'));
+        let complete = text.strip_suffix('…').unwrap();
+        assert!(summary.starts_with(complete));
+        assert!(summary[complete.len()..].starts_with(char::is_whitespace));
+        assert!(text.chars().count() <= 100);
+
+        let japanese = "若".repeat(101);
+        let entry = MacroPromptEntry {
+            definition: &definition,
+            localized_summary: &japanese,
+        };
+        let line = offer_line(&entry, ResolvedInstructionLanguage::Ja);
+        let text = line
+            .strip_prefix("｛若葉｝ ")
+            .unwrap()
+            .split_once("情景の語")
+            .unwrap()
+            .0;
+        assert!(text.ends_with('…'));
+        assert_eq!(text.chars().count(), 100);
+
+        let entry = MacroPromptEntry {
+            definition: &definition,
+            localized_summary: "A short sentence. Another sentence.",
+        };
+        let line = offer_line(&entry, ResolvedInstructionLanguage::En);
+        assert!(line.contains("A short sentence. scene word"));
+        assert!(!line.contains("Another sentence"));
+    }
 
     #[test]
     fn selection_prioritizes_braces_then_ddl_then_mentions_and_respects_word_boundaries() {

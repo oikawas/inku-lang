@@ -4,7 +4,7 @@ import InkuUI
 
 @MainActor func runModelCatalogChecks(casesURL: URL) async throws {
     // The old two-flag selector missed four labels, metadata and ChatGPT evaluations.
-    // Exercise the shared cases with the real Host resolver and the generated v2 resource.
+    // Exercise the shared cases through Swift's record conversion and the real core.
     let data = try Data(contentsOf: casesURL)
     guard let fixture = try JSONSerialization.jsonObject(with: data) as? [String: Any],
           fixture["schema"] as? String == "inku.model-catalog-cases.v1",
@@ -25,12 +25,45 @@ import InkuUI
         }
     }
 
+    guard let selectionCases = fixture["selection_cases"] as? [[String: Any]],
+          let sortCases = fixture["sort_cases"] as? [[String: Any]] else {
+        throw CheckFailure.message("Shared model selection cases unavailable")
+    }
+    for item in selectionCases {
+        guard let record = item["model"] as? [String: Any], let purpose = item["purpose"] as? String,
+              let stage = item["stage"] as? String, let level = item["level"] as? Int,
+              let unselectable = item["unselectable"] as? Bool, let unsupported = item["unsupported"] as? Bool else {
+            throw CheckFailure.message("Shared model selection case malformed")
+        }
+        let model = try ModelGuidanceCatalog.modelSettings(recordData: JSONSerialization.data(withJSONObject: record))
+        guard !model.isSelectable == unselectable, model.isNotRecommended(for: purpose) == unsupported,
+              (model.catalogLevel(purpose: purpose, stage: stage) ?? 0) == level else {
+            throw CheckFailure.message("Model selection disagrees: \(item["name"] as? String ?? "unnamed")")
+        }
+    }
+    for item in sortCases {
+        guard let records = item["models"] as? [[String: Any]], let order = item["order"] as? [String] else {
+            throw CheckFailure.message("Shared model sort case malformed")
+        }
+        let models = try records.map { try ModelGuidanceCatalog.modelSettings(recordData: JSONSerialization.data(withJSONObject: $0)) }
+        let sorted = models.enumerated().sorted { left, right in
+            let a = left.element.catalogSortKey(purpose: "llm"), b = right.element.catalogSortKey(purpose: "llm")
+            return a == b ? left.offset < right.offset : a < b
+        }.map { $0.element.id }
+        guard sorted == order else { throw CheckFailure.message("Model sort disagrees: \(item["name"] as? String ?? "unnamed")") }
+    }
+
     let sourceURL = casesURL.deletingLastPathComponent().appendingPathComponent("model_catalog.json")
     let source = try JSONSerialization.jsonObject(with: Data(contentsOf: sourceURL)) as? NSDictionary
     let manifest = try JSONSerialization.jsonObject(with: ModelGuidanceCatalog.bundledManifestData()) as? [String: Any]
-    guard let source, let exported = manifest?["model_catalog"] as? NSDictionary,
-          source.isEqual(exported), manifest?["model_guidance"] == nil else {
-        throw CheckFailure.message("Generated v2 catalog differs from canonical source or retains v1 guidance")
+    guard let source else { throw CheckFailure.message("Source catalog unavailable") }
+    let sourceCanonical = try ExactJSON(data: Data(contentsOf: sourceURL)).canonicalText
+    let coreCanonical = try ExactJSON(data: SharedModelCatalog.catalogData).canonicalText
+    guard sourceCanonical != nil, sourceCanonical == coreCanonical else {
+        throw CheckFailure.message("Core catalog differs from canonical source")
+    }
+    guard manifest?["model_catalog"] == nil, manifest?["model_guidance"] == nil else {
+        throw CheckFailure.message("Manifest retains copied model catalog")
     }
     let catalog = try ModelGuidanceCatalog.loadBundled()
     guard catalog.labelDefinitions == ModelCatalogLabels.definitions else {
@@ -172,5 +205,5 @@ import InkuUI
           ModelNaming(providers: [plan]).modelShortName("chatgpt:\(saved.id)") == saved.label else {
         throw CheckFailure.message("Historical naming lost canonical/local labels or registered a removed model")
     }
-    print("Model catalog passed: shared 15 cases; exact v2 export and Host label table; measurement key presence; ChatGPT evaluations and author purposes; stale labels refreshed; account/re-offer corrections; custom/wrong-kind boundaries; old settings compatibility; three-tier presentation; measured units and absent values; unsupported purposes chosen as not recommended and kept only where chosen; historical naming without registration. Zero provider calls.")
+    print("Model catalog passed: shared 15 label, \(selectionCases.count) selection and \(sortCases.count) sort cases through real core; canonical catalog and label table; measurement key presence; ChatGPT evaluations, saved settings and account/re-offer corrections. Zero provider calls.")
 }

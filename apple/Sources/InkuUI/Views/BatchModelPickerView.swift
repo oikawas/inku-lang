@@ -283,18 +283,7 @@ struct BatchModelPickerView: View {
 
     private func sortedModels(for provider: ProviderSettings) -> [ProviderModelSettings] {
         let models = SettingsModel.registeredModels(for: provider, purpose: selectedPurpose)
-        if provider.kind == .chatGPTPlan { return models }
-        return models.sorted { first, second in
-            if first.isSelectable != second.isSelectable { return first.isSelectable }
-            // A model chosen for a purpose it did not answer comes after those that did (2026-10-26).
-            let firstUnrecommended = first.isNotRecommended(for: selectedPurpose)
-            if firstUnrecommended != second.isNotRecommended(for: selectedPurpose) { return !firstUnrecommended }
-            let firstLevel = sharedRecommendationLevel(first), secondLevel = sharedRecommendationLevel(second)
-            if firstLevel != secondLevel { return firstLevel > secondLevel }
-            let firstLabel = first.label.isEmpty ? first.id : first.label
-            let secondLabel = second.label.isEmpty ? second.id : second.label
-            return firstLabel.localizedCompare(secondLabel) == .orderedAscending
-        }
+        return ProviderModelOrdering.picker(models, purpose: selectedPurpose, chatGPT: provider.kind == .chatGPTPlan)
     }
 
     private func entry(for reference: String, purpose: String? = nil) -> (provider: ProviderSettings, model: ProviderModelSettings)? {
@@ -316,19 +305,16 @@ struct BatchModelPickerView: View {
     }
 
     private func sharedRecommendationLevel(_ entry: ProviderModelSettings) -> Int {
-        if selectedPurpose == "vision" { return entry.recommendationVision ?? entry.recommendationLevel ?? 0 }
-        let staged = [entry.recommendationStage1, entry.recommendationStage2].compactMap { $0 }.min()
-        return max(0, min(5, staged ?? entry.recommendationLLM ?? entry.recommendationLevel ?? 0))
+        entry.catalogLevel(purpose: selectedPurpose, stage: selectedPurpose == "vision" ? "none" : "both") ?? 0
     }
 
     private func recommendationRows(_ entry: ProviderModelSettings) -> [(String, String)] {
-        if selectedPurpose == "vision" { return [("オススメ度", ModelGuidance.recommendation(entry.recommendationVision ?? entry.recommendationLevel))] }
-        let llm = entry.recommendationLLM ?? entry.recommendationLevel
+        if selectedPurpose == "vision" { return [("オススメ度", ModelGuidance.recommendation(entry.catalogLevel(purpose: "vision")))] }
         if entry.recommendationStage1 != nil || entry.recommendationStage2 != nil {
-            return [("オススメ度 / Stage 1", ModelGuidance.recommendation(entry.recommendationStage1 ?? llm)),
-                    ("オススメ度 / Stage 2", ModelGuidance.recommendation(entry.recommendationStage2 ?? llm))]
+            return [("オススメ度 / Stage 1", ModelGuidance.recommendation(entry.catalogLevel(purpose: "llm", stage: "stage1"))),
+                    ("オススメ度 / Stage 2", ModelGuidance.recommendation(entry.catalogLevel(purpose: "llm", stage: "stage2")))]
         }
-        return [("オススメ度", ModelGuidance.recommendation(llm))]
+        return [("オススメ度", ModelGuidance.recommendation(entry.catalogLevel(purpose: "llm")))]
     }
 
     private func purposes(_ entry: ProviderModelSettings) -> String {

@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-28 — Android uses shared provider admission
+
+Remote-provider admission, waiting and settlement use the shared core and persist their state on the device. Gemini counts input tokens before sending.
+
 ### 2026-10-28 — Install and remove plugin packages on macOS
 
 Settings can check and install, replace, or remove JSON and ZIP plugin packages. Enabled words are available to new works and the Saijiki; saved works retain their own definitions.

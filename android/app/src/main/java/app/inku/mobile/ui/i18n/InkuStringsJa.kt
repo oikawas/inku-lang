@@ -374,6 +374,9 @@ object InkuStringsJa : InkuStrings {
     }
 
     override val errorServiceIdFormat = "Service ID は英数字・_・- で入力してください。"
+    override val errorProviderDailyBudget = "モデル提供元の1日の要求上限に達しました。"
+    override val errorProviderInputBudget = "入力がモデル提供元のトークン上限を超えています。"
+    override val errorProviderInputCount = "入力トークン数を確認できませんでした。"
     override val errorDuplicateModelIds = "同じモデル ID が複数あります。"
     override val errorServiceNotFound: (String) -> String = { id -> "サービスが見つかりません: $id" }
     override val errorProviderModelsUnsupported: (String) -> String = { name ->

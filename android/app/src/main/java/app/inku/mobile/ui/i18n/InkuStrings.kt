@@ -269,6 +269,9 @@ interface InkuStrings {
 
     // --- Errors thrown below the screen -------------------------------------
     val errorServiceIdFormat: String
+    val errorProviderDailyBudget: String
+    val errorProviderInputBudget: String
+    val errorProviderInputCount: String
     val errorDuplicateModelIds: String
     val errorServiceNotFound: (String) -> String
     val errorProviderModelsUnsupported: (String) -> String

@@ -115,6 +115,7 @@ class SingleAttemptModelEffectProvider(
         val detail = (cause as? InkuFailure)?.detail
             ?: when (cause) {
                 is ProviderRateLimitWaitException -> "rate_limit_wait"
+                is app.inku.mobile.llm.ProviderBudgetRejectedException -> "rate_limit_wait"
                 is ProviderOutputLimitException -> "output_limit_reached"
                 else -> null
             }
@@ -146,6 +147,7 @@ class SingleAttemptModelEffectProvider(
         is MalformedProviderResponseException -> "malformed_payload"
         is ProviderOutputLimitException -> "malformed_payload"
         is ProviderRateLimitWaitException -> "rate_limited"
+        is app.inku.mobile.llm.ProviderBudgetRejectedException -> "rate_limited"
         is app.inku.mobile.llm.ChatGptException -> error.failure
         is ModelProviderHttpException -> error.failure ?: when {
             error.statusCode == 429 -> "rate_limited"

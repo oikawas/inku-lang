@@ -20,6 +20,9 @@ fn refused(problems: Vec<Value>) -> Value {
 fn s(v: &Value) -> &str {
     v.as_str().unwrap_or("")
 }
+fn python_strip(value: &str) -> &str {
+    value.trim_matches(|ch: char| ch.is_whitespace() || matches!(ch, '\u{1c}'..='\u{1f}'))
+}
 fn python_string_field(object: &Value, key: &str) -> String {
     match object.get(key) {
         None => String::new(),
@@ -41,7 +44,7 @@ fn text(v: &Value, path: &str, problems: &mut Vec<Value>, limit: usize) -> Strin
         problems.push(problem(path, "text_too_long", limit));
         return String::new();
     }
-    value.trim().to_owned()
+    python_strip(value).to_owned()
 }
 type ArchivePictures = BTreeMap<String, Option<Vec<u8>>>;
 
@@ -251,7 +254,10 @@ fn parse(
                 let mut picture = Value::Null;
                 if !stored && !item["preview"].is_null() {
                     let pp = format!("{path}.preview");
-                    if item["preview"].as_str().is_none_or(|v| v.trim().is_empty()) {
+                    if item["preview"]
+                        .as_str()
+                        .is_none_or(|v| python_strip(v).is_empty())
+                    {
                         wp.push(problem(&pp, "not_a_string", ""));
                     } else {
                         let named = s(&item["preview"]);

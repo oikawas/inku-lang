@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-28 — Refresh ChatGPT models after signing in
-
-After a ChatGPT plan connection or reauthorization, Web refreshes the model list automatically and restores the saved publication choices. A failed refresh leaves the connection in place and reports the error.
-
 ### 2026-10-28 — Share Android ChatGPT plan decisions
 
 ChatGPT plan authorization, session and model publication decisions use the shared core while encrypted credentials remain on the device.
@@ -426,6 +422,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.294 (2026-10-28 / Build1370)
+
+### 2026-10-28 — Refresh ChatGPT models after signing in
+
+After a ChatGPT plan connection or reauthorization, Web refreshes the model list automatically and restores the saved publication choices. A failed refresh leaves the connection in place and reports the error.
 
 ## v2.15.293 (2026-10-28 / Build1369)
 

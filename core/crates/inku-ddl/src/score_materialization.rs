@@ -450,9 +450,25 @@ pub fn materialize_selected_composition(
             });
         }
     }
+    let object_templates = admitted
+        .object_indices()
+        .iter()
+        .enumerate()
+        .filter_map(|(instruction_index, &index)| {
+            objects[index]
+                .plugin_template
+                .as_ref()
+                .map(|(width, height, body)| inku_score::ObjectTemplate {
+                    instruction_index,
+                    aspect: [*width, *height],
+                    body: body.clone(),
+                })
+        })
+        .collect::<Vec<_>>();
     let score = Score {
-        object_templates: Vec::new(),
-        version: if inku_score::instructions_use_brushmarks(&instructions) {
+        version: if !object_templates.is_empty() {
+            inku_score::ScoreEdition::V0_23
+        } else if inku_score::instructions_use_brushmarks(&instructions) {
             inku_score::ScoreEdition::V0_22
         } else if inku_score::instructions_use_free_line(&instructions) {
             inku_score::ScoreEdition::V0_21
@@ -527,6 +543,7 @@ pub fn materialize_selected_composition(
         background: plan.context().background(),
         presence: None,
         instructions,
+        object_templates,
         anchors,
         transform_groups,
         placement_groups,

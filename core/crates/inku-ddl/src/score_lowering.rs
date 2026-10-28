@@ -5330,6 +5330,7 @@ fn resolve_object_plan(
             None => (inku_score::Fade::None, false),
         };
         Ok(ObjectPlacementPlan {
+            plugin_template: None,
             arc_form: resolved.arc_form,
             proportion_width_extent: input.proportion_width_extent.map(|identity| {
                 crate::SemanticIdentity {

@@ -104,6 +104,15 @@ fn token_fields(request: &Value) -> Value {
         Some(Value::String(text)) => text
             .parse::<jiff::Timestamp>()
             .ok()
+            .or_else(|| {
+                let local = text.parse::<jiff::civil::DateTime>().ok().or_else(|| {
+                    text.parse::<jiff::civil::Date>()
+                        .ok()
+                        .map(|date| date.at(0, 0, 0, 0))
+                })?;
+                let offset = r_local_offset(request)?;
+                offset.to_timestamp(local).ok()
+            })
             .map(|t| t.as_second() as f64 + t.subsec_nanosecond() as f64 / 1_000_000_000.0),
         Some(other) => number(other),
     };
@@ -118,6 +127,10 @@ fn token_fields(request: &Value) -> Value {
     json!({"tokens":{"access_token":value["access_token"],"refresh_token":value["refresh_token"],
         "id_token":value.get("id_token").cloned().unwrap_or_else(|| previous.get("id_token").cloned().unwrap_or(json!(""))),
         "scopes":scopes,"expires_at":request["now"].as_f64().unwrap_or(0.0)+expiry,"earliest_refresh_at":earliest}})
+}
+fn r_local_offset(request: &Value) -> Option<jiff::tz::Offset> {
+    let seconds = request["local_offset_seconds"].as_i64()?;
+    jiff::tz::Offset::from_seconds(i32::try_from(seconds).ok()?).ok()
 }
 pub(super) fn run(r: &Value) -> Value {
     let profile = &r["profile"];

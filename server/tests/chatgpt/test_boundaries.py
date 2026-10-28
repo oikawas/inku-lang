@@ -301,6 +301,13 @@ def test_signed_identity_claims_are_checked_after_signature(isolated):
         asyncio.run(verify(good, other))
 
 
+def test_naive_refresh_date_uses_host_local_timezone():
+    from datetime import datetime
+    value = {"token_type": "Bearer", "access_token": "fixture", "refresh_token": "fixture",
+             "expires_in": 60, "earliest_refresh_at": "2026-10-28T00:00:00"}
+    assert auth.token_fields(value)["earliest_refresh_at"] == datetime.fromisoformat(value["earliest_refresh_at"]).timestamp()
+
+
 def test_refresh_serializes_across_threads_and_signout_invalidates_late_result(isolated, monkeypatch):
     value = profile(expires_at=0)
     seed(isolated, value)

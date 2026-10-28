@@ -8,6 +8,7 @@ import secrets
 import threading
 import time
 import uuid
+from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs, urlsplit
 
@@ -120,7 +121,17 @@ async def validate_identity(client, token: str, client_id: str, nonce: str | Non
 
 
 def token_fields(value: dict, previous: dict | None = None) -> dict:
-    return auth_policy("tokens", value=value, previous=previous, now=time.time())["tokens"]
+    offset = None
+    earliest = value.get("earliest_refresh_at")
+    if isinstance(earliest, str):
+        try:
+            local = datetime.fromisoformat(earliest.replace("Z", "+00:00"))
+            if local.tzinfo is None:
+                offset = int(local.astimezone().utcoffset().total_seconds())
+        except (TypeError, ValueError, OverflowError):
+            pass
+    return auth_policy("tokens", value=value, previous=previous, now=time.time(),
+                       local_offset_seconds=offset)["tokens"]
 
 
 async def access_token(owner: str, profile_id: str, generation: int, deadline: float, cancel=None) -> str:

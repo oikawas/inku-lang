@@ -4,7 +4,6 @@ import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.SocketTimeoutException
 import java.nio.charset.CharacterCodingException
-import java.time.Instant
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -86,7 +85,8 @@ class ChatGptPlanManager internal constructor(
             if (authorization != null) throw ChatGptException("chatgpt_attempt_busy")
             val profiles = store.read().getJSONObject("profiles")
             val previous = profileId?.let { profiles.optJSONObject(it) ?: throw ChatGptException("chatgpt_not_connected") }
-            if (previous == null && profiles.length() >= 8) throw ChatGptException("chatgpt_profile_limit")
+            ChatGptCore.call("chatgpt_auth_save_check", JSONObject().put("previous", previous ?: JSONObject.NULL)
+                .put("count", profiles.length()).put("expected_generation", JSONObject.NULL))
             Authorization(profileId ?: UUID.randomUUID().toString(), previous, ServerSocket(0, 4, InetAddress.getByName("127.0.0.1")), japanese, now() + 300_000)
                 .also { authorization = it; updateView() }
         }
@@ -178,11 +178,16 @@ class ChatGptPlanManager internal constructor(
         val tokens = authJson(CHATGPT_TOKEN, "POST", form(mapOf("grant_type" to "authorization_code", "client_id" to client,
             "code" to code, "code_verifier" to attempt.verifier, "redirect_uri" to attempt.redirectUri, "resource" to CHATGPT_RESOURCE)), check)
         val claims = identity(tokens.getString("id_token"), client, attempt.nonce, check)
-        if (attempt.previous?.has("sub") == true && claims.getString("sub") != attempt.previous.getString("sub")) throw ChatGptException("chatgpt_identity_mismatch")
+        val previous = attempt.previous?.let { JSONObject(it.toString()).also { copy -> if (!copy.has("sub")) copy.put("pending", true) } }
+        ChatGptCore.call("chatgpt_auth_identity", JSONObject().put("previous", previous ?: JSONObject.NULL)
+            .put("sub", claims.getString("sub")))
+        val display = ChatGptCore.call("chatgpt_auth_display", JSONObject().put("claims", claims).put("client_id", client)
+            .apply { if (claims.has("email")) put("email_json", app.inku.mobile.pipeline.CoreIdentityJson.encode(claims.get("email"))) })
         val profile = tokenFields(tokens, null).put("id", attempt.profileId).put("client_id", client)
-            .put("sub", claims.getString("sub")).put("generation", (attempt.previous?.optLong("generation") ?: 0) + 1)
-            .put("label", claims.optString("email", "ChatGPT").take(254) + " / " + client.takeLast(8)).put("state", "connected")
-            .put("email", claims.optString("email").take(254)).put("plan_notice_seen", attempt.previous?.optBoolean("plan_notice_seen") ?: false)
+            .put("sub", claims.getString("sub")).put("generation", ChatGptCore.call("chatgpt_auth_generation", JSONObject()
+                .put("previous", attempt.previous ?: JSONObject.NULL)).getLong("generation"))
+            .put("label", display.getString("label")).put("state", "connected")
+            .put("email", display.getString("email")).put("plan_notice_seen", attempt.previous?.optBoolean("plan_notice_seen") ?: false)
             .put("published_models", attempt.previous?.optJSONArray("published_models") ?: JSONArray())
         synchronized(store) {
             check()
@@ -198,10 +203,9 @@ class ChatGptPlanManager internal constructor(
         cancelAuthorization()
         val value = store.read()
         val profiles = value.getJSONObject("profiles")
-        if (!profiles.has(id)) throw ChatGptException("chatgpt_not_connected")
+        val ids = JSONArray().also { array -> profiles.keys().forEachRemaining { array.put(it) } }
+        ChatGptCore.call("chatgpt_auth_select", JSONObject().put("profile_ids", ids).put("profile_id", id))
         if (value.optString("active") == id) return@synchronized
-        profiles.optJSONObject(value.optString("active"))?.let { it.put("generation", it.getLong("generation") + 1) }
-        profiles.getJSONObject(id).let { it.put("generation", it.getLong("generation") + 1) }
         store.write(value.put("active", id)); http.cancelAll(); updateView()
     }
 
@@ -215,13 +219,7 @@ class ChatGptPlanManager internal constructor(
     internal fun checkSession(ref: ChatGptSessionRef): JSONObject = synchronized(store) {
         val value = store.read()
         val profile = value.getJSONObject("profiles").optJSONObject(ref.profileId) ?: throw ChatGptException("chatgpt_not_connected")
-        if (value.optString("active") != ref.profileId || profile.getLong("generation") != ref.generation) throw ChatGptException("chatgpt_session_changed")
-        when (profile.optString("state")) {
-            "connected" -> Unit
-            "quota" -> throw ChatGptException("subscription_sharing_usage_limit_exceeded")
-            else -> throw ChatGptException("chatgpt_reauthentication_required")
-        }
-        if (!profile.planAllowed()) throw ChatGptException("chatgpt_plan_not_authorized")
+        ChatGptCore.call("chatgpt_auth_session", JSONObject().put("profile", ChatGptCore.toCore(profile)).put("generation", ref.generation))
         profile
     }
 
@@ -231,7 +229,8 @@ class ChatGptPlanManager internal constructor(
             val profile = value.getJSONObject("profiles").optJSONObject(value.optString("active")) ?: throw ChatGptException("chatgpt_not_connected")
             // A deliberate refresh can check whether the usage window has reopened.
             if (profile.optString("state") == "quota") {
-                profile.put("state", "connected").put("generation", profile.getLong("generation") + 1)
+                val resumed = ChatGptCore.call("chatgpt_auth_resume_quota", JSONObject().put("profile", ChatGptCore.toCore(profile))).getJSONObject("profile")
+                value.getJSONObject("profiles").put(profile.getString("id"), ChatGptCore.fromCore(resumed))
                 store.write(value); updateView()
             }
             pinSession()
@@ -254,21 +253,24 @@ class ChatGptPlanManager internal constructor(
 
     fun browserUnavailable() { cancelAuthorization(); updateView("chatgpt_browser_unavailable") }
 
-    fun publishModels(ref: ChatGptSessionRef, models: List<String>): Unit = synchronized(store) {
+    fun publishModels(ref: ChatGptSessionRef, models: List<String>, purposes: JSONObject = JSONObject(), assessments: JSONObject = JSONObject()): Unit = synchronized(store) {
         val profile = checkSession(ref)
-        val offered = profile.optJSONObject("catalog")?.getJSONArray("models") ?: throw ChatGptException("chatgpt_catalog_required")
-        val ids = (0 until offered.length()).map { offered.getJSONObject(it).getString("id") }.toSet()
-        if (models.any { it !in ids }) throw ChatGptException("chatgpt_model_unavailable")
         val value = store.read()
-        profile.put("published_models", JSONArray(models.distinct()))
-        value.getJSONObject("profiles").put(ref.profileId, profile)
+        ChatGptCore.call("chatgpt_auth_publication_active", JSONObject().put("active", value.optString("active")).put("profile_id", ref.profileId))
+        val input = ChatGptCore.toCore(profile).put("model_purposes", purposes)
+        val updated = ChatGptCore.call("chatgpt_publication_update", JSONObject().put("profile", input)
+            .put("selected", JSONArray(models)).put("model_purposes", purposes).put("assessments", assessments)).getJSONObject("profile")
+        updated.remove("model_purposes")
+        value.getJSONObject("profiles").put(ref.profileId, ChatGptCore.fromCore(updated))
         store.write(value); http.cancelAll(); updateView()
     }
 
     private suspend fun catalog(ref: ChatGptSessionRef, force: Boolean = false): List<ChatGptModel> {
         val profile = checkSession(ref)
         val cache = profile.optJSONObject("catalog")
-        val entries = if (!force && cache != null && cache.optLong("expires_at") > now()) cache.getJSONArray("models") else {
+        val cachePolicy = ChatGptCore.call("chatgpt_cache", JSONObject().put("cache", ChatGptCore.toCore(profile).opt("catalog") ?: JSONObject.NULL)
+            .put("force", force).put("now", now() / 1000.0))
+        val entries = if (cachePolicy.getBoolean("fresh") && cache != null) cache.getJSONArray("models") else {
             val token = accessToken(ref)
             val response = http.request("$CHATGPT_RESOURCE/models", token = token, check = { checkSession(ref); Unit })
             val json = JSONObject(response.body)
@@ -283,7 +285,7 @@ class ChatGptPlanManager internal constructor(
             val result = modelArray(models)
             synchronized(store) {
                 val current = checkSession(ref)
-                current.put("catalog", JSONObject().put("expires_at", now() + 300_000).put("models", result))
+                current.put("catalog", JSONObject().put("expires_at", (cachePolicy.getDouble("expires_at") * 1000).toLong()).put("models", result))
                 val value = store.read(); value.getJSONObject("profiles").put(ref.profileId, current); store.write(value); updateView()
             }
             result
@@ -293,24 +295,22 @@ class ChatGptPlanManager internal constructor(
 
     private suspend fun accessToken(ref: ChatGptSessionRef): String = refreshMutex.withLock {
         val profile = checkSession(ref)
-        if (profile.getLong("expires_at") > now() + 60_000) return@withLock profile.getString("access_token")
-        if (now() < profile.optLong("earliest_refresh_at")) {
-            if (profile.getLong("expires_at") > now()) return@withLock profile.getString("access_token")
-            throw ChatGptException("chatgpt_refresh_not_ready")
-        }
+        val access = ChatGptCore.call("chatgpt_auth_access", JSONObject().put("profile", ChatGptCore.toCore(profile)).put("now", now() / 1000.0))
+        if (access.getString("decision") == "use") return@withLock profile.getString("access_token")
         val check = { checkSession(ref); Unit }
         try {
             val tokens = authJson(CHATGPT_TOKEN, "POST", form(mapOf("grant_type" to "refresh_token", "client_id" to profile.getString("client_id"),
                 "refresh_token" to profile.getString("refresh_token"), "resource" to CHATGPT_RESOURCE)), check)
             tokens.optString("id_token").takeIf(String::isNotEmpty)?.let {
-                if (identity(it, profile.getString("client_id"), null, check).getString("sub") != profile.getString("sub")) throw ChatGptException("chatgpt_identity_mismatch")
+                val claims = identity(it, profile.getString("client_id"), null, check)
+                ChatGptCore.call("chatgpt_auth_identity", JSONObject().put("previous", profile).put("sub", claims.getString("sub")))
             }
             val fields = tokenFields(tokens, profile)
             synchronized(store) {
                 val current = checkSession(ref)
-                fields.keys().forEach { current.put(it, fields.get(it)) }
-                current.remove("catalog")
-                val value = store.read(); value.getJSONObject("profiles").put(ref.profileId, current); store.write(value); updateView()
+                val refreshed = ChatGptCore.call("chatgpt_auth_refresh_profile", JSONObject().put("profile", ChatGptCore.toCore(current))
+                    .put("tokens", ChatGptCore.toCore(fields))).getJSONObject("profile")
+                val value = store.read(); value.getJSONObject("profiles").put(ref.profileId, ChatGptCore.fromCore(refreshed)); store.write(value); updateView()
             }
             fields.getString("access_token")
         } catch (error: ChatGptException) {
@@ -375,19 +375,22 @@ class ChatGptPlanManager internal constructor(
     }
 
     private fun invalidateForFailure(ref: ChatGptSessionRef, code: String) {
-        when (code) {
-            "subscription_sharing_usage_limit_exceeded" -> invalidate(ref, "quota", removeTokens = false)
-            "chatgpt_admission_rejected", "subscription_sharing_invalid_user", "chatpass_v2_invalid_authorization_context",
-            "chatpass_v2_scope_not_authorized" -> invalidate(ref, "reauthentication_required")
+        if (!ChatGptCore.call("chatgpt_auth_quota_failure", JSONObject().put("code", code)).getBoolean("pause")) return
+        synchronized(store) {
+            val value = store.read()
+            val profiles = value.getJSONObject("profiles")
+            val profile = profiles.optJSONObject(ref.profileId) ?: return@synchronized
+            val result = ChatGptCore.call("chatgpt_auth_pause_quota", JSONObject().put("profile", ChatGptCore.toCore(profile)).put("generation", ref.generation))
+            if (result.getBoolean("changed")) { profiles.put(ref.profileId, ChatGptCore.fromCore(result.getJSONObject("profile"))); store.write(value); updateView() }
         }
     }
 
-    private fun invalidate(ref: ChatGptSessionRef, status: String, removeTokens: Boolean = true): Unit = synchronized(store) {
+    private fun invalidate(ref: ChatGptSessionRef, status: String): Unit = synchronized(store) {
         val value = store.read()
         val profile = value.getJSONObject("profiles").optJSONObject(ref.profileId) ?: return@synchronized
         if (profile.optLong("generation") != ref.generation) return@synchronized
-        profile.put("state", status).put("generation", ref.generation + 1).remove("catalog")
-        if (removeTokens) listOf("access_token", "refresh_token", "id_token", "scopes").forEach(profile::remove)
+        val next = ChatGptCore.call("chatgpt_auth_transition", JSONObject().put("profile", ChatGptCore.toCore(profile)).put("state", status)).getJSONObject("profile")
+        value.getJSONObject("profiles").put(ref.profileId, ChatGptCore.fromCore(next))
         store.write(value); http.cancelAll(); updateView()
     }
 
@@ -402,12 +405,12 @@ class ChatGptPlanManager internal constructor(
         var confirmed = false
         try {
             withTimeout(10_000) {
-                if (old.has("refresh_token")) {
+                if (ChatGptCore.call("chatgpt_auth_revocation", JSONObject().put("profile", ChatGptCore.toCore(old))).getBoolean("send")) {
                     val metadata = discovery()
                     val endpoint = metadata.getString("revocation_endpoint"); validateAuthEndpoint(endpoint)
                     val response = http.request(endpoint, "POST", body = form(mapOf("token" to old.getString("refresh_token"),
                         "token_type_hint" to "refresh_token", "client_id" to old.getString("client_id"))), formBody = true, timeoutMs = 10_000)
-                    confirmed = response.status == 200
+                    confirmed = ChatGptCore.call("chatgpt_auth_revocation", JSONObject().put("profile", ChatGptCore.toCore(old)).put("status", response.status)).getBoolean("confirmed")
                 }
             }
         } catch (cancelled: CancellationException) { updateView(revocationUnconfirmed = true); throw cancelled }
@@ -418,18 +421,15 @@ class ChatGptPlanManager internal constructor(
     private suspend fun authJson(url: String, method: String = "GET", body: String? = null, check: () -> Unit = {}): JSONObject {
         validateAuthEndpoint(url)
         val response = http.request(url, method, body = body, formBody = body != null, check = check)
-        val value = runCatching { JSONObject(response.body) }.getOrElse { throw ChatGptException("chatgpt_auth_unavailable") }
-        if (response.status !in 200..299) {
-            val error = value.opt("error").let { if (it is JSONObject) it.optString("code") else it as? String }
-            val expired = setOf("invalid_grant", "invalid_refresh_token", "token_expired", "refresh_token_expired", "refresh_token_invalidated", "refresh_token_reused")
-            throw ChatGptException(if (error in expired) "chatgpt_reauthentication_required" else if (response.status >= 500) "chatgpt_auth_unavailable" else "chatgpt_auth_rejected")
-        }
-        return value
+        val parsed = runCatching { org.json.JSONTokener(response.body).nextValue() }
+        val result = ChatGptCore.call("chatgpt_auth_http", JSONObject().put("json_valid", parsed.isSuccess)
+            .put("value", parsed.getOrNull() ?: JSONObject.NULL).put("status", response.status))
+        if (result.optBoolean("type_error")) throw ChatGptException("chatgpt_auth_unavailable")
+        return parsed.getOrThrow() as JSONObject
     }
 
     private suspend fun discovery(check: () -> Unit = {}): JSONObject = authJson("$CHATGPT_ISSUER/.well-known/openid-configuration", check = check).also {
-        if (it.getString("issuer") != CHATGPT_ISSUER) throw ChatGptException("chatgpt_identity_invalid")
-        validateAuthEndpoint(it.getString("jwks_uri"))
+        ChatGptCore.call("chatgpt_auth_discovery", JSONObject().put("discovery", it))
     }
 
     private suspend fun identity(token: String, client: String, nonce: String?, check: () -> Unit): JSONObject {
@@ -440,28 +440,17 @@ class ChatGptPlanManager internal constructor(
     }
 
     private fun tokenFields(value: JSONObject, previous: JSONObject?): JSONObject {
-        if (!value.optString("token_type").equals("Bearer", ignoreCase = true)) throw ChatGptException("chatgpt_identity_invalid")
-        for (key in listOf("access_token", "refresh_token")) {
-            val token = value.opt(key)
-            if (token !is String || token.length !in 1..65_536) throw ChatGptException("chatgpt_identity_invalid")
-        }
-        val expiry = value.getDouble("expires_in")
-        if (!expiry.isFinite() || expiry <= 0 || expiry > 86_400) throw ChatGptException("chatgpt_identity_invalid")
-        val earliest = when (val item = value.opt("earliest_refresh_at")) {
-            is String -> Instant.parse(item).toEpochMilli()
-            is Number -> { if (!item.toDouble().isFinite()) throw ChatGptException("chatgpt_identity_invalid"); (item.toDouble() * 1000).toLong() }
-            else -> 0L
-        }
-        if (value.has("scope") && value.opt("scope") !is String) throw ChatGptException("chatgpt_identity_invalid")
-        return JSONObject().put("access_token", value.getString("access_token")).put("refresh_token", value.getString("refresh_token"))
-            .put("id_token", value.optString("id_token", previous?.optString("id_token").orEmpty()))
-            .put("expires_at", now() + (expiry * 1000).toLong()).put("earliest_refresh_at", earliest)
-            .put("scopes", if (value.has("scope")) JSONArray(value.getString("scope").split(' ').filter(String::isNotEmpty)) else previous?.optJSONArray("scopes") ?: JSONArray())
+        val offset = runCatching {
+            val local = java.time.LocalDateTime.parse(value.getString("earliest_refresh_at"))
+            java.time.ZoneId.systemDefault().rules.getOffset(local).totalSeconds
+        }.getOrNull()
+        val input = JSONObject().put("value", value).put("previous", previous?.let(ChatGptCore::toCore) ?: JSONObject.NULL)
+            .put("now", now() / 1000.0).put("local_offset_seconds", offset ?: JSONObject.NULL)
+        return ChatGptCore.fromCore(ChatGptCore.call("chatgpt_auth_tokens", input).getJSONObject("tokens"))
     }
 
     private fun validateAuthEndpoint(url: String) {
-        val uri = java.net.URI(url)
-        if (uri.scheme != "https" || uri.rawAuthority != "auth.openai.com" || uri.fragment != null) throw ChatGptException("chatgpt_identity_invalid")
+        ChatGptCore.call("chatgpt_auth_endpoint", JSONObject().put("url", url))
     }
 
     private fun readLine(input: java.io.InputStream, limit: Int): String {

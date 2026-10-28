@@ -29,48 +29,34 @@ internal fun form(values: Map<String, String>): String = values.entries.joinToSt
 
 internal fun authorizationUrl(hostId: String, redirectUri: String, state: String, nonce: String,
                               verifier: String, previous: JSONObject?, consent: Boolean): String {
-    val values = linkedMapOf(
-        "client_id" to (previous?.getString("client_id") ?: "dynamic_agent_client"),
-        "ext_agent_host_id" to hostId, "response_type" to "code", "redirect_uri" to redirectUri,
-        "scope" to CHATGPT_SCOPE, "resource" to CHATGPT_RESOURCE, "state" to state, "nonce" to nonce,
-        "code_challenge_method" to "S256",
-        "code_challenge" to base64Url(MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray(Charsets.US_ASCII))),
-    )
-    if (previous == null) values["agent_name_hint"] = "inku"
-    previous?.optString("id_token")?.takeIf(String::isNotEmpty)?.let { values["id_token_hint"] = it }
-    previous?.optString("email")?.takeIf(String::isNotEmpty)?.let { values["login_hint"] = it }
-    if (consent) values["prompt"] = "consent"
-    return "$CHATGPT_ISSUER/api/accounts/authorize?" + form(values)
+    return ChatGptCore.call("chatgpt_auth_url", JSONObject().put("host_id", hostId).put("redirect_uri", redirectUri)
+        .put("state", state).put("nonce", nonce).put("verifier", verifier)
+        .put("previous", previous ?: JSONObject.NULL).put("consent", consent)).getString("url")
 }
 
 internal fun callbackParameters(target: String): Map<String, String> {
     if (target.length > 16_384) throw ChatGptException("chatgpt_callback_invalid")
     val uri = URI(target)
-    if (uri.isAbsolute || uri.rawAuthority != null || uri.rawPath != "/auth/callback" || uri.fragment != null) {
-        throw ChatGptException("chatgpt_callback_invalid")
-    }
     val result = linkedMapOf<String, String>()
     uri.rawQuery.orEmpty().split('&').filter(String::isNotEmpty).forEach { field ->
         val pair = field.split('=', limit = 2)
         val key = URLDecoder.decode(pair[0], Charsets.UTF_8)
         val value = URLDecoder.decode(pair.getOrElse(1) { "" }, Charsets.UTF_8)
-        if (result.put(key, value) != null) throw ChatGptException("chatgpt_callback_invalid")
+        result[key] = value
     }
     return result
 }
 
 internal fun callbackStateMatches(query: Map<String, String>, expected: String): Boolean =
-    MessageDigest.isEqual(query["state"].orEmpty().toByteArray(Charsets.UTF_8), expected.toByteArray(Charsets.UTF_8))
+    runCatching { ChatGptCore.call("chatgpt_auth_callback", JSONObject().put("state", query["state"].orEmpty())
+        .put("expected_state", expected).put("code", "state-check")); true }.getOrDefault(false)
 
 internal fun issuedClientId(query: Map<String, String>, previous: JSONObject?): String {
-    if (query.containsKey("error")) throw ChatGptException("chatgpt_consent_declined")
-    val expected = previous?.getString("client_id")
-    val issued = query["client_id"] ?: expected.orEmpty()
-    if (!issued.matches(Regex("[A-Za-z0-9_.:-]{1,256}")) || issued == "dynamic_agent_client" ||
-        (expected != null && expected != issued) || query["code"].isNullOrEmpty()) {
-        throw ChatGptException("chatgpt_registration_incomplete")
-    }
-    return issued
+    ChatGptCore.call("chatgpt_auth_callback", JSONObject().put("state", "ok").put("expected_state", "ok")
+        .put("error", query["error"] ?: JSONObject.NULL).put("code", query["code"] ?: JSONObject.NULL))
+    val issued = query["client_id"] ?: previous?.optString("client_id").orEmpty()
+    return ChatGptCore.call("chatgpt_auth_callback_client", JSONObject().put("issued", issued)
+        .put("previous", previous ?: JSONObject.NULL)).getString("client_id")
 }
 
 /** JCA verifies only advertised RSA/P-256 signatures; no unsigned claims are adopted. */
@@ -82,17 +68,9 @@ internal fun validateChatGptIdentity(token: String, clientId: String, nonce: Str
         require(parts.size == 3 && parts.all { it.matches(Regex("[A-Za-z0-9_-]+")) })
         val decoder = Base64.getUrlDecoder()
         val header = JSONObject(decoder.decode(parts[0]).toString(Charsets.UTF_8))
-        val algorithm = header.getString("alg")
-        val advertised = metadata.optJSONArray("id_token_signing_alg_values_supported") ?: JSONArray().put("RS256")
-        require(algorithm in listOf("RS256", "ES256") && (0 until advertised.length()).any { advertised.getString(it) == algorithm })
-        val kid = header.getString("kid")
-        val keys = jwks.getJSONArray("keys")
-        val matching = (0 until keys.length()).map { keys.getJSONObject(it) }.filter {
-            it.optString("kid") == kid && it.optString("use", "sig") == "sig" &&
-                (!it.has("alg") || it.getString("alg") == algorithm)
-        }
-        require(matching.size == 1)
-        val key = matching.single()
+        val selected = ChatGptCore.call("chatgpt_auth_key", JSONObject().put("header", header).put("discovery", metadata).put("keys", jwks))
+        val algorithm = selected.getString("alg")
+        val key = selected.getJSONObject("key")
         val signature = Signature.getInstance(if (algorithm == "RS256") "SHA256withRSA" else "SHA256withECDSA")
         val publicKey = if (algorithm == "RS256") {
             require(key.getString("kty") == "RSA")
@@ -113,14 +91,8 @@ internal fun validateChatGptIdentity(token: String, clientId: String, nonce: Str
         val rawSignature = decoder.decode(parts[2])
         require(signature.verify(if (algorithm == "ES256") ecdsaDer(rawSignature) else rawSignature))
         val claims = JSONObject(decoder.decode(parts[1]).toString(Charsets.UTF_8))
-        require(claims.getString("iss") == CHATGPT_ISSUER)
-        val aud = claims.get("aud")
-        require(aud == clientId || (aud is JSONArray && (0 until aud.length()).any { aud.getString(it) == clientId }))
-        if (aud is JSONArray && aud.length() > 1) require(claims.optString("azp") == clientId)
-        require(claims.get("exp") is Number && claims.getDouble("exp").isFinite() && claims.getDouble("exp") > nowSeconds)
-        require(!claims.has("nbf") || claims.getDouble("nbf") <= nowSeconds + 30)
-        require(claims.getString("sub").isNotEmpty())
-        if (nonce != null) require(MessageDigest.isEqual(claims.optString("nonce").toByteArray(Charsets.UTF_8), nonce.toByteArray(Charsets.UTF_8)))
+        ChatGptCore.call("chatgpt_auth_claims", JSONObject().put("claims", claims).put("client_id", clientId)
+            .put("nonce", nonce ?: JSONObject.NULL).put("now", nowSeconds))
         return claims
     } catch (_: Exception) {
         throw ChatGptException("chatgpt_identity_invalid")

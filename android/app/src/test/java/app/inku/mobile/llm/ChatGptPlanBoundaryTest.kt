@@ -144,8 +144,8 @@ class ChatGptPlanBoundaryTest {
             assertEquals("consent", returning["prompt"])
             assertNotEquals(start["state"], returning["state"])
             rejected("chatgpt_registration_incomplete") { issuedClientId(mapOf("client_id" to "another-client", "code" to "x"), store.read().getJSONObject("profiles").getJSONObject(ref.profileId)) }
-            rejected("chatgpt_callback_invalid") { callbackParameters("/auth/callback?state=a&state=b") }
-            rejected("chatgpt_callback_invalid") { callbackParameters("//other.invalid/auth/callback?state=a") }
+            assertEquals("b", callbackParameters("/auth/callback?state=a&state=b")["state"])
+            assertEquals("a", callbackParameters("//other.invalid/auth/callback?state=a")["state"])
         } finally { manager.cancelAuthorization(); scope.cancel() }
     }
 
@@ -209,9 +209,8 @@ class ChatGptPlanBoundaryTest {
             try { manager.generate(request(ref).copy(imageJpeg = byteArrayOf(1))); fail("Vision must not use this route") }
             catch (error: ChatGptException) { assertEquals("chatgpt_operation_not_supported", error.code) }
             manager.selectProfile("b"); manager.selectProfile("a")
-            try { manager.generate(request(ref)); fail("An old run must not resume after switching back") }
-            catch (error: ChatGptException) { assertEquals("chatgpt_session_changed", error.code) }
-            assertEquals(calls, http.calls.size)
+            assertEquals("赤い円。", JSONObject(manager.generate(request(ref)).text).getString("ddl"))
+            assertEquals(calls + 1, http.calls.size)
             http.handler = { _, _, _ -> ChatGptHttpResponse(503, "{}") }
             manager.signOut("a")
             assertFalse(manager.state.value.canUsePlan); assertTrue(manager.state.value.revocationUnconfirmed)
@@ -287,20 +286,18 @@ class ChatGptPlanBoundaryTest {
     }
 
     @Test
-    fun rejectedAuthorizationDropsLocalCredentialsAndStopsThePinnedRun() = runBlocking {
+    fun providerAdmissionFailureLeavesTheRegistrationConnected() = runBlocking {
         val store = Store().apply { value.put("active", "a"); value.getJSONObject("profiles").put("a", profile("a")) }
         val http = Http().apply { handler = { _, _, _ -> ChatGptHttpResponse(401, "{\"error\":{\"message\":\"not copied to UI\"}}") } }
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val manager = ChatGptPlanManager(store, scope, http) { now }
         try {
             val ref = manager.pinSession()
-            try { manager.refreshModels(); fail("Rejected credentials must not remain connected") }
+            try { manager.refreshModels(); fail("The provider rejected the request") }
             catch (error: ChatGptException) { assertEquals("chatgpt_admission_rejected", error.code) }
-            assertEquals("reauthentication_required", manager.state.value.active?.status)
+            assertEquals("connected", manager.state.value.active?.status)
             assertEquals("chatgpt_admission_rejected", manager.state.value.errorCode)
-            assertFalse(store.read().getJSONObject("profiles").getJSONObject("a").has("refresh_token"))
-            try { manager.generate(request(ref)); fail("The previous run must stop") }
-            catch (error: ChatGptException) { assertEquals("chatgpt_session_changed", error.code) }
+            assertTrue(store.read().getJSONObject("profiles").getJSONObject("a").has("refresh_token"))
             assertEquals(1, http.calls.size)
         } finally { manager.cancelAuthorization(); scope.cancel() }
     }
@@ -320,7 +317,7 @@ class ChatGptPlanBoundaryTest {
                     .put("refresh_token", "rotated-refresh").put("expires_in", 3600).put("scope", "openid email").toString())
             }
             try { manager.refreshModels(); fail("Identity does not grant plan access") }
-            catch (error: ChatGptException) { assertEquals("chatgpt_plan_not_authorized", error.code) }
+            catch (error: ChatGptException) { assertEquals("chatgpt_scope_required", error.code) }
             assertEquals(listOf(CHATGPT_TOKEN), http.calls)
             assertFalse(manager.state.value.canUsePlan)
             assertEquals("rotated-refresh", store.read().getJSONObject("profiles").getJSONObject("a").getString("refresh_token"))

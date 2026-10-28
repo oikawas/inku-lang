@@ -451,6 +451,7 @@ pub fn materialize_selected_composition(
         }
     }
     let score = Score {
+        object_templates: Vec::new(),
         version: if inku_score::instructions_use_brushmarks(&instructions) {
             inku_score::ScoreEdition::V0_22
         } else if inku_score::instructions_use_free_line(&instructions) {

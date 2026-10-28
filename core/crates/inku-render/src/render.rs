@@ -374,6 +374,11 @@ fn check_mark_extent(
 /// Both entry points check this before any expansion, because the work of
 /// several texture and ground passes grows with these values.
 fn validate_request(request: &RenderRequest) -> Result<(), RenderError> {
+    if !request.score.object_templates.is_empty() {
+        return Err(RenderError::InvalidScore(
+            "object template rendering is not implemented",
+        ));
+    }
     let canvas = request.options.canvas;
     // Only a fitted Score sets a bleed; a host's paper has none.
     if !(canvas.width.is_finite()

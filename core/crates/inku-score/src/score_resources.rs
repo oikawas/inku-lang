@@ -1901,6 +1901,7 @@ mod tests {
         }))
         .unwrap();
         Score {
+            object_templates: Vec::new(),
             version: "0.10.0".into(),
             mirror_relations: Vec::new(),
             canvas: crate::Canvas::Id("square".into()),

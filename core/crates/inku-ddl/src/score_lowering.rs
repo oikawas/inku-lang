@@ -235,8 +235,15 @@ fn project_source_instruction<'a>(
     instruction_index: usize,
     instruction: &'a SemanticInstruction,
 ) -> Option<ScoreLoweringInput<'a>> {
-    let SemanticHead::Primitive(term) = &instruction.entity.head else {
-        return None;
+    let primitive = match &instruction.entity.head {
+        SemanticHead::Primitive(term) => (&term.identity).into(),
+        SemanticHead::MacroInvocation(head) if head.object_aspect.is_some() => {
+            SemanticInputIdentity {
+                category: "shape",
+                id: "square",
+            }
+        }
+        SemanticHead::MacroInvocation(_) => return None,
     };
     Some(ScoreLoweringInput {
         fill_target: project_fill_target(view, instruction.fill_target.as_ref()),
@@ -267,7 +274,7 @@ fn project_source_instruction<'a>(
             .aspect
             .as_ref()
             .map(|term| (&term.identity).into()),
-        primitive: (&term.identity).into(),
+        primitive,
         count: instruction
             .entity
             .quantity
@@ -3705,6 +3712,7 @@ fn lower_verified_stage15_shared<'a>(
         ScoreLoweringOutcome::Complete
     };
     let score = (objects.is_none() && outcome != ScoreLoweringOutcome::Stopped).then(|| Score {
+        object_templates: Vec::new(),
         version: if inku_score::instructions_use_brushmarks(&instructions) {
             inku_score::ScoreEdition::V0_22.as_str().to_owned()
         } else if inku_score::instructions_use_free_line(&instructions) {

@@ -135,9 +135,11 @@ def select(
     try:
         with store.lock("edit:" + actor, time.monotonic() + 5):
             value = store.read(actor)
-            if profile_id not in value["profiles"]:
-                raise ChatGPTError("chatgpt_not_connected")
-            value["active"] = profile_id
+            from ...verified_model_catalog import core_catalog
+            choice = core_catalog("chatgpt_auth_select", profile_ids=list(value["profiles"]), profile_id=profile_id)
+            if "error" in choice:
+                raise ChatGPTError(choice["error"])
+            value["active"] = choice["active"]
             store.write(actor, value)
         return state({"id": actor})
     except ChatGPTError as error:

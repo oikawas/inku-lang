@@ -2170,6 +2170,32 @@ fn answer(request: &Value) -> Result<Value, Refusal> {
                 get(request, "value").unwrap_or(&empty),
             ))
         }
+        action
+            if action.starts_with("chatgpt_auth_")
+                || [
+                    "chatgpt_publication",
+                    "chatgpt_publication_update",
+                    "chatgpt_usable",
+                    "chatgpt_offered",
+                    "chatgpt_cache",
+                ]
+                .contains(&action) =>
+        {
+            let response = crate::model_catalog::model_catalog_json(dumps(request).as_bytes());
+            let text = std::str::from_utf8(&response)
+                .map_err(|_| Refusal::invalid("invalid policy response"))?;
+            let Value::Object(fields) =
+                python_loads(text).map_err(|_| Refusal::invalid("invalid policy response"))?
+            else {
+                return Err(Refusal::invalid("invalid policy response"));
+            };
+            Ok(Value::Object(
+                fields
+                    .into_iter()
+                    .filter(|(key, _)| key != "schema")
+                    .collect(),
+            ))
+        }
         _ => Err(Refusal::invalid("action is unknown")),
     }
 }
@@ -2304,7 +2330,7 @@ mod tests {
             }
             compared += 1;
         }
-        assert_eq!(compared, 162);
+        assert_eq!(compared, 217);
     }
 
     #[test]

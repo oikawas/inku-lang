@@ -19,3 +19,5 @@ unicode-normalization = "=0.1.25"
 icu_collator = "=2.4.0"
 jiff = { version = "=0.2.37", default-features = false, features = ["std", "tz-fat"] }
 httpdate = "=1.0.3"
+base64 = "=0.23.1"
+subtle = "=2.6.1"

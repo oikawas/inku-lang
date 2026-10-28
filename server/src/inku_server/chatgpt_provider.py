@@ -123,7 +123,8 @@ async def catalog(owner: str, profile_id: str, generation: int, deadline: float,
         return check_session(owner, profile_id, generation, cancel)
     profile = check()
     cache = profile.get("catalog")
-    if not force and cache and cache["expires_at"] > time.time():
+    from .verified_model_catalog import core_catalog
+    if core_catalog("chatgpt_cache", cache=cache, force=force, now=time.time())["fresh"]:
         return publication(profile, cache["models"])["models"]
     # A current, validated catalog is local data. Only a refresh needs the
     # wire slot held by inference; recheck both session and cache after waiting.
@@ -152,7 +153,7 @@ async def catalog(owner: str, profile_id: str, generation: int, deadline: float,
     store = CredentialStore()
     with store.lock("edit:" + owner, deadline, check):
         profile = check()
-        profile["catalog"] = {"expires_at": time.time() + 300, "models": models}
+        profile["catalog"] = {"expires_at": core_catalog("chatgpt_cache", now=time.time())["expires_at"], "models": models}
         # The caller holds the edit lock; atomic write preserves other accounts.
         saved = store.read(owner)
         saved["profiles"][profile_id] = profile
@@ -264,7 +265,8 @@ def offered(owner: str, model: str, *, profile_id: str | None = None, generation
         if profile_id is None or generation is None:
             profile_id, generation = pin(owner)
         models = asyncio.run(catalog(owner, profile_id, generation, time.monotonic() + 15))
-        return any(entry["id"] == model and entry["enabled"] and purpose in entry["purposes"] for entry in models)
+        from .verified_model_catalog import core_catalog
+        return core_catalog("chatgpt_offered", models=models, model=model, purpose=purpose)["offered"]
     except (httpx.HTTPError, TimeoutError, ValueError, KeyError, TypeError):
         # Unable to check is not evidence that a model is absent. Preserve
         # explicit registration/provider refusals; let the host report them.

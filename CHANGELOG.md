@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-28 — Share ChatGPT plan policy
+
+The shared core now owns model publication and the pure authorization and registration decisions; the Server continues to handle communication and protected storage.
+
 ### 2026-10-28 — Install and remove plugin packages on macOS
 
 Settings can check and install, replace, or remove JSON and ZIP plugin packages. Enabled words are available to new works and the Saijiki; saved works retain their own definitions.

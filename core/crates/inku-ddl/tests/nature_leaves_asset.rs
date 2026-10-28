@@ -48,6 +48,54 @@ fn canonical(alias: &str) -> &'static str {
 }
 
 #[test]
+fn bracketed_young_leaves_bind_the_same_locked_definition() {
+    let package: Package = serde_json::from_str(ASSET).unwrap();
+    let definitions: Vec<_> = package
+        .entries
+        .iter()
+        .map(|entry| MacroDefinition::from_json(&entry.definition.to_string()).unwrap())
+        .collect();
+    let locks = definitions
+        .iter()
+        .map(|definition| {
+            let identity = definition.identity().unwrap();
+            MacroLock::new(
+                identity.qualified_name(),
+                identity.version(),
+                format!("sha256:{}", identity.full_digest_hex()),
+            )
+            .unwrap()
+        })
+        .collect::<Vec<_>>();
+    let limits = MacroExpansionLimits {
+        max_invocations: 64,
+        max_depth: 16,
+        max_evaluation_steps: 8192,
+        max_nodes_per_invocation: 128,
+        max_total_nodes: 128,
+    };
+    for source in ["｛若葉｝。", "{young leaves}。", "下に｛若葉｝を置く。"] {
+        let result = compile_ddl_to_score(
+            NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::Ja, locks.clone())
+                .unwrap(),
+            &definitions,
+            Some(37),
+            limits,
+            ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+            ScoreErrorPolicy::OmitAndContinue,
+        );
+        assert!(
+            result
+                .score()
+                .is_some_and(|score| !score.instructions.is_empty()),
+            "{source}: {:?} {:?}",
+            result.upstream_diagnostics(),
+            result.downstream_diagnostics()
+        );
+    }
+}
+
+#[test]
 fn bundled_nature_leaves_are_valid_bounded_definitions_that_reach_normal_score_lowering() {
     let package: Package = serde_json::from_str(ASSET).expect("Nature package must be JSON");
     assert_eq!(package.schema, "inku.bundled-macro-package.v1");

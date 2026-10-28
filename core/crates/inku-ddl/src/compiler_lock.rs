@@ -543,6 +543,7 @@ pub fn compile_typed_ddl(
     composition_seed: Option<u64>,
     limits: MacroExpansionLimits,
 ) -> TypedDdlCompilation {
+    let document = document.with_definition_names(definitions);
     if !valid_limits(limits) {
         return integrity_failure(document, "invalid_expansion_limits");
     }

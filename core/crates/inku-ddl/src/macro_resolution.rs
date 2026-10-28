@@ -285,7 +285,11 @@ fn occurrence(
     // An alias invokes its lock's canonical definition: past this point the
     // invocation carries the canonical name, and only the span keeps the alias.
     let invocation = match lock_indices.as_slice() {
-        [index] if document.macro_locks()[*index].aliases().contains(&surface) => {
+        [index]
+            if document.macro_locks()[*index].aliases().contains(&surface)
+                || surface.starts_with('{')
+                || surface.starts_with('｛') =>
+        {
             invocation(document.macro_locks()[*index].qualified_name(), ordinal)
         }
         _ => invocation(&surface, ordinal),

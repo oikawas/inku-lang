@@ -9,6 +9,7 @@ import InkuUI
     let transport = BatchFailureProvider()
     let app = AppModel(databaseURL: directory.appendingPathComponent("works.sqlite"), transport: transport)
     await app.initialize()
+    app.selectDrawRoute("stages"); app.sketchMode = "off"
     // Drawing takes only registered models.
     let provider = ProviderSettings(id: "check", baseURL: URL(string: "http://localhost:1/v1")!, requiresAPIKey: false,
                                     models: ["first", "changed"].map { ProviderModelSettings(id: $0) })
@@ -55,6 +56,7 @@ import InkuUI
     let transport = BatchRetryProvider()
     let app = AppModel(databaseURL: directory.appendingPathComponent("works.sqlite"), transport: transport)
     await app.initialize()
+    app.selectDrawRoute("stages"); app.sketchMode = "off"
     try await app.updateHostSettings(HostSettings(providers: [provider], models: ModelSelection(stage1Model: "check:first", stage2Model: "check:first")))
     app.inputMode = "description"; app.display.preferences.batchRetries = 0
     let batch = AutomationModel()
@@ -81,6 +83,12 @@ import InkuUI
           reopened.rows.map(\.state) == [.succeeded, .succeeded, .waiting], !reopened.canRetryFailures,
           !reopened.running, !app.isBusy else {
         throw CheckFailure.message("Retrying failures drew \(sent) and left \(reopened.rows.map(\.state))")
+    }
+    // The last saved work was drawn by the stages. Resume restores that route even after the current choice changes.
+    app.drawRoute = "read_and_draw"; app.descriptionComposition = true
+    await reopened.resumeBatch(app: app)
+    guard app.drawRoute == "stages", !app.descriptionComposition, reopened.rows.allSatisfy({ $0.state == .succeeded }) else {
+        throw CheckFailure.message("Batch resume did not restore the last saved work's drawing route")
     }
 }
 

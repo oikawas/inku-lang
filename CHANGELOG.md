@@ -16,6 +16,10 @@ The browser acknowledges authorization immediately, and inku exchanges the token
 
 Login and automatic catalog refresh failures now record a bounded diagnostic without credentials or response contents.
 
+### 2026-10-28 — Draw descriptions in words on macOS
+
+Choose whether to read a description and write its instructions, or draw through the existing stages. The saved work keeps its reading and composition record.
+
 ### 2026-10-28 — Refresh ChatGPT models after login
 
 After a successful connection or reauthorization, fetch the model list once so published models appear without a manual refresh. A fetch failure leaves the connection intact and displays the error.

@@ -39,6 +39,7 @@ struct BatchConditionsView: View {
             .disabled(model.catalogs.isEmpty)
             .inkuTooltip(tip("次のバッチで使う配色を選びます。"))
             Divider()
+            DrawConditionsView(model: model, sketch: shownSketchMode, onSketch: { automation.batchSketchMode = $0 })
             WrappingHStack(spacing: 6) { compactControls }
             .buttonStyle(InkuGhostButtonStyle())
         }
@@ -97,7 +98,6 @@ struct BatchConditionsView: View {
     }
 
     @ViewBuilder private var compactControls: some View {
-        sketchControl
         wildControl
         paperControl
         clearControl

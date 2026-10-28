@@ -12,6 +12,7 @@ func runWorkEditChecks(nativeFixtureURL: URL? = nil) async throws {
     let transport = WorkEditProvider()
     let app = AppModel(databaseURL: databaseURL, transport: transport)
     await app.initialize()
+    app.selectDrawRoute("stages"); app.sketchMode = "off"
     let provider = ProviderSettings(id: "check", baseURL: URL(string: "http://localhost:1/v1")!, requiresAPIKey: false,
                                    models: ["original", "pinned-drawing"].map { ProviderModelSettings(id: $0, purposes: ["llm"]) })
     let settings = HostSettings(providers: [provider], models: ModelSelection(stage1Model: "check:original", stage2Model: "check:original"))
@@ -31,6 +32,7 @@ func runWorkEditChecks(nativeFixtureURL: URL? = nil) async throws {
     }
     let reopened = AppModel(databaseURL: databaseURL, transport: transport)
     await reopened.initialize()
+    reopened.selectDrawRoute("stages"); reopened.sketchMode = "off"
     await reopened.selectWork(parent)
     guard !reopened.sourceLocked, !reopened.canRegenerateDescription, await reopened.canEditSavedWork(parent) else {
         throw CheckFailure.message("Fixture must reopen a description-authoritative saved work without a live editor execution")

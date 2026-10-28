@@ -14,6 +14,7 @@ func runRefinementChecks() async throws {
     let provider = RefinementProvider()
     let app = AppModel(databaseURL: databaseURL, transport: provider)
     await app.initialize()
+    app.selectDrawRoute("stages"); app.sketchMode = "off"
     let service = ProviderSettings(id: "check", baseURL: URL(string: "http://localhost:1/v1")!, requiresAPIKey: false,
                                    models: ["original", "layout"].map { ProviderModelSettings(id: $0) })
     try await app.updateHostSettings(HostSettings(providers: [service],

@@ -351,6 +351,12 @@ public final class AutomationModel {
         preparing = true
         batchObservationToken = UUID()
         defer { preparing = false }
+        // Web restores the route from the last saved work before resuming; each pending row still uses its frozen request.
+        if let workID = rows.reversed().first(where: { $0.state == .succeeded && $0.workID != nil })?.workID,
+           let context = try? await app.savedConfiguration(workID: workID), context.imageDDL == nil {
+            app.drawRoute = context.drawRoute ?? "stages"
+            app.descriptionComposition = context.descriptionDDL.flatMap { try? ExactJSON(data: $0) }?["composition"].object != nil
+        }
         if let originalText = journal?.originalText {
             batchText = BatchInputLines.normalizedText(originalText)
         } else if let lastLine = rows.map(\.line).max(), (1...1_000_000).contains(lastLine) {

@@ -42,6 +42,12 @@ async function copyFor(language) {
       if (typeof template === 'string' && !/NaN|undefined/.test(template)) dynamicTexts[key] = template;
     } catch { /* The manifest retains non-scalar functions for consumer review. */ }
   }
+  for (const [key, reason] of Object.entries({ descriptionDdlFailed: 'description_ddl_failed', descriptionDdlUndrawable: 'description_ddl_undrawable' })) {
+    const prefix = language === 'ja' ? '理由: ' : 'Reason: ';
+    const value = pack.pipelineAttentionReason(reason);
+    if (!value.startsWith(prefix)) throw new Error(`pipelineAttentionReason prefix changed: ${language}`);
+    texts[key] = value.slice(prefix.length);
+  }
   texts.limitWeightFormat = pack.settingsRenderLimitsWeight('%@', '%@');
   return {
     texts,

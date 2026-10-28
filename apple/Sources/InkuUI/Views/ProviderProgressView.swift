@@ -42,7 +42,7 @@ public struct ProviderProgressView: View {
             } else {
                 Image(systemName: symbol(snapshot.outcome)).foregroundStyle(snapshot.outcome == .failed ? Color.red : Color.secondary)
             }
-            Text(model.display.localized(snapshot.stageTitleKey)).inkuFont(12, weight: .semibold)
+            Text(snapshot.displayTitle(model.display)).inkuFont(12, weight: .semibold)
             if snapshot.comparison { Text(model.display.localized("比較候補")).inkuFont(12).foregroundStyle(.secondary) }
             if snapshot.outcome != .running {
                 Text(model.display.localized(outcomeKey(snapshot.outcome))).inkuFont(12).foregroundStyle(.secondary)

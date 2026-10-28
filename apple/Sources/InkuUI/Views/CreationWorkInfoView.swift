@@ -98,8 +98,11 @@ struct CreationWorkInfoView: View {
     private func details(_ work: SavedWork) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                if work.sketchGrain != nil || work.sketchState != nil {
-                    group(copy("sketchLabel", "写生")) {
+                if let data = information?.context?.descriptionDDL, let record = try? ExactJSON(data: data) {
+                    ReadDrawInfoView(record: record, display: model.display)
+                }
+                if information?.context?.descriptionDDL == nil && (work.sketchGrain != nil || work.sketchState != nil) {
+                    group(information?.context?.descriptionDDL != nil ? model.display.label("写生（読み）", "Sketch (reading)") : copy("sketchLabel", "写生")) {
                         if let grain = work.sketchGrain { row(copy("sketchGrainLabel", "区切り"), grain, hint: "provenanceHintSketchGrain") }
                         row(copy("provenanceLabelSketchRecord", "写生の記録"), work.sketchState, hint: "provenanceHintSketchRecord")
                     }
@@ -178,6 +181,11 @@ struct CreationWorkInfoView: View {
                           system: model.display.localized("画像から指示書を書く システムプロンプト"))
                 sentStage("review_image_ddl", stage: "image_review", input: model.display.localized("画像の見比べ 送った入力"),
                           system: model.display.localized("画像の見比べ システムプロンプト"))
+                } else if information?.context?.descriptionDDL != nil {
+                sentStage("read_description", stage: "reading", input: model.display.label("読み 送った入力", "Reading input"), system: model.display.label("読み システムプロンプト", "Reading system prompt"))
+                sentStage("compose_description", stage: "description_composition", input: model.display.label("構図と法則 送った入力", "Composition input"), system: model.display.label("構図と法則 システムプロンプト", "Composition system prompt"))
+                systemPrompt("write_description_ddl", stage: "description_ddl", title: model.display.label("指示書を書く システムプロンプト", "Writing system prompt"))
+                systemPrompt("review_description_ddl", stage: "description_review", title: model.display.label("見比べ システムプロンプト", "Review system prompt"))
                 } else {
                 sentStage("generate_sketch", stage: "sketch", input: copy("promptSketchInput", "写生（Stage 0.5） 送った入力"),
                           system: copy("promptSketchSystem", "写生（Stage 0.5） システムプロンプト"))

@@ -57,6 +57,7 @@ struct CreationView: View {
     @State private var showNewDDL = false
     @State private var rightPanelWidth: CGFloat = 0
     @State private var savedProviders: [InkuHost.ProviderSettings] = []
+    @State private var workspaceContext: SavedAuthoringContext?
     @State private var workspaceGeneration: (nodeID: String, value: Int)?
     /// The 3D view's bridge; each appearance of the view mounts a new viewer through it.
     @State private var ddl3d = Ddl3DController()
@@ -169,6 +170,13 @@ struct CreationView: View {
             guard !Task.isCancelled, workspaceWork?.lineageNodeID == nodeID,
                   let generation = generations?[nodeID] else { return }
             workspaceGeneration = (nodeID, generation)
+        }
+        .task(id: workspaceWork?.id) {
+            workspaceContext = nil
+            guard let work = workspaceWork else { return }
+            let context = try? await model.savedConfiguration(workID: work.id)
+            guard !Task.isCancelled, workspaceWork?.id == work.id else { return }
+            workspaceContext = context
         }
         .onChange(of: workspaceWork?.id) { _, _ in
             onWorkspaceWorkChange(workspaceWork)
@@ -497,6 +505,10 @@ struct CreationView: View {
                 .accessibilityLabel(display.localized("色カタログを開く"))
                 .accessibilityValue(catalogSummary)
             Rectangle().fill(InkuColor.border).frame(height: 1)
+            if model.inputMode == "description" {
+                DrawConditionsView(model: model, sketch: model.sketchMode, onSketch: { model.sketchMode = $0 })
+                    .disabled(controlsDisabled)
+            }
             WrappingHStack(spacing: 6) { compactConditionControls }
                 .padding(.top, 2)
                 .disabled(controlsDisabled)
@@ -787,6 +799,12 @@ struct CreationView: View {
             }
             metaItem(display.localized("色カタログ"), maxWidth: 130, title: catalog) { Text(catalog) }
             metaItem(display.localized("キャンバス"), maxWidth: 100, title: canvas) { Text(canvas) }
+            metaItem(display.label("描き方", "Drawing"), maxWidth: 130) {
+                Text(workspaceContext?.imageDDL != nil ? display.label("画像から書く", "Written from a picture") : (workspaceContext?.drawRoute == "read_and_draw" || (workspaceContext?.drawRoute != "stages" && workspaceContext?.descriptionDDL != nil)) ? display.label("言葉で描く", "In words") : display.label("型で描く", "With a plan"))
+            }
+            metaItem(display.label("写生", "Sketch"), maxWidth: 130, title: DrawPresentation.sketchNote(work.sketchState, japanese: display.preferences.language != "en")) {
+                Text(DrawPresentation.sketchShort(work.sketchState, japanese: display.preferences.language != "en"))
+            }
             metaItem(display.label("サイズ", "Size"), maxWidth: nil) { Text(size).monospacedDigit() }
             metaItem(display.label("作成", "Created"), maxWidth: nil) { Text(created).monospacedDigit() }
         }

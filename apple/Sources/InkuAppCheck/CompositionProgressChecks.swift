@@ -14,6 +14,7 @@ func runCompositionProgressChecks() async throws {
     let databaseURL = folder.appendingPathComponent("works.sqlite")
     let app = AppModel(databaseURL: databaseURL, transport: provider)
     await app.initialize()
+    app.selectDrawRoute("stages"); app.sketchMode = "off"
     // Drawing takes only registered models.
     let service = ProviderSettings(id: "check", baseURL: URL(string: "http://localhost:1/v1")!, requiresAPIKey: false,
                                    models: ["pinned", "comparison-stage1", "holes-only", "later"].map { ProviderModelSettings(id: $0) })

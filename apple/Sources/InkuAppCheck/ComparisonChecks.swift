@@ -12,6 +12,7 @@ func runComparisonChecks() async throws {
     let databaseURL = folder.appendingPathComponent("works.sqlite")
     let model = AppModel(databaseURL: databaseURL, transport: transport)
     await model.initialize()
+    model.selectDrawRoute("stages"); model.sketchMode = "off"
     model.inputMode = "ddl"
     model.ddlText = "place one green square at center."
     model.seedText = "42"

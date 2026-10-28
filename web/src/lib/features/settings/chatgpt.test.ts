@@ -17,6 +17,106 @@ const { createChatGPTSettings } = await import('data:text/javascript;base64,' + 
 const response = (value: unknown) => new Response(JSON.stringify(value), { headers: { 'Content-Type': 'application/json' } });
 const state = (label: string) => ({ available: true, reason: null, self_hosted: true, active_profile_id: 'profile', profiles: [{ id: 'profile', label, state: 'connected' }] });
 
+test('completed authorization refreshes the catalog once and keeps login successful on refresh failure', async () => {
+	const previousWindow = globalThis.window, previousTimer = globalThis.setTimeout, previousClear = globalThis.clearTimeout;
+	let scheduled: (() => void) | undefined;
+	(globalThis as any).window = { open() {} };
+	(globalThis as any).setTimeout = (callback: () => void) => { scheduled = callback; return 1; };
+	(globalThis as any).clearTimeout = () => {};
+	try {
+		for (const failed of [false, true]) {
+			const requests: string[] = [];
+			let available: string[] = [], cached = false;
+			let finish!: () => void;
+			const finished = new Promise<void>((resolve) => { finish = resolve; });
+			const connection = createChatGPTSettings({
+				owner: () => 'owner', available: () => true, invalidate() {}, changed() { available = cached ? ['previously-published'] : []; finish(); },
+				apiFetch: async (url: string) => {
+					requests.push(url);
+					if (url.endsWith('/authorize')) return response({ attempt_id: 'attempt', authorization_url: 'https://auth.openai.com/api/accounts/authorize' });
+					if (url.endsWith('/attempts/attempt')) return response({ status: 'completed', profile_id: 'profile', code: null });
+					if (url.endsWith('/models/refresh')) { cached = !failed; return failed ? new Response(JSON.stringify({ detail: { code: 'chatgpt_auth_unavailable' } }), { status: 403 }) : response({ models: [{ id: 'previously-published' }], enabled_models: { 'previously-published': true } }); }
+					return response(state('Account'));
+				}
+			});
+			await connection.load();
+			assert.equal(requests.filter((url) => url.endsWith('/models/refresh')).length, 0);
+			await connection.authorize('profile', true);
+			scheduled!();
+			await finished;
+			assert.equal(requests.filter((url) => url.endsWith('/models/refresh')).length, 1);
+			assert.equal(connection.state.profiles[0].state, 'connected');
+			assert.equal(connection.code, failed ? 'chatgpt_auth_unavailable' : null);
+			assert.deepEqual(available, failed ? [] : ['previously-published']);
+			connection.reset();
+		}
+	} finally {
+		(globalThis as any).window = previousWindow;
+		globalThis.setTimeout = previousTimer;
+		globalThis.clearTimeout = previousClear;
+	}
+});
+
+test('failed authorization does not refresh the catalog', async () => {
+	const previousWindow = globalThis.window, previousTimer = globalThis.setTimeout, previousClear = globalThis.clearTimeout;
+	let scheduled: (() => void) | undefined, fetches = 0, finish!: () => void;
+	const finished = new Promise<void>((resolve) => { finish = resolve; });
+	(globalThis as any).window = { open() {} };
+	(globalThis as any).setTimeout = (callback: () => void) => { scheduled = callback; return 1; };
+	(globalThis as any).clearTimeout = () => {};
+	const connection = createChatGPTSettings({
+		owner: () => 'owner', available: () => true, invalidate() {}, changed() { finish(); },
+		apiFetch: async (url: string) => {
+			if (url.endsWith('/authorize')) return response({ attempt_id: 'attempt', authorization_url: 'https://auth.openai.com/api/accounts/authorize' });
+			if (url.endsWith('/attempts/attempt')) return response({ status: 'failed', profile_id: 'profile', code: 'chatgpt_auth_rejected' });
+			if (url.endsWith('/models/refresh')) fetches++;
+			return response(state('Account'));
+		}
+	});
+	try {
+		await connection.load();
+		await connection.authorize();
+		scheduled!();
+		await finished;
+		assert.equal(fetches, 0);
+		assert.equal(connection.code, 'chatgpt_auth_rejected');
+	} finally { connection.reset(); (globalThis as any).window = previousWindow; globalThis.setTimeout = previousTimer; globalThis.clearTimeout = previousClear; }
+});
+
+test('helper completion is detected by generation and refreshes only once', async () => {
+	const owner = '00000000-0000-4000-8000-000000000001';
+	const profile = '00000000-0000-4000-8000-000000000002';
+	const previous = globalThis.window, previousTimer = globalThis.setTimeout, previousClear = globalThis.clearTimeout;
+	(globalThis as any).window = { location: { assign() {} } };
+	let scheduled: (() => void) | undefined;
+	(globalThis as any).setTimeout = (callback: () => void) => { scheduled = callback; return 1; };
+	(globalThis as any).clearTimeout = () => {};
+	let generation = 1, fetches = 0, changes = 0;
+	let finish!: () => void;
+	const finished = new Promise<void>((resolve) => { finish = resolve; });
+	const connection = createChatGPTSettings({
+		owner: () => owner, available: () => true, invalidate() {}, changed() { changes++; finish(); },
+		apiFetch: async (url: string) => {
+			if (url.endsWith('/authorize')) return response({ action: 'local_helper' });
+			if (url.endsWith('/models/refresh')) { fetches++; return response({ models: [] }); }
+			return response({ ...state('Account'), active_profile_id: profile, profiles: [{ id: profile, state: 'connected', generation }] });
+		}
+	});
+	try {
+		await connection.load();
+		await connection.authorize(profile);
+		await connection.recheck();
+		assert.equal(fetches, 0);
+		generation = 2;
+		scheduled!();
+		await finished;
+		await connection.recheck();
+		assert.equal(fetches, 1);
+		assert.equal(changes, 1);
+		assert.equal(connection.state.profiles[0].generation, 2);
+	} finally { connection.reset(); (globalThis as any).window = previous; globalThis.setTimeout = previousTimer; globalThis.clearTimeout = previousClear; }
+});
+
 test('self-hosted authorization keeps Brave and Japanese in the public Mac helper action', async () => {
 	const owner = '00000000-0000-4000-8000-000000000001';
 	const profile = '00000000-0000-4000-8000-000000000002';
@@ -28,7 +128,7 @@ test('self-hosted authorization keeps Brave and Japanese in the public Mac helpe
 	try {
 		const connection = createChatGPTSettings({
 			owner: () => owner, available: () => true, invalidate() {}, changed() {},
-			apiFetch: async () => response({ action: 'local_helper' })
+			apiFetch: async (url: string) => response(url.endsWith('/authorize') ? { action: 'local_helper' } : state('Account'))
 		});
 		await connection.authorize(profile, true);
 		assert.equal(launched.length, 1);
@@ -59,7 +159,7 @@ test('only the fixed server-selected container target enters the helper URI', as
 		let helperTarget: string | undefined = 'container';
 		const connection = createChatGPTSettings({
 			owner: () => owner, available: () => true, invalidate() {}, changed() {},
-			apiFetch: async () => response({ action: 'local_helper', helper_target: helperTarget })
+			apiFetch: async (url: string) => response(url.endsWith('/authorize') ? { action: 'local_helper', helper_target: helperTarget } : state('Account'))
 		});
 		await connection.authorize();
 		assert.equal(new URL(launched[0]).searchParams.get('target'), 'container');

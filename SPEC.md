@@ -1764,6 +1764,8 @@ When joining model-list and send paths, the shared core removes one trailing `/v
 
 The shared core owns the ChatGPT plan's publication, authorization and registration decisions. The host performs HTTP, browser and callback I/O, signature verification, credential storage and locking.
 
+After a successful Server/Web sign-in or reauthorization, Web refreshes that registration's model list once without the cache; a refresh failure is shown as for manual refresh and does not undo sign-in. Opening settings alone still does not fetch the list, and existing publication choices remain.
+
 The shared rules also cover OAuth response and key selection, JWT time and identifier claims, publication's active registration, quota pause and resume, registration conflicts and limits, display fields, refresh catalog invalidation, and sign-out revocation decisions.
 
 At run admission, the Server's ChatGPT plan validates the account, pinned registration ID and generation, and connection state before reading an unexpired model catalog cache without waiting for the communication lock. External catalog refreshes and inference still use the registration's communication lock. A catalog lock timeout, transport failure or temporary provider failure at admission returns HTTP 503 `chatgpt_transport_unavailable`, rather than the unavailable-model 403 `model_not_offered`. An actually absent, unpublished or purpose-incompatible model remains a 403; connection and quota refusals retain their reasons (2026-10-20).

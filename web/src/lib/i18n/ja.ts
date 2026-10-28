@@ -89,7 +89,7 @@ export const ja: LangPack = {
 	chatgptRefreshModels: 'モデル一覧を更新',
 	chatgptModelsLoaded: (count) => `${count}件のモデルを取得しました。公開するモデルを選んで保存してください。`,
 	chatgptModelsEmpty: 'この登録で選択できるモデルはありません。接続とプラン利用の許可を確認してください。',
-	chatgptModelSettingsGuide: '接続が完了しました。モデル設定で「ChatGPTプラン」のモデル一覧を取得し、用途と公開するモデルを選んで保存してください。その後、描画やVisionに使うモデルを選択できます。',
+	chatgptModelSettingsGuide: '接続が完了しました。モデル一覧を取得します。モデル設定で用途と公開するモデルを選んで保存すると、描画やVisionに使えます。',
 	chatgptOpenModelSettings: 'モデル設定を開く',
 	chatgptPersonalModels: 'この接続の本人用モデルです。「公開モデルを選択」で一覧を取得し、LLM／Visionの用途と公開するモデルを選んで保存してください。他の利用者には公開されません。',
 	chatgptUsingPlan: 'ChatGPTプランを使用中',

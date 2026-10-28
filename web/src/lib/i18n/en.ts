@@ -89,7 +89,7 @@ export const en: LangPack = {
 	chatgptRefreshModels: 'Refresh models',
 	chatgptModelsLoaded: (count) => `Loaded ${count} models. Select models to publish and save.`,
 	chatgptModelsEmpty: 'No selectable models are offered for this account. Check the connection and plan usage permission.',
-	chatgptModelSettingsGuide: 'Connected. Open model settings, fetch the ChatGPT plan model list, choose uses and models to publish, then save. You can then choose models for drawing or Vision.',
+	chatgptModelSettingsGuide: 'Connected. The model list is refreshed automatically. In model settings, choose uses and models to publish and save them to use them for drawing or Vision.',
 	chatgptOpenModelSettings: 'Open model settings',
 	chatgptPersonalModels: 'These models belong to your connection. Use Select models to fetch the list, choose LLM or Vision uses and models to publish, then save. They are not published to other users.',
 	chatgptUsingPlan: 'Using ChatGPT plan',

@@ -46,6 +46,7 @@ object NativePipelineBridge : SharedPipelineBinding {
      */
     external fun ddl3dSnapshot(inputBytes: ByteArray): ByteArray
     external fun modelCatalog(inputBytes: ByteArray): ByteArray
+    external fun providerAdmission(inputBytes: ByteArray): ByteArray
 
     /** One saved Saijiki v1 unit in, the same unit in the current edition out (SPEC §3.3). */
     external fun migrateSaijikiV1(inputBytes: ByteArray): ByteArray

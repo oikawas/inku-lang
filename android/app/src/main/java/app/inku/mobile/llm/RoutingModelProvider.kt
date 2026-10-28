@@ -15,7 +15,7 @@ class RoutingModelProvider(
     private val database: InkuDatabase,
     private val localProvider: LocalLiteRtLmProvider,
     private val chatGptPlan: (() -> ChatGptPlanManager)? = null,
-    private val admission: ProviderAdmission = ProviderAdmission.shared,
+    private val admission: ProviderAdmission = ProviderAdmission(ProviderRateState(database)),
     private val observeAccess: suspend (ProviderSettingEntity, String, Boolean) -> Unit = { _, _, _ -> },
 ) : ModelProvider {
     override val providerId: String = "routing"
@@ -37,8 +37,21 @@ class RoutingModelProvider(
         }
         val remote = remoteProvider(provider)
         try {
-            val result = if (request.pipelineAction == null) remote.generate(request) else
-                admission.admit(provider.providerId, request.timeoutMs) { remote.generate(request) }
+            val started = System.currentTimeMillis()
+            val result = run {
+                val limits = catalogRequest("rate_limits", JSONObject().put("provider", provider.providerId)).getJSONObject("rate_limits")
+                val remaining = request.timeoutMs?.let { (it - (System.currentTimeMillis() - started)).coerceAtLeast(0) }
+                if (remaining == 0L) throw ProviderRateLimitWaitException()
+                admission.admit(provider.providerId, provider.kind, limits, remaining, {
+                    val left = request.timeoutMs?.let { it - (System.currentTimeMillis() - started) }
+                    if (left != null && left <= 0) throw ProviderRateLimitWaitException()
+                    ProviderWireTransport.estimate(provider, request.copy(timeoutMs = left), limits)
+                }) {
+                    val left = request.timeoutMs?.let { it - (System.currentTimeMillis() - started) }
+                    if (left != null && left <= 0) throw java.net.SocketTimeoutException("provider attempt deadline expired")
+                    remote.generate(request.copy(timeoutMs = left))
+                }
+            }
             observeAccess(provider, request.modelId, true)
             return result
         } catch (error: ModelProviderHttpException) {

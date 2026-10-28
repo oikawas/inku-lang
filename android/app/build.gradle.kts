@@ -96,9 +96,11 @@ tasks.withType<Test>().configureEach {
     systemProperty("inku.modelCatalogSource", rootProject.file("../core/crates/inku-pipeline/data/model_catalog.json").absolutePath)
     systemProperty("inku.modelCatalogCases", rootProject.file("../core/crates/inku-pipeline/data/model-catalog-cases.json").absolutePath)
     systemProperty("inku.providerSettingsCases", rootProject.file("../server/tests/data/provider-settings-cases.json").absolutePath)
+    systemProperty("inku.providerAdmissionCases", rootProject.file("../server/tests/data/provider-admission-cases.json").absolutePath)
+    systemProperty("inku.providerAdmissionSequence", rootProject.file("../server/tests/data/provider-admission-sequence.json").absolutePath)
     systemProperty("inku.identityCases", rootProject.file("../server/tests/data/identity-cases.json").absolutePath)
     systemProperty("inku.instructionLanguageCases", rootProject.file("../server/tests/data/instruction-language-cases.json").absolutePath)
-    inputs.files(rootProject.file("../server/tests/data/provider-settings-cases.json"), rootProject.file("../server/tests/data/identity-cases.json"),
+    inputs.files(rootProject.file("../server/tests/data/provider-admission-cases.json"), rootProject.file("../server/tests/data/provider-admission-sequence.json"), rootProject.file("../server/tests/data/provider-settings-cases.json"), rootProject.file("../server/tests/data/identity-cases.json"),
         rootProject.file("../server/tests/data/instruction-language-cases.json"))
 }
 val androidVersionCode = nextAndroidBuildNumber()

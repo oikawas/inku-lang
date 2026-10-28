@@ -483,7 +483,7 @@ Server／Webとの差の監査で見つけた差を、次の規則に揃えた�
   - 鍵が要るproviderはServerの定義（openai・anthropic・gemini・nvidia・ollama-cloud）に従う。OpenAI互換は鍵が空なら`Bearer none`を送る。
   - 成功の応答は1 MiB（bytes）まで読み、エラーの本文は先頭16 KiBで分類する。ChatGPTの引数の上限は1 MiBとし、失敗の分類とSSEの区切りはServerと同じにする。
   - GeminiのモデルIDは、Pythonの`quote(model, safe="")`と同じに符号化する。
-  - 流量制御は、429の後に`Retry-After`／`RetryInfo`と62秒の長い方まで同じproviderへの要求を待たせることと、ollama-cloudの同時2本だけを持つ。rpm／tpm／rpdの予算と`countTokens`は持たない。Androidには上限を上げる手段が無く、既定の上限では大きなGeminiの要求が一度も送られなくなるためである（作者の決定、2026-10-06）。
+  - 外部 provider の流量制御は共有coreの受付を使う（ChatGPT プランを除く）。既定の Gemini は分27回・分14,400入力トークン・日14,400回で、送信前に `countTokens` を1回呼ぶ。429後の待ちは共有coreが決め、`provider_rate_usage:<id>` に保存する。設定が壊れていれば送信せず、上限の変更画面は設けない。ollama-cloudの同時2本も保つ（作者の決定、2026-10-28）。
 - **保存する記録**:
   - 新作には`render_color_profile`、`compiler_outcome`、`render_limits`（4値）、`render_limits_source`（新作は`settings`、保存した設定から派生した作品は`work`）、`ui_lang`、`elapsed_stage1_ms`／`elapsed_stage2_ms`／`elapsed_total_ms`（modelの時間の段ごとの合計）を記録する。
   - 再演には、カタログの名前とsub、`render_color_source`、`render_color_profile`、`seed_text`、`render_limits`／`render_limits_source`を記録する。

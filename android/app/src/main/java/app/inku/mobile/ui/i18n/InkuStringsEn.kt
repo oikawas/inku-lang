@@ -392,6 +392,9 @@ object InkuStringsEn : InkuStrings {
     }
 
     override val errorServiceIdFormat = "A Service ID may hold letters, digits, _ and - only."
+    override val errorProviderDailyBudget = "The provider's daily request budget is exhausted."
+    override val errorProviderInputBudget = "The input exceeds the provider's token budget."
+    override val errorProviderInputCount = "The input token count is unavailable."
     override val errorDuplicateModelIds = "A model ID appears more than once."
     override val errorServiceNotFound: (String) -> String = { id -> "Service not found: $id" }
     override val errorProviderModelsUnsupported: (String) -> String = { name ->

@@ -28,7 +28,7 @@ class RateAccountingUnavailable(Exception):
 
 def retry_after_seconds(headers, raw: bytes, *, now: float) -> float:
     return _core("retry", now=now, retry_after=headers.get("retry-after"),
-                 raw=raw.decode("utf-8", errors="replace"))["seconds"]
+                 raw_bytes=list(raw))["seconds"]
 
 
 def _core(action, **fields):

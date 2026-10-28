@@ -15,7 +15,7 @@ from inku_server.model_settings import connection_for, public_model_settings, up
 from inku_server.persistence.schema import AppSettingRow
 from inku_server.pipeline_provider import ProviderOptions, SingleAttemptProvider
 import inku_render
-from inku_server.provider_rate_limits import ProviderRateBudget, RateLimitUnavailable, RateAccountingUnavailable, _replace_state
+from inku_server.provider_rate_limits import ProviderRateBudget, RateLimitUnavailable, RateAccountingUnavailable, _replace_state, retry_after_seconds
 
 
 def test_core_admission_matches_frozen_server_and_preserves_json():
@@ -42,6 +42,12 @@ def test_overflow_refuses_corrupt_state(tmp_path):
         asyncio.run(ProviderRateBudget(engine, clock=lambda: 1001.0).reserve("p", "openai", request["limits"], 1))
     with engine.connect() as connection:
         assert connection.execute(select(AppSettingRow.value)).scalar_one() == raw
+
+
+def test_retry_info_accepts_json_byte_encodings():
+    body = '{"error":{"details":[{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"91s"}]}}'
+    for encoding in ("utf-8", "utf-8-sig", "utf-16", "utf-16-be", "utf-32", "utf-32-be"):
+        assert retry_after_seconds({}, body.encode(encoding), now=0) == 91
 
 
 def test_db_json_matches_original_sequence(tmp_path, monkeypatch):

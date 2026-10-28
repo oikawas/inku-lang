@@ -38,6 +38,74 @@ fn limit(value: &Value) -> Result<u64, &'static str> {
         (n / 10 * 9 + n % 10 * 9 / 10).max(1)
     })
 }
+fn json_body(request: &Value) -> Option<Value> {
+    let bytes: Vec<u8> = if request["raw_bytes"].is_array() {
+        serde_json::from_value(request["raw_bytes"].clone()).ok()?
+    } else {
+        request["raw"].as_str().unwrap_or("").as_bytes().to_vec()
+    };
+    if let Ok(value) = serde_json::from_slice(&bytes) {
+        return Some(value);
+    }
+    let bytes = bytes.strip_prefix(&[0xef, 0xbb, 0xbf]).unwrap_or(&bytes);
+    if let Ok(value) = serde_json::from_slice(bytes) {
+        return Some(value);
+    }
+    let (width, little, offset) = if bytes.starts_with(&[0xff, 0xfe, 0, 0]) {
+        (4, true, 4)
+    } else if bytes.starts_with(&[0, 0, 0xfe, 0xff]) {
+        (4, false, 4)
+    } else if bytes.starts_with(&[0xff, 0xfe]) {
+        (2, true, 2)
+    } else if bytes.starts_with(&[0xfe, 0xff]) {
+        (2, false, 2)
+    } else if bytes.starts_with(&[0, 0, 0]) {
+        (4, false, 0)
+    } else if bytes.len() >= 4 && bytes[1..4] == [0, 0, 0] {
+        (4, true, 0)
+    } else if bytes.first() == Some(&0) {
+        (2, false, 0)
+    } else if bytes.get(1) == Some(&0) {
+        (2, true, 0)
+    } else {
+        return None;
+    };
+    let input = &bytes[offset..];
+    if !input.len().is_multiple_of(width) {
+        return None;
+    }
+    let decoded = if width == 2 {
+        let words: Vec<u16> = input
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|v| {
+                if little {
+                    u16::from_le_bytes([v[0], v[1]])
+                } else {
+                    u16::from_be_bytes([v[0], v[1]])
+                }
+            })
+            .collect();
+        String::from_utf16(&words).ok()?
+    } else {
+        input
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|v| {
+                let b = [v[0], v[1], v[2], v[3]];
+                char::from_u32(if little {
+                    u32::from_le_bytes(b)
+                } else {
+                    u32::from_be_bytes(b)
+                })
+            })
+            .collect::<Option<String>>()?
+    };
+    serde_json::from_str(&decoded).ok()
+}
+
 fn retry(request: &Value) -> f64 {
     let now = request["now"].as_f64().unwrap_or(0.0);
     let mut wait = WINDOW;
@@ -49,13 +117,18 @@ fn retry(request: &Value) -> f64 {
                     Ok(d) => d.as_secs_f64() - now,
                     Err(e) => -e.duration().as_secs_f64() - now,
                 })
+                .or_else(|| {
+                    jiff::fmt::strtime::parse("%a, %d %b %Y %H:%M:%S %z", header)
+                        .ok()
+                        .and_then(|value| value.to_timestamp().ok())
+                        .map(|value| value.as_second() as f64 - now)
+                })
         });
         if let Some(s) = seconds.filter(|s| s.is_finite()) {
             wait = wait.max(s);
         }
     }
-    let raw = request["raw"].as_str().unwrap_or("");
-    if let Ok(body) = serde_json::from_str::<Value>(raw)
+    if let Some(body) = json_body(request)
         && let Some(details) = body["error"]["details"].as_array()
     {
         for detail in details {
@@ -226,5 +299,14 @@ mod tests {
         ))
         .unwrap();
         assert_eq!(actual, json!({"rpm":1,"tpm":16602069666338596453_u64}));
+    }
+    #[test]
+    fn retry_after_accepts_numeric_timezone() {
+        let request = json!({"action":"retry","now":0,"retry_after":"Thu, 01 Jan 1970 00:02:00 +0000","raw":""});
+        let actual: Value = serde_json::from_slice(&provider_admission_json(
+            &serde_json::to_vec(&request).unwrap(),
+        ))
+        .unwrap();
+        assert_eq!(actual["seconds"], 120.0);
     }
 }

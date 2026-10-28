@@ -20,6 +20,15 @@ fn refused(problems: Vec<Value>) -> Value {
 fn s(v: &Value) -> &str {
     v.as_str().unwrap_or("")
 }
+fn python_string_field(object: &Value, key: &str) -> String {
+    match object.get(key) {
+        None => String::new(),
+        Some(Value::Null) => "None".to_owned(),
+        Some(Value::Bool(value)) => if *value { "True" } else { "False" }.to_owned(),
+        Some(Value::String(value)) => value.clone(),
+        Some(value) => value.to_string(),
+    }
+}
 fn text(v: &Value, path: &str, problems: &mut Vec<Value>, limit: usize) -> String {
     if v.is_null() {
         return String::new();
@@ -149,6 +158,9 @@ fn parse(
     );
     let authors = match &raw["authors"] {
         Value::Null | Value::Bool(false) => vec![],
+        Value::String(value) if value.is_empty() => vec![],
+        Value::Number(value) if value.as_f64() == Some(0.0) => vec![],
+        Value::Object(value) if value.is_empty() => vec![],
         Value::Array(a) if a.iter().all(Value::is_string) => a.clone(),
         _ => {
             problems.push(problem("authors", "not_a_list_of_strings", ""));
@@ -269,8 +281,8 @@ fn parse(
                     }
                 }
                 let definition = &item["definition"];
-                let ns = s(&definition["namespace"]);
-                let heading = s(&definition["heading"]);
+                let ns = python_string_field(definition, "namespace");
+                let heading = python_string_field(definition, "heading");
                 let aliases: Vec<_> = definition["aliases"]
                     .as_array()
                     .map(|a| a.iter().filter_map(Value::as_str).collect())
@@ -285,9 +297,9 @@ fn parse(
                     .map(|b| format!("{b:02x}"))
                     .collect::<String>();
                 let default_ja =
-                    format!("{}.{}。", ns, aliases.first().copied().unwrap_or(heading));
+                    format!("{}.{}。", ns, aliases.first().copied().unwrap_or(&heading));
                 let default_en = format!("{qualified}.");
-                words.push(json!({"index":index,"definition":definition,"summary_ja":summary_ja,"summary_en":summary_en,"note_ja":note_ja,"note_en":note_en,"example_ja":ex_ja,"example_en":ex_en,"draw_ja":if ex_ja.is_empty(){&default_ja}else{&ex_ja},"draw_en":if ex_en.is_empty(){&default_en}else{&ex_en},"aliases":aliases,"qualified_name":qualified,"visible_qualified_names":visible,"preview_key":key,"problems":wp,"picture":picture}));
+                words.push(json!({"index":index,"definition":definition,"heading":heading,"summary_ja":summary_ja,"summary_en":summary_en,"note_ja":note_ja,"note_en":note_en,"example_ja":ex_ja,"example_en":ex_en,"draw_ja":if ex_ja.is_empty(){&default_ja}else{&ex_ja},"draw_en":if ex_en.is_empty(){&default_en}else{&ex_en},"aliases":aliases,"qualified_name":qualified,"visible_qualified_names":visible,"preview_key":key,"problems":wp,"picture":picture}));
             }
         }
     }
@@ -457,7 +469,7 @@ fn finish(input: &Value) -> Result<Value, ()> {
             .skip(1)
             .cloned()
             .collect();
-        reports.push(json!({"heading":w["definition"]["heading"],"qualified_name":w["qualified_name"],"aliases":aliases,"summary_ja":summary(w,"ja"),"summary_en":summary(w,"en"),"note_ja":w["note_ja"],"note_en":w["note_en"],"example_ja":w["draw_ja"],"example_en":w["draw_en"],"digest":s(&entries[i]["digest"]),"preview_source":if w["picture"].is_null(){"drawn"}else{"file"},"problems":problems}));
+        reports.push(json!({"heading":w["heading"],"qualified_name":w["qualified_name"],"aliases":aliases,"summary_ja":summary(w,"ja"),"summary_en":summary(w,"en"),"note_ja":w["note_ja"],"note_en":w["note_en"],"example_ja":w["draw_ja"],"example_en":w["draw_en"],"digest":s(&entries[i]["digest"]),"preview_source":if w["picture"].is_null(){"drawn"}else{"file"},"problems":problems}));
     }
     let package_problems = package["problems"].as_array().ok_or(())?;
     let ok = package_problems.is_empty()
@@ -538,7 +550,19 @@ pub fn plugin_package(input_bytes: Vec<u8>) -> Vec<u8> {
             }
             "check_finish" => finish(&input)?,
             "read_stored" => match parse(input["document"].as_str().ok_or(())?, None, true) {
-                Ok(p) => json!({"outcome":"ok","package":p}),
+                Ok(mut p) => {
+                    if let Some(words) = p["words"].as_array_mut() {
+                        for word in words {
+                            if let Some(fields) = word.as_object_mut() {
+                                fields.remove("picture");
+                                fields.remove("heading");
+                                fields.remove("draw_ja");
+                                fields.remove("draw_en");
+                            }
+                        }
+                    }
+                    json!({"outcome":"ok","package":p})
+                }
                 Err(p) => refused(p),
             },
             "fit_picture" => {
@@ -592,6 +616,11 @@ mod tests {
         let end = call(json!({"action":"check_finish","state":start["state"],"drawings":drawings}));
         assert_eq!(end["outcome"], "ok");
         assert_eq!(end["text"], document);
+        let encoded = String::from_utf8(encode_finished(&end).unwrap()).unwrap();
+        let report = encoded.split("\"report\":{").nth(1).unwrap();
+        assert!(report.starts_with("\"ok\":"));
+        assert!(report.find("\"id\":").unwrap() < report.find("\"namespace\":").unwrap());
+        assert!(report.find("\"problems\":").unwrap() < report.find("\"words\":").unwrap());
         assert!(!end["pictures"].as_object().unwrap().is_empty());
         let malformed = call(json!({"action":"check_start","document":"{}","taken_names":{}}));
         assert_eq!(malformed["outcome"], "refused");

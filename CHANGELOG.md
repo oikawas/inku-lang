@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-28 — Share ChatGPT plan policy
-
-The shared core now owns model publication and the pure authorization and registration decisions; the Server continues to handle communication and protected storage.
-
 ### 2026-10-28 — Install and remove plugin packages on macOS
 
 Settings can check and install, replace, or remove JSON and ZIP plugin packages. Enabled words are available to new works and the Saijiki; saved works retain their own definitions.
@@ -398,6 +394,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.288 (2026-10-28 / Build1364)
+
+### 2026-10-28 — Share ChatGPT plan policy
+
+The shared core now owns model publication and the pure authorization and registration decisions; the Server continues to handle communication and protected storage.
 
 ## v2.15.287 (2026-10-28 / Build1363)
 

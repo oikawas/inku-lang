@@ -52,6 +52,7 @@ pub enum MacroInvocationResolutionDiagnosticKind {
     VersionMismatch,
     DigestMismatch,
     SourceClauseAtomMismatch,
+    PluginObjectNotDrawnYet,
 }
 
 /// One occurrence withheld from the resolved set, retaining its exact evidence.
@@ -93,6 +94,10 @@ pub fn resolve_macro_invocations(
         .enumerate()
         .map(|(index, definition)| DefinitionRecord {
             index,
+            object: definition
+                .plugin_v2
+                .as_ref()
+                .is_some_and(|v| v.kind == "object"),
             qualified_name: definition.qualified_name(),
             identity: definition.identity().map_err(|validation| {
                 validation
@@ -113,6 +118,7 @@ pub fn resolve_macro_invocations(
 #[derive(Clone)]
 struct DefinitionRecord {
     index: usize,
+    object: bool,
     qualified_name: Option<String>,
     identity: Result<MacroDefinitionIdentity, Vec<&'static str>>,
 }
@@ -167,6 +173,19 @@ fn build_resolution(
                     let macro_lock = &document.macro_locks()[*lock_index];
                     match resolve_definition(macro_lock, definitions) {
                         DefinitionResolution::Resolved(identity) => {
+                            if definitions.iter().any(|definition| {
+                                definition.object
+                                    && definition
+                                        .identity
+                                        .as_ref()
+                                        .is_ok_and(|candidate| candidate == &identity)
+                            }) {
+                                diagnostics.push(occurrence.diagnostic(
+                                    MacroInvocationResolutionDiagnosticKind::PluginObjectNotDrawnYet,
+                                    Some(identity), None, Vec::new(),
+                                ));
+                                continue;
+                            }
                             resolved.push(ResolvedMacroInvocation {
                                 invocation: occurrence
                                     .invocation

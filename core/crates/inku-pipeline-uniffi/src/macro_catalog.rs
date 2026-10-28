@@ -136,6 +136,8 @@ fn resolve(input_bytes: &[u8]) -> Result<CatalogOutput, ()> {
     let mut locks = Vec::new();
     let mut diagnostics = Vec::new();
     let mut names = BTreeSet::new();
+    let mut plugin_names = BTreeSet::new();
+    let mut v2_names = BTreeSet::new();
 
     // Explicit installation definitions precede bundled editions. Both travel
     // through the same parser, validation, identity and resource boundary.
@@ -204,11 +206,32 @@ fn resolve(input_bytes: &[u8]) -> Result<CatalogOutput, ()> {
         };
         let qualified_name = identity.qualified_name().to_owned();
         let aliases = definition.alias_qualified_names();
+        let visible = if let Some(v2) = &definition.plugin_v2 {
+            v2.names
+                .ja
+                .iter()
+                .chain(&v2.names.en)
+                .map(|name| inku_ddl::plugin_names::normalize_plugin_name(name))
+                .collect::<Vec<_>>()
+        } else {
+            let (ja, en) =
+                inku_ddl::plugin_names::v1_plugin_names(&definition.heading, &definition.aliases);
+            ja.into_iter()
+                .chain(en)
+                .map(|name| inku_ddl::plugin_names::normalize_plugin_name(&name))
+                .collect::<Vec<_>>()
+        };
+        let conflict = if definition.plugin_v2.is_some() {
+            visible.iter().any(|name| plugin_names.contains(name))
+        } else {
+            visible.iter().any(|name| v2_names.contains(name))
+        };
         // A canonical name and every alias share one namespace of visible
         // names: the first definition to claim any of them keeps it.
-        if std::iter::once(&qualified_name)
-            .chain(&aliases)
-            .any(|name| names.contains(name))
+        if conflict
+            || std::iter::once(&qualified_name)
+                .chain(&aliases)
+                .any(|name| names.contains(name))
             || !names.insert(qualified_name.clone())
         {
             diagnostics.push(omitted(
@@ -231,6 +254,10 @@ fn resolve(input_bytes: &[u8]) -> Result<CatalogOutput, ()> {
             continue;
         }
         names.extend(aliases.iter().cloned());
+        plugin_names.extend(visible.iter().cloned());
+        if definition.plugin_v2.is_some() {
+            v2_names.extend(visible);
+        }
         let version = identity.version().to_owned();
         let digest = identity.full_digest_hex().to_owned();
         let canonical = serde_json::from_slice(identity.canonical_json_bytes()).map_err(|_| ())?;

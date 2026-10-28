@@ -11,6 +11,7 @@ mod description_meter;
 mod display;
 mod macro_catalog;
 mod plugin_diagnostics;
+mod plugin_name_migration;
 mod plugin_package;
 mod plugin_picture;
 mod raster;
@@ -29,6 +30,7 @@ pub use display::{
 };
 pub use macro_catalog::resolve_macro_catalog;
 pub use plugin_diagnostics::explain_plugin_diagnostics;
+pub use plugin_name_migration::migrate_plugin_names;
 pub use plugin_package::plugin_package;
 pub use raster::{
     RasterFailure, RasterFrame, RasterScene, prepare_raster_scene, raster_api_version,

@@ -664,9 +664,14 @@ pub(crate) fn qualified_macro_match(
                     .filter_map(|alias| alias.split_once('.').map(|(_, name)| name.to_owned()))
                     .collect::<Vec<_>>();
                 let (ja, en) = crate::plugin_names::v1_plugin_names(heading, &aliases);
-                ja.iter()
-                    .chain(&en)
-                    .chain(lock.plugin_names())
+                let fallback = ja.into_iter().chain(en).collect::<Vec<_>>();
+                let names = if lock.plugin_names().is_empty() {
+                    &fallback
+                } else {
+                    lock.plugin_names()
+                };
+                names
+                    .iter()
                     .any(|visible| {
                         crate::plugin_names::normalize_plugin_name(visible) == normalized
                     })

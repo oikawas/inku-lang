@@ -227,6 +227,16 @@ fn pipeline_resolve_macro_catalog<'py>(
 }
 
 #[pyfunction]
+fn pipeline_migrate_plugin_names<'py>(
+    py: Python<'py>,
+    input_bytes: &Bound<'py, PyBytes>,
+) -> Bound<'py, PyBytes> {
+    let input = input_bytes.as_bytes().to_vec();
+    let output = py.detach(|| inku_pipeline_uniffi::migrate_plugin_names(input));
+    PyBytes::new(py, &output)
+}
+
+#[pyfunction]
 fn pipeline_explain_plugin_diagnostics<'py>(
     py: Python<'py>,
     input_bytes: &Bound<'py, PyBytes>,
@@ -497,6 +507,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(pipeline_provider_attempt, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_resolve_palette, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_resolve_macro_catalog, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_migrate_plugin_names, module)?)?;
     module.add_function(wrap_pyfunction!(
         pipeline_explain_plugin_diagnostics,
         module

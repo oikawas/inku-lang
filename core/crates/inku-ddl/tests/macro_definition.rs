@@ -6,6 +6,17 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 use serde_json::Value;
+
+#[test]
+fn v1_rejects_v2_fields_even_when_null() {
+    let raw = serde_json::json!({"schema":"inku.macro-definition.v1", "namespace":"Test", "heading":"Word", "version":"1.0.0", "parameters":{}, "components":{}, "body":[], "id":null});
+    assert_eq!(
+        MacroDefinition::from_json(&raw.to_string())
+            .unwrap_err()
+            .code(),
+        "unknown_json_field"
+    );
+}
 use sha2::{Digest, Sha256};
 
 const FIXTURE: &str = include_str!("fixtures/macro-definition-v1.json");

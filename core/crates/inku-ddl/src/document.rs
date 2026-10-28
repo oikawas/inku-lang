@@ -112,8 +112,11 @@ impl NormalizedDdlDocument {
                 })
                 .collect();
             if let [definition] = matches.as_slice() {
-                let (ja, en) =
-                    crate::plugin_names::v1_plugin_names(&definition.heading, &definition.aliases);
+                let (ja, en) = if let Some(v2) = &definition.plugin_v2 {
+                    (v2.names.ja.clone(), v2.names.en.clone())
+                } else {
+                    crate::plugin_names::v1_plugin_names(&definition.heading, &definition.aliases)
+                };
                 lock.plugin_names = ja.into_iter().chain(en).collect();
             }
         }

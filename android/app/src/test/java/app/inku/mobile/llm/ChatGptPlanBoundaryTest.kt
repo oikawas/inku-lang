@@ -109,6 +109,48 @@ class ChatGptPlanBoundaryTest {
     }
 
     @Test
+    fun failedLoginLogsOnlySafeDiagnosticFields() = runBlocking {
+        val store = Store(); val http = Http(); val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val logs = java.util.Collections.synchronizedList(mutableListOf<String>())
+        val verifier = java.util.concurrent.atomic.AtomicReference<String>()
+        val manager = ChatGptPlanManager(store, scope, http, diagnostic = { logs.add(it) }) { now }
+        try {
+            val start = query(manager.authorize())
+            val sensitive = listOf("fake-secret-token-xyz", "https://secret.invalid/private", "person@example.invalid",
+                "test-code", "issued-client", start.getValue("state"), start.getValue("nonce"), start.getValue("code_challenge"))
+            http.handler = { url, _, body ->
+                assertEquals(CHATGPT_TOKEN, url)
+                verifier.set(query("https://test.invalid/?$body").getValue("code_verifier"))
+                assertFalse(verifier.get().isEmpty())
+                ChatGptHttpResponse(401, JSONObject().put("error", "invalid_grant")
+                    .put("secret", sensitive.joinToString(" ") + " " + verifier.get()).toString())
+            }
+            assertEquals(400, completeCallback(start, "issued-client"))
+            withTimeout(2000) { while (logs.isEmpty()) delay(5) }
+            assertEquals(1, logs.size)
+            val line = logs.single()
+            assertTrue(line.contains("stage=token"))
+            assertTrue(line.contains("code=chatgpt_reauthentication_required"))
+            assertTrue(line.contains("status=401"))
+            assertTrue(line.contains("class=app.inku.mobile.llm.ChatGptException"))
+            assertTrue(Regex("frames=[A-Za-z0-9_]+\\.kt:[0-9]+").containsMatchIn(line))
+            sensitive.forEach { assertFalse("Sensitive value entered the diagnostic", line.contains(it)) }
+            assertFalse(line.contains(verifier.get()))
+            assertFalse(line.contains("auth.openai.com"))
+            assertFalse(line.contains("\n"))
+            val injected = ChatGptException("fake-secret-token-xyz", "person@example.invalid")
+            injected.stackTrace = arrayOf(StackTraceElement("app.inku.mobile.Fake", "execute", "secret-token-xyz.kt", 42))
+            val safeLine = ChatGptDiagnostic.line("token", 401, injected)
+            assertTrue(safeLine.contains("code=unrecognized"))
+            sensitive.forEach { assertFalse(safeLine.contains(it)) }
+            assertFalse(safeLine.contains("secret-token-xyz.kt"))
+            val parseFailure = org.json.JSONException(sensitive.joinToString(" "))
+            val parseLine = ChatGptDiagnostic.line("identity", null, parseFailure)
+            sensitive.forEach { assertFalse(parseLine.contains(it)) }
+        } finally { manager.cancelAuthorization(); scope.cancel() }
+    }
+
+    @Test
     fun reauthorizationReturnsBeforeFetchingAndRestoresPublishedCatalog() = runBlocking {
         val store = Store().apply {
             value.put("active", "a")
@@ -152,7 +194,8 @@ class ChatGptPlanBoundaryTest {
     fun automaticCatalogFailureUsesTheManualRefreshFailureHandling() = runBlocking {
         val store = Store().apply { value.put("active", "a"); value.getJSONObject("profiles").put("a", profile("a")) }
         val http = Http(); val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        val manager = ChatGptPlanManager(store, scope, http) { now }
+        val logs = java.util.Collections.synchronizedList(mutableListOf<String>())
+        val manager = ChatGptPlanManager(store, scope, http, diagnostic = { logs.add(it) }) { now }
         try {
             val start = query(manager.authorize("a"))
             http.handler = { url, _, _ -> when {
@@ -169,6 +212,9 @@ class ChatGptPlanBoundaryTest {
             assertEquals("chatgpt_transport_unavailable", automaticError)
             assertEquals("connected", manager.state.value.active?.status)
             assertFalse(manager.state.value.pending)
+            assertEquals(1, logs.size)
+            assertTrue(logs.single().contains("stage=catalog"))
+            assertTrue(logs.single().contains("code=chatgpt_transport_unavailable"))
             assertEquals(1, http.calls.count { it.endsWith("/models") })
             try { manager.refreshModels(); fail("Manual refresh should fail") }
             catch (error: ChatGptException) { assertEquals(automaticError, error.code) }

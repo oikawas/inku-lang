@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-28 — Diagnose Android ChatGPT login failures
+
+Login and automatic catalog refresh failures now record a bounded diagnostic without credentials or response contents.
+
 ### 2026-10-28 — Refresh ChatGPT models after login
 
 After a successful connection or reauthorization, fetch the model list once so published models appear without a manual refresh. A fetch failure leaves the connection intact and displays the error.

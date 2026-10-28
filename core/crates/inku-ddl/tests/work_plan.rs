@@ -74,6 +74,43 @@ fn offered_scene_and_object_words_are_normalized_and_printed() {
         print_work_plan_with_plugins(&plan, ResolvedInstructionLanguage::En, &plugins),
         "3 {young leaves}.\nPlace 2 {boat} at the center."
     );
+    let asset: serde_json::Value = serde_json::from_str(inku_ddl::NATURE_LEAVES_V1_JSON).unwrap();
+    let scene =
+        inku_ddl::MacroDefinition::from_json(&asset["entries"][0]["definition"].to_string())
+            .unwrap();
+    let identity = scene.identity().unwrap();
+    let lock = inku_ddl::MacroLock::new(
+        identity.qualified_name(),
+        identity.version(),
+        format!("sha256:{}", identity.full_digest_hex()),
+    )
+    .unwrap();
+    for (source, language) in [
+        ("3枚の｛若葉｝。", ResolvedInstructionLanguage::Ja),
+        ("3 {young leaves}.", ResolvedInstructionLanguage::En),
+    ] {
+        let result = inku_ddl::compile_ddl_to_score(
+            inku_ddl::NormalizedDdlDocument::new(source, language, vec![lock.clone()]).unwrap(),
+            std::slice::from_ref(&scene),
+            Some(37),
+            inku_ddl::MacroExpansionLimits {
+                max_invocations: 64,
+                max_depth: 16,
+                max_evaluation_steps: 8192,
+                max_nodes_per_invocation: 128,
+                max_total_nodes: 128,
+            },
+            inku_ddl::ScoreLoweringContext::resolve("square", inku_score::Color::White).unwrap(),
+            inku_ddl::ScoreErrorPolicy::OmitAndContinue,
+        );
+        assert!(
+            result
+                .score()
+                .is_some_and(|score| !score.instructions.is_empty()),
+            "{source}: {:?}",
+            result.upstream_diagnostics()
+        );
+    }
     let object = inku_ddl::MacroDefinition::from_json(&json!({"schema":"inku.macro-definition.v2","namespace":"Trial","id":"Boat","names":{"ja":["舟"],"en":["boat"]},"kind":"object","aspect":"2:1","counter":"general","version":"1.0.0","parameters":{},"components":{},"body":[]}).to_string()).unwrap();
     let identity = object.identity().unwrap();
     let lock = inku_ddl::MacroLock::new(

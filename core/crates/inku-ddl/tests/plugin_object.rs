@@ -259,6 +259,26 @@ fn object_word_draws_instead_of_being_rejected() {
             );
         }
         let score = result.score().unwrap();
+        let restored = inku_score::finalize_saved_score(
+            score,
+            &HardResourcePolicy {
+                identity: "object-test.v1".into(),
+                budget,
+            },
+            OperationalResourceBudget(budget),
+        )
+        .unwrap();
+        assert_eq!(restored.demand, result.demand().unwrap(), "{source}");
+        assert_eq!(restored.score.object_templates.len(), 1);
+        let saved = inku_score::canonical_json_bytes(&restored.score).unwrap();
+        assert_eq!(
+            inku_score::read_saved_score_json(&saved).unwrap(),
+            restored.score
+        );
+        if source.contains("8枚") || source.contains("8 {leaf}") {
+            assert_eq!(result.demand().unwrap().primitive_marks, 16);
+            assert_eq!(result.demand().unwrap().object_templates, 3);
+        }
         assert_eq!(score.version, "0.23.0");
         assert_eq!(score.object_templates.len(), 1);
         assert_eq!(

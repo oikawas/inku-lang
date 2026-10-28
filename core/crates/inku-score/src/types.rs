@@ -2611,6 +2611,18 @@ impl Score {
             if !template.body.object_templates.is_empty() {
                 return Err("nested object templates are not supported");
             }
+            if template
+                .body
+                .instructions
+                .iter()
+                .any(|item| item.arrangement.is_some())
+                || !template.body.placement_groups.is_empty()
+                || !template.body.repetition_groups.is_empty()
+                || !template.body.fill_groups.is_empty()
+                || template.body.resource_policy.is_some()
+            {
+                return Err("object template body must be a flat expanded body");
+            }
             template.body.validate_schema_edition()?;
         }
         if self.uses_free_line() && !self.edition_at_least(ScoreEdition::V0_21) {

@@ -961,11 +961,80 @@ impl Analysis {
                 instruction_index,
                 owner: arrangement.resolved.as_ref().unwrap().owner.clone(),
             };
-            let Some(primitive_marks) = intrinsic.checked_mul(outer) else {
+            let Some(copies) = intrinsic.checked_mul(outer) else {
                 self.pending_failures.push(PendingFailure {
                     source,
                     owner,
                     dimension: ResourceDimension::PrimitiveMarks,
+                });
+                continue;
+            };
+            let body = score
+                .object_templates
+                .iter()
+                .find(|template| template.instruction_index == instruction_index)
+                .map(|template| legacy_resource_demand(&template.body));
+            let body = match body.transpose() {
+                Ok(body) => body,
+                Err(dimension) => {
+                    self.pending_failures.push(PendingFailure {
+                        source,
+                        owner,
+                        dimension,
+                    });
+                    continue;
+                }
+            };
+            let Some(primitive_marks) =
+                copies.checked_mul(body.map_or(1, |body| body.primitive_marks))
+            else {
+                self.pending_failures.push(PendingFailure {
+                    source,
+                    owner,
+                    dimension: ResourceDimension::PrimitiveMarks,
+                });
+                continue;
+            };
+            let Some(object_templates) =
+                1_u64.checked_add(body.map_or(0, |body| body.object_templates))
+            else {
+                self.pending_failures.push(PendingFailure {
+                    source,
+                    owner,
+                    dimension: ResourceDimension::ObjectTemplates,
+                });
+                continue;
+            };
+            let Some(template_nodes) = body.map_or(Some(1), |body| {
+                body.object_templates
+                    .checked_add(body.anchor_instances)
+                    .and_then(|n| n.checked_add(body.transform_instances))
+                    .and_then(|n| n.checked_add(1))
+            }) else {
+                self.pending_failures.push(PendingFailure {
+                    source,
+                    owner,
+                    dimension: ResourceDimension::TemplateNodes,
+                });
+                continue;
+            };
+            let Some(anchor_instances) =
+                copies.checked_mul(body.map_or(0, |body| body.anchor_instances))
+            else {
+                self.pending_failures.push(PendingFailure {
+                    source,
+                    owner,
+                    dimension: ResourceDimension::AnchorInstances,
+                });
+                continue;
+            };
+            let Some(transform_instances) =
+                copies.checked_mul(body.map_or(0, |body| body.transform_instances))
+            else {
+                self.pending_failures.push(PendingFailure {
+                    source,
+                    owner,
+                    dimension: ResourceDimension::TransformInstances,
                 });
                 continue;
             };
@@ -977,10 +1046,12 @@ impl Analysis {
                 demand: ResourceDemand {
                     logical_objects: unclaimed_logical,
                     primitive_marks,
-                    object_templates: 1,
-                    maximum_per_template_primitive_marks: primitive_marks,
+                    object_templates,
+                    maximum_per_template_primitive_marks: copies,
                     maximum_resolved_count: intrinsic,
-                    template_nodes: 1,
+                    template_nodes,
+                    anchor_instances,
+                    transform_instances,
                     ..ResourceDemand::default()
                 },
             });
@@ -1700,6 +1771,20 @@ pub fn finalize_saved_score_with_omitted_instructions(
 
     let mut finalized = score.clone();
     finalized.instructions = instructions;
+    finalized.object_templates = score
+        .object_templates
+        .iter()
+        .filter_map(|template| {
+            let instruction_index = instruction_map
+                .values
+                .get(template.instruction_index)
+                .copied()
+                .flatten()?;
+            let mut template = template.clone();
+            template.instruction_index = instruction_index;
+            Some(template)
+        })
+        .collect();
     finalized.anchors = anchors;
     finalized.transform_groups = transform_groups;
     finalized.placement_groups = placement_groups;

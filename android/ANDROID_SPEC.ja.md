@@ -539,7 +539,7 @@ Androidは端末で本人が使うsingle-user hostとして、Serverを介さず
 
 登録を複数保持でき、本人確認済みのアカウントと発行client IDをラベルで見分けて選ぶ。再認証と明示した再同意、認証中止、切断、利用枠を管理するリンクを提供する。描画画面にも利用中のプランと登録を示す。本人確認だけではプラン利用を許可せず、`chatgpt.tokens.use.direct`のscopeを確認する。上限に達した後は追加描画を止め、一覧の明示した再取得で利用可能性を確認できる。切断は端末のtokenを先に除去し、遠隔の失効が確認できない場合はその旨を示す。公開モデルと登録の識別情報は保持する。
 
-ChatGPT の認証、セッションとモデル公開の判定は共有 core を使う。暗号化した登録の保管、ブラウザと listener、HTTP、署名の暗号検証は端末が受け持つ。公開モデルは選んだ用途に対応し、本人の一覧にある必要がある。用途の選択は端末のモデル設定に保持する。
+ChatGPT の認証、セッションとモデル公開の判定は共有 core を使う。暗号化した登録の保管、ブラウザと listener、HTTP、署名の暗号検証は端末が受け持つ。公開モデルは選んだ用途に対応し、本人の一覧にある必要がある。用途の選択は端末のモデル設定に保持する。ログイン成功後は、返事を待たせず本人のモデル一覧をバックグラウンドで更新する。
 
 OAuthは端末の`127.0.0.1`の一時listenerを先に開き、dynamic registration、PKCE S256、state、nonce、OpenAIのJWKSによるID token署名とissuer/audience/期限の照合を行う。host UUIDはアプリの保存領域で固定し、発行されたclient IDを再認証・refreshに使う。refreshは直列化し、更新されたrefresh tokenと`earliest_refresh_at`を保持する。token・本人情報・本人の公開モデルはAndroid Keystoreで暗号化した`noBackupFilesDir`内のAtomicFileへ保存する。URLやtokenをLogcat、作品JSON、Roomへ書かない。Room14と既存の作品データは変更しない。
 

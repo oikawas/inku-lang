@@ -2392,6 +2392,7 @@ mod tests {
         };
         let added = size(&en) - size(&empty);
         eprintln!("stage1 English one plugin added bytes: {added}");
+        assert!(added <= 1500);
         let plugins = work_plan_plugins([&definition]);
         let plan = |name: &str| {
             format!(
@@ -2506,6 +2507,7 @@ mod tests {
         };
         let plugin_bytes = size(&with_plugin) - size(&without);
         eprintln!("stage1 Japanese one plugin added bytes: {plugin_bytes}");
+        assert!(plugin_bytes <= 1500, "{plugin_bytes}");
         let system_schema = with_plugin
             .system
             .split_once("# response_schema\n")

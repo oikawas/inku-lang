@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-28 — Share the remaining ChatGPT authorization rules
-
-The shared core now owns the remaining ChatGPT plan authorization, registration and quota decisions; the Server retains HTTP, signature verification, storage and locks.
-
 ### 2026-10-28 — Share provider admission calculations on macOS
 
 Input estimates, admission, settlement, daily boundaries and 429 delays use the shared core. The existing stored accounting format and host waiting remain in place. Auxiliary text requests now share the same budget, including Gemini token counting and 429 cooldowns.
@@ -414,6 +410,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.293 (2026-10-28 / Build1369)
+
+### 2026-10-28 — Share the remaining ChatGPT authorization rules
+
+The shared core now owns the remaining ChatGPT plan authorization, registration and quota decisions; the Server retains HTTP, signature verification, storage and locks.
 
 ## v2.15.292 (2026-10-28 / Build1368)
 

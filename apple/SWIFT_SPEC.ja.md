@@ -828,7 +828,7 @@ Swift物理schemaはv4で、10table構成を保ち、local annotationの廃止�
 
 catalog／model比較は開始時の作品・Score・設定を固定する。候補は採用前に通常履歴／系譜へ保存せず、選択した候補だけをidempotentに保存する。model比較は使用中の登録LLMを最大4件選び、catalog比較は元を除くcatalog候補を使う。Swiftでは逐次生成する。停止とdialogのcloseは処理の終了を待ち、遅れて届いた候補を混入させない。
 
-model助言、random／Vision推敲、奥書は通常生成と同じprovider transportを使う。通常pipeline外の補助要求はServerと同じく描画pipelineの共有rate予算へ加算しない。推敲は色カタログ・配置の2種類で、親の保存DDLを使い、記述を上書きしない。方向性はVisionの観察にだけ渡し、助言を描画の記述に追加しない。中間の推敲作品は`lineage_only`として保持する。自動推敲の各child edgeはWebと同じ`autonomous_refine_mode`を記録し、Visionではその世代の`vision_model`／`vision_observation`／`vision_next_direction`も記録する。randomの来歴へ以前の画面上のVision助言を混ぜない。奥書は生成した原文を成功時にimmutable recordとして追記し、既存本文を上書きしない。旧採用本文は互換読取を保持し、DB backupへ含める。
+model助言、random／Vision推敲、奥書は通常生成と同じprovider transportを使う。補助のテキスト要求も描画と同じrate予算を使い、GeminiのcountTokens、精算と429後の待ちを行う。同時数の待ち合わせには通さず、ChatGPTプランは予算の対象外とする。推敲は色カタログ・配置の2種類で、親の保存DDLを使い、記述を上書きしない。方向性はVisionの観察にだけ渡し、助言を描画の記述に追加しない。中間の推敲作品は`lineage_only`として保持する。自動推敲の各child edgeはWebと同じ`autonomous_refine_mode`を記録し、Visionではその世代の`vision_model`／`vision_observation`／`vision_next_direction`も記録する。randomの来歴へ以前の画面上のVision助言を混ぜない。奥書は生成した原文を成功時にimmutable recordとして追記し、既存本文を上書きしない。旧採用本文は互換読取を保持し、DB backupへ含める。
 
 batchは空行を除く最大1000入力を受け、元の行番号とmodel、provider、定義、seed等を開始時に固定する。一巡後の失敗行だけを既定0／最大5回再実行する。明示した再開でも固定条件を保持する。再起動時に実行結果が不明な行は利用者の再試行／省略選択を待ち、自動再送しない。demoは開始時の設定を固定し、生成記述と作品を表示する。履歴保存は既定で無効、間隔1〜3600秒、実行時間60〜86400秒。間隔はiteration開始から測り、満了は次の開始を止める。停止は実行と保存結果の終了を待つ。
 
@@ -841,6 +841,8 @@ batchは空行を除く最大1000入力を受け、元の行番号とmodel、pro
 通常APIのrate制限は[製品仕様](../SPEC.ja.md)とServerの共有描画pipelineへ従う。同じservice IDの写生文、解釈、辞書選択、構図、補完と各再試行を集計し、送信前に作品DBのSQLite transactionで要求数・入力token予算を予約する。複数Host・接続・processからの要求も同じDBの状態を使い、待機中はtransactionを保持しない。旧`provider-usage.json`の該当serviceの予約・待機期限を一度だけ原子的に取り込み、原本を変更しない。読めない状態や保存失敗は送信前に拒否する。旧Gemini記録からPacific日次の残量を証明できない場合は、次のPacific午前0時まで日次上限を消費済みとして扱う。
 
 RPM／入力TPMは62秒windowで設定値の90%を使用し、正の小さい設定は最低1とする。Geminiはsystem／本文／schemaを含むcountTokensに10%の余裕を加え、他方式は実際の送信JSONのUTF-8 byte数に128を加えた保守的な予算を用いる。成功時は実入力usageで精算し、入力usageや送信状態が不明な場合は入力TPMが有効なときだけ予約を保って62秒待つ。日次要求数は既知429と再試行も含み、GeminiはAmerica/Los_Angeles、他方式はUTCの午前0時に切り替える。429は62秒、Retry-Afterの秒数／HTTP日時、Gemini RetryInfoの最大値を待ち、既存の待機期限を短縮しない。待機は共通coreが定めた有限の試行期限へ含め、Host独自の再試行を追加しない。
+
+これらの計算は共有 core の provider admission を使い、予約の判断と状態更新は既存 SQLite transaction 内で行う。保存状態と旧 JSON の取込記録は保ち、待機・期限・HTTP は Swift が扱う。Gemini の大きな countTokens は整数を丸めず上限判定へ渡す。429 の本文は UTF-8・UTF-16・UTF-32 を共通 core が読み、読めない RetryInfo の値では後続の値を使わない。
 
 設定値は0〜1,000,000,000の整数で、0は上限なし。rate設定全体がない標準`gemini` serviceは30／16,000／14,400を使い、他serviceは0を使う。既存のrate設定objectで個々の値が欠落している場合は、従来の「0＝上限なし」を保持する。設定画面は3値と隣接する説明buttonを表示し、0を明示保存できる。
 

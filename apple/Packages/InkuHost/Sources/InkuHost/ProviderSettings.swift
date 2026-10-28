@@ -14,8 +14,13 @@ public struct EffectiveProviderRateLimits: Sendable, Equatable {
     public init(requestsPerMinute: Int, tokensPerMinute: Int, requestsPerDay: Int) {
         self.requestsPerMinute = requestsPerMinute; self.tokensPerMinute = tokensPerMinute; self.requestsPerDay = requestsPerDay
     }
-    public var minuteRequestBudget: Int { requestsPerMinute == 0 ? 0 : max(1, requestsPerMinute * 9 / 10) }
-    public var minuteInputTokenBudget: Int { tokensPerMinute == 0 ? 0 : max(1, tokensPerMinute * 9 / 10) }
+    private func budget(_ key: String) -> Int {
+        guard let result = try? ProviderAdmission.call(.object(["action": .string("limits"), "limits": ProviderAdmission.limits(self)])),
+              let value = result[key].number.flatMap(Int.init) else { preconditionFailure("Invalid shared provider limits") }
+        return value
+    }
+    public var minuteRequestBudget: Int { budget("rpm") }
+    public var minuteInputTokenBudget: Int { budget("tpm") }
 }
 
 public struct ProviderRateLimits: Codable, Sendable, Equatable {

@@ -1,6 +1,9 @@
 //! Pure OIDC policy. Signature verification, randomness and I/O remain with hosts.
 use super::*;
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+use icu_properties::{CodePointMapData, props::GeneralCategory};
+use serde::de::{Deserialize, Deserializer, MapAccess, SeqAccess, Visitor};
+use std::fmt;
 use subtle::ConstantTimeEq;
 const ISSUER: &str = "https://auth.openai.com";
 const RESOURCE: &str = "https://api.openai.com/v1";
@@ -132,9 +135,348 @@ fn r_local_offset(request: &Value) -> Option<jiff::tz::Offset> {
     let seconds = request["local_offset_seconds"].as_i64()?;
     jiff::tz::Offset::from_seconds(i32::try_from(seconds).ok()?).ok()
 }
+
+fn decimal_digit(c: char) -> Option<u32> {
+    if c.is_ascii_digit() {
+        return c.to_digit(10);
+    }
+    let categories = CodePointMapData::<GeneralCategory>::new();
+    if categories.get(c) != GeneralCategory::DecimalNumber {
+        return None;
+    }
+    let mut first = c as u32;
+    while first > 0
+        && char::from_u32(first - 1)
+            .is_some_and(|ch| categories.get(ch) == GeneralCategory::DecimalNumber)
+    {
+        first -= 1;
+    }
+    Some((c as u32 - first) % 10)
+}
+
+fn python_int(value: &Value) -> Option<f64> {
+    value
+        .as_i64()
+        .map(|v| v as f64)
+        .or_else(|| value.as_f64().filter(|v| v.is_finite()).map(|v| v.trunc()))
+        .or_else(|| value.as_bool().map(|v| if v { 1.0 } else { 0.0 }))
+        .or_else(|| {
+            value.as_str().and_then(|s| {
+                let s = s.trim();
+                let chars: Vec<_> = s.chars().collect();
+                if chars.iter().enumerate().any(|(i, c)| {
+                    *c == '_'
+                        && (i == 0
+                            || i + 1 == chars.len()
+                            || decimal_digit(chars[i - 1]).is_none()
+                            || decimal_digit(chars[i + 1]).is_none())
+                }) {
+                    return None;
+                }
+                let normalized: String = s
+                    .chars()
+                    .filter(|c| *c != '_')
+                    .map(|c| decimal_digit(c).map_or(c, |v| char::from_digit(v, 10).unwrap()))
+                    .collect();
+                let digits = normalized.strip_prefix(['+', '-']).unwrap_or(&normalized);
+                if digits.is_empty() || !digits.bytes().all(|b| b.is_ascii_digit()) {
+                    return None;
+                }
+                normalized.parse().ok()
+            })
+        })
+}
+
+// Keep object insertion order from the host's JSON when reproducing Python's
+// display of an unusual non-string email claim.
+struct Ordered(String);
+fn ordered_repr(raw: &str) -> Result<String, serde_json::Error> {
+    let raw = raw.trim();
+    // The host serializes this value from its decoded JSON, so number text is
+    // already Python's exact representation, including large integers.
+    if raw.starts_with(|c: char| c == '-' || c.is_ascii_digit()) {
+        return Ok(raw.to_owned());
+    }
+    serde_json::from_str::<Ordered>(raw).map(|value| value.0)
+}
+impl<'de> Deserialize<'de> for Ordered {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        struct V;
+        impl<'de> Visitor<'de> for V {
+            type Value = Ordered;
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str("JSON value")
+            }
+            fn visit_unit<E: serde::de::Error>(self) -> Result<Ordered, E> {
+                Ok(Ordered("None".into()))
+            }
+            fn visit_bool<E: serde::de::Error>(self, v: bool) -> Result<Ordered, E> {
+                Ok(Ordered(if v { "True" } else { "False" }.into()))
+            }
+            fn visit_i64<E: serde::de::Error>(self, v: i64) -> Result<Ordered, E> {
+                Ok(Ordered(v.to_string()))
+            }
+            fn visit_u64<E: serde::de::Error>(self, v: u64) -> Result<Ordered, E> {
+                Ok(Ordered(v.to_string()))
+            }
+            fn visit_f64<E: serde::de::Error>(self, v: f64) -> Result<Ordered, E> {
+                let s = format!("{v:?}");
+                let s = if let Some((mantissa, exponent)) = s.split_once('e') {
+                    let n: i32 = exponent.parse().unwrap_or(0);
+                    format!(
+                        "{mantissa}e{}{num:02}",
+                        if n >= 0 { '+' } else { '-' },
+                        num = n.abs()
+                    )
+                } else {
+                    s
+                };
+                Ok(Ordered(s))
+            }
+            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Ordered, E> {
+                Ok(Ordered(python_repr(&json!(v), true)))
+            }
+            fn visit_seq<A: SeqAccess<'de>>(self, mut a: A) -> Result<Ordered, A::Error> {
+                let mut values = Vec::new();
+                while let Some(v) = a.next_element::<Box<serde_json::value::RawValue>>()? {
+                    values.push(ordered_repr(v.get()).map_err(serde::de::Error::custom)?);
+                }
+                Ok(Ordered(format!("[{}]", values.join(", "))))
+            }
+            fn visit_map<A: MapAccess<'de>>(self, mut a: A) -> Result<Ordered, A::Error> {
+                let mut values = Vec::new();
+                while let Some((k, v)) =
+                    a.next_entry::<String, Box<serde_json::value::RawValue>>()?
+                {
+                    values.push(format!(
+                        "{}: {}",
+                        python_repr(&json!(k), true),
+                        ordered_repr(v.get()).map_err(serde::de::Error::custom)?
+                    ));
+                }
+                Ok(Ordered(format!("{{{}}}", values.join(", "))))
+            }
+        }
+        d.deserialize_any(V)
+    }
+}
+
+fn python_repr(value: &Value, nested: bool) -> String {
+    match value {
+        Value::Null => "None".into(),
+        Value::Bool(v) => if *v { "True" } else { "False" }.into(),
+        Value::String(s) if !nested => s.clone(),
+        Value::String(s) => {
+            let quote = if s.contains('\'') && !s.contains('"') {
+                '"'
+            } else {
+                '\''
+            };
+            let mut out = String::from(quote);
+            for ch in s.chars() {
+                if ch == quote || ch == '\\' {
+                    out.push('\\');
+                    out.push(ch);
+                } else if ch == '\n' {
+                    out.push_str("\\n");
+                } else if ch == '\r' {
+                    out.push_str("\\r");
+                } else if ch == '\t' {
+                    out.push_str("\\t");
+                } else if ch != ' '
+                    && matches!(
+                        CodePointMapData::<GeneralCategory>::new().get(ch),
+                        GeneralCategory::Unassigned
+                            | GeneralCategory::SpaceSeparator
+                            | GeneralCategory::LineSeparator
+                            | GeneralCategory::ParagraphSeparator
+                            | GeneralCategory::Control
+                            | GeneralCategory::Format
+                            | GeneralCategory::PrivateUse
+                            | GeneralCategory::Surrogate
+                    )
+                {
+                    let value = ch as u32;
+                    if value <= 0xff {
+                        out.push_str(&format!("\\x{value:02x}"));
+                    } else if value <= 0xffff {
+                        out.push_str(&format!("\\u{value:04x}"));
+                    } else {
+                        out.push_str(&format!("\\U{value:08x}"));
+                    }
+                } else {
+                    out.push(ch);
+                }
+            }
+            out.push(quote);
+            out
+        }
+        Value::Array(values) => format!(
+            "[{}]",
+            values
+                .iter()
+                .map(|v| python_repr(v, true))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        Value::Object(values) => format!(
+            "{{{}}}",
+            values
+                .iter()
+                .map(|(k, v)| format!("{}: {}", python_repr(&json!(k), true), python_repr(v, true)))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        Value::Number(_) => value.to_string(),
+    }
+}
 pub(super) fn run(r: &Value) -> Value {
     let profile = &r["profile"];
     match r["action"].as_str().unwrap_or("") {
+        "chatgpt_auth_http" => {
+            if r["json_valid"] == false {
+                return fail("chatgpt_auth_unavailable");
+            }
+            let status = r["status"].as_u64().unwrap_or(0);
+            let value = &r["value"];
+            if !(200..300).contains(&status) {
+                let mut code = &value["error"];
+                if code.is_object() {
+                    code = &code["code"];
+                }
+                if code.is_array() || code.is_object() {
+                    return json!({"type_error":true});
+                }
+                if [
+                    "invalid_grant",
+                    "invalid_refresh_token",
+                    "token_expired",
+                    "refresh_token_expired",
+                    "refresh_token_invalidated",
+                    "refresh_token_reused",
+                ]
+                .iter()
+                .any(|s| code == *s)
+                {
+                    return fail("chatgpt_reauthentication_required");
+                }
+                return fail(if status >= 500 {
+                    "chatgpt_auth_unavailable"
+                } else {
+                    "chatgpt_auth_rejected"
+                });
+            }
+            if !value.is_object() {
+                fail("chatgpt_identity_invalid")
+            } else {
+                json!({"valid":true})
+            }
+        }
+        "chatgpt_auth_key" => {
+            let header = &r["header"];
+            let metadata = &r["discovery"];
+            let defaults = json!(["RS256"]);
+            let allowed = metadata
+                .get("id_token_signing_alg_values_supported")
+                .unwrap_or(&defaults);
+            let alg = &header["alg"];
+            if !(alg == "RS256" || alg == "ES256") || !array(Some(allowed)).contains(alg) {
+                return fail("chatgpt_identity_invalid");
+            }
+            let Some(keys) = r["keys"]["keys"].as_array() else {
+                return fail("chatgpt_identity_invalid");
+            };
+            if keys.iter().any(|key| !key.is_object()) {
+                return fail("chatgpt_identity_invalid");
+            }
+            let matches: Vec<_> = keys
+                .iter()
+                .filter(|key| {
+                    key["kid"] == header["kid"] && key.get("use").unwrap_or(&json!("sig")) == "sig"
+                })
+                .collect();
+            if matches.len() != 1 {
+                fail("chatgpt_identity_invalid")
+            } else {
+                json!({"key":matches[0], "alg":alg})
+            }
+        }
+        "chatgpt_auth_publication_active" => {
+            if r["active"] != r["profile_id"] {
+                fail("chatgpt_session_changed")
+            } else {
+                json!({"valid":true})
+            }
+        }
+        "chatgpt_auth_resume_quota" => {
+            if !truthy(profile) || profile["state"] != "quota" {
+                fail("chatgpt_not_connected")
+            } else {
+                let mut next = profile.clone();
+                next["state"] = json!("connected");
+                json!({"profile":next})
+            }
+        }
+        "chatgpt_auth_quota_failure" => {
+            json!({"pause":r["code"] == "subscription_sharing_usage_limit_exceeded"})
+        }
+        "chatgpt_auth_save_check" => {
+            let previous = &r["previous"];
+            let expected = &r["expected_generation"];
+            if !expected.is_null() && (!truthy(previous) || previous["generation"] != *expected) {
+                fail("chatgpt_session_changed")
+            } else if !truthy(previous) && r["count"].as_u64().unwrap_or(0) >= 8 {
+                fail("chatgpt_profile_limit")
+            } else {
+                json!({"valid":true})
+            }
+        }
+        "chatgpt_auth_pending_check" => {
+            if r["exists"] != true && r["count"].as_u64().unwrap_or(0) >= 8 {
+                fail("chatgpt_profile_limit")
+            } else {
+                json!({"valid":true})
+            }
+        }
+        "chatgpt_auth_display" => {
+            let claims = &r["claims"];
+            let shown = |fallback: &str| {
+                if let Some(raw) = r["email_json"].as_str()
+                    && let Ok(value) = serde_json::from_str::<Value>(raw)
+                {
+                    if let Some(s) = value.as_str() {
+                        return s.to_owned();
+                    }
+                    if let Ok(value) = ordered_repr(raw) {
+                        return value;
+                    }
+                }
+                python_repr(claims.get("email").unwrap_or(&json!(fallback)), false)
+            };
+            let email = shown("").chars().take(254).collect::<String>();
+            let label = shown("ChatGPT").chars().take(254).collect::<String>();
+            let issued = r["client_id"].as_str().unwrap_or("");
+            let tail: String = issued
+                .chars()
+                .rev()
+                .take(8)
+                .collect::<String>()
+                .chars()
+                .rev()
+                .collect();
+            json!({"email":email,"label":format!("{label} / {tail}")})
+        }
+        "chatgpt_auth_refresh_profile" => {
+            let mut next = profile.clone();
+            if let (Some(dst), Some(tokens)) = (next.as_object_mut(), r["tokens"].as_object()) {
+                dst.extend(tokens.clone());
+                dst.remove("catalog");
+            }
+            json!({"profile":next})
+        }
+        "chatgpt_auth_revocation" => {
+            json!({"send":truthy(&profile["refresh_token"]) && profile["refresh_owner"] == "runtime", "confirmed":r["status"] == 200})
+        }
         "chatgpt_auth_pause_quota" => {
             if !profile.is_object()
                 || profile["generation"] != r["generation"]
@@ -240,7 +582,12 @@ pub(super) fn run(r: &Value) -> Value {
                 })
                 .or_else(|| claims["exp"].as_str().and_then(|v| v.parse::<i64>().ok()))
                 .or_else(|| claims["exp"].as_bool().map(i64::from));
-            if claims["iss"] != ISSUER
+            if ["iat", "nbf"].iter().any(|key| {
+                claims
+                    .get(*key)
+                    .is_some_and(|v| !python_int(v).is_some_and(|i| i <= now))
+            }) || claims.get("jti").is_some_and(|v| !v.is_string())
+                || claims["iss"] != ISSUER
                 || !ok_aud
                 || !exp.is_some_and(|v| (v as f64) > now)
                 || !claims["sub"].as_str().is_some_and(|s| !s.is_empty())

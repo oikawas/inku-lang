@@ -43,8 +43,9 @@ def saved_publication(owner: str, profile_id: str, generation: int) -> dict:
     store = CredentialStore()
     with store.lock("edit:" + owner, time.monotonic() + 5):
         profile = check_session(owner, profile_id, generation)
-        if store.read(owner)["active"] != profile_id:
-            raise ChatGPTError("chatgpt_session_changed")
+        result = core_catalog("chatgpt_auth_publication_active", active=store.read(owner)["active"], profile_id=profile_id)
+        if "error" in result:
+            raise ChatGPTError(result["error"])
         return publication(profile)
 
 
@@ -54,8 +55,9 @@ def save_publication(owner: str, profile_id: str, generation: int, selected: lis
     with store.lock("edit:" + owner, time.monotonic() + 5):
         profile = check_session(owner, profile_id, generation)
         saved = store.read(owner)
-        if saved["active"] != profile_id:
-            raise ChatGPTError("chatgpt_session_changed")
+        result = core_catalog("chatgpt_auth_publication_active", active=saved["active"], profile_id=profile_id)
+        if "error" in result:
+            raise ChatGPTError(result["error"])
         result = core_catalog("chatgpt_publication_update", profile=profile, selected=selected,
                               model_purposes=model_purposes, assessments={})
         if "error" in result:

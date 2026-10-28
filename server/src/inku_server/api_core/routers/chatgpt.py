@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path
 from pydantic import BaseModel, ConfigDict, Field
 
 from ... import chatgpt_runtime as runtime
-from ...chatgpt_auth import USAGE_URL, attempts, delete_profile, sign_out
+from ...chatgpt_auth import USAGE_URL, attempts, auth_policy, delete_profile, sign_out
 from ...chatgpt_models import save_publication, saved_publication
 from ...chatgpt_provider import catalog, pin
 from ...chatgpt_store import ChatGPTError, CredentialStore
@@ -195,9 +195,7 @@ def retry(
         with store.lock("edit:" + actor, time.monotonic() + 5):
             value = store.read(actor)
             profile = value["profiles"].get(profile_id)
-            if not profile or profile["state"] != "quota":
-                raise ChatGPTError("chatgpt_not_connected")
-            profile["state"] = "connected"
+            value["profiles"][profile_id] = auth_policy("resume_quota", profile=profile)["profile"]
             store.write(actor, value)
         return state({"id": actor})
     except ChatGPTError as error:

@@ -763,6 +763,7 @@ dependencies = [
  "base64",
  "httpdate",
  "icu_collator",
+ "icu_properties",
  "inku-ddl",
  "inku-render",
  "inku-score",

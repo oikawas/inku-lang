@@ -950,7 +950,17 @@ pub fn model_catalog_json(input: &[u8]) -> Vec<u8> {
             | "chatgpt_auth_constants"
             | "chatgpt_auth_callback_client"
             | "chatgpt_auth_select"
-            | "chatgpt_auth_pause_quota",
+            | "chatgpt_auth_pause_quota"
+            | "chatgpt_auth_http"
+            | "chatgpt_auth_key"
+            | "chatgpt_auth_publication_active"
+            | "chatgpt_auth_resume_quota"
+            | "chatgpt_auth_quota_failure"
+            | "chatgpt_auth_save_check"
+            | "chatgpt_auth_pending_check"
+            | "chatgpt_auth_display"
+            | "chatgpt_auth_refresh_profile"
+            | "chatgpt_auth_revocation",
         ) => chatgpt_auth_policy::run(&request),
         Some("reference_batch") => {
             let results: Vec<Value> = array(request.get("queries"))
@@ -1289,6 +1299,24 @@ pub fn model_catalog_json(input: &[u8]) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn chatgpt_auth_addendum_cases() {
+        let rows: Value = serde_json::from_str(include_str!(
+            "../../../../server/tests/data/chatgpt-auth-addendum-cases.json"
+        ))
+        .unwrap();
+        for row in rows.as_array().unwrap() {
+            let mut request = row["request"].clone();
+            request["schema"] = json!("inku.model-catalog-request.v1");
+            let actual: Value =
+                serde_json::from_slice(&model_catalog_json(&serde_json::to_vec(&request).unwrap()))
+                    .unwrap();
+            for (key, expected) in row["expect"].as_object().unwrap() {
+                assert_eq!(&actual[key], expected, "{}: {key}", row["name"]);
+            }
+        }
+    }
 
     #[test]
     fn chatgpt_policy_matches_frozen_server() {

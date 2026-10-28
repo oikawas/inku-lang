@@ -16,7 +16,7 @@ import time
 
 import httpx
 
-from .chatgpt_auth import RESOURCE, access_token, read_limited
+from .chatgpt_auth import RESOURCE, access_token, auth_policy, read_limited
 from .chatgpt_runtime import check_session, guarded
 from .chatgpt_store import ChatGPTError, CredentialStore
 from .chatgpt_models import publication
@@ -144,7 +144,7 @@ async def catalog(owner: str, profile_id: str, generation: int, deadline: float,
     value = json.loads(content)
     if not response.is_success:
         error = response_error(value, response.status_code, response.headers.get("x-request-id"))
-        if error.code == "subscription_sharing_usage_limit_exceeded":
+        if auth_policy("quota_failure", code=error.code)["pause"]:
             pause_quota(owner, profile_id, generation, deadline)
         raise error
     listed = provider_wire.chatgpt_catalog(value)
@@ -240,7 +240,7 @@ async def request(owner: str, profile_id: str, generation: int, model: str, acti
         except ResponseFailure as error:
             if image_effect:
                 error.request_id, error.param = safe_identifier(error.request_id), safe_identifier(error.param)
-            if error.code == "subscription_sharing_usage_limit_exceeded":
+            if auth_policy("quota_failure", code=error.code)["pause"]:
                 pause_quota(owner, profile_id, generation, deadline)
             raise
 

@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-28 — Share the remaining ChatGPT authorization rules
+
+The shared core now owns the remaining ChatGPT plan authorization, registration and quota decisions; the Server retains HTTP, signature verification, storage and locks.
+
 ### 2026-10-28 — Share provider admission calculations on macOS
 
 Input estimates, admission, settlement, daily boundaries and 429 delays use the shared core. The existing stored accounting format and host waiting remain in place. Auxiliary text requests now share the same budget, including Gemini token counting and 429 cooldowns.

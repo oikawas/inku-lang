@@ -10,7 +10,7 @@ Vocabulary plugins written to the specification in [PLUGIN.md](../../PLUGIN.md).
   its words are used by every new work on that Server and appear in the Saijiki ([PLUGIN §5.1](../../PLUGIN.md#51-adding-a-plugin-file-from-the-web-a-server-administrator)).
   The contents are kept as they are in the folder of the same name.
   - [water-nihonga.zip](water-nihonga.zip): five water words (`Water.nihonga` 1.1.0), contents in [water-nihonga/](water-nihonga/)
-  - [sky-nihonga.zip](sky-nihonga.zip): four sky words (`Sky.nihonga` 1.0.0), contents in [sky-nihonga/](sky-nihonga/)
+  - [sky-nihonga.zip](sky-nihonga.zip): four sky words (`Sky.nihonga` 1.1.0), contents in [sky-nihonga/](sky-nihonga/)
 - **DDL export files**: use the words in the one new work that reads the file in, without adding them to a Server ([PLUGIN §5.2](../../PLUGIN.md#52-a-ddl-export-file-immediately-usable-by-an-author)).
 
 | Word | Alias | Version | Zip | Export file |
@@ -22,7 +22,7 @@ Vocabulary plugins written to the specification in [PLUGIN.md](../../PLUGIN.md).
 | `Water.Sea` | `Water.海` | 1.0.0 | water-nihonga | water |
 | `Sky.Clouds` | `Sky.雲` | 1.0.0 | sky-nihonga | sky |
 | `Sky.Heavens` | `Sky.空` | 1.0.0 | sky-nihonga | sky |
-| `Sky.Rain` | `Sky.雨` | 1.0.0 | sky-nihonga | sky |
+| `Sky.Rain` | `Sky.雨` | 2.0.0 | sky-nihonga | sky |
 | `Sky.Snow` | `Sky.雪` | 1.0.0 | sky-nihonga | sky |
 
 "water" is [water.en.ddl.json](water.en.ddl.json) / [water.ja.ddl.json](water.ja.ddl.json), holding the five water words;
@@ -46,7 +46,8 @@ and of the yamato-e, Rinpa and ukiyo-e it carried on, were the reference, built 
 - **Open sea to the horizon**: rows of waves, finer and closer far away, larger and looser toward the viewer. → `Sea`
 - **Suyari-gasumi of yamato-e and Rinpa**: cloud bands with rounded ends crossing the picture, with gold through their cores. → `Clouds`
 - **Ichimonji bokashi** (the ukiyo-e and nihonga technique of shading color down from the top edge). → `Heavens`
-- **Utagawa Hiroshige's *Sudden Shower over Shin-Ōhashi Bridge and Atake***: thin straight rain lines in two tones covering the picture. → `Rain`
+- **Utagawa Hiroshige's *Sudden Shower over Shin-Ōhashi Bridge and Atake***: thin rain covering the picture in layers of different slant and tone, under a dark rain cloud. → the three rain layers and rain cloud of `Rain`
+- **Rain mist** (the nihonga way of showing a distance veiled by rain with pale horizontal shading). → the pale horizontal lines drifting low in `Rain`
 - **Gofun peony snow** (the nihonga way of laying white gofun for falling snow): bleeding white points of several sizes scattered. → `Snow`
 
 The colors are based on `blue`, standing for ultramarine, and `gray`, standing for pale ink: ultramarine for the inner rings and the cores, pale ink for the outer rings and the side lines. Only the cores of `Clouds` use `yellow`, standing for gold, and only `Snow` uses `white`, standing for gofun.
@@ -188,12 +189,24 @@ A sky shaded down from the top edge in ichimonji bokashi (the Saijiki picture, t
 
 ## `Sky.Rain` (alias `Sky.雨`)
 
-<img src="sky-nihonga/previews/rain.png" width="324" alt="Thin straight vertical rain lines in pale ink and ultramarine fall over the whole washi ground">
+<img src="sky-nihonga/previews/rain.png" width="324" alt="Along the top edge of a washi ground, bleeding pale-ink horizontal strokes overlap as a rain cloud, and below it thin pale-ink and ultramarine rain falls slanting from upper left to lower right">
 
-Rain falling over the whole canvas (the Saijiki picture, the middle band of the example `48 Sky.Rain.`).
+A sudden shower slanting on the wind (the Saijiki picture, the top band of the example `48 Sky.Rain.`).
 
-- It receives the rain count. The range is 1–80; with no count written it draws 36–48. The count is the number of pale-ink lines; the 12 ultramarine lines are always drawn.
-- The pale-ink lines are 0.38 long and the ultramarine ones 0.52, both thin vertical pen lines laid with `scatter`. That is only two figure instructions.
+- It receives the rain count. The range is 1–80; with no count written it draws 36–48. The count is the middle rain's; the 30 far and 12 near lines are always drawn.
+- The rain cloud along the top is five bleeding pale-ink horizontal strokes. Only the top one is thick brush; lower down they shorten to 0.98, 0.94, 0.88, 0.80 and 0.70 and shift a little left and right.
+- The rain is laid with `scatter` in three layers, each tilted by a `transform`, the far layer least and the near layer most.
+
+  | Layer | Line | Length | Count | Slant |
+  |---|---|---|---|---|
+  | Far rain | silverpoint, very fine pale ink | 0.24 | 30 | 3° less than the middle |
+  | Middle rain | pen, fine pale ink | 0.38 | the written count | 8° or 12° |
+  | Near rain | pen, fine ultramarine | 0.56 | 12 | 5° more than the middle |
+
+- The wind's direction (left or right) and strength (the middle rain at 8° or 12°) come from four choices.
+- Low in the canvas, three very fine bleeding pale-ink horizontal lines drift as rain mist (y = 0.740, 0.765, 0.800).
+
+Changed from 1.0.0: the two layers of straight vertical rain became three layers slanting on the wind, with a rain cloud and rain mist added.
 
 ## `Sky.Snow` (alias `Sky.雪`)
 
@@ -216,6 +229,7 @@ Gofun peony snow scattered over the whole canvas (the Saijiki picture, the middl
 4. Write `Water.River.` or `48 Sky.Rain.` in DDL. When drawing from a description, Stage 1 picks a word when the description names it (river, rain and the like).
 
 On a Server that already has `water-nihonga.zip` 1.0.0 (Stream, Ripples and Rings), 1.1.0 is a "Replace". The definitions of those three words are unchanged.
+On a Server that already has `sky-nihonga.zip` 1.0.0, 1.1.0 is a "Replace" too; only `Rain` (2.0.0) changed.
 
 What the zips hold:
 
@@ -232,13 +246,13 @@ water-nihonga.zip                   sky-nihonga.zip
 
 | Field | Content |
 |---|---|
-| `namespace`, `name`, `version` | `Water`, `nihonga`, `1.1.0` and `Sky`, `nihonga`, `1.0.0` |
+| `namespace`, `name`, `version` | `Water`, `nihonga`, `1.1.0` and `Sky`, `nihonga`, `1.1.0` |
 | `description_ja`, `description_en` | The description shown in the settings |
 | `license` | `MIT` (the same as this repository) |
 | each word's `summary_*` | The summary given to Stage 1. For Stream, Ripples and Rings, the same text as the export files' `summary` |
 | each word's `note_*` | The Saijiki's description line |
 | each word's `example_*` | The example in each word's section, and its English |
-| each word's `preview` | A picture in `previews/` (432×184): each word's example drawn with several composition seeds, one chosen. Heavens, Rain and Snow draw over the whole canvas, so a band in the frame's proportion was cut from it (the top for Heavens, the middle for Rain and Snow); the others are cut the way the Server cuts a picture drawn from an example |
+| each word's `preview` | A picture in `previews/` (432×184): each word's example drawn with several composition seeds, one chosen. Heavens, Rain and Snow draw over the whole canvas, so a band in the frame's proportion was cut from it (the top for Heavens and Rain, the middle for Snow); the others are cut the way the Server cuts a picture drawn from an example |
 
 The zips can be rebuilt from the folders (with the same timestamps they come out byte for byte the same).
 
@@ -269,7 +283,7 @@ A work holds at most 64 figure instructions (PLUGIN §8). With n rings or lines,
 | `Sea` | 1 + 3n | 16–19 | 25 |
 | `Clouds` | 5n | 15–20 | 25 |
 | `Heavens` | n | 8–10 | 12 |
-| `Rain` | 2 (n + 12 marks) | 2 | 2 |
+| `Rain` | 11 (n + 42 rain marks) | 11 | 11 |
 | `Snow` | 3 (n + 20 marks) | 3 | 3 |
 
 Stream, Ripples and Rings together with no counts written come to 49–57 and fit; with all three at their maximum they come to 67, and the word over the limit is dropped (`Rings`, when checked on 2026-10-26).
@@ -288,7 +302,7 @@ All nine definitions passed `compile-score` (PLUGIN §7.1).
 | `Water.Sea` | 1.0.0 | `sha256:de45214867f54b89b38ced561ef391e169c0b7f8f2f8a00317e4c8b3ab0ca5d1` |
 | `Sky.Clouds` | 1.0.0 | `sha256:3bd2d4d8e0c1412a7a5964b6e48c912de7c85f19f5e2174c5c6636edb9a9de0d` |
 | `Sky.Heavens` | 1.0.0 | `sha256:246ebbbb6c788a4a480d38e4211057875b50bf8f733e06d0a70b8031ce1cba7b` |
-| `Sky.Rain` | 1.0.0 | `sha256:960bdf268bbc5323758b8929e0d321b10ff9fd756383bb6e012699f683956444` |
+| `Sky.Rain` | 2.0.0 | `sha256:c56328d0703b43223d82c63526bc2192351e2991d428e9d3f92654545432013b` |
 | `Sky.Snow` | 1.0.0 | `sha256:51872b6737687175fe310f69c4b9f4ac9c2a4c93f5bab97b60ed5747e6ecf87f` |
 
 Passing the two zips to the Server's `POST /api/plugins/packages/validate` (the same check as "Add a plugin" in the Web):
@@ -309,3 +323,6 @@ Passing the export files' `plugins` to the Server's `/api/compose` as `imported_
   and the DDL with all three 8 ways; none left the canvas and none had diagnostics.
 - River, Sea, Clouds, Heavens, Rain and Snow were each drawn at their maximum and with no count across 12 composition seeds, and at a count of 1;
   Heavens and Rain were drawn again at their maximum and at 1 across 8 seeds. None left the canvas and none had diagnostics.
+- Rain 2.0.0 (2026-10-28) was drawn at its maximum, with no count and at 1 across 12 composition seeds; all four winds appeared, with no diagnostics.
+  Adding 1.1.0 to a Server holding `sky-nihonga.zip` 1.0.0 was refused without "Replace" (409) and replaced it with "Replace",
+  drawing with the new rain. The exported zip passed the check again.

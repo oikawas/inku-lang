@@ -2047,6 +2047,50 @@ mod tests {
     }
 
     #[test]
+    fn saved_template_follows_its_owner_when_an_earlier_instruction_is_omitted() {
+        let policy = hard(100);
+        let mut score = representative_score(policy.clone());
+        score.version = "0.23.0".into();
+        score.instructions = vec![
+            instruction(
+                json!({"kind":"source_instruction","instruction_index":0}),
+                false,
+            ),
+            instruction(
+                json!({"kind":"source_instruction","instruction_index":1}),
+                false,
+            ),
+        ];
+        score.instructions[1].primitive = crate::Primitive::Square;
+        score.instructions[1].position = Some(crate::Point::new(0.4, 0.4));
+        score.instructions[1].size = Some(crate::Point::new(0.2, 0.2));
+        score.anchors.clear();
+        score.transform_groups.clear();
+        score.placement_groups.clear();
+        score.fill_groups.clear();
+        score.repetition_groups.clear();
+        score.mirror_relations.clear();
+        let body: Score = serde_json::from_value(json!({"version":"0.9.0","instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.1}]})).unwrap();
+        score.object_templates = vec![crate::ObjectTemplate {
+            instruction_index: 1,
+            aspect: [1, 1],
+            body: Box::new(body),
+        }];
+        let result = finalize_saved_score_with_omitted_instructions(
+            &score,
+            &policy,
+            OperationalResourceBudget(policy.budget),
+            &[0],
+        )
+        .unwrap();
+        assert_eq!(result.score.instructions.len(), 1);
+        assert_eq!(result.score.object_templates.len(), 1);
+        assert_eq!(result.score.object_templates[0].instruction_index, 0);
+        assert_eq!(result.demand.primitive_marks, 1);
+        assert_eq!(result.demand.object_templates, 2);
+    }
+
+    #[test]
     fn nested_fill_parity_and_atomic_later_admission_remap_every_index() {
         let policy = hard(100);
         let score = representative_score(policy.clone());

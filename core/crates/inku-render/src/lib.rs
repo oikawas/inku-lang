@@ -35,6 +35,7 @@ mod mark_geometry;
 mod mark_paths;
 pub mod marks;
 pub mod materials;
+pub mod object_template;
 pub mod palette;
 pub mod performance;
 pub mod placement;

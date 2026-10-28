@@ -265,6 +265,10 @@ public enum InkuCore {
         InkuCoreBindings.modelCatalog(inputBytes: input)
     }
 
+    public static func providerAdmission(_ input: Data) -> Data {
+        InkuCoreBindings.providerAdmission(inputBytes: input)
+    }
+
     public static func pluginPackage(_ input: Data) -> Data {
         InkuCoreBindings.pluginPackage(inputBytes: input)
     }

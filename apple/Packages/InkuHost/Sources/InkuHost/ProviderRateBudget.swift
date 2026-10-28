@@ -29,40 +29,30 @@ actor ProviderRateBudget {
 
     func reserve(provider: ProviderSettings, inputTokens: Int, deadline: Date) async throws -> String {
         let limits = provider.effectiveRateLimits
-        guard inputTokens >= 0, limits.minuteInputTokenBudget == 0 || inputTokens <= limits.minuteInputTokenBudget else {
-            throw HostError("rate_limited")
-        }
+        guard inputTokens >= 0 else { throw HostError("rate_limited") }
+        try ProviderAdmission.preflight(.integer(inputTokens), limits: limits)
         let database = try accountingDatabase()
         try await importLegacy(provider: provider, database: database)
         let token = UUID().uuidString
         while true {
             try Task.checkCancellation()
             let now = now(), timestamp = now.timeIntervalSince1970
-            let day = Self.day(now, kind: provider.kind)
             let delay = try await database.changeProviderRateState(providerID: provider.id) { state in
-                state.events.removeAll { $0.at + Self.window <= timestamp }
-                if state.day != day { state.day = day; state.daily = 0 }
-                guard limits.requestsPerDay == 0 || state.daily < limits.requestsPerDay else { throw HostError("rate_limited") }
-                var delay = max(0, state.notBefore - timestamp)
-                var tokens = 0
-                for event in state.events {
-                    let sum = tokens.addingReportingOverflow(event.tokens)
-                    guard !sum.overflow else { throw PersistenceError.corruptDatabase }
-                    tokens = sum.partialValue
+                let result = try ProviderAdmission.call(.object(["action": .string("admit"), "state": ProviderAdmission.state(state),
+                    "now": .number(String(timestamp)), "kind": .string(provider.kind.rawValue), "limits": ProviderAdmission.limits(limits),
+                    "input_tokens": .integer(inputTokens), "id": .string(token)]))
+                switch result["decision"].string {
+                case "reject": throw HostError("rate_limited")
+                case "admit":
+                    guard timestamp < deadline.timeIntervalSince1970 else { throw HostError("rate_limited") }
+                    try ProviderAdmission.apply(result["state"], to: &state)
+                    return 0.0
+                case "wait":
+                    guard let delay = result["seconds"].number.flatMap(Double.init), delay.isFinite, delay > 0 else { throw PersistenceError.corruptDatabase }
+                    try ProviderAdmission.apply(result["state"], to: &state)
+                    return delay
+                default: throw PersistenceError.corruptDatabase
                 }
-                let total = tokens.addingReportingOverflow(inputTokens)
-                guard !total.overflow else { throw PersistenceError.corruptDatabase }
-                if (limits.minuteRequestBudget > 0 && state.events.count >= limits.minuteRequestBudget)
-                    || (limits.minuteInputTokenBudget > 0 && total.partialValue > limits.minuteInputTokenBudget) {
-                    guard let oldest = state.events.map(\.at).min() else { throw PersistenceError.corruptDatabase }
-                    delay = max(delay, oldest + Self.window - timestamp)
-                }
-                if delay > 0 { return delay }
-                guard timestamp < deadline.timeIntervalSince1970 else { throw HostError("rate_limited") }
-                let daily = state.daily.addingReportingOverflow(1)
-                guard !daily.overflow else { throw PersistenceError.corruptDatabase }
-                state.events.append(.init(id: token, at: timestamp, tokens: inputTokens)); state.daily = daily.partialValue
-                return 0.0
             }
             if delay <= 0 { return token }
             // Server waits without its own deadline; the attempt deadline ends the wait as rate_limited.
@@ -73,17 +63,19 @@ actor ProviderRateBudget {
     func settle(providerID: String, reservation: String, used: Int?) async throws {
         let database = try accountingDatabase(), now = now().timeIntervalSince1970
         try await database.changeProviderRateState(providerID: providerID) { state in
-            if let used {
-                guard used >= 0 else { throw PersistenceError.invalidRecord("negative provider usage") }
-                if let index = state.events.firstIndex(where: { $0.id == reservation }) { state.events[index].tokens = used }
-            } else { state.notBefore = max(state.notBefore, now + Self.window) }
+            if let used, used < 0 { throw PersistenceError.invalidRecord("negative provider usage") }
+            let result = try ProviderAdmission.call(.object(["action": .string("settle"), "state": ProviderAdmission.state(state),
+                "now": .number(String(now)), "id": .string(reservation), "input_tokens": used.map { .integer($0) } ?? .null]))
+            try ProviderAdmission.apply(result["state"], to: &state)
         }
     }
     func coolDown(providerID: String, seconds: TimeInterval) async throws {
         let database = try accountingDatabase(), now = now().timeIntervalSince1970
         let delay = seconds.isFinite ? max(Self.window, seconds) : Self.window
         try await database.changeProviderRateState(providerID: providerID) { state in
-            state.notBefore = max(state.notBefore, now + delay)
+            let result = try ProviderAdmission.call(.object(["action": .string("pause"), "state": ProviderAdmission.state(state),
+                "now": .number(String(now)), "seconds": .number(String(delay))]))
+            try ProviderAdmission.apply(result["state"], to: &state)
         }
     }
     private func accountingDatabase() throws -> InkuDatabase {
@@ -110,9 +102,9 @@ actor ProviderRateBudget {
               legacy?.cooldowns.values.allSatisfy({ $0.timeIntervalSince1970.isFinite && $0.timeIntervalSince1970 >= 0 }) ?? true else {
             throw PersistenceError.corruptDatabase
         }
-        let now = now(), day = Self.day(now, kind: provider.kind)
+        let now = now(), day = try Self.day(now, kind: provider.kind)
         let events = all.map { ProviderRateEvent(id: $0.id, at: $0.at.timeIntervalSince1970, tokens: $0.tokens) }
-        let currentDayEvents = all.filter { Self.day($0.at, kind: provider.kind) == day }
+        let currentDayEvents = try all.filter { try Self.day($0.at, kind: provider.kind) == day }
         let legacyEntry = legacy?.reservations[provider.id] != nil || legacy?.cooldowns[provider.id] != nil
         let dailyHold = provider.kind == .gemini && legacyEntry ? provider.effectiveRateLimits.requestsPerDay : 0
         let cooldown = legacy?.cooldowns[provider.id]?.timeIntervalSince1970 ?? 0
@@ -135,33 +127,15 @@ actor ProviderRateBudget {
             state.importedLegacySources.append(source)
         }
     }
-    static func day(_ date: Date, kind: ProviderKind) -> String {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = kind == .gemini ? TimeZone(identifier: "America/Los_Angeles")! : TimeZone(secondsFromGMT: 0)!
-        let value = calendar.dateComponents([.year, .month, .day], from: date)
-        return String(format: "%04d-%02d-%02d", value.year!, value.month!, value.day!)
+    static func day(_ date: Date, kind: ProviderKind) throws -> String {
+        let result = try ProviderAdmission.call(.object(["action": .string("day"), "now": .number(String(date.timeIntervalSince1970)), "kind": .string(kind.rawValue)]))
+        guard let day = result["day"].string else { throw PersistenceError.corruptDatabase }
+        return day
     }
 
     static func retryAfter(_ header: String?, raw: Data, now: Date) -> TimeInterval {
-        var values = [window]
-        if let header {
-            if let seconds = Double(header), seconds.isFinite { values.append(seconds) }
-            else {
-                let formatter = DateFormatter(); formatter.locale = Locale(identifier: "en_US_POSIX")
-                formatter.timeZone = TimeZone(secondsFromGMT: 0)
-                for format in ["EEE, dd MMM yyyy HH:mm:ss zzz", "EEEE, dd-MMM-yy HH:mm:ss zzz", "EEE MMM d HH:mm:ss yyyy"] {
-                    formatter.dateFormat = format
-                    if let date = formatter.date(from: header) { values.append(date.timeIntervalSince(now)); break }
-                }
-            }
-        }
-        if let value = try? ExactJSON(data: raw) {
-            for detail in value["error"]["details"].array ?? [] {
-                if detail["@type"].string == "type.googleapis.com/google.rpc.RetryInfo",
-                   let text = detail["retryDelay"].string, text.hasSuffix("s"),
-                   let delay = Double(text.dropLast()), delay.isFinite { values.append(delay) }
-            }
-        }
-        return values.filter(\.isFinite).max() ?? window
+        let input: ExactJSON = .object(["action": .string("retry"), "now": .number(String(now.timeIntervalSince1970)),
+            "retry_after": .optional(header), "raw_bytes": .array(raw.map { .integer($0) })])
+        return (try? ProviderAdmission.call(input)["seconds"].number.flatMap(Double.init)) ?? window
     }
 }

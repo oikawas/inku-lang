@@ -106,15 +106,16 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
                 // The provider slot is held for the whole attempt, inside its deadline (provider_limits.py).
                 group.addTask { [self] in try await ProviderConcurrencySlots.shared.holding(provider.id) {
                     let limits = provider.effectiveRateLimits
-                    var inputTokens = limits.tokensPerMinute > 0 ? (boundedRequest.httpBody?.count ?? 0) + 128 : 0
+                    var estimate = try ProviderAdmission.estimate(kind: provider.kind, tpm: limits.tokensPerMinute,
+                                                                  bodyBytes: boundedRequest.httpBody?.count ?? 0)
                     // Gemini token accounting asks the provider for the same exact request.
-                    if provider.kind == .gemini, limits.tokensPerMinute > 0 {
+                    if estimate["decision"].string == "need_count" {
                         recorder?.setOperation(.admission)
                         try await self.budget.prepare(provider: provider)
                         recorder?.setOperation(.tokenCount)
                         do {
                             guard let boundedTokenRequest else { throw HostError("pipeline_schema_violation") }
-                            inputTokens = try await self.countGeminiTokens(boundedTokenRequest, session: attemptSession)
+                            estimate = try await self.countGeminiTokens(boundedTokenRequest, tpm: limits.tokensPerMinute, session: attemptSession)
                         }
                         catch {
                             if let status = error as? HTTPFailure, status.status == 429 {
@@ -125,6 +126,10 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
                             throw error
                         }
                     }
+                    guard estimate["decision"].string == "estimate" else { throw HostError("rate_limited") }
+                    let exactTokens = estimate["input_tokens"]
+                    try ProviderAdmission.preflight(exactTokens, limits: limits)
+                    guard let inputTokens = exactTokens.number.flatMap(Int.init), inputTokens >= 0 else { throw HostError("rate_limited") }
                     recorder?.setOperation(.admission)
                     rateWait.set(true)
                     let reservation = try await self.budget.reserve(provider: provider, inputTokens: inputTokens, deadline: deadline)
@@ -293,12 +298,13 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
         }
     }
 
-    private func countGeminiTokens(_ request: URLRequest, session: URLSession?) async throws -> Int {
+    private func countGeminiTokens(_ request: URLRequest, tpm: Int, session: URLSession?) async throws -> ExactJSON {
         let value = try ExactJSON(data: await readObserved(request, session: session, maximum: min(16384, maximumResponseBytes),
             onBytes: { _ in }, onResponse: { _ in }))
-        guard value.object != nil else { throw HostError("malformed_payload") }
-        guard let count = value["totalTokens"].number.flatMap(Int.init), count >= 0, count <= (Int.max - 9) / 11 else { throw HostError("rate_limited") }
-        return (count * 11 + 9) / 10
+        let answer = try ProviderAdmission.estimate(kind: .gemini, tpm: tpm, bodyBytes: 0, countResponse: value)
+        if answer["decision"].string == "invalid_response" { throw HostError("malformed_payload") }
+        guard answer["decision"].string == "estimate" else { throw HostError("rate_limited") }
+        return answer
     }
 
     private func auxiliaryAttempt(_ request: URLRequest, timeout: Double, onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {

@@ -28,6 +28,7 @@ pub mod machine;
 pub mod prompts;
 pub mod protocol;
 pub mod provider_wire;
+pub mod model_catalog;
 pub mod recompose;
 pub mod replay;
 pub mod retouch;

@@ -149,10 +149,12 @@ def test_old_catalog_purposes_do_not_override_unset_profile_choices():
 
     profile = {"id": "fixture-profile", "generation": 1, "published_models": ["fixture-model"],
                "catalog": {"models": [{"id": "fixture-model", "label": "Fixture", "purposes": ["llm"]}]}}
-    assert publication(profile)["models"] == [
+    models = publication(profile)["models"]
+    assert [{key: value for key, value in model.items() if key != "selection"} for model in models] == [
         {"id": "fixture-model", "label": "Fixture", "purposes": ["llm", "vision"],
          "enabled": True, "labels": ["unmeasured"], "fold": "unmeasured"},
     ]
+    assert models[0]["selection"]["unselectable"] is False
 
 
 def test_chatgpt_model_admission_limits_operations_and_passes_the_runtime_profile_pin(monkeypatch):

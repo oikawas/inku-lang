@@ -241,7 +241,7 @@ Anthropicの対象Claudeモデルは、通常描画とVisionを含むrequestで�
 
 ## 2026-10-13 モデル情報の正本と札
 
-モデル情報の正本は `server/src/inku_server/model_catalog.json`（`inku.model-catalog.v2`）。
+モデル情報の正本は `core/crates/inku-pipeline/data/model_catalog.json`（`inku.model-catalog.v2`）。
 Gradleの`syncModelCatalog`がgenerated assetsへ写し、通常のAPKに同梱する。Androidには
 評価・候補・初期公開モデル・札の文言の写しをcommitしない。既存の公開選択は起動時に保持する。
 ChatGPTプランも`providers.chatgpt`の評価を使い、本人の一覧と公開選択は従来の登録内に保つ。

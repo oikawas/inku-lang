@@ -24,7 +24,7 @@ export function modelPurposeBadges(model: ModelOption): { purpose: ModelPurpose;
 // Vision answer). It can be chosen, but the system does not recommend it: every
 // control that chooses it is framed in red (the author, 2026-10-26).
 export function purposeUnsupported(model: ModelOption, purpose: ModelPurpose): boolean {
-	return (model.unsupported_purposes ?? []).includes(purpose);
+	return model.selection?.unsupported[purpose] ?? false;
 }
 
 // Which stage is choosing the model. 'both' assigns one model to both stages.
@@ -39,32 +39,12 @@ export type ModelStage = 'stage1' | 'stage2' | 'both';
 // does not change their result. 'both' takes the lower stage score because a
 // model assigned to both stages is limited by its weaker one. Using max would
 // let qwen3.5:4b's Stage 1 result hide its 32% Stage 2 coverage and appear as ★5.
-function stageLevel(model: ModelOption, llm: number, stage?: ModelStage): number {
-	const s1 = model.recommendation_stage1;
-	const s2 = model.recommendation_stage2;
-	if (stage === 'stage1') return Number(s1 ?? llm);
-	if (stage === 'stage2') return Number(s2 ?? llm);
-	if (stage === 'both') {
-		const measured = [s1, s2].filter((value): value is number => typeof value === 'number');
-		return measured.length > 0 ? Math.min(...measured) : llm;
-	}
-	return llm;
-}
-
 export function modelRecommendationLevel(
 	model: ModelOption,
 	purpose?: ModelPurpose,
 	stage?: ModelStage
 ): number {
-	const llm = Number(model.recommendation_llm ?? model.recommendation_level ?? 0);
-	const vision = Number(model.recommendation_vision ?? model.recommendation_level ?? 0);
-	const purposes = model.purposes ?? ['llm'];
-	const forLlm = stageLevel(model, llm, stage);
-	const raw =
-		purpose === 'llm' ? forLlm
-		: purpose === 'vision' ? vision
-		: Math.max(purposes.includes('llm') ? forLlm : 0, purposes.includes('vision') ? vision : 0);
-	return Math.max(0, Math.min(5, Number.isFinite(raw) ? raw : 0));
+	return model.selection?.levels[purpose ?? 'none'][stage ?? 'none'] ?? 0;
 }
 
 // The card prints three tiers (the author, 2026-10-13). The stored levels keep
@@ -117,20 +97,13 @@ export function modelStageRecommendations(
 	};
 }
 
-// Listing order: retired models last, then highest recommendation first. Fetch
-// controls rebuild arrays in provider order, so catalog order cannot preserve it.
+// The Server returns a core-generated key for each purpose and stage.
 export function sortModels(models: ModelOption[], purpose?: ModelPurpose, stage?: ModelStage): ModelOption[] {
 	return [...models].sort((a, b) => {
-		const unselectable = Number(isModelUnselectable(a)) - Number(isModelUnselectable(b));
-		if (unselectable !== 0) return unselectable;
-		// A model chosen for a purpose it did not answer comes after those that did.
-		if (purpose) {
-			const unrecommended = Number(purposeUnsupported(a, purpose)) - Number(purposeUnsupported(b, purpose));
-			if (unrecommended !== 0) return unrecommended;
-		}
-		const level = modelRecommendationLevel(b, purpose, stage) - modelRecommendationLevel(a, purpose, stage);
-		if (level !== 0) return level;
-		return (a.label || a.id).localeCompare(b.label || b.id);
+		const left = a.selection?.sort_keys[purpose ?? 'none'][stage ?? 'none'];
+		const right = b.selection?.sort_keys[purpose ?? 'none'][stage ?? 'none'];
+		if (left === undefined || right === undefined) return 0;
+		return left < right ? -1 : left > right ? 1 : 0;
 	});
 }
 
@@ -171,7 +144,7 @@ export function modelComment(model: ModelOption, isJapanese: boolean): string {
 	return isJapanese ? (model.comment_ja || model.comment_en || '—') : (model.comment_en || model.comment_ja || '—');
 }
 
-// The label table of the model catalog (the Server's model_catalog.json; the author,
+// The label table of the core model catalog (the author,
 // 2026-10-13), in fold order: what each label is called and whether a model carrying it
 // can be published. It arrives with every model list as `model_labels`, and every listed
 // model carries its `labels` and the `fold` it is filed in, worked out by the Server. The
@@ -191,12 +164,9 @@ function labelText(id: string, isJapanese: boolean): string {
 	return label ? (isJapanese ? label.ja : label.en) : id;
 }
 
-// A model can be published, and chosen, only when every one of its labels allows it.
-// Disabling and sorting share this predicate. The list in models.ts that shows before
-// the Server answers carries the stored marks rather than labels.
+// A placeholder has no core decision yet; keep it unavailable until the API answers.
 export function isModelUnselectable(model: ModelOption): boolean {
-	if (model.labels) return model.labels.some((id) => labelTable.find((entry) => entry.id === id)?.publishable === false);
-	return !!model.eol || !!model.requires_subscription || !!model.not_supported;
+	return model.selection?.unselectable ?? true;
 }
 
 // Every label of the model, in the table's order, each with whether it keeps the model

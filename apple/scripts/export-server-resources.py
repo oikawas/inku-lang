@@ -1,11 +1,10 @@
-"""Generate Apple installation data from the Server-owned source defaults."""
+"""Generate Apple installation data from the shared catalog and Server defaults."""
 
 from __future__ import annotations
 
 import argparse
 import ast
 import json
-import runpy
 import shutil
 import subprocess
 import sys
@@ -33,9 +32,19 @@ def literal_assignment(path: Path, name: str):
 
 
 def provider_catalog() -> tuple[dict, list[dict]]:
-    # This versioned module contains data expressions only; loading it does not
-    # import Server settings, inspect credentials or contact a provider.
-    catalog = runpy.run_path(str(SERVER / "verified_model_catalog.py"))
+    # Export remains independent of a native Server installation.
+    source_catalog = model_catalog()
+    names = {"DEFAULT_OPENAI_MODELS": "openai", "DEFAULT_ANTHROPIC_MODELS": "anthropic",
+             "DEFAULT_GEMINI_MODELS": "gemini", "VERIFIED_NVIDIA_MODELS": "nvidia",
+             "VERIFIED_OLLAMA_LOCAL_MODELS": "ollama", "VERIFIED_OLLAMA_CLOUD_MODELS": "ollama-cloud"}
+    stored = {"legacy": "legacy", "subscription": "requires_subscription", "not_supported": "not_supported", "eol": "eol"}
+    catalog = {}
+    for name, provider_id in names.items():
+        provider = source_catalog["providers"][provider_id]
+        by_id = {row["id"]: row for row in provider["models"]}
+        catalog[name] = [{**{key: value for key, value in by_id[model_id].items() if key != "labels"},
+                          **{stored[label]: True for label in by_id[model_id].get("labels", [])}}
+                         for model_id in provider["defaults"]]
 
     def resolve(node):
         if isinstance(node, ast.Name):
@@ -71,7 +80,7 @@ def provider_defaults() -> dict:
 
 
 def model_catalog() -> dict:
-    catalog = json.loads((SERVER / "model_catalog.json").read_text(encoding="utf-8"))
+    catalog = json.loads((ROOT / "core/crates/inku-pipeline/data/model_catalog.json").read_text(encoding="utf-8"))
     if catalog.get("schema") != "inku.model-catalog.v2":
         raise ValueError("Model catalog schema unavailable")
     return catalog

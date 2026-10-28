@@ -13,7 +13,7 @@ import time
 
 from .chatgpt_runtime import check_session
 from .chatgpt_store import ChatGPTError, CredentialStore
-from .model_catalog import MODEL_LABELS, model_fold, model_labels
+from .model_catalog import ASSESSMENT_KEYS, MODEL_LABELS, labelled, model_fold, model_labels
 
 
 def purposes_for_model(profile: dict, model: str) -> list[str]:
@@ -48,11 +48,12 @@ def publication(profile: dict, models: list[dict] | None = None) -> dict:
         # publishes a model for neither purpose has not measured it without a response.
         labels = model_labels({**shared, "purposes": [purpose for purpose in ("llm", "vision")
                                                       if purpose not in assessment.get("unsupported_purposes", [])]})
-        annotated.append({**model, **shared, "purposes": purposes, "labels": labels, "fold": model_fold(labels),
-                          "enabled": model["id"] in selected and bool(purposes) and not assessment.get("not_supported")})
+        shown = {**model, **shared, "purposes": purposes,
+                 "enabled": model["id"] in selected and bool(purposes) and not assessment.get("not_supported")}
+        annotated.append({**labelled(shown), "labels": labels, "fold": model_fold(labels)})
     return {"profile_id": profile["id"], "generation": profile["generation"], "models": annotated,
             "enabled_models": {model["id"]: model["enabled"] for model in annotated},
-            "model_labels": [dict(label) for label in MODEL_LABELS]}
+            "model_labels": [dict(label) for label in MODEL_LABELS], "assessment_keys": list(ASSESSMENT_KEYS)}
 
 
 def saved_publication(owner: str, profile_id: str, generation: int) -> dict:

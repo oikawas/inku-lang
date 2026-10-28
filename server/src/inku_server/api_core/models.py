@@ -671,6 +671,11 @@ def _model_label_table() -> list[dict]:
     return [dict(label) for label in MODEL_LABELS]
 
 
+def _model_assessment_keys() -> list[str]:
+    from ..model_catalog import ASSESSMENT_KEYS
+    return list(ASSESSMENT_KEYS)
+
+
 class ModelSettingsResponse(BaseModel):
     """The model catalog and the model settings the interface needs."""
 
@@ -684,6 +689,8 @@ class ModelSettingsResponse(BaseModel):
             "and whether it lets the model be published."
         ),
     )
+    assessment_keys: list[str] = Field(default_factory=_model_assessment_keys,
+        description="Model assessment fields shared by the model administration screen.")
     catalog: list[dict] = Field(
         default_factory=list,
         description="The model providers and their models, as the model settings page lists them.",

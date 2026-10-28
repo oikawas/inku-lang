@@ -10,10 +10,18 @@ import { isModelUnselectable, modelCost, modelFold, modelFoldTitle, modelFolds, 
 import type { ModelLabel, ModelOption } from './models';
 
 // The Server's model catalog and the cases every client checks itself against (2026-10-13).
-const catalog = JSON.parse(readFileSync(new URL('../../../server/src/inku_server/model_catalog.json', import.meta.url), 'utf8')) as { labels: ModelLabel[] };
-const cases = JSON.parse(readFileSync(new URL('../../../server/tests/data/model-catalog-cases.json', import.meta.url), 'utf8')) as {
+const catalog = JSON.parse(readFileSync(new URL('../../../core/crates/inku-pipeline/data/model_catalog.json', import.meta.url), 'utf8')) as { labels: ModelLabel[] };
+const cases = JSON.parse(readFileSync(new URL('../../../core/crates/inku-pipeline/data/model-catalog-cases.json', import.meta.url), 'utf8')) as {
 	cases: { name: string; labels: string[]; fold: string | null; publishable: boolean }[];
 };
+const fixtures = JSON.parse(readFileSync(new URL('./model-selection-fixtures.json', import.meta.url), 'utf8')) as {
+	models: Record<string, ModelOption['selection']>; cases: Record<string, ModelOption>;
+};
+function coreModel<T extends ModelOption>(model: T): T {
+	const key = JSON.stringify(Object.fromEntries(Object.entries(model).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)));
+	assert.ok(fixtures.models[key], `missing core fixture ${key}`);
+	return { ...model, selection: fixtures.models[key] };
+}
 setModelLabelTable(catalog.labels);
 
 test('both purposes are listed, and the one a model cannot be chosen for is marked', () => {
@@ -26,27 +34,28 @@ test('both purposes are listed, and the one a model cannot be chosen for is mark
 });
 
 test('a purpose measured without a response is not recommended, and a model with neither can still be chosen', () => {
-	const drawsNothing = { id: 'x', label: 'x', purposes: ['vision'] as ('llm' | 'vision')[], unsupported_purposes: ['llm'] as ('llm' | 'vision')[], labels: [], fold: null };
+	const drawsNothing = coreModel({ id: 'x', label: 'x', purposes: ['vision'] as ('llm' | 'vision')[], unsupported_purposes: ['llm'] as ('llm' | 'vision')[], labels: [], fold: null });
 	assert.deepEqual(modelPurposeBadges(drawsNothing).map((badge) => badge.selectable), [false, true]);
 	assert.equal(isModelUnselectable(drawsNothing), false);
 	assert.deepEqual([purposeUnsupported(drawsNothing, 'llm'), purposeUnsupported(drawsNothing, 'vision')], [true, false]);
 	// Chosen against the measurement (2026-10-26): publishable, its label still in the warning colour.
-	const answersNothing = { id: 'x', label: 'x', purposes: ['llm'] as ('llm' | 'vision')[], unsupported_purposes: ['llm', 'vision'] as ('llm' | 'vision')[], labels: ['no_response'], fold: 'no_response' };
+	const answersNothing = coreModel({ id: 'x', label: 'x', purposes: ['llm'] as ('llm' | 'vision')[], unsupported_purposes: ['llm', 'vision'] as ('llm' | 'vision')[], labels: ['no_response'], fold: 'no_response' });
 	assert.equal(isModelUnselectable(answersNothing), false);
 	assert.deepEqual(modelStatusParts(answersNothing, true), [{ text: '計測で応答なし', blocking: true }]);
-	assert.equal(isModelUnselectable({ id: 'x', label: 'x', unsupported_purposes: ['llm', 'vision'] }), false);
+	// Until the API supplies a core decision, a placeholder cannot be selected.
+	assert.equal(isModelUnselectable({ id: 'x', label: 'x', unsupported_purposes: ['llm', 'vision'] }), true);
 });
 
 test('a model chosen for a purpose it did not answer is listed after those that answered it', () => {
-	const answered = { id: 'b', label: 'b', recommendation_llm: 1 };
-	const unanswered = { id: 'a', label: 'a', purposes: ['llm'] as ('llm' | 'vision')[], unsupported_purposes: ['llm'] as ('llm' | 'vision')[], recommendation_llm: 5 };
+	const answered = coreModel({ id: 'b', label: 'b', recommendation_llm: 1 });
+	const unanswered = coreModel({ id: 'a', label: 'a', purposes: ['llm'] as ('llm' | 'vision')[], unsupported_purposes: ['llm'] as ('llm' | 'vision')[], recommendation_llm: 5 });
 	assert.deepEqual(sortModels([unanswered, answered], 'llm').map((model) => model.id), ['b', 'a']);
 });
 
 test('the labels the Server worked out decide the fold and the publication, as the shared cases say', () => {
 	assert.deepEqual(modelFolds(), ['unmeasured', 'legacy', 'subscription', 'no_response', 'not_supported', 'eol']);
 	for (const entry of cases.cases) {
-		const model: ModelOption = { id: 'x', label: 'x', labels: entry.labels, fold: entry.fold };
+		const model = fixtures.cases[entry.name];
 		assert.deepEqual([modelFold(model), !isModelUnselectable(model)], [entry.fold, entry.publishable], entry.name);
 	}
 	assert.equal(cases.cases.length, 15);
@@ -73,9 +82,9 @@ test('each label keeps its own colour: only one that keeps the model from public
 	assert.deepEqual(modelStatusParts({ id: 'x', label: 'x', labels: [], fold: null }, true), []);
 });
 
-test('the startup list, which has no labels yet, keeps to its stored marks', () => {
-	assert.equal(isModelUnselectable({ id: 'paid', label: 'x', requires_subscription: true }), true);
-	assert.equal(isModelUnselectable({ id: 'free', label: 'x' }), false);
+test('the server selection decides whether the model can be chosen', () => {
+	assert.equal(isModelUnselectable(coreModel({ id: 'paid', label: 'x', requires_subscription: true })), true);
+	assert.equal(isModelUnselectable(coreModel({ id: 'free', label: 'x' })), false);
 	assert.equal(modelFold({ id: 'paid', label: 'x', requires_subscription: true }), null);
 });
 

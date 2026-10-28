@@ -242,7 +242,7 @@ New drawing requests and execution options omit `interpretation_seed`, and alloc
 
 ## 2026-10-13 Canonical model information and labels
 
-`server/src/inku_server/model_catalog.json` (`inku.model-catalog.v2`) is the model-information
+`core/crates/inku-pipeline/data/model_catalog.json` (`inku.model-catalog.v2`) is the model-information
 source. Gradle's `syncModelCatalog` copies it into generated assets for every APK. Android
 commits no duplicate evaluations, candidates, initial published models or label wording.
 Startup preserves existing publication choices. ChatGPT-plan evaluations also come from

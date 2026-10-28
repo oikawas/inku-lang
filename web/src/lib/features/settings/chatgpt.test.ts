@@ -144,7 +144,8 @@ test('connected guide leads to personal model settings with explicit publication
 		.replace(/(['"])svelte\/internal\/client\1/g, JSON.stringify(import.meta.resolve('svelte/internal/client')));
 	const { createModelAdministration } = await import('data:text/javascript;base64,' + Buffer.from(adminCode).toString('base64'));
 	const requests: { path: string; body?: unknown }[] = [];
-	let saved = { profile_id: 'profile', generation: 1, models: [] as any[], enabled_models: {} as Record<string, boolean> };
+	let saved = { profile_id: 'profile', generation: 1, models: [] as any[], enabled_models: {} as Record<string, boolean>,
+		assessment_keys: ['recommendation_vision', 'recommendation_stage1', 'speed_label', 'comment_ja'] };
 	const administration = createModelAdministration({
 		currentUser: () => ({ id: owner, permission_groups: admin ? ['admins'] : ['users'] }), chatgptAvailable: () => available,
 		loadAvailableModels() { changes++; }, requestConfirmation() {}, describeApiError() { return 'Error'; },

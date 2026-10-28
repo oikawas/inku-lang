@@ -68,7 +68,7 @@ fun nextAndroidBuildNumber(): Int {
 val androidVersionName = rootProject.file("VERSION").readText().trim()
 val modelCatalogAssets = layout.buildDirectory.dir("generated/modelCatalogAssets")
 val syncModelCatalog = tasks.register<Sync>("syncModelCatalog") {
-    from(rootProject.file("../server/src/inku_server/model_catalog.json"))
+    from(rootProject.file("../core/crates/inku-pipeline/data/model_catalog.json"))
     into(modelCatalogAssets)
 }
 // The experimental 3D viewer is Web's registered build, copied unchanged at
@@ -98,8 +98,8 @@ tasks.withType<Test>().configureEach {
     systemProperty("inku.ddl3dCopy", ddl3dViewerAssets.get().dir("ddl3d").asFile.absolutePath)
     systemProperty("inku.ddl3dRegistration", ddl3dRegistration.absolutePath)
     systemProperty("inku.ddl3dFixture", rootProject.file("../experiments/ddl-3d/fixtures/solids.json").absolutePath)
-    systemProperty("inku.modelCatalogSource", rootProject.file("../server/src/inku_server/model_catalog.json").absolutePath)
-    systemProperty("inku.modelCatalogCases", rootProject.file("../server/tests/data/model-catalog-cases.json").absolutePath)
+    systemProperty("inku.modelCatalogSource", rootProject.file("../core/crates/inku-pipeline/data/model_catalog.json").absolutePath)
+    systemProperty("inku.modelCatalogCases", rootProject.file("../core/crates/inku-pipeline/data/model-catalog-cases.json").absolutePath)
     systemProperty("inku.identityCases", rootProject.file("../server/tests/data/identity-cases.json").absolutePath)
     systemProperty("inku.instructionLanguageCases", rootProject.file("../server/tests/data/instruction-language-cases.json").absolutePath)
     inputs.files(rootProject.file("../server/tests/data/identity-cases.json"),
@@ -252,7 +252,7 @@ val buildRustAndroidArm64 = tasks.register<Exec>("buildRustAndroidArm64") {
     workingDir(rootProject.file("../core"))
     inputs.files(
         rootProject.fileTree("../core") {
-            include("Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "crates/**/Cargo.toml", "crates/**/src/**/*.rs", "crates/**/assets/**", "vendor/resvg/Cargo.toml", "vendor/resvg/src/**/*.rs")
+            include("Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "crates/**/Cargo.toml", "crates/**/src/**/*.rs", "crates/**/assets/**", "crates/inku-pipeline/data/model_catalog.json", "vendor/resvg/Cargo.toml", "vendor/resvg/src/**/*.rs")
             exclude("target/**")
         },
     )
@@ -290,7 +290,7 @@ val buildRustHostJni = tasks.register<Exec>("buildRustHostJni") {
     workingDir(rootProject.file("../core"))
     inputs.files(rootProject.fileTree("../core") {
         include("Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "crates/**/Cargo.toml",
-            "crates/**/src/**/*.rs", "crates/**/assets/**", "vendor/resvg/Cargo.toml",
+            "crates/**/src/**/*.rs", "crates/**/assets/**", "crates/inku-pipeline/data/model_catalog.json", "vendor/resvg/Cargo.toml",
             "vendor/resvg/src/**/*.rs")
         exclude("target/**")
     })
@@ -403,7 +403,7 @@ val generateRustParityExpected = tasks.register<Exec>("generateRustParityExpecte
     workingDir(rootProject.file("../core"))
     inputs.files(
         rootProject.fileTree("../core") {
-            include("Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "crates/**/Cargo.toml", "crates/**/src/**/*.rs", "crates/**/examples/**/*.rs", "crates/**/assets/**", "vendor/resvg/Cargo.toml", "vendor/resvg/src/**/*.rs")
+            include("Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "crates/**/Cargo.toml", "crates/**/src/**/*.rs", "crates/**/examples/**/*.rs", "crates/**/assets/**", "crates/inku-pipeline/data/model_catalog.json", "vendor/resvg/Cargo.toml", "vendor/resvg/src/**/*.rs")
             exclude("target/**")
         },
     )

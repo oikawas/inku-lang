@@ -25,8 +25,7 @@ import InkuUI
         }
     }
 
-    let serverDirectory = casesURL.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-    let sourceURL = serverDirectory.appendingPathComponent("src/inku_server/model_catalog.json")
+    let sourceURL = casesURL.deletingLastPathComponent().appendingPathComponent("model_catalog.json")
     let source = try JSONSerialization.jsonObject(with: Data(contentsOf: sourceURL)) as? NSDictionary
     let manifest = try JSONSerialization.jsonObject(with: ModelGuidanceCatalog.bundledManifestData()) as? [String: Any]
     guard let source, let exported = manifest?["model_catalog"] as? NSDictionary,

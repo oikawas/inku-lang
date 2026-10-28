@@ -3,6 +3,12 @@ export type Provider = string;
 export type ModelOption = {
 	id: string;
 	label: string;
+	selection?: {
+		unselectable: boolean;
+		unsupported: Record<'llm' | 'vision', boolean>;
+		levels: Record<'none' | 'llm' | 'vision', Record<'none' | 'stage1' | 'stage2' | 'both', number>>;
+		sort_keys: Record<'none' | 'llm' | 'vision', Record<'none' | 'stage1' | 'stage2' | 'both', string>>;
+	};
 	notes?: string;
 	purposes?: ('llm' | 'vision')[];
 	// Purposes the model was measured not to answer (2026-10-13). The server keeps

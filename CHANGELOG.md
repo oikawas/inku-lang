@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-28 — Shared model catalog and picker decisions
+
+The unchanged model catalog now lives in the shared core. The Server returns its labels, availability, recommendations and ordering to the Web, and the model administration screen receives the shared assessment fields. Catalog measurement updates require a native Server rebuild.
+
 ### 2026-10-27 — Delete a ChatGPT plan registration on macOS
 
 The connection settings can recheck the state and delete a registration together with its published model settings. Deletion asks for confirmation and reports if provider revocation could not be confirmed.

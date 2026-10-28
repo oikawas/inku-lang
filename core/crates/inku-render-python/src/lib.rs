@@ -363,6 +363,16 @@ fn pipeline_provider_wire<'py>(
     PyBytes::new(py, &output)
 }
 
+#[pyfunction]
+fn pipeline_model_catalog<'py>(
+    py: Python<'py>,
+    input_bytes: &Bound<'py, PyBytes>,
+) -> Bound<'py, PyBytes> {
+    let input = input_bytes.as_bytes().to_vec();
+    let output = py.detach(|| inku_pipeline_uniffi::model_catalog(input));
+    PyBytes::new(py, &output)
+}
+
 /// How a host prepares the image a work is written from (`inku.image-input-policy.v1`).
 #[pyfunction]
 fn pipeline_image_input_policy() -> String {
@@ -489,6 +499,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(pipeline_autonomous_refine, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_chunk_moves, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_provider_wire, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_model_catalog, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_image_input_policy, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_image_canvas, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_image_review_svg, module)?)?;

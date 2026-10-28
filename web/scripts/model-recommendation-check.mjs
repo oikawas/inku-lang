@@ -19,6 +19,12 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const EXPECTATIONS = JSON.parse(
 	readFileSync(join(HERE, 'model-recommendation-expectations.json'), 'utf8')
 );
+const FIXTURES = JSON.parse(readFileSync(join(HERE, '../src/lib/model-selection-fixtures.json'), 'utf8')).models;
+function coreModel(model) {
+	const key = JSON.stringify(Object.fromEntries(Object.entries(model).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)));
+	if (!FIXTURES[key]) throw new Error(`Missing native core fixture: ${key}`);
+	return {...model, selection: FIXTURES[key]};
+}
 
 const { modelRecommendationLevel, modelRecommendation, modelStageRecommendations, sortModels } =
 	await import(join(HERE, '..', 'src/lib/modelMeta.ts'));
@@ -35,7 +41,7 @@ function check(what, actual, expected) {
 
 // ── the three stages read the right key ───────────────────────────────────
 for (const c of EXPECTATIONS.display.cases) {
-	const model = { id: 'x', label: 'x', ...c.model };
+	const model = coreModel({ id: 'x', label: 'x', ...c.model });
 	for (const stage of ['stage1', 'stage2', 'both']) {
 		check(`${JSON.stringify(c.model)} as ${stage}`, modelRecommendationLevel(model, 'llm', stage), c[stage]);
 	}
@@ -43,7 +49,7 @@ for (const c of EXPECTATIONS.display.cases) {
 
 // ── an unmeasured stage is an em dash, never zero stars ───────────────────
 {
-	const model = { id: 'x', label: 'x', recommendation_stage1: 1 };
+	const model = coreModel({ id: 'x', label: 'x', recommendation_stage1: 1 });
 	check('unmeasured stage renders as an em dash', modelRecommendation(model, 'llm', 'stage2'), '—');
 	check('a measured 1 renders as one star', modelRecommendation(model, 'llm', 'stage1'), '★☆☆ (1/3)');
 }
@@ -52,7 +58,7 @@ for (const c of EXPECTATIONS.display.cases) {
 for (const c of EXPECTATIONS.tiers.cases) {
 	check(
 		`level ${c.level} prints as its tier`,
-		modelRecommendation({ id: 'x', label: 'x', recommendation_llm: c.level }, 'llm'),
+		modelRecommendation(coreModel({ id: 'x', label: 'x', recommendation_llm: c.level }), 'llm'),
 		c.text
 	);
 }
@@ -61,17 +67,17 @@ for (const c of EXPECTATIONS.tiers.cases) {
 // Every surface that has no stage in question (the admin metadata editor, the
 // history label) must be unaffected by the stage keys existing.
 {
-	const staged = { id: 'x', label: 'x', recommendation_llm: 4, recommendation_stage1: 5, recommendation_stage2: 2 };
+	const staged = coreModel({ id: 'x', label: 'x', recommendation_llm: 4, recommendation_stage1: 5, recommendation_stage2: 2 });
 	check('no stage falls back to the LLM level', modelRecommendationLevel(staged, 'llm'), 4);
 	check('no purpose and no stage still reads the LLM level', modelRecommendationLevel(staged), 4);
 }
 
 // ── vision is untouched by the stage keys ─────────────────────────────────
 {
-	const model = {
+	const model = coreModel({
 		id: 'x', label: 'x', purposes: ['vision'],
 		recommendation_vision: 3, recommendation_stage1: 5, recommendation_stage2: 5
-	};
+	});
 	for (const stage of ['stage1', 'stage2', 'both']) {
 		check(`vision ignores ${stage}`, modelRecommendationLevel(model, 'vision', stage), 3);
 	}
@@ -81,8 +87,8 @@ for (const c of EXPECTATIONS.tiers.cases) {
 // This is the arrangement's visible consequence: the same two models swap places
 // between the Stage 1 tab and the Stage 2 tab.
 {
-	const s1Model = { id: 'stage1-strong', label: 'a', recommendation_stage1: 5, recommendation_stage2: 2 };
-	const s2Model = { id: 'stage2-strong', label: 'b', recommendation_stage1: 3, recommendation_stage2: 5 };
+	const s1Model = coreModel({ id: 'stage1-strong', label: 'a', recommendation_stage1: 5, recommendation_stage2: 2 });
+	const s2Model = coreModel({ id: 'stage2-strong', label: 'b', recommendation_stage1: 3, recommendation_stage2: 5 });
 	const ids = (stage) => sortModels([s1Model, s2Model], 'llm', stage).map((m) => m.id);
 	check('Stage 1 tab leads with the Stage 1 model', ids('stage1'), ['stage1-strong', 'stage2-strong']);
 	check('Stage 2 tab leads with the Stage 2 model', ids('stage2'), ['stage2-strong', 'stage1-strong']);
@@ -91,7 +97,7 @@ for (const c of EXPECTATIONS.tiers.cases) {
 
 // ── the hover card splits only where the measurement was split ────────────
 for (const c of EXPECTATIONS.hover_card.cases) {
-	const model = { id: 'x', label: 'x', ...c.model };
+	const model = coreModel({ id: 'x', label: 'x', ...c.model });
 	check(
 		`hover card for ${JSON.stringify(c.model)}`,
 		modelStageRecommendations(model, c.purpose ?? 'llm'),

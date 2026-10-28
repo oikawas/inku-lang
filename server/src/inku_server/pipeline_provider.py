@@ -20,7 +20,7 @@ from .model_settings import connection_for, provider_for_model
 from .provider_limits import provider_slot
 from . import provider_wire
 from .provider_observation import ProviderObservationError, ProviderObservationStore
-from .provider_rate_limits import ProviderRateBudget, RateAccountingUnavailable, RateLimitUnavailable, retry_after_seconds
+from .provider_rate_limits import ProviderRateBudget, RateAccountingUnavailable, RateLimitUnavailable, estimate_input_tokens, retry_after_seconds
 from .chatgpt_store import ChatGPTError
 
 _logger = logging.getLogger(__name__)
@@ -242,8 +242,8 @@ class SingleAttemptProvider:
             async with asyncio.timeout(timeout):
                 async with httpx.AsyncClient(timeout=timeout, transport=self.transport, follow_redirects=False) as client:
                     if budget is not None and limits is not None:
-                        input_tokens = len(body_bytes) + 128 if limits["tpm"] else 0
-                        if kind == "gemini" and limits["tpm"]:
+                        input_tokens = estimate_input_tokens(kind, limits["tpm"], len(body_bytes))
+                        if input_tokens is None:
                             # Count the exact system, content and function schema,
                             # rather than guessing Japanese tokens from characters.
                             count_raw = bytearray()
@@ -258,12 +258,7 @@ class SingleAttemptProvider:
                                     self._refusal = {**refusal(refused_raw), "operation": "count_tokens"}
                                     counted.raise_for_status()
                             count_data = json.loads(count_raw)
-                            if not isinstance(count_data, dict):
-                                raise TypeError("token count response is not an object")
-                            count = count_data.get("totalTokens")
-                            if not isinstance(count, int) or isinstance(count, bool) or count < 0:
-                                raise RateLimitUnavailable("input token count is unavailable")
-                            input_tokens = (count * 11 + 9) // 10
+                            input_tokens = estimate_input_tokens(kind, limits["tpm"], len(body_bytes), count_data)
                         self.failure_detail = "rate_limit_wait"
                         reservation = await budget.reserve(str(connection["id"]), kind, limits, input_tokens)
                         self.failure_detail = None

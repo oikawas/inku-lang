@@ -1,6 +1,23 @@
 {
-  "source": "Server provider_rate_limits.py at 7419a3d8162c4c132088092c2603b06f3a227864",
+  "source": "Server provider_rate_limits.py at 7419a3d8162c4c132088092c2603b06f3a227864; estimate cases use pipeline_provider.py at 8fab20ab8afec2f67b7bdcaecd4f64425cd04d4f, with the requested non-object refusal classification",
   "cases": [
+    {"name":"estimate_tpm_off_openai","request":{"action":"estimate","kind":"openai_compatible","tpm":0,"body_bytes":300},"expected":{"decision":"estimate","input_tokens":0}},
+    {"name":"estimate_tpm_off_gemini","request":{"action":"estimate","kind":"gemini","tpm":0,"body_bytes":300},"expected":{"decision":"estimate","input_tokens":0}},
+    {"name":"estimate_bytes","request":{"action":"estimate","kind":"anthropic","tpm":16000,"body_bytes":300},"expected":{"decision":"estimate","input_tokens":428}},
+    {"name":"estimate_empty_body","request":{"action":"estimate","kind":"openai_compatible","tpm":1,"body_bytes":0},"expected":{"decision":"estimate","input_tokens":128}},
+    {"name":"estimate_gemini_needs_count","request":{"action":"estimate","kind":"gemini","tpm":16000,"body_bytes":300},"expected":{"decision":"need_count"}},
+    {"name":"estimate_count_zero","request":{"action":"estimate","kind":"gemini","tpm":16000,"body_bytes":300,"count_response":{"totalTokens":0}},"expected":{"decision":"estimate","input_tokens":0}},
+    {"name":"estimate_count_one","request":{"action":"estimate","kind":"gemini","tpm":16000,"body_bytes":300,"count_response":{"totalTokens":1}},"expected":{"decision":"estimate","input_tokens":2}},
+    {"name":"estimate_count_nine","request":{"action":"estimate","kind":"gemini","tpm":16000,"body_bytes":300,"count_response":{"totalTokens":9}},"expected":{"decision":"estimate","input_tokens":10}},
+    {"name":"estimate_count_ten","request":{"action":"estimate","kind":"gemini","tpm":16000,"body_bytes":300,"count_response":{"totalTokens":10}},"expected":{"decision":"estimate","input_tokens":11}},
+    {"name":"estimate_count_standard","request":{"action":"estimate","kind":"gemini","tpm":16000,"body_bytes":300,"count_response":{"totalTokens":4500}},"expected":{"decision":"estimate","input_tokens":4950}},
+    {"name":"estimate_count_wide_integer","request":{"action":"estimate","kind":"gemini","tpm":16000,"body_bytes":300,"count_response":{"totalTokens":18446744073709551615}},"expected":{"decision":"estimate","input_tokens":20291418481080506777}},
+    {"name":"estimate_count_negative","request":{"action":"estimate","kind":"gemini","tpm":16000,"body_bytes":300,"count_response":{"totalTokens":-1}},"expected":{"decision":"reject","reason":"input token count is unavailable"}},
+    {"name":"estimate_count_boolean","request":{"action":"estimate","kind":"gemini","tpm":16000,"body_bytes":300,"count_response":{"totalTokens":true}},"expected":{"decision":"reject","reason":"input token count is unavailable"}},
+    {"name":"estimate_count_float","request":{"action":"estimate","kind":"gemini","tpm":16000,"body_bytes":300,"count_response":{"totalTokens":1.0}},"expected":{"decision":"reject","reason":"input token count is unavailable"}},
+    {"name":"estimate_count_missing","request":{"action":"estimate","kind":"gemini","tpm":16000,"body_bytes":300,"count_response":{}},"expected":{"decision":"reject","reason":"input token count is unavailable"}},
+    {"name":"estimate_count_nonobject","request":{"action":"estimate","kind":"gemini","tpm":16000,"body_bytes":300,"count_response":[]},"expected":{"decision":"reject","reason":"input token count is unavailable"}},
+    {"name":"estimate_count_null","request":{"action":"estimate","kind":"gemini","tpm":16000,"body_bytes":300,"count_response":null},"expected":{"decision":"reject","reason":"input token count is unavailable"}},
     {
       "name": "first",
       "request": {

@@ -1467,6 +1467,8 @@ Usage, reservations, and the 429 cooldown are persisted in the DB and survive re
 
 The shared core calculates these limits, admission, reconciliation, cooldown and day boundaries. The Server supplies time and persists each transition with compare-and-set; arithmetic overflow is refused as corrupt accounting state.
 
+The shared core also estimates input tokens from the UTF-8 request byte count or, for Gemini with TPM enabled, validates the `countTokens` answer and adds ten percent headroom.
+
 ---
 
 ## 9. The Design of the First Stroke

@@ -15,10 +15,10 @@ from inku_server.model_settings import connection_for, public_model_settings, up
 from inku_server.persistence.schema import AppSettingRow
 from inku_server.pipeline_provider import ProviderOptions, SingleAttemptProvider
 import inku_render
-from inku_server.provider_rate_limits import ProviderRateBudget, RateLimitUnavailable, RateAccountingUnavailable, _replace_state, retry_after_seconds
+from inku_server.provider_rate_limits import ProviderRateBudget, RateLimitUnavailable, RateAccountingUnavailable, _replace_state, estimate_input_tokens, retry_after_seconds
 
 
-def test_core_admission_matches_frozen_server_and_preserves_json():
+def test_core_admission_matches_shared_cases_and_preserves_json():
     cases = json.loads((Path(__file__).parent / "data/provider-admission-cases.json").read_text())["cases"]
     for case in cases:
         actual = json.loads(inku_render.pipeline_provider_admission(json.dumps(case["request"]).encode()))
@@ -42,6 +42,67 @@ def test_overflow_refuses_corrupt_state(tmp_path):
         asyncio.run(ProviderRateBudget(engine, clock=lambda: 1001.0).reserve("p", "openai", request["limits"], 1))
     with engine.connect() as connection:
         assert connection.execute(select(AppSettingRow.value)).scalar_one() == raw
+
+
+def test_large_integer_count_is_estimated_exactly_and_rejected_by_budget():
+    count = 2**64
+    estimate = estimate_input_tokens("gemini", 16000, 100, {"totalTokens": count})
+    assert estimate == (count * 11 + 9) // 10
+    with pytest.raises(RateLimitUnavailable, match="request exceeds the configured input-token budget"):
+        asyncio.run(ProviderRateBudget(None).reserve("fixture", "gemini", {"rpm": 0, "tpm": 16000, "rpd": 0}, estimate))
+
+
+@pytest.mark.parametrize("payload", [{"totalTokens": -1}, {"totalTokens": True}, {"totalTokens": 1.0}, {}, [], None])
+def test_invalid_count_refuses_before_generation(payload, monkeypatch):
+    monkeypatch.setattr("inku_server.pipeline_provider.provider_for_model", lambda *args, **kwargs: ("gemini", "m"))
+    monkeypatch.setattr("inku_server.pipeline_provider.connection_for", lambda *args: {
+        "id": "gemini", "kind": "gemini", "base_url": "https://provider.invalid",
+        "api_key": "fixture-only", "requires_api_key": True,
+        "rate_limits": {"rpm": 30, "tpm": 16000, "rpd": 10},
+    })
+    calls = []
+    async def request(value):
+        calls.append(value.url.path)
+        return httpx.Response(200, content=json.dumps(payload).encode())
+    class Budget:
+        async def reserve(self, *args):
+            pytest.fail("an invalid count must not reserve or send")
+    provider = SingleAttemptProvider(ProviderOptions({}, "gemini:m", "gemini:m", 2048, 8192),
+                                     transport=httpx.MockTransport(request), rate_budget=Budget())
+    action = {"tag": "generate_normalized_ddl", "identity": {"action_id": "a", "attempt": 1, "request_digest": "b"},
+              "timeout_ms": "120000", "payload": {"prompt": {"system": "s", "message": "m",
+              "action_name": "generate_normalized_ddl", "response_schema": {"type": "object", "properties": {}}}}}
+    assert provider(action)["failure"] == "rate_limited"
+    assert len(calls) == 1 and calls[0].endswith(":countTokens")
+
+
+def test_disabled_tpm_skips_gemini_count_and_reserves_zero(monkeypatch):
+    monkeypatch.setattr("inku_server.pipeline_provider.provider_for_model", lambda *args, **kwargs: ("gemini", "m"))
+    monkeypatch.setattr("inku_server.pipeline_provider.connection_for", lambda *args: {
+        "id": "gemini", "kind": "gemini", "base_url": "https://provider.invalid",
+        "api_key": "fixture-only", "requires_api_key": True,
+        "rate_limits": {"rpm": 0, "tpm": 0, "rpd": 0},
+    })
+    calls, reservations = [], []
+    async def request(value):
+        calls.append(value.url.path)
+        return httpx.Response(200, json={"candidates": [{"content": {"parts": [{"functionCall": {
+            "name": "submit_pipeline_response", "args": {"normalized_ddl": "fixture"},
+        }}]}}]})
+    class Budget:
+        async def reserve(self, provider, kind, limits, tokens):
+            reservations.append(tokens)
+            return "fixture"
+        def settle(self, *args):
+            pass
+    provider = SingleAttemptProvider(ProviderOptions({}, "gemini:m", "gemini:m", 2048, 8192),
+                                     transport=httpx.MockTransport(request), rate_budget=Budget())
+    action = {"tag": "generate_normalized_ddl", "identity": {"action_id": "a", "attempt": 1, "request_digest": "b"},
+              "timeout_ms": "120000", "payload": {"prompt": {"system": "s", "message": "m",
+              "action_name": "generate_normalized_ddl", "response_schema": {"type": "object", "properties": {}}}}}
+    assert provider(action)["tag"] != "provider_failed"
+    assert reservations == [0]
+    assert len(calls) == 1 and calls[0].endswith(":generateContent")
 
 
 def test_retry_info_accepts_json_byte_encodings():

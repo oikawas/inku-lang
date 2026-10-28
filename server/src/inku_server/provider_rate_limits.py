@@ -42,6 +42,21 @@ def _core(action, **fields):
         raise RateAccountingUnavailable from error
 
 
+_COUNT_NOT_RECEIVED = object()
+
+
+def estimate_input_tokens(kind: str, tpm: int, body_bytes: int, count_response=_COUNT_NOT_RECEIVED) -> int | None:
+    fields = {"kind": kind, "tpm": tpm, "body_bytes": body_bytes}
+    if count_response is not _COUNT_NOT_RECEIVED:
+        fields["count_response"] = count_response
+    answer = _core("estimate", **fields)
+    if answer["decision"] == "need_count":
+        return None
+    if answer["decision"] == "reject":
+        raise RateLimitUnavailable(answer["reason"])
+    return answer["input_tokens"]
+
+
 def _replace_state(state, result):
     # Preserve the insertion order used by the existing compact DB encoding.
     old_events = {event["id"]: event for event in state["events"]}

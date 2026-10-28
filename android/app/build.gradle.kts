@@ -100,7 +100,7 @@ tasks.withType<Test>().configureEach {
     systemProperty("inku.providerAdmissionSequence", rootProject.file("../server/tests/data/provider-admission-sequence.json").absolutePath)
     systemProperty("inku.identityCases", rootProject.file("../server/tests/data/identity-cases.json").absolutePath)
     systemProperty("inku.instructionLanguageCases", rootProject.file("../server/tests/data/instruction-language-cases.json").absolutePath)
-    inputs.files(rootProject.file("../server/tests/data/provider-admission-cases.json"), rootProject.file("../server/tests/data/provider-admission-sequence.json"), rootProject.file("../server/tests/data/provider-settings-cases.json"), rootProject.file("../server/tests/data/identity-cases.json"),
+    inputs.files(rootProject.file("../server/tests/data/chatgpt-auth-addendum-cases.json"), rootProject.file("../server/tests/data/provider-wire-cases.json"), rootProject.file("../server/tests/data/provider-admission-cases.json"), rootProject.file("../server/tests/data/provider-admission-sequence.json"), rootProject.file("../server/tests/data/provider-settings-cases.json"), rootProject.file("../server/tests/data/identity-cases.json"),
         rootProject.file("../server/tests/data/instruction-language-cases.json"))
 }
 val androidVersionCode = nextAndroidBuildNumber()

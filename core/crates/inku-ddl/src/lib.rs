@@ -33,6 +33,7 @@ pub mod macro_resolution;
 pub mod macro_seed;
 pub mod noun_phrase;
 pub mod numeric_range;
+pub mod plugin_names;
 pub use numeric_range::{
     ExactFraction, FadeDirection, FadeLexeme, NumericAngleLexeme, NumericRangeLexeme,
     NumericSegmentLexeme,

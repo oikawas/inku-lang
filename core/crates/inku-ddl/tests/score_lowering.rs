@@ -2855,11 +2855,15 @@ fn flat_macro_thinness_uses_literal_and_component_parameter_through_the_shared_l
         stop.gaps()
             .contains(&ScoreFieldGap::UnboundMacroCallerMeaning)
     );
-    assert_eq!(continued.score().unwrap().instructions.len(), 1);
+    assert_eq!(continued.score().unwrap().instructions.len(), 3);
     assert_eq!(continued.score().unwrap().instructions[0].thinness, None);
     assert!(matches!(
         continued.instruction_origins(),
-        [ScoreInstructionOrigin::SourceInstruction { .. }]
+        [
+            ScoreInstructionOrigin::SourceInstruction { .. },
+            ScoreInstructionOrigin::MacroEmit { .. },
+            ScoreInstructionOrigin::MacroEmit { .. }
+        ]
     ));
 }
 
@@ -3381,21 +3385,63 @@ fn macro_caller_action_omits_only_action_and_preserves_the_macro_body() {
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
     );
-    let stopped = lower_verified_stage15_score_with_policy(
+    let recovered_thinness = lower_verified_stage15_score_with_policy(
         still_unbound.verified_effective_view(),
         context,
         ScoreErrorPolicy::OmitAndContinue,
     );
-    assert_eq!(stopped.outcome(), ScoreLoweringOutcome::Stopped);
-    assert!(stopped.score().is_none());
-    assert!(stopped.instruction_origins().is_empty());
-    assert!(stopped.diagnostics().iter().any(|diagnostic| matches!(
-        diagnostic.disposition,
-        ScoreDiagnosticDisposition::Omitted {
-            unit: ScoreOmissionUnit::MacroInvocation { .. },
-            ..
-        }
-    )));
+    assert_eq!(
+        recovered_thinness.outcome(),
+        ScoreLoweringOutcome::CompleteWithOmissions
+    );
+    assert_eq!(recovered_thinness.score(), baseline.score());
+    assert!(
+        recovered_thinness
+            .diagnostics()
+            .iter()
+            .any(|diagnostic| matches!(
+                diagnostic.disposition,
+                ScoreDiagnosticDisposition::Omitted {
+                    unit: ScoreOmissionUnit::MacroCallerField {
+                        field: ScoreMacroCallerField::Thinness,
+                        ..
+                    },
+                    ..
+                }
+            ))
+    );
+}
+
+#[test]
+fn macro_caller_position_and_scale_keep_the_generated_body() {
+    let definition = complete_flat_emit_definition();
+    let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
+    let baseline = stage15_locked(
+        "Draw.Pair",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+    );
+    let baseline = lower_verified_stage15_score(baseline.verified_effective_view(), context);
+    for (source, field) in [
+        ("place Draw.Pair at bottom", ScoreMacroCallerField::Position),
+        ("large Draw.Pair", ScoreMacroCallerField::RelativeScale),
+    ] {
+        let result = stage15_locked(
+            source,
+            ResolvedInstructionLanguage::En,
+            std::slice::from_ref(&definition),
+        );
+        let lowered = lower_verified_stage15_score(result.verified_effective_view(), context);
+        assert_eq!(
+            lowered.outcome(),
+            ScoreLoweringOutcome::CompleteWithOmissions,
+            "{source}"
+        );
+        assert_eq!(lowered.score(), baseline.score(), "{source}");
+        assert!(lowered.diagnostics().iter().any(|d| matches!(d.disposition,
+            ScoreDiagnosticDisposition::Omitted { unit: ScoreOmissionUnit::MacroCallerField { field: actual, .. }, .. } if actual == field
+        )), "{source}: {:?}", lowered.diagnostics());
+    }
 }
 
 #[test]

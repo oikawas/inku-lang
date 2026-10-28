@@ -560,6 +560,8 @@ and having the Server's `_BUNDLED_DOCUMENTS` in `server/src/inku_server/plugins/
 
 When drawing from a description, the model sees only the first sentence of each offered word's summary, at most 100 characters. It never receives the definition body or expanded DDL. A future step will use the file's `note`. Scene words form standalone sentences; object words stand in place of shapes. A word is not chosen by association with a season, place, or similar thing.
 
+Composition and laws treat an object word like a square of the same aspect ratio for placement, size, count, and arrangement, while preserving its name as the shape. Colors may recolor it only if the definition declares a color parameter. Scene words remain plugged in shapes.
+
 - Say what is drawn, where on the canvas, and with which medium, color, and form.
 - For a count, give the range and the number when none is written ("the written count (1–9), or 3–5 when none is written").
 - Prepare both Japanese and English (a plugin file carries `summary_ja` and `summary_en`, a bundled package

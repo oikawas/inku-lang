@@ -759,6 +759,8 @@ A v2 definition has primary and alternate names in Japanese and English. A name 
 
 ### 4.14 Scene and Object Words
 
+Composition, laws, and colors treat an object word as a square with its definition's aspect ratio. Its name remains its shape; shape changing laws do not apply. Only a declared color parameter permits recoloring. A scene word remains a plugged in shape.
+
 A scene word draws its own body. An unbound caller position, size, or other field is omitted with a diagnostic while the body remains. An object word resolves position, count, movement, size, angle and relations through the ordinary square as an invisible box with the definition's aspect, and draws its body in place of the outline. Its ordinary size and `side` set the long side to the square's side; explicit width and height set both dimensions. Body positions are fractions of the box's width and height; dimensions are fractions of its short side. Stroke thickness and texture scale do not change with the box. Only appearance words declared as parameters bind; each other appearance word is omitted with a diagnostic. Copies share one expansion, with placement and drawing seeds for each copy. Score 0.23.0 stores the square instruction index, aspect and single body in `object_templates`; render engine 94 performs it. Older Scores retain their drawing.
 
 ## 5. The Three-Layer Pipeline
@@ -2021,6 +2023,8 @@ survives into the following composition-reading wait.
 
 ### 12.6.4 The Laws Stage (Laws After the Composition, Stage B)
 
+An object word may change place, size, count, arrangement, and angle like a square of the same aspect ratio; a law cannot change its shape. Its color stays fixed without a color parameter. Laws do not act on scene words.
+
 In a run with laws, a **laws stage** runs once after the composition (§12.6.2) places the layers and before the commit. A reader chooses, from laws of painting, design and music, the laws the work uses and each law's values; it returns no coordinates or sizes. The core applies the laws to a copy of the composed document's Score and writes again in numbers (§18) only the layers the laws changed; every other layer keeps the bytes the composition printed. The laws are written in numbers, come after the composition, and stay off until every law is in (the author's decisions of 2026-10-19). The stage holds 19 laws: 13 laws and 6 cards. The Server's runs take this stage by default (stage B-5, 2026-10-20, once all 19 were in). The macOS and Android configurations have no `laws` and do not take it.
 
 - Laws: the placement laws are B1 golden section (the lines dividing the sides 0.382 : 0.618 and their four crossings), B2 silver section (1 : √2, 0.414 and 0.586), B3 rule of thirds (1/3 and 2/3), B4 harmonic ratio (2:3 at 0.4 and 0.6, 3:4 at 0.429 and 0.571), B5 armature (the two diagonals and the central vertical and horizontal lines), B7 steelyard balance and B8 symmetrical balance; the size law is B6 subordination; the arrangement laws are B9 equal repetition, B10 progression and B12 beat groups; and there are B15 aerial perspective and B21 unity and variety, which sets the hand. The cards are C1 sparse and dense, C2 patterns, C3 polyrhythm, C4 motif and variation, C5 jo-ha-kyū and C6 shin-gyō-sō; they rebuild a layer's place and arrangement. A layer takes one placement law and one arrangement law at most, and a layer that takes a card takes no other placement or arrangement law and no other card. The laws that change size (B6, B10, B12, B15, C4) multiply. There is one main law, never B21, and the number of laws is not fixed (the author's decision of 2026-10-21; before, two or three with the main law). No main layer is chosen (the author's decision of 2026-10-21; before, the answer chose one): B6 names the layer it sizes by (its base, `main`) and B7 the layer it balances against (its partner, `against`) in their values.
@@ -2046,6 +2050,8 @@ In a run with laws, a **laws stage** runs once after the composition (§12.6.2) 
 - The laws stage from a saved work never commits its base unchanged. When it stops, it is `Failed` with the event `failed` (`stage`, `reason`, `detail`), for: no description (`no_description`); a work's DDL other than the one its basis's run committed (`laws_basis_stale`: a child of another layout, touch or ground, or the author's edit); a laws layers record without a basis (`laws_without_basis`: the works with laws from Build 1286 until hosts keep the basis); a base that cannot be read (`not_canonical`, `unsupported_sentence`, `nothing_to_move`); a plan that does not compile to the base's Score (`not_faithful`); a Score whose layers are not the plan's (`laws_context`); no law left to apply after the direction (`no_law`); no answer passing within the budget of asking again (`laws_refused`, its `detail` the last refused code); a print that fails its check (`laws_compile`); and a provider that returns no answer (`laws_unavailable`). "Another composition" (§12.6.3) keeps the recorded layers where they are and chooses the other layers again (the author's decision, 2026-10-20; before, a work with a sentence written with a numeric point, numeric ends or a numeric angle was not chosen again).
 
 ### 12.6.5 The Color Stage (Colors After the Laws)
+
+An object word can be recolored only when its definition has a color parameter. The invisible box's placeholder black is not counted as a drawn color. Scene word colors stay fixed.
 
 In a run with colors, a **color stage** runs once after the laws stage (§12.6.4) and before the commit, also when the laws fell back or the run has no laws; like the laws stage, it runs only when the composed document was built. A reader chooses the color laws for the work (their number is not fixed; the author's decision of 2026-10-21, before one or two with the main law) and each law's values; it returns no lightness, coordinates or sizes. The core applies them to a copy of the Score of the document the laws left and prints again only the layers the colors changed. Where the description does not state the ground's color, the answer may choose the ground too (the author's decision of 2026-10-21; before, the ground stayed). The color stage is a default of the Server's description runs (2026-10-20, the author; before, a run took it only when a request in developer mode asked for it with `developer_colors_stage`, §12.7.1). A run from a saved work follows the configuration the work was saved with, so a child of a work saved before the default does not take it. The macOS and Android configurations have no `colors` and do not take it.
 
@@ -2078,6 +2084,8 @@ A run may start from an image instead of a description (`AuthoringInput::Image`;
 - Versions: the protocol (1.0.0), the binding version and the core API version are unchanged. The Server's Python binding adds `pipeline_image_input_policy`, `pipeline_image_canvas` and `pipeline_image_review_svg` (the UniFFI and JNI calls are unchanged).
 
 ### 12.6.7 A Work Read and Drawn From Its Description (Writing DDL Directly, 2026-10-25)
+
+The work's definitions and locks let the reader measure an object word's numeric position, range, and size like a square. A scene word with no numeric place is outside that measurement.
 
 The writing and review requests offer words as in §4.5; review also selects words in the current DDL. The reading and composition requests do not add them.
 
@@ -4915,6 +4923,8 @@ live in [CHANGELOG.md](CHANGELOG.md) and the [public history
 archive](docs/history/changelog-v1.72-v2.4.md).
 
 ## Autonomous Refinement Methods
+
+In a chunk move, object word sentences with numeric places can be placed, broken apart, repeated, and checked after rewriting like square sentences. A chunk containing a scene word can only be omitted; a rewrite may include a scene word, while box comparisons use only measurable sentences.
 
 Lineage's autonomous refinement is a bounded run of 1–10 moves whose final judgment remains human. Since 2026-10-21 the Server takes it as a run, which goes on with no screen open (the author's choice, 2026-10-20). There are three moves. The laws move and the juxtaposition move take turns in one run; the chunk move (the author's choice, 2026-10-27) runs alone, without the other two.
 

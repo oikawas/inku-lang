@@ -19,8 +19,9 @@ use inku_ddl::work_plan::{
     print_work_plan_with_numbers,
 };
 use inku_ddl::{
-    NormalizedDdlDocument, ResolvedInstructionLanguage, SemanticExplicitGeometry,
-    SemanticGeometryValue, SemanticInstruction, compile_typed_ddl,
+    MacroDefinition, NormalizedDdlDocument, ParameterSchema, ResolvedInstructionLanguage,
+    SemanticExplicitGeometry, SemanticGeometryValue, SemanticHead, SemanticInstruction,
+    SemanticMacroParameterValue, compile_typed_ddl,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -28,7 +29,7 @@ use inku_score::{Color, Score, ScoreSourceOwner};
 use serde::{Deserialize, Serialize};
 
 use crate::colors::{ColorsChosen, PrintedPlan};
-use crate::description_laws::{LIMITS, fraction, layer_without_numbers};
+use crate::description_laws::{LIMITS, fraction, layer_without_numbers, locked_document};
 use crate::image_ddl::color_word;
 use crate::prompts::{LlmPrompt, PromptError, PromptLimits};
 
@@ -161,14 +162,15 @@ pub struct ColorsChange {
     pub after: Vec<String>,
 }
 
-fn instructions_of(
+fn instructions_of_with_definitions(
     source: &str,
     language: ResolvedInstructionLanguage,
+    definitions: &[MacroDefinition],
 ) -> Vec<SemanticInstruction> {
-    let Ok(document) = NormalizedDdlDocument::new(source, language, Vec::new()) else {
+    let Some(document) = locked_document(source, language, definitions) else {
         return Vec::new();
     };
-    compile_typed_ddl(document, &[], None, LIMITS)
+    compile_typed_ddl(document, definitions, None, LIMITS)
         .semantic_document
         .map(|semantic| semantic.ast.instructions)
         .unwrap_or_default()
@@ -275,7 +277,15 @@ fn layer_of(instruction: &SemanticInstruction) -> Option<WorkPlanLayer> {
 /// sentence reads as a layer, or an instruction is not on a line.
 #[must_use]
 pub fn plan_of(source: &str, language: ResolvedInstructionLanguage) -> Option<DescribedPlan> {
-    let instructions = instructions_of(source, language);
+    plan_of_with_definitions(source, language, &[])
+}
+
+pub fn plan_of_with_definitions(
+    source: &str,
+    language: ResolvedInstructionLanguage,
+    definitions: &[MacroDefinition],
+) -> Option<DescribedPlan> {
+    let instructions = instructions_of_with_definitions(source, language, definitions);
     let mut lines = Vec::new();
     let mut layers = Vec::new();
     let mut numeric = Vec::new();
@@ -353,13 +363,38 @@ pub fn with_layer_things(
 /// it, when the line then reads that color; `None` otherwise. A Japanese
 /// adjective (赤い, 黄色い) becomes the noun with の; an English word keeps
 /// its capital.
+#[cfg(test)]
 fn recolored_line(
     line: &str,
     color: Color,
     language: ResolvedInstructionLanguage,
 ) -> Option<String> {
-    let [instruction] = instructions_of(line, language).try_into().ok()?;
-    let span = &instruction.entity.color.as_ref()?.provenance.source.span;
+    recolored_line_with_definitions(line, color, language, &[])
+}
+
+fn recolored_line_with_definitions(
+    line: &str,
+    color: Color,
+    language: ResolvedInstructionLanguage,
+    definitions: &[MacroDefinition],
+) -> Option<String> {
+    let [instruction] = instructions_of_with_definitions(line, language, definitions)
+        .try_into()
+        .ok()?;
+    let span = match &instruction.entity.head {
+        SemanticHead::MacroInvocation(head) if head.object_aspect.is_some() => {
+            &head
+                .parameters
+                .iter()
+                .find(|parameter| {
+                    matches!(&parameter.schema,
+                ParameterSchema::SemanticRef { category, .. } if category == "color")
+                })?
+                .provenance
+                .span
+        }
+        _ => &instruction.entity.color.as_ref()?.provenance.source.span,
+    };
     let word = line.get(span.start_byte..span.end_byte)?;
     let mut replacement = color_word(color, language);
     match language {
@@ -383,15 +418,31 @@ fn recolored_line(
         &line[..span.start_byte],
         &line[span.end_byte..]
     );
-    let [again] = instructions_of(&text, language).try_into().ok()?;
-    let reads = again.entity.color.as_ref().is_some_and(|term| {
-        term.provenance.canonical_surface_ja == color_word(color, ResolvedInstructionLanguage::Ja)
-    });
+    let [again] = instructions_of_with_definitions(&text, language, definitions)
+        .try_into()
+        .ok()?;
+    let reads = match &again.entity.head {
+        SemanticHead::MacroInvocation(head) if head.object_aspect.is_some() => {
+            head.parameters.iter().any(|parameter| {
+                matches!(&parameter.value, SemanticMacroParameterValue::SemanticRef(identity)
+                if identity.category == "color" && identity.id == color.as_str())
+            })
+        }
+        _ => again.entity.color.as_ref().is_some_and(|term| {
+            term.provenance.canonical_surface_ja
+                == color_word(color, ResolvedInstructionLanguage::Ja)
+        }),
+    };
     reads.then_some(text)
 }
 
 /// One printed layer as its own sentence.
-fn printed_line(printed: &PrintedPlan, at: usize, language: ResolvedInstructionLanguage) -> String {
+fn printed_line(
+    printed: &PrintedPlan,
+    at: usize,
+    language: ResolvedInstructionLanguage,
+    plugins: &[inku_ddl::work_plan::WorkPlanPlugin],
+) -> String {
     print_work_plan_with_numbers(
         &WorkPlan {
             ground: None,
@@ -400,7 +451,7 @@ fn printed_line(printed: &PrintedPlan, at: usize, language: ResolvedInstructionL
             layers: vec![printed.plan.layers[at].clone()],
         },
         language,
-        &[],
+        plugins,
         &[printed.ranges[at].clone()],
         &[printed.joints[at].as_deref()],
         &[printed.numeric[at].clone()],
@@ -437,6 +488,17 @@ pub fn apply_colors(
     chosen: &ColorsChosen,
     language: ResolvedInstructionLanguage,
 ) -> (String, Vec<ColorsChange>) {
+    apply_colors_with_definitions(source, plan, chosen, language, &[])
+}
+
+pub fn apply_colors_with_definitions(
+    source: &str,
+    plan: &DescribedPlan,
+    chosen: &ColorsChosen,
+    language: ResolvedInstructionLanguage,
+    definitions: &[MacroDefinition],
+) -> (String, Vec<ColorsChange>) {
+    let plugins = crate::prompts::work_plan_plugins(definitions.iter());
     let print = &chosen.print;
     let background = background_line_of(source, language);
     let mut out = Vec::new();
@@ -490,13 +552,13 @@ pub fn apply_colors(
                     .find(|color| color.as_str() == name)
             })
             .filter(|_| color_only)
-            .and_then(|color| recolored_line(line, color, language));
+            .and_then(|color| recolored_line_with_definitions(line, color, language, definitions));
         let (how, lines) = match recolored {
             Some(text) => (ColorsChangeHow::ColorWord, vec![text]),
             None => (
                 ColorsChangeHow::Printed,
                 at.iter()
-                    .map(|at| printed_line(&print.printed, *at, language))
+                    .map(|at| printed_line(&print.printed, *at, language, &plugins))
                     .collect(),
             ),
         };
@@ -526,11 +588,63 @@ pub fn apply_colors(
 
 #[cfg(test)]
 mod tests {
+    use inku_ddl::MacroDefinition;
     use inku_ddl::ResolvedInstructionLanguage::{En, Ja};
     use inku_ddl::work_plan::{NumericPlace, NumericSize};
     use inku_score::Color;
 
-    use super::{background_line_of, background_sentence, plan_of, recolored_line};
+    use super::{
+        background_line_of, background_sentence, plan_of, plan_of_with_definitions, recolored_line,
+        recolored_line_with_definitions,
+    };
+
+    #[test]
+    fn a_numeric_object_is_a_described_color_layer() {
+        let definition = MacroDefinition::from_json(
+            &serde_json::json!({
+                "schema":"inku.macro-definition.v2", "namespace":"TestObject", "id":"Boat",
+                "names":{"ja":["舟"],"en":["boat"]}, "kind":"object", "aspect":"2:1",
+                "counter":"general", "version":"1.0.0", "parameters":{}, "components":{},
+                "body":[{"op":"emit","binding":"hull","fields":{
+                    "shape":{"expr":"semantic_ref","category":"shape","id":"arc"},
+                    "movement":{"expr":"semantic_ref","category":"movement","id":"place"},
+                    "color":{"expr":"semantic_ref","category":"color","id":"green"},
+                    "position_x":{"expr":"exact_decimal","value":"0.5"},
+                    "position_y":{"expr":"exact_decimal","value":"0.5"},
+                    "chord":{"expr":"exact_decimal","value":"0.6"},
+                    "sagitta":{"expr":"exact_decimal","value":"0.2"}
+                }}]
+            })
+            .to_string(),
+        )
+        .unwrap();
+        let source = "画面の横0.3、縦0.7の位置に、一辺0.2の｛舟｝を置く。";
+        let plan =
+            plan_of_with_definitions(source, Ja, &[definition.clone()]).expect("object color plan");
+        assert_eq!(plan.printed.plan.layers[0].shape, "TestObject.Boat");
+        assert_eq!(plan.lines, [0]);
+        let mut raw = serde_json::to_value(definition).unwrap();
+        raw["parameters"]["hue"] = serde_json::json!({"type":"semantic_ref","category":"color"});
+        raw["body"][0]["fields"]["color"] = serde_json::json!({"expr":"parameter","name":"hue"});
+        let colored = MacroDefinition::from_json(&raw.to_string()).unwrap();
+        assert!(
+            colored.validate().is_valid(),
+            "{:?}",
+            colored.validate().diagnostics()
+        );
+        let parsed =
+            super::instructions_of_with_definitions("赤い｛舟｝を置く。", Ja, &[colored.clone()]);
+        assert_eq!(parsed.len(), 1);
+        assert!(matches!(
+            parsed[0].entity.head,
+            inku_ddl::SemanticHead::MacroInvocation(_)
+        ));
+        assert_eq!(
+            recolored_line_with_definitions("赤い｛舟｝を置く。", Color::Blue, Ja, &[colored])
+                .as_deref(),
+            Some("青の｛舟｝を置く。")
+        );
+    }
 
     const CYCLE: &str = "画面の横0.06、縦0.58から横0.94、縦0.58まで、青と緑を交互にして、幅0.05、高さ0.3の回転0度の塗りの四角を18個並べる。";
 

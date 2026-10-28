@@ -245,3 +245,185 @@ pub fn spliced(
     }
     Some(lines.join("\n"))
 }
+
+#[cfg(test)]
+mod object_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn saved_numeric_object_reads_as_a_layer() {
+        let definition = MacroDefinition::from_json(
+            &json!({
+                "schema":"inku.macro-definition.v2", "namespace":"TestObject", "id":"Boat",
+                "names":{"ja":["舟"],"en":["boat"]}, "kind":"object", "aspect":"2:1",
+                "counter":"general", "version":"1.0.0", "parameters":{}, "components":{},
+                "body":[{"op":"emit","binding":"hull","fields":{
+                    "shape":{"expr":"semantic_ref","category":"shape","id":"arc"},
+                    "movement":{"expr":"semantic_ref","category":"movement","id":"place"},
+                    "color":{"expr":"semantic_ref","category":"color","id":"green"},
+                    "position_x":{"expr":"exact_decimal","value":"0.5"},
+                    "position_y":{"expr":"exact_decimal","value":"0.5"},
+                    "chord":{"expr":"exact_decimal","value":"0.6"},
+                    "sagitta":{"expr":"exact_decimal","value":"0.2"}
+                }}]
+            })
+            .to_string(),
+        )
+        .unwrap();
+        let plugins = crate::prompts::work_plan_plugins([&definition]);
+        let source = "画面の横0.3、縦0.7の位置に、一辺0.2の｛舟｝を置く。";
+        let plan = composed_plan_of(
+            source,
+            ResolvedInstructionLanguage::Ja,
+            &[definition.clone()],
+            crate::description_laws::LIMITS,
+            &plugins,
+        )
+        .expect("object plan");
+        assert_eq!(plan.plan.layers.len(), 1);
+        assert_eq!(plan.plan.layers[0].shape, "TestObject.Boat");
+        let reading = crate::composition_reading::build_composition_reading_prompt(
+            "舟",
+            &plan.plan,
+            &plugins,
+            ResolvedInstructionLanguage::Ja,
+            crate::focused_flow::config().prompt_limits,
+        )
+        .expect("composition reading request");
+        assert!(reading.message.contains("｛舟｝"));
+        let mut square = plan.plan.layers[0].clone();
+        square.shape = "square".to_owned();
+        assert_eq!(
+            crate::composition::layer_kind(&plan.plan.layers[0]),
+            crate::composition::layer_kind(&square),
+        );
+        let (layers, _) = crate::recompose::composition_layers(
+            source,
+            ResolvedInstructionLanguage::Ja,
+            &[definition.clone()],
+            crate::description_laws::LIMITS,
+        )
+        .expect("recomposable object layer");
+        assert_eq!(layers[0].shape, "TestObject.Boat");
+        let identity = definition.identity().unwrap();
+        let lock = inku_ddl::MacroLock::new(
+            identity.qualified_name(),
+            identity.version(),
+            format!("sha256:{}", identity.full_digest_hex()),
+        )
+        .unwrap();
+        let document = inku_ddl::NormalizedDdlDocument::new(
+            source,
+            ResolvedInstructionLanguage::Ja,
+            vec![lock],
+        )
+        .unwrap();
+        let config = crate::focused_flow::config();
+        let fixture: serde_json::Value =
+            serde_json::from_str(include_str!("../tests/data/laws-port-v1.json")).unwrap();
+        let palette: crate::core_boundary::ResolvedPaletteDto =
+            serde_json::from_value(fixture["cases"][0]["compiler"]["host"]["palette"].clone())
+                .unwrap();
+        let delivery = crate::core_boundary::compile_committed(
+            document,
+            &[definition.clone()],
+            &config.compiler,
+        )
+        .unwrap();
+        let score = delivery.score.unwrap();
+        let context = crate::laws::LawsContext::new_with_plugins(
+            score.clone(),
+            &plan,
+            &palette,
+            config.compiler.host.canvas_format_id(),
+            &plugins,
+        )
+        .expect("laws context with object layer");
+        let prompt = crate::laws::build_laws_prompt(
+            "舟",
+            &context,
+            ResolvedInstructionLanguage::Ja,
+            config.prompt_limits,
+        )
+        .expect("laws prompt");
+        assert!(prompt.message.contains("｛舟｝"));
+        assert_eq!(context.object_law_choices(0), (true, true, true, false));
+        let printed = crate::colors::PrintedPlan::composed(&plan);
+        let colors = crate::colors::ColorsContext::new(crate::colors::ColorsInput {
+            score: &score,
+            printed: &printed,
+            handoff: &crate::colors::LawsHandoff::default(),
+            palette: &palette,
+            canvas_format_id: config.compiler.host.canvas_format_id(),
+            seeds: crate::appearance::Seeds::default(),
+            error_policy: config.compiler.error_policy,
+            description: "舟",
+            plugins: &plugins,
+        });
+        let colors = colors.expect("object color context");
+        let prompt = crate::colors::build_colors_prompt(
+            "舟",
+            &colors,
+            ResolvedInstructionLanguage::Ja,
+            config.prompt_limits,
+        );
+        assert!(
+            prompt.is_err(),
+            "a colorless object offers no recoloring law"
+        );
+        let mut raw = serde_json::to_value(definition).unwrap();
+        raw["parameters"]["hue"] = json!({"type":"semantic_ref","category":"color"});
+        raw["body"][0]["fields"]["color"] = json!({"expr":"parameter","name":"hue"});
+        let colored = MacroDefinition::from_json(&raw.to_string()).unwrap();
+        let colored_plugins = crate::prompts::work_plan_plugins([&colored]);
+        let source = "画面の横0.3、縦0.7の位置に、一辺0.2の赤い｛舟｝を置く。";
+        let plan = composed_plan_of(
+            source,
+            ResolvedInstructionLanguage::Ja,
+            &[colored.clone()],
+            crate::description_laws::LIMITS,
+            &colored_plugins,
+        )
+        .unwrap();
+        let identity = colored.identity().unwrap();
+        let lock = inku_ddl::MacroLock::new(
+            identity.qualified_name(),
+            identity.version(),
+            format!("sha256:{}", identity.full_digest_hex()),
+        )
+        .unwrap();
+        let document = inku_ddl::NormalizedDdlDocument::new(
+            source,
+            ResolvedInstructionLanguage::Ja,
+            vec![lock],
+        )
+        .unwrap();
+        let delivery =
+            crate::core_boundary::compile_committed(document, &[colored], &config.compiler)
+                .unwrap();
+        let score = delivery.score.unwrap();
+        let printed = crate::colors::PrintedPlan::composed(&plan);
+        let colors = crate::colors::ColorsContext::new(crate::colors::ColorsInput {
+            score: &score,
+            printed: &printed,
+            handoff: &crate::colors::LawsHandoff::default(),
+            palette: &palette,
+            canvas_format_id: config.compiler.host.canvas_format_id(),
+            seeds: crate::appearance::Seeds::default(),
+            error_policy: config.compiler.error_policy,
+            description: "舟",
+            plugins: &colored_plugins,
+        })
+        .expect("colorable object context");
+        let prompt = crate::colors::build_colors_prompt(
+            "舟",
+            &colors,
+            ResolvedInstructionLanguage::Ja,
+            config.prompt_limits,
+        )
+        .expect("colorable object prompt");
+        assert!(prompt.message.contains("｛舟｝"));
+        assert!(colors.object_trial_changes_drawn_color(0, inku_score::Color::Blue));
+    }
+}

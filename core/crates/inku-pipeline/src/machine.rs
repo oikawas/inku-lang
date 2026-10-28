@@ -2398,11 +2398,12 @@ impl PipelineSnapshot {
         composed: &ComposedPlan,
     ) -> Option<(LawsContext, usize)> {
         let compiled = self.compile_for_run(document)?;
-        let context = LawsContext::new(
+        let context = LawsContext::new_with_plugins(
             compiled.score()?.clone(),
             composed,
             self.config.compiler.host.palette(),
             self.config.compiler.host.canvas_format_id(),
+            &crate::prompts::work_plan_plugins(self.config.definitions.iter()),
         )?;
         let context = match &self.laws_move {
             Some(laws_move) => context.with_direction(laws_move.direction.clone()),
@@ -2777,6 +2778,7 @@ impl PipelineSnapshot {
                 .flatten()
                 .map(i128::from),
         };
+        let plugins = crate::prompts::work_plan_plugins(self.config.definitions.iter());
         ColorsContext::new(colors::ColorsInput {
             score,
             printed,
@@ -2786,6 +2788,7 @@ impl PipelineSnapshot {
             seeds,
             error_policy: self.config.compiler.error_policy,
             description,
+            plugins: &plugins,
         })
     }
 

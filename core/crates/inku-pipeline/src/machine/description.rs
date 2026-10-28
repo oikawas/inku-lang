@@ -21,8 +21,8 @@ use super::{
 };
 use crate::colors::{self, ColorsContext, LawsHandoff};
 use crate::description_colors::{
-    ColorsChangeHow, DescribedPlan, LayerThing, apply_colors, drawn_layers, plan_of,
-    with_layer_things,
+    ColorsChangeHow, DescribedPlan, LayerThing, apply_colors_with_definitions, drawn_layers,
+    plan_of_with_definitions, with_layer_things,
 };
 use crate::description_composition::{
     build_description_composition_prompt, check_composition, composition_targets, laws_text,
@@ -515,7 +515,12 @@ impl PipelineSnapshot {
     fn described_plan(&self, document: &VisibleDocument) -> Option<DescribedPlan> {
         let compiled = self.compile_for_run(document)?;
         let (_, drawn) = drawn_layers(compiled.score()?);
-        plan_of(&document.source, self.config.language)?.drawn(&drawn)
+        plan_of_with_definitions(
+            &document.source,
+            self.config.language,
+            &self.config.definitions,
+        )?
+        .drawn(&drawn)
     }
 
     /// What the colors read of a composed document: the sentences the run's
@@ -529,7 +534,12 @@ impl PipelineSnapshot {
     ) -> Option<(DescribedPlan, ColorsContext, usize)> {
         let compiled = self.compile_for_run(document)?;
         let (score, drawn) = drawn_layers(compiled.score()?);
-        let plan = plan_of(&document.source, self.config.language)?.drawn(&drawn)?;
+        let plan = plan_of_with_definitions(
+            &document.source,
+            self.config.language,
+            &self.config.definitions,
+        )?
+        .drawn(&drawn)?;
         let context =
             self.colors_context_of(&score, &plan.printed, &LawsHandoff::default(), description)?;
         Some((plan, context, super::shortfalls(&compiled)))
@@ -620,7 +630,13 @@ impl PipelineSnapshot {
                 return self.ask_colors_again(&context, &refusal, text, spent_ms, events);
             }
         };
-        let (source, changes) = apply_colors(&pending.document.source, &plan, &chosen, language);
+        let (source, changes) = apply_colors_with_definitions(
+            &pending.document.source,
+            &plan,
+            &chosen,
+            language,
+            &self.config.definitions,
+        );
         let Some((document, compiled)) = self.laws_document(source) else {
             return self.colors_fallback(json!({"failure": "compile"}), events);
         };

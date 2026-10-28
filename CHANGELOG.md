@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-29 — Use object plugin words in composition, laws, colors, and chunks
+
+Read and measure an object word like a square of the same aspect ratio. Preserve its shape name and allow recoloring only when its definition declares a color parameter. Scene words remain plugged in shapes.
+
 ### 2026-10-28 — Complete Android ChatGPT login in the foreground
 
 The browser acknowledges authorization immediately, and inku exchanges the token after returning to the foreground.

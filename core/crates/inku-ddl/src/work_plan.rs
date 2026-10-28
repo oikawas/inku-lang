@@ -1511,9 +1511,11 @@ fn plan_thinness_id(value: CoreModifierValue) -> Option<String> {
 #[must_use]
 pub fn plan_layer(instruction: &crate::SemanticInstruction) -> Option<WorkPlanLayer> {
     let entity = &instruction.entity;
-    if entity.explicit_geometry.is_some()
-        || !entity.additional_explicit_geometries.is_empty()
-        || !entity.additional_width_extents.is_empty()
+    let object = matches!(&entity.head, crate::SemanticHead::MacroInvocation(head) if head.object_aspect.is_some());
+    if !object
+        && (entity.explicit_geometry.is_some()
+            || !entity.additional_explicit_geometries.is_empty()
+            || !entity.additional_width_extents.is_empty())
     {
         return None;
     }
@@ -1576,7 +1578,7 @@ pub fn composition_layer(instruction: &crate::SemanticInstruction) -> Option<Wor
     if instruction.relation.is_some()
         || instruction.sequence.is_some()
         || instruction.fill_target.is_some()
-        || entity.numeric_position.is_some()
+        || (entity.numeric_position.is_some() && object_aspect.is_none())
         || entity.numeric_segment.is_some()
         || entity.numeric_angle.is_some()
         || entity.fade.is_some()

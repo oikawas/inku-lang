@@ -1,5 +1,5 @@
 //! Test-only object words: their body coordinates belong to one local box.
-use inku_ddl::work_plan::composition_layer;
+use inku_ddl::work_plan::{composition_layer, plan_layer};
 use inku_ddl::{
     MacroDefinition, MacroExpansionLimits, MacroLock, NormalizedDdlDocument,
     ResolvedInstructionLanguage, ScoreErrorPolicy, ScoreLoweringContext,
@@ -86,6 +86,42 @@ fn object_word_can_be_read_back_as_a_plan_layer() {
     let layer = composition_layer(&ast.instructions[0]).expect("object layer");
     assert_eq!(layer.shape, "TestObject.Leaf");
     assert_eq!(layer.proportion.as_deref(), Some("square"));
+    let definition = word(
+        "Boat",
+        "舟",
+        "boat",
+        "2:1",
+        json!([arc("hull", "0.5", "0")]),
+    );
+    let document = NormalizedDdlDocument::new(
+        "画面の横0.3、縦0.7の位置に、一辺0.2の｛舟｝を置く。",
+        ResolvedInstructionLanguage::Ja,
+        vec![lock(&definition)],
+    )
+    .unwrap();
+    let compilation = compile_typed_ddl(
+        document,
+        &[definition],
+        Some(37),
+        MacroExpansionLimits {
+            max_invocations: 64,
+            max_depth: 16,
+            max_evaluation_steps: 8192,
+            max_nodes_per_invocation: 128,
+            max_total_nodes: 128,
+        },
+    );
+    let instruction = &compilation
+        .semantic_document
+        .as_ref()
+        .unwrap()
+        .ast
+        .instructions[0];
+    assert_eq!(
+        composition_layer(instruction).unwrap().shape,
+        "TestObject.Boat"
+    );
+    assert_eq!(plan_layer(instruction).unwrap().shape, "TestObject.Boat");
 }
 
 #[test]

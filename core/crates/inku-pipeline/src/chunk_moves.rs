@@ -1100,6 +1100,10 @@ fn choose_request(state: &TurnState, paper: Paper) -> SendRequest {
         "units": units,
         "ddl": doc.titled(paper.language),
     });
+    let scene = scene_units(doc, paper);
+    if !scene.is_empty() {
+        message["omit_only"] = json!(scene);
+    }
     if let Some(feedback) = &state.feedback {
         message["asked_again"] = json!(feedback);
     }
@@ -1121,6 +1125,19 @@ fn choose_request(state: &TurnState, paper: Paper) -> SendRequest {
         max_tokens: MAX_TOKENS,
         plugin_offer: None,
     }
+}
+
+fn scene_units(doc: &Doc, paper: Paper) -> Vec<usize> {
+    doc.units()
+        .iter()
+        .enumerate()
+        .filter_map(|(at, title)| {
+            doc.members(title)
+                .iter()
+                .any(|index| scene_word(&doc.lines[*index], paper.language, paper.definitions))
+                .then_some(at + 1)
+        })
+        .collect()
 }
 
 fn rewrite_request(
@@ -1498,6 +1515,18 @@ pub fn answer(
                 Ok(choice) => choice,
                 Err(reason) => return again_or_skip(state, reason, None, Stage::Choose, config),
             };
+            if choice.moved != "omit"
+                && choice
+                    .targets
+                    .iter()
+                    .any(|target| scene_units(&state.doc, paper).contains(target))
+            {
+                let reason = paper.say(
+                    "情景の語を含むまとまりは省くだけ",
+                    "a chunk containing a scene word can only be omitted",
+                );
+                return again_or_skip(state, reason, None, Stage::Choose, config);
+            }
             if choice.rewrites() {
                 state.stage = Stage::Rewrite;
                 state.tries = 0;
@@ -1786,6 +1815,44 @@ mod tests {
     use super::*;
 
     #[test]
+    fn numeric_object_chunk_can_move_break_and_repeat() {
+        let definition = MacroDefinition::from_json(
+            &json!({
+                "schema":"inku.macro-definition.v2", "namespace":"TestObject", "id":"Boat",
+                "names":{"ja":["舟"],"en":["boat"]}, "kind":"object", "aspect":"2:1",
+                "counter":"general", "version":"1.0.0", "parameters":{}, "components":{},
+                "body":[{"op":"emit","binding":"hull","fields":{
+                    "shape":{"expr":"semantic_ref","category":"shape","id":"arc"},
+                    "movement":{"expr":"semantic_ref","category":"movement","id":"place"},
+                    "color":{"expr":"semantic_ref","category":"color","id":"green"},
+                    "position_x":{"expr":"exact_decimal","value":"0.5"},
+                    "position_y":{"expr":"exact_decimal","value":"0.5"},
+                    "chord":{"expr":"exact_decimal","value":"0.6"},
+                    "sagitta":{"expr":"exact_decimal","value":"0.2"}
+                }}]
+            })
+            .to_string(),
+        )
+        .unwrap();
+        let definitions = [definition];
+        let paper = Paper {
+            language: ResolvedInstructionLanguage::Ja,
+            units: [1.0, 1.0],
+            definitions: &definitions,
+        };
+        let source = "画面比1:1。\n\n「舟」\n画面の横0.3、縦0.7の位置に、一辺0.2の｛舟｝を置く。";
+        let indexes = Doc::of(source).members("舟");
+        assert!(
+            paper
+                .numbers("画面の横0.3、縦0.7の位置に、一辺0.2の｛舟｝を置く。")
+                .is_ok()
+        );
+        assert!(place(&mut Doc::of(source), paper, &indexes, "center", "keep").is_ok());
+        assert!(break_apart(&mut Doc::of(source), paper, &indexes, "small", 1).is_ok());
+        assert!(repeat(&mut Doc::of(source), paper, &indexes, 2, "row").is_ok());
+    }
+
+    #[test]
     fn rewrite_offers_only_the_named_plugin_word() {
         let package: Value = serde_json::from_str(inku_ddl::NATURE_LEAVES_V1_JSON).unwrap();
         let definition =
@@ -1817,6 +1884,27 @@ mod tests {
                 .as_ref()
                 .is_some_and(|offer| !offer.offered.is_empty())
         );
+        let scene_doc = Doc::of("画面比1:1。\n\n「葉」\n｛若葉｝。");
+        let paper = Paper {
+            language: ResolvedInstructionLanguage::Ja,
+            units: [1.0, 1.0],
+            definitions: &config.definitions,
+        };
+        assert_eq!(scene_units(&scene_doc, paper), vec![1]);
+        let choice = Choice {
+            moved: "simplify".to_owned(),
+            targets: vec![1],
+            params: Map::new(),
+            reason: "若葉を残す".to_owned(),
+        };
+        let rewritten = check_rewrite(
+            &Doc::of(LIGHTHOUSE),
+            &choice,
+            &json!({"title":"若葉", "sentences":["｛若葉｝。"]}),
+            paper,
+        )
+        .expect("a scene word has no numeric box to compare");
+        assert_eq!(rewritten.sentences, ["｛若葉｝。"]);
     }
 
     const LIGHTHOUSE: &str = "画面比1:1。\n背景を白で埋める。\n\n「灯台」\n\

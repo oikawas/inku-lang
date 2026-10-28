@@ -151,6 +151,7 @@ pub(crate) fn fraction(value: ExactFraction) -> f64 {
 /// The numbers of one sentence, or `None` when it has no numeric place (a
 /// ground, a background, a place in words) or when a number is not found
 /// where the parser says it is.
+#[cfg(test)]
 pub(crate) fn parse(line: &str, language: ResolvedInstructionLanguage) -> Option<Numbers> {
     parse_with_definitions(line, language, &[])
 }
@@ -184,7 +185,7 @@ pub(crate) fn parse_with_definitions(
     found.then_some(numbers)
 }
 
-fn locked_document(
+pub(crate) fn locked_document(
     source: &str,
     language: ResolvedInstructionLanguage,
     definitions: &[MacroDefinition],
@@ -1871,8 +1872,14 @@ fn build_card(
     }
     let (value, kept) =
         card_value(law, value, &layers_of, &read, &counts).ok_or("not_one_sentence")?;
-    let context = LawsContext::new(score, &composed, ground.palette, ground.canvas_format_id)
-        .ok_or("laws_context")?;
+    let context = LawsContext::new_with_plugins(
+        score,
+        &composed,
+        ground.palette,
+        ground.canvas_format_id,
+        &crate::prompts::work_plan_plugins(definitions.iter()),
+    )
+    .ok_or("laws_context")?;
     let kept: Vec<Value> = kept
         .into_iter()
         .map(|layer| json!({"layer": layer, "words": ""}))

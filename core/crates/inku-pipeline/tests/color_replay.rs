@@ -124,6 +124,7 @@ fn paints_the_recorded_answers_again() {
             seeds,
             error_policy: ScoreErrorPolicy::OmitAndContinue,
             description,
+            plugins: &[],
         });
         let row = match context {
             None => json!({"id": item["id"], "state": "no_context"}),

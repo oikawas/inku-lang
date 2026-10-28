@@ -423,6 +423,19 @@ fn read_layers(
             });
         }
         let Some(range) = range else {
+            if matches!(&instruction.entity.head, SemanticHead::MacroInvocation(head) if head.object_aspect.is_some())
+                && instruction.entity.numeric_position.is_some()
+            {
+                let boxed = pinned_box(instruction, &layer).ok_or("unsupported_sentence")?;
+                read.push(ReadLayer {
+                    layer,
+                    moving: None,
+                    current: None,
+                    bounds: None,
+                    pinned: Some(vec![boxed]),
+                });
+                continue;
+            }
             if layer.attributes.contains_key(&WorkPlanSlot::Position) {
                 read.push(ReadLayer {
                     layer,

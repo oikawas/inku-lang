@@ -1465,6 +1465,7 @@ pub struct LawsContext {
     /// The nine colors as the request's table shows them.
     colors: Option<Vec<ColorRow>>,
     summaries: Vec<LayerSummary>,
+    object_layers: BTreeMap<usize, (String, String, bool)>,
     /// The layer index of the plan's first layer: plugin sentences come first.
     first_plan_layer: usize,
     /// The refinement's direction; empty in a description run.
@@ -1517,6 +1518,16 @@ fn lightness_of(rgb: [u8; 3]) -> f64 {
 }
 
 impl LawsContext {
+    #[cfg(test)]
+    pub(crate) fn object_law_choices(&self, layer: usize) -> (bool, bool, bool, bool) {
+        (
+            self.movable().contains(&layer),
+            self.candidates("B15").contains(&layer),
+            self.candidates("B21").contains(&layer),
+            self.candidates("C2").contains(&layer),
+        )
+    }
+
     /// The context of a composed document: its Score, the composed plan it was
     /// printed from, the run's palette and canvas. `None` when the Score does
     /// not have one layer per printed sentence.
@@ -1526,6 +1537,16 @@ impl LawsContext {
         composed: &ComposedPlan,
         palette: &ResolvedPaletteDto,
         canvas_format_id: &str,
+    ) -> Option<Self> {
+        Self::new_with_plugins(score, composed, palette, canvas_format_id, &[])
+    }
+
+    pub fn new_with_plugins(
+        score: Score,
+        composed: &ComposedPlan,
+        palette: &ResolvedPaletteDto,
+        canvas_format_id: &str,
+        plugins: &[WorkPlanPlugin],
     ) -> Option<Self> {
         let units = Units::of(canvas_format_id)?;
         let lightness = palette.observations.map(|observations| {
@@ -1559,6 +1580,29 @@ impl LawsContext {
         let summaries = summaries(&score, units);
         let plan_layers = composed.plan.layers.len();
         let first_plan_layer = composed.plan.plugins.len();
+        let object_layers: BTreeMap<usize, (String, String, bool)> = score
+            .object_templates
+            .iter()
+            .filter_map(|template| {
+                let (layer, _) = layer_of(score.instructions.get(template.instruction_index)?)?;
+                let shape = &composed
+                    .plan
+                    .layers
+                    .get(layer.checked_sub(first_plan_layer)?)?
+                    .shape;
+                let plugin = plugins.iter().find(|plugin| plugin.name == *shape);
+                Some((
+                    layer,
+                    (
+                        plugin.map_or_else(|| shape.clone(), |plugin| plugin.name_ja.clone()),
+                        plugin.map_or_else(|| shape.clone(), |plugin| plugin.name_en.clone()),
+                        plugin.is_some_and(|plugin| {
+                            plugin.appearance_slots.contains(&WorkPlanSlot::Color)
+                        }),
+                    ),
+                ))
+            })
+            .collect();
         let expected: Vec<usize> = (0..first_plan_layer + plan_layers).collect();
         let found: Vec<usize> = summaries.iter().map(|summary| summary.layer).collect();
         if found != expected
@@ -1573,6 +1617,7 @@ impl LawsContext {
             lightness,
             colors,
             summaries,
+            object_layers,
             first_plan_layer,
             direction: LawsDirection::default(),
         })
@@ -1655,7 +1700,11 @@ impl LawsContext {
                 .filter(|summary| summary.arranged != Some("plugin"))
                 .map(|summary| summary.layer)
                 .collect(),
-            "C1" | "C2" | "C3" | "C4" => movable,
+            "C1" | "C3" | "C4" => movable,
+            "C2" => movable
+                .into_iter()
+                .filter(|layer| !self.object_layers.contains_key(layer))
+                .collect(),
             "C5" => movable
                 .into_iter()
                 .filter(|layer| {
@@ -2131,8 +2180,8 @@ Return the answer as JSON of the given shape. In laws, key each law you use by i
 /// The legend of the Score's layers, a table since 2026-10-25 (one line a
 /// layer instead of a JSON object repeating every key).
 const LAYER_NOTE: [&str; 2] = [
-    "## 楽譜の層の表\n本文の楽譜の層は表で示す。1 行目が欄の名で、2 行目から 1 層 1 行。欄は | で、一つの欄の中の値はコンマで区切る（- は無し）。box は層の痕が占める矩形 x0,y0,x1,y1（画面を 0〜1 とする）、mark_size は痕1つの幅,高さ。arranged は並べ方: place は1か所に置く（数が2以上なら同じ所に重ねた束）、row_horizontal・row_vertical・row_diagonal は列、grid は格子、scatter は散らす、fill はほかの形の中に塗り込める形（置き場と並びを変えられない）、plugin は差し込みの形（法則を当てられない）。",
-    "## The table of the Score's layers\nThe message shows the Score's layers as a table: the first line names the columns, and each line after it is one layer. Columns are separated by |, and the values inside one column by commas (- is none). box is the rectangle x0,y0,x1,y1 the layer's marks cover (the canvas is 0 to 1); mark_size is the width,height of one mark. arranged is how the layer is arranged: place puts it at one spot (with a count of 2 or more, a bundle at that spot), row_horizontal, row_vertical and row_diagonal are rows, grid is a grid, scatter scatters, fill is a shape filled inside another shape (its place and arrangement cannot change), and plugin is a plugged-in shape (no law takes it).",
+    "## 楽譜の層の表\n本文の楽譜の層は表で示す。1 行目が欄の名で、2 行目から 1 層 1 行。欄は | で、一つの欄の中の値はコンマで区切る（- は無し）。box は層の痕が占める矩形 x0,y0,x1,y1（画面を 0〜1 とする）、mark_size は痕1つの幅,高さ。arranged は並べ方: place は1か所に置く（数が2以上なら同じ所に重ねた束）、row_horizontal・row_vertical・row_diagonal は列、grid は格子、scatter は散らす、fill はほかの形の中に塗り込める形（置き場と並びを変えられない）、plugin は情景の語（法則を当てられない）。",
+    "## The table of the Score's layers\nThe message shows the Score's layers as a table: the first line names the columns, and each line after it is one layer. Columns are separated by |, and the values inside one column by commas (- is none). box is the rectangle x0,y0,x1,y1 the layer's marks cover (the canvas is 0 to 1); mark_size is the width,height of one mark. arranged is how the layer is arranged: place puts it at one spot (with a count of 2 or more, a bundle at that spot), row_horizontal, row_vertical and row_diagonal are rows, grid is a grid, scatter scatters, fill is a shape filled inside another shape (its place and arrangement cannot change), and plugin is a scene word (no law takes it).",
 ];
 
 const LAYER_COLUMNS: &str =
@@ -2229,15 +2278,24 @@ pub(crate) fn table_row(cells: &[Value]) -> String {
     cells.iter().map(cell).collect::<Vec<_>>().join(" | ")
 }
 
-fn layer_rows(summaries: &[LayerSummary]) -> Vec<String> {
+fn layer_rows(context: &LawsContext, language: ResolvedInstructionLanguage) -> Vec<String> {
     let mut rows = vec![LAYER_COLUMNS.to_owned()];
-    rows.extend(summaries.iter().map(|summary| {
+    rows.extend(context.summaries.iter().map(|summary| {
+        let object = context.object_layers.get(&summary.layer);
+        let shape = object.map_or_else(
+            || summary.shape.to_owned(),
+            |(ja, en, _)| match language {
+                ResolvedInstructionLanguage::Ja => ja.clone(),
+                ResolvedInstructionLanguage::En => en.clone(),
+            },
+        );
+        let color = if object.is_some() { "" } else { summary.color };
         table_row(&[
             json!(summary.layer),
-            json!(summary.shape),
+            json!(shape),
             json!(summary.tool),
             json!(summary.count),
-            json!(summary.color),
+            json!(color),
             json!(summary.filled),
             json!(summary.arranged),
             json!(summary.covered),
@@ -2349,7 +2407,13 @@ fn message(
         lines.push(String::new());
     }
     lines.push(heads[1].to_owned());
-    lines.extend(layer_rows(&context.summaries));
+    lines.extend(layer_rows(context, language));
+    if !context.object_layers.is_empty() {
+        lines.push(match language {
+            ResolvedInstructionLanguage::Ja => "shape が ｛名｝ の層は物の語（見えない四角の中の絵）。形は変えられず、置き場・大きさ・数・並べ方は同じ縦横比の四角と同じに変えられる。色は定義に色の引数があるときだけ替えられる。".to_owned(),
+            ResolvedInstructionLanguage::En => "A layer whose shape is {name} is an object word (a picture inside an invisible square). Its shape cannot change; place, size, count, and arrangement can change like a square of the same aspect ratio. Its color can change only when the definition has a color parameter.".to_owned(),
+        });
+    }
     lines.push(String::new());
     lines.push(format!("{}{ground}", heads[2]));
     lines.push(String::new());
@@ -4472,6 +4536,47 @@ impl Compiler<'_> {
         Ok(())
     }
 
+    fn check_objects(&self) -> Result<(), Refusal> {
+        let before = layers(&self.context.score);
+        let after = layers(&self.score);
+        for (layer, (_, _, colorable)) in &self.context.object_layers {
+            let old: Vec<_> = before
+                .get(layer)
+                .into_iter()
+                .flatten()
+                .map(|at| &self.context.score.instructions[*at])
+                .collect();
+            let new: Vec<_> = after
+                .get(layer)
+                .into_iter()
+                .flatten()
+                .map(|at| &self.score.instructions[*at])
+                .collect();
+            if new.iter().any(|mark| {
+                old.first()
+                    .is_some_and(|was| mark.primitive != was.primitive || mark.sides != was.sides)
+            }) {
+                return Err(refusal(
+                    "object_shape_fixed",
+                    "物の語の形は変えられない".to_owned(),
+                    "an object word's shape cannot change".to_owned(),
+                ));
+            }
+            if !colorable
+                && new
+                    .iter()
+                    .any(|mark| old.first().is_some_and(|was| mark.color != was.color))
+            {
+                return Err(refusal(
+                    "object_color_fixed",
+                    "色の引数の無い物の語の色は変えられない".to_owned(),
+                    "an object word without a color parameter cannot change color".to_owned(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
     // --- the cards (stage B-4b): after the fit to spacing, in their order ---------------------
 
     /// A layer's marks in the Score the laws have left so far.
@@ -5216,6 +5321,7 @@ impl Compiler<'_> {
         self.aerial_size();
         self.aerial_color();
         self.hands();
+        self.check_objects()?;
         self.check_colors()?;
         self.check_limits()?;
         Ok(Applied {
@@ -5796,6 +5902,7 @@ fn edit_rebuilt(
     pattern: bool,
     numbers: bool,
     units: Units,
+    object: bool,
 ) -> Option<Edit> {
     let mut layer = layer.clone();
     layer.attributes.remove(&WorkPlanSlot::LineUpDirection);
@@ -5838,6 +5945,9 @@ fn edit_rebuilt(
         ..NumericWriting::default()
     };
     let reshaped = mark.primitive != before.primitive || mark.sides != before.sides;
+    if object && reshaped {
+        return None;
+    }
     if reshaped && mark.primitive != Primitive::Polygon {
         mark.primitive.as_str().clone_into(&mut layer.shape);
     }
@@ -6010,6 +6120,7 @@ fn print_changes(
                         pattern == Some(index),
                         numbers,
                         context.units,
+                        context.object_layers.contains_key(&index),
                     )
                 })
                 .collect::<Option<Vec<Edit>>>()?

@@ -57,14 +57,12 @@ public final class SettingsModel {
     }
 
     public func catalogModels(for provider: ProviderSettings) -> [ProviderModelSettings] {
-        ModelGuidanceCatalog.bundled?.registeredModelSettings(for: provider) ?? provider.models ?? []
+        provider.kind == .chatGPTPlan ? (provider.models ?? []) : ProviderCoreSettings.catalogModels(provider, includeDisabled: true)
     }
 
     public func publishedModels(for provider: ProviderSettings, purpose: String? = nil) -> [ProviderModelSettings] {
-        catalogModels(for: provider).filter { entry in
-            entry.isPublishable && provider.enabledModels?[entry.id] != false
-                && (purpose.map(entry.offers) ?? true)
-        }
+        if provider.kind == .chatGPTPlan { return catalogModels(for: provider).filter { $0.isPublishable && (purpose.map($0.offers) ?? true) } }
+        return ProviderCoreSettings.catalogModels(provider, purpose: purpose).filter { $0.isPublishable && (purpose.map($0.offers) ?? true) }
     }
 
     public func isModelAvailable(_ reference: String) -> Bool {
@@ -72,10 +70,12 @@ public final class SettingsModel {
     }
 
     public nonisolated static func isModelAvailable(_ reference: String, settings: HostSettings) -> Bool {
-        let (providerID, modelID) = ProviderModelReference.resolve(reference, providers: settings.providers)
+        let stage = ProviderModelReference.split(settings.models.stage1Model, providers: settings.providers)?.providerID ?? ProviderModelReference.stageDefaultProviderID
+        let (providerID, modelID) = ProviderModelReference.resolve(reference, providers: settings.providers, defaultProvider: stage)
         guard !modelID.isEmpty, let provider = settings.providers.first(where: { $0.id == providerID }) else { return false }
+        guard provider.kind == .chatGPTPlan || ProviderCoreSettings.isOffered(modelID, provider: provider, purpose: "llm") else { return false }
         guard provider.enabledModels?[modelID] != false else { return false }
-        let models = ModelGuidanceCatalog.bundled?.registeredModelSettings(for: provider) ?? provider.models ?? []
+        let models = provider.kind == .chatGPTPlan ? (provider.models ?? []) : ProviderCoreSettings.catalogModels(provider, purpose: "llm")
         guard let model = models.first(where: { $0.id == modelID }) else { return false }
         return model.isSelectable && model.offers("llm")
     }
@@ -106,19 +106,23 @@ public final class SettingsModel {
     }
 
     public nonisolated static func registeredModels(for provider: ProviderSettings, purpose: String) -> [ProviderModelSettings] {
-        let models = ModelGuidanceCatalog.bundled?.registeredModelSettings(for: provider) ?? provider.models ?? []
+        let models = provider.kind == .chatGPTPlan ? (provider.models ?? []) : ProviderCoreSettings.catalogModels(provider, purpose: purpose)
         return models.filter { $0.offers(purpose) && provider.enabledModels?[$0.id] != false }
     }
 
     public nonisolated static func isRegisteredModelAvailable(_ reference: String, purpose: String, settings: HostSettings) -> Bool {
-        let (providerID, modelID) = ProviderModelReference.resolve(reference, providers: settings.providers)
+        let stage = ProviderModelReference.split(settings.models.stage1Model, providers: settings.providers)?.providerID ?? ProviderModelReference.stageDefaultProviderID
+        let (providerID, modelID) = ProviderModelReference.resolve(reference, providers: settings.providers, defaultProvider: stage)
         guard let provider = settings.providers.first(where: { $0.id == providerID }) else { return false }
+        guard provider.kind == .chatGPTPlan || ProviderCoreSettings.isOffered(modelID, provider: provider, purpose: purpose) else { return false }
         return registeredModels(for: provider, purpose: purpose).contains { $0.id == modelID && $0.isSelectable }
     }
 
     public nonisolated static func isBatchModelAvailable(_ reference: String, settings: HostSettings) -> Bool {
-        let (providerID, modelID) = ProviderModelReference.resolve(reference, providers: settings.providers)
+        let stage = ProviderModelReference.split(settings.models.stage1Model, providers: settings.providers)?.providerID ?? ProviderModelReference.stageDefaultProviderID
+        let (providerID, modelID) = ProviderModelReference.resolve(reference, providers: settings.providers, defaultProvider: stage)
         guard !modelID.isEmpty, let provider = settings.providers.first(where: { $0.id == providerID }) else { return false }
+        guard provider.kind == .chatGPTPlan || ProviderCoreSettings.isOffered(modelID, provider: provider, purpose: "llm") else { return false }
         return batchModels(for: provider).contains { $0.id == modelID && $0.isSelectable }
     }
 
@@ -158,22 +162,10 @@ public final class SettingsModel {
 
     public nonisolated static func modelCatalogURL(for provider: ProviderSettings) throws -> URL {
         try provider.validate()
-        let version: String?
-        switch provider.kind {
-        case .openAICompatible: version = nil
-        case .anthropic: version = "v1"
-        case .gemini: version = "v1beta"
-        case .chatGPTPlan: throw HostError("personal_plan_model_catalog_requires_runtime")
-        }
-        var base = provider.baseURL
-        if let version, base.lastPathComponent != version { base.appendPathComponent(version) }
-        let endpoint = base.appendingPathComponent("models")
-        guard provider.kind == .gemini else { return endpoint }
-        guard var parts = URLComponents(url: endpoint, resolvingAgainstBaseURL: false) else {
-            throw HostError("provider_base_url_invalid")
-        }
-        parts.queryItems = [URLQueryItem(name: "pageSize", value: "1000")]
-        guard let url = parts.url else { throw HostError("provider_base_url_invalid") }
+        guard provider.kind != .chatGPTPlan else { throw HostError("personal_plan_model_catalog_requires_runtime") }
+        let result = try ProviderCoreSettings.call("model_list_start", ["kind": provider.apiProfile == "mlx" ? "mlx" : provider.kind.rawValue,
+            "base_url": provider.baseURL.absoluteString, "api_key": ""])
+        guard let value = result["url"] as? String, let url = URL(string: value) else { throw HostError("provider_base_url_invalid") }
         return url
     }
 
@@ -344,8 +336,8 @@ public final class SettingsModel {
             guard current.baseURL == provider.baseURL, current.kind == provider.kind,
                   current.apiProfile == provider.apiProfile, current.credentialID == provider.credentialID
             else { throw HostError("provider_configuration_changed") }
-            let merged = ProviderModelCatalog.merge(fetched: fetched, previous: catalogModels(for: current),
-                previousEnabled: current.enabledModels, access: access, today: today)
+            let merged = try ProviderModelCatalog.merge(fetched: fetched, previous: catalogModels(for: current),
+                previousEnabled: current.enabledModels, access: access, today: today, providerID: current.id)
             current.models = merged.models
             current.enabledModels = merged.enabled
         }

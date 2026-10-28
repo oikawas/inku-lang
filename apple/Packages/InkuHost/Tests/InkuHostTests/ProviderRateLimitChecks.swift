@@ -24,7 +24,8 @@ final class ProviderRateLimitChecks: XCTestCase, @unchecked Sendable {
         let gemini = ProviderSettings(id: "gemini", kind: .gemini, baseURL: URL(string: "https://fixture.invalid")!, requiresAPIKey: false)
         XCTAssertEqual(gemini.effectiveRateLimits, .init(requestsPerMinute: 30, tokensPerMinute: 16_000, requestsPerDay: 14_400))
         var old = gemini; old.rateLimits = ProviderRateLimits()
-        XCTAssertEqual(old.effectiveRateLimits, .init(requestsPerMinute: 0, tokensPerMinute: 0, requestsPerDay: 0))
+        // The shared settings normalizer fills missing Gemini rate members from its defaults.
+        XCTAssertEqual(old.effectiveRateLimits, .init(requestsPerMinute: 30, tokensPerMinute: 16_000, requestsPerDay: 14_400))
         old.rateLimits = .init(requestsPerMinute: 0, tokensPerMinute: 0, requestsPerDay: 0); try old.validate()
         XCTAssertEqual(ProviderRateLimits.defaults(providerID: "custom").effective(providerID: "custom"), old.effectiveRateLimits)
         XCTAssertEqual(EffectiveProviderRateLimits(requestsPerMinute: 1, tokensPerMinute: 1, requestsPerDay: 0).minuteRequestBudget, 1)

@@ -750,7 +750,7 @@ struct CreationView: View {
     }
 
     private func metaStrip(_ work: SavedWork) -> some View {
-        let naming = ModelNaming(providers: savedProviders)
+        let naming = ModelNaming(providers: savedProviders, stageProvider: model.stageDefaultProviderID)
         let stage1 = work.stage1Model.map { naming.displayName($0) } ?? "DDL"
         let stage2 = work.stage2Model.map { naming.displayName($0) } ?? stage1
         let catalogID = work.renderColorCatalogID ?? work.catalogID

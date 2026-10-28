@@ -166,65 +166,6 @@
     "stage1_model": "nvidia:google/gemma-4-31b-it",
     "stage2_model": "nvidia:google/gemma-4-31b-it"
   },
-  "provider_defaults": {
-    "providers": [
-      {
-        "baseURL": "https://api.openai.com/v1",
-        "credentialID": "openai",
-        "id": "openai",
-        "kind": "openai_compatible",
-        "label": "OpenAI API Platform",
-        "requiresAPIKey": true,
-        "speedHidden": false
-      },
-      {
-        "baseURL": "https://api.anthropic.com",
-        "credentialID": "anthropic",
-        "id": "anthropic",
-        "kind": "anthropic",
-        "label": "Claude API",
-        "requiresAPIKey": true,
-        "speedHidden": false
-      },
-      {
-        "baseURL": "https://generativelanguage.googleapis.com",
-        "credentialID": "gemini",
-        "id": "gemini",
-        "kind": "gemini",
-        "label": "Gemini API",
-        "requiresAPIKey": true,
-        "speedHidden": false
-      },
-      {
-        "baseURL": "https://integrate.api.nvidia.com/v1",
-        "credentialID": "nvidia",
-        "id": "nvidia",
-        "kind": "openai_compatible",
-        "label": "NVIDIA NIM",
-        "requiresAPIKey": true,
-        "speedHidden": false
-      },
-      {
-        "baseURL": "http://localhost:11434/v1",
-        "credentialID": "ollama",
-        "id": "ollama",
-        "kind": "openai_compatible",
-        "label": "Ollama",
-        "requiresAPIKey": false,
-        "speedHidden": true
-      },
-      {
-        "baseURL": "https://ollama.com/v1",
-        "credentialID": "ollama-cloud",
-        "id": "ollama-cloud",
-        "kind": "openai_compatible",
-        "label": "Ollama Cloud (ollama.com)",
-        "requiresAPIKey": true,
-        "speedHidden": true
-      }
-    ],
-    "schema": "inku.provider-defaults.v1"
-  },
   "render": {
     "clip": {
       "max_flattened_points": "200000",

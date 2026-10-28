@@ -31,54 +31,6 @@ def literal_assignment(path: Path, name: str):
     raise ValueError(f"Server constant unavailable: {name}")
 
 
-def provider_catalog() -> tuple[dict, list[dict]]:
-    # Export remains independent of a native Server installation.
-    source_catalog = model_catalog()
-    names = {"DEFAULT_OPENAI_MODELS": "openai", "DEFAULT_ANTHROPIC_MODELS": "anthropic",
-             "DEFAULT_GEMINI_MODELS": "gemini", "VERIFIED_NVIDIA_MODELS": "nvidia",
-             "VERIFIED_OLLAMA_LOCAL_MODELS": "ollama", "VERIFIED_OLLAMA_CLOUD_MODELS": "ollama-cloud"}
-    stored = {"legacy": "legacy", "subscription": "requires_subscription", "not_supported": "not_supported", "eol": "eol"}
-    catalog = {}
-    for name, provider_id in names.items():
-        provider = source_catalog["providers"][provider_id]
-        by_id = {row["id"]: row for row in provider["models"]}
-        catalog[name] = [{**{key: value for key, value in by_id[model_id].items() if key != "labels"},
-                          **{stored[label]: True for label in by_id[model_id].get("labels", [])}}
-                         for model_id in provider["defaults"]]
-
-    def resolve(node):
-        if isinstance(node, ast.Name):
-            return catalog[node.id]
-        if isinstance(node, ast.List):
-            return [resolve(item) for item in node.elts]
-        if isinstance(node, ast.Dict):
-            return {resolve(key): resolve(value) for key, value in zip(node.keys, node.values)}
-        return ast.literal_eval(node)
-
-    source = ast.parse((SERVER / "model_settings.py").read_text())
-    definition = next(node.value for node in source.body if isinstance(node, ast.AnnAssign)
-                      and isinstance(node.target, ast.Name) and node.target.id == "PROVIDER_DEFINITIONS")
-    return catalog, resolve(definition)
-
-
-def provider_defaults() -> dict:
-    # Allowlist public versioned fields only. Do not call default_model_settings:
-    # that factory also reads installation URLs and API keys from the environment.
-    _, definitions = provider_catalog()
-    return {
-        "schema": "inku.provider-defaults.v1",
-        "providers": [{
-            "id": provider["id"],
-            "label": provider["label"],
-            "kind": provider["kind"],
-            "baseURL": provider["default_base_url"],
-            "requiresAPIKey": provider["requires_api_key"],
-            "credentialID": provider["id"],
-            "speedHidden": bool(provider.get("speed_developer_only")),
-        } for provider in definitions],
-    }
-
-
 def model_catalog() -> dict:
     catalog = json.loads((ROOT / "core/crates/inku-pipeline/data/model_catalog.json").read_text(encoding="utf-8"))
     if catalog.get("schema") != "inku.model-catalog.v2":
@@ -98,7 +50,7 @@ def write_json(path: Path, value: object) -> None:
 def export_model_catalog(manifest: dict) -> None:
     manifest.pop("model_guidance", None)
     manifest.pop("model_catalog", None)
-    manifest["provider_defaults"] = provider_defaults()
+    manifest.pop("provider_defaults", None)
 
 
 class BindingPlaceholder:
@@ -115,7 +67,7 @@ def main() -> None:
     global ROOT, SERVER
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-root", type=Path, default=ROOT, help="Product checkout containing the canonical Server/Web resources")
-    parser.add_argument("--model-catalog-only", action="store_true", help="Refresh only provider defaults and remove the old catalog copy")
+    parser.add_argument("--model-catalog-only", action="store_true", help="Remove obsolete provider and model catalog copies")
     arguments = parser.parse_args()
     ROOT = arguments.source_root.resolve()
     SERVER = ROOT / "server/src/inku_server"

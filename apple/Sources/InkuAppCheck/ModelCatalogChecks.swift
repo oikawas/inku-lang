@@ -113,10 +113,10 @@ import InkuUI
     }
     var retired = paid
     retired.eol = true; retired.eolDate = "2026-10-12"; retired.requiresSubscription = true
-    let merged = ProviderModelCatalog.merge(fetched: [.init(id: paid.id, label: paid.id)], previous: [retired],
-                                           previousEnabled: [paid.id: true], access: [paid.id: .subscription(false)], today: "2026-10-13")
+    let merged = try ProviderModelCatalog.merge(fetched: [.init(id: paid.id, label: paid.id)], previous: [retired],
+                                           previousEnabled: [paid.id: true], access: [paid.id: .subscription(false)], today: "2026-10-13", providerID: "ollama-cloud")
     let reoffered = catalog.applyingCatalog(to: merged.models[0], providerID: "ollama-cloud", kind: .openAICompatible)
-    guard reoffered.eol == false, reoffered.eolDate == nil, reoffered.requiresSubscription == false,
+    guard reoffered.eol != true, reoffered.eolDate == nil, reoffered.requiresSubscription != true,
           reoffered.isSelectable, merged.enabled[paid.id] == true else {
         throw CheckFailure.message("Re-offered model lost local eol/access corrections on canonical overlay")
     }
@@ -157,12 +157,16 @@ import InkuUI
     guard draft.model(modelID: unsupported.id)?.allowedUnsupportedPurposes == nil else {
         throw CheckFailure.message("Clearing a chosen unrecommended purpose left it allowed")
     }
-    // The catalog keeps such a purpose out of its defaults, and keeps it only where it was chosen.
+    // Shared normalization keeps an unsupported purpose only when explicitly allowed.
     let openAI = ProviderSettings(id: "openai", kind: .openAICompatible, baseURL: endpoint)
-    var chosen = ProviderModelSettings(id: "gpt-4", purposes: ["llm", "vision"])
-    let catalogDefault = catalog.applyingCatalog(to: chosen, providerID: "openai", kind: .openAICompatible)
+    var chosen = ProviderModelSettings(id: "gpt-4", purposes: ["llm", "vision"], unsupportedPurposes: ["vision"])
+    let defaultRows = try ProviderCoreSettings.call("normalize_models", ["models": [chosen.coreCatalogRecord]])["models"] as? [[String: Any]] ?? []
+    guard let defaultRow = defaultRows.first else { throw CheckFailure.message("Missing normalized model") }
+    let catalogDefault = try ProviderCoreSettings.model(defaultRow)
     chosen.allowedUnsupportedPurposes = ["vision"]
-    let kept = catalog.applyingCatalog(to: chosen, providerID: "openai", kind: .openAICompatible)
+    let keptRows = try ProviderCoreSettings.call("normalize_models", ["models": [chosen.coreCatalogRecord]])["models"] as? [[String: Any]] ?? []
+    guard let keptRow = keptRows.first else { throw CheckFailure.message("Missing normalized allowed model") }
+    let kept = try ProviderCoreSettings.model(keptRow)
     let keptProvider = ProviderSettings(id: "openai", kind: .openAICompatible, baseURL: endpoint, models: [kept])
     guard catalogDefault.purposes == ["llm"], catalogDefault.allowedUnsupportedPurposes == nil,
           kept.purposes == ["llm", "vision"], kept.allowedUnsupportedPurposes == ["vision"], kept.isNotRecommended(for: "vision"),
@@ -198,12 +202,14 @@ import InkuUI
     }
     let noRegisteredModels = ProviderSettings(id: "anthropic", kind: .anthropic, baseURL: endpoint, models: [])
     let historicalNaming = ModelNaming(providers: [noRegisteredModels])
-    guard historicalNaming.resolve("claude-haiku-5-5").provider == "anthropic",
-          historicalNaming.modelShortName("claude-haiku-5-5") == "Claude Haiku 5.5",
-          historicalNaming.modelShortName("chatgpt:gpt-6-astra") == "GPT-6-Astra",
+    // The core resolves from the passed active models only; removed models and
+    // the separate ChatGPT plan are no longer filled from a global snapshot.
+    guard historicalNaming.resolve("claude-haiku-5-5").provider == "nvidia",
+          historicalNaming.modelShortName("claude-haiku-5-5") == "claude-haiku-5-5",
+          historicalNaming.modelShortName("chatgpt:gpt-6-astra") == "gpt-6-astra",
           SettingsModel.batchModels(for: noRegisteredModels).isEmpty,
           ModelNaming(providers: [plan]).modelShortName("chatgpt:\(saved.id)") == saved.label else {
-        throw CheckFailure.message("Historical naming lost canonical/local labels or registered a removed model")
+        throw CheckFailure.message("Historical naming: \(historicalNaming.resolve("claude-haiku-5-5")); \(historicalNaming.modelShortName("claude-haiku-5-5")); \(historicalNaming.modelShortName("chatgpt:gpt-6-astra")); batch \(SettingsModel.batchModels(for: noRegisteredModels).count); plan \(ModelNaming(providers: [plan]).modelShortName("chatgpt:\(saved.id)")); id \(saved.id)")
     }
     print("Model catalog passed: shared 15 label, \(selectionCases.count) selection and \(sortCases.count) sort cases through real core; canonical catalog and label table; measurement key presence; ChatGPT evaluations, saved settings and account/re-offer corrections. Zero provider calls.")
 }

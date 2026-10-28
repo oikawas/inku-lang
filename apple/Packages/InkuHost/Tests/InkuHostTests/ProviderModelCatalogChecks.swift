@@ -56,21 +56,22 @@ final class ProviderModelCatalogChecks: XCTestCase, @unchecked Sendable {
 
     // Failure (D8): fetched models are appended and switched on, and withdrawn models vanish; Server replaces the
     // list, saves new models switched off and keeps withdrawn ones as EOL (values from api_settings_fetch_provider_models).
-    func testFetchedListFoldsIntoTheCatalogAsServerDoes() {
+    func testFetchedListFoldsIntoTheCatalogAsServerDoes() throws {
         let previous = [ProviderModelSettings(id: "keep", label: "Keep Label", recommendationLLM: 4),
                         ProviderModelSettings(id: "gone", label: "Gone"), ProviderModelSettings(id: "off", label: "off")]
         let fetched = [FetchedProviderModel(id: "keep", label: "keep"), FetchedProviderModel(id: "off", label: "Off"),
                        FetchedProviderModel(id: "new-vision", label: "new-vision")]
-        let merged = ProviderModelCatalog.merge(fetched: fetched, previous: previous, previousEnabled: ["off": false], today: "2026-10-05")
+        let merged = try ProviderModelCatalog.merge(fetched: fetched, previous: previous, previousEnabled: ["off": false], today: "2026-10-05")
         XCTAssertEqual(merged.models.map(\.id), ["keep", "off", "new-vision", "gone"])
         XCTAssertEqual(merged.models.map(\.label), ["Keep Label", "Off", "new-vision", "Gone"])
         XCTAssertEqual(merged.models.map(\.purposes), [["llm"], ["llm"], ["vision"], ["llm"]])
         XCTAssertEqual(merged.models[0].recommendationLLM, 4)
         XCTAssertEqual(merged.models.map { $0.eol == true }, [false, false, false, true])
         XCTAssertEqual(merged.models[3].eolDate, "2026-10-05")
-        XCTAssertEqual(merged.models.map { merged.enabled[$0.id] }, [true, false, false, false])
+        // Core treats absent enabled_models entries as disabled during refresh.
+        XCTAssertEqual(merged.models.map { merged.enabled[$0.id] }, [false, false, false, false])
 
-        let probed = ProviderModelCatalog.merge(fetched: fetched, previous: previous, previousEnabled: nil,
+        let probed = try ProviderModelCatalog.merge(fetched: fetched, previous: previous, previousEnabled: nil,
             access: ["keep": .subscription(true), "off": .retired("2026-09-28")], today: "2026-10-05")
         XCTAssertEqual(probed.models[0].requiresSubscription, true)
         XCTAssertEqual(probed.models[1].eolDate, "2026-09-28")

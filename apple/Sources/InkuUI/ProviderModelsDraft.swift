@@ -42,7 +42,10 @@ public struct ProviderModelsDraft: Sendable, Equatable {
 
     public func isEnabled(modelID: String) -> Bool {
         guard let model = model(modelID: modelID), model.isPublishable else { return false }
-        return enabled[modelID] ?? true
+        let row: [String: Any] = ["id": "draft", "active": true, "models": [model.coreCatalogRecord], "enabled_models": enabled]
+        let answer = try? ProviderCoreSettings.call("model_offered", ["settings": ["providers": ["draft": row]], "order": ["draft"],
+            "provider": "draft", "model": modelID])
+        return answer?["offered"] as? Bool ?? false
     }
 
     public func filteredModels(search: String, filter: ProviderModelFilter) -> [ProviderModelSettings] {

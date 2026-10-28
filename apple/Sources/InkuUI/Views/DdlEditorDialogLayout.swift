@@ -106,7 +106,7 @@ struct DdlDrawingModelCard: View {
     let onSelect: () -> Void
 
     var body: some View {
-        let naming = ModelNaming(providers: providers)
+        let naming = ModelNaming(providers: providers, stageProvider: model.stageDefaultProviderID)
         VStack(alignment: .leading, spacing: 5) {
             Text(model.display.webCopy("ddlDialogDrawingModel", "描画モデル")).inkuFont(12).foregroundStyle(.secondary)
             Button(action: onSelect) {

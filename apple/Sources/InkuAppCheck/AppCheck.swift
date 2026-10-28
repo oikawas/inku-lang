@@ -8,6 +8,11 @@ import InkuHost
 struct AppCheck {
     @MainActor
     static func main() async throws {
+        if let index = CommandLine.arguments.firstIndex(of: "--chatgpt-policy-only") {
+            guard CommandLine.arguments.indices.contains(index + 2) else { throw CheckFailure.message("Expected ChatGPT wire and addendum cases") }
+            try runChatGPTPolicyChecks(wireURL: URL(fileURLWithPath: CommandLine.arguments[index + 1]),
+                                      addendumURL: URL(fileURLWithPath: CommandLine.arguments[index + 2])); return
+        }
         if let index = CommandLine.arguments.firstIndex(of: "--provider-admission-only") {
             guard CommandLine.arguments.indices.contains(index + 2) else { throw CheckFailure.message("Expected admission cases and sequence") }
             try runProviderAdmissionChecks(casesURL: URL(fileURLWithPath: CommandLine.arguments[index + 1]),

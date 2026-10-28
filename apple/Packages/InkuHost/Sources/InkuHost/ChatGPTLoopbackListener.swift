@@ -250,20 +250,15 @@ private final class LoopbackEngine: @unchecked Sendable {
             finish(.failure(HostError("chatgpt_cancelled")), keeping: id)
             return
         }
-        guard let query = Self.query(header: header, port: port), let state = query["state"],
-              state.utf8.count <= 256, Self.equal(state, expectedState) else {
-            respond(id, status: 400)
-            return
-        }
-        // State is checked before interpreting a consent error or consuming this attempt.
+        guard let query = Self.query(header: header, port: port) else { respond(id, status: 400); return }
         let result: Result<ChatGPTLoopbackCallback, HostError>
-        if query["error"] != nil || query["error_description"] != nil {
-            result = .failure(HostError("chatgpt_consent_declined"))
-        } else if let code = query["code"], !code.isEmpty {
-            result = .success(ChatGPTLoopbackCallback(code: code, clientID: query["client_id"], state: state))
-        } else {
-            result = .failure(HostError("chatgpt_callback_invalid"))
-        }
+        do {
+            let answer = try ChatGPTPolicy.call("chatgpt_auth_callback", ["state": ChatGPTPolicy.string(query["state"]),
+                "expected_state": .string(expectedState), "code": ChatGPTPolicy.string(query["code"]),
+                "error": ChatGPTPolicy.string(query["error"] ?? query["error_description"])])
+            result = .success(ChatGPTLoopbackCallback(code: try answer.requiredString("code"), clientID: query["client_id"], state: query["state"] ?? ""))
+        } catch let error as HostError { result = .failure(error) }
+        catch { result = .failure(HostError("chatgpt_callback_invalid")) }
         respond(id, status: (try? result.get()) == nil ? 400 : 200)
         finish(result, keeping: id)
     }

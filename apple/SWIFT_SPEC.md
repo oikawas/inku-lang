@@ -850,6 +850,10 @@ Automatic backup defaults off, runs only while the app is open, and waits for ge
 
 ### Personal ChatGPT
 
+ChatGPT plan publication and authentication decisions use the shared core, including model assessments, authorization, callback, claims, key selection, token lifetime and quota transitions. Cryptographic signature verification, local storage and HTTP remain native. Reauthorization preserves the existing encrypted profile and published choices.
+
+
+
 Personal ChatGPT is separate from API key connections and disabled by default. The user explicitly enables it, connects and selects a published drawing model. Stage1 and Stage2 share that model. Several saved personal connections still use one local work library; they do not add multi-user behavior.
 
 The settings flow matches Server and the Web (2026-10-12). The ChatGPT plan settings handle the connection only (enabling, connecting, reauthorizing, renewing consent, selecting, signing out, retrying after the usage limit, and usage), and show a guide and "Open model settings" once the active profile is connected with plan access. Models are chosen under the ChatGPT plan in the Models settings. Opening them reads the saved catalog without an external request; "Refresh models" fetches it, and the checked models are saved as that profile's publication. A model outside the catalog or a profile other than the active one is refused, and reauthorizing the same identity keeps the publication. Only published models appear as "ChatGPT plan" in the drawing model picker, comparison and drawing defaults (copied into the reserved `chatgpt` provider's models; it has no name, rate limit, URL or API key). A drawing request is sent only for a model that is both in the catalog and published; any other stops with `chatgpt_model_not_offered` before the request. An existing connection also saves its publication once.

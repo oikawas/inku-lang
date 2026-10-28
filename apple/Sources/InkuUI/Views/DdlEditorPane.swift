@@ -19,8 +19,8 @@ struct DdlEditorPane: View {
     var onRangeBlocked: ((Bool) -> Void)?
     var onRangePreview: ((CompositionRanges.Preview?) -> Void)?
     private var invalidSource: Bool { rangeStatus.invalid || CompositionRanges.scan(text).contains { $0.bounds == nil } }
-    @State private var highlighter: DdlHighlighter
-    private let plugins: PluginNameIndex
+    private var plugins: PluginNameIndex { PluginNameIndex(words: model.pluginWords) }
+    private var highlighter: DdlHighlighter { DdlHighlighter(saijiki: model.saijiki, plugins: plugins) }
 
     init(model: AppModel, text: Binding<String>, disabled: Bool = false, insertion: Binding<InkuEditorInsertion?>,
          onRangeBlocked: ((Bool) -> Void)? = nil, onRangePreview: ((CompositionRanges.Preview?) -> Void)? = nil) {
@@ -30,9 +30,6 @@ struct DdlEditorPane: View {
         _text = text
         self.disabled = disabled
         _insertion = insertion
-        let plugins = PluginNameIndex(words: model.pluginWords)
-        self.plugins = plugins
-        _highlighter = State(initialValue: DdlHighlighter(saijiki: model.saijiki, plugins: plugins))
     }
 
     private var display: DisplaySettings { model.display }

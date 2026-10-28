@@ -788,6 +788,8 @@ macOS menuはactive sceneの操作可否を使う。⌘Nは新規制作、⌘O�
 
 同梱の歳時記、13色catalog、11用紙と7語のMacro／plugin定義はServer sourceから生成し、共通Rustで定義とdigest lockを解決する。pluginの有効切替は新作品へ適用し、保存作品の定義を置き換えない。DDL packageのimportは`inku.ddl-export.v1`の本文・付属定義・lock・整数表現を検証し、次の新作品へ添える。4MiB／64定義を超える入力や不完全な定義は拒否し、途中結果を採用しない。
 
+macOS の設定では plugin package の JSON／zip を選び、共通 core の検査と provider を使わない例の描画の結果を語ごとに確認して追加・置き換えできる。追加した package は DB と同じ場所の `plugin-packages` に置き、有効な語を新作品の catalog、歳時記、DDL の補完と強調に使う。読み込めない package は理由を表示して削除できる。同梱 package は削除できず、有効・無効だけを切り替える。削除後も保存作品の定義は保持する。
+
 色カタログのnative chooserはID、言語に応じた説明、順序付き色見本、HEXと日英の色名を表示する。固定／記述から自動選択をdraftとして編集し、決定・×で次の条件だけへ適用、キャンセル・Escapeで破棄する。新しいrandom選択は用意しない。直接DDLでは自動選択を使わず、入力をDDLへ切り替えた時に既存auto選択をfixedへ戻す。
 
 macOSでは1つのDDL fileをwindowへdropでき、標準panelと同じURL読込・検証を通す。読込中の生成／batch開始を抑止し、取消し、scene終了、制作内容の変更後に遅い結果を採用しない。成功後に制作を表示し、定義を伴うimportの表示は現在のdraftへ結び付ける。「新規」または保存作品を開いた後は古い完了表示を消す。

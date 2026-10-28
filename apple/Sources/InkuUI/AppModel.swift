@@ -293,7 +293,7 @@ public final class AppModel {
             let url = try databaseURL ?? InkuDatabase.applicationSupportURL(hostIdentifier: "app.inku.macos")
             let database = try InkuDatabase(url: url)
             let store = ProviderSettingsStore(url: url.deletingLastPathComponent().appendingPathComponent("providers.json"))
-            let bootstrap = try Bootstrap()
+            let bootstrap = try Bootstrap(pluginDataDirectory: url.deletingLastPathComponent())
             let settings = try await store.load(installingDefaults: BundledProviderDefaults.loadBundled())
             self.database = database
             await autonomousRefinement.restore(database: database)
@@ -586,6 +586,45 @@ public final class AppModel {
     }
 
     public func localDataDirectory() -> URL? { database?.url.deletingLastPathComponent() }
+    func reloadPluginPackages() throws {
+        guard let directory = localDataDirectory() else { throw HostError("database_unavailable") }
+        let updated = try Bootstrap(pluginDataDirectory: directory)
+        let diagnostics = try Self.pretty(updated.macroCatalogValue(language: instructionLanguage(for: currentInputText), settings: settings,
+                                                                     importedPlugins: importedDDL?.plugins ?? []).data)
+        bootstrap = updated
+        pluginWords = updated.pluginWords.filter { settings.plugins?.isEnabled($0.packageID ?? "") ?? true }
+        macroDiagnostics = diagnostics
+    }
+
+    public func checkPluginPackage(data: Data, isArchive: Bool) async throws -> PluginPackageCheck {
+        guard !isBusy, let directory = localDataDirectory(), let bootstrap else { throw HostError("plugin_package_busy") }
+        return try await PluginPackageRepository(dataDirectory: directory).check(data: data, isArchive: isArchive, bootstrap: bootstrap)
+    }
+
+    @discardableResult
+    public func installPluginPackage(data: Data, isArchive: Bool, replace: Bool) async throws -> PluginPackageCheck {
+        guard !isBusy, let directory = localDataDirectory(), let bootstrap else { throw HostError("plugin_package_busy") }
+        let repository = PluginPackageRepository(dataDirectory: directory)
+        let checked = try await repository.check(data: data, isArchive: isArchive, bootstrap: bootstrap)
+        guard checked.ok else { return checked }
+        guard !isBusy else { throw HostError("plugin_package_busy") }
+        try repository.install(checked, replace: replace)
+        try reloadPluginPackages()
+        return checked
+    }
+
+    public func deletePluginPackage(_ id: String) async throws {
+        guard !isBusy, let directory = localDataDirectory() else { throw HostError("plugin_package_busy") }
+        let repository = PluginPackageRepository(dataDirectory: directory)
+        guard try repository.load().contains(where: { $0.id == id }) else { throw HostError("plugin_package_not_found") }
+        try repository.delete(id)
+        var updated = await hostSettings()
+        var preferences = updated.plugins ?? .init()
+        preferences.disabledPackageIDs.remove(id)
+        updated.plugins = preferences
+        try await updateHostSettings(updated)
+        try reloadPluginPackages()
+    }
     /// The database file in use, once opened.
     public var databaseFileURL: URL? { database?.url }
 

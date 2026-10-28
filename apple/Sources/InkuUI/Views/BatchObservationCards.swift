@@ -8,12 +8,11 @@ struct BatchObservationCards: View {
     @Bindable var model: AppModel
     @Bindable var automation: AutomationModel
     @State private var metrics: [ProviderAttemptMetric] = []
-    @State private var highlighter: DdlHighlighter
+    private var highlighter: DdlHighlighter { DdlHighlighter(saijiki: model.saijiki, plugins: PluginNameIndex(words: model.pluginWords)) }
 
     init(model: AppModel, automation: AutomationModel) {
         self.model = model
         self.automation = automation
-        _highlighter = State(initialValue: DdlHighlighter(saijiki: model.saijiki, plugins: PluginNameIndex(words: model.pluginWords)))
     }
 
     private var work: SavedWork? { automation.observedWork }

@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-28 — Install and remove plugin packages on macOS
+
+Settings can check and install, replace, or remove JSON and ZIP plugin packages. Enabled words are available to new works and the Saijiki; saved works retain their own definitions.
+
 ### 2026-10-28 — Share plugin package checks
 
 The shared core reads and checks plugin packages and produces their Saijiki pictures. The Server draws examples through its pipeline and uses the same shared checks before installation.

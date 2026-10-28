@@ -261,7 +261,8 @@ public struct SaijikiView: View {
             guard let word = model.pluginWords.first(where: { $0.id == id }) else { return nil }
             return Preview(id: id, title: word.displayName(language: offeredLanguage),
                 effect: uiLanguage == "ja" ? word.note : word.englishNote ?? "",
-                example: (offeredLanguage == "ja" ? word.firesOnJapanese : word.firesOnEnglish).first ?? "",
+                example: (offeredLanguage == "ja" ? word.exampleJapanese : word.exampleEnglish)
+                    ?? (offeredLanguage == "ja" ? word.firesOnJapanese : word.firesOnEnglish).first ?? "",
                 svg: nil, imageURL: word.previewURL, insertable: word.packageID != nil)
         case nil: return nil
         }

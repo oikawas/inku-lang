@@ -68,6 +68,8 @@ public struct PluginWord: Identifiable, Sendable {
     public let englishNote: String?
     public let firesOnJapanese: [String]
     public let firesOnEnglish: [String]
+    public var exampleJapanese: String? = nil
+    public var exampleEnglish: String? = nil
 
     public func displayName(language: String) -> String {
         (language == "ja" ? aliases.first : nil) ?? id
@@ -81,10 +83,12 @@ struct Bootstrap {
     private let macroSources: [String: Any]
     let saijiki: [SaijikiCategory]
     let pluginWords: [PluginWord]
+    let bundledPluginWords: [PluginWord]
+    let installedPluginPackages: [InstalledPluginPackage]
     let productReference: ProductReference
     let drawingLimitDefinition: DrawingLimitDefinition
 
-    init() throws {
+    init(pluginDataDirectory: URL? = nil) throws {
         func resource(_ name: String) throws -> Data {
             guard let url = Bundle.module.url(forResource: name, withExtension: "json") else {
                 throw HostError("bundled_resources_unavailable")
@@ -145,7 +149,7 @@ struct Bootstrap {
                 englishDetail: "", preview: reference.saijikiPreviews["aida:" + ja])
         }, englishName: "relations"))
         saijiki = displayCategories
-        pluginWords = try plugins.map { item in
+        let bundled = try plugins.map { item in
             guard let id = item["id"] as? String, let surfaces = item["surfaces"] as? [String: [String]],
                   let notes = item["notes"] as? [String: String] else { throw HostError("bundled_plugins_invalid") }
             let preview = (item["preview"] as? String).flatMap {
@@ -157,6 +161,9 @@ struct Bootstrap {
                 englishNote: notes["en"], firesOnJapanese: (item["fires_on"] as? [String: [String]])?["ja"] ?? [],
                 firesOnEnglish: (item["fires_on"] as? [String: [String]])?["en"] ?? [])
         }
+        bundledPluginWords = bundled
+        installedPluginPackages = try pluginDataDirectory.map { try PluginPackageRepository(dataDirectory: $0).load() } ?? []
+        pluginWords = bundled + installedPluginPackages.flatMap { $0.pluginWords() }
     }
 
     var catalogs: [ColorCatalogOption] {
@@ -378,7 +385,9 @@ struct Bootstrap {
             return !disabled.contains(String(source.dropFirst("bundled:".count)))
         }
         var exact = try ExactJSON(data: Self.bytes(request))
-        exact["canonical"] = .array(importedPlugins.enumerated().map { $0.element.canonicalCandidate(index: $0.offset) } + (exact["canonical"].array ?? []))
+        let installed = installedPluginPackages.filter { !disabled.contains($0.id) }.flatMap { $0.candidateWords(language: language) }
+        exact["canonical"] = .array(importedPlugins.enumerated().map { $0.element.canonicalCandidate(index: $0.offset) }
+                                    + (exact["canonical"].array ?? []) + installed)
         let output = try ExactJSON(data: InkuCore.resolveMacroCatalog(exact.data))
         guard output["schema"].string == "inku.macro-catalog-resolution.v1", output["error"] == .null else {
             throw HostError(output["error"].string ?? "macro_catalog_invalid")

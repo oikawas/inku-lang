@@ -261,6 +261,10 @@ public enum InkuCore {
         InkuCoreBindings.providerWire(inputBytes: input)
     }
 
+    public static func pluginPackage(_ input: Data) -> Data {
+        InkuCoreBindings.pluginPackage(inputBytes: input)
+    }
+
     /// The juxtaposition (取り合わせ, `inku.juxtaposition.v1`): one JSON request with an `action` (`gather`, `prompt`,
     /// `check`, `join`, `same`) in, one JSON answer out. Nothing is sent or saved by the core.
     public static func juxtaposition(_ input: Data) -> Data {

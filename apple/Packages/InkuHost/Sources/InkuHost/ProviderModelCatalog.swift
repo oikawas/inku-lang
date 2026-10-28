@@ -23,7 +23,11 @@ public enum ProviderModelCatalog {
     /// Every page of the list (Anthropic `limit`/`after_id`, Gemini `pageSize`/`pageToken`, one page otherwise).
     /// Server sends the key header only when a key exists, and refuses an empty list.
     public static func fetch(provider: ProviderSettings, firstURL: URL, key: String?, send: Send) async throws -> [FetchedProviderModel] {
-        var headers = ["Accept": "application/json"]
+        guard provider.kind != .chatGPTPlan else { throw HostError("personal_plan_model_catalog_requires_runtime") }
+        let kind = provider.apiProfile == "mlx" ? "mlx" : provider.kind.rawValue
+        let plan = try ProviderCoreSettings.call("model_list_start", ["kind": kind, "base_url": provider.baseURL.absoluteString, "api_key": ""])
+        guard let urlText = plan["url"] as? String, let url = URL(string: urlText) else { throw HostError("provider_base_url_invalid") }
+        var headers = plan["headers"] as? [String: String] ?? [:]
         if let key, !key.isEmpty {
             switch provider.kind {
             case .anthropic: headers["x-api-key"] = key
@@ -32,36 +36,31 @@ public enum ProviderModelCatalog {
             case .chatGPTPlan: throw HostError("personal_plan_model_catalog_requires_runtime")
             }
         }
-        if provider.kind == .anthropic { headers["anthropic-version"] = "2023-06-01" }
-        let itemsKey: String, firstQuery: [String: String]
-        switch provider.kind {
-        case .anthropic: itemsKey = "data"; firstQuery = ["limit": String(pageSize)]
-        case .gemini: itemsKey = "models"; firstQuery = ["pageSize": String(pageSize)]
-        default: itemsKey = ""; firstQuery = [:]
-        }
+        let itemsKey = plan["items_key"] as? String ?? ""
+        let firstQuery = plan["query"] as? [String: String] ?? [:]
         var rows: [ExactJSON] = []
         if itemsKey.isEmpty {
-            let page = try await get(firstURL, query: [:], headers: headers, send: send)
+            let page = try await get(url, query: [:], headers: headers, send: send)
             guard let items = (page["data"] == .null ? page["models"] : page["data"]).array else { throw HostError("model_catalog_invalid") }
             rows = items
         } else {
             var query = firstQuery, finished = false
             for _ in 0..<pageLimit {
-                let page = try await get(firstURL, query: query, headers: headers, send: send)
+                let page = try await get(url, query: query, headers: headers, send: send)
                 guard let items = page[itemsKey].array else { throw HostError("model_catalog_invalid") }
                 rows += items
-                let next: [String: String]?
-                if provider.kind == .anthropic {
-                    next = page["has_more"].bool == true ? page["last_id"].string.flatMap { $0.isEmpty ? nil : ["after_id": $0] } : nil
-                } else {
-                    next = page["nextPageToken"].string.flatMap { $0.isEmpty ? nil : ["pageToken": $0] }
-                }
+                let pageObject = try JSONSerialization.jsonObject(with: page.data)
+                let next = try ProviderCoreSettings.call("model_list_next", ["kind": kind, "page": pageObject])["query"] as? [String: String]
                 guard let next else { finished = true; break }
                 query = firstQuery.merging(next) { $1 }
             }
             guard finished else { throw HostError("model_catalog_unfinished") }
         }
-        let models = rows.compactMap { row -> FetchedProviderModel? in
+        let rawRows = try rows.map { try JSONSerialization.jsonObject(with: $0.data) }
+        let normalized: [[String: Any]]
+        do { normalized = try ProviderCoreSettings.call("model_rows", ["payload": ["data": rawRows]])["models"] as? [[String: Any]] ?? [] }
+        catch let error as HostError where error.code == "model list response was empty" { throw HostError("model_catalog_empty") }
+        let extra = rows.compactMap { row -> FetchedProviderModel? in
             guard row.object != nil else { return nil }
             var id = (row["id"].string.flatMap { $0.isEmpty ? nil : $0 } ?? row["name"].string ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             if id.hasPrefix("models/") { id = String(id.dropFirst(7)) }
@@ -71,6 +70,13 @@ public enum ProviderModelCatalog {
             return FetchedProviderModel(id: id, label: label.isEmpty ? id : label,
                                         contextLimit: row["inputTokenLimit"].number.flatMap(Int.init),
                                         capabilities: row["supportedGenerationMethods"].array?.compactMap(\.string) ?? [])
+        }
+        let byID = Dictionary(extra.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let models = normalized.compactMap { row -> FetchedProviderModel? in
+            guard let id = row["id"] as? String else { return nil }
+            let old = byID[id]
+            return FetchedProviderModel(id: id, label: row["label"] as? String ?? id,
+                contextLimit: old?.contextLimit, capabilities: old?.capabilities ?? [])
         }
         guard !models.isEmpty else { throw HostError("model_catalog_empty") }
         return models
@@ -95,46 +101,34 @@ public enum ProviderModelCatalog {
     /// loses its EOL mark. A model that disappeared stays at the end as EOL. A new model is saved switched off; a
     /// known model keeps its switch unless it is EOL or needs a subscription.
     public static func merge(fetched: [FetchedProviderModel], previous: [ProviderModelSettings], previousEnabled: [String: Bool]?,
-                             access: [String: ProviderModelAccess] = [:], today: String) -> (models: [ProviderModelSettings], enabled: [String: Bool]) {
-        var seen = Set<String>()
-        let byID = Dictionary(previous.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        var models: [ProviderModelSettings] = fetched.compactMap { row in
-            guard seen.insert(row.id).inserted else { return nil }
-            guard var model = byID[row.id] else {
-                return ProviderModelSettings(id: row.id, label: row.label, purposes: row.id.lowercased().contains("vision") ? ["vision"] : ["llm"])
+                             access: [String: ProviderModelAccess] = [:], today: String, providerID: String = "") throws -> (models: [ProviderModelSettings], enabled: [String: Bool]) {
+        let previousRow: [String: Any] = ["models": previous.map(\.coreCatalogRecord), "enabled_models": previousEnabled ?? [:]]
+        let fetchedRows = fetched.map { ["id": $0.id, "label": $0.label] }
+        let prepared = try ProviderCoreSettings.call("refresh_prepare", ["provider": providerID, "models": fetchedRows, "previous": previousRow])
+        if let rows = prepared["models"] as? [[String: Any]] {
+            let answers: [[String: Any]] = rows.filter { $0["eol"] as? Bool != true }.map { row in
+                switch access[row["id"] as? String ?? ""] {
+                case .retired(let date): return ["retired": date]
+                case .subscription(let enabled): return ["subscription": enabled]
+                case nil: return [:]
+                }
             }
-            if !(row.label == row.id && !model.label.isEmpty && model.label != model.id) { model.label = row.label }
-            model.eol = false; model.eolDate = nil
-            model.labels.removeAll { $0 == "eol" }
-            return model
+            let applied = try ProviderCoreSettings.call("access_apply", ["models": rows, "answers": answers])
+            guard let checked = applied["models"] as? [[String: Any]] else { throw HostError("provider_core_invalid") }
+            let result = try ProviderCoreSettings.call("refresh_finish", ["models": checked, "previous": previousRow, "today": today])
+            guard let returned = result["models"] as? [[String: Any]], let enabled = result["enabled_models"] as? [String: Bool],
+                  let normalized = try ProviderCoreSettings.call("normalize_models", ["models": returned])["models"] as? [[String: Any]] else { throw HostError("provider_core_invalid") }
+            return (try normalized.map { try ProviderCoreSettings.model($0) }, enabled)
         }
-        for index in models.indices {
-            switch access[models[index].id] {
-            case .retired(let date): models[index].eol = true; models[index].eolDate = date
-            case .subscription(true): models[index].requiresSubscription = true
-            case .subscription(false): models[index].requiresSubscription = false
-            case nil: break
-            }
-        }
-        let retired = previous.filter { !seen.contains($0.id) }.reduce(into: [ProviderModelSettings]()) { list, model in
-            guard !list.contains(where: { $0.id == model.id }) else { return }
-            var kept = model; kept.eol = true; kept.eolDate = kept.eolDate ?? today
-            list.append(kept)
-        }.sorted { $0.id < $1.id }
-        models += retired
-        let enabled = Dictionary(models.map { model in
-            (model.id, model.isPublishable && byID[model.id] != nil && previousEnabled?[model.id] != false)
-        }, uniquingKeysWith: { first, _ in first })
-        return (models, enabled)
+        throw HostError("provider_core_invalid")
     }
 
     /// Ollama Cloud lists models to anyone, so each model is asked once per fetch with the smallest call:
     /// /api/show answers 410 for a retired model, and a one-token chat 403 for one the plan does not reach.
-    public static let accessProbeProviderIDs: Set<String> = ["ollama-cloud"]
-
     public static func probeAccess(provider: ProviderSettings, key: String?, modelIDs: [String], today: String,
                                    send: @escaping @Sendable (URLRequest) async -> (status: Int?, text: String)) async -> [String: ProviderModelAccess] {
-        guard accessProbeProviderIDs.contains(provider.id) else { return [:] }
+        guard (try? ProviderCoreSettings.call("access_enabled", ["provider": provider.id])["enabled"] as? Bool) == true else { return [:] }
+        let targets = (try? ProviderCoreSettings.call("access_targets", ["models": modelIDs.map { ["id": $0] }])["models"] as? [[String: Any]]) ?? []
         let base = provider.baseURL.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         let origin = base.hasSuffix("/v1") ? String(base.dropLast(3)) : base
         @Sendable func post(_ url: String, _ body: ExactJSON, bearer: String? = nil) -> URLRequest? {
@@ -148,25 +142,22 @@ public enum ProviderModelCatalog {
         @Sendable func probe(_ id: String) async -> ProviderModelAccess? {
             if let show = post(origin + "/api/show", .object(["model": .string(id)])) {
                 let (status, text) = await send(show)
-                if status == 410 {
-                    let date = text.range(of: "retired at \\d{4}-\\d{2}-\\d{2}", options: .regularExpression).map { String(text[$0].suffix(10)) }
-                    return .retired(date ?? today)
-                }
+                let result = try? ProviderCoreSettings.call("access_probe", ["stage": "show", "status": status ?? 0, "text": text, "today": today])
+                if let answer = result?["answer"] as? [String: Any], let date = answer["retired"] as? String { return .retired(date) }
             }
             guard let key, !key.isEmpty, let chat = post(base + "/chat/completions", .object(["model": .string(id),
                 "messages": .array([.object(["role": .string("user"), "content": .string(".")])]), "max_tokens": .integer(1)]), bearer: key) else { return nil }
-            switch await send(chat).status {
-            // A model outside the Free plan answers 402, one the account cannot reach yet 403 (Server settings.py).
-            case 402, 403: return .subscription(true)
-            case 200: return .subscription(false)
-            default: return nil
-            }
+            let response = await send(chat)
+            let result = try? ProviderCoreSettings.call("access_probe", ["stage": "call", "status": response.status ?? 0, "text": response.text, "today": today])
+            guard let answer = result?["answer"] as? [String: Any], let subscription = answer["subscription"] as? Bool else { return nil }
+            return .subscription(subscription)
         }
         // Two at a time: the service refuses by concurrency, and two is its limit.
         var answers: [String: ProviderModelAccess] = [:]
-        var pending = modelIDs[...]
+        var pending = targets.compactMap { $0["id"] as? String }[...]
         await withTaskGroup(of: (String, ProviderModelAccess?).self) { group in
-            for _ in 0..<2 { if let id = pending.popFirst() { group.addTask { (id, await probe(id)) } } }
+            let limit = (try? ProviderCoreSettings.call("provider_concurrency", ["provider": provider.id])["limit"] as? Int) ?? 2
+            for _ in 0..<max(1, limit) { if let id = pending.popFirst() { group.addTask { (id, await probe(id)) } } }
             while let (id, answer) = await group.next() {
                 if let answer { answers[id] = answer }
                 if let next = pending.popFirst() { group.addTask { (next, await probe(next)) } }

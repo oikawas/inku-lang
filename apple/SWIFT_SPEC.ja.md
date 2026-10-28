@@ -694,15 +694,15 @@ macOSのバッチ入力はNSScrollView、NSClipView、NSRulerViewとSwiftUI host
 
 APIキーの存在は秘密値を取得せず照会する。設定済みキーを表示・再入力せず、変更は明示した削除確認後に新しいキーを保存する。接続・model・名前・メモ・rateの通常保存はKeychainを読み書きしない。サービス削除もKeychain項目を削除せず、そのサービスの描画既定参照だけを解除する。APIキーと設定JSONは別資源なので、キー書込後に設定保存が失敗した場合はKeychain項目だけ残りうる。状態を再確認して同じ操作を完了する。取得・推論・OAuthを起動時に自動実行しない。
 
-限定確認は`InkuAppCheck --model-settings-ui-only`を使用する。一時設定／SQLiteと秘密値を扱わないmockで個別保存、invalid URLの拒否、旧設定の読込、draftの破棄、用途・評価・使用設定の再読込、描画候補の制御、keyなし追加・削除を確認する。実APIキー・モデル取得・推論とnative画面の目視受入は別に行う。共有Rustと作品DB schemaは変更しない。
+限定確認は`InkuAppCheck --model-settings-ui-only`を使用する。一時設定／SQLiteと秘密値を扱わないmockで個別保存、共有 core の URL 検査、正規化済み設定の読込、draftの破棄、用途・評価・使用設定の再読込、描画候補の制御、keyなし追加・削除を確認する。実APIキー・モデル取得・推論とnative画面の目視受入は別に行う。作品DB schemaは変更しない。
 
 ## 2026-10-04 Server準拠の標準providerセット
 
-同じcheckoutのServerの公開provider定義から、OpenAI API Platform、Claude API、Gemini API、NVIDIA NIM、Ollama、Ollama Cloudの6接続を同梱する。表示名、接続方式、default URLとAPIキー要否はServer sourceから生成し、環境変数やServerの実設定・credentialは取り込まない。Personal ChatGPTは専用設定で明示して有効にする。
+共有 core の provider 定義から OpenAI API Platform、Claude API、Gemini API、NVIDIA NIM、Ollama、Ollama Cloud の6接続を読む。環境変数や Server の実設定・credential は取り込まない。Personal ChatGPT は専用設定で明示して有効にする。
 
-新規設定と旧設定の初回読込で不足するIDだけを追加し、既存接続のURL・方式・credential ID・制限値、モデル選択、plugin・描画設定を保持する。`providers.json`に追加済みmarkerを原子的に保存し、以後の起動で重複追加や設定再保存を行わない。作者が削除した標準接続も自動で復活させない。APIキーは作者が設定画面で入力してKeychainへ保存する。追加処理はKeychainへアクセスせず、HTTP・モデル取得・生成を開始しない。
+`providers.json` の読み込みと更新は共有 core で正規化し、既存の URL・方式・credential ID・モデル選択と plugin・描画設定を保持する。以前に削除した組み込み接続は無効のまま保存し、設定に戻さない。正規化後の全モデルに公開の真偽を記録し、以前に公開されていなかったモデルを勝手に公開しない。鍵の値は Keychain に置き、core の設定へ渡さない。
 
-設定と制作のモデルchooserは、同じServerの同梱catalogを候補として表示する。同じprovider IDと接続方式に限って使用し、カスタム接続へ流用しない。提供終了モデルは新選択候補から除くが、既存の選択値と手入力を保持する。明示して取得した接続先の候補を優先して併合し、サービスが現在提供するモデルや契約の利用可否を同梱候補から保証しない。Claudeは`/v1/models`、Geminiは`/v1beta/models?pageSize=1000`、OpenAI互換は`/models`へ明示取得する。バッチdialogの登録済み候補と確定操作は上の現行契約に従う。
+設定・制作のモデル候補、参照の引き当て、一覧取得の URL・ページと結果の併合は共有 core を使う。HTTP と credential の管理は Swift に残す。提供終了モデルは新選択候補から除くが、既存の選択値と手入力を保持する。
 
 限定確認は`InkuAppCheck --provider-defaults-only`を使用する。一時設定とSQLiteで新規追加、旧設定の保持、再読込と明示削除、offline候補・一覧取得URLを確認する。実APIキーの入力・モデル取得・推論とnative画面の受入は別に行う。共有Rustと作品DB schemaは変更しない。
 

@@ -23,8 +23,10 @@ func runHistoryModelNameChecks() throws {
         let actual = ModelNaming.abbreviateStripModel(owner: owner, name: name)
         guard actual == expected else { throw CheckFailure.message("History model \(owner)/\(name): \(actual) != Web \(expected)") }
     }
-    guard ModelNaming().stripModel("chatgpt:gpt-6-luna") == "Ch GPT6Lu" else {
-        throw CheckFailure.message("A saved ChatGPT model lost its catalog name when its connection was absent")
+    // Core resolves only providers passed by the host. Without the ChatGPT connection,
+    // its explicit reference uses its stored provider/model IDs instead of the old global snapshot.
+    guard ModelNaming().resolve("chatgpt:gpt-6-luna").provider == "chatgpt" else {
+        throw CheckFailure.message("A saved ChatGPT reference lost its explicit provider")
     }
     print("History model names passed: \(cases.count) current Web outputs, variants/sizes/quantization retained, Ollama Cloud distinguished. No provider calls.")
 }

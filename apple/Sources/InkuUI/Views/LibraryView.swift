@@ -32,7 +32,7 @@ struct LibraryView: View {
     @State private var previewComment = LibraryNoteEditorModel()
     private var library: LibraryModel { model.library }
     private var display: DisplaySettings { model.display }
-    private var naming: ModelNaming { ModelNaming(providers: providers) }
+    private var naming: ModelNaming { ModelNaming(providers: providers, stageProvider: model.stageDefaultProviderID) }
     private var writingDisabled: Bool { model.isBusy || writingLocked }
     private var hasFilters: Bool {
         !library.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -410,7 +410,7 @@ struct LibraryView: View {
             writingDisabled: writingDisabled,
             mutating: library.mutating,
             hashCopied: work.renderHash != nil && library.copiedHash == work.renderHash,
-            modelLines: modelLines.lines(for: work, providers: providers),
+            modelLines: modelLines.lines(for: work, providers: providers, stageProvider: model.stageDefaultProviderID),
             focus: $focusedSlot,
             actions: LibraryGridCardActions(open: openWork, openThumbnail: openThumbnail, openLineage: openLineage,
                                             recordHeight: recordCardHeight, menu: menuActions))
@@ -882,13 +882,15 @@ private final class LibraryGridMeasurements {
 @MainActor
 private final class LibraryModelLineMemo {
     private var providers: [ProviderSettings] = []
+    private var stageProvider = ""
     private var naming = ModelNaming()
     private var lines: [String: [ModelNaming.Line]] = [:]
 
-    func lines(for work: SavedWork, providers: [ProviderSettings]) -> [ModelNaming.Line] {
-        if providers != self.providers {
+    func lines(for work: SavedWork, providers: [ProviderSettings], stageProvider: String) -> [ModelNaming.Line] {
+        if providers != self.providers || stageProvider != self.stageProvider {
             self.providers = providers
-            naming = ModelNaming(providers: providers)
+            self.stageProvider = stageProvider
+            naming = ModelNaming(providers: providers, stageProvider: stageProvider)
             lines.removeAll()
         }
         let key = (work.stage1Model ?? "") + "\u{0}" + (work.stage2Model ?? "")

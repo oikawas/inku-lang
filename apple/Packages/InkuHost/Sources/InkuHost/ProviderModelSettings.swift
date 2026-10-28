@@ -82,6 +82,10 @@ public struct ProviderModelSettings: Codable, Sendable, Equatable, Identifiable 
             ("speed_llm_seconds", speedLLMSeconds), ("speed_vision_seconds", speedVisionSeconds),
             ("cost_usd_llm", costUSDLLM), ("cost_usd_vision", costUSDVision)]
         for (key, value) in measurements { if let value { record[key] = value } }
+        if let allowedUnsupportedPurposes { record["allowed_unsupported_purposes"] = allowedUnsupportedPurposes }
+        if let eolDate { record["eol_date"] = eolDate }
+        if let eol { record["eol"] = eol }
+        if let requiresSubscription { record["requires_subscription"] = requiresSubscription }
         if catalogMeasurementPresent == true && measurements.allSatisfy({ $0.1 == nil }) { record["recommendation_level"] = NSNull() }
         return record
     }
@@ -98,12 +102,8 @@ public struct ProviderModelSettings: Codable, Sendable, Equatable, Identifiable 
     }
 
     public func validate() throws {
-        guard !id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              Set(purposes).count == purposes.count,
-              purposes.allSatisfy({ $0 == "llm" || $0 == "vision" }),
-              [recommendationLevel, recommendationLLM, recommendationVision,
-               recommendationStage1, recommendationStage2].compactMap({ $0 }).allSatisfy({ (1...5).contains($0) })
-        else { throw HostError("provider_model_settings_invalid") }
+        let response = try ProviderCoreSettings.call("normalize_models", ["models": [coreCatalogRecord]])
+        guard !(response["models"] as? [[String: Any]] ?? []).isEmpty else { throw HostError("provider_model_settings_invalid") }
     }
 
     private enum CodingKeys: String, CodingKey {

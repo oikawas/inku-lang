@@ -20,12 +20,15 @@ public struct ModelGuidanceCatalog: Decodable, Sendable {
     }
 
     public static func loadBundled() throws -> ModelGuidanceCatalog {
-        let envelope = try JSONDecoder().decode(GuidanceManifest.self, from: bundledManifestData())
         var catalog = try JSONDecoder().decode(ModelGuidanceCatalog.self, from: SharedModelCatalog.catalogData)
         guard catalog.schema == "inku.model-catalog.v2", catalog.labelDefinitions == ModelCatalogLabels.definitions else {
             throw HostError("model_catalog_schema_invalid")
         }
-        catalog.providerDefinitions = envelope.providerDefaults.providers
+        catalog.providerDefinitions = ProviderCoreSettings.definitions.compactMap { row in
+            guard let id = row["id"] as? String, let kind = row["kind"] as? String else { return nil }
+            return GuidanceProviderDefinition(id: id, kind: kind == "mlx" ? "openai_compatible" : kind,
+                                              speedHidden: row["speed_developer_only"] as? Bool ?? false)
+        }
         return catalog
     }
 
@@ -41,6 +44,7 @@ public struct ModelGuidanceCatalog: Decodable, Sendable {
     }
 
     public func applyingCatalog(to model: ProviderModelSettings, providerID: String, kind: ProviderKind) -> ProviderModelSettings {
+        if kind != .chatGPTPlan { return model }
         guard let source = knownProvider(providerID, kind: kind)?.models.first(where: { $0.id == model.id })?.settings else { return model }
         var result = source
         result.label = model.label
@@ -68,6 +72,7 @@ public struct ModelGuidanceCatalog: Decodable, Sendable {
     }
 
     public func registeredModelSettings(for connection: ProviderSettings) -> [ProviderModelSettings] {
+        if connection.kind != .chatGPTPlan { return connection.models ?? [] }
         if let models = connection.models {
             return models.map { applyingCatalog(to: $0, providerID: connection.id, kind: connection.kind) }
         }
@@ -177,14 +182,6 @@ public struct ModelGuidance: Sendable {
     }
 }
 
-private struct GuidanceManifest: Decodable {
-    let providerDefaults: GuidanceProviderDefaults
-    enum CodingKeys: String, CodingKey {
-        case providerDefaults = "provider_defaults"
-    }
-}
-
-private struct GuidanceProviderDefaults: Decodable { let providers: [GuidanceProviderDefinition] }
 private struct GuidanceProviderDefinition: Decodable, Sendable {
     let id: String
     let kind: String

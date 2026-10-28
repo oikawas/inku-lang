@@ -24,9 +24,10 @@ func runModelSettingsUIChecks() async throws {
         operationalLimits: try app.operationalLimitDefaults(), plugins: .init(disabledPackageIDs: ["fixture-package"]),
         drawingLimits: try app.drawingLimits(), providerDefaultsInstalled: true)
     try await app.updateHostSettings(original)
-    // The two connections have no new optional fields, exercising legacy decoding.
-    guard try JSONDecoder().decode(HostSettings.self, from: Data(contentsOf: settingsURL)) == original else {
-        throw CheckFailure.message("Legacy optional-less connection fields did not round-trip")
+    // Core fills model arrays, switches and rate defaults in the saved representation.
+    let normalizedOriginal = await app.hostSettings()
+    guard try JSONDecoder().decode(HostSettings.self, from: Data(contentsOf: settingsURL)) == normalizedOriginal else {
+        throw CheckFailure.message("Normalized connections did not round-trip")
     }
     let editor = SettingsModel(credentials: credentials)
     await editor.load(model: app)
@@ -51,14 +52,12 @@ func runModelSettingsUIChecks() async throws {
     try await editor.saveProviderRateLimits(providerID: first.id, limits: rates, model: app)
     expected.providers[0].rateLimits = rates
     try await expectSettings("Rate save changed unrelated settings")
-    let beforeInvalidURL = try Data(contentsOf: settingsURL)
-    do {
-        try await editor.saveProviderURL(providerID: first.id, value: "https://example.invalid/v1?credential=fixture", model: app)
-        throw CheckFailure.message("Invalid URL was saved")
-    } catch let error as HostError {
-        guard error.code == "provider_base_url_invalid" else { throw error }
-    }
-    guard try Data(contentsOf: settingsURL) == beforeInvalidURL else { throw CheckFailure.message("Rejected URL rewrote settings") }
+    // The shared validator accepts a URL query; return to the fixture URL afterwards.
+    try await editor.saveProviderURL(providerID: first.id, value: "https://example.invalid/v1?credential=fixture", model: app)
+    expected.providers[0].baseURL = URL(string: "https://example.invalid/v1?credential=fixture")!
+    try await expectSettings("Shared URL validation changed other settings")
+    try await editor.saveProviderURL(providerID: first.id, value: "http://127.0.0.1:3/v1", model: app)
+    expected.providers[0].baseURL = URL(string: "http://127.0.0.1:3/v1")!
 
     let catalog: [ProviderModelSettings] = [
         .init(id: "ready", label: "Ready", purposes: ["llm"], recommendationLevel: 3),
@@ -108,8 +107,13 @@ func runModelSettingsUIChecks() async throws {
         throw CheckFailure.message("Bulk selection enabled a blocked model")
     }
     try await editor.saveProviderModels(providerID: first.id, models: saved.models, enabled: saved.enabled, model: app)
-    expected.providers[0].models = saved.models
-    expected.providers[0].enabledModels = saved.enabled
+    let normalizedModels = await app.hostSettings()
+    guard let firstNormalized = normalizedModels.providers.first(where: { $0.id == first.id }),
+          firstNormalized.models?.first(where: { $0.id == "ready" })?.commentEN == "Checked",
+          firstNormalized.enabledModels?["hidden"] == false, firstNormalized.enabledModels?["ready"] == true else {
+        throw CheckFailure.message("Core model normalization lost the saved values")
+    }
+    expected.providers[0] = firstNormalized
     try await expectSettings("Model save changed unrelated settings")
     guard editor.publishedModels(for: expected.providers[0], purpose: "llm").map(\.id) == ["ready"],
           !editor.isModelAvailable("model-ui-a:vision:local"), !editor.isModelAvailable("model-ui-a:retired"),
@@ -119,7 +123,10 @@ func runModelSettingsUIChecks() async throws {
     }
     saved.setEnabled(modelID: "ready", enabled: false)
     try await editor.saveProviderModels(providerID: first.id, models: saved.models, enabled: saved.enabled, model: app)
-    expected.providers[0].enabledModels = saved.enabled
+    let disabledSettings = await app.hostSettings()
+    guard let disabledProvider = disabledSettings.providers.first(where: { $0.id == first.id }),
+          disabledProvider.enabledModels?["ready"] == false else { throw CheckFailure.message("Core did not disable the model") }
+    expected.providers[0] = disabledProvider
     app.inputMode = "description"
     app.descriptionText = "a green square"
     app.selectNextDrawingModel("model-ui-a:vision:local")
@@ -140,11 +147,14 @@ func runModelSettingsUIChecks() async throws {
 
     try await editor.addProvider(id: "custom-ui", label: "Custom", kind: .openAICompatible,
         baseURL: "http://127.0.0.1:4/v1", model: app)
-    expected.providers.append(.init(id: "custom-ui", baseURL: URL(string: "http://127.0.0.1:4/v1")!,
-        requiresAPIKey: false, label: "Custom", models: [], enabledModels: [:]))
+    let afterAdd = await app.hostSettings()
+    guard let added = afterAdd.providers.first(where: { $0.id == "custom-ui" }), added.label == "Custom", !added.requiresAPIKey else {
+        throw CheckFailure.message("Keyless custom service not added")
+    }
+    expected.providers.insert(added, at: expected.providers.firstIndex(where: { $0.kind == .chatGPTPlan }) ?? expected.providers.endIndex)
     try await expectSettings("Keyless custom service changed another connection")
     try await editor.deleteProvider(providerID: "custom-ui", model: app)
-    expected.providers.removeLast()
+    expected.providers.removeAll { $0.id == "custom-ui" }
     try await expectSettings("Unrelated service deletion changed drawing defaults")
 
     // Failure: the ChatGPT plan's published models were not offered to the drawing pickers, an unpublished one was,
@@ -198,7 +208,7 @@ func runModelSettingsUIChecks() async throws {
     guard await credentials.reads == 0, await credentials.writes == 0, await transport.calls == 0 else {
         throw CheckFailure.message("Settings-only checks touched a secret or called a provider")
     }
-    print("Model settings UI passed: scoped saves and rejected URL; legacy decode; draft discard, filter and bulk selection; persisted purposes/evaluation/usage; disabled/Vision/EOL/subscription drawing guards with saved references retained; keyless add/delete; ChatGPT plan published models 2 of 3 offered by purpose (Vision-only kept out of drawing) and cleared when disconnected; restart. Temporary settings/SQLite only, zero secret reads/writes and provider calls.")
+    print("Model settings UI passed: scoped saves and shared URL validation; normalized settings; draft discard, filter and bulk selection; persisted purposes/evaluation/usage; disabled/Vision/EOL/subscription drawing guards with saved references retained; keyless add/delete; ChatGPT plan published models and disconnection; restart. Temporary settings/SQLite only, zero secret reads/writes and provider calls.")
 }
 
 private actor ModelSettingsNoSecretStore: ProviderCredentialStore {

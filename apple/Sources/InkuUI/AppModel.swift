@@ -294,7 +294,7 @@ public final class AppModel {
             let database = try InkuDatabase(url: url)
             let store = ProviderSettingsStore(url: url.deletingLastPathComponent().appendingPathComponent("providers.json"))
             let bootstrap = try Bootstrap(pluginDataDirectory: url.deletingLastPathComponent())
-            let settings = try await store.load(installingDefaults: BundledProviderDefaults.loadBundled())
+            let settings = try await store.loadNormalized()
             self.database = database
             await autonomousRefinement.restore(database: database)
             // A derived store: without it thumbnails are drawn and kept in memory, and nothing else stops.
@@ -586,6 +586,9 @@ public final class AppModel {
     }
 
     public func localDataDirectory() -> URL? { database?.url.deletingLastPathComponent() }
+    public var stageDefaultProviderID: String {
+        ProviderModelReference.split(settings.models.stage1Model, providers: settings.providers)?.providerID ?? ProviderModelReference.stageDefaultProviderID
+    }
     func reloadPluginPackages() throws {
         guard let directory = localDataDirectory() else { throw HostError("database_unavailable") }
         let updated = try Bootstrap(pluginDataDirectory: directory)
@@ -696,6 +699,7 @@ public final class AppModel {
               !isBusy || settings.plugins == self.settings.plugins else { throw HostError("settings_busy_or_unavailable") }
         var settings = settings
         if self.settings.providerDefaultsInstalled == true { settings.providerDefaultsInstalled = true }
+        if settings.inactiveBuiltinProviderIDs == nil { settings.inactiveBuiltinProviderIDs = self.settings.inactiveBuiltinProviderIDs }
         if let limits = settings.drawingLimits {
             guard let drawingLimitDefinition else { throw HostError("installation_unavailable") }
             settings.drawingLimits = drawingLimitDefinition.normalized(limits)
@@ -707,7 +711,7 @@ public final class AppModel {
             }
         }
         let diagnostics = try bootstrap.map { try Self.pretty($0.macroCatalogValue(language: instructionLanguage(for: currentInputText), settings: settings, importedPlugins: importedDDL?.plugins ?? []).data) }
-        try await settingsStore.save(settings)
+        settings = try await settingsStore.save(settings)
         let previousSettings = self.settings
         self.settings = settings
         synchronizeNextDrawingModel(previousSettings: previousSettings)

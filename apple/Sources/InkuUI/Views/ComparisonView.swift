@@ -22,7 +22,7 @@ public struct ComparisonView: View {
                 RefinementDialog(model: model, title: comparison.kind == .catalog ? "色カタログを変える" : "モデルを変える", work: work,
                     closeDisabled: comparison.running || comparison.hasUnsaved || model.isBusy, onClose: { dismiss() },
                     targetTitle: comparison.kind == .model ? model.display.webCopy("modelCompareTargetTitle", "対象作品") : "推敲対象",
-                    targetModelName: comparison.kind == .model ? ModelNaming(providers: namingProviders).displayName(work.stage1Model ?? work.stage2Model) : nil,
+                    targetModelName: comparison.kind == .model ? ModelNaming(providers: namingProviders, stageProvider: model.stageDefaultProviderID).displayName(work.stage1Model ?? work.stage2Model) : nil,
                     topControls: comparison.kind == .model ? AnyView(modelChoices) : nil) {
                     VStack(alignment: .leading, spacing: 12) {
                         if comparison.kind == .catalog { catalogControls }

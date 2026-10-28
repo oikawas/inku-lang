@@ -79,7 +79,8 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
         do {
             // Server raises TimeoutError for a non-positive attempt timeout.
             guard timeoutMS > 0 else { throw HostError("transport_timeout") }
-            let (provider, model) = try resolve(modelReference, providers: providers)
+            let defaultProvider = ProviderModelReference.split(models.stage1Model, providers: providers)?.providerID ?? ProviderModelReference.stageDefaultProviderID
+            let (provider, model) = try resolve(modelReference, providers: providers, defaultProvider: defaultProvider)
             recorder?.setEndpoint(provider.baseURL)
             let key = try await credentials.key(for: provider.credentialID)
             recorder?.addSecrets(key.map { [$0] } ?? [])
@@ -259,17 +260,18 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
         return data
     }
 
-    private func resolve(_ reference: String, providers: [ProviderSettings]) throws -> (ProviderSettings, String) {
-        let (providerID, model) = ProviderModelReference.resolve(reference, providers: providers)
+    private func resolve(_ reference: String, providers: [ProviderSettings], defaultProvider: String = ProviderModelReference.stageDefaultProviderID) throws -> (ProviderSettings, String) {
+        let (providerID, model) = ProviderModelReference.resolve(reference, providers: providers, defaultProvider: defaultProvider)
         guard !model.isEmpty, let provider = providers.first(where: { $0.id == providerID }) else { throw HostError("provider_selection_required") }
-        return (provider, model)
+        return (try ProviderCoreSettings.connection(provider), model)
     }
 
     /// Vision and other auxiliary routes share HTTP policy, not pipeline accounting.
     public func performAuxiliary(prompt: AuxiliaryPrompt, modelReference: String, settings: HostSettings,
                                  credentials: any CredentialStore,
                                  onBytes: @escaping @Sendable (Int) -> Void) async throws -> String {
-        let (provider, model) = try resolve(modelReference, providers: settings.providers)
+        let defaultProvider = ProviderModelReference.split(settings.models.stage1Model, providers: settings.providers)?.providerID ?? ProviderModelReference.stageDefaultProviderID
+        let (provider, model) = try resolve(modelReference, providers: settings.providers, defaultProvider: defaultProvider)
         let key = try await credentials.key(for: provider.credentialID)
         let wire = try ProviderWire.prepareText(prompt: prompt, provider: provider, model: model, key: key)
         var request = wire.request; request.timeoutInterval = prompt.timeoutSeconds

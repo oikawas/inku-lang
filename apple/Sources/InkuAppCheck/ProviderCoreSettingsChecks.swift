@@ -30,6 +30,11 @@ func runProviderCoreSettingsChecks(url: URL) async throws {
         try equal([split["provider"] ?? NSNull(), split["model"] ?? NSNull()], row["split"], "references \(index)")
         let adaptedSplit = try ProviderCoreSettings.call("split_ref", ["ref": row["ref"]!, "providers": adaptedProviders])
         try equal([adaptedSplit["provider"] ?? NSNull(), adaptedSplit["model"] ?? NSNull()], row["split"], "adapted references \(index)")
+        for stage in ["stage1", "stage2"] {
+            let resolved = try ProviderCoreSettings.call("resolve_ref", ["ref": row["ref"]!, "providers": adaptedProviders,
+                "default_provider": "nvidia", "default_model": "google/gemma-4-31b-it"])
+            try equal([resolved["provider"] ?? NSNull(), resolved["model"] ?? NSNull()], row[stage], "adapted \(stage) \(index)")
+        }
     }
     for (index, row) in rows("resolution_cases").enumerated() {
         let settings = row["settings"] as? [String: Any] ?? [:]

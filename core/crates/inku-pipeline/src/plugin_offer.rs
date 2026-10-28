@@ -36,7 +36,7 @@ pub struct OfferRecord {
 }
 
 pub const PLUGIN_RULE_JA: &str = "\n\n# プラグインの語\nplugins の語だけを使う。記述の物そのものなら使い、色名・たとえ・時など別の意味なら使わない。物の語は形の語（円・四角など）の代わりに書き、その語の行に挙がった語だけを添える。情景の語は数以外を添えず、数は記述にある時だけ（例：｛若葉｝。）。描く物を他の形で重ねない。";
-pub const PLUGIN_RULE_EN: &str = "\n\n# Plugin words\nUse only listed plugins when the description means the thing itself, not a color, simile, or time. An object word replaces a shape word (circle, square, ...) and takes only the words its line lists. A scene word takes only a count, and only when stated (e.g. {young leaves}.). Do not draw its subject again with other shapes.";
+pub const PLUGIN_RULE_EN: &str = "\n\n# Plugin words\nUse only the words in plugins. Use a word when the description means its thing itself; do not use it for another meaning (a color, simile, or time). An object word replaces a shape word (circle, square, ...) and takes only the words its line lists. A scene word takes only a count, and only when stated (e.g. {young leaves}.). Do not draw its subject again with other shapes.";
 
 pub fn rule(language: ResolvedInstructionLanguage) -> &'static str {
     match language {

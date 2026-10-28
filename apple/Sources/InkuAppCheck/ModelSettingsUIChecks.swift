@@ -71,6 +71,21 @@ func runModelSettingsUIChecks() async throws {
     guard initialDraft.filteredModels(search: "vision", filter: .all).map(\.id) == ["vision:local"],
           initialDraft.filteredModels(search: "", filter: .vision).map(\.id) == ["vision:local"],
           !initialDraft.isDirty else { throw CheckFailure.message("Searching or filtering mutated the draft") }
+    let lexical = ["gemma-3-1b-it", "gemma-3-4b-it", "gemma-3-12b-it", "gemma-3-27b-it"]
+        .map { ProviderModelSettings(id: $0, recommendationLLM: 3) }
+    let ordered = ProviderModelsDraft(models: lexical, enabled: [:]).filteredModels(search: "", filter: .all).map(\.id)
+    guard ordered == ["gemma-3-12b-it", "gemma-3-1b-it", "gemma-3-27b-it", "gemma-3-4b-it"] else {
+        throw CheckFailure.message("Model settings did not use the core lexical order: \(ordered)")
+    }
+    let picker = [ProviderModelSettings(id: "weak", purposes: ["llm", "vision"], recommendationVision: 5,
+                                        recommendationStage1: 4, recommendationStage2: 2),
+                  ProviderModelSettings(id: "strong", purposes: ["llm", "vision"], recommendationVision: 1,
+                                        recommendationStage1: 3, recommendationStage2: 3)]
+    guard ProviderModelOrdering.picker(picker, purpose: "llm", chatGPT: false).map(\.id) == ["strong", "weak"],
+          ProviderModelOrdering.picker(picker, purpose: "vision", chatGPT: false).map(\.id) == ["weak", "strong"],
+          ProviderModelOrdering.picker(picker, purpose: "llm", chatGPT: true).map(\.id) == ["weak", "strong"] else {
+        throw CheckFailure.message("Drawing picker order or ChatGPT publication order changed")
+    }
     var discarded = initialDraft
     discarded.setEnabled(modelID: "ready", enabled: false)
     discarded.togglePurpose(modelID: "ready", purpose: "vision")

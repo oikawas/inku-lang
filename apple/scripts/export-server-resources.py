@@ -96,12 +96,9 @@ def write_json(path: Path, value: object) -> None:
 
 
 def export_model_catalog(manifest: dict) -> None:
-    catalog = model_catalog()
     manifest.pop("model_guidance", None)
-    manifest["model_catalog"] = catalog
+    manifest.pop("model_catalog", None)
     manifest["provider_defaults"] = provider_defaults()
-    write_json(DESTINATION_ROOT / "apple/Packages/InkuHost/Sources/InkuHost/Resources/model-labels.json",
-               {"schema": catalog["schema"], "labels": catalog["labels"]})
 
 
 class BindingPlaceholder:
@@ -118,7 +115,7 @@ def main() -> None:
     global ROOT, SERVER
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-root", type=Path, default=ROOT, help="Product checkout containing the canonical Server/Web resources")
-    parser.add_argument("--model-catalog-only", action="store_true", help="Refresh only the model catalog and label resources")
+    parser.add_argument("--model-catalog-only", action="store_true", help="Refresh only provider defaults and remove the old catalog copy")
     arguments = parser.parse_args()
     ROOT = arguments.source_root.resolve()
     SERVER = ROOT / "server/src/inku_server"

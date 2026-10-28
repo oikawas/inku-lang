@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-28 — macOS reads the shared model catalog
+
+The model catalog, labels, ratings and ordering now come from the shared core; the settings list uses the same lexical order as the Web.
+
 ### 2026-10-27 — Delete a ChatGPT plan registration on macOS
 
 The connection settings can recheck the state and delete a registration together with its published model settings. Deletion asks for confirmation and reports if provider revocation could not be confirmed.

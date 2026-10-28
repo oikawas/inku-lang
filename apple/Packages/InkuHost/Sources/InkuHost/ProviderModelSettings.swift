@@ -52,24 +52,49 @@ public struct ProviderModelSettings: Codable, Sendable, Equatable, Identifiable 
     }
 
     public var resolvedLabels: [ModelCatalogLabelDefinition] { ModelCatalogLabels.resolve(for: self) }
-    public var modelFold: String? { resolvedLabels.last?.id }
-    public var isSelectable: Bool { resolvedLabels.allSatisfy(\.publishable) }
+    public var modelFold: String? { SharedModelCatalog.decision(for: self).fold }
+    public var isSelectable: Bool { !SharedModelCatalog.decision(for: self).selection.unselectable }
     /// A model offered for no purpose is never published, nor turned on by "select all".
     public var isPublishable: Bool { isSelectable && !purposes.isEmpty }
 
     /// Measured without a response for this purpose: it can be chosen, but is not recommended.
-    public func isNotRecommended(for purpose: String) -> Bool { (unsupportedPurposes ?? []).contains(purpose) }
+    public func isNotRecommended(for purpose: String) -> Bool { SharedModelCatalog.decision(for: self).selection.unsupported[purpose] ?? false }
 
     /// Offered for the purpose: a purpose measured without a response only when it was chosen for it.
     public func offers(_ purpose: String) -> Bool {
         purposes.contains(purpose) && (!isNotRecommended(for: purpose) || (allowedUnsupportedPurposes ?? []).contains(purpose))
     }
-    public var hasCatalogMeasurement: Bool {
-        catalogMeasurementPresent == true
-            || [recommendationLevel, recommendationLLM, recommendationVision, recommendationStage1, recommendationStage2].contains { $0 != nil }
-            || speedClass != nil || speedLabel != nil || commentJA != nil || commentEN != nil
-            || speedLLMSeconds != nil || speedVisionSeconds != nil || costUSDLLM != nil || costUSDVision != nil
-            || unsupportedPurposes != nil
+    public var hasCatalogMeasurement: Bool { !SharedModelCatalog.measurementKeys.isDisjoint(with: coreCatalogRecord.keys) }
+
+    /// Translate stored labels and local observations into the Server-shaped core input.
+    public var coreCatalogRecord: [String: Any] {
+        var record: [String: Any] = ["id": id, "label": label, "purposes": purposes]
+        var stored = Set(labels)
+        if let requiresSubscription { if requiresSubscription { stored.insert("subscription") } else { stored.remove("subscription") } }
+        if let eol { if eol { stored.insert("eol") } else { stored.remove("eol") } }
+        for (label, key) in [("legacy", "legacy"), ("subscription", "requires_subscription"),
+                             ("not_supported", "not_supported"), ("eol", "eol")] where stored.contains(label) { record[key] = true }
+        let measurements: [(String, Any?)] = [
+            ("recommendation_level", recommendationLevel), ("recommendation_llm", recommendationLLM),
+            ("recommendation_vision", recommendationVision), ("recommendation_stage1", recommendationStage1),
+            ("recommendation_stage2", recommendationStage2), ("speed_class", speedClass), ("speed_label", speedLabel),
+            ("comment_ja", commentJA), ("comment_en", commentEN), ("unsupported_purposes", unsupportedPurposes),
+            ("speed_llm_seconds", speedLLMSeconds), ("speed_vision_seconds", speedVisionSeconds),
+            ("cost_usd_llm", costUSDLLM), ("cost_usd_vision", costUSDVision)]
+        for (key, value) in measurements { if let value { record[key] = value } }
+        if catalogMeasurementPresent == true && measurements.allSatisfy({ $0.1 == nil }) { record["recommendation_level"] = NSNull() }
+        return record
+    }
+
+    public func catalogLevel(purpose: String, stage: String = "none") -> Int? {
+        guard let value = SharedModelCatalog.decision(for: self).selection.levels[purpose]?[stage], value > 0 else { return nil }
+        return Int(value)
+    }
+    public func catalogSortKey(purpose: String = "none", stage: String = "none") -> String {
+        guard let key = SharedModelCatalog.decision(for: self).selection.sortKeys[purpose]?[stage] else {
+            preconditionFailure("Core model catalog sort key unavailable")
+        }
+        return key
     }
 
     public func validate() throws {

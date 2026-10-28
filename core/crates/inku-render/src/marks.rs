@@ -75,6 +75,8 @@ impl std::error::Error for MarkError {}
 #[derive(Clone, Copy)]
 pub struct MarkContext<'a> {
     pub canvas: CanvasSize,
+    /// The paper whose bounds clip transformed geometry; normally the canvas.
+    pub clip_canvas: Option<CanvasSize>,
     pub color_map: &'a BTreeMap<String, String>,
     pub work_assignment: &'a BTreeMap<String, String>,
     pub render_seed: Option<Seed>,
@@ -128,9 +130,10 @@ pub(crate) fn reaches_canvas(
     } else {
         (start, end)
     };
-    let reach = ink_reach(width, context.canvas);
+    let clip_canvas = context.clip_canvas.unwrap_or(context.canvas);
+    let reach = ink_reach(width, clip_canvas);
     // A fitted frame's strokes reach its paper (render engine 93).
-    let [x0, y0, x1, y1] = context.canvas.paper();
+    let [x0, y0, x1, y1] = clip_canvas.paper();
     start.x.max(end.x) + reach >= x0
         && start.x.min(end.x) - reach <= x1
         && start.y.max(end.y) + reach >= y0
@@ -1686,6 +1689,7 @@ mod tests {
         let colors = BTreeMap::new();
         let context = MarkContext {
             canvas: CanvasSize::new(1000.0, 1000.0),
+            clip_canvas: None,
             color_map: &colors,
             work_assignment: &colors,
             render_seed: Some(1),
@@ -1723,6 +1727,7 @@ mod tests {
         let colors = BTreeMap::new();
         let context = MarkContext {
             canvas: CanvasSize::new(1000.0, 1000.0),
+            clip_canvas: None,
             color_map: &colors,
             work_assignment: &colors,
             render_seed: Some(7),
@@ -1808,6 +1813,7 @@ mod tests {
         let colors = BTreeMap::new();
         let context = MarkContext {
             canvas: CanvasSize::new(1000.0, 1000.0),
+            clip_canvas: None,
             color_map: &colors,
             work_assignment: &colors,
             render_seed: Some(1),
@@ -1902,6 +1908,7 @@ mod tests {
         let colors = BTreeMap::new();
         let context = MarkContext {
             canvas: CanvasSize::new(1000.0, 1000.0),
+            clip_canvas: None,
             color_map: &colors,
             work_assignment: &colors,
             render_seed: Some(7),

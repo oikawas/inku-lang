@@ -158,6 +158,85 @@ fn a_declared_color_reaches_the_object_body() {
 
 #[test]
 #[ignore = "object placement and rendering are not connected yet"]
+fn object_box_placement_matches_a_square_with_the_same_meaning() {
+    let leaf = word(
+        "Leaf",
+        "葉",
+        "leaf",
+        "1:1",
+        json!([arc("upper", "0.5", "0"), arc("lower", "0.5", "180")]),
+    );
+    let definitions = [leaf];
+    let budget = ResourceBudget {
+        maximum: ResourceDemand {
+            logical_objects: 400,
+            primitive_marks: 400,
+            object_templates: 64,
+            maximum_per_template_primitive_marks: 240,
+            maximum_resolved_count: 2000,
+            template_nodes: 512,
+            anchor_instances: 400,
+            transform_instances: 400,
+            placement_instances: 400,
+            fill_instances: 400,
+        },
+    };
+    let compile = |source: &str, locks: Vec<MacroLock>, definitions: &[MacroDefinition]| {
+        compile_ddl_to_score_with_resources(
+            NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::Ja, locks).unwrap(),
+            definitions,
+            Some(37),
+            MacroExpansionLimits {
+                max_invocations: 64,
+                max_depth: 16,
+                max_evaluation_steps: 8192,
+                max_nodes_per_invocation: 128,
+                max_total_nodes: 128,
+            },
+            ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+            ScoreErrorPolicy::OmitAndContinue,
+            HardResourcePolicy {
+                identity: "object-test.v1".into(),
+                budget,
+            },
+            OperationalResourceBudget(budget),
+        )
+    };
+    for (object, square) in [
+        ("上に｛葉｝を8枚散らす。", "上に黒い四角を8個散らす。"),
+        ("｛葉｝を5枚並べる。", "黒い四角を5個並べる。"),
+        (
+            "横0.3、縦0.7の位置に、幅0.2、高さ0.1の｛葉｝を置く。",
+            "横0.3、縦0.7の位置に、幅0.2、高さ0.1の黒い四角を置く。",
+        ),
+    ] {
+        let actual = compile(object, vec![lock(&definitions[0])], &definitions);
+        let expected = compile(square, vec![], &[]);
+        assert!(
+            actual.upstream_diagnostics().is_empty() && actual.downstream_diagnostics().is_empty(),
+            "{object}: {:?} {:?}",
+            actual.upstream_diagnostics(),
+            actual.downstream_diagnostics()
+        );
+        assert!(
+            expected.upstream_diagnostics().is_empty()
+                && expected.downstream_diagnostics().is_empty(),
+            "{square}: {:?} {:?}",
+            expected.upstream_diagnostics(),
+            expected.downstream_diagnostics()
+        );
+        let a = &actual.score().unwrap().instructions[0];
+        let b = &expected.score().unwrap().instructions[0];
+        assert_eq!(
+            (a.position, a.size, a.rotation, &a.arrangement),
+            (b.position, b.size, b.rotation, &b.arrangement),
+            "{object}"
+        );
+    }
+}
+
+#[test]
+#[ignore = "object placement and rendering are not connected yet"]
 fn object_word_draws_instead_of_being_rejected() {
     let leaf = word(
         "Leaf",
@@ -259,6 +338,47 @@ fn object_word_draws_instead_of_being_rejected() {
             );
         }
         let score = result.score().unwrap();
+        if source == "上に｛葉｝を8枚散らす。" {
+            let request = inku_render::types::RenderRequest {
+                score: score.clone(),
+                options: inku_render::types::RenderOptions {
+                    resolved_color_map: Default::default(),
+                    catalog_id: None,
+                    canvas: inku_render::types::CanvasSize::new(1000.0, 1000.0),
+                    canvas_aspect_id: "square".into(),
+                    svg_profile: inku_render::types::SvgProfile::Display,
+                    render_seed: Some(17),
+                    composition_seed: Some(37),
+                    wild: false,
+                    error_policy: ScoreErrorPolicy::OmitAndContinue,
+                },
+            };
+            let clip = inku_render::render::CompatFillClipPolicy {
+                tolerance_pixels: 0.1,
+                limits: inku_render::compat_clip::ClipLimits {
+                    max_nodes: 50_000,
+                    max_path_elements: 200_000,
+                    max_flattened_points: 200_000,
+                    max_work: 10_000_000,
+                    max_output_vertices: 200_000,
+                },
+            };
+            let picture = inku_render::render::render_with_resources(
+                request,
+                &HardResourcePolicy {
+                    identity: "object-test.v1".into(),
+                    budget,
+                },
+                OperationalResourceBudget(budget),
+                clip,
+            )
+            .unwrap();
+            assert!(
+                picture.svg.matches("<path").count() >= 16,
+                "{}",
+                picture.svg
+            );
+        }
         let restored = inku_score::finalize_saved_score(
             score,
             &HardResourcePolicy {

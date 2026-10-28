@@ -395,6 +395,149 @@ fn validate_request(request: &RenderRequest) -> Result<(), RenderError> {
         .map_err(RenderError::InvalidScore)
 }
 
+/// Paint one local template into an already performed box. The template's
+/// geometry receives the box transform, while mark widths and texture scales
+/// keep the work's short-side unit.
+#[allow(clippy::too_many_arguments)]
+fn paint_object_body(
+    template: &inku_score::ObjectTemplate,
+    parent: &Instruction,
+    containing: crate::affine::AffineTransform,
+    request: &RenderRequest,
+    assignment: &std::collections::BTreeMap<String, String>,
+    support: crate::support::Support,
+    owner_index: usize,
+    copy_index: usize,
+    material_definitions: &mut Vec<Element>,
+    surface_definitions: &mut Vec<Element>,
+    allowance: &mut OutputAllowance,
+) -> Result<Element, RenderError> {
+    let (canvas, box_transform) =
+        crate::object_template::object_box_transform(parent, request.options.canvas, containing)
+            .map_err(RenderError::InvalidScore)?;
+    let seed = request.options.render_seed.unwrap_or(0);
+    let digest = crate::determinism::seed_salt_index_digest(
+        seed,
+        "object-copy",
+        ((owner_index as i128) << 64) | (copy_index as i128),
+    );
+    let copy_seed = i128::from(u64::from_be_bytes(
+        digest[..8].try_into().expect("digest has eight bytes"),
+    ));
+    let performed = resolve_checked_performance(
+        PerformanceRequest {
+            score: &template.body,
+            performance_seed: Some(copy_seed),
+            composition_seed: request.options.composition_seed,
+            canvas: Some(canvas),
+        },
+        request.options.error_policy,
+    )
+    .map_err(RenderError::CheckedPerformance)?;
+    let profile = request.options.svg_profile;
+    let use_filters = matches!(profile, SvgProfile::Display | SvgProfile::Live);
+    let oil_fill_pass_limit = crate::fills::oil_fill_pass_limit(&performed.score.instructions);
+    let mut group = Element::new("g");
+    for (instruction, body_entry) in performed.performed_instructions() {
+        let geometry = MarkGeometry::of(instruction)?;
+        let body_transform = body_entry.transform.in_pixels(canvas.unit());
+        let instruction_index = owner_index
+            .checked_mul(100_001)
+            .and_then(|index| index.checked_add(body_entry.instruction_index))
+            .ok_or(RenderError::InvalidScore(
+                "object instruction index overflow",
+            ))?;
+        let context = MarkContext {
+            canvas,
+            clip_canvas: Some(request.options.canvas),
+            color_map: &request.options.resolved_color_map,
+            work_assignment: assignment,
+            render_seed: Some(copy_seed),
+            instruction_seed_override: body_entry.seed_override,
+            instruction_index,
+            mark_index: copy_index,
+            wild: request.options.wild,
+            use_filters,
+            profile,
+            support,
+            geometry_transform: box_transform.compose(body_transform),
+            oil_fill_pass_limit,
+            effects: body_entry.effects,
+        };
+        check_mark_extent(geometry, instruction, context)?;
+        if let Some(follower_index) = body_entry.closed_arc_pair_follower
+            && let Some(follower) = performed.score.instructions.get(follower_index)
+            && let Some(follower_entry) = performed.performed.get(follower_index)
+            && follower.arrangement.is_none()
+            && follower.mode_ == instruction.mode_
+        {
+            let follower_context = MarkContext {
+                instruction_seed_override: follower_entry.seed_override,
+                instruction_index: owner_index
+                    .checked_mul(100_001)
+                    .and_then(|index| index.checked_add(follower_entry.instruction_index))
+                    .ok_or(RenderError::InvalidScore(
+                        "object instruction index overflow",
+                    ))?,
+                geometry_transform: box_transform
+                    .compose(follower_entry.transform.in_pixels(canvas.unit())),
+                effects: follower_entry.effects,
+                ..context
+            };
+            let follower_geometry = MarkGeometry::of(follower)?;
+            check_mark_extent(follower_geometry, follower, follower_context)?;
+            if let Some(fill) =
+                render_closed_arc_pair_fill(instruction, context, follower, follower_context)?
+            {
+                let before = material_definitions.len();
+                material_definitions.extend(accepted_fills::closed_contour_definitions(
+                    follower,
+                    follower_geometry,
+                    follower_context,
+                ));
+                allowance.spend(std::iter::once(&fill).chain(&material_definitions[before..]))?;
+                group.push(fill);
+            }
+        }
+        allowance.add_mark();
+        let definitions_start = (material_definitions.len(), surface_definitions.len());
+        if profile != SvgProfile::Compat
+            && owns_surface(instruction.primitive)
+            && is_noncomputer_solid_fill(instruction)
+            && instruction.weight != crate::types::Weight::OilPaint
+            && !accepted_fills::active(instruction)
+        {
+            let (filter_id, seed) = solid_mottle_filter_id(instruction, context);
+            material_definitions.push(solid_mottle_filter(&filter_id, seed));
+        }
+        material_definitions.extend(accepted_fills::definitions(instruction, geometry, context));
+        let mark = render_instruction_with_line_centerline(
+            instruction,
+            geometry,
+            context,
+            body_entry.line_centerline.as_deref(),
+            &[],
+        );
+        let mark = if let Some(surface) = render_surface(instruction, geometry, context) {
+            let mut combined = Element::new("g");
+            combined.push(mark);
+            combined.push(surface.group);
+            surface_definitions.extend(surface.definitions);
+            combined
+        } else {
+            mark
+        };
+        let mark = crate::ink_spread::wrap(mark, instruction, context);
+        allowance.spend(
+            std::iter::once(&mark)
+                .chain(&material_definitions[definitions_start.0..])
+                .chain(&surface_definitions[definitions_start.1..]),
+        )?;
+        group.push(mark);
+    }
+    Ok(group)
+}
+
 /// Absolute maxima for [`render`], the entry that receives no host authority.
 ///
 /// Its hosts coerce a legacy Score to their own limits first. The Server lets
@@ -636,6 +779,13 @@ fn render_impl(
                 .score
                 .instructions
                 .iter()
+                .chain(
+                    performance
+                        .score
+                        .object_templates
+                        .iter()
+                        .flat_map(|template| template.body.instructions.iter()),
+                )
                 .any(|instruction| instruction.weight == weight)
                 && let Some(filter) = texture_filter(weight, request.options.canvas)
             {
@@ -666,6 +816,13 @@ fn render_impl(
                 .score
                 .instructions
                 .iter()
+                .chain(
+                    performance
+                        .score
+                        .object_templates
+                        .iter()
+                        .flat_map(|template| template.body.instructions.iter()),
+                )
                 .any(|instruction| accepted_fills::uses_brush_tile(instruction, weight))
                 && let Some(tile) = accepted_fills::brush_tile_definition(weight)
             {
@@ -715,6 +872,7 @@ fn render_impl(
         {
             let first_context = MarkContext {
                 canvas: request.options.canvas,
+                clip_canvas: None,
                 color_map: &request.options.resolved_color_map,
                 work_assignment: &assignment,
                 render_seed: request.options.render_seed,
@@ -771,10 +929,36 @@ fn render_impl(
         }
         for (mark_index, copy) in expanded.iter().enumerate() {
             let single = &copy.instruction;
+            if let Some(template) =
+                performance.score.object_templates.iter().find(|template| {
+                    template.instruction_index == performed.original_instruction_index
+                })
+            {
+                let body = paint_object_body(
+                    template,
+                    single,
+                    instruction_transform.in_pixels(request.options.canvas.unit()),
+                    &request,
+                    &assignment,
+                    support,
+                    instruction_index,
+                    mark_index,
+                    &mut material_definitions,
+                    &mut surface_definitions,
+                    &mut allowance,
+                )?;
+                if structured || has_fill_scopes {
+                    instruction_group.push(body);
+                } else {
+                    content.push(body);
+                }
+                continue;
+            }
             // Refuse a mark missing a field its primitive requires.
             let geometry = MarkGeometry::of(single)?;
             let context = MarkContext {
                 canvas: request.options.canvas,
+                clip_canvas: None,
                 color_map: &request.options.resolved_color_map,
                 work_assignment: &assignment,
                 render_seed: request.options.render_seed,
@@ -1041,6 +1225,107 @@ fn render_impl(
 mod tests {
     use super::*;
     use crate::types::{CanvasSize, RenderOptions};
+
+    #[test]
+    fn object_body_is_painted_as_marks_inside_the_performed_box() {
+        let parent: Instruction = serde_json::from_value(
+            serde_json::json!({"primitive":"square","position":[0.2,0.65],"size":[0.2,0.1]}),
+        )
+        .unwrap();
+        let body: Score =
+            serde_json::from_value(serde_json::json!({"version":"0.22.0","instructions":[
+                {"primitive":"line","from":[0.0,0.5],"to":[1.0,0.5],"color":"green"},
+                {"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"color":"red"}
+            ]}))
+            .unwrap();
+        let template = inku_score::ObjectTemplate {
+            instruction_index: 0,
+            aspect: [2, 1],
+            body: Box::new(body),
+        };
+        let request = RenderRequest {
+            score: serde_json::from_value(serde_json::json!({"version":"0.9.0","instructions":[]}))
+                .unwrap(),
+            options: RenderOptions {
+                resolved_color_map: Default::default(),
+                catalog_id: None,
+                canvas: CanvasSize::new(1000.0, 1000.0),
+                canvas_aspect_id: "square".into(),
+                svg_profile: SvgProfile::Display,
+                render_seed: Some(17),
+                composition_seed: Some(37),
+                wild: false,
+                error_policy: inku_score::ScoreErrorPolicy::OmitAndContinue,
+            },
+        };
+        let mut definitions = Vec::new();
+        let mut surfaces = Vec::new();
+        let mut allowance = OutputAllowance::default();
+        let body = paint_object_body(
+            &template,
+            &parent,
+            crate::affine::AffineTransform::identity(),
+            &request,
+            &Default::default(),
+            DEFAULT_SUPPORT,
+            0,
+            0,
+            &mut definitions,
+            &mut surfaces,
+            &mut allowance,
+        )
+        .unwrap();
+        assert_eq!(body.children().len(), 2);
+        let mut document = Document::new(request.options.canvas);
+        document.push(body);
+        let svg = document.serialize();
+        assert!(svg.contains("200") && svg.contains("650"), "{svg}");
+        assert!(!svg.contains("<rect"), "{svg}");
+        let mut request = request;
+        request.score.version = "0.23.0".into();
+        request.score.instructions.push(parent);
+        request.score.object_templates.push(template);
+        let rendered = render_impl(request, None, &[], OutputAllowance::default()).unwrap();
+        assert_eq!(rendered.svg.matches("<rect").count(), 1, "{}", rendered.svg);
+        assert!(
+            rendered.svg.contains("<line") || rendered.svg.contains("<path"),
+            "{}",
+            rendered.svg
+        );
+    }
+
+    #[test]
+    fn transformed_object_ink_is_clipped_against_the_work_paper() {
+        let colors = std::collections::BTreeMap::new();
+        let instruction: Instruction =
+            serde_json::from_value(serde_json::json!({"primitive":"line"})).unwrap();
+        let context = MarkContext {
+            canvas: CanvasSize::new(1000.0, 2000.0),
+            clip_canvas: Some(CanvasSize::new(2000.0, 1000.0)),
+            color_map: &colors,
+            work_assignment: &colors,
+            render_seed: Some(1),
+            instruction_seed_override: None,
+            instruction_index: 0,
+            mark_index: 0,
+            wild: false,
+            use_filters: false,
+            profile: SvgProfile::Display,
+            support: DEFAULT_SUPPORT,
+            geometry_transform: crate::affine::AffineTransform::translation(
+                crate::types::Point::new(1.0, 0.0),
+            ),
+            oil_fill_pass_limit: 1,
+            effects: Default::default(),
+        };
+        assert!(crate::marks::reaches_canvas(
+            &instruction,
+            context,
+            crate::types::Point::new(1700.0, 400.0),
+            crate::types::Point::new(1800.0, 500.0),
+            1.0
+        ));
+    }
 
     #[test]
     fn svg_limit_runtime_base_admits_bytes_a_lower_fixed_base_refuses() {

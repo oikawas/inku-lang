@@ -19,9 +19,9 @@ from ...reference import build_reference, render_markdown
 from ...saijiki import display_categories
 from ...render_engines import current_render_engine
 from ...distribution_notices import NoticesResponse, notice_bytes, notice_catalog
-from ... import provider_wire
 from ...model_settings import connection_for, default_user_model_settings, model_provider_catalog, normalize_model_settings, provider_for_model
 from ...verified_model_catalog import core_catalog
+from ...text_provider import send_text
 from ... import db as _db
 from ..common import MODEL_NOT_OFFERED_DETAIL, _APP_VERSION, _RELEASE_VERSION, _build_number, _env_flag, _model_offered_to, _normalize_instruction_lang, _normalize_ui_lang, _resolve_instruction_lang, _unexpected_http_error
 from ..deps import _current_user
@@ -401,13 +401,9 @@ def _generate_demo_instruction(seed_phrase: str, *, model: str | None, lang: str
     # Asked as the colophon is (provider_wire): no temperature for Claude, which
     # claude-sonnet-5 refuses with a 400, nor for Gemini, which is tuned for its
     # default; room for the thinking Claude 5 does unasked and Gemini counts.
-    built = provider_wire.text_request(connection, model_id, system=_demo_instruction_system(lang), text=seed_phrase,
-                                       images=[], temperature=0.9, max_tokens=180)
-    with httpx.Client(timeout=timeout, transport=transport, follow_redirects=False) as client:
-        response = client.post(built["url"], headers=provider_wire.headers(built, str(connection.get("api_key") or "")),
-                               content=built["body"].encode("utf-8"))
+    _, response, read = send_text(connection, model_id, system=_demo_instruction_system(lang), text=seed_phrase,
+                                  images=[], temperature=0.9, max_tokens=180, timeout=timeout, transport=transport)
     response.raise_for_status()
-    read = provider_wire.read_text(built["format"], response.status_code, response.content)
     if read["outcome"] != "answer":
         raise ValueError(read.get("detail") or "demo instruction answer is malformed")
     # Gemma returns its thoughts as parts beside the answer; they are not read.

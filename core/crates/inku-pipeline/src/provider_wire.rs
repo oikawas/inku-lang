@@ -2355,7 +2355,7 @@ mod tests {
             }
             compared += 1;
         }
-        assert_eq!(compared, 217);
+        assert_eq!(compared, 221);
     }
 
     #[test]

@@ -84,6 +84,12 @@ def text_request(connection: dict, model: str, *, system: str, text: str, images
                 images=list(images), temperature=temperature, max_tokens=max_tokens)
 
 
+def text_request_with_count(connection: dict, model: str, *, system: str, text: str, images: list[str],
+                            temperature: float, max_tokens: int) -> dict:
+    return _ask("text_request_with_count", connection=_connection(connection), model=model, system=system, text=text,
+                images=list(images), temperature=temperature, max_tokens=max_tokens)
+
+
 def chatgpt_request(model: str, prompt: dict, answer_limit: int, *, images: list[str] | None = None) -> dict:
     """The ChatGPT plan's body for one pipeline effect: body, canonical, wire_limit, event_limit."""
     return _ask("chatgpt_request", model=model, answer_limit=answer_limit,
@@ -163,3 +169,7 @@ def usage(format_name: str, raw: bytes) -> dict | None:
 def read_text(format_name: str, status: int, raw: bytes) -> dict:
     """The answer to a text response: ``answer`` with ``text`` (and ``cut`` when it was cut off), or ``malformed``."""
     return _ask("text_response", format=format_name, status=status, body=_body_text(raw))
+
+
+def read_text_with_usage(format_name: str, status: int, raw: bytes) -> dict:
+    return _ask("text_response_with_usage", format=format_name, status=status, body=_body_text(raw))

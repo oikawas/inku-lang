@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-28 — Share provider admission for text requests
+
+Server Vision and demo text requests now share provider limits with drawing, including Gemini token counting and 429 cooldown. The shared core also owns the ChatGPT plan quota pause transition.
+
 ### 2026-10-28 — Share provider settings on macOS
 
 Provider settings, model references, publication, discovery and validation follow the shared core. Migration preserves removed built-in connections and the previously published models.

@@ -64,9 +64,10 @@ def pause_quota(owner: str, profile_id: str, generation: int, deadline: float) -
     with store.lock("edit:" + owner, deadline):
         saved = store.read(owner)
         profile = saved["profiles"].get(profile_id)
-        if profile and profile["generation"] == generation and profile["state"] != "quota":
-            profile["state"] = "quota"
-            profile.pop("catalog", None)
+        from .verified_model_catalog import core_catalog
+        result = core_catalog("chatgpt_auth_pause_quota", profile=profile, generation=generation)
+        if result["changed"]:
+            saved["profiles"][profile_id] = result["profile"]
             store.write(owner, saved)
 
 

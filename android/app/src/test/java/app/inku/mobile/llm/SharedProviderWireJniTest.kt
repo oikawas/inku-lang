@@ -169,7 +169,7 @@ class SharedProviderWireJniTest {
     @Test
     fun allChatGptRowsMatchServer() {
         val rows = requireNotNull(cases["chatgpt"])
-        assertEquals(217, rows.size)
+        assertEquals(221, rows.size)
         val actions = mutableMapOf<String, Int>()
         for ((index, item) in rows.withIndex()) {
             val row = item.row

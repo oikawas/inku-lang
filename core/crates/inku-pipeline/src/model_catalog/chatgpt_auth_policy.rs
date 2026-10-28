@@ -135,6 +135,19 @@ fn r_local_offset(request: &Value) -> Option<jiff::tz::Offset> {
 pub(super) fn run(r: &Value) -> Value {
     let profile = &r["profile"];
     match r["action"].as_str().unwrap_or("") {
+        "chatgpt_auth_pause_quota" => {
+            if !profile.is_object()
+                || profile["generation"] != r["generation"]
+                || profile["state"] == "quota"
+            {
+                json!({"changed":false})
+            } else {
+                let mut next = profile.clone();
+                next["state"] = json!("quota");
+                next.as_object_mut().unwrap().remove("catalog");
+                json!({"changed":true,"profile":next})
+            }
+        }
         "chatgpt_auth_constants" => {
             json!({"issuer":ISSUER,"authorize":format!("{ISSUER}/api/accounts/authorize"),"token":format!("{ISSUER}/api/accounts/oauth/token"),"resource":RESOURCE,"scopes":SCOPES})
         }

@@ -1545,6 +1545,7 @@ fn has_relative_scale_head_context(
         }
         if has_primitive_candidate_at(edition, source, cursor, language)
             || qualified_macro_end(source, cursor).is_some()
+            || bracketed_plugin_at(source, cursor).is_some()
         {
             return true;
         }

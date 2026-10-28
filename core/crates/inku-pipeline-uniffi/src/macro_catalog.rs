@@ -344,6 +344,24 @@ mod tests {
     use serde_json::json;
 
     #[test]
+    fn v2_name_conflicts_with_v1_but_two_v1_generated_names_can_coexist() {
+        let v1 = |namespace: &str| json!({"schema":"inku.macro-definition.v1","namespace":namespace,"heading":"YoungLeaves","aliases":["若葉"],"version":"1.0.0","parameters":{},"components":{},"body":[]});
+        let v2 = json!({"schema":"inku.macro-definition.v2","namespace":"Other","id":"Leaf","names":{"ja":["若葉"],"en":["new leaf"]},"kind":"scene","version":"1.0.0","parameters":{},"components":{},"body":[]});
+        let output = resolve(
+            &serde_json::to_vec(&json!({"maximum_entries":10,"canonical":[
+                {"source_id":"one","definition_json":v1("Nature").to_string(),"summary":"a"},
+                {"source_id":"two","definition_json":v1("Garden").to_string(),"summary":"b"},
+                {"source_id":"three","definition_json":v2.to_string(),"summary":"c"}
+            ]}))
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(output.entries.len(), 2);
+        assert_eq!(output.diagnostics.len(), 1);
+        assert_eq!(output.diagnostics[0].reason, "duplicate_qualified_name");
+    }
+
+    #[test]
     fn an_alias_may_not_claim_a_name_another_definition_already_holds() {
         let definition = |heading: &str, aliases: &[&str]| {
             serde_json::json!({

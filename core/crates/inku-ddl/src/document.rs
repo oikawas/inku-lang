@@ -99,7 +99,8 @@ pub struct NormalizedDdlDocument {
 }
 
 impl NormalizedDdlDocument {
-    pub(crate) fn with_definition_names(mut self, definitions: &[crate::MacroDefinition]) -> Self {
+    /// Attach visible names only from definitions matching the complete lock identity.
+    pub fn with_definition_names(mut self, definitions: &[crate::MacroDefinition]) -> Self {
         for lock in &mut self.macro_locks {
             let matches: Vec<_> = definitions
                 .iter()

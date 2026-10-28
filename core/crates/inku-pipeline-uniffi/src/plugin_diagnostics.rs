@@ -25,6 +25,16 @@ struct Input {
     enabled: Vec<String>,
     #[serde(default)]
     disabled: Vec<String>,
+    #[serde(default)]
+    plugin_names: Vec<PluginName>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PluginName {
+    name: String,
+    qualified_name: String,
+    enabled: bool,
 }
 
 /// One author-facing explanation for a withheld plugin sentence.
@@ -34,6 +44,8 @@ pub(crate) struct PluginDiagnostic {
     pub reason: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub suggestion: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub candidates: Vec<String>,
     pub start_byte: usize,
     pub end_byte: usize,
 }
@@ -185,6 +197,7 @@ pub(crate) fn explain(
             name,
             reason,
             suggestion,
+            candidates: Vec::new(),
             start_byte: start,
             end_byte: end,
         });
@@ -192,19 +205,134 @@ pub(crate) fn explain(
     out
 }
 
+fn explain_bracketed(
+    source: &str,
+    diagnostics: &[Value],
+    names: &[PluginName],
+) -> Vec<PluginDiagnostic> {
+    let mut result = Vec::new();
+    for diagnostic in diagnostics {
+        let Some(reason) = diagnostic["reason"].as_str() else {
+            continue;
+        };
+        if !matches!(
+            reason,
+            "macro_resolution_missing_lock"
+                | "macro_resolution_missing_definition"
+                | "macro_resolution_version_mismatch"
+                | "macro_resolution_digest_mismatch"
+                | "macro_binding_count_out_of_range"
+                | "macro_resolution_ambiguous_lock_prefix"
+                | "upstream_conflict"
+        ) {
+            continue;
+        }
+        let Some(start) = diagnostic["span"]["start_byte"]
+            .as_u64()
+            .and_then(|v| usize::try_from(v).ok())
+        else {
+            continue;
+        };
+        let Some(end) = diagnostic["span"]["end_byte"]
+            .as_u64()
+            .and_then(|v| usize::try_from(v).ok())
+        else {
+            continue;
+        };
+        let Some(text) = source.get(start..end) else {
+            continue;
+        };
+        let Some((offset, open)) = text.char_indices().find(|(_, c)| matches!(c, '{' | '｛'))
+        else {
+            continue;
+        };
+        let begin = offset + open.len_utf8();
+        let Some((length, close)) = text[begin..]
+            .char_indices()
+            .find(|(_, c)| matches!(c, '}' | '｝'))
+        else {
+            continue;
+        };
+        let written = text[begin..begin + length].trim();
+        if written.is_empty() {
+            continue;
+        }
+        let normalized = inku_ddl::plugin_names::normalize_plugin_name(written);
+        let mut exact: Vec<_> = names
+            .iter()
+            .filter(|n| {
+                n.enabled && inku_ddl::plugin_names::normalize_plugin_name(&n.name) == normalized
+            })
+            .map(|n| n.qualified_name.clone())
+            .collect();
+        exact.sort();
+        exact.dedup();
+        let disabled = names.iter().any(|n| {
+            !n.enabled && inku_ddl::plugin_names::normalize_plugin_name(&n.name) == normalized
+        });
+        let suggestion = names
+            .iter()
+            .filter(|n| n.enabled)
+            .map(|n| {
+                (
+                    edit_distance(
+                        &normalized,
+                        &inku_ddl::plugin_names::normalize_plugin_name(&n.name),
+                    ),
+                    &n.name,
+                )
+            })
+            .filter(|(d, _)| *d <= 2)
+            .min()
+            .map(|(_, name)| name.clone());
+        let (code, suggestion, candidates) = if exact.len() > 1 {
+            ("plugin_name_ambiguous", None, exact)
+        } else if reason == "macro_binding_count_out_of_range" {
+            ("plugin_count_out_of_range", None, Vec::new())
+        } else if matches!(
+            reason,
+            "macro_resolution_version_mismatch" | "macro_resolution_digest_mismatch"
+        ) {
+            ("plugin_version_mismatch", None, Vec::new())
+        } else if disabled && exact.is_empty() {
+            ("plugin_disabled", None, Vec::new())
+        } else if exact.is_empty() && suggestion.is_some() {
+            ("plugin_name_mismatch", suggestion, Vec::new())
+        } else {
+            ("plugin_not_installed", None, Vec::new())
+        };
+        result.push(PluginDiagnostic {
+            name: written.to_owned(),
+            reason: code,
+            suggestion,
+            candidates,
+            start_byte: start + offset,
+            end_byte: start + begin + length + close.len_utf8(),
+        });
+    }
+    result
+}
+
 fn run(input_bytes: &[u8]) -> Result<Output, ()> {
     if input_bytes.len() > MAX_INPUT_BYTES {
         return Err(());
     }
     let input: Input = serde_json::from_slice(input_bytes).map_err(|_| ())?;
+    let mut plugins = explain(
+        &input.source,
+        &input.upstream_diagnostics,
+        &input.enabled,
+        &input.disabled,
+    );
+    plugins.extend(explain_bracketed(
+        &input.source,
+        &input.upstream_diagnostics,
+        &input.plugin_names,
+    ));
+    plugins.sort_by_key(|p| p.start_byte);
     Ok(Output {
         schema: SCHEMA,
-        plugins: explain(
-            &input.source,
-            &input.upstream_diagnostics,
-            &input.enabled,
-            &input.disabled,
-        ),
+        plugins,
     })
 }
 
@@ -229,6 +357,68 @@ mod tests {
     fn missing(source: &str, sentence: &str, reason: &str) -> Value {
         let start = source.find(sentence).unwrap();
         json!({"reason": reason, "span": {"start_byte": start, "end_byte": start + sentence.len()}})
+    }
+
+    #[test]
+    fn bracketed_names_explain_disabled_mismatch_and_ambiguity() {
+        let source = "｛若葉｝。{young leave}.";
+        let names = vec![
+            PluginName {
+                name: "若葉".into(),
+                qualified_name: "Nature.Young".into(),
+                enabled: true,
+            },
+            PluginName {
+                name: "若葉".into(),
+                qualified_name: "Garden.Young".into(),
+                enabled: true,
+            },
+            PluginName {
+                name: "young leaves".into(),
+                qualified_name: "Nature.Young".into(),
+                enabled: true,
+            },
+        ];
+        let diagnostics = vec![
+            missing(source, "｛若葉｝", "macro_resolution_ambiguous_lock_prefix"),
+            missing(source, "{young leave}", "macro_resolution_missing_lock"),
+        ];
+        let result = explain_bracketed(source, &diagnostics, &names);
+        assert_eq!(result[0].reason, "plugin_name_ambiguous");
+        assert_eq!(result[0].candidates, ["Garden.Young", "Nature.Young"]);
+        assert_eq!(result[1].reason, "plugin_name_mismatch");
+        assert_eq!(result[1].suggestion.as_deref(), Some("young leaves"));
+        let disabled = vec![PluginName {
+            name: "若葉".into(),
+            qualified_name: "Nature.Young".into(),
+            enabled: false,
+        }];
+        let result = explain_bracketed(
+            source,
+            &[missing(source, "｛若葉｝", "macro_resolution_missing_lock")],
+            &disabled,
+        );
+        assert_eq!(result[0].reason, "plugin_disabled");
+        let result = explain_bracketed(
+            source,
+            &[missing(
+                source,
+                "｛若葉｝",
+                "macro_binding_count_out_of_range",
+            )],
+            &disabled,
+        );
+        assert_eq!(result[0].reason, "plugin_count_out_of_range");
+        let result = explain_bracketed(
+            source,
+            &[missing(
+                source,
+                "｛若葉｝",
+                "macro_resolution_digest_mismatch",
+            )],
+            &disabled,
+        );
+        assert_eq!(result[0].reason, "plugin_version_mismatch");
     }
 
     #[test]

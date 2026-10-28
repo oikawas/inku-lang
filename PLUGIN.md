@@ -144,7 +144,7 @@ A definition has only these fields. An unknown field rejects the whole definitio
 | `components` | yes | parts used only inside this definition (`use` in §3.6); `{}` when none |
 | `body` | yes | the statements that draw (§3.6) |
 
-DDL writes the name as `namespace.heading` (`Sky.Stars`) or `namespace.alias` (`Sky.星`). One name belongs to
+DDL writes a visible name in braces, such as `{stars}` or `｛星｝`. During migration it also reads `namespace.heading` (`Sky.Stars`) and `namespace.alias` (`Sky.星`). One name belongs to
 one definition: a definition claiming a canonical name or alias that a definition already loaded holds is not
 accepted (except that definitions from an export file in §5.2 take precedence for that work). Adding from the
 Web, the check refuses a word whose name another plugin already holds (§5.1). The namespace
@@ -179,6 +179,8 @@ Every value is JSON naming its kind with `expr`.
 There is no arithmetic. To combine numbers, write the values out as a `cycle` table or `vary` choices.
 
 ### 3.4 Parameters
+
+For a scene word, unbound caller position, size, angle, and similar fields are omitted individually with a diagnostic; the definition body remains drawable.
 
 `parameters` maps names to types. The types are closed:
 
@@ -327,6 +329,7 @@ Three categories outside the Saijiki are closed words defined by the core:
 
 | Written as | Meaning |
 |---|---|
+| `{stars}.` / `｛星｝。` | a bracketed visible name; qualified names remain readable during migration |
 | `Sky.Stars.` / `Sky.星。` | a bare-name sentence; a count parameter chooses from `omitted` |
 | `5 Sky.Stars.` / `5個のSky.星。` | a sentence with a count; a count parameter receives it |
 | `red Sky.ColorStars.` / `赤いSky.色星。` | a word of a parameter's category written before the name (for a definition declaring a color parameter) |

@@ -20,6 +20,7 @@ fn run(input: &[u8]) -> Option<Value> {
         return None;
     }
     let input: Value = serde_json::from_slice(input).ok()?;
+    let has_document = !input["document"].is_null();
     let definitions = input["definitions"].as_array()?;
     let mut records = Vec::new();
     let mut old_definitions = Vec::new();
@@ -28,7 +29,7 @@ fn run(input: &[u8]) -> Option<Value> {
     for value in definitions {
         let old = MacroDefinition::from_json(&value.to_string()).ok()?;
         let old_id = old.identity().ok()?;
-        let changed = old.plugin_v2.is_none();
+        let changed = !has_document && old.plugin_v2.is_none();
         let mut wire = serde_json::to_value(&old).ok()?;
         if changed {
             let (ja, en) = inku_ddl::plugin_names::v1_plugin_names(&old.heading, &old.aliases);
@@ -96,15 +97,14 @@ fn run(input: &[u8]) -> Option<Value> {
                     .with_aliases(aliases)
                     .ok()?,
             );
-            let mut replacement = raw.clone();
-            if let Some(i) = matching {
-                replacement["digest"] = records[i]["new_digest"].clone();
-            } else {
+            if matching.is_none() {
                 problems.push(json!({"code":"definition_not_supplied","qualified_name":qualified}));
             }
-            new_locks.push(replacement);
+            new_locks.push(raw.clone());
         }
-        let normalized = NormalizedDdlDocument::new(source, language, locks).ok()?;
+        let normalized = NormalizedDdlDocument::new(source, language, locks)
+            .ok()?
+            .with_definition_names(&old_definitions);
         let resolved = resolve_macro_invocations(&normalized, &old_definitions).ok()?;
         for item in &resolved.resolved {
             let Some(i) = records.iter().position(|r| {
@@ -114,16 +114,15 @@ fn run(input: &[u8]) -> Option<Value> {
             }) else {
                 continue;
             };
-            if !records[i]["changed"].as_bool()? {
-                continue;
-            }
-            let Some(v2) = migrated[i].plugin_v2.as_ref() else {
-                continue;
+            let (ja, en) = if let Some(v2) = migrated[i].plugin_v2.as_ref() {
+                (v2.names.ja.clone(), v2.names.en.clone())
+            } else {
+                inku_ddl::plugin_names::v1_plugin_names(&migrated[i].heading, &migrated[i].aliases)
             };
             let name = if language == ResolvedInstructionLanguage::Ja {
-                v2.names.ja.first()?
+                ja.first()?
             } else {
-                v2.names.en.first()?
+                en.first()?
             };
             let replacement = if language == ResolvedInstructionLanguage::Ja {
                 format!("｛{name}｝")
@@ -163,6 +162,37 @@ mod tests {
     use inku_score::Color;
 
     #[test]
+    fn definitions_only_migrate_and_missing_lock_is_reported() {
+        let package: Value = serde_json::from_str(inku_ddl::NATURE_LEAVES_V1_JSON).unwrap();
+        let old = package["entries"][0]["definition"].clone();
+        let output = run(&serde_json::to_vec(&json!({"definitions":[old]})).unwrap()).unwrap();
+        assert_eq!(output["definitions"][0]["changed"], true);
+        assert_eq!(
+            output["definitions"][0]["definition"]["schema"],
+            "inku.macro-definition.v2"
+        );
+        assert_ne!(
+            output["definitions"][0]["old_digest"],
+            output["definitions"][0]["new_digest"]
+        );
+        let second = run(&serde_json::to_vec(
+            &json!({"definitions":[output["definitions"][0]["definition"]]}),
+        )
+        .unwrap())
+        .unwrap();
+        assert_eq!(second["definitions"][0]["changed"], false);
+        let missing=run(&serde_json::to_vec(&json!({"document":{"source":"Nature.YoungLeaves。","language":"ja","macro_locks":[]},"definitions":[]})).unwrap()).unwrap();
+        assert_eq!(missing["document"]["source"], "Nature.YoungLeaves。");
+        assert!(
+            missing["problems"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|p| p["code"] == "missing_lock")
+        );
+    }
+
+    #[test]
     fn a_locked_scene_migrates_without_changing_score_and_is_idempotent() {
         let package: Value = serde_json::from_str(inku_ddl::NATURE_LEAVES_V1_JSON).unwrap();
         let old =
@@ -172,6 +202,11 @@ mod tests {
         let input = json!({"document":{"source":"Nature.若葉。","language":"ja","macro_locks":[lock]},"definitions":[old]});
         let output = run(&serde_json::to_vec(&input).unwrap()).unwrap();
         assert_eq!(output["document"]["source"], "｛若葉｝。");
+        assert_eq!(
+            output["document"]["macro_locks"],
+            input["document"]["macro_locks"]
+        );
+        assert_eq!(output["definitions"][0]["changed"], false);
         let new = MacroDefinition::from_json(&output["definitions"][0]["definition"].to_string())
             .unwrap();
         let second = run(&serde_json::to_vec(

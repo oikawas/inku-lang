@@ -538,6 +538,11 @@ impl<'de> Deserialize<'de> for MacroDefinition {
             if wire.heading.present || wire.aliases.present {
                 return Err(D::Error::custom("unknown field for macro-definition.v2"));
             }
+            if (wire.aspect.present && wire.aspect.value.is_none())
+                || (wire.counter.present && wire.counter.value.is_none())
+            {
+                return Err(D::Error::custom("invalid type: null for plugin field"));
+            }
             let heading = wire.id.value.ok_or_else(|| D::Error::missing_field("id"))?;
             let names = wire
                 .names

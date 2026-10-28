@@ -428,7 +428,9 @@
 # composed works changed when the prototype's titles were added); a titled DDL
 # now lowers to its untitled Score. No saved DDL's compile changes (the 6,270
 # DDLs of the 2026-10-27 5173 listing, none of whose lines is a title).
-DDL_ENGINE_VERSION = "72"
+# 73: Read bracketed plugin names and omit unbound caller fields separately;
+# saved-DDL comparison is measured during the owner's review.
+DDL_ENGINE_VERSION = "73"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write
@@ -506,4 +508,6 @@ DDL_ENGINE_VERSION = "72"
 # its chunk. It draws nothing. A composed read-and-draw run prints each thing's
 # title when it commits. It is grammar, not a Saijiki word, and is not offered
 # to a model.
-DDL_VERSION = "27"
+# 28: Plugin names can be written in braces; qualified names remain readable
+# while saved works migrate.
+DDL_VERSION = "28"

@@ -6,6 +6,7 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 
 #[test]
 fn v1_rejects_v2_fields_even_when_null() {
@@ -17,7 +18,50 @@ fn v1_rejects_v2_fields_even_when_null() {
         "unknown_json_field"
     );
 }
-use sha2::{Digest, Sha256};
+
+#[test]
+fn v2_name_and_object_validation_preserves_v1_identity() {
+    let base = serde_json::json!({"schema":"inku.macro-definition.v2","namespace":"Garden","id":"Bird","names":{"ja":["小鳥"],"en":["little bird"]},"kind":"scene","version":"1.0.0","parameters":{},"components":{},"body":[]});
+    let valid = MacroDefinition::from_json(&base.to_string()).unwrap();
+    assert!(
+        valid.validate().is_valid(),
+        "{:?}",
+        valid.validate().diagnostics()
+    );
+    let mut invalid = base.clone();
+    invalid["id"] = serde_json::json!("9bad");
+    invalid["names"] = serde_json::json!({"ja":["円", "123"],"en":["little bird","LITTLE BIRD"]});
+    invalid["kind"] = serde_json::json!("object");
+    invalid["aspect"] = serde_json::json!("17:0");
+    invalid["counter"] = serde_json::json!("bad");
+    invalid["parameters"] = serde_json::json!({"count":{"type":"integer","receives":"count","minimum":1,"maximum":4,"omitted":[1]}});
+    let invalid = MacroDefinition::from_json(&invalid.to_string())
+        .unwrap()
+        .validate();
+    for code in [
+        "invalid_plugin_id",
+        "name_is_core_word",
+        "invalid_plugin_name",
+        "duplicate_plugin_name",
+        "invalid_plugin_aspect",
+        "invalid_plugin_counter",
+        "object_count_parameter",
+    ] {
+        assert!(
+            invalid.has_code(code),
+            "{code}: {:?}",
+            invalid.diagnostics()
+        );
+    }
+    let mut scene = base;
+    scene["aspect"] = serde_json::json!("1:1");
+    scene["counter"] = serde_json::json!("general");
+    let invalid = MacroDefinition::from_json(&scene.to_string())
+        .unwrap()
+        .validate();
+    assert!(invalid.has_code("scene_has_aspect"));
+    assert!(invalid.has_code("scene_has_counter"));
+}
 
 const FIXTURE: &str = include_str!("fixtures/macro-definition-v1.json");
 

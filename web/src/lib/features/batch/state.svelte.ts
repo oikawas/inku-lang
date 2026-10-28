@@ -117,7 +117,7 @@ export type BatchRunOptions<TResult extends BatchLineResult> = {
 
 export type ResumeInterruptedOptions = {
 	blocked: () => boolean;
-	applyConditions: (conditions: BatchRunConditions) => void;
+	applyConditions: (conditions: BatchRunConditions) => void | Promise<void>;
 	run: (lines: NumberedLine[]) => Promise<void>;
 };
 
@@ -364,7 +364,7 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 				this.resume = null;
 				return;
 			}
-			options.applyConditions(snapshot.conditions);
+			await options.applyConditions(snapshot.conditions);
 			// Refill the whole prompt: the pending plan keeps the original numbers.
 			this.input = snapshot.prompt;
 			this.resume = null;
@@ -413,7 +413,7 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 			this.failures = failures;
 			this.input = snapshot.prompt;
 			if (restoreConditions) {
-				options.applyConditions(snapshot.conditions);
+				await options.applyConditions(snapshot.conditions);
 			}
 			await options.run(failures.map(({ line, input }) => ({ line, input })));
 		} finally {

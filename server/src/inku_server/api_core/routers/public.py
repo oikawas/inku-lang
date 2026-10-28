@@ -20,7 +20,8 @@ from ...saijiki import display_categories
 from ...render_engines import current_render_engine
 from ...distribution_notices import NoticesResponse, notice_bytes, notice_catalog
 from ... import provider_wire
-from ...model_settings import connection_for, model_provider_catalog, provider_for_model
+from ...model_settings import connection_for, default_user_model_settings, model_provider_catalog, normalize_model_settings, provider_for_model
+from ...verified_model_catalog import core_catalog
 from ... import db as _db
 from ..common import MODEL_NOT_OFFERED_DETAIL, _APP_VERSION, _RELEASE_VERSION, _build_number, _env_flag, _model_offered_to, _normalize_instruction_lang, _normalize_ui_lang, _resolve_instruction_lang, _unexpected_http_error
 from ..deps import _current_user
@@ -222,8 +223,42 @@ def api_models(actor: dict = Depends(_current_user)) -> ModelSettingsResponse:
             settings, include_disabled=False, include_developer=developer_mode, purpose="llm"
         ),
         vision_catalog=vision,
-        settings={"model_settings": actor.get("model_settings") or {}},
+        settings={"model_settings": actor.get("model_settings") or {}, "model_defaults": default_user_model_settings()},
     )
+
+
+class ModelReferenceQuery(BaseModel):
+    action: str = Field(description="Reference operation supplied by the shared core")
+    ref: str = Field(default="", description="Stored or selected model reference")
+    provider: str = Field(default="", description="Provider used to qualify the reference")
+    default_provider: str = Field(default="", description="Provider used when ownership is ambiguous; an empty value uses the core default")
+    default_model: str = Field(default="", description="Model used for an empty reference")
+
+
+class ModelReferencesRequest(BaseModel):
+    queries: list[ModelReferenceQuery] = Field(max_length=2048, description="Model references to resolve in order")
+
+
+class ModelReferencesResponse(BaseModel):
+    results: list[dict] = Field(description="Shared-core reference results in request order")
+
+
+@router.post("/api/model-references", response_model=ModelReferencesResponse, summary="Resolve model references")
+def api_model_references(body: ModelReferencesRequest, actor: dict = Depends(_current_user)) -> ModelReferencesResponse:
+    """Resolve model references against active services and the caller's published ChatGPT models."""
+    clean = normalize_model_settings(_db.get_model_settings())
+    groups = [{"id": provider["id"], "label": provider["label"], "active": provider["active"],
+               "models": provider["models"]} for provider in clean["providers"].values()]
+    offered = api_models(actor)
+    chatgpt_groups = [group for group in [*(offered.drawing_catalog or []), *(offered.vision_catalog or [])]
+                      if group.get("id") == "chatgpt"]
+    if chatgpt_groups:
+        models = {model["id"]: model for group in chatgpt_groups for model in group["models"]}
+        groups.append({**chatgpt_groups[0], "models": list(models.values())})
+    providers = {group["id"]: group for group in groups}
+    results = core_catalog("reference_batch", providers=providers,
+                           queries=[query.model_dump() for query in body.queries])["results"]
+    return ModelReferencesResponse(results=results)
 
 
 PLUGIN_PREVIEW_ROUTE = "/api/saijiki/plugin-preview"

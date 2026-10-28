@@ -399,3 +399,20 @@ test('T-906: manual save preserves payload meaning and updates the current proje
 	assert.equal(projected?.history_id, 'saved-id');
 	assert.equal(refreshed, 1);
 });
+
+test('a settings response arriving after sign-out cannot restore the previous account', async () => {
+	let finish!: (response: Response) => void;
+	let signedIn = true;
+	const state = new DemoState({
+		apiFetch: async () => new Promise<Response>((resolve) => { finish = resolve; }),
+		signedIn: () => signedIn, instructionLang: () => 'auto', uiLang: () => 'ja',
+		describeApiError: (_detail, status) => `HTTP ${status}`,
+	});
+	const loading = state.loadSettings();
+	signedIn = false;
+	state.resetForSignedOut();
+	finish(jsonResponse({ ...state.settings, prompt_provider:'openai', prompt_model:'openai:legacy-model' }));
+	await loading;
+	assert.equal(state.settingsLoaded, false);
+	assert.notEqual(state.settings.prompt_model, 'legacy-model');
+});

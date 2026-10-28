@@ -124,33 +124,10 @@ def test_the_speed_numbers_are_dated() -> None:
         assert re.search(r"\d{4}-\d{2}-\d{2}", str(model["speed_label"])), model["id"]
 
 
-def _web_fallback_models() -> dict[str, bool]:
-    """`models.ts` の ollama-cloud の控えを {id: 印が付いているか} で読む。"""
+def test_the_web_uses_the_api_instead_of_a_fallback_list() -> None:
     source = (Path(__file__).resolve().parents[2] / "web/src/lib/models.ts").read_text(encoding="utf-8")
-    block = source.split("id: 'ollama-cloud'", 1)[1].split("]", 1)[0]
-    entries = re.findall(r"\{\s*id: '([^']+)'[^}]*\}", block)
-    marked = re.findall(r"\{\s*id: '([^']+)'[^}]*requires_subscription:\s*true[^}]*\}", block)
-    assert entries, "控えの一覧が読めていない"
-    return {model_id: model_id in set(marked) for model_id in entries}
-
-
-def test_the_web_fallback_carries_the_same_list_as_the_server() -> None:
-    """控えは正本と同じ 18 本を、同じ印つきで持つ。
-
-    サーバのカタログが届くまでの数百ミリ秒は `models.ts` の控えがそのまま出る。
-    **以前は「控えには印が付かないので、印で守る前提のものを置かない」** としており、
-    無料枠で叩ける 8 本だけを置いていた。控え自身が `requires_subscription` を
-    持てるようになった (2026-08-01・[I-025]) ので前提が変わった —
-    `isModelUnselectable()` は描画される model をそのまま読み、`PROVIDER_GROUPS` は
-    `modelCatalog` / `availableModelCatalog` の初期値なので、**印は起動直後から効く。**
-
-    そこで守る性質を「無料枠だけを置く」から**「正本と同じ本数・同じ印」**へ移す。
-    件数だけを見ると 1 本落としても気づけないので、id の集合と印の集合の両方を留める。
-    """
-    listed = _web_fallback_models()
-    assert set(listed) == set(_by_id()), sorted(set(listed) ^ set(_by_id()))
-    assert {model_id for model_id, is_marked in listed.items() if is_marked} == SUBSCRIPTION_ONLY
-    assert {model_id for model_id, is_marked in listed.items() if not is_marked} == FREE_TIER_REACHABLE
+    assert "PROVIDER_GROUPS" not in source
+    assert {str(model["id"]) for model in _BY_ID["ollama-cloud"]["models"]} == set(_by_id())
 
 
 def test_the_provider_hides_speed_outside_developer_mode() -> None:

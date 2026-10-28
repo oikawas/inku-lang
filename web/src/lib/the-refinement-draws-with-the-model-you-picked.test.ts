@@ -27,8 +27,8 @@ test('T-164  paintOne takes a model for one run, and prefers it over the page se
 	assert.match(RUN_OWNER, /const resolvedStage2Model = options\.stage2Model \?\? defaults\.stage2Model/);
 	// The page resolves its ordinary settings before crossing the narrow run
 	// boundary, so route state does not leak into the canonical owner.
-	assert.match(PAGE, /stage1Model: qualifiedModelId\(stage1Provider, stage1Model\)/);
-	assert.match(PAGE, /stage2Model: qualifiedModelId\(stage2Provider, stage2Model\)/);
+	assert.match(PAGE, /stage1Model: qualifiedModelRef\(stage1Provider, stage1Model\)/);
+	assert.match(PAGE, /stage2Model: qualifiedModelRef\(stage2Provider, stage2Model\)/);
 });
 
 test('T-165  the run the Server takes is started with the picked model', () => {

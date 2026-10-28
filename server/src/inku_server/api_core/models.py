@@ -714,5 +714,5 @@ class ModelSettingsResponse(BaseModel):
         default=False, description="True when the caller can use a ChatGPT plan for models.",
     )
     settings: dict = Field(
-        default_factory=dict, description="The model settings, as a free-form object. Empty when none are set.",
+        default_factory=dict, description="The model settings, as a free-form object. On /api/models, model_defaults contains the shared-core user defaults.",
     )

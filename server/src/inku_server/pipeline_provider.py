@@ -15,7 +15,7 @@ from typing import Any
 
 import httpx
 
-from .api_core.common import _is_qualified_model_id
+from .api_core.common import _resolved_default_model
 from .model_settings import connection_for, provider_for_model
 from .provider_limits import provider_slot
 from . import provider_wire
@@ -66,13 +66,9 @@ def resolved_drawing_model(model: str | None, actor: dict | None) -> str:
     One model draws both stages (2026-09-30), so this reads the Stage 1 keys; a
     stored Stage 2 choice that still differs is not consulted.
     """
-    settings = (actor or {}).get("model_settings") or {}
-    default_model = "google/gemma-4-31b-it"
-    provider = str(settings.get("stage1_provider", "nvidia") or "nvidia")
-    model_id = str(settings.get("stage1_model", default_model) or default_model)
     if model:
         return str(model).strip()
-    return model_id if _is_qualified_model_id(model_id) else f"{provider}:{model_id}"
+    return _resolved_default_model("stage1", actor)
 
 
 class SingleAttemptProvider:

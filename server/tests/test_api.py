@@ -2742,6 +2742,8 @@ def test_model_settings_fetch_models_from_provider(monkeypatch):
     assert r.status_code == 200
     assert seen["url"] == "https://api.openai.com/v1/models"
     openai_catalog = next(provider for provider in r.json()["catalog"] if provider["id"] == "openai")
+    assert all("selection" in model for model in openai_catalog["models"])
+    openai_catalog["models"] = [{k: v for k, v in model.items() if k != "selection"} for model in openai_catalog["models"]]
     # v1.98: 提供元から消えたモデルは削除せず EOL として末尾に残す。
     today = datetime.now(timezone.utc).date().isoformat()
     assert openai_catalog["models"] == [
@@ -2772,6 +2774,8 @@ def test_model_settings_fetch_models_from_provider(monkeypatch):
     r = client.post("/api/settings/models/openai/fetch-models", headers=headers)
     assert r.status_code == 200
     openai_catalog = next(provider for provider in r.json()["catalog"] if provider["id"] == "openai")
+    assert all("selection" in model for model in openai_catalog["models"])
+    openai_catalog["models"] = [{k: v for k, v in model.items() if k != "selection"} for model in openai_catalog["models"]]
     assert openai_catalog["models"] == [
         {"id": "new-model", "label": "New Model", "purposes": ["llm"], "enabled": False,
          "labels": ["unmeasured"], "fold": "unmeasured"},
@@ -3060,3 +3064,25 @@ def test_a_work_its_ddl_holds_is_not_read_again_from_its_description(auth_contex
     }, headers=headers)
     assert redrawn.status_code == 409
     assert redrawn.json()["detail"]["code"] == "description_locked"
+
+
+def test_model_references_are_resolved_by_core(auth_context):
+    headers, _user, _group = auth_context
+    response = client.post('/api/model-references', headers=headers, json={'queries': [
+        {'action': 'split_ref', 'ref': 'ollama:qwen3.5:4b-q4_K_M'},
+        {'action': 'qualify_ref', 'provider': 'ollama', 'ref': 'qwen3.5:4b-q4_K_M'},
+        {'action': 'resolve_display', 'ref': 'ovms:gemma3-4b-api'},
+    ]})
+    assert response.status_code == 200
+    rows = response.json()['results']
+    assert (rows[0]['provider'], rows[0]['model']) == ('ollama', 'qwen3.5:4b-q4_K_M')
+    assert rows[1]['ref'] == 'ollama:qwen3.5:4b-q4_K_M'
+    assert (rows[2]['provider_label'], rows[2]['model_label']) == ('Intel OVMS', 'Google Gemma 3 4B Instruct')
+
+
+def test_models_api_returns_core_user_defaults(auth_context):
+    from inku_server.model_settings import default_user_model_settings
+    headers, _user, _group = auth_context
+    response = client.get('/api/models', headers=headers)
+    assert response.status_code == 200
+    assert response.json()['settings']['model_defaults'] == default_user_model_settings()

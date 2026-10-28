@@ -78,7 +78,8 @@ test('drawing-time selection and input-level secret drafts stay at their narrow 
 });
 
 test('page wiring keeps registry reads typed and confirmation capability narrow', () => {
-	assert.match(PAGE, /registerModelCatalog\(settings\.modelCatalog\)/);
+	assert.match(PAGE, /configureModelReferences\(apiFetch\)/);
+	assert.match(PAGE, /await loadModelReferences\(queries\)/);
 	assert.match(PAGE, /providerGroups=\{settings\.mode === 'model' \? availableModelCatalog : settings\.modelCatalog\}/);
 	assert.match(MODEL_OWNER, /requestConfirmation:/);
 	assert.match(MODEL_OWNER, /deps\.requestConfirmation\(\{/);

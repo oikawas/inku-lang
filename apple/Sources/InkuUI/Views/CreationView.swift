@@ -58,6 +58,7 @@ struct CreationView: View {
     @State private var rightPanelWidth: CGFloat = 0
     @State private var savedProviders: [InkuHost.ProviderSettings] = []
     @State private var workspaceGeneration: (nodeID: String, value: Int)?
+    @State private var lineageMounted = false
     /// The 3D view's bridge; each appearance of the view mounts a new viewer through it.
     @State private var ddl3d = Ddl3DController()
     @Environment(\.inkuWindowSize) private var windowSize
@@ -155,6 +156,7 @@ struct CreationView: View {
         }
         .onChange(of: ui.workspaceTab) { _, tab in
             batchWorkspace.invalidateReads()
+            if tab == "lineage" { lineageMounted = true }
             if tab == "lineage", isBatch, batchWorkspace.followsLatest,
                let work = batchWork, let rowID = automation.observedRow?.id {
                 batchWorkspace.pin(work, rowID: rowID)
@@ -846,19 +848,27 @@ struct CreationView: View {
                     .background(InkuColor.bg, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(InkuColor.border2))
                     .padding(.vertical, 14)
-            } else if ui.workspaceTab == "lineage" && display.visible("work_tools") && workspaceWork != nil {
-                LineageView(model: model, onWorkAction: onWorkAction, onExport: onLineageExport, initialWork: workspaceWork,
-                            writingLocked: controlsDisabled, onBrowseWork: { _ in batchWorkspace.showHistory() },
-                            onOpenInCanvas: { work in
-                                batchWorkspace.showHistory()
-                                Task { await model.selectWork(work); ui.workspaceTab = "artwork" }
-                            }, onDetach: {
-                                batchWorkspace.showHistory(); model.detachLineage(); ui.workspaceTab = "artwork"
-                            })
-                    .background(InkuColor.bg)
-                    .padding(.horizontal, display.visible("history") ? 68 : 0)
             } else {
+                let showsLineage = ui.workspaceTab == "lineage" && display.visible("work_tools") && workspaceWork != nil
                 artwork
+                    .opacity(showsLineage ? 0 : 1)
+                    .allowsHitTesting(!showsLineage)
+                    .accessibilityHidden(showsLineage)
+                if (lineageMounted || showsLineage) && workspaceWork != nil {
+                    LineageView(model: model, onWorkAction: onWorkAction, onExport: onLineageExport, initialWork: workspaceWork,
+                                writingLocked: controlsDisabled, onBrowseWork: { _ in batchWorkspace.showHistory() },
+                                onOpenInCanvas: { work in
+                                    batchWorkspace.showHistory()
+                                    Task { await model.selectWork(work); ui.workspaceTab = "artwork" }
+                                }, onDetach: {
+                                    batchWorkspace.showHistory(); model.detachLineage(); ui.workspaceTab = "artwork"
+                                })
+                        .background(InkuColor.bg)
+                        .padding(.horizontal, display.visible("history") ? 68 : 0)
+                        .opacity(showsLineage ? 1 : 0)
+                        .allowsHitTesting(showsLineage)
+                        .accessibilityHidden(!showsLineage)
+                }
             }
         }
         .overlay(alignment: .leading) {

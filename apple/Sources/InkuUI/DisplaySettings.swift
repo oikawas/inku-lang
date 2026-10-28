@@ -131,6 +131,8 @@ public final class DisplaySettings {
     public private(set) var saveError: String?
     @ObservationIgnored private var fileURL: URL?
     @ObservationIgnored private var previewingTextSize = false
+    @ObservationIgnored private let fileWriter = DisplayPreferencesFileWriter()
+    @ObservationIgnored private var saveRevision = 0
     public init() {}
 
     public func connect(directory: URL?) {
@@ -173,8 +175,30 @@ public final class DisplaySettings {
     private func persist() {
         guard !previewingTextSize, let fileURL else { return }
         do {
-            try JSONEncoder().encode(preferences).write(to: fileURL, options: .atomic)
-            saveError = nil
+            let data = try JSONEncoder().encode(preferences)
+            saveRevision += 1
+            let revision = saveRevision
+            Task {
+                let error = await fileWriter.write(data, to: fileURL, revision: revision)
+                if saveRevision == revision { saveError = error }
+            }
         } catch { saveError = "表示設定を保存できませんでした: \(error.localizedDescription)" }
+    }
+}
+
+/// Atomic file replacement can stall the main thread when a tab choice changes.
+/// The actor serializes writes and skips an older snapshot if a newer one arrived first.
+private actor DisplayPreferencesFileWriter {
+    private var latestRevision = 0
+
+    func write(_ data: Data, to url: URL, revision: Int) -> String? {
+        guard revision > latestRevision else { return nil }
+        latestRevision = revision
+        do {
+            try data.write(to: url, options: .atomic)
+            return nil
+        } catch {
+            return "表示設定を保存できませんでした: \(error.localizedDescription)"
+        }
     }
 }

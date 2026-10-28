@@ -563,7 +563,7 @@ fn candidates_at_with_locked_macro_boundary(
     // particles. The ordinary asset-only boundary scan cannot see that head.
     let left_end = source[..start_byte].trim_end_matches(is_separator).len();
     let bracket_end = source[..start_byte]
-        .trim_end_matches(char::is_whitespace)
+        .trim_end_matches(|ch| is_separator(ch) && !matches!(ch, '}' | '｝'))
         .len();
     let preceded_by_bracket_macro = language == ResolvedInstructionLanguage::Ja
         && source[..bracket_end].char_indices().any(|(start, ch)| {

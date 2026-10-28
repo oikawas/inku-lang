@@ -297,5 +297,20 @@ mod tests {
         let after = score("｛若葉｝。", &new);
         assert!(before.is_some());
         assert_eq!(before, after);
+
+        // Legacy calls can include empty parentheses immediately before a
+        // particle. The migrated bracketed spelling must retain its action.
+        let input = json!({"document":{"source":"Nature.若葉()を置く。","language":"ja","macro_locks":input["document"]["macro_locks"]},"definitions":[old]});
+        let migrated = run(&serde_json::to_vec(&input).unwrap()).unwrap();
+        assert_eq!(migrated["document"]["source"], "｛若葉｝()を置く。");
+        let before = score(input["document"]["source"].as_str().unwrap(), &old);
+        assert!(before.as_ref().is_some_and(|s| !s.instructions.is_empty()));
+        for source in [
+            "｛若葉｝()を置く。",
+            "{若葉}()を置く。",
+            "{若葉} ( ) を置く。",
+        ] {
+            assert_eq!(before, score(source, &new), "{source}");
+        }
     }
 }

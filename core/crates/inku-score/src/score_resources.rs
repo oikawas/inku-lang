@@ -949,6 +949,11 @@ impl Analysis {
     }
 
     fn account(&mut self, score: &Score) {
+        let templates = score
+            .object_templates
+            .iter()
+            .map(|template| (template.instruction_index, template))
+            .collect::<BTreeMap<_, _>>();
         for (instruction_index, instruction) in score.instructions.iter().enumerate() {
             let source = self.instruction_sources[instruction_index];
             let arrangement = instruction.arrangement.as_ref().unwrap();
@@ -961,11 +966,105 @@ impl Analysis {
                 instruction_index,
                 owner: arrangement.resolved.as_ref().unwrap().owner.clone(),
             };
-            let Some(primitive_marks) = intrinsic.checked_mul(outer) else {
+            let Some(copies) = intrinsic.checked_mul(outer) else {
                 self.pending_failures.push(PendingFailure {
                     source,
                     owner,
                     dimension: ResourceDimension::PrimitiveMarks,
+                });
+                continue;
+            };
+            let body = templates
+                .get(&instruction_index)
+                .map(|template| object_body_resource_demand(&template.body));
+            let body = match body.transpose() {
+                Ok(body) => body,
+                Err(dimension) => {
+                    self.pending_failures.push(PendingFailure {
+                        source,
+                        owner,
+                        dimension,
+                    });
+                    continue;
+                }
+            };
+            let Some(primitive_marks) =
+                copies.checked_mul(body.map_or(1, |body| body.primitive_marks))
+            else {
+                self.pending_failures.push(PendingFailure {
+                    source,
+                    owner,
+                    dimension: ResourceDimension::PrimitiveMarks,
+                });
+                continue;
+            };
+            let Some(object_templates) =
+                1_u64.checked_add(body.map_or(0, |body| body.object_templates))
+            else {
+                self.pending_failures.push(PendingFailure {
+                    source,
+                    owner,
+                    dimension: ResourceDimension::ObjectTemplates,
+                });
+                continue;
+            };
+            let Some(template_nodes) =
+                body.map_or(Some(1), |body| body.template_nodes.checked_add(1))
+            else {
+                self.pending_failures.push(PendingFailure {
+                    source,
+                    owner,
+                    dimension: ResourceDimension::TemplateNodes,
+                });
+                continue;
+            };
+            let Some(anchor_instances) =
+                copies.checked_mul(body.map_or(0, |body| body.anchor_instances))
+            else {
+                self.pending_failures.push(PendingFailure {
+                    source,
+                    owner,
+                    dimension: ResourceDimension::AnchorInstances,
+                });
+                continue;
+            };
+            let Some(transform_instances) =
+                copies.checked_mul(body.map_or(0, |body| body.transform_instances))
+            else {
+                self.pending_failures.push(PendingFailure {
+                    source,
+                    owner,
+                    dimension: ResourceDimension::TransformInstances,
+                });
+                continue;
+            };
+            let Some(placement_instances) =
+                copies.checked_mul(body.map_or(0, |body| body.placement_instances))
+            else {
+                self.pending_failures.push(PendingFailure {
+                    source,
+                    owner,
+                    dimension: ResourceDimension::PlacementInstances,
+                });
+                continue;
+            };
+            let Some(fill_instances) =
+                copies.checked_mul(body.map_or(0, |body| body.fill_instances))
+            else {
+                self.pending_failures.push(PendingFailure {
+                    source,
+                    owner,
+                    dimension: ResourceDimension::FillInstances,
+                });
+                continue;
+            };
+            let Some(per_template) = copies
+                .checked_mul(body.map_or(1, |body| body.maximum_per_template_primitive_marks))
+            else {
+                self.pending_failures.push(PendingFailure {
+                    source,
+                    owner,
+                    dimension: ResourceDimension::MaximumPerTemplatePrimitiveMarks,
                 });
                 continue;
             };
@@ -977,11 +1076,15 @@ impl Analysis {
                 demand: ResourceDemand {
                     logical_objects: unclaimed_logical,
                     primitive_marks,
-                    object_templates: 1,
-                    maximum_per_template_primitive_marks: primitive_marks,
-                    maximum_resolved_count: intrinsic,
-                    template_nodes: 1,
-                    ..ResourceDemand::default()
+                    object_templates,
+                    maximum_per_template_primitive_marks: per_template,
+                    maximum_resolved_count: intrinsic
+                        .max(body.map_or(0, |body| body.maximum_resolved_count)),
+                    template_nodes,
+                    anchor_instances,
+                    transform_instances,
+                    placement_instances,
+                    fill_instances,
                 },
             });
         }
@@ -1211,6 +1314,12 @@ fn mirror_body_instruction_index(score: &Score, body: &crate::MirrorBodyRef) -> 
 /// bound before execution starts.
 pub fn legacy_resource_demand(score: &Score) -> Result<ResourceDemand, ResourceDimension> {
     let mut primitive_marks = 0_u64;
+    let mut template_demand = ResourceDemand::default();
+    let templates = score
+        .object_templates
+        .iter()
+        .map(|template| (template.instruction_index, template))
+        .collect::<BTreeMap<_, _>>();
     let mut index = 0;
     while let Some(head) = score.instructions.get(index) {
         let (marks, group_size) = head.arrangement.as_ref().map_or((1, 1), |arrangement| {
@@ -1224,6 +1333,47 @@ pub fn legacy_resource_demand(score: &Score) -> Result<ResourceDemand, ResourceD
             .checked_mul(u64::from(group_size))
             .and_then(|unit| primitive_marks.checked_add(unit))
             .ok_or(ResourceDimension::PrimitiveMarks)?;
+        for member in index
+            ..index
+                .saturating_add(usize::try_from(group_size).unwrap_or(usize::MAX))
+                .min(score.instructions.len())
+        {
+            if let Some(template) = templates.get(&member) {
+                // Each invisible box replaces a mark with the body's marks.
+                // A legacy entry also has to count the resulting work before
+                // the renderer allocates any copies.
+                let body = object_body_resource_demand(&template.body)?;
+                primitive_marks = primitive_marks
+                    .checked_sub(marks)
+                    .and_then(|n| {
+                        body.primitive_marks
+                            .checked_mul(marks)
+                            .and_then(|body_marks| n.checked_add(body_marks))
+                    })
+                    .ok_or(ResourceDimension::PrimitiveMarks)?;
+                let multiply = |value: u64, dimension| value.checked_mul(marks).ok_or(dimension);
+                template_demand = template_demand.checked_add(ResourceDemand {
+                    object_templates: body.object_templates,
+                    anchor_instances: multiply(
+                        body.anchor_instances,
+                        ResourceDimension::AnchorInstances,
+                    )?,
+                    transform_instances: multiply(
+                        body.transform_instances,
+                        ResourceDimension::TransformInstances,
+                    )?,
+                    placement_instances: multiply(
+                        body.placement_instances,
+                        ResourceDimension::PlacementInstances,
+                    )?,
+                    fill_instances: multiply(
+                        body.fill_instances,
+                        ResourceDimension::FillInstances,
+                    )?,
+                    ..ResourceDemand::default()
+                })?;
+            }
+        }
         index = index.saturating_add(usize::try_from(group_size).unwrap_or(usize::MAX));
     }
     let count = |length: usize, dimension| u64::try_from(length).map_err(|_| dimension);
@@ -1240,7 +1390,7 @@ pub fn legacy_resource_demand(score: &Score) -> Result<ResourceDemand, ResourceD
         )
         .try_fold(score.anchors.len(), usize::checked_add)
         .ok_or(ResourceDimension::AnchorInstances)?;
-    Ok(ResourceDemand {
+    ResourceDemand {
         primitive_marks,
         object_templates: count(score.instructions.len(), ResourceDimension::ObjectTemplates)?,
         anchor_instances: count(anchor_moves, ResourceDimension::AnchorInstances)?,
@@ -1254,7 +1404,56 @@ pub fn legacy_resource_demand(score: &Score) -> Result<ResourceDemand, ResourceD
         )?,
         fill_instances: count(score.fill_groups.len(), ResourceDimension::FillInstances)?,
         ..ResourceDemand::default()
-    })
+    }
+    .checked_add(template_demand)
+}
+
+/// Account the stored and performed cost of one object body. Its only outer
+/// repetition has one instance; internal arrangement counts remain symbolic.
+pub fn object_body_resource_demand(score: &Score) -> Result<ResourceDemand, ResourceDimension> {
+    if let Some(policy) = &score.resource_policy {
+        let finalized = finalize_saved_score(score, &policy.hard_policy, policy.operational_budget)
+            .map_err(|_| ResourceDimension::TemplateNodes)?;
+        if !finalized.resource_diagnostics.is_empty() {
+            return Err(ResourceDimension::TemplateNodes);
+        }
+        return Ok(finalized.demand);
+    }
+    let mut demand = legacy_resource_demand(score)?;
+    let peak = score
+        .instructions
+        .iter()
+        .map(|instruction| {
+            instruction.arrangement.as_ref().map_or(1, |arrangement| {
+                match (arrangement.layout, arrangement.rows, arrangement.cols) {
+                    (crate::Layout::Grid, Some(rows), Some(cols)) => {
+                        u64::from(rows) * u64::from(cols)
+                    }
+                    _ => u64::from(arrangement.count),
+                }
+                .max(1)
+            })
+        })
+        .max()
+        .unwrap_or(0);
+    demand.maximum_per_template_primitive_marks = peak;
+    demand.maximum_resolved_count = peak;
+    demand.placement_instances = demand
+        .placement_instances
+        .checked_add(
+            u64::try_from(score.repetition_groups.len())
+                .map_err(|_| ResourceDimension::PlacementInstances)?,
+        )
+        .ok_or(ResourceDimension::PlacementInstances)?;
+    demand.template_nodes = u64::try_from(score.instructions.len())
+        .map_err(|_| ResourceDimension::TemplateNodes)?
+        .checked_add(
+            u64::try_from(score.anchors.len()).map_err(|_| ResourceDimension::TemplateNodes)?,
+        )
+        .and_then(|n| n.checked_add(u64::try_from(score.transform_groups.len()).ok()?))
+        .and_then(|n| n.checked_add(u64::try_from(score.repetition_groups.len()).ok()?))
+        .ok_or(ResourceDimension::TemplateNodes)?;
+    Ok(demand)
 }
 
 /// Refuse a legacy-edition Score whose demand exceeds either authority.
@@ -1700,6 +1899,20 @@ pub fn finalize_saved_score_with_omitted_instructions(
 
     let mut finalized = score.clone();
     finalized.instructions = instructions;
+    finalized.object_templates = score
+        .object_templates
+        .iter()
+        .filter_map(|template| {
+            let instruction_index = instruction_map
+                .values
+                .get(template.instruction_index)
+                .copied()
+                .flatten()?;
+            let mut template = template.clone();
+            template.instruction_index = instruction_index;
+            Some(template)
+        })
+        .collect();
     finalized.anchors = anchors;
     finalized.transform_groups = transform_groups;
     finalized.placement_groups = placement_groups;
@@ -1901,6 +2114,7 @@ mod tests {
         }))
         .unwrap();
         Score {
+            object_templates: Vec::new(),
             version: "0.10.0".into(),
             mirror_relations: Vec::new(),
             canvas: crate::Canvas::Id("square".into()),
@@ -1958,6 +2172,75 @@ mod tests {
                 operational_budget: OperationalResourceBudget(budget(100)),
             }),
         }
+    }
+
+    #[test]
+    fn legacy_object_demand_counts_body_marks_for_every_box() {
+        let body: Score = serde_json::from_value(json!({"version":"0.9.0", "instructions":[
+            {"primitive":"circle","center":[0.5,0.5],"radius":0.1},
+            {"primitive":"circle","center":[0.5,0.5],"radius":0.2}
+        ]}))
+        .unwrap();
+        let mut score: Score = serde_json::from_value(json!({"version":"0.23.0", "instructions":[
+            {"primitive":"square","position":[0.4,0.4],"size":[0.2,0.2],"arrangement":{"count":8}}
+        ]}))
+        .unwrap();
+        score.object_templates.push(crate::ObjectTemplate {
+            instruction_index: 0,
+            aspect: [1, 1],
+            body: Box::new(body),
+        });
+        let demand = legacy_resource_demand(&score).unwrap();
+        assert_eq!(demand.primitive_marks, 16);
+        assert_eq!(demand.object_templates, 3);
+        assert!(
+            check_legacy_resource_demand(&score, &hard(15), OperationalResourceBudget(budget(15)))
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn saved_template_follows_its_owner_when_an_earlier_instruction_is_omitted() {
+        let policy = hard(100);
+        let mut score = representative_score(policy.clone());
+        score.version = "0.23.0".into();
+        score.instructions = vec![
+            instruction(
+                json!({"kind":"source_instruction","instruction_index":0}),
+                false,
+            ),
+            instruction(
+                json!({"kind":"source_instruction","instruction_index":1}),
+                false,
+            ),
+        ];
+        score.instructions[1].primitive = crate::Primitive::Square;
+        score.instructions[1].position = Some(crate::Point::new(0.4, 0.4));
+        score.instructions[1].size = Some(crate::Point::new(0.2, 0.2));
+        score.anchors.clear();
+        score.transform_groups.clear();
+        score.placement_groups.clear();
+        score.fill_groups.clear();
+        score.repetition_groups.clear();
+        score.mirror_relations.clear();
+        let body: Score = serde_json::from_value(json!({"version":"0.9.0","instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.1}]})).unwrap();
+        score.object_templates = vec![crate::ObjectTemplate {
+            instruction_index: 1,
+            aspect: [1, 1],
+            body: Box::new(body),
+        }];
+        let result = finalize_saved_score_with_omitted_instructions(
+            &score,
+            &policy,
+            OperationalResourceBudget(policy.budget),
+            &[0],
+        )
+        .unwrap();
+        assert_eq!(result.score.instructions.len(), 1);
+        assert_eq!(result.score.object_templates.len(), 1);
+        assert_eq!(result.score.object_templates[0].instruction_index, 0);
+        assert_eq!(result.demand.primitive_marks, 1);
+        assert_eq!(result.demand.object_templates, 2);
     }
 
     #[test]

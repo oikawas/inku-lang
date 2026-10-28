@@ -39,6 +39,9 @@ ChatGPT plan authorization, session and model publication decisions use the shar
 ### 2026-10-28 — Share ChatGPT plan policy on macOS
 
 ChatGPT plan publication and authentication decisions use the shared core, while signature verification and encrypted local storage stay native.
+### 2026-10-28 — Draw object words inside invisible boxes
+
+Object words use the square's placement, count, dimensions, angle and relations, then draw their definition inside a box with its aspect (DDL engine 74). Score 0.23.0 retains one body shared by copies and render engine 94 performs it. Older Scores draw as before.
 
 ### 2026-10-28 — Offer plugin words named by a description
 

@@ -681,10 +681,11 @@ pub enum ScoreEdition {
     V0_20,
     V0_21,
     V0_22,
+    V0_23,
 }
 
 impl ScoreEdition {
-    pub const ALL: [Self; 22] = [
+    pub const ALL: [Self; 23] = [
         Self::V0_1,
         Self::V0_2,
         Self::V0_3,
@@ -707,6 +708,7 @@ impl ScoreEdition {
         Self::V0_20,
         Self::V0_21,
         Self::V0_22,
+        Self::V0_23,
     ];
 
     /// The edition a version string names.
@@ -742,6 +744,7 @@ impl ScoreEdition {
             Self::V0_20 => "0.20.0",
             Self::V0_21 => "0.21.0",
             Self::V0_22 => "0.22.0",
+            Self::V0_23 => "0.23.0",
         }
     }
 }
@@ -1771,6 +1774,16 @@ pub struct ScoreResourcePolicy {
     pub operational_budget: crate::resource::OperationalResourceBudget,
 }
 
+/// The local drawing carried by one invisible square instruction. Body
+/// geometry is expressed in the square's local coordinate system.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ObjectTemplate {
+    pub instruction_index: usize,
+    pub aspect: [u8; 2],
+    pub body: Box<Score>,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Score {
     #[serde(default = "default_score_version")]
@@ -1782,6 +1795,8 @@ pub struct Score {
     #[serde(default)]
     pub presence: Option<Presence>,
     pub instructions: Vec<Instruction>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub object_templates: Vec<ObjectTemplate>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub anchors: Vec<AnchorPoint>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -2331,6 +2346,9 @@ impl Score {
     /// as polygon sides, are clamped by the renderer and stay accepted.
     pub fn validate_work_ranges(&self) -> Result<(), &'static str> {
         let unit = |value: f64| (0.0..=1.0).contains(&value);
+        for template in &self.object_templates {
+            template.body.validate_work_ranges()?;
+        }
         if let Canvas::Spec(CanvasSpec {
             ground: Some(ground),
             ..
@@ -2571,6 +2589,47 @@ impl Score {
 
     pub fn validate_schema_edition(&self) -> Result<(), &'static str> {
         self.validate_compact_score_0_10()?;
+        if !self.object_templates.is_empty() && !self.edition_at_least(ScoreEdition::V0_23) {
+            return Err("object templates require Score version 0.23.0");
+        }
+        let mut owners = std::collections::BTreeSet::new();
+        for template in &self.object_templates {
+            if !owners.insert(template.instruction_index) {
+                return Err("object template owners must be unique");
+            }
+            if template
+                .aspect
+                .iter()
+                .any(|dimension| !(1..=16).contains(dimension))
+            {
+                return Err("object template aspect is out of range");
+            }
+            if !self
+                .instructions
+                .get(template.instruction_index)
+                .is_some_and(|instruction| instruction.primitive == Primitive::Square)
+            {
+                return Err("object template requires a square owner");
+            }
+            if !template.body.object_templates.is_empty() {
+                return Err("nested object templates are not supported");
+            }
+            if !template.body.placement_groups.is_empty()
+                || !template.body.mirror_relations.is_empty()
+            {
+                return Err("object template body cannot contain placement groups");
+            }
+            if template.body.repetition_groups.iter().any(|group| {
+                group
+                    .member
+                    .symbolic
+                    .as_ref()
+                    .is_none_or(|symbolic| symbolic.instance_count != 1)
+            }) {
+                return Err("object template body repetition must have one instance");
+            }
+            template.body.validate_schema_edition()?;
+        }
         if self.uses_free_line() && !self.edition_at_least(ScoreEdition::V0_21) {
             return Err("free_line requires Score version 0.21.0");
         }

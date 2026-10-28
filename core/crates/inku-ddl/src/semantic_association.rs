@@ -411,6 +411,7 @@ pub struct SemanticMacroInvocationHead {
     pub lock: MacroLockResolutionIdentity,
     pub provenance: SemanticMacroInvocationProvenance,
     pub parameters: Vec<SemanticMacroParameterBinding>,
+    pub object_aspect: Option<(u8, u8)>,
 }
 
 /// Closed semantic entity head kind.
@@ -700,9 +701,6 @@ const fn macro_resolution_issue_kind(
         }
         MacroInvocationResolutionDiagnosticKind::SourceClauseAtomMismatch => {
             "macro_resolution_source_clause_atom_mismatch"
-        }
-        MacroInvocationResolutionDiagnosticKind::PluginObjectNotDrawnYet => {
-            "plugin_object_not_drawn_yet"
         }
     }
 }
@@ -3093,6 +3091,7 @@ fn semantic_macro_head(
         lock: resolved.lock.clone(),
         provenance: macro_invocation_provenance(document, clause_stream, resolved),
         parameters,
+        object_aspect: resolved.object_aspect,
     }
 }
 
@@ -4895,6 +4894,12 @@ fn semantic_macro_head_value(head: &SemanticMacroInvocationHead) -> Value {
         "qualified_name".to_owned(),
         Value::String(head.qualified_name.clone()),
     );
+    if let Some((width, height)) = head.object_aspect {
+        record.insert(
+            "object_aspect".to_owned(),
+            serde_json::json!([width, height]),
+        );
+    }
     Value::Object(record.into_iter().collect())
 }
 

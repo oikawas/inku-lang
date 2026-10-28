@@ -369,13 +369,39 @@ fn account_composition_plan(
     };
     // Check source node capacity before allocating ownership vectors.
     for object in &plan.objects {
+        let owner = PlanResourceOwner::Object(object.origin().clone());
+        let body = object
+            .plugin_template
+            .as_ref()
+            .map(|(_, _, body)| {
+                inku_score::object_body_resource_demand(body).map_err(|dimension| {
+                    PlanResourceError {
+                        owner: Box::new(owner.clone()),
+                        reason: PlanResourceFailure::ArithmeticOverflow(dimension),
+                    }
+                })
+            })
+            .transpose()?;
+        let templates = 1_u64
+            .checked_add(body.map_or(0, |body| body.object_templates))
+            .ok_or_else(|| PlanResourceError {
+                owner: Box::new(owner.clone()),
+                reason: PlanResourceFailure::ArithmeticOverflow(ResourceDimension::ObjectTemplates),
+            })?;
+        let nodes = body.map_or(Some(0), |body| Some(body.template_nodes));
+        let nodes = nodes
+            .and_then(|n| 1_u64.checked_add(n))
+            .ok_or_else(|| PlanResourceError {
+                owner: Box::new(owner.clone()),
+                reason: PlanResourceFailure::ArithmeticOverflow(ResourceDimension::TemplateNodes),
+            })?;
         accounting.add(
             ResourceDemand {
-                object_templates: 1,
-                template_nodes: 1,
+                object_templates: templates,
+                template_nodes: nodes,
                 ..ResourceDemand::default()
             },
-            &PlanResourceOwner::Object(object.origin().clone()),
+            &owner,
         )?;
     }
     for owner in plan
@@ -514,12 +540,36 @@ fn account_composition_plan(
             return Err(invalid(&owner, "member omitted source object"));
         }
         let repetitions = claims.objects[index].map_or(1, |claim| claim.repetitions);
-        let primitive_marks = u64::from(object.count())
+        let copies = u64::from(object.count())
             .checked_mul(repetitions)
             .ok_or_else(|| PlanResourceError {
                 owner: Box::new(owner.clone()),
                 reason: PlanResourceFailure::ArithmeticOverflow(ResourceDimension::PrimitiveMarks),
             })?;
+        let body = object
+            .plugin_template
+            .as_ref()
+            .map(|(_, _, body)| {
+                inku_score::object_body_resource_demand(body).map_err(|dimension| {
+                    PlanResourceError {
+                        owner: Box::new(owner.clone()),
+                        reason: PlanResourceFailure::ArithmeticOverflow(dimension),
+                    }
+                })
+            })
+            .transpose()?;
+        let primitive_marks = copies
+            .checked_mul(body.map_or(1, |body| body.primitive_marks))
+            .ok_or_else(|| PlanResourceError {
+                owner: Box::new(owner.clone()),
+                reason: PlanResourceFailure::ArithmeticOverflow(ResourceDimension::PrimitiveMarks),
+            })?;
+        let multiplied = |value: u64, dimension| {
+            copies.checked_mul(value).ok_or_else(|| PlanResourceError {
+                owner: Box::new(owner.clone()),
+                reason: PlanResourceFailure::ArithmeticOverflow(dimension),
+            })
+        };
         let logical_objects = if claims.objects[index].is_some() {
             0
         } else {
@@ -542,9 +592,35 @@ fn account_composition_plan(
             ResourceDemand {
                 logical_objects,
                 primitive_marks,
-                maximum_per_template_primitive_marks: primitive_marks,
-                maximum_resolved_count: u64::from(object.count()),
-                fill_instances,
+                maximum_per_template_primitive_marks: multiplied(
+                    body.map_or(1, |body| body.maximum_per_template_primitive_marks),
+                    ResourceDimension::MaximumPerTemplatePrimitiveMarks,
+                )?,
+                maximum_resolved_count: u64::from(object.count())
+                    .max(body.map_or(0, |body| body.maximum_resolved_count)),
+                fill_instances: fill_instances
+                    .checked_add(multiplied(
+                        body.map_or(0, |body| body.fill_instances),
+                        ResourceDimension::FillInstances,
+                    )?)
+                    .ok_or_else(|| PlanResourceError {
+                        owner: Box::new(owner.clone()),
+                        reason: PlanResourceFailure::ArithmeticOverflow(
+                            ResourceDimension::FillInstances,
+                        ),
+                    })?,
+                anchor_instances: multiplied(
+                    body.map_or(0, |body| body.anchor_instances),
+                    ResourceDimension::AnchorInstances,
+                )?,
+                transform_instances: multiplied(
+                    body.map_or(0, |body| body.transform_instances),
+                    ResourceDimension::TransformInstances,
+                )?,
+                placement_instances: multiplied(
+                    body.map_or(0, |body| body.placement_instances),
+                    ResourceDimension::PlacementInstances,
+                )?,
                 ..ResourceDemand::default()
             },
             &owner,

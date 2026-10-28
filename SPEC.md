@@ -759,7 +759,7 @@ A v2 definition has primary and alternate names in Japanese and English. A name 
 
 ### 4.14 Scene and Object Words
 
-A scene word draws its own body. An unbound caller position, size, or other field is omitted with a diagnostic while the body remains. An object word is accepted as a definition with an aspect and counter but is not drawn yet; its call is omitted with `plugin_object_not_drawn_yet`.
+A scene word draws its own body. An unbound caller position, size, or other field is omitted with a diagnostic while the body remains. An object word resolves position, count, movement, size, angle and relations through the ordinary square as an invisible box with the definition's aspect, and draws its body in place of the outline. Its ordinary size and `side` set the long side to the square's side; explicit width and height set both dimensions. Body positions are fractions of the box's width and height; dimensions are fractions of its short side. Stroke thickness and texture scale do not change with the box. Only appearance words declared as parameters bind; each other appearance word is omitted with a diagnostic. Copies share one expansion, with placement and drawing seeds for each copy. Score 0.23.0 stores the square instruction index, aspect and single body in `object_templates`; render engine 94 performs it. Older Scores retain their drawing.
 
 ## 5. The Three-Layer Pipeline
 

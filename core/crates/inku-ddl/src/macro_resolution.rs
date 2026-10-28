@@ -38,6 +38,7 @@ pub struct ResolvedMacroInvocation {
     pub atom_index: usize,
     pub lock: MacroLockResolutionIdentity,
     pub definition_identity: MacroDefinitionIdentity,
+    pub object_aspect: Option<(u8, u8)>,
 }
 
 /// Stable failure classes for one source-ordered visible macro occurrence.
@@ -52,7 +53,6 @@ pub enum MacroInvocationResolutionDiagnosticKind {
     VersionMismatch,
     DigestMismatch,
     SourceClauseAtomMismatch,
-    PluginObjectNotDrawnYet,
 }
 
 /// One occurrence withheld from the resolved set, retaining its exact evidence.
@@ -94,10 +94,13 @@ pub fn resolve_macro_invocations(
         .enumerate()
         .map(|(index, definition)| DefinitionRecord {
             index,
-            object: definition
+            object_aspect: definition
                 .plugin_v2
                 .as_ref()
-                .is_some_and(|v| v.kind == "object"),
+                .filter(|v| v.kind == "object")
+                .and_then(|v| v.aspect.as_deref())
+                .and_then(|aspect| aspect.split_once(':'))
+                .and_then(|(w, h)| Some((w.parse().ok()?, h.parse().ok()?))),
             qualified_name: definition.qualified_name(),
             identity: definition.identity().map_err(|validation| {
                 validation
@@ -118,7 +121,7 @@ pub fn resolve_macro_invocations(
 #[derive(Clone)]
 struct DefinitionRecord {
     index: usize,
-    object: bool,
+    object_aspect: Option<(u8, u8)>,
     qualified_name: Option<String>,
     identity: Result<MacroDefinitionIdentity, Vec<&'static str>>,
 }
@@ -173,19 +176,15 @@ fn build_resolution(
                     let macro_lock = &document.macro_locks()[*lock_index];
                     match resolve_definition(macro_lock, definitions) {
                         DefinitionResolution::Resolved(identity) => {
-                            if definitions.iter().any(|definition| {
-                                definition.object
-                                    && definition
+                            let object_aspect = definitions
+                                .iter()
+                                .find(|definition| {
+                                    definition
                                         .identity
                                         .as_ref()
                                         .is_ok_and(|candidate| candidate == &identity)
-                            }) {
-                                diagnostics.push(occurrence.diagnostic(
-                                    MacroInvocationResolutionDiagnosticKind::PluginObjectNotDrawnYet,
-                                    Some(identity), None, Vec::new(),
-                                ));
-                                continue;
-                            }
+                                })
+                                .and_then(|definition| definition.object_aspect);
                             resolved.push(ResolvedMacroInvocation {
                                 invocation: occurrence
                                     .invocation
@@ -195,6 +194,7 @@ fn build_resolution(
                                 atom_index,
                                 lock: macro_lock.into(),
                                 definition_identity: identity,
+                                object_aspect,
                             });
                         }
                         DefinitionResolution::Diagnostic {
@@ -520,6 +520,7 @@ mod tests {
         };
         diagnostic.surface = "corrupt".to_owned();
         let definitions = vec![DefinitionRecord {
+            object_aspect: None,
             index: 0,
             qualified_name: definition.qualified_name(),
             identity: Ok(identity),

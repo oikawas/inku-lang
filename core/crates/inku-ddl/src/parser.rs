@@ -583,6 +583,38 @@ fn candidates_at_with_locked_macro_boundary(
                         })
                 })
             });
+    // The ordinary coordination right-boundary check sees built-in words
+    // and qualified Macro names, but not a bracketed sidecar-locked word.
+    if language == ResolvedInstructionLanguage::Ja
+        && source[start_byte..].starts_with('と')
+        && (preceded_by_locked_macro
+            || has_japanese_recognized_left_candidate(edition, source, start_byte)
+            || has_japanese_recognized_left_candidate_across_separators(
+                edition, source, start_byte,
+            ))
+    {
+        let end_byte = start_byte + 'と'.len_utf8();
+        let right = end_byte + source[end_byte..].len()
+            - source[end_byte..]
+                .trim_start_matches(char::is_whitespace)
+                .len();
+        if matches!(
+            qualified_macro_match(document, right),
+            Some(
+                QualifiedMacroMatch::ExactLock { .. } | QualifiedMacroMatch::AmbiguousLocks { .. }
+            )
+        ) {
+            let candidate = Candidate {
+                end_byte,
+                priority: crate::grammar_markers::GRAMMAR_MARKER_PRIORITY,
+                identity: "function:と".into(),
+                delivery: CandidateDelivery::Token(NeutralTokenKind::GrammarMarker(MarkerId::JaTo)),
+            };
+            if !candidates.contains(&candidate) {
+                candidates.push(candidate);
+            }
+        }
+    }
     for candidate in candidates_at(edition, source, start_byte, language, false) {
         let followed_by_locked_macro = matches!(
             qualified_macro_match(document, candidate.end_byte),

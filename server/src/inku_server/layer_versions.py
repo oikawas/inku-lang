@@ -430,7 +430,10 @@
 # DDLs of the 2026-10-27 5173 listing, none of whose lines is a title).
 # 73: Read bracketed plugin names and omit unbound caller fields separately;
 # saved-DDL comparison is measured during the owner's review.
-DDL_ENGINE_VERSION = "73"
+# 74: Object plugin words resolve as invisible boxes carrying Score 0.23
+# templates.
+# Their templates are performed by render engine 94.
+DDL_ENGINE_VERSION = "74"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

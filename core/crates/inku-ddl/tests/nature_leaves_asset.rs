@@ -96,7 +96,7 @@ fn bracketed_young_leaves_bind_the_same_locked_definition() {
 }
 
 #[test]
-fn v2_scene_keeps_v1_body_and_object_is_not_drawn() {
+fn v2_scene_keeps_v1_body_and_empty_object_keeps_its_box() {
     let package: Package = serde_json::from_str(ASSET).unwrap();
     let mut raw = package.entries[0].definition.clone();
     let id = raw["heading"].clone();
@@ -156,22 +156,30 @@ fn v2_scene_keeps_v1_body_and_object_is_not_drawn() {
     )
     .unwrap();
     let result = compile_ddl_to_score(
-        NormalizedDdlDocument::new("｛若葉｝。", ResolvedInstructionLanguage::Ja, vec![lock])
-            .unwrap(),
+        NormalizedDdlDocument::new(
+            "｛若葉｝を置く。",
+            ResolvedInstructionLanguage::Ja,
+            vec![lock],
+        )
+        .unwrap(),
         &[object],
         Some(37),
         limits,
         ScoreLoweringContext::resolve("square", Color::White).unwrap(),
         ScoreErrorPolicy::OmitAndContinue,
     );
-    assert!(result.score().is_none());
     assert!(
-        result
-            .upstream_diagnostics()
-            .iter()
-            .any(|d| d.reason == "plugin_object_not_drawn_yet"),
+        result.upstream_diagnostics().is_empty(),
         "{:?}",
         result.upstream_diagnostics()
+    );
+    assert_eq!(
+        result
+            .score()
+            .unwrap_or_else(|| panic!("{:?}", result.downstream_diagnostics()))
+            .object_templates
+            .len(),
+        1
     );
 }
 

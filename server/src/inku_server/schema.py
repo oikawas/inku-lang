@@ -31,7 +31,7 @@ def count_field_description(limits: Limits = DEFAULT_LIMITS) -> str:
 COUNT_FIELD_DESCRIPTION = count_field_description(DEFAULT_LIMITS)
 
 Coord = tuple[float, float]
-ScoreVersion = Literal["0.22.0", "0.21.0", "0.20.0", "0.19.0", "0.18.0", "0.17.0", "0.16.0", "0.15.0", "0.14.0", "0.13.0", "0.12.0", "0.11.0", "0.10.0", "0.9.0", "0.8.0", "0.7.0", "0.6.0", "0.5.0", "0.4.0", "0.3.0", "0.2.0", "0.1.0"]
+ScoreVersion = Literal["0.23.0", "0.22.0", "0.21.0", "0.20.0", "0.19.0", "0.18.0", "0.17.0", "0.16.0", "0.15.0", "0.14.0", "0.13.0", "0.12.0", "0.11.0", "0.10.0", "0.9.0", "0.8.0", "0.7.0", "0.6.0", "0.5.0", "0.4.0", "0.3.0", "0.2.0", "0.1.0"]
 
 Primitive = Literal[
     "line",
@@ -1508,7 +1508,7 @@ class MirrorRelationV1(BaseModel):
     follower_facts: MirrorFollowerFactsV1 = Field(description="Facts about the follower that the renderer must keep.")
 
 
-class Score(BaseModel):
+class ScoreBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     version: ScoreVersion = Field(
@@ -1612,44 +1612,45 @@ class Score(BaseModel):
     @model_validator(mode="after")
     def _validate_composite_arrangements(self) -> "Score":
         """A composite is one contiguous, non-overlapping instruction span."""
-        if self.version == "0.1.0" and any(
+        version = "0.22.0" if self.version == "0.23.0" else self.version
+        if version == "0.1.0" and any(
             instruction.arc_form is not None for instruction in self.instructions
         ):
             raise ValueError("arc_form requires Score version 0.2.0")
-        if self.version in {"0.1.0", "0.2.0"} and any(
+        if version in {"0.1.0", "0.2.0"} and any(
             instruction.surface_intensity != "normal" for instruction in self.instructions
         ):
             raise ValueError("surface_intensity requires Score version 0.3.0 or later")
-        if self.version not in {"0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"} and any(
+        if version not in {"0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"} and any(
             instruction.thinness in ("thick", "extra_thick") for instruction in self.instructions
         ):
             raise ValueError("thick thinness requires Score version 0.16.0")
-        if self.version not in {"0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"} and any(
+        if version not in {"0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"} and any(
             instruction.surface_intensity != "normal" and not closed_solid_fill(instruction)
             for instruction in self.instructions
         ):
             raise ValueError(
                 "surface_intensity on a stroke or a textured surface requires Score version 0.17.0"
             )
-        if self.version not in {"0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"} and any(
+        if version not in {"0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"} and any(
             instruction.surface is not None and instruction.surface.texture == "sweep"
             for instruction in self.instructions
         ):
             raise ValueError("surface texture sweep requires Score version 0.17.0")
-        if self.version != "0.22.0" and any(
+        if version != "0.22.0" and any(
             instruction.surface is not None and instruction.surface.texture == "brushmarks"
             for instruction in self.instructions
         ):
             raise ValueError("surface texture brushmarks requires Score version 0.22.0")
-        if self.mirror_relations and self.version not in {"0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"}:
+        if self.mirror_relations and version not in {"0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"}:
             raise ValueError("mirror_relations requires Score version 0.15.0")
-        if self.version not in {"0.20.0", "0.21.0", "0.22.0"} and self._uses_joint_relations():
+        if version not in {"0.20.0", "0.21.0", "0.22.0"} and self._uses_joint_relations():
             raise ValueError("joint relations require Score version 0.20.0")
-        if self.version not in {"0.21.0", "0.22.0"} and any(
+        if version not in {"0.21.0", "0.22.0"} and any(
             instruction.primitive == "free_line" for instruction in self.instructions
         ):
             raise ValueError("free_line requires Score version 0.21.0")
-        if self.version not in {"0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"} and any(
+        if version not in {"0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"} and any(
             isinstance(group.target.owner, NumericRangeTargetOwner) for group in self.fill_groups
         ):
             raise ValueError("fill target numeric_range requires Score version 0.18.0")
@@ -1682,9 +1683,9 @@ class Score(BaseModel):
                         "between needs two prior instructions inside its composite group"
                     )
             covered_until = stop
-        if self.anchors and self.version not in {"0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"}:
+        if self.anchors and version not in {"0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"}:
             raise ValueError("anchors requires Score version 0.6.0")
-        if self.transform_groups and self.version not in {"0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"}:
+        if self.transform_groups and version not in {"0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"}:
             raise ValueError("transform_groups requires Score version 0.4.0")
         for group_index, group in enumerate(self.transform_groups):
             if group.start > group.end or (
@@ -1693,7 +1694,7 @@ class Score(BaseModel):
                 raise ValueError("transform group range must be nonempty unless it owns anchors")
             if group.end > len(self.instructions):
                 raise ValueError("transform group range exceeds the instruction list")
-            if self.version not in {"0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"} and (
+            if version not in {"0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"} and (
                 group.scale_x != 1.0
                 or group.scale_y != 1.0
                 or group.translate_x != 0.0
@@ -1712,7 +1713,7 @@ class Score(BaseModel):
                 raise ValueError("transform group anchor_indices must be unique")
             if any(index >= len(self.anchors) for index in anchor_indices):
                 raise ValueError("transform group anchor_indices exceeds anchors")
-            if group.anchor_indices and self.version not in {"0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"}:
+            if group.anchor_indices and version not in {"0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"}:
                 raise ValueError("transform group anchor_indices requires Score version 0.6.0")
             for prior in self.transform_groups[:group_index]:
                 current_contains_prior = (
@@ -1738,16 +1739,16 @@ class Score(BaseModel):
                     raise ValueError("outer transform groups must include descendant fixed_position_indices")
                 if not set(prior.anchor_indices) <= anchor_indices:
                     raise ValueError("outer transform groups must include descendant anchor_indices")
-        if self.placement_groups and self.version not in {"0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"}:
+        if self.placement_groups and version not in {"0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"}:
             raise ValueError("placement_groups requires Score version 0.7.0")
         for group in [*self.placement_groups, *self.fill_groups]:
-            if group.cycle_members is not None and self.version not in {"0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"}:
+            if group.cycle_members is not None and version not in {"0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"}:
                 raise ValueError("cycle_members requires Score version 0.14.0")
             for member in group.members:
                 symbolic = member.symbolic
                 if symbolic is not None and (
                     symbolic.kind == "ordinary_group" or isinstance(symbolic.owner, OrdinaryGroupOwner)
-                ) and self.version not in {"0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"}:
+                ) and version not in {"0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"}:
                     raise ValueError("ordinary group members require Score version 0.14.0")
                 if symbolic is not None and (
                     symbolic.kind == "ordinary_group" or isinstance(symbolic.owner, OrdinaryGroupOwner)
@@ -1765,14 +1766,14 @@ class Score(BaseModel):
         placement_anchor_indices: set[int] = set()
         placement_transform_indices: set[int] = set()
         for group in self.placement_groups:
-            if group.layout in {"scatter", "tile"} and self.version not in {"0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"}:
+            if group.layout in {"scatter", "tile"} and version not in {"0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"}:
                 raise ValueError("scatter and tile placement_groups require Score version 0.8.0")
-            if group.layout == "cells" and self.version not in {"0.19.0", "0.20.0", "0.21.0", "0.22.0"}:
+            if group.layout == "cells" and version not in {"0.19.0", "0.20.0", "0.21.0", "0.22.0"}:
                 raise ValueError("cells placement_groups require Score version 0.19.0")
             recipe = group.resolved.recipe if group.resolved is not None else None
             if (group.layout == "cells") != isinstance(recipe, CellsRecipe):
                 raise ValueError("cells placement_groups require the resolved cells recipe")
-            if group.members and self.version not in {"0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"}:
+            if group.members and version not in {"0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"}:
                 raise ValueError("placement group members require Score version 0.9.0")
             if not group.members and group.start >= group.end:
                 raise ValueError("placement group range must be nonempty")
@@ -1840,17 +1841,17 @@ class Score(BaseModel):
                 instruction.arrangement.resolved.recipe, CellsRecipe
             ):
                 raise ValueError("cells recipes belong to cells placement_groups")
-            if self.version not in {"0.12.0", "0.13.0", "0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"} and (
+            if version not in {"0.12.0", "0.13.0", "0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"} and (
                 instruction.ink_spread is not None
                 or (relation is not None and relation.target_endpoint is not None)
             ):
                 raise ValueError("ink_spread and target_endpoint require Score version 0.12.0")
-            if relation is not None and relation.target_path_position == "interior" and self.version not in {"0.13.0", "0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"}:
+            if relation is not None and relation.target_path_position == "interior" and version not in {"0.13.0", "0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"}:
                 raise ValueError("interior target_path_position requires Score version 0.13.0")
-            if relation is not None and relation.target_path_position is not None and self.version not in {"0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"}:
+            if relation is not None and relation.target_path_position is not None and version not in {"0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"}:
                 raise ValueError("target_path_position requires Score version 0.11.0")
             if relation is not None and relation.target_anchor_index is not None:
-                if self.version not in {"0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"}:
+                if version not in {"0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"}:
                     raise ValueError("relation target_anchor_index requires Score version 0.6.0")
                 if relation.target_anchor_index >= len(self.anchors):
                     raise ValueError("relation target_anchor_index exceeds anchors")
@@ -1866,9 +1867,9 @@ class Score(BaseModel):
                 for instruction in self.instructions
             )
         )
-        if has_compact_fields and self.version not in {"0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"}:
+        if has_compact_fields and version not in {"0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"}:
             raise ValueError("compact symbolic fields require Score version 0.10.0 or newer")
-        if self.version == "0.10.0" or (self.version in {"0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"} and has_compact_fields):
+        if version == "0.10.0" or (version in {"0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"} and has_compact_fields):
             if self.resource_policy is None:
                 raise ValueError("Score 0.10 requires a resource_policy snapshot")
             if not self.resource_policy.hard_policy.identity:
@@ -1913,4 +1914,38 @@ class Score(BaseModel):
                         raise ValueError("cycle occurrence_count must equal the logical count")
                 elif expected != group.logical_count:
                     raise ValueError("fill member counts must equal the logical count")
+        return self
+
+
+class ObjectTemplate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    instruction_index: int = Field(ge=0)
+    aspect: tuple[Annotated[int, Field(ge=1, le=16)], Annotated[int, Field(ge=1, le=16)]]
+    body: ScoreBody
+
+
+class Score(ScoreBody):
+    object_templates: list[ObjectTemplate] = Field(
+        default_factory=list,
+        exclude_if=lambda value: not value,
+        description="Local drawings for invisible square instructions, stored once per object.",
+    )
+
+    @model_validator(mode="after")
+    def _validate_object_templates(self) -> "Score":
+        if self.object_templates and self.version != "0.23.0":
+            raise ValueError("object templates require Score version 0.23.0")
+        owners: set[int] = set()
+        for template in self.object_templates:
+            if template.instruction_index in owners:
+                raise ValueError("object template owners must be unique")
+            owners.add(template.instruction_index)
+            if template.instruction_index >= len(self.instructions) or self.instructions[template.instruction_index].primitive != "square":
+                raise ValueError("object template requires a square owner")
+            body = template.body
+            if body.placement_groups or body.mirror_relations:
+                raise ValueError("object template body cannot contain placement groups")
+            if any(group.member.symbolic is None or group.member.symbolic.instance_count != 1 for group in body.repetition_groups):
+                raise ValueError("object template body repetition must have one instance")
         return self

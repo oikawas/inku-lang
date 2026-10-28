@@ -1391,6 +1391,89 @@ fn lower_macro_instruction(
     }
 }
 
+/// Lower a plugin body once in local box coordinates. Caller placement and
+/// geometry belong to the square; only unbound appearance is diagnosed here.
+fn lower_object_plugin_template(
+    view: VerifiedStage15EffectiveView<'_>,
+    source_instruction_index: usize,
+    instruction: &SemanticInstruction,
+    head: &SemanticMacroInvocationHead,
+    mut context: ScoreLoweringContext,
+    error_policy: ScoreErrorPolicy,
+    diagnostics: &mut Vec<ScoreLoweringDiagnostic>,
+) -> Option<(u8, u8, Box<Score>)> {
+    let (width, height) = head.object_aspect?;
+    context.canvas_format.width_units = u32::from(width);
+    context.canvas_format.height_units = u32::from(height);
+    context.declared_ratio = None;
+    context.canvas_fit = None;
+    let mut caller = instruction.clone();
+    caller.action = None;
+    caller.position = None;
+    caller.layout_direction = None;
+    caller.relation = None;
+    caller.fill_target = None;
+    caller.sequence = None;
+    caller.entity.quantity = None;
+    caller.entity.relative_scale = None;
+    caller.entity.explicit_geometry = None;
+    caller.entity.additional_relative_scales.clear();
+    caller.entity.additional_explicit_geometries.clear();
+    caller.entity.additional_width_extents.clear();
+    caller.entity.numeric_position = None;
+    caller.entity.numeric_range = None;
+    caller.entity.numeric_segment = None;
+    caller.entity.angle = None;
+    caller.entity.numeric_angle = None;
+    caller.entity.shape_constraint = None;
+    caller.entity.proportion = Default::default();
+    caller.entity.fade = None;
+    let mut instructions = Vec::new();
+    let mut anchors = Vec::new();
+    let mut anchor_origins = Vec::new();
+    let mut instruction_origins = Vec::new();
+    let mut transform_groups = Vec::new();
+    lower_macro_instruction(
+        view,
+        source_instruction_index,
+        &caller,
+        head,
+        None,
+        context,
+        error_policy,
+        &mut instructions,
+        &mut anchors,
+        &mut anchor_origins,
+        &mut instruction_origins,
+        diagnostics,
+        None,
+        None,
+        &mut transform_groups,
+    );
+    if instructions.is_empty() && anchors.is_empty() {
+        return None;
+    }
+    Some((
+        width,
+        height,
+        Box::new(Score {
+            version: inku_score::ScoreEdition::V0_22.as_str().to_owned(),
+            canvas: context.score_canvas(None),
+            background: context.background,
+            presence: None,
+            instructions,
+            object_templates: Vec::new(),
+            anchors,
+            transform_groups,
+            placement_groups: Vec::new(),
+            repetition_groups: Vec::new(),
+            fill_groups: Vec::new(),
+            mirror_relations: Vec::new(),
+            resource_policy: None,
+        }),
+    ))
+}
+
 fn exact_macro_expansion<'a>(
     view: VerifiedStage15EffectiveView<'a>,
     head: &SemanticMacroInvocationHead,
@@ -2753,6 +2836,7 @@ fn lower_verified_stage15_shared<'a>(
     // body. The body keeps its own actions, quantities, anchors and transforms.
     for (projected_index, instruction) in document.instructions.iter().enumerate() {
         if !matches!(instruction.entity.head, SemanticHead::MacroInvocation(_))
+            || matches!(&instruction.entity.head, SemanticHead::MacroInvocation(head) if head.object_aspect.is_some())
             || instruction
                 .action
                 .as_ref()
@@ -2808,6 +2892,10 @@ fn lower_verified_stage15_shared<'a>(
     if objects.is_some() {
         for (projected_index, instruction) in document.instructions.iter().enumerate() {
             if !matches!(instruction.entity.head, SemanticHead::MacroInvocation(_)) {
+                continue;
+            }
+            if matches!(&instruction.entity.head, SemanticHead::MacroInvocation(head) if head.object_aspect.is_some())
+            {
                 continue;
             }
             let Some(count) = instruction
@@ -2868,6 +2956,7 @@ fn lower_verified_stage15_shared<'a>(
     }
 
     let mut instructions = Vec::new();
+    let mut object_templates = Vec::new();
     let mut anchors = Vec::new();
     let mut anchor_origins = Vec::new();
     let mut instruction_origins = Vec::new();
@@ -3111,13 +3200,52 @@ fn lower_verified_stage15_shared<'a>(
             continue;
         }
         match &instruction.entity.head {
-            SemanticHead::Primitive(_) => {
+            SemanticHead::Primitive(_)
+            | SemanticHead::MacroInvocation(SemanticMacroInvocationHead {
+                object_aspect: Some(_),
+                ..
+            }) => {
+                let mut plugin_template =
+                    if let SemanticHead::MacroInvocation(head) = &instruction.entity.head {
+                        let Some(template) = lower_object_plugin_template(
+                            candidate.verified_effective_view(),
+                            instruction_index,
+                            instruction,
+                            head,
+                            context,
+                            error_policy,
+                            &mut diagnostics,
+                        ) else {
+                            continue;
+                        };
+                        Some(template)
+                    } else {
+                        None
+                    };
                 let mut input = project_source_instruction(
                     candidate.verified_effective_view(),
                     instruction_index,
                     instruction,
                 )
                 .expect("source projection is called only for primitive heads");
+                if plugin_template.is_some() {
+                    // The box is invisible, so this finite placeholder has
+                    // no effect on the plugin body's own appearance.
+                    input.color = Some(SemanticInputIdentity {
+                        category: "color",
+                        id: "black",
+                    });
+                    input.color_cycle = &[];
+                    input.touch = None;
+                    input.continuity = None;
+                    input.surface = None;
+                    input.surface_intensity = None;
+                    input.surface_fineness = None;
+                    input.surface_underlayer = None;
+                    input.thinness = None;
+                    input.fluctuation = [None; 3];
+                    input.ink_spread = None;
+                }
                 if let Some((region, count)) = group_members.get(&projected_index) {
                     // The group alone owns action and target; members retain appearance
                     // and quantities while resolving geometry in a local Place recipe.
@@ -3184,6 +3312,7 @@ fn lower_verified_stage15_shared<'a>(
                     if let Some(index) = object_index {
                         objects[index].relation = relation;
                         objects[index].count_was_omitted = instruction.entity.quantity.is_none();
+                        objects[index].plugin_template = plugin_template.take();
                     }
                 } else if let Some(relation) = instruction
                     .relation
@@ -3244,6 +3373,15 @@ fn lower_verified_stage15_shared<'a>(
                         &mut instruction_origins,
                         &mut diagnostics,
                     );
+                }
+                if let Some((width, height, body)) = plugin_template
+                    && instructions.len() > body_start
+                {
+                    object_templates.push(inku_score::ObjectTemplate {
+                        instruction_index: body_start,
+                        aspect: [width, height],
+                        body,
+                    });
                 }
             }
             SemanticHead::MacroInvocation(head) => {
@@ -3325,6 +3463,10 @@ fn lower_verified_stage15_shared<'a>(
                     },
                     kind: match instruction.entity.head {
                         SemanticHead::Primitive(_) => PlacementMemberKind::Primitive,
+                        SemanticHead::MacroInvocation(SemanticMacroInvocationHead {
+                            object_aspect: Some(_),
+                            ..
+                        }) => PlacementMemberKind::Primitive,
                         SemanticHead::MacroInvocation(_) => PlacementMemberKind::Macro,
                     },
                     source_count: u32::try_from(*count)
@@ -3333,7 +3475,7 @@ fn lower_verified_stage15_shared<'a>(
                 },
             );
         } else if objects.is_some()
-            && matches!(instruction.entity.head, SemanticHead::MacroInvocation(_))
+            && matches!(&instruction.entity.head, SemanticHead::MacroInvocation(head) if head.object_aspect.is_none())
             && (body_start < body_end || anchor_start < anchors.len())
         {
             // Count one still owns a complete body, including Anchor-only macros.
@@ -3715,8 +3857,9 @@ fn lower_verified_stage15_shared<'a>(
         ScoreLoweringOutcome::Complete
     };
     let score = (objects.is_none() && outcome != ScoreLoweringOutcome::Stopped).then(|| Score {
-        object_templates: Vec::new(),
-        version: if inku_score::instructions_use_brushmarks(&instructions) {
+        version: if !object_templates.is_empty() {
+            inku_score::ScoreEdition::V0_23.as_str().to_owned()
+        } else if inku_score::instructions_use_brushmarks(&instructions) {
             inku_score::ScoreEdition::V0_22.as_str().to_owned()
         } else if inku_score::instructions_use_free_line(&instructions) {
             inku_score::ScoreEdition::V0_21.as_str().to_owned()
@@ -3767,6 +3910,7 @@ fn lower_verified_stage15_shared<'a>(
         background: context.background,
         presence: None,
         instructions,
+        object_templates,
         anchors: anchors.clone(),
         transform_groups: score_transform_groups,
         placement_groups: placement_groups

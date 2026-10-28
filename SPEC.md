@@ -1465,6 +1465,8 @@ The Server's shared pipeline totals sketch prose, Stage 1, catalog selection, ho
 
 Usage, reservations, and the 429 cooldown are persisted in the DB and survive restart. Concurrent admissions are serialized in the DB. RPD includes retries and known 429s, resetting at midnight Pacific time for Gemini and midnight UTC otherwise. An exhausted day or an oversized input returns a rate-limit failure without sending a generation request. After 429, the wait is the maximum of 62 seconds, `Retry-After`, and Gemini `RetryInfo`. Transport inserts no retry, and admission waits remain inside the core's finite attempt deadline. Accounting covers only this Server's shared pipeline, excluding external applications, servers using another DB, and separate paths such as Vision.
 
+The shared core calculates these limits, admission, reconciliation, cooldown and day boundaries. The Server supplies time and persists each transition with compare-and-set; arithmetic overflow is refused as corrupt accounting state.
+
 ---
 
 ## 9. The Design of the First Stroke

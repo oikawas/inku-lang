@@ -948,7 +948,8 @@ pub fn model_catalog_json(input: &[u8]) -> Vec<u8> {
             | "chatgpt_auth_identity"
             | "chatgpt_auth_generation"
             | "chatgpt_auth_constants"
-            | "chatgpt_auth_callback_client",
+            | "chatgpt_auth_callback_client"
+            | "chatgpt_auth_select",
         ) => chatgpt_auth_policy::run(&request),
         Some("reference_batch") => {
             let results: Vec<Value> = array(request.get("queries"))

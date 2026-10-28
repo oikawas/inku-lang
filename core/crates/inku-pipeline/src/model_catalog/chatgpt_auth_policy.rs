@@ -136,6 +136,13 @@ pub(super) fn run(r: &Value) -> Value {
                 json!({"client_id":issued})
             }
         }
+        "chatgpt_auth_select" => {
+            if array(r.get("profile_ids")).contains(&r["profile_id"]) {
+                json!({"active":r["profile_id"]})
+            } else {
+                fail("chatgpt_not_connected")
+            }
+        }
         "chatgpt_auth_url" => authorization(r),
         "chatgpt_auth_discovery" => {
             if r["discovery"]["issuer"] != ISSUER

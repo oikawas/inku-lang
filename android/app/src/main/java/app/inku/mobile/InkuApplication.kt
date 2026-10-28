@@ -19,6 +19,7 @@ internal const val MIGRATION_REPORT = "saijiki-v2-migration.json"
 
 class InkuApplication : Application() {
     val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    internal val activityForeground = kotlinx.coroutines.flow.MutableStateFlow(false)
     private val chatGptAssessments by lazy {
         val rows = app.inku.mobile.data.catalogRequest("catalog").getJSONObject("catalog")
             .getJSONObject("providers").getJSONObject("chatgpt").getJSONArray("models")
@@ -28,6 +29,7 @@ class InkuApplication : Application() {
     }
     val chatGptPlan by lazy {
         app.inku.mobile.llm.ChatGptPlanManager(app.inku.mobile.llm.AndroidChatGptCredentialStore(this), applicationScope,
+            foreground = activityForeground,
             modelPolicy = {
                 kotlinx.coroutines.runBlocking(Dispatchers.IO) {
                     val settings = database.settingsDao()

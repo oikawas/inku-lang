@@ -5,6 +5,7 @@ import java.net.ServerSocket
 import java.net.SocketTimeoutException
 import java.nio.charset.CharacterCodingException
 import java.util.UUID
+import android.util.Log
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -14,10 +15,12 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
@@ -28,6 +31,9 @@ class ChatGptPlanManager internal constructor(
     private val scope: CoroutineScope,
     private val http: ChatGptHttp = UrlConnectionChatGptHttp(),
     private val modelPolicy: () -> ChatGptModelPolicy = { ChatGptModelPolicy() },
+    private val diagnostic: (String) -> Unit = { Log.w("InkuProvider", it) },
+    private val foreground: StateFlow<Boolean> = MutableStateFlow(true),
+    private val authorizationTimeoutMs: Long = 300_000,
     private val now: () -> Long = System::currentTimeMillis,
 ) : ModelProvider {
     override val providerId: String = CHATGPT_PROVIDER
@@ -39,6 +45,7 @@ class ChatGptPlanManager internal constructor(
 
     private class Authorization(val profileId: String, val previous: JSONObject?, val listener: ServerSocket,
                                 val japanese: Boolean, val deadline: Long) {
+        val trace = DiagnosticTrace()
         val state = randomOAuthValue()
         val nonce = randomOAuthValue()
         val verifier = randomOAuthValue()
@@ -46,6 +53,19 @@ class ChatGptPlanManager internal constructor(
         @Volatile var cancelled = false
         @Volatile var used = false
         var job: Job? = null
+    }
+
+    private class DiagnosticTrace {
+        var stage = "listener"
+            private set
+        var status: Int? = null
+            private set
+        fun enter(value: String) { stage = value; status = null }
+        fun response(value: Int) { status = value }
+    }
+
+    private fun logFailure(trace: DiagnosticTrace, error: Exception) {
+        runCatching { diagnostic(ChatGptDiagnostic.line(trace.stage, trace.status, error)) }
     }
 
     init { updateView() }
@@ -88,7 +108,7 @@ class ChatGptPlanManager internal constructor(
             val previous = profileId?.let { profiles.optJSONObject(it) ?: throw ChatGptException("chatgpt_not_connected") }
             ChatGptCore.call("chatgpt_auth_save_check", JSONObject().put("previous", previous ?: JSONObject.NULL)
                 .put("count", profiles.length()).put("expected_generation", JSONObject.NULL))
-            Authorization(profileId ?: UUID.randomUUID().toString(), previous, ServerSocket(0, 4, InetAddress.getByName("127.0.0.1")), japanese, now() + 300_000)
+            Authorization(profileId ?: UUID.randomUUID().toString(), previous, ServerSocket(0, 4, InetAddress.getByName("127.0.0.1")), japanese, now() + authorizationTimeoutMs)
                 .also { authorization = it; updateView() }
         }
         val url = try {
@@ -116,8 +136,11 @@ class ChatGptPlanManager internal constructor(
                     var consumed = false
                     var success = false
                     var signedIn: ChatGptSessionRef? = null
+                    var client: String? = null
+                    var callbackCode: String? = null
                     var code: String? = null
                     try {
+                        attempt.trace.enter("callback")
                         val input = socket.getInputStream()
                         val request = readLine(input, 16_384).split(' ')
                         if (request.size != 3 || request[0] != "GET") throw ChatGptException("chatgpt_callback_invalid")
@@ -140,29 +163,49 @@ class ChatGptPlanManager internal constructor(
                             if (attempt.used) throw ChatGptException("chatgpt_callback_invalid")
                             attempt.used = true; consumed = true
                         }
-                        val client = issuedClientId(query, attempt.previous)
-                        signedIn = withTimeout((attempt.deadline - now()).coerceAtLeast(1)) { exchange(attempt, client, query.getValue("code")) }
+                        client = issuedClientId(query, attempt.previous)
+                        callbackCode = query.getValue("code")
                         success = true
                     } catch (cancelled: CancellationException) { throw cancelled }
-                    catch (error: Exception) { code = (error as? ChatGptException)?.code ?: "chatgpt_auth_unavailable" }
+                    catch (error: Exception) {
+                        logFailure(attempt.trace, error)
+                        code = (error as? ChatGptException)?.code ?: "chatgpt_auth_unavailable"
+                    }
                     val text = if (attempt.japanese) {
-                        if (success) "ChatGPTの認証が完了しました。このタブを閉じ、inkuへ戻ってモデル設定を開いてください。"
+                        if (success) "ChatGPTでの許可を受け取りました。inkuへ戻ると接続を完了します。"
                         else "ChatGPTの認証は完了していません。inkuへ戻り、接続の案内を確認してください。"
                     } else {
-                        if (success) "ChatGPT authorization completed. Close this tab, return to inku and open Model settings."
+                        if (success) "ChatGPT authorization received. Return to inku to finish connecting."
                         else "ChatGPT authorization did not complete. Return to inku and check the connection message."
                     }
                     val body = ("<!doctype html><html lang=\"${if (attempt.japanese) "ja" else "en"}\"><meta charset=\"utf-8\"><title>inku</title><p>$text</p></html>").toByteArray(Charsets.UTF_8)
                     runCatching { socket.getOutputStream().apply {
                         write(("HTTP/1.1 ${if (success) "200 OK" else "400 Bad Request"}\r\nContent-Type: text/html; charset=utf-8\r\nCache-Control: no-store\r\nReferrer-Policy: no-referrer\r\nConnection: close\r\nContent-Length: ${body.size}\r\n\r\n").toByteArray(Charsets.US_ASCII)); write(body); flush()
                     } }
+                    socket.close()
+                    if (success) {
+                        try {
+                            val remaining = attempt.deadline - now()
+                            if (remaining <= 0 || withTimeoutOrNull(remaining) { foreground.first { it } } == null) {
+                                throw ChatGptException("chatgpt_cancelled")
+                            }
+                            checkAttempt(attempt)
+                            signedIn = withTimeout((attempt.deadline - now()).coerceAtLeast(1)) {
+                                exchange(attempt, requireNotNull(client), requireNotNull(callbackCode))
+                            }
+                        } catch (cancelled: CancellationException) { throw cancelled }
+                        catch (error: Exception) {
+                            logFailure(attempt.trace, error)
+                            code = (error as? ChatGptException)?.code ?: "chatgpt_auth_unavailable"
+                        }
+                    }
                     if (consumed) {
                         synchronized(store) {
                             if (authorization === attempt) { authorization = null; updateView(code) }
                         }
                         if (success) signedIn?.let { ref ->
                             scope.launch(Dispatchers.IO) {
-                                try { refreshPinnedModels(ref) }
+                                try { refreshPinnedModels(ref, logFailure = true) }
                                 catch (cancelled: CancellationException) { throw cancelled }
                                 catch (_: ChatGptException) { /* Refresh reports its own failure. */ }
                             }
@@ -170,8 +213,11 @@ class ChatGptPlanManager internal constructor(
                     }
                 }
             }
-        } catch (cancelled: CancellationException) { throw cancelled }
-        catch (error: Exception) { synchronized(store) {
+        } catch (cancelled: CancellationException) {
+            if (cancelled is kotlinx.coroutines.TimeoutCancellationException) logFailure(attempt.trace, cancelled)
+            throw cancelled
+        }
+        catch (error: Exception) { logFailure(attempt.trace, error); synchronized(store) {
             if (authorization === attempt) { authorization = null; updateView((error as? ChatGptException)?.code ?: "chatgpt_auth_unavailable") }
         } } finally { attempt.listener.close() }
     }
@@ -180,6 +226,7 @@ class ChatGptPlanManager internal constructor(
         val check = { checkAttempt(attempt) }
         // Retain the issued ID on a failed code exchange; it is never an authorized profile.
         if (attempt.previous == null) synchronized(store) {
+            attempt.trace.enter("store")
             check()
             val value = store.read()
             val profiles = value.getJSONObject("profiles")
@@ -189,21 +236,27 @@ class ChatGptPlanManager internal constructor(
                 .put("generation", 0).put("state", "reauthentication_required"))
             store.write(value)
         }
+        attempt.trace.enter("token")
         val tokens = authJson(CHATGPT_TOKEN, "POST", form(mapOf("grant_type" to "authorization_code", "client_id" to client,
-            "code" to code, "code_verifier" to attempt.verifier, "redirect_uri" to attempt.redirectUri, "resource" to CHATGPT_RESOURCE)), check)
-        val claims = identity(tokens.getString("id_token"), client, attempt.nonce, check)
+            "code" to code, "code_verifier" to attempt.verifier, "redirect_uri" to attempt.redirectUri, "resource" to CHATGPT_RESOURCE)), check, attempt.trace::response)
+        val claims = identity(tokens.getString("id_token"), client, attempt.nonce, check, attempt.trace)
+        attempt.trace.enter("identity")
         val previous = attempt.previous?.let { JSONObject(it.toString()).also { copy -> if (!copy.has("sub")) copy.put("pending", true) } }
         ChatGptCore.call("chatgpt_auth_identity", JSONObject().put("previous", previous ?: JSONObject.NULL)
             .put("sub", claims.getString("sub")))
+        attempt.trace.enter("display")
         val display = ChatGptCore.call("chatgpt_auth_display", JSONObject().put("claims", claims).put("client_id", client)
             .apply { ChatGptEmailJson.fromToken(tokens.getString("id_token"))?.let { put("email_json", it) } })
-        val profile = tokenFields(tokens, null).put("id", attempt.profileId).put("client_id", client)
-            .put("sub", claims.getString("sub")).put("generation", ChatGptCore.call("chatgpt_auth_generation", JSONObject()
+        attempt.trace.enter("tokens")
+        val profile = tokenFields(tokens, null).put("id", attempt.profileId).put("client_id", client).put("sub", claims.getString("sub"))
+        attempt.trace.enter("generation")
+        profile.put("generation", ChatGptCore.call("chatgpt_auth_generation", JSONObject()
                 .put("previous", attempt.previous ?: JSONObject.NULL)).getLong("generation"))
             .put("label", display.getString("label")).put("state", "connected")
             .put("email", display.getString("email")).put("plan_notice_seen", attempt.previous?.optBoolean("plan_notice_seen") ?: false)
             .put("published_models", attempt.previous?.optJSONArray("published_models") ?: JSONArray())
         return synchronized(store) {
+            attempt.trace.enter("store")
             check()
             val value = store.read()
             val profiles = value.getJSONObject("profiles")
@@ -211,13 +264,16 @@ class ChatGptPlanManager internal constructor(
             val prior = current?.takeIf { it.has("sub") }
             val count = profiles.keys().asSequence().map { profiles.getJSONObject(it) }.count { it.has("sub") }
             val expected = attempt.previous?.takeIf { it.has("sub") }?.optLong("generation")
+            attempt.trace.enter("save_check")
             ChatGptCore.call("chatgpt_auth_save_check", JSONObject().put("previous", prior ?: JSONObject.NULL)
                 .put("expected_generation", expected ?: JSONObject.NULL).put("count", count))
+            attempt.trace.enter("preserve")
             val saved = if (prior != null) ChatGptCore.fromCore(ChatGptCore.call("chatgpt_auth_preserve", JSONObject()
                 .put("profile", ChatGptCore.toCore(profile, modelPolicy().purposes))
                 .put("previous", ChatGptCore.toCore(prior, modelPolicy().purposes))).getJSONObject("profile")) else profile
             saved.remove("model_purposes")
             saved.remove("model_metadata")
+            attempt.trace.enter("store")
             profiles.put(attempt.profileId, saved)
             value.put("active", attempt.profileId)
             store.write(value)
@@ -265,11 +321,17 @@ class ChatGptPlanManager internal constructor(
         return refreshPinnedModels(ref)
     }
 
-    private suspend fun refreshPinnedModels(ref: ChatGptSessionRef): List<String> {
+    private suspend fun refreshPinnedModels(ref: ChatGptSessionRef, logFailure: Boolean = false): List<String> {
         try {
             return withTimeout(30_000) { wireMutex.withLock { catalog(ref, force = true).map { it.id } } }
-        } catch (cancelled: CancellationException) { throw cancelled }
+        } catch (cancelled: CancellationException) {
+            if (logFailure && cancelled is kotlinx.coroutines.TimeoutCancellationException) {
+                logFailure(DiagnosticTrace().apply { enter("catalog") }, cancelled)
+            }
+            throw cancelled
+        }
         catch (error: Exception) {
+            if (logFailure) logFailure(DiagnosticTrace().apply { enter("catalog") }, error)
             val safe = error as? ChatGptException ?: ChatGptException("chatgpt_transport_unavailable")
             invalidateForFailure(ref, safe.code)
             reportFailure(ref, safe.code); throw safe
@@ -456,9 +518,10 @@ class ChatGptPlanManager internal constructor(
         updateView(revocationUnconfirmed = !confirmed)
     }
 
-    private suspend fun authJson(url: String, method: String = "GET", body: String? = null, check: () -> Unit = {}): JSONObject {
+    private suspend fun authJson(url: String, method: String = "GET", body: String? = null, check: () -> Unit = {}, status: (Int) -> Unit = {}): JSONObject {
         validateAuthEndpoint(url)
         val response = http.request(url, method, body = body, formBody = body != null, check = check)
+        status(response.status)
         val validJson = app.inku.mobile.pipeline.NativePipelineBridge.canonicalJson(response.body) != null
         val parsed = runCatching { org.json.JSONTokener(response.body).nextValue() }
         val result = ChatGptCore.call("chatgpt_auth_http", JSONObject().put("json_valid", validJson && parsed.isSuccess)
@@ -467,14 +530,17 @@ class ChatGptPlanManager internal constructor(
         return parsed.getOrThrow() as JSONObject
     }
 
-    private suspend fun discovery(check: () -> Unit = {}): JSONObject = authJson("$CHATGPT_ISSUER/.well-known/openid-configuration", check = check).also {
+    private suspend fun discovery(check: () -> Unit = {}, status: (Int) -> Unit = {}): JSONObject = authJson("$CHATGPT_ISSUER/.well-known/openid-configuration", check = check, status = status).also {
         ChatGptCore.call("chatgpt_auth_discovery", JSONObject().put("discovery", it))
     }
 
-    private suspend fun identity(token: String, client: String, nonce: String?, check: () -> Unit): JSONObject {
-        val metadata = discovery(check)
-        val keys = authJson(metadata.getString("jwks_uri"), check = check)
+    private suspend fun identity(token: String, client: String, nonce: String?, check: () -> Unit, trace: DiagnosticTrace? = null): JSONObject {
+        trace?.enter("discovery")
+        val metadata = discovery(check) { trace?.response(it) }
+        trace?.enter("jwks")
+        val keys = authJson(metadata.getString("jwks_uri"), check = check, status = { trace?.response(it) })
         check()
+        trace?.enter("identity")
         return validateChatGptIdentity(token, client, nonce, metadata, keys, now() / 1000)
     }
 

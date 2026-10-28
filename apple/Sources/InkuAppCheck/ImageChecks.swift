@@ -16,6 +16,7 @@ func runImageChecks(realOpus: Bool = false) async throws {
     let transport = ImageCheckProvider()
     let app = AppModel(databaseURL: url, transport: realOpus ? nil : transport)
     await app.initialize()
+    if !realOpus { app.seedText = "7" }
     var settings = await app.hostSettings()
     let providerID = realOpus ? "anthropic" : "fixture"
     let modelID = realOpus ? "claude-opus-5-5" : "vision"
@@ -151,6 +152,7 @@ private actor ImageCheckProvider: ProviderTransport {
     func perform(action: Data, models: ModelSelection, providers: [ProviderSettings], credentials: any CredentialStore,
                  onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {
         let value = try ExactJSON(data: action)
+        captureParityPrompt(value)
         if String(decoding: action, as: UTF8.self).contains("2026:10:27 12:34:56") { provenanceLeaked = true }
         let actionTag = try value.requiredString("tag"); tags.append(actionTag)
         if shouldBlock {

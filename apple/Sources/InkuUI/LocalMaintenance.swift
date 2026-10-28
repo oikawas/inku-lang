@@ -14,6 +14,7 @@ public struct LocalBackupGeneration: Identifiable, Sendable {
     public let modifiedAt: Date?
     public let byteCount: Int64
     public var id: String { name }
+    public var isManual: Bool { name.hasPrefix("inku-manual-") }
 }
 
 private struct BackupSnapshot: Sendable {
@@ -35,6 +36,17 @@ private actor LocalMaintenanceStore {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         return folder.appendingPathComponent("inku-auto-\(Int64(now.timeIntervalSince1970 * 1000))-\(UUID().uuidString).sqlite")
     }
+    func nextManualBackupURL(now: Date) throws -> URL {
+        let automatic = try nextBackupURL(now: now)
+        return automatic.deletingLastPathComponent().appendingPathComponent(automatic.lastPathComponent.replacingOccurrences(of: "inku-auto-", with: "inku-manual-"))
+    }
+    func recordManual(url: URL) throws {
+        let metadata = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
+        guard metadata.isRegularFile == true, metadata.isSymbolicLink != true, (metadata.fileSize ?? 0) > 0 else { throw HostError("backup_output_unavailable") }
+        var record = try manifest()
+        record.files.append(url.lastPathComponent)
+        try JSONEncoder().encode(record).write(to: manifestURL, options: .atomic)
+    }
     func snapshot() throws -> BackupSnapshot {
         let record = try manifest()
         let folder = directory.appendingPathComponent("automatic-backups", isDirectory: true)
@@ -46,7 +58,7 @@ private actor LocalMaintenanceStore {
         var generations: [LocalBackupGeneration] = []
         var totalBytes: Int64 = 0
         let owned = Set(record.files)
-        for file in files where owned.contains(file.lastPathComponent) && file.lastPathComponent.hasPrefix("inku-auto-") && file.pathExtension == "sqlite" {
+        for file in files where owned.contains(file.lastPathComponent) && (file.lastPathComponent.hasPrefix("inku-auto-") || file.lastPathComponent.hasPrefix("inku-manual-")) && file.pathExtension == "sqlite" {
             let metadata = try file.resourceValues(forKeys: keys)
             guard metadata.isRegularFile == true, metadata.isSymbolicLink != true else { continue }
             let bytes = Int64(max(0, metadata.fileSize ?? 0))
@@ -58,6 +70,24 @@ private actor LocalMaintenanceStore {
         generations.sort { $0.name > $1.name }
         return BackupSnapshot(lastSuccess: record.lastSuccess, generations: generations, totalBytes: totalBytes)
     }
+    func retainedURL(name: String) throws -> URL {
+        guard !name.contains("/"), !name.contains("\\"), (name.hasPrefix("inku-auto-") || name.hasPrefix("inku-manual-")), name.hasSuffix(".sqlite"),
+              try manifest().files.contains(name) else { throw HostError("backup_not_found") }
+        let folder = directory.appendingPathComponent("automatic-backups", isDirectory: true)
+        let folderValues = try folder.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+        guard folderValues.isDirectory == true, folderValues.isSymbolicLink != true else { throw HostError("backup_not_found") }
+        let url = folder.appendingPathComponent(name)
+        let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+        guard values.isRegularFile == true, values.isSymbolicLink != true else { throw HostError("backup_not_found") }
+        return url
+    }
+    func deleteRetained(name: String) throws {
+        let url = try retainedURL(name: name)
+        try FileManager.default.removeItem(at: url)
+        var record = try manifest()
+        record.files.removeAll { $0 == name }
+        try JSONEncoder().encode(record).write(to: manifestURL, options: .atomic)
+    }
     func completed(url: URL, retention: Int, at: Date) throws {
         let metadata = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
         guard (1...100).contains(retention), metadata.isRegularFile == true, metadata.isSymbolicLink != true,
@@ -65,9 +95,9 @@ private actor LocalMaintenanceStore {
         var record = try manifest()
         record.lastSuccess = at
         record.files.append(url.lastPathComponent)
-        let excess = max(0, record.files.count - retention)
-        let removed = Array(record.files.prefix(excess))
-        record.files.removeFirst(excess)
+        let automatic = record.files.filter { $0.hasPrefix("inku-auto-") }
+        let removed = Array(automatic.prefix(max(0, automatic.count - retention)))
+        record.files.removeAll { removed.contains($0) }
         // Record the verified replacement before deleting any previous owned backup.
         try JSONEncoder().encode(record).write(to: manifestURL, options: .atomic)
         for name in removed where name.hasPrefix("inku-auto-") && name.hasSuffix(".sqlite") && !name.contains("/") {
@@ -160,6 +190,28 @@ public final class LocalMaintenance {
             backupInfoError = nil
         } catch is CancellationError { }
         catch { backupInfoError = "バックアップの状態を読み込めませんでした: \(error.localizedDescription)" }
+    }
+    public func deleteRetainedBackup(name: String, display: DisplaySettings? = nil) async {
+        guard let store else { return }
+        do { try await store.deleteRetained(name: name); backupError = nil; backupStatus = display?.webCopy("settingsDbBackupDeleted", "バックアップを削除しました。") ?? ""; await refreshBackupInfo() }
+        catch { backupError = error.localizedDescription }
+    }
+    public func restoreRetainedBackup(name: String, app: AppModel) async {
+        guard let store, !app.isBusy else { return }
+        do {
+            let source = try await store.retainedURL(name: name)
+            let safety = try await store.nextManualBackupURL(now: clock())
+            guard await app.backup(to: safety) else { return }
+            try await store.recordManual(url: safety)
+            backupStatus = app.display.webCopy("settingsDbBackupRestoring", "リカバリしています…")
+            let revision = app.restorationRevision
+            await app.restore(from: source)
+            await refreshBackupInfo(app: app)
+            if app.restorationRevision != revision {
+                backupStatus = app.display.webCopyFormat("settingsDbBackupRestoreDone", "リカバリしました。置き換える前の DB は %@ として保存しました。", safety.lastPathComponent)
+                backupError = nil
+            }
+        } catch { backupError = error.localizedDescription }
     }
     public func checkBackup(app: AppModel, automationRunning: Bool) async {
         guard !checkingBackup else { return }

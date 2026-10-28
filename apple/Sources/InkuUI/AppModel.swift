@@ -1,4 +1,5 @@
 import CoreGraphics
+import CryptoKit
 import Foundation
 import ImageIO
 import InkuCore
@@ -1422,8 +1423,7 @@ public final class AppModel {
         configuration["compiler"]["stage15_variation"] = .null
         configuration["catalogs"] = .array([])
         if drawingSettings != nil { configuration["compiler"]["host"]["catalog_mode"] = .string(catalog == "default" ? "default" : "explicit") }
-        options["wild"] = .bool(mode == .description ? wildOverride ?? work.renderWild ?? options["wild"].bool ?? false
-                                                    : work.renderWild ?? options["wild"].bool ?? false)
+        options["wild"] = .bool(wildOverride ?? work.renderWild ?? options["wild"].bool ?? false)
         options["svg_profile"] = .string("display")
         let sketch: SketchRequest
         if mode == .sketch {
@@ -1462,7 +1462,7 @@ public final class AppModel {
         var request = GenerationRequest(authoring: .directDDL(work.ddl ?? ""), configuration: configuration.data,
             renderOptions: options.data, clipPolicy: saved.clipPolicy, models: settings.models, providers: settings.providers,
             renderColorMaps: [catalog: options["resolved_color_map"].data], description: work.effectiveSourceText,
-            parentWorkID: work.id, derivationKind: "laws_change", historyVisibility: "lineage_only")
+            parentWorkID: work.id, derivationKind: "laws_change", historyVisibility: "normal")
         request.savedLawsDirection = direction.data
         request.completionRanges = saved.completionRanges
         request.lawsRecords = saved.lawsRecords
@@ -1494,6 +1494,48 @@ public final class AppModel {
         try Task.checkCancellation()
         if let failure { throw failure }
         throw HostError(ran ? "autonomous_generation_failed" : "authoring_busy_or_unavailable")
+    }
+
+    func sendChunkPrompt(_ asked: ExactJSON, png: Data?, request: GenerationRequest) async throws -> String {
+        guard let transport = managedTransport ?? transport else { throw HostError("pipeline_unavailable") }
+        var prompt: ExactJSON = .object(["system": asked["system"], "message": asked["text"],
+            "response_schema": asked["response_schema"], "action_name": .string("generate_normalized_ddl")])
+        var images: [ExactJSON] = []
+        if let png {
+            let hash = SHA256.hash(data: png).map { String(format: "%02x", $0) }.joined()
+            prompt["images"] = .array([.object(["media_type": .string("image/png"), "byte_len": .integer(png.count), "sha256": .string(hash)])])
+            images = [.string("data:image/png;base64," + png.base64EncodedString())]
+        }
+        let digest = SHA256.hash(data: prompt.data).map { String(format: "%02x", $0) }.joined()
+        prompt["prompt_id"] = .string("inku.chunk-moves-\(asked["purpose"].string ?? "choose").v1")
+        prompt["prompt_digest"] = .string("sha256:" + digest)
+        let config = try ExactJSON(data: request.configuration)
+        prompt["instruction_language"] = config["language"]
+        var action: ExactJSON = .object(["tag": .string("generate_normalized_ddl"), "timeout_ms": .string("300000"), "delay_ms": .string("0"),
+            "payload": .object(["prompt": prompt]), "_transient_images": .array(images),
+            "identity": .object(["action_id": .string(UUID().uuidString), "attempt": .integer(1), "request_digest": .string(digest)])])
+        for attempt in 1...2 {
+            action["identity"]["attempt"] = .integer(attempt)
+            let result: Data
+            if let personal = transport as? any ChatGPTPlanEffectTransport {
+                let limit = (config["prompt_limits"]["max_response_bytes"].number ?? config["prompt_limits"]["max_response_bytes"].string).flatMap(Int.init) ?? 1_048_576
+                result = try await personal.performPersonalPlan(action: action.data, models: request.models, providers: request.providers,
+                    session: request.chatGPTSession, argumentLimit: limit, credentials: credentials, onBytes: { _ in }, onDiagnostic: { _ in })
+            } else {
+                result = try await transport.perform(action: action.data, models: request.models, providers: request.providers, credentials: credentials, onBytes: { _ in })
+            }
+            let response = try ExactJSON(data: result)
+            if response["tag"].string == "provider_failed" {
+                let failure = response["failure"].string ?? "provider_failed"
+                if attempt == 1 && ["rate_limited", "transport_timeout", "transport_unavailable"].contains(failure) {
+                    try await Task.sleep(for: .seconds(2)); continue
+                }
+                throw HostError(failure)
+            }
+            guard let text = response["response"].string else { throw HostError("unusable_answer") }
+            return text
+        }
+        throw HostError("provider_failed")
     }
 
     /// SPEC §7.8 juxtaposition: what the shared core reads for this work (Server `api_juxtaposition`). `written` is the
@@ -2413,8 +2455,13 @@ public final class AppModel {
         }
     }
     func drawingFailureText(_ view: PipelineView) -> String? {
-        DrawingFailureMessage.text(for: view, language: display.preferences.language,
-                                   chatGPTCode: chatGPTFailureCodes[view.executionID], copy: { key, fallback in self.display.webCopy(key, fallback) })
+        guard let text = DrawingFailureMessage.text(for: view, language: display.preferences.language,
+                                   chatGPTCode: chatGPTFailureCodes[view.executionID], copy: { key, fallback in self.display.webCopy(key, fallback) }) else { return nil }
+        if let delivery = view.deliveryJSON, let document = try? ExactJSON(data: delivery),
+           ["upstream_diagnostics", "downstream_diagnostics", "resource_omissions", "relation_omissions", "render_warnings", "catalog_diagnostics"].contains(where: { !(document[$0].array ?? []).isEmpty }) {
+            return text + "\n" + PipelineDiagnosticText.formatDocument(String(decoding: delivery, as: UTF8.self), display: display)
+        }
+        return text
     }
     private static func phaseStatus(_ phase: String) -> String {
         [
@@ -2431,7 +2478,7 @@ public final class AppModel {
         if let id = saved.nextCatalogID, catalogs.contains(where: { $0.id == id }) { catalogID = id }
         if let mode = saved.nextCatalogMode, ["fixed", "auto"].contains(mode) { catalogMode = mode }
         if let id = saved.nextCanvasID, canvases.contains(where: { $0.id == id }) { canvasID = id }
-        if let saved = saved.nextWild { wild = saved }
+        wild = saved.defaultWild ?? false
         nextConditionsRestored = true
     }
 
@@ -2442,7 +2489,6 @@ public final class AppModel {
         // Batch-only modes are not a next-work choice of the creation screen.
         if ["fixed", "auto"].contains(catalogMode) { next.nextCatalogMode = catalogMode }
         next.nextCanvasID = canvasID
-        next.nextWild = wild
         if next != display.preferences { display.preferences = next }
     }
 

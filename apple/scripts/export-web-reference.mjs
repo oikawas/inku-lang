@@ -32,6 +32,25 @@ async function copyFor(language) {
   const pack = context.pack;
   const texts = Object.fromEntries(Object.entries(pack).filter(([key, value]) =>
     typeof value === 'string'));
+  // Export the keyed diagnostic vocabularies, including every key in Web, rather than the unknown-key fallback.
+  for (const [functionName, argument, prefix] of [
+    ['pipelineDiagnosticReason', 'reason', 'diagnosticReason.'],
+    ['pipelineDiagnosticPart', 'kind', 'diagnosticPart.'],
+  ]) {
+    const pattern = new RegExp(`${functionName}:\\s*\\(${argument}\\)\\s*=>\\s*\\((\\{[\\s\\S]*?\\})\\[${argument}\\]`);
+    const matched = script(source).match(pattern);
+    if (!matched) throw new Error(`diagnostic vocabulary missing: ${functionName}`);
+    const vocabulary = vm.runInContext(`(${matched[1]})`, context, { timeout: 5000 });
+    for (const key of Object.keys(vocabulary)) texts[prefix + key] = pack[functionName](key);
+  }
+  for (const reason of ['plugin_not_installed', 'plugin_disabled', 'plugin_name_mismatch', 'plugin_version_mismatch', 'plugin_count_out_of_range']) {
+    texts['diagnosticPlugin.' + reason] = pack.pipelinePluginDiagnostic(reason, '%@', null);
+    if (reason === 'plugin_name_mismatch') texts['diagnosticPlugin.suggestion'] = pack.pipelinePluginDiagnostic(reason, '%@', '%@');
+  }
+  texts['diagnosticWarning.invalid_color'] = pack.pipelineRenderWarning('invalid_color', '%@');
+  texts['diagnosticWarning.other'] = pack.pipelineRenderWarning('%@', null);
+  texts['diagnosticOmitted.noIndex'] = pack.pipelineDiagnosticOmitted('%@', null);
+  for (const move of ['omit', 'simplify', 'place', 'break', 'repeat', 'merge']) texts['chunkMove.' + move] = pack.aiRefineChunkMoveName(move);
   const dynamicTexts = {};
   const dynamicKeys = [];
   for (const [key, value] of Object.entries(pack)) {

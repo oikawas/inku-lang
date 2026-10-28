@@ -200,6 +200,7 @@ struct CreationView: View {
                 if automation.running && automation.mode == "demo" { demoBanner }
                 if display.visible("input_modes") { inputTabs }
                 inputContents
+                if !isBatch { PipelineDiagnosticsView(raw: model.diagnosticsJSON, display: display) }
                 if !isBatch && display.visible("ddl_tools") {
                     HStack {
                         Spacer(minLength: 0)

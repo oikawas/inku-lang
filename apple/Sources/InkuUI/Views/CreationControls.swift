@@ -108,13 +108,13 @@ struct CreationCanvasControls: View {
         HStack(spacing: 6) {
             // CanvasArtworkWorkspace `leadingCornerControls`: before the hash, in every interface mode.
             if let threeDimensional { Ddl3DModeButton(display: model.display, threeDimensional: threeDimensional) }
-            if model.display.visible("detail_status"), let hash = work?.renderHash, !hash.isEmpty {
+            if saved, model.display.visible("detail_status"), let id = work?.id, !id.isEmpty {
                 // CanvasArtworkWorkspace.svelte:278: the bubble says the copy happened, for 1.2 s.
                 Button { perform("copy-hash") } label: { Text("#").fontWeight(.semibold) }
-                    .buttonStyle(InkuFloatingCircleButtonStyle(active: model.library.copiedHash == hash))
-                    .accessibilityLabel(model.display.localized("full hash をコピー"))
+                    .buttonStyle(InkuFloatingCircleButtonStyle(active: model.library.copiedHash == id))
+                    .accessibilityLabel(model.display.webCopy("historyIdCopyTitle", "クリックで作品のUUIDをコピーします"))
                     .disabled(browsingDisabled)
-                    .inkuTooltip(model.display.tooltip(model.library.copiedHash == hash ? "コピーしました" : "クリックでfull hashをコピーします"))
+                    .inkuTooltip(model.display.tooltip("", serverKey: model.library.copiedHash == id ? "historyHashCopied" : "historyIdCopyTitle"))
             }
             if model.display.visible("work_tools") {
                 Button { if let work { onReplayWork(work) } } label: { Image(systemName: "arrow.clockwise") }

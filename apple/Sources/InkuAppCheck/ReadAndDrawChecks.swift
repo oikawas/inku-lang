@@ -69,6 +69,7 @@ private actor ReadAndDrawCheckProvider: ProviderTransport {
     func perform(action: Data, models: ModelSelection, providers: [ProviderSettings], credentials: any CredentialStore,
                  onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {
         let value = try ExactJSON(data: action), tag = try value.requiredString("tag")
+        captureParityPrompt(value)
         actions.append(value)
         let response: String, result: String
         switch tag {

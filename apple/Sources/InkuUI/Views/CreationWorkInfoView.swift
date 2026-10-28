@@ -25,6 +25,7 @@ struct CreationWorkInfoView: View {
     @State private var copied: String?
     @State private var copyToken = UUID()
     @State private var loadToken = UUID()
+    @State private var note = LibraryNoteEditorModel()
 
     /// Set when the view is the drawer over the canvas rather than a sheet.
     private let onClose: (() -> Void)?
@@ -98,6 +99,30 @@ struct CreationWorkInfoView: View {
     private func details(_ work: SavedWork) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                group(copy("historyPreviewCommentLabel", "作品へのコメント")) {
+                    if model.isPreview {
+                        Text(copy("provenanceWorkNotSaved", "未保存"))
+                    } else if note.state.annotation == nil && !loading {
+                        Text(note.text.isEmpty ? "-" : note.text)
+                    } else {
+                    TextEditor(text: Binding(get: { note.text }, set: { note.text = LibraryNoteEditorModel.limited($0) }))
+                        .frame(height: 64).border(InkuColor.border)
+                        .disabled(note.state.annotation == nil || note.saving || model.isBusy || work.trashed)
+                    HStack {
+                        Spacer()
+                        if note.errorText != nil { Text(copy("historyPreviewCommentSaveFailed", "保存できませんでした。")) .foregroundStyle(.red).inkuFont(12) }
+                        Button(copy(note.saving ? "historyPreviewCommentSaving" : "historyPreviewCommentSave", note.saving ? "保存中…" : "保存")) {
+                            Task {
+                                _ = await note.save { id, text in
+                                    await model.library.saveNote(id: id, note: text.trimmingCharacters(in: .whitespacesAndNewlines))
+                                    if let error = model.library.errorText { throw HostError(error) }
+                                    return try await model.auxiliaryDatabase().libraryAnnotation(id: id)
+                                }
+                            }
+                        }.buttonStyle(LibraryGhostButtonStyle()).disabled(!note.canSave || model.isBusy || work.trashed)
+                    }
+                    }
+                }
                 if let data = information?.context?.descriptionDDL, let record = try? ExactJSON(data: data) {
                     ReadDrawInfoView(record: record, display: model.display)
                 }
@@ -111,7 +136,6 @@ struct CreationWorkInfoView: View {
                     row("Stage 1 (" + copy("provenanceSectionInterpretation", "解釈") + ")", work.stage1Model, hint: "provenanceHintStage1Model")
                     row(model.display.localized("Stage 1 言語"), languageName(work.instructionLangResolved), hint: "provenanceHintStage1Lang")
                     row(copy("provenanceLabelLangRequested", "要求した言語"), languageName(work.instructionLangRequested), hint: "provenanceHintLangRequested")
-                    row(model.display.localized("解釈 seed"), work.interpretationSeed, hint: "provenanceHintInterpretationSeed")
                     if let reason = work.interpretFallback, !reason.isEmpty {
                         row(copy("provenanceLabelInterpretFallback", "解釈フォールバック"), reason, hint: "provenanceHintInterpretFallback")
                     }
@@ -147,9 +171,6 @@ struct CreationWorkInfoView: View {
                     row("Render engine version", work.renderEngineVersion, hint: "provenanceHintRenderEngine")
                     row(copy("provenanceLabelDdlSpec", "DDL version"), provenance?.ddlVersion, hint: "provenanceHintDdlSpec")
                     row(copy("provenanceLabelTransformLayer", "DDL engine version"), provenance?.ddlEngineVersion, hint: "provenanceHintTransformLayer")
-                    row(copy("provenanceLabelStage1PromptDigest", "Stage 1 プロンプト digest"), information?.prompt("generate_normalized_ddl")?["prompt_digest"].string, hint: "provenanceHintStage1PromptDigest")
-                    row(copy("provenanceLabelStage1PromptBaseDigest", "Stage 1 プロンプト基底 digest"), nil, hint: "provenanceHintStage1PromptBaseDigest")
-                    row(copy("provenanceLabelStage2PromptDigest", "Stage 2 プロンプト digest"), information?.prompt("complete_visible_ddl_holes")?["prompt_digest"].string, hint: "provenanceHintStage2PromptDigest")
                     row("Build", provenance?.build, hint: "provenanceHintBuild")
                 }
                 group(copy("provenanceSectionOrigin", "由来")) {
@@ -157,7 +178,6 @@ struct CreationWorkInfoView: View {
                     row(copy("provenanceLabelDerivation", "派生"), information.map { derivation($0.edge?.derivationKind) }, hint: "provenanceHintDerivation")
                     if let run = provenance?.batchRunID { row(copy("provenanceLabelBatchRun", "バッチ実行 ID"), run, hint: "provenanceHintBatchRun") }
                     if let line = provenance?.batchLineNumber { row(copy("provenanceLabelBatchLine", "バッチ行番号"), String(line), hint: "provenanceHintBatchLine") }
-                    if let note = information?.annotation.note, !note.isEmpty { row(copy("provenanceLabelComment", "コメント"), note, hint: "provenanceHintComment") }
                 }
                 group(copy("provenanceSectionRun", "実行")) {
                     row(model.display.localized("作成日"), Date(timeIntervalSince1970: Double(work.at) / 1000).formatted(date: .numeric, time: .standard), hint: "provenanceHintCreated")
@@ -173,14 +193,18 @@ struct CreationWorkInfoView: View {
     private func prompts(_ work: SavedWork) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
+                if information?.context?.imageDDL == nil,
+                   information?.prompt("select_description_catalog") != nil || catalogWasAutomatic {
+                    sentStage("select_description_catalog", stage: "catalog", input: copy("promptCatalogInput", "色カタログの選択 送った入力"), system: copy("promptCatalogSystem", "色カタログの選択 システムプロンプト"))
+                }
                 // OutputTabsContent.svelte: the stages in the order a work calls them.
                 if information?.context?.imageDDL != nil {
-                sentStage("select_image_catalog", stage: "image_catalog", input: model.display.localized("画像の色カタログ選択 送った入力"),
-                          system: model.display.localized("画像の色カタログ選択 システムプロンプト"))
-                sentStage("write_image_ddl", stage: "image_ddl", input: model.display.localized("画像から指示書を書く 送った入力"),
-                          system: model.display.localized("画像から指示書を書く システムプロンプト"))
-                sentStage("review_image_ddl", stage: "image_review", input: model.display.localized("画像の見比べ 送った入力"),
-                          system: model.display.localized("画像の見比べ システムプロンプト"))
+                sentStage("select_image_catalog", stage: "image_catalog", input: copy("promptImageCatalogInput", "画像の色カタログ選択 送った入力"),
+                          system: copy("promptImageCatalogSystem", "画像の色カタログ選択 システムプロンプト"))
+                sentStage("write_image_ddl", stage: "image_ddl", input: copy("promptImageDdlInput", "画像から指示書を書く 送った入力"),
+                          system: copy("promptImageDdlSystem", "画像から指示書を書く システムプロンプト"))
+                sentStage("review_image_ddl", stage: "image_review", input: copy("promptImageReviewInput", "画像の見比べ 送った入力"),
+                          system: copy("promptImageReviewSystem", "画像の見比べ システムプロンプト"))
                 } else if information?.context?.descriptionDDL != nil {
                 sentStage("read_description", stage: "reading", input: model.display.label("読み 送った入力", "Reading input"), system: model.display.label("読み システムプロンプト", "Reading system prompt"))
                 sentStage("compose_description", stage: "description_composition", input: model.display.label("構図と法則 送った入力", "Composition input"), system: model.display.label("構図と法則 システムプロンプト", "Composition system prompt"))
@@ -202,6 +226,12 @@ struct CreationWorkInfoView: View {
                 }
             }.padding(14)
         }
+    }
+
+    private var catalogWasAutomatic: Bool {
+        guard let data = information?.context?.configuration, let configuration = try? ExactJSON(data: data) else { return false }
+        return configuration["render"]["catalog_mode"].string == "auto" || configuration["catalog_mode"].string == "auto"
+            || !(configuration["catalogs"].array ?? []).isEmpty
     }
 
     /// OutputTabsContent.svelte `.score-*`: a toolbar on bg2, a line-number gutter on bg2, and Web JSON colors.
@@ -299,6 +329,11 @@ struct CreationWorkInfoView: View {
     @ViewBuilder private func systemPrompt(_ action: String, stage: String, title: String) -> some View {
         if let system = information?.prompt(action)?["system"].string {
             promptText(title, system, id: action, collapsible: true)
+            if let digest = information?.prompt(action)?["prompt_digest"].string, !digest.isEmpty {
+                (Text(copy("promptDigestLabel", "プロンプト digest") + ": ") + Text(digest).fontDesign(.monospaced))
+                    .inkuFont(11).foregroundStyle(.tertiary).textSelection(.enabled)
+                    .inkuTooltip(model.display.tooltip("", serverKey: "promptDigestHint"))
+            }
         } else {
             VStack(alignment: .leading, spacing: 6) {
                 Text(title).inkuFont(12, weight: .semibold).foregroundStyle(.secondary)
@@ -346,6 +381,7 @@ struct CreationWorkInfoView: View {
     }
     private func derivation(_ kind: String?) -> String {
         if kind == "laws_change" { return model.display.preferences.language == "en" ? "Laws" : "法則" }
+        if kind == "chunk_move" { return model.display.webCopy("aiRefineKindChunks", "まとまりの手") }
         let titles = ["tool_change": "てざわり", "touch_change": "タッチ", "layout_change": "構図", "catalog_change": "色", "reinterpretation": "解釈",
             "model_comparison": "モデル", "language_comparison": "言語", "ddl_edit": "DDL編集", "description_edit": "記述編集",
             "replay": "再描画", "canvas_aspect_change": "キャンバス変更", "canvas_fit": "はめ込み", "variation": "変奏（旧）", "sketch_grain_change": "写生の有無"]
@@ -371,8 +407,9 @@ struct CreationWorkInfoView: View {
             let result = try await model.savedGenerationInformation(work: work)
             guard loadToken == token, !Task.isCancelled else { return }
             information = result
+            note.receive(workID: work.id, state: .available(result.annotation))
         }
         catch is CancellationError { }
-        catch { if loadToken == token, !Task.isCancelled { loadError = error.localizedDescription } }
+        catch { if loadToken == token, !Task.isCancelled { loadError = error.localizedDescription; note.receive(workID: work.id, state: .unavailable) } }
     }
 }

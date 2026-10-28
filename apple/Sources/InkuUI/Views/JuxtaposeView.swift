@@ -103,6 +103,8 @@ public struct JuxtaposeView: View {
 
     private var footer: some View {
         HStack {
+            Button(model.display.webCopy("wildButton", "筆致制限を外す")) { juxtapose.wild.toggle() }
+                .buttonStyle(InkuGhostButtonStyle(active: juxtapose.wild)).disabled(juxtapose.busy)
             if juxtapose.busy {
                 Spacer()
                 RunStatusView(display: model.display,

@@ -100,7 +100,6 @@ struct BatchConditionsView: View {
     @ViewBuilder private var compactControls: some View {
         wildControl
         paperControl
-        clearControl
     }
 
     private var sketchControl: some View {
@@ -170,14 +169,6 @@ struct BatchConditionsView: View {
             CreationPaperPicker(model: model) { showPaperPicker = false }.environment(model.display).disabled(disabled)
         }
         .accessibilityValue(shownCanvas)
-    }
-
-    private var clearControl: some View {
-        Button(model.display.webCopy("clearInputBtn", "新規作成")) {
-            guard !disabled else { return }
-            automation.restoreBatchInput("")
-        }
-        .inkuTooltip(model.display.tooltip("入力をクリアする", serverKey: "tooltipInputClear"))
     }
 
     private var details: some View {

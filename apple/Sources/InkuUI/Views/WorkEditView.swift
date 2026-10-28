@@ -94,9 +94,8 @@ public struct WorkEditView: View {
                 RunStatusView(display: model.display, label: model.isBusy ? model.status : "生成の準備中", variant: .inline,
                               stopping: editor.stopping, onStop: { Task { await editor.stop(app: model) } })
             } else {
-                if editor.mode == .description {
-                    wildControl
-                } else {
+                wildControl
+                if editor.mode != .description {
                     Text(model.display.webCopy("workEditParentGrain", "親の写生") + ": "
                         + model.display.localized(editor.work.sketchText?.isEmpty == false ? "あり" : sketchStateNote))
                         .inkuFont(12).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
@@ -120,7 +119,6 @@ public struct WorkEditView: View {
                 editor.wildOverride = !wild; editor.inheritWild = false
             }.buttonStyle(.bordered).tint(wild ? Color.accentColor : Color.secondary)
                 .accessibilityValue(model.display.localized(wild ? "入" : "切"))
-            if editor.inheritWild { Text(model.display.localized("（継承）")).inkuFont(11).foregroundStyle(.secondary) }
         }.disabled(model.isBusy)
     }
 

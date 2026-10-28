@@ -63,7 +63,7 @@ func runRefinementChecks() async throws {
           layout.capturedStage1Model == "check:original", layout.capturedStage2Model == "check:layout",
           Set(layout.candidates.compactMap { $0.work.compositionSeed }).count == 4,
           layout.candidates.allSatisfy({ $0.work.renderSeed == "0" && $0.work.ddl == parent.ddl
-              && $0.work.renderColorMap == parent.renderColorMap && $0.work.renderWild == parent.renderWild
+              && $0.work.renderColorMap == parent.renderColorMap && $0.work.renderWild == (app.display.preferences.defaultWild ?? false)
               && $0.work.stage1Model == "check:original" && $0.work.stage2Model == "check:layout"
               && $0.work.interpretationSeed == nil }),
           await provider.calls == initialCalls, try await database.list().count == initialRows,

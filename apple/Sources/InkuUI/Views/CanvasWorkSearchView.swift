@@ -59,6 +59,7 @@ struct InkuSearchField: NSViewRepresentable {
     /// The pause after typing before the search applies (the strip's 250 ms); nil applies each change at once (the
     /// library, whose model coalesces typing itself).
     var delay: Duration? = nil
+    var borderless: Bool = false
     /// Escape. Without it the field clears itself, as a search field does; the library's closes the library, as Escape
     /// does there on the Web, and keeps the search.
     var onCancel: (() -> Void)? = nil
@@ -81,6 +82,7 @@ struct InkuSearchField: NSViewRepresentable {
         field.placeholderString = placeholder
         field.setAccessibilityLabel(label)
         field.isEnabled = context.environment.isEnabled
+        field.isBezeled = !borderless
         if field.currentEditor() == nil, field.stringValue != value { field.stringValue = value }
     }
     static func dismantleNSView(_ field: NSSearchField, coordinator: Coordinator) { coordinator.pending?.cancel() }

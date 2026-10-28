@@ -284,6 +284,10 @@ public enum InkuCore {
         InkuCoreBindings.autonomousRefine(inputBytes: input)
     }
 
+    public static func chunkMoves(_ input: Data) -> Data {
+        InkuCoreBindings.chunkMoves(inputBytes: input)
+    }
+
     /// The experimental 3D viewer's input (`inku.ddl3d.v1`, Web `snapshot()`), shared with Android:
     /// `{"score": "<stored Score text>", "metadata": "<render metadata object text>"}` in, `{"json": "<input>"}` or
     /// `{"error": "<reason>"}` out.

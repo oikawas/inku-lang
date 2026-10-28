@@ -71,6 +71,7 @@ public final class ComparisonModel {
     public var targetModelReference: String { original?.stage1Model ?? original?.stage2Model ?? "" }
 
     public func initialize(app: AppModel) async {
+        inheritWild = false; wildOverride = app.display.preferences.defaultWild ?? false
         guard !initialized else { return }
         initialized = true
         guard !app.isPreview, let work = requestedWork ?? app.selectedWork else {

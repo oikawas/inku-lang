@@ -4,6 +4,12 @@ import InkuPersistence
 import InkuUI
 import InkuHost
 
+func captureParityPrompt(_ action: ExactJSON) {
+    guard ProcessInfo.processInfo.environment["INKU_PARITY_CAPTURE"] == "1" else { return }
+    let value: ExactJSON = .object(["tag": action["tag"], "prompt": action["payload"]["prompt"]])
+    print("INKU_PARITY_PROMPT " + value.data.base64EncodedString())
+}
+
 @main
 struct AppCheck {
     @MainActor
@@ -13,6 +19,8 @@ struct AppCheck {
             try await runReadAndDrawBaselineReplay(databaseURL: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return
         }
         if CommandLine.arguments.contains("--read-and-draw-only") { try await runReadAndDrawChecks(); return }
+        if CommandLine.arguments.contains("--chunk-move-only") { try await runChunkMoveChecks(); return }
+        if CommandLine.arguments.contains("--lineage-migration-only") { try await runLineageMigrationReplayChecks(); return }
         if let index = CommandLine.arguments.firstIndex(of: "--chatgpt-policy-only") {
             guard CommandLine.arguments.indices.contains(index + 2) else { throw CheckFailure.message("Expected ChatGPT wire and addendum cases") }
             try runChatGPTPolicyChecks(wireURL: URL(fileURLWithPath: CommandLine.arguments[index + 1]),

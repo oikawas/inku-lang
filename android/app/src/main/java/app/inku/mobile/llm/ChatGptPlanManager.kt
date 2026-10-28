@@ -15,10 +15,12 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
@@ -30,6 +32,8 @@ class ChatGptPlanManager internal constructor(
     private val http: ChatGptHttp = UrlConnectionChatGptHttp(),
     private val modelPolicy: () -> ChatGptModelPolicy = { ChatGptModelPolicy() },
     private val diagnostic: (String) -> Unit = { Log.w("InkuProvider", it) },
+    private val foreground: StateFlow<Boolean> = MutableStateFlow(true),
+    private val authorizationTimeoutMs: Long = 300_000,
     private val now: () -> Long = System::currentTimeMillis,
 ) : ModelProvider {
     override val providerId: String = CHATGPT_PROVIDER
@@ -104,7 +108,7 @@ class ChatGptPlanManager internal constructor(
             val previous = profileId?.let { profiles.optJSONObject(it) ?: throw ChatGptException("chatgpt_not_connected") }
             ChatGptCore.call("chatgpt_auth_save_check", JSONObject().put("previous", previous ?: JSONObject.NULL)
                 .put("count", profiles.length()).put("expected_generation", JSONObject.NULL))
-            Authorization(profileId ?: UUID.randomUUID().toString(), previous, ServerSocket(0, 4, InetAddress.getByName("127.0.0.1")), japanese, now() + 300_000)
+            Authorization(profileId ?: UUID.randomUUID().toString(), previous, ServerSocket(0, 4, InetAddress.getByName("127.0.0.1")), japanese, now() + authorizationTimeoutMs)
                 .also { authorization = it; updateView() }
         }
         val url = try {
@@ -132,6 +136,8 @@ class ChatGptPlanManager internal constructor(
                     var consumed = false
                     var success = false
                     var signedIn: ChatGptSessionRef? = null
+                    var client: String? = null
+                    var callbackCode: String? = null
                     var code: String? = null
                     try {
                         attempt.trace.enter("callback")
@@ -157,8 +163,8 @@ class ChatGptPlanManager internal constructor(
                             if (attempt.used) throw ChatGptException("chatgpt_callback_invalid")
                             attempt.used = true; consumed = true
                         }
-                        val client = issuedClientId(query, attempt.previous)
-                        signedIn = withTimeout((attempt.deadline - now()).coerceAtLeast(1)) { exchange(attempt, client, query.getValue("code")) }
+                        client = issuedClientId(query, attempt.previous)
+                        callbackCode = query.getValue("code")
                         success = true
                     } catch (cancelled: CancellationException) { throw cancelled }
                     catch (error: Exception) {
@@ -166,16 +172,33 @@ class ChatGptPlanManager internal constructor(
                         code = (error as? ChatGptException)?.code ?: "chatgpt_auth_unavailable"
                     }
                     val text = if (attempt.japanese) {
-                        if (success) "ChatGPTの認証が完了しました。このタブを閉じ、inkuへ戻ってモデル設定を開いてください。"
+                        if (success) "ChatGPTでの許可を受け取りました。inkuへ戻ると接続を完了します。"
                         else "ChatGPTの認証は完了していません。inkuへ戻り、接続の案内を確認してください。"
                     } else {
-                        if (success) "ChatGPT authorization completed. Close this tab, return to inku and open Model settings."
+                        if (success) "ChatGPT authorization received. Return to inku to finish connecting."
                         else "ChatGPT authorization did not complete. Return to inku and check the connection message."
                     }
                     val body = ("<!doctype html><html lang=\"${if (attempt.japanese) "ja" else "en"}\"><meta charset=\"utf-8\"><title>inku</title><p>$text</p></html>").toByteArray(Charsets.UTF_8)
                     runCatching { socket.getOutputStream().apply {
                         write(("HTTP/1.1 ${if (success) "200 OK" else "400 Bad Request"}\r\nContent-Type: text/html; charset=utf-8\r\nCache-Control: no-store\r\nReferrer-Policy: no-referrer\r\nConnection: close\r\nContent-Length: ${body.size}\r\n\r\n").toByteArray(Charsets.US_ASCII)); write(body); flush()
                     } }
+                    socket.close()
+                    if (success) {
+                        try {
+                            val remaining = attempt.deadline - now()
+                            if (remaining <= 0 || withTimeoutOrNull(remaining) { foreground.first { it } } == null) {
+                                throw ChatGptException("chatgpt_cancelled")
+                            }
+                            checkAttempt(attempt)
+                            signedIn = withTimeout((attempt.deadline - now()).coerceAtLeast(1)) {
+                                exchange(attempt, requireNotNull(client), requireNotNull(callbackCode))
+                            }
+                        } catch (cancelled: CancellationException) { throw cancelled }
+                        catch (error: Exception) {
+                            logFailure(attempt.trace, error)
+                            code = (error as? ChatGptException)?.code ?: "chatgpt_auth_unavailable"
+                        }
+                    }
                     if (consumed) {
                         synchronized(store) {
                             if (authorization === attempt) { authorization = null; updateView(code) }

@@ -101,12 +101,18 @@ class ChatGptPlanBoundaryTest {
         try { block(); fail("Expected $code") } catch (error: ChatGptException) { assertEquals(code, error.code) }
     }
 
-    private fun completeCallback(start: Map<String, String>, client: String): Int {
+    private fun callbackResponse(start: Map<String, String>, client: String): Pair<Int, String> {
         val url = start.getValue("redirect_uri") + "?" + form(mapOf("state" to start.getValue("state"), "code" to "test-code", "client_id" to client))
         val connection = URI(url).toURL().openConnection() as HttpURLConnection
         connection.connectTimeout = 2000; connection.readTimeout = 3000
-        return try { connection.responseCode } finally { connection.disconnect() }
+        return try {
+            val status = connection.responseCode
+            val body = (if (status >= 400) connection.errorStream else connection.inputStream).bufferedReader().use { it.readText() }
+            status to body
+        } finally { connection.disconnect() }
     }
+
+    private fun completeCallback(start: Map<String, String>, client: String): Int = callbackResponse(start, client).first
 
     @Test
     fun failedLoginLogsOnlySafeDiagnosticFields() = runBlocking {
@@ -125,7 +131,9 @@ class ChatGptPlanBoundaryTest {
                 ChatGptHttpResponse(401, JSONObject().put("error", "invalid_grant")
                     .put("secret", sensitive.joinToString(" ") + " " + verifier.get()).toString())
             }
-            assertEquals(400, completeCallback(start, "issued-client"))
+            val response = callbackResponse(start, "issued-client")
+            assertEquals(200, response.first)
+            assertTrue(response.second.contains("ChatGPTでの許可を受け取りました。inkuへ戻ると接続を完了します。"))
             withTimeout(2000) { while (logs.isEmpty()) delay(5) }
             assertEquals(1, logs.size)
             val line = logs.single()
@@ -147,6 +155,51 @@ class ChatGptPlanBoundaryTest {
             val parseFailure = org.json.JSONException(sensitive.joinToString(" "))
             val parseLine = ChatGptDiagnostic.line("identity", null, parseFailure)
             sensitive.forEach { assertFalse(parseLine.contains(it)) }
+        } finally { manager.cancelAuthorization(); scope.cancel() }
+    }
+
+    @Test
+    fun callbackWaitsForForegroundBeforeTokenAndCatalog() = runBlocking {
+        val store = Store(); val http = Http(); val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val foreground = kotlinx.coroutines.flow.MutableStateFlow(false)
+        val manager = ChatGptPlanManager(store, scope, http, foreground = foreground) { now }
+        try {
+            val start = query(manager.authorize(japanese = false))
+            http.handler = { url, _, _ -> when {
+                url == CHATGPT_TOKEN -> ChatGptHttpResponse(200, tokens(start.getValue("nonce")).toString())
+                url.endsWith("openid-configuration") -> ChatGptHttpResponse(200, metadata.toString())
+                url.endsWith("/jwks") -> ChatGptHttpResponse(200, keys.toString())
+                url.endsWith("/models") -> ChatGptHttpResponse(200, "{\"models\":[]}")
+                else -> error("Unexpected request")
+            } }
+            val response = callbackResponse(start, "issued-client")
+            assertEquals(200, response.first)
+            assertTrue(response.second.contains("ChatGPT authorization received. Return to inku to finish connecting."))
+            assertTrue(manager.state.value.pending)
+            delay(100)
+            assertTrue(http.calls.isEmpty())
+            foreground.value = true
+            withTimeout(2000) { while (manager.state.value.pending || manager.state.value.models == null) delay(5) }
+            assertEquals("connected", manager.state.value.active?.status)
+            assertEquals(1, http.calls.count { it == CHATGPT_TOKEN })
+            assertEquals(1, http.calls.count { it.endsWith("/models") })
+        } finally { manager.cancelAuthorization(); scope.cancel() }
+    }
+
+    @Test
+    fun callbackWhileBackgroundExpiresWithoutSendingToken() = runBlocking {
+        val store = Store(); val http = Http(); val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val foreground = kotlinx.coroutines.flow.MutableStateFlow(false)
+        val manager = ChatGptPlanManager(store, scope, http, foreground = foreground, authorizationTimeoutMs = 500) { now }
+        try {
+            val start = query(manager.authorize())
+            assertEquals(200, completeCallback(start, "issued-client"))
+            withTimeout(2000) { while (manager.state.value.pending) delay(5) }
+            assertEquals("chatgpt_cancelled", manager.state.value.errorCode)
+            assertTrue(http.calls.isEmpty())
+            foreground.value = true
+            delay(100)
+            assertTrue(http.calls.isEmpty())
         } finally { manager.cancelAuthorization(); scope.cancel() }
     }
 
@@ -186,6 +239,7 @@ class ChatGptPlanBoundaryTest {
             assertEquals(listOf("personal-model"), manager.state.value.models!!.map { it.id })
             assertEquals(listOf("personal-model"), manager.state.value.publishedModels)
             assertNotNull(store.read().getJSONObject("profiles").getJSONObject("a").optJSONObject("catalog"))
+            assertEquals(1, http.calls.count { it == CHATGPT_TOKEN })
             assertEquals(1, http.calls.count { it.endsWith("/models") })
         } finally { gate.countDown(); manager.cancelAuthorization(); scope.cancel() }
     }

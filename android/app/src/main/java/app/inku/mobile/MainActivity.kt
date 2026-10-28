@@ -29,6 +29,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
+    override fun onStart() {
+        super.onStart()
+        (application as InkuApplication).activityForeground.value = true
+    }
+
+    override fun onStop() {
+        (application as InkuApplication).activityForeground.value = false
+        super.onStop()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {

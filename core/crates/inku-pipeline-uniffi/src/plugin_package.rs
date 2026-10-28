@@ -131,17 +131,17 @@ fn parse(
     let ident = Regex::new(r"^[A-Za-z][A-Za-z0-9_-]*$").unwrap();
     let mut namespace = s(&raw["namespace"]);
     let mut name = s(&raw["name"]);
-    if !ident.is_match(namespace) {
+    if !ident.is_match(namespace.strip_suffix('\n').unwrap_or(namespace)) {
         blocking.push(problem("namespace", "invalid_identifier", ""));
         namespace = "";
     }
-    if !ident.is_match(name) {
+    if !ident.is_match(name.strip_suffix('\n').unwrap_or(name)) {
         blocking.push(problem("name", "invalid_identifier", ""));
         name = "";
     }
     let version = s(&raw["version"]);
     let version_re = Regex::new(r"^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$").unwrap();
-    let version = if version_re.is_match(version) {
+    let version = if version_re.is_match(version.strip_suffix('\n').unwrap_or(version)) {
         version
     } else {
         problems.push(problem("version", "invalid_semantic_version", ""));
@@ -703,6 +703,12 @@ mod tests {
     fn package_refusals_and_word_picture_findings_are_named() {
         let document = include_str!("../../../../docs/plugins/sky-nihonga/package.json");
         let original: Value = serde_json::from_str(document).unwrap();
+        let mut trailing_newlines = original.clone();
+        trailing_newlines["name"] = json!("Valid\n");
+        trailing_newlines["version"] = json!("1.2.3\n");
+        let accepted = parse(&trailing_newlines.to_string(), None, true).unwrap();
+        assert_eq!(accepted["name"], "Valid\n");
+        assert_eq!(accepted["version"], "1.2.3\n");
         for (document, expected) in [
             (" ".repeat(MAX_PACKAGE + 1), "package_too_large"),
             ("[1]".to_owned(), "not_an_object"),

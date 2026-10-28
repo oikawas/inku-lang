@@ -50,13 +50,15 @@ use crate::description_composition::{CompositionThing, GOLDEN, number, titled_co
 use crate::description_ddl::{hint, writing_guide};
 use crate::description_laws::{
     Numbers, PlaceKind, center, extent, inside, moved_values, parse_with_definitions, rewritten,
-    sentence_box, union,
+    scene_word, sentence_box, union,
 };
 use crate::identity::python_strip;
 use crate::image_ddl::{
     ImageDdlLimits, ImageDdlProblem, canvas_message, check_image_document, palette_words,
 };
 use crate::machine::PipelineConfig;
+use crate::plugin_offer::{PluginOffer, offer_line, offer_plugins, rule};
+use crate::prompts::MacroPromptEntry;
 use crate::protocol::DecimalU64;
 use crate::recompose;
 use crate::saved_variants::Draw;
@@ -814,7 +816,9 @@ fn check_rewrite(
                 "one sentence a line, ending with a period",
             ));
         };
-        if parse_with_definitions(text, paper.language, paper.definitions).is_none() {
+        if parse_with_definitions(text, paper.language, paper.definitions).is_none()
+            && !scene_word(text, paper.language, paper.definitions)
+        {
             let head: String = text.chars().take(40).collect();
             return Err(paper.say(
                 format!("数の位置・範囲・二点の無い文がある: {head}"),
@@ -844,7 +848,16 @@ fn check_rewrite(
         .map(|index| doc.lines[index].as_str())
         .collect();
     let old = paper.box_of(&old_lines)?;
-    let new = paper.box_of(&written)?;
+    let measurable: Vec<_> = written
+        .iter()
+        .filter(|line| parse_with_definitions(line, paper.language, paper.definitions).is_some())
+        .collect();
+    let Some(new) = paper.box_of(&measurable).ok() else {
+        return Ok(Rewrite {
+            title: title.to_owned(),
+            sentences: written,
+        });
+    };
     let (oc, nc) = (center(old), center(new));
     let shift = ((oc[0] - nc[0]) * paper.units[0]).hypot((oc[1] - nc[1]) * paper.units[1]);
     if shift > CENTER_SHIFT {
@@ -1048,6 +1061,8 @@ pub struct SendRequest {
     pub response_schema: Value,
     pub image: bool,
     pub max_tokens: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub plugin_offer: Option<PluginOffer>,
 }
 
 /// The compiler's findings in a child the turn did not have drawn, as the
@@ -1104,6 +1119,7 @@ fn choose_request(state: &TurnState, paper: Paper) -> SendRequest {
         response_schema: schema,
         image: true,
         max_tokens: MAX_TOKENS,
+        plugin_offer: None,
     }
 }
 
@@ -1171,6 +1187,45 @@ fn rewrite_request(
             ResolvedInstructionLanguage::En => FEEDBACK_EN,
         });
     }
+    let catalog: Vec<_> = config
+        .definitions
+        .iter()
+        .zip(&config.macro_summaries)
+        .map(|(definition, summary)| MacroPromptEntry {
+            definition,
+            localized_summary: summary,
+        })
+        .collect();
+    let offer = offer_plugins(
+        &context.description,
+        Some(&lines.join("\n")),
+        &catalog,
+        config.prompt_limits.max_offered_plugins,
+    );
+    let offer_record = if offer.offered.is_empty() {
+        None
+    } else {
+        let entries: Vec<_> = offer
+            .offered
+            .iter()
+            .filter_map(|item| {
+                catalog
+                    .iter()
+                    .find(|entry| {
+                        entry.definition.qualified_name().as_deref() == Some(&item.qualified_name)
+                    })
+                    .copied()
+            })
+            .collect();
+        message["plugins"] = json!(
+            entries
+                .iter()
+                .map(|entry| offer_line(entry, paper.language))
+                .collect::<Vec<_>>()
+        );
+        system.push_str(rule(paper.language));
+        Some(offer)
+    };
     Ok(SendRequest {
         purpose: "rewrite",
         system,
@@ -1178,6 +1233,7 @@ fn rewrite_request(
         response_schema: schema,
         image: false,
         max_tokens: MAX_TOKENS,
+        plugin_offer: offer_record,
     })
 }
 
@@ -1728,6 +1784,40 @@ pub fn chunk_moves_json(input: &[u8]) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rewrite_offers_only_the_named_plugin_word() {
+        let package: Value = serde_json::from_str(inku_ddl::NATURE_LEAVES_V1_JSON).unwrap();
+        let definition =
+            MacroDefinition::from_json(&package["entries"][0]["definition"].to_string()).unwrap();
+        let name = "若葉";
+        let mut config = config();
+        let baseline_config = config.clone();
+        config.definitions.push(definition);
+        config.macro_summaries.push("A leaf scene.".to_owned());
+        let response = r#"{"move":"simplify","targets":[1],"reason":"まとめる"}"#;
+        let (unrelated, _) = turn();
+        let (_, baseline) = answer(&baseline_config, unrelated.clone(), response).unwrap();
+        let (_, with_unrelated_plugin) = answer(&config, unrelated, response).unwrap();
+        assert_eq!(sent(&baseline).system, sent(&with_unrelated_plugin).system);
+        assert_eq!(sent(&baseline).text, sent(&with_unrelated_plugin).text);
+        let (mut state, _) = turn();
+        state.context.description = name.to_owned();
+        let (_, todo) = answer(&config, state, response).unwrap();
+        let request = sent(&todo);
+        assert!(request.text.contains("\"plugins\""));
+        assert!(
+            request
+                .system
+                .contains(rule(ResolvedInstructionLanguage::Ja))
+        );
+        assert!(
+            request
+                .plugin_offer
+                .as_ref()
+                .is_some_and(|offer| !offer.offered.is_empty())
+        );
+    }
 
     const LIGHTHOUSE: &str = "画面比1:1。\n背景を白で埋める。\n\n「灯台」\n\
         画面の横0.6、縦0.4の位置に、幅0.1、高さ0.3の白の塗りの四角を1個置く。\n\

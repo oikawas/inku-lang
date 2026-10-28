@@ -17,7 +17,7 @@ use std::collections::BTreeMap;
 use inku_ddl::work_plan::{WorkPlan, WorkPlanLayer, plan_layer, print_work_plan_with_numbers};
 use inku_ddl::{
     ExactFraction, MacroDefinition, MacroExpansionLimits, MacroLock, NormalizedDdlDocument,
-    ResolvedInstructionLanguage, SemanticExplicitGeometry, SemanticGeometryValue,
+    ResolvedInstructionLanguage, SemanticExplicitGeometry, SemanticGeometryValue, SemanticHead,
     SemanticInstruction, SourceSpan, compile_typed_ddl,
 };
 use inku_score::Score;
@@ -203,6 +203,21 @@ fn locked_document(
         })
         .collect::<Option<Vec<_>>>()?;
     NormalizedDdlDocument::new(source, language, locks).ok()
+}
+
+pub(crate) fn scene_word(
+    line: &str,
+    language: ResolvedInstructionLanguage,
+    definitions: &[MacroDefinition],
+) -> bool {
+    let Some(document) = locked_document(line, language, definitions) else {
+        return false;
+    };
+    let compilation = compile_typed_ddl(document, definitions, None, LIMITS);
+    compilation.semantic_document.as_ref().is_some_and(|semantic| {
+        matches!(semantic.ast.instructions.as_slice(), [instruction]
+            if matches!(&instruction.entity.head, SemanticHead::MacroInvocation(head) if head.object_aspect.is_none()))
+    })
 }
 
 fn numbers_of(

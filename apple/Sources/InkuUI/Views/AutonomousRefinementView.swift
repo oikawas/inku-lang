@@ -58,7 +58,7 @@ public struct AutonomousRefinementView: View {
                 } else {
                     Button(copy("aiRefineStartButton")) { Task { await refinement.start(app: model) } }
                         .buttonStyle(.borderedProminent)
-                        .disabled(model.isBusy || refinement.source == nil || refinement.source?.svg.isEmpty == true || refinement.enabledKinds.isEmpty || refinement.modelReference.isEmpty)
+                        .disabled(model.isBusy || refinement.source == nil || refinement.source?.svg.isEmpty == true || refinement.enabledKinds.isEmpty || refinement.modelReference.isEmpty || (refinement.enabledKinds.contains("chunks") && refinement.note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
                 }
             }.padding(20)
         }
@@ -88,17 +88,20 @@ public struct AutonomousRefinementView: View {
                 HStack(spacing: 20) {
                     ForEach(AutonomousRefinementModel.kinds, id: \.self) { kind in
                         Toggle(kindLabel(kind), isOn: Binding(get: { refinement.enabledKinds.contains(kind) },
-                            set: { if $0 { refinement.enabledKinds.insert(kind) } else { refinement.enabledKinds.remove(kind) } }))
+                            set: { if $0 { if kind == "chunks" { refinement.enabledKinds = ["chunks"] } else { refinement.enabledKinds.remove("chunks"); refinement.enabledKinds.insert(kind) } } else { refinement.enabledKinds.remove(kind) } }))
                     }
                 }.padding(6)
             }
+            if refinement.enabledKinds.contains("chunks") { Text(copy("aiRefineChunksNote")).inkuFont(12).foregroundStyle(.secondary) }
             HStack(spacing: 24) {
                 Stepper(copy("aiRefineMovesLabel") + ": \(refinement.moves)", value: $refinement.moves, in: 1...10)
-                Toggle(model.display.localized("筆致制限を外すかを元の作品から引き継ぐ"), isOn: $refinement.inheritWild)
-                if !refinement.inheritWild { Toggle(model.display.localized("筆致制限を外す"), isOn: $refinement.wild) }
+                Toggle(model.display.localized("筆致制限を外す"), isOn: $refinement.wild)
             }
-            Text(copy("aiRefineDirectionLabel")).inkuFont(12, weight: .semibold)
-            TextField(copy("aiRefineDirectionPlaceholder"), text: $refinement.note, axis: .vertical).lineLimit(3...5)
+            Text(copy(refinement.enabledKinds.contains("chunks") ? "aiRefineChunksDirectionLabel" : "aiRefineDirectionLabel")).inkuFont(12, weight: .semibold)
+            TextField(copy(refinement.enabledKinds.contains("chunks") ? "aiRefineChunksDirectionPlaceholder" : "aiRefineDirectionPlaceholder"), text: $refinement.note, axis: .vertical).lineLimit(3...5)
+            if refinement.enabledKinds.contains("chunks") && refinement.note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text(copy("aiRefineChunksNoteRequired")).inkuFont(12).foregroundStyle(.secondary)
+            }
             Text("\(refinement.note.utf16.count) / 1000").inkuFont(12).foregroundStyle(.secondary)
         }.disabled(model.isBusy)
     }
@@ -110,7 +113,7 @@ public struct AutonomousRefinementView: View {
             } else { Color.clear.frame(width: 56, height: 56) }
             VStack(alignment: .leading, spacing: 2) {
                 Text(attemptHeading(turn: turn, attempt: attempt)).inkuFont(12, weight: .semibold)
-                if let detail = attempt["sentence"].string ?? attempt["main_law"].string { Text(detail).fixedSize(horizontal: false, vertical: true) }
+                if let detail = chunkMoveText(attempt, display: model.display) ?? attempt["sentence"].string ?? attempt["main_law"].string { Text(detail).fixedSize(horizontal: false, vertical: true) }
                 if let reason = attempt["reason"].string { Text(reason).inkuFont(12).foregroundStyle(.secondary).textSelection(.enabled) }
             }.frame(maxWidth: .infinity, alignment: .leading)
         }.padding(8).overlay(RoundedRectangle(cornerRadius: 8).stroke(attempt["outcome"].string == "kept" ? Color.accentColor : InkuColor.border))
@@ -131,11 +134,12 @@ public struct AutonomousRefinementView: View {
             }
             return model.display.localized("処理中")
         }
-        let keys = ["moves_done": "aiRefineEndedMovesDone", "nothing_available": "aiRefineEndedNothingAvailable", "stalled": "aiRefineEndedStalled",
+        let chunks = run.kinds.contains("chunks")
+        let keys = ["moves_done": "aiRefineEndedMovesDone", "nothing_available": chunks ? "aiRefineEndedNothingAvailableChunks" : "aiRefineEndedNothingAvailable", "stalled": chunks ? "aiRefineEndedStalledChunks" : "aiRefineEndedStalled",
                     "stopped": "aiRefineEndedStopped", "interrupted": "aiRefineEndedInterrupted", "failed": "aiRefineEndedFailed"]
         return copy(keys[run.stopReason ?? ""] ?? "aiRefineEndedFailed") + (run.lastKeptID == nil ? copy("aiRefineNoneKept") : "")
     }
-    private func kindLabel(_ kind: String) -> String { copy(kind == "laws" ? "aiRefineKindLaws" : "aiRefineKindJuxtaposition") }
+    private func kindLabel(_ kind: String) -> String { copy(kind == "laws" ? "aiRefineKindLaws" : kind == "chunks" ? "aiRefineKindChunks" : "aiRefineKindJuxtaposition") }
     private func copy(_ key: String) -> String {
         // The Web's process lives in the Server; this process lives in the app.
         model.display.webCopy(key, key).replacingOccurrences(of: "サーバー", with: "アプリ")

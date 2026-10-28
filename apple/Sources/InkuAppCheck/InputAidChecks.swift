@@ -59,7 +59,7 @@ func runInputAidChecks() async throws {
     try JSONEncoder().encode({ () -> DisplayPreferences in
         var saved = DisplayPreferences()
         saved.nextCatalogID = "removed-catalog"; saved.nextCanvasID = "removed-paper"
-        saved.nextCatalogMode = "auto"; saved.nextWild = true
+        saved.nextCatalogMode = "auto"; saved.nextWild = false; saved.defaultWild = true
         return saved
     }()).write(to: folder.appendingPathComponent("interface.json"))
     let gone = AppModel(databaseURL: database, transport: provider)
@@ -74,8 +74,8 @@ func runInputAidChecks() async throws {
     let relaunched = AppModel(databaseURL: database, transport: provider)
     await relaunched.initialize()
     relaunched.selectDrawRoute("stages"); relaunched.sketchMode = "off"
-    guard relaunched.catalogID == otherCatalog, relaunched.canvasID == otherPaper, !relaunched.wild, relaunched.catalogMode == "fixed" else {
-        throw CheckFailure.message("Next-work conditions did not come back after a relaunch")
+    guard relaunched.catalogID == otherCatalog, relaunched.canvasID == otherPaper, relaunched.wild, relaunched.catalogMode == "fixed" else {
+        throw CheckFailure.message("Next-work conditions or independent wild default did not come back after a relaunch")
     }
 
     // Failure: the Swift label rule drifted from the Server/Web corpus.

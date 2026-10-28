@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 import InkuCore
 import InkuHost
 import InkuPersistence
@@ -39,9 +40,9 @@ public struct AutonomousRun: Codable, Sendable, Identifiable {
 /// The app owns the task; the sheet only reads it. The core owns all decisions.
 @MainActor @Observable
 public final class AutonomousRefinementModel {
-    public static let kinds = ["laws", "juxtaposition"]
+    public static let kinds = ["laws", "juxtaposition", "chunks"]
     public var moves = 5
-    public var enabledKinds: Set<String> = Set(kinds)
+    public var enabledKinds: Set<String> = ["laws", "juxtaposition"]
     public var note = "" { didSet { if note.utf16.count > 1000 { note = Self.bounded(note) } } }
     public var modelReference = ""
     public var inheritWild = true
@@ -97,7 +98,6 @@ public final class AutonomousRefinementModel {
                 saved.state = "interrupted"; saved.stopReason = "interrupted"; saved.current = nil
                 runs[index] = saved
             }
-            if saved.state != "running" { try await promote(saved) }
         }
         try persist()
         connected = true
@@ -110,7 +110,7 @@ public final class AutonomousRefinementModel {
             try await connect(database: database)
             source = work ?? app.selectedWork
             sourceLocked = false
-            inheritWild = true; wild = source?.renderWild ?? false
+            inheritWild = false; wild = app.display.preferences.defaultWild ?? false
             if let source { sourceLocked = try await app.savedConfiguration(workID: source.id).authority == "ddl_authoritative" }
             let latest = runs.last { $0.sourceID == source?.id }
             run = latest?.state == "interrupted" && latest?.acknowledged != true ? latest : nil
@@ -124,6 +124,7 @@ public final class AutonomousRefinementModel {
             }
             if let saved = app.display.preferences.autonomousRefine {
                 moves = min(10, max(1, saved.moves)); enabledKinds = Set(saved.kinds.filter(Self.kinds.contains)); note = saved.note
+                if enabledKinds.contains("chunks") { enabledKinds = ["chunks"] }
             }
             modelReference = AuxiliaryModel.defaultVisionModel(saved: app.display.preferences.visionModelReference, settings: await app.hostSettings())
             if provider == nil { provider = try app.auxiliaryProvider() }
@@ -150,6 +151,7 @@ public final class AutonomousRefinementModel {
         guard !source.svg.isEmpty else { errorText = "autonomous_source_has_no_image"; return }
         let kinds = Self.kinds.filter(enabledKinds.contains)
         guard !kinds.isEmpty else { errorText = "aiRefineKindsError"; return }
+        guard !kinds.contains("chunks") || (kinds.count == 1 && !note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) else { errorText = "aiRefineKindsError"; return }
         var settings = await app.hostSettings()
         guard !stopping else { stopping = false; return }
         guard SettingsModel.isRegisteredModelAvailable(modelReference, purpose: "vision", settings: settings) else {
@@ -179,6 +181,11 @@ public final class AutonomousRefinementModel {
                     var facts: ExactJSON = .object(["description_locked": .bool(context.authority == "ddl_authoritative"),
                         "ddl_work": .bool(context.origin == "user_authored_ddl" || InkuCore.descriptionWithoutLabels(parent.effectiveSourceText).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty),
                         "laws": .array(names.map(ExactJSON.string))])
+                    if current.kinds.contains("chunks") {
+                        var units: ExactJSON = .object(["action": .string("units"), "ddl": .string(parent.ddl ?? ""), "language": .string(parent.instructionLangResolved ?? "ja")])
+                        if let composition = Self.chunkComposition(context) { units["composition"] = composition }
+                        facts["chunks"] = .integer((try await Self.chunkCore(units))["units"].array?.count ?? 0)
+                    }
                     if let main { facts["main_law"] = .string(main) }
                     let next = try await Self.core(.object(["action": .string("next"), "moves": .integer(current.moves),
                         "kinds": .array(current.kinds.map(ExactJSON.string)), "parent": facts,
@@ -194,7 +201,17 @@ public final class AutonomousRefinementModel {
                     var record: ExactJSON = .object([:])
                     do {
                         var request: GenerationRequest
-                        if kind == "laws" {
+                        var chunkResult: (SavedWork, ExactJSON)?
+                        if kind == "chunks" {
+                            request = try await app.makeSavedLawsRequest(work: parent, direction: .object([:]), settings: settings, wild: current.wild)
+                            request.savedLawsDirection = nil
+                            request.derivationKind = "chunk_move"
+                            request.models.stage1MaxTokens = 8192
+                            chunkResult = try await chunkTurn(app: app, parent: parent, context: context, request: request, run: current, step: step)
+                            guard let chunkResult else { attempt["outcome"] = .string("failed"); attempt["reason"] = .string("chunk_move_skipped"); throw AttemptFinished() }
+                            record["chunks"] = chunkResult.1
+                            attempt["move"] = chunkResult.1["move"]; attempt["targets"] = chunkResult.1["targets"]; attempt["title"] = chunkResult.1["title"]
+                        } else if kind == "laws" {
                             request = try await app.makeSavedLawsRequest(work: parent, direction: step["direction"], settings: settings, wild: current.wild)
                         } else {
                             if step["reuse"].bool != true || answers[turn] == nil {
@@ -233,17 +250,20 @@ public final class AutonomousRefinementModel {
                             request = try await app.makeSavedWorkEditRequest(work: parent, mode: .description, description: choice.joined,
                                 wildOverride: current.wild, metadata: moved.object ?? [:], drawingSettings: settings)
                         }
-                        request.historyVisibility = "lineage_only"
                         if let session, let pinned = request.chatGPTSession, session != pinned { throw HostError("chatgpt_session_changed") }
                         if session == nil { session = request.chatGPTSession }
                         try Task.checkCancellation()
-                        ownsAppOperation = true
-                        let child = try await app.runAutonomousMove(request: request)
-                        ownsAppOperation = false
+                        let child: SavedWork
+                        if let chunkResult { child = chunkResult.0 }
+                        else {
+                            ownsAppOperation = true
+                            child = try await app.runAutonomousMove(request: request)
+                            ownsAppOperation = false
+                        }
                         // A saved child is journaled before cancellation is observed or its gate is measured.
                         children[child.id] = child; run?.pendingChildID = child.id; try checkpoint()
                         let measured = try await Self.core(.object(["action": .string("measure"), "before": .string(parent.svg), "after": .string(child.svg)]))
-                        let outcome = measured["passes"].bool == true ? "kept" : "not_visible"
+                        let outcome = kind == "chunks" || measured["passes"].bool == true ? "kept" : "not_visible"
                         if kind == "laws" {
                             let childContext = try await app.savedConfiguration(workID: child.id)
                             let childRecords = try childContext.lawsRecords.map { try ExactJSON(data: $0) } ?? .object([:])
@@ -326,14 +346,7 @@ public final class AutonomousRefinementModel {
         run?.stopReason = reason; run?.state = ["stopped", "failed", "interrupted"].contains(reason) ? reason : "done"
         run?.current = nil
         try checkpoint()
-        if let run { try await promote(run) }
         await app.refreshWorks()
-    }
-
-    private func promote(_ run: AutonomousRun) async throws {
-        guard let database, let id = run.lastKeptID, let work = try await database.work(id: id),
-              !work.trashed, work.historyVisibility == "lineage_only", let node = work.lineageNodeID else { return }
-        try await database.promoteLineageNode(id: node)
     }
 
     private func checkpoint() throws {
@@ -345,6 +358,93 @@ public final class AutonomousRefinementModel {
     private func persist() throws {
         guard let storeURL else { throw HostError("autonomous_store_unavailable") }
         try JSONEncoder().encode(runs).write(to: storeURL, options: .atomic)
+    }
+    private static func chunkComposition(_ context: SavedAuthoringContext) -> ExactJSON? {
+        guard let bytes = context.descriptionDDL, let record = try? ExactJSON(data: bytes),
+              record["composition"]["things"].array != nil, record["composition"]["answer"]["things"].array != nil else { return nil }
+        return .object(["owners": record["composition"]["things"], "things": record["composition"]["answer"]["things"]])
+    }
+    private static func chunkCore(_ request: ExactJSON) async throws -> ExactJSON {
+        let result = try await Task.detached { try ExactJSON(data: InkuCore.chunkMoves(request.data)) }.value
+        guard result["schema"].string == "inku.chunk-moves.v1" else { throw HostError("chunk_core_invalid") }
+        return result
+    }
+    private func chunkTurn(app: AppModel, parent: SavedWork, context: SavedAuthoringContext, request: GenerationRequest,
+                           run current: AutonomousRun, step: ExactJSON) async throws -> (SavedWork, ExactJSON)? {
+        let config = try ExactJSON(data: request.configuration)
+        let saved = try await app.savedGenerationInformation(work: parent)
+        let diagnostics = try saved.presentation?.diagnosticsJSON.map(ExactJSON.init(data:)) ?? .object([:])
+        let fields = ["upstream_diagnostics", "downstream_diagnostics", "plugin_diagnostics", "relation_omissions", "resource_omissions"]
+        let count = fields.reduce(0) { $0 + (diagnostics[$1].array?.count ?? 0) } + (diagnostics["render_diagnostics"]["diagnostics"].array?.count ?? 0)
+        var record = try context.descriptionDDL.map(ExactJSON.init(data:)) ?? .object([:])
+        var history: [ExactJSON] = []
+        if let database, let nodeID = parent.lineageNodeID, let graph = try await database.lineage(focusNodeID: nodeID, descendantDepth: 0, nodeLimit: 60) {
+            var node = nodeID; var seen: Set<String> = []
+            while seen.insert(node).inserted, let edge = graph.edges.first(where: { $0.childNodeID == node }) {
+                let metadata = try ExactJSON(data: Data(edge.metadataJSON.utf8))["ai_move"]
+                if metadata["kind"].string == "chunks", metadata["chunks"].object != nil { history.append(metadata["chunks"]) }
+                node = edge.parentNodeID
+                if record["composition"].object == nil, let id = graph.nodes.first(where: { $0.id == node })?.node.historyID,
+                   let ancestor = try? await app.savedConfiguration(workID: id), let data = ancestor.descriptionDDL,
+                   let candidate = try? ExactJSON(data: data), candidate["composition"].object != nil { record = candidate }
+            }
+        }
+        history.reverse()
+        let previous = history.enumerated().map { i, item in ExactJSON.object(["generation": .integer(i + 1), "move": item["move"], "targets": item["targets"], "reason": item["reason"], "applied": .bool(true)]) }
+        let turn = try Self.int(step["turn"])
+        let seedHex = SHA256.hash(data: Data("\(current.id):\(turn)".utf8)).map { String(format: "%02x", $0) }.joined()
+        let seed = UInt64(seedHex.prefix(15), radix: 16) ?? 0
+        let shown: ExactJSON = .object(["description": .string(InkuCore.descriptionWithoutLabels(parent.effectiveSourceText).trimmingCharacters(in: .whitespacesAndNewlines)),
+            "reading_core": record["reading"]["core"].array.map(ExactJSON.array) ?? .array([]), "thesis": record["composition"]["answer"]["thesis"].string.map(ExactJSON.string) ?? .string(""),
+            "direction": .string(current.note ?? ""), "history": .array(previous), "generation": .integer(previous.count + 1), "of": .integer(previous.count + current.moves - turn + 1)])
+        var start: ExactJSON = .object(["action": .string("start"), "config": config, "ddl": .string(parent.ddl ?? ""), "context": shown,
+            "seed": .string(String(seed)), "diagnostics": .integer(count)])
+        if let composition = Self.chunkComposition(context) { start["composition"] = composition }
+        var result = try await Self.chunkCore(start)
+        guard result["outcome"].string == "ok" else { throw HostError(result["reason"].string ?? "chunks_unavailable") }
+        var child: SavedWork?
+        while true {
+            try Task.checkCancellation()
+            let state = result["state"]
+            switch result["todo"].string {
+            case "send":
+                let asked = result["request"]
+                let png = asked["image"].bool == true ? try await AuxiliaryModel.png(svgs: [parent.svg], visionAdvice: true, visionSide: 1024) : nil
+                if asked["image"].bool == true && png == nil { throw HostError("source_has_no_image") }
+                var answer: String?
+                ownsAppOperation = true
+                let ran = await app.performSerialized(status: "まとまりを考えています…", allowsBrowsing: true) { _ in
+                    answer = try await app.sendChunkPrompt(asked, png: png, request: request)
+                }
+                ownsAppOperation = false
+                guard ran, let answer else { throw HostError("unusable_answer") }
+                result = try await Self.chunkCore(.object(["action": .string("answer"), "config": config, "state": state, "answer": .string(answer)]))
+            case "draw":
+                var drawing = request
+                drawing.authoring = .directDDL(result["ddl"].string ?? "")
+                var drawn: ExactJSON = .object(["rendered": .bool(false)])
+                do {
+                    ownsAppOperation = true
+                    child = try await app.runAutonomousMove(request: drawing)
+                    ownsAppOperation = false
+                    if let child {
+                        children[child.id] = child; self.run?.pendingChildID = child.id; try checkpoint()
+                        let info = try await app.savedGenerationInformation(work: child)
+                        let d = try info.presentation?.diagnosticsJSON.map(ExactJSON.init(data:)) ?? .object([:])
+                        let n = fields.reduce(0) { $0 + (d[$1].array?.count ?? 0) } + (d["render_diagnostics"]["diagnostics"].array?.count ?? 0)
+                        drawn = .object(["rendered": .bool(!child.svg.isEmpty), "diagnostics": .integer(n), "marks": d["resource_execution"]["demand"]["primitive_marks"].number.map(ExactJSON.number) ?? .integer(0)])
+                    }
+                } catch is CancellationError { throw CancellationError() }
+                catch { ownsAppOperation = false; child = nil }
+                result = try await Self.chunkCore(.object(["action": .string("drawn"), "config": config, "state": state, "drawn": drawn]))
+                if result["todo"].string != "keep" { self.run?.pendingChildID = nil; try checkpoint() }
+            case "keep":
+                guard let child else { throw HostError("chunk_child_missing") }
+                return (child, result["record"])
+            default: return nil
+            }
+            guard result["outcome"].string == "ok" else { throw HostError(result["reason"].string ?? "chunk_move_failed") }
+        }
     }
     private struct AttemptFinished: Error { }
     private static func code(_ error: Error) -> String { (error as? HostError)?.code ?? (error is JuxtapositionAnswerError ? "unusable_answer" : "autonomous_failed") }

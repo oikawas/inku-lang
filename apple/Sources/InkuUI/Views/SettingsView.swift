@@ -55,6 +55,9 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     @State private var settings = SettingsModel()
     @Binding var section: SettingsSection
     @State private var confirmRestore = false
+    @State private var backupDeleteName: String?
+    @State private var backupRestoreName: String?
+    @State private var backupRestoreFinal = false
     @State private var backupDraft = BackupSchedule()
     @State private var backupConfigurationError: String?
     @State private var fanoutDraft = "4"
@@ -101,6 +104,24 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             #endif
             Button(model.display.localized("キャンセル"), role: .cancel) {}
         } message: { Text(model.display.localized("現在のデータを残す場合は、先にバックアップを保存してください。")) }
+        .alert(model.display.label("バックアップを削除しますか？", "Delete this backup?"), isPresented: Binding(get: { backupDeleteName != nil }, set: { if !$0 { backupDeleteName = nil } })) {
+            Button(model.display.webCopy("settingsDbBackupDelete", "削除"), role: .destructive) {
+                if let name = backupDeleteName { Task { await maintenance.deleteRetainedBackup(name: name) } }
+                backupDeleteName = nil
+            }
+            Button(model.display.localized("キャンセル"), role: .cancel) { backupDeleteName = nil }
+        } message: { Text(model.display.webCopyFormat("settingsDbBackupDeleteConfirm", "%@ のバックアップを削除します。", backupDeleteName ?? "")) }
+        .alert(model.display.label("DB 全体をバックアップから復元しますか？", "Restore the whole database?"), isPresented: Binding(get: { backupRestoreName != nil && !backupRestoreFinal }, set: { if !$0 && !backupRestoreFinal { backupRestoreName = nil } })) {
+            Button(model.display.webCopy("settingsDbBackupRestoreNext", "次へ")) { backupRestoreFinal = true }
+            Button(model.display.localized("キャンセル"), role: .cancel) { backupRestoreName = nil }
+        } message: { Text(model.display.webCopyFormat("settingsDbBackupRestoreConfirm", "DB を %@ のバックアップから復元します。", backupRestoreName ?? "")) }
+        .alert(model.display.label("本当に復元しますか？", "Really restore?"), isPresented: $backupRestoreFinal) {
+            Button(model.display.webCopy("settingsDbBackupRestore", "復元"), role: .destructive) {
+                if let name = backupRestoreName { Task { await maintenance.restoreRetainedBackup(name: name, app: model) } }
+                backupRestoreName = nil
+            }
+            Button(model.display.localized("キャンセル"), role: .cancel) { backupRestoreName = nil }
+        } message: { Text(model.display.webCopyFormat("settingsDbBackupRestoreFinalConfirm", "本当に %@ から復元しますか？", backupRestoreName ?? "")) }
     }
 
     /// settings-modal.css `.modal-head`: 16px title, the detail switch and the close button, padding 14×22.
@@ -156,8 +177,12 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             VStack(alignment: .leading, spacing: 20) {
                 ForEach(groups, id: \.label) { group in
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(group.label).inkuFont(12, weight: .medium).foregroundStyle(.secondary)
-                            .padding(.horizontal, 10).padding(.bottom, 3)
+                        if group.items.count == 1 && group.label == title(group.items[0]) {
+                            Rectangle().fill(InkuColor.border).frame(height: 1).padding(.horizontal, 10).padding(.bottom, 3)
+                        } else {
+                            Text(group.label).inkuFont(12, weight: .medium).foregroundStyle(.secondary)
+                                .padding(.horizontal, 10).padding(.bottom, 3)
+                        }
                         ForEach(group.items) { item in navigationItem(item) }
                     }
                 }
@@ -197,6 +222,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .display: model.display.webCopy("settingsCategoryDisplayOperation", item.title)
         case .making: model.display.webCopy("settingsBatchRetryLabel", item.title)
         case .personalPlan: model.display.webCopy("chatgptPlanLabel", item.title)
+        case .export: model.display.label("ファイルの保存", "File saving")
         case .plugins: model.display.webCopy("settingsTabPlugins", item.title)
         case .other: model.display.label("その他", "Other")
         case .native: model.display.label("macOS補助", "Additional macOS settings")
@@ -285,6 +311,12 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 
     private var appearance: some View {
         return Group {
+            Section(model.display.webCopy("settingsWildDefault", "筆致制限を外すの既定値")) {
+                Text(model.display.webCopy("settingsWildDefaultDescription", "新しい描画と派生の既定値")).inkuFont(13).foregroundStyle(.secondary)
+                Toggle(model.display.webCopy("wildButton", "筆致制限を外す"), isOn: Binding(get: { model.display.preferences.defaultWild ?? false }, set: { value in
+                    model.display.preferences.defaultWild = value; model.wild = value
+                }))
+            }
             textSizeSettings
             captionPositionSettings
             uiModeSettings
@@ -607,6 +639,10 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                                 Text(ByteCountFormatter.string(fromByteCount: generation.byteCount, countStyle: .file)
                                      + (generation.modifiedAt.map { " · " + $0.formatted(date: .numeric, time: .shortened) } ?? ""))
                                     .inkuFont(12).foregroundStyle(.secondary)
+                                HStack {
+                                    Button(model.display.webCopy("settingsDbBackupRestore", "復元")) { backupRestoreName = generation.name }
+                                    Button(model.display.webCopy("settingsDbBackupDelete", "削除")) { backupDeleteName = generation.name }
+                                }.disabled(model.isBusy || automation.isOccupied)
                             }.padding(.vertical, 3)
                         }
                     }

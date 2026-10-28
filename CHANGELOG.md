@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-28 — Align macOS history, diagnostics and refinement with Web
+
+Align history and generation information, settings and backup actions, diagnostic messages, chunk moves, and the default brush constraint; refinement children are kept in normal history.
+
 ### 2026-10-28 — Draw descriptions in words on macOS
 
 Choose whether to read a description and write its instructions, or draw through the existing stages. The saved work keeps its reading and composition record.

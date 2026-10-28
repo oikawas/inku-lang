@@ -39,6 +39,7 @@ public final class WorkEditModel {
 
     public func initialize(app: AppModel) async {
         guard !initialized else { return }
+        inheritWild = false; wildOverride = app.display.preferences.defaultWild ?? false
         do {
             let context = try await app.savedConfiguration(workID: work.id)
             try Task.checkCancellation()

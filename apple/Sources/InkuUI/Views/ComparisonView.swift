@@ -101,7 +101,6 @@ public struct ComparisonView: View {
                 }.disabled(comparison.running || model.isBusy)
                     .buttonStyle(.bordered).tint(effectiveWild ? Color.accentColor : Color.secondary)
                     .accessibilityValue(model.display.localized(effectiveWild ? "入" : "切"))
-                if comparison.inheritWild { Text(model.display.localized("（継承）")).inkuFont(11).foregroundStyle(.secondary) }
                 Spacer()
                 Button(model.display.webCopy("modelCompareButton", "選んだモデルで描く"), systemImage: "play.fill") {
                     Task { await comparison.generate(app: model) }

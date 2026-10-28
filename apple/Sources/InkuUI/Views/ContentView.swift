@@ -569,7 +569,7 @@ public struct ContentView: View {
         case "presentation":
             if threeDimensionalShown, work.id == workspaceWork?.id { ui.toggleCanvasFullScreen() }
             else { Task { await preparePresentation(work: work) } }
-        case "copy-hash": model.library.copyHash(work.renderHash)
+        case "copy-hash": model.library.copyHash(work.id)
         case "export-card": dialog = .export(ExportSession(works: [work], preserveOrder: false, directCard: true))
         case "draw-ddl":
             // Web DdlViewer: the box's draft is what is drawn, once.

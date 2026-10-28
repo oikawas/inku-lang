@@ -190,6 +190,7 @@ actor LawsColorsCheckProvider: ObservedProviderTransport {
     func perform(action: Data, models: ModelSelection, providers: [ProviderSettings], credentials: any CredentialStore,
                  onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {
         let action = try ExactJSON(data: action)
+        captureParityPrompt(action)
         actions.append(action); selectedModels.append(models.stage1Model)
         let answers: [String: (String, ExactJSON)] = ["generate_normalized_ddl": ("normalized_ddl_generated", Self.plan),
             "read_composition": ("composition_read", Self.reading), "choose_laws": ("laws_chosen", Self.laws),

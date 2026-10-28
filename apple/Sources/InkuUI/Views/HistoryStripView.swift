@@ -16,6 +16,7 @@ import SwiftUI
     @State private var collapsed = false
     @State private var measuredWindowWidth: CGFloat = 0
     @State private var providers: [ProviderSettings] = []
+    @FocusState private var focusedWorkID: String?
     /// Web `heldWorks`: the strip has held works since it appeared, so an emptied strip awaiting works keeps its place.
     @State private var heldWorks = false
     /// Web `keptHeights`: the highest the thumbnail row has been, for each choice of fields under the pictures.
@@ -270,10 +271,25 @@ import SwiftUI
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .focused($focusedWorkID, equals: work.id)
+        .onKeyPress(.leftArrow) { moveFocus(from: work.id, delta: -1) }
+        .onKeyPress(.rightArrow) { moveFocus(from: work.id, delta: 1) }
         .overlay(alignment: .topTrailing) { starButton(work).padding(3) }
         .task(id: work.id) { await model.loadWorkActionState(work) }
         .inkuTooltip(display.tooltipValue(detailsTip(work)))
         .accessibilityLabel(display.localizedFormat("作品を開く: %@", title(work)))
+    }
+
+    private func moveFocus(from id: String, delta: Int) -> KeyPress.Result {
+        guard !locked, focusedWorkID == id else { return .ignored }
+        Task {
+            guard let next = await history.navigate(app: model, fromWorkID: id, delta: delta, selectWork: false), !locked else { return }
+            onSelectWork(next)
+            await model.selectWork(next)
+            guard !locked else { return }
+            focusedWorkID = next.id
+        }
+        return .handled
     }
 
     /// Web `.thumb-star`: an 18px plate on the picture that stars or unstars the work.

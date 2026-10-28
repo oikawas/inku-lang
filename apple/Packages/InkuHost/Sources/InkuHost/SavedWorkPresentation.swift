@@ -39,7 +39,7 @@ public struct SavedWorkPresentation: Sendable {
 
 enum SavedPresentation {
     /// Server `_SYSTEM_PROMPT_STAGES`: the actions the prompt tab shows, in the order a work calls them.
-    static let promptStages = [("read_description", "reading"), ("compose_description", "description_composition"),
+    static let promptStages = [("select_description_catalog", "catalog"), ("read_description", "reading"), ("compose_description", "description_composition"),
                                ("write_description_ddl", "description_ddl"), ("review_description_ddl", "description_review"),
                                ("select_image_catalog", "image_catalog"), ("write_image_ddl", "image_ddl"),
                                ("review_image_ddl", "image_review"), ("generate_sketch", "sketch"), ("generate_normalized_ddl", "stage1"),
@@ -81,8 +81,9 @@ enum SavedPresentation {
         let latest = promptStages.compactMap { tag, _ in records.last { $0["action"].string == tag } }
         let hasImage = records.contains { ["select_image_catalog", "write_image_ddl", "review_image_ddl"].contains($0["action"].string ?? "") }
         let hasReadAndDraw = records.contains { ["read_description", "compose_description", "write_description_ddl", "review_description_ddl"].contains($0["action"].string ?? "") }
+        let hasCatalogChoice = records.contains { $0["action"].string == "select_description_catalog" }
         let stages = promptStages.filter { entry in
-            (hasImage || !entry.1.hasPrefix("image_")) && (hasReadAndDraw || !["reading", "description_composition", "description_ddl", "description_review"].contains(entry.1))
+            (hasImage || !entry.1.hasPrefix("image_")) && (entry.1 != "catalog" || (!hasImage && hasCatalogChoice)) && (hasReadAndDraw || !["reading", "description_composition", "description_ddl", "description_review"].contains(entry.1))
         }
         let metadata = rendered["metadata"]
         var diagnostics: ExactJSON = .object([

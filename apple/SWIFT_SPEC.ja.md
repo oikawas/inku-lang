@@ -1,5 +1,7 @@
 # inku Swift 実装仕様
 
+macOS の履歴帯は矢印キーでページをまたいで移動し、キャンバスとライブラリの `#` は作品 UUID をコピーする。生成情報にはコメントと段ごとのプロンプト digest を表示し、診断は Web の文で示す。自動バックアップの保持世代は確認のうえ削除または復元でき、復元前には現行 DB の控えを残す。筆致制限を外す既定値は次の作品の札とは独立する。AI 推敲のまとまりの手は方向を必須とし、他の手と併用しない。推敲の子はすべて通常の履歴に保存し、既存の中間作品は DB 移行で通常の履歴へ移す。移行前に SQLite の控えを作る。
+
 このディレクトリは、macOS先行のnative SwiftUIクライアントとApple向け共通packageのworkspaceである。本書をSwift host固有の仕様正本とし、[SWIFT_SPEC.md](SWIFT_SPEC.md)を対応英語版とする。共有DDL、Score、prompt、authoring authority、pipeline状態遷移、seed、描画の意味は[製品仕様](../SPEC.ja.md)を正本とし、Serverを開発上のprimaryとして同じRust coreへ追随する。Swift側に意味処理を複製しない。
 
 最終更新: 2026-10-23。

@@ -88,6 +88,7 @@ public final class RefinementModel {
 
     public func initialize(app: AppModel) async {
         guard !initialized, !initializing, !closed else { return }
+        inheritWild = false; wildOverride = app.display.preferences.defaultWild ?? false
         initializing = true
         defer { initializing = false }
         do {

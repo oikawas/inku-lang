@@ -287,7 +287,7 @@ public final class AuxiliaryModel {
     }
 
     /// The thumbnail is an observation input; the saved SVG is never rewritten.
-    nonisolated static func png(svgs: [String], visionAdvice: Bool = false) async throws -> Data? {
+    nonisolated static func png(svgs: [String], visionAdvice: Bool = false, visionSide: UInt32 = 768) async throws -> Data? {
         let clean = svgs.filter { !$0.isEmpty }
         guard !clean.isEmpty else { return nil }
         return try await Task.detached {
@@ -295,7 +295,7 @@ public final class AuxiliaryModel {
             let source: String
             let width: UInt32
             let height: UInt32
-            if visionAdvice { source = clean[0]; width = 768; height = 768 }
+            if visionAdvice { source = clean[0]; width = visionSide; height = visionSide }
             else {
                 let count = min(2, clean.count)
                 let images = clean.prefix(count).enumerated().map { index, svg in

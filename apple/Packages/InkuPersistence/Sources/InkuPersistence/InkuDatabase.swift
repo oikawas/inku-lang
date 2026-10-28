@@ -29,6 +29,21 @@ public actor InkuDatabase {
             // Inspect existing bytes read-only before enabling any writer configuration.
             let inspection = try Self.readOnlyQueue(at: self.url)
             try inspection.read { try Self.validateRestore($0) }
+            if try inspection.read({ try Int.fetchOne($0, sql: "PRAGMA user_version") ?? 0 }) < 5 {
+                let backupURL = self.url.deletingLastPathComponent().appendingPathComponent(".inku-before-v5-\(UUID().uuidString).sqlite")
+                let backup = try DatabaseQueue(path: backupURL.path)
+                do {
+                    try inspection.backup(to: backup)
+                    try backup.writeWithoutTransaction { try $0.execute(sql: "PRAGMA journal_mode = DELETE") }
+                    try backup.read { try Self.validateRestore($0) }
+                    try backup.close()
+                    try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: backupURL.path)
+                } catch {
+                    try? backup.close()
+                    try? FileManager.default.removeItem(at: backupURL)
+                    throw error
+                }
+            }
             try inspection.close()
         } else {
             try FileManager.default.createDirectory(
@@ -53,6 +68,10 @@ public actor InkuDatabase {
                 if try Int.fetchOne(db, sql: "PRAGMA user_version") == 3 {
                     try Self.validateSchema(db)
                     try db.execute(sql: Self.resourceSQL("migration-v4"))
+                }
+                if try Int.fetchOne(db, sql: "PRAGMA user_version") == 4 {
+                    try Self.validateSchema(db)
+                    try db.execute(sql: Self.resourceSQL("migration-v5"))
                 }
             }
         }
@@ -521,16 +540,6 @@ public actor InkuDatabase {
         }
     }
 
-    /// Promotion changes visibility, without changing any of the saved work's content.
-    public func promoteLineageNode(id: String) throws {
-        try queue.write { db in
-            guard let node = try LineageNode.fetchOne(db, key: id), node.state == "lineage_only",
-                  let historyID = node.historyID else { throw PersistenceError.invalidRecord("node cannot be promoted") }
-            try db.execute(sql: "UPDATE lineage_nodes SET state = 'active' WHERE id = ?", arguments: [id])
-            try db.execute(sql: "UPDATE history SET history_visibility = 'normal' WHERE id = ?", arguments: [historyID])
-        }
-    }
-
     /// Web's explicit overview reads from the root, keeping the selected focus.
     public func lineageOverview(focusNodeID: String, nodeLimit: Int = 200) throws -> LineageGraph? {
         guard let rootID = try queue.read({ db in
@@ -905,6 +914,9 @@ public actor InkuDatabase {
             if try Int.fetchOne(db, sql: "PRAGMA user_version") == 3 {
                 try db.execute(sql: Self.resourceSQL("migration-v4"))
             }
+            if try Int.fetchOne(db, sql: "PRAGMA user_version") == 4 {
+                try db.execute(sql: Self.resourceSQL("migration-v5"))
+            }
         }
         try isolated.read { try Self.validateRestore($0) }
         // Artwork rollback must not reopen reservations already charged by this DB.
@@ -995,13 +1007,15 @@ public actor InkuDatabase {
         return try String(contentsOf: resource, encoding: .utf8)
     }
 
-    private static func schemaSQL(version: Int = 4) throws -> String {
+    private static func schemaSQL(version: Int = 5) throws -> String {
         let baseline = try resourceSQL("schema-v1")
         if version == 1 { return baseline }
         let second = baseline + "\n" + (try resourceSQL("migration-v2"))
         if version == 2 { return second }
         let third = second + "\n" + (try resourceSQL("migration-v3"))
-        return version == 3 ? third : third + "\n" + (try resourceSQL("migration-v4"))
+        if version == 3 { return third }
+        let fourth = third + "\n" + (try resourceSQL("migration-v4"))
+        return version == 4 ? fourth : fourth + "\n" + (try resourceSQL("migration-v5"))
     }
 
     private struct SchemaObject: Equatable {
@@ -1023,7 +1037,7 @@ public actor InkuDatabase {
     }
 
     private static func validateSchema(_ db: Database) throws {
-        guard let version = try Int.fetchOne(db, sql: "PRAGMA user_version"), [1, 2, 3, 4].contains(version) else {
+        guard let version = try Int.fetchOne(db, sql: "PRAGMA user_version"), [1, 2, 3, 4, 5].contains(version) else {
             throw PersistenceError.unknownSchema
         }
         let expected = try DatabaseQueue()
@@ -1033,6 +1047,7 @@ public actor InkuDatabase {
         if version >= 2 { identifiers.append("swift-v2-library-annotations") }
         if version >= 3 { identifiers.append("swift-v3-provider-rate-state") }
         if version >= 4 { identifiers.append("swift-v4-remove-export-mark") }
+        if version >= 5 { identifiers.append("swift-v5-show-lineage-works") }
         guard try schemaObjects(in: db) == expectedObjects,
               try String.fetchAll(db, sql: "SELECT identifier FROM schema_migrations ORDER BY identifier")
                 == identifiers else {

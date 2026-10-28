@@ -58,6 +58,24 @@ private actor LocalMaintenanceStore {
         generations.sort { $0.name > $1.name }
         return BackupSnapshot(lastSuccess: record.lastSuccess, generations: generations, totalBytes: totalBytes)
     }
+    func retainedURL(name: String) throws -> URL {
+        guard !name.contains("/"), !name.contains("\\"), name.hasPrefix("inku-auto-"), name.hasSuffix(".sqlite"),
+              try manifest().files.contains(name) else { throw HostError("backup_not_found") }
+        let folder = directory.appendingPathComponent("automatic-backups", isDirectory: true)
+        let folderValues = try folder.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+        guard folderValues.isDirectory == true, folderValues.isSymbolicLink != true else { throw HostError("backup_not_found") }
+        let url = folder.appendingPathComponent(name)
+        let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+        guard values.isRegularFile == true, values.isSymbolicLink != true else { throw HostError("backup_not_found") }
+        return url
+    }
+    func deleteRetained(name: String) throws {
+        let url = try retainedURL(name: name)
+        try FileManager.default.removeItem(at: url)
+        var record = try manifest()
+        record.files.removeAll { $0 == name }
+        try JSONEncoder().encode(record).write(to: manifestURL, options: .atomic)
+    }
     func completed(url: URL, retention: Int, at: Date) throws {
         let metadata = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
         guard (1...100).contains(retention), metadata.isRegularFile == true, metadata.isSymbolicLink != true,
@@ -160,6 +178,21 @@ public final class LocalMaintenance {
             backupInfoError = nil
         } catch is CancellationError { }
         catch { backupInfoError = "バックアップの状態を読み込めませんでした: \(error.localizedDescription)" }
+    }
+    public func deleteRetainedBackup(name: String) async {
+        guard let store else { return }
+        do { try await store.deleteRetained(name: name); backupError = nil; await refreshBackupInfo() }
+        catch { backupError = error.localizedDescription }
+    }
+    public func restoreRetainedBackup(name: String, app: AppModel) async {
+        guard let store, let folder = backupDirectory, !app.isBusy else { return }
+        do {
+            let source = try await store.retainedURL(name: name)
+            let safety = folder.appendingPathComponent("inku-before-restore-\(UUID().uuidString).sqlite")
+            guard await app.backup(to: safety) else { return }
+            await app.restore(from: source)
+            await refreshBackupInfo(app: app)
+        } catch { backupError = error.localizedDescription }
     }
     public func checkBackup(app: AppModel, automationRunning: Bool) async {
         guard !checkingBackup else { return }

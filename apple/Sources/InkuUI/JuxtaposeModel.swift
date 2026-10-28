@@ -30,6 +30,7 @@ public final class JuxtaposeModel {
     public var modelReference = ""
     public private(set) var result: Juxtaposition.Result?
     public var chosen: Int?
+    public var wild = false
     /// Every sentence shown in this dialog; "Pick again" leaves them out.
     public private(set) var shown: [String] = []
     public private(set) var asking = false
@@ -51,6 +52,7 @@ public final class JuxtaposeModel {
     public var choice: Juxtaposition.Choice? { chosen.flatMap { index in result?.choices.indices.contains(index) == true ? result?.choices[index] : nil } }
 
     public func initialize(app: AppModel) async {
+        wild = app.display.preferences.defaultWild ?? false
         if provider == nil {
             do { provider = try app.auxiliaryProvider() }
             catch { errorText = error.localizedDescription; return }
@@ -130,9 +132,8 @@ public final class JuxtaposeModel {
             guard let self else { return false }
             defer { self.finish() }
             do {
-                // nil wild = inherit the parent work's setting, as the description edit does.
                 let request = try await app.makeSavedWorkEditRequest(work: work, mode: .description, description: choice.joined,
-                    wildOverride: nil, metadata: result.metadata(choice).object ?? [:])
+                    wildOverride: self.wild, metadata: result.metadata(choice).object ?? [:])
                 try Task.checkCancellation()
                 guard !app.isBusy, !app.isPreview else { throw HostError("authoring_busy_or_unavailable") }
                 self.ownsAppOperation = true

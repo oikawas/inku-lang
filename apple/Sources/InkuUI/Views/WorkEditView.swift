@@ -120,7 +120,6 @@ public struct WorkEditView: View {
                 editor.wildOverride = !wild; editor.inheritWild = false
             }.buttonStyle(.bordered).tint(wild ? Color.accentColor : Color.secondary)
                 .accessibilityValue(model.display.localized(wild ? "入" : "切"))
-            if editor.inheritWild { Text(model.display.localized("（継承）")).inkuFont(11).foregroundStyle(.secondary) }
         }.disabled(model.isBusy)
     }
 

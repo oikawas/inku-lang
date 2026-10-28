@@ -1,5 +1,7 @@
 # inku Swift Implementation Specification
 
+On macOS the history strip moves across pages with the arrow keys, and `#` on the canvas and in the library copies the work UUID. Generation information includes the comment and each stage's prompt digest, and diagnostics use the Web wording. Retained automatic backups can be deleted or restored after confirmation; restore first saves a copy of the current database. The default for removing brush constraints is independent of the next-work switch. An autonomous chunk move requires a direction and runs alone. All refinement children are saved in normal history; the database migration moves existing intermediate works to normal history after taking a SQLite backup.
+
 This directory contains the native SwiftUI client, developed for macOS first, and the shared Apple packages. [SWIFT_SPEC.ja.md](SWIFT_SPEC.ja.md) is the canonical specification for Swift host behavior; this document is its maintained English version. The [product specification](../SPEC.md) defines shared DDL, Score, prompts, authoring authority, pipeline transitions, seeds, and rendering semantics. Server remains the primary development host, and Swift follows the same Rust core without duplicating semantic processing.
 
 Last updated: 2026-10-23.

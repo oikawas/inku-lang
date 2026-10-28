@@ -53,6 +53,8 @@ public struct DisplayPreferences: Codable, Sendable, Equatable {
     public var nextCatalogMode: String?
     public var nextCanvasID: String?
     public var nextWild: Bool?
+    /// Default for new drawings and derivative dialogs, independent of the next-work switch.
+    public var defaultWild: Bool?
     /// Screen choices (Web `settings_tab`, `inku-history-display-mode`), restored on the next launch.
     public var settingsTab: String?
     public var workspaceTab: String?

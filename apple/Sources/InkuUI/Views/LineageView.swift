@@ -471,10 +471,6 @@ struct LineageView: View {
                         .inkuFont(12).accessibilityLabel(model.display.localized("作品の詳細"))
                 }
             }
-            if item.node.state == "lineage_only" {
-                Button(model.display.localized("通常履歴に保存")) { Task { await library.promote(item.id) } }
-                    .buttonStyle(InkuGhostButtonStyle()).disabled(library.mutating || writingDisabled)
-            }
         }
         .padding(8)
         .modifier(LibraryCardSurface(current: item.id == graph.focusNodeID, focused: focusedNodeID == item.id, tombstone: item.node.state == "tombstone", cornerRadius: 10))
@@ -512,7 +508,6 @@ struct LineageView: View {
         return VStack(alignment: .leading, spacing: 3) {
             if item.id == graph.focusNodeID { identityBadge("表示中", active: true) }
             if let work = item.work { LineageNodeLockMark(model: model, work: work) }
-            if item.node.state == "lineage_only" { identityBadge("中間作品・履歴非表示") }
             if LineageWorkScope.sameText(item, focus: focus) { identityBadge("同じ記述") }
             if LineageWorkScope.sameEdition(item, focus: focus) { identityBadge("同じ版") }
         }
@@ -575,9 +570,6 @@ struct LineageView: View {
             Button(model.display.localized("推敲の印"), systemImage: library.lineageAnnotation(for: work.id).forRevision ? "pencil.circle.fill" : "pencil.circle") { Task { await library.toggleRevision(work) } }
                 .disabled(library.mutating || writingDisabled)
             if let hash = work.renderHash { Button(model.display.localized("描画ハッシュ全体をコピー"), systemImage: "doc.on.doc") { library.copyHash(hash) } }
-            if item.node.state == "lineage_only" {
-                Button(model.display.localized("ライブラリへ追加"), systemImage: "plus") { Task { await library.promote(item.id) } }.disabled(library.mutating || writingDisabled)
-            }
             Divider()
             if work.trashed {
                 Button(model.display.localized("戻す"), systemImage: "arrow.uturn.backward") { Task { await library.restore(ids: [work.id]) } }.disabled(library.mutating || writingDisabled)
@@ -623,6 +615,7 @@ struct LineageView: View {
 
     private func operation(_ kind: String?) -> String {
         if kind == "laws_change" { return model.display.preferences.language == "en" ? "Laws" : "法則" }
+        if kind == "chunk_move" { return model.display.webCopy("aiRefineKindChunks", "まとまりの手") }
         if model.display.preferences.language == "en" {
             if kind == nil { return "Origin" }
             let labels = ["touch_change": "Touch", "layout_change": "Layout", "catalog_change": "Color",

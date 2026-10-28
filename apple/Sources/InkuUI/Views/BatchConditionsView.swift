@@ -100,7 +100,6 @@ struct BatchConditionsView: View {
     @ViewBuilder private var compactControls: some View {
         wildControl
         paperControl
-        clearControl
     }
 
     private var sketchControl: some View {

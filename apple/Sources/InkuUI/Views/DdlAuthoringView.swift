@@ -146,7 +146,7 @@ struct DdlAuthoringView: View {
         case "prompt": promptOutput
         case "events": model.eventsJSON
         case "plugins": model.macroDiagnostics
-        default: model.diagnosticsJSON
+        default: PipelineDiagnosticText.formatDocument(model.diagnosticsJSON, display: model.display)
         }
     }
     private var promptOutput: String {

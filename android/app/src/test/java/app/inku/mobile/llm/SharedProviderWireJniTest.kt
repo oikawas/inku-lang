@@ -1,6 +1,7 @@
 package app.inku.mobile.llm
 
 import app.inku.mobile.pipeline.CoreIdentityJson
+import app.inku.mobile.pipeline.NativePipelineBridge
 import java.io.File
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -172,7 +173,9 @@ class SharedProviderWireJniTest {
             val action = row.getJSONObject("request").getString("action")
             if (!row.getJSONObject("request").has("schema")) actions[action] = (actions[action] ?: 0) + 1
             val expected = row.getJSONObject("expect")
-            val answer = SharedProviderWire.call(item.requestJson)
+            val answer = if (row.getJSONObject("request").has("schema")) {
+                JSONObject(NativePipelineBridge.providerWire(item.requestJson.encodeToByteArray()).decodeToString())
+            } else SharedProviderWire.call(item.requestJson)
             assertEquals(why, SharedProviderWire.SCHEMA, answer.getString("schema"))
             for (key in expected.keys().asSequence()) {
                 assertTrue("$why missing $key", answer.has(key))

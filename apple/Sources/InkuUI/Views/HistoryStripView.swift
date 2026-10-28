@@ -185,17 +185,21 @@ import SwiftUI
         let key = fieldsKey
         let kept = keptHeights[key] ?? 0
         // The count follows the window width (Web); a narrower strip clips the last tiles instead of widening the window.
-        return HStack(alignment: .top, spacing: 7) {
-            ForEach(library.works, id: \.id) { work in tile(work) }
-            if let placeholder { emptyTile(placeholder, height: max(58, kept)) }
-        }
+        return ScrollViewReader { proxy in
+          ScrollView(.horizontal, showsIndicators: false) {
+            HStack(alignment: .top, spacing: 7) {
+                ForEach(library.works, id: \.id) { work in tile(work).id(work.id) }
+                if let placeholder { emptyTile(placeholder, height: max(58, kept)) }
+            }
         // Web f62812ed3: the row never gets lower than it has been for the chosen fields, so a search, or a page with
         // shorter tiles, does not move the canvas above it.
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: kept > 0 ? kept : nil, alignment: .topLeading)
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
             if height > (keptHeights[key] ?? 0) { keptHeights[key] = height }
         }
-        .clipped()
+          }
+          .onChange(of: focusedWorkID) { _, id in if let id { proxy.scrollTo(id) } }
+        }
     }
 
     /// Web `.thumb.thumb-empty`: one dashed tile a thumbnail wide and the row high, its words in the middle.
@@ -271,6 +275,7 @@ import SwiftUI
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .focusable()
         .focused($focusedWorkID, equals: work.id)
         .onKeyPress(.leftArrow) { moveFocus(from: work.id, delta: -1) }
         .onKeyPress(.rightArrow) { moveFocus(from: work.id, delta: 1) }
@@ -281,9 +286,10 @@ import SwiftUI
     }
 
     private func moveFocus(from id: String, delta: Int) -> KeyPress.Result {
-        guard !locked, focusedWorkID == id else { return .ignored }
+        guard !locked else { return .handled }
+        guard focusedWorkID == id else { return .ignored }
         Task {
-            guard let next = await history.navigate(app: model, fromWorkID: id, delta: delta, selectWork: false), !locked else { return }
+            guard let next = await history.navigate(app: model, fromWorkID: selectionID ?? id, delta: delta, selectWork: false), !locked else { return }
             onSelectWork(next)
             await model.selectWork(next)
             guard !locked else { return }

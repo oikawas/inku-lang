@@ -3,6 +3,12 @@ import InkuHost
 @testable import InkuUI
 
 @MainActor final class PipelineDiagnosticTextTests: XCTestCase {
+    func testOrderAndPluginExplanationsAndExecutionOmissions() {
+        let raw = #"{"plugin_diagnostics":[{"start_byte":1,"end_byte":3}],"catalog_diagnostics":[{}],"upstream_diagnostics":[{"span":{"start_byte":1,"end_byte":3}},{"span":{"start_byte":4,"end_byte":6}}],"downstream_diagnostics":[{}],"resource_omissions":[{}],"relation_omissions":[{}],"render_diagnostics":{"diagnostics":[{}]},"resource_execution":{"omissions":[{}],"relation_omissions":[{}]},"render_warnings":[{}]}"#
+        let entries = PipelineDiagnosticText.entries(raw)
+        XCTAssertEqual(entries.map(\.channel), ["plugin", "catalog", "upstream", "downstream", "resource", "relation", "render", "resource", "relation", "warning"])
+        XCTAssertEqual(entries[2].value["span"]["start_byte"].number, "4")
+    }
     func testResourceOmissionAndPartialExecution() throws {
         let display = DisplaySettings()
         display.preferences.language = "ja"

@@ -73,10 +73,23 @@ import InkuHost
         return parts.joined(separator: " ")
     }
     static func formatDocument(_ raw: String, display: DisplaySettings) -> String {
-        guard let data = raw.data(using: .utf8), let json = try? ExactJSON(data: data) else { return raw }
-        let fields = [("plugin_diagnostics", "plugin"), ("upstream_diagnostics", "upstream"), ("downstream_diagnostics", "downstream"), ("resource_omissions", "resource"), ("relation_omissions", "relation"), ("render_warnings", "warning"), ("catalog_diagnostics", "catalog"), ("diagnostics", "upstream")]
-        var lines = fields.flatMap { field, channel in (json[field].array ?? []).map { format($0, channel: channel, display: display) } }
-        lines += (json["render_diagnostics"]["diagnostics"].array ?? []).map { format($0, channel: "render", display: display) }
+        let lines = entries(raw).map { format($0.value, channel: $0.channel, display: display) }
         return lines.isEmpty ? display.webCopy("pipelineDiagnosticUnknown", "詳しい診断情報があります。") : lines.joined(separator: "\n")
+    }
+    static func entries(_ raw: String) -> [(channel: String, value: ExactJSON)] {
+        guard let data = raw.data(using: .utf8), let json = try? ExactJSON(data: data) else { return [] }
+        let plugins = json["plugin_diagnostics"].array ?? []
+        let upstream = (json["upstream_diagnostics"].array ?? []).filter { item in
+            let span = item["span"]
+            return !plugins.contains { $0["start_byte"] == span["start_byte"] && $0["end_byte"] == span["end_byte"] }
+        }
+        func items(_ values: [ExactJSON]?, _ channel: String) -> [(channel: String, value: ExactJSON)] {
+            (values ?? []).map { (channel, $0) }
+        }
+        return items(plugins, "plugin") + items(json["catalog_diagnostics"].array, "catalog") + items(upstream, "upstream")
+            + items(json["downstream_diagnostics"].array, "downstream") + items(json["resource_omissions"].array, "resource")
+            + items(json["relation_omissions"].array, "relation") + items(json["render_diagnostics"]["diagnostics"].array, "render")
+            + items(json["resource_execution"]["omissions"].array, "resource") + items(json["resource_execution"]["relation_omissions"].array, "relation")
+            + items(json["render_warnings"].array, "warning")
     }
 }

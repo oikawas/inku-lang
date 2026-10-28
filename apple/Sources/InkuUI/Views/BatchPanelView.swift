@@ -166,9 +166,11 @@ struct BatchPanelView: View {
                         .inkuFont(12).foregroundStyle(.secondary).monospacedDigit()
                 }
                 HStack(spacing: 8) {
-                    Button(model.display.webCopy("clearInputBtn", "新規作成")) { automation.restoreBatchInput("") }
-                        .buttonStyle(InkuGhostButtonStyle()).disabled(controlsDisabled)
-                        .inkuTooltip(model.display.tooltip("入力をクリアする", serverKey: "tooltipInputClear"))
+                    if !automation.running {
+                        Button(model.display.webCopy("clearInputBtn", "新規作成")) { automation.restoreBatchInput("") }
+                            .buttonStyle(InkuGhostButtonStyle())
+                            .inkuTooltip(model.display.tooltip("入力をクリアする", serverKey: "tooltipInputClear"))
+                    }
                     if !automation.batchPromptHistory.isEmpty { inputHistory }
                 }
             }

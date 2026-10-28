@@ -268,7 +268,7 @@ struct LibraryView: View {
         let label = display.webCopy("historySearchLabel", "検索（記述 / ハッシュ値 / 作品ID）")
         return Group {
             #if os(macOS)
-            InkuSearchField(value: $library.query, placeholder: placeholder, label: label, onCancel: onClose,
+            InkuSearchField(value: $library.query, placeholder: placeholder, label: label, borderless: true, onCancel: onClose,
                             onSearch: { library.query = $0 })
                 .inkuSearchFieldHeight()
             #else
@@ -277,7 +277,7 @@ struct LibraryView: View {
         }
         // Web `.history-search`: flex 0 1 22rem, at least 10rem.
         .frame(minWidth: 130, idealWidth: 286, maxWidth: 286)
-        .overlay(RoundedRectangle(cornerRadius: 4).stroke(library.query.isEmpty ? Color.clear : Color.accentColor))
+        .overlay(RoundedRectangle(cornerRadius: 4).stroke(library.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? InkuColor.border2 : Color.accentColor))
         .inkuTooltip(display.webCopy("historySearchHint", "ハッシュ値と作品IDは全体か先頭部分、ハッシュ値は下位4桁でも検索できます。"), focus: .text)
     }
 
@@ -926,8 +926,13 @@ private struct LibraryPager: View {
                 Button {
                     library.query = ""
                 } label: {
-                    Text(display.webCopyFormat("historySearchActive", "検索中「%@」", library.query) + " ×")
-                }.buttonStyle(LibraryGhostButtonStyle(active: true))
+                    Text(display.webCopyFormat("historySearchActive", "検索中「%@」", library.query.trimmingCharacters(in: .whitespacesAndNewlines)) + " ×")
+                        .lineLimit(1).truncationMode(.tail).frame(maxWidth: 256)
+                        .padding(.horizontal, 10).padding(.vertical, 5)
+                        .foregroundStyle(Color.accentColor)
+                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.accentColor))
+                }.buttonStyle(.plain)
+                    .inkuTooltip(display.tooltip("検索を解除", serverKey: "historySearchClear"))
             }
             Button(display.webCopy("historyLatest", fallback: "最新")) { Task { await library.setLatestPage() } }
                 .buttonStyle(LibraryGhostButtonStyle(minWidth: 54))
@@ -1198,7 +1203,7 @@ private struct LibraryWorkMenu: View {
             .disabled(library.mutating || writingDisabled)
         Button(display.localized("推敲の印"), systemImage: library.annotation(for: work.id).forRevision ? "pencil.circle.fill" : "pencil.circle") { Task { await library.toggleRevision(work) } }
             .disabled(library.mutating || writingDisabled)
-        Button(display.webCopy("historyIdCopyTitle", "作品のUUIDをコピー"), systemImage: "doc.on.doc") { library.copyHash(work.id) }
+        Button(display.label("作品 UUID をコピー", "Copy work UUID"), systemImage: "doc.on.doc") { library.copyHash(work.id) }
         Divider()
         if work.trashed {
             // HistoryManager.svelte:1069-1070,1215-1226: the per-work buttons' titles, on the menu items that replace them.
@@ -1420,11 +1425,6 @@ struct LibraryWorkDetails: View {
             }
             LabeledContent(model.display.localized("SVG容量"), value: ByteCountFormatter.string(fromByteCount: SavedWorkFacts.svgBytes(work), countStyle: .file))
                 .inkuFont(12).foregroundStyle(.secondary)
-            LabeledContent(model.display.webCopy("historyIdHeader", "ID")) {
-                Button(String(work.id.prefix(8))) { library.copyHash(work.id) }
-                    .buttonStyle(.borderless).inkuFont(12, design: .monospaced)
-                    .inkuTooltip(model.display.tooltip("作品UUIDをコピー", serverKey: library.copiedHash == work.id ? "historyHashCopied" : "historyIdCopyTitle"))
-            }
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Label(model.display.localized("コメント"), systemImage: "text.bubble").inkuFont(12, weight: .medium)

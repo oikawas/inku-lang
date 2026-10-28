@@ -39,7 +39,7 @@ public struct AutonomousRefinementView: View {
                         if let error = run.error { Text(error).foregroundStyle(.red).textSelection(.enabled) }
                     } else { controls }
                     if let error = refinement.errorText {
-                        Text(error == "aiRefineKindsError" ? copy(error) : model.display.message(error)).foregroundStyle(.red).textSelection(.enabled)
+                        Text(["aiRefineKindsError", "aiRefineChunksNoteRequired"].contains(error) ? copy(error) : model.display.message(error)).foregroundStyle(.red).textSelection(.enabled)
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading).padding(20)
             }
@@ -58,7 +58,7 @@ public struct AutonomousRefinementView: View {
                 } else {
                     Button(copy("aiRefineStartButton")) { Task { await refinement.start(app: model) } }
                         .buttonStyle(.borderedProminent)
-                        .disabled(model.isBusy || refinement.source == nil || refinement.source?.svg.isEmpty == true || refinement.enabledKinds.isEmpty || refinement.modelReference.isEmpty || (refinement.enabledKinds.contains("chunks") && refinement.note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
+                        .disabled(model.isBusy || refinement.source == nil || refinement.source?.svg.isEmpty == true || refinement.enabledKinds.isEmpty || refinement.modelReference.isEmpty)
                 }
             }.padding(20)
         }
@@ -79,7 +79,7 @@ public struct AutonomousRefinementView: View {
 
     private var controls: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if refinement.sourceLocked { Text(copy("aiRefineHeldNote")).inkuFont(12).foregroundStyle(.secondary) }
+            if refinement.sourceLocked && !refinement.enabledKinds.contains("chunks") { Text(copy("aiRefineHeldNote")).inkuFont(12).foregroundStyle(.secondary) }
             Text(copy("aiRefineModel")).inkuFont(12, weight: .semibold)
             Button { showModels = true } label: {
                 Label(refinement.modelReference.isEmpty ? model.display.localized("Visionモデルを選択") : refinement.modelReference, systemImage: "eye")
@@ -95,13 +95,11 @@ public struct AutonomousRefinementView: View {
             if refinement.enabledKinds.contains("chunks") { Text(copy("aiRefineChunksNote")).inkuFont(12).foregroundStyle(.secondary) }
             HStack(spacing: 24) {
                 Stepper(copy("aiRefineMovesLabel") + ": \(refinement.moves)", value: $refinement.moves, in: 1...10)
-                Toggle(model.display.localized("筆致制限を外す"), isOn: $refinement.wild)
+                Button(model.display.webCopy("wildButton", "筆致制限を外す")) { refinement.wild.toggle() }
+                    .buttonStyle(InkuGhostButtonStyle(active: refinement.wild))
             }
             Text(copy(refinement.enabledKinds.contains("chunks") ? "aiRefineChunksDirectionLabel" : "aiRefineDirectionLabel")).inkuFont(12, weight: .semibold)
             TextField(copy(refinement.enabledKinds.contains("chunks") ? "aiRefineChunksDirectionPlaceholder" : "aiRefineDirectionPlaceholder"), text: $refinement.note, axis: .vertical).lineLimit(3...5)
-            if refinement.enabledKinds.contains("chunks") && refinement.note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                Text(copy("aiRefineChunksNoteRequired")).inkuFont(12).foregroundStyle(.secondary)
-            }
             Text("\(refinement.note.utf16.count) / 1000").inkuFont(12).foregroundStyle(.secondary)
         }.disabled(model.isBusy)
     }
@@ -114,7 +112,7 @@ public struct AutonomousRefinementView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(attemptHeading(turn: turn, attempt: attempt)).inkuFont(12, weight: .semibold)
                 if let detail = chunkMoveText(attempt, display: model.display) ?? attempt["sentence"].string ?? attempt["main_law"].string { Text(detail).fixedSize(horizontal: false, vertical: true) }
-                if let reason = attempt["reason"].string { Text(reason).inkuFont(12).foregroundStyle(.secondary).textSelection(.enabled) }
+                if ["unavailable", "failed"].contains(attempt["outcome"].string ?? ""), let reason = attempt["reason"].string { Text(reason).inkuFont(12).foregroundStyle(.secondary).textSelection(.enabled) }
             }.frame(maxWidth: .infinity, alignment: .leading)
         }.padding(8).overlay(RoundedRectangle(cornerRadius: 8).stroke(attempt["outcome"].string == "kept" ? Color.accentColor : InkuColor.border))
     }

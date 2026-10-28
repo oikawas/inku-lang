@@ -54,7 +54,6 @@ public struct JuxtaposeView: View {
         VStack(alignment: .leading, spacing: 8) {
             label(model.display.webCopy("inputSectionLabel", "記述"))
             textBox(juxtapose.work.effectiveSourceText)
-            Toggle(model.display.localized("筆致制限を外す"), isOn: $juxtapose.wild).disabled(juxtapose.busy)
             label(model.display.webCopy("juxtaposeModel", "一文を選ぶVisionモデル"))
             Button { showModels = true } label: {
                 Label(juxtapose.modelReference.isEmpty ? model.display.localized("Visionモデルを選択") : juxtapose.modelReference,
@@ -104,6 +103,8 @@ public struct JuxtaposeView: View {
 
     private var footer: some View {
         HStack {
+            Button(model.display.webCopy("wildButton", "筆致制限を外す")) { juxtapose.wild.toggle() }
+                .buttonStyle(InkuGhostButtonStyle(active: juxtapose.wild)).disabled(juxtapose.busy)
             if juxtapose.busy {
                 Spacer()
                 RunStatusView(display: model.display,

@@ -151,7 +151,8 @@ public final class AutonomousRefinementModel {
         guard !source.svg.isEmpty else { errorText = "autonomous_source_has_no_image"; return }
         let kinds = Self.kinds.filter(enabledKinds.contains)
         guard !kinds.isEmpty else { errorText = "aiRefineKindsError"; return }
-        guard !kinds.contains("chunks") || (kinds.count == 1 && !note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) else { errorText = "aiRefineKindsError"; return }
+        guard !kinds.contains("chunks") || kinds.count == 1 else { errorText = "aiRefineKindsError"; return }
+        guard !kinds.contains("chunks") || !note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { errorText = "aiRefineChunksNoteRequired"; return }
         var settings = await app.hostSettings()
         guard !stopping else { stopping = false; return }
         guard SettingsModel.isRegisteredModelAvailable(modelReference, purpose: "vision", settings: settings) else {
@@ -413,7 +414,10 @@ public final class AutonomousRefinementModel {
                 if asked["image"].bool == true && png == nil { throw HostError("source_has_no_image") }
                 var answer: String?
                 ownsAppOperation = true
-                let ran = await app.performSerialized(status: "まとまりを考えています…", allowsBrowsing: true) { _ in
+                let kind = app.display.webCopy("aiRefineKindChunks", "まとまりの手")
+                let status = app.display.webCopyFormat("aiRefineTaking", "%@手目：%@を打っています…", String(turn),
+                    app.display.preferences.language == "en" ? kind.lowercased() : kind)
+                let ran = await app.performSerialized(status: status, allowsBrowsing: true) { _ in
                     answer = try await app.sendChunkPrompt(asked, png: png, request: request)
                 }
                 ownsAppOperation = false

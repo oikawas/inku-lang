@@ -108,7 +108,7 @@ struct CreationCanvasControls: View {
         HStack(spacing: 6) {
             // CanvasArtworkWorkspace `leadingCornerControls`: before the hash, in every interface mode.
             if let threeDimensional { Ddl3DModeButton(display: model.display, threeDimensional: threeDimensional) }
-            if model.display.visible("detail_status"), let id = work?.id, !id.isEmpty {
+            if saved, model.display.visible("detail_status"), let id = work?.id, !id.isEmpty {
                 // CanvasArtworkWorkspace.svelte:278: the bubble says the copy happened, for 1.2 s.
                 Button { perform("copy-hash") } label: { Text("#").fontWeight(.semibold) }
                     .buttonStyle(InkuFloatingCircleButtonStyle(active: model.library.copiedHash == id))

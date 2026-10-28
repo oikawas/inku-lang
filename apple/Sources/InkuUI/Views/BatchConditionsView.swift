@@ -171,14 +171,6 @@ struct BatchConditionsView: View {
         .accessibilityValue(shownCanvas)
     }
 
-    private var clearControl: some View {
-        Button(model.display.webCopy("clearInputBtn", "新規作成")) {
-            guard !disabled else { return }
-            automation.restoreBatchInput("")
-        }
-        .inkuTooltip(model.display.tooltip("入力をクリアする", serverKey: "tooltipInputClear"))
-    }
-
     private var details: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(model.display.localized("生成条件の詳細")).inkuFont(14, weight: .semibold)

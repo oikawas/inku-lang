@@ -104,24 +104,30 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             #endif
             Button(model.display.localized("キャンセル"), role: .cancel) {}
         } message: { Text(model.display.localized("現在のデータを残す場合は、先にバックアップを保存してください。")) }
-        .alert(model.display.label("バックアップを削除しますか？", "Delete this backup?"), isPresented: Binding(get: { backupDeleteName != nil }, set: { if !$0 { backupDeleteName = nil } })) {
+        .alert(model.display.webCopyFormat("settingsDbBackupDeleteConfirm", "%@ のバックアップを削除します。", backupLabel(backupDeleteName)), isPresented: Binding(get: { backupDeleteName != nil }, set: { if !$0 { backupDeleteName = nil } })) {
             Button(model.display.webCopy("settingsDbBackupDelete", "削除"), role: .destructive) {
-                if let name = backupDeleteName { Task { await maintenance.deleteRetainedBackup(name: name) } }
+                if let name = backupDeleteName { Task { await maintenance.deleteRetainedBackup(name: name, display: model.display) } }
                 backupDeleteName = nil
             }
             Button(model.display.localized("キャンセル"), role: .cancel) { backupDeleteName = nil }
-        } message: { Text(model.display.webCopyFormat("settingsDbBackupDeleteConfirm", "%@ のバックアップを削除します。", backupDeleteName ?? "")) }
-        .alert(model.display.label("DB 全体をバックアップから復元しますか？", "Restore the whole database?"), isPresented: Binding(get: { backupRestoreName != nil && !backupRestoreFinal }, set: { if !$0 && !backupRestoreFinal { backupRestoreName = nil } })) {
+        }
+        .alert(model.display.webCopyFormat("settingsDbBackupRestoreConfirm", "DB を %@ のバックアップから復元します。", backupLabel(backupRestoreName)), isPresented: Binding(get: { backupRestoreName != nil && !backupRestoreFinal }, set: { if !$0 && !backupRestoreFinal { backupRestoreName = nil } })) {
             Button(model.display.webCopy("settingsDbBackupRestoreNext", "次へ")) { backupRestoreFinal = true }
             Button(model.display.localized("キャンセル"), role: .cancel) { backupRestoreName = nil }
-        } message: { Text(model.display.webCopyFormat("settingsDbBackupRestoreConfirm", "DB を %@ のバックアップから復元します。", backupRestoreName ?? "")) }
-        .alert(model.display.label("本当に復元しますか？", "Really restore?"), isPresented: $backupRestoreFinal) {
+        }
+        .alert(model.display.webCopyFormat("settingsDbBackupRestoreFinalConfirm", "本当に %@ から復元しますか？", backupLabel(backupRestoreName)), isPresented: $backupRestoreFinal) {
             Button(model.display.webCopy("settingsDbBackupRestore", "復元"), role: .destructive) {
                 if let name = backupRestoreName { Task { await maintenance.restoreRetainedBackup(name: name, app: model) } }
                 backupRestoreName = nil
             }
             Button(model.display.localized("キャンセル"), role: .cancel) { backupRestoreName = nil }
-        } message: { Text(model.display.webCopyFormat("settingsDbBackupRestoreFinalConfirm", "本当に %@ から復元しますか？", backupRestoreName ?? "")) }
+        }
+    }
+
+    private func backupLabel(_ name: String?) -> String {
+        guard let generation = maintenance.backupGenerations.first(where: { $0.name == name }) else { return name ?? "" }
+        let kind = model.display.webCopy(generation.isManual ? "settingsDbBackupKindManual" : "settingsDbBackupKindAuto", generation.isManual ? "手動" : "自動")
+        return (generation.modifiedAt?.formatted(date: .numeric, time: .standard) ?? generation.name) + " (" + kind + ")"
     }
 
     /// settings-modal.css `.modal-head`: 16px title, the detail switch and the close button, padding 14×22.
@@ -156,6 +162,9 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             (model.display.webCopy("settingsTabExport", "エクスポート"), [.export, .clipboard]),
             (model.display.webCopy("settingsCategoryAdministration", "接続と管理"), [.models, .database] + (detailed ? [.limits] : [])),
         ]
+        #if os(macOS)
+        result.insert(("", [.image]), at: 2)
+        #endif
         if detailed { result.append((model.display.webCopy("settingsCategoryExtensions", "拡張と詳細"), [.plugins, .unread])) }
         result.append((model.display.label("この端末", "This device"), [.other, .native]))
         #if !os(macOS)
@@ -166,7 +175,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 
     private var makingSections: [SettingsSection] {
         #if os(macOS)
-        [.making, .image, .demo]
+        [.making, .demo]
         #else
         [.making, .demo]
         #endif
@@ -177,13 +186,15 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             VStack(alignment: .leading, spacing: 20) {
                 ForEach(groups, id: \.label) { group in
                     VStack(alignment: .leading, spacing: 3) {
-                        if group.items.count == 1 && group.label == title(group.items[0]) {
+                        if group.label.isEmpty || (group.items.count == 1 && group.label == title(group.items[0])) {
                             Rectangle().fill(InkuColor.border).frame(height: 1).padding(.horizontal, 10).padding(.bottom, 3)
                         } else {
-                            Text(group.label).inkuFont(12, weight: .medium).foregroundStyle(.secondary)
-                                .padding(.horizontal, 10).padding(.bottom, 3)
+                            HStack(spacing: 8) {
+                                Text(group.label).inkuFont(11, weight: .semibold).tracking(0.88).foregroundStyle(.secondary)
+                                Rectangle().fill(InkuColor.border).frame(height: 1)
+                            }.padding(.horizontal, 10).padding(.bottom, 3)
                         }
-                        ForEach(group.items) { item in navigationItem(item) }
+                        ForEach(group.items) { item in navigationItem(item).padding(.leading, 10) }
                     }
                 }
             }
@@ -222,7 +233,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .display: model.display.webCopy("settingsCategoryDisplayOperation", item.title)
         case .making: model.display.webCopy("settingsBatchRetryLabel", item.title)
         case .personalPlan: model.display.webCopy("chatgptPlanLabel", item.title)
-        case .export: model.display.label("ファイルの保存", "File saving")
+        case .export: model.display.webCopy("settingsTabFileSaving", "ファイル保存")
         case .plugins: model.display.webCopy("settingsTabPlugins", item.title)
         case .other: model.display.label("その他", "Other")
         case .native: model.display.label("macOS補助", "Additional macOS settings")
@@ -635,13 +646,15 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                     DisclosureGroup(model.display.localized("保持中の世代")) {
                         ForEach(maintenance.backupGenerations) { generation in
                             VStack(alignment: .leading, spacing: 3) {
-                                Text(generation.name).inkuFont(12, design: .monospaced).textSelection(.enabled)
+                                Text(backupLabel(generation.name)).inkuFont(12).textSelection(.enabled)
                                 Text(ByteCountFormatter.string(fromByteCount: generation.byteCount, countStyle: .file)
                                      + (generation.modifiedAt.map { " · " + $0.formatted(date: .numeric, time: .shortened) } ?? ""))
                                     .inkuFont(12).foregroundStyle(.secondary)
                                 HStack {
+                                    Text(model.display.webCopy("settingsDbBackupListActions", "操作")).foregroundStyle(.secondary)
                                     Button(model.display.webCopy("settingsDbBackupRestore", "復元")) { backupRestoreName = generation.name }
                                     Button(model.display.webCopy("settingsDbBackupDelete", "削除")) { backupDeleteName = generation.name }
+                                        .buttonStyle(InkuGhostButtonStyle()).foregroundStyle(.red)
                                 }.disabled(model.isBusy || automation.isOccupied)
                             }.padding(.vertical, 3)
                         }

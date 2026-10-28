@@ -59,18 +59,17 @@ struct LibraryPreviewPanel: View {
                 fact(display.webCopy("historySvgSizeHeader", "SVGサイズ"), byteSize)
                 fact(display.webCopy("historyPreviewRenderVersion", "描画版"), work.renderEngineVersion ?? display.webCopy("historyVersionNotRecorded", "記録なし"))
                 if let generation { fact(display.webCopy("historyStripFieldGeneration", "世代"), String(generation)) }
-                if let hash = work.renderHash {
-                    factRow(display.webCopy("historyHashHeader", "ハッシュ")) {
+                factRow(display.webCopy("historyIdHeader", "ID")) {
                         HStack(spacing: 8) {
-                            Text("#" + hash.suffix(4).uppercased()).textSelection(.enabled)
-                            Button { model.library.copyHash(hash) } label: { Image(systemName: "doc.on.doc").frame(width: 22, height: 22) }
+                            Text(String(work.id.prefix(8))).textSelection(.enabled)
+                                .inkuTooltip(display.tooltipValue(work.id))
+                            Button { model.library.copyHash(work.id) } label: { Image(systemName: "doc.on.doc").frame(width: 22, height: 22) }
                                 .buttonStyle(.plain)
-                                .accessibilityLabel(display.webCopy("historyHashCopyTitle", "描画ハッシュ全体をコピー"))
-                                .inkuTooltip(model.library.copiedHash == hash ? display.webCopy("historyHashCopied", "コピーしました")
-                                             : display.webCopy("historyHashCopyTitle", "描画ハッシュ全体をコピー"))
+                                .accessibilityLabel(display.webCopy("historyIdCopyTitle", "作品 UUID をコピー"))
+                                .inkuTooltip(model.library.copiedHash == work.id ? display.webCopy("historyHashCopied", "コピーしました")
+                                             : display.webCopy("historyIdCopyTitle", "作品 UUID をコピー"))
                         }
                     }
-                }
                 note.padding(.top, 10)
             }.padding(.top, 12).overlay(alignment: .top) { Divider() }.padding(.top, 8)
         }

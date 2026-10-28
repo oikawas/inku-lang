@@ -1903,7 +1903,6 @@ public final class AppModel {
 
     public func newWork() {
         guard !isBusy else { return }
-        wild = display.preferences.defaultWild ?? false
         backgroundDrawing = false
         displayToken = UUID()
         library.clearSelectedAnnotation()

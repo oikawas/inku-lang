@@ -100,13 +100,18 @@ struct CreationWorkInfoView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 group(copy("historyPreviewCommentLabel", "作品へのコメント")) {
+                    if model.isPreview {
+                        Text(copy("provenanceWorkNotSaved", "未保存"))
+                    } else if note.state.annotation == nil && !loading {
+                        Text(note.text.isEmpty ? "-" : note.text)
+                    } else {
                     TextEditor(text: Binding(get: { note.text }, set: { note.text = LibraryNoteEditorModel.limited($0) }))
                         .frame(height: 64).border(InkuColor.border)
                         .disabled(note.state.annotation == nil || note.saving || model.isBusy || work.trashed)
                     HStack {
-                        Text("\(note.text.utf16.count) / \(LibraryNoteEditorModel.limit)").inkuFont(12).foregroundStyle(.secondary)
                         Spacer()
-                        Button(copy("historyPreviewCommentSave", "保存")) {
+                        if note.errorText != nil { Text(copy("historyPreviewCommentSaveFailed", "保存できませんでした。")) .foregroundStyle(.red).inkuFont(12) }
+                        Button(copy(note.saving ? "historyPreviewCommentSaving" : "historyPreviewCommentSave", note.saving ? "保存中…" : "保存")) {
                             Task {
                                 _ = await note.save { id, text in
                                     await model.library.saveNote(id: id, note: text.trimmingCharacters(in: .whitespacesAndNewlines))
@@ -114,9 +119,9 @@ struct CreationWorkInfoView: View {
                                     return try await model.auxiliaryDatabase().libraryAnnotation(id: id)
                                 }
                             }
-                        }.disabled(!note.canSave || model.isBusy || work.trashed)
+                        }.buttonStyle(LibraryGhostButtonStyle()).disabled(!note.canSave || model.isBusy || work.trashed)
                     }
-                    if let error = note.errorText { Text(error).foregroundStyle(.red).inkuFont(12) }
+                    }
                 }
                 if let data = information?.context?.descriptionDDL, let record = try? ExactJSON(data: data) {
                     ReadDrawInfoView(record: record, display: model.display)
@@ -188,17 +193,18 @@ struct CreationWorkInfoView: View {
     private func prompts(_ work: SavedWork) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                if information?.context?.imageDDL == nil, information?.prompt("select_description_catalog") != nil {
+                if information?.context?.imageDDL == nil,
+                   information?.prompt("select_description_catalog") != nil || catalogWasAutomatic {
                     sentStage("select_description_catalog", stage: "catalog", input: copy("promptCatalogInput", "色カタログの選択 送った入力"), system: copy("promptCatalogSystem", "色カタログの選択 システムプロンプト"))
                 }
                 // OutputTabsContent.svelte: the stages in the order a work calls them.
                 if information?.context?.imageDDL != nil {
-                sentStage("select_image_catalog", stage: "image_catalog", input: model.display.localized("画像の色カタログ選択 送った入力"),
-                          system: model.display.localized("画像の色カタログ選択 システムプロンプト"))
-                sentStage("write_image_ddl", stage: "image_ddl", input: model.display.localized("画像から指示書を書く 送った入力"),
-                          system: model.display.localized("画像から指示書を書く システムプロンプト"))
-                sentStage("review_image_ddl", stage: "image_review", input: model.display.localized("画像の見比べ 送った入力"),
-                          system: model.display.localized("画像の見比べ システムプロンプト"))
+                sentStage("select_image_catalog", stage: "image_catalog", input: copy("promptImageCatalogInput", "画像の色カタログ選択 送った入力"),
+                          system: copy("promptImageCatalogSystem", "画像の色カタログ選択 システムプロンプト"))
+                sentStage("write_image_ddl", stage: "image_ddl", input: copy("promptImageDdlInput", "画像から指示書を書く 送った入力"),
+                          system: copy("promptImageDdlSystem", "画像から指示書を書く システムプロンプト"))
+                sentStage("review_image_ddl", stage: "image_review", input: copy("promptImageReviewInput", "画像の見比べ 送った入力"),
+                          system: copy("promptImageReviewSystem", "画像の見比べ システムプロンプト"))
                 } else if information?.context?.descriptionDDL != nil {
                 sentStage("read_description", stage: "reading", input: model.display.label("読み 送った入力", "Reading input"), system: model.display.label("読み システムプロンプト", "Reading system prompt"))
                 sentStage("compose_description", stage: "description_composition", input: model.display.label("構図と法則 送った入力", "Composition input"), system: model.display.label("構図と法則 システムプロンプト", "Composition system prompt"))
@@ -220,6 +226,12 @@ struct CreationWorkInfoView: View {
                 }
             }.padding(14)
         }
+    }
+
+    private var catalogWasAutomatic: Bool {
+        guard let data = information?.context?.configuration, let configuration = try? ExactJSON(data: data) else { return false }
+        return configuration["render"]["catalog_mode"].string == "auto" || configuration["catalog_mode"].string == "auto"
+            || !(configuration["catalogs"].array ?? []).isEmpty
     }
 
     /// OutputTabsContent.svelte `.score-*`: a toolbar on bg2, a line-number gutter on bg2, and Web JSON colors.
@@ -318,8 +330,8 @@ struct CreationWorkInfoView: View {
         if let system = information?.prompt(action)?["system"].string {
             promptText(title, system, id: action, collapsible: true)
             if let digest = information?.prompt(action)?["prompt_digest"].string, !digest.isEmpty {
-                Text(copy("promptDigestLabel", "プロンプト digest") + ": " + digest)
-                    .inkuFont(12, design: .monospaced).foregroundStyle(.secondary).textSelection(.enabled)
+                (Text(copy("promptDigestLabel", "プロンプト digest") + ": ") + Text(digest).fontDesign(.monospaced))
+                    .inkuFont(11).foregroundStyle(.tertiary).textSelection(.enabled)
                     .inkuTooltip(model.display.tooltip("", serverKey: "promptDigestHint"))
             }
         } else {

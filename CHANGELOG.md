@@ -12,10 +12,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 Android receives the embedded model catalog, labels, selectability and ordering through JNI instead of maintaining a second classification. Model names now sort with the same collation as Web. Local observations and purpose choices remain unchanged.
 
-### 2026-10-28 — Shared provider and model settings
-
-Moved provider and model settings, model references and list refresh decisions into the shared core. Web hides the list while loading and offers a retry if loading fails.
-
 ### 2026-10-27 — Delete a ChatGPT plan registration on macOS
 
 The connection settings can recheck the state and delete a registration together with its published model settings. Deletion asks for confirmation and reports if provider revocation could not be confirmed.
@@ -390,6 +386,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.285 (2026-10-28 / Build1361)
+
+### 2026-10-28 — Shared provider and model settings
+
+Moved provider and model settings, model references and list refresh decisions into the shared core. Web hides the list while loading and offers a retry if loading fails.
 
 ## v2.15.284 (2026-10-28 / Build1360)
 

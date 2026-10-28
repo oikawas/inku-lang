@@ -10,7 +10,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ### 2026-10-28 — Share provider admission calculations on macOS
 
-Input estimates, admission, settlement, daily boundaries and 429 delays use the shared core. The existing stored accounting format and host waiting remain in place.
+Input estimates, admission, settlement, daily boundaries and 429 delays use the shared core. The existing stored accounting format and host waiting remain in place. Auxiliary text requests now share the same budget, including Gemini token counting and 429 cooldowns.
 
 ### 2026-10-28 — Share provider settings on macOS
 

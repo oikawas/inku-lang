@@ -164,9 +164,9 @@ function labelText(id: string, isJapanese: boolean): string {
 	return label ? (isJapanese ? label.ja : label.en) : id;
 }
 
-// A placeholder has no core decision yet; keep it unavailable until the API answers.
+// A placeholder has no core decision yet; allow it until the API answers.
 export function isModelUnselectable(model: ModelOption): boolean {
-	return model.selection?.unselectable ?? true;
+	return model.selection?.unselectable ?? false;
 }
 
 // Every label of the model, in the table's order, each with whether it keeps the model

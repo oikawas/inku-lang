@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { isModelUnselectable, modelCost, modelFold, modelFoldTitle, modelFolds, modelPurposeBadges, modelSpeed, modelStatusLabel, modelStatusParts, purposeUnsupported, setModelLabelTable, sortModels } from './modelMeta';
+import { PROVIDER_GROUPS } from './models';
 import type { ModelLabel, ModelOption } from './models';
 
 // The Server's model catalog and the cases every client checks itself against (2026-10-13).
@@ -42,8 +43,15 @@ test('a purpose measured without a response is not recommended, and a model with
 	const answersNothing = coreModel({ id: 'x', label: 'x', purposes: ['llm'] as ('llm' | 'vision')[], unsupported_purposes: ['llm', 'vision'] as ('llm' | 'vision')[], labels: ['no_response'], fold: 'no_response' });
 	assert.equal(isModelUnselectable(answersNothing), false);
 	assert.deepEqual(modelStatusParts(answersNothing, true), [{ text: '計測で応答なし', blocking: true }]);
-	// Until the API supplies a core decision, a placeholder cannot be selected.
-	assert.equal(isModelUnselectable({ id: 'x', label: 'x', unsupported_purposes: ['llm', 'vision'] }), true);
+	assert.equal(isModelUnselectable({ id: 'x', label: 'x', unsupported_purposes: ['llm', 'vision'] }), false);
+});
+
+test('placeholder models stay selectable and in their received order before or without an API response', () => {
+	for (const group of PROVIDER_GROUPS) {
+		assert.ok(group.models.every((model) => model.selection === undefined));
+		assert.ok(group.models.every((model) => !isModelUnselectable(model)), group.id);
+		assert.deepEqual(sortModels(group.models, 'llm', 'stage1'), group.models, group.id);
+	}
 });
 
 test('a model chosen for a purpose it did not answer is listed after those that answered it', () => {

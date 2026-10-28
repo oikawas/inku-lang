@@ -401,7 +401,7 @@ public final class AppModel {
         stopping = false
         isBusy = true
         errorText = nil
-        status = "生成中"
+        status = runningMode == "description" && drawRoute == "read_and_draw" ? display.webCopy(sketchMode == "on" ? "readDrawReading" : "readDrawWriting", sketchMode == "on" ? "記述を読んでいます…" : "指示書を書いています…") : "生成中"
         let operation = Task { @MainActor [weak self] in
             guard let self else { return }
             await self.runGeneration(host: host, bootstrap: bootstrap, token: token, parentWorkID: parentWorkID,
@@ -2249,15 +2249,13 @@ public final class AppModel {
             else { apply(view) }
         case .providerAttempt(_, _, _, let deadline):
             if let stage = providerProgress?.stage, [.descriptionReading, .descriptionComposition, .descriptionWriting, .descriptionReview].contains(stage) {
-                if (providerProgress?.attempt ?? 1) > 1 {
-                    status = stage == .descriptionComposition ? display.webCopy("readDrawRecomposing", "構図と法則を決め直しています…") : display.webCopy("readDrawRevising", "指示書を直しています…")
-                } else { status = display.localized(stage.titleKey) }
+                status = providerProgress?.displayTitle(display) ?? ""
             }
             else if let choosing = choosingStatus(comparison: false) { status = choosing }
             else { status = providerProgress?.stage == .composition ? "構図を読んでいます" : "モデルの応答待ち（期限 \(deadline.formatted(date: .omitted, time: .standard))）" }
         case .transportBytes(_, let count):
             if let stage = providerProgress?.stage, [.descriptionReading, .descriptionComposition, .descriptionWriting, .descriptionReview].contains(stage) {
-                status = display.localized(stage.titleKey)
+                status = providerProgress?.displayTitle(display) ?? ""
             }
             else if let choosing = choosingStatus(comparison: false) { status = choosing }
             else { status = providerProgress?.stage == .composition ? "構図の応答を受信中" : "応答を受信中（\(count) bytes）" }
@@ -2399,6 +2397,7 @@ public final class AppModel {
     /// Web PipelineStatus prints `pipelineAttentionText` for a failed run, not a bare "failed".
     private func statusText(for view: PipelineView) -> String {
         if let failure = drawingFailureText(view) { return failure }
+        if view.phase == "score_ready", drawRoute == "read_and_draw", activeSingleInputMode == "description" { return display.webCopy("readDrawSaving", "作品を保存しています…") }
         switch view.actionTag {
         case "read_description": return display.webCopy("readDrawReading", "記述を読んでいます…")
         case "compose_description": return display.webCopy("readDrawComposing", "構図と法則を決めています…")
@@ -2415,7 +2414,7 @@ public final class AppModel {
     }
     func drawingFailureText(_ view: PipelineView) -> String? {
         DrawingFailureMessage.text(for: view, language: display.preferences.language,
-                                   chatGPTCode: chatGPTFailureCodes[view.executionID])
+                                   chatGPTCode: chatGPTFailureCodes[view.executionID], copy: { key, fallback in self.display.webCopy(key, fallback) })
     }
     private static func phaseStatus(_ phase: String) -> String {
         [
@@ -2459,8 +2458,8 @@ public final class AppModel {
         case "image_invalid": return display.webCopy("imageInvalid", "画像を読めません。JPEG・PNG・GIF・TIFF のファイルを選んでください。")
         case "image_too_large": return display.webCopy("imageTooLarge", "画像が大きすぎます。小さくしてから選んでください。")
         case "vision_model_not_available", "image_model_not_vision": return display.webCopy("imageVisionRequired", "画像を見る Vision のモデルを選んでください。")
-        case "description_ddl_failed": return display.label("指示書を書けませんでした。もう一度描いてください。", "Could not write the instructions. Try drawing again.")
-        case "description_ddl_undrawable": return display.label("指示書を描けませんでした。もう一度描いてください。", "The instructions could not be drawn. Try again.")
+        case "description_ddl_failed": return display.webCopy("descriptionDdlFailed", "記述から指示書を書けませんでした。モデルを変えて、もう一度描いてください")
+        case "description_ddl_undrawable": return display.webCopy("descriptionDdlUndrawable", "書いた指示書から何も描けませんでした。記述かモデルを変えて、もう一度描いてください")
         case "image_ddl_failed", "image_ddl_undrawable": return display.webCopy("imageDdlFailed", "画像から指示書を書けませんでした。モデルを変えて、もう一度描いてください。")
         default: break
         }

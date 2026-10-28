@@ -2,7 +2,7 @@
   "schema": "inku.apple-ui-reference.v1",
   "version": "v2.15.294",
   "build": "1370",
-  "buildDate": "2026-10-28T12:19:58.114Z",
+  "buildDate": "2026-10-28T12:52:57.304Z",
   "versions": {
     "ddlSpec": "28",
     "ddlEngine": "73",
@@ -1412,6 +1412,8 @@
         "confirmRun": "実行",
         "confirmOk": "OK",
         "confirmDdlOverwriteMessage": "指示書の編集結果が失われます、よろしいですか？",
+        "descriptionDdlFailed": "記述から指示書を書けませんでした。モデルを変えて、もう一度描いてください",
+        "descriptionDdlUndrawable": "書いた指示書から何も描けませんでした。記述かモデルを変えて、もう一度描いてください",
         "limitWeightFormat": "この本数なら 1 枚およそ %@〜%@ MB（細い筆致〜太い筆致）"
       },
       "dynamicTexts": {
@@ -3076,6 +3078,8 @@
         "confirmRun": "Run",
         "confirmOk": "OK",
         "confirmDdlOverwriteMessage": "Your instruction edits will be lost. Continue?",
+        "descriptionDdlFailed": "no instructions could be written from the description; change the model and draw again",
+        "descriptionDdlUndrawable": "the instructions written drew nothing; change the description or the model and draw again",
         "limitWeightFormat": "About %@-%@ MB per work at this count (thin to thick tool)"
       },
       "dynamicTexts": {
@@ -4095,7 +4099,7 @@
     }
   },
   "source": {
-    "commit": "505b1e5e1cad9c8fc77605d2544a75ff8bf52dfd",
+    "commit": "46a058eb3c03515206256b31f005457f9b51ceeb",
     "files": {
       "web/src/lib/plugins/system/canvas-aspect/index.ts": "51431fe06ed38cfb11f7e08a87b85b68dacdeda646525242fb561c234cf0c9ff",
       "web/src/routes/+page.svelte": "e355815d7bd4716d20e9314977556281a30169ae4083ed27ece02ea8217825d2",

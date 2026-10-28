@@ -67,6 +67,15 @@ public struct ProviderProgressSnapshot: Sendable, Equatable {
     public private(set) var actionIdentity: ProviderActionIdentity?
 
     public var stageTitleKey: String { stage?.titleKey ?? "モデルの応答" }
+    @MainActor func displayTitle(_ display: DisplaySettings) -> String {
+        switch stage {
+        case .descriptionReading: return display.webCopy("readDrawReading", "記述を読んでいます…")
+        case .descriptionComposition: return display.webCopy(askedAgain ? "readDrawRecomposing" : "readDrawComposing", askedAgain ? "構図と法則を決め直しています…" : "構図と法則を決めています…")
+        case .descriptionWriting: return display.webCopy(askedAgain ? "readDrawRevising" : "readDrawWriting", askedAgain ? "指示書を直しています…" : "指示書を書いています…")
+        case .descriptionReview: return display.webCopy(askedAgain ? "readDrawRevising" : "readDrawReviewing", askedAgain ? "指示書を直しています…" : "描いた画を見て直しています…")
+        default: return display.localized(stageTitleKey)
+        }
+    }
     public var clockRunning: Bool { outcome == .running && stageEndedAt == nil }
     public func stageElapsed(at date: Date) -> TimeInterval {
         max(0, (stageEndedAt ?? date).timeIntervalSince(stageBeganAt))

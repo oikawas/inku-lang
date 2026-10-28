@@ -394,7 +394,6 @@ struct CreationDisplayedProcess: View {
     @State private var confirmingDiscard = false
     @State private var displayedContext: SavedAuthoringContext?
     private var readRecord: Data? { displayedContext?.descriptionDDL ?? (model.selectedWorkID == work.id ? model.savedDescriptionDDL : nil) }
-    private var imageRecord: Data? { displayedContext?.imageDDL ?? (model.selectedWorkID == work.id ? model.savedImageDDL : nil) }
     private var canEditSketch: Bool { saved && model.workActionState(for: work)?.canReadDescription == true }
     private var ddlHeading: String {
         let requested = InkuCore.normalizeInstructionLanguage(value: work.instructionLangResolved, defaultLanguage: "auto") ?? "auto"
@@ -405,8 +404,6 @@ struct CreationDisplayedProcess: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(imageRecord != nil ? model.display.label("画像から書く", "From an image") : readRecord != nil ? model.display.label("言葉で描く", "In words") : model.display.label("型で描く", "Through stages"))
-                .inkuFont(11, weight: .medium).foregroundStyle(.secondary)
             // `+page.svelte` `.displayed-work-heading`: 12px semibold under a rule, 16pt above.
             Text(model.display.webCopy("displayedWorkProcess", "表示中作品の写生と指示書")).inkuFont(12, weight: .semibold)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -440,7 +437,7 @@ struct CreationDisplayedProcess: View {
                                 .inkuFont(12).foregroundStyle(.secondary)
                         }
                     }.padding(.top, 6)
-                } label: { Text(readRecord != nil ? model.display.label("写生（読み）", "Sketch (reading)") : model.display.webCopy("sketchLabel", "写生（Stage 0.5）")).inkuFont(12, weight: .semibold) }
+                } label: { Text(readRecord != nil ? model.display.webCopy("readDrawReadingLabel", "写生（読み）") : model.display.webCopy("sketchLabel", "写生（Stage 0.5）")).inkuFont(12, weight: .semibold) }
                 .inkuTooltip(model.display.tooltip("写生層が書いた文章を表示します。", serverKey: "tooltipSketchToggle"))
                 if let sketch {
                     // `+page.svelte:2794`: editing needs the prose on screen, so the button unfolds the section.
@@ -505,13 +502,7 @@ struct CreationDisplayedProcess: View {
 
     private var sketchNote: String {
         if let data = readRecord, let record = try? ExactJSON(data: data) {
-            switch record["reading_state"].string {
-            case "read": return model.display.label("記述を読み、読みを使って描いた", "Read the description and drew from the reading")
-            case "supplied": return model.display.label("指定された読みを使って描いた", "Drew from the supplied reading")
-            case "fallback": return model.display.label("読みを得られず、記述から描いた", "Drew from the description when the reading failed")
-            case "off": return model.display.label("読みを通さずに描いた", "Drew without a reading")
-            default: return model.display.label("読みの記録なし", "Reading not recorded")
-            }
+            return DrawPresentation.readingNote(record["reading_state"].string, japanese: model.display.preferences.language != "en")
         }
         return switch work.sketchState {
         case "fine", "coarse": ""

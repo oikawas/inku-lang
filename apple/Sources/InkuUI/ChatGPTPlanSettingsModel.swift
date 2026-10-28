@@ -56,8 +56,11 @@ public final class ChatGPTPlanSettingsModel {
                 openURL(attempt.authorizationURL)
                 _ = try await runtime.finishAuthorization(attempt.id)
                 try Task.checkCancellation()
-                // The connected guide that follows names the next step: model settings.
+                // A connected profile has a fresh catalog before the pickers are synchronized.
+                // Catalog failure does not undo the successful authorization.
                 self.status = ""
+                do { _ = try await runtime.refreshPublication() }
+                catch { if !Task.isCancelled { self.report(error, language: app.display.preferences.language) } }
             } catch { if !Task.isCancelled { self.report(error, language: app.display.preferences.language) } }
             if let id = self.attemptID { try? await app.personalPlanRuntime().cancelAuthorization(id) }
             self.attemptID = nil

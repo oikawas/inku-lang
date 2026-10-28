@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-28 — Refresh ChatGPT models after login
+
+After a successful connection or reauthorization, fetch the model list once so published models appear without a manual refresh. A fetch failure leaves the connection intact and displays the error.
+
 ### 2026-10-28 — Share Android ChatGPT plan decisions
 
 ChatGPT plan authorization, session and model publication decisions use the shared core while encrypted credentials remain on the device.

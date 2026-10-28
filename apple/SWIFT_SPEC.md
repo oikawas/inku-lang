@@ -850,6 +850,10 @@ Automatic backup defaults off, runs only while the app is open, and waits for ge
 
 ### Personal ChatGPT
 
+After a successful new connection, reauthorization or consent renewal, the app refreshes the model catalog once and then updates the drawing model pickers. If the refresh fails, the connection remains successful and the catalog error is shown. Opening settings alone does not refresh the catalog.
+
+
+
 ChatGPT plan publication and authentication decisions use the shared core, including model assessments, authorization, callback, claims, key selection, token lifetime and quota transitions. Cryptographic signature verification, local storage and HTTP remain native. Reauthorization preserves the existing encrypted profile and published choices.
 
 

@@ -392,6 +392,12 @@ fn check_mark_extent(
 /// Both entry points check this before any expansion, because the work of
 /// several texture and ground passes grows with these values.
 fn validate_request(request: &RenderRequest) -> Result<(), RenderError> {
+    if !request.score.object_templates.is_empty() {
+        request
+            .score
+            .validate_schema_edition()
+            .map_err(RenderError::InvalidScore)?;
+    }
     let canvas = request.options.canvas;
     // Only a fitted Score sets a bleed; a host's paper has none.
     if !(canvas.width.is_finite()
@@ -667,7 +673,7 @@ fn paint_object_body(
                 "object body fill clipping failed",
             ));
         }
-        allowance.spend(paint.iter().chain(&definitions[before..]))?;
+        allowance.spend(definitions[before..].iter())?;
         material_definitions.extend(definitions.into_iter().skip(before));
         for element in paint {
             group.push(element);
@@ -1577,6 +1583,9 @@ mod tests {
             },
         };
         let output = render(request.clone()).unwrap();
+        let mut older = request.clone();
+        older.score.version = "0.22.0".into();
+        assert!(matches!(render(older), Err(RenderError::InvalidScore(_))));
         let ids = output
             .svg
             .split(" id=\"")

@@ -84,6 +84,12 @@ import InkuUI
           !reopened.running, !app.isBusy else {
         throw CheckFailure.message("Retrying failures drew \(sent) and left \(reopened.rows.map(\.state))")
     }
+    // The last saved work was drawn by the stages. Resume restores that route even after the current choice changes.
+    app.drawRoute = "read_and_draw"; app.descriptionComposition = true
+    await reopened.resumeBatch(app: app)
+    guard app.drawRoute == "stages", !app.descriptionComposition, reopened.rows.allSatisfy({ $0.state == .succeeded }) else {
+        throw CheckFailure.message("Batch resume did not restore the last saved work's drawing route")
+    }
 }
 
 /// Fails every row until told otherwise, except the first row; answers the composition reading as refused so

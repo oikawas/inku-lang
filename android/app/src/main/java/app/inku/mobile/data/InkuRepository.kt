@@ -129,6 +129,7 @@ class InkuRepository(
     }
     private val providerModelCandidatePrefix = "provider_model_candidates:"
     private val modelObservationPrefix = "model_catalog_observations:"
+    private val providerKeyGuard = ProviderSettingsKeyGuard()
     val modelCatalog: ModelCatalog by lazy { ModelCatalog.load(context) }
     private val localLiteRtProvider = LocalLiteRtLmProvider(context.applicationContext, database.modelAssetDao())
     val chatGptPlan: app.inku.mobile.llm.ChatGptPlanManager
@@ -766,7 +767,7 @@ class InkuRepository(
         database.withTransaction {
             val dao = database.providerSettingDao()
             val previous = dao.listAll()
-            val normalized = ProviderSettingsCodec.normalize(previous, DefaultModelDownloads.all.map { it.modelId }, storedModelCandidates(), storedModelObservations())
+            val normalized = providerKeyGuard.normalize(previous, DefaultModelDownloads.all.map { it.modelId }, storedModelCandidates(), storedModelObservations())
             val kept = normalized.map { it.providerId }.toSet()
             previous.filter { it.providerId != "chatgpt" && it.providerId !in kept }
                 .forEach { dao.deleteCustom(it.providerId) }
@@ -882,10 +883,8 @@ class InkuRepository(
             val candidates = storedModelCandidates()
             val changedConnection = !apiKey.isNullOrBlank() || existing?.baseUrl != next.baseUrl || existing?.kind != next.kind
             val observations = storedModelObservations().let { if (changedConnection) it - cleanId else it }
-            val patch = ProviderSettingsCodec.toCore(next,
-                if (next.isDefaultLocal) DefaultModelDownloads.all.map { it.modelId } else candidates[cleanId] ?: modelCatalog.ids(cleanId),
-                observations[cleanId]?.records.orEmpty(), observations[cleanId]?.access.orEmpty())
-            val updated = ProviderSettingsCodec.update(current, DefaultModelDownloads.all.map { it.modelId }, cleanId, patch, candidates, observations)
+            val updated = providerKeyGuard.save(current, next, DefaultModelDownloads.all.map { it.modelId },
+                candidates, observations, modelCatalog.ids(cleanId))
             val saved = updated.firstOrNull { it.providerId == cleanId } ?: inkuError { it.errorServiceIdFormat }
             val allowed = ProviderSettingsCodec.parseModelIds(saved.publishedModelsJson)
             val requested = ProviderSettingsCodec.parseModelIds(next.publishedModelsJson)
@@ -903,7 +902,7 @@ class InkuRepository(
         database.withTransaction {
             val dao = database.providerSettingDao()
             if (dao.get(providerId) == null) return@withTransaction
-            val updated = ProviderSettingsCodec.update(dao.listAll(), DefaultModelDownloads.all.map { it.modelId }, providerId,
+            val updated = providerKeyGuard.update(dao.listAll(), DefaultModelDownloads.all.map { it.modelId }, providerId,
                 JSONObject().put("clear_api_key", true), storedModelCandidates(), storedModelObservations())
                 .firstOrNull { it.providerId == providerId } ?: return@withTransaction
             dao.upsert(updated.copy(updatedAt = System.currentTimeMillis()))
@@ -950,7 +949,7 @@ class InkuRepository(
         database.withTransaction {
             val dao = database.providerSettingDao()
             if (dao.get(providerId) == null) return@withTransaction
-            val updated = ProviderSettingsCodec.update(dao.listAll(), DefaultModelDownloads.all.map { it.modelId },
+            val updated = providerKeyGuard.update(dao.listAll(), DefaultModelDownloads.all.map { it.modelId },
                 providerId, JSONObject().put("delete", true), storedModelCandidates(), storedModelObservations()).firstOrNull { it.providerId == providerId }
             if (updated == null) dao.deleteCustom(providerId)
             else dao.upsert(updated.copy(updatedAt = System.currentTimeMillis()))

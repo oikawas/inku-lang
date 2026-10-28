@@ -6092,7 +6092,7 @@ private fun modelChoiceStatusLabel(downloadState: String, strings: InkuStrings):
 
 private fun providerReferenceRows(state: InkuUiState) = JSONObject().also { rows ->
     state.providerSettings.forEach { provider -> rows.put(provider.providerId,
-        app.inku.mobile.data.ProviderSettingsCodec.toCore(provider, if (provider.isDefaultLocal)
+        app.inku.mobile.data.ProviderSettingsCodec.toCore(provider.copy(encryptedApiKey = null), if (provider.isDefaultLocal)
             app.inku.mobile.data.ProviderSettingsCodec.parseModelIds(provider.publishedModelsJson)
             else state.providerModelCandidates[provider.providerId] ?: app.inku.mobile.data.ProviderSettingsCodec.catalogIds(provider.providerId))) }
 }

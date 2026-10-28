@@ -108,7 +108,7 @@ class RoutingModelProvider(
                     modelId in ProviderSettingsCodec.parseModelIds(it.publishedModelsJson) }) return plan
             val rows = JSONObject()
             providers.forEach { provider -> rows.put(provider.providerId,
-                ProviderSettingsCodec.toCore(provider, available[provider.providerId] ?: ProviderSettingsCodec.parseModelIds(provider.publishedModelsJson))) }
+                ProviderSettingsCodec.toCore(provider.copy(encryptedApiKey = null), available[provider.providerId] ?: ProviderSettingsCodec.parseModelIds(provider.publishedModelsJson))) }
             val answer = catalogRequest("resolve_ref", JSONObject().put("providers", rows).put("ref", modelId)
                 .put("default_provider", stageDefaultProviderId ?: "__missing__"))
             val resolved = answer.getString("provider")
@@ -127,7 +127,7 @@ class RoutingModelProvider(
             val stage2 = pipelineAction == "complete_visible_ddl_holes"
             val stage = if (stage2) "stage2" else "stage1"
             val rows = JSONObject()
-            providers.forEach { rows.put(it.providerId, ProviderSettingsCodec.toCore(it)) }
+            providers.forEach { rows.put(it.providerId, ProviderSettingsCodec.toCore(it.copy(encryptedApiKey = null))) }
             val configuredProvider = selection?.optString("${stage}_provider")?.takeIf { it.isNotBlank() }
             val selectedModel = selection?.optString("${stage}_model")?.takeIf { it.isNotBlank() }
                 ?: if (stage2) CompatibilityConstants.defaultStage2Model else CompatibilityConstants.defaultStage1Model

@@ -14,6 +14,7 @@ pub(crate) enum ZipError {
 #[derive(Debug)]
 pub(crate) struct Member {
     pub name: String,
+    raw_name: Vec<u8>,
     flags: u16,
     method: u16,
     crc: u32,
@@ -89,12 +90,28 @@ pub(crate) fn members(data: &[u8]) -> Result<Vec<Member>, ZipError> {
         if next > end {
             return Err(invalid());
         }
-        let name = std::str::from_utf8(
-            data.get(cursor + 46..cursor + 46 + name_len)
-                .ok_or_else(invalid)?,
-        )
-        .map_err(|_| invalid())?
-        .to_owned();
+        let raw_name = data
+            .get(cursor + 46..cursor + 46 + name_len)
+            .ok_or_else(invalid)?;
+        let flags = u16_at(data, cursor + 8).ok_or_else(invalid)?;
+        let name = if flags & (1 << 11) != 0 {
+            std::str::from_utf8(raw_name)
+                .map_err(|_| invalid())?
+                .to_owned()
+        } else {
+            const CP437: &str = "ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■ ";
+            let table: Vec<char> = CP437.chars().collect();
+            raw_name
+                .iter()
+                .map(|b| {
+                    if *b < 128 {
+                        char::from(*b)
+                    } else {
+                        table[usize::from(*b - 128)]
+                    }
+                })
+                .collect()
+        };
         let compressed = u32_at(data, cursor + 20).ok_or_else(invalid)?;
         let uncompressed = u32_at(data, cursor + 24).ok_or_else(invalid)?;
         let local = u32_at(data, cursor + 42).ok_or_else(invalid)?;
@@ -107,7 +124,8 @@ pub(crate) fn members(data: &[u8]) -> Result<Vec<Member>, ZipError> {
         }
         result.push(Member {
             name,
-            flags: u16_at(data, cursor + 8).ok_or_else(invalid)?,
+            raw_name: raw_name.to_vec(),
+            flags,
             method: u16_at(data, cursor + 10).ok_or_else(invalid)?,
             crc: u32_at(data, cursor + 16).ok_or_else(invalid)?,
             compressed_size: compressed as usize,
@@ -156,7 +174,7 @@ pub(crate) fn read(
         .and_then(|x| x.checked_add(name_len))
         .and_then(|x| x.checked_add(extra_len))
         .ok_or_else(fail)?;
-    if data.get(p + 30..p + 30 + name_len) != Some(member.name.as_bytes()) {
+    if data.get(p + 30..p + 30 + name_len) != Some(member.raw_name.as_slice()) {
         return Err(fail());
     }
     let end = start.checked_add(member.compressed_size).ok_or_else(fail)?;
@@ -183,6 +201,97 @@ pub(crate) fn read(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn stored_zip(name: &str, contents: &[u8], method: u16) -> Vec<u8> {
+        let mut out = Vec::new();
+        let u16bytes = |v: u16| v.to_le_bytes();
+        let u32bytes = |v: u32| v.to_le_bytes();
+        out.extend_from_slice(b"PK\x03\x04");
+        out.extend_from_slice(&u16bytes(20));
+        out.extend_from_slice(&u16bytes(0));
+        out.extend_from_slice(&u16bytes(method));
+        out.extend_from_slice(&[0; 4]);
+        out.extend_from_slice(&u32bytes(crc32(contents)));
+        out.extend_from_slice(&u32bytes(contents.len() as u32));
+        out.extend_from_slice(&u32bytes(contents.len() as u32));
+        out.extend_from_slice(&u16bytes(name.len() as u16));
+        out.extend_from_slice(&u16bytes(0));
+        out.extend_from_slice(name.as_bytes());
+        out.extend_from_slice(contents);
+        let central = out.len() as u32;
+        out.extend_from_slice(b"PK\x01\x02");
+        out.extend_from_slice(&u16bytes(20));
+        out.extend_from_slice(&u16bytes(20));
+        out.extend_from_slice(&u16bytes(0));
+        out.extend_from_slice(&u16bytes(method));
+        out.extend_from_slice(&[0; 4]);
+        out.extend_from_slice(&u32bytes(crc32(contents)));
+        out.extend_from_slice(&u32bytes(contents.len() as u32));
+        out.extend_from_slice(&u32bytes(contents.len() as u32));
+        out.extend_from_slice(&u16bytes(name.len() as u16));
+        out.extend_from_slice(&[0; 12]);
+        out.extend_from_slice(&u32bytes(0));
+        out.extend_from_slice(name.as_bytes());
+        let central_size = out.len() as u32 - central;
+        out.extend_from_slice(b"PK\x05\x06");
+        out.extend_from_slice(&[0; 4]);
+        out.extend_from_slice(&u16bytes(1));
+        out.extend_from_slice(&u16bytes(1));
+        out.extend_from_slice(&u32bytes(central_size));
+        out.extend_from_slice(&u32bytes(central));
+        out.extend_from_slice(&u16bytes(0));
+        out
+    }
+
+    #[test]
+    fn stored_data_checks_crc_and_refuses_unsupported_methods() {
+        let zip = stored_zip("package.json", b"{}", 0);
+        let member = members(&zip).unwrap().remove(0);
+        assert_eq!(read(&zip, &member, 2).unwrap().unwrap(), b"{}");
+        assert!(read(&zip, &member, 1).unwrap().is_none());
+        let mut corrupt = zip.clone();
+        corrupt[30 + "package.json".len()] ^= 1;
+        assert!(
+            matches!(read(&corrupt, &member, 2), Err(ZipError::Invalid(name)) if name == "package.json")
+        );
+        let zip = stored_zip("package.json", b"{}", 12);
+        let member = members(&zip).unwrap().remove(0);
+        assert!(
+            matches!(read(&zip, &member, 2), Err(ZipError::Invalid(name)) if name == "package.json")
+        );
+    }
+
+    #[test]
+    fn duplicate_names_preserve_directory_order() {
+        let a = stored_zip("same.png", b"first", 0);
+        let b = stored_zip("same.png", b"second", 0);
+        let ae = a.len() - 22;
+        let be = b.len() - 22;
+        let ac = u32_at(&a, ae + 16).unwrap() as usize;
+        let bc = u32_at(&b, be + 16).unwrap() as usize;
+        let mut both = a[..ac].to_vec();
+        both.extend_from_slice(&b[..bc]);
+        let central_offset = both.len() as u32;
+        both.extend_from_slice(&a[ac..ae]);
+        let second_central = both.len();
+        both.extend_from_slice(&b[bc..be]);
+        both[second_central + 42..second_central + 46].copy_from_slice(&(ac as u32).to_le_bytes());
+        let size = both.len() as u32 - central_offset;
+        both.extend_from_slice(b"PK\x05\x06");
+        both.extend_from_slice(&[0; 4]);
+        both.extend_from_slice(&2u16.to_le_bytes());
+        both.extend_from_slice(&2u16.to_le_bytes());
+        both.extend_from_slice(&size.to_le_bytes());
+        both.extend_from_slice(&central_offset.to_le_bytes());
+        both.extend_from_slice(&0u16.to_le_bytes());
+        let entries = members(&both).unwrap();
+        assert_eq!(
+            entries.iter().map(|m| m.name.as_str()).collect::<Vec<_>>(),
+            ["same.png", "same.png"]
+        );
+        assert_eq!(read(&both, &entries[0], 16).unwrap().unwrap(), b"first");
+        assert_eq!(read(&both, &entries[1], 16).unwrap().unwrap(), b"second");
+    }
 
     #[test]
     fn reads_package_and_bounds_expanded_members() {

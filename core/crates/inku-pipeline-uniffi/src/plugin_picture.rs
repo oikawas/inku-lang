@@ -211,3 +211,29 @@ pub(crate) fn drawn(svg: &str) -> Result<Value, Value> {
     };
     fitted(&image, &paper)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn uploaded_transparency_flattens_and_fits_both_frames() {
+        let mut bytes = Vec::new();
+        {
+            let mut encoder = png::Encoder::new(&mut bytes, 1, 2);
+            encoder.set_color(png::ColorType::Rgba);
+            encoder.set_depth(png::BitDepth::Eight);
+            let mut writer = encoder.write_header().unwrap();
+            writer
+                .write_image_data(&[0, 0, 0, 0, 0, 0, 0, 255])
+                .unwrap();
+        }
+        let result = uploaded(&bytes).unwrap();
+        for (key, width, height) in [("png", 216, 92), ("png_2x", 432, 184)] {
+            let decoded = decode(&STANDARD.decode(result[key].as_str().unwrap()).unwrap()).unwrap();
+            assert_eq!((decoded.width, decoded.height), (width, height));
+            assert_eq!(&decoded.rgb[..3], &[255, 255, 255]);
+            assert!(decoded.rgb.iter().any(|v| *v < 16));
+        }
+    }
+}

@@ -79,10 +79,14 @@ fn parse(
         return Err(vec![problem("", "package_too_large", MAX_PACKAGE)]);
     }
     let raw: Value = serde_json::from_str(document).map_err(|e| {
+        let message = e.to_string();
+        let message = message
+            .rsplit_once(" at line ")
+            .map_or(message.as_str(), |(s, _)| s);
         vec![problem(
             "",
             "invalid_json",
-            format!("{} (line {}, column {})", e, e.line(), e.column()),
+            format!("{} (line {}, column {})", message, e.line(), e.column()),
         )]
     })?;
     let obj = raw
@@ -464,15 +468,74 @@ fn finish(input: &Value) -> Result<Value, ()> {
     Ok(json!({"outcome":"ok","report":report,"text":state["document"],"pictures":pictures}))
 }
 
+fn ordered_object(value: &Value, keys: &[&str]) -> String {
+    let fields: Vec<_> = keys
+        .iter()
+        .map(|key| format!("{}:{}", json!(key), value[*key]))
+        .collect();
+    format!("{{{}}}", fields.join(","))
+}
+
+fn encode_finished(output: &Value) -> Option<Vec<u8>> {
+    let report = &output["report"];
+    let words = report["words"].as_array()?;
+    let word_keys = [
+        "heading",
+        "qualified_name",
+        "aliases",
+        "summary_ja",
+        "summary_en",
+        "note_ja",
+        "note_en",
+        "example_ja",
+        "example_en",
+        "digest",
+        "preview_source",
+        "problems",
+    ];
+    let word_json = words
+        .iter()
+        .map(|w| ordered_object(w, &word_keys))
+        .collect::<Vec<_>>()
+        .join(",");
+    let report_keys = [
+        "ok",
+        "id",
+        "namespace",
+        "name",
+        "version",
+        "description_ja",
+        "description_en",
+        "problems",
+    ];
+    let mut report_json = ordered_object(report, &report_keys);
+    report_json.pop();
+    report_json.push_str(&format!(",\"words\":[{word_json}]}}"));
+    Some(
+        format!(
+            "{{\"outcome\":\"ok\",\"report\":{report_json},\"text\":{},\"pictures\":{}}}",
+            output["text"], output["pictures"]
+        )
+        .into_bytes(),
+    )
+}
+
 #[uniffi::export]
 pub fn plugin_package(input_bytes: Vec<u8>) -> Vec<u8> {
     let output = std::panic::catch_unwind(|| {
         let input: Value = serde_json::from_slice(&input_bytes).map_err(|_| ())?;
         let result = match s(&input["action"]) {
-            "check_start" => match start(&input) {
-                Ok(v) => v,
-                Err(p) => refused(p),
-            },
+            "check_start" => {
+                if input["document"].as_str().is_some() == input["archive"].as_str().is_some()
+                    || !input["taken_names"].is_object()
+                {
+                    return Err(());
+                }
+                match start(&input) {
+                    Ok(v) => v,
+                    Err(p) => refused(p),
+                }
+            }
             "check_finish" => finish(&input)?,
             "read_stored" => match parse(input["document"].as_str().ok_or(())?, None, true) {
                 Ok(p) => json!({"outcome":"ok","package":p}),
@@ -497,6 +560,12 @@ pub fn plugin_package(input_bytes: Vec<u8>) -> Vec<u8> {
     .ok()
     .and_then(Result::ok)
     .unwrap_or_else(|| json!({"error":"invalid_plugin_package_input"}));
+    if output["outcome"] == "ok"
+        && output.get("report").is_some()
+        && let Some(encoded) = encode_finished(&output)
+    {
+        return encoded;
+    }
     serde_json::to_vec(&output)
         .unwrap_or_else(|_| br#"{"error":"invalid_plugin_package_input"}"#.to_vec())
 }
@@ -545,5 +614,53 @@ mod tests {
         );
         let bad = call(json!({"action":"fit_picture","png":STANDARD.encode(b"not png")}));
         assert_eq!(bad["problems"][0]["code"], "not_a_png");
+    }
+
+    #[test]
+    fn shape_findings_and_preview_boundaries_keep_their_paths() {
+        let doc = include_str!("../../../../docs/plugins/sky-nihonga/package.json");
+        let mut raw: Value = serde_json::from_str(doc).unwrap();
+        raw["extra_z"] = json!(1);
+        raw["extra_a"] = json!(1);
+        raw["schema"] = json!("wrong");
+        raw["version"] = json!("wrong");
+        raw["description_ja"] = json!(false);
+        raw["authors"] = json!([1]);
+        raw["words"][0]["summary_ja"] = json!("");
+        raw["words"][0]["summary_en"] = json!("");
+        raw["words"][0]["preview"] = json!("missing.png");
+        let output = call(json!({"action":"read_stored","document":raw.to_string()}));
+        assert_eq!(output["outcome"], "ok");
+        let problems = output["package"]["problems"].as_array().unwrap();
+        assert_eq!(problems[0]["path"], "extra_a");
+        assert_eq!(problems[1]["path"], "extra_z");
+        for code in [
+            "unknown_field",
+            "wrong_schema",
+            "invalid_semantic_version",
+            "not_a_string",
+            "not_a_list_of_strings",
+        ] {
+            assert!(problems.iter().any(|p| p["code"] == code), "{code}");
+        }
+        assert!(
+            output["package"]["words"][0]["problems"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|p| p["code"] == "no_summary")
+        );
+        let start =
+            call(json!({"action":"check_start","document":raw.to_string(),"taken_names":{}}));
+        assert!(
+            start["state"]["package"]["words"][0]["problems"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|p| p["code"] == "preview_needs_zip")
+        );
+        let invalid = call(json!({"action":"read_stored","document":"{\n invalid"}));
+        let detail = invalid["problems"][0]["detail"].as_str().unwrap();
+        assert!(detail.contains(" (line 2, column "));
     }
 }

@@ -82,7 +82,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                 .inkuFont(14)
             }
         }
-        .task(id: section) { await settings.load(model: model) }
+        .task(id: model.providerSettingsRevision) { await settings.load(model: model) }
         .onAppear {
             if [.plugins, .unread, .limits].contains(section) { model.display.preferences.settingsDetail = "detailed" }
         }

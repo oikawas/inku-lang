@@ -72,6 +72,7 @@ pub(crate) fn config() -> PipelineConfig {
         retry_delay_ms: DecimalU64::new(10),
     };
     PipelineConfig {
+        plugin_offers: Vec::new(),
         envelope_limits: EnvelopeLimits {
             max_input_bytes: 1_000_000,
             max_snapshot_bytes: 1_000_000,
@@ -99,6 +100,7 @@ pub(crate) fn config() -> PipelineConfig {
         macro_summaries: vec![],
         catalogs: vec![],
         prompt_limits: PromptLimits {
+            max_offered_plugins: 8,
             max_catalog_entries: 16,
             max_summary_bytes: 1024,
             max_catalog_serialized_bytes: 32768,
@@ -184,6 +186,46 @@ pub(crate) fn ack(state: &PipelineSnapshot) -> PipelineInput {
             authority_digest: action.payload["authority_digest"].as_str().unwrap().into(),
         },
     }
+}
+
+#[test]
+fn stage1_records_the_offer_in_the_saved_config() {
+    let asset: serde_json::Value = serde_json::from_str(inku_ddl::NATURE_LEAVES_V1_JSON).unwrap();
+    let definition =
+        inku_ddl::MacroDefinition::from_json(&asset["entries"][0]["definition"].to_string())
+            .unwrap();
+    let mut config = config();
+    config.language = inku_ddl::ResolvedInstructionLanguage::Ja;
+    config.definitions = vec![definition];
+    config.macro_summaries = vec!["若葉を描く。".into()];
+    let start = envelope(
+        None,
+        PipelineInput::Start {
+            variation_id: "offer-record".into(),
+            authoring_nonce: "offer-1".into(),
+            config: Box::new(config),
+            authority: VariationAuthorityState::new_description(),
+            authoring: AuthoringInput::Description {
+                description: "｛若葉｝".into(),
+                auto_catalog: false,
+                sketch: SketchRequest::Off,
+                route: DescriptionRoute::Stages,
+                source_labels: Vec::new(),
+                composition: CompositionRequest::Off,
+            },
+        },
+    );
+    let snapshot = run(None, &start).snapshot;
+    let saved = serde_json::to_value(&snapshot.config).unwrap();
+    assert_eq!(
+        saved["plugin_offers"][0]["stage"],
+        "generate_normalized_ddl"
+    );
+    assert_eq!(
+        saved["plugin_offers"][0]["offer"]["offered"][0]["reason"],
+        "brace"
+    );
+    assert_eq!(saved["plugin_offers"][0]["offer"]["omitted"], json!([]));
 }
 
 #[test]

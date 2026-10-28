@@ -553,16 +553,12 @@ and having the Server's `_BUNDLED_DOCUMENTS` in `server/src/inku_server/plugins/
 
 - A new `.inku-plugin.md` in `server/plugins/` (`INKU_DOCUMENT_PLUGIN_DIR`) does not become a definition.
   Documents other than the bundled package show "not used for drawing", and their words are left out.
-- "In words" and the image tab do not give the model a list of plugins. A name the model writes in DDL
-  draws, but without the list the model will rarely choose one.
+- The image tab does not give the model a list of plugins. "In words" offers words named in the description or the DDL being reviewed.
 - Android and macOS have no way yet for users to install definitions, and there is no public catalog of installable packages.
 
 ## 6. Writing the Summary
 
-The summary is the only description the underdrawing's (Stage 1's) LLM receives when drawing from a
-description; it never receives the definition body or expanded DDL. The underdrawing chooses a plugin, as a
-bare-name sentence, only when the description writes the heading word of its name or a paraphrase of the same
-thing, never by association with a season, place, or similar thing.
+When drawing from a description, the model sees only the first sentence of each offered word's summary, at most 100 characters. It never receives the definition body or expanded DDL. A future step will use the file's `note`. Scene words form standalone sentences; object words stand in place of shapes. A word is not chosen by association with a season, place, or similar thing.
 
 - Say what is drawn, where on the canvas, and with which medium, color, and form.
 - For a count, give the range and the number when none is written ("the written count (1–9), or 3–5 when none is written").

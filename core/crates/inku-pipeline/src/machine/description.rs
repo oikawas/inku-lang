@@ -421,40 +421,61 @@ impl PipelineSnapshot {
         let record = self.description_record()?;
         let context = self.description_context(record)?;
         let (language, limits) = (self.config.language, self.config.prompt_limits);
-        let Some(composition) = self.composed() else {
-            return match review {
+        let prompt = if let Some(composition) = self.composed() {
+            let answer = composition
+                .answer
+                .as_ref()
+                .ok_or(ProtocolError::InternalInvariant)?;
+            let laws_text = laws_text(answer, language);
+            let composed = ComposedContext {
+                answer,
+                laws_text: &laws_text,
+                targets: &composition.targets,
+            };
+            match review {
+                None => {
+                    build_composed_description_ddl_prompt(&context, &composed, language, limits)
+                }
+                Some((drawing, current)) => {
+                    let head = current.lines().next().unwrap_or_default();
+                    build_composed_description_ddl_review_prompt(
+                        &context,
+                        &composed,
+                        drawing,
+                        head,
+                        &composition.shown(),
+                        language,
+                        limits,
+                    )
+                }
+            }
+        } else {
+            match review {
                 None => build_description_ddl_prompt(&context, language, limits),
                 Some((drawing, current)) => build_description_ddl_review_prompt(
                     &context, drawing, current, language, limits,
                 ),
             }
-            .map_err(|_| ProtocolError::SchemaViolation);
         };
-        let answer = composition
-            .answer
-            .as_ref()
-            .ok_or(ProtocolError::InternalInvariant)?;
-        let laws_text = laws_text(answer, language);
-        let composed = ComposedContext {
-            answer,
-            laws_text: &laws_text,
-            targets: &composition.targets,
-        };
-        match review {
-            None => build_composed_description_ddl_prompt(&context, &composed, language, limits),
-            Some((drawing, current)) => {
-                let head = current.lines().next().unwrap_or_default();
-                build_composed_description_ddl_review_prompt(
-                    &context,
-                    &composed,
-                    drawing,
-                    head,
-                    &composition.shown(),
-                    language,
-                    limits,
-                )
-            }
-        }
+        let prompt = prompt.map_err(|_| ProtocolError::SchemaViolation)?;
+        let catalog = self
+            .config
+            .definitions
+            .iter()
+            .zip(&self.config.macro_summaries)
+            .map(|(definition, summary)| crate::prompts::MacroPromptEntry {
+                definition,
+                localized_summary: summary,
+            })
+            .collect::<Vec<_>>();
+        crate::plugin_offer::with_plugin_offer(
+            prompt,
+            context.description,
+            review.map(|(_, current)| current),
+            &catalog,
+            limits,
+        )
+        .map(|(prompt, _)| prompt)
         .map_err(|_| ProtocolError::SchemaViolation)
     }
 

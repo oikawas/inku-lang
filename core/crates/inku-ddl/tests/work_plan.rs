@@ -9,6 +9,111 @@ use inku_ddl::work_plan::{
 };
 use serde_json::json;
 
+#[test]
+fn offered_scene_and_object_words_are_normalized_and_printed() {
+    use inku_ddl::work_plan::{
+        WorkPlanPlugin, normalize_work_plan_with_plugins, print_work_plan_with_plugins,
+        work_plan_response_schema_for_plugins,
+    };
+    let scene = WorkPlanPlugin {
+        name: "Nature.YoungLeaves".into(),
+        name_ja: "｛若葉｝".into(),
+        name_en: "{young leaves}".into(),
+        counter: Some(inku_ddl::CountCounter::Flat),
+        ..Default::default()
+    };
+    let object = WorkPlanPlugin {
+        name: "Trial.Boat".into(),
+        name_ja: "｛舟｝".into(),
+        name_en: "{boat}".into(),
+        object: true,
+        counter: Some(inku_ddl::CountCounter::General),
+        aspect: Some("2:1".into()),
+        ..Default::default()
+    };
+    let plugins = [scene, object];
+    let schema = work_plan_response_schema_for_plugins(&plugins, ResolvedInstructionLanguage::Ja);
+    assert_eq!(
+        schema["properties"]["plugins"]["items"]["properties"]["name"]["enum"],
+        json!(["｛若葉｝"])
+    );
+    assert!(
+        schema["properties"]["layers"]["items"]["properties"]["shape"]["enum"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("｛舟｝"))
+    );
+    let (plan, diagnostics) = normalize_work_plan_with_plugins(
+        &json!({"plugins":[{"name":"｛若葉｝","count":3}], "layers":[{"shape":"｛舟｝","action":"place","count":2,"color":"red","position":"center"}]}),
+        &plugins,
+    );
+    assert_eq!(plan.layers.len(), 1);
+    assert!(
+        diagnostics
+            .iter()
+            .any(|d| d.field == "color" && d.reason == "unsupported_for_form")
+    );
+    let mut accepting = plugins.clone();
+    accepting[1].appearance_slots.push(WorkPlanSlot::Color);
+    let (colored, _) = normalize_work_plan_with_plugins(
+        &json!({"layers":[{"shape":"｛舟｝","action":"place","count":1,"color":"red"}]}),
+        &accepting,
+    );
+    assert_eq!(
+        colored.layers[0]
+            .attributes
+            .get(&WorkPlanSlot::Color)
+            .map(String::as_str),
+        Some("red")
+    );
+    assert_eq!(
+        print_work_plan_with_plugins(&plan, ResolvedInstructionLanguage::Ja, &plugins),
+        "3枚の｛若葉｝。\n中心に、｛舟｝を2個置く。"
+    );
+    assert_eq!(
+        print_work_plan_with_plugins(&plan, ResolvedInstructionLanguage::En, &plugins),
+        "3 {young leaves}.\nPlace 2 {boat} at the center."
+    );
+    let object = inku_ddl::MacroDefinition::from_json(&json!({"schema":"inku.macro-definition.v2","namespace":"Trial","id":"Boat","names":{"ja":["舟"],"en":["boat"]},"kind":"object","aspect":"2:1","counter":"general","version":"1.0.0","parameters":{},"components":{},"body":[]}).to_string()).unwrap();
+    let identity = object.identity().unwrap();
+    let lock = inku_ddl::MacroLock::new(
+        identity.qualified_name(),
+        identity.version(),
+        format!("sha256:{}", identity.full_digest_hex()),
+    )
+    .unwrap();
+    for (source, language) in [
+        ("中心に、｛舟｝を2個置く。", ResolvedInstructionLanguage::Ja),
+        (
+            "Place 2 {boat} at the center.",
+            ResolvedInstructionLanguage::En,
+        ),
+    ] {
+        let result = inku_ddl::compile_ddl_to_score(
+            inku_ddl::NormalizedDdlDocument::new(source, language, vec![lock.clone()]).unwrap(),
+            std::slice::from_ref(&object),
+            Some(37),
+            inku_ddl::MacroExpansionLimits {
+                max_invocations: 64,
+                max_depth: 16,
+                max_evaluation_steps: 8192,
+                max_nodes_per_invocation: 128,
+                max_total_nodes: 128,
+            },
+            inku_ddl::ScoreLoweringContext::resolve("square", inku_score::Color::White).unwrap(),
+            inku_ddl::ScoreErrorPolicy::OmitAndContinue,
+        );
+        assert!(
+            result
+                .upstream_diagnostics()
+                .iter()
+                .any(|item| item.reason == "plugin_object_not_drawn_yet"),
+            "{source}: {:?}",
+            result.upstream_diagnostics()
+        );
+    }
+}
+
 /// A stale matrix would let the schema offer combinations the compiler rejects.
 #[test]
 fn embedded_capabilities_match_the_current_compiler() {

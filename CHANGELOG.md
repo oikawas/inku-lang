@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-28 — Offer plugin words named by a description
+
+The drawing prompts offer a bounded selection of words named in the description or the DDL under review. Scene words use the plan's plugins field; object words use its shape field.
+
 ### 2026-10-28 — Bracketed plugin names and definition v2
 
 DDL 28 resolves bracketed names such as `{young leaves}` against locked v1 and v2 definitions. Unbound scene caller positions, sizes and similar fields are omitted individually. Object definitions are accepted but not drawn yet. Saved-work migration retains v1 definitions and locks and rewrites only the spelling.

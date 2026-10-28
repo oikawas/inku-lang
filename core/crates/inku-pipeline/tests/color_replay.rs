@@ -25,6 +25,7 @@ use serde_json::{Value, json};
 
 /// Limits wide enough for any of the prototype's descriptions.
 const LIMITS: PromptLimits = PromptLimits {
+    max_offered_plugins: 8,
     max_catalog_entries: 16,
     max_summary_bytes: 1024,
     max_catalog_serialized_bytes: 32768,

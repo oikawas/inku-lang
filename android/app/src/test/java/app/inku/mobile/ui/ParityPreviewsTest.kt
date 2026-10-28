@@ -63,11 +63,11 @@ class ParityPreviewsTest {
     }
 
     @Test fun recommendationUsesPurposeAndFallsBackToLegacyLevel() {
-        val model = CatalogModel("test", JSONObject().put("recommendation_llm", 5)
-            .put("recommendation_vision", 2).put("recommendation_level", 4), emptyList())
+        val model = app.inku.mobile.data.ModelCatalog.EMPTY.classify(JSONObject().put("id", "test").put("recommendation_llm", 5)
+            .put("recommendation_vision", 2).put("recommendation_level", 4))
         assertEquals("★★★", modelRecommendationStars(model, "llm"))
         assertEquals("★☆☆", modelRecommendationStars(model, "vision"))
-        assertEquals("★★★", modelRecommendationStars(CatalogModel("legacy",
-            JSONObject().put("recommendation_level", 4), emptyList()), "vision"))
+        assertEquals("★★★", modelRecommendationStars(app.inku.mobile.data.ModelCatalog.EMPTY.classify(
+            JSONObject().put("id", "legacy").put("recommendation_level", 4)), "vision"))
     }
 }

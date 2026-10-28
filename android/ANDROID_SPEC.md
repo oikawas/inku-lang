@@ -243,15 +243,14 @@ New drawing requests and execution options omit `interpretation_seed`, and alloc
 ## 2026-10-13 Canonical model information and labels
 
 `core/crates/inku-pipeline/data/model_catalog.json` (`inku.model-catalog.v2`) is the model-information
-source. Gradle's `syncModelCatalog` copies it into generated assets for every APK. Android
+source. The shared core embeds it, and Android receives the catalog, labels and selection decisions through JNI `modelCatalog`. Android
 commits no duplicate evaluations, candidates, initial published models or label wording.
 Startup preserves existing publication choices. ChatGPT-plan evaluations also come from
 `providers.chatgpt`; personal offerings and publication choices remain within their registration.
 
 Model management shows six folds in label-table order, with counts, initially closed. Every
 label appears in rows and descriptions: blocking labels use the warning color and publishable
-labels use subdued color. The last label determines the fold; only models whose labels are
-all `publishable` can be newly published or selected. No remaining purpose adds `no_response`
+labels use subdued color. The last label determines the fold; core `selection` decides whether a model can be published or selected. Core sort keys order names with the same collation as Web. No remaining purpose adds `no_response`
 (publishable from 2026-10-26, still in the warning color);
 no measurement and only publishable other labels adds `unmeasured`. Management and drawing
 model selection show the available recommendations (LLM, Stage 1, Stage 2, Vision), average

@@ -2,6 +2,7 @@ package app.inku.mobile.ui
 
 import app.inku.mobile.data.CatalogModel
 import app.inku.mobile.data.ModelCatalogLabel
+import app.inku.mobile.data.ModelCatalog
 import java.io.File
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -12,10 +13,10 @@ import org.junit.Test
 /** The Vision chooser follows Web's `ModelCardPicker` and `modelMeta` (purpose badges, selectability, order). */
 class VisionModelPickerTest {
     private val eol = ModelCatalogLabel("eol", "提供終了", "End of life", publishable = false)
-    private val old = ModelCatalogLabel("older", "旧世代", "Older", publishable = true)
+    private val old = ModelCatalogLabel("legacy", "旧世代", "Older", publishable = true)
 
     private fun model(id: String, record: String, vararg labels: ModelCatalogLabel) =
-        CatalogModel(id, JSONObject(record), labels.toList())
+        ModelCatalog.EMPTY.classify(JSONObject(record).put("id", id).put("labels", org.json.JSONArray(labels.map { it.id })))
 
     @Test
     fun aPurposeTheModelCannotBeChosenForIsGreyed() {

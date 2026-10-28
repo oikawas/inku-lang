@@ -66,11 +66,6 @@ fun nextAndroidBuildNumber(): Int {
 }
 
 val androidVersionName = rootProject.file("VERSION").readText().trim()
-val modelCatalogAssets = layout.buildDirectory.dir("generated/modelCatalogAssets")
-val syncModelCatalog = tasks.register<Sync>("syncModelCatalog") {
-    from(rootProject.file("../core/crates/inku-pipeline/data/model_catalog.json"))
-    into(modelCatalogAssets)
-}
 // The experimental 3D viewer is Web's registered build, copied unchanged at
 // build time and never committed (experiments/ddl-3d/README.md). The copy holds
 // the registration, the native parent page and the build it names; with no
@@ -183,7 +178,6 @@ android {
         jniLibs.srcDir(displayCheckJniDirectory)
     }
     sourceSets.getByName("main") {
-        assets.srcDir(modelCatalogAssets)
         assets.srcDir(ddl3dViewerAssets)
         jniLibs.srcDir(rustGeneratedJniLibsDirectory)
     }
@@ -197,7 +191,7 @@ android {
     }
 }
 
-tasks.named("preBuild") { dependsOn(syncModelCatalog, syncDdl3dViewer) }
+tasks.named("preBuild") { dependsOn(syncDdl3dViewer) }
 
 val rustNdkDirectory = androidComponents.sdkComponents.ndkDirectory
 val rustLibrary = rustTargetDirectory.map {

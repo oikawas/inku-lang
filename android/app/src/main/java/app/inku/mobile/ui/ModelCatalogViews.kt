@@ -53,26 +53,9 @@ internal fun modelRecommendationStars(model: CatalogModel, purpose: String? = nu
 
 /** Web `modelRecommendationLevel`: the stored 0-5 level that also orders the cards. */
 internal fun modelRecommendationLevel(model: CatalogModel, purpose: String? = null, stage: String? = null): Double {
-    val record = model.record
-    fun score(key: String): Double? = if (record.has(key) && !record.isNull(key))
-        record.optDouble(key).takeIf(Double::isFinite) else null
-    val llm = score("recommendation_llm") ?: score("recommendation_level") ?: 0.0
-    val vision = score("recommendation_vision") ?: score("recommendation_level") ?: 0.0
-    val stageScores = listOfNotNull(score("recommendation_stage1"), score("recommendation_stage2"))
-    val stagedLlm = when (stage) {
-        "stage1" -> score("recommendation_stage1") ?: llm
-        "stage2" -> score("recommendation_stage2") ?: llm
-        "both" -> stageScores.minOrNull() ?: llm
-        else -> llm
-    }
-    val purposes = record.optJSONArray("purposes")?.let { array ->
-        (0 until array.length()).map(array::optString)
-    } ?: listOf("llm")
-    return when (purpose) {
-        "llm" -> stagedLlm
-        "vision" -> vision
-        else -> maxOf(if ("llm" in purposes) stagedLlm else 0.0, if ("vision" in purposes) vision else 0.0)
-    }.coerceIn(0.0, 5.0)
+    val p = purpose.takeIf { it == "llm" || it == "vision" } ?: "none"
+    val s = stage.takeIf { it == "stage1" || it == "stage2" || it == "both" } ?: "none"
+    return model.selection.getJSONObject("levels").getJSONObject(p).getDouble(s)
 }
 
 private fun CatalogModel.listed(key: String): List<String> =
@@ -84,7 +67,7 @@ private fun CatalogModel.listed(key: String): List<String> =
  * control that chooses it is framed in red (the author, 2026-10-26).
  */
 internal fun purposeUnsupported(model: CatalogModel, purpose: String): Boolean =
-    purpose in model.listed("unsupported_purposes")
+    model.selection.getJSONObject("unsupported").optBoolean(purpose, false)
 
 /**
  * The purposes a published model serves, as Server normalises them: the ones
@@ -114,17 +97,17 @@ internal fun modelPurposeBadges(model: CatalogModel, ticked: List<String>? = nul
  * Web `isModelUnselectable`: a label that keeps it from publication. No
  * response when measured no longer does (2026-10-26).
  */
-internal fun isModelUnselectable(model: CatalogModel): Boolean = !model.publishable
+internal fun isModelUnselectable(model: CatalogModel): Boolean = model.selection.getBoolean("unselectable")
 
 /**
  * Web `sortModels`: selectable first, then those that answered the purpose when
  * measured, then by the purpose's level, then by name.
  */
-internal fun <T> sortModels(models: List<T>, purpose: String, catalog: (T) -> CatalogModel, name: (T) -> String): List<T> =
-    models.sortedWith(compareBy<T> { isModelUnselectable(catalog(it)) }
-        .thenBy { purposeUnsupported(catalog(it), purpose) }
-        .thenByDescending { modelRecommendationLevel(catalog(it), purpose) }
-        .thenBy { name(it) })
+internal fun <T> sortModels(models: List<T>, purpose: String, catalog: (T) -> CatalogModel, @Suppress("UNUSED_PARAMETER") name: (T) -> String, stage: String? = null): List<T> {
+    val key = purpose.takeIf { it == "llm" || it == "vision" } ?: "none"
+    val stageKey = stage.takeIf { it == "stage1" || it == "stage2" || it == "both" } ?: "none"
+    return models.sortedBy { catalog(it).selection.getJSONObject("sort_keys").getJSONObject(key).getString(stageKey) }
+}
 
 /** Place beside ModelLabelWithSupportMark in a model choice heading. */
 @Composable

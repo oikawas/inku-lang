@@ -242,13 +242,13 @@ Anthropicの対象Claudeモデルは、通常描画とVisionを含むrequestで�
 ## 2026-10-13 モデル情報の正本と札
 
 モデル情報の正本は `core/crates/inku-pipeline/data/model_catalog.json`（`inku.model-catalog.v2`）。
-Gradleの`syncModelCatalog`がgenerated assetsへ写し、通常のAPKに同梱する。Androidには
+共有coreが一覧を埋め込み、AndroidはJNIの`modelCatalog`から一覧・札・選択の判定を受け取る。Androidには
 評価・候補・初期公開モデル・札の文言の写しをcommitしない。既存の公開選択は起動時に保持する。
 ChatGPTプランも`providers.chatgpt`の評価を使い、本人の一覧と公開選択は従来の登録内に保つ。
 
 モデル管理は、札の表の順に6つの折りたたみを並べ、件数を付けて初めは閉じる。
 全ての札を行と説明に表示し、公開できない札は警告色、公開できる札は控えめな色にする。
-最後の札が折りたたみを決め、全ての札が`publishable`のモデルだけを新しく公開・選択できる。
+最後の札が折りたたみを決め、coreの`selection`が公開・選択の可否を決める。並べ順もcoreの用途・stageごとの鍵を使い、Webと同じ名前の照合順にする。
 用途が残らないモデルには`no_response`、計測項目が無く他の札が全て公開可能なら`unmeasured`を付ける（2026-10-26から`no_response`は公開できる札で、警告色のまま）。
 推奨度（LLM・Stage 1・Stage 2・Vision）、平均秒数、概算USDコスト、コメントを
 正本にある範囲でモデル管理と描画のモデル選択に表示する。未確認の値は作らない。

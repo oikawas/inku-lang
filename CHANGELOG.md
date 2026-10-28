@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-28 — Android reads model catalog and selection from the shared core
+
+Android receives the embedded model catalog, labels, selectability and ordering through JNI instead of maintaining a second classification. Model names now sort with the same collation as Web. Local observations and purpose choices remain unchanged.
+
 ### 2026-10-27 — Delete a ChatGPT plan registration on macOS
 
 The connection settings can recheck the state and delete a registration together with its published model settings. Deletion asks for confirmation and reports if provider revocation could not be confirmed.

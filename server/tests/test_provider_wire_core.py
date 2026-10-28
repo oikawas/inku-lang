@@ -66,6 +66,16 @@ def test_every_shared_request_is_written_as_server_wrote_it(section, rows):
     assert compared == rows
 
 
+def test_versioned_provider_bases_use_the_same_api_root():
+    for row in CASES["base_url_requests"]:
+        built = _built(row)
+        assert built["url"] == row["expect"]["url"], row["why"]
+        assert built["body"] == row["expect"]["body"], row["why"]
+        assert {name.lower(): value for name, value in provider_wire.headers(built, "KEY").items()} == row["expect"]["headers"], row["why"]
+        if row["request"]["action"] == "pipeline_request" and row["request"]["connection"]["kind"] == "gemini":
+            assert built["count_tokens"]["url"] == built["url"].removesuffix(":generateContent") + ":countTokens"
+
+
 def test_the_pipeline_transport_sends_the_bytes_server_sent(monkeypatch):
     """Every pipeline row the core can build, sent through SingleAttemptProvider."""
     compared = 0

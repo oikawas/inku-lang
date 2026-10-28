@@ -1037,6 +1037,8 @@ Stage 1、camera projection、hole補完は既存の共有grammar helperを使�
 
 ### 12.5 描画とVisionのモデル
 
+モデル一覧と送信の道を結ぶとき、共有coreはAnthropicのURLの末尾の`/v1`、Geminiの末尾の`/v1beta`または`/v1`を一つ外す。保存されたURLは変えない。
+
 ChatGPTプランの公開、認可と登録の決まりは共有coreが持つ。HTTP、ブラウザとcallbackの入出力、署名の検証、認証情報の保存とlockはホストが担当する。
 
 ServerのChatGPTプランは、runの開始時に本人・固定した登録IDと世代・接続状態を検証し、有効期限内のモデル一覧キャッシュを通信ロックを待たずに読む。外部から一覧を取り直すときと描画の送信は、従来どおり登録ごとの通信ロックを使う。開始時の一覧取得のロック待ち・通信障害・一時的な提供元の失敗はHTTP 503 `chatgpt_transport_unavailable`で返し、未提供を意味する403 `model_not_offered`へ変換しない。実際の未提供・非公開・用途不一致は403とし、接続や利用枠の拒否はその理由を保つ（2026-10-20）。

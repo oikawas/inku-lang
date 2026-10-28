@@ -25,6 +25,7 @@ class SharedProviderWireJniTest {
         var section = ""
         for (line in fixture.readLines()) {
             val text = line.trim().removeSuffix(",")
+            if (text.startsWith("\"base_url_requests\": [")) section = "base_url_requests"
             if (text.startsWith("\"requests\": [")) section = "requests"
             if (text.startsWith("\"text_requests\": [")) section = "text_requests"
             if (text.startsWith("\"responses\": [")) section = "responses"
@@ -109,6 +110,9 @@ class SharedProviderWireJniTest {
 
     @Test
     fun allTextRequestsMatchServerWireBytes() = requests("text_requests", 81)
+
+    @Test
+    fun providerVersionedBasesUseSharedRoot() = requests("base_url_requests", 28)
 
     /** Server passes a `models/` Gemini name to the core unchanged; Android's send path must too. */
     @Test

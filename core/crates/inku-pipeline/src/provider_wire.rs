@@ -1023,7 +1023,7 @@ fn pipeline_request(
     } else {
         0.0
     });
-    let base = connection.base();
+    let base = crate::provider_url::api_root(&connection.kind, connection.base());
     let user = |parts: Value| {
         let content = if images.is_empty() {
             string(message)
@@ -1270,7 +1270,7 @@ fn text_request(
     temperature: &Value,
     max_tokens: i64,
 ) -> Result<Built, Refusal> {
-    let base = connection.base();
+    let base = crate::provider_url::api_root(&connection.kind, connection.base());
     match connection.kind.as_str() {
         "openai_compatible" => {
             let content = if images.is_empty() {
@@ -2301,6 +2301,26 @@ mod tests {
     #[test]
     fn every_shared_text_request_is_written_as_server_wrote_it() {
         assert_eq!(check_requests("text_requests"), 81);
+    }
+
+    #[test]
+    fn versioned_provider_bases_use_one_shared_api_root() {
+        assert_eq!(check_requests("base_url_requests"), 28);
+        for row in cases()["base_url_requests"].as_array().unwrap() {
+            if row["request"]["action"] == "pipeline_request"
+                && row["request"]["connection"]["kind"] == "gemini"
+            {
+                let answer = ask(&row["request"]);
+                let generation_url = answer["url"].as_str().unwrap();
+                assert_eq!(
+                    answer["count_tokens"]["url"],
+                    format!(
+                        "{}:countTokens",
+                        generation_url.strip_suffix(":generateContent").unwrap()
+                    )
+                );
+            }
+        }
     }
 
     #[test]

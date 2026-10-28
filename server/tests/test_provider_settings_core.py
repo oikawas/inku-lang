@@ -76,3 +76,15 @@ def test_android_local_provider_uses_shared_settings_and_never_disables():
                            order=normalized["order"], env={}, patch_order=["local-litert-lm"],
                            patch={"providers": {"local-litert-lm": {"delete": True}}})
     assert updated["settings"]["providers"]["local-litert-lm"]["active"] is True
+
+
+def test_versioned_base_url_stays_in_settings_while_list_uses_api_root():
+    for provider, version in (("anthropic", "v1"), ("gemini", "v1beta"), ("gemini", "v1")):
+        base = f"https://example.invalid/{version}"
+        settings = model_settings.update_model_settings({}, {"providers": {provider: {"base_url": base}}})
+        assert settings["providers"][provider]["base_url"] == base
+        kind = settings["providers"][provider]["kind"]
+        listed = core_catalog("model_list_start", kind=kind, base_url=base, api_key="")
+        path = "/v1/models" if provider == "anthropic" else "/v1beta/models"
+        assert listed["url"] == "https://example.invalid" + path
+        assert settings["providers"][provider]["base_url"] == base

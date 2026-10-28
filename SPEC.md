@@ -1760,6 +1760,8 @@ Shared standalone grammar makes modifier phrases own their connectors but exclud
 
 ### 12.5 Drawing and Vision Models
 
+When joining model-list and send paths, the shared core removes one trailing `/v1` from an Anthropic base URL, or one trailing `/v1beta` or `/v1` from a Gemini base URL; the saved URL is unchanged.
+
 The shared core owns the ChatGPT plan's publication, authorization and registration decisions. The host performs HTTP, browser and callback I/O, signature verification, credential storage and locking.
 
 At run admission, the Server's ChatGPT plan validates the account, pinned registration ID and generation, and connection state before reading an unexpired model catalog cache without waiting for the communication lock. External catalog refreshes and inference still use the registration's communication lock. A catalog lock timeout, transport failure or temporary provider failure at admission returns HTTP 503 `chatgpt_transport_unavailable`, rather than the unavailable-model 403 `model_not_offered`. An actually absent, unpublished or purpose-incompatible model remains a 403; connection and quota refusals retain their reasons (2026-10-20).

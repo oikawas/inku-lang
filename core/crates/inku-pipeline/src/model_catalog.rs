@@ -1063,10 +1063,8 @@ pub fn model_catalog_json(input: &[u8]) -> Vec<u8> {
         },
         Some("model_list_start") => {
             let kind = request["kind"].as_str().unwrap_or("");
-            let base = request["base_url"]
-                .as_str()
-                .unwrap_or("")
-                .trim_end_matches('/');
+            let base =
+                crate::provider_url::api_root(kind, request["base_url"].as_str().unwrap_or(""));
             let key = request["api_key"].as_str().unwrap_or("");
             let mut headers = Map::new();
             headers.insert("Accept".into(), json!("application/json"));

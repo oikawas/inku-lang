@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-28 — Fix versioned Anthropic and Gemini base URLs
+
+Model-list and send URLs no longer repeat the API version when a configured Anthropic or Gemini base URL already ends in it.
+
 ### 2026-10-28 — Install and remove plugin packages on macOS
 
 Settings can check and install, replace, or remove JSON and ZIP plugin packages. Enabled words are available to new works and the Saijiki; saved works retain their own definitions.

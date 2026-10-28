@@ -3,7 +3,7 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import { wildSettings } from '$lib/features/wild/settings.svelte';
 	import WildToggle from './WildToggle.svelte';
-	import { qualifiedModelId, type Provider, type ProviderGroup } from '$lib/models';
+	import { qualifiedModelRef, type Provider, type ProviderGroup } from '$lib/models';
 	import ModelCardPicker from './ModelCardPicker.svelte';
 	import RunStatus from './RunStatus.svelte';
 	import type { LineageNode } from '$lib/features/history/types';
@@ -126,7 +126,7 @@
 	<div class="juxtapose-body">
 		<span class="juxtapose-label">{t().inputSectionLabel}</span>
 		<p class="juxtapose-text">{description}</p>
-		<ModelCardPicker label={t().juxtaposeModel} {selectedModel} providerGroups={visionProviderGroups} purpose="vision" disabled={busy} onSelect={(provider: Provider, model: string) => { selectedModel = qualifiedModelId(provider, model); void onSaveVisionModel(provider, model); }} />
+		<ModelCardPicker label={t().juxtaposeModel} {selectedModel} providerGroups={visionProviderGroups} purpose="vision" disabled={busy} onSelect={(provider: Provider, model: string) => { selectedModel = qualifiedModelRef(provider, model); void onSaveVisionModel(provider, model); }} />
 		{#if result}
 			<fieldset class="juxtapose-choices" disabled={busy}>
 				<legend>{t().juxtaposeChoices.replace('{count}', String(result.candidates))}</legend>

@@ -1,0 +1,1 @@
+[{"id":"ovms","label":"Intel OVMS","models":[{"id":"qwen3-api","label":"Qwen3 8B Instruct"},{"id":"qwen-api","label":"Qwen2.5 7B Instruct"},{"id":"gemma3-12b-api","label":"Google Gemma 3 12B Instruct"},{"id":"gemma3-4b-api","label":"Google Gemma 3 4B Instruct"}]}]

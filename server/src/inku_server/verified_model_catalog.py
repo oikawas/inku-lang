@@ -1,6 +1,7 @@
 """Python access to the embedded core model catalog."""
 
 import json
+import math
 from functools import lru_cache
 
 import inku_render
@@ -13,7 +14,15 @@ def catalog_info():
 
 def core_catalog(action, **fields):
     request = {"schema": "inku.model-catalog-request.v1", "action": action, **fields}
-    result = json.loads(inku_render.pipeline_model_catalog(json.dumps(request, ensure_ascii=False).encode("utf-8")))
+    def json_value(value):
+        if isinstance(value, float) and not math.isfinite(value):
+            return None
+        if isinstance(value, dict):
+            return {key: json_value(item) for key, item in value.items()}
+        if isinstance(value, (list, tuple)):
+            return [json_value(item) for item in value]
+        return value
+    result = json.loads(inku_render.pipeline_model_catalog(json.dumps(json_value(request), ensure_ascii=False, allow_nan=False).encode("utf-8")))
     if result.get("outcome") != "ok":
         raise ValueError(f"model catalog refused: {result}")
     return result

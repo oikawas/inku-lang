@@ -39,7 +39,7 @@ def _local_model_ids() -> list[str]:
 
 
 def test_provider_lists_the_measured_models() -> None:
-    assert _BY_ID["ollama"]["models"] is VERIFIED_OLLAMA_LOCAL_MODELS
+    assert _BY_ID["ollama"]["models"] == VERIFIED_OLLAMA_LOCAL_MODELS
     ids = _local_model_ids()
     assert len(ids) == 10
     assert RETIRED_PLACEHOLDERS.isdisjoint(ids)
@@ -97,20 +97,10 @@ def test_the_end_to_end_level_stays_absent_and_the_stage_levels_stand_in() -> No
         assert "recommendation_level" not in model
 
 
-def test_web_fallback_list_matches_the_catalog() -> None:
-    # The web list is what the settings pane shows until the API catalog arrives.
-    # It holds no comments, so the only thing that can drift is the ids -- and it
-    # drifts silently, since a stale fallback still renders.
+def test_web_uses_the_api_instead_of_a_fallback_list() -> None:
     source = _WEB_MODELS_TS.read_text(encoding="utf-8")
-    # Start at the group's own `models: [`, not at its `id: 'ollama',` line: ids in
-    # PROVIDER_GROUPS are bare, exactly as the server catalog states them (Build 731
-    # dropped the qualification, and this branch was cut before that), so a pattern
-    # loose enough to read the model ids would otherwise also read the group id.
-    start = source.index("models: [", source.index("id: 'ollama',"))
-    end = source.index("id: 'ollama-cloud',")
-    block = source[start:end]
-    web_ids = [m.group(1) for m in re.finditer(r"id: '([^']+)'", block)]
-    assert web_ids == _local_model_ids()
+    assert "PROVIDER_GROUPS" not in source
+    assert _local_model_ids() == [str(model["id"]) for model in VERIFIED_OLLAMA_LOCAL_MODELS]
 
 
 # --------------------------------------------------------------------------

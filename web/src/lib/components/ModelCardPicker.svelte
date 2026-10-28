@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tick } from 'svelte';
+	import { getContext, tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import { pickerSelection, type ModelOption, type Provider, type ProviderGroup } from '$lib/models';
 	import { modelRecommendation, modelRecommendationStars, modelSpeed, modelCost, modelComment, modelStatusLabel, modelStatusParts, isModelUnselectable, purposeUnsupported, sortModels, type ModelPurpose } from '$lib/modelMeta';
@@ -16,6 +16,7 @@
 	};
 
 	let { label, selectedModel, providerGroups, purpose = 'llm', disabled = false, onSelect }: Props = $props();
+	const catalogLoad = getContext<{ status: () => 'loading' | 'ready' | 'error'; retry: () => Promise<void> } | undefined>('model-catalog-load');
 	let open = $state(false);
 	let selectionError = $state('');
 	let launchButton = $state<HTMLButtonElement>();
@@ -84,7 +85,7 @@
 <div class="context-model-picker">
 	<span class="field-label">{label}</span>
 	<button class="picker-launch" type="button" {disabled} bind:this={launchButton} onclick={openPicker}>
-		<span><strong>{selected?.model.label ?? selectedModel}</strong>{#if selected}<small>{selected.group.id === 'chatgpt' ? t().chatgptPlanLabel : selected.group.label}</small>{:else if offer.notInList}<small class="not-in-list">{t().modelPickerNotInList}</small>{/if}</span>
+		<span><strong>{selected?.model.label ?? selectedModel}</strong>{#if selected}<small>{selected.group.id === 'chatgpt' ? t().chatgptPlanLabel : selected.group.label}</small>{:else if offer.notInList && (!catalogLoad || catalogLoad.status() === 'ready')}<small class="not-in-list">{t().modelPickerNotInList}</small>{/if}</span>
 		<span class="change-label">{t().modelSelectButton}</span>
 	</button>
 </div>
@@ -93,8 +94,10 @@
 	<div class="picker-backdrop" role="presentation" onclick={closePicker}></div>
 	<div class="picker-dialog" class:empty={configuredGroups.length === 0} role="dialog" aria-modal="true" aria-label={label} tabindex="-1" bind:this={pickerDialog} onkeydown={trapKeyboard}>
 		<header><h2>{label}</h2><button type="button" bind:this={closeButton} aria-label={t().closeLabel} onclick={closePicker}>×</button></header>
+		{#if catalogLoad?.status() === 'loading'}<p role="status">{t().modelCatalogLoading}</p>{/if}
+		{#if catalogLoad?.status() === 'error'}<p role="alert">{t().modelCatalogLoadFailed} <button type="button" onclick={() => void catalogLoad.retry()}>{t().modelCatalogRetry}</button></p>{/if}
 		{#if selectionError}<p class="selection-error" role="alert">{selectionError}</p>{/if}
-		<div class="picker-groups">
+		{#if !catalogLoad || catalogLoad.status() === 'ready'}<div class="picker-groups">
 			{#each configuredGroups as group (group.id)}
 				<section><h3>{group.id === 'chatgpt' ? t().chatgptPlanLabel : group.label}</h3><div class="model-grid">
 					{#each sortModels(group.models, purpose) as model (model.id)}
@@ -119,7 +122,7 @@
 			{:else}
 				<p class="picker-empty">{t().modelPickerEmpty}</p>
 			{/each}
-		</div>
+		</div>{/if}
 	</div>
 {/if}
 

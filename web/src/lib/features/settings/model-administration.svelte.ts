@@ -1,6 +1,6 @@
 import { t } from '$lib/i18n/index.svelte';
 import { setModelLabelTable } from '$lib/modelMeta';
-import { PROVIDER_GROUPS, type ModelLabel, type ModelOption, type Provider, type ProviderGroup } from '$lib/models';
+import { type ModelLabel, type ModelOption, type Provider, type ProviderGroup } from '$lib/models';
 import type { ApiFetch } from '$lib/transport/api-fetch';
 import type { SettingsActor } from './navigation-state.svelte';
 
@@ -81,7 +81,7 @@ export function createModelAdministration<TActor extends SettingsActor>(
 	let modelSettingsStatus = $state<string | null>(null);
 	let modelFetchResults = $state<Record<string, ModelFetchResult>>({});
 	let modelSettingsLoading = $state(false);
-	let modelCatalog = $state<ProviderGroup[]>(PROVIDER_GROUPS.filter((group) => group.id !== 'nvidia'));
+	let modelCatalog = $state<ProviderGroup[]>([]);
 	let chatgptPublication = $state<ChatGPTPublication | null>(null);
 	let assessmentKeys = $state<(keyof ModelOption)[]>([]);
 	let boundOwner = $state<string | undefined>(undefined);
@@ -157,6 +157,9 @@ export function createModelAdministration<TActor extends SettingsActor>(
 		boundOwner = owner;
 		const version = revision;
 		modelSettingsLoading = true;
+		modelSettings = null;
+		modelCatalog = [];
+		modelSettingsStatus = null;
 		try {
 			if (isAdministrator()) {
 				const response = await deps.apiFetch('/api/settings/models', { cache: 'no-store' });
@@ -181,7 +184,11 @@ export function createModelAdministration<TActor extends SettingsActor>(
 			}
 			modelSettingsStatus = null;
 		} catch (error) {
-			if (sameOwner(owner, version)) modelSettingsStatus = error instanceof Error ? error.message : String(error);
+			if (sameOwner(owner, version)) {
+				modelSettings = null;
+				modelCatalog = [];
+				modelSettingsStatus = error instanceof Error ? error.message : String(error);
+			}
 		} finally {
 			if (sameOwner(owner, version)) modelSettingsLoading = false;
 		}

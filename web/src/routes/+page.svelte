@@ -5,7 +5,7 @@
 </script>
 
 <script lang="ts">
-	import { onDestroy, onMount, tick, untrack } from 'svelte';
+	import { onDestroy, onMount, setContext, tick, untrack } from 'svelte';
 	import { NoticeReader, EMPTY_NOTICE_STATE, type NoticeState } from '$lib/third-party-notices';
 	import ThirdPartyNoticesDialog from '$lib/components/ThirdPartyNoticesDialog.svelte';
 	import { pipelineDescription } from '$lib/description-labels';
@@ -50,25 +50,18 @@
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import { abbreviateStripModel, toggleHistoryStripField, type HistoryStripField } from '$lib/historyStripFields';
 	import {
-		PROVIDER_GROUPS,
-		DEFAULT_PROVIDER,
-		DEFAULT_MODEL,
-		modelsForProvider,
 		modelDisplayName,
 		modelShortName,
-		providerLabel,
-		providerOfModel,
-		qualifiedModelId,
-		registerModelCatalog,
-		clearChatGPTModelCatalog,
-		resolveModelRefForDisplay,
-		splitModelRef,
+		qualifiedModelRef,
+		displayModelReference,
+		splitModelReference,
 		type Provider,
 		type ProviderGroup,
 		type ModelLabel,
 		type ModelOption
 	} from '$lib/models';
 	import { setModelLabelTable } from '$lib/modelMeta';
+	import { clearChatGPTReferences, clearModelReferences, configureModelReferences, disableModelReferences, loadModelReferences, type ReferenceQuery } from '$lib/modelReferences';
 	import { t, getLang, initLang } from '$lib/i18n/index.svelte';
 	import { initMascot } from '$lib/mascot.svelte';
 	import { FALLBACK_CATALOG, catalogById, catalogNameplate, type ColorCatalog, type ColorCatalogsResponse } from '$lib/colors';
@@ -153,7 +146,6 @@
 	const MODEL_STAGE1_KEY    = 'inku-model-stage1';
 	const PROVIDER_STAGE2_KEY = 'inku-provider-stage2';
 	const MODEL_STAGE2_KEY    = 'inku-model-stage2';
-	const DEFAULT_VISION_MODEL = 'meta/llama-3.2-90b-vision-instruct';
 	// Injected by vite.config from web/APP_VERSION, the single source shared with
 	// the server (/api/info) and the CLI. Never write the version here again.
 	const APP_VERSION = __APP_VERSION__;
@@ -533,18 +525,12 @@
 
 	// ── Settings tabs ────────────────────────────────────────
 	let pluginEntries = $state<PluginEntry[]>([]);
-	let availableModelCatalog = $state<ProviderGroup[]>(PROVIDER_GROUPS.filter((group) => group.id !== 'nvidia'));
+	let availableModelCatalog = $state<ProviderGroup[]>([]);
 	let demoPromptModelCatalog = $state<ProviderGroup[]>([]);
 	let availableVisionModelCatalog = $state<ProviderGroup[]>([]);
 	let availableModelsLoaded = $state(false);
-	// Teach models.ts which providers this server serves, so that a reference
-	// qualified with an operator-added provider is recognised as qualified.
-	$effect(() => {
-		registerModelCatalog(settings.modelCatalog);
-		registerModelCatalog(availableModelCatalog);
-		registerModelCatalog(demoPromptModelCatalog);
-		registerModelCatalog(availableVisionModelCatalog);
-	});
+	let modelCatalogStatus = $state<'loading' | 'ready' | 'error'>('loading');
+	setContext('model-catalog-load', { status: () => modelCatalogStatus, retry: () => loadAvailableModels() });
 
 	/**
 	 * v1.98: Turn a Server failure detail into one human-readable line.
@@ -624,7 +610,7 @@
 		chatgptAvailable: () => chatgptPlanAvailable && modelCatalogOwner === session.currentUser?.id,
 		invalidateChatGPTModels: () => {
 			modelCatalogRequest++;
-			clearChatGPTModelCatalog();
+			clearChatGPTReferences();
 			availableModelCatalog = availableModelCatalog.filter((group) => group.id !== 'chatgpt');
 			availableVisionModelCatalog = availableVisionModelCatalog.filter((group) => group.id !== 'chatgpt');
 		},
@@ -651,7 +637,7 @@
 			untrack(() => {
 				settings.chatgpt.reset();
 				if (modelCatalogOwner !== actor || !chatgptPlanAvailable) {
-					clearChatGPTModelCatalog();
+					clearChatGPTReferences();
 					availableModelCatalog = availableModelCatalog.filter((group) => group.id !== 'chatgpt');
 					availableVisionModelCatalog = availableVisionModelCatalog.filter((group) => group.id !== 'chatgpt');
 				}
@@ -696,7 +682,7 @@
 	function modelsFor(provider: Provider) {
 		const group = availableModelCatalog.find((item) => item.id === provider);
 		if (group) return group.models;
-		return availableModelsLoaded ? [] : modelsForProvider(provider);
+		return [];
 	}
 
 	function visionModelsFor(provider: Provider) {
@@ -714,8 +700,8 @@
 		visionProvider = settings.vision_provider;
 		visionModel = settings.vision_model;
 		okugakiModel = settings.okugaki_model
-			? qualifiedModelId(settings.okugaki_provider ?? settings.vision_provider, settings.okugaki_model)
-			: qualifiedModelId(settings.vision_provider, settings.vision_model);
+			? qualifiedModelRef(settings.okugaki_provider ?? settings.vision_provider, settings.okugaki_model)
+			: qualifiedModelRef(settings.vision_provider, settings.vision_model);
 		instructionCaptionVisible = settings.instruction_caption_visible !== false;
 	}
 
@@ -730,7 +716,7 @@
 	}
 
 	async function persistOkugakiModel(provider: Provider, model: string): Promise<void> {
-		const nextModel = qualifiedModelId(provider, model.trim());
+		const nextModel = qualifiedModelRef(provider, model.trim());
 		if (!nextModel || nextModel === okugakiModel) return;
 		const previous = okugakiModel;
 		okugakiModel = nextModel;
@@ -775,14 +761,15 @@
 	}
 
 	/** Put back the conditions the last work of the stopped run was drawn under. */
-	function applyBatchRunConditions(conditions: BatchRunConditions) {
+	async function applyBatchRunConditions(conditions: BatchRunConditions) {
+		await loadModelReferences([conditions.stage1Model, conditions.stage2Model].filter((ref): ref is string => !!ref).map((ref) => ({action: 'split_ref', ref})));
 		if (conditions.stage1Model) {
-			const ref = splitModelRef(conditions.stage1Model, availableModelCatalog);
+			const ref = splitModelReference(conditions.stage1Model, availableModelCatalog);
 			if (ref.provider) stage1Provider = ref.provider;
 			stage1Model = ref.model;
 		}
 		if (conditions.stage2Model) {
-			const ref = splitModelRef(conditions.stage2Model, availableModelCatalog);
+			const ref = splitModelReference(conditions.stage2Model, availableModelCatalog);
 			if (ref.provider) stage2Provider = ref.provider;
 			stage2Model = ref.model;
 		}
@@ -980,6 +967,8 @@
 		if (!session.currentUser) return;
 		const previousUser = session.currentUser;
 		const userId = previousUser.id;
+		try {
+		await loadModelReferences([{action: 'split_ref', ref: okugakiModel}]);
 		// What the page owns; the features add their own fields to the save.
 		const pageModelSettings: UserModelSettings = {
 			stage1_provider: stage1Provider,
@@ -988,12 +977,11 @@
 			stage2_model: stage2Model,
 			vision_provider: visionProvider,
 			vision_model: visionModel,
-			okugaki_provider: splitModelRef(okugakiModel).provider ?? visionProvider,
-			okugaki_model: splitModelRef(okugakiModel).model,
+			okugaki_provider: splitModelReference(okugakiModel).provider ?? visionProvider,
+			okugaki_model: splitModelReference(okugakiModel).model,
 			instruction_caption_visible: instructionCaptionVisible,
 		};
 		const model_settings = { ...pageModelSettings, ...collectUserSettings({ excludeIds: ['text-size'] }) };
-		try {
 			const r = await apiFetch('/api/auth/me/settings', {
 				method: 'PATCH',
 				headers: { 'Content-Type': 'application/json' },
@@ -1168,26 +1156,49 @@
 		const userId = session.currentUser?.id;
 		if (!userId) {
 			availableModelsLoaded = false;
+			modelCatalogStatus = 'loading';
 			return;
 		}
+		configureModelReferences(apiFetch);
+		modelCatalogStatus = 'loading';
+		availableModelsLoaded = false;
+		clearModelReferences();
+		availableModelCatalog = [];
+		availableVisionModelCatalog = [];
+		demoPromptModelCatalog = [];
 		try {
 			const r = await apiFetch('/api/models', { cache: 'no-store' });
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			const data = await r.json() as { catalog: ProviderGroup[]; llm_catalog?: ProviderGroup[]; drawing_catalog?: ProviderGroup[]; vision_catalog?: ProviderGroup[]; chatgpt_plan_available?: boolean; model_labels?: ModelLabel[]; settings: { model_settings?: UserModelSettings } };
+			const data = await r.json() as { catalog: ProviderGroup[]; llm_catalog?: ProviderGroup[]; drawing_catalog?: ProviderGroup[]; vision_catalog?: ProviderGroup[]; chatgpt_plan_available?: boolean; model_labels?: ModelLabel[]; settings: { model_settings?: UserModelSettings; model_defaults?: UserModelSettings } };
+			if (session.currentUser?.id !== userId || request !== modelCatalogRequest) return;
+			const groups = [data.catalog, data.llm_catalog, data.drawing_catalog, data.vision_catalog].flatMap((catalog) => catalog ?? []);
+			const queries: ReferenceQuery[] = groups.flatMap((group) => group.models.flatMap((model): ReferenceQuery[] => [
+				{ action: 'qualify_ref', provider: group.id, ref: model.id }, { action: 'split_ref', ref: model.id }
+			]));
+			const userModels = { ...data.settings.model_defaults, ...data.settings.model_settings } as UserModelSettings;
+			for (const stage of ['stage1', 'stage2', 'vision', 'okugaki'] as const) {
+				const provider = userModels?.[`${stage}_provider`];
+				const model = userModels?.[`${stage}_model`];
+				if (provider && model) queries.push({ action: 'qualify_ref', provider, ref: model }, { action: 'split_ref', ref: model });
+			}
+			await loadModelReferences(queries);
+			if (session.currentUser?.id !== userId || request !== modelCatalogRequest) return;
+			for (const group of groups) for (const model of group.models) model.qualified_id = qualifiedModelRef(group.id, model.id);
+			await loadModelReferences(groups.flatMap((group) => group.models.map((model): ReferenceQuery => ({action: 'split_ref', ref: model.qualified_id ?? ''}))));
 			if (session.currentUser?.id !== userId || request !== modelCatalogRequest) return;
 			chatgptPlanAvailable = data.chatgpt_plan_available === true;
 			setModelLabelTable(data.model_labels);
 			modelCatalogOwner = userId;
-			clearChatGPTModelCatalog();
 			availableModelCatalog = data.drawing_catalog ?? data.llm_catalog ?? data.catalog;
 			demoPromptModelCatalog = demoInstructionModelGroups(data.llm_catalog ?? data.catalog);
 			availableVisionModelCatalog = (data.vision_catalog ?? data.catalog)
 				.map((group) => ({ ...group, models: group.models.filter((model) => model.purposes?.includes('vision') && !model.unsupported_purposes?.includes('vision')) }))
 				.filter((group) => group.models.length > 0);
 			availableModelsLoaded = true;
-			if (data.settings.model_settings) {
+			modelCatalogStatus = 'ready';
+			if (Object.keys(userModels).length > 0) {
 				applyUserModelSettings(
-					{ ...session.currentUser, model_settings: data.settings.model_settings },
+					{ ...session.currentUser, model_settings: userModels },
 					{ excludeUserSettingIds: ['text-size'] }
 				);
 			}
@@ -1207,13 +1218,14 @@
 				visionModel = fallbackGroup?.models[0]?.id ?? visionModel;
 			}
 			const okugakiModelAvailable = availableVisionModelCatalog.some((group) =>
-				group.models.some((model) => qualifiedModelId(group.id, model.id) === okugakiModel)
+				group.models.some((model) => qualifiedModelRef(group.id, model.id) === okugakiModel)
 			);
 			if (!okugakiModelAvailable) {
-				okugakiModel = qualifiedModelId(visionProvider, visionModel);
+				okugakiModel = qualifiedModelRef(visionProvider, visionModel);
 			}
 			demo.reconcilePromptModel(demoPromptModelCatalog, availableModelsLoaded);
 		} catch (e) {
+			if (session.currentUser?.id === userId && request === modelCatalogRequest) modelCatalogStatus = 'error';
 			console.warn('failed to load model catalog', e);
 		}
 	}
@@ -1281,7 +1293,7 @@
 			if (data.chatgpt_plan_available !== true) {
 				modelCatalogRequest++;
 				settings.chatgpt.reset();
-				clearChatGPTModelCatalog();
+				clearChatGPTReferences();
 				availableModelCatalog = availableModelCatalog.filter((group) => group.id !== 'chatgpt');
 				availableVisionModelCatalog = availableVisionModelCatalog.filter((group) => group.id !== 'chatgpt');
 			}
@@ -1350,7 +1362,7 @@
 		settings.resetForLoggedOut();
 		chatgptPlanAvailable = false;
 		modelCatalogRequest++;
-		clearChatGPTModelCatalog();
+		disableModelReferences();
 		availableModelCatalog = availableModelCatalog.filter((group) => group.id !== 'chatgpt');
 		availableVisionModelCatalog = availableVisionModelCatalog.filter((group) => group.id !== 'chatgpt');
 		history.clear();
@@ -1360,13 +1372,13 @@
 	}
 
 	// ── Models ──────────────────────────────────────────────
-	let stage1Provider  = $state<Provider>(DEFAULT_PROVIDER);
-	let stage1Model     = $state<string>(DEFAULT_MODEL);
-	let stage2Provider  = $state<Provider>(DEFAULT_PROVIDER);
-	let stage2Model     = $state<string>(DEFAULT_MODEL);
-	let visionProvider  = $state<Provider>(DEFAULT_PROVIDER);
-	let visionModel     = $state<string>(DEFAULT_VISION_MODEL);
-	let okugakiModel    = $state<string>(qualifiedModelId(DEFAULT_PROVIDER, DEFAULT_VISION_MODEL));
+	let stage1Provider  = $state<Provider>('');
+	let stage1Model     = $state<string>('');
+	let stage2Provider  = $state<Provider>('');
+	let stage2Model     = $state<string>('');
+	let visionProvider  = $state<Provider>('');
+	let visionModel     = $state<string>('');
+	let okugakiModel    = $state<string>('');
 	let includeThinking = $state(false);
 	let currentResultStarState = $state<HistoryStarProjection | null>(null);
 	const visibleThumbCount = $derived(Math.max(1, Math.floor((windowWidth - 40) / 89)));
@@ -1487,8 +1499,8 @@
 
 	async function saveCurrentDemoToHistory(): Promise<void> {
 		await demo.saveCurrent({
-			stage1Model: qualifiedModelId(stage1Provider, stage1Model),
-			stage2Model: qualifiedModelId(stage2Provider, stage2Model),
+			stage1Model: qualifiedModelRef(stage1Provider, stage1Model),
+			stage2Model: qualifiedModelRef(stage2Provider, stage2Model),
 			effectiveCatalogId: colorCatalogSettings.effectiveId,
 			canvasAspectId: effectiveCanvasAspectId(),
 			instructionLang: work.instructionLang,
@@ -1564,8 +1576,8 @@
 			syncToItem: (item) => history.syncToItem(item)
 		},
 		models: {
-			stage1: () => qualifiedModelId(stage1Provider, stage1Model),
-			stage2: () => qualifiedModelId(stage2Provider, stage2Model),
+			stage1: () => qualifiedModelRef(stage1Provider, stage1Model),
+			stage2: () => qualifiedModelRef(stage2Provider, stage2Model),
 			label: statusModelName,
 			shortLabel: (model) => modelShortName(model)
 		},
@@ -2395,8 +2407,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	// say which provider ran it: the same id can be served by two of them.
 	function shortModel(m: string | null | undefined): string {
 		if (!m) return '';
-		const { provider, model } = resolveModelRefForDisplay(m);
-		const owner = providerLabel(provider);
+		const { providerLabel: owner, model } = displayModelReference(m);
 		const short = shortModelName(model);
 		return owner ? `${owner}/${short}` : short;
 	}
@@ -2436,8 +2447,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	const statusStage2ModelOnly = $derived(work.displayedHistoryItem
 		? (work.displayedHistoryItem.stage2_model ? modelShortName(work.displayedHistoryItem.stage2_model) : '-')
 		: (work.result?.stage2_model ? modelShortName(work.result.stage2_model) : '-'));
-	const nextStage1Model = $derived(statusModelName(qualifiedModelId(stage1Provider, stage1Model)));
-	const nextStage2Model = $derived(statusModelName(qualifiedModelId(stage2Provider, stage2Model)));
+	const nextStage1Model = $derived(statusModelName(qualifiedModelRef(stage1Provider, stage1Model)));
+	const nextStage2Model = $derived(statusModelName(qualifiedModelRef(stage2Provider, stage2Model)));
 	const nextCatalogName = $derived(colorCatalogSettings.isAuto ? (work.inputMode === 'image' ? t().imageCatalogAuto : t().colorCatalogAuto) : currentCatalog.name);
 	// The catalog a work was drawn with, named as it stands today. Two things
 	// the bare name cannot say are said here instead of being papered over: an
@@ -2508,8 +2519,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 
 	function historyModelStage1Short(it: Iteration): string {
 		if (!it.stage1_model) return '-';
-		const { provider } = resolveModelRefForDisplay(it.stage1_model);
-		return abbreviateStripModel(providerLabel(provider), modelShortName(it.stage1_model));
+		const { providerLabel: owner } = displayModelReference(it.stage1_model);
+		return abbreviateStripModel(owner, modelShortName(it.stage1_model));
 	}
 
 	function historyModelStage1Full(it: Iteration): string {
@@ -2826,7 +2837,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						imageUploading={work.imageUploading}
 						imageRunning={work.imageRunning}
 						imageCanvasAspectId={work.imageCanvasAspectId}
-						visionModelName={statusModelName(qualifiedModelId(visionProvider, visionModel))}
+						visionModelName={statusModelName(qualifiedModelRef(visionProvider, visionModel))}
 						visionModelAvailable={availableVisionModelCatalog.some((group) => group.id === visionProvider && group.models.some((model) => model.id === visionModel))}
 						onSelectImage={work.selectImage}
 						onImageProvenanceInput={work.noteImageProvenanceTyped}
@@ -2871,7 +2882,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						onResumeBatch={() => void resumeInterruptedBatch()}
 						onRetryBatchFailures={() => void retryFailedBatch()}
 						canSubmit={work.canSubmit}
-						generationDisabled={refinementSession.gridBusy || work.reloading || demoRunning || batch.resuming || work.imageFolder.running}
+						generationDisabled={modelCatalogStatus !== 'ready' || refinementSession.gridBusy || work.reloading || demoRunning || batch.resuming || work.imageFolder.running}
 						error={work.error}
 						stageLabel={work.stageLabel}
 						{canvasAspectId}
@@ -3152,7 +3163,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				{statusStage2ModelOnly}
 				runStage1ModelLabel={work.stage1ModelLabel}
 				runStage2ModelLabel={work.stage2ModelLabel}
-				visionModel={qualifiedModelId(visionProvider, visionModel)}
+				visionModel={qualifiedModelRef(visionProvider, visionModel)}
 				{okugakiModel}
 				visionProviderGroups={availableVisionModelCatalog}
 				{statusCatalogName}
@@ -3217,7 +3228,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				statusDescriptionLocked={work.descriptionLocked}
 				statusTenkei={work.displayedHistoryItem?.tenkei ?? null}
 				{developerMode}
-				refineDrawingModelId={qualifiedModelId(stage2Provider, stage2Model)}
+				refineDrawingModelId={qualifiedModelRef(stage2Provider, stage2Model)}
 				refineDrawingModelGroups={availableModelCatalog}
 				onSelectRefineDrawingModel={selectDdlDialogDrawingModel}
 				refineWildValue={effectiveRefineWild}
@@ -3318,7 +3329,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			returnFocusTo={ddlDialogReturnFocus}
 			drawing={ddlDialogDrawing}
 			stage2ModelLabel={work.stage2ModelLabel}
-			drawingModelId={qualifiedModelId(stage2Provider, stage2Model)}
+			drawingModelId={qualifiedModelRef(stage2Provider, stage2Model)}
 			drawingModelGroups={availableModelCatalog}
 			onSelectDrawingModel={selectDdlDialogDrawingModel}
 			runTokensIn={work.activeRunTokensIn}
@@ -3360,7 +3371,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		generatedDdlHighlighted={demoGeneratedDdlHighlighted}
 		canSaveCurrent={demo.canSaveCurrent}
 		savingCurrent={demo.savingCurrent}
-		actionDisabled={work.loading || work.reloading || refinementSession.gridBusy || batch.resuming}
+		actionDisabled={modelCatalogStatus !== 'ready' || work.loading || work.reloading || refinementSession.gridBusy || batch.resuming}
 		drawingStage1ModelLabel={work.stage1ModelLabel}
 		drawingStage2ModelLabel={work.stage2ModelLabel}
 		saveStatus={demo.saveStatus}
@@ -3373,7 +3384,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		{#snippet inputSettings()}
 			<div class="demo-drawing-conditions" inert={demoRunning}>
 				<h3>{t().nextWorkConditions}</h3>
-				<ModelCardPicker label="Stage 1/2" selectedModel={qualifiedModelId(stage1Provider, stage1Model)} providerGroups={availableModelCatalog}
+				<ModelCardPicker label="Stage 1/2" selectedModel={qualifiedModelRef(stage1Provider, stage1Model)} providerGroups={availableModelCatalog}
 					onSelect={setDrawingModel} />
 				<label class="demo-catalog-field"><span>{t().colorCatalogButton}</span>
 					<select bind:value={colorCatalogSettings.selected}>

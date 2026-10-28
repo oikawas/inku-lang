@@ -1,145 +1,18 @@
-#!/usr/bin/env node
-// model-ref-check — the browser half of model reference resolution.
-//
-//   npm run lint:models
-//
-// It reads model-ref-expectations.json, the same file
-// server/tests/test_model_ref_qualification.py reads, and asserts that
-// src/lib/models.ts answers exactly what the server answers. Two tables that
-// agree today would drift; one table cannot.
-//
-// There is no test runner in web/ on purpose — this is a plain node script, the
-// same shape as i18n-lint.mjs. Node strips the TypeScript types on import.
-
+import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const HERE = dirname(fileURLToPath(import.meta.url));
-const EXPECTATIONS = JSON.parse(readFileSync(join(HERE, 'model-ref-expectations.json'), 'utf8'));
-
-const { splitModelRef, qualifiedModelId, resolveModelRef, resolveModelRefForDisplay, modelDisplayName } =
-	await import(join(HERE, '..', 'src/lib/models.ts'));
-
-const failures = [];
+import { modelReference } from '../src/lib/modelReferences.ts';
+import { qualifiedModelRef, splitModelReference, modelDisplayName, modelShortName, pickerSelection } from '../src/lib/models.ts';
+const fixture = JSON.parse(readFileSync(new URL('../src/lib/model-reference-test-fixtures.json', import.meta.url), 'utf8'));
 let checks = 0;
-
-function check(what, actual, expected) {
-	checks += 1;
-	const a = JSON.stringify(actual);
-	const e = JSON.stringify(expected);
-	if (a !== e) failures.push(`${what}\n    expected ${e}\n    actual   ${a}`);
+for (let i = 0; i < fixture.queries.length; i++) {
+  assert.deepEqual(modelReference(fixture.queries[i]), fixture.results[i]); checks++;
 }
-
-/** The catalog as ProviderGroup[], so the rules read the server's model lists. */
-function groupsFrom(catalog, drop = null) {
-	return Object.entries(catalog)
-		.filter(([id]) => id !== drop)
-		.map(([id, models]) => ({ id, label: id, models: models.map((m) => ({ id: m, label: m })) }));
-}
-
-const GROUPS = groupsFrom(EXPECTATIONS.catalog);
-const STAGE1 = EXPECTATIONS.stage_defaults.stage1_provider;
-const STAGE2 = EXPECTATIONS.stage_defaults.stage2_provider;
-
-// ── the expectation table ─────────────────────────────────────────────────
-for (const c of EXPECTATIONS.cases) {
-	for (const [stage, fallback] of [['stage1', STAGE1], ['stage2', STAGE2]]) {
-		check(
-			`resolve ${c.ref} (${stage}, rule ${c.rule})`,
-			resolveModelRef(c.ref, GROUPS, fallback),
-			{ provider: c.provider, model: c.model }
-		);
-	}
-}
-
-// ── rule 3 falls to the drawing model's provider ──────────────────────────
-// One model draws both stages (2026-09-30): the fallback is the Stage 1
-// provider, whatever a stored Stage 2 provider still says.
-{
-	const { stage1_provider } = EXPECTATIONS.rule_three.stored_settings;
-	for (const c of EXPECTATIONS.rule_three.cases) {
-		check(`rule three ${c.ref}`, resolveModelRef(c.ref, GROUPS, stage1_provider).provider, c.provider);
-	}
-}
-
-// ── rule 2 demands exactly one owner ──────────────────────────────────────
-{
-	const a = EXPECTATIONS.ambiguity;
-	// The shipped catalog no longer contains a model two providers both list --
-	// replacing the Ollama list on 2026-07-29 removed the last one -- so the
-	// second owner is added here. Without it this rule would go untested.
-	const catalog = Object.fromEntries(
-		Object.entries(EXPECTATIONS.catalog).map(([id, models]) => [
-			id,
-			id === a.added_owner ? [...models, a.ref] : models
-		])
-	);
-	const owners = Object.entries(catalog)
-		.filter(([, models]) => models.includes(a.ref))
-		.map(([id]) => id);
-	const groups = groupsFrom(catalog);
-	check(`${a.ref} is offered by both providers`, owners.sort(), [...a.owners].sort());
-	check(`${a.ref} is not decided by rule 2`, resolveModelRef(a.ref, groups, STAGE1).provider, STAGE1);
-	check(
-		`${a.ref} is decided once ${a.deactivate} is gone`,
-		resolveModelRef(a.ref, groupsFrom(catalog, a.deactivate), STAGE1).provider,
-		a.provider_when_deactivated
-	);
-}
-
-// ── the retired provider names, and never routes ──────────────────────────
-// resolveModelRef is the routing resolver, so nothing unqualified may reach a
-// retired provider through it -- not even a model only that provider ever owned.
-for (const ref of EXPECTATIONS.never_ovms.refs) {
-	const provider = resolveModelRef(ref, GROUPS, 'ollama').provider;
-	check(`${ref} does not land on ovms`, provider === 'ovms', false);
-}
-
-// The display resolver is the one place that may, and it must, or the six
-// artworks made on ovms would be attributed to whatever the stage default is.
-for (const c of EXPECTATIONS.retired_display.cases) {
-	check(
-		`display ${c.ref}`,
-		resolveModelRefForDisplay(c.ref, GROUPS, 'ollama'),
-		{ provider: c.provider, model: c.model }
-	);
-	check(`display name ${c.ref}`, modelDisplayName(c.ref, undefined, 'ollama'), c.display);
-}
-
-// ── qualification never happens twice ─────────────────────────────────────
-for (const c of EXPECTATIONS.qualify) {
-	check(`qualify(${c.provider}, ${c.ref})`, qualifiedModelId(c.provider, c.ref, GROUPS), c.expected);
-}
-
-// ── a model id carrying colons survives the round trip ────────────────────
-for (const c of EXPECTATIONS.round_trip) {
-	const qualified = qualifiedModelId(c.provider, c.model, GROUPS);
-	check(`qualify ${c.provider} + ${c.model}`, qualified, `${c.provider}:${c.model}`);
-	check(`split ${qualified}`, splitModelRef(qualified, GROUPS), { provider: c.provider, model: c.model });
-}
-
-// ── the JavaScript trap this rule was rewritten around ────────────────────
-// 'a:b:c'.split(':', 1) returns ['a'] — the limit drops the tail rather than
-// capping the number of splits the way Python does. splitModelRef must not
-// lose anything after the model id's own colon.
-check(
-	"split('ollama-cloud:gemma4:31b') keeps the tail",
-	splitModelRef('ollama-cloud:gemma4:31b', GROUPS),
-	{ provider: 'ollama-cloud', model: 'gemma4:31b' }
-);
-check('an empty model id is not a qualification', splitModelRef('ollama:', GROUPS), {
-	provider: null,
-	model: 'ollama:'
-});
-check('a leading colon is not a qualification', splitModelRef(':leading', GROUPS), {
-	provider: null,
-	model: ':leading'
-});
-
-if (failures.length > 0) {
-	console.error(`model-ref-check: ${failures.length} of ${checks} checks failed\n`);
-	for (const failure of failures) console.error(`  ✗ ${failure}\n`);
-	process.exit(1);
-}
+assert.deepEqual(splitModelReference('chatgpt:model'), {provider:'chatgpt',model:'model'}); checks++;
+assert.equal(qualifiedModelRef('nim','plain-model'), 'nim:plain-model'); checks++;
+assert.equal(modelDisplayName('nim:plain-model'), 'NVIDIA NIM (Cloud) / Plain Model'); checks++;
+assert.equal(modelShortName('nim:google/gemma-4-31b-it'), 'gemma-4-31b-it'); checks++;
+const groups=[{id:'nim',label:'NVIDIA NIM (Cloud)',models:[{id:'plain-model',label:'Plain Model',qualified_id:'nim:plain-model'}]}];
+assert.equal(pickerSelection(groups,'nim:plain-model').selected?.model.id,'plain-model'); checks++;
+const source=readFileSync(new URL('../src/lib/models.ts',import.meta.url),'utf8');
+for (const old of ['PROVIDER_GROUPS','RETIRED_PROVIDER_GROUPS','function splitModelRef(', 'function qualifiedModelId(', 'function resolveModelRef(']) { assert.equal(source.includes(old),false); checks++; }
 console.log(`model-ref-check: ${checks} checks passed`);

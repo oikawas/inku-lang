@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -23,8 +22,8 @@ from ...limits import (
 )
 from ...persistence.backup import BackupNotFoundError, BackupSchemaMismatchError, SQLiteSnapshotError
 from ...plugins import plugin_status_items
-from ...model_catalog import catalog_models
-from ...model_settings import MODEL_METADATA_KEYS, connection_for, model_provider_catalog, normalize_model_settings, public_model_settings, update_model_settings
+from ...verified_model_catalog import core_catalog
+from ...model_settings import connection_for, model_provider_catalog, normalize_model_settings, provider_concurrency_limit, public_model_settings, update_model_settings
 from ... import db as _db
 from ... import logging_setup as _logging_setup
 from ... import thumbs_db as _thumbs_db
@@ -564,6 +563,29 @@ def api_settings_models() -> ModelSettingsResponse:
     )
 
 
+class ModelProviderValidationBody(BaseModel):
+    provider: str = Field(default="", description="Provider identifier to inspect")
+    base_url: str = Field(default="", description="Service URL to inspect")
+    rate_limits: dict = Field(default_factory=dict, description="Request and token limits to inspect")
+    models: list[dict] = Field(default_factory=list, description="Models to inspect for duplicate identifiers")
+
+
+class ModelProviderValidationResult(BaseModel):
+    normalized_provider: str = Field(description="Provider identifier after normalization")
+    normalized_url: str = Field(description="URL after normalization")
+    provider_valid: bool = Field(description="Whether the provider identifier has the supported form")
+    url_valid: bool = Field(description="Whether the URL has an HTTP or HTTPS origin")
+    rate_limits_valid: bool = Field(description="Whether all limits are integers in the supported range")
+    duplicate_models: list[str] = Field(description="Repeated non-empty model identifiers")
+
+
+@router.post("/api/settings/models/validate", response_model=ModelProviderValidationResult, summary="Inspect model provider settings")
+def api_settings_validate_model_provider(body: ModelProviderValidationBody) -> ModelProviderValidationResult:
+    """Inspect the supplied values without storing settings or contacting a provider."""
+    result = core_catalog("validate_settings", **body.model_dump())
+    return ModelProviderValidationResult(**result)
+
+
 @router.put("/api/settings/models", response_model=ModelSettingsResponse, summary="Update model settings")
 def api_settings_update_models(
     body: ModelSettingsPatch,
@@ -597,10 +619,6 @@ def api_settings_update_models(
 # largest page each API allows, so one request is the usual case. The page cap
 # only stops a provider that never says it is done; a list cut short there
 # would retire real models, so it is an error rather than a partial answer.
-_MODEL_LIST_PAGE_SIZE = 1000
-_MODEL_LIST_PAGE_LIMIT = 20
-
-
 def _get_model_list_page(url: str, headers: dict[str, str]) -> object:
     try:
         req = urllib.request.Request(url, headers=headers, method="GET")
@@ -616,6 +634,7 @@ def _fetch_paged_model_list(
     *,
     items_key: str,
     first_query: dict[str, str],
+    page_limit: int,
     next_query,
 ) -> dict:
     """Read every page of a paginated model list into one `{items_key: [...]}`.
@@ -625,7 +644,7 @@ def _fetch_paged_model_list(
     """
     collected: list = []
     query = first_query
-    for _ in range(_MODEL_LIST_PAGE_LIMIT):
+    for _ in range(page_limit):
         page = _get_model_list_page(f"{base}?{urllib.parse.urlencode(query)}", headers)
         if not isinstance(page, dict) or not isinstance(page.get(items_key), list):
             raise ValueError("model list response did not contain models")
@@ -648,62 +667,21 @@ def _fetch_provider_model_list(provider_id: str, settings: dict) -> list[dict[st
     if not provider:
         raise ValueError("unknown provider")
     conn = connection_for(provider_id, settings)
-    base_url = str(conn["base_url"]).rstrip("/")
-    headers: dict[str, str] = {"Accept": "application/json"}
-    if conn.get("kind") == "anthropic":
-        if conn.get("api_key"):
-            headers["x-api-key"] = str(conn["api_key"])
-        headers["anthropic-version"] = "2023-06-01"
-        payload = _fetch_paged_model_list(
-            f"{base_url}/v1/models",
-            headers,
-            items_key="data",
-            first_query={"limit": str(_MODEL_LIST_PAGE_SIZE)},
-            next_query=lambda page: (
-                {"after_id": str(page["last_id"])}
-                if page.get("has_more") and page.get("last_id")
-                else None
-            ),
-        )
-    elif conn.get("kind") == "gemini":
-        # The key rides in the header the pipeline transport already uses. In
-        # the query string it would be written into every proxy and access log
-        # the URL passes through.
-        if conn.get("api_key"):
-            headers["x-goog-api-key"] = str(conn["api_key"])
-        payload = _fetch_paged_model_list(
-            f"{base_url}/v1beta/models",
-            headers,
-            items_key="models",
-            first_query={"pageSize": str(_MODEL_LIST_PAGE_SIZE)},
-            next_query=lambda page: (
-                {"pageToken": str(page["nextPageToken"])} if page.get("nextPageToken") else None
-            ),
-        )
+    kind = str(conn.get("kind") or "")
+    plan = core_catalog("model_list_start", kind=kind, base_url=str(conn["base_url"]),
+                        api_key=str(conn.get("api_key") or ""))
+    if plan["query"] is None:
+        payload = _get_model_list_page(plan["url"], plan["headers"])
     else:
-        if conn.get("api_key"):
-            headers["Authorization"] = f"Bearer {conn['api_key']}"
-        payload = _get_model_list_page(f"{base_url}/models", headers)
+        payload = _fetch_paged_model_list(
+            plan["url"], plan["headers"], items_key=plan["items_key"], first_query=plan["query"], page_limit=plan["page_limit"],
+            next_query=lambda page: core_catalog("model_list_next", kind=kind, page=page)["query"],
+        )
 
-    raw_models = payload.get("data") if isinstance(payload, dict) else None
-    if raw_models is None and isinstance(payload, dict):
-        raw_models = payload.get("models")
-    if not isinstance(raw_models, list):
-        raise ValueError("model list response did not contain models")
-    models: list[dict[str, str]] = []
-    for item in raw_models:
-        if not isinstance(item, dict):
-            continue
-        model_id = str(item.get("id") or item.get("name") or "").strip()
-        if model_id.startswith("models/"):
-            model_id = model_id.removeprefix("models/")
-        if not model_id:
-            continue
-        label = str(item.get("display_name") or item.get("displayName") or model_id).strip()
-        models.append({"id": model_id, "label": label or model_id})
-    if not models:
-        raise ValueError("model list response was empty")
-    return models
+    result = core_catalog("model_rows", payload=payload)
+    if "error" in result:
+        raise ValueError(result["error"])
+    return result["models"]
 
 
 # Ollama Cloud hands its model list, and each model's details, to anyone: both
@@ -714,11 +692,7 @@ def _fetch_provider_model_list(provider_id: str, settings: dict) -> list[dict[st
 # once per fetch, with the smallest call there is. Anything else -- a busy
 # service, a timeout, a key the service refuses -- settles nothing, and the
 # mark the model already carries stays.
-_ACCESS_PROBE_PROVIDERS = frozenset({"ollama-cloud"})
 _ACCESS_PROBE_TIMEOUT_SECONDS = 20
-# The service refuses by concurrency, and two is its limit (model_settings).
-_ACCESS_PROBE_WORKERS = 2
-_RETIRED_AT = re.compile(r"retired at (\d{4}-\d{2}-\d{2})")
 
 
 def _post_for_status(url: str, headers: dict[str, str], body: dict) -> tuple[int | None, str]:
@@ -745,44 +719,29 @@ def _probe_model_access(base_url: str, api_key: str, model_id: str) -> dict:
     """What one model is to this key: {"retired": date}, {"subscription": bool}, or {} when unsettled."""
     origin = base_url.rstrip("/").removesuffix("/v1")
     status, text = _post_for_status(f"{origin}/api/show", {}, {"model": model_id})
-    if status == 410:
-        found = _RETIRED_AT.search(text)
-        return {"retired": found.group(1) if found else datetime.now(timezone.utc).date().isoformat()}
-    if not api_key:
-        return {}
+    answer = core_catalog("access_probe", stage="show", status=status, text=text,
+                          today=datetime.now(timezone.utc).date().isoformat())["answer"]
+    if answer or not api_key:
+        return answer
     status, _ = _post_for_status(
         f"{base_url.rstrip('/')}/chat/completions",
         {"Authorization": f"Bearer {api_key}"},
         {"model": model_id, "messages": [{"role": "user", "content": "."}], "max_tokens": 1},
     )
-    # A model outside the Free plan answers 402 (2026-10-13), one the account
-    # cannot reach yet 403; neither can be called on this key.
-    if status in (402, 403):
-        return {"subscription": True}
-    if status == 200:
-        return {"subscription": False}
-    return {}
+    return core_catalog("access_probe", stage="call", status=status)["answer"]
 
 
 def _apply_model_access(provider_id: str, settings: dict, models: list[dict]) -> None:
     """Mark the models this key cannot call, in place, for a provider that must be asked."""
-    if provider_id not in _ACCESS_PROBE_PROVIDERS:
+    if not core_catalog("access_enabled", provider=provider_id)["enabled"]:
         return
     conn = connection_for(provider_id, settings)
     base_url = str(conn["base_url"])
     api_key = str(conn.get("api_key") or "")
-    asked = [model for model in models if not model.get("eol")]
-    with ThreadPoolExecutor(max_workers=_ACCESS_PROBE_WORKERS) as pool:
+    asked = core_catalog("access_targets", models=models)["models"]
+    with ThreadPoolExecutor(max_workers=provider_concurrency_limit(provider_id) or 1) as pool:
         answers = list(pool.map(lambda model: _probe_model_access(base_url, api_key, str(model["id"])), asked))
-    for model, answer in zip(asked, answers):
-        if "retired" in answer:
-            model["eol"] = True
-            model["eol_date"] = answer["retired"]
-        elif answer.get("subscription") is True:
-            model["requires_subscription"] = True
-        elif answer.get("subscription") is False:
-            # The account reaches it now, whatever the builtin catalog assumed.
-            model.pop("requires_subscription", None)
+    models[:] = core_catalog("access_apply", models=models, answers=answers)["models"]
 
 
 @router.post(
@@ -805,72 +764,12 @@ def api_settings_fetch_provider_models(
         raise HTTPException(status_code=502, detail=str(e)) from e
     clean = normalize_model_settings(current)
     previous_provider = clean.get("providers", {}).get(provider_id, {})
-    previous_models = {
-        str(model.get("id")): model
-        for model in previous_provider.get("models", [])
-    }
-    carried = (
-        *MODEL_METADATA_KEYS,
-        # An administrator's choice of a purpose against the measurement (2026-10-26).
-        "allowed_unsupported_purposes",
-        "eol", "eol_date",
-        # 有料プラン限定の印は提供元の一覧に現れない (一覧には載るが叩くと 402 か
-        # 403 が返る)。取得のたびに消えては困るので、EOL と違って再提供で外さない。
-        "requires_subscription",
-    )
-    catalog = catalog_models(provider_id)
-    for model in models:
-        previous = previous_models.get(str(model["id"]))
-        if not previous:
-            # A model this installation meets for the first time takes what the catalog
-            # (model_catalog.json) knows about it. The provider names it, and listing it
-            # means it is offered, so the catalog's end-of-life mark is not taken.
-            known = catalog.get(str(model["id"]))
-            if known:
-                model.update({key: value for key, value in known.items() if key not in ("id", "label", "eol", "eol_date")})
-            continue
-        for key in carried:
-            if key in previous:
-                model[key] = previous[key]
-        # NVIDIA NIM のようにプロバイダが display_name を返さない場合、取得のたびに
-        # ラベルが ID へ戻ってしまう。提供元が実質ラベルを持たないときだけ、
-        # 既存の整えたラベルを残す (提供元が名前を返すならそちらを優先)。
-        previous_label = str(previous.get("label") or "").strip()
-        if (
-            previous_label
-            and previous_label != str(previous.get("id"))
-            and str(model.get("label") or "") == str(model["id"])
-        ):
-            model["label"] = previous_label
-        # 一度 EOL にしたモデルが再び提供された場合は印を外す。
-        model.pop("eol", None)
-        model.pop("eol_date", None)
+    models = core_catalog("refresh_prepare", provider=provider_id, models=models, previous=previous_provider)["models"]
     _apply_model_access(provider_id, current, models)
-
-    # 提供元から消えたモデルは削除せず EOL として末尾に残す。過去の作品が記録して
-    # いるモデル名の表示・評価情報を失わないため (v1.98)。
-    live_ids = {str(model["id"]) for model in models}
-    retired_on = datetime.now(timezone.utc).date().isoformat()
-    retired = []
-    for model_id, previous in previous_models.items():
-        if model_id in live_ids:
-            continue
-        kept = dict(previous)
-        kept["eol"] = True
-        kept.setdefault("eol_date", retired_on)
-        retired.append(kept)
-    models = models + sorted(retired, key=lambda item: str(item.get("id")))
-
-    previous_enabled_models = previous_provider.get("enabled_models") or {}
-    enabled_models = {
-        model["id"]: (
-            not model.get("eol")
-            and not model.get("requires_subscription")
-            and str(model["id"]) in previous_models
-            and bool(previous_enabled_models.get(model["id"], False))
-        )
-        for model in models
-    }
+    refreshed = core_catalog("refresh_finish", models=models, previous=previous_provider,
+                             today=datetime.now(timezone.utc).date().isoformat())
+    models = refreshed["models"]
+    enabled_models = refreshed["enabled_models"]
     saved = _db.update_model_settings(update_model_settings(current, {
         "providers": {
             provider_id: {

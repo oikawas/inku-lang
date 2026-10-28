@@ -12,7 +12,7 @@
 	import { derivationKindLabel } from '$lib/derivation';
 	import { t } from '$lib/i18n/index.svelte';
 	import { groupDigits } from '$lib/formatNumber';
-	import { modelDisplayName, modelShortName, qualifiedModelId, type Provider, type ProviderGroup } from '$lib/models';
+	import { modelDisplayName, modelShortName, qualifiedModelRef, type Provider, type ProviderGroup } from '$lib/models';
 	import ModelCardPicker from './ModelCardPicker.svelte';
 	import type { AnimationExportSettings } from '$lib/animationExport';
 	import type { ExportTemplate } from '$lib/exportTemplates';
@@ -475,7 +475,7 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 
 
 	async function selectOkugakiModel(provider: Provider, model: string): Promise<void> {
-		const nextModel = qualifiedModelId(provider, model);
+		const nextModel = qualifiedModelRef(provider, model);
 		const previous = selectedOkugakiModel;
 		selectedOkugakiModel = nextModel;
 		okugakiError = null;

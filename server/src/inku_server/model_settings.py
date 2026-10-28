@@ -6,172 +6,28 @@ browser. The UI receives masked status fields.
 
 from __future__ import annotations
 
-import math
 import os
 from copy import deepcopy
 from typing import Any
 
-from .model_catalog import catalog_models, labelled
 from .secrets import decrypt_secret, encrypt_secret
-from .verified_model_catalog import (
-    DEFAULT_ANTHROPIC_MODELS,
-    DEFAULT_GEMINI_MODELS,
-    DEFAULT_OPENAI_MODELS,
-    MODEL_CATALOG,
-    MODEL_CONFIG_VERSION,
-    STORED_LABEL_KEYS,
-    VERIFIED_NVIDIA_MODELS,
-    VERIFIED_OLLAMA_CLOUD_MODELS,
-    VERIFIED_OLLAMA_LOCAL_MODELS,
-)
+from .verified_model_catalog import core_catalog
 
-# Every recommendation key, named once. Three places have to agree about them --
-# the normalizer's receiving end, the metadata refresh a catalog version bump
-# triggers, and the set carried across a live model-list fetch (api.py) -- and a
-# key added to only some of them is lost in whichever path was missed, without
-# anything failing.
-#
-# The stage keys refine recommendation_llm rather than replacing it. A model
-# measured end to end -- every NVIDIA and Ollama Cloud entry -- has one number and
-# both stages read it, so adding these migrated nothing. They exist because the
-# local Ollama models were measured per stage and the two stages disagree: the
-# pair inku recommends is a Stage 1 model that covers 32% of Stage 2 and a Stage 2
-# model that breaks Stage 1 in English. One number cannot say that.
-MODEL_RECOMMENDATION_KEYS = (
-    "recommendation_llm",
-    "recommendation_vision",
-    "recommendation_stage1",
-    "recommendation_stage2",
-    "recommendation_level",
-)
-# Measured reference numbers the picker prints beside the levels (the author's
-# tooltip request, 2026-10-13): approximate USD for one drawing and for one
-# Vision image, and the mean seconds the provider took for each. Numbers rather
-# than labels, so the card can word them in either language.
-MODEL_MEASUREMENT_KEYS = (
-    "cost_usd_llm",
-    "cost_usd_vision",
-    "speed_llm_seconds",
-    "speed_vision_seconds",
-)
-MODEL_METADATA_KEYS = (
-    "purposes",
-    "unsupported_purposes",
-    "not_supported",
-    "legacy",
-    *MODEL_RECOMMENDATION_KEYS,
-    "speed_class",
-    "speed_label",
-    *MODEL_MEASUREMENT_KEYS,
-    "comment_ja",
-    "comment_en",
-)
-# What the catalog decides about a model (model_catalog.json): laid over an installation's copy
-# whole when the catalog changes. The name an installation shows and the paid-plan mark its own
-# key's probe found are the installation's.
-CATALOG_MODEL_KEYS = (*MODEL_METADATA_KEYS, "eol", "eol_date", "notes")
+# Metadata field sets come from the same core that normalizes and refreshes models.
+_PROVIDER_METADATA = core_catalog("provider_metadata")
+MODEL_RECOMMENDATION_KEYS = tuple(_PROVIDER_METADATA["recommendation"])
+MODEL_MEASUREMENT_KEYS = tuple(_PROVIDER_METADATA["measurement"])
+MODEL_METADATA_KEYS = tuple(_PROVIDER_METADATA["metadata"])
+CATALOG_MODEL_KEYS = tuple(_PROVIDER_METADATA["catalog"])
 
 
 def normalize_rate_limits(value: Any, *, provider_id: str = "") -> dict[str, int]:
-    defaults = {"rpm": 30, "tpm": 16_000, "rpd": 14_400} if provider_id == "gemini" else {"rpm": 0, "tpm": 0, "rpd": 0}
-    incoming = value if isinstance(value, dict) else {}
-    return {key: incoming[key] if isinstance(incoming.get(key), int)
-            and not isinstance(incoming[key], bool) and 0 <= incoming[key] <= 1_000_000_000
-            else default for key, default in defaults.items()}
+    return core_catalog("rate_limits", value=value, provider=provider_id)["rate_limits"]
 
 
-PROVIDER_DEFINITIONS: list[dict[str, Any]] = [
-    {
-        "id": "openai",
-        "label": "OpenAI API Platform",
-        "kind": "openai_compatible",
-        "api_key_env": "OPENAI_API_KEY",
-        "base_url_env": "OPENAI_BASE_URL",
-        "default_base_url": "https://api.openai.com/v1",
-        "requires_api_key": True,
-        # The defaults of every builtin provider, and all model information, are in
-        # model_catalog.json.
-        "models": DEFAULT_OPENAI_MODELS,
-    },
-    {
-        "id": "anthropic",
-        "label": "Claude API",
-        "kind": "anthropic",
-        "api_key_env": "ANTHROPIC_API_KEY",
-        "base_url_env": "ANTHROPIC_BASE_URL",
-        "default_base_url": "https://api.anthropic.com",
-        "requires_api_key": True,
-        "models": DEFAULT_ANTHROPIC_MODELS,
-    },
-    {
-        "id": "gemini",
-        "label": "Gemini API",
-        "kind": "gemini",
-        "api_key_env": "GEMINI_API_KEY",
-        "base_url_env": "GEMINI_BASE_URL",
-        "default_base_url": "https://generativelanguage.googleapis.com",
-        "requires_api_key": True,
-        # The 2.5 models refuse API accounts made after their retirement
-        # (generateContent answers 404), so a fresh install offered nothing that
-        # worked. These two answered through this API in the draw session's
-        # 2026-09-22/23 Stage 1 comparisons. A stored list is not touched: it
-        # decides which models an installation has.
-        "models": DEFAULT_GEMINI_MODELS,
-    },
-    {
-        "id": "nvidia",
-        "label": "NVIDIA NIM",
-        "kind": "openai_compatible",
-        "developer_only": True,
-        "api_key_env": "NVIDIA_API_KEY",
-        "base_url_env": "NVIDIA_BASE_URL",
-        "default_base_url": "https://integrate.api.nvidia.com/v1",
-        "requires_api_key": True,
-        "models": VERIFIED_NVIDIA_MODELS,
-    },
-    {
-        "id": "ollama",
-        "label": "Ollama",
-        "kind": "openai_compatible",
-        "api_key_env": "OLLAMA_API_KEY",
-        "base_url_env": "OLLAMA_BASE_URL",
-        "default_base_url": "http://localhost:11434/v1",
-        "requires_api_key": False,
-        # Tags name the quantization. A bare tag is a moving target upstream, and the
-        # measurements behind these entries were taken against one build of one file.
-        "models": VERIFIED_OLLAMA_LOCAL_MODELS,
-        # Speed was taken out of what a release presents (decided 2026-07-27: there is
-        # no GPU here, so there is no speed to promise). The numbers are still worth
-        # having while experimenting locally, and they were measured on one machine
-        # that no one else is running, so they are shown in developer mode only.
-        "speed_developer_only": True,
-    },
-    {
-        "id": "ollama-cloud",
-        "label": "Ollama Cloud (ollama.com)",
-        "kind": "openai_compatible",
-        "api_key_env": "OLLAMA_CLOUD_API_KEY",
-        "base_url_env": "OLLAMA_CLOUD_BASE_URL",
-        "default_base_url": "https://ollama.com/v1",
-        "requires_api_key": True,
-        # The free tier refuses work by concurrency rather than by volume: eight
-        # simultaneous requests returned 429 while only 7.6% of the weekly allowance
-        # had been spent (measured 2026-07-27). Two is a property of the service, not
-        # a taste, so it is fixed here instead of being offered as a setting.
-        "max_concurrency": 2,
-        "models": VERIFIED_OLLAMA_CLOUD_MODELS,
-        # Same reason as local Ollama, for a different cause: there the machine is
-        # nobody else's, here the queue is everybody's. The same request to the same
-        # model ran 1.2 and 110 seconds on one day (2026-07-27), and gemma4:31b's
-        # median moved 11s -> 105s -> 35s across three runs of the same four cases
-        # on 2026-07-29. The numbers are worth having while measuring and are not a
-        # promise to anyone else, so a release does not show them.
-        "speed_developer_only": True,
-    },
-]
+PROVIDER_DEFINITIONS: list[dict[str, Any]] = core_catalog("providers", host="server")["providers"]
 
 BUILTIN_PROVIDER_IDS = {str(provider["id"]) for provider in PROVIDER_DEFINITIONS}
-_BUILTIN_PROVIDER_BY_ID = {str(provider["id"]): provider for provider in PROVIDER_DEFINITIONS}
 
 # Providers withdrawn from the catalog. Dropping the definition is not enough to
 # remove one from an installation: a provider id the builtin list does not know
@@ -183,129 +39,9 @@ _BUILTIN_PROVIDER_BY_ID = {str(provider["id"]): provider for provider in PROVIDE
 # ovms (Intel OpenVINO Model Server) was the local OpenAI-compatible backend
 # until 2026-07-30. Its endpoint had stopped serving models while still answering
 # /health, and the models it offered are reachable through Ollama instead.
-RETIRED_PROVIDER_IDS = {"ovms"}
-_OPENAI_LEGACY_LOCAL_BASE_URLS = {
-    "http://127.0.0.1:18000/v3",
-    "http://localhost:18000/v3",
-    "http://localhost:8000/v3",
-}
-
-
-def _normalize_provider_base_url(provider_id: str, value: str) -> str:
-    base_url = value.strip().rstrip("/")
-    if provider_id == "openai" and base_url in _OPENAI_LEGACY_LOCAL_BASE_URLS:
-        return str(_BUILTIN_PROVIDER_BY_ID["openai"]["default_base_url"])
-    return base_url
-
-
-def _normalize_provider_id(value: Any) -> str:
-    text = str(value or "").strip().lower()
-    return "".join(ch for ch in text if ch.isalnum() or ch in {"_", "-"})
-
-
-def _normalize_provider_kind(value: Any) -> str:
-    return str(value) if value in {"openai_compatible", "mlx", "anthropic", "gemini"} else "openai_compatible"
-
-
+RETIRED_PROVIDER_IDS = {provider["id"] for provider in core_catalog("retired_providers")["providers"]}
 def _normalize_models(models: Any) -> list[dict[str, Any]]:
-    normalized: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    if isinstance(models, list):
-        for model in models:
-            if not isinstance(model, dict):
-                continue
-            model_id = str(model.get("id") or "").strip()
-            if not model_id or model_id in seen:
-                continue
-            seen.add(model_id)
-            item = {"id": model_id, "label": str(model.get("label") or model_id).strip() or model_id}
-            if isinstance(model.get("notes"), str) and model["notes"].strip():
-                item["notes"] = model["notes"].strip()
-            purposes = model.get("purposes")
-            if isinstance(purposes, list):
-                clean_purposes = [purpose for purpose in ("llm", "vision") if purpose in purposes]
-            else:
-                marker = f"{model_id} {item.get('notes', '')}".lower()
-                clean_purposes = ["vision"] if "vision" in marker else ["llm"]
-            # A purpose the model was measured not to answer is left out of what the
-            # catalog or a tick offers (the author, 2026-10-13), unless an
-            # administrator chose it for the model knowing it is not recommended
-            # (`allowed_unsupported_purposes`, the author, 2026-10-26). A model left
-            # with no purpose is offered for nothing, rather than defaulted to LLM.
-            unsupported = model.get("unsupported_purposes")
-            clean_unsupported = ([purpose for purpose in ("llm", "vision") if purpose in unsupported]
-                                 if isinstance(unsupported, list) else [])
-            allowed = model.get("allowed_unsupported_purposes")
-            clean_allowed = ([purpose for purpose in clean_unsupported if purpose in allowed]
-                             if isinstance(allowed, list) else [])
-            clean_purposes = [purpose for purpose in clean_purposes
-                              if purpose not in clean_unsupported or purpose in clean_allowed]
-            if not clean_purposes and not clean_unsupported:
-                clean_purposes = ["llm"]
-            item["purposes"] = clean_purposes
-            if clean_unsupported:
-                item["unsupported_purposes"] = clean_unsupported
-            allowed_kept = [purpose for purpose in clean_allowed if purpose in clean_purposes]
-            if allowed_kept:
-                item["allowed_unsupported_purposes"] = allowed_kept
-            # v1.98: 推奨度は用途ごとに持つ。LLM は「3 回成功したか・スキーマを壊さないか・
-            # 補正発火が少ないか」、Vision は画像特徴の再現率で決まり、尺度が異なるため。
-            # 旧 recommendation_level は用途別の値が無いときだけ読む (書き出しはしない)。
-            legacy = model.get("recommendation_level")
-            for key in ("recommendation_llm", "recommendation_vision"):
-                purpose = "llm" if key == "recommendation_llm" else "vision"
-                value = model.get(key)
-                if not isinstance(value, int) or isinstance(value, bool):
-                    value = legacy if purpose in clean_purposes else None
-                if isinstance(value, int) and not isinstance(value, bool):
-                    item[key] = max(1, min(5, value))
-            # Stage levels have no purpose of their own -- they narrow the LLM
-            # level -- so they are read straight through with no legacy fallback.
-            # Absent means "not measured for that stage", which the picker shows
-            # as an em dash; it must not be filled in with a 0 or with the other
-            # stage's number.
-            for key in ("recommendation_stage1", "recommendation_stage2"):
-                value = model.get(key)
-                if isinstance(value, int) and not isinstance(value, bool):
-                    item[key] = max(1, min(5, value))
-            for key in ("speed_class", "speed_label", "comment_ja", "comment_en", "eol_date"):
-                value = model.get(key)
-                if isinstance(value, str) and value.strip():
-                    item[key] = value.strip()
-            # Absent means not measured, as with the levels. A free model costs 0,
-            # which is a measurement; no request takes 0 seconds, so that is not.
-            for key in MODEL_MEASUREMENT_KEYS:
-                value = model.get(key)
-                if (isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
-                        and (value > 0 if key.startswith("speed_") else value >= 0)):
-                    item[key] = float(value)
-            # v1.98: 提供終了 (EOL) の印。新規描画では選べないが一覧には残す。
-            if model.get("eol") is True:
-                item["eol"] = True
-            # 提供元の有料プランでしか叩けないモデルの印。EOL とは別の理由で選べない
-            # (退役したのではなく、こちらの契約が届いていない)。一覧には残す — 消すと
-            # 契約を変えたときに戻す作業が要るうえ、存在自体が見えなくなる。
-            if model.get("requires_subscription") is True:
-                item["requires_subscription"] = True
-            # Left out of the benchmark as a kind inku does not draw with (speech,
-            # music, video, embeddings and the like; the author, 2026-10-13). Not
-            # published, and folded away in model administration.
-            if model.get("not_supported") is True:
-                item["not_supported"] = True
-            # An older generation the provider has superseded (the OpenAI API up to
-            # GPT-5.4; the author, 2026-10-13). It can still be published; model
-            # administration only folds it away below the list.
-            if model.get("legacy") is True:
-                item["legacy"] = True
-            # The common format (model_catalog.json, the API) names the stored labels in
-            # `labels`; the Server keeps each as the boolean above. Labels it works out
-            # itself (no response, not measured) are not stored.
-            labels = model.get("labels")
-            for label in labels if isinstance(labels, list) else []:
-                if label in STORED_LABEL_KEYS:
-                    item[STORED_LABEL_KEYS[label]] = True
-            normalized.append(item)
-    return normalized
+    return core_catalog("normalize_models", models=models)["models"]
 
 
 def normalize_chatgpt_models(entries: Any) -> list[dict[str, Any]]:
@@ -329,338 +65,43 @@ def chatgpt_assessments(settings: dict[str, Any] | None) -> dict[str, dict[str, 
     return {model["id"]: model for model in entries}
 
 
-def _chatgpt_models(stored: Any, *, catalog_moved: bool) -> list[dict[str, Any]]:
-    """The catalog's ChatGPT plan entries and an installation's own, by model id.
+def _settings_environment() -> dict[str, str]:
+    names = {str(p[key]) for p in PROVIDER_DEFINITIONS for key in ("api_key_env", "base_url_env")}
+    return {name: os.environ[name] for name in names if name in os.environ}
 
-    An administrator's change outlives a read but not a change of catalog, as for every other
-    provider: while the catalog stays, the stored entry wins; once it changes, the catalog's.
-    """
-    catalog = {model["id"]: model for model in normalize_chatgpt_models(list(catalog_models("chatgpt").values()))}
-    own = {model["id"]: model for model in normalize_chatgpt_models(stored)}
-    return list(({**own, **catalog} if catalog_moved else {**catalog, **own}).values())
+
+def _ordered_settings(result: dict[str, Any]) -> dict[str, Any]:
+    settings = result["settings"]
+    providers = settings["providers"]
+    settings["providers"] = {key: providers[key] for key in result["order"] if key in providers}
+    return settings
 
 
 def default_model_settings() -> dict[str, Any]:
-    return {
-        "model_catalog_version": MODEL_CONFIG_VERSION,
-        "chatgpt_models": _chatgpt_models(None, catalog_moved=True),
-        "providers": {
-            str(provider["id"]): {
-                "id": provider["id"],
-                "label": provider["label"],
-                "kind": provider["kind"],
-                "api_key_env": provider["api_key_env"],
-                "base_url_env": provider["base_url_env"],
-                "default_base_url": provider["default_base_url"],
-                "requires_api_key": provider["requires_api_key"],
-                "memo": "",
-                "rate_limits": normalize_rate_limits(None, provider_id=str(provider["id"])),
-                "models": _normalize_models(deepcopy(provider["models"])),
-                "builtin": True,
-                "active": True,
-                "base_url": _normalize_provider_base_url(
-                    str(provider["id"]),
-                    os.getenv(str(provider["base_url_env"]), str(provider["default_base_url"])),
-                ),
-                "api_key": os.getenv(str(provider["api_key_env"]), ""),
-                "enabled_models": {str(model["id"]): True for model in provider["models"]},
-            }
-            for provider in PROVIDER_DEFINITIONS
-        },
-    }
+    return _ordered_settings(core_catalog("default_settings", env=_settings_environment()))
 
 
 def default_user_model_settings() -> dict[str, Any]:
-    return {
-        "stage1_provider": "nvidia",
-        "stage1_model": "google/gemma-4-31b-it",
-        "stage2_provider": "nvidia",
-        "stage2_model": "google/gemma-4-31b-it",
-        "vision_provider": "nvidia",
-        "vision_model": "meta/llama-3.2-90b-vision-instruct",
-        # v2.9.1: okugaki used to keep one qualified string while every other
-        # stage kept a (provider, model) pair. The pair is the canonical form;
-        # the single string is still read (see normalize_user_model_settings).
-        "okugaki_provider": "nvidia",
-        "okugaki_model": "meta/llama-3.2-90b-vision-instruct",
-        "model_inspection_selected_models": [],
-        "instruction_caption_visible": True,
-        "instruction_caption_writing_mode": "horizontal",
-        "instruction_caption_position": "left",
-        # The colour catalogue the user draws with. "auto" is not a catalogue:
-        # it asks the server to read each description (see color_selector).
-        "color_catalog_id": "default",
-        "ui_text_size": 1,
-        # Sketch prose stays visible for an account that has never folded it.
-        "sketch_open": True,
-        # Whether the generation-information drawer stays open, and shows the
-        # new work, when another work is chosen from the history strip.
-        "generation_info_follows_selection": True,
-        # Whether the generation information shows the tokens of each stage
-        # beside the work's total (2026-10-26); the total alone by default.
-        "generation_info_token_detail": False,
-    }
+    return core_catalog("user_defaults")["settings"]
 
 
 def normalize_model_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
-    default = default_model_settings()
-    if not isinstance(settings, dict):
-        return default
-    clean = deepcopy(default)
-    incoming_catalog_version = str(settings.get("model_catalog_version") or "")
-    catalog_moved = incoming_catalog_version != MODEL_CONFIG_VERSION
-    clean["chatgpt_models"] = _chatgpt_models(settings.get("chatgpt_models"), catalog_moved=catalog_moved)
-    providers = settings.get("providers")
-    if isinstance(providers, dict):
-        for raw_provider_id, incoming in providers.items():
-            provider_id = _normalize_provider_id(raw_provider_id)
-            if not provider_id or not isinstance(incoming, dict):
-                continue
-            if provider_id in RETIRED_PROVIDER_IDS or provider_id == "chatgpt":
-                continue
-            builtin = _BUILTIN_PROVIDER_BY_ID.get(provider_id)
-            provider = clean["providers"].get(provider_id) or {
-                "id": provider_id,
-                "label": provider_id,
-                "kind": "openai_compatible",
-                "api_key_env": "",
-                "base_url_env": "",
-                "default_base_url": "",
-                "requires_api_key": False,
-                "memo": "",
-                "models": [],
-                "builtin": False,
-                "active": True,
-                "base_url": "",
-                "api_key": "",
-                "enabled_models": {},
-            }
-            if isinstance(incoming.get("delete"), bool) and incoming["delete"]:
-                if provider.get("builtin"):
-                    provider["active"] = False
-                    clean["providers"][provider_id] = provider
-                else:
-                    clean["providers"].pop(provider_id, None)
-                continue
-            if incoming.get("active") is not None:
-                provider["active"] = bool(incoming["active"])
-            elif provider_id not in clean["providers"]:
-                provider["active"] = True
-            if isinstance(incoming.get("label"), str) and incoming["label"].strip():
-                provider["label"] = incoming["label"].strip()
-            elif builtin:
-                provider["label"] = builtin["label"]
-            if incoming.get("kind") is not None:
-                provider["kind"] = _normalize_provider_kind(incoming["kind"])
-            if isinstance(incoming.get("api_key_env"), str):
-                provider["api_key_env"] = incoming["api_key_env"].strip()
-            if isinstance(incoming.get("base_url_env"), str):
-                provider["base_url_env"] = incoming["base_url_env"].strip()
-            if isinstance(incoming.get("default_base_url"), str) and incoming["default_base_url"].strip():
-                provider["default_base_url"] = _normalize_provider_base_url(provider_id, incoming["default_base_url"])
-            if incoming.get("requires_api_key") is not None:
-                provider["requires_api_key"] = bool(incoming["requires_api_key"])
-            if isinstance(incoming.get("memo"), str):
-                provider["memo"] = incoming["memo"].strip()
-            provider["rate_limits"] = normalize_rate_limits(incoming.get("rate_limits"), provider_id=provider_id)
-            models = _normalize_models(incoming.get("models"))
-            if models:
-                # A stored list is the installation's own -- it may name models pulled
-                # locally that no catalog knows -- so it decides which models exist.
-                # What it must not do is outlive a catalog whose measurements changed:
-                # the stored copy carries whatever metadata was current when it was
-                # written, and a list refreshed from a live endpoint carries none at
-                # all (pentala's Ollama entries held id, label and purposes only). So
-                # on a change of catalog the catalog's information is laid back over the
-                # matching ids, which is the whole reason MODEL_CONFIG_VERSION exists.
-                builtin_by_id = {str(model["id"]): model for model in provider["models"]}
-                # A provider an operator added is followed too when the catalog names
-                # it (Mac local LLM, `local-mlx`, the author 2026-10-15): it is not
-                # builtin, so it has no default list, but its measurements are kept
-                # in the catalog like any other provider's.
-                in_catalog = provider_id in MODEL_CATALOG["providers"]
-                if (builtin or in_catalog) and (provider_id == "nvidia" or catalog_moved):
-                    catalog = catalog_models(provider_id)
-                    stored_by_id = {}
-                    for stored_model in incoming["models"]:
-                        if isinstance(stored_model, dict):
-                            stored_by_id.setdefault(str(stored_model.get("id") or "").strip(), stored_model)
-                    # NVIDIA additionally keeps builtin-only models the stored list has
-                    # dropped, because artworks name them and a dropped id would leave
-                    # those artworks labelless.
-                    merged = dict(builtin_by_id) if provider_id == "nvidia" else {}
-                    for model in models:
-                        model_id = str(model["id"])
-                        combined = {**builtin_by_id.get(model_id, {}), **model}
-                        # Inferred LLM use is not a stored purpose override.
-                        # An id-only entry inherits the known model's purposes.
-                        if model_id in builtin_by_id and not isinstance(stored_by_id[model_id].get("purposes"), list):
-                            combined["purposes"] = builtin_by_id[model_id]["purposes"]
-                        if catalog_moved and model_id in catalog:
-                            # The catalog is the one source of model information (the
-                            # author, 2026-10-13), so its entry replaces all of it: a key
-                            # the catalog dropped must not linger from the stored copy.
-                            combined = {key: value for key, value in combined.items() if key not in CATALOG_MODEL_KEYS}
-                            combined.update({key: value for key, value in catalog[model_id].items() if key not in ("id", "label")})
-                        merged[model_id] = combined
-                    provider["models"] = _normalize_models(list(merged.values()))
-                else:
-                    provider["models"] = models
-            if not provider.get("default_base_url") and provider.get("base_url"):
-                provider["default_base_url"] = provider["base_url"]
-            known_model_ids = {str(model["id"]) for model in provider["models"]}
-            provider["enabled_models"] = {
-                model_id: bool((provider.get("enabled_models") or {}).get(model_id, True))
-                for model_id in known_model_ids
-            }
-            if isinstance(incoming.get("base_url"), str) and incoming["base_url"].strip():
-                provider["base_url"] = _normalize_provider_base_url(provider_id, incoming["base_url"])
-            if isinstance(incoming.get("api_key"), str):
-                provider["api_key"] = incoming["api_key"]
-            enabled_models = incoming.get("enabled_models")
-            if isinstance(enabled_models, dict):
-                for model_id, enabled in enabled_models.items():
-                    if model_id in known_model_ids:
-                        provider["enabled_models"][model_id] = bool(enabled)
-            # Measured to answer neither purpose, or not supported: there is nothing
-            # to publish it for.
-            for model in provider["models"]:
-                if not model.get("purposes", ["llm"]) or model.get("not_supported") is True:
-                    provider["enabled_models"][str(model["id"])] = False
-            clean["providers"][provider_id] = provider
-    return clean
+    incoming = settings.get("providers") if isinstance(settings, dict) else None
+    order = list(incoming) if isinstance(incoming, dict) else []
+    return _ordered_settings(core_catalog("normalize_settings", settings=settings, order=order, env=_settings_environment()))
 
 
-def _normalize_selected_model_ids(value: Any) -> list[str]:
-    if not isinstance(value, list):
-        return []
-    clean: list[str] = []
-    seen: set[str] = set()
-    for item in value:
-        if not isinstance(item, str):
-            continue
-        model_id = item.strip()
-        if not model_id or model_id in seen:
-            continue
-        clean.append(model_id)
-        seen.add(model_id)
-        if len(clean) >= 4:
-            break
-    return clean
-
-
-# "auto" sits in the same slot as a catalog id but is not one: it asks the paint
-# endpoint to read the description (catalog_mode=auto).  Anything else has to be
-# a catalog that still exists -- a retired id would be stored only to answer 422
-# on the next drawing.
-AUTO_COLOR_CATALOG_ID = "auto"
-
-
-def _normalize_catalog_choice(value: Any) -> str:
+def _user_catalog_context() -> dict[str, Any]:
     from .color_catalogs import DEFAULT_COLOR_CATALOG_ID, color_catalog_ids
-
-    if not isinstance(value, str):
-        return DEFAULT_COLOR_CATALOG_ID
-    choice = value.strip()
-    if choice == AUTO_COLOR_CATALOG_ID or choice in color_catalog_ids():
-        return choice
-    return DEFAULT_COLOR_CATALOG_ID
-
-
-_USER_PROVIDER_KEYS = ("stage1_provider", "stage2_provider", "vision_provider", "okugaki_provider")
-_USER_MODEL_KEYS = ("stage1_model", "stage2_model", "vision_model", "okugaki_model")
-_INSTRUCTION_CAPTION_WRITING_MODES = {"horizontal", "vertical"}
-_INSTRUCTION_CAPTION_POSITIONS = {"left", "right"}
-_UI_TEXT_SIZE_STEPS = range(5)
-
-
-def _normalize_instruction_caption_writing_mode(value: Any) -> str:
-    if isinstance(value, str) and value in _INSTRUCTION_CAPTION_WRITING_MODES:
-        return value
-    return "horizontal"
-
-
-def _normalize_instruction_caption_position(value: Any) -> str:
-    if isinstance(value, str) and value in _INSTRUCTION_CAPTION_POSITIONS:
-        return value
-    return "left"
-
-
-def _normalize_ui_text_size(value: Any) -> int:
-    return value if isinstance(value, int) and not isinstance(value, bool) and value in _UI_TEXT_SIZE_STEPS else 1
+    return {"color_ids": sorted(color_catalog_ids()), "default_color": DEFAULT_COLOR_CATALOG_ID}
 
 
 def normalize_user_model_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
-    default = default_user_model_settings()
-    if not isinstance(settings, dict):
-        return default
-    clean = dict(default)
-    for key in _USER_PROVIDER_KEYS:
-        if isinstance(settings.get(key), str) and settings[key].strip():
-            clean[key] = str(settings[key])
-    for key in _USER_MODEL_KEYS:
-        if isinstance(settings.get(key), str) and settings[key].strip():
-            clean[key] = settings[key].strip()
-    # v2.9.1: read both shapes, write the pair. Values stored before the pair
-    # existed carry the provider inside okugaki_model ("openai:gpt-4.1-mini").
-    # The prefix is authoritative when present because it is what the picker
-    # actually wrote. Only builtin provider ids are recognised here: this
-    # function is called once per user row and must not read the stored
-    # catalog. A custom provider's qualified value simply stays a single
-    # string, which qualify_model_ref() then leaves alone.
-    okugaki_prefix, okugaki_bare = split_model_ref(str(clean["okugaki_model"]), None)
-    if okugaki_prefix:
-        clean["okugaki_provider"] = okugaki_prefix
-        clean["okugaki_model"] = okugaki_bare
-    # One model draws both stages (2026-09-30, the author): Stage 2 always
-    # follows Stage 1, so an account that chose two keeps its Stage 1 model.
-    clean["stage2_provider"] = clean["stage1_provider"]
-    clean["stage2_model"] = clean["stage1_model"]
-    clean["model_inspection_selected_models"] = _normalize_selected_model_ids(settings.get("model_inspection_selected_models"))
-    clean["instruction_caption_visible"] = settings.get("instruction_caption_visible") is not False
-    clean["instruction_caption_writing_mode"] = _normalize_instruction_caption_writing_mode(
-        settings.get("instruction_caption_writing_mode")
-    )
-    clean["instruction_caption_position"] = _normalize_instruction_caption_position(
-        settings.get("instruction_caption_position")
-    )
-    clean["color_catalog_id"] = _normalize_catalog_choice(settings.get("color_catalog_id"))
-    clean["ui_text_size"] = _normalize_ui_text_size(settings.get("ui_text_size"))
-    # An absent sketch fold means "never folded".
-    clean["sketch_open"] = settings.get("sketch_open") is not False
-    clean["generation_info_follows_selection"] = settings.get("generation_info_follows_selection") is not False
-    clean["generation_info_token_detail"] = settings.get("generation_info_token_detail") is True
-    return clean
+    return core_catalog("normalize_user", settings=settings, **_user_catalog_context())["settings"]
 
 
 def update_user_model_settings(current: dict[str, Any] | None, patch: dict[str, Any]) -> dict[str, Any]:
-    clean = normalize_user_model_settings(current)
-    for key in _USER_PROVIDER_KEYS:
-        if isinstance(patch.get(key), str) and patch[key].strip():
-            clean[key] = str(patch[key])
-    for key in _USER_MODEL_KEYS:
-        if isinstance(patch.get(key), str) and patch[key].strip():
-            clean[key] = patch[key].strip()
-    if "instruction_caption_visible" in patch:
-        clean["instruction_caption_visible"] = bool(patch["instruction_caption_visible"])
-    if "instruction_caption_writing_mode" in patch:
-        clean["instruction_caption_writing_mode"] = _normalize_instruction_caption_writing_mode(
-            patch.get("instruction_caption_writing_mode")
-        )
-    if "instruction_caption_position" in patch:
-        clean["instruction_caption_position"] = _normalize_instruction_caption_position(
-            patch.get("instruction_caption_position")
-        )
-    if "model_inspection_selected_models" in patch:
-        clean["model_inspection_selected_models"] = _normalize_selected_model_ids(patch.get("model_inspection_selected_models"))
-    if "color_catalog_id" in patch:
-        clean["color_catalog_id"] = _normalize_catalog_choice(patch.get("color_catalog_id"))
-    if "ui_text_size" in patch:
-        clean["ui_text_size"] = _normalize_ui_text_size(patch.get("ui_text_size"))
-    for key in ("sketch_open", "generation_info_follows_selection", "generation_info_token_detail"):
-        if key in patch:
-            clean[key] = bool(patch[key])
-    return normalize_user_model_settings(clean)
+    return core_catalog("update_user", settings=current, patch=patch, **_user_catalog_context())["settings"]
 
 
 def model_provider_catalog(
@@ -671,45 +112,9 @@ def model_provider_catalog(
     purpose: str | None = None,
 ) -> list[dict[str, Any]]:
     clean = normalize_model_settings(settings)
-    catalog: list[dict[str, Any]] = []
-    for provider_id, provider in clean["providers"].items():
-        if not provider.get("active", True):
-            continue
-        builtin = _BUILTIN_PROVIDER_BY_ID.get(provider_id)
-        if not include_developer and builtin and builtin.get("developer_only"):
-            continue
-        enabled_models = provider["enabled_models"]
-        # Hiding here rather than at the source keeps to what developer mode means:
-        # it changes what is shown, never what is stored or which model gets called.
-        hide_speed = bool(
-            not include_developer and builtin and builtin.get("speed_developer_only")
-        )
-        models = []
-        for model in provider["models"]:
-            enabled = bool(enabled_models.get(str(model["id"]), True))
-            if purpose and purpose not in model.get("purposes", ["llm"]):
-                continue
-            if include_disabled or enabled:
-                shown = labelled({**model, "enabled": enabled})
-                if hide_speed:
-                    for key in ("speed_class", "speed_label", "speed_llm_seconds", "speed_vision_seconds"):
-                        shown.pop(key, None)
-                models.append(shown)
-        catalog.append({
-            "id": provider["id"],
-            "label": provider["label"],
-            "kind": provider["kind"],
-            "api_key_env": provider["api_key_env"],
-            "base_url_env": provider["base_url_env"],
-            "default_base_url": provider["default_base_url"],
-            "requires_api_key": provider["requires_api_key"],
-            "builtin": provider.get("builtin", False),
-            "active": provider.get("active", True),
-            "models": models,
-        })
-        if include_disabled:
-            catalog[-1]["memo"] = str(provider.get("memo") or "")
-    return catalog
+    return core_catalog("provider_catalog", settings=clean, order=list(clean["providers"]),
+                        include_disabled=include_disabled, include_developer=include_developer,
+                        purpose=purpose)["providers"]
 
 
 def model_is_offered(
@@ -725,20 +130,13 @@ def model_is_offered(
     model may be called (see model_provider_catalog), and the built-in Stage
     defaults sit with a provider that only developer mode shows.
     """
-    for provider in model_provider_catalog(
-        settings, include_disabled=False, include_developer=True, purpose=purpose
-    ):
-        if provider["id"] == provider_id:
-            return any(str(model["id"]) == model_id for model in provider["models"])
-    return False
+    clean = normalize_model_settings(settings)
+    return core_catalog("model_offered", settings=clean, order=list(clean["providers"]),
+                        provider=provider_id, model=model_id, purpose=purpose)["offered"]
 
 
 def mask_secret(value: str | None) -> str | None:
-    if not value:
-        return None
-    if len(value) <= 8:
-        return "****"
-    return f"{value[:4]}...{value[-4:]}"
+    return core_catalog("mask_secret", secret=value)["masked"]
 
 
 def storage_model_settings(settings: dict[str, Any]) -> dict[str, Any]:
@@ -755,97 +153,23 @@ def public_model_settings(
     include_developer: bool = True,
 ) -> dict[str, Any]:
     clean = normalize_model_settings(settings)
-    providers: dict[str, dict[str, Any]] = {}
-    for provider_id, provider in clean["providers"].items():
-        if not provider.get("active", True):
-            continue
-        builtin = _BUILTIN_PROVIDER_BY_ID.get(provider_id)
-        if not include_developer and builtin and builtin.get("developer_only"):
-            continue
-        stored = clean["providers"][provider_id]
-        api_key = decrypt_secret(str(stored.get("api_key") or ""))
-        providers[provider_id] = {
-            "base_url": stored.get("base_url") or provider["default_base_url"],
-            "api_key_set": bool(api_key),
-            "api_key_hint": mask_secret(api_key),
-            "enabled_models": dict(stored.get("enabled_models") or {}),
-            "rate_limits": dict(stored["rate_limits"]),
-        }
-    return {"providers": providers}
+    providers = clean["providers"]
+    visible = core_catalog("provider_catalog", settings=clean, order=list(providers),
+                           include_disabled=True, include_developer=include_developer, purpose=None)["providers"]
+    keys = {provider["id"]: decrypt_secret(str(providers[provider["id"]].get("api_key") or ""))
+            for provider in visible}
+    result = core_catalog("public_settings", settings=clean, order=list(providers), keys=keys,
+                          include_developer=include_developer)["settings"]
+    result["providers"] = {key: result["providers"][key] for key in providers if key in result["providers"]}
+    return result
 
 
 def update_model_settings(current: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:
-    clean = normalize_model_settings(current)
-    # The ChatGPT plan's shared assessments arrive like any provider's models (the common
-    # format, 2026-10-13) or, from an older client, as `chatgpt_models`. Each entry replaces
-    # the stored assessment of the same model and leaves the others.
-    incoming_chatgpt = patch.get("chatgpt_models")
-    providers = patch.get("providers")
-    if isinstance(providers, dict) and isinstance(providers.get("chatgpt"), dict):
-        incoming_chatgpt = providers["chatgpt"].get("models")
-    if isinstance(incoming_chatgpt, list):
-        merged = {str(model["id"]): model for model in clean.get("chatgpt_models", [])}
-        merged.update({model["id"]: model for model in normalize_chatgpt_models(incoming_chatgpt)})
-        clean["chatgpt_models"] = list(merged.values())
-    if isinstance(providers, dict):
-        for raw_provider_id, incoming in providers.items():
-            provider_id = _normalize_provider_id(raw_provider_id)
-            if provider_id == "chatgpt":
-                continue
-            if not isinstance(incoming, dict):
-                continue
-            if incoming.get("delete") is True:
-                if provider_id in BUILTIN_PROVIDER_IDS and provider_id in clean["providers"]:
-                    clean["providers"][provider_id]["active"] = False
-                else:
-                    clean["providers"].pop(provider_id, None)
-                continue
-            existing = clean["providers"].get(provider_id)
-            if not existing:
-                clean["providers"][provider_id] = {
-                    "id": provider_id,
-                    "label": incoming.get("label") or provider_id,
-                    "kind": _normalize_provider_kind(incoming.get("kind")),
-                    "api_key_env": incoming.get("api_key_env") or "",
-                    "base_url_env": incoming.get("base_url_env") or "",
-                    "default_base_url": incoming.get("default_base_url") or incoming.get("base_url") or "",
-                    "requires_api_key": bool(incoming.get("requires_api_key")),
-                    "memo": incoming.get("memo") or "",
-                    "models": _normalize_models(incoming.get("models")),
-                    "builtin": False,
-                    "active": True,
-                    "base_url": incoming.get("base_url") or incoming.get("default_base_url") or "",
-                    "api_key": "",
-                    "enabled_models": {},
-                }
-            else:
-                clean["providers"][provider_id].update({k: v for k, v in incoming.items() if k in {
-                    "label", "kind", "api_key_env", "base_url_env", "default_base_url", "requires_api_key", "memo", "models", "active"
-                }})
-            if isinstance(incoming.get("base_url"), str) and incoming["base_url"].strip():
-                clean["providers"][provider_id]["base_url"] = _normalize_provider_base_url(provider_id, incoming["base_url"])
-            if isinstance(incoming.get("rate_limits"), dict):
-                clean["providers"][provider_id]["rate_limits"] = {
-                    **clean["providers"][provider_id].get("rate_limits", {}), **incoming["rate_limits"],
-                }
-            if incoming.get("clear_api_key") is True:
-                clean["providers"][provider_id]["api_key"] = ""
-            elif isinstance(incoming.get("api_key"), str) and incoming["api_key"]:
-                clean["providers"][provider_id]["api_key"] = incoming["api_key"]
-            enabled_models = incoming.get("enabled_models")
-            if isinstance(enabled_models, dict):
-                known_models = {
-                    str(model["id"]): model for model in clean["providers"][provider_id].get("models", [])
-                }
-                for model_id, enabled in enabled_models.items():
-                    if model_id in known_models:
-                        # A retired model, or one this account's plan does not reach,
-                        # cannot be published: users would only meet it as an error.
-                        callable_model = not (
-                            known_models[model_id].get("eol") or known_models[model_id].get("requires_subscription")
-                        )
-                        clean["providers"][provider_id]["enabled_models"][model_id] = bool(enabled) and callable_model
-    return normalize_model_settings(clean)
+    providers = current.get("providers") if isinstance(current, dict) else None
+    changes = patch.get("providers") if isinstance(patch, dict) else None
+    return _ordered_settings(core_catalog("update_settings", settings=current, patch=patch,
+        order=list(providers) if isinstance(providers, dict) else [],
+        patch_order=list(changes) if isinstance(changes, dict) else [], env=_settings_environment()))
 
 
 def _known_provider_ids(settings: dict[str, Any] | None) -> set[str]:
@@ -874,14 +198,8 @@ def split_model_ref(ref: str, settings: dict[str, Any] | None) -> tuple[str | No
     the model id is free to carry as many colons as it likes -- "gpt-oss:20b"
     and "qwen3.5:4b-q4_K_M" both survive the round trip.
     """
-    text = str(ref or "")
-    index = text.find(":")
-    if index <= 0:
-        return None, text
-    head, rest = text[:index], text[index + 1 :]
-    if rest and head in _known_provider_ids(settings):
-        return head, rest
-    return None, text
+    result = core_catalog("split_ref", ref=str(ref or ""), providers={key: {} for key in _known_provider_ids(settings)})
+    return result["provider"], result["model"]
 
 
 def qualify_model_ref(provider: str, ref: str, settings: dict[str, Any] | None) -> str:
@@ -891,22 +209,8 @@ def qualify_model_ref(provider: str, ref: str, settings: dict[str, Any] | None) 
     so passing a reference that names a different provider leaves it alone
     instead of producing "ollama:ollama-cloud:gemma4:31b".
     """
-    clean_provider = str(provider or "").strip()
-    clean_ref = str(ref or "").strip()
-    if not clean_provider or not clean_ref:
-        return clean_ref
-    known, _ = split_model_ref(clean_ref, settings)
-    return clean_ref if known else f"{clean_provider}:{clean_ref}"
-
-
-def _providers_owning_model(model_id: str, catalog: dict[str, Any]) -> list[str]:
-    owners: list[str] = []
-    for provider_id, provider in catalog.get("providers", {}).items():
-        if not provider.get("active", True):
-            continue
-        if any(str(model.get("id")) == model_id for model in provider.get("models", [])):
-            owners.append(str(provider_id))
-    return owners
+    return core_catalog("qualify_ref", provider=str(provider or ""), ref=str(ref or ""),
+                        providers={key: {} for key in _known_provider_ids(settings)})["ref"]
 
 
 def provider_for_model(model: str | None, *, stage: str, settings: dict[str, Any]) -> tuple[str, str]:
@@ -924,57 +228,24 @@ def provider_for_model(model: str | None, *, stage: str, settings: dict[str, Any
     stopped serving models, so an unresolvable reference looked like a working
     one.
     """
-    stage_key = "stage1_provider" if stage == "stage1" else "stage2_provider"
-    if not model:
-        clean = normalize_user_model_settings(settings)
-        model_id = clean["stage1_model"] if stage == "stage1" else clean["stage2_model"]
-        return str(clean[stage_key]), str(model_id)
+    stage_key = "stage1" if stage == "stage1" else "stage2"
+    defaults = normalize_user_model_settings(settings)
     catalog = normalize_model_settings(settings)
-    provider_id, model_id = split_model_ref(model, catalog)
-    if provider_id:
-        return provider_id, model_id
-    owners = _providers_owning_model(model, catalog)
-    if len(owners) == 1:
-        return owners[0], model
-    return str(normalize_user_model_settings(settings)[stage_key]), model
+    result = core_catalog("resolve_ref", ref=str(model or ""), providers=catalog["providers"],
+                          default_provider=str(defaults[f"{stage_key}_provider"]),
+                          default_model=str(defaults[f"{stage_key}_model"]))
+    return result["provider"], result["model"]
 
 
 def provider_concurrency_limit(provider_id: str) -> int:
-    """How many requests this provider will take at once. 0 means no limit.
-
-    Read from the builtin definition rather than from stored settings: a provider
-    that answers 429 above two simultaneous requests is describing itself, not
-    expressing a preference the operator should be able to raise.
-    """
-    builtin = _BUILTIN_PROVIDER_BY_ID.get(provider_id)
-    if not builtin:
-        return 0
-    limit = builtin.get("max_concurrency")
-    if isinstance(limit, int) and not isinstance(limit, bool) and limit > 0:
-        return limit
-    return 0
+    return core_catalog("provider_concurrency", provider=provider_id)["limit"]
 
 
 def connection_for(provider_id: str, settings: dict[str, Any]) -> dict[str, Any]:
-    """Where to reach a provider. An unknown id is an error, not a redirection.
-
-    A name nobody configured used to fall through to ovms, which meant a typo or a
-    retired reference reached a real endpoint and got a real-looking answer from
-    the wrong machine. Raising here is what makes the withdrawal of a provider
-    visible at the point of use.
-    """
     clean = normalize_model_settings(settings)
-    provider = clean["providers"].get(provider_id)
-    if not provider:
-        raise ValueError(f"unknown model provider: {provider_id}")
-    return {
-        "id": provider_id,
-        # MLX uses the OpenAI-compatible endpoints, with its own generation
-        # profile. Keep list fetching and Vision on the same wire protocol.
-        "kind": "openai_compatible" if provider["kind"] == "mlx" else provider["kind"],
-        "api_profile": provider["kind"],
-        "base_url": provider.get("base_url") or provider["default_base_url"],
-        "api_key": decrypt_secret(str(provider.get("api_key") or "")) or os.getenv(str(provider["api_key_env"]), ""),
-        "requires_api_key": provider["requires_api_key"],
-        "rate_limits": dict(provider["rate_limits"]),
-    }
+    answer = core_catalog("connection", provider=provider_id, settings=clean)
+    if "error" in answer:
+        raise ValueError(answer["error"])
+    provider = clean["providers"][provider_id]
+    answer["connection"]["api_key"] = decrypt_secret(str(provider.get("api_key") or "")) or os.getenv(str(provider["api_key_env"]), "")
+    return answer["connection"]

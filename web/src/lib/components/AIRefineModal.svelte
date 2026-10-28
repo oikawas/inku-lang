@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onDestroy, onMount, tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
-	import { qualifiedModelId, type Provider, type ProviderGroup } from '$lib/models';
+	import { qualifiedModelRef, type Provider, type ProviderGroup } from '$lib/models';
 	import type { LineageNode } from '$lib/features/history/types';
 	import type { HistoryItem } from '$lib/historyManagerState.svelte';
 	import HistoryThumbnail from './HistoryThumbnail.svelte';
@@ -242,7 +242,7 @@
 		{:else}
 			<!-- A chunk run takes chunk moves, which an edited DDL does not hold back. -->
 			{#if held && !useChunks}<p class="ai-refine-note">{t().aiRefineHeldNote}</p>{/if}
-			<ModelCardPicker label={t().aiRefineModel} {selectedModel} providerGroups={visionProviderGroups} purpose="vision" disabled={starting} onSelect={(provider: Provider, model: string) => { selectedModel = qualifiedModelId(provider, model); void onSaveVisionModel(provider, model); }} />
+			<ModelCardPicker label={t().aiRefineModel} {selectedModel} providerGroups={visionProviderGroups} purpose="vision" disabled={starting} onSelect={(provider: Provider, model: string) => { selectedModel = qualifiedModelRef(provider, model); void onSaveVisionModel(provider, model); }} />
 			<fieldset class="ai-refine-kinds" disabled={starting}>
 				<legend>{t().aiRefineKindsLabel}</legend>
 				<label><input type="checkbox" bind:checked={useLaws} onchange={(event) => { if (event.currentTarget.checked) useChunks = false; }} /><span>{t().aiRefineKindLaws}</span></label>

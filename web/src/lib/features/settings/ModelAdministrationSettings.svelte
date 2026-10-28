@@ -426,7 +426,7 @@
 		{#if modelSettingsLoading && !modelSettings}
 				<div class="popover-group"><div class="inline-message">{t().settingsLoading}</div></div>
 			{:else if !modelSettings}
-				<div class="popover-group"><div class="inline-message">{modelSettingsStatus ?? t().settingsLoadFailed}</div></div>
+				<div class="popover-group"><div class="inline-message">{t().modelCatalogLoadFailed}{#if modelSettingsStatus} ({modelSettingsStatus}){/if} <button type="button" onclick={() => void administration.loadModelSettings()}>{t().modelCatalogRetry}</button></div></div>
 			{/if}
 		{#if modelSettings}
 			<div class="popover-group">

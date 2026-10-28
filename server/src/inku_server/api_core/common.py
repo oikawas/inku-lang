@@ -6,9 +6,9 @@ import importlib.metadata
 import os
 from pathlib import Path
 from fastapi import HTTPException
-from ..okugaki import DEFAULT_MODEL as DEFAULT_OKUGAKI_MODEL
 from ..languages import SUPPORTED_INSTRUCTION_LANGS, normalize_instruction_lang, resolve_instruction_lang
-from ..model_settings import model_is_offered, provider_for_model, split_model_ref
+from ..model_settings import model_is_offered, provider_for_model
+from ..verified_model_catalog import core_catalog
 from .. import db as _db
 from .deps import _logger
 
@@ -87,19 +87,17 @@ def _build_number() -> str | None:
         return None
 
 
-def _is_qualified_model_id(model: str) -> bool:
-    provider, _ = split_model_ref(model, _db.get_model_settings())
-    return provider is not None
-
-
 def _resolved_vision_model(model: str | None, actor: dict | None = None) -> str:
     """Keep explicit references for the resolver; qualify only the actor's default."""
-    settings = (actor or {}).get("model_settings") or {}
-    provider = str(settings.get("vision_provider", "nvidia") or "nvidia")
-    model_id = str(settings.get("vision_model", DEFAULT_OKUGAKI_MODEL) or DEFAULT_OKUGAKI_MODEL)
     if model:
         return str(model).strip()
-    return model_id if _is_qualified_model_id(model_id) else f"{provider}:{model_id}"
+    return _resolved_default_model("vision", actor)
+
+
+def _resolved_default_model(stage: str, actor: dict | None) -> str:
+    settings = (actor or {}).get("model_settings") or {}
+    return core_catalog("resolve_stage_default", stage=stage, user_settings=settings,
+                        providers=_db.get_model_settings().get("providers", {}))["ref"]
 
 
 def _model_metadata(*, stage1_model: str | None = None, stage2_model: str | None = None) -> dict[str, str]:

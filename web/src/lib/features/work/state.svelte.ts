@@ -11,7 +11,7 @@ import {
 import { composeFallbackReason, composeFallbackState, composeFallbackValue } from '$lib/composeFallback';
 import { needsFallbackRefineConfirm, rememberFallbackRefineConfirm, type FallbackRefineParent } from '$lib/fallbackRefineGate';
 import { submitDerivationKind as submitDerivationKindOf, type DerivationKind } from '$lib/derivation';
-import { modelDisplayName, qualifiedModelId, type Provider, type ProviderGroup } from '$lib/models';
+import { modelDisplayName, qualifiedModelRef, type Provider, type ProviderGroup } from '$lib/models';
 import { AUTO_CATALOG_ID, colorCatalogOverride } from '$lib/features/color-catalog/render';
 import { colorCatalogSettings } from '$lib/features/color-catalog/settings.svelte';
 import { renderSettingsPayload, type RenderOverrides } from '$lib/features/render-payload';
@@ -325,8 +325,8 @@ export function createWorkState(deps: WorkStateDeps) {
 			...compositionOption(route, options.compositionMode ?? compositionMode),
 			sketch: options.sketchMode ?? sketchMode,
 			...(options.sketchText ? { sketch_text: options.sketchText } : {}),
-			stage1_model: options.stage1Model ?? qualifiedModelId(deps.models.stage1Provider(), deps.models.stage1Model()),
-			stage2_model: options.stage2Model ?? qualifiedModelId(deps.models.stage2Provider(), deps.models.stage2Model()),
+			stage1_model: options.stage1Model ?? qualifiedModelRef(deps.models.stage1Provider(), deps.models.stage1Model()),
+			stage2_model: options.stage2Model ?? qualifiedModelRef(deps.models.stage2Provider(), deps.models.stage2Model()),
 			instruction_lang: instructionLang,
 			ui_lang: getLang(),
 			catalog_id: typeof render.catalog_id === 'string' ? render.catalog_id : colorCatalogSettings.effectiveId,
@@ -421,7 +421,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		if (!uploadedImage || imageUploading || loading || reloading || pipelineBusy || refinementSession.gridBusy || demo.running || batch.resuming) return;
 		let image = uploadedImage;
 		const provenance = imageProvenance;
-		const model = qualifiedModelId(deps.models.visionProvider(), deps.models.visionModel());
+		const model = qualifiedModelRef(deps.models.visionProvider(), deps.models.visionModel());
 		const abortController = new AbortController();
 		submitAbortController = abortController;
 		submitStopRequested = false;
@@ -521,7 +521,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		const provenance = await provenanceOfFile(file);
 		const image = await api.uploadImage(file, signal);
 		signal.throwIfAborted();
-		const model = qualifiedModelId(deps.models.visionProvider(), deps.models.visionModel());
+		const model = qualifiedModelRef(deps.models.visionProvider(), deps.models.visionModel());
 		stageLabel = t().imageWritingDdl;
 		const view = await imageBatchController.fromImage(image.image_id, provenance, imageCanvasAspectId, {
 			...pipelineOptions(), stage1_model: model, stage2_model: model,
@@ -813,8 +813,8 @@ export function createWorkState(deps: WorkStateDeps) {
 				strings: t(),
 				// Resolve injected route settings before entering the stateless run
 				// operation. A caller's one-run override still wins there.
-				stage1Model: qualifiedModelId(deps.models.stage1Provider(), deps.models.stage1Model()),
-				stage2Model: qualifiedModelId(deps.models.stage2Provider(), deps.models.stage2Model()),
+				stage1Model: qualifiedModelRef(deps.models.stage1Provider(), deps.models.stage1Model()),
+				stage2Model: qualifiedModelRef(deps.models.stage2Provider(), deps.models.stage2Model()),
 				includeThinking: deps.models.includeThinking(),
 				instructionLang,
 				canvasAspectId: effectiveCanvasAspectId(),
@@ -850,7 +850,7 @@ export function createWorkState(deps: WorkStateDeps) {
 	async function interpretOne(text: string, signal?: AbortSignal, modelOverride?: string, langOverride?: InstructionLang): Promise<InterpretResult> {
 		const uiLang = getLang();
 		stage1UserPrompt = text;
-		const resolvedStage1Model = modelOverride ?? qualifiedModelId(deps.models.stage1Provider(), deps.models.stage1Model());
+		const resolvedStage1Model = modelOverride ?? qualifiedModelRef(deps.models.stage1Provider(), deps.models.stage1Model());
 		const r = await apiFetch('/api/interpret', {
 			method: 'POST',
 			signal,
@@ -914,7 +914,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		sketch_state?: string | null;
 	}> {
 		const uiLang = getLang();
-		const resolvedStage2Model = modelOverride ?? qualifiedModelId(deps.models.stage2Provider(), deps.models.stage2Model());
+		const resolvedStage2Model = modelOverride ?? qualifiedModelRef(deps.models.stage2Provider(), deps.models.stage2Model());
 		const r = await apiFetch('/api/compose', {
 			method: 'POST',
 			signal,
@@ -979,7 +979,7 @@ export function createWorkState(deps: WorkStateDeps) {
 				...wildOverride(false),
 			}),
 			paintInstruction: (prompt, paintOptions) => {
-				const model = qualifiedModelId(deps.models.stage1Provider(), deps.models.stage1Model());
+				const model = qualifiedModelRef(deps.models.stage1Provider(), deps.models.stage1Model());
 				return paintOne(prompt, { ...paintOptions, stage1Model: model, stage2Model: model });
 			},
 			onLatestResult: (painted) => {
@@ -1123,8 +1123,8 @@ export function createWorkState(deps: WorkStateDeps) {
 	async function submitBatch(options: { resumeLines?: NumberedLine[]; retryFailedLines?: NumberedLine[]; }): Promise<void> {
 		const batchCanvasAspectId = effectiveCanvasAspectId();
 		const batchCatalogId = colorCatalogSettings.selected;
-		const batchStage1Model = qualifiedModelId(deps.models.stage1Provider(), deps.models.stage1Model());
-		const batchStage2Model = qualifiedModelId(deps.models.stage2Provider(), deps.models.stage2Model());
+		const batchStage1Model = qualifiedModelRef(deps.models.stage1Provider(), deps.models.stage1Model());
+		const batchStage2Model = qualifiedModelRef(deps.models.stage2Provider(), deps.models.stage2Model());
 		const batchSketchMode = sketchMode;
 		const batchRoute = drawRoute;
 		const batchComposition = compositionMode;
@@ -1460,10 +1460,10 @@ export function createWorkState(deps: WorkStateDeps) {
 		get composeFallbackRecord() { return composeFallbackState(composeFallbackRaw); },
 		get statusDdlOrigin() { return (displayedHistoryItem?.display_label ?? null) === 'DDL'; },
 		get stage1ModelLabel() {
-			return modelDisplayName(qualifiedModelId(deps.models.stage1Provider(), deps.models.stage1Model()), deps.models.available(), deps.models.stage1Provider());
+			return modelDisplayName(qualifiedModelRef(deps.models.stage1Provider(), deps.models.stage1Model()), deps.models.available(), deps.models.stage1Provider());
 		},
 		get stage2ModelLabel() {
-			return modelDisplayName(qualifiedModelId(deps.models.stage2Provider(), deps.models.stage2Model()), deps.models.available(), deps.models.stage2Provider());
+			return modelDisplayName(qualifiedModelRef(deps.models.stage2Provider(), deps.models.stage2Model()), deps.models.available(), deps.models.stage2Provider());
 		},
 		get inputMode() { return inputMode; },
 		set inputMode(value) { inputMode = value; },

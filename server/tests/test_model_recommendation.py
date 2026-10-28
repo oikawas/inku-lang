@@ -221,10 +221,8 @@ def test_every_place_that_lists_metadata_keys_knows_the_recommendation_keys():
     statement about a list and itself: measured 2026-07-30, deleting the two stage
     keys from the constant left the earlier version of this test green.
     """
-    import inspect
-
-    from inku_server.api_core.routers import settings as settings_routes
     from inku_server import model_settings as ms
+    from inku_server.verified_model_catalog import core_catalog
 
     expected = (
         "recommendation_llm",
@@ -238,12 +236,14 @@ def test_every_place_that_lists_metadata_keys_knows_the_recommendation_keys():
     for key in expected:
         assert key in MODEL_METADATA_KEYS, key
 
-    normaliser = inspect.getsource(ms._normalize_models)
-    for key in expected:
-        assert key in normaliser, f"{key} is not read on the way in"
-
-    fetch = inspect.getsource(settings_routes.api_settings_fetch_provider_models)
-    assert "MODEL_METADATA_KEYS" in fetch, "the live fetch no longer carries the shared key list"
+    raw = {"id": "test", "purposes": ["llm", "vision"], **{key: 3 for key in expected}}
+    normalised = ms._normalize_models([raw])[0]
+    for key in expected[:-1]:
+        assert normalised[key] == 3
+    prepared = core_catalog("refresh_prepare", provider="openai", models=[{"id": "test", "label": "test"}],
+                            previous={"models": [normalised]})["models"][0]
+    for key in expected[:-1]:
+        assert prepared[key] == 3
 
 
 def test_the_release_view_keeps_no_measured_duration_in_a_comment():

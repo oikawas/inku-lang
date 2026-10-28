@@ -431,7 +431,7 @@
 # 73: Read bracketed plugin names and omit unbound caller fields separately;
 # saved-DDL comparison is measured during the owner's review.
 # 74: Object plugin words resolve as invisible boxes carrying Score 0.23
-# templates; Japanese numeric positions also accept the omitted canvas prefix.
+# templates.
 # Their templates are performed by render engine 94.
 DDL_ENGINE_VERSION = "74"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
@@ -513,5 +513,4 @@ DDL_ENGINE_VERSION = "74"
 # to a model.
 # 28: Plugin names can be written in braces; qualified names remain readable
 # while saved works migrate.
-# 29: Japanese numeric positions can omit the canvas prefix.
-DDL_VERSION = "29"
+DDL_VERSION = "28"

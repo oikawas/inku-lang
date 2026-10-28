@@ -855,7 +855,9 @@ pub(crate) fn analyze_clause_geometry(
                     geometry_value(document, atoms, clause_index, region_index, index, keyword)
                         .filter(|_| {
                             document.language() == crate::ResolvedInstructionLanguage::En
-                                || japanese_position_context_closes(atoms, index)
+                                || (index > 0
+                                    && keyword_at(atoms, index - 1, GeometryKeyword::Canvas)
+                                    && japanese_position_context_closes(atoms, index))
                         })
                         .zip(
                             keyword_at(atoms, index + 2, GeometryKeyword::AxisY).then(|| index + 2),

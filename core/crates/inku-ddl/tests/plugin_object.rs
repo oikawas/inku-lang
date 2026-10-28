@@ -55,39 +55,6 @@ fn lock(definition: &MacroDefinition) -> MacroLock {
 }
 
 #[test]
-fn japanese_square_accepts_an_explicit_position_without_the_canvas_prefix() {
-    let result = inku_ddl::compile_ddl_to_score(
-        NormalizedDdlDocument::new(
-            "横0.3、縦0.7の位置に、幅0.2、高さ0.1の黒い四角を置く。",
-            ResolvedInstructionLanguage::Ja,
-            vec![],
-        )
-        .unwrap(),
-        &[],
-        Some(37),
-        MacroExpansionLimits {
-            max_invocations: 64,
-            max_depth: 16,
-            max_evaluation_steps: 8192,
-            max_nodes_per_invocation: 128,
-            max_total_nodes: 128,
-        },
-        ScoreLoweringContext::resolve("square", Color::White).unwrap(),
-        ScoreErrorPolicy::OmitAndContinue,
-    );
-    assert!(
-        result.upstream_diagnostics().is_empty(),
-        "{:?}",
-        result.upstream_diagnostics()
-    );
-    assert!(
-        result
-            .score()
-            .is_some_and(|score| !score.instructions.is_empty())
-    );
-}
-
-#[test]
 fn a_declared_color_reaches_the_object_body() {
     let leaf = word(
         "Leaf",
@@ -214,8 +181,8 @@ fn object_box_placement_matches_a_square_with_the_same_meaning() {
         ("｛葉｝を5枚並べる。", "黒い四角を5個並べる。"),
         ("｛葉｝を敷き詰める。", "黒い四角を敷き詰める。"),
         (
-            "横0.3、縦0.7の位置に、幅0.2、高さ0.1の｛葉｝を置く。",
-            "横0.3、縦0.7の位置に、幅0.2、高さ0.1の黒い四角を置く。",
+            "画面の横0.3、縦0.7の位置に、幅0.2、高さ0.1の｛葉｝を置く。",
+            "画面の横0.3、縦0.7の位置に、幅0.2、高さ0.1の黒い四角を置く。",
         ),
         (
             "｛葉｝と黒い四角を中心に並べる。",
@@ -722,7 +689,7 @@ fn object_word_draws_instead_of_being_rejected() {
             ResolvedInstructionLanguage::Ja,
         ),
         (
-            "横0.3、縦0.7の位置に、幅0.2、高さ0.1の｛舟｝を置く。",
+            "画面の横0.3、縦0.7の位置に、幅0.2、高さ0.1の｛舟｝を置く。",
             ResolvedInstructionLanguage::Ja,
         ),
         ("上に｛葉｝を60枚散らす。", ResolvedInstructionLanguage::Ja),
@@ -918,7 +885,7 @@ fn object_word_draws_instead_of_being_rejected() {
             }
         );
         let box_instruction = &score.instructions[score.object_templates[0].instruction_index];
-        if source.contains("横0.3") {
+        if source.contains("画面の横0.3") {
             let anchor = &box_instruction
                 .arrangement
                 .as_ref()

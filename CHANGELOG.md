@@ -10,7 +10,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ### 2026-10-28 — Draw object words inside invisible boxes
 
-Object words use the square's placement, count, dimensions, angle and relations, then draw their definition inside a box with its aspect. Score 0.23.0 retains one body shared by copies and render engine 94 performs it. Japanese numeric positions also accept an omitted canvas prefix (DDL 29, DDL engine 74). Older Scores draw as before.
+Object words use the square's placement, count, dimensions, angle and relations, then draw their definition inside a box with its aspect (DDL engine 74). Score 0.23.0 retains one body shared by copies and render engine 94 performs it. Older Scores draw as before.
 
 ### 2026-10-28 — Offer plugin words named by a description
 

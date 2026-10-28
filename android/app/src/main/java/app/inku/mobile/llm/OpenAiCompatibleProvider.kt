@@ -54,6 +54,58 @@ class OpenAiCompatibleProvider(
 
 /** HTTP is local to Android; the request and answer interpretation belong to the core. */
 internal object ProviderWireTransport {
+    suspend fun estimate(provider: app.inku.mobile.data.db.ProviderSettingEntity, request: ModelRequest,
+        limits: JSONObject, openConnection: (URL) -> HttpURLConnection = { it.openConnection() as HttpURLConnection }): Long =
+        withContext(Dispatchers.IO) {
+            val baseUrl = requireNotNull(provider.baseUrl)
+            val kind = provider.kind.replace('-', '_')
+            val built = build(kind, provider.providerId, baseUrl, request)
+            val input = JSONObject().put("action", "estimate").put("kind", kind).put("tpm", limits.getLong("tpm"))
+                .put("body_bytes", built.getString("body").toByteArray(Charsets.UTF_8).size)
+            var answer = SharedProviderAdmission.call(input)
+            var answerText: String? = null
+            if (answer.optString("decision") == "need_count") {
+                val count = built.getJSONObject("count_tokens")
+                val connection = openConnection(URL(count.getString("url")))
+                val result = try {
+                    configureRemoteConnection(connection, "POST", null, request.timeoutMs)
+                    val headers = built.getJSONObject("headers")
+                    headers.keys().forEach { connection.setRequestProperty(it, headers.getString(it)) }
+                    val auth = built.getJSONObject("auth")
+                    val key = provider.encryptedApiKey?.let(app.inku.mobile.data.AndroidSecretBox::decryptOrPlain)
+                        ?.takeIf(String::isNotBlank) ?: auth.getString("missing")
+                    connection.setRequestProperty(auth.getString("header"), auth.getString("prefix") + key)
+                    connection.doOutput = true
+                    connection.outputStream.writer(Charsets.UTF_8).use { it.write(count.getString("body")) }
+                    readProviderHttpBody(connection, MAX_PROVIDER_ERROR_BYTES)
+                } finally { connection.disconnect() }
+                if (result.status !in 200..299) throw ModelProviderHttpException(result.status,
+                    "HTTP ${result.status} from provider", retryAfter = result.retryAfter, retryBody = result.body)
+                // Embed the original response so JSON integer/float distinctions survive.
+                val prefix = app.inku.mobile.pipeline.CoreIdentityJson.encode(input).removeSuffix("}")
+                val raw = "$prefix,\"count_response\":${result.body}}"
+                answerText = app.inku.mobile.pipeline.NativePipelineBridge.providerAdmission(raw.toByteArray(Charsets.UTF_8)).toString(Charsets.UTF_8)
+                answer = JSONObject(answerText)
+            }
+            when (answer.optString("decision")) {
+                "estimate" -> {
+                    val digits = answerText?.let { Regex("\"input_tokens\"\\s*:\\s*(\\d+)").find(it)?.groupValues?.get(1) }
+                        ?: answer.get("input_tokens").toString()
+                    val value = digits.toBigIntegerOrNull() ?: throw ProviderRateStateException()
+                    if (value > java.math.BigInteger.valueOf(Long.MAX_VALUE)) {
+                        val preflight = "{\"action\":\"preflight\",\"limits\":${app.inku.mobile.pipeline.CoreIdentityJson.encode(limits)},\"input_tokens\":$digits}"
+                        val checked = JSONObject(app.inku.mobile.pipeline.NativePipelineBridge.providerAdmission(preflight.toByteArray(Charsets.UTF_8)).toString(Charsets.UTF_8))
+                        if (checked.optString("decision") == "reject") throw ProviderBudgetRejectedException(checked.getString("reason"))
+                        throw ProviderRateStateException()
+                    }
+                    value.toLong()
+                }
+                "invalid_response" -> throw MalformedProviderResponseException(answer.optString("reason"))
+                "reject" -> throw ProviderBudgetRejectedException(answer.optString("reason"))
+                else -> throw MalformedProviderResponseException("Invalid token count response")
+            }
+        }
+
     fun build(kind: String, providerId: String, baseUrl: String, request: ModelRequest): JSONObject {
         ProviderUrlValidator.validateRemoteBaseUrl(baseUrl)
         val textRequest = request.pipelineAction == null || isVisionTextAction(request.pipelineAction)
@@ -64,7 +116,7 @@ internal object ProviderWireTransport {
             .put("api_profile", "")
             .put("base_url", baseUrl)
         val input = JSONObject()
-            .put("action", if (textRequest) "text_request" else "pipeline_request")
+            .put("action", if (textRequest && kind == "gemini") "text_request_with_count" else if (textRequest) "text_request" else "pipeline_request")
             .put("connection", connection)
             .put("model", model)
             .put("max_tokens", request.maxTokens)
@@ -123,7 +175,7 @@ internal object ProviderWireTransport {
             }
             val response = SharedProviderWire.call(JSONObject()
                 .put("action", if (request.pipelineAction == null || isVisionTextAction(request.pipelineAction))
-                    "text_response" else "pipeline_response")
+                    "text_response_with_usage" else "pipeline_response")
                 .put("format", built.getString("format"))
                 .put("status", http.status)
                 .put("body", http.body))

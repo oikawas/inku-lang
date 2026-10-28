@@ -2027,7 +2027,7 @@ fn answer(request: &Value) -> Result<Value, Refusal> {
             )?;
             Ok(built.answer(true, model))
         }
-        "text_request" => {
+        "text_request" | "text_request_with_count" => {
             let connection = connection_of(request)?;
             let model = model()?;
             let field = |name: &str| {
@@ -2055,9 +2055,9 @@ fn answer(request: &Value) -> Result<Value, Refusal> {
                 temperature,
                 tokens_of(request, "max_tokens")?,
             )?;
-            Ok(built.answer(false, model))
+            Ok(built.answer(action == "text_request_with_count", model))
         }
-        "pipeline_response" | "text_response" => {
+        "pipeline_response" | "text_response" | "text_response_with_usage" => {
             let format = as_str(get(request, "format"))
                 .filter(|format| {
                     ["openai_responses", "openai_chat", "anthropic", "gemini"].contains(format)
@@ -2071,12 +2071,17 @@ fn answer(request: &Value) -> Result<Value, Refusal> {
             };
             let body = as_str(get(request, "body"))
                 .ok_or_else(|| Refusal::invalid("body must be a string"))?;
-            Ok(read_response(
-                format,
-                status,
-                body,
-                action == "text_response",
-            ))
+            let mut result = read_response(format, status, body, action != "pipeline_response");
+            if action == "text_response_with_usage" && (200..300).contains(&status) {
+                let tokens = python_loads(body)
+                    .ok()
+                    .and_then(|data| input_tokens(format, &data))
+                    .unwrap_or(Value::Null);
+                if let Value::Object(members) = &mut result {
+                    members.push(("input_tokens".to_owned(), tokens));
+                }
+            }
+            Ok(result)
         }
         "usage" => {
             // The ChatGPT plan's terminal response is read as `openai_responses`.

@@ -171,6 +171,7 @@ public final class AppModel {
     @ObservationIgnored private let transport: (any ProviderTransport)?
     @ObservationIgnored private var managedTransport: (any ProviderTransport)?
     @ObservationIgnored private var personalRuntime: ChatGPTPlanRuntime?
+    @ObservationIgnored private var personalRuntimeOverride: ChatGPTPlanRuntime?
     @ObservationIgnored private let credentials = KeychainCredentialStore()
     @ObservationIgnored private var database: InkuDatabase?
     @ObservationIgnored private var host: PipelineHost?
@@ -203,6 +204,13 @@ public final class AppModel {
     public init(databaseURL: URL? = nil, transport: (any ProviderTransport)? = nil) {
         self.databaseURL = databaseURL
         self.transport = transport
+    }
+
+    // Allows isolated runtime fixtures without reading the user's Keychain or vault.
+    init(databaseURL: URL, transport: (any ProviderTransport)? = nil, personalRuntime: ChatGPTPlanRuntime) {
+        self.databaseURL = databaseURL
+        self.transport = transport
+        self.personalRuntimeOverride = personalRuntime
     }
 
     public var sourceLocked: Bool { authoringAuthority == "ddl_authoritative" }
@@ -304,7 +312,7 @@ public final class AppModel {
             library.prefetchesThumbnails = true
             library.pageCompanions = { [weak self] ids in await self?.loadWorkActionStates(workIDs: ids) }
             displayRenderer.connectFailureLog(directory: url.deletingLastPathComponent())
-            let personalRuntime = ChatGPTPlanRuntime(directory: url.deletingLastPathComponent().appendingPathComponent("personal-chatgpt", isDirectory: true))
+            let personalRuntime = personalRuntimeOverride ?? ChatGPTPlanRuntime(directory: url.deletingLastPathComponent().appendingPathComponent("personal-chatgpt", isDirectory: true))
             let ordinary: any ProviderTransport
             if let native = transport as? URLSessionProviderTransport { ordinary = native.withRateDatabase(database) }
             else { ordinary = transport ?? URLSessionProviderTransport(database: database) }

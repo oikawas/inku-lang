@@ -1297,9 +1297,9 @@ mod tests {
             "../../../../server/tests/data/provider-wire-cases.json"
         ))
         .unwrap();
-        for row in array(fixture.get("chatgpt_policy_step4"))
+        for row in array(fixture.get("chatgpt"))
             .iter()
-            .chain(array(fixture.get("chatgpt_policy_step4_extra")))
+            .filter(|row| row["request"]["schema"] == "inku.model-catalog-request.v1")
         {
             let actual: Value = serde_json::from_slice(&model_catalog_json(
                 &serde_json::to_vec(&row["request"]).unwrap(),

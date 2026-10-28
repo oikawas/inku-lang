@@ -164,13 +164,13 @@ class SharedProviderWireJniTest {
     @Test
     fun allChatGptRowsMatchServer() {
         val rows = requireNotNull(cases["chatgpt"])
-        assertEquals(162, rows.size)
+        assertEquals(217, rows.size)
         val actions = mutableMapOf<String, Int>()
         for ((index, item) in rows.withIndex()) {
             val row = item.row
             val why = "chatgpt[$index] ${row.getString("why")}"
             val action = row.getJSONObject("request").getString("action")
-            actions[action] = (actions[action] ?: 0) + 1
+            if (!row.getJSONObject("request").has("schema")) actions[action] = (actions[action] ?: 0) + 1
             val expected = row.getJSONObject("expect")
             val answer = SharedProviderWire.call(item.requestJson)
             assertEquals(why, SharedProviderWire.SCHEMA, answer.getString("schema"))

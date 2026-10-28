@@ -25,7 +25,7 @@ CASES = json.loads((pathlib.Path(__file__).parent / "data" / "provider-wire-case
 
 def test_chatgpt_policy_matches_frozen_server():
     from inku_server.verified_model_catalog import core_catalog
-    for row in CASES["chatgpt_policy_step4"] + CASES["chatgpt_policy_step4_extra"]:
+    for row in (row for row in CASES["chatgpt"] if row["request"].get("schema") == "inku.model-catalog-request.v1"):
         request = dict(row["request"])
         request.pop("schema")
         action = request.pop("action")
@@ -127,6 +127,11 @@ def test_every_shared_chatgpt_row_goes_through_servers_transport_as_it_did():
     for row in CASES["chatgpt"]:
         request, expect = row["request"], row["expect"]
         action = request["action"]
+        if request.get("schema") == "inku.model-catalog-request.v1":
+            import inku_render
+            answer = json.loads(inku_render.pipeline_provider_wire(json.dumps(request).encode()))
+            assert {key: answer.get(key) for key in expect} == expect, row["why"]
+            continue
         if action in {"chatgpt_request", "chatgpt_vision_request"}:
             if expect["outcome"] == "refused":
                 with pytest.raises(provider_wire.ProviderWireRefused, match=expect["detail"]):

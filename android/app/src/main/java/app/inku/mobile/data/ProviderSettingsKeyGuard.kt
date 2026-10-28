@@ -29,7 +29,8 @@ internal class ProviderSettingsKeyGuard(
         val safe = protect(next)
         val patch = ProviderSettingsCodec.toCore(safe,
             if (safe.isDefaultLocal) localModels else candidates[safe.providerId] ?: catalogModels,
-            observations[safe.providerId]?.records.orEmpty(), observations[safe.providerId]?.access.orEmpty())
+            observations[safe.providerId]?.records.orEmpty(), observations[safe.providerId]?.access.orEmpty(),
+            observations[safe.providerId]?.seen.orEmpty())
         return ProviderSettingsCodec.update(protect(rows), localModels, safe.providerId, patch, candidates, observations)
     }
 

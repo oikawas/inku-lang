@@ -36,9 +36,15 @@ internal object ProviderSettingsCodec {
     }.getOrElse { value.lines().map(String::trim).filter(String::isNotEmpty) }
 
     fun toCore(row: ProviderSettingEntity, available: List<String> = parseModelIds(row.publishedModelsJson),
-        observed: Map<String, JSONObject> = emptyMap(), access: Map<String, Boolean> = emptyMap()): JSONObject {
+        observed: Map<String, JSONObject> = emptyMap(), access: Map<String, Boolean> = emptyMap(),
+        seen: List<String> = emptyList()): JSONObject {
         val ids = parseModelIds(row.publishedModelsJson)
         val allModels = (if (row.isDefaultLocal) available else available + ids).distinct()
+        // Core can merge its built-in NVIDIA models even when the host's
+        // candidates omit them. Every known but unpublished id must be false.
+        val builtins = definitions[row.providerId]?.optJSONArray("models") ?: JSONArray()
+        val known = (allModels + ids + catalogIds(row.providerId) + observed.keys + access.keys + seen +
+            (0 until builtins.length()).map { builtins.getJSONObject(it).getString("id") }).distinct()
         val models = JSONArray(allModels.map { id ->
             (observed[id] ?: catalogModels[row.providerId]?.get(id))?.let { JSONObject(it.toString()) }
                 ?: JSONObject().put("id", id).put("label", id)
@@ -52,7 +58,7 @@ internal object ProviderSettingsCodec {
             .put("kind", row.kind.replace('-', '_')).put("base_url", row.baseUrl ?: "")
             .put("active", row.isEnabled).put("api_key", row.encryptedApiKey ?: "")
             .put("models", applied)
-            .put("enabled_models", JSONObject().also { enabled -> allModels.forEach { enabled.put(it, it in ids) } })
+            .put("enabled_models", JSONObject().also { enabled -> known.forEach { enabled.put(it, it in ids) } })
             .put("rate_limits", JSONObject().put("rpm", 0).put("tpm", 0).put("rpd", 0)).put("memo", "")
     }
 
@@ -78,7 +84,8 @@ internal object ProviderSettingsCodec {
             val known = definitions[row.providerId]?.optJSONArray("models") ?: JSONArray()
             val defaultIds = (0 until known.length()).map { known.getJSONObject(it).getString("id") }
             input.put(row.providerId, toCore(row, if (row.isDefaultLocal) localModels else available[row.providerId] ?: defaultIds,
-                observations[row.providerId]?.records.orEmpty(), observations[row.providerId]?.access.orEmpty()))
+                observations[row.providerId]?.records.orEmpty(), observations[row.providerId]?.access.orEmpty(),
+                observations[row.providerId]?.seen.orEmpty()))
         }
         if (!input.has("local-litert-lm")) {
             val local = definitions.getValue("local-litert-lm")

@@ -96,7 +96,7 @@ def default_manifest(binding: PipelineBinding) -> dict:
                 "operational_resource_budget": deepcopy(budget),
             },
             "definitions": [], "macro_summaries": [], "catalogs": [],
-            "prompt_limits": {"max_catalog_entries": 64, "max_summary_bytes": 8192,
+            "prompt_limits": {"max_catalog_entries": 64, "max_summary_bytes": 8192, "max_offered_plugins": 8,
                               "max_catalog_serialized_bytes": 1024 * 1024,
                               "max_source_bytes": 400_000, "max_response_bytes": 1024 * 1024},
             "catalog_retry": deepcopy(retry), "stage1_retry": stage1_retry, "hole_retry": deepcopy(retry),

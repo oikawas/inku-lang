@@ -353,16 +353,26 @@ pub struct WorkPlanPlugin {
     pub name: String,
     pub aliases: Vec<String>,
     pub counter: Option<crate::CountCounter>,
+    pub name_ja: String,
+    pub name_en: String,
+    pub object: bool,
+    pub aspect: Option<String>,
+    pub appearance_slots: Vec<WorkPlanSlot>,
 }
 
 impl WorkPlanPlugin {
     fn answers_to(&self, value: &str) -> bool {
-        self.name == value || self.aliases.iter().any(|alias| alias == value)
+        self.name == value
+            || self.name_ja == value
+            || self.name_en == value
+            || self.aliases.iter().any(|alias| alias == value)
     }
 
     /// The name a sentence in `language` is written with.
     fn written(&self, language: ResolvedInstructionLanguage) -> &str {
         match language {
+            ResolvedInstructionLanguage::Ja if !self.name_ja.is_empty() => &self.name_ja,
+            ResolvedInstructionLanguage::En if !self.name_en.is_empty() => &self.name_en,
             ResolvedInstructionLanguage::Ja => self.aliases.first().unwrap_or(&self.name),
             ResolvedInstructionLanguage::En => &self.name,
         }
@@ -529,6 +539,31 @@ pub fn work_plan_response_schema_with_plugins(plugins: &[String]) -> Value {
     schema
 }
 
+/// The offered scene words occupy `plugins`; object words occupy layer shapes.
+#[must_use]
+pub fn work_plan_response_schema_for_plugins(
+    plugins: &[WorkPlanPlugin],
+    language: ResolvedInstructionLanguage,
+) -> Value {
+    let scenes: Vec<_> = plugins
+        .iter()
+        .filter(|plugin| !plugin.object)
+        .map(|plugin| plugin.written(language).to_owned())
+        .collect();
+    let mut schema = work_plan_response_schema_with_plugins(&scenes);
+    if let Some(shapes) =
+        schema["properties"]["layers"]["items"]["properties"]["shape"]["enum"].as_array_mut()
+    {
+        shapes.extend(
+            plugins
+                .iter()
+                .filter(|plugin| plugin.object)
+                .map(|plugin| json!(plugin.written(language))),
+        );
+    }
+    schema
+}
+
 fn text(value: Option<&Value>) -> Option<String> {
     match value? {
         Value::String(text) if text != UNSPECIFIED && !text.is_empty() => Some(text.clone()),
@@ -598,7 +633,10 @@ pub fn normalize_work_plan_with_plugins(
         let Some(written) = written else {
             continue;
         };
-        let Some(plugin) = plugins.iter().find(|plugin| plugin.answers_to(&written)) else {
+        let Some(plugin) = plugins
+            .iter()
+            .find(|plugin| !plugin.object && plugin.answers_to(&written))
+        else {
             note(None, "plugins", written, "unknown_plugin");
             continue;
         };
@@ -607,16 +645,7 @@ pub fn normalize_work_plan_with_plugins(
             None | Some(Value::Null) => None,
             Some(value) => match value.as_u64() {
                 Some(0) => None,
-                Some(count) if plugin.counter.is_some() => Some(count),
-                Some(count) => {
-                    note(
-                        None,
-                        "plugins",
-                        format!("{name}:{count}"),
-                        "plugin_takes_no_count",
-                    );
-                    None
-                }
+                Some(count) => Some(count),
                 None => {
                     note(
                         None,
@@ -642,8 +671,13 @@ pub fn normalize_work_plan_with_plugins(
         .cloned()
         .unwrap_or_default();
     for (index, layer) in layers.iter().enumerate() {
-        let Some(shape) =
-            text(layer.get("shape")).filter(|shape| capabilities.forms.contains_key(shape))
+        let object = text(layer.get("shape")).and_then(|shape| {
+            plugins
+                .iter()
+                .find(|plugin| plugin.object && plugin.answers_to(&shape))
+        });
+        let Some(shape) = text(layer.get("shape"))
+            .filter(|shape| capabilities.forms.contains_key(shape) || object.is_some())
         else {
             note(
                 Some(index),
@@ -654,6 +688,11 @@ pub fn normalize_work_plan_with_plugins(
             continue;
         };
         let mut proportion = text(layer.get("proportion"));
+        if object.is_some()
+            && let Some(value) = proportion.take()
+        {
+            note(Some(index), "proportion", value, "unsupported_for_form");
+        }
         if let Some(value) = &proportion
             && !capabilities.forms.contains_key(&format!("{shape}/{value}"))
         {
@@ -668,8 +707,22 @@ pub fn normalize_work_plan_with_plugins(
         let form = proportion
             .as_ref()
             .map_or_else(|| shape.clone(), |value| format!("{shape}/{value}"));
+        let form = if let Some(object) = object {
+            match object
+                .aspect
+                .as_deref()
+                .and_then(|a| a.split_once(':'))
+                .and_then(|(w, h)| Some((w.parse::<u8>().ok()?, h.parse::<u8>().ok()?)))
+            {
+                Some((w, h)) if w < h => "square/tall".to_owned(),
+                Some((w, h)) if w > h => "square/wide".to_owned(),
+                _ => "square".to_owned(),
+            }
+        } else {
+            form
+        };
         let mut out = WorkPlanLayer {
-            shape,
+            shape: object.map_or(shape, |plugin| plugin.name.clone()),
             proportion,
             ..WorkPlanLayer::default()
         };
@@ -718,7 +771,25 @@ pub fn normalize_work_plan_with_plugins(
             if slot == WorkPlanSlot::MotionQuality && value == "still" {
                 continue;
             }
-            if vocabulary.term(slot, &value).is_none() {
+            if object.is_some_and(|plugin| {
+                matches!(
+                    slot,
+                    WorkPlanSlot::Color
+                        | WorkPlanSlot::Tool
+                        | WorkPlanSlot::Thinness
+                        | WorkPlanSlot::Continuity
+                        | WorkPlanSlot::Surface
+                        | WorkPlanSlot::Handling
+                        | WorkPlanSlot::Fineness
+                        | WorkPlanSlot::Underlayer
+                        | WorkPlanSlot::MotionQuality
+                        | WorkPlanSlot::MotionAmplitude
+                        | WorkPlanSlot::MotionSpacing
+                        | WorkPlanSlot::Bleeding
+                ) && !plugin.appearance_slots.contains(&slot)
+            }) {
+                note(Some(index), slot.field(), value, "unsupported_for_form");
+            } else if vocabulary.term(slot, &value).is_none() {
                 note(Some(index), slot.field(), value, "unknown_value");
             } else if capabilities.forms[&form].contains_key(&slot)
                 && !capabilities.accepts(&form, slot, &value)
@@ -1059,6 +1130,7 @@ fn print_layer_ja(
     layer: &WorkPlanLayer,
     range: Option<&ComposedRange>,
     numeric: Option<&NumericWriting>,
+    object: Option<&WorkPlanPlugin>,
 ) -> String {
     let ja = ResolvedInstructionLanguage::Ja;
     let no = MarkerId::JaNo.surface();
@@ -1171,14 +1243,24 @@ fn print_layer_ja(
         .and_then(|sides| polygon_noun(sides, ja))
     {
         Some(polygon) => out.push_str(polygon),
-        None => out.push_str(&surface(WorkPlanSlot::Shape, &layer.shape, ja)),
+        None => out.push_str(&object.map_or_else(
+            || surface(WorkPlanSlot::Shape, &layer.shape, ja),
+            |plugin| plugin.written(ja).to_owned(),
+        )),
     }
     out.push_str(MarkerId::JaWo.surface());
     if let Some(direction) = layer.attribute(WorkPlanSlot::LineUpDirection) {
         out.push_str(&surface(WorkPlanSlot::LineUpDirection, direction, ja));
         out.push_str(MarkerId::JaNi.surface());
     }
-    out.push_str(&format!("{}個", layer.count));
+    out.push_str(&format!(
+        "{}{}",
+        layer.count,
+        object
+            .and_then(|plugin| plugin.counter)
+            .unwrap_or_default()
+            .japanese()
+    ));
     out.push_str(&surface(WorkPlanSlot::Action, &layer.action, ja));
     out.push('。');
     out
@@ -1188,6 +1270,7 @@ fn print_layer_en(
     layer: &WorkPlanLayer,
     range: Option<&ComposedRange>,
     numeric: Option<&NumericWriting>,
+    object: Option<&WorkPlanPlugin>,
 ) -> String {
     let en = ResolvedInstructionLanguage::En;
     let mut words: Vec<String> = Vec::new();
@@ -1237,8 +1320,11 @@ fn print_layer_en(
         // A polygon's noun is read in the singular whatever the count.
         Some(polygon) => words.push(polygon.to_owned()),
         None => {
-            let head = surface(WorkPlanSlot::Shape, &layer.shape, en);
-            words.push(if layer.count > 1 {
+            let head = object.map_or_else(
+                || surface(WorkPlanSlot::Shape, &layer.shape, en),
+                |plugin| plugin.written(en).to_owned(),
+            );
+            words.push(if layer.count > 1 && object.is_none() {
                 format!("{head}s")
             } else {
                 head
@@ -1657,9 +1743,12 @@ pub fn print_work_plan_with_numbers(
     for (index, layer) in plan.layers.iter().enumerate() {
         let range = ranges.get(index).and_then(Option::as_ref);
         let written = numeric.get(index).and_then(Option::as_ref);
+        let object = plugins
+            .iter()
+            .find(|plugin| plugin.object && plugin.answers_to(&layer.shape));
         let sentence = match language {
-            ResolvedInstructionLanguage::Ja => print_layer_ja(layer, range, written),
-            ResolvedInstructionLanguage::En => print_layer_en(layer, range, written),
+            ResolvedInstructionLanguage::Ja => print_layer_ja(layer, range, written, object),
+            ResolvedInstructionLanguage::En => print_layer_en(layer, range, written, object),
         };
         let relation = joints
             .get(index)

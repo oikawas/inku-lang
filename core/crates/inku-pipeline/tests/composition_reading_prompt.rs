@@ -85,6 +85,7 @@ fn the_reading_request_is_built_as_the_prototype_built_it() {
     let definitions = nature_definitions();
     let plugins = work_plan_plugins(&definitions);
     let limits = PromptLimits {
+        max_offered_plugins: 8,
         max_catalog_entries: 64,
         max_summary_bytes: 8192,
         max_catalog_serialized_bytes: 1024 * 1024,

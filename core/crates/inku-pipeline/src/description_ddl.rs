@@ -1230,6 +1230,7 @@ mod tests {
 
     fn limits() -> PromptLimits {
         PromptLimits {
+            max_offered_plugins: 8,
             max_source_bytes: 400_000,
             max_response_bytes: 1_000_000,
             ..crate::focused_flow::config().prompt_limits
@@ -1380,6 +1381,52 @@ mod tests {
                 );
                 assert_eq!(message.get("reading").is_some(), reading.is_some());
             }
+        }
+    }
+
+    #[test]
+    fn named_words_are_added_to_a_writing_request_without_changing_its_prefix() {
+        let asset: Value = serde_json::from_str(inku_ddl::NATURE_LEAVES_V1_JSON).unwrap();
+        let definition =
+            inku_ddl::MacroDefinition::from_json(&asset["entries"][0]["definition"].to_string())
+                .unwrap();
+        let palette = palette();
+        for (language, description, summary) in [
+            (ResolvedInstructionLanguage::Ja, "若葉", "若葉を描く。"),
+            (
+                ResolvedInstructionLanguage::En,
+                "young leaves",
+                "Young leaves.",
+            ),
+        ] {
+            let context = DescriptionDdlContext {
+                description,
+                reading: None,
+                canvas: CanvasRatio::reduced(3, 4).unwrap(),
+                palette: &palette,
+                limits: ImageDdlLimits::of(&a4_compiler()),
+            };
+            let baseline = build_description_ddl_prompt(&context, language, limits()).unwrap();
+            let catalog = [crate::prompts::MacroPromptEntry {
+                definition: &definition,
+                localized_summary: summary,
+            }];
+            let (prompt, offer) = crate::plugin_offer::with_plugin_offer(
+                baseline.clone(),
+                description,
+                None,
+                &catalog,
+                limits(),
+            )
+            .unwrap();
+            assert_eq!(offer.offered.len(), 1);
+            assert!(prompt.system.starts_with(&baseline.system));
+            assert!(prompt.system.ends_with(crate::plugin_offer::rule(language)));
+            let added = prompt.system.len() + prompt.message.len()
+                - baseline.system.len()
+                - baseline.message.len();
+            eprintln!("writing {language:?} one plugin added bytes: {added}");
+            assert!(added <= 1000);
         }
     }
 

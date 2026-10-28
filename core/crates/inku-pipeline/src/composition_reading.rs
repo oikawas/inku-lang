@@ -516,6 +516,7 @@ mod tests {
 
     fn limits() -> PromptLimits {
         PromptLimits {
+            max_offered_plugins: 8,
             max_catalog_entries: 8,
             max_summary_bytes: 1024,
             max_catalog_serialized_bytes: 8192,

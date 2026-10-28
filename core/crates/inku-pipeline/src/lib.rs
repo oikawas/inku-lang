@@ -26,6 +26,7 @@ pub mod laws_entry;
 pub mod laws_record;
 pub mod machine;
 pub mod model_catalog;
+pub mod plugin_offer;
 pub mod prompts;
 pub mod protocol;
 pub mod provider_admission;

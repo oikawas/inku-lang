@@ -1297,6 +1297,7 @@ pub(crate) mod tests {
         let ja = ResolvedInstructionLanguage::Ja;
         let limits = crate::focused_flow::config().prompt_limits;
         let limits = PromptLimits {
+            max_offered_plugins: 8,
             max_source_bytes: 400_000,
             max_response_bytes: 1_000_000,
             ..limits

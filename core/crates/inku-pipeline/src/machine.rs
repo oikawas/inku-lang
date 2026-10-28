@@ -184,6 +184,10 @@ pub struct CatalogCandidate {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PipelineConfig {
+    /// Offer decisions made by this run; the host saves the config in the
+    /// immutable history fork context, including this optional record.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub plugin_offers: Vec<crate::plugin_offer::OfferRecord>,
     pub envelope_limits: crate::byte_envelope::EnvelopeLimits,
     pub language: ResolvedInstructionLanguage,
     pub compiler: CompilerOptions,
@@ -1416,6 +1420,7 @@ impl PipelineSnapshot {
         events: &mut Vec<PipelineEvent>,
     ) -> Result<(), ProtocolError> {
         let stage = prompt.stage;
+        self.record_plugin_offer(&prompt);
         let policy = self.retry_policy(stage);
         self.phase = PipelinePhase::AwaitingLlm {
             stage,
@@ -1432,6 +1437,45 @@ impl PipelineSnapshot {
             policy.remaining_attempt_timeout(0),
             events,
         )
+    }
+
+    fn record_plugin_offer(&mut self, prompt: &LlmPrompt) {
+        if !matches!(
+            prompt.stage,
+            LlmStage::GenerateNormalizedDdl
+                | LlmStage::WriteDescriptionDdl
+                | LlmStage::ReviewDescriptionDdl
+        ) {
+            return;
+        }
+        let Ok(message) = serde_json::from_str::<serde_json::Value>(&prompt.message) else {
+            return;
+        };
+        let Some(description) = message["description"].as_str() else {
+            return;
+        };
+        let catalog: Vec<_> = self
+            .config
+            .definitions
+            .iter()
+            .zip(&self.config.macro_summaries)
+            .map(|(definition, summary)| MacroPromptEntry {
+                definition,
+                localized_summary: summary,
+            })
+            .collect();
+        let offer = crate::plugin_offer::offer_plugins(
+            description,
+            message["current_ddl"].as_str(),
+            &catalog,
+            self.config.prompt_limits.max_offered_plugins,
+        );
+        self.config
+            .plugin_offers
+            .push(crate::plugin_offer::OfferRecord {
+                stage: prompt.stage,
+                offer,
+            });
     }
 }
 
@@ -1821,6 +1865,7 @@ impl PipelineSnapshot {
         attempt: u32,
         events: &mut Vec<PipelineEvent>,
     ) -> Result<(), ProtocolError> {
+        self.record_plugin_offer(&prompt);
         let policy = self.retry_policy(stage);
         let total = elapsed_ms
             .checked_add(policy.retry_delay_ms.get())
@@ -2954,6 +2999,7 @@ impl PipelineSnapshot {
             return Err(ProtocolError::InvalidPolicy);
         }
         // A run keeps no record of the run before it in the same execution.
+        self.config.plugin_offers.clear();
         self.description_ddl = None;
         match route {
             DescriptionRoute::Stages => self.sketch = SketchRecord::from_request(sketch),

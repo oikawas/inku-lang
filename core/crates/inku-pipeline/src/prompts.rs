@@ -18,7 +18,7 @@ use inku_ddl::{
     saijiki_derived_projection, saijiki_tool_guidance, visible_ddl_patch_available,
     work_plan::{
         UNSPECIFIED, WorkPlan, WorkPlanPlugin, normalize_work_plan_with_plugins,
-        print_work_plan_with_plugins, work_plan_response_schema_with_plugins,
+        print_work_plan_with_plugins, work_plan_response_schema_for_plugins,
     },
 };
 use inku_score::{
@@ -106,11 +106,17 @@ impl LlmStage {
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct PromptLimits {
+    #[serde(default = "default_max_offered_plugins")]
+    pub max_offered_plugins: usize,
     pub max_catalog_entries: usize,
     pub max_summary_bytes: usize,
     pub max_catalog_serialized_bytes: usize,
     pub max_source_bytes: usize,
     pub max_response_bytes: usize,
+}
+
+const fn default_max_offered_plugins() -> usize {
+    8
 }
 
 /// One finite candidate that the host has admitted for description-based selection.
@@ -497,6 +503,8 @@ struct Stage1Message<'a> {
     catalog_id: &'a str,
     catalog_mode: &'a str,
     canvas: CanvasPromptContext<'a>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    plugins: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -695,15 +703,28 @@ pub fn build_stage1_prompt_for_run(
             canvas_format_id: context.canvas_format_id.clone(),
         }
     })?;
-    let (_, macro_catalog_digest) = project_macro_catalog(macros, limits)?;
-    let plugins = installed_plugin_names(macros)
-        .into_iter()
-        .map(|plugin| plugin.name)
-        .collect::<Vec<_>>();
+    let offer =
+        crate::plugin_offer::offer_plugins(description, None, macros, limits.max_offered_plugins);
+    let offered: Vec<_> = offer
+        .offered
+        .iter()
+        .filter_map(|item| {
+            macros
+                .iter()
+                .find(|entry| {
+                    entry.definition.qualified_name().as_deref()
+                        == Some(item.qualified_name.as_str())
+                })
+                .copied()
+        })
+        .collect();
+    let macro_catalog_digest = if offered.is_empty() {
+        None
+    } else {
+        Some(project_macro_catalog(&offered, limits)?.1)
+    };
+    let plugins = installed_plugin_names(&offered);
     let mut system = stage1_work_plan_system_for(language, composes)?;
-    if !plugins.is_empty() {
-        system.push_str(&stage1_plugin_section(macros, language));
-    }
     if sketch.is_some() {
         system.push_str(match language {
             ResolvedInstructionLanguage::Ja => STAGE1_SKETCH_NOTE_JA,
@@ -722,9 +743,13 @@ pub fn build_stage1_prompt_for_run(
             registry_id: &context.canvas_format_registry_id,
             registry_digest: &context.canvas_format_registry_digest,
         },
+        plugins: offered
+            .iter()
+            .map(|entry| crate::plugin_offer::offer_line(entry, language))
+            .collect(),
     })
     .map_err(|_| PromptError::Serialization)?;
-    finish_prompt(LlmPrompt {
+    let mut prompt = finish_prompt(LlmPrompt {
         schema_id: LLM_PROMPT_SCHEMA_ID.to_owned(),
         prompt_id: TYPED_STAGE1_PROMPT_ID.to_owned(),
         stage: LlmStage::GenerateNormalizedDdl,
@@ -732,15 +757,26 @@ pub fn build_stage1_prompt_for_run(
         instruction_language: language,
         system,
         message,
-        response_schema: work_plan_response_schema_with_plugins(&plugins),
+        response_schema: work_plan_response_schema_for_plugins(&plugins, language),
         prompt_digest: String::new(),
         saijiki_asset_id: Some(SAIJIKI_ASSET_ID.to_owned()),
         saijiki_asset_digest: Some(saijiki_asset_sha256_hex().to_owned()),
-        macro_catalog_digest: Some(macro_catalog_digest),
+        macro_catalog_digest,
         base_source_digest: None,
         base_compiler_lock_digest: None,
         images: Vec::new(),
-    })
+    })?;
+    if !offered.is_empty() {
+        prompt.system.push_str(crate::plugin_offer::rule(language));
+        prompt.system.push_str(match language {
+            ResolvedInstructionLanguage::Ja => " 情景の語は plugins に名と数（数が無ければ0）、物の語は層の shape に入れ、行に無い欄（色・画材など）は unspecified にする。",
+            ResolvedInstructionLanguage::En => " Put scene words in plugins with name and count (0 if unstated), object words in a layer's shape, leaving fields their line does not list (color, tool, ...) unspecified.",
+        });
+        let schema = serde_json::to_string(&prompt.response_schema)
+            .map_err(|_| PromptError::Serialization)?;
+        prompt = hash_prompt(prompt, &schema);
+    }
+    Ok(prompt)
 }
 
 /// Add one rejected, uncommitted candidate and the compiler's bounded diagnostics.
@@ -1110,16 +1146,6 @@ const STAGE1_SKETCH_NOTE_EN: &str = r#"
 # Sketch (supplement)
 The input sketch supplements the extent of place or the seasonal or time-of-day light that the description does not state. Subjects, movement, direction, counts, and placement follow the description; the sketch never replaces them. From the sketch, only add scene or back layers and the background color; never weaken or remove the layers for the description's roles."#;
 
-const STAGE1_PLUGINS_JA: &str = r#"
-
-# plugins（登録プラグイン）
-次のプラグインは、要約に書かれた物をまとめて描く。判断の基準は名前の見出しの語（Nature.若葉なら「若葉」）である。記述にその語か、同じ物を指す言い換え（落葉に対する「落ち葉」など）が書かれていれば、その名前をpluginsへ入れる。書かれていなければ、季節・場所・似た物からの連想では選ばない。プラグインが描く物をlayersで重ねて描かない。記述のほかの物はこれまでどおりlayersで描く。該当が無ければpluginsは空にする。pluginsの各項目は name と count である。記述がその物の数を書いていれば（「若葉が十枚」「三本の下草」）count にその数を、書いていなければ 0 を入れる。数を推測で補わない。"#;
-
-const STAGE1_PLUGINS_EN: &str = r#"
-
-# plugins (installed plugins)
-Each plugin below draws the subject its summary describes as a whole. The test is the heading word of its name (for Nature.若葉, 若葉, young leaves). When the description writes that word or a paraphrase naming the same thing (fallen leaves for 落葉), put the name in plugins. When it does not, never choose the plugin by association with a season, place, or similar thing. Do not also draw that subject in layers. Draw everything else in the description with layers as usual. Leave plugins empty when none applies. Each plugins entry has name and count. When the description states how many of that subject there are ("ten young leaves", "three blades of undergrowth"), set count to that number; otherwise set count to 0. Never guess a number."#;
-
 /// Installed plugins, sorted and unique by canonical name, that a plan may choose.
 fn installed_plugin_names(macros: &[MacroPromptEntry<'_>]) -> Vec<WorkPlanPlugin> {
     work_plan_plugins(macros.iter().map(|entry| entry.definition))
@@ -1132,48 +1158,79 @@ pub fn work_plan_plugins<'a>(
     let mut plugins = definitions
         .into_iter()
         .filter_map(|definition| {
+            let v2 = definition.plugin_v2.as_ref();
+            let object = v2.is_some_and(|v| v.kind == "object");
+            let (ja, en) = crate::plugin_offer::visible_names(definition);
+            let mut aliases = definition.alias_qualified_names();
+            aliases.extend(ja.iter().map(|name| format!("｛{name}｝")));
+            aliases.extend(en.iter().map(|name| format!("{{{name}}}")));
+            let appearance_slots = definition
+                .parameters
+                .iter()
+                .filter_map(|(_, schema)| match schema {
+                    inku_ddl::ParameterSchema::SemanticRef {
+                        category,
+                        dimension,
+                    } => Some(match category.as_str() {
+                        "color" => inku_ddl::work_plan::WorkPlanSlot::Color,
+                        "touch" => inku_ddl::work_plan::WorkPlanSlot::Tool,
+                        "continuity" => inku_ddl::work_plan::WorkPlanSlot::Continuity,
+                        "surface" => inku_ddl::work_plan::WorkPlanSlot::Surface,
+                        "handling" => inku_ddl::work_plan::WorkPlanSlot::Handling,
+                        "fineness" => inku_ddl::work_plan::WorkPlanSlot::Fineness,
+                        "variation" => match dimension {
+                            Some(inku_ddl::fluctuation::FluctuationDimension::Amplitude) => {
+                                inku_ddl::work_plan::WorkPlanSlot::MotionAmplitude
+                            }
+                            Some(inku_ddl::fluctuation::FluctuationDimension::Frequency) => {
+                                inku_ddl::work_plan::WorkPlanSlot::MotionSpacing
+                            }
+                            Some(inku_ddl::fluctuation::FluctuationDimension::Quality) => {
+                                inku_ddl::work_plan::WorkPlanSlot::MotionQuality
+                            }
+                            Some(inku_ddl::fluctuation::FluctuationDimension::Spread) => {
+                                inku_ddl::work_plan::WorkPlanSlot::Bleeding
+                            }
+                            None => return None,
+                        },
+                        _ => return None,
+                    }),
+                    _ => None,
+                })
+                .collect();
             Some(WorkPlanPlugin {
                 name: definition.qualified_name()?,
-                aliases: definition.alias_qualified_names(),
-                counter: definition
-                    .parameters
-                    .iter()
-                    .find_map(|(_, schema)| schema.count_parameter())
-                    .map(|count| count.counter),
+                aliases,
+                name_ja: crate::plugin_offer::primary_name(
+                    definition,
+                    ResolvedInstructionLanguage::Ja,
+                ),
+                name_en: crate::plugin_offer::primary_name(
+                    definition,
+                    ResolvedInstructionLanguage::En,
+                ),
+                object,
+                aspect: v2.and_then(|v| v.aspect.clone()),
+                appearance_slots,
+                counter: if object {
+                    Some(match v2.and_then(|v| v.counter.as_deref()) {
+                        Some("flat") => inku_ddl::CountCounter::Flat,
+                        Some("long") => inku_ddl::CountCounter::Long,
+                        _ => inku_ddl::CountCounter::General,
+                    })
+                } else {
+                    definition
+                        .parameters
+                        .iter()
+                        .find_map(|(_, schema)| schema.count_parameter())
+                        .map(|count| count.counter)
+                },
             })
         })
         .collect::<Vec<_>>();
     plugins.sort_by(|left, right| left.name.cmp(&right.name));
     plugins.dedup_by(|left, right| left.name == right.name);
     plugins
-}
-
-/// The plugin rule followed by one `name: summary` line per installed plugin.
-fn stage1_plugin_section(
-    macros: &[MacroPromptEntry<'_>],
-    language: ResolvedInstructionLanguage,
-) -> String {
-    let mut lines = macros
-        .iter()
-        .filter_map(|entry| {
-            let name = entry.definition.qualified_name()?;
-            let aliases = entry.definition.alias_qualified_names();
-            // Japanese lists the Japanese alias the plan will print; English
-            // reads the canonical name alone.
-            let label = match (language, aliases.first()) {
-                (ResolvedInstructionLanguage::Ja, Some(alias)) => format!("{name}（別名 {alias}）"),
-                _ => name,
-            };
-            Some(format!("- {label}: {}", entry.localized_summary))
-        })
-        .collect::<Vec<_>>();
-    lines.sort();
-    lines.dedup();
-    let rule = match language {
-        ResolvedInstructionLanguage::Ja => STAGE1_PLUGINS_JA,
-        ResolvedInstructionLanguage::En => STAGE1_PLUGINS_EN,
-    };
-    format!("{rule}\n{}", lines.join("\n"))
 }
 
 /// Principle 8 for a run that composes: a place only where the description states it.
@@ -1697,7 +1754,7 @@ fn validate_canvas_context(context: &Stage1Context) -> Result<(), PromptError> {
     Ok(())
 }
 
-fn project_macro_catalog(
+pub(crate) fn project_macro_catalog(
     entries: &[MacroPromptEntry<'_>],
     limits: PromptLimits,
 ) -> Result<(String, String), PromptError> {
@@ -1996,7 +2053,7 @@ fn stage1_ordered_placement_grammar_en() -> String {
 const STAGE1_DDL_INTENT_JA: &str =
     "決定的 compiler が再読できる、可視で編集可能な normalized DDL を作る。";
 const STAGE1_OUTPUT_SCOPE_JA: &str = "Score、renderer命令、観測文、思考過程、説明、非表示metadataを出力しない。normalized DDL はそれ単独で意味を完結させ、後段のLLM補完を前提にholeや曖昧な代用語を残さない。";
-const STAGE1_GRAMMAR_JA_PREFIX: &str = r#"accepted_saijiki_vocabulary の有限語彙と、compilerが読む通常の数値・句読点・文法だけを使う。installed_macro_signatures のmacroを使う場合は qualified_name と列挙されたparameterだけを書く。version、digest、MacroDefinition本文、component、展開結果をDDLへ書かない。
+const STAGE1_GRAMMAR_JA_PREFIX: &str = r#"accepted_saijiki_vocabulary の有限語彙と、compilerが読む通常の数値・句読点・文法だけを使う。
 
 作者が明示した対象、色、画材、太さ、個数、寸法、角度、座標、領域、関係、反復、配置を失わない。fill、scatter、tile、background は別の意味である。fillは作者が指定した図形を指定領域の内部へ、指定個数と寸法を保って充填する。scatterへ読み替えない。scatterは疎密を持つ散布、tileは規則的な敷き詰め、backgroundはキャンバス背景色だけに使う。『満天』『星空』『全面』を理由にfillへ変えず、『埋める』を全面scatterへ変えない。明示領域をcanvas全体へ広げない。"#;
 
@@ -2011,7 +2068,7 @@ const STAGE1_CONTEXT_JA: &str =
 const STAGE1_DDL_INTENT_EN: &str =
     "produce visible, editable normalized DDL that the deterministic compiler can parse again.";
 const STAGE1_OUTPUT_SCOPE_EN: &str = "Do not output a Score, renderer instructions, observation text, chain of thought, explanation, or hidden metadata. The normalized DDL must be meaning-complete by itself; do not leave holes or vague placeholders for a later LLM.";
-const STAGE1_GRAMMAR_EN_PREFIX: &str = r#"Use the finite accepted_saijiki_vocabulary plus ordinary numeric literals, punctuation, and grammar accepted by the compiler. When invoking an installed macro, write only its qualified_name and listed parameters. Do not write versions, digests, MacroDefinition bodies, components, or expansions into DDL.
+const STAGE1_GRAMMAR_EN_PREFIX: &str = r#"Use the finite accepted_saijiki_vocabulary plus ordinary numeric literals, punctuation, and grammar accepted by the compiler.
 
 Preserve every explicit subject, color, material, thinness, count, size, angle, coordinate, region, relation, repetition, and placement. Fill, scatter, tile, and background are distinct meanings. Fill places the author's specified shape inside the specified region while preserving its explicit count and size; never normalize fill to scatter. Scatter is a distribution with spacing, tile is regular tessellation, and background means only the canvas background color. Do not infer fill merely from “starry sky”, “full”, or “whole area”, and do not turn “fill” into whole-canvas scatter. Never expand an explicit region to the whole canvas."#;
 
@@ -2026,10 +2083,10 @@ fn stage1_vocabulary_roles(language: ResolvedInstructionLanguage) -> String {
     match language {
         ResolvedInstructionLanguage::Ja => r#"語彙一覧はそのまま使える語形であり、自由な同義語や複合語を生成する材料ではない。抽象化した視覚内容を、一覧の語形と上記の構文へ符号化する。カテゴリ名は説明用の見出しで、命令に付けない。
 単独図形のheadは下記かたち一覧から選ぶ。てざわりは道具、つらなりは線の連続性、おもては面の属性であり、それだけをheadや動作にしない。属性は対応するheadの前に置く。図形の形容と描画headを区別する。
-図形命令と支持体・背景・macroは別の構文である。地を指定するなら、じの語を単独の文にする。背景色は「背景を<色>で埋める。」。いずれも任意で、必要な描画対象の代用ではない。macroはqualified_nameと宣言されたparameterの呼出しだけを一文にし、外側に動作・数量・位置・属性を足さない。明示指定がある場合は宣言されたparameterで結合し、結合不能な指定を削って呼出しを成立させない。"#.to_owned(),
+図形命令と支持体・背景は別の構文である。地を指定するなら、じの語を単独の文にする。背景色は「背景を<色>で埋める。」。いずれも任意で、必要な描画対象の代用ではない。"#.to_owned(),
         ResolvedInstructionLanguage::En => r#"The vocabulary lists usable surface forms, not material for inventing synonyms or compound terms. Encode the interpreted visual content with those forms and the grammar above. Category names are explanatory headings, not command prefixes.
 Choose standalone drawing heads from the forms vocabulary below. Touches specify tools, continuity specifies line continuity, and surfaces specify surface attributes; none is a head or action on its own. Put attributes before their corresponding head. Distinguish shape modifiers from drawing heads.
-Drawing commands, ground, background, and macros have separate syntax. To specify ground, write a ground vocabulary noun as its own sentence. Background color uses "fill the background with <color>." Both are optional and do not replace required drawing subjects. A macro sentence contains only its qualified_name call with declared parameters; do not append an outer action, count, position, or attribute. Bind explicit specifications through declared parameters and never delete an unbindable specification to make a call succeed."#.to_owned(),
+Drawing commands, ground, and background have separate syntax. To specify ground, write a ground vocabulary noun as its own sentence. Background color uses "fill the background with <color>." Both are optional and do not replace required drawing subjects."#.to_owned(),
     }
 }
 
@@ -2273,6 +2330,7 @@ mod tests {
     use super::*;
 
     const LIMITS: PromptLimits = PromptLimits {
+        max_offered_plugins: 8,
         max_catalog_entries: 8,
         max_summary_bytes: 256,
         max_catalog_serialized_bytes: 8_192,
@@ -2305,14 +2363,36 @@ mod tests {
             LIMITS,
         )
         .unwrap();
-        assert!(
-            ja.system
-                .contains("- Nature.YoungLeaves（別名 Nature.若葉）: 若葉を上半分へ置く。")
-        );
+        assert!(ja.system.contains(crate::plugin_offer::PLUGIN_RULE_JA));
+        assert!(ja.message.contains("｛若葉｝ 若葉を上半分へ置く。"));
         assert_eq!(
             ja.response_schema["properties"]["plugins"]["items"]["properties"]["name"]["enum"],
-            serde_json::json!(["Nature.YoungLeaves"])
+            serde_json::json!(["｛若葉｝"])
         );
+        let en = build_stage1_prompt(
+            "young leaves",
+            ResolvedInstructionLanguage::En,
+            &context,
+            &entry,
+            LIMITS,
+        )
+        .unwrap();
+        let empty = build_stage1_prompt(
+            "young leaves",
+            ResolvedInstructionLanguage::En,
+            &context,
+            &[],
+            LIMITS,
+        )
+        .unwrap();
+        let size = |prompt: &LlmPrompt| {
+            prompt.system.len()
+                + prompt.message.len()
+                + serde_json::to_vec(&prompt.response_schema).unwrap().len()
+        };
+        let added = size(&en) - size(&empty);
+        eprintln!("stage1 English one plugin added bytes: {added}");
+        assert!(added <= 1500);
         let plugins = work_plan_plugins([&definition]);
         let plan = |name: &str| {
             format!(
@@ -2329,7 +2409,7 @@ mod tests {
                 )
                 .unwrap()
                 .normalized_ddl,
-                "Nature.若葉。"
+                "｛若葉｝。"
             );
             assert_eq!(
                 parse_stage1_response_with_plugins(
@@ -2340,7 +2420,7 @@ mod tests {
                 )
                 .unwrap()
                 .normalized_ddl,
-                "Nature.YoungLeaves."
+                "{young leaves}."
             );
         }
     }
@@ -2369,15 +2449,19 @@ mod tests {
             LIMITS,
         )
         .unwrap();
-        assert!(with_plugin.system.contains("# plugins"));
         assert!(
             with_plugin
                 .system
-                .contains("- Nature.若葉: 若葉を上半分へ散らす。")
+                .contains(crate::plugin_offer::PLUGIN_RULE_JA)
+        );
+        assert!(
+            with_plugin
+                .message
+                .contains("｛若葉｝ 若葉を上半分へ散らす。")
         );
         assert_eq!(
             with_plugin.response_schema["properties"]["plugins"]["items"]["properties"]["name"]["enum"],
-            serde_json::json!(["Nature.若葉"])
+            serde_json::json!(["｛若葉｝"])
         );
         // Without installed plugins the prompt and schema keep the plugin-free edition.
         let without = build_stage1_prompt(
@@ -2393,16 +2477,61 @@ mod tests {
             without.response_schema,
             inku_ddl::work_plan::work_plan_response_schema()
         );
+        let no_match = build_stage1_prompt(
+            "赤い円",
+            ResolvedInstructionLanguage::Ja,
+            &context,
+            &[MacroPromptEntry {
+                definition: &definition,
+                localized_summary: "若葉を上半分へ散らす。",
+            }],
+            LIMITS,
+        )
+        .unwrap();
+        let no_catalog = build_stage1_prompt(
+            "赤い円",
+            ResolvedInstructionLanguage::Ja,
+            &context,
+            &[],
+            LIMITS,
+        )
+        .unwrap();
+        assert_eq!(
+            serde_json::to_vec(&no_match).unwrap(),
+            serde_json::to_vec(&no_catalog).unwrap()
+        );
+        let size = |prompt: &LlmPrompt| {
+            prompt.system.len()
+                + prompt.message.len()
+                + serde_json::to_vec(&prompt.response_schema).unwrap().len()
+        };
+        let plugin_bytes = size(&with_plugin) - size(&without);
+        eprintln!("stage1 Japanese one plugin added bytes: {plugin_bytes}");
+        assert!(plugin_bytes <= 1500, "{plugin_bytes}");
+        let system_schema = with_plugin
+            .system
+            .split_once("# response_schema\n")
+            .unwrap()
+            .1
+            .split_once(crate::plugin_offer::PLUGIN_RULE_JA)
+            .unwrap()
+            .0;
+        assert_eq!(
+            serde_json::from_str::<Value>(system_schema).unwrap(),
+            with_plugin.response_schema
+        );
         let installed = [
             WorkPlanPlugin {
                 name: "Nature.若葉".to_owned(),
                 aliases: Vec::new(),
                 counter: Some(inku_ddl::CountCounter::Flat),
+                ..WorkPlanPlugin::default()
             },
             WorkPlanPlugin {
                 name: "Nature.紅葉".to_owned(),
                 aliases: Vec::new(),
                 counter: None,
+                ..WorkPlanPlugin::default()
             },
         ];
         let plan = r#"{"background":"white","ground":"unspecified","plugins":["Nature.若葉","Garden.薔薇","Nature.若葉"],"layers":[
@@ -2447,11 +2576,11 @@ mod tests {
         };
         assert_eq!(
             print(counted, ResolvedInstructionLanguage::Ja),
-            "10枚のNature.若葉。\nNature.紅葉。"
+            "10枚のNature.若葉。\n3個のNature.紅葉。"
         );
         assert_eq!(
             print(counted, ResolvedInstructionLanguage::En),
-            "10 Nature.若葉.\nNature.紅葉."
+            "10 Nature.若葉.\n3 Nature.紅葉."
         );
         let unwritten = r#"{"background":"unspecified","ground":"unspecified","layers":[],"plugins":[
             {"name":"Nature.若葉","count":0}]}"#;
@@ -2493,7 +2622,7 @@ mod tests {
         assert_eq!(delivered_schema["properties"]["layers"]["type"], "array");
         assert!(stage1.system.contains("work planner"));
         assert!(stage1.system.contains("# tool_marks"));
-        assert!(stage1.macro_catalog_digest.is_some());
+        assert!(stage1.macro_catalog_digest.is_none());
         assert!(!stage1.system.contains("secret_macro_body"));
         assert!(
             !serde_json::to_string(&stage1)

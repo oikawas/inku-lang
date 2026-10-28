@@ -4,6 +4,10 @@ The inku application code is licensed under the [repository MIT license](../LICE
 The container also carries independently licensed Python packages, native Rust
 code, and Noto Serif JP. This document does not relicense those components.
 
+The shared core embeds the America/Los_Angeles zone from the public-domain
+IANA Time Zone Database, 2026e rearguard; its provenance is recorded in
+`core/crates/inku-pipeline/data/tzdata-NOTICE.txt`.
+
 The API image also preserves Ubuntu's SQLite `3.37.2-2ubuntu0.8` binary under
 `/opt/inku-sqlite/lib/`, independently of the base distribution's SQLite.
 Its complete packaged copyright notice is

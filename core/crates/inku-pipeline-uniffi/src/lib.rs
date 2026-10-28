@@ -246,6 +246,15 @@ pub fn model_catalog(input_bytes: Vec<u8>) -> Vec<u8> {
     .unwrap_or_else(|_| br#"{"error":"internal_invariant"}"#.to_vec())
 }
 
+/// Host-independent provider admission decisions and state transitions.
+#[uniffi::export]
+pub fn provider_admission(input_bytes: Vec<u8>) -> Vec<u8> {
+    catch_unwind(AssertUnwindSafe(|| {
+        inku_pipeline::provider_admission::provider_admission_json(&input_bytes)
+    }))
+    .unwrap_or_else(|_| br#"{"error":"internal_invariant"}"#.to_vec())
+}
+
 /// How a host prepares the image a work is written from and the drawing it
 /// shows beside it (`inku.image-input-policy.v1`, 2026-10-24). The Server's
 /// CPython binding and Android's JNI call it, and macOS through UniFFI

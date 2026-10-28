@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-28 — Share provider admission calculations
+
+The shared core now calculates provider budgets, admission, reconciliation and 429 waits. The Server retains persistent accounting and waiting.
+
 ### 2026-10-28 — Share plugin package checks
 
 The shared core reads and checks plugin packages and produces their Saijiki pictures. The Server draws examples through its pipeline and uses the same shared checks before installation.

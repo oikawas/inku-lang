@@ -278,6 +278,29 @@ def test_callback_wrong_state_does_not_consume_and_oidc_nonce_is_checked(isolate
         asyncio.run(bad_nonce())
 
 
+def test_signed_identity_claims_are_checked_after_signature(isolated):
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    other = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    jwk = {**json.loads(jwt.algorithms.RSAAlgorithm.to_jwk(key.public_key())), "kid": "fixture", "use": "sig"}
+    def handle(request):
+        if request.url.path.endswith("openid-configuration"):
+            return httpx.Response(200, json={"issuer": auth.ISSUER, "jwks_uri": auth.ISSUER + "/jwks"})
+        return httpx.Response(200, json={"keys": [jwk]})
+    async def verify(claims, signer=key):
+        token = jwt.encode(claims, signer, algorithm="RS256", headers={"kid": "fixture"})
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
+            return await auth.validate_identity(client, token, "client", "nonce", lambda: None, time.monotonic() + 5)
+    good = {"iss": auth.ISSUER, "aud": ["client", "other"], "azp": "client",
+            "sub": "subject", "exp": time.time() + 300, "nonce": "nonce"}
+    assert asyncio.run(verify(good))["sub"] == "subject"
+    for changes in ({"iss": "https://evil.invalid"}, {"aud": "other"}, {"azp": "other"},
+                    {"exp": time.time() - 1}, {"sub": ""}, {"nonce": "wrong"}):
+        with pytest.raises(ChatGPTError, match="identity_invalid"):
+            asyncio.run(verify({**good, **changes}))
+    with pytest.raises(ChatGPTError, match="identity_invalid"):
+        asyncio.run(verify(good, other))
+
+
 def test_refresh_serializes_across_threads_and_signout_invalidates_late_result(isolated, monkeypatch):
     value = profile(expires_at=0)
     seed(isolated, value)

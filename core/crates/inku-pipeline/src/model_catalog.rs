@@ -3,6 +3,8 @@ use serde_json::{Map, Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::sync::OnceLock;
+mod chatgpt_auth_policy;
+mod chatgpt_policy;
 mod model_refresh;
 mod provider_settings;
 
@@ -925,6 +927,29 @@ pub fn model_catalog_json(input: &[u8]) -> Vec<u8> {
             "metadata":&provider_settings::METADATA[..17], "catalog":provider_settings::METADATA})
         }
         Some("retired_providers") => json!({"providers":retired_providers()}),
+        Some(
+            "chatgpt_publication"
+            | "chatgpt_publication_update"
+            | "chatgpt_usable"
+            | "chatgpt_offered"
+            | "chatgpt_cache",
+        ) => chatgpt_policy::run(&request),
+        Some(
+            "chatgpt_auth_url"
+            | "chatgpt_auth_endpoint"
+            | "chatgpt_auth_claims"
+            | "chatgpt_auth_callback"
+            | "chatgpt_auth_tokens"
+            | "chatgpt_auth_access"
+            | "chatgpt_auth_session"
+            | "chatgpt_auth_transition"
+            | "chatgpt_auth_preserve"
+            | "chatgpt_auth_discovery"
+            | "chatgpt_auth_identity"
+            | "chatgpt_auth_generation"
+            | "chatgpt_auth_constants"
+            | "chatgpt_auth_callback_client",
+        ) => chatgpt_auth_policy::run(&request),
         Some("reference_batch") => {
             let results: Vec<Value> = array(request.get("queries"))
                 .iter()
@@ -1264,6 +1289,26 @@ pub fn model_catalog_json(input: &[u8]) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn chatgpt_policy_matches_frozen_server() {
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../../../../server/tests/data/provider-wire-cases.json"
+        ))
+        .unwrap();
+        for row in array(fixture.get("chatgpt_policy_step4"))
+            .iter()
+            .chain(array(fixture.get("chatgpt_policy_step4_extra")))
+        {
+            let actual: Value = serde_json::from_slice(&model_catalog_json(
+                &serde_json::to_vec(&row["request"]).unwrap(),
+            ))
+            .unwrap();
+            for (key, expected) in row["expect"].as_object().unwrap() {
+                assert_eq!(&actual[key], expected, "{}: {key}", row["why"]);
+            }
+        }
+    }
 
     #[test]
     fn provider_definitions_match_server_baseline() {

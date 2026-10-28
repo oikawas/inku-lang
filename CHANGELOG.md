@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-28 — Share ChatGPT plan policy
+
+The shared core now owns model publication and the pure authorization and registration decisions; the Server continues to handle communication and protected storage.
+
 ### 2026-10-28 — Include the Android local provider in shared settings
 
 The shared provider table and settings recognize Android's always-enabled LiteRT-LM local provider.

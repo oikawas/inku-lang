@@ -21,6 +21,16 @@ from inku_server import provider_wire
 from inku_server.pipeline_provider import ProviderOptions, SingleAttemptProvider
 
 CASES = json.loads((pathlib.Path(__file__).parent / "data" / "provider-wire-cases.json").read_text(encoding="utf-8"))
+
+
+def test_chatgpt_policy_matches_frozen_server():
+    from inku_server.verified_model_catalog import core_catalog
+    for row in CASES["chatgpt_policy_step4"] + CASES["chatgpt_policy_step4_extra"]:
+        request = dict(row["request"])
+        request.pop("schema")
+        action = request.pop("action")
+        answer = core_catalog(action, **request)
+        assert {key: answer.get(key) for key in row["expect"]} == row["expect"], row["why"]
 # What httpx adds to every request, which the rows leave out.
 _CLIENT_HEADERS = {"host", "content-length", "accept", "accept-encoding", "connection", "user-agent"}
 

@@ -341,6 +341,14 @@ fn pipeline_chunk_moves<'py>(
     PyBytes::new(py, &output)
 }
 
+/// Inspect plugin packages through the shared host-neutral JSON boundary.
+#[pyfunction]
+fn pipeline_plugin_package(py: Python<'_>, input_bytes: &Bound<'_, PyBytes>) -> String {
+    let input = input_bytes.as_bytes().to_vec();
+    let output = py.detach(|| inku_pipeline_uniffi::plugin_package(input));
+    String::from_utf8(output).expect("plugin package output is UTF-8 JSON")
+}
+
 /// The autonomous refinement (AI自動推敲) from the shared core: next, record, measure.
 #[pyfunction]
 fn pipeline_autonomous_refine<'py>(
@@ -498,6 +506,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(pipeline_juxtaposition, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_autonomous_refine, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_chunk_moves, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_plugin_package, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_provider_wire, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_model_catalog, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_image_input_policy, module)?)?;

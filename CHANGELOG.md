@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-28 — Share plugin package checks
+
+The shared core reads and checks plugin packages and produces their Saijiki pictures. The Server draws examples through its pipeline and uses the same shared checks before installation.
+
 ### 2026-10-28 — Android reads model catalog and selection from the shared core
 
 Android receives the embedded model catalog, labels, selectability and ordering through JNI instead of maintaining a second classification. Model names now sort with the same collation as Web. Local observations and purpose choices remain unchanged.

@@ -732,15 +732,19 @@ dependencies = [
 name = "inku-pipeline-uniffi"
 version = "0.1.0"
 dependencies = [
+ "base64",
+ "flate2",
  "inku-ddl",
  "inku-display",
  "inku-pipeline",
  "inku-render",
  "inku-score",
  "inku-svg-raster",
+ "png",
  "regex",
  "serde",
  "serde_json",
+ "sha2",
  "sudachi",
  "uniffi",
 ]

@@ -698,4 +698,70 @@ mod tests {
         let detail = invalid["problems"][0]["detail"].as_str().unwrap();
         assert!(detail.contains(" (line 2, column "));
     }
+
+    #[test]
+    fn package_refusals_and_word_picture_findings_are_named() {
+        let document = include_str!("../../../../docs/plugins/sky-nihonga/package.json");
+        let original: Value = serde_json::from_str(document).unwrap();
+        for (document, expected) in [
+            (" ".repeat(MAX_PACKAGE + 1), "package_too_large"),
+            ("[1]".to_owned(), "not_an_object"),
+            ("{".to_owned(), "invalid_json"),
+            (
+                json!({"namespace":"bad!","name":"bad!","words":[]}).to_string(),
+                "invalid_identifier",
+            ),
+            (
+                json!({"namespace":"A","name":"B","words":[]}).to_string(),
+                "no_words",
+            ),
+            (
+                json!({"namespace":"A","name":"B","words":vec![json!({});65]}).to_string(),
+                "too_many_words",
+            ),
+        ] {
+            assert!(
+                parse(&document, None, false)
+                    .unwrap_err()
+                    .iter()
+                    .any(|p| p["code"] == expected),
+                "{expected}"
+            );
+        }
+        let mut raw = original.clone();
+        raw["words"][0]["summary_ja"] = json!("あ".repeat(3000));
+        raw["words"][0]["definition"]["namespace"] = json!("Elsewhere");
+        let parsed = parse(&raw.to_string(), None, false).unwrap();
+        let findings = parsed["words"][0]["problems"].as_array().unwrap();
+        for code in ["text_too_long", "namespace_differs_from_package"] {
+            assert!(findings.iter().any(|p| p["code"] == code), "{code}");
+        }
+        let mut pictures = BTreeMap::new();
+        pictures.insert("large.png".to_owned(), None);
+        pictures.insert("bad.png".to_owned(), Some(b"bad".to_vec()));
+        for (preview, expected) in [
+            (json!(42), "not_a_string"),
+            (json!("../bad.png"), "invalid_preview_path"),
+            (json!("missing.png"), "preview_not_found"),
+            (json!("large.png"), "image_too_large"),
+            (json!("bad.png"), "not_a_png"),
+        ] {
+            let mut raw = original.clone();
+            raw["words"][0]["preview"] = preview;
+            let parsed = parse(&raw.to_string(), Some(&pictures), false).unwrap();
+            assert!(
+                parsed["words"][0]["problems"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|p| p["code"] == expected),
+                "{expected}"
+            );
+        }
+        assert_eq!(
+            archive(&vec![0; MAX_ARCHIVE + 1]).unwrap_err()[0]["code"],
+            "archive_too_large"
+        );
+        assert_eq!(archive(b"bad").unwrap_err()[0]["code"], "invalid_zip");
+    }
 }

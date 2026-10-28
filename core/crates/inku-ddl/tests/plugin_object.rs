@@ -1,8 +1,9 @@
 //! Test-only object words: their body coordinates belong to one local box.
+use inku_ddl::work_plan::composition_layer;
 use inku_ddl::{
     MacroDefinition, MacroExpansionLimits, MacroLock, NormalizedDdlDocument,
     ResolvedInstructionLanguage, ScoreErrorPolicy, ScoreLoweringContext,
-    compile_ddl_to_score_with_resources,
+    compile_ddl_to_score_with_resources, compile_typed_ddl,
 };
 use inku_score::{
     Color, HardResourcePolicy, OperationalResourceBudget, ResourceBudget, ResourceDemand,
@@ -52,6 +53,39 @@ fn lock(definition: &MacroDefinition) -> MacroLock {
         format!("sha256:{}", identity.full_digest_hex()),
     )
     .unwrap()
+}
+
+#[test]
+fn object_word_can_be_read_back_as_a_plan_layer() {
+    let leaf = word(
+        "Leaf",
+        "葉",
+        "leaf",
+        "1:1",
+        json!([arc("upper", "0.5", "0")]),
+    );
+    let document = NormalizedDdlDocument::new(
+        "｛葉｝を置く。",
+        ResolvedInstructionLanguage::Ja,
+        vec![lock(&leaf)],
+    )
+    .unwrap();
+    let compilation = compile_typed_ddl(
+        document,
+        &[leaf],
+        Some(37),
+        MacroExpansionLimits {
+            max_invocations: 64,
+            max_depth: 16,
+            max_evaluation_steps: 8192,
+            max_nodes_per_invocation: 128,
+            max_total_nodes: 128,
+        },
+    );
+    let ast = &compilation.semantic_document.as_ref().unwrap().ast;
+    let layer = composition_layer(&ast.instructions[0]).expect("object layer");
+    assert_eq!(layer.shape, "TestObject.Leaf");
+    assert_eq!(layer.proportion.as_deref(), Some("square"));
 }
 
 #[test]

@@ -1561,14 +1561,17 @@ pub fn plan_ground(ground: &crate::SemanticTerm) -> Option<String> {
 /// composition reads: form, action, count, place, size, colour, surface and
 /// line-up direction. An alternate composition reads these from the visible
 /// instructions alone (draw-system05, 2026-10-04). `None` for an instruction a
-/// plan does not write: a Macro word, a relation, a sequence, a fill of a
+/// plan does not write: a scene Macro word, a relation, a sequence, a fill of a
 /// shape, a numeric point, segment or angle, a fade, or a value outside the
 /// plan's words.
 #[must_use]
 pub fn composition_layer(instruction: &crate::SemanticInstruction) -> Option<WorkPlanLayer> {
     let entity = &instruction.entity;
-    let crate::SemanticHead::Primitive(head) = &entity.head else {
-        return None;
+    let (shape, object_aspect) = match &entity.head {
+        crate::SemanticHead::Primitive(head) => (plan_id(WorkPlanSlot::Shape, head)?, None),
+        crate::SemanticHead::MacroInvocation(head) => {
+            (head.qualified_name.clone(), Some(head.object_aspect?))
+        }
     };
     if instruction.relation.is_some()
         || instruction.sequence.is_some()
@@ -1581,7 +1584,6 @@ pub fn composition_layer(instruction: &crate::SemanticInstruction) -> Option<Wor
     {
         return None;
     }
-    let shape = plan_id(WorkPlanSlot::Shape, head)?;
     let action = plan_id(WorkPlanSlot::Action, instruction.action.as_ref()?)?;
     let proportions: Vec<&crate::SemanticTerm> = [
         entity.proportion.aspect.as_ref(),
@@ -1592,7 +1594,11 @@ pub fn composition_layer(instruction: &crate::SemanticInstruction) -> Option<Wor
     .flatten()
     .collect();
     let proportion = match proportions.as_slice() {
-        [] => None,
+        [] => object_aspect.map(|(width, height)| match width.cmp(&height) {
+            std::cmp::Ordering::Greater => "wide".to_owned(),
+            std::cmp::Ordering::Less => "tall".to_owned(),
+            std::cmp::Ordering::Equal => "square".to_owned(),
+        }),
         [term] => Some(plan_id(WorkPlanSlot::Proportion, term)?),
         _ => return None,
     };

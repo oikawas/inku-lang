@@ -375,7 +375,8 @@ fn read_layers(
         }
         pinned_group = None;
         let after_pinned = read.last().is_some_and(|last| last.pinned.is_some());
-        if matches!(instruction.entity.head, SemanticHead::MacroInvocation(_)) {
+        if matches!(&instruction.entity.head, SemanticHead::MacroInvocation(head) if head.object_aspect.is_none())
+        {
             // A plugin word is not a plan layer and the composition never places it.
             if range.is_some() || instruction.position.is_some() {
                 return Err("unsupported_sentence");

@@ -72,7 +72,9 @@ pub fn composed_plan_of(
     let mut ranges = Vec::new();
     let mut joints = Vec::new();
     for instruction in &ast.instructions {
-        if let SemanticHead::MacroInvocation(head) = &instruction.entity.head {
+        if let SemanticHead::MacroInvocation(head) = &instruction.entity.head
+            && head.object_aspect.is_none()
+        {
             if !plan.layers.is_empty()
                 || instruction.position.is_some()
                 || instruction.relation.is_some()

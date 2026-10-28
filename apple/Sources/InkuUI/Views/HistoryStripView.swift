@@ -187,7 +187,7 @@ import SwiftUI
         // The count follows the window width (Web); a narrower strip clips the last tiles instead of widening the window.
         return ScrollViewReader { proxy in
           ScrollView(.horizontal, showsIndicators: false) {
-            HStack(alignment: .top, spacing: 7) {
+            LazyHStack(alignment: .top, spacing: 7) {
                 ForEach(library.works, id: \.id) { work in tile(work).id(work.id) }
                 if let placeholder { emptyTile(placeholder, height: max(58, kept)) }
             }

@@ -10,7 +10,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ### 2026-10-29 — Reduce macOS tab switching stalls
 
-Save tab choices without blocking the screen on the settings file write. Keep the artwork and lineage views mounted across switches to avoid repeated artwork rendering and lineage reads.
+Save tab choices without blocking the screen on the settings file write. Keep the artwork and lineage views mounted across switches. Build only visible history thumbnails and reuse model-name resolutions.
 
 ### 2026-10-28 — Complete Android ChatGPT login in the foreground
 

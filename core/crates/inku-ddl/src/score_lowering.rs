@@ -1666,29 +1666,6 @@ fn append_macro_caller_diagnostics(
     invalid
 }
 
-/// Geometry or position is not eligible for the existing repeated-call layout.
-fn macro_caller_has_unbound_geometry(instruction: &SemanticInstruction) -> bool {
-    instruction.entity.thinness.is_some()
-        || instruction.entity.relative_scale.is_some()
-        || instruction.entity.explicit_geometry.is_some()
-        || instruction.entity.numeric_position.is_some()
-        || instruction.entity.numeric_range.is_some()
-        || instruction.entity.numeric_segment.is_some()
-        || instruction.entity.angle.is_some()
-        || instruction.entity.numeric_angle.is_some()
-        || instruction.entity.fade.is_some()
-        || instruction.entity.fluctuation.amplitude.is_some()
-        || instruction.entity.fluctuation.frequency.is_some()
-        || instruction.entity.fluctuation.quality.is_some()
-        || instruction.entity.fluctuation.spread.is_some()
-        || instruction.entity.shape_constraint.is_some()
-        || instruction.entity.proportion.aspect.is_some()
-        || instruction.entity.proportion.width_extent.is_some()
-        || instruction.entity.proportion.arc_form.is_some()
-        || instruction.layout_direction.is_some()
-        || instruction.position.is_some()
-}
-
 /// Whether a mirror takes this instruction's body as its target: a mirror
 /// relation on the next instruction, or on the group that starts there.
 fn mirror_takes_body_of(document: &crate::SemanticDocumentAst, projected_index: usize) -> bool {
@@ -2815,7 +2792,8 @@ fn lower_verified_stage15_shared<'a>(
     // one-member group that the caller's action lays out once: one copy per
     // cell for no action, placing, scattering or drawing, and the action's
     // own layout for a line-up or a tile. Performance sizes the cells from
-    // the drawn copies. A caller with a position, a fill, an order, a
+    // the drawn copies. Unbound caller position is omitted before placement.
+    // A caller with a fill, an order, a
     // relation, or a mirror after it keeps the outer repetition in place.
     if objects.is_some() {
         for (projected_index, instruction) in document.instructions.iter().enumerate() {
@@ -2834,7 +2812,6 @@ fn lower_verified_stage15_shared<'a>(
             if instruction.fill_target.is_some()
                 || instruction.sequence.is_some()
                 || instruction.relation.is_some()
-                || macro_caller_has_unbound_geometry(instruction)
                 || mirror_takes_body_of(document, projected_index)
                 || group_members.contains_key(&projected_index)
                 || omitted_group_members.contains(&projected_index)
@@ -3283,7 +3260,13 @@ fn lower_verified_stage15_shared<'a>(
                 {
                     body_caller = instruction.clone();
                     body_caller.action = None;
-                    body_caller.position = None;
+                    let implicit_repetition = group_members.contains_key(&projected_index)
+                        && !document.coordinated_head_groups.iter().any(|group| {
+                            group.member_instruction_indices.contains(&projected_index)
+                        });
+                    if !implicit_repetition {
+                        body_caller.position = None;
+                    }
                     body_caller.fill_target = None;
                     body_caller.sequence = None;
                     &body_caller

@@ -8,14 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-28 — Share provider admission calculations
-
-The shared core now calculates provider budgets, admission, reconciliation and 429 waits. The Server retains persistent accounting and waiting.
-
-### 2026-10-28 — Share plugin package checks
-
-The shared core reads and checks plugin packages and produces their Saijiki pictures. The Server draws examples through its pipeline and uses the same shared checks before installation.
-
 ### 2026-10-28 — Android reads model catalog and selection from the shared core
 
 Android receives the embedded model catalog, labels, selectability and ordering through JNI instead of maintaining a second classification. Model names now sort with the same collation as Web. Local observations and purpose choices remain unchanged.
@@ -398,6 +390,16 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.286 (2026-10-28 / Build1362)
+
+### 2026-10-28 — Share provider admission calculations
+
+The shared core now calculates provider budgets, admission, reconciliation and 429 waits. The Server retains persistent accounting and waiting.
+
+### 2026-10-28 — Share plugin package checks
+
+The shared core reads and checks plugin packages and produces their Saijiki pictures. The Server draws examples through its pipeline and uses the same shared checks before installation.
 
 ## v2.15.285 (2026-10-28 / Build1361)
 

@@ -52,6 +52,8 @@ def estimate_input_tokens(kind: str, tpm: int, body_bytes: int, count_response=_
     answer = _core("estimate", **fields)
     if answer["decision"] == "need_count":
         return None
+    if answer["decision"] == "invalid_response":
+        raise TypeError(answer["reason"])
     if answer["decision"] == "reject":
         raise RateLimitUnavailable(answer["reason"])
     return answer["input_tokens"]

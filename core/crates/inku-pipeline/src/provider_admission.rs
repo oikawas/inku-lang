@@ -166,6 +166,11 @@ fn process(r: &Value) -> Result<Value, &'static str> {
         let Some(response) = r.get("count_response") else {
             return Ok(json!({"decision":"need_count"}));
         };
+        if !response.is_object() {
+            return Ok(
+                json!({"decision":"invalid_response","reason":"token count response is not an object"}),
+            );
+        }
         let count = response
             .as_object()
             .and_then(|obj| obj.get("totalTokens"))

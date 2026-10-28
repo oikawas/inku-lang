@@ -1,5 +1,5 @@
 {
-  "source": "Server provider_rate_limits.py at 7419a3d8162c4c132088092c2603b06f3a227864; estimate cases use pipeline_provider.py at 8fab20ab8afec2f67b7bdcaecd4f64425cd04d4f, with the requested non-object refusal classification",
+  "source": "Server provider_rate_limits.py at 7419a3d8162c4c132088092c2603b06f3a227864; estimate cases use pipeline_provider.py at 8fab20ab8afec2f67b7bdcaecd4f64425cd04d4f",
   "cases": [
     {"name":"estimate_tpm_off_openai","request":{"action":"estimate","kind":"openai_compatible","tpm":0,"body_bytes":300},"expected":{"decision":"estimate","input_tokens":0}},
     {"name":"estimate_tpm_off_gemini","request":{"action":"estimate","kind":"gemini","tpm":0,"body_bytes":300},"expected":{"decision":"estimate","input_tokens":0}},
@@ -16,8 +16,8 @@
     {"name":"estimate_count_boolean","request":{"action":"estimate","kind":"gemini","tpm":16000,"body_bytes":300,"count_response":{"totalTokens":true}},"expected":{"decision":"reject","reason":"input token count is unavailable"}},
     {"name":"estimate_count_float","request":{"action":"estimate","kind":"gemini","tpm":16000,"body_bytes":300,"count_response":{"totalTokens":1.0}},"expected":{"decision":"reject","reason":"input token count is unavailable"}},
     {"name":"estimate_count_missing","request":{"action":"estimate","kind":"gemini","tpm":16000,"body_bytes":300,"count_response":{}},"expected":{"decision":"reject","reason":"input token count is unavailable"}},
-    {"name":"estimate_count_nonobject","request":{"action":"estimate","kind":"gemini","tpm":16000,"body_bytes":300,"count_response":[]},"expected":{"decision":"reject","reason":"input token count is unavailable"}},
-    {"name":"estimate_count_null","request":{"action":"estimate","kind":"gemini","tpm":16000,"body_bytes":300,"count_response":null},"expected":{"decision":"reject","reason":"input token count is unavailable"}},
+    {"name":"estimate_count_nonobject","request":{"action":"estimate","kind":"gemini","tpm":16000,"body_bytes":300,"count_response":[]},"expected":{"decision":"invalid_response","reason":"token count response is not an object"}},
+    {"name":"estimate_count_null","request":{"action":"estimate","kind":"gemini","tpm":16000,"body_bytes":300,"count_response":null},"expected":{"decision":"invalid_response","reason":"token count response is not an object"}},
     {
       "name": "first",
       "request": {

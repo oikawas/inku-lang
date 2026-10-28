@@ -1469,6 +1469,8 @@ The shared core calculates these limits, admission, reconciliation, cooldown and
 
 The shared core also estimates input tokens from the UTF-8 request byte count or, for Gemini with TPM enabled, validates the `countTokens` answer and adds ten percent headroom.
 
+A non-object `countTokens` answer is a malformed payload; an object without a valid non-negative integer count is a rate-limit refusal.
+
 ---
 
 ## 9. The Design of the First Stroke

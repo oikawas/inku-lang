@@ -72,7 +72,7 @@ def test_invalid_count_refuses_before_generation(payload, monkeypatch):
     action = {"tag": "generate_normalized_ddl", "identity": {"action_id": "a", "attempt": 1, "request_digest": "b"},
               "timeout_ms": "120000", "payload": {"prompt": {"system": "s", "message": "m",
               "action_name": "generate_normalized_ddl", "response_schema": {"type": "object", "properties": {}}}}}
-    assert provider(action)["failure"] == "rate_limited"
+    assert provider(action)["failure"] == ("rate_limited" if isinstance(payload, dict) else "malformed_payload")
     assert len(calls) == 1 and calls[0].endswith(":countTokens")
 
 

@@ -323,7 +323,9 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     private var appearance: some View {
         return Group {
             Section(model.display.webCopy("settingsWildDefault", "筆致制限を外すの既定値")) {
-                Text(model.display.webCopy("settingsWildDefaultDescription", "新しい描画と派生の既定値")).inkuFont(13).foregroundStyle(.secondary)
+                Text(model.display.label("このMacで、新しい描画や派生の条件を開くときの既定値です。入力欄の札を変えても、この設定は変わりません。",
+                                         "The starting choice for new drawings and derived works on this Mac. Changing the chip in the input area does not change this setting."))
+                    .inkuFont(13).foregroundStyle(.secondary)
                 Toggle(model.display.webCopy("wildButton", "筆致制限を外す"), isOn: Binding(get: { model.display.preferences.defaultWild ?? false }, set: { value in
                     model.display.preferences.defaultWild = value; model.wild = value
                 }))

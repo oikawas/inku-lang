@@ -155,7 +155,7 @@ struct CreationView: View {
         .onChange(of: model.inputMode) { _, value in
             if value == "description", isImage, model.selectedWork != nil { automation.workspaceInputMode = "description" }
         }
-        .onChange(of: ui.workspaceTab) { _, tab in
+        .onChange(of: ui.workspaceTab, initial: true) { _, tab in
             batchWorkspace.invalidateReads()
             if tab == "lineage" { lineageMounted = true }
             if tab == "lineage", isBatch, batchWorkspace.followsLatest,

@@ -392,6 +392,7 @@ object InkuStringsEn : InkuStrings {
     }
 
     override val errorServiceIdFormat = "A Service ID may hold letters, digits, _ and - only."
+    override val errorDuplicateModelIds = "A model ID appears more than once."
     override val errorServiceNotFound: (String) -> String = { id -> "Service not found: $id" }
     override val errorProviderModelsUnsupported: (String) -> String = { name ->
         "Fetching the model list from $name is not supported on Android."

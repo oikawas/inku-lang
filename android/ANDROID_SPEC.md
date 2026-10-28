@@ -194,7 +194,7 @@ Host-JNI JVM tests read the shared `server/tests/data/saved-variant-cases.json`.
 
 **On-device Vision models do not read composition (the author's decision, 2026-10-17).** `composition.read` is `!isLocalVisionModel(modelId)` and remains true for external-provider models. Acceptance on E2B spent about 114 seconds on four composition attempts before falling back to the default reading, so the on-device models return to their former behavior. This is an intentional difference from Server's always-true setting. New runs and forks from saved works use the same rule. The existing shared pipeline retains external-provider retries, answer validation and fallback.
 
-Provider resolution uses an explicit `provider:model`, then a sole enabled provider publishing the model, then the user's stage default. `complete_visible_ddl_holes` uses Stage 2; other requests use Stage 1. Confirming a model selection also saves `stage1_provider` and `stage2_provider` in `model_selection`. Older settings derive each provider from its qualified stage model without a Room migration. First-run defaults retain the existing on-device model. An unresolved setting or disabled default never silently switches to the device. ChatGPT-plan routing follows the same order and uses the session reference pinned at run start.
+Provider resolution uses an explicit `provider:model`, then a sole enabled provider listing the model, then the user's stage default, using the shared core. `complete_visible_ddl_holes` uses Stage 2; other requests use Stage 1. Confirming a model selection also saves `stage1_provider` and `stage2_provider` in `model_selection`. Older settings derive each provider from its qualified stage model without a Room migration. First-run defaults retain the existing on-device model. An unresolved setting or disabled default never silently switches to the device. ChatGPT-plan routing follows the same order and uses the session reference pinned at run start.
 
 Autonomous refinement rasterizes the saved SVG with its aspect ratio preserved inside 768×768, centers it on a transparent square, and sends PNG. The request MIME is `image/png` and IHDR dimensions are 768×768. Camera JPEG preparation and the on-device photo path remain unchanged.
 
@@ -242,6 +242,8 @@ New drawing requests and execution options omit `interpretation_seed`, and alloc
 
 ## 2026-10-13 Canonical model information and labels
 
+The shared core `modelCatalog` supplies provider definitions, settings normalization, updates and validation, model references, list refresh, purposes and access decisions. Room sends encrypted key strings through the core unchanged. The host supplies the on-device model assets. Android additionally restricts remote URLs to HTTPS or loopback HTTP. ChatGPT plan registration remains separately managed.
+
 `core/crates/inku-pipeline/data/model_catalog.json` (`inku.model-catalog.v2`) is the model-information
 source. The shared core embeds it, and Android receives the catalog, labels and selection decisions through JNI `modelCatalog`. Android
 commits no duplicate evaluations, candidates, initial published models or label wording.
@@ -259,7 +261,7 @@ seconds, estimated USD costs and comments from the source. Missing values are no
 A refetched list adds `eol` to missing models and removes it from models offered again.
 Previously seen models remain visible. A successful request with this installation's key
 removes `subscription`; 402/403 adds it. Ollama Cloud offers an explicit per-model
-“Check with this key” action, sending only `max_tokens: 1` for the selected model. Only 200
+“Check with this key” action: it checks `/api/show`, then if needed sends `max_tokens: 1` for the selected model. A 410 records the retirement date. Only 200
 confirms access, and only 402/403 denies it. Other statuses and transport failures leave
 labels unchanged. There are no automatic mass probes or measurements. Observations live
 in existing `app_settings` and are invalidated by key or connection changes; they never

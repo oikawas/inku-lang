@@ -21,15 +21,19 @@ data class CatalogModel(
     val name: String get() = record.optString("label").ifBlank { id }
 }
 
-data class ModelCatalogObservation(val seen: List<String> = emptyList(), val access: Map<String, Boolean> = emptyMap()) {
+data class ModelCatalogObservation(val seen: List<String> = emptyList(), val access: Map<String, Boolean> = emptyMap(),
+    val records: Map<String, JSONObject> = emptyMap()) {
     companion object {
         fun read(json: String?): ModelCatalogObservation = runCatching {
             val value = JSONObject(json ?: "{}")
             val access = value.optJSONObject("access") ?: JSONObject()
-            ModelCatalogObservation(value.optJSONArray("seen").strings(), access.keys().asSequence().associateWith(access::getBoolean))
+            val records = value.optJSONObject("records") ?: JSONObject()
+            ModelCatalogObservation(value.optJSONArray("seen").strings(), access.keys().asSequence().associateWith(access::getBoolean),
+                records.keys().asSequence().associateWith(records::getJSONObject))
         }.getOrDefault(ModelCatalogObservation())
     }
-    fun json(): String = JSONObject().put("seen", JSONArray(seen)).put("access", JSONObject(access)).toString()
+    fun json(): String = JSONObject().put("seen", JSONArray(seen)).put("access", JSONObject(access))
+        .put("records", JSONObject(records)).toString()
 }
 
 /** Read-only repository catalog; local observations are applied to a fresh record. */
@@ -38,6 +42,7 @@ class ModelCatalog(source: JSONObject) {
     private val info by lazy { catalogRequest("catalog") }
     private val storedKeys by lazy { info.getJSONObject("stored_label_keys") }
     private val cache = ConcurrentHashMap<String, CatalogModel>()
+    private val observationCache = ConcurrentHashMap<String, String>()
     val labels: List<ModelCatalogLabel> by lazy { (this.source.optJSONArray("labels") ?: info.getJSONObject("catalog").getJSONArray("labels")).let { rows ->
         (0 until rows.length()).map { index -> rows.getJSONObject(index).let {
             ModelCatalogLabel(it.getString("id"), it.getString("ja"), it.getString("en"), it.getBoolean("publishable"))
@@ -72,21 +77,44 @@ class ModelCatalog(source: JSONObject) {
         (0 until rows.length()).map { rows.getJSONObject(it).getString("id") }
     }.orEmpty()
 
-    fun resolve(providerId: String, modelId: String, offered: Set<String>? = null, accessible: Boolean? = null): CatalogModel {
+    fun resolve(providerId: String, modelId: String, offered: Set<String>? = null, accessible: Boolean? = null,
+        observedRecord: JSONObject? = null): CatalogModel {
         val id = rawId(providerId, modelId)
         val rows = provider(providerId)?.optJSONArray("models")
         val original = rows?.let { (0 until it.length()).map(it::getJSONObject).firstOrNull { row -> row.getString("id") == id } }
-        val record = original?.let { JSONObject(it.toString()) } ?: JSONObject().put("id", id)
-        val observed = withObservations(record, offered, accessible)
+        val record = observedRecord?.let { JSONObject(it.toString()) } ?: original?.let { JSONObject(it.toString()) } ?: JSONObject().put("id", id)
+        val observed = withObservations(record, if (observedRecord != null) null else offered, accessible)
         return cached(providerId, observed)
     }
 
     private fun withObservations(input: JSONObject, offered: Set<String>?, accessible: Boolean?): JSONObject {
+        if (offered == null && accessible == null) return JSONObject(input.toString())
+        val key = "${input}\u0000${offered?.contains(input.optString("id"))}\u0000$accessible"
+        return JSONObject(observationCache.computeIfAbsent(key) { applyObservations(input, offered, accessible).toString() })
+    }
+
+    private fun applyObservations(input: JSONObject, offered: Set<String>?, accessible: Boolean?): JSONObject {
         val record = JSONObject(input.toString())
         val id = record.optString("id")
         val stored = record.optJSONArray("labels").strings().toMutableSet()
-        offered?.let { if (id in it) stored.remove("eol") else stored.add("eol") }
-        accessible?.let { if (it) stored.remove("subscription") else stored.add("subscription") }
+        var core = internalRecord(record)
+        if (offered != null) {
+            val previous = JSONObject().put("models", JSONArray().put(core)).put("enabled_models", JSONObject())
+            val fresh = if (id in offered) JSONArray().put(JSONObject().put("id", id).put("label", record.optString("label", id))) else JSONArray()
+            val prepared = catalogRequest("refresh_prepare", JSONObject().put("models", fresh).put("previous", previous)).getJSONArray("models")
+            core = catalogRequest("refresh_finish", JSONObject().put("models", prepared).put("previous", previous)
+                .put("today", java.time.LocalDate.now().toString())).getJSONArray("models").getJSONObject(0)
+            if (core.optBoolean("eol")) stored.add("eol") else stored.remove("eol")
+            if (core.optBoolean("eol")) record.put("eol", true) else record.remove("eol")
+            if (core.has("eol_date")) record.put("eol_date", core.getString("eol_date")) else record.remove("eol_date")
+        }
+        if (accessible != null) {
+            val answer = JSONObject().put("subscription", !accessible)
+            val applied = catalogRequest("access_apply", JSONObject().put("models", JSONArray().put(core))
+                .put("answers", JSONArray().put(answer))).getJSONArray("models").getJSONObject(0)
+            if (applied.optBoolean("requires_subscription")) stored.add("subscription") else stored.remove("subscription")
+            if (applied.optBoolean("requires_subscription")) record.put("requires_subscription", true) else record.remove("requires_subscription")
+        }
         record.put("labels", JSONArray(stored.toList()))
         return record
     }

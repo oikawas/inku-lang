@@ -5946,12 +5946,7 @@ private fun parsePublishedModelIds(value: String): List<String> {
     synchronized(PublishedModelIdCache) {
         PublishedModelIdCache[value]?.let { return it }
     }
-    val parsed = runCatching {
-        val array = JSONArray(value)
-        (0 until array.length()).mapNotNull { array.optString(it).takeIf { id -> id.isNotBlank() } }
-    }.getOrElse {
-        value.lines().map { it.trim() }.filter { it.isNotBlank() }
-    }
+    val parsed = app.inku.mobile.data.ProviderSettingsCodec.parseModelIds(value)
     synchronized(PublishedModelIdCache) {
         PublishedModelIdCache[value] = parsed
     }
@@ -5983,7 +5978,9 @@ private fun connectionKindLabel(value: String): String {
 
 private fun catalogModelFor(state: InkuUiState, providerId: String, modelId: String): app.inku.mobile.data.CatalogModel {
     val id = app.inku.mobile.data.ModelCatalog.rawId(providerId, modelId)
-    return state.modelCatalog.resolve(providerId, id, state.providerModelCandidates[providerId]?.toSet(), state.modelCatalogObservations[providerId]?.access?.get(id))
+    val observation = state.modelCatalogObservations[providerId]
+    return state.modelCatalog.resolve(providerId, id, state.providerModelCandidates[providerId]?.toSet(),
+        observation?.access?.get(id), observation?.records?.get(id))
 }
 
 private fun modelChoicesFor(state: InkuUiState, includeChatGpt: Boolean = true): List<ModelChoice> {
@@ -5995,7 +5992,7 @@ private fun modelChoicesFor(state: InkuUiState, includeChatGpt: Boolean = true):
         .filter { it.isEnabled && !it.isDefaultLocal && !(!includeChatGpt && it.providerId == "chatgpt") }
         .forEach { provider ->
             availablePublishedModels(provider, state).forEach { modelId ->
-                val qualified = qualifyModelId(provider.providerId, modelId)
+                val qualified = qualifyModelId(provider.providerId, modelId, state)
                 val label = if (provider.providerId == "chatgpt") state.chatGptPlan.models?.firstOrNull { it.id == modelId }?.label ?: catalogModelFor(state, provider.providerId, modelId).name else catalogModelFor(state, provider.providerId, modelId).name
                 choices += ModelChoice(qualified, label, if (provider.providerId == "chatgpt") stringsFor(state.uiLanguage).chatGptPlan else provider.displayName)
             }
@@ -6061,7 +6058,7 @@ private fun modelOptionsForProvider(state: InkuUiState, providerId: String, stri
         .map { id ->
         ModelOptionChoice(
             rawId = id,
-            qualifiedId = qualifyModelId(provider.providerId, id),
+            qualifiedId = qualifyModelId(provider.providerId, id, state),
             label = if (providerId == "chatgpt") state.chatGptPlan.models?.firstOrNull { it.id == id }?.label ?: catalogModelFor(state, providerId, id).name else catalogModelFor(state, providerId, id).name,
             notes = id,
             notRecommended = (if (state.modelSelectionForCamera) listOf("llm", "vision") else listOf("llm"))
@@ -6071,11 +6068,9 @@ private fun modelOptionsForProvider(state: InkuUiState, providerId: String, stri
 }
 
 private fun providerOfModelId(modelId: String, state: InkuUiState): String {
-    state.providerSettings.firstOrNull { modelId.startsWith("${it.providerId}:") }?.let { return it.providerId }
-    state.providerSettings.firstOrNull { provider ->
-        provider.providerId != "chatgpt" && parsePublishedModelIds(provider.publishedModelsJson).contains(modelId)
-    }?.let { return it.providerId }
-    return "local-litert-lm"
+    val rows = providerReferenceRows(state)
+    return app.inku.mobile.data.catalogRequest("resolve_display", JSONObject().put("providers", rows)
+        .put("ref", modelId).put("default_provider", "local-litert-lm")).getString("provider")
 }
 
 private fun availablePublishedModels(provider: app.inku.mobile.data.db.ProviderSettingEntity, state: InkuUiState): List<String> {
@@ -6095,9 +6090,16 @@ private fun modelChoiceStatusLabel(downloadState: String, strings: InkuStrings):
     }
 }
 
-private fun qualifyModelId(providerId: String, modelId: String): String {
-    return if (modelId.startsWith("$providerId:")) modelId else "$providerId:$modelId"
+private fun providerReferenceRows(state: InkuUiState) = JSONObject().also { rows ->
+    state.providerSettings.forEach { provider -> rows.put(provider.providerId,
+        app.inku.mobile.data.ProviderSettingsCodec.toCore(provider, if (provider.isDefaultLocal)
+            app.inku.mobile.data.ProviderSettingsCodec.parseModelIds(provider.publishedModelsJson)
+            else state.providerModelCandidates[provider.providerId] ?: app.inku.mobile.data.ProviderSettingsCodec.catalogIds(provider.providerId))) }
 }
+
+private fun qualifyModelId(providerId: String, modelId: String, state: InkuUiState): String =
+    app.inku.mobile.data.catalogRequest("qualify_ref", JSONObject().put("providers", providerReferenceRows(state))
+        .put("provider", providerId).put("ref", modelId)).getString("ref")
 
 /** A model's name, followed by the supported mark when Android is verified to draw with it. */
 @Composable

@@ -9,12 +9,14 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
+import app.inku.mobile.data.catalogRequest
 
 internal data class ProviderModelListRequest(
     val url: String,
     val headers: Map<String, String>,
     /** Sent with every page: the largest page the API allows. */
     val firstQuery: Map<String, String> = emptyMap(),
+    val pageLimit: Int = 20,
 )
 
 /**
@@ -24,37 +26,15 @@ internal data class ProviderModelListRequest(
  */
 internal fun providerModelListRequest(kind: String, baseUrl: String, apiKey: String?): ProviderModelListRequest {
     ProviderUrlValidator.validateRemoteBaseUrl(baseUrl)
-    val root = baseUrl.trimEnd('/')
-    val key = apiKey?.takeIf { it.isNotBlank() }
-    return when (kind) {
-        "anthropic" -> ProviderModelListRequest(
-            "$root/v1/models",
-            buildMap {
-                key?.let { put("x-api-key", it) }
-                put("anthropic-version", "2023-06-01")
-            },
-            mapOf("limit" to MODEL_LIST_PAGE_SIZE),
-        )
-        "gemini" -> ProviderModelListRequest(
-            "$root/v1beta/models",
-            key?.let { mapOf("x-goog-api-key" to it) } ?: emptyMap(),
-            mapOf("pageSize" to MODEL_LIST_PAGE_SIZE),
-        )
-        "openai-compatible", "openai_compatible" -> ProviderModelListRequest(
-            "$root/models",
-            key?.let { mapOf("Authorization" to "Bearer $it") } ?: emptyMap(),
-        )
-        else -> error("Model list is unavailable for this connection type.")
-    }
+    require(kind in setOf("anthropic", "gemini", "openai-compatible", "openai_compatible")) { "Model list is unavailable for this connection type." }
+    val result = catalogRequest("model_list_start", JSONObject().put("kind", kind.replace('-', '_'))
+        .put("base_url", baseUrl).put("api_key", apiKey.orEmpty()))
+    return ProviderModelListRequest(result.getString("url"), result.getJSONObject("headers").stringMap(), result.optJSONObject("query").stringMap(), result.getInt("page_limit"))
 }
-
 /** The query for the page after [page], or null when [page] was the last one. */
-internal fun nextModelListQuery(kind: String, page: JSONObject): Map<String, String>? = when (kind) {
-    "anthropic" -> page.optString("last_id").takeIf { page.optBoolean("has_more") && it.isNotEmpty() }
-        ?.let { mapOf("after_id" to it) }
-    "gemini" -> page.optString("nextPageToken").takeIf { it.isNotEmpty() }?.let { mapOf("pageToken" to it) }
-    else -> null
-}
+internal fun nextModelListQuery(kind: String, page: JSONObject): Map<String, String>? =
+    catalogRequest("model_list_next", JSONObject().put("kind", kind.replace('-', '_')).put("page", page))
+        .optJSONObject("query")?.stringMap()
 
 internal fun parseProviderModelList(body: String): List<String> = providerModelIds(modelListItems(parseModelListPage(body)))
 
@@ -69,16 +49,19 @@ private fun modelListItems(page: JSONObject): JSONArray =
         ?: error("Model list response did not contain models.")
 
 private fun providerModelIds(raw: JSONArray): List<String> {
-    val models = (0 until raw.length()).mapNotNull { index ->
-        val item = raw.optJSONObject(index) ?: return@mapNotNull null
-        item.optString("id").ifBlank { item.optString("name") }
-            .removePrefix("models/")
-            .trim()
-            .takeIf { it.isNotBlank() }
-    }.distinct()
-    require(models.isNotEmpty()) { "Model list response was empty." }
-    return models
+    val rows = providerModelRows(raw)
+    return (0 until rows.length()).map { rows.getJSONObject(it).getString("id") }.distinct()
 }
+
+private fun providerModelRows(raw: JSONArray): JSONArray {
+    val result = catalogRequest("model_rows", JSONObject().put("payload", JSONObject().put("data", raw)))
+    require(!result.has("error")) { "Model list response was empty." }
+    return result.getJSONArray("models")
+}
+
+private fun JSONObject?.stringMap(): Map<String, String> = this?.let { value ->
+    value.keys().asSequence().associateWith { value.getString(it) }
+}.orEmpty()
 
 internal object ProviderModelListFetcher {
     /**
@@ -86,15 +69,18 @@ internal object ProviderModelListFetcher {
      * that never says it is done; a list cut short there is an error rather
      * than a partial answer.
      */
-    suspend fun fetchModels(kind: String, baseUrl: String, apiKey: String?): List<String> = withContext(Dispatchers.IO) {
+    suspend fun fetchModels(kind: String, baseUrl: String, apiKey: String?): List<String> =
+        fetchRows(kind, baseUrl, apiKey).let { rows -> (0 until rows.length()).map { rows.getJSONObject(it).getString("id") } }
+
+    suspend fun fetchRows(kind: String, baseUrl: String, apiKey: String?): JSONArray = withContext(Dispatchers.IO) {
         val request = providerModelListRequest(kind, baseUrl, apiKey)
         val collected = JSONArray()
         var query = request.firstQuery
-        repeat(MODEL_LIST_PAGE_LIMIT) {
+        repeat(request.pageLimit) {
             val page = parseModelListPage(fetchPage(pageUrl(request.url, query), request.headers))
             val items = modelListItems(page)
             for (index in 0 until items.length()) collected.put(items.get(index))
-            val following = nextModelListQuery(kind, page) ?: return@withContext providerModelIds(collected)
+            val following = nextModelListQuery(kind, page) ?: return@withContext providerModelRows(collected)
             query = request.firstQuery + following
         }
         error("Model list response did not end.")
@@ -150,7 +136,3 @@ internal object ProviderModelListFetcher {
         }
     }
 }
-
-// The server's page size and page cap (`_MODEL_LIST_PAGE_SIZE`, `_MODEL_LIST_PAGE_LIMIT`).
-private const val MODEL_LIST_PAGE_SIZE = "1000"
-private const val MODEL_LIST_PAGE_LIMIT = 20

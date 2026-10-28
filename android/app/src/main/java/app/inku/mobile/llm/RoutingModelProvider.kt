@@ -3,6 +3,8 @@ package app.inku.mobile.llm
 import app.inku.mobile.ui.i18n.InkuFailure
 import app.inku.mobile.ui.i18n.inkuError
 import app.inku.mobile.data.AndroidSecretBox
+import app.inku.mobile.data.ProviderSettingsCodec
+import app.inku.mobile.data.catalogRequest
 import app.inku.mobile.data.db.InkuDatabase
 import app.inku.mobile.data.db.ProviderSettingEntity
 import app.inku.mobile.data.model.CompatibilityConstants
@@ -19,7 +21,7 @@ class RoutingModelProvider(
     override val providerId: String = "routing"
 
     override suspend fun generate(request: ModelRequest): ModelResponse {
-        if (request.modelId.startsWith("chatgpt:", ignoreCase = true)) {
+        if (request.modelId.startsWith("chatgpt:")) {
             return (chatGptPlan?.invoke() ?: throw ChatGptException("chatgpt_not_connected")).generate(request)
         }
         val provider = resolveProvider(request)
@@ -46,6 +48,11 @@ class RoutingModelProvider(
     }
 
     suspend fun fetchModels(providerId: String): List<String> {
+        val rows = fetchModelRows(providerId)
+        return (0 until rows.length()).map { rows.getJSONObject(it).getString("id") }
+    }
+
+    suspend fun fetchModelRows(providerId: String): JSONArray {
         val provider = database.providerSettingDao().get(providerId) ?: inkuError { it.errorServiceNotFound(providerId) }
         if (provider.kind !in setOf("openai-compatible", "openai_compatible", "anthropic", "gemini")) {
             inkuError { it.errorProviderModelsUnsupported(provider.displayName) }
@@ -55,7 +62,7 @@ class RoutingModelProvider(
         if (requiresApiKey(provider.providerId) && apiKey.isNullOrBlank()) {
             throw InkuFailure(CREDENTIALS_UNAVAILABLE) { it.errorProviderApiKeyMissing(provider.displayName) }
         }
-        return ProviderModelListFetcher.fetchModels(provider.kind, baseUrl, apiKey)
+        return ProviderModelListFetcher.fetchRows(provider.kind, baseUrl, apiKey)
     }
 
     private suspend fun resolveProvider(request: ModelRequest): ProviderSettingEntity {
@@ -69,10 +76,15 @@ class RoutingModelProvider(
                 isEnabled = plan.canUsePlan, isDefaultLocal = false, updatedAt = 0,
             )
         }
-        resolveProviderForRouting(providers, request.modelId, null)?.let { return it }
+        val available = providers.associate { provider ->
+            provider.providerId to if (provider.isDefaultLocal) ProviderSettingsCodec.parseModelIds(provider.publishedModelsJson) else database.settingsDao().get("provider_model_candidates:${provider.providerId}")
+                ?.valueJson?.takeUnless { it == "null" }?.let(ProviderSettingsCodec::parseModelIds)
+                .let { it ?: ProviderSettingsCodec.catalogIds(provider.providerId) }
+        }
+        resolveProviderForRouting(providers, request.modelId, null, available)?.let { return it }
         val selection = database.settingsDao().get("model_selection")?.valueJson?.let(::JSONObject)
         val fallback = configuredStageProvider(providers, selection, request.pipelineAction)
-        return resolveProviderForRouting(providers, request.modelId, fallback)
+        return resolveProviderForRouting(providers, request.modelId, fallback, available)
             ?: inkuError { it.errorProviderNotFoundForModel(request.modelId) }
     }
 
@@ -87,15 +99,23 @@ class RoutingModelProvider(
             providers: List<ProviderSettingEntity>,
             modelId: String,
             stageDefaultProviderId: String?,
+            available: Map<String, List<String>> = emptyMap(),
         ): ProviderSettingEntity? {
-            // The reserved identity never falls through to a paid API or the device.
-            if (modelId.startsWith("chatgpt:", ignoreCase = true)) return providers.firstOrNull { it.providerId == "chatgpt" }
-            providers.firstOrNull { modelId.startsWith("${it.providerId}:") && modelId.length > it.providerId.length + 1 }
-                ?.let { return it }
-            val owners = providers.filter { provider ->
-                provider.isEnabled && parsePublishedModelIds(provider.publishedModelsJson).contains(modelId)
-            }
-            return owners.singleOrNull() ?: providers.firstOrNull { it.providerId == stageDefaultProviderId }
+            // The ChatGPT plan is owned outside provider_settings (step 4).
+            val plan = providers.firstOrNull { it.providerId == "chatgpt" && it.isEnabled &&
+                modelId in ProviderSettingsCodec.parseModelIds(it.publishedModelsJson) }
+            if (plan != null && providers.none { it.providerId != "chatgpt" && it.isEnabled &&
+                    modelId in ProviderSettingsCodec.parseModelIds(it.publishedModelsJson) }) return plan
+            val rows = JSONObject()
+            providers.forEach { provider -> rows.put(provider.providerId,
+                ProviderSettingsCodec.toCore(provider, available[provider.providerId] ?: ProviderSettingsCodec.parseModelIds(provider.publishedModelsJson))) }
+            val answer = catalogRequest("resolve_ref", JSONObject().put("providers", rows).put("ref", modelId)
+                .put("default_provider", stageDefaultProviderId ?: "__missing__"))
+            val resolved = answer.getString("provider")
+            providers.firstOrNull { it.providerId == resolved }?.let { return it }
+            val retired = catalogRequest("retired_providers").getJSONArray("providers")
+            return (0 until retired.length()).map(retired::getJSONObject).firstOrNull { it.optString("id") == resolved }
+                ?.let { ProviderSettingsCodec.fromCore(it).copy(isEnabled = false) }
         }
 
         /** Older selections carry qualified models, so no Room migration is needed. */
@@ -106,10 +126,19 @@ class RoutingModelProvider(
         ): String? {
             val stage2 = pipelineAction == "complete_visible_ddl_holes"
             val stage = if (stage2) "stage2" else "stage1"
-            (selection?.opt("${stage}_provider") as? String)?.takeIf { it.isNotBlank() }?.let { return it }
-            val selectedModel = (selection?.opt("${stage}_model") as? String)?.takeIf { it.isNotBlank() }
+            val rows = JSONObject()
+            providers.forEach { rows.put(it.providerId, ProviderSettingsCodec.toCore(it)) }
+            val configuredProvider = selection?.optString("${stage}_provider")?.takeIf { it.isNotBlank() }
+            val selectedModel = selection?.optString("${stage}_model")?.takeIf { it.isNotBlank() }
                 ?: if (stage2) CompatibilityConstants.defaultStage2Model else CompatibilityConstants.defaultStage1Model
-            return resolveProviderForRouting(providers, selectedModel, null)?.providerId
+            val model = if (configuredProvider != null) catalogRequest("split_ref", JSONObject()
+                .put("providers", rows).put("ref", selectedModel)).getString("model") else selectedModel
+            val settings = JSONObject().put("stage1_model", model)
+            configuredProvider?.let { settings.put("stage1_provider", it) }
+            val reference = catalogRequest("resolve_stage_default", JSONObject().put("providers", rows)
+                .put("stage", "stage1").put("user_settings", settings)).getString("ref")
+            val answer = catalogRequest("split_ref", JSONObject().put("providers", rows).put("ref", reference))
+            return answer.optString("provider").takeUnless { it.isBlank() || it == "null" }
         }
 
         internal fun remoteProvider(provider: ProviderSettingEntity): ModelProvider {
@@ -129,11 +158,5 @@ class RoutingModelProvider(
 
         internal fun canGenerateWith(provider: ProviderSettingEntity): Boolean = provider.isEnabled
 
-        private fun parsePublishedModelIds(value: String): List<String> = runCatching {
-            val array = JSONArray(value)
-            (0 until array.length()).mapNotNull { array.optString(it).takeIf { id -> id.isNotBlank() } }
-        }.getOrElse {
-            value.lines().map { it.trim() }.filter { it.isNotBlank() }
-        }
     }
 }

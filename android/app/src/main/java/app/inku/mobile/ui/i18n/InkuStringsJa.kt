@@ -374,6 +374,7 @@ object InkuStringsJa : InkuStrings {
     }
 
     override val errorServiceIdFormat = "Service ID は英数字・_・- で入力してください。"
+    override val errorDuplicateModelIds = "同じモデル ID が複数あります。"
     override val errorServiceNotFound: (String) -> String = { id -> "サービスが見つかりません: $id" }
     override val errorProviderModelsUnsupported: (String) -> String = { name ->
         "$name のモデル取得はAndroid版では未対応です。"

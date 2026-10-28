@@ -193,7 +193,7 @@ ChatGPTプランの要求とSSEは次の段（上の節）で移した。専用V
 
 **端末内のVisionモデルでは構図を読まない（作者の決定 2026-10-17）。** `composition.read`は`!isLocalVisionModel(modelId)`とし、外部providerのモデルではtrueを保つ。E2Bで構図読取りの4回の試行に約114秒を費やして既定読みに切り替わった受入結果により、端末内モデルだけ元の動作へ戻した。Serverが常にtrueとする点との意図的な差である。新規実行と保存作品からのforkの設定に同じ規則を使う。外部providerの再試行・応答の判定・fallbackは既存の共有pipelineを使う。
 
-providerは、明示した`provider:model`、そのモデルを公開する有効なproviderが1つ、利用者の段の既定provider、の順で選ぶ。Stage 2は`complete_visible_ddl_holes`、それ以外はStage 1の既定を使う。モデル選択の確定時に`model_selection`へ`stage1_provider`・`stage2_provider`も保存する。旧設定は各段の修飾付きモデルからproviderを読めるためRoom移行は不要。初回の既定は従来の端末内モデルを引き継ぎ、解決できない設定や無効な既定から端末内へ勝手に切り替えない。ChatGPTプランも同じ解決順で選び、開始時に固定したsession参照を使う。
+providerは、明示した`provider:model`、そのモデルを一覧に持つ有効なproviderが1つ、利用者の段の既定provider、の順で共通coreが選ぶ。Stage 2は`complete_visible_ddl_holes`、それ以外はStage 1の既定を使う。モデル選択の確定時に`model_selection`へ`stage1_provider`・`stage2_provider`も保存する。旧設定は各段の修飾付きモデルからproviderを読めるためRoom移行は不要。初回の既定は従来の端末内モデルを引き継ぎ、解決できない設定や無効な既定から端末内へ勝手に切り替えない。ChatGPTプランも同じ解決順で選び、開始時に固定したsession参照を使う。
 
 自律推敲のVision助言は保存SVGを縦横比を保って768×768に収まるよう画像化し、透明な正方形の中央へ置いてPNGで送る。本文のMIMEは`image/png`、IHDRは768×768である。カメラ画像のJPEG前処理と端末内モデルへの写真経路は変えない。
 
@@ -241,6 +241,8 @@ Anthropicの対象Claudeモデルは、通常描画とVisionを含むrequestで�
 
 ## 2026-10-13 モデル情報の正本と札
 
+プロバイダ表、設定の正規化・更新・検査、モデル参照、一覧取得・更新、用途とアクセス判定は共有coreの `modelCatalog` を使う。Roomの暗号化済み鍵は復号せずcoreへ渡し、そのまま保存する。端末内モデルは端末の資産一覧をcoreへ渡す。URLはcoreの検査に加え、AndroidでHTTPSまたは端末自身へのHTTPに制限する。ChatGPTプランの登録は従来どおり別管理する。
+
 モデル情報の正本は `core/crates/inku-pipeline/data/model_catalog.json`（`inku.model-catalog.v2`）。
 共有coreが一覧を埋め込み、AndroidはJNIの`modelCatalog`から一覧・札・選択の判定を受け取る。Androidには
 評価・候補・初期公開モデル・札の文言の写しをcommitしない。既存の公開選択は起動時に保持する。
@@ -256,7 +258,7 @@ ChatGPTプランも`providers.chatgpt`の評価を使い、本人の一覧と公
 端末で一覧を取り直した結果に無いモデルは`eol`、再提供されたモデルはその札を外す。
 以前の一覧のモデルも保持し、消えたモデルを一覧から隠さない。自分の鍵での要求の成功は
 `subscription`を外し、402／403は付ける。Ollama Cloudにはモデルごとの「この鍵で確かめる」を置き、
-明示操作した1モデルに`max_tokens: 1`だけ送る。200は使用可、402／403は使用不可、
+明示操作した1モデルについて `/api/show` を確認し、必要なら `max_tokens: 1` の要求を送る。410は終了日を記録し、200は使用可、402／403は使用不可、
 他の状態や通信失敗は未決で札を変えない。自動の大量プローブ・実測は行わない。
 観測は既存の`app_settings`に保存し、鍵・接続先の変更で無効化する。正本・評価は変更しない。
 Roomの表・migrationは追加しない。共通15件の照合とPixel 9の表示確認を受入とする。

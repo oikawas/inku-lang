@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-28 — Refresh Android ChatGPT models after login
+
+The personal model catalog refreshes in the background after a successful login, restoring the published choices without another manual refresh.
+
 ### 2026-10-28 — Share Android ChatGPT plan decisions
 
 ChatGPT plan authorization, session and model publication decisions use the shared core while encrypted credentials remain on the device.

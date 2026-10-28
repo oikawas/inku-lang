@@ -26,7 +26,7 @@ class ChatGptPlanBoundaryTest {
     }
 
     private class Http : ChatGptHttp {
-        val calls = mutableListOf<String>()
+        val calls = java.util.Collections.synchronizedList(mutableListOf<String>())
         var chunkSize = 7
         /** Streamed instead of a 200 body's UTF-8, for bytes no String holds. */
         var streamBytes: ByteArray? = null
@@ -101,6 +101,83 @@ class ChatGptPlanBoundaryTest {
         try { block(); fail("Expected $code") } catch (error: ChatGptException) { assertEquals(code, error.code) }
     }
 
+    private fun completeCallback(start: Map<String, String>, client: String): Int {
+        val url = start.getValue("redirect_uri") + "?" + form(mapOf("state" to start.getValue("state"), "code" to "test-code", "client_id" to client))
+        val connection = URI(url).toURL().openConnection() as HttpURLConnection
+        connection.connectTimeout = 2000; connection.readTimeout = 3000
+        return try { connection.responseCode } finally { connection.disconnect() }
+    }
+
+    @Test
+    fun reauthorizationReturnsBeforeFetchingAndRestoresPublishedCatalog() = runBlocking {
+        val store = Store().apply {
+            value.put("active", "a")
+            value.getJSONObject("profiles").put("a", profile("a").put("published_models", JSONArray().put("personal-model"))
+                .put("catalog", JSONObject().put("expires_at", now + 100_000).put("models", JSONArray().put(JSONObject().put("id", "old").put("label", "Old")))))
+        }
+        val http = Http(); val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val gate = java.util.concurrent.CountDownLatch(1)
+        val entered = java.util.concurrent.CountDownLatch(1)
+        val manager = ChatGptPlanManager(store, scope, http) { now }
+        try {
+            assertTrue(http.calls.isEmpty())
+            val start = query(manager.authorize("a"))
+            http.handler = { url, _, _ -> when {
+                url == CHATGPT_TOKEN -> ChatGptHttpResponse(200, tokens(start.getValue("nonce"))
+                    .put("id_token", signedIdentity(start.getValue("nonce"), "issued-a", "person-a")).toString())
+                url.endsWith("openid-configuration") -> ChatGptHttpResponse(200, metadata.toString())
+                url.endsWith("/jwks") -> ChatGptHttpResponse(200, keys.toString())
+                url.endsWith("/models") -> {
+                    entered.countDown()
+                    check(gate.await(5, java.util.concurrent.TimeUnit.SECONDS))
+                    ChatGptHttpResponse(200, "{\"models\":[{\"slug\":\"personal-model\",\"display_name\":\"Personal\",\"visibility\":\"list\"}]}")
+                }
+                else -> error("Unexpected request")
+            } }
+            assertEquals(200, completeCallback(start, "issued-a"))
+            assertTrue(entered.await(2, java.util.concurrent.TimeUnit.SECONDS))
+            withTimeout(2000) { while (manager.state.value.pending) delay(5) }
+            assertEquals("connected", manager.state.value.active?.status)
+            assertNull(manager.state.value.models)
+            gate.countDown()
+            withTimeout(2000) { while (manager.state.value.models == null) delay(5) }
+            assertEquals(listOf("personal-model"), manager.state.value.models!!.map { it.id })
+            assertEquals(listOf("personal-model"), manager.state.value.publishedModels)
+            assertNotNull(store.read().getJSONObject("profiles").getJSONObject("a").optJSONObject("catalog"))
+            assertEquals(1, http.calls.count { it.endsWith("/models") })
+        } finally { gate.countDown(); manager.cancelAuthorization(); scope.cancel() }
+    }
+
+    @Test
+    fun automaticCatalogFailureUsesTheManualRefreshFailureHandling() = runBlocking {
+        val store = Store().apply { value.put("active", "a"); value.getJSONObject("profiles").put("a", profile("a")) }
+        val http = Http(); val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val manager = ChatGptPlanManager(store, scope, http) { now }
+        try {
+            val start = query(manager.authorize("a"))
+            http.handler = { url, _, _ -> when {
+                url == CHATGPT_TOKEN -> ChatGptHttpResponse(200, tokens(start.getValue("nonce"))
+                    .put("id_token", signedIdentity(start.getValue("nonce"), "issued-a", "person-a")).toString())
+                url.endsWith("openid-configuration") -> ChatGptHttpResponse(200, metadata.toString())
+                url.endsWith("/jwks") -> ChatGptHttpResponse(200, keys.toString())
+                url.endsWith("/models") -> ChatGptHttpResponse(503, "{}")
+                else -> error("Unexpected request")
+            } }
+            assertEquals(200, completeCallback(start, "issued-a"))
+            withTimeout(2000) { while (manager.state.value.errorCode == null) delay(5) }
+            val automaticError = manager.state.value.errorCode
+            assertEquals("chatgpt_transport_unavailable", automaticError)
+            assertEquals("connected", manager.state.value.active?.status)
+            assertFalse(manager.state.value.pending)
+            assertEquals(1, http.calls.count { it.endsWith("/models") })
+            try { manager.refreshModels(); fail("Manual refresh should fail") }
+            catch (error: ChatGptException) { assertEquals(automaticError, error.code) }
+            assertEquals(automaticError, manager.state.value.errorCode)
+            assertEquals("connected", manager.state.value.active?.status)
+            assertEquals(2, http.calls.count { it.endsWith("/models") })
+        } finally { manager.cancelAuthorization(); scope.cancel() }
+    }
+
     @Test
     fun loopbackRejectsWrongStateAndAdoptsOnlyTheVerifiedIssuedRegistration() = runBlocking {
         val store = Store(); val http = Http(); val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -121,6 +198,7 @@ class ChatGptPlanBoundaryTest {
                 }
                 url.endsWith("openid-configuration") -> ChatGptHttpResponse(200, metadata.toString())
                 url.endsWith("/jwks") -> ChatGptHttpResponse(200, keys.toString())
+                url.endsWith("/models") -> ChatGptHttpResponse(200, "{\"models\":[]}")
                 else -> error("Unexpected auth endpoint")
             } }
             fun callback(state: String): Int {
@@ -133,6 +211,7 @@ class ChatGptPlanBoundaryTest {
             assertTrue(http.calls.isEmpty()); assertTrue(manager.state.value.pending)
             assertEquals(200, callback(start.getValue("state")))
             withTimeout(2000) { while (manager.state.value.pending) delay(5) }
+            withTimeout(2000) { while (manager.state.value.models == null) delay(5) }
             assertTrue(manager.state.value.canUsePlan)
             assertTrue(manager.state.value.showPlanNotice)
             assertEquals(emptyList<String>(), manager.state.value.publishedModels)

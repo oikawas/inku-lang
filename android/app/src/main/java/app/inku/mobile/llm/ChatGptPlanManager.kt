@@ -115,6 +115,7 @@ class ChatGptPlanManager internal constructor(
                     socket.soTimeout = 1000
                     var consumed = false
                     var success = false
+                    var signedIn: ChatGptSessionRef? = null
                     var code: String? = null
                     try {
                         val input = socket.getInputStream()
@@ -140,7 +141,7 @@ class ChatGptPlanManager internal constructor(
                             attempt.used = true; consumed = true
                         }
                         val client = issuedClientId(query, attempt.previous)
-                        withTimeout((attempt.deadline - now()).coerceAtLeast(1)) { exchange(attempt, client, query.getValue("code")) }
+                        signedIn = withTimeout((attempt.deadline - now()).coerceAtLeast(1)) { exchange(attempt, client, query.getValue("code")) }
                         success = true
                     } catch (cancelled: CancellationException) { throw cancelled }
                     catch (error: Exception) { code = (error as? ChatGptException)?.code ?: "chatgpt_auth_unavailable" }
@@ -155,8 +156,17 @@ class ChatGptPlanManager internal constructor(
                     runCatching { socket.getOutputStream().apply {
                         write(("HTTP/1.1 ${if (success) "200 OK" else "400 Bad Request"}\r\nContent-Type: text/html; charset=utf-8\r\nCache-Control: no-store\r\nReferrer-Policy: no-referrer\r\nConnection: close\r\nContent-Length: ${body.size}\r\n\r\n").toByteArray(Charsets.US_ASCII)); write(body); flush()
                     } }
-                    if (consumed) synchronized(store) {
-                        if (authorization === attempt) { authorization = null; updateView(code) }
+                    if (consumed) {
+                        synchronized(store) {
+                            if (authorization === attempt) { authorization = null; updateView(code) }
+                        }
+                        if (success) signedIn?.let { ref ->
+                            scope.launch(Dispatchers.IO) {
+                                try { refreshPinnedModels(ref) }
+                                catch (cancelled: CancellationException) { throw cancelled }
+                                catch (_: ChatGptException) { /* Refresh reports its own failure. */ }
+                            }
+                        }
                     }
                 }
             }
@@ -166,7 +176,7 @@ class ChatGptPlanManager internal constructor(
         } } finally { attempt.listener.close() }
     }
 
-    private suspend fun exchange(attempt: Authorization, client: String, code: String) {
+    private suspend fun exchange(attempt: Authorization, client: String, code: String): ChatGptSessionRef {
         val check = { checkAttempt(attempt) }
         // Retain the issued ID on a failed code exchange; it is never an authorized profile.
         if (attempt.previous == null) synchronized(store) {
@@ -193,7 +203,7 @@ class ChatGptPlanManager internal constructor(
             .put("label", display.getString("label")).put("state", "connected")
             .put("email", display.getString("email")).put("plan_notice_seen", attempt.previous?.optBoolean("plan_notice_seen") ?: false)
             .put("published_models", attempt.previous?.optJSONArray("published_models") ?: JSONArray())
-        synchronized(store) {
+        return synchronized(store) {
             check()
             val value = store.read()
             val profiles = value.getJSONObject("profiles")
@@ -212,6 +222,7 @@ class ChatGptPlanManager internal constructor(
             value.put("active", attempt.profileId)
             store.write(value)
             http.cancelAll()
+            saved.sessionRef()
         }
     }
 
@@ -251,6 +262,10 @@ class ChatGptPlanManager internal constructor(
             }
             pinSession()
         }
+        return refreshPinnedModels(ref)
+    }
+
+    private suspend fun refreshPinnedModels(ref: ChatGptSessionRef): List<String> {
         try {
             return withTimeout(30_000) { wireMutex.withLock { catalog(ref, force = true).map { it.id } } }
         } catch (cancelled: CancellationException) { throw cancelled }

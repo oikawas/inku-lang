@@ -1987,10 +1987,14 @@ class InkuViewModel @JvmOverloads constructor(
         }
     }
 
-    fun publishChatGptModels(session: app.inku.mobile.llm.ChatGptSessionRef, models: List<String>) {
+    fun publishChatGptModels(session: app.inku.mobile.llm.ChatGptSessionRef, models: List<String>, purposes: Map<String, List<String>>) {
         viewModelScope.launch {
             try {
-                withContext(Dispatchers.IO) { repository.chatGptPlan.publishModels(session, models) }
+                val offered = state.value.chatGptPlan.models.orEmpty().map { it.id }.toSet()
+                val chosen = purposes.filterKeys { it in offered }
+                val json = JSONObject().apply { chosen.forEach { (id, items) -> put(id, JSONArray(items)) } }
+                withContext(Dispatchers.IO) { repository.chatGptPlan.publishModels(session, models, json) }
+                saveModelPurposes("chatgpt", chosen)
                 localState.value = localState.value.copy(message = strings().modelSettingsSaved)
             } catch (error: app.inku.mobile.llm.ChatGptException) { localState.value = localState.value.copy(message = strings().chatGptError(error.code)) }
         }

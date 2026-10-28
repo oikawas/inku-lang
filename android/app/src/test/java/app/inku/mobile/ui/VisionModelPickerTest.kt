@@ -103,7 +103,8 @@ class VisionModelPickerTest {
         assertTrue(picker.contains("it.id in candidateIds && hasPurpose(it)"))
         // The drawing models that did not answer come after those that did.
         assertTrue(app.contains("}.sortedBy { it.notRecommended }"))
-        assertEquals(2, Regex("saveModelPurposes\\(").findAll(app).count())
+        assertEquals(1, Regex("saveModelPurposes\\(").findAll(app).count())
+        assertTrue(app.contains("publishChatGptModels(session, models, purposes)"))
         assertTrue(app.contains("provider != \"local-litert-lm\" && \"vision\" in servedPurposes(state, provider, choice.id)"))
         // The camera reads the photo and draws with one model, so it offers those used for both (2026-10-21).
         assertTrue(app.contains("\"llm\" in purposes && (!state.modelSelectionForCamera || \"vision\" in purposes)"))

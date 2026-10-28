@@ -477,6 +477,27 @@ class ChatGptPlanBoundaryTest {
             .perform(action.toString(), app.inku.mobile.pipeline.PipelineModelSelection("chatgpt:m", "chatgpt:m"))).getString("failure")
     }
 
+    @Test
+    fun publicationChecksPurposeBeforeSending() = runBlocking {
+        val store = Store().apply { value.getJSONObject("profiles").put("a", profile("a")); value.put("active", "a") }
+        val http = Http(); val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val policy = ChatGptModelPolicy(JSONObject().put("personal-model", JSONArray().put("llm")))
+        val manager = ChatGptPlanManager(store, scope, http, modelPolicy = { policy }) { now }
+        try {
+            http.handler = { url, _, _ -> if (url.endsWith("/models"))
+                ChatGptHttpResponse(200, "{\"models\":[{\"slug\":\"personal-model\",\"display_name\":\"Personal model\",\"visibility\":\"list\"}]}")
+            else error("Vision must not be sent") }
+            val ref = manager.pinSession()
+            manager.refreshModels()
+            manager.publishModels(ref, listOf("personal-model"))
+            val vision = ModelRequest("chatgpt:personal-model", "Choose", 0.0, 1200,
+                pipelineAction = JUXTAPOSITION_VISION_ACTION, imagePng = refinementPngHeader(), chatGptSession = ref)
+            try { manager.generate(vision); fail("Vision purpose was not published") }
+            catch (error: ChatGptException) { assertEquals("chatgpt_model_not_offered", error.code) }
+            assertEquals(1, http.calls.size)
+        } finally { manager.cancelAuthorization(); scope.cancel() }
+    }
+
     /** A published personal model on profile "a", answering /responses with [stream]. */
     private suspend fun withPlan(stream: () -> String, block: suspend (ChatGptPlanManager, ChatGptSessionRef, Http) -> Unit) {
         val store = Store().apply { value.getJSONObject("profiles").put("a", profile("a")); value.put("active", "a") }

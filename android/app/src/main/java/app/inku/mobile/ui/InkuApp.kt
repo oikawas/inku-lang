@@ -5101,8 +5101,7 @@ private fun ChatGptModelCard(state: InkuUiState, viewModel: InkuViewModel) {
             fetchState = state.providerModelFetchStates["chatgpt"],
             onSave = { models, purposes ->
                 picker = false
-                viewModel.publishChatGptModels(session, models)
-                viewModel.saveModelPurposes("chatgpt", purposes)
+                viewModel.publishChatGptModels(session, models, purposes)
             },
         )
     }
@@ -6077,8 +6076,16 @@ private fun availablePublishedModels(provider: app.inku.mobile.data.db.ProviderS
     val published = parsePublishedModelIds(provider.publishedModelsJson)
     val usable = published.filter { catalogModelFor(state, provider.providerId, it).publishable }
     if (provider.providerId != "chatgpt") return usable
-    val offered = state.chatGptPlan.models.orEmpty().map { it.id }.toSet()
-    return usable.filter { it in offered }
+    val profile = JSONObject().put("published_models", JSONArray(published))
+        .put("model_purposes", JSONObject().apply { state.modelPurposes["chatgpt"].orEmpty().forEach { (id, purposes) -> put(id, JSONArray(purposes)) } })
+    val models = JSONArray().apply { state.chatGptPlan.models.orEmpty().forEach { put(JSONObject().put("id", it.id).put("label", it.label)) } }
+    val observations = state.modelCatalogObservations["chatgpt"]
+    val assessments = JSONObject().apply { state.chatGptPlan.models.orEmpty().forEach { model ->
+        put(model.id, state.modelCatalog.resolve("chatgpt", model.id, observedRecord = observations?.records?.get(model.id)).record)
+    } }
+    val rows = app.inku.mobile.data.catalogRequest("chatgpt_publication", JSONObject().put("profile", profile)
+        .put("models", models).put("assessments", assessments)).getJSONObject("publication").getJSONArray("models")
+    return (0 until rows.length()).map { rows.getJSONObject(it) }.filter { it.optBoolean("enabled") }.map { it.getString("id") }
 }
 
 private fun modelChoiceStatusLabel(downloadState: String, strings: InkuStrings): String {

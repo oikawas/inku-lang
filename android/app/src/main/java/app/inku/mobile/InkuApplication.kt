@@ -19,8 +19,27 @@ internal const val MIGRATION_REPORT = "saijiki-v2-migration.json"
 
 class InkuApplication : Application() {
     val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val chatGptAssessments by lazy {
+        val rows = app.inku.mobile.data.catalogRequest("catalog").getJSONObject("catalog")
+            .getJSONObject("providers").getJSONObject("chatgpt").getJSONArray("models")
+        org.json.JSONObject().apply { for (index in 0 until rows.length()) {
+            val row = rows.getJSONObject(index); put(row.getString("id"), row)
+        } }
+    }
     val chatGptPlan by lazy {
-        app.inku.mobile.llm.ChatGptPlanManager(app.inku.mobile.llm.AndroidChatGptCredentialStore(this), applicationScope)
+        app.inku.mobile.llm.ChatGptPlanManager(app.inku.mobile.llm.AndroidChatGptCredentialStore(this), applicationScope,
+            modelPolicy = {
+                kotlinx.coroutines.runBlocking(Dispatchers.IO) {
+                    val settings = database.settingsDao()
+                    val purposes = runCatching { org.json.JSONObject(settings.get("model_purposes")?.valueJson ?: "{}")
+                        .optJSONObject("chatgpt") ?: org.json.JSONObject() }.getOrDefault(org.json.JSONObject())
+                    val records = runCatching { org.json.JSONObject(settings.get("model_catalog_observations:chatgpt")?.valueJson ?: "{}")
+                        .optJSONObject("records") ?: org.json.JSONObject() }.getOrDefault(org.json.JSONObject())
+                    val assessments = org.json.JSONObject(chatGptAssessments.toString())
+                    records.keys().forEachRemaining { id -> assessments.put(id, records.get(id)) }
+                    app.inku.mobile.llm.ChatGptModelPolicy(purposes, assessments)
+                }
+            })
     }
     private val databaseLock = Any()
 

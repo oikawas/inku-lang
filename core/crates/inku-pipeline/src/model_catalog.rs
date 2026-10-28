@@ -421,6 +421,14 @@ fn provider_definitions(host: &str) -> Vec<Value> {
         let id = provider["id"].as_str().expect("provider id").to_owned();
         provider["models"] = defaults[&id].clone();
     }
+    if host == "android" {
+        definitions.insert(
+            0,
+            json!({"id":"local-litert-lm","label":"LiteRT-LM / Local",
+            "kind":"litert_lm","api_key_env":"","base_url_env":"",
+            "default_base_url":"local://litert-lm","requires_api_key":false,"models":[]}),
+        );
+    }
     definitions
 }
 
@@ -1264,11 +1272,47 @@ mod tests {
         ))
         .unwrap();
         assert_eq!(json!(provider_definitions("server")), cases["definitions"]);
+        assert_eq!(json!(provider_definitions("macos")), cases["definitions"]);
         assert!(
             provider_definitions("android")
                 .iter()
                 .all(|provider| provider["id"] != "ollama")
         );
+        let android = &cases["android_local"];
+        let android_defs = provider_definitions("android");
+        assert_eq!(android_defs[0], android["definition"]);
+        assert_eq!(android_defs.len(), provider_definitions("server").len());
+        let local = json!({"providers":{"local-litert-lm":{"kind":"litert_lm","active":false,
+            "models":[android["model"]],"base_url":android["url"],"requires_api_key":true}}});
+        let normalized =
+            provider_settings::run(&json!({"action":"normalize_settings","host":"android",
+            "settings":local,"order":["local-litert-lm"],"env":{}}));
+        let row = &normalized["settings"]["providers"]["local-litert-lm"];
+        assert_eq!(row["kind"], android["kind"]);
+        assert_eq!(row["base_url"], android["url"]);
+        assert_eq!(row["active"], true);
+        assert_eq!(row["builtin"], true);
+        assert_eq!(row["requires_api_key"], false);
+        let resolved = resolve_ref(
+            android["reference"].as_str().unwrap(),
+            &normalized["settings"]["providers"],
+            "nvidia",
+            "",
+        );
+        assert_eq!(resolved["provider"], "local-litert-lm");
+        assert_eq!(resolved["model"], "gemma-4-e2b");
+        let updated = provider_settings::run(&json!({"action":"update_settings","host":"android",
+            "settings":normalized["settings"],"order":normalized["order"],"env":{},
+            "patch":{"providers":{"local-litert-lm":{"delete":true}}},"patch_order":["local-litert-lm"]}));
+        assert_eq!(
+            updated["settings"]["providers"]["local-litert-lm"]["active"],
+            true
+        );
+        let connection: Value = serde_json::from_slice(&model_catalog_json(&serde_json::to_vec(&json!({
+            "schema":"inku.model-catalog-request.v1","action":"connection","provider":"local-litert-lm","settings":updated["settings"]
+        })).unwrap())).unwrap();
+        assert_eq!(connection["connection"]["kind"], android["kind"]);
+        assert_eq!(connection["connection"]["base_url"], android["url"]);
         let providers = &cases["reference_settings"]["providers"];
         for row in array(cases.get("references")) {
             let reference = row["ref"].as_str().unwrap();
@@ -1302,6 +1346,9 @@ mod tests {
                 .unwrap_or_default();
             let request = json!({"action":"normalize_settings", "settings":row["input"],"order":order,"env":{}});
             assert_eq!(provider_settings::run(&request)["settings"], row["result"]);
+            let mut macos = request;
+            macos["host"] = json!("macos");
+            assert_eq!(provider_settings::run(&macos)["settings"], row["result"]);
         }
         for row in array(cases.get("updates")) {
             let order: Vec<String> = row["patch"]["providers"]
@@ -1310,6 +1357,9 @@ mod tests {
                 .unwrap_or_default();
             let request = json!({"action":"update_settings", "settings":row["input"],"patch":row["patch"],"order":[],"patch_order":order,"env":{}});
             assert_eq!(provider_settings::run(&request)["settings"], row["result"]);
+            let mut macos = request;
+            macos["host"] = json!("macos");
+            assert_eq!(provider_settings::run(&macos)["settings"], row["result"]);
         }
         for row in array(cases.get("refresh_cases")) {
             let prepared = model_refresh::run(

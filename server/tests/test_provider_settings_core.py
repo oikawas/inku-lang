@@ -55,3 +55,24 @@ def test_validation_report_is_read_only_and_requires_an_administrator():
     finally:
         app.dependency_overrides.pop(_admin_user, None)
     assert TestClient(app).post('/api/settings/models/validate', json={}).status_code in (401, 403)
+
+
+def test_android_local_provider_uses_shared_settings_and_never_disables():
+    case = json.loads((Path(__file__).parent / "data/provider-settings-cases.json").read_text())["android_local"]
+    android = core_catalog("providers", host="android")["providers"]
+    assert android[0] == case["definition"]
+    for host in ("server", "macos"):
+        assert all(row["id"] != "local-litert-lm" for row in core_catalog("providers", host=host)["providers"])
+    settings = {"providers": {"local-litert-lm": {"kind": case["kind"], "active": False, "models": [case["model"]]}}}
+    normalized = core_catalog("normalize_settings", host="android", settings=settings, order=["local-litert-lm"], env={})
+    local = normalized["settings"]["providers"]["local-litert-lm"]
+    assert local["active"] and local["builtin"] and local["kind"] == case["kind"]
+    assert local["base_url"] == case["url"] and not local["requires_api_key"]
+    resolved = core_catalog("resolve_ref", **{"ref": case["reference"], "providers": normalized["settings"]["providers"]})
+    assert (resolved["provider"], resolved["model"]) == ("local-litert-lm", "gemma-4-e2b")
+    connection = core_catalog("connection", provider="local-litert-lm", settings=normalized["settings"])["connection"]
+    assert (connection["kind"], connection["base_url"]) == (case["kind"], case["url"])
+    updated = core_catalog("update_settings", host="android", settings=normalized["settings"],
+                           order=normalized["order"], env={}, patch_order=["local-litert-lm"],
+                           patch={"providers": {"local-litert-lm": {"delete": True}}})
+    assert updated["settings"]["providers"]["local-litert-lm"]["active"] is True

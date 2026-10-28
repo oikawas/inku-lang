@@ -70,11 +70,11 @@ fn chatgpt(stored: &Value, moved: bool) -> Vec<Value> {
     }
     result
 }
-fn definitions() -> Vec<Value> {
-    provider_definitions("server")
+fn definitions(host: &str) -> Vec<Value> {
+    provider_definitions(host)
 }
-fn defaults(env: &Value) -> (Value, Vec<String>) {
-    let definitions = definitions();
+fn defaults(env: &Value, host: &str) -> (Value, Vec<String>) {
+    let definitions = definitions(host);
     let mut providers = Map::new();
     let mut order = Vec::new();
     for definition in &definitions {
@@ -134,10 +134,13 @@ fn sanitize_id(value: &str) -> String {
         .filter(|c| c.is_alphanumeric() || *c == '_' || *c == '-')
         .collect()
 }
-fn kind(value: &Value) -> &str {
+fn kind<'a>(value: &'a Value, host: &str) -> &'a str {
     value
         .as_str()
-        .filter(|v| ["openai_compatible", "mlx", "anthropic", "gemini"].contains(v))
+        .filter(|v| {
+            ["openai_compatible", "mlx", "anthropic", "gemini"].contains(v)
+                || (host == "android" && *v == "litert_lm")
+        })
         .unwrap_or("openai_compatible")
 }
 pub(super) const METADATA: &[&str] = &[
@@ -162,9 +165,9 @@ pub(super) const METADATA: &[&str] = &[
     "eol_date",
     "notes",
 ];
-fn normalize(input: &Value, env: &Value, input_order: &Value) -> (Value, Vec<String>) {
-    let definitions = definitions();
-    let (mut clean, mut order) = defaults(env);
+fn normalize(input: &Value, env: &Value, input_order: &Value, host: &str) -> (Value, Vec<String>) {
+    let definitions = definitions(host);
+    let (mut clean, mut order) = defaults(env, host);
     if !input.is_object() {
         return (clean, order);
     }
@@ -186,6 +189,9 @@ fn normalize(input: &Value, env: &Value, input_order: &Value) -> (Value, Vec<Str
         let existed = clean["providers"].get(&id).is_some();
         let mut provider = clean["providers"].get(&id).cloned().unwrap_or_else(|| json!({"id":id,"label":id,"kind":"openai_compatible","api_key_env":"","base_url_env":"","default_base_url":"","requires_api_key":false,"memo":"","models":[],"builtin":false,"active":true,"base_url":"","api_key":"","enabled_models":{}}));
         if incoming["delete"] == true {
+            if host == "android" && id == "local-litert-lm" {
+                continue;
+            }
             if truthy(&provider["builtin"]) {
                 provider["active"] = json!(false);
                 clean["providers"][&id] = provider;
@@ -210,7 +216,7 @@ fn normalize(input: &Value, env: &Value, input_order: &Value) -> (Value, Vec<Str
             provider["label"] = builtin["label"].clone();
         }
         if !incoming["kind"].is_null() {
-            provider["kind"] = json!(kind(&incoming["kind"]));
+            provider["kind"] = json!(kind(&incoming["kind"], host));
         }
         for key in ["api_key_env", "base_url_env", "memo"] {
             if let Some(v) = incoming[key].as_str() {
@@ -305,6 +311,13 @@ fn normalize(input: &Value, env: &Value, input_order: &Value) -> (Value, Vec<Str
         if incoming["api_key"].is_string() {
             provider["api_key"] = incoming["api_key"].clone();
         }
+        if host == "android" && id == "local-litert-lm" {
+            provider["kind"] = json!("litert_lm");
+            provider["active"] = json!(true);
+            provider["requires_api_key"] = json!(false);
+            provider["default_base_url"] = json!("local://litert-lm");
+            provider["base_url"] = json!("local://litert-lm");
+        }
         clean["providers"][&id] = provider;
         if !existed {
             order.push(id);
@@ -318,8 +331,9 @@ fn update(
     env: &Value,
     current_order: &Value,
     patch_order: &Value,
+    host: &str,
 ) -> (Value, Vec<String>) {
-    let (mut clean, mut order) = normalize(current, env, current_order);
+    let (mut clean, mut order) = normalize(current, env, current_order, host);
     let providers = &patch["providers"];
     let incoming_chatgpt = if providers["chatgpt"].is_object() {
         &providers["chatgpt"]["models"]
@@ -341,7 +355,11 @@ fn update(
             continue;
         }
         if incoming["delete"] == true {
-            if definitions().iter().any(|d| d["id"] == id) && clean["providers"].get(&id).is_some()
+            if host == "android" && id == "local-litert-lm" {
+                continue;
+            }
+            if definitions(host).iter().any(|d| d["id"] == id)
+                && clean["providers"].get(&id).is_some()
             {
                 clean["providers"][&id]["active"] = json!(false);
             } else {
@@ -359,7 +377,7 @@ fn update(
                     .unwrap_or(json!(""))
             };
             clean["providers"][&id] = json!({"id":id,"label":if truthy(&incoming["label"]) {incoming["label"].clone()} else {json!(id)},
-                "kind":kind(&incoming["kind"]),"api_key_env":get("api_key_env"),"base_url_env":get("base_url_env"),
+                "kind":kind(&incoming["kind"], host),"api_key_env":get("api_key_env"),"base_url_env":get("base_url_env"),
                 "default_base_url":if truthy(&incoming["default_base_url"]) {incoming["default_base_url"].clone()} else {get("base_url")},
                 "requires_api_key":truthy(&incoming["requires_api_key"]),"memo":get("memo"),"models":normalize_models(&incoming["models"]),
                 "builtin":false,"active":true,"base_url":if truthy(&incoming["base_url"]) {incoming["base_url"].clone()} else {get("default_base_url")},
@@ -387,7 +405,7 @@ fn update(
             .as_str()
             .filter(|s| !s.trim().is_empty())
         {
-            provider["base_url"] = json!(url(&id, base, &definitions()));
+            provider["base_url"] = json!(url(&id, base, &definitions(host)));
         }
         if let Some(values) = incoming["rate_limits"].as_object() {
             let mut rates = provider["rate_limits"]
@@ -416,21 +434,24 @@ fn update(
             }
         }
     }
-    normalize(&clean, env, &json!(order))
+    normalize(&clean, env, &json!(order), host)
 }
 
 pub(super) fn run(request: &Value) -> Value {
+    let host = request["host"].as_str().unwrap_or("server");
     if request["action"] == "validate_settings" {
         let raw_id = request["provider"].as_str().unwrap_or("");
         let id = sanitize_id(raw_id);
         let base = request["base_url"].as_str().unwrap_or("");
-        let normal_url = url(&id, base, &definitions());
-        let url_valid = ["http://", "https://"].iter().any(|prefix| {
-            normal_url.strip_prefix(prefix).is_some_and(|rest| {
-                !rest.split(['/', '?', '#']).next().unwrap_or("").is_empty()
-                    && !rest.chars().any(char::is_whitespace)
-            })
-        });
+        let normal_url = url(&id, base, &definitions(host));
+        let url_valid =
+            (host == "android" && id == "local-litert-lm" && normal_url == "local://litert-lm")
+                || ["http://", "https://"].iter().any(|prefix| {
+                    normal_url.strip_prefix(prefix).is_some_and(|rest| {
+                        !rest.split(['/', '?', '#']).next().unwrap_or("").is_empty()
+                            && !rest.chars().any(char::is_whitespace)
+                    })
+                });
         let mut seen = HashSet::new();
         let mut duplicates = Vec::new();
         for row in array(request.get("models")) {
@@ -450,7 +471,7 @@ pub(super) fn run(request: &Value) -> Value {
             "url_valid":url_valid,"rate_limits_valid":rates_valid,"duplicate_models":duplicates});
     }
     let (settings, order) = if request["action"] == "default_settings" {
-        defaults(&request["env"])
+        defaults(&request["env"], host)
     } else if request["action"] == "update_settings" {
         update(
             &request["settings"],
@@ -458,9 +479,15 @@ pub(super) fn run(request: &Value) -> Value {
             &request["env"],
             &request["order"],
             &request["patch_order"],
+            host,
         )
     } else {
-        normalize(&request["settings"], &request["env"], &request["order"])
+        normalize(
+            &request["settings"],
+            &request["env"],
+            &request["order"],
+            host,
+        )
     };
     json!({"settings":settings,"order":order})
 }

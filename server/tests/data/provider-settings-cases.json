@@ -1,4 +1,11 @@
 {
+  "android_local": {
+    "definition": {"id":"local-litert-lm","label":"LiteRT-LM / Local","kind":"litert_lm","api_key_env":"","base_url_env":"","default_base_url":"local://litert-lm","requires_api_key":false,"models":[]},
+    "model": {"id":"gemma-4-e2b","label":"Gemma 4 E2B"},
+    "reference":"local-litert-lm:gemma-4-e2b",
+    "kind":"litert_lm",
+    "url":"local://litert-lm"
+  },
   "definitions": [
     {
       "id": "openai",

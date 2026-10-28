@@ -21,12 +21,9 @@ from ...plugins.packages import (
     PluginPackage,
     PluginPackageError,
     Problem,
-    check_package,
     data_url,
+    package_core,
     parse_plugin_package,
-    preview_pngs,
-    read_package_archive,
-    uploaded_preview_pngs,
 )
 from ..deps import _admin_user, _current_user
 
@@ -160,48 +157,34 @@ def _check(body: PluginPackageCheckBody, owner: str) -> _Checked:
     package.json text to store.
     """
     from ...pipeline_compat import draw_plugin_example
-    from ...pipeline_runtime import get_binding
 
     def refused(problems) -> _Checked:
         return _Checked(package=None, text="", pictures={},
                         report={"ok": False, "problems": [problem.as_dict() for problem in problems], "words": []})
 
-    archive = None
-    text = body.document or ""
     if body.archive is not None:
         try:
-            data = base64.b64decode(body.archive, validate=True)
+            base64.b64decode(body.archive, validate=True)
         except (binascii.Error, ValueError):
             return refused([Problem("", "not_base64")])
-        try:
-            text, archive = read_package_archive(data)
-        except PluginPackageError as exc:
-            return refused(exc.problems)
-    try:
-        package = parse_plugin_package(text, archive=archive)
-    except PluginPackageError as exc:
-        return refused(exc.problems)
-    report = check_package(
-        package,
-        binding=get_binding(),
-        draw_example=lambda ddl, language, imported: draw_plugin_example(owner, ddl, language, imported),
-        taken_names=_taken_names(package.id),
-    )
-    pictures = {}
+    payload = {"action": "check_start", "taken_names": _taken_names("")}
+    payload["archive" if body.archive is not None else "document"] = body.archive if body.archive is not None else body.document
+    started = package_core(payload)
+    if started["outcome"] == "refused":
+        return refused([Problem(**p) for p in started["problems"]])
+    drawings = []
+    for request in started["draw"]:
+        drawing = draw_plugin_example(owner, request["ddl"], request["language"], started["imported"])
+        drawings.append({"id": request["id"], "svg": drawing.svg, "marks": drawing.marks, "reasons": list(drawing.reasons)})
+    finished = package_core({"action": "check_finish", "state": started["state"], "drawings": drawings})
+    report = finished["report"]
+    pictures = {key: (base64.b64decode(value["png"]), base64.b64decode(value["png_2x"]))
+                for key, value in finished["pictures"].items()}
+    package = parse_plugin_package(finished["text"], stored=True)
     for word, word_report in zip(package.words, report["words"], strict=True):
-        svg = word_report.pop("preview_svg", "")
-        # A picture the word names in its zip wins over the one its example draws;
-        # the example is drawn either way, as the check of the definition.
-        if word.picture is not None:
-            pictures[word.preview_key()] = word.picture
-        elif svg:
-            pictures[word.preview_key()] = preview_pngs(svg)
-        word_report["preview_source"] = "file" if word.picture is not None else "drawn"
-        if word.preview_key() in pictures:
-            word_report["preview_png"] = data_url(pictures[word.preview_key()][1])
+        word_report["preview_png"] = data_url(pictures[word.preview_key()][1]) if word.preview_key() in pictures else ""
     report["exists"] = PLUGIN_PACKAGE_MANAGER.has(package.id)
-    return _Checked(package=package, text=text, report=report, pictures=pictures)
-
+    return _Checked(package=package, text=finished["text"], report=report, pictures=pictures)
 
 @router.post("/api/plugins/packages/validate", summary="Check a plugin package without installing it")
 def api_plugin_package_validate(
@@ -350,10 +333,10 @@ def api_plugin_preview_replace(
         data = base64.b64decode(body.png_base64, validate=True)
     except (binascii.Error, ValueError):
         raise HTTPException(status_code=422, detail=[{"path": "image", "code": "not_base64", "detail": ""}]) from None
-    try:
-        pictures = uploaded_preview_pngs(data)
-    except PluginPackageError as exc:
-        raise HTTPException(status_code=422, detail=[problem.as_dict() for problem in exc.problems]) from exc
+    result = package_core({"action": "fit_picture", "png": base64.b64encode(data).decode("ascii")})
+    if result["outcome"] == "refused":
+        raise HTTPException(status_code=422, detail=result["problems"])
+    pictures = (base64.b64decode(result["png"]), base64.b64decode(result["png_2x"]))
     return _set_preview(plugin_id, heading, pictures)
 
 

@@ -562,19 +562,27 @@ fn candidates_at_with_locked_macro_boundary(
     // A sidecar-locked Macro is also a recognized left boundary for Japanese
     // particles. The ordinary asset-only boundary scan cannot see that head.
     let left_end = source[..start_byte].trim_end_matches(is_separator).len();
-    let preceded_by_locked_macro = language == ResolvedInstructionLanguage::Ja
-        && document.macro_locks().iter().any(|macro_lock| {
-            macro_lock.visible_names().any(|name| {
-                left_end
-                    .checked_sub(name.len())
-                    .filter(|left_start| source.is_char_boundary(*left_start))
-                    .and_then(|left_start| qualified_macro_match(document, left_start))
-                    .is_some_and(|matched| {
-                        matches!(matched, QualifiedMacroMatch::ExactLock { end_byte, .. }
-                            if end_byte == left_end)
-                    })
-            })
+    let bracket_end = source[..start_byte]
+        .trim_end_matches(|ch| is_separator(ch) && !matches!(ch, '}' | '｝'))
+        .len();
+    let preceded_by_bracket_macro = language == ResolvedInstructionLanguage::Ja
+        && source[..bracket_end].char_indices().any(|(start, ch)| {
+            matches!(ch, '{' | '｛') && matches!(qualified_macro_match(document, start), Some(QualifiedMacroMatch::ExactLock { end_byte, .. }) if end_byte == bracket_end)
         });
+    let preceded_by_locked_macro = preceded_by_bracket_macro
+        || language == ResolvedInstructionLanguage::Ja
+            && document.macro_locks().iter().any(|macro_lock| {
+                macro_lock.visible_names().any(|name| {
+                    left_end
+                        .checked_sub(name.len())
+                        .filter(|left_start| source.is_char_boundary(*left_start))
+                        .and_then(|left_start| qualified_macro_match(document, left_start))
+                        .is_some_and(|matched| {
+                            matches!(matched, QualifiedMacroMatch::ExactLock { end_byte, .. }
+                            if end_byte == left_end)
+                        })
+                })
+            });
     for candidate in candidates_at(edition, source, start_byte, language, false) {
         let followed_by_locked_macro = matches!(
             qualified_macro_match(document, candidate.end_byte),
@@ -642,6 +650,46 @@ pub(crate) fn qualified_macro_match(
     start_byte: usize,
 ) -> Option<QualifiedMacroMatch> {
     let source = document.source();
+    if let Some((end_byte, name)) = bracketed_plugin_at(source, start_byte) {
+        let normalized = crate::plugin_names::normalize_plugin_name(name);
+        let lock_indices: Vec<usize> = document
+            .macro_locks()
+            .iter()
+            .enumerate()
+            .filter_map(|(index, lock)| {
+                let (_, heading) = lock.qualified_name().split_once('.')?;
+                let aliases = lock
+                    .aliases()
+                    .iter()
+                    .filter_map(|alias| alias.split_once('.').map(|(_, name)| name.to_owned()))
+                    .collect::<Vec<_>>();
+                let (ja, en) = crate::plugin_names::v1_plugin_names(heading, &aliases);
+                let fallback = ja.into_iter().chain(en).collect::<Vec<_>>();
+                let names = if lock.plugin_names().is_empty() {
+                    &fallback
+                } else {
+                    lock.plugin_names()
+                };
+                names
+                    .iter()
+                    .any(|visible| {
+                        crate::plugin_names::normalize_plugin_name(visible) == normalized
+                    })
+                    .then_some(index)
+            })
+            .collect();
+        return Some(match lock_indices.as_slice() {
+            [] => QualifiedMacroMatch::Unlocked { end_byte },
+            [index] => QualifiedMacroMatch::ExactLock {
+                end_byte,
+                lock_index: *index,
+            },
+            _ => QualifiedMacroMatch::AmbiguousLocks {
+                end_byte,
+                lock_indices,
+            },
+        });
+    }
     let unlocked_end = qualified_macro_end(source, start_byte)?;
     // A lock is invoked by its canonical name or by any of its aliases; the
     // longest visible name that starts here decides the invocation's extent.
@@ -676,6 +724,33 @@ pub(crate) fn qualified_macro_match(
             lock_indices,
         }),
     }
+}
+
+/// Recognize only a nonempty, unnested pair wholly within one sentence.
+fn bracketed_plugin_at(source: &str, start: usize) -> Option<(usize, &str)> {
+    let mut chars = source.get(start..)?.char_indices();
+    let (_, open) = chars.next()?;
+    if !matches!(open, '{' | '｛') {
+        return None;
+    }
+    let content_start = start + open.len_utf8();
+    for (offset, ch) in chars {
+        if matches!(
+            ch,
+            '{' | '｛' | '。' | '.' | '！' | '!' | '？' | '?' | '\n' | '\r'
+        ) {
+            return None;
+        }
+        if matches!(ch, '}' | '｝') {
+            let end = start + offset;
+            let name = &source[content_start..end];
+            // JSON documents were historically read as ordinary source; do not
+            // turn their object syntax into a plugin reference.
+            return (!name.trim().is_empty() && !name.contains(['"', ':']))
+                .then_some((end + ch.len_utf8(), name));
+        }
+    }
+    None
 }
 
 fn candidates_at(
@@ -1470,6 +1545,7 @@ fn has_relative_scale_head_context(
         }
         if has_primitive_candidate_at(edition, source, cursor, language)
             || qualified_macro_end(source, cursor).is_some()
+            || bracketed_plugin_at(source, cursor).is_some()
         {
             return true;
         }
@@ -2227,6 +2303,58 @@ fn is_separator(character: char) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn bracketed_names_resolve_v1_locks_and_keep_invalid_pairs_unchanged() {
+        use super::*;
+        let lock = crate::MacroLock::new(
+            "Nature.YoungLeaves",
+            "1.0.0",
+            format!("sha256:{}", "a".repeat(64)),
+        )
+        .unwrap()
+        .with_aliases(["Nature.若葉".to_owned()])
+        .unwrap();
+        for source in ["｛若葉｝", "{ Ｙｏｕｎｇ  Leaves ｝", "｛young leaves}"] {
+            let doc = NormalizedDdlDocument::new(
+                source,
+                ResolvedInstructionLanguage::Ja,
+                vec![lock.clone()],
+            )
+            .unwrap();
+            assert!(
+                matches!(qualified_macro_match(&doc,0),Some(QualifiedMacroMatch::ExactLock { end_byte, .. }) if end_byte==source.len()),
+                "{source}"
+            );
+        }
+        for source in [
+            "{}",
+            "{   }",
+            "{unknown",
+            "{a.b}",
+            "{a{b}",
+            "{\"normalized_ddl\":\"value\"}",
+        ] {
+            assert!(bracketed_plugin_at(source, 0).is_none(), "{source}");
+        }
+        let other = crate::MacroLock::new(
+            "Garden.YoungLeaves",
+            "1.0.0",
+            format!("sha256:{}", "b".repeat(64)),
+        )
+        .unwrap()
+        .with_aliases(["Garden.若葉".to_owned()])
+        .unwrap();
+        let doc = NormalizedDdlDocument::new(
+            "｛若葉｝",
+            ResolvedInstructionLanguage::Ja,
+            vec![lock, other],
+        )
+        .unwrap();
+        assert!(matches!(
+            qualified_macro_match(&doc, 0),
+            Some(QualifiedMacroMatch::AmbiguousLocks { .. })
+        ));
+    }
     use super::*;
     use crate::SAIJIKI_ASSET_ID;
 

@@ -52,6 +52,7 @@ pub enum MacroInvocationResolutionDiagnosticKind {
     VersionMismatch,
     DigestMismatch,
     SourceClauseAtomMismatch,
+    PluginObjectNotDrawnYet,
 }
 
 /// One occurrence withheld from the resolved set, retaining its exact evidence.
@@ -93,6 +94,10 @@ pub fn resolve_macro_invocations(
         .enumerate()
         .map(|(index, definition)| DefinitionRecord {
             index,
+            object: definition
+                .plugin_v2
+                .as_ref()
+                .is_some_and(|v| v.kind == "object"),
             qualified_name: definition.qualified_name(),
             identity: definition.identity().map_err(|validation| {
                 validation
@@ -113,6 +118,7 @@ pub fn resolve_macro_invocations(
 #[derive(Clone)]
 struct DefinitionRecord {
     index: usize,
+    object: bool,
     qualified_name: Option<String>,
     identity: Result<MacroDefinitionIdentity, Vec<&'static str>>,
 }
@@ -167,6 +173,19 @@ fn build_resolution(
                     let macro_lock = &document.macro_locks()[*lock_index];
                     match resolve_definition(macro_lock, definitions) {
                         DefinitionResolution::Resolved(identity) => {
+                            if definitions.iter().any(|definition| {
+                                definition.object
+                                    && definition
+                                        .identity
+                                        .as_ref()
+                                        .is_ok_and(|candidate| candidate == &identity)
+                            }) {
+                                diagnostics.push(occurrence.diagnostic(
+                                    MacroInvocationResolutionDiagnosticKind::PluginObjectNotDrawnYet,
+                                    Some(identity), None, Vec::new(),
+                                ));
+                                continue;
+                            }
                             resolved.push(ResolvedMacroInvocation {
                                 invocation: occurrence
                                     .invocation
@@ -285,7 +304,11 @@ fn occurrence(
     // An alias invokes its lock's canonical definition: past this point the
     // invocation carries the canonical name, and only the span keeps the alias.
     let invocation = match lock_indices.as_slice() {
-        [index] if document.macro_locks()[*index].aliases().contains(&surface) => {
+        [index]
+            if document.macro_locks()[*index].aliases().contains(&surface)
+                || surface.starts_with('{')
+                || surface.starts_with('｛') =>
+        {
             invocation(document.macro_locks()[*index].qualified_name(), ordinal)
         }
         _ => invocation(&surface, ordinal),

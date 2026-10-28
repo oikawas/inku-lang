@@ -1139,7 +1139,7 @@ fn ground_is_drawable_content_for_both_facade_modes_and_continue_omissions() {
 }
 
 #[test]
-fn background_does_not_admit_an_omitted_macro_without_drawable_residual() {
+fn background_keeps_macro_body_when_only_caller_position_is_omitted() {
     use serde_json::json;
 
     let definition = definition_from(
@@ -1221,12 +1221,8 @@ fn background_does_not_admit_an_omitted_macro_without_drawable_residual() {
                 .any(|diagnostic| diagnostic.reason == ScoreFieldGap::UnboundMacroCallerMeaning),
             "{diagnostics:?}"
         );
-        assert!(
-            score.is_none_or(|score| score.instructions.is_empty()),
-            "{score:?}"
-        );
-        assert_eq!(outcome, ScoreLoweringOutcome::Stopped);
-        assert!(score.is_none());
+        assert_eq!(score.unwrap().instructions.len(), 1);
+        assert_eq!(outcome, ScoreLoweringOutcome::CompleteWithOmissions);
     }
 
     let with_ground = "paper. place Guard.Grass at bottom. fill background with white.";
@@ -1259,7 +1255,7 @@ fn background_does_not_admit_an_omitted_macro_without_drawable_residual() {
         (compact.outcome(), compact.score()),
     ] {
         assert_eq!(outcome, ScoreLoweringOutcome::CompleteWithOmissions);
-        assert_eq!(score.unwrap().instructions.len(), 1);
+        assert_eq!(score.unwrap().instructions.len(), 2);
     }
 }
 

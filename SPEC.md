@@ -519,7 +519,7 @@ waves), and the work plan values `fine`, `large`, and `solid` and field name
 
 ## 4. Plugin Model
 
-In this section, a plugin means a data-only **vocabulary macro** invoked explicitly from a visible qualified term such as `Nature.雨`. It is not an external code hook. Canvas is a shared-core host option and a Render Engine Pack replaces the drawing core; neither is a plugin in this sense.
+In this section, a plugin means a data-only **vocabulary macro** invoked explicitly by a bracketed name such as `{young leaves}`. During migration `Nature.YoungLeaves` remains readable. It is not an external code hook. Canvas is a shared-core host option and a Render Engine Pack replaces the drawing core; neither is a plugin in this sense.
 
 ### 4.1 Why the Plugin Model Is Designed From the Start
 
@@ -553,8 +553,8 @@ combination of existing core words.
 No plugin can rewrite what "place" means.  Core vocabulary is immutable.
 
 **Principle 3: a plugin is referenced explicitly.**
-It carries a namespace, as in `Nature.雨`.  The bare vocabulary space stays
-unpolluted, and whether a plugin is in use is evident from the description.
+Its name is enclosed in braces, as in `{young leaves}`. The bare vocabulary
+space stays unpolluted. During migration `Nature.YoungLeaves` remains readable.
 
 **Principle 4: a plugin stands alone.**
 Plugin A may not depend on plugin B.  With no chain of dependencies, installing
@@ -572,9 +572,9 @@ The current runtime's `plugin_storage["canvas-aspect"]`, `canvas_aspect` request
 
 ### 4.5 Expansion Through MacroDefinition
 
-A vocabulary plugin is a data-only macro that gives a name to a combination of core vocabulary. A visible invocation uses `Namespace.Heading`, as in `Nature.雨`; definition version / canonical digest, document / compiler identity, and source / generated provenance are stored in a sidecar lock rather than authored as DDL metadata.
+A vocabulary plugin is a data-only macro that gives a name to a combination of core vocabulary. A visible invocation uses braces, as in `{young leaves}`; the qualified form remains readable during migration. Definition version / canonical digest, document / compiler identity, and source / generated provenance are stored in a sidecar lock rather than authored as DDL metadata.
 
-Every domain uses the single versioned `inku.macro-definition.v1`. There are no domain-specific Tree / human / water grammars, per-plugin parsers, or plugin code. The compiler resolves and locks the visible invocation, binds closed typed parameters, then performs late expansion without an LLM into semantic nodes from the attested composition seed and caller-owned finite bounds, rejoining ordinary typed lowering. The Renderer does not understand plugins; it receives only the later ordinary Score. On the Description path, Stage 1 may receive only a bounded signature, parameter schema, and short summary; MacroDefinition bodies and expanded DDL are not sent to Stage 1 or Stage 2 prompts. An unknown or ambiguous qualified term in direct DDL is never filled by a hidden LLM fallback; that sentence alone is omitted, the rest is drawn, and the author is told why (§4.12).
+Every domain uses the versioned `inku.macro-definition.v1` or `inku.macro-definition.v2`. There are no domain-specific Tree / human / water grammars, per-plugin parsers, or plugin code. The compiler resolves and locks the visible invocation, binds closed typed parameters, then performs late expansion without an LLM into semantic nodes from the attested composition seed and caller-owned finite bounds, rejoining ordinary typed lowering. The Renderer does not understand plugins; it receives only the later ordinary Score. On the Description path, Stage 1 may receive only a bounded signature, parameter schema, and short summary; MacroDefinition bodies and expanded DDL are not sent to Stage 1 or Stage 2 prompts. An unknown or ambiguous qualified term in direct DDL is never filled by a hidden LLM fallback; that sentence alone is omitted, the rest is drawn, and the author is told why (§4.12).
 
 Inline and continuation forms that resolve uniquely to the same subject and explicit instructions have the same source-independent canonical meaning. With the same drawing conditions, policy / definition identity, and attested seed, surface sentence splitting or anaphoric syntax alone does not change a macro seed or effective meaning. Unknown, ambiguity, and conflict are not guessed equivalent; meaning-bearing relations, order, quantity, attributes, actions, parameters, and genuine multiple macro invocations remain. This rule does not guarantee general word-order exchange or graph isomorphism.
 
@@ -583,6 +583,8 @@ Meaning bound to a declared parameter is read from the expansion result. Attribu
 At this boundary the Renderer needs to know only core meaning, while a plugin cannot add primitives or syntax or rewrite core semantics. Plugins cannot depend on other plugins, so installation and removal remain independent.
 
 ### 4.6 Generic MacroDefinition v1
+
+V2 adds an `id`, Japanese and English `names`, and `kind`. An object word has an `aspect` and optional `counter`. V1 canonical bytes and digests remain unchanged. Unbound caller position, size, angle, and similar fields are omitted individually with `UnboundMacroCallerMeaning`, retaining the scene body.
 
 A Transform containing only Anchors uses the center of their resolved bounding box. A single Anchor is its own center. When drawable shapes are present, the existing combined drawable-shape bounding-box center is used, and Anchors follow the same transform.
 
@@ -693,19 +695,7 @@ plugin-specific execution path.
 
 ### 4.10 Namespace Convention
 
-Every plugin carries a namespace:
-
-```text
-Nature.雨
-Human.目
-Water.さざ波
-```
-
-So that:
-- where a plugin is used is evident from the description
-- words of the same name do not collide (`Nature.雨` and `Weather.雨` stay
-  distinct)
-- a future package / catalog implementation can display Saijiki words by namespace
+Definitions keep a namespace and id for locks and storage. DDL writes a visible name in braces, such as `{young leaves}`, without the namespace. Names are matched after NFKC, lowercasing, and whitespace folding; a name shared by definitions is diagnosed as ambiguous. The qualified form remains readable during migration.
 
 ### 4.11 The Boundary of Freedom
 
@@ -755,13 +745,19 @@ compatibility boundary.
 
 ### 4.12 Unresolved Plugins and DDL Export
 
+A bracketed name matching multiple locks is reported as `plugin_name_ambiguous` with candidates. The shared diagnostic entrance accepts `plugin_names` entries carrying visible names, qualified ids, and enabled state.
+
 A sentence whose plugin name does not resolve where it is drawn is omitted alone and the rest is drawn. The work does not stop, the sentence stays in the author's DDL, and no LLM rewrites it into other words. The shared Rust explainer (pipeline binding `explain_plugin_diagnostics`) combines the compiler's resolution diagnostic with the host's enabled and disabled plugin names and the work's own definitions, and returns one reason per sentence: `plugin_not_installed` (no such name), `plugin_disabled` (installed but disabled), `plugin_name_mismatch` (no installed name matches; one installed name with the same heading under another namespace, a case-only difference, or at most two edits away is suggested), `plugin_version_mismatch` (the same name with different content), or `plugin_count_out_of_range` (the name resolves but the written count lies outside what the word receives, §4.6). The host stores it with the work's diagnostics and shows it in place of the generic entry for the same range.
 
 A saved work keeps the exact definitions it used, so removing a plugin does not change its replay. To carry DDL between environments, a work exports as `inku.ddl-export.v1`: the visible DDL, its language, and the definitions and summaries of the plugins it names. Imported definitions are used for the new work only, ahead of an installed definition of the same name, and are never installed. When one differs from the installed edition or is not installed here, a catalog diagnostic (`imported_plugin_differs_from_installed` / `imported_plugin_not_installed`) says which was used. Definitions are data-only and pass the shared Rust validation boundary again when read.
 
 ### 4.13 Canonical Names and Aliases
 
-A plugin's canonical name is its English heading (`Nature.YoungLeaves`), and its definition may declare other headings in the same namespace as `aliases` (for example `["若葉"]`). Visible DDL invokes the same definition by either name, and the DDL text stays as written. An alias uses only characters the grammar reads (letters, digits, `_`, `-`) and may not repeat the heading or another alias. The catalog refuses a definition that claims a canonical name or alias another definition already holds. The lock that pins a definition carries its aliases beside the canonical name, version, and digest; matching binds any of those names to that lock, and everything after works with the canonical name. A definition without aliases keeps its canonical bytes and digest. An underdrawing writes a plugin by its alias in Japanese DDL and by its canonical name in English DDL. DDL Spec 14.
+A v2 definition has primary and alternate names in Japanese and English. A name may not match a core word or duplicate another name in the definition after normalization. V1 names are derived from its aliases and its split English heading. V1 digests and saved-work locks remain unchanged. A bracketed name matching multiple locks receives `plugin_name_ambiguous`.
+
+### 4.14 Scene and Object Words
+
+A scene word draws its own body. An unbound caller position, size, or other field is omitted with a diagnostic while the body remains. An object word is accepted as a definition with an aspect and counter but is not drawn yet; its call is omitted with `plugin_object_not_drawn_yet`.
 
 ## 5. The Three-Layer Pipeline
 

@@ -187,7 +187,7 @@ Webの歳時記previewも現行カテゴリに合わせる。おもて9語は同
 
 ## 4. プラグイン設計原則
 
-本節のpluginは、`Nature.雨`のようなvisible qualified termから明示的に呼ぶ、data-onlyの**語彙マクロ**を意味する。外部code hookではない。Canvasはshared coreのhost option、Render Engine Packは描画coreの差し替えであり、この意味のpluginではない。
+本節のpluginは、`｛若葉｝`のように括弧で明示的に呼ぶ、data-onlyの**語彙マクロ**を意味する。移行期間は`Nature.若葉`の書き方も読む。外部code hookではない。Canvasはshared coreのhost option、Render Engine Packは描画coreの差し替えであり、この意味のpluginではない。
 
 ### 4.1 なぜプラグインを最初から設計するか
 
@@ -218,7 +218,7 @@ Nature plugin（雨・葉・水・風）のような具象語彙をコアに入�
 「置く」の意味を書き換えるプラグインは作れない。コアの語彙は不変。
 
 **原則3: プラグインは明示的に参照される**
-`Nature.雨` のように名前空間を持つ。素の語彙空間を汚さない。プラグインを使っているか否かが記述から明らかになる。
+`｛若葉｝` / `{young leaves}` のように名を波括弧で囲む。素の語彙空間を汚さず、使用を明示する。移行の間は `Nature.若葉` も読む。
 
 **原則4: プラグインは単独で完結する**
 プラグインAがプラグインBに依存することを禁じる。依存関係の連鎖がないことで、導入・削除が独立できる。
@@ -234,9 +234,9 @@ Canvasのcanonical ownerはshared coreの`inku.canvas-format-registry.v1`であ�
 
 ### 4.5 MacroDefinitionによる展開モデル
 
-語彙pluginはコア語彙の組み合わせに名前を付けるdata-only macroである。Visible invocationは`Nature.雨`のような`Namespace.Heading`とし、definition version / canonical digest、document / compiler identity、source / generated provenanceはsidecar lockへ保存する。作者へDDL metadataとして書かせない。
+語彙pluginはコア語彙の組み合わせに名前を付けるdata-only macroである。Visible invocationは`｛若葉｝`のような括弧の名とし、移行中は`Namespace.Heading`も読む。definition version / canonical digest、document / compiler identity、source / generated provenanceはsidecar lockへ保存する。作者へDDL metadataとして書かせない。
 
-全domainは一つのversioned `inku.macro-definition.v1`を使う。Tree / human / water等のdomain固有grammar、plugin別parser、plugin codeは作らない。Compilerはvisible invocationをlock解決し、closed typed parameterをbindingした後、attested composition seedとcaller-owned finite boundsでLLMなしにsemantic nodeへlate expansionし、通常のtyped loweringへ合流させる。Rendererはpluginを理解せず、後続の通常Scoreだけを受け取る。Description pathでStage 1へ渡せるのはbounded signature、parameter schema、short summaryだけであり、MacroDefinition本文やexpanded DDLをStage 1 / Stage 2 promptへ渡さない。Direct DDLのunknown / ambiguous qualified termをhidden LLM fallbackで補わない。その文だけを省略して描き切り、理由を作者に示す（§4.12）。
+全domainはversioned `inku.macro-definition.v1`または`inku.macro-definition.v2`を使う。Tree / human / water等のdomain固有grammar、plugin別parser、plugin codeは作らない。Compilerはvisible invocationをlock解決し、closed typed parameterをbindingした後、attested composition seedとcaller-owned finite boundsでLLMなしにsemantic nodeへlate expansionし、通常のtyped loweringへ合流させる。Rendererはpluginを理解せず、後続の通常Scoreだけを受け取る。Description pathでStage 1へ渡せるのはbounded signature、parameter schema、short summaryだけであり、MacroDefinition本文やexpanded DDLをStage 1 / Stage 2 promptへ渡さない。Direct DDLのunknown / ambiguous qualified termをhidden LLM fallbackで補わない。その文だけを省略して描き切り、理由を作者に示す（§4.12）。
 
 同じ対象と明示指示へ一意に解決されたinlineとcontinuationは、文章の分割や照応の表面形から独立した同じcanonical meaningを持つ。したがって同じdrawing condition、policy / definition identity、attested seedなら、surface syntaxだけでmacro seed、effective meaningを変えない。unknown、ambiguity、conflictを等価と推測せず、関係・順序・数量・属性・action・parameter、または真正の複数macro invocationを消さない。この規則は一般の文順交換やgraph isomorphismを保証しない。
 
@@ -245,6 +245,8 @@ Canvasのcanonical ownerはshared coreの`inku.canvas-format-registry.v1`であ�
 この境界により、Rendererはcore meaningだけを知ればよく、pluginは新primitive・新syntax・core語義の変更を持ち込めない。Plugin間依存は許さず、導入と削除を独立させる。
 
 ### 4.6 Generic MacroDefinition v1
+
+v2 は `id`、日英の `names`、`kind` を持つ。物の語は `aspect` と任意の `counter` を持てる。v1 の正準 bytes と digest は変わらない。未束縛の外側の位置・大きさ・傾きなどはその欄だけを `UnboundMacroCallerMeaning` として外し、情景の本体を残す。
 
 Anchorだけを含むTransformは、解決済みのAnchor全体の外接矩形中心を使う。一点だけならその点自身が中心になる。描画図形を含む場合は従来の描画図形全体の外接矩形中心を使い、Anchorは同じ変換に従う。
 
@@ -327,18 +329,7 @@ Render Engine は、`JSON Score + render options + server-owned color metadata` 
 
 ### 4.10 名前空間の規約
 
-プラグインは必ず名前空間を持つ。例:
-
-```
-Nature.雨
-Human.目
-Water.さざ波
-```
-
-これにより：
-- プラグイン使用箇所が記述から明らかになる
-- 同名語彙の衝突を防ぐ（Nature.雨 と Weather.雨 は別物として扱える）
-- 将来のpackage / catalog実装では歳時記（Saijiki）を名前空間別に表示できる
+定義は名前空間と id を持ち、lock と保存に使う。DDL は名前空間を書かず、`｛若葉｝` のように見える名を括弧で囲む。名は NFKC・小文字・連続空白の正規化で照合し、異なる定義が同じ名を持つと曖昧として診断する。移行期間は従来の `Nature.若葉` も読む。
 
 ### 4.11 自由度の境界
 
@@ -362,13 +353,19 @@ Water.さざ波
 
 ### 4.12 未登録のプラグインとDDLの書き出し
 
+括弧の名が複数の lock に当たると `plugin_name_ambiguous` とし、候補を示す。共有診断入口は `plugin_names` に見える名・qualified id・有効状態を受け取れる。
+
 描いた環境でプラグイン名が解決できない文は、その文だけを省略して残りを描き切る。作品全体を止めず、原文のDDLからその文を消さず、LLMに別の語で書き直させない。共有Rust（pipeline binding `explain_plugin_diagnostics`）が、compilerの解決診断と、hostの有効・無効化中のプラグイン名、作品自身の定義から、文ごとに理由を一つ返す: `plugin_not_installed`（その名前が無い）、`plugin_disabled`（導入済みだが無効）、`plugin_name_mismatch`（登録名と一致しない。同じ見出しの別名前空間、大文字小文字の違い、2文字以内の違いの登録名を候補として一つ示す）、`plugin_version_mismatch`（同じ名前で定義の中身が違う）、`plugin_count_out_of_range`（名前は解決したが、書いた個数が語の受ける範囲の外。§4.6）。Hostは作品の診断に保存し、同じ範囲の汎用診断の代わりに表示する。
 
 保存済み作品は使った定義の実物を持つので、プラグインを外しても再演は変わらない。環境をまたいでDDLを持ち運ぶために、作品を`inku.ddl-export.v1`（可視DDL、言語、DDLが名前を書く定義とその要約）として書き出せる。読み込んだ定義は新しい作品だけで使い、登録済みの同名定義より優先する。導入はしない。登録済みと中身が違う、または未登録のときは、どちらを使ったかをcatalog診断（`imported_plugin_differs_from_installed`／`imported_plugin_not_installed`）で知らせる。定義はdata-onlyで、読み込み時も共有Rustの検証境界を通る。
 
 ### 4.13 正式名と別名
 
-プラグインの正式名は英語の見出し（`Nature.YoungLeaves`）とし、定義は同じ名前空間の別名を`aliases`（例: `["若葉"]`）として宣言できる。可視DDLは正式名と別名のどちらでも同じ定義を呼び、DDLの本文は書いたまま残る。別名は構文が読める文字（文字・数字・`_`・`-`）だけで、見出しや他の別名と重ならない。catalogは、既に他の定義が持つ正式名・別名を名乗る定義を受け付けない。定義を固定するlockは正式名・版・digestに加えて別名を持ち、照合はどの名前でもそのlockへ結び、以後は正式名で扱う。別名を持たない定義の正準bytesとdigestは変わらない。下絵は、日本語のDDLでは別名、英語のDDLでは正式名でプラグインを書く。DDL Spec 14。
+v2 定義は日本語・英語それぞれの主の名と別名を持つ。名は基本語と一致できず、定義内で正規化後に重複できない。v1 では日本語名を別名から、英語名を見出しの語分割から作る。v1 の digest と保存済み作品の lock は変えない。複数 lock に当たる括弧の名は `plugin_name_ambiguous` とする。
+
+### 4.14 情景の語と物の語
+
+情景の語は定義の中身をそのまま描く。外に添えた未束縛の位置・大きさなどはその語だけを診断付きで外す。物の語は縦横比と助数詞を持つ定義として受けるが、まだ描かず `plugin_object_not_drawn_yet` として省略する。
 
 ## 5. 三層パイプライン
 

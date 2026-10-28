@@ -668,6 +668,8 @@ Write one of the nine abstract colors and let the work's color catalog resolve i
 
 ### 3.22 Plugin invocation
 
+DDL 28 writes a visible plugin name in braces, as in `{young leaves}`. Full-width and ASCII braces may be mixed; names match locks after NFKC, lowercasing, and whitespace folding. An unknown or ambiguous name omits its sentence with a diagnostic. The qualified form remains readable during migration.
+
 A plugin is a data-only macro naming a composition of core meanings. It adds neither a primitive nor unrestricted plugin-specific natural grammar.
 
 ```text
@@ -675,7 +677,7 @@ Namespace.Heading
 Namespace.宣言済み別名
 ```
 
-Use an ASCII dot between namespace and heading. Only the formal heading and declared aliases in that namespace resolve. For an environment declaring `Nature.YoungLeaves` and `Nature.若葉` as the formal name and alias of one definition, either names that definition. This does **not** make Nature a fixed plugin available everywhere.
+The transitional qualified form uses an ASCII dot between namespace and heading. In an environment declaring `Nature.YoungLeaves` and `Nature.若葉` as names of one definition, either invokes it. This does **not** make Nature a fixed plugin available everywhere.
 
 Check the exact registered name and its public parameter types and bounds, and normally make a call one sentence. Versions, digests, locks, definition bodies, and transcribed output are not author-written DDL metadata. Do not invent function syntax such as `Name(count=3)`.
 
@@ -697,6 +699,7 @@ As a group or sequence member, a macro retains its internal counts, positions, a
 | plugin_not_installed | No matching definition |
 | plugin_disabled | Installed but disabled |
 | plugin_name_mismatch | Name, alias, namespace, or case differs from registration |
+| plugin_name_ambiguous | A bracketed name matches more than one definition |
 | plugin_version_mismatch | Same name, different pinned definition content |
 | plugin_count_out_of_range | Count outside that word's range |
 

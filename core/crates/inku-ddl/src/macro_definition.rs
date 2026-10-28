@@ -6,8 +6,9 @@ use std::{
 };
 
 use serde::{
-    Deserialize, Deserializer, Serialize,
+    Deserialize, Deserializer, Serialize, Serializer,
     de::{Error as _, MapAccess, Visitor},
+    ser::SerializeStruct,
 };
 use sha2::{Digest, Sha256};
 
@@ -452,8 +453,7 @@ pub struct ComponentDefinition {
 }
 
 /// One invocable, versioned semantic macro definition.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct MacroDefinition {
     pub schema: String,
     pub namespace: String,
@@ -461,12 +461,168 @@ pub struct MacroDefinition {
     /// Other headings in the same namespace that invoke this definition, such
     /// as a Japanese name beside an English canonical heading. Omitted when
     /// empty, so a definition without aliases keeps its canonical bytes.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub aliases: Vec<String>,
     pub version: String,
     pub parameters: SemanticMap<ParameterSchema>,
     pub components: SemanticMap<ComponentDefinition>,
     pub body: Vec<Statement>,
+    pub plugin_v2: Option<Box<PluginDefinitionV2>>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PluginNamesV2 {
+    pub ja: Vec<String>,
+    pub en: Vec<String>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PluginDefinitionV2 {
+    pub names: PluginNamesV2,
+    pub kind: String,
+    pub aspect: Option<String>,
+    pub counter: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct MacroDefinitionWire {
+    schema: String,
+    namespace: String,
+    #[serde(default)]
+    heading: Present<String>,
+    #[serde(default)]
+    id: Present<String>,
+    #[serde(default)]
+    aliases: Present<Vec<String>>,
+    #[serde(default)]
+    names: Present<PluginNamesV2>,
+    #[serde(default)]
+    kind: Present<String>,
+    #[serde(default)]
+    aspect: Present<String>,
+    #[serde(default)]
+    counter: Present<String>,
+    version: String,
+    parameters: SemanticMap<ParameterSchema>,
+    components: SemanticMap<ComponentDefinition>,
+    body: Vec<Statement>,
+}
+
+struct Present<T> {
+    value: Option<T>,
+    present: bool,
+}
+impl<T> Default for Present<T> {
+    fn default() -> Self {
+        Self {
+            value: None,
+            present: false,
+        }
+    }
+}
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for Present<T> {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        Ok(Self {
+            value: Option::<T>::deserialize(deserializer)?,
+            present: true,
+        })
+    }
+}
+
+impl<'de> Deserialize<'de> for MacroDefinition {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let wire = MacroDefinitionWire::deserialize(deserializer)?;
+        let v2 = wire.schema == "inku.macro-definition.v2";
+        let (heading, aliases, plugin_v2) = if v2 {
+            if wire.heading.present || wire.aliases.present {
+                return Err(D::Error::custom("unknown field for macro-definition.v2"));
+            }
+            if (wire.aspect.present && wire.aspect.value.is_none())
+                || (wire.counter.present && wire.counter.value.is_none())
+            {
+                return Err(D::Error::custom("invalid type: null for plugin field"));
+            }
+            let heading = wire.id.value.ok_or_else(|| D::Error::missing_field("id"))?;
+            let names = wire
+                .names
+                .value
+                .ok_or_else(|| D::Error::missing_field("names"))?;
+            let kind = wire
+                .kind
+                .value
+                .ok_or_else(|| D::Error::missing_field("kind"))?;
+            (
+                heading,
+                Vec::new(),
+                Some(Box::new(PluginDefinitionV2 {
+                    names,
+                    kind,
+                    aspect: wire.aspect.value,
+                    counter: wire.counter.value,
+                })),
+            )
+        } else {
+            if wire.id.present
+                || wire.names.present
+                || wire.kind.present
+                || wire.aspect.present
+                || wire.counter.present
+            {
+                return Err(D::Error::custom("unknown field for macro-definition.v1"));
+            }
+            if wire.aliases.present && wire.aliases.value.is_none() {
+                return Err(D::Error::custom("invalid type: null, expected a sequence"));
+            }
+            (
+                wire.heading
+                    .value
+                    .ok_or_else(|| D::Error::missing_field("heading"))?,
+                wire.aliases.value.unwrap_or_default(),
+                None,
+            )
+        };
+        Ok(Self {
+            schema: wire.schema,
+            namespace: wire.namespace,
+            heading,
+            aliases,
+            version: wire.version,
+            parameters: wire.parameters,
+            components: wire.components,
+            body: wire.body,
+            plugin_v2,
+        })
+    }
+}
+
+impl Serialize for MacroDefinition {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut out = serializer.serialize_struct("MacroDefinition", 12)?;
+        out.serialize_field("schema", &self.schema)?;
+        out.serialize_field("namespace", &self.namespace)?;
+        if let Some(v2) = &self.plugin_v2 {
+            out.serialize_field("id", &self.heading)?;
+            out.serialize_field("names", &v2.names)?;
+            out.serialize_field("kind", &v2.kind)?;
+            if let Some(aspect) = &v2.aspect {
+                out.serialize_field("aspect", aspect)?;
+            }
+            if let Some(counter) = &v2.counter {
+                out.serialize_field("counter", counter)?;
+            }
+        } else {
+            out.serialize_field("heading", &self.heading)?;
+            if !self.aliases.is_empty() {
+                out.serialize_field("aliases", &self.aliases)?;
+            }
+        }
+        out.serialize_field("version", &self.version)?;
+        out.serialize_field("parameters", &self.parameters)?;
+        out.serialize_field("components", &self.components)?;
+        out.serialize_field("body", &self.body)?;
+        out.end()
+    }
 }
 
 /// Stable typed-input parse failure. Localized prose never enters semantic identity.
@@ -679,8 +835,86 @@ impl MacroDefinition {
     /// Validate names, references, cycles, finite domains, and symbolic resource bounds.
     pub fn validate(&self) -> MacroDefinitionValidation {
         let mut diagnostics = Vec::new();
-        if self.schema != MACRO_DEFINITION_SCHEMA_ID {
+        if self.schema != MACRO_DEFINITION_SCHEMA_ID && self.schema != "inku.macro-definition.v2" {
             push_diagnostic(&mut diagnostics, "unknown_schema", "$.schema");
+        }
+        if let Some(v2) = &self.plugin_v2 {
+            if !is_ascii_identifier(&self.heading) {
+                push_diagnostic(&mut diagnostics, "invalid_plugin_id", "$.id");
+            }
+            let mut seen = HashSet::new();
+            for (language, names) in [
+                (crate::ResolvedInstructionLanguage::Ja, &v2.names.ja),
+                (crate::ResolvedInstructionLanguage::En, &v2.names.en),
+            ] {
+                let lang = if language == crate::ResolvedInstructionLanguage::Ja {
+                    "ja"
+                } else {
+                    "en"
+                };
+                if names.is_empty() {
+                    push_diagnostic(
+                        &mut diagnostics,
+                        "invalid_plugin_name",
+                        format!("$.names.{lang}"),
+                    );
+                }
+                for (index, name) in names.iter().enumerate() {
+                    let path = format!("$.names.{lang}[{index}]");
+                    if !crate::plugin_names::valid_plugin_name(name, language) {
+                        push_diagnostic(&mut diagnostics, "invalid_plugin_name", &path);
+                    } else {
+                        let folded = crate::plugin_names::normalize_plugin_name(name);
+                        if !seen.insert(folded) {
+                            push_diagnostic(&mut diagnostics, "duplicate_plugin_name", &path);
+                        }
+                        if crate::plugin_names::plugin_name_is_core_word(name) {
+                            push_diagnostic(&mut diagnostics, "name_is_core_word", &path);
+                        }
+                    }
+                }
+            }
+            match v2.kind.as_str() {
+                "scene" => {
+                    if v2.aspect.is_some() {
+                        push_diagnostic(&mut diagnostics, "scene_has_aspect", "$.aspect");
+                    }
+                    if v2.counter.is_some() {
+                        push_diagnostic(&mut diagnostics, "scene_has_counter", "$.counter");
+                    }
+                }
+                "object" => {
+                    let valid_aspect = v2
+                        .aspect
+                        .as_deref()
+                        .and_then(|a| a.split_once(':'))
+                        .is_some_and(|(w, h)| {
+                            [w, h].iter().all(|part| {
+                                !part.is_empty()
+                                    && part.bytes().all(|b| b.is_ascii_digit())
+                                    && part.parse::<u8>().is_ok_and(|n| (1..=16).contains(&n))
+                            })
+                        });
+                    if !valid_aspect {
+                        push_diagnostic(&mut diagnostics, "invalid_plugin_aspect", "$.aspect");
+                    }
+                    if v2
+                        .counter
+                        .as_deref()
+                        .is_some_and(|c| !matches!(c, "flat" | "long" | "general"))
+                    {
+                        push_diagnostic(&mut diagnostics, "invalid_plugin_counter", "$.counter");
+                    }
+                    for (name, _) in self.parameters.iter().filter(|(_, p)| receives_count(p)) {
+                        push_diagnostic(
+                            &mut diagnostics,
+                            "object_count_parameter",
+                            format!("$.parameters.{name}"),
+                        );
+                    }
+                }
+                _ => push_diagnostic(&mut diagnostics, "invalid_plugin_kind", "$.kind"),
+            }
         }
         match MacroInvocation::new(self.namespace.clone(), self.heading.clone(), 0) {
             Ok(_) => {}
@@ -837,9 +1071,41 @@ impl MacroDefinition {
     /// Domain-separated full SHA-256 semantic identity.
     pub fn identity(&self) -> Result<MacroDefinitionIdentity, MacroDefinitionValidation> {
         let canonical_json = self.canonical_json_bytes()?;
-        let mut framed =
-            Vec::with_capacity(MACRO_DEFINITION_DIGEST_DOMAIN.len() + 8 + canonical_json.len());
-        framed.extend_from_slice(MACRO_DEFINITION_DIGEST_DOMAIN);
+        Ok(self.identity_from_canonical(canonical_json))
+    }
+
+    /// Identity for reporting a legacy-name migration that requires author repair.
+    /// This does not make the returned definition valid for catalog admission.
+    pub fn migration_identity_allow_core_name(
+        &self,
+    ) -> Result<MacroDefinitionIdentity, MacroDefinitionValidation> {
+        let validation = self.validate();
+        if validation.is_valid() {
+            return self.identity();
+        }
+        if validation.diagnostics().is_empty()
+            || validation
+                .diagnostics()
+                .iter()
+                .any(|finding| finding.code() != "name_is_core_word")
+        {
+            return Err(validation);
+        }
+        let mut canonical = self.clone();
+        normalize_definition_semantic_aliases(&mut canonical);
+        let canonical_json =
+            serde_json::to_vec(&canonical).expect("typed MacroDefinition must serialize");
+        Ok(self.identity_from_canonical(canonical_json))
+    }
+
+    fn identity_from_canonical(&self, canonical_json: Vec<u8>) -> MacroDefinitionIdentity {
+        let domain = if self.plugin_v2.is_some() {
+            b"inku.macro-definition.v2".as_slice()
+        } else {
+            MACRO_DEFINITION_DIGEST_DOMAIN
+        };
+        let mut framed = Vec::with_capacity(domain.len() + 8 + canonical_json.len());
+        framed.extend_from_slice(domain);
         framed.extend_from_slice(&(canonical_json.len() as u64).to_be_bytes());
         framed.extend_from_slice(&canonical_json);
         let full_digest: [u8; 32] = Sha256::digest(framed).into();
@@ -847,7 +1113,7 @@ impl MacroDefinition {
             .iter()
             .map(|byte| format!("{byte:02x}"))
             .collect();
-        Ok(MacroDefinitionIdentity {
+        MacroDefinitionIdentity {
             qualified_name: self
                 .qualified_name()
                 .expect("validated definition must have a qualified name"),
@@ -855,7 +1121,7 @@ impl MacroDefinition {
             canonical_json,
             full_digest,
             full_digest_hex,
-        })
+        }
     }
 }
 

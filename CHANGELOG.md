@@ -16,6 +16,10 @@ ChatGPT plan authorization, session and model publication decisions use the shar
 
 ChatGPT plan publication and authentication decisions use the shared core, while signature verification and encrypted local storage stay native.
 
+### 2026-10-28 — Bracketed plugin names and definition v2
+
+DDL 28 resolves bracketed names such as `{young leaves}` against locked v1 and v2 definitions. Unbound scene caller positions, sizes and similar fields are omitted individually. Object definitions are accepted but not drawn yet. Saved-work migration retains v1 definitions and locks and rewrites only the spelling.
+
 ### 2026-10-28 — Share provider admission calculations on macOS
 
 Input estimates, admission, settlement, daily boundaries and 429 delays use the shared core. The existing stored accounting format and host waiting remain in place. Auxiliary text requests now share the same budget, including Gemini token counting and 429 cooldowns.

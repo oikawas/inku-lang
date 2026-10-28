@@ -199,10 +199,10 @@ pub(crate) fn read(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
-    fn stored_zip(name: &str, contents: &[u8], method: u16) -> Vec<u8> {
+    pub(crate) fn stored_zip(name: &str, contents: &[u8], method: u16) -> Vec<u8> {
         let mut out = Vec::new();
         let u16bytes = |v: u16| v.to_le_bytes();
         let u32bytes = |v: u32| v.to_le_bytes();

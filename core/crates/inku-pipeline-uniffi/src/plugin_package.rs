@@ -763,5 +763,23 @@ mod tests {
             "archive_too_large"
         );
         assert_eq!(archive(b"bad").unwrap_err()[0]["code"], "invalid_zip");
+        let missing = crate::zip_reader::tests::stored_zip("other.txt", b"x", 0);
+        assert_eq!(
+            archive(&missing).unwrap_err()[0]["code"],
+            "archive_without_package_json"
+        );
+        let not_utf8 = crate::zip_reader::tests::stored_zip("package.json", &[0xff], 0);
+        assert_eq!(archive(&not_utf8).unwrap_err()[0]["code"], "not_utf8");
+        let large =
+            crate::zip_reader::tests::stored_zip("package.json", &vec![b'x'; MAX_PACKAGE + 1], 0);
+        assert_eq!(archive(&large).unwrap_err()[0]["code"], "package_too_large");
+        let mut too_many = crate::zip_reader::tests::stored_zip("package.json", b"{}", 0);
+        let end = too_many.len() - 22;
+        too_many[end + 8..end + 10].copy_from_slice(&257u16.to_le_bytes());
+        too_many[end + 10..end + 12].copy_from_slice(&257u16.to_le_bytes());
+        assert_eq!(
+            archive(&too_many).unwrap_err()[0]["code"],
+            "too_many_archive_members"
+        );
     }
 }

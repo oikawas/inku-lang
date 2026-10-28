@@ -14,6 +14,7 @@ func runServerHostParityChecks() async throws {
     // only when default is the chosen catalog (the candidate shares the host it mutates).
     let app = AppModel(databaseURL: folder.appendingPathComponent("catalog.sqlite"), transport: ParityFailingProvider(mode: .network))
     await app.initialize()
+    app.selectDrawRoute("stages"); app.sketchMode = "off"
     guard app.errorText == nil, let other = app.catalogs.first(where: { $0.id != "default" }) else {
         throw CheckFailure.message("Server host parity could not load the bundled catalogs: \(app.errorText ?? app.status)")
     }
@@ -45,6 +46,7 @@ func runServerHostParityChecks() async throws {
         + " 詳細: 指示書生成処理・処理中に接続が失われました（生成要求、NSURLErrorDomain -1005、transport_unavailable）。"
     let keyless = AppModel(databaseURL: folder.appendingPathComponent("keyless.sqlite"), transport: ParityFailingProvider(mode: .credentials))
     await keyless.initialize()
+    keyless.selectDrawRoute("stages"); keyless.sketchMode = "off"
     try await keyless.updateHostSettings(HostSettings(providers: [service], models: ModelSelection(stage1Model: "check:pinned", stage2Model: "check:pinned")))
     keyless.inputMode = "description"; keyless.descriptionText = app.descriptionText
     keyless.seedText = "42"; keyless.sketchMode = "off"; keyless.catalogMode = "fixed"
@@ -61,6 +63,7 @@ func runServerHostParityChecks() async throws {
     try Data(#"{"interval":2000,"duration":7200}"#.utf8).write(to: demoFolder.appendingPathComponent("demo-settings.json"))
     let demoApp = AppModel(databaseURL: demoFolder.appendingPathComponent("demo.sqlite"), transport: ParityFailingProvider(mode: .network))
     await demoApp.initialize()
+    demoApp.selectDrawRoute("stages"); demoApp.sketchMode = "off"
     let automation = AutomationModel()
     await automation.connect(app: demoApp)
     guard automation.demoInterval == 2000, automation.demoDuration == 7200 else {

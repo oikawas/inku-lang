@@ -44,6 +44,7 @@ func runSavedLawsStageChecks() async throws {
         let transport = LawsColorsCheckProvider(refuseColors: true)
         let app = AppModel(databaseURL: folder.appendingPathComponent("colors-\(hasColors).sqlite"), transport: transport)
         await app.initialize()
+    app.selectDrawRoute("stages"); app.sketchMode = "off"
         try await app.updateHostSettings(HostSettings(providers: [service], models: .init(stage1Model: "laws-check:parent", stage2Model: "laws-check:parent")))
         app.inputMode = "description"; app.language = "ja"; app.seedText = "7"; app.sketchMode = "off"
         app.descriptionText = "円がひとつ浮かび、下に点が散らばる"
@@ -94,6 +95,7 @@ func runAuxiliaryProvenanceChecks() async throws {
     let transport = AutonomousCheckProvider()
     let app = AppModel(databaseURL: databaseURL, transport: transport)
     await app.initialize()
+    app.selectDrawRoute("stages"); app.sketchMode = "off"
     let service = ProviderSettings(id: "auto-check", baseURL: URL(string: "http://127.0.0.1:1/v1")!, requiresAPIKey: false,
         models: [.init(id: "parent"), .init(id: "one", purposes: ["llm", "vision"])])
     try await app.updateHostSettings(HostSettings(providers: [service], models: .init(stage1Model: "auto-check:parent", stage2Model: "auto-check:parent")))

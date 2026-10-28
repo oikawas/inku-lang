@@ -9,6 +9,7 @@ import InkuUI
     defer { try? FileManager.default.removeItem(at: folder) }
     let app = AppModel(databaseURL: folder.appendingPathComponent("bootstrap.sqlite"), transport: CompositionCheckProvider())
     await app.initialize()
+    app.selectDrawRoute("stages"); app.sketchMode = "off"
     guard app.errorText == nil, !app.catalogs.isEmpty, !app.canvases.isEmpty else {
         throw CheckFailure.message("Composition host fixture could not load bundled defaults: \(app.errorText ?? app.status)")
     }

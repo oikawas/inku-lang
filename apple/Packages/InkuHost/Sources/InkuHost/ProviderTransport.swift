@@ -64,14 +64,16 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
                        "generate_normalized_ddl": "normalized_ddl_generated", "read_composition": "composition_read",
                        "choose_laws": "laws_chosen", "choose_colors": "colors_chosen",
                        "complete_visible_ddl_holes": "visible_ddl_hole_patch_generated", "select_image_catalog": "image_catalog_selected",
-                       "write_image_ddl": "image_ddl_written", "review_image_ddl": "image_ddl_reviewed"]
+                       "write_image_ddl": "image_ddl_written", "review_image_ddl": "image_ddl_reviewed",
+                       "read_description": "description_read", "compose_description": "description_composed",
+                       "write_description_ddl": "description_ddl_written", "review_description_ddl": "description_ddl_reviewed"]
         guard let resultTag = results[tag],
               let timeoutMS = UInt64(try effect.requiredString("timeout_ms")),
               timeoutMS <= UInt64.max / 1_000_000 else { throw HostError("pipeline_schema_violation") }
         let began = ContinuousClock.now
         let deadline = budget.now().addingTimeInterval(Double(timeoutMS) / 1000)
         let modelReference = tag == "complete_visible_ddl_holes" ? models.stage2Model : models.stage1Model
-        let maxTokens = tag == "complete_visible_ddl_holes" ? models.holeMaxTokens : (["write_image_ddl", "review_image_ddl"].contains(tag) ? 8192 : models.stage1MaxTokens)
+        let maxTokens = tag == "complete_visible_ddl_holes" ? models.holeMaxTokens : (["write_image_ddl", "review_image_ddl", "read_description", "compose_description", "write_description_ddl", "review_description_ddl"].contains(tag) ? 8192 : models.stage1MaxTokens)
         var failure: String?
         var response: String?
         let rateWait = ProviderRateWait()

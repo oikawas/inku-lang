@@ -5,9 +5,13 @@ import InkuHost
 public struct ProviderProgressSnapshot: Sendable, Equatable {
     public enum Outcome: Sendable, Equatable { case running, succeeded, failed, cancelled, awaitingReview }
     public enum Stage: Sendable, Equatable {
-        case sketch, catalog, interpretation, composition, laws, colors, completion, imageCatalog, imageWriting, imageReview
+        case sketch, catalog, interpretation, composition, laws, colors, completion, imageCatalog, imageWriting, imageReview, descriptionReading, descriptionComposition, descriptionWriting, descriptionReview
         init?(action: String) {
             switch action {
+            case "read_description": self = .descriptionReading
+            case "compose_description": self = .descriptionComposition
+            case "write_description_ddl": self = .descriptionWriting
+            case "review_description_ddl": self = .descriptionReview
             case "generate_sketch": self = .sketch
             case "select_description_catalog": self = .catalog
             case "generate_normalized_ddl": self = .interpretation
@@ -23,6 +27,10 @@ public struct ProviderProgressSnapshot: Sendable, Equatable {
         }
         var titleKey: String {
             switch self {
+            case .descriptionReading: "読んでいます"
+            case .descriptionComposition: "構図と法則を決めています"
+            case .descriptionWriting: "書いています"
+            case .descriptionReview: "見て直しています"
             case .sketch: "写生"
             case .catalog: "色カタログの選択"
             case .interpretation: "解釈"
@@ -79,7 +87,7 @@ public struct ProviderProgressSnapshot: Sendable, Equatable {
         let reference: String?
         switch stage {
         case .some(.completion): reference = models?.stage2Model
-        case .some(.sketch), .some(.catalog), .some(.interpretation), .some(.composition), .some(.laws), .some(.colors), .some(.imageCatalog), .some(.imageWriting), .some(.imageReview):
+        case .some(.sketch), .some(.catalog), .some(.interpretation), .some(.composition), .some(.laws), .some(.colors), .some(.imageCatalog), .some(.imageWriting), .some(.imageReview), .some(.descriptionReading), .some(.descriptionComposition), .some(.descriptionWriting), .some(.descriptionReview):
             reference = models?.stage1Model
         case .none: reference = nil
         }

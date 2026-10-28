@@ -168,6 +168,7 @@ private func juxtapositionChildChecks() async throws {
     let transport = JuxtapositionVision(answers: [])
     let app = AppModel(databaseURL: databaseURL, transport: transport)
     await app.initialize()
+    app.selectDrawRoute("stages"); app.sketchMode = "off"
     let service = ProviderSettings(id: "check", baseURL: URL(string: "http://localhost:1/v1")!, requiresAPIKey: false,
                                    models: [.init(id: "generation"), .init(id: "vision", purposes: ["llm", "vision"])])
     try await app.updateHostSettings(HostSettings(providers: [service],
@@ -184,6 +185,7 @@ private func juxtapositionChildChecks() async throws {
     }
     let reopened = AppModel(databaseURL: databaseURL, transport: transport)
     await reopened.initialize()
+    reopened.selectDrawRoute("stages"); reopened.sketchMode = "off"
     let database = try InkuDatabase(url: databaseURL)
     guard let parent = try await database.list(limit: 10).first(where: { $0.effectiveSourceText.hasPrefix("1.") }) else {
         throw CheckFailure.message("Juxtaposition fixture lost its labelled parent")

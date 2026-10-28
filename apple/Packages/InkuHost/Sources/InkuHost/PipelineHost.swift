@@ -168,7 +168,9 @@ public actor PipelineHost {
             completionRanges: context["completion_ranges"].object == nil ? nil : context["completion_ranges"].data,
             lawsRecords: LawsRecords.of(context)?.data,
             imageDDL: context["image_ddl"].object == nil ? nil : context["image_ddl"].data,
-            imageProvenance: context["image_provenance"].string)
+            imageProvenance: context["image_provenance"].string,
+            drawRoute: context["route"].string ?? (context["description_ddl"].object == nil ? "stages" : "read_and_draw"),
+            descriptionDDL: context["description_ddl"].object == nil ? nil : context["description_ddl"].data)
     }
 
     public func savedAuthoringSummaries(workIDs: [String]) async throws -> [String: SavedAuthoringSummary] {
@@ -590,6 +592,7 @@ private struct StoredExecution: Codable, Sendable {
     var imageProvenance: String? = nil
     var inheritedImageDDL: Data? = nil
     var providerObservations: [ProviderAttemptObservation]? = nil
+    var readAndDrawElapsedMS: UInt64? = nil
     var startedAt: Date
 }
 
@@ -688,6 +691,21 @@ private actor ExecutionDriver {
     /// Server `start`: a direct DDL drawn from a saved work carries that work's completion range and laws records.
     private func authoring(_ request: GenerationRequest) throws -> ExactJSON {
         var authoring = request.authoring.json
+        if case .description(let text, _, _) = request.authoring, request.drawRoute == "read_and_draw" {
+            authoring["route"] = .string("read_and_draw")
+            authoring["description"] = .string(InkuCore.descriptionWithoutLabels(text))
+            if request.descriptionComposition == true { authoring["composition"] = .object(["mode": .string("on")]) }
+            let spans = try ExactJSON(data: InkuCore.descriptionLabelSpans(text)).array ?? []
+            let scalars = Array(text.unicodeScalars)
+            let labels = spans.compactMap { span -> ExactJSON? in
+                guard let values = span.array, values.count == 3, values[2].string == "comment",
+                      let start = values[0].number.flatMap(Int.init), let end = values[1].number.flatMap(Int.init),
+                      start >= 0, end <= scalars.count, end >= start + 2 else { return nil }
+                let label = String(String.UnicodeScalarView(scalars[(start + 1)..<(end - 1)])).trimmingCharacters(in: .whitespacesAndNewlines)
+                return label.isEmpty ? nil : .string(label)
+            }
+            if !labels.isEmpty { authoring["source_labels"] = .array(labels) }
+        }
         if request.authoring.isDirect, request.parentWorkID == nil, request.declareCanvas == true {
             authoring["declare_canvas"] = .bool(true)
         }
@@ -707,6 +725,7 @@ private actor ExecutionDriver {
         guard let request = initialRequest else { throw HostError("execution_already_started") }
         var config = try ExactJSON(data: request.configuration)
         if case .image = request.authoring { config["image"] = .object(["review": .bool(true)]) }
+        if request.drawRoute == "read_and_draw" { config["description_ddl"] = .object(["review": .bool(request.descriptionReview == true), "colors": .bool(true)]) }
         let payload: ExactJSON = .object(["tag": .string("start"), "variation_id": .string(newID()), "authoring_nonce": .string(newID()),
                                          "config": config,
                                          "authority": .object(["protocol_version": .string("inku.variation-authority.v1"), "revision": .string("0"),
@@ -843,7 +862,7 @@ private actor ExecutionDriver {
                         progress(.changed(try makeView())); await gate.unlock()
                     } catch { await gate.unlock(); throw error }
                 } else if ["generate_sketch", "select_description_catalog", "generate_normalized_ddl", "read_composition",
-                           "choose_laws", "choose_colors", "complete_visible_ddl_holes", "select_image_catalog", "write_image_ddl", "review_image_ddl"].contains(tag) {
+                           "choose_laws", "choose_colors", "complete_visible_ddl_holes", "select_image_catalog", "write_image_ddl", "review_image_ddl", "read_description", "compose_description", "write_description_ddl", "review_description_ddl"].contains(tag) {
                     if !allowProvider {
                         restored = true; driving = false
                         do {
@@ -853,7 +872,7 @@ private actor ExecutionDriver {
                     let task: Task<Data, Error>
                     do {
                         var sendAction = action
-                        if ["select_image_catalog", "write_image_ddl", "review_image_ddl"].contains(tag) {
+                        if ["select_image_catalog", "write_image_ddl", "review_image_ddl", "review_description_ddl"].contains(tag) {
                             let references = action["payload"]["prompt"]["images"].array ?? []
                             guard !references.isEmpty else { throw HostError("pipeline_schema_violation") }
                             var urls: [ExactJSON] = []
@@ -1083,7 +1102,14 @@ private actor ExecutionDriver {
         else if current?["document"] != nextSnapshot["document"] || nextSnapshot["delivery"].object == nil || nextSnapshot["phase"]["tag"].string == "failed" {
             next.rendered = nil; next.savedWorkID = nil; next.candidate = nil
         }
-        if clearProvider { next.pendingProviderAction = nil }
+        if clearProvider {
+            next.pendingProviderAction = nil
+            if ["read_description", "compose_description", "write_description_ddl", "review_description_ddl"].contains(current?["action"]["tag"].string ?? ""),
+               let elapsed = (payload["result"]["elapsed_ms"].string ?? payload["result"]["elapsed_ms"].number).flatMap(UInt64.init) {
+                let sum = (next.readAndDrawElapsedMS ?? 0).addingReportingOverflow(elapsed)
+                next.readAndDrawElapsedMS = sum.overflow ? UInt64.max : sum.partialValue
+            }
+        }
         return NextState(state: next, snapshot: nextSnapshot)
     }
     private func advance(_ payload: ExactJSON, clearProvider: Bool = false) async throws {
@@ -1188,6 +1214,11 @@ private actor ExecutionDriver {
         performance["configuration"] = snapshot["config"]
         performance["document"] = snapshot["document"]
         performance["authority"] = snapshot["authority"]
+        if snapshot["description_ddl"].object != nil {
+            performance["description_ddl"] = snapshot["description_ddl"]
+            performance["route"] = .string("read_and_draw")
+            performance["elapsed_read_and_draw_ms"] = .number(String(state.readAndDrawElapsedMS ?? 0))
+        }
         if snapshot["image_ddl"].object != nil { performance["image_ddl"] = snapshot["image_ddl"] }
         else if let inherited = state.inheritedImageDDL { performance["image_ddl"] = try ExactJSON(data: inherited) }
         if let provenance = state.imageProvenance { performance["image_provenance"] = .string(provenance) }
@@ -1225,6 +1256,11 @@ private actor ExecutionDriver {
     /// Current Server pipeline_product.sketch_result maps only this run's new result.
     /// Historical NULL/not_applicable metadata remains untouched in saved-work replay.
     private func savedSketchResult() -> (text: String?, state: String) {
+        let reading = snapshot["description_ddl"]
+        if reading.object != nil {
+            if let text = reading["reading_text"].string, !text.isEmpty { return (text, "supplemented") }
+            return (nil, reading["reading_state"].string == "off" ? "off" : "fallback")
+        }
         let record = snapshot["sketch"]
         guard record.object != nil else { return (nil, "off") }
         let state = record["state"].string

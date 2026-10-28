@@ -8,6 +8,11 @@ import InkuHost
 struct AppCheck {
     @MainActor
     static func main() async throws {
+        if let index = CommandLine.arguments.firstIndex(of: "--read-and-draw-replay-only") {
+            guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Expected temporary baseline database") }
+            try await runReadAndDrawBaselineReplay(databaseURL: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return
+        }
+        if CommandLine.arguments.contains("--read-and-draw-only") { try await runReadAndDrawChecks(); return }
         if let index = CommandLine.arguments.firstIndex(of: "--chatgpt-policy-only") {
             guard CommandLine.arguments.indices.contains(index + 2) else { throw CheckFailure.message("Expected ChatGPT wire and addendum cases") }
             try runChatGPTPolicyChecks(wireURL: URL(fileURLWithPath: CommandLine.arguments[index + 1]),

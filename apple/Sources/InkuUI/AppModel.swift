@@ -57,6 +57,7 @@ public final class AppModel {
     public var imageFileName = ""
     public var imageWarningAcknowledged = false
     public var savedImageDDL: Data?
+    public var savedDescriptionDDL: Data?
     public var descriptionText = ""
     public var ddlText = ""
     /// The Web always requests `auto`; an explicit language remains possible for restored inputs.
@@ -66,7 +67,23 @@ public final class AppModel {
     public var seedText = ""
     public var wild = false { didSet { rememberNextConditions() } }
     public var catalogMode = "fixed" { didSet { rememberNextConditions() } }
-    public var sketchMode = "off"
+    public var sketchMode = "on"
+    public var drawRoute = "read_and_draw"
+    public var descriptionComposition = false
+    public func selectDrawRoute(_ route: String) {
+        guard ["read_and_draw", "stages"].contains(route) else { return }
+        if route == "read_and_draw", drawRoute != route { sketchMode = "on" }
+        drawRoute = route
+    }
+    public var descriptionCanReview: Bool {
+        SettingsModel.isRegisteredModelAvailable(nextGenerationHostSettings.models.stage1Model, purpose: "vision", settings: nextGenerationHostSettings)
+    }
+    private func applyDescriptionRoute(_ request: inout GenerationRequest, settings: HostSettings) {
+        guard case .description = request.authoring, drawRoute == "read_and_draw" else { return }
+        request.drawRoute = "read_and_draw"
+        request.descriptionComposition = descriptionComposition
+        request.descriptionReview = SettingsModel.isRegisteredModelAvailable(request.models.stage1Model, purpose: "vision", settings: settings)
+    }
     public var sketchText = ""
     /// Web `sketchDraft`/`sketchEditing`: the author's edit of the displayed work's sketch prose. Drawing that work's
     /// description again with the sketch on sends the edited prose instead of calling the layer (I8).
@@ -418,6 +435,7 @@ public final class AppModel {
                 displayWork(work)
                 selectedContext = try await host.savedAuthoringContext(workID: id)
                 savedImageDDL = selectedContext?.imageDDL
+                savedDescriptionDDL = selectedContext?.descriptionDDL
                 if savedImageDDL != nil { imageInput = nil; imageFileName = ""; imageProvenanceTyped = false }
             }
         } catch {
@@ -474,7 +492,13 @@ public final class AppModel {
             guard displayToken == selectionToken, selectedWorkID == work.id, !isBrowsingLocked else { return }
             selectedContext = context
             savedImageDDL = context.imageDDL
+            savedDescriptionDDL = context.descriptionDDL
             imageProvenanceTyped = false
+            if context.imageDDL == nil {
+                drawRoute = context.drawRoute ?? "stages"
+                if let record = context.descriptionDDL, let json = try? ExactJSON(data: record) { descriptionComposition = json["composition"].object != nil }
+                else { descriptionComposition = false }
+            }
             if context.imageDDL != nil {
                 imageInput = nil; imageFileName = ""; imageProvenance = context.imageProvenance ?? ""
                 inputMode = "image"
@@ -992,6 +1016,7 @@ public final class AppModel {
             parentWorkID: parentWorkID, derivationKind: derivationKind, catalogMode: catalogModeOverride ?? catalogMode,
             sketch: sketch, savedConfiguration: savedConfig,
             importedPlugins: mode == "ddl" && parentWorkID == nil ? importedDDL?.plugins ?? [] : [])
+        if mode == "description" { applyDescriptionRoute(&request, settings: nextGenerationHostSettings) }
         request.captureProviderIO = developerModeEnabled && display.preferences.captureProviderIO == true
         // Server `start`: a direct DDL drawn from the selected saved work carries its completion range record.
         if mode == "ddl", parentWorkID != nil, parentWorkID == selectedWorkID {
@@ -1058,10 +1083,12 @@ public final class AppModel {
             throw HostError("drawing_model_not_available")
         }
         // Web work/state.svelte.ts:636-641: the demo follows the catalog choice but has no wild setting (`wildOverride(false)`).
-        return try bootstrap.request(inputMode: "description", source: "", description: description,
+        var request = try bootstrap.request(inputMode: "description", source: "", description: description,
             language: instructionLanguage(for: description), catalogID: catalogID, canvasID: canvasID, seed: seedText, wild: false,
             settings: settings, parentWorkID: nil, derivationKind: "new",
             catalogMode: catalogMode == "auto" ? "auto" : "fixed", sketch: sketchMode == "on" ? .on : .off)
+        applyDescriptionRoute(&request, settings: settings)
+        return request
     }
 
     public func drawNewDDL(_ source: String, imported: DDLPackageImport? = nil,
@@ -1406,7 +1433,7 @@ public final class AppModel {
         } else if let prose = work.sketchText, !prose.isEmpty {
             sketch = text == work.effectiveSourceText.trimmingCharacters(in: .whitespacesAndNewlines) ? .supplied(prose) : .on
         } else { sketch = .off }
-        let request = GenerationRequest(authoring: .description(text, autoCatalog: false, sketch: sketch),
+        var request = GenerationRequest(authoring: .description(text, autoCatalog: false, sketch: sketch),
             configuration: configuration.data, renderOptions: options.data, clipPolicy: saved.clipPolicy,
             models: drawing.models, providers: drawing.providers,
             renderColorMaps: [catalog: options["resolved_color_map"].data], description: text,
@@ -1416,6 +1443,7 @@ public final class AppModel {
                 : ["edited_from_history_id": .string(work.id), "from_sketch_state": work.sketchState.map(ExactJSON.string) ?? .null,
                    "to_sketch_mode": .string(sketchMode)]).data)
         try Task.checkCancellation()
+        applyDescriptionRoute(&request, settings: drawing)
         let pinned = try await pinPersonalPlanRequests([request])[0]
         try Task.checkCancellation()
         return pinned
@@ -1845,7 +1873,7 @@ public final class AppModel {
         importedDDL = nil; importedMacroNames = []
         selectedContext = nil
         currentView = nil
-        savedImageDDL = nil; imageInput = nil; imageFileName = ""; imageProvenance = ""; imageProvenanceTyped = false
+        savedDescriptionDDL = nil; savedImageDDL = nil; imageInput = nil; imageFileName = ""; imageProvenance = ""; imageProvenanceTyped = false
         currentExecutionID = nil
         currentSVG = ""
         visibleDDL = ""
@@ -2220,10 +2248,18 @@ public final class AppModel {
             if backgroundDrawing { status = statusText(for: view) }
             else { apply(view) }
         case .providerAttempt(_, _, _, let deadline):
-            if let choosing = choosingStatus(comparison: false) { status = choosing }
+            if let stage = providerProgress?.stage, [.descriptionReading, .descriptionComposition, .descriptionWriting, .descriptionReview].contains(stage) {
+                if (providerProgress?.attempt ?? 1) > 1 {
+                    status = stage == .descriptionComposition ? display.webCopy("readDrawRecomposing", "構図と法則を決め直しています…") : display.webCopy("readDrawRevising", "指示書を直しています…")
+                } else { status = display.localized(stage.titleKey) }
+            }
+            else if let choosing = choosingStatus(comparison: false) { status = choosing }
             else { status = providerProgress?.stage == .composition ? "構図を読んでいます" : "モデルの応答待ち（期限 \(deadline.formatted(date: .omitted, time: .standard))）" }
         case .transportBytes(_, let count):
-            if let choosing = choosingStatus(comparison: false) { status = choosing }
+            if let stage = providerProgress?.stage, [.descriptionReading, .descriptionComposition, .descriptionWriting, .descriptionReview].contains(stage) {
+                status = display.localized(stage.titleKey)
+            }
+            else if let choosing = choosingStatus(comparison: false) { status = choosing }
             else { status = providerProgress?.stage == .composition ? "構図の応答を受信中" : "応答を受信中（\(count) bytes）" }
         case .providerDiagnostic(let id, let diagnostic): receive(diagnostic, executionID: id)
         case .providerMetric: break
@@ -2364,11 +2400,17 @@ public final class AppModel {
     private func statusText(for view: PipelineView) -> String {
         if let failure = drawingFailureText(view) { return failure }
         switch view.actionTag {
+        case "read_description": return display.webCopy("readDrawReading", "記述を読んでいます…")
+        case "compose_description": return display.webCopy("readDrawComposing", "構図と法則を決めています…")
+        case "write_description_ddl": return display.webCopy("readDrawWriting", "指示書を書いています…")
+        case "review_description_ddl": return display.webCopy("readDrawReviewing", "描いた画を見て直しています…")
         case "select_image_catalog": return display.webCopy("imageSelectingCatalog", "画像から色カタログを選んでいます…")
         case "write_image_ddl": return display.webCopy("imageWritingDdl", "画像から指示書を書いています…")
         case "draw_image_review": return display.localized("見比べる画を描いています…")
         case "review_image_ddl": return display.webCopy("imageReviewingDdl", "画像と描いた画を見比べています…")
-        default: return Self.phaseStatus(view.phase)
+        default:
+            if view.phase == "score_ready", drawRoute == "read_and_draw" { return display.webCopy("readDrawSaving", "作品を保存しています…") }
+            return Self.phaseStatus(view.phase)
         }
     }
     func drawingFailureText(_ view: PipelineView) -> String? {
@@ -2417,6 +2459,8 @@ public final class AppModel {
         case "image_invalid": return display.webCopy("imageInvalid", "画像を読めません。JPEG・PNG・GIF・TIFF のファイルを選んでください。")
         case "image_too_large": return display.webCopy("imageTooLarge", "画像が大きすぎます。小さくしてから選んでください。")
         case "vision_model_not_available", "image_model_not_vision": return display.webCopy("imageVisionRequired", "画像を見る Vision のモデルを選んでください。")
+        case "description_ddl_failed": return display.label("指示書を書けませんでした。もう一度描いてください。", "Could not write the instructions. Try drawing again.")
+        case "description_ddl_undrawable": return display.label("指示書を描けませんでした。もう一度描いてください。", "The instructions could not be drawn. Try again.")
         case "image_ddl_failed", "image_ddl_undrawable": return display.webCopy("imageDdlFailed", "画像から指示書を書けませんでした。モデルを変えて、もう一度描いてください。")
         default: break
         }

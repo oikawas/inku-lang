@@ -64,6 +64,7 @@ func runInputAidChecks() async throws {
     }()).write(to: folder.appendingPathComponent("interface.json"))
     let gone = AppModel(databaseURL: database, transport: provider)
     await gone.initialize()
+    gone.selectDrawRoute("stages"); gone.sketchMode = "off"
     guard gone.catalogID == "default", gone.canvasID == "square", gone.catalogMode == "auto", gone.wild else {
         throw CheckFailure.message("Vanished catalog/paper must fall back to the defaults while mode and wild are kept: \(gone.catalogID) \(gone.canvasID)")
     }
@@ -72,6 +73,7 @@ func runInputAidChecks() async throws {
     gone.catalogID = otherCatalog; gone.canvasID = otherPaper; gone.wild = false; gone.catalogMode = "fixed"
     let relaunched = AppModel(databaseURL: database, transport: provider)
     await relaunched.initialize()
+    relaunched.selectDrawRoute("stages"); relaunched.sketchMode = "off"
     guard relaunched.catalogID == otherCatalog, relaunched.canvasID == otherPaper, !relaunched.wild, relaunched.catalogMode == "fixed" else {
         throw CheckFailure.message("Next-work conditions did not come back after a relaunch")
     }

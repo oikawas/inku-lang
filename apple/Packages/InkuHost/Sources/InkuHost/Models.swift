@@ -82,6 +82,10 @@ public struct GenerationProvenance: Codable, Sendable {
 
 public struct GenerationRequest: Codable, Sendable {
     public var authoring: GenerationAuthoring
+    /// Absent for the original stages route and older saved executions.
+    public var drawRoute: String?
+    public var descriptionComposition: Bool?
+    public var descriptionReview: Bool?
     public var configuration: Data
     public var renderOptions: Data
     public var clipPolicy: Data
@@ -302,6 +306,8 @@ public struct SavedAuthoringContext: Sendable {
     public var lawsRecords: Data?
     public var imageDDL: Data?
     public var imageProvenance: String?
+    public var drawRoute: String?
+    public var descriptionDDL: Data?
     public var originKind: AuthoringOrigin? { AuthoringOrigin(rawValue: origin) }
 }
 

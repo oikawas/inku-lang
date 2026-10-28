@@ -98,8 +98,45 @@ struct CreationWorkInfoView: View {
     private func details(_ work: SavedWork) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                if let data = information?.context?.descriptionDDL, let record = try? ExactJSON(data: data) {
+                    group(model.display.label("言葉で描く", "In words")) {
+                        row(model.display.label("描き方", "Drawing"), model.display.label("言葉で描く", "In words"), hint: "provenanceHintDrawRoute")
+                        row(model.display.label("読み", "Reading"), record["reading_state"].string, hint: "provenanceHintReading")
+                        row(model.display.label("見比べ", "Review"), (record["rounds"].array ?? []).contains { $0["stage"].string == "review_description_ddl" } ? model.display.label("あり", "Yes") : model.display.label("なし", "No"), hint: "provenanceHintReadReview")
+                        row(model.display.label("札", "Labels"), record["source_labels"].array?.compactMap(\.string).joined(separator: " / "), hint: "provenanceHintReadLabels")
+                        row(model.display.label("読みの本文", "Reading"), record["reading_text"].string, hint: "provenanceHintReading")
+                        row(model.display.label("落とした項目", "Dropped items"), record["dropped_items"].array?.map { [$0["quote"].string, $0["image"].string].compactMap { $0 }.joined(separator: " · ") }.joined(separator: "\n"), hint: "provenanceHintReading")
+                        row(model.display.label("落とした引用", "Dropped quotes"), record["dropped_quotes"].object?.keys.sorted().map { key in key + ": " + (record["dropped_quotes"][key].string ?? "") }.joined(separator: "\n"), hint: "provenanceHintReading")
+                        row(model.display.label("回の記録", "Rounds"), record["rounds"].array?.map { round in
+                            let name = round["stage"].string == "review_description_ddl" ? model.display.label("見比べ", "Review") : model.display.label("書く", "Writing")
+                            let repeatText = round["asked_again"].bool == true ? model.display.label("（聞き直し）", " (asked again)") : ""
+                            let figures = (round["figures"].array ?? []).map { [$0["who"].string, $0["what"].string].compactMap { $0 }.joined(separator: ": ") }.joined(separator: ", ")
+                            return name + repeatText + " · " + (round["instructions"].number ?? "0") + " / " + (round["problems"].number ?? "0") + (figures.isEmpty ? "" : " · " + figures)
+                        }.joined(separator: "\n"), hint: "provenanceHintReadReview")
+                        row(model.display.label("見比べる前の指示書", "Instructions before review"), record["before_review"].string, hint: "provenanceHintReadReview")
+                    }
+                    if record["composition"].object != nil {
+                        let composition = record["composition"], answer = composition["answer"]
+                        group(model.display.label("構図と法則", "Composition and laws")) {
+                            row(model.display.label("状態", "State"), composition["state"].string, hint: "provenanceHintComposition")
+                            row(model.display.label("命題", "Thesis"), answer["thesis"].string, hint: "provenanceHintComposition")
+                            row(model.display.label("画の型", "Form"), answer["form"].string, hint: "provenanceHintComposition")
+                            row(model.display.label("主の法則", "Main law"), answer["main_law"].string, hint: "provenanceHintComposition")
+                            row(model.display.label("法則", "Laws"), answer["laws"].object?.keys.sorted().joined(separator: ", "), hint: "provenanceHintComposition")
+                            row(model.display.label("最後の測り", "Last measure"), composition["measures"].array?.last?["after"].array?.map { [$0["law"].string, $0["state"].string].compactMap { $0 }.joined(separator: " · ") }.joined(separator: "\n"), hint: "provenanceHintCompositionMeasure")
+                            row(model.display.label("理由", "Reason"), answer["reason"].string, hint: "provenanceHintComposition")
+                            row(model.display.label("物", "Things"), answer["things"].array?.map { [$0["thing"].number, $0["what"].string, $0["role"].string, $0["kind"].string].compactMap { $0 }.joined(separator: " · ") }.joined(separator: "\n"), hint: "provenanceHintComposition")
+                            row(model.display.label("目標", "Targets"), composition["targets"].array?.compactMap(\.string).joined(separator: "\n"), hint: "provenanceHintComposition")
+                            row(model.display.label("配色", "Colors"), [composition["colors"]["state"].string, composition["colors"]["main_law"].string, composition["colors"]["ground"].string].compactMap { $0 }.joined(separator: " · "), hint: "provenanceHintComposition")
+                            row(model.display.label("配色の変更", "Color changes"), composition["colors"]["changes"].array?.map { change in
+                                let after = change["after"].array?.compactMap(\.string).joined(separator: " / ") ?? ""
+                                return [change["how"].string, change["before"].string, after].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " → ")
+                            }.joined(separator: "\n"), hint: "provenanceHintComposition")
+                        }
+                    }
+                }
                 if work.sketchGrain != nil || work.sketchState != nil {
-                    group(copy("sketchLabel", "写生")) {
+                    group(information?.context?.descriptionDDL != nil ? model.display.label("写生（読み）", "Sketch (reading)") : copy("sketchLabel", "写生")) {
                         if let grain = work.sketchGrain { row(copy("sketchGrainLabel", "区切り"), grain, hint: "provenanceHintSketchGrain") }
                         row(copy("provenanceLabelSketchRecord", "写生の記録"), work.sketchState, hint: "provenanceHintSketchRecord")
                     }
@@ -178,6 +215,11 @@ struct CreationWorkInfoView: View {
                           system: model.display.localized("画像から指示書を書く システムプロンプト"))
                 sentStage("review_image_ddl", stage: "image_review", input: model.display.localized("画像の見比べ 送った入力"),
                           system: model.display.localized("画像の見比べ システムプロンプト"))
+                } else if information?.context?.descriptionDDL != nil {
+                sentStage("read_description", stage: "reading", input: model.display.label("読み 送った入力", "Reading input"), system: model.display.label("読み システムプロンプト", "Reading system prompt"))
+                sentStage("compose_description", stage: "description_composition", input: model.display.label("構図と法則 送った入力", "Composition input"), system: model.display.label("構図と法則 システムプロンプト", "Composition system prompt"))
+                systemPrompt("write_description_ddl", stage: "description_ddl", title: model.display.label("指示書を書く システムプロンプト", "Writing system prompt"))
+                systemPrompt("review_description_ddl", stage: "description_review", title: model.display.label("見比べ システムプロンプト", "Review system prompt"))
                 } else {
                 sentStage("generate_sketch", stage: "sketch", input: copy("promptSketchInput", "写生（Stage 0.5） 送った入力"),
                           system: copy("promptSketchSystem", "写生（Stage 0.5） システムプロンプト"))

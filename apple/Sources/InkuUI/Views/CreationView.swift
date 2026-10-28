@@ -497,11 +497,48 @@ struct CreationView: View {
                 .accessibilityLabel(display.localized("色カタログを開く"))
                 .accessibilityValue(catalogSummary)
             Rectangle().fill(InkuColor.border).frame(height: 1)
+            if model.inputMode == "description" {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(display.label("描き方", "Drawing method")).inkuFont(12, weight: .medium)
+                    HStack {
+                        Button(display.label("言葉で描く", "In words")) { model.selectDrawRoute("read_and_draw") }
+                            .buttonStyle(InkuGhostButtonStyle(active: model.drawRoute == "read_and_draw"))
+                            .inkuTooltip(display.label("記述を読み、指示書を言葉で書きます。", "Read the description and write the instructions in words."))
+                        Button(display.label("型で描く", "Through stages")) { model.selectDrawRoute("stages") }
+                            .buttonStyle(InkuGhostButtonStyle(active: model.drawRoute == "stages"))
+                            .inkuTooltip(display.label("型を選び、段を通して描きます。", "Choose a form and draw through the stages."))
+                    }
+                    HStack {
+                        Button(display.label("写生", "Sketch") + (model.sketchMode == "on" ? " ✓" : "")) { model.sketchMode = model.sketchMode == "on" ? "off" : "on" }
+                            .buttonStyle(InkuGhostButtonStyle(active: model.sketchMode == "on"))
+                        Button(display.label("構図・法則・配色", "Composition, laws, colors") + (model.drawRoute == "stages" || model.descriptionComposition ? " ✓" : "")) { model.descriptionComposition.toggle() }
+                            .buttonStyle(InkuGhostButtonStyle(active: model.drawRoute == "stages" || model.descriptionComposition))
+                            .disabled(model.drawRoute == "stages")
+                    }
+                    Text(drawingFlowSummary)
+                        .inkuFont(11).foregroundStyle(.secondary)
+                }.disabled(controlsDisabled)
+            }
             WrappingHStack(spacing: 6) { compactConditionControls }
                 .padding(.top, 2)
                 .disabled(controlsDisabled)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var drawingFlowSummary: String {
+        var steps: [String] = []
+        if model.sketchMode == "on" { steps.append(display.label("写生", "Sketch")) }
+        if model.drawRoute == "stages" {
+            steps += [display.label("型", "Form"), display.label("構図・法則・配色", "Composition, laws, colors")]
+        } else {
+            if model.descriptionComposition { steps.append(display.label("構図・法則", "Composition and laws")) }
+            steps.append(display.label("指示書", "Instructions"))
+            if model.descriptionCanReview { steps.append(display.label("見比べ", "Review")) }
+            if model.descriptionComposition { steps.append(display.label("配色", "Colors")) }
+        }
+        steps.append(display.label("描画", "Drawing"))
+        return steps.joined(separator: " → ")
     }
 
     private var catalogSummary: String {

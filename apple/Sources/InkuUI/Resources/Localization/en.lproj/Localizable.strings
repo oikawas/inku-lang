@@ -1578,3 +1578,17 @@
 "画像から指示書を書く システムプロンプト" = "Image instruction writing system prompt";
 "画像の見比べ 送った入力" = "Image review input";
 "画像の見比べ システムプロンプト" = "Image review system prompt";
+
+"言葉で描く" = "In words";
+"型で描く" = "Through stages";
+"画像から書く" = "From an image";
+"描き方" = "Drawing method";
+"構図・法則・配色" = "Composition, laws, colors";
+"写生（読み）" = "Sketch (reading)";
+"読んでいます" = "Reading";
+"構図と法則を決めています" = "Deciding composition and laws";
+"決め直しています" = "Deciding again";
+"書いています" = "Writing";
+"直しています" = "Correcting";
+"見て直しています" = "Reviewing the drawing";
+"保存しています" = "Saving";

@@ -11,6 +11,7 @@ import InkuUI
     defer { try? FileManager.default.removeItem(at: folder) }
     let app = AppModel(databaseURL: folder.appendingPathComponent("bootstrap.sqlite"), transport: LawsColorsCheckProvider(refuseColors: true))
     await app.initialize()
+    app.selectDrawRoute("stages"); app.sketchMode = "off"
     guard app.errorText == nil, !app.catalogs.isEmpty, !app.canvases.isEmpty else {
         throw CheckFailure.message("Laws/colors host fixture could not load bundled defaults: \(app.errorText ?? app.status)")
     }
@@ -128,6 +129,7 @@ import InkuUI
     let provider = LawsColorsCheckProvider(refuseColors: false, ground: "black")
     let app = AppModel(databaseURL: folder.appendingPathComponent("bootstrap.sqlite"), transport: provider)
     await app.initialize()
+    app.selectDrawRoute("stages"); app.sketchMode = "off"
     let service = ProviderSettings(id: "laws-check", baseURL: URL(string: "http://127.0.0.1:1/v1")!, requiresAPIKey: false,
         models: [.init(id: "pinned")])
     try await app.updateHostSettings(HostSettings(providers: [service], models: .init(stage1Model: "laws-check:pinned", stage2Model: "laws-check:pinned")))

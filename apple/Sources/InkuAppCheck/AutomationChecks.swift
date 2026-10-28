@@ -9,6 +9,7 @@ import InkuUI
     let transport = BatchFailureProvider()
     let app = AppModel(databaseURL: directory.appendingPathComponent("works.sqlite"), transport: transport)
     await app.initialize()
+    app.selectDrawRoute("stages"); app.sketchMode = "off"
     // Drawing takes only registered models.
     let provider = ProviderSettings(id: "check", baseURL: URL(string: "http://localhost:1/v1")!, requiresAPIKey: false,
                                     models: ["first", "changed"].map { ProviderModelSettings(id: $0) })
@@ -55,6 +56,7 @@ import InkuUI
     let transport = BatchRetryProvider()
     let app = AppModel(databaseURL: directory.appendingPathComponent("works.sqlite"), transport: transport)
     await app.initialize()
+    app.selectDrawRoute("stages"); app.sketchMode = "off"
     try await app.updateHostSettings(HostSettings(providers: [provider], models: ModelSelection(stage1Model: "check:first", stage2Model: "check:first")))
     app.inputMode = "description"; app.display.preferences.batchRetries = 0
     let batch = AutomationModel()

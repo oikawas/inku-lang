@@ -848,6 +848,8 @@ Limits are integers from zero through 1,000,000,000; zero disables a limit. Abse
 
 Automatic backup defaults off, runs only while the app is open, and waits for generation/restore/automation. A successful verified backup is recorded before rotating only app-owned generations; manual backups are excluded. Optional result logs record actual committed works, not merely opened old works.
 
+Description drawing defaults to reading and writing instructions in words, with optional sketch and composition. The existing staged route remains available; saved works retain the route and reading record.
+
 ### Personal ChatGPT
 
 After a successful new connection, reauthorization or consent renewal, the app refreshes the model catalog once and then updates the drawing model pickers. If the refresh fails, the connection remains successful and the catalog error is shown. Opening settings alone does not refresh the catalog.

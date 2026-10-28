@@ -208,7 +208,7 @@ import InkuUI
           historicalNaming.modelShortName("claude-haiku-5-5") == "claude-haiku-5-5",
           historicalNaming.modelShortName("chatgpt:gpt-6-astra") == "gpt-6-astra",
           SettingsModel.batchModels(for: noRegisteredModels).isEmpty,
-          ModelNaming(providers: [plan]).modelShortName("chatgpt:\(saved.id)") == saved.id else {
+          ModelNaming(providers: [plan]).modelShortName("chatgpt:\(saved.id)") == saved.label else {
         throw CheckFailure.message("Historical naming: \(historicalNaming.resolve("claude-haiku-5-5")); \(historicalNaming.modelShortName("claude-haiku-5-5")); \(historicalNaming.modelShortName("chatgpt:gpt-6-astra")); batch \(SettingsModel.batchModels(for: noRegisteredModels).count); plan \(ModelNaming(providers: [plan]).modelShortName("chatgpt:\(saved.id)")); id \(saved.id)")
     }
     print("Model catalog passed: shared 15 label, \(selectionCases.count) selection and \(sortCases.count) sort cases through real core; canonical catalog and label table; measurement key presence; ChatGPT evaluations, saved settings and account/re-offer corrections. Zero provider calls.")

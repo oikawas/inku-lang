@@ -4,7 +4,7 @@ import InkuHost
 /// How a saved model reference is named on screen, ported from the Build1162 Web functions:
 /// `shortModelName`/`shortModel` (routes/+page.svelte), `abbreviateStripModel` (lib/historyStripFields.ts),
 /// and `providerLabel`/`modelDisplayName`/`modelShortName`/`resolveModelRefForDisplay` (lib/models.ts).
-/// The configured services take the place of the Server catalog; the bundled Server defaults fill the rest.
+/// The configured services and published personal-plan models supply the names resolved by the shared core.
 public struct ModelNaming: Sendable {
     /// Web `DEFAULT_PROVIDER`, the stage default of rule 3.
     public static let defaultProvider = "nvidia"
@@ -18,8 +18,13 @@ public struct ModelNaming: Sendable {
     }
 
     private func displayResolution(_ reference: String, defaultProvider: String? = nil) -> [String: Any] {
-        (try? ProviderCoreSettings.call("resolve_display", ["ref": reference,
-            "providers": ProviderModelReference.referenceProviders(connections), "default_provider": defaultProvider ?? stageDefault])) ?? [:]
+        var providers = ProviderModelReference.referenceProviders(connections)
+        if let plan = connections.first(where: { $0.kind == .chatGPTPlan && $0.id == "chatgpt" }) {
+            providers["chatgpt"] = ["id": "chatgpt", "label": "ChatGPT plan", "active": true,
+                "models": (plan.models ?? []).map { ["id": $0.id, "label": $0.label] }] as [String: Any]
+        }
+        return (try? ProviderCoreSettings.call("resolve_display", ["ref": reference,
+            "providers": providers, "default_provider": defaultProvider ?? stageDefault])) ?? [:]
     }
 
     // MARK: models.ts

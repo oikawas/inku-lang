@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-28 — Shared model catalog and picker decisions
-
-The unchanged model catalog now lives in the shared core. The Server returns its labels, availability, recommendations and ordering to the Web, and the model administration screen receives the shared assessment fields. Catalog measurement updates require a native Server rebuild.
-
 ### 2026-10-27 — Delete a ChatGPT plan registration on macOS
 
 The connection settings can recheck the state and delete a registration together with its published model settings. Deletion asks for confirmation and reports if provider revocation could not be confirmed.
@@ -386,6 +382,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.283 (2026-10-28 / Build1359)
+
+### 2026-10-28 — Shared model catalog and picker decisions
+
+The unchanged model catalog now lives in the shared core. The Server returns its labels, availability, recommendations and ordering to the Web, and the model administration screen receives the shared assessment fields. Catalog measurement updates require a native Server rebuild.
 
 ## v2.15.282 (2026-10-27 / Build1358)
 

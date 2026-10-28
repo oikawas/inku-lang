@@ -13,6 +13,8 @@ four places (gathered into this document on 2026-07-28) — prose in `SPEC.md` (
 
 [SPEC.md §2.1](../../SPEC.md#21-performance-versions-identity-and-preservation) is the authority for current version, identity, and reference-corpus rules. The material below preserves the rules and examples as they stood at the time; it is not where current values or procedures are updated. Record a new version's values, reasons, and results only in [CHANGELOG.md](../../CHANGELOG.md); do not add a new version section here.
 
+Render engine 94's object-word performance is recorded under Unreleased in the changelog.
+
 What follows explains the historical "Versions and identity IDs." **There were two reasons.**
 
 1. **The performance changed** — the same Score with the same seed now draws differently

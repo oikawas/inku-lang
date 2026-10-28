@@ -7,6 +7,7 @@ use crate::accepted_fills;
 use crate::arrangement::{ArrangedCopy, ArrangementRequest, expand_arrangement};
 use crate::checked_performance::{
     CheckedPerformanceError, CheckedPerformanceWithResourcesError, resolve_checked_performance,
+    resolve_checked_performance_with_resources,
     resolve_checked_performance_with_resources_and_omissions,
 };
 use crate::determinism::hash01;
@@ -130,10 +131,28 @@ fn owns_surface(primitive: Primitive) -> bool {
 /// Build the JSON-compatible render metadata carried beside the SVG.
 #[must_use]
 pub fn build_render_metadata(score: &Score, profile: SvgProfile) -> RenderMetadata {
-    let render_surface_textures = score
+    let templates = score
+        .object_templates
+        .iter()
+        .map(|template| (template.instruction_index, template))
+        .collect::<std::collections::BTreeMap<_, _>>();
+    let visible_instructions = score
         .instructions
         .iter()
         .enumerate()
+        .flat_map(|(index, instruction)| match templates.get(&index) {
+            Some(template) => template
+                .body
+                .instructions
+                .iter()
+                .map(move |child| (index, child))
+                .collect::<Vec<_>>(),
+            None => vec![(index, instruction)],
+        })
+        .collect::<Vec<_>>();
+    let render_surface_textures = visible_instructions
+        .iter()
+        .copied()
         .filter_map(|(instruction_index, instruction)| {
             let surface = instruction.surface.as_ref()?;
             (owns_surface(instruction.primitive)
@@ -156,10 +175,9 @@ pub fn build_render_metadata(score: &Score, profile: SvgProfile) -> RenderMetada
         render_texture_profile: profile,
         texture_degraded: profile == SvgProfile::Compat
             && (!render_surface_textures.is_empty()
-                || score
-                    .instructions
+                || visible_instructions
                     .iter()
-                    .any(|instruction| instruction.ink_spread.is_some())),
+                    .any(|(_, instruction)| instruction.ink_spread.is_some())),
         render_canvas_ground: canvas_ground(score),
         render_surface_textures,
         execution: None,
@@ -374,11 +392,6 @@ fn check_mark_extent(
 /// Both entry points check this before any expansion, because the work of
 /// several texture and ground passes grows with these values.
 fn validate_request(request: &RenderRequest) -> Result<(), RenderError> {
-    if !request.score.object_templates.is_empty() {
-        return Err(RenderError::InvalidScore(
-            "object template rendering is not implemented",
-        ));
-    }
     let canvas = request.options.canvas;
     // Only a fitted Score sets a bleed; a host's paper has none.
     if !(canvas.width.is_finite()
@@ -408,6 +421,8 @@ fn paint_object_body(
     support: crate::support::Support,
     owner_index: usize,
     copy_index: usize,
+    child_stride: usize,
+    clip_policy: Option<CompatFillClipPolicy>,
     material_definitions: &mut Vec<Element>,
     surface_definitions: &mut Vec<Element>,
     allowance: &mut OutputAllowance,
@@ -424,26 +439,75 @@ fn paint_object_body(
     let copy_seed = i128::from(u64::from_be_bytes(
         digest[..8].try_into().expect("digest has eight bytes"),
     ));
-    let performed = resolve_checked_performance(
-        PerformanceRequest {
-            score: &template.body,
-            performance_seed: Some(copy_seed),
-            composition_seed: request.options.composition_seed,
-            canvas: Some(canvas),
-        },
-        request.options.error_policy,
-    )
-    .map_err(RenderError::CheckedPerformance)?;
+    let body_request = PerformanceRequest {
+        score: &template.body,
+        performance_seed: Some(copy_seed),
+        composition_seed: request.options.composition_seed,
+        canvas: Some(canvas),
+    };
+    let performed = if let Some(policy) = &template.body.resource_policy {
+        resolve_checked_performance_with_resources(
+            body_request,
+            request.options.error_policy,
+            &policy.hard_policy,
+            policy.operational_budget,
+        )
+        .map_err(|error| match error {
+            CheckedPerformanceWithResourcesError::Resources(error) => {
+                RenderError::ResourceAuthority(error)
+            }
+            CheckedPerformanceWithResourcesError::Performance(error) => {
+                RenderError::CheckedPerformance(error)
+            }
+        })?
+    } else {
+        resolve_checked_performance(body_request, request.options.error_policy)
+            .map_err(RenderError::CheckedPerformance)?
+    };
     let profile = request.options.svg_profile;
     let use_filters = matches!(profile, SvgProfile::Display | SvgProfile::Live);
     let oil_fill_pass_limit = crate::fills::oil_fill_pass_limit(&performed.score.instructions);
+    let mark_stride = performed
+        .score
+        .instructions
+        .iter()
+        .map(|item| {
+            item.arrangement.as_ref().map_or(1_usize, |arrangement| {
+                match (arrangement.layout, arrangement.rows, arrangement.cols) {
+                    (crate::types::Layout::Grid, Some(rows), Some(cols)) => {
+                        (rows as usize).saturating_mul(cols as usize)
+                    }
+                    _ => arrangement.count as usize,
+                }
+                .max(1)
+            })
+        })
+        .max()
+        .unwrap_or(1)
+        .checked_add(1)
+        .ok_or(RenderError::InvalidScore("object mark index overflow"))?;
+    let mark_base = copy_index
+        .checked_mul(mark_stride)
+        .ok_or(RenderError::InvalidScore("object mark index overflow"))?;
     let mut group = Element::new("g");
-    for (instruction, body_entry) in performed.performed_instructions() {
-        let geometry = MarkGeometry::of(instruction)?;
+    let mut scopes = performed.fill_scopes.clone();
+    for scope in &mut scopes {
+        scope.prepared_region = scope
+            .prepared_region
+            .transformed(box_transform)
+            .map_err(|_| RenderError::InvalidScore("invalid object fill boundary"))?;
+    }
+    let mut forest =
+        FillPaintForest::with_prefix(scopes.len(), format!("object_{owner_index}_{copy_index}_"));
+    for (performed_index, (instruction, body_entry)) in
+        performed.performed_instructions().enumerate()
+    {
+        let mut instruction_group = Element::new("g");
         let body_transform = body_entry.transform.in_pixels(canvas.unit());
         let instruction_index = owner_index
-            .checked_mul(100_001)
+            .checked_mul(child_stride)
             .and_then(|index| index.checked_add(body_entry.instruction_index))
+            .and_then(|index| index.checked_add(usize::MAX / 2))
             .ok_or(RenderError::InvalidScore(
                 "object instruction index overflow",
             ))?;
@@ -455,7 +519,7 @@ fn paint_object_body(
             render_seed: Some(copy_seed),
             instruction_seed_override: body_entry.seed_override,
             instruction_index,
-            mark_index: copy_index,
+            mark_index: mark_base,
             wild: request.options.wild,
             use_filters,
             profile,
@@ -464,8 +528,23 @@ fn paint_object_body(
             oil_fill_pass_limit,
             effects: body_entry.effects,
         };
+        let expanded = if instruction.arrangement.is_some() {
+            expand_arrangement(ArrangementRequest {
+                instruction,
+                placement_seed: Some(copy_seed),
+                performance_seed: Some(copy_seed),
+                canvas: Some(canvas),
+            })
+        } else {
+            vec![ArrangedCopy {
+                instruction: instruction.clone(),
+                effects: body_entry.effects,
+            }]
+        };
+        let geometry = MarkGeometry::of(instruction)?;
         check_mark_extent(geometry, instruction, context)?;
-        if let Some(follower_index) = body_entry.closed_arc_pair_follower
+        if expanded.len() == 1
+            && let Some(follower_index) = body_entry.closed_arc_pair_follower
             && let Some(follower) = performed.score.instructions.get(follower_index)
             && let Some(follower_entry) = performed.performed.get(follower_index)
             && follower.arrangement.is_none()
@@ -474,8 +553,9 @@ fn paint_object_body(
             let follower_context = MarkContext {
                 instruction_seed_override: follower_entry.seed_override,
                 instruction_index: owner_index
-                    .checked_mul(100_001)
+                    .checked_mul(child_stride)
                     .and_then(|index| index.checked_add(follower_entry.instruction_index))
+                    .and_then(|index| index.checked_add(usize::MAX / 2))
                     .ok_or(RenderError::InvalidScore(
                         "object instruction index overflow",
                     ))?,
@@ -496,44 +576,102 @@ fn paint_object_body(
                     follower_context,
                 ));
                 allowance.spend(std::iter::once(&fill).chain(&material_definitions[before..]))?;
-                group.push(fill);
+                instruction_group.push(fill);
             }
         }
-        allowance.add_mark();
-        let definitions_start = (material_definitions.len(), surface_definitions.len());
-        if profile != SvgProfile::Compat
-            && owns_surface(instruction.primitive)
-            && is_noncomputer_solid_fill(instruction)
-            && instruction.weight != crate::types::Weight::OilPaint
-            && !accepted_fills::active(instruction)
-        {
-            let (filter_id, seed) = solid_mottle_filter_id(instruction, context);
-            material_definitions.push(solid_mottle_filter(&filter_id, seed));
+        for (body_mark_index, copy) in expanded.iter().enumerate() {
+            let instruction = &copy.instruction;
+            let geometry = MarkGeometry::of(instruction)?;
+            let context = MarkContext {
+                mark_index: mark_base
+                    .checked_add(body_mark_index)
+                    .ok_or(RenderError::InvalidScore("object mark index overflow"))?,
+                effects: copy.effects,
+                ..context
+            };
+            check_mark_extent(geometry, instruction, context)?;
+            allowance.add_mark();
+            let definitions_start = (material_definitions.len(), surface_definitions.len());
+            if profile != SvgProfile::Compat
+                && owns_surface(instruction.primitive)
+                && is_noncomputer_solid_fill(instruction)
+                && instruction.weight != crate::types::Weight::OilPaint
+                && !accepted_fills::active(instruction)
+            {
+                let (filter_id, seed) = solid_mottle_filter_id(instruction, context);
+                material_definitions.push(solid_mottle_filter(&filter_id, seed));
+            }
+            material_definitions.extend(accepted_fills::definitions(
+                instruction,
+                geometry,
+                context,
+            ));
+            let mark = render_instruction_with_line_centerline(
+                instruction,
+                geometry,
+                context,
+                body_entry.line_centerline.as_deref(),
+                &[],
+            );
+            let mark = if let Some(surface) = render_surface(instruction, geometry, context) {
+                let mut combined = Element::new("g");
+                combined.push(mark);
+                combined.push(surface.group);
+                surface_definitions.extend(surface.definitions);
+                combined
+            } else {
+                mark
+            };
+            let mark = crate::ink_spread::wrap(mark, instruction, context);
+            allowance.spend(
+                std::iter::once(&mark)
+                    .chain(&material_definitions[definitions_start.0..])
+                    .chain(&surface_definitions[definitions_start.1..]),
+            )?;
+            instruction_group.push(mark);
         }
-        material_definitions.extend(accepted_fills::definitions(instruction, geometry, context));
-        let mark = render_instruction_with_line_centerline(
-            instruction,
-            geometry,
-            context,
-            body_entry.line_centerline.as_deref(),
-            &[],
-        );
-        let mark = if let Some(surface) = render_surface(instruction, geometry, context) {
-            let mut combined = Element::new("g");
-            combined.push(mark);
-            combined.push(surface.group);
-            surface_definitions.extend(surface.definitions);
-            combined
+        if scopes.is_empty() {
+            group.push(instruction_group);
         } else {
-            mark
-        };
-        let mark = crate::ink_spread::wrap(mark, instruction, context);
-        allowance.spend(
-            std::iter::once(&mark)
-                .chain(&material_definitions[definitions_start.0..])
-                .chain(&surface_definitions[definitions_start.1..]),
-        )?;
-        group.push(mark);
+            forest.push(
+                instruction_group,
+                performed_index,
+                body_entry.fill_scope_index,
+                &scopes,
+            );
+        }
+    }
+    if !scopes.is_empty() {
+        let clip_policy = clip_policy.unwrap_or(CompatFillClipPolicy {
+            tolerance_pixels: 0.1,
+            limits: crate::compat_clip::ClipLimits {
+                max_nodes: 50_000,
+                max_path_elements: 200_000,
+                max_flattened_points: 200_000,
+                max_work: 10_000_000,
+                max_output_vertices: 200_000,
+            },
+        });
+        let mut definitions = material_definitions.clone();
+        definitions.extend(surface_definitions.iter().cloned());
+        let before = definitions.len();
+        let (paint, diagnostics, _) = forest.finish(
+            &scopes,
+            profile,
+            &mut definitions,
+            clip_policy,
+            &performed.performed,
+        );
+        if !diagnostics.is_empty() {
+            return Err(RenderError::InvalidScore(
+                "object body fill clipping failed",
+            ));
+        }
+        allowance.spend(paint.iter().chain(&definitions[before..]))?;
+        material_definitions.extend(definitions.into_iter().skip(before));
+        for element in paint {
+            group.push(element);
+        }
     }
     Ok(group)
 }
@@ -831,6 +969,21 @@ fn render_impl(
         }
     }
     let mut surface_definitions = Vec::new();
+    let object_templates = request
+        .score
+        .object_templates
+        .iter()
+        .map(|template| (template.instruction_index, template))
+        .collect::<std::collections::BTreeMap<_, _>>();
+    let child_stride = request
+        .score
+        .object_templates
+        .iter()
+        .map(|item| item.body.instructions.len())
+        .max()
+        .unwrap_or(0)
+        .checked_add(1)
+        .ok_or(RenderError::InvalidScore("object index overflow"))?;
     let mut closed_arc_pair_spread_marks = BTreeSet::new();
     let mut first_non_finite = None;
     // The boxes of the marks drawn so far that are not lines: each free line
@@ -929,11 +1082,7 @@ fn render_impl(
         }
         for (mark_index, copy) in expanded.iter().enumerate() {
             let single = &copy.instruction;
-            if let Some(template) =
-                performance.score.object_templates.iter().find(|template| {
-                    template.instruction_index == performed.original_instruction_index
-                })
-            {
+            if let Some(template) = object_templates.get(&performed.original_instruction_index) {
                 let body = paint_object_body(
                     template,
                     single,
@@ -943,6 +1092,8 @@ fn render_impl(
                     support,
                     instruction_index,
                     mark_index,
+                    child_stride,
+                    resources.map(|(_, _, clip)| clip),
                     &mut material_definitions,
                     &mut surface_definitions,
                     &mut allowance,
@@ -1073,12 +1224,23 @@ fn render_impl(
     let is_print = ground
         .as_ref()
         .is_some_and(|ground| ground.material == crate::types::GroundMaterial::Mezzotint)
-        || performance.score.instructions.iter().any(|instruction| {
-            matches!(
-                instruction.weight,
-                crate::types::Weight::Burin | crate::types::Weight::Drypoint
+        || performance
+            .score
+            .instructions
+            .iter()
+            .chain(
+                performance
+                    .score
+                    .object_templates
+                    .iter()
+                    .flat_map(|template| template.body.instructions.iter()),
             )
-        });
+            .any(|instruction| {
+                matches!(
+                    instruction.weight,
+                    crate::types::Weight::Burin | crate::types::Weight::Drypoint
+                )
+            });
     if is_print && let Some(seed) = request.options.render_seed {
         // The plate covers a fitted frame's paper (render engine 93).
         let [x0, y0, x1, y1] = request.options.canvas.paper();
@@ -1270,6 +1432,8 @@ mod tests {
             DEFAULT_SUPPORT,
             0,
             0,
+            3,
+            None,
             &mut definitions,
             &mut surfaces,
             &mut allowance,
@@ -1292,6 +1456,138 @@ mod tests {
             "{}",
             rendered.svg
         );
+    }
+
+    #[test]
+    fn object_body_texture_appears_in_render_metadata() {
+        let body: Score =
+            serde_json::from_value(serde_json::json!({"version":"0.22.0","instructions":[
+                {"primitive":"circle","center":[0.5,0.5],"radius":0.2,"surface":{"texture":"grain"}}
+            ]}))
+            .unwrap();
+        let mut score: Score =
+            serde_json::from_value(serde_json::json!({"version":"0.23.0","instructions":[
+                {"primitive":"square","position":[0.3,0.3],"size":[0.2,0.2]}
+            ]}))
+            .unwrap();
+        score.object_templates.push(inku_score::ObjectTemplate {
+            instruction_index: 0,
+            aspect: [1, 1],
+            body: Box::new(body),
+        });
+        let metadata = build_render_metadata(&score, SvgProfile::Compat);
+        assert!(metadata.texture_degraded);
+        assert_eq!(metadata.render_surface_textures.len(), 1);
+        assert_eq!(metadata.render_surface_textures[0].instruction_index, 0);
+        assert_eq!(
+            metadata.render_surface_textures[0].texture,
+            SurfaceTexture::Grain
+        );
+    }
+
+    #[test]
+    fn object_box_size_does_not_scale_stroke_width() {
+        let template = inku_score::ObjectTemplate { instruction_index: 0, aspect: [1, 1], body: Box::new(serde_json::from_value(serde_json::json!({"version":"0.22.0","instructions":[
+            {"primitive":"line","from":[0.2,0.5],"to":[0.8,0.5],"color":"green","weight":"computer"}
+        ]})).unwrap()) };
+        let request = RenderRequest {
+            score: serde_json::from_value(serde_json::json!({"version":"0.9.0","instructions":[]}))
+                .unwrap(),
+            options: RenderOptions {
+                resolved_color_map: Default::default(),
+                catalog_id: None,
+                canvas: CanvasSize::new(1000.0, 1000.0),
+                canvas_aspect_id: "square".into(),
+                svg_profile: SvgProfile::Display,
+                render_seed: Some(17),
+                composition_seed: Some(37),
+                wild: false,
+                error_policy: inku_score::ScoreErrorPolicy::OmitAndContinue,
+            },
+        };
+        let paint = |size: f64| {
+            let parent: Instruction = serde_json::from_value(
+                serde_json::json!({"primitive":"square","position":[0.2,0.2],"size":[size,size]}),
+            )
+            .unwrap();
+            let body = paint_object_body(
+                &template,
+                &parent,
+                crate::affine::AffineTransform::identity(),
+                &request,
+                &Default::default(),
+                DEFAULT_SUPPORT,
+                0,
+                0,
+                2,
+                None,
+                &mut Vec::new(),
+                &mut Vec::new(),
+                &mut OutputAllowance::default(),
+            )
+            .unwrap();
+            let mut doc = Document::new(request.options.canvas);
+            doc.push(body);
+            doc.serialize()
+        };
+        let small = paint(0.2);
+        let large = paint(0.5);
+        let width = |svg: &str| {
+            svg.split("class=\"raster-bleed\"")
+                .nth(1)
+                .unwrap()
+                .split("width=\"")
+                .nth(1)
+                .unwrap()
+                .split('"')
+                .next()
+                .unwrap()
+                .to_owned()
+        };
+        assert_eq!(width(&small), width(&large));
+        assert_ne!(small, large);
+    }
+
+    #[test]
+    fn object_copy_material_ids_are_distinct_from_each_other_and_ordinary_marks() {
+        let body: Score = serde_json::from_value(serde_json::json!({"version":"0.22.0","instructions":[
+            {"primitive":"circle","center":[0.5,0.5],"radius":0.2,"color":"green","filled":true,"weight":"pencil"}
+        ]})).unwrap();
+        let mut score: Score = serde_json::from_value(serde_json::json!({"version":"0.23.0","instructions":[
+            {"primitive":"square","position":[0.3,0.3],"size":[0.2,0.2],"arrangement":{"count":3,"layout":"horizontal"}},
+            {"primitive":"circle","center":[0.5,0.8],"radius":0.1,"filled":true,"weight":"pencil"}
+        ]})).unwrap();
+        score.object_templates.push(inku_score::ObjectTemplate {
+            instruction_index: 0,
+            aspect: [1, 1],
+            body: Box::new(body),
+        });
+        let request = RenderRequest {
+            score,
+            options: RenderOptions {
+                resolved_color_map: Default::default(),
+                catalog_id: None,
+                canvas: CanvasSize::new(1000.0, 1000.0),
+                canvas_aspect_id: "square".into(),
+                svg_profile: SvgProfile::Display,
+                render_seed: Some(17),
+                composition_seed: Some(37),
+                wild: false,
+                error_policy: inku_score::ScoreErrorPolicy::OmitAndContinue,
+            },
+        };
+        let output = render(request.clone()).unwrap();
+        let ids = output
+            .svg
+            .split(" id=\"")
+            .skip(1)
+            .filter_map(|s| s.split('"').next())
+            .collect::<Vec<_>>();
+        let unique = ids.iter().copied().collect::<BTreeSet<_>>();
+        assert_eq!(ids.len(), unique.len(), "duplicate SVG IDs: {ids:?}");
+        let mut printed = request;
+        printed.score.object_templates[0].body.instructions[0].weight = crate::types::Weight::Burin;
+        assert!(render(printed).unwrap().svg.contains("layer_15_plate_tone"));
     }
 
     #[test]

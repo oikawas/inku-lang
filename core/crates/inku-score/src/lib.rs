@@ -39,6 +39,6 @@ pub use score_resources::{
     SavedScoreResourceDisposition, SavedScoreResourceError, SavedScoreResourceFailure,
     SavedScoreResourceOwner, check_legacy_resource_demand, finalize_saved_score,
     finalize_saved_score_with_omitted_instructions, legacy_resource_demand,
-    resource_budget_from_legacy_four_limits,
+    object_body_resource_demand, resource_budget_from_legacy_four_limits,
 };
 pub use types::*;

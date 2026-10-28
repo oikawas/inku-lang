@@ -702,9 +702,6 @@ const fn macro_resolution_issue_kind(
         MacroInvocationResolutionDiagnosticKind::SourceClauseAtomMismatch => {
             "macro_resolution_source_clause_atom_mismatch"
         }
-        MacroInvocationResolutionDiagnosticKind::PluginObjectNotDrawnYet => {
-            "plugin_object_not_drawn_yet"
-        }
     }
 }
 

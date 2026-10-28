@@ -53,7 +53,6 @@ pub enum MacroInvocationResolutionDiagnosticKind {
     VersionMismatch,
     DigestMismatch,
     SourceClauseAtomMismatch,
-    PluginObjectNotDrawnYet,
 }
 
 /// One occurrence withheld from the resolved set, retaining its exact evidence.
@@ -186,13 +185,6 @@ fn build_resolution(
                                         .is_ok_and(|candidate| candidate == &identity)
                                 })
                                 .and_then(|definition| definition.object_aspect);
-                            if object_aspect.is_some() {
-                                diagnostics.push(occurrence.diagnostic(
-                                    MacroInvocationResolutionDiagnosticKind::PluginObjectNotDrawnYet,
-                                    Some(identity), None, Vec::new(),
-                                ));
-                                continue;
-                            }
                             resolved.push(ResolvedMacroInvocation {
                                 invocation: occurrence
                                     .invocation

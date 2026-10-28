@@ -23,11 +23,6 @@ fn templates_require_the_new_edition_and_a_unique_square_owner() {
     wrong["instructions"][0]["primitive"] = json!("circle");
     let wrong: Score = serde_json::from_value(wrong).unwrap();
     assert!(wrong.validate_schema_edition().is_err());
-    let mut repeated_body = serde_json::to_value(&score).unwrap();
-    repeated_body["object_templates"][0]["body"]["instructions"] =
-        json!([{"primitive":"square","arrangement":{"count":2}}]);
-    let repeated_body: Score = serde_json::from_value(repeated_body).unwrap();
-    assert!(repeated_body.validate_schema_edition().is_err());
     let legacy: Score =
         serde_json::from_value(json!({"version":"0.22.0", "instructions":[]})).unwrap();
     assert!(legacy.validate_schema_edition().is_ok());

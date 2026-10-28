@@ -2346,6 +2346,9 @@ impl Score {
     /// as polygon sides, are clamped by the renderer and stay accepted.
     pub fn validate_work_ranges(&self) -> Result<(), &'static str> {
         let unit = |value: f64| (0.0..=1.0).contains(&value);
+        for template in &self.object_templates {
+            template.body.validate_work_ranges()?;
+        }
         if let Canvas::Spec(CanvasSpec {
             ground: Some(ground),
             ..
@@ -2611,17 +2614,19 @@ impl Score {
             if !template.body.object_templates.is_empty() {
                 return Err("nested object templates are not supported");
             }
-            if template
-                .body
-                .instructions
-                .iter()
-                .any(|item| item.arrangement.is_some())
-                || !template.body.placement_groups.is_empty()
-                || !template.body.repetition_groups.is_empty()
-                || !template.body.fill_groups.is_empty()
-                || template.body.resource_policy.is_some()
+            if !template.body.placement_groups.is_empty()
+                || !template.body.mirror_relations.is_empty()
             {
-                return Err("object template body must be a flat expanded body");
+                return Err("object template body cannot contain placement groups");
+            }
+            if template.body.repetition_groups.iter().any(|group| {
+                group
+                    .member
+                    .symbolic
+                    .as_ref()
+                    .is_none_or(|symbolic| symbolic.instance_count != 1)
+            }) {
+                return Err("object template body repetition must have one instance");
             }
             template.body.validate_schema_edition()?;
         }

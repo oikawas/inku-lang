@@ -126,7 +126,21 @@ fn offered_scene_and_object_words_are_normalized_and_printed() {
             ResolvedInstructionLanguage::En,
         ),
     ] {
-        let result = inku_ddl::compile_ddl_to_score(
+        let budget = inku_score::ResourceBudget {
+            maximum: inku_score::ResourceDemand {
+                logical_objects: 400,
+                primitive_marks: 400,
+                object_templates: 64,
+                maximum_per_template_primitive_marks: 240,
+                maximum_resolved_count: 2000,
+                template_nodes: 512,
+                anchor_instances: 400,
+                transform_instances: 400,
+                placement_instances: 400,
+                fill_instances: 400,
+            },
+        };
+        let result = inku_ddl::compile_ddl_to_score_with_resources(
             inku_ddl::NormalizedDdlDocument::new(source, language, vec![lock.clone()]).unwrap(),
             std::slice::from_ref(&object),
             Some(37),
@@ -139,14 +153,25 @@ fn offered_scene_and_object_words_are_normalized_and_printed() {
             },
             inku_ddl::ScoreLoweringContext::resolve("square", inku_score::Color::White).unwrap(),
             inku_ddl::ScoreErrorPolicy::OmitAndContinue,
+            inku_score::HardResourcePolicy {
+                identity: "object-work-plan.v1".into(),
+                budget,
+            },
+            inku_score::OperationalResourceBudget(budget),
         );
         assert!(
-            result
-                .upstream_diagnostics()
-                .iter()
-                .any(|item| item.reason == "plugin_object_not_drawn_yet"),
+            result.upstream_diagnostics().is_empty(),
             "{source}: {:?}",
             result.upstream_diagnostics()
+        );
+        assert_eq!(
+            result
+                .score()
+                .unwrap_or_else(|| panic!("{source}: {:?}", result.downstream_diagnostics()))
+                .object_templates
+                .len(),
+            1,
+            "{source}"
         );
     }
 }

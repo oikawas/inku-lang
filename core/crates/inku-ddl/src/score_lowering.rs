@@ -1405,6 +1405,35 @@ fn lower_object_plugin_template(
     let (width, height) = head.object_aspect?;
     context.canvas_format.width_units = u32::from(width);
     context.canvas_format.height_units = u32::from(height);
+    // Explicit width and height may override the definition's aspect. Lower
+    // offsets (line ends, arc centers, rectangle corners) in that same box;
+    // otherwise their normalized coordinates would retain the old ratio.
+    if let Some(SemanticExplicitGeometry::WidthHeight { width, height }) =
+        &instruction.entity.explicit_geometry
+        && let Ok(w) = Rational::from_decimal(width.decimal.value)
+        && let Ok(h) = Rational::from_decimal(height.decimal.value)
+        && let Ok(ratio) = w.div(h)
+    {
+        let ratio = reduced_ratio(ratio);
+        if let (Ok(w), Ok(h)) = (
+            u32::try_from(ratio.numerator()),
+            u32::try_from(ratio.denominator()),
+        ) && w > 0
+            && h > 0
+        {
+            context.canvas_format.width_units = w;
+            context.canvas_format.height_units = h;
+        } else if let (Ok(w), Ok(h)) = (w.to_f64(), h.to_f64())
+            && w > 0.0
+            && h > 0.0
+        {
+            // CanvasFormat uses a u32 ratio; keep as much precision as that
+            // representation permits for longer exact decimal spellings.
+            let scale = f64::from(u32::MAX) / w.max(h);
+            context.canvas_format.width_units = (w * scale).round().max(1.0) as u32;
+            context.canvas_format.height_units = (h * scale).round().max(1.0) as u32;
+        }
+    }
     context.declared_ratio = None;
     context.canvas_fit = None;
     let mut caller = instruction.clone();
@@ -1433,6 +1462,8 @@ fn lower_object_plugin_template(
     let mut anchor_origins = Vec::new();
     let mut instruction_origins = Vec::new();
     let mut transform_groups = Vec::new();
+    let mut objects = Vec::new();
+    let mut planned_transforms = Vec::new();
     lower_macro_instruction(
         view,
         source_instruction_index,
@@ -1446,32 +1477,90 @@ fn lower_object_plugin_template(
         &mut anchor_origins,
         &mut instruction_origins,
         diagnostics,
-        None,
-        None,
+        Some(&mut objects),
+        Some(&mut planned_transforms),
         &mut transform_groups,
     );
-    if instructions.is_empty() && anchors.is_empty() {
+    let repetitions = if objects.is_empty() && anchors.is_empty() {
+        Vec::new()
+    } else {
+        vec![PlacementMemberPlan {
+            source_instruction_index,
+            source_instruction_indices: vec![source_instruction_index],
+            member: inku_score::PlacementMember {
+                start: 0,
+                end: objects.len(),
+                anchor_indices: (0..anchors.len()).collect(),
+                transform_group_indices: (0..planned_transforms.len()).collect(),
+                symbolic: None,
+            },
+            kind: PlacementMemberKind::Macro,
+            source_count: 1,
+            count_was_omitted: true,
+        }]
+    };
+    let plan = crate::CompositionPlanResult {
+        view,
+        context,
+        policy_digest: String::new(),
+        error_policy,
+        outcome: crate::CompositionPlanOutcome::Ready,
+        objects,
+        anchors,
+        anchor_origins,
+        transform_groups: planned_transforms,
+        placement_groups: Vec::new(),
+        fill_groups: Vec::new(),
+        standalone_macro_repetitions: repetitions,
+        mirror_relations: Vec::new(),
+        ground: None,
+        diagnostics: Vec::new(),
+    };
+    // The containing work's policy accounts the body multiplied by its box
+    // count. This local policy is used only after that outer admission to
+    // replay the body's recipes; its maximum remains exactly representable by
+    // JSON consumers that use IEEE-754 numbers.
+    const LOCAL_POLICY_MAX: u64 = (1_u64 << 53) - 1;
+    let maximum = inku_score::ResourceDemand {
+        logical_objects: LOCAL_POLICY_MAX,
+        primitive_marks: LOCAL_POLICY_MAX,
+        object_templates: LOCAL_POLICY_MAX,
+        maximum_per_template_primitive_marks: LOCAL_POLICY_MAX,
+        maximum_resolved_count: LOCAL_POLICY_MAX,
+        template_nodes: LOCAL_POLICY_MAX,
+        anchor_instances: LOCAL_POLICY_MAX,
+        transform_instances: LOCAL_POLICY_MAX,
+        placement_instances: LOCAL_POLICY_MAX,
+        fill_instances: LOCAL_POLICY_MAX,
+    };
+    let budget = inku_score::ResourceBudget { maximum };
+    let selected = crate::select_composition_plan_resources(
+        &plan,
+        inku_score::HardResourcePolicy {
+            identity: "inku.object-template.v1".into(),
+            budget,
+        },
+        inku_score::OperationalResourceBudget(budget),
+    );
+    let body = selected
+        .ok()
+        .and_then(|selected| crate::materialize_selected_composition(&selected).ok())
+        .map(|materialized| materialized.score);
+    let Some(body) = body else {
+        let reason = ScoreFieldGap::UnsupportedMacroStructure;
+        diagnostics.push(ScoreLoweringDiagnostic {
+            owner: macro_invocation_owner(source_instruction_index, head, None),
+            disposition: diagnostic_disposition(
+                error_policy,
+                &reason,
+                macro_invocation_unit(source_instruction_index, head),
+                None,
+            ),
+            reason,
+        });
         return None;
-    }
-    Some((
-        width,
-        height,
-        Box::new(Score {
-            version: inku_score::ScoreEdition::V0_22.as_str().to_owned(),
-            canvas: context.score_canvas(None),
-            background: context.background,
-            presence: None,
-            instructions,
-            object_templates: Vec::new(),
-            anchors,
-            transform_groups,
-            placement_groups: Vec::new(),
-            repetition_groups: Vec::new(),
-            fill_groups: Vec::new(),
-            mirror_relations: Vec::new(),
-            resource_policy: None,
-        }),
-    ))
+    };
+    Some((width, height, Box::new(body)))
 }
 
 fn exact_macro_expansion<'a>(

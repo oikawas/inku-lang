@@ -27,6 +27,7 @@ struct ResolvedPaint {
 }
 
 pub(crate) struct FillPaintForest {
+    prefix: String,
     roots: Vec<Paint>,
     children: Vec<Vec<Paint>>,
     registered: Vec<bool>,
@@ -35,7 +36,12 @@ pub(crate) struct FillPaintForest {
 
 impl FillPaintForest {
     pub fn new(scope_count: usize) -> Self {
+        Self::with_prefix(scope_count, String::new())
+    }
+
+    pub fn with_prefix(scope_count: usize, prefix: String) -> Self {
         Self {
+            prefix,
             roots: Vec::new(),
             children: (0..scope_count).map(|_| Vec::new()).collect(),
             registered: vec![false; scope_count],
@@ -50,7 +56,7 @@ impl FillPaintForest {
         scope: Option<usize>,
         scopes: &[PerformedFillScope],
     ) {
-        let id = format!("fill_paint_{performed_index}");
+        let id = format!("{}fill_paint_{performed_index}", self.prefix);
         self.paint_order
             .insert(id.clone(), (self.paint_order.len(), performed_index));
         let mut wrapper = Element::new("g").attr("id", id);
@@ -159,7 +165,7 @@ impl FillPaintForest {
             });
         };
         let scope = &scopes[index];
-        let mut group = Element::new("g").attr("id", format!("fill_{index}"));
+        let mut group = Element::new("g").attr("id", format!("{}fill_{index}", self.prefix));
         for child in std::mem::take(&mut self.children[index]) {
             if let Some(element) =
                 self.resolve(child, scopes, profile, definitions, clip_policy, failures)
@@ -168,7 +174,7 @@ impl FillPaintForest {
             }
         }
         if profile != SvgProfile::Compat {
-            let id = format!("fill_target_{index}");
+            let id = format!("{}fill_target_{index}", self.prefix);
             let points = crate::svg::points_list(scope.prepared_region.contour());
             let mut clip = Element::new("clipPath")
                 .attr("id", &id)
@@ -181,7 +187,7 @@ impl FillPaintForest {
                 instruction_indices: scope.instruction_indices.clone(),
             });
         }
-        let prefix = format!("fill_clip_{index}");
+        let prefix = format!("{}fill_clip_{index}", self.prefix);
         match clip_element(
             &group,
             &scope.prepared_region,

@@ -16,9 +16,9 @@ use std::collections::BTreeMap;
 
 use inku_ddl::work_plan::{WorkPlan, WorkPlanLayer, plan_layer, print_work_plan_with_numbers};
 use inku_ddl::{
-    ExactFraction, MacroExpansionLimits, NormalizedDdlDocument, ResolvedInstructionLanguage,
-    SemanticExplicitGeometry, SemanticGeometryValue, SemanticInstruction, SourceSpan,
-    compile_typed_ddl,
+    ExactFraction, MacroDefinition, MacroExpansionLimits, MacroLock, NormalizedDdlDocument,
+    ResolvedInstructionLanguage, SemanticExplicitGeometry, SemanticGeometryValue,
+    SemanticInstruction, SourceSpan, compile_typed_ddl,
 };
 use inku_score::Score;
 use serde::{Deserialize, Serialize};
@@ -152,8 +152,16 @@ pub(crate) fn fraction(value: ExactFraction) -> f64 {
 /// ground, a background, a place in words) or when a number is not found
 /// where the parser says it is.
 pub(crate) fn parse(line: &str, language: ResolvedInstructionLanguage) -> Option<Numbers> {
-    let document = NormalizedDdlDocument::new(line, language, Vec::new()).ok()?;
-    let compilation = compile_typed_ddl(document, &[], None, LIMITS);
+    parse_with_definitions(line, language, &[])
+}
+
+pub(crate) fn parse_with_definitions(
+    line: &str,
+    language: ResolvedInstructionLanguage,
+    definitions: &[MacroDefinition],
+) -> Option<Numbers> {
+    let document = locked_document(line, language, definitions)?;
+    let compilation = compile_typed_ddl(document, definitions, None, LIMITS);
     let semantic = compilation.semantic_document.as_ref()?;
     let [instruction] = semantic.ast.instructions.as_slice() else {
         return None;
@@ -174,6 +182,27 @@ pub(crate) fn parse(line: &str, language: ResolvedInstructionLanguage) -> Option
             .values()
             .all(|(value, span)| written(*span, *value));
     found.then_some(numbers)
+}
+
+fn locked_document(
+    source: &str,
+    language: ResolvedInstructionLanguage,
+    definitions: &[MacroDefinition],
+) -> Option<NormalizedDdlDocument> {
+    let locks: Vec<MacroLock> = definitions
+        .iter()
+        .map(|definition| {
+            let identity = definition.identity().ok()?;
+            MacroLock::new(
+                identity.qualified_name(),
+                identity.version(),
+                format!("sha256:{}", identity.full_digest_hex()),
+            )
+            .and_then(|lock| lock.with_aliases(definition.alias_qualified_names()))
+            .ok()
+        })
+        .collect::<Option<Vec<_>>>()?;
+    NormalizedDdlDocument::new(source, language, locks).ok()
 }
 
 fn numbers_of(
@@ -443,6 +472,7 @@ pub struct ThingDocument {
     parsed: Vec<Option<Numbers>>,
     language: ResolvedInstructionLanguage,
     units: [f64; 2],
+    definitions: Vec<MacroDefinition>,
 }
 
 impl ThingDocument {
@@ -452,15 +482,26 @@ impl ThingDocument {
         language: ResolvedInstructionLanguage,
         units: [f64; 2],
     ) -> Self {
+        Self::new_with_definitions(sentences, language, units, &[])
+    }
+
+    #[must_use]
+    pub fn new_with_definitions(
+        sentences: &[ThingSentence],
+        language: ResolvedInstructionLanguage,
+        units: [f64; 2],
+        definitions: &[MacroDefinition],
+    ) -> Self {
         Self {
             lines: sentences.iter().map(|item| item.text.clone()).collect(),
             things: sentences.iter().map(|item| item.thing).collect(),
             parsed: sentences
                 .iter()
-                .map(|item| parse(&item.text, language))
+                .map(|item| parse_with_definitions(&item.text, language, definitions))
                 .collect(),
             language,
             units,
+            definitions: definitions.to_vec(),
         }
     }
 
@@ -558,7 +599,8 @@ impl ThingDocument {
     fn rewrite(&mut self, new: Vec<(usize, String)>) -> bool {
         let mut read = Vec::new();
         for (index, line) in new {
-            let Some(numbers) = parse(&line, self.language) else {
+            let Some(numbers) = parse_with_definitions(&line, self.language, &self.definitions)
+            else {
                 return false;
             };
             if !inside(sentence_box(&numbers, self.units)) {
@@ -1618,9 +1660,10 @@ pub(crate) fn layer_without_numbers(instruction: &SemanticInstruction) -> Option
 fn plan_of(
     source: &str,
     language: ResolvedInstructionLanguage,
+    definitions: &[MacroDefinition],
 ) -> Option<(ComposedPlan, Vec<usize>, Vec<bool>)> {
-    let document = NormalizedDdlDocument::new(source, language, Vec::new()).ok()?;
-    let compilation = compile_typed_ddl(document, &[], None, LIMITS);
+    let document = locked_document(source, language, definitions)?;
+    let compilation = compile_typed_ddl(document, definitions, None, LIMITS);
     let ast = &compilation.semantic_document.as_ref()?.ast;
     let starts: Vec<usize> = std::iter::once(0)
         .chain(source.match_indices('\n').map(|(at, _)| at + 1))
@@ -1726,6 +1769,7 @@ pub fn build_cards(
     answer: &CompositionAnswer,
     ground: &CardGround<'_>,
     language: ResolvedInstructionLanguage,
+    definitions: &[MacroDefinition],
     compile: &dyn Fn(&str) -> Option<Score>,
 ) -> (Vec<ThingSentence>, Vec<CardRecord>) {
     let mut sentences = sentences.to_vec();
@@ -1744,7 +1788,16 @@ pub fn build_cards(
             .filter(|item| things.contains(&item.thing))
             .cloned()
             .collect();
-        match build_card(&sentences, head, law, value, ground, language, compile) {
+        match build_card(
+            &sentences,
+            head,
+            law,
+            value,
+            ground,
+            language,
+            definitions,
+            compile,
+        ) {
             Ok(built) => {
                 sentences = built;
                 records.push(CardRecord {
@@ -1774,13 +1827,14 @@ fn build_card(
     value: &Value,
     ground: &CardGround<'_>,
     language: ResolvedInstructionLanguage,
+    definitions: &[MacroDefinition],
     compile: &dyn Fn(&str) -> Option<Score>,
 ) -> Result<Vec<ThingSentence>, String> {
     let source = std::iter::once(head.to_owned())
         .chain(sentences.iter().map(|item| item.text.clone()))
         .collect::<Vec<_>>()
         .join("\n");
-    let (composed, lines, read) = plan_of(&source, language).ok_or("unreadable")?;
+    let (composed, lines, read) = plan_of(&source, language, definitions).ok_or("unreadable")?;
     // The source's line of each layer, as an index of `sentences`.
     let sentence_of: Vec<Option<usize>> = lines.iter().map(|line| line.checked_sub(1)).collect();
     let layers_of = |thing: u64| -> Vec<usize> {
@@ -1817,6 +1871,7 @@ fn build_card(
     let chosen =
         apply_cards(&answer, &context, &composed).map_err(|refusal| refusal.code.to_owned())?;
     let print = &chosen.print;
+    let plugins = crate::prompts::work_plan_plugins(definitions.iter());
     // The printed layers of each changed composed layer, in print order.
     let mut printed: BTreeMap<usize, Vec<String>> = BTreeMap::new();
     for (at, composed_layer) in print.composed.iter().enumerate() {
@@ -1831,7 +1886,7 @@ fn build_card(
                 layers: vec![print.plan.layers[at].clone()],
             },
             language,
-            &[],
+            &plugins,
             &[print.ranges[at].clone()],
             &[None],
             &[print.numeric[at].clone()],
@@ -1860,6 +1915,51 @@ fn build_card(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn object_word_has_the_numeric_place_of_its_square() {
+        let definition = MacroDefinition::from_json(
+            &json!({
+                "schema":"inku.macro-definition.v2", "namespace":"TestObject", "id":"Boat",
+                "names":{"ja":["舟"],"en":["boat"]}, "kind":"object", "aspect":"2:1",
+                "counter":"general", "version":"1.0.0", "parameters":{}, "components":{},
+                "body":[{"op":"emit","binding":"hull","fields":{
+                    "shape":{"expr":"semantic_ref","category":"shape","id":"arc"},
+                    "movement":{"expr":"semantic_ref","category":"movement","id":"place"},
+                    "color":{"expr":"semantic_ref","category":"color","id":"green"},
+                    "position_x":{"expr":"exact_decimal","value":"0.5"},
+                    "position_y":{"expr":"exact_decimal","value":"0.5"},
+                    "chord":{"expr":"exact_decimal","value":"0.6"},
+                    "sagitta":{"expr":"exact_decimal","value":"0.2"}
+                }}]
+            })
+            .to_string(),
+        )
+        .unwrap();
+        let object = parse_with_definitions(
+            "画面の横0.3、縦0.7の位置に、一辺0.2の｛舟｝を置く。",
+            ResolvedInstructionLanguage::Ja,
+            &[definition.clone()],
+        )
+        .expect("numeric object");
+        assert_eq!(object.kind, PlaceKind::Point);
+        assert_eq!(object.values, vec![0.3, 0.7]);
+        assert_eq!(object.sizes["side"].0, 0.2);
+        let range = parse_with_definitions(
+            "画面の横0.2〜0.8、縦0.6〜0.7の範囲に、一辺0.1の｛舟｝を5個並べる。",
+            ResolvedInstructionLanguage::Ja,
+            &[definition.clone()],
+        )
+        .expect("numeric object range");
+        assert_eq!(range.kind, PlaceKind::Range);
+        let english = parse_with_definitions(
+            "place one {boat} width 0.12, height 0.05 at horizontal 0.28, vertical 0.62.",
+            ResolvedInstructionLanguage::En,
+            &[definition],
+        )
+        .expect("English numeric object");
+        assert_eq!(english.values, vec![0.28, 0.62]);
+    }
 
     fn sentences(items: &[(u64, &str)]) -> Vec<ThingSentence> {
         items

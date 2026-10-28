@@ -38,7 +38,10 @@
 //! `draw` a DDL, `keep` the child with its record, or `skip` the turn. Nothing
 //! is sent, drawn or saved here.
 
-use inku_ddl::{ResolvedInstructionLanguage, ddl_title_lines, print_ddl_titles, split_ddl_titles};
+use inku_ddl::{
+    MacroDefinition, ResolvedInstructionLanguage, ddl_title_lines, print_ddl_titles,
+    split_ddl_titles,
+};
 use inku_score::CanvasRatio;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
@@ -46,7 +49,8 @@ use serde_json::{Map, Value, json};
 use crate::description_composition::{CompositionThing, GOLDEN, number, titled_composed_source};
 use crate::description_ddl::{hint, writing_guide};
 use crate::description_laws::{
-    Numbers, PlaceKind, center, extent, inside, moved_values, parse, rewritten, sentence_box, union,
+    Numbers, PlaceKind, center, extent, inside, moved_values, parse_with_definitions, rewritten,
+    sentence_box, union,
 };
 use crate::identity::python_strip;
 use crate::image_ddl::{
@@ -221,12 +225,13 @@ fn unique_title(doc: &Doc, title: &str) -> String {
 /// The work's language and its canvas in short-edge units, which every
 /// reading and rewriting of numbers needs.
 #[derive(Clone, Copy, Debug)]
-struct Paper {
+struct Paper<'a> {
     language: ResolvedInstructionLanguage,
     units: [f64; 2],
+    definitions: &'a [MacroDefinition],
 }
 
-impl Paper {
+impl Paper<'_> {
     fn say(self, ja: impl Into<String>, en: impl Into<String>) -> String {
         match self.language {
             ResolvedInstructionLanguage::Ja => ja.into(),
@@ -235,7 +240,7 @@ impl Paper {
     }
 
     fn numbers(self, line: &str) -> Result<Numbers, String> {
-        parse(line, self.language).ok_or_else(|| {
+        parse_with_definitions(line, self.language, self.definitions).ok_or_else(|| {
             let head: String = line.chars().take(40).collect();
             self.say(
                 format!("数の位置の無い文: {head}"),
@@ -259,7 +264,8 @@ impl Paper {
     /// cannot read (a number below zero) does not: the prototype read it and
     /// found it off the canvas.
     fn fits(self, line: &str) -> bool {
-        parse(line, self.language).is_some_and(|numbers| inside(sentence_box(&numbers, self.units)))
+        parse_with_definitions(line, self.language, self.definitions)
+            .is_some_and(|numbers| inside(sentence_box(&numbers, self.units)))
     }
 
     /// The sentence moved by `(dx, dy)` (canvas fractions) and scaled by `s`
@@ -808,7 +814,7 @@ fn check_rewrite(
                 "one sentence a line, ending with a period",
             ));
         };
-        if parse(text, paper.language).is_none() {
+        if parse_with_definitions(text, paper.language, paper.definitions).is_none() {
             let head: String = text.chars().take(40).collect();
             return Err(paper.say(
                 format!("数の位置・範囲・二点の無い文がある: {head}"),
@@ -1259,7 +1265,7 @@ fn refuse(reason: &'static str, detail: impl Into<String>) -> Refusal {
     }
 }
 
-fn paper_of(config: &PipelineConfig) -> Result<(Paper, CanvasRatio), Refusal> {
+fn paper_of(config: &PipelineConfig) -> Result<(Paper<'_>, CanvasRatio), Refusal> {
     let format = inku_score::lookup_canvas_format(config.compiler.host.canvas_format_id())
         .map_err(|_| refuse("paper", "the configuration names no known paper"))?;
     let ratio = CanvasRatio::reduced(format.width_units, format.height_units)
@@ -1272,6 +1278,7 @@ fn paper_of(config: &PipelineConfig) -> Result<(Paper, CanvasRatio), Refusal> {
                 f64::from(ratio.width_units) / short,
                 f64::from(ratio.height_units) / short,
             ],
+            definitions: &config.definitions,
         },
         ratio,
     ))
@@ -1733,10 +1740,11 @@ mod tests {
         config
     }
 
-    fn ja() -> Paper {
+    fn ja() -> Paper<'static> {
         Paper {
             language: ResolvedInstructionLanguage::Ja,
             units: [1.0, 1.0],
+            definitions: &[],
         }
     }
 
@@ -1894,6 +1902,7 @@ mod tests {
         let paper = Paper {
             language: ResolvedInstructionLanguage::En,
             units: [1.0, 1.0],
+            definitions: &[],
         };
         let turned = paper
             .turned(

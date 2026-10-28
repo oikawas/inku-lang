@@ -239,7 +239,12 @@ impl PipelineSnapshot {
             .as_ref()
             .ok_or(ProtocolError::InternalInvariant)?;
         let (_, sentences) = self.thing_sentences(&candidate.source);
-        let doc = ThingDocument::new(&sentences, self.config.language, self.paper_units()?);
+        let doc = ThingDocument::new_with_definitions(
+            &sentences,
+            self.config.language,
+            self.paper_units()?,
+            &self.config.definitions,
+        );
         let records = measure(&mut doc.clone(), answer, true);
         Ok(thing_problems(&doc, &records, answer, self.config.language))
     }
@@ -275,7 +280,12 @@ impl PipelineSnapshot {
             let check = self.check_written(&candidate).ok()?;
             Some((check.drawable, check.problems.len()))
         };
-        let doc = ThingDocument::new(&sentences, language, units);
+        let doc = ThingDocument::new_with_definitions(
+            &sentences,
+            language,
+            units,
+            &self.config.definitions,
+        );
         let written = measure(&mut doc.clone(), &answer, false);
         let mut fitted = doc.clone();
         let fit = measure(&mut fitted, &answer, true);
@@ -300,8 +310,15 @@ impl PipelineSnapshot {
             let candidate = self.new_document(source.to_owned()).ok()?;
             self.compile_for_run(&candidate)?.score().cloned()
         };
-        let (carded, mut cards) =
-            build_cards(&current, &head, &answer, &ground, language, &compile);
+        let (carded, mut cards) = build_cards(
+            &current,
+            &head,
+            &answer,
+            &ground,
+            language,
+            &self.config.definitions,
+            &compile,
+        );
         if cards.iter().any(|card| card.built) {
             let before = problems_of(joined(&current));
             match (before, problems_of(joined(&carded))) {
@@ -315,7 +332,12 @@ impl PipelineSnapshot {
             }
         }
         let after = measure(
-            &mut ThingDocument::new(&current, language, units),
+            &mut ThingDocument::new_with_definitions(
+                &current,
+                language,
+                units,
+                &self.config.definitions,
+            ),
             &answer,
             false,
         );

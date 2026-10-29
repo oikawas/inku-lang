@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-29 — Android ChatGPT plan policy and registration deletion
+
+Use the shared core for callback, attempt, operation and publication checks. Registrations can be deleted after confirmation in Settings.
+
 ### 2026-10-28 — Complete Android ChatGPT login in the foreground
 
 The browser acknowledges authorization immediately, and inku exchanges the token after returning to the foreground.

@@ -567,6 +567,8 @@ The DDL authority and description-based creation messages use “work”. Work-v
 
 ## 2026-10-04 Connect a personal ChatGPT plan
 
+The shared core checks the callback path and duplicate parameters and drops empty values. Invalid callbacks are refused while the listener continues. The core also validates publication counts, IDs and purposes. Each registration can be deleted after confirmation in its row; it is signed out first, then the registration and its publication settings are removed. Deleting the selected registration clears the selection.
+
 Android is a local single-user host and connects directly to a personal ChatGPT plan. Settings has an independent ChatGPT plan pane. Continue with ChatGPT opens Chrome on the phone for authorization, without a Mac transfer helper or an API key. Return to inku, acknowledge the first-use plan notice, then open Model settings.
 
 Android may stop background network access, so the authorization callback is acknowledged first and the token exchange waits until inku is in the foreground, within the authorization deadline.

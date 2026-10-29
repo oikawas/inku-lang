@@ -4,7 +4,6 @@ import android.util.Log
 import java.io.ByteArrayOutputStream
 import java.math.BigInteger
 import java.net.URI
-import java.net.URLDecoder
 import java.net.URLEncoder
 import java.security.AlgorithmParameters
 import java.security.KeyFactory
@@ -36,15 +35,8 @@ internal fun authorizationUrl(hostId: String, redirectUri: String, state: String
 
 internal fun callbackParameters(target: String): Map<String, String> {
     if (target.length > 16_384) throw ChatGptException("chatgpt_callback_invalid")
-    val uri = URI(target)
-    val result = linkedMapOf<String, String>()
-    uri.rawQuery.orEmpty().split('&').filter(String::isNotEmpty).forEach { field ->
-        val pair = field.split('=', limit = 2)
-        val key = URLDecoder.decode(pair[0], Charsets.UTF_8)
-        val value = URLDecoder.decode(pair.getOrElse(1) { "" }, Charsets.UTF_8)
-        result[key] = value
-    }
-    return result
+    val query = ChatGptCore.call("chatgpt_auth_callback_query", JSONObject().put("target", target)).getJSONObject("query")
+    return query.keys().asSequence().associateWith { query.getJSONArray(it).getString(0) }
 }
 
 internal fun callbackStateMatches(query: Map<String, String>, expected: String): Boolean =
@@ -110,11 +102,11 @@ private fun ecdsaDer(raw: ByteArray): ByteArray {
     return byteArrayOf(0x30, (r.size + s.size + 4).toByte(), 0x02, r.size.toByte()) + r + byteArrayOf(0x02, s.size.toByte()) + s
 }
 
-internal val CHATGPT_EFFECTS = setOf("generate_sketch", "select_description_catalog", "generate_normalized_ddl", "read_composition",
-    "choose_laws", "choose_colors", "complete_visible_ddl_holes",
-    // The image stages send the photo, and then the drawing, with the request (server `IMAGE_EFFECTS`).
-    "select_image_catalog", "write_image_ddl", "review_image_ddl",
-    "read_description", "compose_description", "write_description_ddl", "review_description_ddl")
+internal fun chatGptPurpose(action: String?): String {
+    if (isVisionTextAction(action)) return "vision"
+    val effects = ChatGptCore.call("chatgpt_auth_constants").getJSONArray("image_effects")
+    return if ((0 until effects.length()).any { effects.getString(it) == action }) "vision" else "llm"
+}
 
 /** Server `request_vision`: the assistant text read up to 512 KiB. */
 private const val CHATGPT_VISION_ANSWER_LIMIT = 512 * 1024
@@ -139,6 +131,9 @@ internal fun chatGptRequest(request: ModelRequest): ChatGptRequest {
         throw ChatGptException("chatgpt_operation_not_supported")
     }
     val model = request.modelId.removePrefix("chatgpt:")
+    val purpose = chatGptPurpose(request.pipelineAction)
+    ChatGptCore.call("chatgpt_auth_operation", JSONObject().put("purpose", purpose)
+        .put("tag", if (isVisionTextAction(request.pipelineAction)) "vision" else request.pipelineAction ?: JSONObject.NULL))
     if (isVisionTextAction(request.pipelineAction)) {
         val image = request.imagePng
         if (image == null || image.isEmpty() || request.imageJpeg != null || request.tool != null) {
@@ -154,7 +149,7 @@ internal fun chatGptRequest(request: ModelRequest): ChatGptRequest {
         return built(built, "text", CHATGPT_VISION_ANSWER_LIMIT)
     }
     val tool = request.tool
-    if (request.pipelineAction !in CHATGPT_EFFECTS || request.imageJpeg != null || request.imagePng != null || tool == null) {
+    if (request.imageJpeg != null || request.imagePng != null || tool == null) {
         throw ChatGptException("chatgpt_operation_not_supported")
     }
     // The schema's original member order matters when it has no propertyOrdering.

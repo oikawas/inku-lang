@@ -195,7 +195,7 @@ public struct ContentView: View {
             }
         }
         .onChange(of: ui.workspaceTab) { _, tab in remember { $0.workspaceTab = tab } }
-        .onChange(of: automation.workspaceInputMode) { _, mode in remember { $0.inputTab = mode } }
+        .onChange(of: automation.workspaceInputMode) { _, mode in model.display.rememberInputTab(mode) }
         .onChange(of: model.library.layout) { _, layout in
             if layout != .lineage { remember { $0.libraryLayout = layout.rawValue } }
         }
@@ -437,7 +437,7 @@ public struct ContentView: View {
         let saved = model.display.preferences
         if let tab = saved.workspaceTab, ["artwork", "lineage"].contains(tab) { ui.workspaceTab = tab }
         // Web returns to the description tab when the input switch is hidden.
-        if saved.inputTab == "batch", model.display.visible("input_modes"), !automation.isOccupied {
+        if model.display.inputTab == "batch", model.display.visible("input_modes"), !automation.isOccupied {
             automation.workspaceInputMode = "batch"
         }
         if model.descriptionText.isEmpty, model.selectedWork == nil {

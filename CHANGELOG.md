@@ -14,6 +14,8 @@ Save tab choices without blocking the screen on the settings file write. Keep th
 
 Keep the history strip at its content height. When a history tile has focus, the left and right arrow keys show adjacent works; movement within the current page avoids a database refresh. Save the selected Settings tab separately from observable display preferences. Keep the covered creation workspace out of hit testing and accessibility. Resolve the history tile's default provider only when connection settings change, and read connection settings and Keychain only when opening the Models page.
 
+Persist Description, Image, and Batch tab choices without invalidating all display consumers. Switching between Description and Image no longer resets Batch browsing state.
+
 ### 2026-10-28 — Complete Android ChatGPT login in the foreground
 
 The browser acknowledges authorization immediately, and inku exchanges the token after returning to the foreground.

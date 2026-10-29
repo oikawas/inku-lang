@@ -134,6 +134,7 @@ public final class DisplaySettings {
     @ObservationIgnored private var fileURL: URL?
     @ObservationIgnored private var previewingTextSize = false
     @ObservationIgnored private var rememberedSettingsTab: String?
+    @ObservationIgnored private var rememberedInputTab: String?
     @ObservationIgnored private let fileWriter = DisplayPreferencesFileWriter()
     @ObservationIgnored private var saveRevision = 0
     public init() {}
@@ -152,6 +153,7 @@ public final class DisplaySettings {
         }
         fileURL = url
         rememberedSettingsTab = nil
+        rememberedInputTab = nil
     }
 
     public var colorScheme: ColorScheme? {
@@ -176,6 +178,13 @@ public final class DisplaySettings {
         rememberedSettingsTab = tab
         persist()
     }
+    /// Input tab selection is owned by AutomationModel. Persist it without invalidating unrelated display consumers.
+    public var inputTab: String? { rememberedInputTab ?? preferences.inputTab }
+    public func rememberInputTab(_ tab: String) {
+        guard inputTab != tab else { return }
+        rememberedInputTab = tab
+        persist()
+    }
     public func previewTextSize(_ step: Int) {
         previewingTextSize = true
         preferences.textSizeStep = min(4, max(0, step))
@@ -189,6 +198,7 @@ public final class DisplaySettings {
         do {
             var snapshot = preferences
             if let rememberedSettingsTab { snapshot.settingsTab = rememberedSettingsTab }
+            if let rememberedInputTab { snapshot.inputTab = rememberedInputTab }
             let data = try JSONEncoder().encode(snapshot)
             saveRevision += 1
             let revision = saveRevision

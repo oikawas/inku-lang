@@ -148,7 +148,9 @@ struct CreationView: View {
             NewDdlAuthoringSheet(model: model)
                 .environment(\.inkuWindowSize, windowSize).inkuDialogFrame(.ddlEditor)
         }
-        .onChange(of: automation.workspaceInputMode) { _, _ in batchWorkspace.invalidateReads() }
+        .onChange(of: automation.workspaceInputMode) { _, mode in
+            if mode == "batch" { batchWorkspace.invalidateReads() }
+        }
         .onChange(of: model.savedImageDDL) { _, value in
             if value != nil && !model.isBusy { automation.workspaceInputMode = "image" }
         }

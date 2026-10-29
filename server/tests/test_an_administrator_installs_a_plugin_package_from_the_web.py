@@ -29,6 +29,13 @@ def _guide(guide: str = "PLUGIN.ja.md") -> dict:
     return json.loads(section[start:section.index("```", start)])
 
 
+def _guide_object_definition(guide: str) -> dict:
+    text = (ROOT / guide).read_text(encoding="utf-8")
+    section = text[text.index("## 2."):text.index("## 3.")]
+    start = section.index("```json") + 7
+    return json.loads(section[start:section.index("```", start)])
+
+
 @pytest.fixture(autouse=True)
 def package_directory(tmp_path, monkeypatch):
     directory = tmp_path / "plugin-packages"
@@ -85,6 +92,21 @@ def test_the_guide_file_passes_as_it_is(admin, guide):
     assert report["words"][0]["aliases"] == []
     assert report["words"][0]["note_ja"] == "夜空に黄色い星を描く。"
     assert "summary_ja" not in report["words"][0]
+
+
+@pytest.mark.parametrize("guide, language, example", [
+    ("PLUGIN.ja.md", "ja", "中心に、｛星｝を3個置く。"),
+    ("PLUGIN.md", "en", "Place 3 {stars} at the center."),
+])
+def test_the_guide_object_example_compiles_without_diagnostics(admin, guide, language, example):
+    text = (ROOT / guide).read_text(encoding="utf-8")
+    assert f"`{example}`" in text[text.index("## 2."):text.index("## 3.")]
+    package = _guide(guide)
+    package["words"][0]["definition"] = _guide_object_definition(guide)
+    package["words"][0][f"example_{language}"] = example
+    report = _check(admin, package)
+    assert report["ok"] is True, _codes(report)
+    assert not _codes(report), _codes(report)
 
 
 def test_bundled_v2_leaves_pass_shape_definition_and_real_example_drawings(admin):

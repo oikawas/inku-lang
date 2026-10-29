@@ -7,7 +7,7 @@ Plugins are data-only vocabulary macros. A definition expands into ordinary DDL 
 1. Write an `inku.macro-definition.v2` definition for an object or a scene (§2–3).
 2. Put the definition, Japanese and English notes, optional examples and pictures in an `inku.plugin-package.v2` file (§5.1).
 3. An administrator chooses the JSON or zip in Web settings. The Server checks shape, definition, and drawings of the examples before installation.
-4. Call a visible name in braces: `｛星｝。` or `{stars}.` The old `Sky.星` spelling is still read during the transition.
+4. Call a visible name in braces: `｛星｝。` or `{stars}.` The legacy identifier spelling `Sky.Stars` is also read.
 
 ## 2. Object example
 
@@ -39,7 +39,7 @@ This definition draws one yellow star. `id` is the stable lock identity; `names`
 }
 ```
 
-For an object example, write a position and a count, such as `Place 3 {stars} at the upper left.` The outer count repeats the whole object.
+For an object example, write a position and a count, such as `Place 3 {stars} at the center.` The outer count repeats the whole object.
 
 ## 3. Definition rules
 
@@ -74,13 +74,177 @@ Write `schema`, `namespace`, `id`, `names`, `kind`, `version`, `parameters`, `co
 
 `namespace` and `id` start with an ASCII letter and then use ASCII letters, digits, `_`, or `-`. `names.ja/en` contain visible names, with the primary name first. A name cannot be empty or contain control characters, braces, a dot, or a namespace. Matching normalizes NFKC, lowercases, and collapses whitespace. A plugin may not claim a core word. One catalog name belongs to only one definition, and a file claiming an installed plugin's name is refused.
 
-### 3.3 Parameters and body
+### 3.3 Expressions
 
-Parameter types are `semantic_ref` (category and optional dimension), `exact_decimal` (optional dimension), `integer`, `number`, `boolean`, and `list`. Required parameters are not silently defaulted. A scene call with an undeclared modifier omits that modifier with a diagnostic while keeping the call. Composition and rules place, size, count, and arrange an object through its aspect rectangle without changing its shape. Coloring changes a plugin only when its definition accepts color. A scene remains an inserted drawing.
+Every value is JSON naming its kind with `expr`.
 
-Only a scene may declare one top-level integer parameter such as `{"type":"integer","receives":"count","minimum":1,"maximum":9,"omitted":[3,4,5],"counter":"general"}`. The omitted count comes from its candidates and seed. An out-of-range count omits only that call with `macro_binding_count_out_of_range`. Without the declaration, the count repeats the whole scene.
+| `expr` | Other fields | Meaning |
+|---|---|---|
+| `semantic_ref` | `category`, `id` | a meaning word (§3.8), for example `{"expr":"semantic_ref","category":"color","id":"red"}` |
+| `exact_decimal` | `value` (string) | an exact decimal; write positions and dimensions with it, for example `{"expr":"exact_decimal","value":"0.25"}` |
+| `integer` | `value` | an integer |
+| `number` | `value` | a floating-point number, for `transform` amounts and the like |
+| `boolean` | `value` | true or false |
+| `list` | `items` | a fixed-length list |
+| `cycle` | `items`, `index` | the item at `index` (a non-negative integer), wrapping back to the start; all items have the same kind |
+| `parameter` | `name` | a declared parameter's value |
+| `local` | `name` | the value of a `repeat` `index` or a `vary` `binding` |
 
-Expressions use `expr`: `semantic_ref`, `exact_decimal` for positions and dimensions, `integer`, `number`, `boolean`, `list`, `cycle`, `parameter`, and `local`. Arithmetic is absent. The finite body uses `emit`, `repeat`, `vary`, `use`, `transform`, `anchor`, and `relation`, among others. See the [DDL reference](manual/en/ddl-reference.md) and the [shared core](core/crates/inku-ddl/src/macro_definition.rs) for supported meanings and fields. A plugin cannot add a primitive or executable hook.
+There is no arithmetic. To combine numbers, write the values out as a `cycle` table or `vary` choices.
+
+### 3.4 Parameters
+
+For a scene word, unbound caller position, size, angle, and similar fields are omitted individually with a diagnostic; the definition body remains drawable.
+For an object, caller position, size, angle, count, movement, and relations act on the outer box. Appearance words such as color reach its contents only when the definition declares a matching parameter.
+
+`parameters` maps names to types. The types are closed:
+
+| `type` | Other fields | What the call binds to it |
+|---|---|---|
+| `semantic_ref` | `category`, optional `dimension` | a word of that category written on the call; a color parameter takes "red" in `red {color stars}.` |
+| `exact_decimal` | optional `dimension` | a number written on the call. `dimension` is `radius`, `diameter`, `length`, `side`, `width`, `height`, `chord`, `sagitta`, `position_x`, or `position_y` |
+| `integer` | — | a number written on the call |
+| `integer` (count) | `receives: "count"`, `minimum`, `maximum`, `omitted`, optional `counter` | the count written on the word (below) |
+| `number` | — | a number written on the call |
+| `boolean` | — | — |
+| `list` | `length`, `items` | — |
+
+- Every declared parameter except the count parameter is required. A call that does not write it is not drawn;
+  no default is filled in silently.
+- With two parameters of the same category, names never decide which one a word binds to. Declare one per category.
+- An undeclared appearance word on the call is left out alone with a diagnostic (for example
+  "red" in `Place red {stars}.`). It never overrides values inside the definition.
+- A sway parameter can name its part with `dimension` (`amplitude`, `frequency`, or `quality`), as in
+  `{"type":"semantic_ref","category":"variation","dimension":"amplitude"}`.
+
+**A scene parameter that receives the word's count.** A count written on a word (`5 {star field}.`, `5個の｛星原｝。`)
+repeats the whole word from outside unless the definition declares that it receives it. To take it as the
+inner count, declare an integer parameter with `receives: "count"` and its bounds, and read that parameter as
+the `count` of a body `repeat`.
+
+```json
+"star_count": {"type": "integer", "receives": "count", "minimum": 1, "maximum": 9, "omitted": [3, 4, 5], "counter": "general"}
+```
+
+- Only one top-level scene parameter may declare it, never an object or component parameter.
+- `minimum` is at least 1 and at most `maximum`; `omitted` is not empty and lists distinct integers inside the bounds.
+- Make the `repeat` `maximum` at least the parameter's `maximum`.
+- When no count is written, one of the `omitted` choices is chosen deterministically from the call's seed.
+- A count outside the bounds leaves out only that word with the `macro_binding_count_out_of_range`
+  diagnostic and draws the rest. It is never clamped.
+- `counter` (`flat` for 枚, `long` for 本, `general` for 個) decides only the counter the underdrawing writes
+  with a count in Japanese DDL.
+
+### 3.5 Positions and sizes
+
+- Positions inside a scene are fractions of the canvas; positions inside an object are fractions of its invisible box.
+  In either case, `(0.0, 0.0)` is top left, `(1.0, 1.0)` bottom right, and `(0.5, 0.5)` the center. x is a fraction
+  of the width and y a fraction of the height. A named `place` inside an object is a region inside that box.
+- Scene dimensions are fractions of the canvas's short edge. Dimensions inside an object are fractions of the box's
+  short edge. For example, `radius` 0.24 is a 120px radius when that short edge is 500px; a circle stays round
+  even on a non-square canvas or box. A center plus a radius beyond the edge runs outside.
+- `transform` `translate_x` and `translate_y` use canvas units in a scene and box units inside an object. Scaling
+  the box does not change stroke width or texture fineness.
+- A call to the whole object uses its `aspect` box for placement, count, movement, size, angle, and relations, as an
+  ordinary rectangle would. Normal size and an explicit side use the box's long edge. An explicit width and height
+  set both dimensions.
+- Give a size either with a dimension such as `radius` or with `relative_scale`, not both.
+- A shape without a size takes the same normal size as ordinary DDL. Writing `relative_scale` `normal`
+  explicitly is not the same as writing nothing.
+- The shapes are `line`, `circle`, `ellipse`, `triangle`, `square`, `polygon`, `arc`, `point`, and `cloudform`.
+  A plugin cannot add a tenth.
+
+### 3.6 Body statements
+
+A statement names its kind with `op`.
+
+| `op` | Fields | Meaning |
+|---|---|---|
+| `emit` | `binding` (a name or `null`), `fields` | one shape instruction; `fields` are in §3.7. Name a `binding` to point at it from a `relation` |
+| `repeat` | `count`, `maximum`, `index`, `body` | repeats `body` `count` times (an integer expression). `maximum` is an upper bound of at least 1 that `count` may not exceed. `index` holds a number from 0 |
+| `vary` | `binding`, `domain`, `choices` or `range`, `body` | chooses one value from the seed into `binding` for use in `body`. `choices` is a list of same-kind expressions; `range` is `{"start","end","step"}`. `domain` names the choice so it is kept apart from other `vary` statements |
+| `use` | `component`, `arguments` | calls a component from the same definition's `components`, passing all of its parameters |
+| `group` | `body` | groups statements; adds no placement |
+| `transform` | `transform`, `body` | moves the shapes of `body` together. `transform` has at least one of `translate_x`, `translate_y`, `scale_x`, `scale_y`, `rotate_degrees` (numbers). Scaling and rotation happen at the group's bounding-box center; translation uses the units in §3.5 |
+| `anchor` | `name`, optional `fields` | a non-drawing point; `fields` is either `place` or the pair `position_x` and `position_y` |
+| `relation` | `kind`, `from`, `to` | a relation between two `emit` bindings or anchors; `kind` is a relation word from §3.8 |
+
+- **`vary` chooses again every time it is reached.** Inside `repeat` it chooses for each repetition, and separate
+  `vary` statements for x and y choose separately. Choosing between two position tables with separate x and y
+  `vary` statements mixes the tables and can make shapes overlap. Fix positions with a `cycle` table, and use
+  `vary` for things that may mix, such as size or color.
+- The seed comes from the work's composition seed. The same seed draws the same picture; another seed chooses differently.
+- A component cannot call itself, even indirectly, or a component of another definition.
+- A `relation` works between adjacent `emit` statements of the same expansion. `connected`, `touching`,
+  `not_touching`, `between`, `along`, and `cutting` are available. A relation that cannot hold is removed alone
+  with a diagnostic and the shapes are still drawn. Two arcs joined with `touching`, the later one with
+  `surface: solid`, fill their inside as one closed outline (the leaf form; [SPEC §4.11](SPEC.md#411-the-boundary-of-freedom)).
+
+### 3.7 `emit` fields
+
+An `emit` may have these fields and no others.
+
+| Field | Value | Notes |
+|---|---|---|
+| `shape` | a `shape` word | required; one of the nine shapes in §3.5 |
+| `movement` | a `movement` word | required. `place` reaches the drawing today; `line_up`, `scatter`, and `tile` are covered in Appendix A |
+| `place` | a `place` word | either this or the `position_x` / `position_y` pair: `center`, `top`, `bottom`, `left_edge`, `right_edge`, `top_edge`, `bottom_edge`, `corner`; inside an object it names a box region |
+| `position_x`, `position_y` | `exact_decimal` | written as a pair; fractions of the canvas for a scene or the box inside an object |
+| `radius`, `diameter`, `length`, `side`, `width`, `height`, `chord`, `sagitta` | `exact_decimal` | dimensions. `width` with `height` and `chord` with `sagitta` are pairs. A line takes `length`, an arc `chord` and `sagitta`, a point `radius` or `diameter` |
+| `relative_scale` | a `relative_scale` word | a factor on the normal size |
+| `color` | a `color` word | color |
+| `touch` | a `touch` word | drawing medium |
+| `continuity` | a `continuity` word | stroke continuity (solid, dashed, …) |
+| `surface` | a `surface` word | fill: `none` for an outline only, `solid` for a full fill, or a texture word |
+| `surface_intensity` | a `handling` word | texture strength |
+| `angle` | an `angle` word | tilt; a point takes none |
+| `thinness` | a `thinness` word | stroke thinness; on a closed shape it thins the outline |
+| `fluctuation_amplitude`, `fluctuation_frequency`, `fluctuation_quality`, `ink_spread` | a `variation` word | sway amplitude, frequency, and quality, and bleeding. With amplitude alone, frequency is medium and quality the default |
+| `proportion_aspect` | `ratio` `tall` or `wide` | tall or wide |
+| `proportion_width_extent`, `proportion_arc_form` | a `ratio` word | full or half width; semicircle, waxing, waning, crescent |
+| `shape_form` | `shape_form` `regular` | regular form |
+| `sides` | an integer from 5 to 8 | polygon sides |
+| `count`, `layout_direction` | integer, an `angle` word | covered in Appendix A; write counts with `repeat` |
+
+A value whose category does not match the field is rejected (for example a `touch` word in `color`). A field
+left out takes the same default as ordinary DDL.
+
+### 3.8 Finding meaning words (semantic_ref)
+
+A `semantic_ref` `id` is the English identifier of a word in the Saijiki
+(`core/crates/inku-ddl/assets/saijiki-v2.json`): the word's `score_value` when present, otherwise its
+`surface_en` with `-` and spaces turned into `_`. The table changes with the product, so print today's list
+instead of copying one:
+
+```sh
+python3 - <<'PY'
+import json
+names = {"katachi": "shape", "katamuki": "angle", "tezawari": "touch", "tsuranari": "continuity",
+         "omote": "surface", "sabaki": "handling", "kime": "fineness", "shitaji": "underlayer",
+         "ji": "ground", "iro": "color", "yuragi": "variation", "basho": "place",
+         "ugoki": "movement", "jun": "sequence", "wariai": "ratio"}
+asset = json.load(open("core/crates/inku-ddl/assets/saijiki-v2.json"))
+for category in asset["categories"]:
+    ids = []
+    for word in category["words"]:
+        wire = word.get("score_value") or (word.get("surface_en") or "").replace("-", "_").replace(" ", "_")
+        if wire:
+            ids.append(f"{wire}（{word['surface_ja']}）")
+    print(names[category["key"]] + ": " + ", ".join(ids))
+print("relation: " + ", ".join(r["relation_type"] for r in asset["relations"]))
+PY
+```
+
+Run it at the top of a product checkout. Each line starts with the `category`, and each item is
+`id（Japanese word）`. `free_line` appears under `shape` but is not available to plugins (only the nine in §3.5).
+
+Three categories outside the Saijiki are closed words defined by the core:
+
+| Category | Words |
+|---|---|
+| `thinness` | `fine`, `extra_fine` |
+| `relative_scale` | `very_small`, `small`, `slightly_small`, `normal`, `slightly_large`, `large`, `very_large` |
+| `shape_form` | `regular` |
 
 ## 4. Calling a plugin from DDL
 

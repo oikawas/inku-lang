@@ -7,7 +7,7 @@
 1. 物か情景の語の定義を `inku.macro-definition.v2` で書きます（§2、§3）。
 2. 定義、日英の note、任意の例文と絵を `inku.plugin-package.v2` にまとめます（§5.1）。
 3. 管理者が Web の設定から JSON または PNG を含む zip を選ぶと、Server が形、定義、例文の描画を検査します。通ったファイルだけ追加できます。
-4. DDL では見える名を括弧で呼びます。例：`｛星｝。`、`{stars}.`。移行期間中は旧 `Sky.星` も読めます。
+4. DDL では見える名を括弧で呼びます。例：`｛星｝。`、`{stars}.`。旧形式では識別子による `Sky.Stars` も読めます。
 
 ## 2. 物の語の手本
 
@@ -39,7 +39,7 @@
 }
 ```
 
-物の語の使用例は、位置と数を含めて `左上に3個の｛星｝。` のように書くことを勧めます。外側の個数は物全体を繰り返します。
+物の語の使用例は、位置と数を含めて `中心に、｛星｝を3個置く。` のように書くことを勧めます。外側の個数は物全体を繰り返します。
 
 ## 3. 定義の決まり
 
@@ -74,13 +74,168 @@
 
 `namespace` と `id` は英字で始まる英数字、`_`、`-` だけの識別子です。`names.ja/en` は見える名の配列で、最初が主の名です。空の名、制御文字、括弧、`.`、名前空間を含む名は使えません。照合は NFKC・小文字化・連続空白を一つにする正規化で行います。基本語と同じ名は名乗れません。一つの目録で同じ名を二つの語が持つと曖昧になります。別のプラグインが同じ名を持つファイルは追加できません。
 
-### 3.3 引数と本体
+### 3.3 式
 
-`parameters` は型の表です。`semantic_ref`（分類と任意の dimension）、`exact_decimal`（任意の dimension）、`integer`、`number`、`boolean`、`list` を使います。呼出しに書かれない必須の引数は補いません。情景の語に宣言されていない修飾を添えたときは、語全体ではなく修飾だけを診断付きで外します。物の語は位置・寸法・傾き・数を構図と法則で扱い、定義の形は替えません。配色が変えるのは定義が色を受けるときだけです。
+値はすべて、`expr`で種類を示すJSONで書く。
 
-情景だけが最上位の整数引数一つに `{"type":"integer","receives":"count","minimum":1,"maximum":9,"omitted":[3,4,5],"counter":"general"}` を書けます。省略時は候補から seed で決まり、範囲外は `macro_binding_count_out_of_range` でその呼出しだけ外れます。宣言しなければ外側の反復です。
+| `expr` | 他の欄 | 意味 |
+|---|---|---|
+| `semantic_ref` | `category`, `id` | 意味の語（§3.8）。例: `{"expr":"semantic_ref","category":"color","id":"red"}` |
+| `exact_decimal` | `value`（文字列） | 正確な十進数。位置と寸法はこれで書く。例: `{"expr":"exact_decimal","value":"0.25"}` |
+| `integer` | `value` | 整数 |
+| `number` | `value` | 小数（f64）。`transform`の量などに使う |
+| `boolean` | `value` | 真偽 |
+| `list` | `items` | 固定長の並び |
+| `cycle` | `items`, `index` | `index`（0以上の整数）番目の項を取る。端を越えると先頭へ戻る。`items`はすべて同じ種類にする |
+| `parameter` | `name` | 宣言した引数の値 |
+| `local` | `name` | `repeat`の`index`か`vary`の`binding`の値 |
 
-式は `expr` で種類を示し、`semantic_ref`、位置・寸法の `exact_decimal`、`integer`、`number`、`boolean`、`list`、`cycle`、`parameter`、`local` を使います。算術はありません。本体は `emit`、`repeat`、`vary`、`use`、`transform`、`anchor`、`relation` 等の有限な文です。詳細な値と意味語は [DDL の手引き](manual/ja/ddl-reference.md) と [共有 core](core/crates/inku-ddl/src/macro_definition.rs) を参照してください。新しい図形や実行 hook は追加できません。
+算術（足し算・掛け算など）は無い。数を組み合わせたいときは、`cycle`の表や`vary`の選択肢として値を書き並べる。
+
+### 3.4 引数（parameters）
+
+情景の語が受けない位置・大きさ・傾きなどを呼出しに書いた場合、その欄だけを診断付きで外し、定義の本体は描く。
+物の語では位置・寸法・傾き・数・動き・関係は外側の箱に働く。色などの見た目の語は定義が引数で受けるときだけ中身に働く。
+
+引数は名前から型への表である。型は次に限られる。
+
+| `type` | 他の欄 | 呼出しで結ばれるもの |
+|---|---|---|
+| `semantic_ref` | `category`、任意の`dimension` | 呼出しに書いたその分類の語。例: 色の引数は`赤い｛色星｝。`の「赤い」を受ける |
+| `exact_decimal` | 任意の`dimension` | 呼出しに書いた数。`dimension`は`radius`・`diameter`・`length`・`side`・`width`・`height`・`chord`・`sagitta`・`position_x`・`position_y` |
+| `integer` | — | 呼出しに書いた数 |
+| `integer`（個数） | `receives: "count"`, `minimum`, `maximum`, `omitted`, 任意の`counter` | 語に書いた個数（下の説明） |
+| `number` | — | 呼出しに書いた数 |
+| `boolean` | — | — |
+| `list` | `length`, `items` | — |
+
+- 宣言した引数は、個数の引数を除いてすべて必須である。呼出しに書かれないと、その呼出しは描かれない。
+  黙って既定値を入れることはない。
+- 同じ分類の引数を二つ宣言しても、引数の名前からどちらへ結ぶかを推測しない。分類ごとに一つにする。
+- 宣言していない見た目の語を呼出しに書くと、その語だけが診断付きで外れる（例: `赤い｛星｝を置く。`の「赤い」）。
+  定義の中の値は上書きされない。
+- 揺らぎの引数は`{"type":"semantic_ref","category":"variation","dimension":"amplitude"}`のように、
+  `dimension`（`amplitude`・`frequency`・`quality`）で幅・速さ・質を分けられる。
+
+**情景の語の個数を受ける引数。** 語に書いた個数（`5個の｛星原｝。`、`5 {star field}.`）は、受けると宣言しない限り、
+語全体を外から繰り返す。中の個数として受けるには、整数の引数に`receives: "count"`と範囲を宣言し、
+本体の`repeat`の`count`でその引数を読む。
+
+```json
+"star_count": {"type": "integer", "receives": "count", "minimum": 1, "maximum": 9, "omitted": [3, 4, 5], "counter": "general"}
+```
+
+- 情景の語の最上位の引数に一つだけ宣言できる。物の語にも部品の引数にも置けない。
+- `minimum`は1以上で`maximum`以下、`omitted`は空でなく、重複せず、範囲の中の整数だけを並べる。
+- `repeat`の`maximum`は引数の`maximum`以上にする。
+- 個数が書かれなければ、`omitted`の候補から呼出しの種で一つを決まった仕方で選ぶ。
+- 範囲の外の個数は`macro_binding_count_out_of_range`の診断を出してその語だけを外し、ほかは描く。丸めない。
+- `counter`（`flat`は枚、`long`は本、`general`は個）は、下絵が日本語のDDLに個数を書くときの助数詞だけを決める。
+
+### 3.5 位置と大きさの決まり
+
+- 情景の語の位置は画面に対する割合、物の語の中身の位置は見えない箱に対する割合である。どちらも
+  `(0.0, 0.0)`が左上、`(1.0, 1.0)`が右下、`(0.5, 0.5)`が中央。xは幅、yは高さに対する割合になる。
+  物の語の名の位置（`place`）も箱の中の領域を指す。
+- 情景の語の寸法は画面の短い辺、物の語の中身の寸法は箱の短い辺に対する割合である。
+  たとえば`radius` 0.24は、その短い辺が500pxなら半径120px。紙や箱が正方形でなくても円は円のまま。
+  中心と半径が端を超えると外へはみ出す。
+- `transform`の`translate_x`・`translate_y`は情景では画面の単位、物の語の中身では箱の単位である。
+  箱を大きくしても線の太さと質感の細かさは変えない。
+- 呼出しの物全体は`aspect`の見えない四角として通常の四角と同じ位置・数・動き・大きさ・傾き・関係を解く。
+  普通の大きさと一辺の指定は箱の長い辺に合わせ、幅と高さを両方指定したときはその値を使う。
+- 大きさは`radius`などの寸法か`relative_scale`のどちらか一方で書く。
+- 大きさを書かない図形は、通常のDDLと同じ普通の大きさになる。`relative_scale`の`normal`を明示したときと、書かないときは別の扱いである。
+- 図形の種類は`line`・`circle`・`ellipse`・`triangle`・`square`・`polygon`・`arc`・`point`・`cloudform`の9つで、プラグインは10番目の図形を足せない。
+
+### 3.6 本体の文（body）
+
+文は`op`で種類を示す。
+
+| `op` | 欄 | 意味 |
+|---|---|---|
+| `emit` | `binding`（名前か`null`）, `fields` | 図形1つの指示。`fields`は§3.7。`binding`に名前を付けると`relation`で指せる |
+| `repeat` | `count`, `maximum`, `index`, `body` | `count`回（整数の式）`body`を繰り返す。`maximum`は1以上の上限で、`count`がそれを超えてはいけない。`index`に0からの番号が入る |
+| `vary` | `binding`, `domain`, `choices`か`range`, `body` | 種から値を一つ選んで`binding`に入れ、`body`で使う。`choices`は同じ種類の式の並び、`range`は`{"start","end","step"}`。`domain`は選び方を他の`vary`と分ける名前 |
+| `use` | `component`, `arguments` | 同じ定義の`components`の部品を呼ぶ。部品の引数はすべて渡す |
+| `group` | `body` | 文をまとめる。配置は足さない |
+| `transform` | `transform`, `body` | `body`の図形をまとめて動かす。`transform`は`translate_x`・`translate_y`・`scale_x`・`scale_y`・`rotate_degrees`のうち一つ以上（数）。拡大縮小と回転はまとまりの外接矩形の中心で行い、移動は§3.5の単位で行う |
+| `anchor` | `name`, 任意の`fields` | 描かない目印の点。`fields`は`place`か、`position_x`と`position_y`の組のどちらか一方 |
+| `relation` | `kind`, `from`, `to` | 二つの`emit`（`binding`）や`anchor`の関係。`kind`は§3.8の関係の語 |
+
+- **`vary`は出会うたびに選び直す。** `repeat`の中の`vary`は繰り返しのたびに、x用とy用に分けた`vary`はそれぞれ別に選ぶ。
+  二つの位置の表から一つを選ぶつもりでxとyを別の`vary`にすると、表が混ざって図形が重なることがある。
+  位置は`cycle`の表で決め、`vary`は大きさや色など、混ざってよいものに使う。
+- 選ぶ種は作品の構図の種から来る。同じ種なら同じ画になり、種が変わると選び方も変わる。
+- 部品は自分自身を（間接的にも）呼べない。他の定義の部品も呼べない。
+- `relation`は、同じ展開の中で隣り合う`emit`の間で働く。`connected`・`touching`・`not_touching`・`between`・`along`・`cutting`を使える。
+  成り立たない関係は、その関係だけが診断付きで外れ、図形は描かれる。二つの弧を`touching`でつなぎ、
+  後の弧を`surface: solid`で塗ると、二つの弧を一つの閉じた輪郭として内側を塗る（葉の形。[SPEC §4.11](SPEC.ja.md#411-自由度の境界)）。
+
+### 3.7 `emit`の欄
+
+`emit`は次の欄を持てる。これ以外の欄は受け付けられない。
+
+| 欄 | 値 | 書くこと |
+|---|---|---|
+| `shape` | `shape`の語 | 必須。§3.5の9つの図形 |
+| `movement` | `movement`の語 | 必須。今の描画に届くのは`place`。`line_up`・`scatter`・`tile`は付録Aの範囲 |
+| `place` | `place`の語 | `position_x`と`position_y`の組とどちらか一方。`center`・`top`・`bottom`・`left_edge`・`right_edge`・`top_edge`・`bottom_edge`・`corner`。物の語の中身では箱の領域 |
+| `position_x`, `position_y` | `exact_decimal` | 二つ組で書く。情景では画面、物の語の中身では箱に対する割合 |
+| `radius`, `diameter`, `length`, `side`, `width`, `height`, `chord`, `sagitta` | `exact_decimal` | 寸法。`width`と`height`、`chord`と`sagitta`は組で書く。線は`length`、弧は`chord`と`sagitta`、点は`radius`か`diameter` |
+| `relative_scale` | `relative_scale`の語 | 普通の大きさに対する倍率 |
+| `color` | `color`の語 | 色 |
+| `touch` | `touch`の語 | 画材 |
+| `continuity` | `continuity`の語 | 線の連なり（実線・破線など） |
+| `surface` | `surface`の語 | 面の塗り。`none`は輪郭だけ、`solid`は塗りつぶし、ほかは質感の語 |
+| `surface_intensity` | `handling`の語 | 面の質感の濃さ |
+| `angle` | `angle`の語 | 傾き。点には書けない |
+| `thinness` | `thinness`の語 | 線の細さ。閉じた形では輪郭の線に効く |
+| `fluctuation_amplitude`, `fluctuation_frequency`, `fluctuation_quality`, `ink_spread` | `variation`の語 | 揺らぎの幅・速さ・質と、にじみ。幅だけを書くと速さは中、質は既定になる |
+| `proportion_aspect` | `ratio`の`tall`・`wide` | 縦長・横長 |
+| `proportion_width_extent`, `proportion_arc_form` | `ratio`の語 | 全幅・半幅、半円・上弦・下弦・三日月 |
+| `shape_form` | `shape_form`の`regular` | 正形 |
+| `sides` | 整数5〜8 | 多角形の辺の数 |
+| `count`, `layout_direction` | 整数、`angle`の語 | 付録Aの範囲。個数は`repeat`で書く |
+
+値の分類が欄と合わないと受け付けられない（例: `color`の欄に`touch`の語）。
+書かない欄は、通常のDDLと同じ既定になる。
+
+### 3.8 意味の語（semantic_ref）の調べ方
+
+`semantic_ref`の`id`は、歳時記（`core/crates/inku-ddl/assets/saijiki-v2.json`）の語の英語の識別子である。
+語の`score_value`があればそれ、無ければ`surface_en`の`-`と空白を`_`にしたものになる。表は製品とともに変わるので、
+写さずに次のコマンドで今の一覧を出す。
+
+```sh
+python3 - <<'PY'
+import json
+names = {"katachi": "shape", "katamuki": "angle", "tezawari": "touch", "tsuranari": "continuity",
+         "omote": "surface", "sabaki": "handling", "kime": "fineness", "shitaji": "underlayer",
+         "ji": "ground", "iro": "color", "yuragi": "variation", "basho": "place",
+         "ugoki": "movement", "jun": "sequence", "wariai": "ratio"}
+asset = json.load(open("core/crates/inku-ddl/assets/saijiki-v2.json"))
+for category in asset["categories"]:
+    ids = []
+    for word in category["words"]:
+        wire = word.get("score_value") or (word.get("surface_en") or "").replace("-", "_").replace(" ", "_")
+        if wire:
+            ids.append(f"{wire}（{word['surface_ja']}）")
+    print(names[category["key"]] + ": " + ", ".join(ids))
+print("relation: " + ", ".join(r["relation_type"] for r in asset["relations"]))
+PY
+```
+
+productのcheckoutの最上位で走らせる。出力の行頭が`category`、各項目が`id（日本語の語）`である。
+`shape`の`free_line`は一覧にあるが、プラグインの図形には使えない（§3.5の9つだけ）。
+
+歳時記の外にある三つの分類は、coreが決めた閉じた語である。
+
+| 分類 | 語 |
+|---|---|
+| `thinness` | `fine`, `extra_fine` |
+| `relative_scale` | `very_small`, `small`, `slightly_small`, `normal`, `slightly_large`, `large`, `very_large` |
+| `shape_form` | `regular` |
 
 ## 4. DDL での呼び方
 

@@ -146,7 +146,7 @@ The `Plugins` settings add and delete vocabulary plugins and show whether each i
 - `Replace picture` on a word uploads a PNG the Saijiki shows instead; `Back to the original picture` returns to the zip's picture or the one drawn from the example. Replacing the plugin keeps replaced pictures.
 - `Export` saves a v2 zip with definitions, notes, examples, and current pictures; another Server can add it as it is.
 - An added plugin can be switched off or deleted.
-- Bundled `Nature.leaves` is a v2 file in the core. It can be disabled but not deleted or given replacement artwork. Old v1 files appear as rejected with reasons.
+- Bundled `Nature.leaves` is a v2 file in the core. It can be disabled but not deleted or given a replacement picture. Old v1 files appear as rejected with reasons.
 
 Bundled leaves do not depend on `INKU_PLUGIN_PACKAGE_DIR`; only administrator-installed files are read there.
 

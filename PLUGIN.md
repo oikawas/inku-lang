@@ -7,7 +7,7 @@ Plugins are data-only vocabulary macros. A definition expands into ordinary DDL 
 1. Write an `inku.macro-definition.v2` definition for an object or a scene (§2–3).
 2. Put the definition, Japanese and English notes, optional examples and pictures in an `inku.plugin-package.v2` file (§5.1).
 3. An administrator chooses the JSON or zip in Web settings. The Server checks shape, definition, and drawings of the examples before installation.
-4. Call a visible name in braces: `｛星｝。` or `{stars}.` The legacy identifier spelling `Sky.Stars` is also read.
+4. Call a visible name in braces: `｛星｝。` or `{stars}.`
 
 ## 2. Object example
 

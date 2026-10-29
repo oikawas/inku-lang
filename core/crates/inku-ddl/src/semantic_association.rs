@@ -677,6 +677,7 @@ const fn macro_resolution_issue_kind(
     kind: MacroInvocationResolutionDiagnosticKind,
 ) -> &'static str {
     match kind {
+        MacroInvocationResolutionDiagnosticKind::OldNotation => "plugin_old_notation",
         MacroInvocationResolutionDiagnosticKind::MissingLock => "macro_resolution_missing_lock",
         MacroInvocationResolutionDiagnosticKind::AmbiguousLockPrefix => {
             "macro_resolution_ambiguous_lock_prefix"

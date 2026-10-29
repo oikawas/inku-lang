@@ -188,7 +188,7 @@ Webの歳時記previewも現行カテゴリに合わせる。おもて9語は同
 
 ## 4. プラグイン設計原則
 
-本節のpluginは、`｛若葉｝`のように括弧で明示的に呼ぶ、data-onlyの**語彙マクロ**を意味する。移行期間は`Nature.若葉`の書き方も読む。外部code hookではない。Canvasはshared coreのhost option、Render Engine Packは描画coreの差し替えであり、この意味のpluginではない。
+本節のpluginは、`｛若葉｝`のように括弧で明示的に呼ぶ、data-onlyの**語彙マクロ**を意味する。旧表記 `Nature.若葉` は描画では読まず、移行の関数だけが読む。外部code hookではない。Canvasはshared coreのhost option、Render Engine Packは描画coreの差し替えであり、この意味のpluginではない。
 
 ### 4.1 なぜプラグインを最初から設計するか
 
@@ -219,7 +219,7 @@ Nature plugin（雨・葉・水・風）のような具象語彙をコアに入�
 「置く」の意味を書き換えるプラグインは作れない。コアの語彙は不変。
 
 **原則3: プラグインは明示的に参照される**
-`｛若葉｝` / `{young leaves}` のように名を波括弧で囲む。素の語彙空間を汚さず、使用を明示する。移行の間は `Nature.若葉` も読む。
+`｛若葉｝` / `{young leaves}` のように名を波括弧で囲む。素の語彙空間を汚さず、使用を明示する。旧表記 `Nature.若葉` は描画では読まず、移行の関数だけが読む。
 
 **原則4: プラグインは単独で完結する**
 プラグインAがプラグインBに依存することを禁じる。依存関係の連鎖がないことで、導入・削除が独立できる。
@@ -273,7 +273,7 @@ v1が保存済みMacroDefinitionのために受理した旧`variation:trembling`
 
 宣言parameterはすべて必須である。三parameterを宣言してcallerが一値だけならMissingCompatibleFact等のbinding errorとなる。一振幅parameterだけを宣言してEmitへ届けた場合は、§13.6の同じresolverが残る二slotを解決する。未宣言callerの推測overlay、generic variation一fieldからの三slot推測、parameter optional化は行わない。
 
-例外は語の個数を受けるparameterだけである（2026-09-28 作者決定、I-702）。語に書いた個数（`Nature.若葉を10枚`、`Place 10 Nature.YoungLeaves`）は、定義が受けると宣言しない限り、従来どおり語全体の外側の反復になる。定義は整数parameterに`{"type":"integer","receives":"count","minimum":1,"maximum":12,"omitted":[4,5,6]}`のように宣言して、それを中の個数として受ける。宣言できるのは定義の最上位のparameterに一つだけで、componentのparameterには置けない。`minimum`は1以上で`maximum`以下、`omitted`は空でなく重複しない範囲内の整数列である。`receives`の無い整数parameterはこれらのfieldを持たず、canonical bytesは従来の`{"type":"integer"}`のままである。個数を受けるのは呼出しに付いた単独の数だけで、辺数の修飾は受けない。受けた個数はそのparameterが所有し、外側の反復にはならない。個数を書かない呼出しでは、`omitted`の候補から、その呼出しのattested seedとparameter名で決定的に一つを選ぶ。範囲外の個数は`macro_binding_count_out_of_range`の診断付きでその呼出しだけを省き、ほかを描く。黙って範囲へ丸めない。この診断はLLMの補完の対象（穴）にしない。同梱`Nature.leaves` 2.1.0では、紅葉（`AutumnLeaves`）を除く六語がこの宣言を持つ（2026-10-01 作者決定）。若葉・落葉・枯葉は葉の枚数（1〜12・1〜16・1〜8枚、省略時4〜6・8〜12・2〜4枚）、青葉は枝の上の葉の枚数（1〜12枚、省略時6〜8枚）、下草・枯草は3〜5本の葉の株の数（1〜3株、省略時1〜2株、株ごとの本数はseedで決まる）を受ける。紅葉は一枚の葉の裂片を描く語なので受けず、書いた個数は紅葉の葉の数として外側の反復のままである。外側の反復の写しは同じ場所に重ねず、写しを一つの成員とする配置groupで一度だけ置く（2026-10-04 作者決定、I-708）。動作なし・置く・散らす・引くは`cells`（Score 0.19.0、recipeは`{"kind":"cells"}`）で、演奏した写しのうち最大の外接矩形に合わせて画面を区画に分ける（区画は画面の左上の角から敷く。正方形でない画面でも同じ。render engine 86）。各軸の区画の数は、写しが収まる数のうち1以上・写しの数以下である。写しごとに演奏seedで別の区画を選び、区画の中ではみ出さない範囲でseedでずらす。区画より写しが多いときだけ、同じ順で区画を使い直し、写しが重なる。写しの大きさは関係で動いた後の形で決まるので、組み立ての時には求めない。並べる・敷き詰めるはgroupの`horizontal_source_order`・`tile`で置く。位置・埋める・順序・関係を持つ呼出しと、鏡写しの対象になる呼出しは従来の反復のままである。任意の`counter`（`flat`・`long`・`general`）は数える物の種類で、日本語の印字の助数詞（枚・本・個）だけを決め、個数の意味は変えない。Stage 1の下絵は記述に書かれた個数をプラグインへ渡す（§12.6）。
+例外は語の個数を受けるparameterだけである（2026-09-28 作者決定、I-702）。語に書いた個数（`｛若葉｝を10枚`、`Place 10 {young leaves}`）は、定義が受けると宣言しない限り、従来どおり語全体の外側の反復になる。定義は整数parameterに`{"type":"integer","receives":"count","minimum":1,"maximum":12,"omitted":[4,5,6]}`のように宣言して、それを中の個数として受ける。宣言できるのは定義の最上位のparameterに一つだけで、componentのparameterには置けない。`minimum`は1以上で`maximum`以下、`omitted`は空でなく重複しない範囲内の整数列である。`receives`の無い整数parameterはこれらのfieldを持たず、canonical bytesは従来の`{"type":"integer"}`のままである。個数を受けるのは呼出しに付いた単独の数だけで、辺数の修飾は受けない。受けた個数はそのparameterが所有し、外側の反復にはならない。個数を書かない呼出しでは、`omitted`の候補から、その呼出しのattested seedとparameter名で決定的に一つを選ぶ。範囲外の個数は`macro_binding_count_out_of_range`の診断付きでその呼出しだけを省き、ほかを描く。黙って範囲へ丸めない。この診断はLLMの補完の対象（穴）にしない。同梱`Nature.leaves` 2.1.0では、紅葉（`AutumnLeaves`）を除く六語がこの宣言を持つ（2026-10-01 作者決定）。若葉・落葉・枯葉は葉の枚数（1〜12・1〜16・1〜8枚、省略時4〜6・8〜12・2〜4枚）、青葉は枝の上の葉の枚数（1〜12枚、省略時6〜8枚）、下草・枯草は3〜5本の葉の株の数（1〜3株、省略時1〜2株、株ごとの本数はseedで決まる）を受ける。紅葉は一枚の葉の裂片を描く語なので受けず、書いた個数は紅葉の葉の数として外側の反復のままである。外側の反復の写しは同じ場所に重ねず、写しを一つの成員とする配置groupで一度だけ置く（2026-10-04 作者決定、I-708）。動作なし・置く・散らす・引くは`cells`（Score 0.19.0、recipeは`{"kind":"cells"}`）で、演奏した写しのうち最大の外接矩形に合わせて画面を区画に分ける（区画は画面の左上の角から敷く。正方形でない画面でも同じ。render engine 86）。各軸の区画の数は、写しが収まる数のうち1以上・写しの数以下である。写しごとに演奏seedで別の区画を選び、区画の中ではみ出さない範囲でseedでずらす。区画より写しが多いときだけ、同じ順で区画を使い直し、写しが重なる。写しの大きさは関係で動いた後の形で決まるので、組み立ての時には求めない。並べる・敷き詰めるはgroupの`horizontal_source_order`・`tile`で置く。位置・埋める・順序・関係を持つ呼出しと、鏡写しの対象になる呼出しは従来の反復のままである。任意の`counter`（`flat`・`long`・`general`）は数える物の種類で、日本語の印字の助数詞（枚・本・個）だけを決め、個数の意味は変えない。Stage 1の下絵は記述に書かれた個数をプラグインへ渡す（§12.6）。
 
 `inku.macro-definition.v1`はclosed typed parameterと、definition-local `components`、共通operator `emit` / `use` / `group` / `anchor` / `relation` / bounded `repeat` / typed `transform` / deterministic bounded `vary`だけを持つ。任意code、I/O、無制限loop、recursion / component cycle、filesystem / network / clock / environment、外部macro依存、raw SVG / Score / renderer instructionの生成を許さない。Expansionはeffect-freeで、attested composition seedと明示boundsから決定的なsemantic nodeとsource / generated typed provenanceを返す。
 
@@ -332,7 +332,7 @@ Render Engine は、`JSON Score + render options + server-owned color metadata` 
 
 ### 4.10 名前空間の規約
 
-定義は名前空間と id を持ち、lock と保存に使う。DDL は名前空間を書かず、`｛若葉｝` のように見える名を括弧で囲む。名は NFKC・小文字・連続空白の正規化で照合し、異なる定義が同じ名を持つと曖昧として診断する。移行期間は従来の `Nature.若葉` も読む。
+定義は名前空間と id を持ち、lock と保存に使う。DDL は名前空間を書かず、`｛若葉｝` のように見える名を括弧で囲む。名は NFKC・小文字・連続空白の正規化で照合し、異なる定義が同じ名を持つと曖昧として診断する。従来の `Nature.若葉` は描画では読まず、移行の関数だけが読む。
 
 ### 4.11 自由度の境界
 

@@ -258,6 +258,7 @@ export const ja: LangPack = {
 	pipelineDiagnosticUnknown: '詳しい診断情報があります。',
 	pipelinePluginDiagnostic: (reason, name, suggestion) => {
 		switch (reason) {
+			case 'plugin_old_notation': return `${name} は古い書き方です。${suggestion ? `${suggestion} で書いてください。` : '括弧つきの名で書いてください。'}`;
 			case 'plugin_disabled': return `プラグイン ${name} は無効になっているため、この文は描かれていません。有効にすると描けます。`;
 			case 'plugin_name_mismatch': return `プラグイン ${name} は登録名と一致しないため、この文は描かれていません。${suggestion ? `${suggestion} のことですか。` : ''}`;
 			case 'plugin_version_mismatch': return `プラグイン ${name} の中身が作品の保存時と違うため、この文は描かれていません。`;
@@ -544,6 +545,7 @@ export const ja: LangPack = {
 	ddlUnknownNameUnregistered: 'この名前は登録されていません',
 	ddlPluginReason: (reason, suggestion, candidates) => {
 		switch (reason) {
+			case 'plugin_old_notation': return suggestion ? `古い書き方です。${suggestion} で書いてください。` : '古い書き方です。括弧つきの名で書いてください。';
 			case 'plugin_disabled': return '無効になっています。有効にすると描けます。';
 			case 'plugin_name_mismatch': return suggestion ? `${suggestion} のことですか。` : 'この Server にない名前です。';
 			case 'plugin_name_ambiguous': return `複数の語に当たります：${candidates.join('、')}。`;

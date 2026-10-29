@@ -140,11 +140,12 @@ fn suggestion(name: &str, enabled: &[String]) -> Option<String> {
         .map(|(_, candidate)| candidate.clone())
 }
 
-pub(crate) fn explain(
+fn explain(
     source: &str,
     diagnostics: &[Value],
     enabled: &[String],
     disabled: &[String],
+    names: &[PluginName],
 ) -> Vec<PluginDiagnostic> {
     let known: BTreeSet<&str> = enabled.iter().chain(disabled).map(String::as_str).collect();
     let mut out = Vec::new();
@@ -159,7 +160,9 @@ pub(crate) fn explain(
         // A resolved word whose written count lies outside what it receives
         // (SPEC §4.6) is left out the same way, so it is explained here too.
         let count = reason == "macro_binding_count_out_of_range";
-        if !version
+        let old_notation = reason == "plugin_old_notation";
+        if !old_notation
+            && !version
             && !count
             && !matches!(
                 reason,
@@ -186,7 +189,23 @@ pub(crate) fn explain(
         let Some(name) = written_name(text, &known) else {
             continue;
         };
-        let (reason, suggestion) = if count {
+        let (reason, suggestion) = if old_notation {
+            let candidate = names
+                .iter()
+                .find(|entry| {
+                    entry.qualified_name == name
+                        || name.split_once('.').is_some_and(|(namespace, heading)| {
+                            entry
+                                .qualified_name
+                                .split_once('.')
+                                .is_some_and(|(other, _)| other == namespace)
+                                && inku_ddl::plugin_names::normalize_plugin_name(&entry.name)
+                                    == inku_ddl::plugin_names::normalize_plugin_name(heading)
+                        })
+                })
+                .map(|entry| entry.qualified_name.clone());
+            ("plugin_old_notation", candidate)
+        } else if count {
             ("plugin_count_out_of_range", None)
         } else if version {
             ("plugin_version_mismatch", None)
@@ -324,6 +343,7 @@ fn run(input_bytes: &[u8]) -> Result<Output, ()> {
         &input.upstream_diagnostics,
         &input.enabled,
         &input.disabled,
+        &input.plugin_names,
     );
     plugins.extend(explain_bracketed(
         &input.source,
@@ -474,7 +494,7 @@ mod tests {
         ];
         let enabled = ["Nature.紅葉".to_owned(), "Nature.若葉".to_owned()];
         let disabled = ["Old.Mark".to_owned()];
-        let explained = explain(source, &diagnostics, &enabled, &disabled);
+        let explained = explain(source, &diagnostics, &enabled, &disabled, &[]);
         let summary: Vec<_> = explained
             .iter()
             .map(|item| (item.name.as_str(), item.reason, item.suggestion.as_deref()))

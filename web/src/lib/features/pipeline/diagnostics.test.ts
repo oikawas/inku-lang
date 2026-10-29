@@ -96,6 +96,13 @@ test('a withheld plugin sentence is explained in the author\'s language', () => 
 	);
 });
 
+test('retired notation names the braced replacement in both languages', () => {
+	const entry = { qualified_name: 'Nature.YoungLeaves', surface_ja: ['若葉'], surface_en: ['young leaves'] };
+	const diagnostic = { channel: 'plugin' as const, value: { name: 'Nature.若葉', reason: 'plugin_old_notation', suggestion: 'Nature.YoungLeaves', start_byte: 0, end_byte: 13 } };
+	assert.equal(formatPipelineDiagnostic(diagnostic, ja, [entry]), 'Nature.若葉 は古い書き方です。｛若葉｝ で書いてください。');
+	assert.equal(formatPipelineDiagnostic(diagnostic, en, [entry]), 'Nature.若葉 uses the old notation. Write {young leaves} instead.');
+});
+
 test('an ambiguous name names its candidates by their primary names', () => {
 	const entries = [
 		{ qualified_name: 'Sky.Stars', surface_ja: ['星'], surface_en: ['stars'] },

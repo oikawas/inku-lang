@@ -54,16 +54,16 @@ def test_work_v2_visible_names_reach_the_shared_explainer(monkeypatch):
     assert "Studio.Stars" in binding.received["enabled"]
 
 
-def test_disabled_v2_word_is_explained_for_its_legacy_identifier(monkeypatch):
+def test_retired_v2_identifier_is_explained_even_when_disabled(monkeypatch):
     from inku_server.pipeline_candidate import PipelineBinding
 
     manager = macro_catalog.PLUGIN_PACKAGE_MANAGER
     monkeypatch.setattr(manager, "packages", lambda: [])
     monkeypatch.setattr(manager, "is_enabled", lambda _package: False)
     source = "Nature.YoungLeaves。"
-    diagnostics = [{"reason": "macro_resolution_missing_lock", "span": {"start_byte": 0, "end_byte": len(source.encode())}}]
+    diagnostics = [{"reason": "plugin_old_notation", "span": {"start_byte": 0, "end_byte": len("Nature.YoungLeaves".encode())}}]
     result = macro_catalog.explain_plugin_diagnostics(PipelineBinding(), source, diagnostics)
-    assert result[0]["reason"] == "plugin_disabled"
+    assert result[0]["reason"] == "plugin_old_notation"
 
 
 def test_run_offer_projection_uses_saved_names_and_includes_chunk_rewrite():

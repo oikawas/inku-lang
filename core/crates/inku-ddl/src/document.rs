@@ -96,9 +96,18 @@ pub struct NormalizedDdlDocument {
     source: String,
     language: ResolvedInstructionLanguage,
     macro_locks: Vec<MacroLock>,
+    legacy_names_for_migration: bool,
 }
 
 impl NormalizedDdlDocument {
+    /// Enable the retired qualified spelling solely to locate migration edits.
+    pub fn with_legacy_names_for_migration(mut self) -> Self {
+        self.legacy_names_for_migration = true;
+        self
+    }
+    pub(crate) const fn legacy_names_for_migration(&self) -> bool {
+        self.legacy_names_for_migration
+    }
     /// Attach visible names only from definitions matching the complete lock identity.
     pub fn with_definition_names(mut self, definitions: &[crate::MacroDefinition]) -> Self {
         for lock in &mut self.macro_locks {
@@ -150,6 +159,7 @@ impl NormalizedDdlDocument {
             source: source.into(),
             language,
             macro_locks,
+            legacy_names_for_migration: false,
         })
     }
 
@@ -174,6 +184,7 @@ impl NormalizedDdlDocument {
             source,
             language: self.language,
             macro_locks: self.macro_locks.clone(),
+            legacy_names_for_migration: self.legacy_names_for_migration,
         }
     }
 }

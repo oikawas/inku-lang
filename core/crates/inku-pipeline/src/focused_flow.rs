@@ -287,7 +287,7 @@ fn canonical_macro_crosses_owned_start_and_commit() {
             config: Box::new(selected),
             authority: VariationAuthorityState::new_direct_ddl(),
             authoring: AuthoringInput::DirectDdl {
-                source: "Example.Circle.".into(),
+                source: "{circle}.".into(),
                 completion_ranges: None,
                 laws_layers: None,
                 laws_basis: None,
@@ -630,7 +630,7 @@ fn stage1_compiler_feedback_uses_the_shared_attempt_budget() {
         PipelineInput::EffectResult {
             result: EffectResult::NormalizedDdlGenerated {
                 identity: state.action.as_ref().unwrap().identity.clone(),
-                response: json!({"normalized_ddl": "Unknown.Macro."}).to_string(),
+                response: json!({"normalized_ddl": "{unknown macro}."}).to_string(),
                 elapsed_ms: DecimalU64::new(20),
             },
         },
@@ -787,7 +787,7 @@ fn stage1_does_not_correct_canonical_ddl_when_macro_expansion_exceeds_its_budget
         .to_string(),
     )
     .unwrap();
-    let source = "Example.Circle. Example.Circle.";
+    let source = "{circle}. {circle}.";
     let identity = definition.identity().unwrap();
     let document = inku_ddl::NormalizedDdlDocument::new(
         source,

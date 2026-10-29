@@ -668,7 +668,7 @@ Write one of the nine abstract colors and let the work's color catalog resolve i
 
 ### 3.22 Plugin invocation
 
-DDL 28 writes a visible plugin name in braces, as in `{young leaves}`. Full-width and ASCII braces may be mixed; names match locks after NFKC, lowercasing, and whitespace folding. An unknown or ambiguous name omits its sentence with a diagnostic. The qualified form remains readable during migration.
+DDL 28 writes a visible plugin name in braces, as in `{young leaves}`. Full-width and ASCII braces may be mixed; names match locks after NFKC, lowercasing, and whitespace folding. An unknown or ambiguous name omits its sentence with a diagnostic. Only the migration function reads the old qualified form; drawing does not.
 
 The editor completes names after a brace and marks the ranges and reasons returned by the shared core, including on hover.
 
@@ -679,7 +679,7 @@ Namespace.Heading
 Namespace.宣言済み別名
 ```
 
-In a new definition, `id` is the stored lock identity and `names.ja/en` are visible DDL names. For bundled leaves, the primary names of `Nature.YoungLeaves` are `｛若葉｝` and `{young leaves}`. The old `Nature.若葉` spelling remains readable for saved works during migration. A visible name cannot claim a core word.
+In a new definition, `id` is the stored lock identity and `names.ja/en` are visible DDL names. For bundled leaves, the primary names of `Nature.YoungLeaves` are `｛若葉｝` and `{young leaves}`. Only the migration function reads the old `Nature.若葉` spelling. A visible name cannot claim a core word.
 
 Check the exact registered name and its public parameter types and bounds, and normally make a call one sentence. Versions, digests, locks, definition bodies, and transcribed output are not author-written DDL metadata. Do not invent function syntax such as `Name(count=3)`.
 

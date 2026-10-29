@@ -142,7 +142,7 @@ def test_editor_uses_the_shared_core_for_braced_and_legacy_calls():
     assert response.status_code == 200, response.text
     calls = response.json()["calls"]
     assert [(call["text"], call["status"]) for call in calls] == [
-        ("｛若葉｝", "resolved"), ("Nature.YoungLeaves", "resolved"), ("｛若刃｝", "plugin_name_mismatch")]
+        ("｛若葉｝", "resolved"), ("Nature.YoungLeaves", "plugin_old_notation"), ("｛若刃｝", "plugin_name_mismatch")]
     assert calls[0]["qualified_name"] == "Nature.YoungLeaves"
     count = client.post("/api/pipeline/plugin-calls", headers=headers,
                         json={"source": "13枚の｛若葉｝。", "language": "ja"})
@@ -151,4 +151,4 @@ def test_editor_uses_the_shared_core_for_braced_and_legacy_calls():
     legacy_count = client.post("/api/pipeline/plugin-calls", headers=headers,
                                json={"source": "13枚のNature.YoungLeaves。", "language": "ja"})
     assert legacy_count.status_code == 200, legacy_count.text
-    assert [(call["text"], call["status"]) for call in legacy_count.json()["calls"]] == [("Nature.YoungLeaves", "plugin_count_out_of_range")]
+    assert [(call["text"], call["status"]) for call in legacy_count.json()["calls"]] == [("Nature.YoungLeaves", "plugin_old_notation")]

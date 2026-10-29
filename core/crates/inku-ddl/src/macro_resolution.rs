@@ -44,6 +44,7 @@ pub struct ResolvedMacroInvocation {
 /// Stable failure classes for one source-ordered visible macro occurrence.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MacroInvocationResolutionDiagnosticKind {
+    OldNotation,
     MissingLock,
     AmbiguousLockPrefix,
     MissingDefinition,
@@ -158,6 +159,18 @@ fn build_resolution(
             if !occurrence_matches_atom(document.source(), atom, &occurrence) {
                 diagnostics.push(occurrence.diagnostic(
                     MacroInvocationResolutionDiagnosticKind::SourceClauseAtomMismatch,
+                    None,
+                    None,
+                    Vec::new(),
+                ));
+                continue;
+            }
+
+            if !document.legacy_names_for_migration()
+                && !occurrence.surface.starts_with(['{', '｛'])
+            {
+                diagnostics.push(occurrence.diagnostic(
+                    MacroInvocationResolutionDiagnosticKind::OldNotation,
                     None,
                     None,
                     Vec::new(),

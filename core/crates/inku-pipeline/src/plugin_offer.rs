@@ -189,7 +189,9 @@ fn occurrence(text: &str, name: &str) -> Option<usize> {
         return None;
     }
     if name.chars().any(cjk) {
-        return text.find(&name);
+        return text
+            .match_indices(&name)
+            .find_map(|(at, _)| (!follows_namespace_dot(text, at)).then_some(at));
     }
     let words = |value: &str| {
         let mut result = Vec::new();
@@ -212,12 +214,24 @@ fn occurrence(text: &str, name: &str) -> Option<usize> {
     }
     let actual = words(text);
     actual.windows(wanted.len()).find_map(|window| {
-        window
-            .iter()
-            .map(|(_, word)| word)
-            .eq(wanted.iter())
-            .then_some(window[0].0)
+        (window.iter().map(|(_, word)| word).eq(wanted.iter())
+            && !follows_namespace_dot(text, window[0].0))
+        .then_some(window[0].0)
     })
+}
+
+fn follows_namespace_dot(text: &str, at: usize) -> bool {
+    let Some(before) = text[..at].strip_suffix('.') else {
+        return false;
+    };
+    let namespace = before
+        .rsplit(|ch: char| !ch.is_ascii_alphanumeric() && ch != '_' && ch != '-')
+        .next()
+        .unwrap_or("");
+    namespace
+        .chars()
+        .next()
+        .is_some_and(|ch| ch.is_ascii_alphabetic())
 }
 
 fn braced(text: &str, names: &[String]) -> Option<usize> {
@@ -231,16 +245,6 @@ fn braced(text: &str, names: &[String]) -> Option<usize> {
             .iter()
             .any(|name| normalize_plugin_name(name) == inner)
             .then_some(at)
-    })
-}
-
-fn legacy_occurrence(text: &str, name: &str) -> Option<usize> {
-    let name = normalize_plugin_name(name);
-    text.match_indices(&name).find_map(|(at, _)| {
-        let before = text[..at].chars().next_back();
-        let after = text[at + name.len()..].chars().next();
-        let word = |ch: char| ch.is_alphanumeric() || ch == '_';
-        (!before.is_some_and(|ch| word(ch) || ch == '.') && !after.is_some_and(word)).then_some(at)
     })
 }
 
@@ -264,14 +268,7 @@ pub fn offer_plugins(
         let (ja, en) = visible_names(definition);
         let names: Vec<_> = ja.into_iter().chain(en).collect();
         let brace = braced(&text, &names);
-        let ddl_at = ddl.as_deref().and_then(|ddl| {
-            let bracket = braced(ddl, &names);
-            let legacy = std::iter::once(qualified_name.clone())
-                .chain(definition.alias_qualified_names())
-                .filter_map(|name| legacy_occurrence(ddl, &name))
-                .min();
-            bracket.into_iter().chain(legacy).min()
-        });
+        let ddl_at = ddl.as_deref().and_then(|ddl| braced(ddl, &names));
         let named = names
             .iter()
             .filter_map(|name| occurrence(&text, name))
@@ -446,7 +443,7 @@ mod tests {
         });
         let result = offer_plugins(
             "terrain に若葉、｛満月｝と雨",
-            Some("Nature.若葉()。"),
+            Some("｛若葉｝。"),
             &catalog,
             2,
         );
@@ -506,7 +503,7 @@ mod tests {
             serde_json::to_vec(&empty).unwrap()
         );
         let (prompt, record) =
-            with_plugin_offer(base, "海", Some("Nature.若葉()。"), &catalog, limits).unwrap();
+            with_plugin_offer(base, "海", Some("｛若葉｝。"), &catalog, limits).unwrap();
         assert_eq!(record.offered[0].reason, OfferReason::Ddl);
         assert!(prompt.system.ends_with(PLUGIN_RULE_JA));
         let message: Value = serde_json::from_str(&prompt.message).unwrap();

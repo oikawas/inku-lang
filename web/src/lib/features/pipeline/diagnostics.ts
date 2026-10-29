@@ -23,7 +23,7 @@ export type PipelineHistoryDiagnostics = {
 /** Why a plugin sentence was not drawn, from the shared explainer. */
 export type PluginDiagnostic = {
 	name: string;
-	reason: 'plugin_not_installed' | 'plugin_disabled' | 'plugin_name_mismatch' | 'plugin_version_mismatch' | 'plugin_count_out_of_range' | 'plugin_name_ambiguous';
+	reason: 'plugin_not_installed' | 'plugin_disabled' | 'plugin_name_mismatch' | 'plugin_version_mismatch' | 'plugin_count_out_of_range' | 'plugin_name_ambiguous' | 'plugin_old_notation';
 	suggestion?: string;
 	candidates?: string[];
 	start_byte: number;

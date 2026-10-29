@@ -128,7 +128,8 @@ fn run(input: &[u8]) -> Option<Value> {
         }
         let normalized = NormalizedDdlDocument::new(source, language, locks)
             .ok()?
-            .with_definition_names(&old_definitions);
+            .with_definition_names(&old_definitions)
+            .with_legacy_names_for_migration();
         let resolved = resolve_macro_invocations(&normalized, &old_definitions).ok()?;
         for item in &resolved.resolved {
             let Some(i) = records.iter().position(|r| {
@@ -286,7 +287,8 @@ mod tests {
             };
             compile_ddl_to_score(
                 NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::Ja, vec![lock])
-                    .unwrap(),
+                    .unwrap()
+                    .with_legacy_names_for_migration(),
                 std::slice::from_ref(definition),
                 Some(37),
                 limits,

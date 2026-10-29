@@ -570,7 +570,8 @@ fn candidates_at_with_locked_macro_boundary(
             matches!(ch, '{' | '｛') && matches!(qualified_macro_match(document, start), Some(QualifiedMacroMatch::ExactLock { end_byte, .. }) if end_byte == bracket_end)
         });
     let preceded_by_locked_macro = preceded_by_bracket_macro
-        || language == ResolvedInstructionLanguage::Ja
+        || document.legacy_names_for_migration()
+            && language == ResolvedInstructionLanguage::Ja
             && document.macro_locks().iter().any(|macro_lock| {
                 macro_lock.visible_names().any(|name| {
                     left_end
@@ -598,12 +599,15 @@ fn candidates_at_with_locked_macro_boundary(
             - source[end_byte..]
                 .trim_start_matches(char::is_whitespace)
                 .len();
-        if matches!(
-            qualified_macro_match(document, right),
-            Some(
-                QualifiedMacroMatch::ExactLock { .. } | QualifiedMacroMatch::AmbiguousLocks { .. }
+        if (document.legacy_names_for_migration() || source[right..].starts_with(['{', '｛']))
+            && matches!(
+                qualified_macro_match(document, right),
+                Some(
+                    QualifiedMacroMatch::ExactLock { .. }
+                        | QualifiedMacroMatch::AmbiguousLocks { .. }
+                )
             )
-        ) {
+        {
             let candidate = Candidate {
                 end_byte,
                 priority: crate::grammar_markers::GRAMMAR_MARKER_PRIORITY,
@@ -616,11 +620,13 @@ fn candidates_at_with_locked_macro_boundary(
         }
     }
     for candidate in candidates_at(edition, source, start_byte, language, false) {
-        let followed_by_locked_macro = matches!(
-            qualified_macro_match(document, candidate.end_byte),
-            Some(QualifiedMacroMatch::ExactLock { .. })
-                | Some(QualifiedMacroMatch::AmbiguousLocks { .. })
-        );
+        let followed_by_locked_macro = (document.legacy_names_for_migration()
+            || source[candidate.end_byte..].starts_with(['{', '｛']))
+            && matches!(
+                qualified_macro_match(document, candidate.end_byte),
+                Some(QualifiedMacroMatch::ExactLock { .. })
+                    | Some(QualifiedMacroMatch::AmbiguousLocks { .. })
+            );
         let already_present = candidates.iter().any(|existing| existing == &candidate);
         if (followed_by_locked_macro || preceded_by_locked_macro) && !already_present {
             candidates.push(candidate);
@@ -2336,6 +2342,43 @@ fn is_separator(character: char) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn only_braced_words_supply_a_japanese_coordination_boundary() {
+        use super::*;
+        let lock = crate::MacroLock::new(
+            "Nature.YoungLeaves",
+            "1.0.0",
+            format!("sha256:{}", "a".repeat(64)),
+        )
+        .unwrap()
+        .with_aliases(["Nature.若葉".to_owned()])
+        .unwrap();
+        for (source, expected) in [
+            ("｛若葉｝と円を置く。", true),
+            ("Nature.若葉と円を置く。", false),
+        ] {
+            let doc = NormalizedDdlDocument::new(
+                source,
+                ResolvedInstructionLanguage::Ja,
+                vec![lock.clone()],
+            )
+            .unwrap();
+            let at = source.find('と').unwrap();
+            let candidates = candidates_at_with_locked_macro_boundary(
+                SaijikiEdition::V2,
+                &doc,
+                at,
+                ResolvedInstructionLanguage::Ja,
+            );
+            assert_eq!(
+                candidates
+                    .iter()
+                    .any(|candidate| candidate.identity == "function:と"),
+                expected,
+                "{source}: {candidates:?}"
+            );
+        }
+    }
     #[test]
     fn bracketed_names_resolve_v1_locks_and_keep_invalid_pairs_unchanged() {
         use super::*;

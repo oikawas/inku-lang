@@ -260,6 +260,7 @@ export const en: LangPack = {
 	pipelineDiagnosticUnknown: 'Detailed diagnostic information is available.',
 	pipelinePluginDiagnostic: (reason, name, suggestion) => {
 		switch (reason) {
+			case 'plugin_old_notation': return `${name} uses the old notation. ${suggestion ? `Write ${suggestion} instead.` : 'Write the name in braces.'}`;
 			case 'plugin_disabled': return `The plugin ${name} is disabled, so this sentence was not drawn. Enable it to draw it.`;
 			case 'plugin_name_mismatch': return `${name} does not match an installed plugin, so this sentence was not drawn.${suggestion ? ` Did you mean ${suggestion}?` : ''}`;
 			case 'plugin_version_mismatch': return `The plugin ${name} differs from the one this work was saved with, so this sentence was not drawn.`;
@@ -546,6 +547,7 @@ export const en: LangPack = {
 	ddlUnknownNameUnregistered: 'This name is not registered',
 	ddlPluginReason: (reason, suggestion, candidates) => {
 		switch (reason) {
+			case 'plugin_old_notation': return suggestion ? `Old notation. Write ${suggestion} instead.` : 'Old notation. Write the name in braces.';
 			case 'plugin_disabled': return 'This word is disabled. Enable it to draw it.';
 			case 'plugin_name_mismatch': return suggestion ? `Did you mean ${suggestion}?` : 'This name is not on this Server.';
 			case 'plugin_name_ambiguous': return `This name matches multiple words: ${candidates.join(', ')}.`;

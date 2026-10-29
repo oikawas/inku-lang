@@ -833,7 +833,7 @@
   {
    "id": "ja-10",
    "lang": "ja",
-   "source": "和紙。\n背景を白で埋める。\nNature.落葉。\n下の3分の2（横0〜1、縦1/3〜1）に、灰の太筆の薄い刷きの全幅の雲形を1個埋める。\n左下（横0〜1/3、縦2/3〜1）に、細かく小刻みに揺れる橙の太い太筆の実線の濃い粒の斜めの大きな線を2個引く。\n左中央（横0〜1/3、縦1/3〜2/3）に、黒のペンの実線の濃い塗りの回転の横長の小さな楕円を1個置く。\n左下の四半分（横0〜1/2、縦1/2〜1）に、灰の鉛筆の程よいとても小さな点を15個散らす。",
+   "source": "和紙。\n背景を白で埋める。\n｛落葉｝。\n下の3分の2（横0〜1、縦1/3〜1）に、灰の太筆の薄い刷きの全幅の雲形を1個埋める。\n左下（横0〜1/3、縦2/3〜1）に、細かく小刻みに揺れる橙の太い太筆の実線の濃い粒の斜めの大きな線を2個引く。\n左中央（横0〜1/3、縦1/3〜2/3）に、黒のペンの実線の濃い塗りの回転の横長の小さな楕円を1個置く。\n左下の四半分（横0〜1/2、縦1/2〜1）に、灰の鉛筆の程よいとても小さな点を15個散らす。",
    "current": [
     "twothirds-bottom",
     "cell-02",
@@ -916,7 +916,7 @@
       "to_key": "hband-1"
      }
     ],
-    "source": "和紙。\n背景を白で埋める。\nNature.落葉。\n画面全体（横0〜1、縦0〜1）に、灰の太筆の薄い刷きの全幅の雲形を1個埋める。\n左上の四半分（横0〜1/2、縦0〜1/2）に、細かく小刻みに揺れる橙の太い太筆の実線の濃い粒の斜めの大きな線を2個引く。\n左下（横0〜1/3、縦2/3〜1）に、黒のペンの実線の濃い塗りの回転の横長の小さな楕円を1個置く。\n中ほど（横0〜1、縦1/3〜2/3）に、灰の鉛筆の程よいとても小さな点を15個散らす。"
+    "source": "和紙。\n背景を白で埋める。\n｛落葉｝。\n画面全体（横0〜1、縦0〜1）に、灰の太筆の薄い刷きの全幅の雲形を1個埋める。\n左上の四半分（横0〜1/2、縦0〜1/2）に、細かく小刻みに揺れる橙の太い太筆の実線の濃い粒の斜めの大きな線を2個引く。\n左下（横0〜1/3、縦2/3〜1）に、黒のペンの実線の濃い塗りの回転の横長の小さな楕円を1個置く。\n中ほど（横0〜1、縦1/3〜2/3）に、灰の鉛筆の程よいとても小さな点を15個散らす。"
    },
    "chance": {
     "outcome": "recomposed",
@@ -949,7 +949,7 @@
       "to_key": "twothirds-bottom"
      }
     ],
-    "source": "和紙。\n背景を白で埋める。\nNature.落葉。\n画面全体（横0〜1、縦0〜1）に、灰の太筆の薄い刷きの全幅の雲形を1個埋める。\n右中央（横2/3〜1、縦1/3〜2/3）に、細かく小刻みに揺れる橙の太い太筆の実線の濃い粒の斜めの大きな線を2個引く。\n右下の四半分（横1/2〜1、縦1/2〜1）に、黒のペンの実線の濃い塗りの回転の横長の小さな楕円を1個置く。\n下の3分の2（横0〜1、縦1/3〜1）に、灰の鉛筆の程よいとても小さな点を15個散らす。"
+    "source": "和紙。\n背景を白で埋める。\n｛落葉｝。\n画面全体（横0〜1、縦0〜1）に、灰の太筆の薄い刷きの全幅の雲形を1個埋める。\n右中央（横2/3〜1、縦1/3〜2/3）に、細かく小刻みに揺れる橙の太い太筆の実線の濃い粒の斜めの大きな線を2個引く。\n右下の四半分（横1/2〜1、縦1/2〜1）に、黒のペンの実線の濃い塗りの回転の横長の小さな楕円を1個置く。\n下の3分の2（横0〜1、縦1/3〜1）に、灰の鉛筆の程よいとても小さな点を15個散らす。"
    }
   },
   {
@@ -3277,7 +3277,7 @@
   {
    "id": "en-13",
    "lang": "en",
-   "source": "Paper.\nFill the background with white.\nNature.FallenLeaves.\nScatter 40 broadly loosely swaying black extra-fine pen faint grain falling small lines at the lower left quarter (horizontal 0 to 1/2, vertical 1/2 to 1).",
+   "source": "Paper.\nFill the background with white.\n{fallen leaves}.\nScatter 40 broadly loosely swaying black extra-fine pen faint grain falling small lines at the lower left quarter (horizontal 0 to 1/2, vertical 1/2 to 1).",
    "current": [
     "quarter-bl"
    ],
@@ -3308,7 +3308,7 @@
       "to_key": "half-bottom"
      }
     ],
-    "source": "Paper.\nFill the background with white.\nNature.FallenLeaves.\nScatter 40 broadly loosely swaying black extra-fine pen faint grain falling small lines at the lower half (horizontal 0 to 1, vertical 1/2 to 1)."
+    "source": "Paper.\nFill the background with white.\n{fallen leaves}.\nScatter 40 broadly loosely swaying black extra-fine pen faint grain falling small lines at the lower half (horizontal 0 to 1, vertical 1/2 to 1)."
    },
    "chance": {
     "outcome": "recomposed",
@@ -3323,7 +3323,7 @@
       "to_key": "twothirds-bottom"
      }
     ],
-    "source": "Paper.\nFill the background with white.\nNature.FallenLeaves.\nScatter 40 broadly loosely swaying black extra-fine pen faint grain falling small lines at the lower two thirds (horizontal 0 to 1, vertical 1/3 to 1)."
+    "source": "Paper.\nFill the background with white.\n{fallen leaves}.\nScatter 40 broadly loosely swaying black extra-fine pen faint grain falling small lines at the lower two thirds (horizontal 0 to 1, vertical 1/3 to 1)."
    }
   },
   {
@@ -3381,7 +3381,7 @@
   {
    "id": "en-15",
    "lang": "en",
-   "source": "Paper.\nFill the background with gray.\nNature.Undergrowth.\nFill one crayon faint grain full-width square at the whole canvas (horizontal 0 to 1, vertical 0 to 1).",
+   "source": "Paper.\nFill the background with gray.\n{undergrowth}.\nFill one crayon faint grain full-width square at the whole canvas (horizontal 0 to 1, vertical 0 to 1).",
    "current": [
     "whole"
    ],

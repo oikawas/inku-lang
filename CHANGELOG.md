@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-29 — Retire qualified plugin calls from drawing
+
+DDL no longer draws `namespace.name` calls and diagnoses the old spelling. The migration function still rewrites it to a braced name. A v1 definition remains usable through its braced name.
+
 ### 2026-10-29 — Android plugin v2
 
 Migrate saved plugin spellings at startup, show the bundled words and saved offers, add editor completion and diagnostics, and carry locked definitions in DDL v2 exports. Completion matches normalized names in both languages, and settings shows each word's kind.

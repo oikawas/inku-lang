@@ -148,6 +148,15 @@ export type DdlEditorControl = {
 	destroy: () => void;
 };
 
+export function pluginHoverContent(call: PluginCall, entries: PluginEntry[], language: 'ja' | 'en', previewForPlugin: PreviewForPlugin, reason: (call: PluginCall) => string): { text: string; image?: string } {
+	const entry = entries.find(item => item.qualified_name === call.qualified_name);
+	if (entry && call.status === 'resolved') {
+		const preview = previewForPlugin(entry, language);
+		return { text: `${preview.word}\n${preview.effect}\n${preview.example}`, image: preview.image };
+	}
+	return { text: reason(call) };
+}
+
 export function createDdlEditor(parent: HTMLElement, value: string, initial: DdlEditorOptions): DdlEditorControl {
 	let options = initial;
 	let view: EditorView | null = null;
@@ -206,12 +215,12 @@ export function createDdlEditor(parent: HTMLElement, value: string, initial: Ddl
 			if (options.pluginCallSource !== view.state.doc.toString()) return null;
 			const call = options.pluginCalls?.find(item => item.start_utf16 <= pos && pos < item.end_utf16);
 			if (!call) return null;
-			const entry = options.pluginEntries.find(item => item.qualified_name === call.qualified_name);
 			return { pos: call.start_utf16, end: call.end_utf16, above: true, create() {
 				const dom = document.createElement('div');
 				const lang = resolveInstructionLang(view.state.doc.toString(), options.isJapanese ? 'ja' : 'en');
-				if (entry && call.status === 'resolved') { const preview = options.previewForPlugin(entry, lang); dom.textContent = `${preview.word}\n${preview.effect}\n${preview.example}`; if (preview.image) { const img = document.createElement('img'); img.src = preview.image; img.alt = ''; dom.appendChild(img); } }
-				else dom.textContent = options.pluginReason?.(call) ?? '';
+				const content = pluginHoverContent(call, options.pluginEntries, lang, options.previewForPlugin, options.pluginReason ?? (() => ''));
+				dom.textContent = content.text;
+				if (content.image) { const img = document.createElement('img'); img.src = content.image; img.alt = ''; dom.appendChild(img); }
 				dom.style.whiteSpace = 'pre-line'; return { dom };
 			} };
 		}),

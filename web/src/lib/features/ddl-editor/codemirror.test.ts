@@ -5,7 +5,7 @@ import { history, redo, undo } from '@codemirror/commands';
 import { CompletionContext } from '@codemirror/autocomplete';
 import { readCompositionRanges, scanNumericRanges } from '../../composition-ranges.ts';
 import { ddlPartClass, highlightDDL } from '../../highlight.ts';
-import { ddlCompletions, ddlEditorModel, ddlSyntax, insertDdlWord, replaceDdlValue } from './codemirror.ts';
+import { ddlCompletions, ddlEditorModel, ddlSyntax, insertDdlWord, pluginHoverContent, replaceDdlValue } from './codemirror.ts';
 import * as ddlControls from './codemirror.ts';
 import { compositionChanged, openRangeAt, rangeEditorState, rangeFocusChanged } from './codemirror-ranges.ts';
 
@@ -191,6 +191,14 @@ test('editor decorations follow the core ranges and keep the palette', () => {
 	assert.ok(marks.includes('ddl-token ddl-token-unknown'));
 });
 
+test('hover shows the resolved preview or the diagnostic reason', () => {
+	const entry = { qualified_name: 'Sky.Stars', surface_ja: ['星'], surface_en: ['stars'], note_ja: '星の note', note_en: 'star note' };
+	const call = { start_byte: 0, end_byte: 9, start_utf16: 0, end_utf16: 3, text: '｛星｝', spelling: 'braced' as const, status: 'resolved', qualified_name: 'Sky.Stars' };
+	const preview = () => ({ categoryKey: 'plugin', word: '｛星｝', canonicalWord: 'Sky.Stars', effect: '星の note', example: '｛星｝。', svg: '', image: '/preview.png' });
+	assert.deepEqual(pluginHoverContent(call, [entry], 'ja', preview, () => 'disabled'), { text: '｛星｝\n星の note\n｛星｝。', image: '/preview.png' });
+	assert.deepEqual(pluginHoverContent({ ...call, status: 'plugin_disabled' }, [entry], 'ja', preview, () => '有効にすると描けます。'), { text: '有効にすると描けます。' });
+});
+
 test('cursor completions use the DDL language and canonical Macro names, and yield to numeric edits', async () => {
 	let previews = 0;
 	const source = ddlCompletions(() => ({ isJapanese: true,
@@ -203,6 +211,12 @@ test('cursor completions use the DDL language and canonical Macro names, and yie
 	const ja = editor('赤い円。\n{grass');
 	const japanese = await source(new CompletionContext(ja, ja.doc.length, true));
 	assert.ok(japanese?.options.some((word) => word.label === '｛下草｝'));
+	const fullWidth = editor('Draw a red circle.\n｛草');
+	const fullWidthOptions = await source(new CompletionContext(fullWidth, fullWidth.doc.length, true));
+	assert.ok(fullWidthOptions?.options.some((word) => word.label === '{grass}'));
+	const folded = editor('赤い円。\n｛ＧＲＡＳＳ');
+	const foldedOptions = await source(new CompletionContext(folded, folded.doc.length, true));
+	assert.ok(foldedOptions?.options.some((word) => word.label === '｛下草｝'));
 	const existing = editor('赤い円。\n{grass}');
 	const beforeClose = existing.doc.length - 1;
 	const choices = await source(new CompletionContext(existing, beforeClose, true));

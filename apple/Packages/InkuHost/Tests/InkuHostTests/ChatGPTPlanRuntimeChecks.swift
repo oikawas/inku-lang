@@ -1,9 +1,24 @@
+import CryptoKit
 import Foundation
 import InkuPersistence
 import XCTest
 @testable import InkuHost
 
 final class ChatGPTPlanRuntimeChecks: XCTestCase {
+    // The core's owner limit still admits one local listener and rejects a second until cancellation.
+    func testCoreAttemptLimitKeepsSingleLocalAuthorization() async throws {
+        let fixture = try RuntimeFixture(expired: false)
+        defer { fixture.remove() }
+        let runtime = ChatGPTPlanRuntime(store: fixture.store, http: RuntimeHTTP(blockRefresh: false))
+        let first = try await runtime.beginAuthorization(profileID: fixture.activeID)
+        XCTAssertEqual(first.profileID, fixture.activeID)
+        do { _ = try await runtime.beginAuthorization(profileID: fixture.activeID)
+            XCTFail("A second local authorization started")
+        } catch { XCTAssertEqual((error as? HostError)?.code, "chatgpt_attempt_busy") }
+        await runtime.cancelAuthorization(first.id)
+        let restarted = try await runtime.beginAuthorization(profileID: fixture.activeID)
+        await runtime.cancelAuthorization(restarted.id)
+    }
     // Failure: a one-provider bare model skipped pinning, or a reserved personal reference fell into an API-key route.
     func testPersonalSelectionUsesOrdinaryResolutionRulesAndRefusesMissingReservedProvider() throws {
         // Server's resolver never gives a bare reference to the plan: it falls to the stage default provider.
@@ -91,6 +106,23 @@ final class ChatGPTPlanRuntimeChecks: XCTestCase {
         XCTAssertEqual(try fixture.store.load().profiles[fixture.activeID]?.state, "connected")
     }
 
+    // Server's delete decision checks signed_out state, not the generation captured before revocation.
+    func testDeleteAcceptsNewerSignedOutGeneration() async throws {
+        let fixture = try RuntimeFixture(expired: false)
+        defer { fixture.remove() }
+        let client = BlockingRevocationHTTP()
+        let runtime = ChatGPTPlanRuntime(store: fixture.store, http: client)
+        let task = Task { try await runtime.deleteProfile(fixture.activeID) }
+        await client.waitForDiscovery()
+        var value = try fixture.store.load()
+        value.profiles[fixture.activeID]?.generation += 1
+        try fixture.store.write(value)
+        await client.resume()
+        let confirmed = try await task.value
+        XCTAssertFalse(confirmed)
+        XCTAssertNil(try fixture.store.load().profiles[fixture.activeID])
+    }
+
     // Deleting a different registration must not change the active profile or its published models.
     func testDeleteInactiveRegistrationKeepsActivePublication() async throws {
         let other = UUID().uuidString
@@ -167,6 +199,73 @@ final class ChatGPTPlanRuntimeChecks: XCTestCase {
         XCTAssertEqual(refreshed.publishedModels.map(\.id), ["offered"])
         let responseCount = await client.responseCount()
         XCTAssertEqual(responseCount, 0)
+    }
+
+    // The shared publication input guard rejects invalid session identities and purpose keys before a store lock.
+    func testPublicationInputUsesCoreBoundaries() async throws {
+        let fixture = try RuntimeFixture(expired: false)
+        defer { fixture.remove() }
+        let runtime = ChatGPTPlanRuntime(store: fixture.store, http: RuntimeHTTP(blockRefresh: false))
+        for (id, generation, purposes, expected) in [
+            ("", Int64(1), [String: [String]](), "chatgpt_session_changed"),
+            (String(repeating: "x", count: 129), Int64(1), [:], "chatgpt_session_changed"),
+            (fixture.activeID, Int64(0), [:], "chatgpt_session_changed"),
+            (fixture.activeID, Int64(1), ["": ["llm"]], "chatgpt_model_not_offered"),
+            (fixture.activeID, Int64(1), [String(repeating: "x", count: 257): ["vision"]], "chatgpt_model_not_offered"),
+        ] {
+            do { _ = try await runtime.savePublication(profileID: id, generation: generation, models: ["offered"], purposes: purposes)
+                XCTFail("Invalid publication input was saved")
+            } catch { XCTAssertEqual((error as? HostError)?.code, expected) }
+        }
+    }
+
+    // Previously unsupported description and image effects must reach the mock Responses endpoint with the right purpose.
+    func testCoreOperationAllowsDescriptionAndVisionImageEffects() async throws {
+        for (tag, purpose, images) in [("read_description", "llm", [String]()),
+                                       ("write_image_ddl", "vision", ["data:image/png;base64,iVBORw0KGgo="])] {
+            let fixture = try RuntimeFixture(expired: false)
+            defer { fixture.remove() }
+            let client = RuntimeHTTP(blockRefresh: false)
+            let runtime = ChatGPTPlanRuntime(store: fixture.store, http: client)
+            let opened = try await runtime.publication()
+            _ = try await runtime.savePublication(profileID: opened.profileID, generation: opened.generation,
+                                                  models: ["offered"], purposes: ["offered": [purpose]])
+            let session = try await runtime.pin()
+            do { _ = try await runtime.perform(action: Self.action(tag: tag, images: images), session: session,
+                                               model: "offered", argumentLimit: 4096, onBytes: { _ in }) }
+            catch { XCTAssertNotEqual(ChatGPTPlanRuntime.diagnostic(error).code, "chatgpt_operation_not_supported") }
+            let count = await client.responseCount()
+            XCTAssertEqual(count, 1, tag)
+        }
+        let fixture = try RuntimeFixture(expired: false)
+        defer { fixture.remove() }
+        let client = RuntimeHTTP(blockRefresh: false)
+        let runtime = ChatGPTPlanRuntime(store: fixture.store, http: client)
+        let opened = try await runtime.publication()
+        _ = try await runtime.savePublication(profileID: opened.profileID, generation: opened.generation,
+                                              models: ["offered"], purposes: ["offered": ["llm"]])
+        let session = try await runtime.pin()
+        do { _ = try await runtime.perform(action: Self.action(tag: "write_image_ddl", images: ["data:image/png;base64,iVBORw0KGgo="]),
+                                           session: session, model: "offered", argumentLimit: 4096, onBytes: { _ in })
+            XCTFail("A model without Vision was sent an image effect")
+        } catch { XCTAssertEqual(ChatGPTPlanRuntime.diagnostic(error).code, "chatgpt_model_not_offered") }
+        let refusedCount = await client.responseCount()
+        XCTAssertEqual(refusedCount, 0)
+    }
+
+    // An invalid image must be rejected before a stale catalog can trigger token or model HTTP.
+    func testImageEffectValidatesBodyBeforeCatalogRefresh() async throws {
+        let fixture = try RuntimeFixture(expired: true)
+        defer { fixture.remove() }
+        let client = RuntimeHTTP(blockRefresh: false)
+        let runtime = ChatGPTPlanRuntime(store: fixture.store, http: client)
+        let session = try await runtime.pin()
+        do { _ = try await runtime.perform(action: Self.action(tag: "write_image_ddl", images: ["https://example.invalid/image.png"]),
+                                           session: session, model: "offered", argumentLimit: 4096, onBytes: { _ in })
+            XCTFail("An external image URL was accepted")
+        } catch { XCTAssertEqual(ChatGPTPlanRuntime.diagnostic(error).code, "pipeline_schema_violation") }
+        let calls = await client.requestCount()
+        XCTAssertEqual(calls, 0)
     }
     // Failure: a model the profile was offered but never published still reached the Responses endpoint.
     func testUnpublishedModelIsRefusedBeforeTheRequest() async throws {
@@ -384,11 +483,22 @@ final class ChatGPTPlanRuntimeChecks: XCTestCase {
         }
     }
 
-    private static var action: Data {
-        ExactJSON.object(["tag": .string("generate_normalized_ddl"), "identity": .object(["action_id": .string("fixture")]),
-            "timeout_ms": .string("2000"), "payload": .object(["prompt": .object(["system": .string("system"), "message": .string("message"),
-                "response_schema": .object(["type": .string("object")])])])]).data
+    private static func action(tag: String, images: [String] = []) -> Data {
+        var prompt: [String: ExactJSON] = ["system": .string("system"), "message": .string("message"),
+            "response_schema": .object(["type": .string("object")])]
+        if !images.isEmpty {
+            prompt["images"] = .array(images.map { url in
+                let bytes = Data(base64Encoded: String(url.split(separator: ",").last ?? "")) ?? Data()
+                let digest = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+                return .object(["media_type": .string("image/png"), "byte_len": .integer(bytes.count), "sha256": .string(digest)])
+            })
+        }
+        var fields: [String: ExactJSON] = ["tag": .string(tag), "identity": .object(["action_id": .string("fixture")]),
+            "timeout_ms": .string("2000"), "payload": .object(["prompt": .object(prompt)])]
+        if !images.isEmpty { fields["_transient_images"] = .array(images.map(ExactJSON.string)) }
+        return ExactJSON.object(fields).data
     }
+    private static var action: Data { action(tag: "generate_normalized_ddl") }
 }
 
 private struct RuntimeFixture {
@@ -450,12 +560,15 @@ private actor RuntimeHTTP: ChatGPTHTTPClient {
     private var refreshEntered = false
     private var refreshWaiters: [CheckedContinuation<Void, Never>] = []
     private var responses = 0
+    private var requests = 0
     private var responseRequest: URLRequest?
     init(blockRefresh: Bool) { self.blockRefresh = blockRefresh }
     func waitForRefresh() async { if !refreshEntered { await withCheckedContinuation { refreshWaiters.append($0) } } }
     func responseCount() -> Int { responses }
+    func requestCount() -> Int { requests }
     func lastResponseRequest() -> URLRequest? { responseRequest }
     func send(_ request: URLRequest, maximumBytes: Int, onBytes: @escaping @Sendable (Int) -> Void) async throws -> ChatGPTHTTPResponse {
+        requests += 1
         switch request.url!.path {
         case "/api/accounts/oauth/token":
             refreshEntered = true; let waiters = refreshWaiters; refreshWaiters = []; waiters.forEach { $0.resume() }

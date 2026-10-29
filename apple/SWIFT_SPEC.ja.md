@@ -860,6 +860,8 @@ RPM／入力TPMは62秒windowで設定値の90%を使用し、正の小さい設
 
 ChatGPT プランの公開と認証の判断は共有 core を使い、モデル評価、認可、戻り、claim、署名鍵の選択、token の期限と quota の状態を扱う。暗号署名の検証、端末の保存と HTTP は Swift に残す。再認証では既存の暗号化された登録と公開の選択を保持する。
 
+戻りの対象と使用済みの判定、同時の認可試行、前の登録、操作の用途、公開入力、登録削除も共有 core の `model_catalog` に従う。戻りの対象や state が不正なら HTTP 400 を返して listener は待ち続け、state が正しく一度使用済みにした後の失敗は試みを終える。登録削除は接続解除後も signed out の登録だけを消し、別の接続済み登録は保持する。
+
 
 
 Personal ChatGPTは通常のAPI key接続と別に扱い、既定は無効とする。利用者が明示して有効化・接続し、公開したmodelを描画modelとして選ぶ。Stage1／Stage2は同じ描画modelを使用する。本人の接続を複数保存しても、作品DBは一つのローカルlibraryであり、multi-user機能を追加しない。
@@ -871,6 +873,8 @@ ChatGPTプランのmodelはVisionにも使う（作者裁定、2026-10-12。契�
 本人認証は127.0.0.1の一時listenerと`/auth/callback`、state／nonce／PKCE、発行済みclient ID、検証したidentityと許可scopeを使用する。資格情報は最大1MiBのAES-GCM暗号化vaultへ原子的に保存し、device-localの32byte keyをKeychainへ置く。平文token fallbackを持たず、SQLite backupに資格情報を含めない。初期無効状態で認証や推論を開始しない。
 
 開始時にprofile ID／generationを固定し、queued要求やbatch／demoの再開で接続を付け替えない。接続解除・切替・quota後は古いrefreshや遅延応答を採用せず、別providerへ暗黙に切り替えない。共有Rustの記述解釈、写生、自動配色、構図の読み、DDL補完と、Vision推敲・奥書をResponses／SSEへ接続する。要求本文、SSEの読み、失敗の分類、モデル一覧の読みは共有coreの`provider_wire`が行う（2026-10-17）。demo用記述とmodel検査はこの接続では未対応として表示する。実本人OAuth、model取得、推論の受入はoffline確認と分ける。
+
+ChatGPT プランの操作判定が共有 core に揃い、言葉で描く4操作と画像から描く3操作も送信できる。画像の操作は Vision 用途に公開したモデルを使い、画像を含む要求本文をモデル一覧取得や token 更新より先に検査する。画像を含む送信の生の記録は残さない。
 
 ### 保存作品の書出しとnative raster
 

@@ -108,6 +108,7 @@ private final class LoopbackEngine: @unchecked Sendable {
     private var waiter: CheckedContinuation<ChatGPTLoopbackCallback, any Error>?
     private var terminal: Result<ChatGPTLoopbackCallback, HostError>?
     private var waitClaimed = false
+    private var used = false
     private var closed = false
     private var deadlineTask: DispatchWorkItem?
     private var requests: [ObjectIdentifier: Request] = [:]
@@ -245,18 +246,35 @@ private final class LoopbackEngine: @unchecked Sendable {
 
     private func handle(_ id: ObjectIdentifier, header: Data) {
         guard !closed, let port, let expectedState else { respond(id, status: 400); return }
-        guard DispatchTime.now() < deadline else {
+        guard let target = Self.target(header: header, port: port) else { respond(id, status: 400); return }
+        let query: [String: ExactJSON]
+        do {
+            let parsed = try ChatGPTPolicy.call("chatgpt_auth_callback_query", ["target": .string(target)])
+            query = parsed["query"].object ?? [:]
+            _ = try ChatGPTPolicy.call("chatgpt_auth_callback", ["state": ChatGPTPolicy.string(query["state"]?.array?.first?.string),
+                "expected_state": .string(expectedState), "code": .string("state-check"), "error": .null])
+        } catch { respond(id, status: 400); return }
+        let decision: ExactJSON
+        do {
+            decision = try ChatGPTPolicy.result("chatgpt_auth_callback_use", ["used": .bool(used),
+                "cancelled": .bool(closed), "expired": .bool(DispatchTime.now() >= deadline)])
+        } catch { respond(id, status: 400); return }
+        used = decision["used"].bool ?? used
+        if let code = decision["error"].string {
             respond(id, status: 400)
-            finish(.failure(HostError("chatgpt_cancelled")), keeping: id)
+            if decision["fail_attempt"].bool == true { finish(.failure(HostError(code)), keeping: id) }
             return
         }
-        guard let query = Self.query(header: header, port: port) else { respond(id, status: 400); return }
         let result: Result<ChatGPTLoopbackCallback, HostError>
         do {
-            let answer = try ChatGPTPolicy.call("chatgpt_auth_callback", ["state": ChatGPTPolicy.string(query["state"]),
-                "expected_state": .string(expectedState), "code": ChatGPTPolicy.string(query["code"]),
-                "error": ChatGPTPolicy.string(query["error"] ?? query["error_description"])])
-            result = .success(ChatGPTLoopbackCallback(code: try answer.requiredString("code"), clientID: query["client_id"], state: query["state"] ?? ""))
+            if let error = query["error"]?.array?.first?.string {
+                _ = try ChatGPTPolicy.call("chatgpt_auth_callback", ["state": .string(expectedState),
+                    "expected_state": .string(expectedState), "code": .string("error-check"), "error": .string(error)])
+            }
+            let answer = try ChatGPTPolicy.call("chatgpt_auth_callback", ["state": .string(expectedState),
+                "expected_state": .string(expectedState), "code": ChatGPTPolicy.string(query["code"]?.array?.first?.string), "error": .null])
+            result = .success(ChatGPTLoopbackCallback(code: try answer.requiredString("code"),
+                clientID: query["client_id"]?.array?.first?.string, state: expectedState))
         } catch let error as HostError { result = .failure(error) }
         catch { result = .failure(HostError("chatgpt_callback_invalid")) }
         respond(id, status: (try? result.get()) == nil ? 400 : 200)
@@ -305,7 +323,7 @@ private final class LoopbackEngine: @unchecked Sendable {
         }
     }
 
-    private static func query(header: Data, port: UInt16) -> [String: String]? {
+    private static func target(header: Data, port: UInt16) -> String? {
         guard header.allSatisfy({ $0 == 9 || $0 == 10 || $0 == 13 || (32...126).contains($0) }),
               let text = String(data: header, encoding: .utf8) else { return nil }
         let lines = text.components(separatedBy: "\r\n")
@@ -323,47 +341,7 @@ private final class LoopbackEngine: @unchecked Sendable {
         }
         guard headers["host"] == "127.0.0.1:\(port)", headers["transfer-encoding"] == nil,
               headers["content-length"] == nil || headers["content-length"] == "0" else { return nil }
-        let target = String(parts[1])
-        guard let delimiter = target.firstIndex(of: "?"), target[..<delimiter] == "/auth/callback",
-              !target.contains("#") else { return nil }
-        var query: [String: String] = [:]
-        let pairs = target[target.index(after: delimiter)...].split(separator: "&", omittingEmptySubsequences: false)
-        guard !pairs.isEmpty, pairs.count <= 32 else { return nil }
-        for pair in pairs {
-            let fields = pair.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
-            guard fields.count == 2, let name = decode(fields[0]), let value = decode(fields[1]),
-                  !name.isEmpty, name.utf8.count <= 128, value.utf8.count <= 4096,
-                  query[name] == nil else { return nil }
-            query[name] = value
-        }
-        return query
-    }
-
-    private static func decode(_ raw: Substring) -> String? {
-        let bytes = Array(raw.utf8)
-        var index = 0
-        while index < bytes.count {
-            if bytes[index] == 37 {
-                guard index + 2 < bytes.count, hexadecimal(bytes[index + 1]), hexadecimal(bytes[index + 2]) else { return nil }
-                index += 3
-            } else { index += 1 }
-        }
-        guard let value = String(raw).replacingOccurrences(of: "+", with: " ").removingPercentEncoding,
-              !value.unicodeScalars.contains(where: { $0.value < 32 || $0.value == 127 }) else { return nil }
-        return value
-    }
-
-    private static func hexadecimal(_ byte: UInt8) -> Bool {
-        (48...57).contains(byte) || (65...70).contains(byte) || (97...102).contains(byte)
-    }
-
-    private static func equal(_ lhs: String, _ rhs: String) -> Bool {
-        let a = Array(lhs.utf8), b = Array(rhs.utf8)
-        var difference = a.count ^ b.count
-        for index in 0..<max(a.count, b.count) {
-            difference |= Int((index < a.count ? a[index] : 0) ^ (index < b.count ? b[index] : 0))
-        }
-        return difference == 0
+        return String(parts[1])
     }
 
     deinit {

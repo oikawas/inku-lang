@@ -101,16 +101,21 @@ public actor ChatGPTPlanRuntime {
 
     public func beginAuthorization(profileID: String? = nil, consent: Bool = false) async throws -> ChatGPTAuthorization {
         let saved = try checkedState()
-        guard attempts.isEmpty, !startingAuthorization else { throw HostError("chatgpt_attempt_busy") }
+        let pendingCount = attempts.count + (startingAuthorization ? 1 : 0)
+        let limits = try ChatGPTPolicy.call("chatgpt_auth_attempt", ["pending_count": .integer(pendingCount),
+            "owner_count": .integer(pendingCount)])
         startingAuthorization = true
         defer { startingAuthorization = false }
         let previous = profileID.flatMap { saved.profiles[$0] }
-        let previousClientID = previous?.clientID ?? profileID.flatMap { saved.pendingRegistrations[$0] }
-        if profileID != nil && previousClientID == nil { throw HostError("chatgpt_not_connected") }
+        let pending = profileID.flatMap { saved.pendingRegistrations[$0] }
+        let prior = try ChatGPTPolicy.call("chatgpt_auth_previous", ["profile_id": ChatGPTPolicy.string(profileID),
+            "profile": previous.map { .object(["client_id": .string($0.clientID)]) } ?? .null,
+            "pending": pending.map { .object(["client_id": .string($0)]) } ?? .null])["previous"]
+        let previousClientID = prior["client_id"].string
         if previous == nil && saved.profiles.count >= 8 { throw HostError("chatgpt_profile_limit") }
         let id = UUID().uuidString, selectedID = profileID ?? UUID().uuidString
         let state = try random(32), nonce = try random(32), verifier = try random(64)
-        let deadline = Date().addingTimeInterval(300), beginEpoch = epoch
+        let deadline = Date().addingTimeInterval(TimeInterval(limits["deadline_seconds"].number.flatMap(Double.init) ?? 300)), beginEpoch = epoch
         // Reserve before the listener suspends; another authorize action cannot create a second attempt.
         let hostID: String = try await mutate { value in
             if value.hostID == nil { value.hostID = "urn:uuid:" + UUID().uuidString.lowercased() }
@@ -193,15 +198,19 @@ public actor ChatGPTPlanRuntime {
         try await signOutProfile(id).confirmed
     }
 
-    /// Delete the registration only if no newer authorization replaced the signed-out generation.
+    /// Delete only a registration that is still signed out. The shared core decides the state transition.
     public func deleteProfile(_ id: String) async throws -> Bool {
         let result = try await signOutProfile(id)
         try await mutate { value in
-            guard let profile = value.profiles[id], profile.state == "signed_out",
-                  profile.generation == result.generation else { throw HostError("chatgpt_session_changed") }
-            value.profiles.removeValue(forKey: id)
-            value.pendingRegistrations.removeValue(forKey: id)
-            if value.activeProfileID == id { value.activeProfileID = nil }
+            let states = ExactJSON.object(value.profiles.mapValues { .object(["state": .string($0.state)]) })
+            let pending = ExactJSON.object(value.pendingRegistrations.mapValues { .object(["client_id": .string($0)]) })
+            let answer = try ChatGPTPolicy.call("chatgpt_auth_delete", ["profile_id": .string(id), "value": .object([
+                "profiles": states, "registrations_pending": pending, "active": ChatGPTPolicy.string(value.activeProfileID)])])["value"]
+            let remaining = Set(answer["profiles"].object?.keys ?? Dictionary<String, ExactJSON>().keys)
+            let remainingPending = Set(answer["registrations_pending"].object?.keys ?? Dictionary<String, ExactJSON>().keys)
+            value.profiles = value.profiles.filter { remaining.contains($0.key) }
+            value.pendingRegistrations = value.pendingRegistrations.filter { remainingPending.contains($0.key) }
+            value.activeProfileID = answer["active"].string
         }
         return result.confirmed
     }
@@ -261,8 +270,9 @@ public actor ChatGPTPlanRuntime {
     public func savePublication(profileID: String, generation: Int64, models selected: [String],
                                 purposes: [String: [String]] = [:]) async throws -> ChatGPTPlanPublication {
         try checkOpen()
-        guard selected.count <= 1024, selected.allSatisfy({ (1...256).contains($0.count) }) else { throw HostError("chatgpt_model_not_offered") }
-        guard purposes.values.allSatisfy({ $0.allSatisfy(["llm", "vision"].contains) }) else { throw HostError("chatgpt_model_not_offered") }
+        _ = try ChatGPTPolicy.call("chatgpt_auth_publication_input", ["profile_id": .string(profileID),
+            "generation": .number(String(generation)), "selected": .array(selected.map(ExactJSON.string)),
+            "model_purposes": .object(purposes.mapValues { .array($0.map(ExactJSON.string)) })])
         let session = ChatGPTPlanSession(profileID: profileID, generation: generation)
         return try await mutate { value in
             var profile = try self.checkedProfile(session, value: value)
@@ -322,10 +332,9 @@ public actor ChatGPTPlanRuntime {
                                 argumentLimit: Int, recorder: ProviderAttemptRecorder?, willSend: @escaping ProviderObservationHandler,
                                 onBytes: @escaping @Sendable (Int) -> Void) async throws -> String {
         let effect = try ExactJSON(data: action), tag = try effect.requiredString("tag")
-        guard ["generate_sketch", "select_description_catalog", "generate_normalized_ddl", "read_composition",
-               "choose_laws", "choose_colors", "complete_visible_ddl_holes"].contains(tag) else {
-            throw HostError("chatgpt_operation_not_supported")
-        }
+        let imageEffects = try ChatGPTPolicy.call("chatgpt_auth_constants")["image_effects"].array?.compactMap(\.string) ?? []
+        let purpose = imageEffects.contains(tag) ? "vision" : "llm"
+        _ = try ChatGPTPolicy.call("chatgpt_auth_operation", ["purpose": .string(purpose), "tag": .string(tag)])
         guard let timeout = Double(try effect.requiredString("timeout_ms")), timeout.isFinite,
               argumentLimit > 0, argumentLimit <= (Int.max - 524_288) / 6 else { throw HostError("pipeline_schema_violation") }
         // Server raises TimeoutError for a non-positive attempt timeout before the ChatGPT request.
@@ -339,15 +348,16 @@ public actor ChatGPTPlanRuntime {
             // The body does not depend on authentication. Durably save it before any
             // model-discovery or token-refresh HTTP, as well as before the paid request.
             let body: ChatGPTWire.Request?
+            let imageBody = purpose == "vision" ? try Self.request(action: action, model: model, argumentLimit: argumentLimit) : nil
             if let recorder {
                 let profile = try checkedProfile(session)
-                let prepared = try Self.request(action: action, model: model, argumentLimit: argumentLimit)
+                let prepared = try imageBody ?? Self.request(action: action, model: model, argumentLimit: argumentLimit)
                 recorder.prepare(body: prepared.body, providerID: providerID, model: model,
                     secrets: [profile.accessToken, profile.refreshToken, profile.idToken].compactMap { $0 })
                 try await recorder.saveRequest(willSend)
                 body = prepared
-            } else { body = nil }
-            try await checkOffered(model, purpose: "llm", session: session, deadline: deadline, operationEpoch: operationEpoch)
+            } else { body = imageBody }
+            try await checkOffered(model, purpose: purpose, session: session, deadline: deadline, operationEpoch: operationEpoch)
             let token = try await accessToken(session, deadline: deadline, operationEpoch: operationEpoch)
             if let recorder {
                 let profile = try checkedProfile(session)
@@ -390,6 +400,7 @@ public actor ChatGPTPlanRuntime {
     /// published and chosen for Vision; otherwise nothing is sent.
     public func visionText(session: ChatGPTPlanSession, model: String, system: String, message: String, images: [String],
                            timeoutSeconds: Double, onBytes: @escaping @Sendable (Int) -> Void) async throws -> String {
+        _ = try ChatGPTPolicy.call("chatgpt_auth_operation", ["purpose": .string("vision"), "tag": .string("vision")])
         guard timeoutSeconds.isFinite, timeoutSeconds > 0 else { throw HostError("chatgpt_transport_timeout") }
         let prepared = try ChatGPTWire.visionRequest(model: model, system: system, text: message, images: images, answerLimit: Self.visionTextLimit)
         let deadline = Date().addingTimeInterval(timeoutSeconds)

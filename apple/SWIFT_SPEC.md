@@ -860,6 +860,8 @@ After a successful new connection, reauthorization or consent renewal, the app r
 
 ChatGPT plan publication and authentication decisions use the shared core, including model assessments, authorization, callback, claims, key selection, token lifetime and quota transitions. Cryptographic signature verification, local storage and HTTP remain native. Reauthorization preserves the existing encrypted profile and published choices.
 
+The shared core's `model_catalog` also decides callback parsing and one-time use, concurrent authorization attempts, previous registrations, operation purposes, publication input, and registration deletion. An invalid callback target or state gets HTTP 400 while the listener keeps waiting; a failure after a valid callback has been marked used ends the attempt. Deletion removes only a registration that remains signed out after sign-out and keeps a different connected registration.
+
 
 
 Personal ChatGPT is separate from API key connections and disabled by default. The user explicitly enables it, connects and selects a published drawing model. Stage1 and Stage2 share that model. Several saved personal connections still use one local work library; they do not add multi-user behavior.
@@ -871,6 +873,8 @@ ChatGPT plan models also serve Vision (author's ruling, 2026-10-12; the contract
 Sign-in uses a temporary listener on 127.0.0.1 with `/auth/callback`, state/nonce/PKCE, an issued client ID, verified identity and granted scopes. Credentials occupy an atomically committed AES-GCM vault capped at 1MiB, with a device-local 32-byte key in Keychain. There is no plaintext token fallback, and SQLite backups exclude credentials. The initial disabled state starts neither authentication nor inference.
 
 Requests pin profile ID and generation at startup and never switch connections while queued or resuming batch/demo work. Disconnects, connection changes and quota failures invalidate old refreshes and late responses without implicit fallback to another provider. Responses/SSE carries the shared Rust description, sketch, automatic-color, composition-reading and DDL-hole effects, and Vision refinement and colophons. Request bodies, SSE reading, failure classification and the model list are done by the shared core's `provider_wire` (2026-10-17). Demo-description generation and model inspection explicitly remain unsupported for this connection. Actual sign-in, model discovery and inference acceptance are separate from offline checks.
+
+Core operation decisions also let the ChatGPT plan send the four draw-in-words effects and three image-to-drawing effects. Image effects require a model published for Vision, and their image-bearing request bodies are validated before model catalog or token HTTP calls. Raw observations of image-bearing requests remain disabled.
 
 ### Export and native raster
 

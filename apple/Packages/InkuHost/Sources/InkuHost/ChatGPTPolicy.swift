@@ -6,11 +6,14 @@ public enum ChatGPTPolicy {
     public static func evaluate(_ request: ExactJSON) throws -> ExactJSON {
         try ExactJSON(data: InkuCore.modelCatalog(request.data))
     }
-    static func call(_ action: String, _ fields: [String: ExactJSON] = [:]) throws -> ExactJSON {
+    static func result(_ action: String, _ fields: [String: ExactJSON] = [:]) throws -> ExactJSON {
         var request = fields
         request["action"] = .string(action)
         request["schema"] = .string("inku.model-catalog-request.v1")
-        let result = try evaluate(.object(request))
+        return try evaluate(.object(request))
+    }
+    static func call(_ action: String, _ fields: [String: ExactJSON] = [:]) throws -> ExactJSON {
+        let result = try result(action, fields)
         if let code = result["error"].string { throw HostError(code) }
         return result
     }

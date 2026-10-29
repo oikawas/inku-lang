@@ -44,7 +44,10 @@ import app.inku.mobile.ui.theme.LocalUiTextScale
 import app.inku.mobile.ui.theme.PillInkOnDark
 import app.inku.mobile.ui.theme.PillInkOnLight
 import app.inku.mobile.ui.theme.TypeScale
+import androidx.compose.ui.text.style.TextDecoration
 import kotlinx.coroutines.yield
+
+internal data class PluginEditorCall(val start: Int, val end: Int, val text: String, val status: String, val suggestion: String?, val candidates: List<String>)
 
 /** One native text field: raw text, IME and selections remain in TextFieldState. */
 @OptIn(ExperimentalFoundationApi::class)
@@ -58,6 +61,7 @@ internal fun DdlRangeEditor(
     readOnly: Boolean = false,
     onWordTap: () -> Unit = {},
     completionTags: List<DdlEditorCompletionTag> = emptyList(),
+    pluginCalls: List<PluginEditorCall> = emptyList(),
 ) {
     val table = LocalCompositionRangeTable.current
     val focusRequester = remember { FocusRequester() }
@@ -70,6 +74,7 @@ internal fun DdlRangeEditor(
     val projection = remember(snapshot, table, completionTags) { ddlEditorProjection(snapshot, table, completionTags) }
     val currentProjection by rememberUpdatedState(projection)
     val currentCompletionTags by rememberUpdatedState(completionTags)
+    val currentPluginCalls by rememberUpdatedState(pluginCalls)
     val currentFocused by rememberUpdatedState(focused)
     val wordTap by rememberUpdatedState(onWordTap)
     val placeColor = tokens.firstOrNull { it.group.key == "basho" }?.color ?: MaterialTheme.colorScheme.primaryContainer
@@ -93,6 +98,13 @@ internal fun DdlRangeEditor(
                     background = color,
                     color = if (isLightColor(color)) PillInkOnLight else PillInkOnDark,
                 ), start, end)
+            }
+            currentPluginCalls.forEach { call ->
+                val start = displayed.displayOffset(call.start)
+                val end = displayed.displayOffset(call.end)
+                if (start >= 0 && end > start && end <= text.length) addStyle(
+                    if (call.status == "resolved") SpanStyle(background = tagColor, color = tagInk)
+                    else SpanStyle(color = muted, textDecoration = TextDecoration.Underline), start, end)
             }
             displayed.labels.forEach { label ->
                 addStyle(SpanStyle(background = placeColor, color = placeInk), label.start, label.end)

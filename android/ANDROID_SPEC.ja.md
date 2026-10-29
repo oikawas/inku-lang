@@ -579,7 +579,7 @@ Geminiへ渡す応答の型は、各objectの `propertyOrdering` に沿って `p
 
 指示書エディタと再描画は保存した統合本文を使い、本文なしの描画入口を無効にする。記述をDDLの代わりに用いない。保存Scoreの再演・コピーは元のNULL・空文字・空白と由来を保ち、新たな共有pipelineの描画は確定document.sourceと新しいauthorityを保存する。由来から過去の入力やauthoring authorityを推測しない。旧expanded本文は旧エンジンの補完出力であり、現行エンジンとの100%互換は保証しない。
 
-現行作品JSON（`inku.history_item`、形式0.2.0）と`inku.ddl-export.v1`は`ddl`と`ddl_source_origin`を出力し、旧二本文のキーを出さない。JSONの指示書読込みでは旧`ddl`／`normalized_ddl`と`expanded_ddl`にも同じ選択規則を当て、由来を読み書きで保持する。読込んだ本文から描く作品は新しい作品であり、旧authorityは復元しない。画面・テキスト書出しはNULLを空文字として扱う。
+現行作品JSON（`inku.history_item`、形式0.2.0）と`inku.ddl-export.v2`は`ddl`と`ddl_source_origin`を出力し、旧二本文のキーを出さない。旧作品JSONの読込みでは旧`ddl`／`normalized_ddl`と`expanded_ddl`にも同じ選択規則を当て、由来を読み書きで保持する。読込んだ本文から描く作品は新しい作品であり、旧authorityは復元しない。画面・テキスト書出しはNULLを空文字として扱う。
 
 ## 2026-10-01 DDLの無い作品をNULLで保存
 
@@ -663,13 +663,15 @@ Androidへの転送は、Rustのpremultiplied RGBAをNDKの`RGBA_8888` Bitmapへ
 
 下絵の任意`plugins`とその個数（`count`）、Stage 1の登録プラグイン節、正式名と別名（DDL Spec 14、同梱`Nature.leaves` 2.1.0）の照合と、語に書いた個数の受け取り（SPEC §4.6）は、同梱した共有Rust coreがそのまま行う。lockの任意`aliases`はRoomへそのまま運ぶ。
 
-同梱パッケージ`Nature.leaves`の有効・無効は、設定「その他」の「同梱プラグイン」で切り替える（Serverの文書単位と同じ粒度）。値は`plugin_settings`のキー`bundled:Nature.leaves:enabled`に`{"enabled":bool}`で保存し、欠落・壊れた値は有効とする。無効なら新しい作品のcatalog解決の`bundled_packages`から外す。保存済み作品は自分のconfigの定義で描き直す。語の名前は、日本語表示では別名（若葉など）、英語表示では正式名で示し、どちらも共有coreの定義から取る。
+同梱パッケージ`Nature.leaves`の有効・無効は、設定「その他」の「同梱プラグイン」で切り替える。値は`plugin_settings`のキー`bundled:Nature.leaves:enabled`に`{"enabled":bool}`で保存し、欠落・壊れた値は有効とする。無効なら新しい作品のcatalog解決から外す。保存済み作品は自分の定義で描き直す。v2 の語は `｛若葉｝`／`{young leaves}` と書く。設定には共有coreの資産から絵、日英の主の名、ほかの名、種類、説明、例文を出す。
 
-作品を保存するとき、上流診断が1件以上あれば共有`explain_plugin_diagnostics`（JNI`NativePipelineBridge.explainPluginDiagnostics`）を呼び、結果を`pipeline_diagnostics.plugin_diagnostics`（配列）に保存する。`enabled`は作品configの定義の正式名と別名、および有効な同梱パッケージの名前、`disabled`は無効な同梱パッケージの名前である。保存時の検査は、必須チャンネルの完全一致に加え、任意チャンネル`plugin_diagnostics`を配列として受け付け、この項目の無い保存済みの行も読む。描画の診断は、同じ範囲の上流診断の代わりに、Webの`pipelinePluginDiagnostic`と同じ文言で理由（未登録・無効・名前の不一致と候補・版の不一致）を示す。
+作品を保存するとき、上流診断が1件以上あれば共有`explain_plugin_diagnostics`を呼び、結果を`pipeline_diagnostics.plugin_diagnostics`に保存する。`enabled`・`disabled`には定義の識別名、`plugin_names`には全ての語の名を正規化し、識別名と有効状態を添えて渡す。作品自身の定義は有効として扱う。保存時の検査は任意の診断配列も受け付け、旧行も読む。描画の診断は未登録・無効・名前や版の不一致を示す。
 
 描画coreが描画を止めずに残す警告（描画のmetadataの`render_warnings`。いまは`#rrggbb`でない色表の値を既定の色で描いた`invalid_color`と色の名前）は、Logcat（tag `InkuRender`）に記録し、作品の描画の診断にWebの`pipelineRenderWarning`と同じ文言で示す。警告があれば`pipeline_diagnostics.render_warnings`（配列）にも保存し、保存時の検査はこれも任意チャンネルとして受け付ける。保存Score再演（`renderSaved`）が断ったときは、coreの理由コードを「このScoreは描けません:」に続けてWebの`renderRefusalReason`と同じ文言で示し、coreの`message`はLogcatにだけ記録する。
 
-DDLの書き出しは、保存作品の書き出しシートの「DDL（プラグイン定義付き）」で、`inku.ddl-export.v1`（DDLと、それが正式名または別名で書く定義だけ、`exported_from`はbuildとrender engine）を`inku-<id>-<日時>.inku-ddl.json`として共有する。DDL編集の「読込」で書き出しファイルを読むと、DDLを編集欄へ入れ、定義を次の新しい作品のcatalog解決だけに先頭の候補として渡す（登録しない、既存作品の編集には渡さない）。登録済みに無い名前は`imported_plugin_not_installed`、中身が違う名前は`imported_plugin_differs_from_installed`のcatalog診断を付ける。書き出し形式でないファイルはそのままDDLとして読む。描画のseedとキャンバスは書き出しに含まれないため、読み込んだ作品は同じ構図（Scoreが同じ）で描かれる。制作画面のDDL欄は、読み取り専用のテキスト欄がタップを取り、DDL編集を開けなかったため、欄全体でタップを受けるよう直した。
+DDLの書き出しは `inku.ddl-export.v2` とし、保存した lock の名前と版に一致する定義だけを note と共に運ぶ。v1 は再書き出しを求めて断り、編集欄を変えない。v2 の読み込みでは定義を次の新しい作品だけに渡す。書き出し形式でないファイルと旧 `inku.history_item` は従来どおり読む。
+
+起動時に一度、共有coreで保存済みDDLの古いプラグイン名を移し、作品・variation と関連 digest を一つの transaction で更新する。定義、lock、Score、SVG、記述は変更しない。断った単位と部分移行は報告に記録する。編集欄は共有coreのプラグイン呼出しを強調・診断し、有効な語の補完を出す。作品詳細には保存した提示の記録を出す。
 
 DDL SpecとDDL engineの版はServerの`layer_versions.py`が名乗り、Androidは版の定数を持たない。
 

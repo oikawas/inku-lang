@@ -584,14 +584,13 @@ class InkuRepository(
     }
 
     /**
-     * The saved work as `inku.ddl-export.v1`: its visible DDL and the plugin
-     * definitions that DDL names, from the work's own saved configuration.
+     * The saved work as `inku.ddl-export.v2`, with its locked plugin definitions.
      */
     suspend fun ddlExportJson(item: HistoryItemEntity): String {
-        val config = readManagedHistory(AndroidWorkPipeline.OWNER_ID, item.id)
+        val context = readManagedHistory(AndroidWorkPipeline.OWNER_ID, item.id)
             ?.forkContextJson
             ?.let(::JSONObject)
-            ?.optJSONObject("config")
+        val config = context?.optJSONObject("config")
         val language = config?.optString("language")?.takeIf { it.isNotBlank() }
             ?: item.instructionLangResolved
             ?: "ja"
@@ -605,6 +604,7 @@ class InkuRepository(
                 .put("build_number", BuildConfig.BUILD_NUMBER)
                 .put("render_engine_version", engineVersion ?: JSONObject.NULL),
             ddlSourceOrigin = item.ddlSourceOrigin,
+            locks = context?.optJSONObject("macro_catalog")?.optJSONArray("definition_locks"),
         ).toString(2)
     }
 
@@ -803,6 +803,12 @@ class InkuRepository(
     }.getOrNull() ?: true
 
     fun bundledPluginWords(japanese: Boolean): List<String> = pipeline.bundledPluginWords(japanese)
+
+    suspend fun pluginEditorAnalysis(source: String, language: String, executionId: String?, historyId: String?, imported: List<app.inku.mobile.pipeline.ImportedPluginDefinition>): JSONObject =
+        pipeline.pluginEditorAnalysis(source, language, executionId, historyId, imported)
+
+    suspend fun pluginOfferConfig(historyId: String): JSONObject? =
+        readManagedHistory(AndroidWorkPipeline.OWNER_ID, historyId)?.forkContextJson?.let(::JSONObject)?.optJSONObject("config")
 
     suspend fun setBundledPluginPackageEnabled(enabled: Boolean) {
         database.pluginSettingDao().upsert(

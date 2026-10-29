@@ -186,6 +186,36 @@ pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_explai
 
 #[unsafe(no_mangle)]
 #[allow(non_snake_case)]
+pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_migratePluginNames(
+    env: JNIEnv<'_>,
+    _receiver: JObject<'_>,
+    input: JByteArray<'_>,
+) -> jbyteArray {
+    unary_bytes(env, input, inku_pipeline_uniffi::migrate_plugin_names)
+}
+
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
+pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_pluginPackage(
+    env: JNIEnv<'_>,
+    _receiver: JObject<'_>,
+    input: JByteArray<'_>,
+) -> jbyteArray {
+    unary_bytes(env, input, inku_pipeline_uniffi::plugin_package)
+}
+
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
+pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_pluginCalls(
+    env: JNIEnv<'_>,
+    _receiver: JObject<'_>,
+    input: JByteArray<'_>,
+) -> jbyteArray {
+    unary_bytes(env, input, inku_pipeline_uniffi::plugin_calls)
+}
+
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
 pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_recompose(
     env: JNIEnv<'_>,
     _receiver: JObject<'_>,

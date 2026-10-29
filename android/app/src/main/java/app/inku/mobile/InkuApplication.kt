@@ -5,6 +5,7 @@ import android.util.Log
 import app.inku.mobile.data.db.InkuDatabase
 import app.inku.mobile.data.db.RoomV10ResetCoordinator
 import app.inku.mobile.data.db.SaijikiV1Migration
+import app.inku.mobile.data.db.PluginNamesV2Migration
 import app.inku.mobile.data.model.CanvasAspects
 import app.inku.mobile.pipeline.NativePipelineBridge
 import kotlinx.coroutines.CoroutineScope
@@ -103,14 +104,20 @@ class InkuApplication : Application() {
         }.getOrElse { error ->
             Log.e(MIGRATION_LOG_TAG, "Saijiki v2 migration failed; nothing was written", error)
             return
-        } ?: return
-        runCatching { filesDir.resolve(MIGRATION_REPORT).writeText(report.toString(1)) }
-        Log.i(
-            MIGRATION_LOG_TAG,
-            "Saijiki v2 migration written: ${report.optLong("total_ms")} ms, " +
-                "${report.optInt("statements")} statements, " +
-                "${report.optJSONArray("refused_records")?.length() ?: 0} refused records",
-        )
+        }
+        if (report != null) {
+            runCatching { filesDir.resolve(MIGRATION_REPORT).writeText(report.toString(1)) }
+            Log.i(MIGRATION_LOG_TAG, "Saijiki v2 migration written: ${report.optLong("total_ms")} ms, " +
+                "${report.optInt("statements")} statements, ${report.optJSONArray("refused_records")?.length() ?: 0} refused records")
+        }
+        val pluginReport = runCatching { PluginNamesV2Migration(NativePipelineBridge::migratePluginNames).runOnce(db) }
+            .getOrElse { error ->
+                Log.e(MIGRATION_LOG_TAG, "Plugin names v2 migration failed; nothing was written", error)
+                return
+            } ?: return
+        runCatching { filesDir.resolve("plugin-names-v2-migration.json").writeText(pluginReport.toString(1)) }
+        Log.i(MIGRATION_LOG_TAG, "Plugin names v2 migration: ${pluginReport.optInt("history_changed")} histories, " +
+            "${pluginReport.optInt("variation_changed")} variations, ${pluginReport.optJSONArray("refused_records")?.length() ?: 0} refused or partial")
     }
 
     override fun onTerminate() {

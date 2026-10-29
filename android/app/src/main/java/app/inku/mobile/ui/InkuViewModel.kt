@@ -299,7 +299,7 @@ data class InkuUiState(
     val cameraCaptureState: CameraCaptureState = CameraCaptureState.Idle,
     val cameraSourcePhotoPath: String? = null,
     val bundledPluginsEnabled: Boolean = true,
-    /** Definitions read with an `inku.ddl-export.v1` file, held for the next new work. */
+    /** Definitions read with an `inku.ddl-export.v2` file, held for the next new work. */
     val importedPlugins: List<ImportedPluginDefinition> = emptyList(),
     val importedPluginNames: List<String> = emptyList(),
     val bundledPluginWordsJa: List<String> = emptyList(),
@@ -1542,19 +1542,29 @@ class InkuViewModel @JvmOverloads constructor(
         }
     }
 
+    internal suspend fun pluginEditorAnalysis(source: String, language: String): JSONObject {
+        val current = localState.value
+        return withContext(Dispatchers.IO) {
+            repository.pluginEditorAnalysis(source, language, matchingPipelineExecutionId(current), current.selectedHistory?.id?.takeUnless { current.lineageDetached }, current.importedPlugins)
+        }
+    }
+
+    internal suspend fun pluginOfferConfig(historyId: String): JSONObject? =
+        withContext(Dispatchers.IO) { repository.pluginOfferConfig(historyId) }
+
     internal fun previewDdlRange(preview: DdlRangePreview?) {
         localState.value = localState.value.copy(ddlRangePreview = preview)
     }
 
     /**
-     * Reads a DDL file into the editor. An `inku.ddl-export.v1` file brings its
+     * Reads a DDL file into the editor. An `inku.ddl-export.v2` file brings its
      * plugin definitions for the next new work only; the work is detached from
      * the current lineage because an import is never an edit of that work.
      */
-    fun importDdlFile(text: String) {
-        val parsed = runCatching { DdlExport.parse(text) }.getOrElse {
-            localState.value = localState.value.copy(message = strings().ddlImportInvalid)
-            return
+    fun importDdlFile(text: String): Boolean {
+        val parsed = runCatching { DdlExport.parse(text, if (state.value.uiLanguage.isEnglish) "en" else "ja") }.getOrElse {
+            localState.value = localState.value.copy(message = if (it.message == "ddl_export_requires_v2") strings().ddlImportRequiresV2 else strings().ddlImportInvalid)
+            return false
         }
         localState.value = localState.value.copy(
             ddl = parsed.ddl.orEmpty(),
@@ -1568,6 +1578,7 @@ class InkuViewModel @JvmOverloads constructor(
             importedPluginNames = parsed.names,
             message = if (parsed.names.isEmpty()) null else strings().ddlImportedPlugins(parsed.names.joinToString(", ")),
         )
+        return true
     }
 
     fun ddlImportFailed() {
@@ -1578,7 +1589,7 @@ class InkuViewModel @JvmOverloads constructor(
     suspend fun exportSvg(item: HistoryItemEntity, profile: String): String =
         withContext(Dispatchers.IO) { repository.exportSvg(item, profile) }
 
-    /** The saved work as `inku.ddl-export.v1` text, for the share sheet. */
+    /** The saved work as `inku.ddl-export.v2` text, for the share sheet. */
     suspend fun ddlExportJson(item: HistoryItemEntity): String =
         withContext(Dispatchers.IO) { repository.ddlExportJson(item) }
 

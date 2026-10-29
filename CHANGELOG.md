@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-29 — Android plugin v2
+
+Migrate saved plugin spellings at startup, show the bundled words and saved offers, add editor completion and diagnostics, and carry locked definitions in DDL v2 exports.
+
 ### 2026-10-29 — Plugin names in the editor and Saijiki
 
 The editor marks braced words and their reasons from the shared core and offers name completion and previews. The Saijiki, settings, and check show names and kinds; each work records the words offered to AI.

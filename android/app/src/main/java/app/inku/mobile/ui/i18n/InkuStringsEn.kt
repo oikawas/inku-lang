@@ -683,10 +683,26 @@ object InkuStringsEn : InkuStrings {
     override val bundledPluginsTitle = "Bundled plugins"
     override val ddlImportFile = "Open"
     override val ddlImportInvalid = "The DDL file could not be read"
+    override val ddlImportRequiresV2 = "This export uses an old format. Export it again as v2."
     override fun ddlImportedPlugins(names: String) = "Read plugin definitions with the DDL ($names). They are used by the next new work only."
     override val ddlExportWithPlugins = "DDL (with plugin definitions)"
     override val ddlExportWithPluginsNote = "The DDL and the plugin definitions it uses; another setup that reads it draws the same composition"
-    override val bundledPluginsSubtitle = "Nature.leaves. When disabled, new works do not use it, and sentences naming its words are not drawn, with the reason shown. Saved works redraw with their own definitions."
+    override val bundledPluginsSubtitle = "When disabled, new works do not use it, and sentences naming its words are not drawn, with the reason shown. Saved works redraw with their own definitions."
+    override val bundledPluginScene = "Scene word"
+    override fun bundledPluginExample(word: String) = "Example: {$word}."
+    override fun pluginEditorReason(reason: String, suggestion: String?, candidates: List<String>) = when (reason) {
+        "plugin_disabled" -> "This word is disabled. Enable it to draw it."
+        "plugin_name_mismatch" -> suggestion?.let { "Did you mean $it?" } ?: "This name is not on this Server."
+        "plugin_name_ambiguous" -> "This name matches multiple words: ${candidates.joinToString(", ")}."
+        "plugin_version_mismatch" -> "This version differs from the one saved with the work."
+        "plugin_count_out_of_range" -> "The count is outside the range this word accepts."
+        else -> "This name is not on this Server."
+    }
+    override val pluginOffersTitle = "Offered plugins"
+    override val pluginOffersNone = "None offered"
+    override val pluginOffersOmitted = "Omitted by the limit"
+    override fun pluginOfferStage(stage: String) = when (stage) { "generate_normalized_ddl" -> "Underdrawing"; "write_description_ddl" -> "Writing"; "review_description_ddl" -> "Review"; "chunk_rewrite" -> "Chunk rewrite"; else -> stage }
+    override fun pluginOfferReason(reason: String) = when (reason) { "brace" -> "written in braces"; "ddl" -> "in the DDL"; "name" -> "name appeared in the description"; else -> "" }
     override fun bundledPluginsToggle(words: String) = "Use ($words)"
     override fun cameraVisionRemoteNotice(provider: String) = "With this model, the photo you take is sent to $provider. Only a downsized, re-encoded photo is sent, without location or other capture data."
     override val cameraReadyToEdit = "Ready to edit"

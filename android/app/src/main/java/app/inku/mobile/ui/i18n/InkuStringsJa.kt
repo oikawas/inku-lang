@@ -655,10 +655,26 @@ object InkuStringsJa : InkuStrings {
     override val bundledPluginsTitle = "同梱プラグイン"
     override val ddlImportFile = "読込"
     override val ddlImportInvalid = "DDLファイルを読めませんでした"
+    override val ddlImportRequiresV2 = "この書き出しは古い形式です。v2 で書き出し直してください。"
     override fun ddlImportedPlugins(names: String) = "DDLと一緒にプラグイン定義を読み込みました（$names）。次の新しい作品だけに使います。"
     override val ddlExportWithPlugins = "DDL（プラグイン定義付き）"
     override val ddlExportWithPluginsNote = "DDLと、それが使うプラグインの定義。別の環境で読み込んでも同じ構図で描けます"
-    override val bundledPluginsSubtitle = "Nature.leaves。無効にすると新しい作品で使われず、その語の文は理由を示して描かれません。保存済みの作品は自分の定義で描き直せます。"
+    override val bundledPluginsSubtitle = "無効にすると新しい作品で使われず、その語の文は理由を示して描かれません。保存済みの作品は自分の定義で描き直せます。"
+    override val bundledPluginScene = "情景の語"
+    override fun bundledPluginExample(word: String) = "例文：｛$word｝。"
+    override fun pluginEditorReason(reason: String, suggestion: String?, candidates: List<String>) = when (reason) {
+        "plugin_disabled" -> "無効になっています。有効にすると描けます。"
+        "plugin_name_mismatch" -> suggestion?.let { "$it のことですか。" } ?: "この Server にない名前です。"
+        "plugin_name_ambiguous" -> "複数の語に当たります：${candidates.joinToString("、")}。"
+        "plugin_version_mismatch" -> "作品に保存された版と一致しません。"
+        "plugin_count_out_of_range" -> "数がこの語の受けられる範囲の外です。"
+        else -> "この Server にない名前です。"
+    }
+    override val pluginOffersTitle = "提示したプラグイン"
+    override val pluginOffersNone = "提示なし"
+    override val pluginOffersOmitted = "上限で落とした語"
+    override fun pluginOfferStage(stage: String) = when (stage) { "generate_normalized_ddl" -> "下絵"; "write_description_ddl" -> "書く"; "review_description_ddl" -> "見直す"; "chunk_rewrite" -> "まとまりの書き直し"; else -> stage }
+    override fun pluginOfferReason(reason: String) = when (reason) { "brace" -> "括弧で書いた"; "ddl" -> "DDL にあった"; "name" -> "名が記述に現れた"; else -> "" }
     override fun bundledPluginsToggle(words: String) = "使う（$words）"
     override fun cameraVisionRemoteNotice(provider: String) = "このモデルを使うと、撮影した写真を${provider}へ送信します。送るのは縮小して再圧縮した画像だけで、位置情報などの撮影情報は含みません。"
     override val cameraReadyToEdit = "編集できます"

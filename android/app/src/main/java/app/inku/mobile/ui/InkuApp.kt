@@ -856,6 +856,26 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
     var rangeStatus by remember { mutableStateOf(DdlEditorRangeStatus()) }
     val editorValue = TextFieldValue(editorState.text.toString(), editorState.selection, editorState.composition)
     var completionStates by remember { mutableStateOf(emptyList<app.inku.mobile.pipeline.CompletionRangeState>()) }
+    var pluginCalls by remember { mutableStateOf(emptyList<PluginEditorCall>()) }
+    var pluginEntries by remember { mutableStateOf(emptyList<org.json.JSONObject>()) }
+    val pluginLanguage = InstructionLanguages.ofDdl(editorValue.text, state.selectedHistory?.normalizedDdl,
+        state.selectedHistory?.instructionLangResolved, LocalUiLanguage.current.code)
+    LaunchedEffect(editorValue.text, pluginLanguage, state.selectedHistory?.id, state.lineageDetached, state.bundledPluginsEnabled, state.importedPlugins, state.pipelineView?.executionId, state.pipelineView?.sequence) {
+        pluginCalls = emptyList()
+        pluginEntries = emptyList()
+        kotlinx.coroutines.delay(250)
+        val output = runCatching { viewModel.pluginEditorAnalysis(editorValue.text, pluginLanguage) }.getOrNull()
+        if (output?.optString("schema") == "inku.plugin-calls.v1" && !output.has("error")) {
+            val calls = output.optJSONArray("calls") ?: org.json.JSONArray()
+            pluginCalls = (0 until calls.length()).mapNotNull { calls.optJSONObject(it) }.map {
+                val candidates = it.optJSONArray("candidates") ?: org.json.JSONArray()
+                PluginEditorCall(it.getInt("start_utf16"), it.getInt("end_utf16"), it.optString("text"), it.optString("status"), it.optString("suggestion").takeIf(String::isNotEmpty),
+                    (0 until candidates.length()).map { index -> candidates.getString(index) })
+            }
+            val entries = output.optJSONArray("entries") ?: org.json.JSONArray()
+            pluginEntries = (0 until entries.length()).mapNotNull { entries.optJSONObject(it) }
+        }
+    }
     LaunchedEffect(editorValue.text, state.selectedHistory?.id, state.lineageDetached,
         state.pipelineView?.executionId, state.pipelineView?.sequence) {
         completionStates = emptyList()
@@ -926,7 +946,7 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
                 viewModel.ddlImportFailed()
                 return@launch
             }
-            viewModel.importDdlFile(text)
+            if (!viewModel.importDdlFile(text)) return@launch
             val imported = viewModel.state.value.ddl
             session.reset()
             synchronization.adopt(imported)
@@ -1017,12 +1037,39 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
                     readOnly = state.isDrawing,
                     tokens = vocabularyTokens,
                     completionTags = completionRangeEditorTags(completionStates, S),
+                    pluginCalls = pluginCalls,
                     onWordTap = {
                         val current = TextFieldValue(editorState.text.toString(), editorState.selection)
                         val selected = selectVocabularyAtOffset(current, current.selection.start, allVocabularyWords)
                         if (current.selection != selected.selection) editorState.edit { selection = selected.selection }
                     },
                 )
+                pluginCalls.filter { it.status != "resolved" }.forEach { call ->
+                    Text("${call.text}: ${S.pluginEditorReason(call.status, call.suggestion, call.candidates)}",
+                        color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
+                }
+                if (focused && editorState.selection.collapsed && editorState.composition == null) {
+                    val cursor = editorState.selection.start.coerceIn(0, editorValue.text.length)
+                    val before = editorValue.text.substring(0, cursor)
+                    val open = maxOf(before.lastIndexOf('｛'), before.lastIndexOf('{'))
+                    if (open >= 0 && before.substring(open + 1).none { it in "｝}\n\r" }) {
+                        val query = before.substring(open + 1).trim()
+                        val field = if (pluginLanguage == "en") "written_en" else "written_ja"
+                        val surface = if (pluginLanguage == "en") "surface_en" else "surface_ja"
+                        val matches = pluginEntries.filter { entry ->
+                            val aliases = entry.optJSONArray(surface) ?: org.json.JSONArray()
+                            (0 until aliases.length()).any { aliases.optString(it).contains(query, ignoreCase = true) }
+                        }
+                        if (matches.isNotEmpty()) WrapRow {
+                            matches.forEach { entry ->
+                                val written = entry.optString(field)
+                                SecondarySmallButton(written, onClick = {
+                                    editorState.edit { replace(open, cursor, written); selection = TextRange(open + written.length) }
+                                }, enabled = !state.isDrawing)
+                            }
+                        }
+                    }
+                }
                 completionRangeEditorNote(completionStates, S)?.let { note ->
                     Text(note, style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -3147,7 +3194,7 @@ private fun CanvasHeroCard(
         )
     }
     if (showControls && generationInfoOpen && state.refinementPreviewId == null) item?.let {
-        GenerationInfoSheet(item = it, onDismiss = { generationInfoOpen = false })
+        GenerationInfoSheet(item = it, viewModel = viewModel, onDismiss = { generationInfoOpen = false })
     }
     if (!presentation && showControls && pngExporting) {
         Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), verticalAlignment = Alignment.CenterVertically) {
@@ -4925,11 +4972,48 @@ private fun MiscSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
                 text = S.bundledPluginsToggle(words.joinToString(S.listSeparator)),
                 onCheckedChange = viewModel::setBundledPluginsEnabled,
             )
+            BundledPluginDetails(LocalUiLanguage.current.isEnglish)
         }
         SettingsCard(S.mascotTitle, S.mascotSubtitle, state.mascotKind) {
             Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                 ChipButton(S.mascotIncu, selected = state.mascotKind == "incu", onClick = { viewModel.setMascotKind("incu") })
                 ChipButton(S.mascotYuragi, selected = state.mascotKind == "yuragi", onClick = { viewModel.setMascotKind("yuragi") })
+            }
+        }
+    }
+}
+
+@Composable
+private fun BundledPluginDetails(english: Boolean) {
+    val words by produceState<List<Pair<org.json.JSONObject, ImageBitmap?>>>(emptyList()) {
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                val request = org.json.JSONObject().put("action", "bundled_nature")
+                val result = org.json.JSONObject(app.inku.mobile.pipeline.NativePipelineBridge.pluginPackage(request.toString().toByteArray()).decodeToString())
+                val packageWords = org.json.JSONObject(result.getString("text")).getJSONArray("words")
+                val pictures = result.getJSONObject("pictures")
+                (0 until packageWords.length()).map { i ->
+                    val word = packageWords.getJSONObject(i)
+                    val bytes = java.util.Base64.getDecoder().decode(pictures.getString(word.getString("preview")))
+                    word to BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+                }
+            }.getOrDefault(emptyList())
+        }
+    }
+    words.forEach { (word, picture) ->
+        val definition = word.getJSONObject("definition")
+        val names = definition.getJSONObject("names")
+        val ja = names.getJSONArray("ja"); val en = names.getJSONArray("en")
+        val mainJa = ja.getString(0); val mainEn = en.getString(0)
+        val aliases = (1 until ja.length()).map { ja.getString(it) } + (1 until en.length()).map { en.getString(it) }
+        Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+            picture?.let { Image(it, contentDescription = null, modifier = Modifier.size(Dimens.ddlEditorPreviewSize)) }
+            Column {
+                Text("｛$mainJa｝ / {$mainEn}", fontWeight = FontWeight.SemiBold)
+                if (aliases.isNotEmpty()) Text(aliases.joinToString(" / "), style = MaterialTheme.typography.bodySmall)
+                Text(S.bundledPluginScene, style = MaterialTheme.typography.bodySmall)
+                Text(word.optString(if (english) "note_en" else "note_ja"), style = MaterialTheme.typography.bodySmall)
+                Text(S.bundledPluginExample(if (english) mainEn else mainJa), style = MaterialTheme.typography.bodySmall)
             }
         }
     }
@@ -6540,7 +6624,7 @@ private fun CanvasPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: 
         }
     }
     if (generationInfoOpen && state.refinementPreviewId == null) item?.let {
-        GenerationInfoSheet(item = it, onDismiss = { generationInfoOpen = false })
+        GenerationInfoSheet(item = it, viewModel = viewModel, onDismiss = { generationInfoOpen = false })
     }
 }
 
@@ -6738,9 +6822,12 @@ internal fun generationInfoSections(item: HistoryItemEntity): List<GenerationInf
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun GenerationInfoSheet(item: HistoryItemEntity, onDismiss: () -> Unit) {
+private fun GenerationInfoSheet(item: HistoryItemEntity, viewModel: InkuViewModel, onDismiss: () -> Unit) {
     val clipboard = LocalClipboardManager.current
     val parityText = savedWorkParityStrings(LocalUiLanguage.current)
+    val english = LocalUiLanguage.current.isEnglish
+    val strings = S
+    val offerConfig by produceState<JSONObject?>(null, item.id) { value = viewModel.pluginOfferConfig(item.id) }
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
@@ -6751,6 +6838,35 @@ private fun GenerationInfoSheet(item: HistoryItemEntity, onDismiss: () -> Unit) 
             verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
         ) {
             Text(S.generationInfoTitle, style = MaterialTheme.typography.titleMedium)
+            offerConfig?.let { config ->
+                val offers = config.optJSONArray("plugin_offers") ?: org.json.JSONArray()
+                val definitions = config.optJSONArray("definitions") ?: org.json.JSONArray()
+                val names = (0 until definitions.length()).mapNotNull { definitions.optJSONObject(it) }.associate { definition ->
+                    val id = definition.optString("id").ifEmpty { definition.optString("heading") }
+                    val primary = definition.optJSONObject("names")?.optJSONArray(if (english) "en" else "ja")?.optString(0).orEmpty()
+                    val name = if (primary.isEmpty()) "${definition.optString("namespace")}.$id" else if (english) "{$primary}" else "｛$primary｝"
+                    "${definition.optString("namespace")}.$id" to name
+                }
+                fun offerName(entry: JSONObject): String {
+                    val id = entry.optString("qualified_name")
+                    return entry.optString(if (english) "written_en" else "written_ja").ifEmpty { names[id] ?: id }
+                }
+                if (offers.length() > 0) Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
+                    CompactLabel(S.pluginOffersTitle)
+                    for (i in 0 until offers.length()) {
+                        val record = offers.optJSONObject(i) ?: continue
+                        val offer = record.optJSONObject("offer") ?: JSONObject()
+                        val offered = offer.optJSONArray("offered") ?: org.json.JSONArray()
+                        val omitted = offer.optJSONArray("omitted") ?: org.json.JSONArray()
+                        val text = (0 until offered.length()).mapNotNull { offered.optJSONObject(it) }.joinToString(strings.listSeparator) {
+                            "${offerName(it)}（${strings.pluginOfferReason(it.optString("reason"))}）"
+                        }.ifEmpty { strings.pluginOffersNone }
+                        Text("${S.pluginOfferStage(record.optString("stage"))}: $text", style = MaterialTheme.typography.bodySmall)
+                        if (omitted.length() > 0) Text("${S.pluginOffersOmitted}: " +
+                            (0 until omitted.length()).mapNotNull { omitted.optJSONObject(it) }.joinToString(S.listSeparator, transform = ::offerName), style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
             val descriptionRecord = remember(item.id, item.renderMetadataJson) {
                 runCatching { JSONObject(item.renderMetadataJson).optJSONObject("description_ddl") }.getOrNull()
             }

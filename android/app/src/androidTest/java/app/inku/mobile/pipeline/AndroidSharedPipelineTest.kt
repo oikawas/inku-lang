@@ -430,6 +430,6 @@ class AndroidSharedPipelineTest {
         const val MODEL = "fixture:model"
         const val COMPOSITION_READING = """{"thesis":"One quiet circle","roles":["focal"],"relations":[],"tension":{"motion":"still","focus":"unspecified","vertical":"unspecified","balance":"unspecified","symmetry":"unspecified","void":"unspecified"},"stated_places":[]}"""
         const val EDITED_DDL = "place one red circle at center."
-        const val STEP16_DDL = "Nature.若葉. Place a small diagonal red arc at top. Place a blue arc at bottom, mirrored with the previous shape."
+        const val STEP16_DDL = "｛若葉｝. Place a small diagonal red arc at top. Place a blue arc at bottom, mirrored with the previous shape."
     }
 }

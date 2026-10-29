@@ -539,10 +539,19 @@ interface InkuStrings {
     val bundledPluginsTitle: String
     val ddlImportFile: String
     val ddlImportInvalid: String
+    val ddlImportRequiresV2: String
     fun ddlImportedPlugins(names: String): String
     val ddlExportWithPlugins: String
     val ddlExportWithPluginsNote: String
     val bundledPluginsSubtitle: String
+    val bundledPluginScene: String
+    fun bundledPluginExample(word: String): String
+    fun pluginEditorReason(reason: String, suggestion: String?, candidates: List<String>): String
+    val pluginOffersTitle: String
+    val pluginOffersNone: String
+    val pluginOffersOmitted: String
+    fun pluginOfferStage(stage: String): String
+    fun pluginOfferReason(reason: String): String
     fun bundledPluginsToggle(words: String): String
     fun cameraVisionRemoteNotice(provider: String): String
     val cameraReadyToEdit: String

@@ -14,13 +14,16 @@ struct DdlEditorPane: View {
     @State private var showGuide = false
     @State private var completionStates: [CompletionRangeState] = []
     @State private var completionSource = ""
+    @State private var pluginCalls: [PluginCall] = []
+    @State private var pluginSource = ""
+    @State private var hoverIndex: Int?
+    @Environment(\.inkuTooltipsCovered) private var tooltipsCovered
     @State private var rangeStatus = RangeEditorStatus()
     /// Web DdlEditorDialog: an invalid range or an IME composition holds the draw back.
     var onRangeBlocked: ((Bool) -> Void)?
     var onRangePreview: ((CompositionRanges.Preview?) -> Void)?
     private var invalidSource: Bool { rangeStatus.invalid || CompositionRanges.scan(text).contains { $0.bounds == nil } }
-    private var plugins: PluginNameIndex { PluginNameIndex(words: model.pluginWords) }
-    private var highlighter: DdlHighlighter { DdlHighlighter(saijiki: model.saijiki, plugins: plugins) }
+    private var highlighter: DdlHighlighter { DdlHighlighter(saijiki: model.saijiki, calls: pluginSource == text ? pluginCalls : []) }
 
     init(model: AppModel, text: Binding<String>, disabled: Bool = false, insertion: Binding<InkuEditorInsertion?>,
          onRangeBlocked: ((Bool) -> Void)? = nil, onRangePreview: ((CompositionRanges.Preview?) -> Void)? = nil) {
@@ -34,7 +37,7 @@ struct DdlEditorPane: View {
 
     private var display: DisplaySettings { model.display }
     private var english: Bool { display.preferences.language == "en" }
-    private var unknownNames: [PluginNameIndex.Unknown] { plugins.unknownNames(in: text) }
+    private var unknownNames: [PluginCall] { pluginSource == text ? pluginCalls.filter { $0.status != "resolved" } : [] }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -95,7 +98,7 @@ struct DdlEditorPane: View {
                                rangeStatus = status
                                onRangePreview?(status.preview)
                            },
-                           completions: model.ddlCompletions)
+                           completions: model.ddlCompletions, onCharacterHover: { hoverIndex = $0 })
             if text.isEmpty {
                 Text(display.webCopy("ddlEditPlaceholder", "背景を白で埋める。青い細い線を左下から右上へ三本引く。赤い小さな円を余白を残して配置する。"))
                     .inkuFont(14).foregroundStyle(.tertiary).lineSpacing(14 * 0.7)
@@ -104,14 +107,25 @@ struct DdlEditorPane: View {
             }
         }
         .background(InkuColor.panel, in: RoundedRectangle(cornerRadius: 4))
+        .overlay(alignment: .topTrailing) {
+            if !tooltipsCovered, display.preferences.showTooltips, pluginSource == text,
+               let hoverIndex, let call = pluginCalls.first(where: { NSLocationInRange(hoverIndex, $0.range) }) {
+                PluginCallPreview(call: call, model: model, language: model.instructionLanguage(for: text))
+                    .allowsHitTesting(false).padding(8)
+            }
+        }
         .clipShape(RoundedRectangle(cornerRadius: 4))
         .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.accentColor.opacity(0.7)))
         // Web DdlEditor: the states are asked 180 ms after the text settles.
         .task(id: [text, model.completionRecordKey]) {
             try? await Task.sleep(for: .milliseconds(180))
             guard !Task.isCancelled else { return }
-            completionStates = model.completionRangeStates(source: text)
-            completionSource = text
+            let source = text
+            let calls = await model.pluginCalls(source: source)
+            guard !Task.isCancelled, text == source else { return }
+            pluginCalls = calls; pluginSource = source
+            completionStates = model.completionRangeStates(source: source)
+            completionSource = source
         }
     }
 
@@ -148,9 +162,63 @@ struct DdlEditorPane: View {
     private static let unknownColor = Color(red: 0xbf / 255, green: 0x88 / 255, blue: 0x20 / 255)
 
     /// ja.ts:378-379, en.ts:378-379.
-    private func firingHint(_ unknown: PluginNameIndex.Unknown) -> String {
-        guard let word = unknown.firesAs else { return display.webCopy("ddlUnknownNameUnregistered", "この名前は登録されていません") }
-        return english ? "Drop the “\(unknown.namespace).” and it fires as “\(word)”"
-            : "「\(unknown.namespace).」を外すと「\(word)」として効きます"
+    private func firingHint(_ unknown: PluginCall) -> String {
+        switch unknown.status {
+        case "plugin_disabled": return english ? "This plugin is disabled." : "このプラグインは無効です。"
+        case "plugin_name_mismatch":
+            let suggested = unknown.suggestion ?? ""
+            let name = suggested.hasPrefix("{") || suggested.hasPrefix("｛") ? suggested
+                : (model.instructionLanguage(for: text) == "en" ? "{\(suggested)}" : "｛\(suggested)｝")
+            return english ? "Did you mean \(name)?" : "\(name) ではありませんか。"
+        case "plugin_name_ambiguous":
+            return (english ? "More than one word matches: " : "複数の語に一致します：") + unknown.candidates.joined(separator: ", ")
+        default: return display.webCopy("ddlUnknownNameUnregistered", "この名前は登録されていません")
+        }
+    }
+}
+
+@MainActor
+struct PluginCallPreview: View {
+    let call: PluginCall
+    let model: AppModel
+    let language: String
+    private var japanese: Bool { model.display.preferences.language != "en" }
+    private var word: PluginWord? { model.pluginWords.first { $0.id == call.qualifiedName } }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if call.status == "resolved" {
+                Text((language == "en" ? call.writtenEnglish : call.writtenJapanese) ?? word?.displayName(language: language) ?? "").inkuFont(12, weight: .semibold)
+                if let word {
+                    let others = Array(word.japanese.dropFirst()) + Array(word.english.dropFirst())
+                    if !others.isEmpty { Text(others.joined(separator: " / ")).inkuFont(11) }
+                    Text(word.kind == "object" ? model.display.label("物の語", "Object word") : model.display.label("情景の語", "Scene word")).inkuFont(11)
+                }
+                let note = japanese ? (word?.note ?? call.noteJapanese ?? "") : (word?.englishNote ?? call.noteEnglish ?? "")
+                if !note.isEmpty { Text(note).inkuFont(11) }
+                let example = language == "en" ? (word?.exampleEnglish ?? call.exampleEnglish) : (word?.exampleJapanese ?? call.exampleJapanese)
+                if let example, !example.isEmpty { Text(example).inkuFont(11) }
+                if let word, word.previewData != nil || word.previewURL != nil {
+                    SaijikiPreviewView(svg: nil, imageURL: word.previewURL, imageData: word.previewData, renderer: model.renderer).frame(width: 180, height: 80)
+                }
+            } else {
+                Text(call.text).inkuFont(12, weight: .semibold)
+                Text(reason).inkuFont(11)
+            }
+        }
+        .padding(10).frame(maxWidth: 260, alignment: .leading)
+        .background(InkuColor.panel, in: RoundedRectangle(cornerRadius: 6))
+        .overlay(RoundedRectangle(cornerRadius: 6).stroke(InkuColor.border))
+        .shadow(radius: 4)
+    }
+    private var reason: String {
+        switch call.status {
+        case "plugin_disabled": return japanese ? "このプラグインは無効です。" : "This plugin is disabled."
+        case "plugin_name_mismatch":
+            let value = call.suggestion ?? ""
+            let name = value.hasPrefix("{") || value.hasPrefix("｛") ? value : (language == "en" ? "{\(value)}" : "｛\(value)｝")
+            return japanese ? "\(name) ではありませんか。" : "Did you mean \(name)?"
+        case "plugin_name_ambiguous": return (japanese ? "複数の語に一致します：" : "More than one word matches: ") + call.candidates.joined(separator: ", ")
+        default: return japanese ? "この名前は登録されていません。" : "This name is not registered."
+        }
     }
 }

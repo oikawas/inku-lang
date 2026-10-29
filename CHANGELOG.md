@@ -12,6 +12,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 Migrate saved plugin spellings at startup, show the bundled words and saved offers, add editor completion and diagnostics, and carry locked definitions in DDL v2 exports. Completion matches normalized names in both languages, and settings shows each word's kind.
 
+### 2026-10-29 — Move macOS plugins to v2
+
+Read bundled words and reference checks from the shared core, and show their braced names in the Saijiki, editor, and settings. DDL export uses v2 and the work's saved locks. Database migration v6 updates saved DDL on startup and keeps a pre-migration snapshot and refusal report.
+
 ### 2026-10-29 — Plugin names in the editor and Saijiki
 
 The editor marks braced words and their reasons from the shared core and offers name completion and previews. The Saijiki, settings, and check show names and kinds; each work records the words offered to AI.

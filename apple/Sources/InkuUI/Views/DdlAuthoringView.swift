@@ -44,7 +44,7 @@ struct DdlAuthoringView: View {
                 Text(model.display.localized("確定したDDLの変更後は、この作品の記述を生成元へ戻せません。新規作品では別の記述を使えます。"))
                     .inkuFont(12).foregroundStyle(.secondary)
             }
-            if showsDiagnostics { PipelineDiagnosticsView(raw: model.diagnosticsJSON, display: model.display) }
+            if showsDiagnostics { PipelineDiagnosticsView(raw: model.diagnosticsJSON, display: model.display, pluginWords: model.pluginWords) }
             if !model.holeIDs.isEmpty {
                 Text(model.display.localized("補完対象")).inkuFont(12, weight: .semibold)
                 ForEach(model.holeIDs, id: \.self) { id in
@@ -174,13 +174,14 @@ struct DdlAuthoringView: View {
 @MainActor struct PipelineDiagnosticsView: View {
     let raw: String
     let display: DisplaySettings
+    var pluginWords: [PluginWord] = []
     var body: some View {
         let entries = PipelineDiagnosticText.entries(raw)
         if !entries.isEmpty {
             DisclosureGroup(display.webCopy("pipelineDiagnostics", "診断")) {
                 ForEach(Array(entries.enumerated()), id: \.offset) { _, entry in
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("• " + PipelineDiagnosticText.format(entry.value, channel: entry.channel, display: display))
+                        Text("• " + PipelineDiagnosticText.format(entry.value, channel: entry.channel, display: display, pluginWords: pluginWords))
                         DisclosureGroup(display.webCopy("pipelineDiagnosticDetails", "詳細")) {
                             let pretty = (try? JSONSerialization.jsonObject(with: entry.value.data)).flatMap {
                                 try? JSONSerialization.data(withJSONObject: $0, options: [.prettyPrinted, .sortedKeys, .fragmentsAllowed])

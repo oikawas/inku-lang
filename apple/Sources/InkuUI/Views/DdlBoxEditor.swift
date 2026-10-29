@@ -9,7 +9,11 @@ struct DdlBoxEditor: View {
     @Bindable var model: AppModel
     let work: SavedWork
     let editable: Bool
-    private var highlighter: DdlHighlighter { DdlHighlighter(saijiki: model.saijiki, plugins: PluginNameIndex(words: model.pluginWords)) }
+    @State private var pluginCalls: [PluginCall] = []
+    @State private var pluginSource = ""
+    @State private var hoverIndex: Int?
+    @Environment(\.inkuTooltipsCovered) private var tooltipsCovered
+    private var highlighter: DdlHighlighter { DdlHighlighter(saijiki: model.saijiki, calls: pluginSource == text ? pluginCalls : []) }
     @State private var completionStates: [CompletionRangeState] = []
     @State private var completionSource = ""
     @State private var rangeStatus = RangeEditorStatus()
@@ -38,9 +42,16 @@ struct DdlBoxEditor: View {
                                rangeStatus = status
                                model.rangePreview = status.preview
                            },
-                           completions: model.ddlCompletions)
+                           completions: model.ddlCompletions, onCharacterHover: { hoverIndex = $0 })
                 .frame(minHeight: 100, maxHeight: 220)
                 .overlay(alignment: .leading) { Rectangle().fill(.quaternary).frame(width: 2) }
+                .overlay(alignment: .topTrailing) {
+                    if !tooltipsCovered, model.display.preferences.showTooltips, pluginSource == text,
+                       let hoverIndex, let call = pluginCalls.first(where: { NSLocationInRange(hoverIndex, $0.range) }) {
+                        PluginCallPreview(call: call, model: model, language: model.instructionLanguage(for: text))
+                            .allowsHitTesting(false).padding(8)
+                    }
+                }
             if completionSource == text { CompletionRangeSummary(display: model.display, states: completionStates) }
             if invalidSource {
                 Text(model.display.localized("横1/3〜2/3、縦2/3〜1 の形で、0〜1の数を、始まりを終わりより小さく書いてください。「-」「－」も使えます。枠は最後の有効な範囲です"))
@@ -54,8 +65,12 @@ struct DdlBoxEditor: View {
         .task(id: [work.id, text, model.completionRecordKey]) {
             try? await Task.sleep(for: .milliseconds(180))
             guard !Task.isCancelled else { return }
-            completionStates = model.completionRangeStates(source: text)
-            completionSource = text
+            let source = text
+            let calls = await model.pluginCalls(source: source, workID: work.id)
+            guard !Task.isCancelled, text == source else { return }
+            pluginCalls = calls; pluginSource = source
+            completionStates = model.completionRangeStates(source: source)
+            completionSource = source
         }
     }
 }

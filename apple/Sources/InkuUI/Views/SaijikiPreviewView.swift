@@ -10,6 +10,7 @@ import UIKit
 struct SaijikiPreviewView: View {
     let svg: String?
     let imageURL: URL?
+    let imageData: Data?
     let renderer: ArtworkRenderer
     @State private var image: CGImage?
     @State private var failed = false
@@ -17,7 +18,9 @@ struct SaijikiPreviewView: View {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 5).fill(.quaternary.opacity(0.2))
-            if let imageURL {
+            if let imageData {
+                pluginImageData(imageData)
+            } else if let imageURL {
                 pluginImage(imageURL)
             } else if let image {
                 Image(decorative: image, scale: 1).resizable().scaledToFit()
@@ -40,6 +43,16 @@ struct SaijikiPreviewView: View {
                 failed = true
             }
         }
+    }
+
+    @ViewBuilder private func pluginImageData(_ data: Data) -> some View {
+        #if os(macOS)
+        if let image = NSImage(data: data) { Image(nsImage: image).resizable().scaledToFit() }
+        else { Image(systemName: "leaf").foregroundStyle(.secondary) }
+        #else
+        if let image = UIImage(data: data) { Image(uiImage: image).resizable().scaledToFit() }
+        else { Image(systemName: "leaf").foregroundStyle(.secondary) }
+        #endif
     }
 
     @ViewBuilder private func pluginImage(_ url: URL) -> some View {

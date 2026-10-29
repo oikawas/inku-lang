@@ -273,6 +273,14 @@ public enum InkuCore {
         InkuCoreBindings.pluginPackage(inputBytes: input)
     }
 
+    public static func pluginCalls(_ input: Data) -> Data {
+        InkuCoreBindings.pluginCalls(bytes: input)
+    }
+
+    public static func migratePluginNames(_ input: Data) -> Data {
+        InkuCoreBindings.migratePluginNames(inputBytes: input)
+    }
+
     /// The juxtaposition (取り合わせ, `inku.juxtaposition.v1`): one JSON request with an `action` (`gather`, `prompt`,
     /// `check`, `join`, `same`) in, one JSON answer out. Nothing is sent or saved by the core.
     public static func juxtaposition(_ input: Data) -> Data {

@@ -31,9 +31,9 @@ func runPluginPackageChecks(specURL: URL) async throws {
           let end = spec.range(of: "```", range: start.upperBound..<spec.endIndex),
           let definition = try JSONSerialization.jsonObject(with: Data(spec[start.upperBound..<end.lowerBound].utf8)) as? [String: Any]
     else { throw CheckFailure.message("Could not read shared Sky.Stars fixture") }
-    let word: [String: Any] = ["definition": definition, "summary_ja": "空の上半分に、黄色の星を散らす。", "summary_en": "Scatters yellow stars over the upper half.", "note_ja": "夜の空に小さな星。", "example_ja": "5個のSky.星。", "example_en": "5 Sky.Stars."]
+    let word: [String: Any] = ["definition": definition, "note_ja": "夜の空に小さな星。", "note_en": "Small stars in the night sky.", "example_ja": "中心に、｛星｝を3個置く。", "example_en": "Place 3 {stars} in the center."]
     func document(_ words: [[String: Any]], name: String = "night") throws -> Data {
-        try JSONSerialization.data(withJSONObject: ["schema": "inku.plugin-package.v1", "namespace": "Sky", "name": name, "version": "1.0.0", "description_ja": "夜空の語。", "words": words])
+        try JSONSerialization.data(withJSONObject: ["schema": "inku.plugin-package.v2", "namespace": "Sky", "name": name, "version": "1.0.0", "description_ja": "夜空の語。", "words": words])
     }
     let model = AppModel(databaseURL: folder.appendingPathComponent("works.sqlite"), transport: PackageNoProvider())
     await model.initialize()
@@ -47,7 +47,7 @@ func runPluginPackageChecks(specURL: URL) async throws {
     }
     let installed = try await model.installPluginPackage(data: one, isArchive: false, replace: false)
     guard installed.ok, model.pluginWords.contains(where: { $0.id == "Sky.Stars" }),
-          model.ddlCompletions.words(for: "星").contains("Sky.星") else { throw CheckFailure.message("Installed word or completion absent") }
+          model.ddlCompletions.words(for: "星").contains("｛星｝") else { throw CheckFailure.message("Installed word or completion absent") }
     let previewFolder = folder.appendingPathComponent("plugin-packages/Sky.night/previews")
     let files = try FileManager.default.contentsOfDirectory(at: previewFolder, includingPropertiesForKeys: nil)
     guard let small = files.first(where: { !$0.lastPathComponent.contains("@2x") }),
@@ -57,7 +57,7 @@ func runPluginPackageChecks(specURL: URL) async throws {
     let reopened = AppModel(databaseURL: folder.appendingPathComponent("works.sqlite"), transport: PackageNoProvider())
     await reopened.initialize()
     guard reopened.pluginWords.contains(where: { $0.id == "Sky.Stars" }) else { throw CheckFailure.message("Installed package not loaded after restart") }
-    model.inputMode = "ddl"; model.ddlText = "5個のSky.星。"; model.language = "ja"
+    model.inputMode = "ddl"; model.ddlText = "中心に、｛星｝を3個置く。"; model.language = "ja"
     await model.generate()
     guard let saved = model.selectedWork, model.errorText == nil else { throw CheckFailure.message("Installed package drawing failed: \(model.errorText ?? model.status)") }
     let savedBefore = try await model.savedConfiguration(workID: saved.id)
@@ -78,7 +78,7 @@ func runPluginPackageChecks(specURL: URL) async throws {
     guard !(try ExactJSON(data: model.requestForCurrentInput(inputMode: "ddl").configuration).text.contains("Sky.Stars")) else { throw CheckFailure.message("Disabled package in new catalog") }
     try await model.deletePluginPackage("Sky.night")
     guard !model.pluginWords.contains(where: { $0.id == "Sky.Stars" }), !(await model.hostSettings()).plugins!.disabledPackageIDs.contains("Sky.night") else { throw CheckFailure.message("Deleted package still present") }
-    model.newWork(); model.inputMode = "ddl"; model.ddlText = "5個のSky.星。"
+    model.newWork(); model.inputMode = "ddl"; model.ddlText = "中心に、｛星｝を3個置く。"
     await model.generate()
     guard model.selectedWork == nil else { throw CheckFailure.message("Deleted package still drew in a new work") }
     guard model.diagnosticsJSON.contains("macro_resolution_missing_lock") else { throw CheckFailure.message("Deleted word diagnostic missing: \(model.diagnosticsJSON)") }
@@ -94,19 +94,19 @@ func runPluginPackageChecks(specURL: URL) async throws {
     var invalidWord = word; invalidWord["example_ja"] = "意味のない文章。"
     let invalid = try await model.checkPluginPackage(data: document([invalidWord], name: "invalid"), isArchive: false)
     guard !invalid.ok, (invalid.report["words"].array ?? []).contains(where: { !($0["problems"].array ?? []).isEmpty }) else { throw CheckFailure.message("Stopped example accepted: \(invalid.report.text)") }
-    var moon = definition; moon["heading"] = "Moon"; moon["aliases"] = ["月"]
-    var second = word; second["definition"] = moon; second["example_ja"] = ""; second["example_en"] = ""
+    var moon = definition; moon["id"] = "Moon"; moon["names"] = ["ja": ["月"], "en": ["moon"]]
+    var second = word; second["definition"] = moon; second["example_ja"] = "中心に、｛月｝を3個置く。"; second["example_en"] = "Place 3 {moon} in the center."
     let two = try document([word, second])
     let checkedTwo = try await model.installPluginPackage(data: two, isArchive: false, replace: false)
     guard checkedTwo.ok, model.pluginWords.contains(where: { $0.id == "Sky.Moon" }) else { throw CheckFailure.message("Two-word fixture failed: \(checkedTwo.report.text)") }
-    model.newWork(); model.inputMode = "ddl"; model.ddlText = "5個のSky.月。"
+    model.newWork(); model.inputMode = "ddl"; model.ddlText = "中心に、｛月｝を3個置く。"
     await model.generate()
     guard model.selectedWork != nil, model.errorText == nil else { throw CheckFailure.message("Second package did not draw") }
     settings = await model.hostSettings(); settings.plugins = PluginPreferences(disabledPackageIDs: ["Sky.night"])
     try await model.updateHostSettings(settings)
     guard !model.pluginWords.contains(where: { $0.id == "Sky.Moon" }) else { throw CheckFailure.message("Two-word package did not disable") }
     try await model.deletePluginPackage("Sky.night")
-    model.newWork(); model.inputMode = "ddl"; model.ddlText = "5個のSky.月。"
+    model.newWork(); model.inputMode = "ddl"; model.ddlText = "中心に、｛月｝を3個置く。"
     await model.generate()
     guard model.selectedWork == nil, model.diagnosticsJSON.contains("macro_resolution_missing_lock") else {
         throw CheckFailure.message("Deleted second fixture did not report the missing word")

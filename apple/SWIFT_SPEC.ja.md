@@ -20,6 +20,10 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-10-29 プラグイン v2 と保存作品の移行
+
+同梱の葉、編集時の参照と診断は共有 core の答えを使う。歳時記・補完・設定・生成情報には括弧つきの名を出す。DDL の持ち運びは `inku.ddl-export.v2` と作品の lock に基づき、v1 ファイルを拒否する。DB v6 は起動時に検証済み `.inku-before-v6-*.sqlite` を残してから作品の DDL の写しを移し、core が断った作品は保持し理由を DB の横の JSON に記録する。定義・lock・Score・SVG は保持する。
+
 ## 2026-10-27 macOSのBuild番号
 
 現行の左下表示はBuild番号の数字だけとし、版とラベルを付けない。ダークモードでは白、ライトモードでは標準の文字色を使う。
@@ -317,10 +321,10 @@ AI自動推敲プロセスは、記述ロック・DDL直接入力の作品もVis
 
 作者の指示（Server Build 1190との差の取り込み、段C-3）。正本はWebの`features/ddl-editor/codemirror.ts`の`ddlCompletions`。
 
-- 指示書の箱とエディタで、カーソルの前の語の始まり（大文字小文字は問わない）に合う候補を、macOSの補完の一覧で出す。候補は指示書の言語（`AppModel.instructionLanguage(for:)`）の歳時記の語と、マクロの名（日本語は別名の1つ目、ほかは修飾名、Webの`pluginDisplayName`）。有効なプラグインの語だけ。
+- 指示書の箱とエディタでは、指示書の言語（`AppModel.instructionLanguage(for:)`）の歳時記の語と有効なプラグインの名を候補に出す。プラグインの主の名とほかの名で照合し、主の名を括弧ごと入れる。
 - 一覧は作者が打った時だけ開き、選ぶまで文を変えない（初めは何も選ばない）。語を選んで入れた時・名前の追従・外から文を戻した時は開かない。読み取り専用・変換中・開いた範囲の数の中では出さない。
 - 語の始まりは、カーソルの前の空白・句読点・記号の無い並びのうち、候補の始まりに合う最も長いもの。英字の語の途中からは始めない（`.`と`_`は語の中に含める）。日本語は区切りが無いので、候補に合う最も長い末尾を取る。Webは曖昧な一致で並べるが、Swiftは始まりの一致だけ。
-- 確認：AppCheck `--ddl-box-only`（本物の歳時記とマクロで、日本語・英語・別名・修飾名が出ること、英字の語の途中・空白の後・開いた範囲では出ないこと）。
+- 確認：AppCheck `--ddl-box-only` は本物の歳時記とプラグインを使い、UI 試験は括弧の補完とほかの名を確かめる。
 
 ## 2026-10-13 指示書の数の範囲を畳み、絵の上で確かめ、打ち直す
 
@@ -795,7 +799,7 @@ private executionの`ProviderAttemptObservation`は本文を任意に持ち、�
 
 macOS menuはactive sceneの操作可否を使う。⌘Nは新規制作、⌘Oは画面buttonと共通のDDL file読込、⌘,は設定、⌘1〜4は制作／library／系譜／batch・demo、⇧⌘Eは書出し、⇧⌘Cは画像copy。既存の⌘Return生成、Escape停止、⇧⌘Fプレゼンテーションと併用する。生成・自動実行・読込・dialog・presentationの状態に合わせて対象操作を無効化し、menu経由で別の書込みを割り込ませない。設定はsystem sidebarとgrouped formを使い、モデル設定への導線は該当categoryを開く。
 
-同梱の歳時記、13色catalog、11用紙と7語のMacro／plugin定義はServer sourceから生成し、共通Rustで定義とdigest lockを解決する。pluginの有効切替は新作品へ適用し、保存作品の定義を置き換えない。DDL packageのimportは`inku.ddl-export.v1`の本文・付属定義・lock・整数表現を検証し、次の新作品へ添える。4MiB／64定義を超える入力や不完全な定義は拒否し、途中結果を採用しない。
+同梱の歳時記、13色catalog、11用紙と7語のMacro／plugin定義はServer sourceから生成し、共通Rustで定義とdigest lockを解決する。pluginの有効切替は新作品へ適用し、保存作品の定義を置き換えない。DDL packageのimportは`inku.ddl-export.v2`の本文・付属定義・lock・整数表現を検証し、次の新作品へ添える。4MiB／64定義を超える入力や不完全な定義は拒否し、途中結果を採用しない。
 
 macOS の設定では plugin package の JSON／zip を選び、共通 core の検査と provider を使わない例の描画の結果を語ごとに確認して追加・置き換えできる。追加した package は DB と同じ場所の `plugin-packages` に置き、有効な語を新作品の catalog、歳時記、DDL の補完と強調に使う。読み込めない package は理由を表示して削除できる。同梱 package は削除できず、有効・無効だけを切り替える。削除後も保存作品の定義は保持する。
 

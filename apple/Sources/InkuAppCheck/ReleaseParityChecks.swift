@@ -24,7 +24,12 @@ func runReleaseParityChecks() async throws {
         throw CheckFailure.message("Older interface.json lost saved choices: \(display.saveError ?? "\(read)")")
     }
     display.preferences.batchRetries = 2
-    let rewritten = try JSONSerialization.jsonObject(with: Data(contentsOf: preferencesFolder.appendingPathComponent("interface.json"))) as? [String: Any]
+    var rewritten: [String: Any]?
+    for _ in 0..<100 {
+        rewritten = try JSONSerialization.jsonObject(with: Data(contentsOf: preferencesFolder.appendingPathComponent("interface.json"))) as? [String: Any]
+        if rewritten?["batchRetries"] as? Int == 2 { break }
+        try await Task.sleep(for: .milliseconds(20))
+    }
     guard rewritten?["language"] as? String == "en", rewritten?["batchRetries"] as? Int == 2 else {
         throw CheckFailure.message("A later change was not saved after reading an older interface.json")
     }
@@ -61,7 +66,7 @@ func runReleaseParityChecks() async throws {
                 options["canvas"]["height"].number.flatMap { Double($0) }.map { Int($0) }, config["language"].string)
     }
     model.inputMode = "ddl"
-    model.ddlText = "Nature.若葉 を置く"
+    model.ddlText = "｛若葉｝を置く"
     model.canvasID = wide.id
     model.seedText = "42"
     await model.generate()

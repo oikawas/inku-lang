@@ -26,86 +26,40 @@ enum DdlTokenClass: String, Sendable, Equatable {
     }
 }
 
-/// Web `plugin-names.ts`: namespaced plugin references in DDL text, which ones this installation holds,
-/// and what a wrong one would have fired as. The pattern is the expansion layer's `_PLUGIN_REFERENCE_RE`.
-struct PluginNameIndex: Sendable {
-    /// Qualified names and aliases, longest first.
-    let names: [String]
-    /// Firing phrases, longest first, with the entry word each belongs to.
-    let firesOn: [(phrase: String, word: String)]
+struct PluginCall: Sendable, Equatable {
+    let range: NSRange
+    let text: String
+    let status: String
+    let qualifiedName: String?
+    let writtenJapanese: String?
+    let writtenEnglish: String?
+    let noteJapanese: String?
+    let noteEnglish: String?
+    let exampleJapanese: String?
+    let exampleEnglish: String?
+    let suggestion: String?
+    let candidates: [String]
 
-    struct Reference: Sendable, Equatable {
-        let range: NSRange
-        let text: String
-        let known: Bool
-    }
-
-    struct Unknown: Sendable, Equatable {
-        let text: String
-        let namespace: String
-        let firesAs: String?
-    }
-
-    private static let reference = try! NSRegularExpression(pattern: "(?<![A-Za-z0-9_])[A-Z][A-Za-z0-9_-]*\\.[^\\s、。,;:]+")
-
-    init(words: [PluginWord]) {
-        var names: [String] = []
-        var firesOn: [(String, String)] = []
-        for word in words {
-            names.append(word.id)
-            names.append(contentsOf: word.aliases.filter { !$0.isEmpty })
-            let local = Self.localPart(word.id)
-            for phrase in word.firesOnJapanese + word.firesOnEnglish {
-                let trimmed = phrase.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !trimmed.isEmpty { firesOn.append((trimmed, local)) }
-            }
-        }
-        self.names = names.sorted { ($0 as NSString).length > ($1 as NSString).length }
-        self.firesOn = firesOn.sorted { ($0.0 as NSString).length > ($1.0 as NSString).length }.map { (phrase: $0.0, word: $0.1) }
-    }
-
-    static func localPart(_ name: String) -> String {
-        guard let dot = name.firstIndex(of: ".") else { return name }
-        return String(name[name.index(after: dot)...])
-    }
-
-    static func namespacePart(_ name: String) -> String {
-        guard let dot = name.firstIndex(of: ".") else { return "" }
-        return String(name[..<dot])
-    }
-
-    /// `scanPluginReferences`: a known name ends where the name ends, and the rest is scanned again.
-    func references(in text: String) -> [Reference] {
-        let source = text as NSString
-        var found: [Reference] = []
-        var at = 0
-        while at < source.length,
-              let match = Self.reference.firstMatch(in: text, range: NSRange(location: at, length: source.length - at)) {
-            let matched = source.substring(with: match.range)
-            let known = names.first { matched.hasPrefix($0) }
-            let length = known.map { ($0 as NSString).length } ?? match.range.length
-            let range = NSRange(location: match.range.location, length: length)
-            found.append(Reference(range: range, text: source.substring(with: range), known: known != nil))
-            at = NSMaxRange(range)
-        }
-        return found
-    }
-
-    /// `firingWordFor`: the entry word the local part would fire as without its namespace.
-    func firingWord(for reference: String) -> String? {
-        let local = Self.localPart(reference)
-        guard !local.isEmpty else { return nil }
-        let lowered = local.lowercased()
-        return firesOn.first { local.hasPrefix($0.phrase) || lowered.hasPrefix($0.phrase.lowercased()) }?.word
-    }
-
-    /// `unknownPluginNames`: the references this installation does not hold, once each, in first-seen order.
-    func unknownNames(in text: String) -> [Unknown] {
-        var seen: Set<String> = []
-        return references(in: text).compactMap { reference in
-            guard !reference.known, seen.insert(reference.text).inserted else { return nil }
-            return Unknown(text: reference.text, namespace: Self.namespacePart(reference.text), firesAs: firingWord(for: reference.text))
-        }
+    init?(_ value: ExactJSON, source: String, entries: [ExactJSON] = []) {
+        guard let start = value["start_utf16"].number.flatMap(Int.init),
+              let end = value["end_utf16"].number.flatMap(Int.init),
+              start >= 0, end > start, end <= (source as NSString).length,
+              let text = value["text"].string, let status = value["status"].string,
+              (source as NSString).substring(with: NSRange(location: start, length: end - start)) == text else { return nil }
+        range = NSRange(location: start, length: end - start)
+        self.text = text
+        self.status = status
+        let id = value["qualified_name"].string
+        qualifiedName = id
+        let entry = entries.first { $0["qualified_name"].string == id }
+        writtenJapanese = entry?["written_ja"].string
+        writtenEnglish = entry?["written_en"].string
+        noteJapanese = entry?["note_ja"].string
+        noteEnglish = entry?["note_en"].string
+        exampleJapanese = entry?["example_ja"].string
+        exampleEnglish = entry?["example_en"].string
+        suggestion = value["suggestion"].string
+        candidates = (value["candidates"].array ?? []).compactMap(\.string)
     }
 }
 
@@ -115,12 +69,12 @@ struct PluginNameIndex: Sendable {
 struct DdlHighlighter: Sendable {
     private struct Entry: Sendable { let word: String; let lower: String; let length: Int; let token: DdlTokenClass; let ascii: Bool }
     private let buckets: [Character: [Entry]]
-    private let plugins: PluginNameIndex
+    private let calls: [PluginCall]
     private static let emotionWords = ["美しい", "美しく", "激しい", "激しく", "静かな", "静かに", "素敵", "きれい", "やさしい",
                                        "切ない", "哀しい", "儚い", "神秘的", "幻想的", "寂しい", "爽やか"]
         .sorted { $0.count > $1.count }
 
-    init(saijiki: [SaijikiCategory], plugins: PluginNameIndex) {
+    init(saijiki: [SaijikiCategory], calls: [PluginCall] = []) {
         var entries: [Entry] = []
         for category in saijiki {
             let token = DdlTokenClass(categoryKey: category.id)
@@ -139,12 +93,12 @@ struct DdlHighlighter: Sendable {
             buckets[first, default: []].append(entry)
         }
         self.buckets = buckets
-        self.plugins = plugins
+        self.calls = calls
     }
 
     func marks(_ text: String) -> [InkuEditorMark] {
         let source = text as NSString
-        let references = Dictionary(plugins.references(in: text).map { ($0.range.location, $0) }, uniquingKeysWith: { first, _ in first })
+        let references = Dictionary(calls.map { ($0.range.location, $0) }, uniquingKeysWith: { first, _ in first })
         let titles = Dictionary(DdlTitles.lineRanges(text).map { ($0.location, $0) }, uniquingKeysWith: { first, _ in first })
         var marks: [InkuEditorMark] = []
         var index = 0
@@ -156,7 +110,7 @@ struct DdlHighlighter: Sendable {
                 continue
             }
             if let reference = references[index] {
-                marks.append(InkuEditorMark(range: reference.range, style: reference.known ? .token(.plugin) : .unknownName))
+                marks.append(InkuEditorMark(range: reference.range, style: reference.status == "resolved" ? .token(.plugin) : .unknownName))
                 index = NSMaxRange(reference.range)
                 continue
             }
@@ -197,7 +151,7 @@ struct DdlHighlighter: Sendable {
 /// InkuAppCheck `--ddl-title-only`: the highlighter's marks as plain values, with no plugin words.
 public enum DdlHighlightProbe {
     public static func marks(_ text: String, saijiki: [SaijikiCategory]) -> [(range: NSRange, style: String)] {
-        DdlHighlighter(saijiki: saijiki, plugins: PluginNameIndex(words: [])).marks(text).map { mark in
+        DdlHighlighter(saijiki: saijiki).marks(text).map { mark in
             let style = switch mark.style {
             case .title: "title"
             case .token(let token): token.rawValue

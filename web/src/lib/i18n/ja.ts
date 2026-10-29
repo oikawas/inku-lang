@@ -343,6 +343,9 @@ export const ja: LangPack = {
 	saijikiLabel: '歳時記:',
 	saijikiToggleBtn: '歳時記',
 	saijikiTitle: '歳時記',
+	saijikiPlugins: 'プラグイン',
+	pluginObject: '物の語',
+	pluginScene: '情景の語',
 	saijikiHint: '語彙を選ぶと、描画への効き方と作例を表示します。',
 	currentSetting: '現在の設定',
 	saveCurrentBtn: '現在を保存',
@@ -538,8 +541,17 @@ export const ja: LangPack = {
 	ddlSyntaxGuide: '指示書（DDL）簡易ガイド\n指示書は、絵そのものではなく、絵を生成するための短い視覚指示です。自然文を、色・かたち・場所・動き・てざわりに分解した「演奏用の記述」として扱います。これらの文法を、DDL (Drawing Description Language)として定義しています。\n1行に1つの視覚指示を書くと安定します。\n基本形: 色 + 大きさ + かたち + 数 + 場所 + 動き。\n例: 背景を白で埋める。\n例: 赤い小さな円を右上に三個置く。\n例: 青い細い線を左下から右上へ引く。\n場所は「上端」「右半分」「左下から右上へ」のように具体化します。\n動きや質感は「波打つ」「細かく揺れる」「クレヨン」「鉛筆」のように短く添えます。',
 	ddlDialogDrawingModel: '描画モデル',
 	ddlUnknownNameTitle: 'このサーバーにない名前',
-	ddlUnknownNameFires: (namespace, word) => `「${namespace}.」を外すと「${word}」として効きます`,
 	ddlUnknownNameUnregistered: 'この名前は登録されていません',
+	ddlPluginReason: (reason, suggestion, candidates) => {
+		switch (reason) {
+			case 'plugin_disabled': return '無効になっています。有効にすると描けます。';
+			case 'plugin_name_mismatch': return suggestion ? `${suggestion} のことですか。` : 'この Server にない名前です。';
+			case 'plugin_name_ambiguous': return `複数の語に当たります：${candidates.join('、')}。`;
+			case 'plugin_version_mismatch': return '作品に保存された版と一致しません。';
+			case 'plugin_count_out_of_range': return '数がこの語の受けられる範囲の外です。';
+			default: return 'この Server にない名前です。';
+		}
+	},
 	ddlPluginWarningsTitle: 'プラグインからの警告',
 	renderLimitNotesTitle: '効いた上限',
 
@@ -1328,8 +1340,6 @@ export const ja: LangPack = {
 	settingsUserPlugins: '語彙プラグイン',
 	settingsPluginDrawn: '描画に使う',
 	settingsPluginDrawnHint: '開発側がJSONで書いた定義を持つパッケージです。語を書くと、この定義で描きます。削除はできないので、使わないときは無効にします。',
-	settingsPluginNotDrawn: '描画には使われない',
-	settingsPluginNotDrawnHint: '定義を持たない旧形式の文書です。「展開」の文は絵に使われず、この語を書いても省かれて診断が出ます。片付けるときは削除してください。',
 	settingsPluginWords: '語の一覧',
 	settingsUserPluginsAddTitle: 'プラグインを追加',
 	settingsUserPluginsAddDescription: 'プラグインのファイル（inku.plugin-package.v2 の JSON か、それと絵をまとめた zip）を選ぶと、すぐに検査し、歳時記に出る説明・例・絵を見せます。書き方は PLUGIN.md にあります。',

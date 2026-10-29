@@ -69,7 +69,7 @@
 		if (!file) return;
 		importError = null;
 		try {
-			const read = parseDdlImport(await file.text());
+			const read = parseDdlImport(await file.text(), isJapanese ? 'ja' : 'en');
 			value = read.ddl;
 			importedPlugins = read.plugins;
 			importedNames = read.names;

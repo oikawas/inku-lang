@@ -232,6 +232,32 @@ fn stage1_records_the_offer_in_the_saved_config() {
 }
 
 #[test]
+fn direct_ddl_run_does_not_inherit_the_parent_offer() {
+    let mut config = config();
+    config.plugin_offers.push(crate::plugin_offer::OfferRecord {
+        stage: crate::prompts::LlmStage::GenerateNormalizedDdl,
+        offer: crate::plugin_offer::PluginOffer::default(),
+    });
+    let start = envelope(
+        None,
+        PipelineInput::Start {
+            variation_id: "fresh-offer".into(),
+            authoring_nonce: "new".into(),
+            config: Box::new(config),
+            authority: VariationAuthorityState::new_description(),
+            authoring: AuthoringInput::DirectDdl {
+                source: "Place a circle.".into(),
+                declare_canvas: false,
+                completion_ranges: None,
+                laws_layers: None,
+                laws_basis: None,
+            },
+        },
+    );
+    assert!(run(None, &start).snapshot.config.plugin_offers.is_empty());
+}
+
+#[test]
 fn canonical_macro_crosses_owned_start_and_commit() {
     let definition = inku_ddl::MacroDefinition::from_json(
         &json!({
@@ -466,6 +492,11 @@ fn stage1_compiler_feedback_retries_before_the_corrected_ddl_commits() {
     );
     let rejected_output = run(Some(&state), &rejected);
     state = rejected_output.snapshot;
+    assert_eq!(
+        state.config.plugin_offers.len(),
+        1,
+        "a reissued stage replaces its offer record"
+    );
     assert!(state.document.is_none() && state.delivery.is_none());
     assert!(
         rejected_output

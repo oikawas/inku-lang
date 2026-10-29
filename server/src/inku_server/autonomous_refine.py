@@ -716,6 +716,7 @@ class AutonomousRunner:
         picture = _picture(str(item.get("svg") or ""))
         child: dict[str, Any] | None = None
         sent = 0
+        chunk_offers: dict[str, dict] = {}
         while True:
             if stop.is_set():
                 raise _Stopped
@@ -724,6 +725,8 @@ class AutonomousRunner:
             if todo == "send":
                 sent += 1
                 asked = answer["request"]
+                if asked["purpose"] == "rewrite":
+                    chunk_offers["rewrite"] = {"stage": "chunk_rewrite", "offer": asked.get("plugin_offer") or {"offered": [], "omitted": []}}
                 text, failure = self._send_chunk(run, step, context, asked,
                                                  picture if asked["image"] else None, sent, stop,
                                                  str(config.get("language") or "ja"))
@@ -734,7 +737,8 @@ class AutonomousRunner:
                 ddl = answer["ddl"]
                 try:
                     view = self._settle(owner, lambda: service.start(
-                        owner, "direct_ddl", ddl, parent=relation, source_work=source_work, options=options), stop)
+                        owner, "direct_ddl", ddl, parent=relation,
+                        source_work={**source_work, "chunk_plugin_offers": list(chunk_offers.values())}, options=options), stop)
                     child = view["result"]
                     saved = _db.get_items(owner, [child["history_id"]])
                     drawn_item = saved[0] if saved else {}

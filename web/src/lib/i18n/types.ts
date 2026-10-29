@@ -227,6 +227,9 @@ export interface LangPack {
 	saijikiLabel: string;
 	saijikiToggleBtn: string;
 	saijikiTitle: string;
+	saijikiPlugins: string;
+	pluginObject: string;
+	pluginScene: string;
 	saijikiHint: string;
 	currentSetting: string;
 	saveCurrentBtn: string;
@@ -395,8 +398,8 @@ export interface LangPack {
 	// A namespaced name the server does not hold. Not an error: plugins can be
 	// installed later, so the wording says "not on this server", not "wrong".
 	ddlUnknownNameTitle: string;
-	ddlUnknownNameFires: (namespace: string, word: string) => string;
 	ddlUnknownNameUnregistered: string;
+	ddlPluginReason: (reason: string, suggestion: string | null, candidates: string[]) => string;
 	// The same loss, seen after the drawing: the warnings the server recorded.
 	ddlPluginWarningsTitle: string;
 	renderLimitNotesTitle: string;
@@ -1138,8 +1141,6 @@ export interface LangPack {
 	settingsUserPlugins: string;
 	settingsPluginDrawn: string;
 	settingsPluginDrawnHint: string;
-	settingsPluginNotDrawn: string;
-	settingsPluginNotDrawnHint: string;
 	settingsPluginWords: string;
 	settingsUserPluginsAddTitle: string;
 	settingsUserPluginsAddDescription: string;

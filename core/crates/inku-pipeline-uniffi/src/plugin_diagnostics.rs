@@ -295,7 +295,7 @@ fn explain_bracketed(
             ("plugin_not_installed", None, Vec::new())
         };
         result.push(PluginDiagnostic {
-            name: written.to_owned(),
+            name: text[offset..bracket_end].to_owned(),
             reason: code,
             suggestion,
             candidates,

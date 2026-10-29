@@ -13,7 +13,6 @@
 	import type { ImportedPlugin } from '$lib/features/ddl-editor/ddl-import';
 	import type { CompletionRangeWork } from '$lib/features/ddl-editor/completion-range-states';
 	import { pluginDisplayName } from '$lib/plugin-names';
-	import { pluginWarningsToShow } from '$lib/plugin-names';
 	import { limitNotesToShow } from '$lib/limitNotes';
 	import { hydrateSaijiki, hydrateSaijikiEn } from '$lib/saijiki';
 	import { SURFACE_PREVIEWS, HANDLING_PREVIEWS, FINENESS_PREVIEWS, UNDERLAYER_PREVIEWS, localizePreview, shapeSvg, type PreviewEntry } from '$lib/saijiki-surface';
@@ -162,15 +161,14 @@
 
 	type PluginEntry = {
 		qualified_name: string;
-		aliases?: string[];
-		surface_ja: string[];
-		surface_en: string[];
+		word_id?: string;
+		word_kind?: 'object' | 'scene';
+		surface_ja?: string[];
+		surface_en?: string[];
 		note_ja: string;
 		note_en: string;
-		// Carried by GET /api/saijiki so the DDL editor can tell a wrong
-		// qualified name from a name that does not exist at all.
-		fires_on_ja?: string[];
-		fires_on_en?: string[];
+		written_ja?: string;
+		written_en?: string;
 		// A package installed from the Web gives the DDL call its check drew.
 		example_ja?: string;
 		example_en?: string;
@@ -325,18 +323,6 @@
 			};
 			return shapeSvg(paths[kind] ?? paths.pen);
 		};
-		if (categoryKey === "plugin-nature") {
-			const natureSvg = shapeSvg("<path d=\"M32 48 C52 28 74 68 94 48 S132 28 150 48\" stroke=\"#b95845\" stroke-width=\"5\" fill=\"none\" stroke-linecap=\"round\"/><path d=\"M34 62 C58 50 78 76 102 62 S134 50 150 62\" stroke=\"#d39a7b\" stroke-width=\"3\" fill=\"none\" stroke-linecap=\"round\"/>");
-			const naturePreviews: Record<string, PreviewEntry> = {
-				"Nature.風": { effect: "左から右へのゆるやかな揺れを全体に通します。", example: "Nature.風を通す", effectEn: "Runs a slow left-to-right sway through the whole drawing.", exampleEn: "Nature.wind", svg: natureSvg },
-				"Nature.うねり": { effect: "媒質を限定しない大きな波の揺れを全体に通します。", example: "Nature.うねりを通す", effectEn: "Runs a broad medium-free undulation through the whole drawing.", exampleEn: "Nature.undulation", svg: natureSvg },
-				"Nature.無風": { effect: "揺らぎと配置軌跡を抑え、静止に寄せます。", example: "Nature.無風", effectEn: "Suppresses sway and placement paths, settling toward stillness.", exampleEn: "Nature.stillness", svg: natureSvg },
-			};
-			naturePreviews["Nature.wind"] = naturePreviews["Nature.風"];
-			naturePreviews["Nature.undulation"] = naturePreviews["Nature.うねり"];
-			naturePreviews["Nature.stillness"] = naturePreviews["Nature.無風"];
-			return { ...base, ...localized(naturePreviews[canonicalWord] ?? naturePreviews[word] ?? naturePreviews["Nature.うねり"]) };
-		}
 		const angleSvg = (rotation: number, line = false) => shapeSvg(line
 			? `<g transform="rotate(${rotation} 90 46)"><path d="M42 46 H138" fill="none" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/></g><circle cx="90" cy="46" r="2.5" fill="#c9c2b5"/>`
 			: `<g transform="rotate(${rotation} 90 46)"><rect x="58" y="29" width="64" height="34" fill="none" stroke="#2b2b2b" stroke-width="5" rx="2"/></g><circle cx="90" cy="46" r="2.5" fill="#c9c2b5"/>`);
@@ -482,29 +468,18 @@
 	 * no firing phrases; its example is the DDL call the check drew. The fourth
 	 * is the drawing baked from the word's own expansion.
 	 */
-	function pluginPreview(entry: {
-		qualified_name: string;
-		aliases?: string[];
-		note_ja: string;
-		note_en: string;
-		fires_on_ja?: string[];
-		fires_on_en?: string[];
-		example_ja?: string;
-		example_en?: string;
-		preview_url?: string;
-		preview_url_2x?: string;
-	}, wordLang: ResolvedInstructionLang): SaijikiPreview {
+	function pluginPreview(entry: PluginEntry, wordLang: ResolvedInstructionLang): SaijikiPreview {
 		const uiLang = instructionLangOf(getLang());
 		// The note explains the word, so it is the reader's language; the firing
 		// phrase is what a description would say to reach it, so it is the DDL's.
-		const firesOn = (wordLang === 'ja' ? entry.fires_on_ja : entry.fires_on_en) ?? [];
 		const example = wordLang === 'ja' ? entry.example_ja : entry.example_en;
+		const details = [`${pluginDisplayName(entry, 'ja')} / ${pluginDisplayName(entry, 'en')}`, [...(entry.surface_ja ?? []).slice(1), ...(entry.surface_en ?? []).slice(1)].join(' / '), entry.word_kind === 'object' ? t().pluginObject : t().pluginScene, (uiLang === 'ja' ? entry.note_ja : entry.note_en) || ''].filter(Boolean).join('\n');
 		return {
 			categoryKey: 'plugin',
 			word: pluginDisplayName(entry, wordLang),
 			canonicalWord: entry.qualified_name,
-			effect: (uiLang === 'ja' ? entry.note_ja : entry.note_en) || '',
-			example: example || (firesOn[0] ?? ''),
+			effect: details,
+			example: example || `${pluginDisplayName(entry, wordLang)}${wordLang === 'ja' ? '。' : '.'}`,
 			// The fallback is the drawing, not an empty frame; it is only read
 			// when the word ships no artwork, since `image` wins where it is set.
 			svg: PLUGIN_FALLBACK_SVG,
@@ -2925,6 +2900,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					{/if}
 
 					<PipelineStatus
+						{pluginEntries}
 						patch={work.pipelinePatch}
 						committedDdl={work.pipelineView?.document?.source ?? ''}
 						diagnostics={work.pipelineDiagnostics}
@@ -3033,17 +3009,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 									disabled={!canEditCurrentDdl || rangeEditingLocked || work.singleRunning || work.loading || work.pipelineBusy}
 									onclick={() => { void work.replayImageBeforeReview(); }}>{t().imageBeforeReviewPaint}</button>
 							</details>
-						</section>
-					{/if}
-
-					<!-- What the expansion layer removed. This complements editor-time
-					     DDL warnings by reporting the side only known after expansion. -->
-					{#if work.pluginWarningsShown.length > 0 && work.inputMode === 'single'}
-						<section class="panel-section plugin-warnings">
-							<div class="plugin-warnings-title">{t().ddlPluginWarningsTitle}</div>
-							{#each work.pluginWarningsShown as warning}
-								<p class="plugin-warning-line">{warning}</p>
-							{/each}
 						</section>
 					{/if}
 
@@ -3303,6 +3268,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 {#await import('$lib/components/SaijikiDrawer.svelte') then { default: SaijikiDrawer }}
 	<SaijikiDrawer
 		open={saijikiOpen}
+		ddlLang={shownDdlLang}
 		{pluginEntries}
 		bind:activePreview={activeSaijikiPreview}
 		onClose={() => (saijikiOpen = false)}
@@ -4336,23 +4302,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	.sketch-editor { font-family: inherit; width: 100%; resize: vertical; }
 	.sketch-note { margin: 0; font-size: var(--ui-font-size-12); line-height: 1.6; color: var(--fg3); }
 
-	/* The same amber as the editor's mark: one meaning, one colour. */
-	.plugin-warnings {
-		border: 1px solid var(--ddl-token-unknown-border);
-		background: var(--ddl-token-unknown-bg);
-	}
-	.plugin-warnings-title {
-		color: var(--ddl-token-unknown-fg);
-		font-size: var(--ui-font-size-11);
-		font-weight: 500;
-		margin-bottom: 4px;
-	}
-	.plugin-warning-line {
-		color: var(--fg2);
-		font-size: var(--ui-font-size-11);
-		line-height: 1.5;
-		word-break: break-word;
-	}
 	/* A limit taking effect is not a warning: nothing went wrong, a setting was
 	   honoured. So it reads in the ordinary border, not the amber one. */
 	.limit-notes {

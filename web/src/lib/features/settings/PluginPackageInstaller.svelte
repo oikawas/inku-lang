@@ -96,8 +96,9 @@
 						<li class="plugin-word">
 							{#if word.preview_png}<img class="plugin-word-preview" src={word.preview_png} alt="" />{:else}<span class="plugin-word-preview" aria-hidden="true"></span>{/if}
 							<div class="plugin-word-text">
-								<strong>{word.qualified_name}</strong>
-								{#if word.aliases.length}<small>{word.aliases.join(', ')}</small>{/if}
+								<strong>｛{word.names?.ja?.[0] ?? word.id}｝ / {'{' + (word.names?.en?.[0] ?? word.id) + '}'}</strong>
+								<small>{[...(word.names?.ja?.slice(1) ?? []), ...(word.names?.en?.slice(1) ?? [])].join(' / ')}</small>
+								<span>{word.kind === 'object' ? t().pluginObject : t().pluginScene}{word.kind === 'object' ? ` · ${word.aspect ?? ''} · ${word.counter ?? ''}` : ''}</span>
 								{#if (isJapanese ? word.note_ja : word.note_en)}<span>{isJapanese ? word.note_ja : word.note_en}</span>{/if}
 								<span>{t().saijikiPreviewExampleLabel}{isJapanese ? word.example_ja : word.example_en}</span>
 								{#if word.preview_png}<small>{word.preview_source === 'file' ? t().settingsPluginPictureFromFile : t().settingsPluginPictureDrawn}</small>{/if}

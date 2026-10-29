@@ -169,6 +169,20 @@ class CompletionRangeStatesBody(BaseModel):
         return self
 
 
+class PluginCallsBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    source: str = Field(max_length=100_000, description="DDL source to inspect without drawing.")
+    history_id: str | None = None
+    execution_id: str | None = None
+    language: Literal["ja", "en"] | None = None
+
+    @model_validator(mode="after")
+    def at_most_one_work(self):
+        if self.history_id and self.execution_id:
+            raise ValueError("choose at most one saved work or execution")
+        return self
+
+
 class AuthorDdlBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     expected_revision: str = Field(
@@ -372,6 +386,8 @@ class PipelineService:
                 context.update(resolved_context)
             else:
                 config = self.config_for(owner, source_work)
+            if (source_work or {}).get("chunk_plugin_offers"):
+                context["chunk_plugin_offers"] = deepcopy(source_work["chunk_plugin_offers"])
             if canvas_format_id is not None and canvas_aspect is not None and canvas_format_id != canvas_aspect:
                 raise CandidateHostError("canvas_alias_conflict")
             selected = canvas_format_id if canvas_format_id is not None else canvas_aspect
@@ -600,6 +616,67 @@ class PipelineService:
             return {"schema": "inku.completion-range-states.v1", "ranges": []}
         request = {"config": config, "source": body.source, "completion_ranges": record}
         return json.loads(states(json.dumps(request, ensure_ascii=False, allow_nan=False).encode("utf-8")))
+
+    def plugin_calls(self, owner: str, body: PluginCallsBody) -> dict:
+        """Inspect a buffer with its work's catalog, without starting an execution."""
+        from .api_core.common import _resolve_instruction_lang
+        from .macro_catalog import _installed_plugin_names, installed_plugin_name_entries, resolve_new_work_macro_catalog
+
+        native = getattr(self.binding, "plugin_calls", None)
+        if native is None:
+            raise HTTPException(503, "binding_plugin_calls_unavailable")
+        if body.history_id:
+            linked = self.store.read_linked_history(owner, body.history_id)
+            if linked is None:
+                legacy = self.store.read_legacy_history(owner, body.history_id)
+                if legacy is None:
+                    raise HTTPException(404, "history_not_found")
+                config = self.config_for(owner, asdict(legacy))
+                catalog = resolve_new_work_macro_catalog(self.binding, config)
+                config = {**config, "definitions": catalog["definitions"]}
+            else:
+                config, catalog = linked.saved_config, linked.macro_catalog
+        elif body.execution_id:
+            with self._lock:
+                run = self._runs.get((owner, body.execution_id))
+            if run is not None:
+                snapshot, context = run.snapshot(), run.context
+            else:
+                saved = self.store.read_execution(owner, body.execution_id)
+                if saved is None:
+                    raise HTTPException(404, "variation_not_found")
+                stored = json.loads(saved.state_bytes)
+                snapshot, context = stored["snapshot"], stored["context"]
+            config, catalog = snapshot["config"], context.get("macro_catalog", {})
+            if (snapshot.get("document") or {}).get("macro_locks") is not None:
+                catalog = {**catalog, "definition_locks": snapshot["document"]["macro_locks"]}
+        else:
+            config = self.config_for(owner, None)
+            catalog = resolve_new_work_macro_catalog(self.binding, config)
+            config = {**config, "definitions": catalog["definitions"]}
+        locks = []
+        for lock in catalog.get("definition_locks", []):
+            lock = dict(lock)
+            if not lock["digest"].startswith("sha256:"):
+                lock["digest"] = "sha256:" + lock["digest"]
+            locks.append(lock)
+        enabled, disabled = _installed_plugin_names()
+        names = installed_plugin_name_entries()
+        work_ids = {lock["qualified_name"] for lock in locks}
+        for definition in config.get("definitions", []):
+            qualified = f"{definition.get('namespace', '')}.{definition.get('id') or definition.get('heading', '')}"
+            if qualified not in work_ids:
+                continue
+            enabled.append(qualified)
+            for name in (definition.get("names", {}).get("ja", []) + definition.get("names", {}).get("en", [])):
+                names.append({"name": name, "qualified_name": qualified, "enabled": True})
+        request = {"source": body.source, "language": body.language or _resolve_instruction_lang(body.source, "auto"),
+                   "definitions": config.get("definitions", []), "locks": locks, "compiler": config.get("compiler"),
+                   "enabled": sorted(set(enabled)), "disabled": disabled, "plugin_names": names}
+        result = json.loads(native(json.dumps(request, ensure_ascii=False, allow_nan=False).encode()))
+        if result.get("error"):
+            raise HTTPException(422, result["error"])
+        return result
 
     def retouch(self, owner: str, history_id: str, source: str, tools: dict[int, str]) -> dict:
         """Ask the shared core to write other tools into a saved work's instructions.
@@ -872,6 +949,11 @@ def pipeline_router(service: PipelineService | Callable[[], PipelineService], ac
     def completion_range_states(body: CompletionRangeStatesBody, actor: dict = Depends(actor_dependency)):
         """Read the states of the completion ranges of a DDL source, taken from a saved work or an execution. Nothing is started or resumed; the result has an empty ranges list when the work has no completion ranges. Requires a signed-in user; returns 404 (variation_not_found or history_not_found) when the work or execution is not found."""
         return current_service().completion_range_states(actor["id"], body)
+
+    @router.post("/plugin-calls", summary="Read plugin calls in DDL")
+    def plugin_calls(body: PluginCallsBody, actor: dict = Depends(actor_dependency)):
+        """Resolve editor references against the selected work without starting or saving a run."""
+        return current_service().plugin_calls(actor["id"], body)
 
     @router.get("/history/{history_id}", summary="Read a work's variation link")
     def history_link(history_id: str = Path(description="ID of the saved work."), actor: dict = Depends(actor_dependency)):

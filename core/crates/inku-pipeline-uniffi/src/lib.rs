@@ -10,6 +10,7 @@ mod description_meter;
 #[cfg(feature = "display")]
 mod display;
 mod macro_catalog;
+mod plugin_calls;
 mod plugin_diagnostics;
 mod plugin_name_migration;
 mod plugin_package;
@@ -29,6 +30,7 @@ pub use display::{
     display_tiles, prepare_display_scene,
 };
 pub use macro_catalog::resolve_macro_catalog;
+pub use plugin_calls::plugin_calls;
 pub use plugin_diagnostics::explain_plugin_diagnostics;
 pub use plugin_name_migration::migrate_plugin_names;
 pub use plugin_package::plugin_package;

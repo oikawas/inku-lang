@@ -1,7 +1,7 @@
 import { SAIJIKI, SAIJIKI_EN, type SaijikiCategory } from './saijiki';
-import { scanPluginReferences, type PluginNameIndex } from './plugin-names';
 import { scanNumericRanges } from './composition-ranges';
 import { ddlTitleLineSpans, withoutDdlTitleLines } from './ddl-titles';
+import type { PluginCall } from './features/ddl-editor/plugin-calls';
 
 export type Part = {
 	text: string;
@@ -106,10 +106,10 @@ const EMOTION_WORDS = [
  * `ddl` marks the text as a DDL, whose title lines are cut out whole; a
  * description's quoted line stays ordinary text.
  */
-export function annotate(text: string, pluginNames: PluginNameIndex | null = null, ddl = false): Part[] {
+export function annotate(text: string, calls: readonly PluginCall[] = [], ddl = false): Part[] {
 	const parts: Part[] = [];
 	const titleAt = new Map(ddl ? ddlTitleLineSpans(text).map((span) => [span.start, span.end]) : []);
-	const references = pluginNames ? scanPluginReferences(text, pluginNames) : [];
+	const references = calls.map((call) => ({ start: call.start_utf16, end: call.end_utf16, text: text.slice(call.start_utf16, call.end_utf16), known: call.status === 'resolved' }));
 	const referenceAt = new Map(references.map((reference) => [reference.start, reference]));
 	const placeAt = new Map(scanNumericRanges(text).map((range) => [
 		range.nameStart + text.slice(range.nameStart, range.nameEnd).lastIndexOf(range.name),
@@ -191,7 +191,6 @@ function escapeHtml(value: string): string {
 // get the same color as their Japanese counterparts; the label switch stays as
 // the fallback for callers that only carry a label.
 function saijikiCategoryClassByKey(key: string): string {
-	if (key.startsWith('plugin-')) return 'plugin';
 	switch (key) {
 		case 'katachi': return 'shape';
 		case 'tezawari': return 'touch';
@@ -217,7 +216,6 @@ function saijikiCategoryClass(category: string | undefined): string {
 		case 'うごき': return 'action';
 		case 'かたむき': return 'angle';
 		case 'わりあい': return 'ratio';
-		case 'Nature': return 'plugin';
 		default: return 'word';
 	}
 }
@@ -251,10 +249,10 @@ function renderDDLPart(part: Part, caretOffset: number | null): string {
  * `pluginNames` is optional on purpose: the viewers and the batch/demo
  * observers call this without one and must keep the output they had.
  */
-export function highlightDDL(text: string, caretIndex: number | null = null, pluginNames: PluginNameIndex | null = null): string {
+export function highlightDDL(text: string, caretIndex: number | null = null, calls: readonly PluginCall[] = []): string {
 	const clampedCaret = caretIndex === null ? null : Math.max(0, Math.min(text.length, caretIndex));
 	let offset = 0;
-	const html = annotate(text, pluginNames, true).map((part) => {
+	const html = annotate(text, calls, true).map((part) => {
 		const nextOffset = offset + part.text.length;
 		const localCaret = clampedCaret !== null
 			&& clampedCaret >= offset

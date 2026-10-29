@@ -34,6 +34,7 @@ export type PaintScore = {
 export type Seed = number | string;
 
 export type PaintResult = {
+	plugin_offers?: import('../canvas/plugin-offers').PluginOfferRecord[];
 	image_ddl?: Record<string, unknown> | null;
 	/** Read and draw's record (SPEC 12.6.7); null on any other work. */
 	description_ddl?: DescriptionDdlRecord | null;
@@ -83,7 +84,6 @@ export type PaintResult = {
 	elapsed_stage2_ms: number;
 	elapsed_total_ms: number;
 	// Compatibility diagnostics returned for older saved work.
-	plugin_warnings?: string[] | null;
 	// Which render limits took effect and where they came from. The values say
 	// what was used; the source distinguishes a replayed ceiling (ledger I-154).
 	render_limits?: Record<string, number> | null;

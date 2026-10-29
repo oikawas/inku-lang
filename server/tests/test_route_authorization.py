@@ -103,7 +103,8 @@ PUBLIC = {  # every entry needs a reason
 #   +1 for GET /api/plugins/{plugin_id}/export, a package as a zip with its
 #   pictures (2026-10-26).
 # The old document-only validate and reload routes retired with the v2 package cutover.
-EXPECTED_ROUTE_COUNT = 143
+# Editor inspection and package-word preview add two authenticated routes.
+EXPECTED_ROUTE_COUNT = 145
 
 
 def _guard_names(dependant, seen=None) -> set[str]:

@@ -19,8 +19,10 @@
 	import { loadSystemPrompts, type SystemPromptsState } from './system-prompts';
 	import { generationInfoSettings } from './generation-info-settings.svelte';
 	import { tokenStageLabel, tokenStageRows, type ProviderUsage } from './generation-info-tokens';
+	import { offerReason, offerStage, type PluginOfferRecord } from './plugin-offers';
 
 	export type GenerationInfoWork = {
+		plugin_offers?: PluginOfferRecord[] | null;
 		image_ddl?: Record<string, unknown> | null;
 		/** The read-and-draw record; present only on a work drawn that way. */
 		description_ddl?: DescriptionDdlRecord | null;
@@ -202,6 +204,7 @@
 	// Read and draw (SPEC 12.6.7): the reading, what its anchor check dropped,
 	// each answer the run read, and whether the drawing was seen.
 	const detailReadRecord = $derived(statusHistoryItem?.description_ddl ?? result?.description_ddl ?? null);
+	const detailPluginOffers = $derived(statusHistoryItem?.plugin_offers ?? result?.plugin_offers ?? null);
 	const detailReadDropped = $derived(droppedReadingLines(detailReadRecord));
 	const detailReadReviewed = $derived(!!detailReadRecord?.rounds?.some((round) => round.stage === 'review_description_ddl'));
 	// The composition and laws (2026-10-26): what was decided, how the last
@@ -325,6 +328,15 @@
 				<dt><Tooltip placement="right" text={hint}><span>{label}</span></Tooltip></dt>
 			{/snippet}
 			<div class="generation-details" bind:this={detailsScrollEl}>
+				{#if detailPluginOffers?.length}
+					<section class="detail-group">
+						<h4>{isJapanese ? '提示したプラグイン' : 'Offered plugins'}</h4>
+						{#each detailPluginOffers as record, index (index)}
+							<p class="detail-note">{offerStage(record.stage, isJapanese)}: {record.offered.length ? record.offered.map(item => `${isJapanese ? item.written_ja : item.written_en}（${offerReason(item.reason, isJapanese)}）`).join(isJapanese ? '、' : ', ') : (isJapanese ? '提示なし' : 'None offered')}</p>
+							{#if record.omitted.length}<p class="detail-note">{isJapanese ? '上限で落とした語' : 'Omitted by the limit'}: {record.omitted.map(item => isJapanese ? item.written_ja : item.written_en).join(isJapanese ? '、' : ', ')}</p>{/if}
+						{/each}
+					</section>
+				{/if}
 				{#if detailImageRecord}
 					<section class="detail-group">
 						<h4>{t().imageTab} · {t().imageProvenanceLabel}</h4>

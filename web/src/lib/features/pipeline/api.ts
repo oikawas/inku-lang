@@ -49,6 +49,7 @@ export type PipelineHoleCompletionCheck = {
 };
 
 export type PipelineView = {
+	plugin_offers?: import('../canvas/plugin-offers').PluginOfferRecord[];
 	image_ddl?: Record<string, unknown> | null;
 	/** How the description is drawn; absent on a view from before the route. */
 	route?: DrawRoute;
@@ -273,7 +274,7 @@ export function pipelineDiagnostics(
 	// A plugin sentence's explanation replaces the compiler's generic entry for the same source range.
 	const explained = (value: unknown) => {
 		const span = (value as { span?: { start_byte?: unknown; end_byte?: unknown } } | null)?.span;
-		return plugins.some((plugin) => plugin.start_byte === span?.start_byte && plugin.end_byte === span?.end_byte);
+		return typeof span?.start_byte === 'number' && typeof span.end_byte === 'number' && plugins.some((plugin) => plugin.start_byte < (span.end_byte as number) && plugin.end_byte > (span.start_byte as number));
 	};
 	return [
 		...plugins.map((value) => ({ channel: 'plugin' as const, value })),

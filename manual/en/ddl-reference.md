@@ -670,6 +670,8 @@ Write one of the nine abstract colors and let the work's color catalog resolve i
 
 DDL 28 writes a visible plugin name in braces, as in `{young leaves}`. Full-width and ASCII braces may be mixed; names match locks after NFKC, lowercasing, and whitespace folding. An unknown or ambiguous name omits its sentence with a diagnostic. The qualified form remains readable during migration.
 
+The editor completes names after a brace and marks the ranges and reasons returned by the shared core, including on hover.
+
 A plugin is a data-only macro naming a composition of core meanings. It adds neither a primitive nor unrestricted plugin-specific natural grammar.
 
 ```text

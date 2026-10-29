@@ -195,6 +195,54 @@ def test_authenticated_states_use_saved_or_run_inputs_and_pass_core_response_thr
     service.close()
 
 
+def test_plugin_calls_read_work_or_current_catalog_without_starting_a_run(saved_work, monkeypatch):
+    from inku_server import macro_catalog
+
+    store, snapshot = saved_work
+    requests = []
+    answer = {"schema": "inku.plugin-calls.v1", "calls": []}
+    def calls(encoded):
+        requests.append(json.loads(encoded))
+        return json.dumps(answer).encode()
+    monkeypatch.setattr(macro_catalog, "_installed_plugin_names", lambda: ([], []))
+    monkeypatch.setattr(macro_catalog, "installed_plugin_name_entries", lambda: [])
+    monkeypatch.setattr(macro_catalog, "resolve_new_work_macro_catalog", lambda *_: {"definitions": [], "definition_locks": []})
+    service = make_service(store, SimpleNamespace(plugin_calls=calls))
+    monkeypatch.setattr(service, "execution", lambda *_: pytest.fail("must not resume"))
+    store.create_execution("owner", "run", "variation-1", "0", json.dumps({"snapshot": snapshot, "context": {}, "rendered": None}).encode())
+    app = FastAPI()
+    app.include_router(pipeline_router(service, actor))
+    with TestClient(app) as client:
+        for work in ({}, {"history_id": "work"}, {"execution_id": "run"}):
+            body = {**work, "source": "｛若葉｝。", "language": "ja"}
+            assert client.post("/api/pipeline/plugin-calls", json=body).status_code == 422
+            response = client.post("/api/pipeline/plugin-calls", headers={"x-owner": "owner"}, json=body)
+            assert response.status_code == 200, response.text
+            assert response.json() == answer
+            assert requests[-1]["source"] == body["source"]
+            assert requests[-1]["language"] == "ja"
+            if work:
+                assert client.post("/api/pipeline/plugin-calls", headers={"x-owner": "other"}, json=body).status_code == 404
+        assert client.post("/api/pipeline/plugin-calls", headers={"x-owner": "owner"}, json={"source": "x", "history_id": "work", "execution_id": "run"}).status_code == 422
+    service.close()
+
+
+def test_plugin_offers_are_frozen_and_read_with_the_history_context(saved_work):
+    from inku_server.persistence.variation_authority import _history_fork_context_bytes, history_link_records
+
+    _, snapshot = saved_work
+    snapshot = deepcopy(snapshot)
+    snapshot["config"] = {"definitions": [{"namespace": "Sky", "id": "Stars", "names": {"ja": ["星"], "en": ["stars"]}}],
+                          "plugin_offers": [{"stage": "generate_normalized_ddl", "offer": {"offered": [{"qualified_name": "Sky.Stars", "reason": "brace"}], "omitted": []}}]}
+    context = {"host_options": {}, "macro_catalog": {}, "chunk_plugin_offers": [{"stage": "chunk_rewrite", "offer": {"offered": [], "omitted": []}}]}
+    digest = snapshot["delivery"]["source_digest"]
+    encoded, checksum = _history_fork_context_bytes(snapshot, context, variation_id="variation-1", revision="1", ddl_digest=digest, pipeline_diagnostics=DIAGNOSTICS)
+    _, records = history_link_records({"variation_id": "variation-1", "revision": "1", "ddl_digest": digest,
+                                       "fork_context_bytes": encoded, "fork_context_digest": checksum})
+    assert records["plugin_offers"][0]["offered"][0]["written_ja"] == "｛星｝"
+    assert records["plugin_offers"][1]["stage"] == "chunk_rewrite"
+
+
 def test_same_svg_with_updated_record_is_saved_as_a_distinct_performance():
     projected = []
     updated = {**RECORD, "updated_words": True}

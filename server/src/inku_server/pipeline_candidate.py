@@ -172,6 +172,7 @@ class PipelineBinding:
             self.resolve_macro_catalog = module.pipeline_resolve_macro_catalog
             # Optional so an older native wheel keeps working without the explanations.
             self.explain_plugin_diagnostics = getattr(module, "pipeline_explain_plugin_diagnostics", None)
+            self.plugin_calls = getattr(module, "pipeline_plugin_calls", None)
             # Optional for the same reason; views then carry no attempt.
             self.provider_attempt = getattr(module, "pipeline_provider_attempt", None)
             # Older compatible wheels rebuild the saved DDL without choosing its ranges again.
@@ -332,6 +333,7 @@ class CandidateExecution:
 
     def view(self) -> dict:
         """Visible source/diagnostics and exact authority; not a resumable token."""
+        from .macro_catalog import plugin_offer_records
         with self._lock:
             if self._snapshot is None:
                 raise CandidateHostError("execution_not_started")
@@ -350,6 +352,11 @@ class CandidateExecution:
                            "catalog_diagnostics": self.context.get("macro_catalog", {}).get("diagnostics", []),
                            "rendered": self._rendered,
                            "result": json_seeds(self.context.get("result"))})
+            offers = plugin_offer_records(state["config"], self.context.get("chunk_plugin_offers", []))
+            if offers:
+                result["plugin_offers"] = offers
+                if isinstance(result.get("result"), dict):
+                    result["result"]["plugin_offers"] = offers
             if self.context.get("svg_refusal") is not None:
                 # Keep the earlier legal performance internally, but never
                 # present it as the refused attempt's successful result.

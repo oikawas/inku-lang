@@ -345,6 +345,9 @@ export const en: LangPack = {
 	saijikiLabel: 'saijiki:',
 	saijikiToggleBtn: 'Saijiki',
 	saijikiTitle: 'Saijiki',
+	saijikiPlugins: 'Plugins',
+	pluginObject: 'Object word',
+	pluginScene: 'Scene word',
 	saijikiHint: 'Pick a word to see how it affects the drawing, with an example.',
 	currentSetting: 'Current settings',
 	saveCurrentBtn: 'Save current',
@@ -540,8 +543,17 @@ export const en: LangPack = {
 	ddlSyntaxGuide: 'Instructions (DDL) quick guide\nThe instructions are not the picture itself. They are a compact visual instruction from which the picture is performed. They turn natural language into a performable description made of color, shape, place, motion, and material. This grammar is defined as DDL (Drawing Description Language).\nUse one visual instruction per line when possible.\nBasic form: color + size + shape + count + place + motion.\nExample: Fill the background with white.\nExample: Place three small red circles at upper right.\nExample: Draw a thin blue line from lower left to upper right.\nMake places concrete, such as top edge, right half, or lower left to upper right.\nAdd motion or material briefly, such as undulating, fine tremble, crayon, or pencil.',
 	ddlDialogDrawingModel: 'Drawing model',
 	ddlUnknownNameTitle: 'Not on this server',
-	ddlUnknownNameFires: (namespace, word) => `Drop the “${namespace}.” and it fires as “${word}”`,
 	ddlUnknownNameUnregistered: 'This name is not registered',
+	ddlPluginReason: (reason, suggestion, candidates) => {
+		switch (reason) {
+			case 'plugin_disabled': return 'This word is disabled. Enable it to draw it.';
+			case 'plugin_name_mismatch': return suggestion ? `Did you mean ${suggestion}?` : 'This name is not on this Server.';
+			case 'plugin_name_ambiguous': return `This name matches multiple words: ${candidates.join(', ')}.`;
+			case 'plugin_version_mismatch': return 'This version differs from the one saved with the work.';
+			case 'plugin_count_out_of_range': return 'The count is outside the range this word accepts.';
+			default: return 'This name is not on this Server.';
+		}
+	},
 	ddlPluginWarningsTitle: 'Plugin warnings',
 	renderLimitNotesTitle: 'Limits that took effect',
 
@@ -1330,8 +1342,6 @@ export const en: LangPack = {
 	settingsUserPlugins: 'Vocabulary plugins',
 	settingsPluginDrawn: 'Used for drawing',
 	settingsPluginDrawnHint: 'A package with definitions the developers wrote in JSON. Its words are drawn with those definitions. It cannot be deleted; switch it off when it is not wanted.',
-	settingsPluginNotDrawn: 'Not used for drawing',
-	settingsPluginNotDrawnHint: 'A legacy document without definitions. Its expansion text is not drawn from, and writing its words leaves them out with a diagnostic. Delete it to tidy up.',
 	settingsPluginWords: 'Words',
 	settingsUserPluginsAddTitle: 'Add a plugin',
 	settingsUserPluginsAddDescription: 'Choose a plugin file (inku.plugin-package.v2 JSON, or a zip holding it with its pictures). It is checked at once, and you see the note, example and picture the Saijiki will show. PLUGIN.md says how to write one.',

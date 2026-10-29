@@ -417,11 +417,11 @@ class PluginPackageManager:
     def bundled_entries(self) -> list[dict[str, object]]:
         package, _ = self.bundled()
         return [{
-            "qualified_name": word.qualified_name, "aliases": [],
+            "qualified_name": word.qualified_name,
             "surface_ja": list(word.names("ja")), "surface_en": list(word.names("en")),
             "note_ja": word.summary_for("ja"), "note_en": word.summary_for("en"),
             "example_ja": word.example_for("ja"), "example_en": word.example_for("en"),
-            "fires_on_ja": [], "fires_on_en": [], "has_preview": True,
+            "has_preview": True,
             "has_preview_hidpi": True, "preview_version": package.version,
             "custom_preview": False, "word_id": word.heading,
             "word_kind": word.definition.get("kind", "scene"),
@@ -451,19 +451,15 @@ class PluginPackageManager:
         return entries
 
     def _entry(self, package: PluginPackage, word: PackageWord) -> dict[str, object]:
-        aliases: list[str] = []
         preview = self.preview_path(package, word)
         return {
             "qualified_name": word.qualified_name,
-            "aliases": aliases,
             "surface_ja": list(word.names("ja")),
             "surface_en": list(word.names("en")),
             "note_ja": word.note.get("ja") or word.note.get("en", ""),
             "note_en": word.note.get("en") or word.note.get("ja", ""),
             "example_ja": word.example_for("ja"),
             "example_en": word.example_for("en"),
-            "fires_on_ja": [],
-            "fires_on_en": [],
             "has_preview": preview is not None,
             "has_preview_hidpi": self.preview_path(package, word, hidpi=True) is not None,
             "preview_version": str(preview.stat().st_mtime_ns) if preview is not None else "",

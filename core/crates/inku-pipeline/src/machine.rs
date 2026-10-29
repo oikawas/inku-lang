@@ -1472,6 +1472,9 @@ impl PipelineSnapshot {
         );
         self.config
             .plugin_offers
+            .retain(|record| record.stage != prompt.stage);
+        self.config
+            .plugin_offers
             .push(crate::plugin_offer::OfferRecord {
                 stage: prompt.stage,
                 offer,
@@ -4298,6 +4301,8 @@ fn advance_impl(
         if variation_id.is_empty() || authoring_nonce.is_empty() {
             return Err(ProtocolError::SchemaViolation);
         }
+        let mut config = config;
+        config.plugin_offers.clear();
         config.validate()?;
         let execution_id = value_digest(
             "inku.pipeline-execution.v1",

@@ -23,7 +23,7 @@ const states = ['completed', 'numbers_changed', 'words_changed'].map((state, i) 
 const labels = (strings: typeof ja) => ({ completed: strings.ddlCompletionTag, numbers_changed: strings.ddlCompletionNumbersTag, words_changed: strings.ddlCompletionWordsTag });
 function editor(doc = source) {
 	return EditorState.create({ doc, selection: { anchor: doc.length }, extensions: [
-		ddlEditorModel(table, { names: [], firesOn: [] }), completionRangeTagState
+		ddlEditorModel(table), completionRangeTagState
 	] });
 }
 function widgets(state: EditorState) {

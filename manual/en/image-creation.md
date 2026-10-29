@@ -254,13 +254,9 @@ A free line takes only two relations, the "between" words `connected` and `touch
 
 ### A plugin name that does not exist shows up while you type
 
-A `namespace.word` such as `Nature.青葉` is marked in the plugin color only when that qualified name is registered on this server. **A name that is not registered takes a different color, and the reason is listed under the editor.**
+Call a word in braces, such as `{green leaves}`. While editing, the shared core checks the work's catalog and marks usable words and reasons such as disabled, misspelled, or ambiguous names. Hover shows the reason or the word's example. Type `{` or `｛` to complete from Japanese and English names; the selection inserts the primary name and closing brace in the instructions' language. The Saijiki and preview show names, kind, note, example, and picture.
 
-- **If the word is a firing word, the editor says how to drop the prefix.** `Nature.菖蒲` reads `Remove "Nature." and it fires as "下草"`, because `菖蒲` is one of the words that fire `Nature.下草` while the qualified name itself does not exist.
-- **If it is not a firing word either**, the editor says `This name is not registered`.
-- **The color means caution, not error.** Plugins can be added later, so a name missing today may be valid tomorrow.
-- **⚠ A qualified name that does not exist costs the whole sentence.** When the expansion layer strips `namespace.`, it removes that sentence with a warning. **The same warning stays under the work after it is painted.**
-- **A word without a dot is unchanged.** Written as plain `菖蒲` it stays an ordinary word and keeps its color.
+Generation information records the plugins offered to AI in this work's run, their reasons, and words omitted by the limit. A run drawn directly from instructions has no such row.
 
 ### A work whose DDL was edited holds its description
 

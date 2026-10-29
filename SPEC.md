@@ -738,6 +738,8 @@ compatibility boundary.
 
 ### 4.12 Unresolved Plugins and DDL Export
 
+During editing the shared core's `inku.plugin-calls.v1` resolves plugin spans and states against the work's catalog and the enabled and disabled names. Web marks those spans and shows the reasons; the call neither draws nor saves a work.
+
 A bracketed name matching multiple locks is reported as `plugin_name_ambiguous` with candidates. The shared diagnostic entrance accepts `plugin_names` entries carrying visible names, qualified ids, and enabled state.
 
 A sentence whose plugin name does not resolve where it is drawn is omitted alone and the rest is drawn. The work does not stop, the sentence stays in the author's DDL, and no LLM rewrites it into other words. The shared Rust explainer (pipeline binding `explain_plugin_diagnostics`) combines the compiler's resolution diagnostic with the host's enabled and disabled plugin names and the work's own definitions, and returns one reason per sentence: `plugin_not_installed` (no such name), `plugin_disabled` (installed but disabled), `plugin_name_mismatch` (no installed name matches; one installed name with the same heading under another namespace, a case-only difference, or at most two edits away is suggested), `plugin_version_mismatch` (the same name with different content), or `plugin_count_out_of_range` (the name resolves but the written count lies outside what the word receives, §4.6). The host stores it with the work's diagnostics and shows it in place of the generic entry for the same range.
@@ -1835,6 +1837,8 @@ missing key) settles nothing and the model keeps its mark.
 Stage 1 produces visible DDL from a description. Stage 2 produces only visible patch candidates for known holes reported by the compiler. Both use the same model, while each stage retains its bounded input, prompt and required result. The deterministic shared Rust lowerer structures Score; this is not delegated to an LLM.
 
 ### 12.6 The Design of Stage 1 (Interpretation)
+
+A work records the plugin words offered to AI in its own run, the reasons and words omitted by the limit, and shows them in generation information. A resent stage keeps its last offer; a new run does not inherit its parent's offers.
 
 Stage 1 maps free description finitely into normalized DDL that the writer can
 inspect and edit. It preserves explicit elements, quantity, color, material,

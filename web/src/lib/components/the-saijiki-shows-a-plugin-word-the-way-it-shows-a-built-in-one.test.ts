@@ -110,12 +110,12 @@ test('T-22: a plugin preview is built from the document, not invented', () => {
 	// phrase a description would use to reach the word.
 	assert.match(fn, /word: pluginDisplayName\(entry, wordLang\)/);
 	assert.match(fn, /canonicalWord: entry\.qualified_name/);
-	assert.match(fn, /effect: \(uiLang === 'ja' \? entry\.note_ja : entry\.note_en\)/);
-	assert.match(fn, /example: example \|\| \(firesOn\[0\] \?\? ''\)/);
+	assert.match(fn, /uiLang === 'ja' \? entry\.note_ja : entry\.note_en/);
+	assert.match(fn, /example: example \|\|/);
 	// Both languages are read, so neither text is ever shown in the other's.
 	// The note is prose and follows the reader; the firing phrase and the
 	// example are what a description or DDL would say, so they follow the DDL (T-92).
-	assert.match(fn, /wordLang === 'ja' \? entry\.fires_on_ja : entry\.fires_on_en/);
+	assert.doesNotMatch(fn, /fires_on_/);
 	assert.match(fn, /wordLang === 'ja' \? entry\.example_ja : entry\.example_en/);
 });
 

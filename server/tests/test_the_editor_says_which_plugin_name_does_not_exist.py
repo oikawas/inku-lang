@@ -69,12 +69,10 @@ def test_the_list_api_carries_v2_names_without_document_firing_phrases():
     entries = _by_name(_plugins_entries(headers))
     assert entries, "no plugin entries were served"
     for entry in entries.values():
-        assert isinstance(entry.get("fires_on_ja"), list), entry
-        assert isinstance(entry.get("fires_on_en"), list), entry
+        assert not {"aliases", "fires_on_ja", "fires_on_en"} & entry.keys()
     undergrowth = entries.get("Nature.Undergrowth")
     assert undergrowth is not None, sorted(entries)
-    assert undergrowth["aliases"] == [], undergrowth
-    assert undergrowth["fires_on_ja"] == undergrowth["fires_on_en"] == []
+    assert undergrowth["word_kind"] == "scene"
     assert undergrowth["surface_ja"][0] == "下草"
     assert undergrowth["written_ja"] == "｛下草｝"
 
@@ -85,7 +83,7 @@ def test_the_editors_own_list_carries_v2_names_too():
     entries = _by_name(_saijiki_entries(headers))
     undergrowth = entries.get("Nature.Undergrowth")
     assert undergrowth is not None, sorted(entries)
-    assert undergrowth["fires_on_ja"] == undergrowth["fires_on_en"] == []
+    assert not {"aliases", "fires_on_ja", "fires_on_en"} & undergrowth.keys()
     assert undergrowth["written_ja"] == "｛下草｝"
 
 
@@ -117,8 +115,8 @@ def test_the_editor_reads_the_keys_this_server_writes():
     halves; only the key names hold them together. A rename on either side
     would leave the editor silently unable to name the word."""
     source = _WEB_PLUGIN_NAMES.read_text(encoding="utf-8")
-    keys = sorted(set(re.findall(r"fires_on_[a-z]{2}", source)))
-    assert keys == ["fires_on_en", "fires_on_ja"], keys
+    assert not re.findall(r"fires_on_[a-z]{2}", source)
+    keys = ["surface_ja", "surface_en", "written_ja", "written_en"]
     headers = _auth()
     for entries in (_plugins_entries(headers), _saijiki_entries(headers)):
         for entry in entries:
@@ -126,12 +124,27 @@ def test_the_editor_reads_the_keys_this_server_writes():
                 assert key in entry, f"{key} missing from {sorted(entry)}"
 
 
-def test_both_transports_agree_on_the_firing_phrases():
-    """One join, two readers: a fix on one path must not leave the other stale."""
+def test_both_transports_agree_on_the_visible_names():
+    """The settings and editor use the same names and kind."""
     headers = _auth()
     from_plugins = _by_name(_plugins_entries(headers))
     from_saijiki = _by_name(_saijiki_entries(headers))
     assert set(from_saijiki) <= set(from_plugins)
     for name, entry in from_saijiki.items():
-        assert entry["fires_on_ja"] == from_plugins[name]["fires_on_ja"], name
-        assert entry["fires_on_en"] == from_plugins[name]["fires_on_en"], name
+        for field in ("surface_ja", "surface_en", "written_ja", "written_en", "word_kind"):
+            assert entry[field] == from_plugins[name][field], name
+
+
+def test_editor_uses_the_shared_core_for_braced_and_legacy_calls():
+    headers = _auth()
+    source = "｛若葉｝。Nature.YoungLeaves。｛若刃｝。{}。{\"x\":1}。"
+    response = client.post("/api/pipeline/plugin-calls", headers=headers, json={"source": source, "language": "ja"})
+    assert response.status_code == 200, response.text
+    calls = response.json()["calls"]
+    assert [(call["text"], call["status"]) for call in calls] == [
+        ("｛若葉｝", "resolved"), ("Nature.YoungLeaves", "resolved"), ("｛若刃｝", "plugin_name_mismatch")]
+    assert calls[0]["qualified_name"] == "Nature.YoungLeaves"
+    count = client.post("/api/pipeline/plugin-calls", headers=headers,
+                        json={"source": "13枚の｛若葉｝。", "language": "ja"})
+    assert count.status_code == 200, count.text
+    assert [call["status"] for call in count.json()["calls"]] == ["plugin_count_out_of_range"]

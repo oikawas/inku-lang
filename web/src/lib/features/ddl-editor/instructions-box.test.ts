@@ -34,7 +34,7 @@ function actualMethod(path: string, name: string): string {
 
 test('box and modal settings choose line numbers and commit complete drafts', async () => {
 	const { setup } = await harness(`export function setup(compact, value, onChange, onRanges) {
-		const isJapanese = true, disabled = false, pluginEntries = [], pluginNameIndex = {}, ranges = [];
+		const isJapanese = true, disabled = false, pluginEntries = [], ranges = [], callSource = '', calls = [], reason = () => '';
 		const completionSource = value, completionStates = [], completionLabels = {};
 		const previewForWord = () => {}, previewForPlugin = () => {};
 		let activeSaijikiPreview = null;
@@ -87,12 +87,12 @@ test('the drawer inserts at the box caret, appends before focus, and only previe
 		return { selectWord, preview: () => activePreview };
 	}`);
 	const raw = '  赤い円。\r\n青い線。  ';
-	const model = ddlEditorModel([], { names: [], firesOn: [] });
+	const model = ddlEditorModel([]);
 	const { control } = await harness(`export function control(view, options, cursorPlaced, insertDdlWord) {
 		return { ${actualMethod('./codemirror.ts', 'insertWord')} };
 	}`);
 	function box(selection: ReturnType<typeof EditorSelection.cursor>, readOnly = false, cursorPlaced = true) {
-		let state = EditorState.create({ doc: raw, selection, extensions: readOnly ? ddlEditorModel([], { names: [], firesOn: [] }, true) : model });
+		let state = EditorState.create({ doc: raw, selection, extensions: readOnly ? ddlEditorModel([], true) : model });
 		const view = { get state() { return state; }, dispatch(tr: { state: EditorState }) { state = tr.state; }, focus() {} };
 		return { ...control(view, { cursorAtEnd: true }, cursorPlaced, insertDdlWord), value: () => state.doc.toString(),
 			setValue(next: string) { const tr = replaceDdlValue(state, next); if (tr) state = tr.state; } };
@@ -147,7 +147,7 @@ test('discard edits in the box confirms before changing the draft and guards the
 	}`);
 	const saved = '保存した円。\r\n青い線。';
 	const draft = saved + '\r\n下書き。';
-	let state = EditorState.create({ doc: draft, extensions: [ddlEditorModel([], { names: [], firesOn: [] }), history()] });
+	let state = EditorState.create({ doc: draft, extensions: [ddlEditorModel([]), history()] });
 	let workDdl = draft, focuses = 0;
 	let confirmation: { run: () => void; cancel: () => void } | null = null;
 	const view = { get state() { return state; }, composing: false, dispatch(tr: { state: EditorState }) { state = tr.state; workDdl = state.doc.toString(); box.set({ ddl: workDdl }); }, focus() { focuses++; } };

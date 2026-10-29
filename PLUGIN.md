@@ -248,6 +248,8 @@ Three categories outside the Saijiki are closed words defined by the core:
 
 ## 4. Calling a plugin from DDL
 
+The Web Saijiki and settings show the Japanese and English names, kind, note, example, and picture. The editor completes names after a brace and shows the shared core's marks, reasons, and hover preview. The note is used both in the underdrawing offer and in the word's description.
+
 Put a visible name in braces: `｛星｝。` or `{stars}.` Modifiers attach to that call. An object's shape stays fixed while composition and rules act on its aspect rectangle. A scene stays an inserted drawing. Saved works retain their exact definitions and locks for replay.
 
 ## 5. Loading a definition

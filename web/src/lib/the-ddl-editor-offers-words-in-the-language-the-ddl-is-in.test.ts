@@ -167,7 +167,7 @@ test('T-92: both preview builders take the word language and split the two texts
 	assert.ok(plugin.length > 0, 'pluginPreview moved');
 	assert.match(plugin, /wordLang: ResolvedInstructionLang\): SaijikiPreview/);
 	// The note explains; the firing phrase is what a description would say.
-	assert.match(plugin, /wordLang === 'ja' \? entry\.fires_on_ja : entry\.fires_on_en/);
+	assert.match(plugin, /wordLang === 'ja' \? entry\.example_ja : entry\.example_en/);
 	assert.match(plugin, /uiLang === 'ja' \? entry\.note_ja : entry\.note_en/);
 });
 
@@ -196,11 +196,11 @@ test('T-94: the vocabulary lint does not count a language code as a label', () =
 	assert.ok(pairs.length >= 2, `only ${pairs.length} language-code ternaries; the guard may be unreached`);
 });
 
-test('T-93: the saijiki drawer still offers the reader their own language', () => {
+test('T-93: the saijiki drawer uses the DDL language when it can insert', () => {
 	const drawer = read(DRAWER);
 	// No DDL is being written in the drawer, so there is no other language for
 	// it to follow. It now says so instead of relying on the callee's default.
-	assert.match(drawer, /const wordLang = \$derived\(instructionLangOf\(getLang\(\)\)\)/);
+	assert.match(drawer, /const wordLang = \$derived\(ddlLang \?\? instructionLangOf\(getLang\(\)\)\)/);
 	assert.match(drawer, /saijikiWordsFor\(cat\.key, wordLang === 'ja'\)/);
 	assert.doesNotMatch(drawer, /resolveInstructionLang/, 'the drawer reads a DDL it does not have');
 });

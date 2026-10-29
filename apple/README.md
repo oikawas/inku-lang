@@ -84,7 +84,7 @@ open apple/build/macOS/DerivedData/Build/Products/Release/Inku.app
 
 ### Building the distribution
 
-The following builds the distribution dmg: a Universal Release build, a check of the third-party notices, Developer ID signing with Hardened Runtime, creating and signing the dmg, notarization and stapling, a Gatekeeper check, the SHA-256, and a plain-text copy of the third-party notices for the Release. Output goes to `apple/build/release/Inku-<version>-<build>/`. The version comes from `apple/VERSION` and `apple/BUILD_NUMBER`. Pass the signing identity and the notary keychain profile as arguments or environment variables (`INKU_MACOS_SIGN_IDENTITY` / `INKU_MACOS_NOTARY_PROFILE`).
+The following builds the distribution dmg: a Universal Release build, a check of the third-party notices, Developer ID signing with Hardened Runtime, creating and signing the dmg, notarization and stapling, a Gatekeeper check, the SHA-256, and a plain-text copy of the third-party notices for the Release. Output goes to `apple/build/release/Inku-<version>-<build>/`. The version comes from `apple/VERSION` and the build number from the completed app. Pass the signing identity and the notary keychain profile as arguments or environment variables (`INKU_MACOS_SIGN_IDENTITY` / `INKU_MACOS_NOTARY_PROFILE`).
 
 ```sh
 apple/scripts/package-macos-release.sh --identity "Developer ID Application: <name> (<team>)" --notary-profile <profile>

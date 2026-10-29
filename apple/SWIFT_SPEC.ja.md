@@ -6,7 +6,7 @@ macOS の履歴帯は矢印キーでページをまたいで移動し、キャ�
 
 最終更新: 2026-10-23。
 
-binding／protocolの版は同梱Rust coreのversion report、描画層の版はrender metadataと[Serverの層定義](../server/src/inku_server/layer_versions.py)を参照する。本書へ共通engineの版定数を複製しない。macOSアプリの版は`apple/VERSION`と`apple/BUILD_NUMBER`を正本とする独自の版で、Server／Webの版とは別に採番する（初回は1.0.0／Build 1）。対応するServerの版はアプリの「inkuについて」と変更履歴に併記する。共有層の版が一致しても、host機能とnative UIの移植が完了したことにはならない。
+binding／protocolの版は同梱Rust coreのversion report、描画層の版はrender metadataと[Serverの層定義](../server/src/inku_server/layer_versions.py)を参照する。本書へ共通engineの版定数を複製しない。macOSアプリの版は`apple/VERSION`、Build番号の下限は`apple/BUILD_NUMBER`を正本とし、Server／Webの版とは別に採番する（初回は1.0.0／Build 1）。対応するServerの版はアプリの「inkuについて」と変更履歴に併記する。共有層の版が一致しても、host機能とnative UIの移植が完了したことにはならない。
 
 作品識別`dh1`／`rh3`・正準JSON、指示言語の正規化と判定、記述ラベルの本文と除外位置はUniFFI経由で共有coreを呼ぶ。Swiftには同じ規則を複製せず、coreが返すUnicode scalar位置だけをmacOSエディタのUTF-16位置へ変換する。保存済みの識別値を書き換えない。`ExactJSON.text`は数値の表記を保持する転送用、`canonicalText`はcoreによる正準形とし、prompt用の空白付き`pythonText`は別の書式として保持する。
 
@@ -19,6 +19,12 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 確定した実装変更と残る範囲は本書の日付付き節へ記し、製品の変更履歴は共通の[CHANGELOG.ja.md](../CHANGELOG.ja.md)／[CHANGELOG.md](../CHANGELOG.md)へ同期して記す。Swift専用CHANGELOGを分けない。
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
+
+## 2026-10-27 macOSのBuild番号
+
+現行の左下表示はBuild番号の数字だけとし、版とラベルを付けない。ダークモードでは白、ライトモードでは標準の文字色を使う。
+
+左下にはアプリのBuild番号だけを明るく表示する。`build-macos.sh`は変更の有無にかかわらず開始ごとに新しい番号を確保し、Info.plistへ入れる。番号はこのMacの`~/Library/Application Support/Inku/build-numbers`に保存し、作業木間で共有する。排他と原子的な保存で同時buildの重複を防ぎ、`apple/BUILD_NUMBER`は既存版との下限とする。失敗したbuildの番号は再使用しない。直接のXcode buildは番号が渡されなければ失敗する。配布用のpackageは完成appの番号を読む。採番記録を消した場合や別のMacでは、それまでの番号の継続は保証しない。
 
 ## 2026-10-27 ChatGPTプラン登録の管理
 
@@ -432,6 +438,7 @@ Geminiへの描画pipeline・Vision・デモの指示文は、共有coreの[`pro
 ## 2026-10-12 左下に版とBuildを常に出す
 
 作者の指示「アプリの左下に、バージョン番号とビルド番号を常時表示する」による。
+以下は当時の表示記録。現行の表示は上記「2026-10-27 macOSのBuild番号」に従う。
 
 - 左端の操作列（[`AppRailView`](Sources/InkuUI/Views/AppRailView.swift)）の一番下、窓の左下に、アプリの版とBuild（`apple/VERSION`・`apple/BUILD_NUMBER`から入る`CFBundleShortVersionString`・`CFBundleVersion`）を出す。畳んだ列では`1.1.2`と`Build 4`の2行、広げた列では`1.1.2 · Build 4`の1行。
 - 見た目はWebの操作列の一番下のBuildの表示（`.rail-build`）に合わせる：10pt、淡い文字、等幅の数字。ツールチップは`Build 4`。
@@ -553,7 +560,7 @@ macOS版を初めて配布するにあたり、画面・操作・保存した選
 
 ### 版・署名・配布
 
-- 版は`apple/VERSION`と`apple/BUILD_NUMBER`からbuild時にInfo.plistへ入れ、作品の来歴の`build`とDDL書出しの`build_number`にも使う。
+- 版は`apple/VERSION`から、Build番号は`apple/BUILD_NUMBER`を下限とするローカル採番からbuild時にInfo.plistへ入れる。完成appの番号を作品の来歴の`build`とDDL書出しの`build_number`にも使う。
 - 配布物は`apple/scripts/package-macos-release.sh`で作る。Universal Release build、第三者通知の照合、Developer ID署名（Hardened Runtime、timestamp、entitlementsは空）、`.dmg`の作成と署名、Appleの公証とstaple、Gatekeeperの確認、SHA-256の記録までを行う。署名identityと公証のprofileは引数か環境変数で渡し、sourceに書かない。
 - 配布アプリはbundle ID `app.inku.macos`と既定のデータ場所を使う。`--database`起動引数とbundleの`InkuDatabasePath`は開発用に残すが、配布物には`InkuDatabasePath`を入れない。
 - 第三者通知はRust crate（registry・git・path・vendored由来）、GRDB、辞書（SudachiDictのUniDic部分を含む）、フォントを網羅し、「inkuについて」の「ライセンス」から全文を読める。

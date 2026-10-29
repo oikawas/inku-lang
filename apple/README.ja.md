@@ -84,7 +84,7 @@ open apple/build/macOS/DerivedData/Build/Products/Release/Inku.app
 
 ### 配布物の作成
 
-配布用のdmgは次で作ります。Universal Release build、第三者通知の照合、Developer ID署名（Hardened Runtime）、dmgの作成と署名、公証とstaple、Gatekeeperの確認、SHA-256とRelease添付用の第三者通知テキストの作成までを行い、`apple/build/release/Inku-<版>-<build>/`へ出力します。版は`apple/VERSION`と`apple/BUILD_NUMBER`です。署名identityと公証のkeychain profileは引数か環境変数（`INKU_MACOS_SIGN_IDENTITY`／`INKU_MACOS_NOTARY_PROFILE`）で渡します。
+配布用のdmgは次で作ります。Universal Release build、第三者通知の照合、Developer ID署名（Hardened Runtime）、dmgの作成と署名、公証とstaple、Gatekeeperの確認、SHA-256とRelease添付用の第三者通知テキストの作成までを行い、`apple/build/release/Inku-<版>-<build>/`へ出力します。版は`apple/VERSION`、Build番号は完成appから読みます。署名identityと公証のkeychain profileは引数か環境変数（`INKU_MACOS_SIGN_IDENTITY`／`INKU_MACOS_NOTARY_PROFILE`）で渡します。
 
 ```sh
 apple/scripts/package-macos-release.sh --identity "Developer ID Application: <name> (<team>)" --notary-profile <profile>

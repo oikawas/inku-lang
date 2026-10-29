@@ -54,7 +54,7 @@ public struct SaijikiView: View {
     private var drawerPreview: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let preview = selectedPreview {
-                SaijikiPreviewView(svg: preview.svg, imageURL: preview.imageURL, renderer: model.renderer)
+                SaijikiPreviewView(svg: preview.svg, imageURL: preview.imageURL, imageData: preview.imageData, renderer: model.renderer)
                     .frame(width: 216, height: 92).frame(maxWidth: .infinity).id(preview.id)
                 Text(preview.title).inkuFont(13, weight: .semibold)
                 if !preview.effect.isEmpty { Text(preview.effect).inkuFont(11).foregroundStyle(.secondary) }
@@ -211,7 +211,7 @@ public struct SaijikiView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
                     if let preview = selectedPreview {
-                        SaijikiPreviewView(svg: preview.svg, imageURL: preview.imageURL, renderer: model.renderer)
+                        SaijikiPreviewView(svg: preview.svg, imageURL: preview.imageURL, imageData: preview.imageData, renderer: model.renderer)
                             .frame(maxWidth: .infinity).frame(height: 92).id(preview.id)
                         Text(preview.title).inkuFont(14, weight: .semibold)
                             .fixedSize(horizontal: false, vertical: true)
@@ -256,14 +256,14 @@ public struct SaijikiView: View {
             return Preview(id: id, title: name(word),
                 effect: word.preview?.effect(language: uiLanguage) ?? (uiLanguage == "ja" ? word.detail : word.englishDetail ?? ""),
                 example: word.preview?.example(language: offeredLanguage) ?? "", svg: word.preview?.svg,
-                imageURL: nil, insertable: !word.referenceOnly)
+                imageURL: nil, imageData: nil, insertable: !word.referenceOnly)
         case .plugin(let id):
             guard let word = model.pluginWords.first(where: { $0.id == id }) else { return nil }
             return Preview(id: id, title: word.displayName(language: offeredLanguage),
                 effect: uiLanguage == "ja" ? word.note : word.englishNote ?? "",
                 example: (offeredLanguage == "ja" ? word.exampleJapanese : word.exampleEnglish)
-                    ?? (offeredLanguage == "ja" ? word.firesOnJapanese : word.firesOnEnglish).first ?? "",
-                svg: nil, imageURL: word.previewURL, insertable: word.packageID != nil)
+                    ?? "",
+                svg: nil, imageURL: word.previewURL, imageData: word.previewData, insertable: word.packageID != nil)
         case nil: return nil
         }
     }
@@ -289,6 +289,7 @@ public struct SaijikiView: View {
         let example: String
         let svg: String?
         let imageURL: URL?
+        let imageData: Data?
         let insertable: Bool
     }
 }

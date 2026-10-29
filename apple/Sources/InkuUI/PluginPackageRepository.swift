@@ -13,30 +13,33 @@ struct InstalledPluginPackage: Sendable {
 
     func candidateWords(language: String) -> [ExactJSON] {
         words.map { word in
-            let primary = word[language == "en" ? "summary_en" : "summary_ja"].string ?? ""
-            let fallback = word[language == "en" ? "summary_ja" : "summary_en"].string ?? ""
+            let primary = word[language == "en" ? "note_en" : "note_ja"].string ?? ""
+            let fallback = word[language == "en" ? "note_ja" : "note_en"].string ?? ""
             return .object(["source_id": .string("package:" + id), "definition_json": .string(word["definition"].text),
                             "summary": .string(primary.isEmpty ? fallback : primary)])
         }
     }
     func pluginWords() -> [PluginWord] {
         words.compactMap { word in
-            guard let name = word["qualified_name"].string, let key = word["preview_key"].string else { return nil }
-            let definition = word["definition"]
-            let heading = definition["heading"].string ?? name
-            let aliases = (word["visible_qualified_names"].array ?? []).dropFirst().compactMap(\.string)
-            let jaAliases = (word["aliases"].array ?? []).compactMap(\.string)
-            let ja = jaAliases.isEmpty ? [heading] : jaAliases
+            guard word["qualified_name"].string != nil, let key = word["preview_key"].string else { return nil }
             let custom = directory.appendingPathComponent("custom/\(key)@2x.png")
             let preview = FileManager.default.fileExists(atPath: custom.path) ? custom : directory.appendingPathComponent("previews/\(key)@2x.png")
-            let noteJa = word["note_ja"].string ?? "", noteEn = word["note_en"].string ?? ""
-            let exampleJa = word["example_ja"].string ?? "", exampleEn = word["example_en"].string ?? ""
-            return PluginWord(id: name, aliases: aliases, japanese: ja, english: [heading],
-                note: noteJa.isEmpty ? noteEn : noteJa, previewURL: FileManager.default.fileExists(atPath: preview.path) ? preview : nil,
-                packageID: id, sourceFile: nil, englishNote: noteEn.isEmpty ? noteJa : noteEn, firesOnJapanese: [], firesOnEnglish: [],
-                exampleJapanese: exampleJa.isEmpty ? (aliases.first ?? name) + "。" : exampleJa,
-                exampleEnglish: exampleEn.isEmpty ? name + "." : exampleEn)
+            return Self.pluginWord(word, packageID: id, previewURL: FileManager.default.fileExists(atPath: preview.path) ? preview : nil, previewData: nil)
         }
+    }
+
+    static func pluginWord(_ word: ExactJSON, packageID: String, previewURL: URL?, previewData: Data?) -> PluginWord? {
+        guard let id = word["qualified_name"].string else { return nil }
+        let ja = (word["names"]["ja"].array ?? []).compactMap(\.string)
+        let en = (word["names"]["en"].array ?? []).compactMap(\.string)
+        guard !ja.isEmpty, !en.isEmpty else { return nil }
+        let noteJa = word["note_ja"].string ?? "", noteEn = word["note_en"].string ?? ""
+        return PluginWord(id: id, aliases: [], japanese: ja, english: en,
+            note: noteJa.isEmpty ? noteEn : noteJa, previewURL: previewURL, packageID: packageID, sourceFile: nil,
+            englishNote: noteEn.isEmpty ? noteJa : noteEn, firesOnJapanese: [], firesOnEnglish: [],
+            exampleJapanese: word["example_ja"].string, exampleEnglish: word["example_en"].string,
+            previewData: previewData, kind: word["kind"].string ?? "", aspect: word["aspect"].string, counter: word["counter"].string,
+            visibleNames: (word["visible_qualified_names"].array ?? []).compactMap(\.string))
     }
 }
 
@@ -102,7 +105,7 @@ struct PluginPackageRepository: Sendable {
         let installed = try load()
         let installedNames = Set(installed.flatMap { $0.words.flatMap { ($0["visible_qualified_names"].array ?? []).compactMap(\.string) } })
         for word in bootstrap.bundledPluginWords {
-            for name in [word.id] + word.aliases where !installedNames.contains(name) { taken[name] = .string("plugin document") }
+            for name in word.visibleNames where !installedNames.contains(name) { taken[name] = .string("plugin document") }
         }
         for package in installed {
             for word in package.words {

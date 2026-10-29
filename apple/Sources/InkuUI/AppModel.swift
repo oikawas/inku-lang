@@ -977,10 +977,6 @@ public final class AppModel {
         let catalog = try bootstrap.macroCatalogValue(language: language, settings: settings, importedPlugins: value.plugins)
         newWork()
         importedDDL = value; importedMacroNames = value.names
-        importedMacroNames += value.plugins.flatMap { plugin in
-            guard let namespace = plugin.definition["namespace"].string else { return [String]() }
-            return (plugin.definition["aliases"].array ?? []).compactMap(\.string).map { namespace + "." + $0 }
-        }
         inputMode = "ddl"; ddlText = value.source
         macroDiagnostics = try Self.pretty(catalog.data)
         status = "DDLを読み込みました。生成して保存できます。"
@@ -2092,14 +2088,19 @@ public final class AppModel {
         for work in works {
             try Task.checkCancellation()
             var value: ExactJSON = .object([:])
-            do { value = try ExactJSON(data: await host.savedAuthoringContext(workID: work.id).configuration) }
+            var locks: [ExactJSON] = []
+            do {
+                let context = try await host.savedAuthoringContext(workID: work.id)
+                value = try ExactJSON(data: context.configuration)
+                if let document = context.document { locks = try ExactJSON(data: document)["macro_locks"].array ?? [] }
+            }
             catch {
                 if profile != "display" || requiresPluginDefinitions { throw HostError("saved_export_plugin_context_unavailable") }
             }
             var profiles: [String: String] = [:]
             if profile != "display" { profiles[profile] = try await host.exportSVG(workID: work.id, profile: profile) }
             sources.append(ExportSource(work: work, profiles: profiles,
-                pluginDefinitions: value["definitions"].array ?? [], pluginSummaries: value["macro_summaries"].array?.compactMap(\.string) ?? [],
+                pluginDefinitions: value["definitions"].array ?? [], pluginSummaries: value["macro_summaries"].array?.compactMap(\.string) ?? [], pluginLocks: locks,
                 language: value["language"].string))
         }
         return sources

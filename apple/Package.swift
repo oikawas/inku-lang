@@ -29,7 +29,6 @@ let package = Package(
                 resources: [.copy("Resources/server-defaults.json"), .copy("Resources/color-catalogs.json"),
                             .copy("Resources/ui-reference.json"), .copy("Resources/third-party-notices.json"),
                             .copy("Resources/macro-sources.json"), .copy("Resources/saijiki.json"),
-                            .copy("Resources/plugin-words.json"), .copy("Resources/plugin-previews"),
                             .process("Resources/Localization")] + (ddl3dCopied ? [.copy("Resources/ddl3d")] : [])),
         .executableTarget(name: "InkuMac", dependencies: ["InkuUI"]),
         .executableTarget(name: "InkuAppCheck", dependencies: ["InkuUI", "InkuPersistence", "InkuCore", "InkuHost", "InkuExport"]),

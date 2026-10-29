@@ -5,9 +5,7 @@ from __future__ import annotations
 import argparse
 import ast
 import json
-import shutil
 import subprocess
-import sys
 from copy import deepcopy
 from pathlib import Path
 from types import SimpleNamespace
@@ -139,49 +137,15 @@ def main() -> None:
         "budgetMapping": budget_mapping,
         "bytesPerMark": literal_assignment(SERVER / "limits.py", "BYTES_PER_MARK"),
     }
-    # Parse versioned documents with the Server's data-only parser. Never load
-    # user installations or execute the Markdown expansion prose.
-    sys.path.insert(0, str(ROOT / "server/src"))
-    from inku_server.plugins import bundled_package_for
-    from inku_server.plugins.document_format import (
-        entry_preview_path,
-        parse_plugin_document,
-    )
-
-    legacy = []
-    bundled = []
-    plugin_words = []
-    OUTPUT.mkdir(parents=True, exist_ok=True)
-    previews = OUTPUT / "plugin-previews"
-    previews.mkdir(exist_ok=True)
-    for path in sorted((ROOT / "server/plugins").glob("*.inku-plugin.md")):
-        document = parse_plugin_document(path.read_text(encoding="utf-8"), source_path=str(path))
-        package = bundled_package_for(path)
-        if package is not None:
-            bundled.append(package)
-        source_id = f"bundled:{package}" if package is not None else path.name
-        for entry in document.entries:
-            legacy.append({"source_id": source_id,
-                           "qualified_name": entry.qualified_name(document.manifest.namespace)})
-            preview = entry_preview_path(document, entry, hidpi=True) or entry_preview_path(document, entry)
-            preview_name = None
-            if preview is not None:
-                preview_name = f"{document.manifest.namespace}-{entry.heading}.png"
-                shutil.copyfile(preview, previews / preview_name)
-            plugin_words.append({"id": entry.qualified_name(document.manifest.namespace),
-                                 "aliases": entry.alias_qualified_names(document.manifest.namespace),
-                                 "surfaces": entry.surfaces, "notes": entry.notes,
-                                 "fires_on": entry.fires_on, "preview": preview_name,
-                                 "package_id": package, "source_id": source_id, "source_file": path.name})
     macro_sources = {"maximum_entries": manifest["pipeline"]["prompt_limits"]["max_catalog_entries"],
-                     "canonical": [], "legacy": legacy, "bundled_packages": sorted(set(bundled))}
+                     "canonical": [], "legacy": [], "bundled_packages": ["Nature.leaves"]}
     saijiki = json.loads((ROOT / "core/crates/inku-ddl/assets/saijiki-v2.json").read_text(encoding="utf-8"))
     for name, value in [("server-defaults.json", manifest), ("color-catalogs.json", catalogs),
-                        ("macro-sources.json", macro_sources), ("plugin-words.json", plugin_words),
+                        ("macro-sources.json", macro_sources),
                         ("saijiki.json", saijiki)]:
         write_json(OUTPUT / name, value)
     subprocess.run(["node", str(DESTINATION_ROOT / "apple/scripts/export-web-reference.mjs"), "--source-root", str(ROOT)], check=True)
-    print(f"Generated Server defaults, {len(catalogs)} catalogs, {len(plugin_words)} plugin words and canonical Saijiki.")
+    print(f"Generated Server defaults, {len(catalogs)} catalogs and canonical Saijiki.")
 
 
 if __name__ == "__main__":

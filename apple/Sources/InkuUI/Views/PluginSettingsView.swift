@@ -35,9 +35,11 @@ struct PluginSettingsView: View {
                                     .background(InkuColor.bg, in: Capsule())
                                     .overlay(Capsule().stroke(InkuColor.border2))
                             }
-                            Text(model.display.webCopy(package.versions.isEmpty ? "settingsPluginNotDrawn" : "settingsPluginDrawn",
-                                                       package.versions.isEmpty ? "描画には使われない" : "描画に使う"))
-                                .inkuFont(11).foregroundStyle(.secondary).fixedSize()
+                            if package.rejectedProblems.isEmpty {
+                                Text(model.display.webCopy(package.versions.isEmpty ? "settingsPluginNotDrawn" : "settingsPluginDrawn",
+                                                           package.versions.isEmpty ? "描画には使われない" : "描画に使う"))
+                                    .inkuFont(11).foregroundStyle(.secondary).fixedSize()
+                            }
                             Spacer()
                             if package.rejectedProblems.isEmpty {
                             Toggle(model.display.webCopy(settings.preferences.isEnabled(package.id) ? "settingsPluginEnabled" : "settingsPluginDisabled",
@@ -76,16 +78,21 @@ struct PluginSettingsView: View {
                             ForEach(package.words) { word in
                                 HStack(alignment: .top, spacing: 10) {
                                     Group {
-                                        if let url = word.previewURL { preview(url) }
+                                        if let data = word.previewData { previewData(data) }
+                                        else if let url = word.previewURL { preview(url) }
                                         else { Color.clear }
                                     }
                                     .frame(width: 96, height: 44)
                                     .background(InkuColor.bg, in: RoundedRectangle(cornerRadius: 4))
                                     .overlay(RoundedRectangle(cornerRadius: 4).stroke(InkuColor.border))
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text(word.id).inkuFont(12, weight: .semibold)
-                                        if !word.aliases.isEmpty { Text(word.aliases.joined(separator: ", ")).inkuFont(12) }
-                                        Text((model.display.preferences.language == "en" ? word.english : word.japanese).joined(separator: " | ")).inkuFont(12)
+                                        Text(word.displayName(language: "ja") + " / " + word.displayName(language: "en")).inkuFont(12, weight: .semibold)
+                                        let names = Array(word.japanese.dropFirst()) + Array(word.english.dropFirst())
+                                        if !names.isEmpty { Text(names.joined(separator: " / ")).inkuFont(12) }
+                                        Text(model.display.localized(word.kind == "object" ? "物の語" : "情景の語")).inkuFont(12)
+                                        if word.kind == "object" {
+                                            Text([word.aspect, word.counter].compactMap { $0 }.joined(separator: " / ")).inkuFont(12)
+                                        }
                                         let note = model.display.preferences.language == "en" ? word.englishNote ?? "" : word.note
                                         if !note.isEmpty { Text(note).inkuFont(12).foregroundStyle(.secondary) }
                                     }.frame(maxWidth: .infinity, alignment: .leading)
@@ -137,13 +144,15 @@ struct PluginSettingsView: View {
                         Image(nsImage: image).resizable().scaledToFit().frame(width: 108, height: 46)
                     }
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(word["qualified_name"].string ?? "").inkuFont(12, weight: .semibold)
-                        let aliases = (word["aliases"].array ?? []).compactMap(\.string)
+                        let jaNames = (word["names"]["ja"].array ?? []).compactMap(\.string)
+                        let enNames = (word["names"]["en"].array ?? []).compactMap(\.string)
+                        Text("｛\(jaNames.first ?? "")｝ / {\(enNames.first ?? "")}").inkuFont(12, weight: .semibold)
+                        let aliases = Array(jaNames.dropFirst()) + Array(enNames.dropFirst())
                         if !aliases.isEmpty { Text(aliases.joined(separator: ", ")).inkuFont(12) }
+                        Text(model.display.localized(word["kind"].string == "object" ? "物の語" : "情景の語")).inkuFont(12)
                         let note = word[japanese ? "note_ja" : "note_en"].string ?? ""
                         if !note.isEmpty { Text(note).inkuFont(12) }
                         Text(word[japanese ? "example_ja" : "example_en"].string ?? "").inkuFont(12)
-                        Text(word[japanese ? "summary_ja" : "summary_en"].string ?? "").inkuFont(12).foregroundStyle(.secondary)
                         if check.preview(at: index) != nil {
                             Text(model.display.webCopy(word["preview_source"].string == "file" ? "settingsPluginPictureFromFile" : "settingsPluginPictureDrawn", "絵"))
                                 .inkuFont(11).foregroundStyle(.secondary)
@@ -174,6 +183,16 @@ struct PluginSettingsView: View {
         if let image = UIImage(contentsOfFile: url.path) {
             Image(uiImage: image).resizable().scaledToFit()
         } else { Image(systemName: "leaf").foregroundStyle(.secondary) }
+        #endif
+    }
+
+    @ViewBuilder private func previewData(_ data: Data) -> some View {
+        #if os(macOS)
+        if let image = NSImage(data: data) { Image(nsImage: image).resizable().scaledToFit() }
+        else { Image(systemName: "leaf").foregroundStyle(.secondary) }
+        #else
+        if let image = UIImage(data: data) { Image(uiImage: image).resizable().scaledToFit() }
+        else { Image(systemName: "leaf").foregroundStyle(.secondary) }
         #endif
     }
 }

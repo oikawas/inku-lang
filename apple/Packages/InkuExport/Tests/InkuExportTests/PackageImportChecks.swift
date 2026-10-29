@@ -7,13 +7,17 @@ import XCTest
 final class PackageImportChecks: XCTestCase, @unchecked Sendable {
     // Failure: reading a package changes its Unicode/source-u64 or locks, or silently accepts partial invalid definitions.
     func testPackageRoundTripKeepsExactSourceDefinitionsAndLocksAndRejectsPartialImports() throws {
-        let definition: ExactJSON = .object(["schema": .string("inku.macro-definition.v1"), "namespace": .string("Trace"),
-            "heading": .string("Mark"), "aliases": .array([.string("若葉")]), "version": .string("3.2.1"),
+        let definition: ExactJSON = .object(["schema": .string("inku.macro-definition.v2"), "namespace": .string("Trace"),
+            "id": .string("Mark"), "names": .object(["ja": .array([.string("若葉")]), "en": .array([.string("mark")])]), "kind": .string("scene"), "version": .string("3.2.1"),
             "parameters": .object([:]), "components": .object([:]), "body": .array([])])
         let source = "Trace.若葉を置く。\n注: e\u{301}\nseed: 18446744073709551615"
         var work = SavedWork(id: "package-round-trip", at: 1, input: "保存", score: "{}", svg: "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"2\" height=\"2\"/>")
         work.ddl = source; work.instructionLangResolved = "ja"
-        let bytes = try ExportService.ddl(ExportSource(work: work, pluginDefinitions: [definition], pluginSummaries: ["Unicode e\u{301}の定義"]))
+        let initial: ExactJSON = .object(["schema": .string("inku.ddl-export.v2"), "ddl": .string(source), "language": .string("ja"),
+                                         "plugins": .array([.object(["definition": definition, "note": .string("Unicode e\u{301}の定義")])])])
+        let initialImport = try DDLPackageImport.parse(initial.data)
+        let initialLocks = try XCTUnwrap(try initialImport.resolveCatalog(language: "ja")["locks"].array)
+        let bytes = try ExportService.ddl(ExportSource(work: work, pluginDefinitions: [definition], pluginSummaries: ["Unicode e\u{301}の定義"], pluginLocks: initialLocks))
         let imported = try DDLPackageImport.parse(bytes)
         XCTAssertEqual(Array(imported.source.utf8), Array(source.utf8))
         XCTAssertEqual(imported.plugins[0].definition.data, definition.data)
@@ -22,9 +26,10 @@ final class PackageImportChecks: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(locks.count, 1); XCTAssertEqual(locks[0]["version"].string, "3.2.1")
         XCTAssertFalse(try XCTUnwrap(locks[0]["digest"].string).isEmpty)
         var next = work; next.id = "second"
-        let readAgain = try DDLPackageImport.parse(ExportService.ddl(ExportSource(work: next, pluginDefinitions: imported.plugins.map(\.definition), pluginSummaries: imported.plugins.map(\.summary))))
+        let readAgain = try DDLPackageImport.parse(ExportService.ddl(ExportSource(work: next, pluginDefinitions: imported.plugins.map(\.definition), pluginSummaries: imported.plugins.map(\.summary), pluginLocks: locks)))
         XCTAssertEqual(try readAgain.resolveCatalog(language: "ja")["locks"], .array(locks))
         XCTAssertEqual(try DDLPackageImport.parse(Data("{\"other\":18446744073709551615}".utf8)).source, "{\"other\":18446744073709551615}")
+        XCTAssertThrowsError(try DDLPackageImport.parse(Data("{\"schema\":\"inku.ddl-export.v1\",\"ddl\":\"x\"}".utf8)))
         var envelope = try ExactJSON(data: bytes)
         envelope["plugins"] = .array((envelope["plugins"].array ?? []) + [.object(["definition": .object(["namespace": .string("bad")])])])
         XCTAssertThrowsError(try DDLPackageImport.parse(envelope.data))

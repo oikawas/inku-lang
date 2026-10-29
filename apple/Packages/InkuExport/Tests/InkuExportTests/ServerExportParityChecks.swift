@@ -39,12 +39,15 @@ final class ServerExportParityChecks: XCTestCase, @unchecked Sendable {
     func testDDLExportFollowsServer() throws {
         var work = SavedWork(id: "w", at: 1, input: "a", score: "{}", svg: "<svg/>")
         work.ddl = "地: 白\n[x.dot] 赤"; work.renderEngineVersion = "rust-1"; work.renderHash = "hash"
-        let good: ExactJSON = .object(["namespace": .string("x"), "heading": .string("dot")])
+        let good: ExactJSON = .object(["schema": .string("inku.macro-definition.v2"), "namespace": .string("Example"), "id": .string("Dot"),
+            "names": .object(["ja": .array([.string("点景")]), "en": .array([.string("dot")])]), "kind": .string("scene"), "version": .string("1.0.0"),
+            "parameters": .object([:]), "components": .object([:]), "body": .array([])])
         let bad: ExactJSON = .object(["namespace": .integer(1), "heading": .string("dot")])
-        let source = ExportSource(work: work, pluginDefinitions: [bad, good], pluginSummaries: ["bad", "good"], language: "ja")
+        let lock: ExactJSON = .object(["qualified_name": .string("Example.Dot"), "version": .string("1.0.0")])
+        let source = ExportSource(work: work, pluginDefinitions: [bad, good], pluginSummaries: ["bad", "good"], pluginLocks: [lock], language: "ja")
         let value = try ExactJSON(data: ExportService.ddl(source, buildNumber: "7"))
         XCTAssertEqual(value["exported_from"], .object(["build_number": .string("7"), "render_engine_version": .string("rust-1")]))
-        XCTAssertEqual(value["plugins"], .array([.object(["definition": good, "summary": .string("good")])]))
+        XCTAssertEqual(value["plugins"], .array([.object(["definition": good, "note": .string("good")])]))
         let unset = try ExactJSON(data: ExportService.ddl(source, buildNumber: nil))
         XCTAssertEqual(unset["exported_from"]["build_number"], .null)
     }

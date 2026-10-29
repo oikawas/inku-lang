@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
 import ImageIO
+import InkuCore
 import InkuHost
 import InkuPersistence
 import UniformTypeIdentifiers
@@ -11,11 +12,12 @@ public struct ExportSource: Sendable {
     public let profiles: [String: String]
     public let pluginDefinitions: [ExactJSON]
     public let pluginSummaries: [String]
+    public let pluginLocks: [ExactJSON]
     public let language: String
 
-    public init(work: SavedWork, profiles: [String: String] = [:], pluginDefinitions: [ExactJSON] = [], pluginSummaries: [String] = [], language: String? = nil) {
+    public init(work: SavedWork, profiles: [String: String] = [:], pluginDefinitions: [ExactJSON] = [], pluginSummaries: [String] = [], pluginLocks: [ExactJSON] = [], language: String? = nil) {
         self.work = work; self.profiles = profiles
-        self.pluginDefinitions = pluginDefinitions; self.pluginSummaries = pluginSummaries
+        self.pluginDefinitions = pluginDefinitions; self.pluginSummaries = pluginSummaries; self.pluginLocks = pluginLocks
         self.language = work.instructionLangResolved ?? language ?? "ja"
     }
 
@@ -196,18 +198,25 @@ public enum ExportService {
     /// Server ddl_export.build_ddl_export: a definition without a string namespace and heading is skipped.
     public static func ddl(_ source: ExportSource, buildNumber: String? = applicationBuildNumber) throws -> Data {
         guard let text = source.work.ddl, DDLSource.hasBody(text) else { throw ExportFailure("この保存作品には書き出せるDDLがありません。") }
+        let candidates: [ExactJSON] = source.pluginDefinitions.enumerated().map { index, definition in
+            .object(["source_id": .string("export:\(index)"), "definition_json": .string(definition.text),
+                     "summary": .string(index < source.pluginSummaries.count ? source.pluginSummaries[index] : "")])
+        }
+        let request: ExactJSON = .object(["maximum_entries": .integer(max(1, candidates.count)), "language": .string(source.language),
+            "canonical": .array(candidates), "legacy": .array([]), "bundled_packages": .array([])])
+        let catalog = try ExactJSON(data: InkuCore.resolveMacroCatalog(request.data))
+        guard catalog["error"] == .null else { throw ExportFailure("保存されたプラグイン定義を確認できませんでした。") }
         var plugins: [ExactJSON] = []; var seen = Set<String>()
-        for (index, definition) in source.pluginDefinitions.enumerated() {
-            guard let namespace = definition["namespace"].string, let heading = definition["heading"].string else { continue }
-            let name = namespace + "." + heading
-            let visible = [name] + (definition["aliases"].array ?? []).compactMap { $0.string.map { namespace + "." + $0 } }
-            if !seen.contains(name), visible.contains(where: text.contains) {
-                seen.insert(name)
-                plugins.append(.object(["definition": definition, "summary": .string(index < source.pluginSummaries.count ? source.pluginSummaries[index] : "")]))
-            }
+        for entry in catalog["entries"].array ?? [] {
+            guard let name = entry["qualified_name"].string, let version = entry["version"].string,
+                  source.pluginLocks.contains(where: { $0["qualified_name"].string == name && $0["version"].string == version }),
+                  seen.insert(name + "\u{0}" + version).inserted,
+                  let sourceID = entry["source_id"].string, sourceID.hasPrefix("export:"),
+                  let index = Int(sourceID.dropFirst(7)), source.pluginDefinitions.indices.contains(index) else { continue }
+            plugins.append(.object(["definition": source.pluginDefinitions[index], "note": .string(index < source.pluginSummaries.count ? source.pluginSummaries[index] : "")]))
         }
         return ExactJSON.object([
-            "schema": .string("inku.ddl-export.v1"), "language": .string(source.language),
+            "schema": .string("inku.ddl-export.v2"), "language": .string(source.language),
             "ddl": .string(text), "plugins": .array(plugins),
             "exported_from": .object(["build_number": .optional(buildNumber), "render_engine_version": .optional(source.work.renderEngineVersion)])
         ]).data

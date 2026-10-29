@@ -2,7 +2,7 @@ import Foundation
 import InkuHost
 
 /// Web `ddlCompletions`: the saijiki words of the instruction language and the macro names as they are shown
-/// (`pluginDisplayName`: the Japanese alias for Japanese DDL, the qualified name otherwise).
+/// Plugin suggestions insert the primary name in the instruction language, with braces.
 public struct DdlCompletions {
     public let japanese: [String]
     public let english: [String]

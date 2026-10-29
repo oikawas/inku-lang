@@ -321,10 +321,10 @@ At the author's instruction (bringing in the differences from Server Build 1190,
 
 At the author's instruction (bringing in the differences from Server Build 1190, stage C-3). The source is `ddlCompletions` in Web `features/ddl-editor/codemirror.ts`.
 
-- The instruction box and the editor list, in the macOS completion list, the candidates that start with the word before the caret (ignoring case). The candidates are the saijiki words of the instruction language (`AppModel.instructionLanguage(for:)`) and the macro names (the first alias for Japanese, the qualified name otherwise, as Web `pluginDisplayName`), for enabled plugins only.
+- The instruction box and editor offer saijiki words and enabled plugin names in the instruction language (`AppModel.instructionLanguage(for:)`). Plugin completion matches primary and other names and inserts the primary name with braces.
 - The list opens only as the author types, and changes nothing until an item is picked (none is chosen at first). Inserting a chosen word, a followed name or text restored from outside opens nothing. Nothing is offered while read-only, composing, or inside an open range's numbers.
 - The word is the longest run before the caret, with no space, punctuation or symbol, that starts some candidate; it never starts inside a Latin word (`.` and `_` belong to the word). Japanese has no word breaks, so the longest matching tail is taken. The Web ranks by fuzzy match; Swift matches word starts only.
-- Checks: AppCheck `--ddl-box-only` (with the real saijiki and macros: Japanese, English, alias and qualified names are offered; nothing inside a Latin word, after a space or in an open range).
+- Checks: AppCheck `--ddl-box-only` uses the real saijiki and plugins; UI tests cover brace completion and alternate names.
 
 ## 2026-10-13 Fold numeric ranges in the instructions, frame them over the work and retype them
 

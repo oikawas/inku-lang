@@ -8,6 +8,27 @@ import org.junit.Test
 
 class DdlRangeEditorTest {
     @Test
+    fun pluginCompletionMatchesEitherLanguageWithCompatibilityNormalizationAndConsumesOneCloser() {
+        val entry = org.json.JSONObject()
+            .put("surface_ja", org.json.JSONArray().put("若葉").put("わかば").put("ワカバ"))
+            .put("surface_en", org.json.JSONArray().put("young leaves"))
+        assertTrue(pluginCompletionMatches(entry, "ＹＯＵＮＧ"))
+        assertTrue(pluginCompletionMatches(entry, "ﾜｶﾊﾞ"))
+        assertTrue(pluginCompletionMatches(entry, "LeAvEs"))
+        assertFalse(pluginCompletionMatches(entry, "other"))
+        assertEquals(5, pluginCompletionEnd("{abc}.", 4))
+        assertEquals(5, pluginCompletionEnd("｛abc｝。", 4))
+        assertEquals(4, pluginCompletionEnd("{abc.", 4))
+        assertEquals(4, pluginCompletionEnd("{abc", 4))
+        val ja = app.inku.mobile.ui.i18n.InkuStringsJa
+        val en = app.inku.mobile.ui.i18n.InkuStringsEn
+        assertEquals("入っていない名前です。", ja.pluginEditorReason("plugin_name_mismatch", null, emptyList()))
+        assertEquals("This name is not installed.", en.pluginEditorReason("plugin_not_installed", null, emptyList()))
+        assertEquals("物の語", pluginKindLabel("object", ja))
+        assertEquals("Object word", pluginKindLabel("object", en))
+        assertEquals("Scene word", pluginKindLabel("scene", en))
+    }
+    @Test
     fun completionTagsKeepUtf16OffsetsRawClipboardAndImeAndOnlyEditedWordsHaveANote() {
         val ja = app.inku.mobile.ui.i18n.InkuStringsJa
         val en = app.inku.mobile.ui.i18n.InkuStringsEn

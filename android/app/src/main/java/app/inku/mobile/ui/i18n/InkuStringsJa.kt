@@ -661,14 +661,15 @@ object InkuStringsJa : InkuStrings {
     override val ddlExportWithPluginsNote = "DDLと、それが使うプラグインの定義。別の環境で読み込んでも同じ構図で描けます"
     override val bundledPluginsSubtitle = "無効にすると新しい作品で使われず、その語の文は理由を示して描かれません。保存済みの作品は自分の定義で描き直せます。"
     override val bundledPluginScene = "情景の語"
+    override val bundledPluginObject = "物の語"
     override fun bundledPluginExample(word: String) = "例文：｛$word｝。"
     override fun pluginEditorReason(reason: String, suggestion: String?, candidates: List<String>) = when (reason) {
         "plugin_disabled" -> "無効になっています。有効にすると描けます。"
-        "plugin_name_mismatch" -> suggestion?.let { "$it のことですか。" } ?: "この Server にない名前です。"
+        "plugin_name_mismatch" -> suggestion?.let { "$it のことですか。" } ?: "入っていない名前です。"
         "plugin_name_ambiguous" -> "複数の語に当たります：${candidates.joinToString("、")}。"
         "plugin_version_mismatch" -> "作品に保存された版と一致しません。"
         "plugin_count_out_of_range" -> "数がこの語の受けられる範囲の外です。"
-        else -> "この Server にない名前です。"
+        else -> "入っていない名前です。"
     }
     override val pluginOffersTitle = "提示したプラグイン"
     override val pluginOffersNone = "提示なし"

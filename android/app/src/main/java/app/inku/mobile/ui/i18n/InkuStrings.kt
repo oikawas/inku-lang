@@ -545,6 +545,7 @@ interface InkuStrings {
     val ddlExportWithPluginsNote: String
     val bundledPluginsSubtitle: String
     val bundledPluginScene: String
+    val bundledPluginObject: String
     fun bundledPluginExample(word: String): String
     fun pluginEditorReason(reason: String, suggestion: String?, candidates: List<String>): String
     val pluginOffersTitle: String

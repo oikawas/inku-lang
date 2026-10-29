@@ -10,7 +10,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ### 2026-10-29 — Android plugin v2
 
-Migrate saved plugin spellings at startup, show the bundled words and saved offers, add editor completion and diagnostics, and carry locked definitions in DDL v2 exports.
+Migrate saved plugin spellings at startup, show the bundled words and saved offers, add editor completion and diagnostics, and carry locked definitions in DDL v2 exports. Completion matches normalized names in both languages, and settings shows each word's kind.
 
 ### 2026-10-29 — Plugin names in the editor and Saijiki
 

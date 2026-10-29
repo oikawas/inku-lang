@@ -1053,18 +1053,17 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
                     val before = editorValue.text.substring(0, cursor)
                     val open = maxOf(before.lastIndexOf('｛'), before.lastIndexOf('{'))
                     if (open >= 0 && before.substring(open + 1).none { it in "｝}\n\r" }) {
-                        val query = before.substring(open + 1).trim()
+                        val query = before.substring(open + 1)
                         val field = if (pluginLanguage == "en") "written_en" else "written_ja"
-                        val surface = if (pluginLanguage == "en") "surface_en" else "surface_ja"
-                        val matches = pluginEntries.filter { entry ->
-                            val aliases = entry.optJSONArray(surface) ?: org.json.JSONArray()
-                            (0 until aliases.length()).any { aliases.optString(it).contains(query, ignoreCase = true) }
-                        }
+                        val matches = pluginEntries.filter { entry -> pluginCompletionMatches(entry, query) }
                         if (matches.isNotEmpty()) WrapRow {
                             matches.forEach { entry ->
                                 val written = entry.optString(field)
                                 SecondarySmallButton(written, onClick = {
-                                    editorState.edit { replace(open, cursor, written); selection = TextRange(open + written.length) }
+                                    editorState.edit {
+                                        val end = pluginCompletionEnd(asCharSequence().toString(), cursor)
+                                        replace(open, end, written); selection = TextRange(open + written.length)
+                                    }
                                 }, enabled = !state.isDrawing)
                             }
                         }
@@ -5011,7 +5010,7 @@ private fun BundledPluginDetails(english: Boolean) {
             Column {
                 Text("｛$mainJa｝ / {$mainEn}", fontWeight = FontWeight.SemiBold)
                 if (aliases.isNotEmpty()) Text(aliases.joinToString(" / "), style = MaterialTheme.typography.bodySmall)
-                Text(S.bundledPluginScene, style = MaterialTheme.typography.bodySmall)
+                Text(pluginKindLabel(definition.optString("kind"), S), style = MaterialTheme.typography.bodySmall)
                 Text(word.optString(if (english) "note_en" else "note_ja"), style = MaterialTheme.typography.bodySmall)
                 Text(S.bundledPluginExample(if (english) mainEn else mainJa), style = MaterialTheme.typography.bodySmall)
             }

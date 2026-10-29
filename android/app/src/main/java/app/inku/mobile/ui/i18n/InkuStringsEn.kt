@@ -689,14 +689,15 @@ object InkuStringsEn : InkuStrings {
     override val ddlExportWithPluginsNote = "The DDL and the plugin definitions it uses; another setup that reads it draws the same composition"
     override val bundledPluginsSubtitle = "When disabled, new works do not use it, and sentences naming its words are not drawn, with the reason shown. Saved works redraw with their own definitions."
     override val bundledPluginScene = "Scene word"
+    override val bundledPluginObject = "Object word"
     override fun bundledPluginExample(word: String) = "Example: {$word}."
     override fun pluginEditorReason(reason: String, suggestion: String?, candidates: List<String>) = when (reason) {
         "plugin_disabled" -> "This word is disabled. Enable it to draw it."
-        "plugin_name_mismatch" -> suggestion?.let { "Did you mean $it?" } ?: "This name is not on this Server."
+        "plugin_name_mismatch" -> suggestion?.let { "Did you mean $it?" } ?: "This name is not installed."
         "plugin_name_ambiguous" -> "This name matches multiple words: ${candidates.joinToString(", ")}."
         "plugin_version_mismatch" -> "This version differs from the one saved with the work."
         "plugin_count_out_of_range" -> "The count is outside the range this word accepts."
-        else -> "This name is not on this Server."
+        else -> "This name is not installed."
     }
     override val pluginOffersTitle = "Offered plugins"
     override val pluginOffersNone = "None offered"

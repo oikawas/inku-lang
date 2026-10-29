@@ -113,6 +113,7 @@ public struct ContentView: View {
                 .opacity(presentation ? 0 : 1)
                 .accessibilityHidden(presentation || ui.libraryOpen || ui.settingsOpen)
                 .allowsHitTesting(!presentation && !ui.libraryOpen && !ui.settingsOpen)
+                .environment(\.inkuTooltipsCovered, presentation || ui.libraryOpen || ui.settingsOpen)
             if ui.libraryOpen && !presentation { libraryOverlay }
             if ui.settingsOpen && !presentation { settingsOverlay }
             if presentation { presentationView }
@@ -168,7 +169,7 @@ public struct ContentView: View {
         }
         .background {
             // Esc leaves the canvas full screen wherever the keyboard is (the viewer takes it first otherwise).
-            if ui.canvasFullScreen {
+            if ui.canvasFullScreen && !ui.libraryOpen && !ui.settingsOpen {
                 Button("") { ui.exitCanvasFullScreen() }
                     .keyboardShortcut(.escape, modifiers: [])
                     .frame(width: 0, height: 0).opacity(0).accessibilityHidden(true)

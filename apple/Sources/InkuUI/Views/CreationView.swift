@@ -65,6 +65,7 @@ struct CreationView: View {
     @Environment(\.inkuWindowSize) private var windowSize
     private var isBatch: Bool { automation.workspaceInputMode == "batch" }
     private var isImage: Bool { automation.workspaceInputMode == "image" }
+    private var workspaceCovered: Bool { ui.settingsOpen || ui.libraryOpen }
     private var batchWork: SavedWork? { batchWorkspace.pinnedWork ?? (batchWorkspace.followsLatest ? automation.observedWork : nil) }
     private var usesBatchWork: Bool { isBatch && batchWork != nil }
     private var workspaceWork: SavedWork? { usesBatchWork ? batchWork : model.displayedWork }
@@ -650,7 +651,7 @@ struct CreationView: View {
                 }
                 .buttonStyle(InkuPaintButtonStyle())
                 .keyboardShortcut(.return, modifiers: .command)
-                .disabled(!model.canForkDescription || automation.isOccupied)
+                .disabled(!model.canForkDescription || automation.isOccupied || workspaceCovered)
                 .inkuTooltip(display.tooltip("この記述をそのまま使って、新しい作品として描き直します。", serverKey: "tooltipForkDescription"))
             } else {
                 Button { batchWorkspace.showHistory(); Task { await model.generateDescription() } } label: {
@@ -658,7 +659,7 @@ struct CreationView: View {
                 }
                 .buttonStyle(InkuPaintButtonStyle())
                 .keyboardShortcut(.return, modifiers: .command)
-                .disabled(!model.canGenerateDescription || automation.isOccupied)
+                .disabled(!model.canGenerateDescription || automation.isOccupied || workspaceCovered)
                 .inkuTooltip(tip("入力と次の生成条件から作品を描きます。"))
             }
         }
@@ -667,7 +668,7 @@ struct CreationView: View {
     /// Web RunStatus.svelte: mascot, the stage and its provider facts, and the stop button, in one bordered box.
     private func runStatus(label: String, onStop: @escaping () -> Void, stopping: Bool) -> some View {
         RunStatusView(display: display, label: label, stopping: stopping, stopTooltip: tip("実行中の描画を停止します。"),
-                      stopsWithEscape: true, onStop: onStop) { ProviderProgressView(model: model) }
+                      stopsWithEscape: !workspaceCovered, onStop: onStop) { ProviderProgressView(model: model) }
     }
 
     /// The native status line and the backup and result-log reports, which the Web has no place for.

@@ -87,6 +87,7 @@ struct InkuTextEditor: View {
     var onRangeStatus: ((RangeEditorStatus) -> Void)? = nil
     /// Web `ddlCompletions`: saijiki words and macro names offered while typing; nil offers nothing.
     var completions: DdlCompletions? = nil
+    var onCharacterHover: ((Int?) -> Void)? = nil
     @Environment(DisplaySettings.self) private var display
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.colorScheme) private var colorScheme
@@ -96,7 +97,7 @@ struct InkuTextEditor: View {
                                accessibilityLabel: accessibilityLabel,
                                textScale: display.preferences.textScale, colorScheme: colorScheme,
                                style: style, marks: marks, insertion: insertion,
-                               rangeTable: rangeTable, onRangeStatus: onRangeStatus, completions: completions)
+                               rangeTable: rangeTable, onRangeStatus: onRangeStatus, completions: completions, onCharacterHover: onCharacterHover)
             .clipped()
     }
 }
@@ -170,6 +171,7 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
     var rangeTable: [CompositionRanges.Entry]? = nil
     var onRangeStatus: ((RangeEditorStatus) -> Void)? = nil
     var completions: DdlCompletions? = nil
+    var onCharacterHover: ((Int?) -> Void)? = nil
 
     func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
 
@@ -264,6 +266,7 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
         /// Set by the author's own typing; a chosen word, a followed name or a restored text offers nothing.
         private var typedInsertion = false
         private var programmaticEdit = false
+        private var completionValues: [String: String] = [:]
 
         init(text: Binding<String>) { self.text = text }
 
@@ -294,6 +297,7 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
             editor?.onFocusChanged = nil
             editor?.onHover = nil
             editor?.completionRange = nil
+            editor?.normalizeCompletion = nil
             editor = nil
             scroll = nil
             ruler = nil
@@ -309,6 +313,7 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
             if (settings.completions == nil) != (editor.completionRange == nil) {
                 editor.completionRange = settings.completions == nil ? nil : { [weak self] in self?.completionMatch()?.range }
             }
+            editor.normalizeCompletion = { [weak self] value in self?.completionValues[value] ?? value }
             scroll.appearance = NSAppearance(named: settings.colorScheme == .dark ? .darkAqua : .aqua)
             if editor.hasMarkedText() {
                 pendingExternalText = source == editor.string ? nil : source
@@ -418,6 +423,7 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
         }
 
         private func hover(at index: Int?) {
+            settings?.onCharacterHover?(index)
             let start = index.flatMap { index in
                 rangeState.ranges.first { range in rangeState.names.contains { NSLocationInRange(index, $0) && $0.location >= range.nameStart && NSMaxRange($0) <= range.nameEnd } }?.start
             }
@@ -471,7 +477,7 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
             let selection = editor.selectedRange()
             guard selection.length == 0 else { return nil }
             let body = rangeState.active.map { NSRange(location: $0.bodyStart, length: $0.bodyEnd - $0.bodyStart) }
-            return DdlCompletions.match(text: editor.string, caret: selection.location, words: completions.words(for: editor.string), excluded: body)
+            return completions.match(text: editor.string, caret: selection.location, excluded: body)
         }
 
         /// Web `activateOnTyping`: the list opens as the author types a word some candidate starts with. No item is
@@ -491,7 +497,13 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
             guard settings?.completions != nil else { return words }
             guard let match = completionMatch(), match.range == charRange else { return [] }
             index?.pointee = -1
-            return match.items
+            guard let editor, let completions = settings?.completions else { return match.items }
+            completionValues.removeAll()
+            return match.items.map { item in
+                let label = completions.presentation(for: item, text: editor.string)
+                completionValues[label] = item
+                return label
+            }
         }
 
         func textDidEndEditing(_ notification: Notification) { applyDeferredUpdates() }
@@ -583,6 +595,7 @@ private final class BatchEditorTextView: NSTextView {
     private var hoverArea: NSTrackingArea?
     /// The word the completion list replaces; nil leaves completion off (the system's word range is not used).
     var completionRange: (() -> NSRange?)?
+    var normalizeCompletion: ((String) -> String)?
     /// True while the completion list writes its candidate into the text.
     private(set) var completing = false
     override var rangeForUserCompletion: NSRange {
@@ -592,7 +605,7 @@ private final class BatchEditorTextView: NSTextView {
     override func insertCompletion(_ word: String, forPartialWordRange charRange: NSRange, movement: Int, isFinal flag: Bool) {
         completing = true
         defer { completing = false }
-        super.insertCompletion(word, forPartialWordRange: charRange, movement: movement, isFinal: flag)
+        super.insertCompletion(normalizeCompletion?(word) ?? word, forPartialWordRange: charRange, movement: movement, isFinal: flag)
     }
     override func becomeFirstResponder() -> Bool {
         let became = super.becomeFirstResponder()
@@ -762,6 +775,7 @@ private struct BatchNativeInputEditor: UIViewRepresentable {
     var rangeTable: [CompositionRanges.Entry]? = nil
     var onRangeStatus: ((RangeEditorStatus) -> Void)? = nil
     var completions: DdlCompletions? = nil
+    var onCharacterHover: ((Int?) -> Void)? = nil
 
     func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
     func makeUIView(context: Context) -> BatchIOSTextView {

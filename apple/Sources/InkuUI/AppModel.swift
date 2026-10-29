@@ -234,15 +234,52 @@ public final class AppModel {
 
     public var sourceLocked: Bool { authoringAuthority == "ddl_authoritative" }
     public var developerModeEnabled: Bool { ProviderObservationPolicy.developerModeEnabled }
-    /// Names actually pinned to the visible authoring document, independent of next-work plugin preferences.
-    public var authoringMacroNames: [String] {
-        guard let data = currentView?.configurationJSON ?? selectedContext?.configuration,
-              let configuration = try? ExactJSON(data: data) else { return importedMacroNames }
-        let names = (configuration["definitions"].array ?? []).flatMap { definition -> [String] in
-            guard let namespace = definition["namespace"].string, let heading = definition["heading"].string else { return [] }
-            return ([heading] + (definition["aliases"].array ?? []).compactMap(\.string)).map { namespace + "." + $0 }
+
+    func pluginCalls(source: String, workID: String? = nil) async -> [PluginCall] {
+        guard let bootstrap else { return [] }
+        let language = instructionLanguage(for: source)
+        let disabledPackages = settings.plugins?.disabledPackageIDs ?? []
+        let disabledWords = bootstrap.pluginWords.filter { $0.packageID.map(disabledPackages.contains) ?? false }
+        let disabledIDs = disabledWords.map(\.id) + Array(disabledPackages)
+        let names: [ExactJSON] = bootstrap.pluginWords.flatMap { word in
+            (word.japanese + word.english).map { name in
+                .object(["name": .string(name), "qualified_name": .string(word.id),
+                         "enabled": .bool(!(word.packageID.map(disabledPackages.contains) ?? false))])
+            }
         }
-        return Array(Set(names + importedMacroNames)).sorted()
+        let config: ExactJSON
+        let locks: ExactJSON
+        let workContext: SavedAuthoringContext?
+        if let workID, let host { workContext = try? await host.savedAuthoringContext(workID: workID) }
+        else { workContext = selectedContext }
+        let current = workID == nil ? currentView : nil
+        if let configData = current?.configurationJSON ?? workContext?.configuration,
+           let documentData = current?.documentJSON ?? workContext?.document,
+           let savedConfig = try? ExactJSON(data: configData), let document = try? ExactJSON(data: documentData) {
+            config = savedConfig
+            locks = document["macro_locks"].array == nil ? .array([]) : document["macro_locks"]
+        } else {
+            guard let catalog = try? bootstrap.macroCatalogValue(language: language, settings: settings, importedPlugins: importedDDL?.plugins ?? []) else { return [] }
+            let entries = catalog["entries"].array ?? []
+            config = .object(["definitions": .array(entries.map { $0["definition"] }), "macro_summaries": .array(entries.map { $0["summary"] })])
+            locks = catalog["locks"]
+        }
+        let normalizedLocks = (locks.array ?? []).map { value -> ExactJSON in
+            var value = value
+            if let digest = value["digest"].string, !digest.hasPrefix("sha256:") { value["digest"] = .string("sha256:" + digest) }
+            return value
+        }
+        let enabled = normalizedLocks.compactMap { $0["qualified_name"].string }
+        let request: ExactJSON = .object(["source": .string(source), "language": .string(language),
+            "definitions": config["definitions"].array == nil ? .array([]) : config["definitions"],
+            "summaries": config["macro_summaries"].array == nil ? .array([]) : config["macro_summaries"],
+            "locks": .array(normalizedLocks), "compiler": config["compiler"], "enabled": .array(enabled.map { .string($0) }),
+            "disabled": .array(disabledIDs.map { .string($0) }), "plugin_names": .array(names)])
+        let bytes = request.data
+        let answer = await Task.detached { InkuCore.pluginCalls(bytes) }.value
+        guard !Task.isCancelled, let result = try? ExactJSON(data: answer), result["schema"].string == "inku.plugin-calls.v1" else { return [] }
+        let entries = result["entries"].array ?? []
+        return (result["calls"].array ?? []).compactMap { PluginCall($0, source: source, entries: entries) }
     }
     public var displayedWork: SavedWork? { previewWork ?? selectedWork }
     public var isPreview: Bool { previewWork != nil }
@@ -2465,7 +2502,7 @@ public final class AppModel {
                                    chatGPTCode: chatGPTFailureCodes[view.executionID], copy: { key, fallback in self.display.webCopy(key, fallback) }) else { return nil }
         if let delivery = view.deliveryJSON, let document = try? ExactJSON(data: delivery),
            ["upstream_diagnostics", "downstream_diagnostics", "resource_omissions", "relation_omissions", "render_warnings", "catalog_diagnostics"].contains(where: { !(document[$0].array ?? []).isEmpty }) {
-            return text + "\n" + PipelineDiagnosticText.formatDocument(String(decoding: delivery, as: UTF8.self), display: display)
+            return text + "\n" + PipelineDiagnosticText.formatDocument(String(decoding: delivery, as: UTF8.self), display: display, pluginWords: pluginWords)
         }
         return text
     }
@@ -2543,7 +2580,8 @@ extension AppModel {
 
     /// Web `ddlCompletions`: the enabled saijiki words and macro names, in the language the instructions read in.
     public var ddlCompletions: DdlCompletions {
-        DdlCompletions(saijiki: saijiki, plugins: pluginWords) { [weak self] text in self?.instructionLanguage(for: text) ?? "ja" }
+        let disabled = settings.plugins?.disabledPackageIDs ?? []
+        return DdlCompletions(saijiki: saijiki, plugins: pluginWords.filter { $0.packageID.map { !disabled.contains($0) } ?? true }, uiLanguage: display.preferences.language) { [weak self] text in self?.instructionLanguage(for: text) ?? "ja" }
     }
 
     private func chooseCanvasFit(source: String, recordedWork: SavedWork? = nil, paperID: String,

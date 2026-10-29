@@ -8,7 +8,9 @@ struct BatchObservationCards: View {
     @Bindable var model: AppModel
     @Bindable var automation: AutomationModel
     @State private var metrics: [ProviderAttemptMetric] = []
-    private var highlighter: DdlHighlighter { DdlHighlighter(saijiki: model.saijiki, plugins: PluginNameIndex(words: model.pluginWords)) }
+    @State private var pluginCalls: [PluginCall] = []
+    @State private var pluginSource = ""
+    private var highlighter: DdlHighlighter { DdlHighlighter(saijiki: model.saijiki, calls: pluginSource == work?.ddl ? pluginCalls : []) }
 
     init(model: AppModel, automation: AutomationModel) {
         self.model = model
@@ -54,6 +56,14 @@ struct BatchObservationCards: View {
             let information = try? await model.savedGenerationInformation(work: work)
             guard !Task.isCancelled else { return }
             metrics = information?.metrics ?? []
+        }
+        .task(id: work?.ddl) {
+            guard let work, let source = work.ddl else { pluginCalls = []; pluginSource = ""; return }
+            try? await Task.sleep(for: .milliseconds(180))
+            guard !Task.isCancelled else { return }
+            let calls = await model.pluginCalls(source: source, workID: work.id)
+            guard !Task.isCancelled, self.work?.ddl == source else { return }
+            pluginCalls = calls; pluginSource = source
         }
     }
 

@@ -124,7 +124,7 @@ struct CreationWorkInfoView: View {
                     }
                 }
                 if let data = information?.context?.descriptionDDL, let record = try? ExactJSON(data: data) {
-                    ReadDrawInfoView(record: record, display: model.display)
+                    ReadDrawInfoView(record: record, display: model.display, pluginOffers: information?.pluginOffers(japanese: model.display.preferences.language != "en") ?? [])
                 }
                 if information?.context?.descriptionDDL == nil && (work.sketchGrain != nil || work.sketchState != nil) {
                     group(information?.context?.descriptionDDL != nil ? model.display.label("写生（読み）", "Sketch (reading)") : copy("sketchLabel", "写生")) {
@@ -180,6 +180,8 @@ struct CreationWorkInfoView: View {
                     if let line = provenance?.batchLineNumber { row(copy("provenanceLabelBatchLine", "バッチ行番号"), String(line), hint: "provenanceHintBatchLine") }
                 }
                 group(copy("provenanceSectionRun", "実行")) {
+                    let offers = information?.pluginOffers(japanese: model.display.preferences.language != "en") ?? []
+                    if !offers.isEmpty { row(model.display.localized("提示したプラグイン"), offers.joined(separator: "\n"), hint: "provenanceHintPluginOffers") }
                     row(model.display.localized("作成日"), Date(timeIntervalSince1970: Double(work.at) / 1000).formatted(date: .numeric, time: .standard), hint: "provenanceHintCreated")
                     row(model.display.localized("処理時間"), work.elapsedMS.map { $0 > 0 ? String(format: "%.1fs", Double($0) / 1000) : copy("provenanceElapsedNotRecorded", "記録なし") }, hint: "provenanceHintElapsed")
                     row("tokens in / out", (information?.tokenTotal(input: true) ?? absent) + " / " + (information?.tokenTotal(input: false) ?? absent), hint: "provenanceHintTokens")

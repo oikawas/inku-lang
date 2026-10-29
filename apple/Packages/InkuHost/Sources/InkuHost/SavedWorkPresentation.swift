@@ -95,11 +95,7 @@ enum SavedPresentation {
             "resource_execution": metadata["resource_execution"],
         ])
         diagnostics = withRenderWarnings(diagnostics, metadata)
-        let names = (configuration["definitions"].array ?? []).flatMap { definition -> [ExactJSON] in
-            guard let namespace = definition["namespace"].string, let heading = definition["heading"].string else { return [] }
-            return ([heading] + (definition["aliases"].array?.compactMap(\.string) ?? []))
-                .map { .string(namespace + "." + $0) }
-        }
+        let names = (document["macro_locks"].array ?? []).compactMap { $0["qualified_name"].string }.map(ExactJSON.string)
         let pluginInput: ExactJSON = .object(["source": document["source"],
             "upstream_diagnostics": delivery["upstream_diagnostics"], "enabled": .array(names),
             "disabled": .array(disabledPluginNames.map(ExactJSON.string))])

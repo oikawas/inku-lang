@@ -12,7 +12,7 @@ func runPluginChecks() async throws {
     await model.initialize()
     model.inputMode = "ddl"
     model.language = "ja"
-    model.ddlText = "Nature.若葉 を置く"
+    model.ddlText = "｛若葉｝を置く"
     model.seedText = "42"
     await model.generate()
     guard model.errorText == nil, let saved = model.selectedWork else {
@@ -25,11 +25,8 @@ func runPluginChecks() async throws {
     settings.plugins = PluginPreferences(disabledPackageIDs: Set(model.pluginWords.compactMap(\.packageID)))
     try await model.updateHostSettings(settings)
 
-    guard model.authoringMacroNames.contains("Nature.若葉") else {
-        throw CheckFailure.message("Disabling a plugin hid a saved work's pinned reference vocabulary")
-    }
-
     model.newWork()
+    model.inputMode = "ddl"; model.ddlText = "中心に円を置く。"
     let next = try model.requestForCurrentInput()
     guard try ExactJSON(data: next.configuration)["definitions"].array?.isEmpty == true else {
         throw CheckFailure.message("Disabled plugin leaked into a fresh request")

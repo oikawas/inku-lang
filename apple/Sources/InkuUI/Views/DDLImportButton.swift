@@ -75,7 +75,7 @@ final class DDLImportController {
                     case "ddl_import_too_large": model.errorText = model.display.localized("DDLファイルは4MiB以下で読み込んでください。")
                     case "ddl_import_invalid_utf8": model.errorText = model.display.localized("UTF-8のテキストファイルを選択してください。")
                     case "ddl_export_without_ddl": model.errorText = model.display.localized("このDDL packageには指示書がありません。")
-                    case "ddl_export_requires_v2": model.errorText = model.display.localized("元の作品から v2 で書き出し直してください。")
+                    case "ddl_export_requires_v2": model.errorText = model.display.label("元の作品から v2 で書き出し直してください。", "Export the original work again in v2 format.")
                     case "ddl_export_too_many_plugins": model.errorText = model.display.localized("持ち込めるプラグイン定義は64件までです。")
                     case "ddl_export_invalid_plugin", "imported_macro_catalog_incomplete": model.errorText = model.display.localized("プラグイン定義を確認できませんでした。元の作品からもう一度書き出してください。")
                     case "authoring_busy", "ddl_import_busy_or_unavailable": model.errorText = model.display.localized("描画の準備が完了してから読み込んでください。")

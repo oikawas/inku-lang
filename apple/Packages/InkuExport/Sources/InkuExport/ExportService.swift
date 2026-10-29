@@ -198,21 +198,18 @@ public enum ExportService {
     /// Server ddl_export.build_ddl_export: a definition without a string namespace and heading is skipped.
     public static func ddl(_ source: ExportSource, buildNumber: String? = applicationBuildNumber) throws -> Data {
         guard let text = source.work.ddl, DDLSource.hasBody(text) else { throw ExportFailure("この保存作品には書き出せるDDLがありません。") }
-        let candidates: [ExactJSON] = source.pluginDefinitions.enumerated().map { index, definition in
-            .object(["source_id": .string("export:\(index)"), "definition_json": .string(definition.text),
-                     "summary": .string(index < source.pluginSummaries.count ? source.pluginSummaries[index] : "")])
-        }
-        let request: ExactJSON = .object(["maximum_entries": .integer(max(1, candidates.count)), "language": .string(source.language),
-            "canonical": .array(candidates), "legacy": .array([]), "bundled_packages": .array([])])
-        let catalog = try ExactJSON(data: InkuCore.resolveMacroCatalog(request.data))
-        guard catalog["error"] == .null else { throw ExportFailure("保存されたプラグイン定義を確認できませんでした。") }
         var plugins: [ExactJSON] = []; var seen = Set<String>()
-        for entry in catalog["entries"].array ?? [] {
+        for (index, definition) in source.pluginDefinitions.enumerated() {
+            let candidate: ExactJSON = .object(["source_id": .string("export:\(index)"), "definition_json": .string(definition.text),
+                "summary": .string(index < source.pluginSummaries.count ? source.pluginSummaries[index] : "")])
+            let request: ExactJSON = .object(["maximum_entries": .integer(1), "language": .string(source.language),
+                "canonical": .array([candidate]), "legacy": .array([]), "bundled_packages": .array([])])
+            let catalog = try ExactJSON(data: InkuCore.resolveMacroCatalog(request.data))
+            guard catalog["error"] == .null else { throw ExportFailure("保存されたプラグイン定義を確認できませんでした。") }
+            guard let entry = catalog["entries"].array?.first else { continue }
             guard let name = entry["qualified_name"].string, let version = entry["version"].string,
                   source.pluginLocks.contains(where: { $0["qualified_name"].string == name && $0["version"].string == version }),
-                  seen.insert(name + "\u{0}" + version).inserted,
-                  let sourceID = entry["source_id"].string, sourceID.hasPrefix("export:"),
-                  let index = Int(sourceID.dropFirst(7)), source.pluginDefinitions.indices.contains(index) else { continue }
+                  seen.insert(name + "\u{0}" + version).inserted else { continue }
             plugins.append(.object(["definition": source.pluginDefinitions[index], "note": .string(index < source.pluginSummaries.count ? source.pluginSummaries[index] : "")]))
         }
         return ExactJSON.object([

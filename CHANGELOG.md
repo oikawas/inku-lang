@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-29 — Move macOS plugins to v2
+
+Read bundled words and reference checks from the shared core, and show their braced names in the Saijiki, editor, and settings. DDL export uses v2 and the work's saved locks. Database migration v6 updates saved DDL on startup and keeps a pre-migration snapshot and refusal report.
+
 ### 2026-10-29 — Plugin names in the editor and Saijiki
 
 The editor marks braced words and their reasons from the shared core and offers name completion and previews. The Saijiki, settings, and check show names and kinds; each work records the words offered to AI.

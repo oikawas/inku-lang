@@ -14,6 +14,9 @@ func captureParityPrompt(_ action: ExactJSON) {
 struct AppCheck {
     @MainActor
     static func main() async throws {
+        if CommandLine.arguments.contains("--plugin-name-migration-only") {
+            try await runPluginNameMigrationChecks(); return
+        }
         if let index = CommandLine.arguments.firstIndex(of: "--read-and-draw-replay-only") {
             guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Expected temporary baseline database") }
             try await runReadAndDrawBaselineReplay(databaseURL: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return

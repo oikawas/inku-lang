@@ -5,6 +5,7 @@ import InkuHost
 struct ReadDrawInfoView: View {
     let record: ExactJSON
     let display: DisplaySettings
+    var pluginOffers: [String] = []
     private var ja: Bool { display.preferences.language != "en" }
     private func l(_ jaText: String, _ en: String) -> String { ja ? jaText : en }
     private var sep: String { ja ? "、" : ", " }
@@ -73,6 +74,7 @@ struct ReadDrawInfoView: View {
         let reviewed = rounds.contains { $0["stage"].string == "review_description_ddl" }
         let labels = record["source_labels"].array?.compactMap(\.string) ?? []
         VStack(alignment: .leading, spacing: 16) {
+            if !pluginOffers.isEmpty { row(l("提示したプラグイン", "Plugins offered"), pluginOffers.joined(separator: "\n"), "provenanceHintPluginOffers") }
             group(l("言葉で描く", "In words")) {
                 row(l("描き方", "Drawing"), l("言葉で描く", "In words"), "provenanceHintDrawRoute")
                 row(l("読み", "Reading"), reading, "provenanceHintReading")

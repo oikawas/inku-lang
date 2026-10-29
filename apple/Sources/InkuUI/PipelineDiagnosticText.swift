@@ -27,7 +27,7 @@ import InkuHost
     private static func copiedTemplate(_ key: String, _ fallback: String, _ args: [String], _ display: DisplaySettings) -> String {
         String(format: display.webCopy(key, fallback), arguments: args)
     }
-    static func format(_ value: ExactJSON, channel: String, display: DisplaySettings) -> String {
+    static func format(_ value: ExactJSON, channel: String, display: DisplaySettings, pluginWords: [PluginWord] = []) -> String {
         guard value.object != nil else { return display.webCopy("pipelineDiagnosticUnknown", "詳しい診断情報があります。") }
         if channel == "plugin" {
             let code = value["reason"].string ?? "plugin_not_installed", name = value["name"].string ?? ""
@@ -43,7 +43,11 @@ import InkuHost
         let name = reason(value)
         let fallback = display.label("理由: \(name)。", "Reason: \(name).")
         let reasonText = display.webCopy("diagnosticReason." + name, fallback)
-        if channel == "catalog" { return (value["qualified_name"].string.map { $0 + ": " } ?? "") + reasonText }
+        if channel == "catalog" {
+            let id = value["qualified_name"].string
+            let word = pluginWords.first { $0.id == id }
+            return (word.map { $0.displayName(language: display.preferences.language == "en" ? "en" : "ja") + ": " } ?? "") + reasonText
+        }
         var parts: [String] = []
         let span = value["span"].object != nil ? value["span"] : (value["owner"]["spans"].array?.first ?? .null)
         let owner = index(value["owner"].object != nil ? value["owner"] : value)
@@ -72,8 +76,8 @@ import InkuHost
         }
         return parts.joined(separator: " ")
     }
-    static func formatDocument(_ raw: String, display: DisplaySettings) -> String {
-        let lines = entries(raw).map { format($0.value, channel: $0.channel, display: display) }
+    static func formatDocument(_ raw: String, display: DisplaySettings, pluginWords: [PluginWord] = []) -> String {
+        let lines = entries(raw).map { format($0.value, channel: $0.channel, display: display, pluginWords: pluginWords) }
         return lines.isEmpty ? display.webCopy("pipelineDiagnosticUnknown", "詳しい診断情報があります。") : lines.joined(separator: "\n")
     }
     static func entries(_ raw: String) -> [(channel: String, value: ExactJSON)] {

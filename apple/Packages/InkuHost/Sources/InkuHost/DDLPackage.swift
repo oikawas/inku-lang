@@ -3,13 +3,13 @@ import InkuCore
 
 public struct ImportedMacroDefinition: Sendable, Equatable {
     public let definition: ExactJSON
-    public let summary: String
-    public init(definition: ExactJSON, summary: String) { self.definition = definition; self.summary = summary }
+    public let note: String
+    public init(definition: ExactJSON, note: String) { self.definition = definition; self.note = note }
 
     /// The shared catalog reads definition JSON as a string, retaining UInt64 lexemes.
     public func canonicalCandidate(index: Int) -> ExactJSON {
         .object(["source_id": .string("imported:\(index)"), "definition_json": .string(definition.text),
-                 "summary": .string(summary)])
+                 "summary": .string(note)])
     }
 }
 
@@ -21,15 +21,21 @@ public struct DDLPackageImport: Sendable, Equatable {
     public let language: String?
     public let plugins: [ImportedMacroDefinition]
     public var names: [String] {
-        guard let catalog = try? resolveCatalog(language: language ?? "ja") else { return [] }
+        let resolvedLanguage = language ?? InkuCore.resolveInstructionLanguage(text: source, requested: "auto", fallback: "ja") ?? "ja"
+        guard let catalog = try? resolveCatalog(language: resolvedLanguage) else { return [] }
+        let locks = (catalog["locks"].array ?? []).map { value -> ExactJSON in
+            var value = value
+            if let digest = value["digest"].string, !digest.hasPrefix("sha256:") { value["digest"] = .string("sha256:" + digest) }
+            return value
+        }
         let request: ExactJSON = .object([
-            "source": .string(source), "language": .string(language ?? "ja"),
+            "source": .string(source), "language": .string(resolvedLanguage),
             "definitions": .array(plugins.map(\.definition)),
-            "summaries": .array(plugins.map { .string($0.summary) }),
-            "locks": catalog["locks"], "compiler": .null
+            "summaries": .array(plugins.map { .string($0.note) }),
+            "locks": .array(locks), "compiler": .null
         ])
         guard let answer = try? ExactJSON(data: InkuCore.pluginCalls(request.data)) else { return [] }
-        return (answer["entries"].array ?? []).compactMap { $0[language == "en" ? "written_en" : "written_ja"].string }
+        return (answer["entries"].array ?? []).compactMap { $0[resolvedLanguage == "en" ? "written_en" : "written_ja"].string }
     }
 
     public static func read(url: URL) throws -> Self {
@@ -65,7 +71,7 @@ public struct DDLPackageImport: Sendable, Equatable {
         guard items.count <= maximumPlugins else { throw HostError("ddl_export_too_many_plugins") }
         let plugins = try items.map { item in
             guard item["definition"].object != nil else { throw HostError("ddl_export_invalid_plugin") }
-            return ImportedMacroDefinition(definition: item["definition"], summary: item["note"].string ?? "")
+            return ImportedMacroDefinition(definition: item["definition"], note: item["note"].string ?? "")
         }
         let language = file["language"].string.flatMap { ["ja", "en"].contains($0) ? $0 : nil }
         let value = Self(source: source, language: language, plugins: plugins)

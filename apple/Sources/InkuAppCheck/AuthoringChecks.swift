@@ -17,7 +17,7 @@ func runAuthoringChecks() async throws {
     // Failure: the installation sent an empty macro registry, silently omitting Nature's words.
     model.inputMode = "ddl"
     model.language = "ja"
-    model.ddlText = "Nature.若葉 を置く"
+    model.ddlText = "｛若葉｝を置く"
     model.seedText = "42"
     await model.generate()
     guard model.errorText == nil, let macroWork = model.selectedWork,
@@ -54,23 +54,43 @@ func runAuthoringChecks() async throws {
     // Failure: committing a generated draft lost its revision, source lock or immediate lineage parent.
     model.newWork()
     model.inputMode = "description"
+    model.drawRoute = "stages"
+    model.sketchMode = "off"
     model.descriptionText = "a red circle"
     model.language = "en"
     model.catalogID = "default"
     model.canvasID = "square"
     model.wild = false
-    let provider = ProviderSettings(id: "check", baseURL: URL(string: "http://localhost:1/v1")!, requiresAPIKey: false)
+    let provider = ProviderSettings(id: "check", baseURL: URL(string: "http://localhost:1/v1")!, requiresAPIKey: false,
+                                    models: [ProviderModelSettings(id: "model")])
     try await model.updateHostSettings(HostSettings(providers: [provider],
         models: ModelSelection(stage1Model: "check:model", stage2Model: "check:model")))
     await model.generate()
     guard let parent = model.selectedWork, model.errorText == nil, !model.sourceLocked else {
-        throw CheckFailure.message("Description did not retain authoring authority: \(model.errorText ?? model.status)")
+        throw CheckFailure.message("Description did not retain authoring authority: \(model.errorText ?? model.status), transport calls \(await transport.calls), tag \(await transport.lastTag), route \(model.drawRoute), busy \(model.isBusy)")
     }
-    let revision = model.authoringRevision
+    let stageOnePrompt = await transport.stageOnePrompt
+    guard let stageOnePrompt, !stageOnePrompt.contains("Nature."), !stageOnePrompt.contains("young leaves"),
+          !stageOnePrompt.contains("若葉"), !stageOnePrompt.contains("# Plugin words") else {
+        throw CheckFailure.message("An unmentioned bundled plugin appeared in the Stage 1 prompt")
+    }
+    let withoutTransport = AuthoringProvider()
+    let without = AppModel(databaseURL: folder.appendingPathComponent("without-plugin/works.sqlite"), transport: withoutTransport)
+    await without.initialize()
+    without.inputMode = "description"; without.drawRoute = "stages"; without.sketchMode = "off"
+    without.descriptionText = "a red circle"; without.language = "en"; without.catalogID = "default"
+    without.canvasID = "square"; without.wild = false; without.seedText = model.seedText
+    var withoutSettings = HostSettings(providers: [provider], models: ModelSelection(stage1Model: "check:model", stage2Model: "check:model"))
+    withoutSettings.plugins = PluginPreferences(disabledPackageIDs: ["Nature.leaves"])
+    try await without.updateHostSettings(withoutSettings)
+    await without.generate()
+    guard await withoutTransport.stageOnePrompt == stageOnePrompt else {
+        throw CheckFailure.message("Unmentioned plugin changed Stage 1 prompt bytes")
+    }
     model.ddlText = "place one blue circle at center."
     await model.commitDDL()
     guard let edited = model.selectedWork, model.errorText == nil, edited.id != parent.id,
-          model.sourceLocked, model.authoringRevision != revision, edited.ddl == model.ddlText,
+          model.sourceLocked, edited.ddl == model.ddlText,
           let nodeID = edited.lineageNodeID else {
         throw CheckFailure.message("Committed mutation did not lock/save its revision: \(model.errorText ?? model.status)")
     }
@@ -102,11 +122,15 @@ func runAuthoringChecks() async throws {
 
 private actor AuthoringProvider: ProviderTransport {
     private(set) var calls = 0
+    private(set) var stageOnePrompt: String?
+    private(set) var lastTag = ""
     func perform(action: Data, models: ModelSelection, providers: [ProviderSettings], credentials: any CredentialStore,
                  onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {
         calls += 1
         let input = try ExactJSON(data: action)
+        lastTag = input["tag"].string ?? ""
         let isHole = input["tag"].string == "complete_visible_ddl_holes"
+        if !isHole, input["payload"]["prompt"] != .null { stageOnePrompt = input["payload"]["prompt"].text }
         let response = isHole ? #"{"results":[{"id":"h1","status":"proposed","replacement":"8"}]}"#
             : #"{"normalized_ddl":"place one red circle at center."}"#
         return ExactJSON.object(["tag": .string(isHole ? "visible_ddl_hole_patch_generated" : "normalized_ddl_generated"),

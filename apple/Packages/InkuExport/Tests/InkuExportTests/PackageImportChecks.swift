@@ -17,6 +17,13 @@ final class PackageImportChecks: XCTestCase, @unchecked Sendable {
                                          "plugins": .array([.object(["definition": definition, "note": .string("Unicode e\u{301}の定義")])])])
         let initialImport = try DDLPackageImport.parse(initial.data)
         let initialLocks = try XCTUnwrap(try initialImport.resolveCatalog(language: "ja")["locks"].array)
+        var older = definition
+        older["version"] = .string("2.0.0")
+        let olderFile: ExactJSON = .object(["schema": .string("inku.ddl-export.v2"), "ddl": .string(source), "language": .string("ja"),
+                                         "plugins": .array([.object(["definition": older, "note": .string("")])])])
+        let olderLocks = try XCTUnwrap(try DDLPackageImport.parse(olderFile.data).resolveCatalog(language: "ja")["locks"].array)
+        let multi = try ExactJSON(data: ExportService.ddl(ExportSource(work: work, pluginDefinitions: [definition, older], pluginSummaries: [], pluginLocks: initialLocks + olderLocks)))
+        XCTAssertEqual(multi["plugins"].array?.count, 2)
         let bytes = try ExportService.ddl(ExportSource(work: work, pluginDefinitions: [definition], pluginSummaries: ["Unicode e\u{301}の定義"], pluginLocks: initialLocks))
         let imported = try DDLPackageImport.parse(bytes)
         XCTAssertEqual(Array(imported.source.utf8), Array(source.utf8))
@@ -26,7 +33,7 @@ final class PackageImportChecks: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(locks.count, 1); XCTAssertEqual(locks[0]["version"].string, "3.2.1")
         XCTAssertFalse(try XCTUnwrap(locks[0]["digest"].string).isEmpty)
         var next = work; next.id = "second"
-        let readAgain = try DDLPackageImport.parse(ExportService.ddl(ExportSource(work: next, pluginDefinitions: imported.plugins.map(\.definition), pluginSummaries: imported.plugins.map(\.summary), pluginLocks: locks)))
+        let readAgain = try DDLPackageImport.parse(ExportService.ddl(ExportSource(work: next, pluginDefinitions: imported.plugins.map(\.definition), pluginSummaries: imported.plugins.map(\.note), pluginLocks: locks)))
         XCTAssertEqual(try readAgain.resolveCatalog(language: "ja")["locks"], .array(locks))
         XCTAssertEqual(try DDLPackageImport.parse(Data("{\"other\":18446744073709551615}".utf8)).source, "{\"other\":18446744073709551615}")
         XCTAssertThrowsError(try DDLPackageImport.parse(Data("{\"schema\":\"inku.ddl-export.v1\",\"ddl\":\"x\"}".utf8)))

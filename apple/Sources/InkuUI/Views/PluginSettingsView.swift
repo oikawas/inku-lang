@@ -89,7 +89,7 @@ struct PluginSettingsView: View {
                                         Text(word.displayName(language: "ja") + " / " + word.displayName(language: "en")).inkuFont(12, weight: .semibold)
                                         let names = Array(word.japanese.dropFirst()) + Array(word.english.dropFirst())
                                         if !names.isEmpty { Text(names.joined(separator: " / ")).inkuFont(12) }
-                                        Text(model.display.localized(word.kind == "object" ? "物の語" : "情景の語")).inkuFont(12)
+                                        Text(word.kind == "object" ? model.display.label("物の語", "Object word") : model.display.label("情景の語", "Scene word")).inkuFont(12)
                                         if word.kind == "object" {
                                             Text([word.aspect, word.counter].compactMap { $0 }.joined(separator: " / ")).inkuFont(12)
                                         }
@@ -149,7 +149,7 @@ struct PluginSettingsView: View {
                         Text("｛\(jaNames.first ?? "")｝ / {\(enNames.first ?? "")}").inkuFont(12, weight: .semibold)
                         let aliases = Array(jaNames.dropFirst()) + Array(enNames.dropFirst())
                         if !aliases.isEmpty { Text(aliases.joined(separator: ", ")).inkuFont(12) }
-                        Text(model.display.localized(word["kind"].string == "object" ? "物の語" : "情景の語")).inkuFont(12)
+                        Text(word["kind"].string == "object" ? model.display.label("物の語", "Object word") : model.display.label("情景の語", "Scene word")).inkuFont(12)
                         let note = word[japanese ? "note_ja" : "note_en"].string ?? ""
                         if !note.isEmpty { Text(note).inkuFont(12) }
                         Text(word[japanese ? "example_ja" : "example_en"].string ?? "").inkuFont(12)

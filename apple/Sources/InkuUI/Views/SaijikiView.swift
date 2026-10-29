@@ -259,8 +259,12 @@ public struct SaijikiView: View {
                 imageURL: nil, imageData: nil, insertable: !word.referenceOnly)
         case .plugin(let id):
             guard let word = model.pluginWords.first(where: { $0.id == id }) else { return nil }
+            let others = Array(word.japanese.dropFirst()) + Array(word.english.dropFirst())
+            let category = uiLanguage == "ja" ? (word.kind == "object" ? "物の語" : "情景の語") : (word.kind == "object" ? "Object word" : "Scene word")
+            let description = [others.isEmpty ? "" : (uiLanguage == "ja" ? "ほかの名：" : "Other names: ") + others.joined(separator: " / "),
+                               category, uiLanguage == "ja" ? word.note : word.englishNote ?? ""].filter { !$0.isEmpty }.joined(separator: "\n")
             return Preview(id: id, title: word.displayName(language: offeredLanguage),
-                effect: uiLanguage == "ja" ? word.note : word.englishNote ?? "",
+                effect: description,
                 example: (offeredLanguage == "ja" ? word.exampleJapanese : word.exampleEnglish)
                     ?? "",
                 svg: nil, imageURL: word.previewURL, imageData: word.previewData, insertable: word.packageID != nil)

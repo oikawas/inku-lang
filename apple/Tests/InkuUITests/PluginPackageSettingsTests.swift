@@ -20,6 +20,31 @@ import InkuHost
         await app.initialize()
         XCTAssertEqual(app.pluginWords.filter { $0.packageID == "Nature.leaves" }.count, 7)
         XCTAssertNotNil(app.pluginWords.first { $0.displayName(language: "ja") == "｛若葉｝" }?.previewData)
+        let typed = "｛わか"
+        let completion = app.ddlCompletions.match(text: typed, caret: (typed as NSString).length)
+        XCTAssertTrue(completion?.items.contains("｛若葉｝") == true)
+        for source in ["｛若葉｝。", "｛わかば｝。", "{young leaves}.", "Nature.YoungLeaves。"] {
+            let calls = await app.pluginCalls(source: source)
+            XCTAssertEqual(calls.first?.status, "resolved", source)
+        }
+        let mistyped = await app.pluginCalls(source: "｛若刃｝。")
+        XCTAssertEqual(mistyped.first?.status, "plugin_name_mismatch")
+        XCTAssertEqual(mistyped.first?.suggestion, "若葉")
+        for source in ["｛菖蒲｝。", "Nature.若葉。"] {
+            let calls = await app.pluginCalls(source: source)
+            XCTAssertEqual(calls.first?.status, "plugin_not_installed", source)
+        }
+        for source in ["{}", "｛ ｝", "{\"a\":1}"] {
+            let calls = await app.pluginCalls(source: source)
+            XCTAssertTrue(calls.isEmpty, source)
+        }
+        var host = await app.hostSettings()
+        host.plugins = PluginPreferences(disabledPackageIDs: ["Nature.leaves"])
+        try await app.updateHostSettings(host)
+        let disabledCalls = await app.pluginCalls(source: "｛若葉｝。")
+        XCTAssertEqual(disabledCalls.first?.status, "plugin_disabled")
+        host.plugins = PluginPreferences()
+        try await app.updateHostSettings(host)
         let settings = PluginSettingsModel()
         await settings.load(model: app)
         await settings.choose(file, model: app)
@@ -40,6 +65,14 @@ import InkuHost
         await settings.delete("Sky.broken", model: app)
         XCTAssertFalse(settings.packages.contains { $0.id == "Sky.broken" })
         XCTAssertNil(settings.error)
+        let oldPackage = folder.appendingPathComponent("plugin-packages/Sky.old")
+        try FileManager.default.createDirectory(at: oldPackage, withIntermediateDirectories: true)
+        let oldFile = oldPackage.appendingPathComponent("package.json")
+        try JSONSerialization.data(withJSONObject: ["schema": "inku.plugin-package.v1", "namespace": "Sky", "name": "old", "version": "1.0.0", "words": [word]]).write(to: oldFile)
+        await settings.load(model: app)
+        let old = try XCTUnwrap(settings.packages.first { $0.id == "Sky.old" })
+        XCTAssertTrue(old.rejectedProblems.contains { $0["code"].string == "rewrite_as_v2" })
+        XCTAssertTrue(FileManager.default.fileExists(atPath: oldFile.path))
     }
 }
 

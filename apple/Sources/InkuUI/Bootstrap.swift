@@ -58,7 +58,6 @@ public struct SaijikiCategory: Identifiable, Sendable {
 
 public struct PluginWord: Identifiable, Sendable {
     public let id: String
-    public let aliases: [String]
     public let japanese: [String]
     public let english: [String]
     public let note: String
@@ -66,8 +65,6 @@ public struct PluginWord: Identifiable, Sendable {
     public let packageID: String?
     public let sourceFile: String?
     public let englishNote: String?
-    public let firesOnJapanese: [String]
-    public let firesOnEnglish: [String]
     public var exampleJapanese: String? = nil
     public var exampleEnglish: String? = nil
     public var previewData: Data? = nil

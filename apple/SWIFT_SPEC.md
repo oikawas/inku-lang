@@ -20,6 +20,10 @@ Options and replacements for Change the touches, Change the ground and Change th
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-29 Plugin v2 and saved-work migration
+
+Bundled leaves and editor reference diagnostics use the shared core. The Saijiki, completion, settings, and generation information show braced names. Portable DDL uses `inku.ddl-export.v2` and the work's locks; v1 files are refused. On startup, database migration v6 verifies a `.inku-before-v6-*.sqlite` snapshot before updating the saved DDL copies, leaves refused works intact, and writes a JSON report beside the database. Definitions, locks, Score, and SVG are retained.
+
 ## 2026-10-27 macOS build numbers
 
 The current bottom-left display contains only the build number, without the version or a label. It is white in dark mode and uses the standard text color in light mode.
@@ -795,7 +799,7 @@ Private execution `ProviderAttemptObservation` records may contain bodies; ordin
 
 macOS menus use the active scene's available actions. Command-N creates a new work, Command-O shares the screen button's DDL import, Command-comma opens Settings, Command-1 through 4 navigate creation/library/lineage/batch-demo, Shift-Command-E exports, and Shift-Command-C copies the image. Existing Command-Return generation, Escape stop, and Shift-Command-F presentation remain available. Generation, automation, import, dialogs, and presentation disable affected actions so menus cannot interrupt them with another write. Settings uses a system sidebar and grouped forms; model setup links open the appropriate category.
 
-Server-derived resources include the saijiki, 13 color catalogs, 11 canvas formats, and seven Macro/plugin words. Shared Rust resolves definitions and digest locks. Plugin preferences affect new works; saved definitions remain pinned. `inku.ddl-export.v1` imports validate text, definitions, locks, and exact integer representation before attaching the package to a new work. Inputs beyond 4 MiB/64 definitions or with incomplete definitions are refused without adopting partial results.
+Server-derived resources include the saijiki, 13 color catalogs, 11 canvas formats, and seven Macro/plugin words. Shared Rust resolves definitions and digest locks. Plugin preferences affect new works; saved definitions remain pinned. `inku.ddl-export.v2` imports validate text, definitions, locks, and exact integer representation before attaching the package to a new work. Inputs beyond 4 MiB/64 definitions or with incomplete definitions are refused without adopting partial results.
 
 On macOS, Settings checks a selected plugin-package JSON or ZIP with the shared core and draws its examples without a provider, then shows each word's result before installation or replacement. Installed packages live in `plugin-packages` beside the database; enabled words appear in the catalog for new works, Saijiki, DDL completion and highlighting. Unreadable packages show their problems and can be removed. Bundled packages can be enabled or disabled, but not removed. Saved works retain their definitions after removal.
 

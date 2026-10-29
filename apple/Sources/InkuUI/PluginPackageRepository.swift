@@ -34,9 +34,9 @@ struct InstalledPluginPackage: Sendable {
         let en = (word["names"]["en"].array ?? []).compactMap(\.string)
         guard !ja.isEmpty, !en.isEmpty else { return nil }
         let noteJa = word["note_ja"].string ?? "", noteEn = word["note_en"].string ?? ""
-        return PluginWord(id: id, aliases: [], japanese: ja, english: en,
+        return PluginWord(id: id, japanese: ja, english: en,
             note: noteJa.isEmpty ? noteEn : noteJa, previewURL: previewURL, packageID: packageID, sourceFile: nil,
-            englishNote: noteEn.isEmpty ? noteJa : noteEn, firesOnJapanese: [], firesOnEnglish: [],
+            englishNote: noteEn.isEmpty ? noteJa : noteEn,
             exampleJapanese: word["example_ja"].string, exampleEnglish: word["example_en"].string,
             previewData: previewData, kind: word["kind"].string ?? "", aspect: word["aspect"].string, counter: word["counter"].string,
             visibleNames: (word["visible_qualified_names"].array ?? []).compactMap(\.string))
@@ -67,7 +67,7 @@ struct PluginPackageRepository: Sendable {
         return answer
     }
     static func safeID(_ id: String) -> Bool {
-        id.range(of: #"^[A-Za-z][A-Za-z0-9_-]*\.[A-Za-z][A-Za-z0-9_-]*$"#, options: .regularExpression) != nil
+        !id.isEmpty && id != "." && id != ".." && !id.contains("/") && !id.contains("\\") && !id.contains("\0")
     }
     func load() throws -> [InstalledPluginPackage] {
         guard FileManager.default.fileExists(atPath: directory.path) else { return [] }
@@ -87,10 +87,10 @@ struct PluginPackageRepository: Sendable {
                     return InstalledPluginPackage(id: id, package: nil, problems: problems.isEmpty ? [fallback] : problems, directory: url)
                 }
                 let package = result["package"]
-                let actualID = (package["namespace"].string ?? "") + "." + (package["name"].string ?? "")
+                let directoryParts = id.split(separator: ".", omittingEmptySubsequences: false).map(String.init)
                 var problems = package["problems"].array ?? []
                 problems += (package["words"].array ?? []).flatMap { $0["problems"].array ?? [] }
-                if actualID != id { problems.append(.object(["path": .string(""), "code": .string("id_differs_from_directory"), "detail": .string("")])) }
+                if directoryParts != [package["namespace"].string ?? "", package["name"].string ?? ""] { problems.append(.object(["path": .string(""), "code": .string("id_differs_from_directory"), "detail": .string("")])) }
                 return InstalledPluginPackage(id: id, package: problems.isEmpty ? package : nil, problems: problems, directory: url)
             } catch {
                 let problem: ExactJSON = .object(["path": .string(""), "code": .string("invalid_json"), "detail": .string(error.localizedDescription)])
@@ -124,7 +124,7 @@ struct PluginPackageRepository: Sendable {
             return PluginPackageCheck(report: .object(["ok": .bool(false), "problems": started["problems"], "words": .array([])]), text: "", pictures: .object([:]))
         }
         let imported = (started["imported"].array ?? []).map {
-            ImportedMacroDefinition(definition: $0["definition"], summary: $0["summary"].string ?? "")
+            ImportedMacroDefinition(definition: $0["definition"], note: $0["note"].string ?? "")
         }
         let temp = FileManager.default.temporaryDirectory.appendingPathComponent("inku-plugin-check-" + UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: temp, withIntermediateDirectories: true)

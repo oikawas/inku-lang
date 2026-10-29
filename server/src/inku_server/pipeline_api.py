@@ -663,7 +663,10 @@ class PipelineService:
         # A saved definition can use an installed picture only if its lock
         # still identifies the same content; otherwise the editor uses its
         # neutral fallback rather than showing a different edition.
-        picture_catalog = catalog if not (body.history_id or body.execution_id) else resolve_new_work_macro_catalog(self.binding, self.config_for(owner, None))
+        try:
+            picture_catalog = catalog if not (body.history_id or body.execution_id) else resolve_new_work_macro_catalog(self.binding, self.config_for(owner, None))
+        except CandidateHostError:
+            picture_catalog = {"definition_locks": []}
         current_locks = {item["qualified_name"]: item["digest"].removeprefix("sha256:") for item in picture_catalog.get("definition_locks", [])}
         from urllib.parse import urlencode
         pictures = {lock["qualified_name"]: "/api/saijiki/plugin-preview?" + urlencode({"name": lock["qualified_name"], "scale": "1"})

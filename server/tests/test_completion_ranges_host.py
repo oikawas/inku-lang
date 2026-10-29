@@ -268,6 +268,13 @@ def test_saved_editor_only_uses_the_installed_picture_for_the_same_lock(saved_wo
         response = client.post("/api/pipeline/plugin-calls", headers={"x-owner": "owner"}, json={"source": "x", "execution_id": "run"})
         assert response.status_code == 200, response.text
         assert set(requests[0]["pictures"]) == {"Sky.Stars"}
+        from inku_server.pipeline_candidate import CandidateHostError
+        def unavailable(*_args):
+            raise CandidateHostError("invalid_macro_catalog_source")
+        service.config_for = unavailable
+        response = client.post("/api/pipeline/plugin-calls", headers={"x-owner": "owner"}, json={"source": "x", "execution_id": "run"})
+        assert response.status_code == 200, response.text
+        assert requests[-1]["pictures"] == {}
     service.close()
 
 

@@ -55,6 +55,7 @@
 	const pluginQuery = new PluginCallsQuery();
 	let calls = $state.raw<PluginCall[]>([]);
 	let workEntries = $state.raw<PluginEntry[]>([]);
+	let catalogKey = '';
 	let callSource = $state('');
 	const completionLabels = $derived({ completed: t().ddlCompletionTag, numbers_changed: t().ddlCompletionNumbersTag, words_changed: t().ddlCompletionWordsTag });
 	const completionHint = $derived(completionWordsHint(completionStates, t()));
@@ -74,7 +75,9 @@
 	$effect(() => {
 		const source = value, work = completionWork, fetchCalls = apiFetch;
 		const lang = resolveInstructionLang(source, isJapanese ? 'ja' : 'en');
-		pluginQuery.cancel(); calls = []; workEntries = []; callSource = '';
+		pluginQuery.cancel(); calls = []; callSource = '';
+		const nextKey = JSON.stringify(work);
+		if (nextKey !== catalogKey) { workEntries = []; catalogKey = nextKey; }
 		if (!fetchCalls) return;
 		const timer = setTimeout(() => { void pluginQuery.load(fetchCalls, work, source, lang, (result, entries) => { calls = result; workEntries = entries; callSource = source; }); }, 180);
 		return () => { clearTimeout(timer); pluginQuery.cancel(); };

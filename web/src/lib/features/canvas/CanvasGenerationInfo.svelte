@@ -19,7 +19,7 @@
 	import { loadSystemPrompts, type SystemPromptsState } from './system-prompts';
 	import { generationInfoSettings } from './generation-info-settings.svelte';
 	import { tokenStageLabel, tokenStageRows, type ProviderUsage } from './generation-info-tokens';
-	import { offerReason, offerStage, type PluginOfferRecord } from './plugin-offers';
+	import { offerName, offerReason, offerStage, type PluginOfferRecord } from './plugin-offers';
 
 	export type GenerationInfoWork = {
 		plugin_offers?: PluginOfferRecord[] | null;
@@ -332,8 +332,8 @@
 					<section class="detail-group">
 						<h4>{isJapanese ? '提示したプラグイン' : 'Offered plugins'}</h4>
 						{#each detailPluginOffers as record, index (index)}
-							<p class="detail-note">{offerStage(record.stage, isJapanese)}: {record.offered.length ? record.offered.map(item => `${isJapanese ? item.written_ja : item.written_en}（${offerReason(item.reason, isJapanese)}）`).join(isJapanese ? '、' : ', ') : (isJapanese ? '提示なし' : 'None offered')}</p>
-							{#if record.omitted.length}<p class="detail-note">{isJapanese ? '上限で落とした語' : 'Omitted by the limit'}: {record.omitted.map(item => isJapanese ? item.written_ja : item.written_en).join(isJapanese ? '、' : ', ')}</p>{/if}
+							<p class="detail-note">{offerStage(record.stage, isJapanese)}: {record.offered.length ? record.offered.map(item => `${offerName(item, isJapanese)}（${offerReason(item.reason, isJapanese)}）`).join(isJapanese ? '、' : ', ') : (isJapanese ? '提示なし' : 'None offered')}</p>
+							{#if record.omitted.length}<p class="detail-note">{isJapanese ? '上限で落とした語' : 'Omitted by the limit'}: {record.omitted.map(item => offerName(item, isJapanese)).join(isJapanese ? '、' : ', ')}</p>{/if}
 						{/each}
 					</section>
 				{/if}

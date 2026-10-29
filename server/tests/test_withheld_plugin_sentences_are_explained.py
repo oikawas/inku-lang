@@ -76,4 +76,12 @@ def test_run_offer_projection_uses_saved_names_and_includes_chunk_rewrite():
     old = {"definitions": [{"namespace": "Nature", "heading": "YoungLeaves", "aliases": ["若葉"]}],
            "plugin_offers": [{"stage": "generate_normalized_ddl", "offer": {"offered": [{"qualified_name": "Nature.YoungLeaves", "reason": "name"}], "omitted": []}}]}
     item = macro_catalog.plugin_offer_records(old)[0]["offered"][0]
-    assert (item["written_ja"], item["written_en"]) == ("｛若葉｝", "{young leaves}")
+    assert (item["written_ja"], item["written_en"]) == ("Nature.YoungLeaves", "Nature.YoungLeaves")
+    old["definitions"][0]["names"] = {"ja": ["若葉", "わかば"]}
+    item = macro_catalog.plugin_offer_records(old)[0]["offered"][0]
+    assert (item["written_ja"], item["written_en"]) == ("｛若葉｝", "Nature.YoungLeaves")
+    old["definitions"] = []
+    item = macro_catalog.plugin_offer_records(old)[0]["offered"][0]
+    assert (item["written_ja"], item["written_en"]) == ("Nature.YoungLeaves", "Nature.YoungLeaves")
+    old["plugin_offers"][0]["offer"]["offered"][0]["written_en"] = "{existing name}"
+    assert macro_catalog.plugin_offer_records(old)[0]["offered"][0]["written_en"] == "{existing name}"

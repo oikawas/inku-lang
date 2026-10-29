@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -188,11 +187,10 @@ def plugin_offer_records(config: Mapping[str, Any], extra: Sequence[Mapping[str,
             continue
         identifier = f"{definition.get('namespace', '')}.{definition.get('id') or definition.get('heading', '')}"
         names = definition.get("names") or {}
-        heading = str(definition.get("heading") or definition.get("id") or "")
-        ja = (names.get("ja") or definition.get("aliases") or [heading])[0]
-        legacy_en = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", heading).replace("_", " ").replace("-", " ").lower()
-        en = (names.get("en") or [" ".join(legacy_en.split())])[0]
-        definitions[identifier] = (f"｛{ja}｝", f"{{{en}}}")
+        ja = names.get("ja") or []
+        en = names.get("en") or []
+        definitions[identifier] = (f"｛{ja[0]}｝" if ja else identifier,
+                                   f"{{{en[0]}}}" if en else identifier)
     result = []
     for record in [*(config.get("plugin_offers") or []), *extra]:
         offer = record.get("offer") or {}
@@ -200,7 +198,7 @@ def plugin_offer_records(config: Mapping[str, Any], extra: Sequence[Mapping[str,
             result_items = []
             for item in offer.get(key, []):
                 qualified = item.get("qualified_name", "")
-                ja, en = definitions.get(qualified, (f"｛{qualified}｝", f"{{{qualified}}}"))
+                ja, en = definitions.get(qualified, (qualified, qualified))
                 result_items.append({**item, "written_ja": item.get("written_ja") or ja,
                                      "written_en": item.get("written_en") or en})
             return result_items

@@ -360,7 +360,7 @@ Render Engine は、`JSON Score + render options + server-owned color metadata` 
 
 括弧の名が複数の lock に当たると `plugin_name_ambiguous` とし、候補を示す。共有診断入口は `plugin_names` に見える名・qualified id・有効状態を受け取れる。
 
-描いた環境でプラグイン名が解決できない文は、その文だけを省略して残りを描き切る。作品全体を止めず、原文のDDLからその文を消さず、LLMに別の語で書き直させない。共有Rust（pipeline binding `explain_plugin_diagnostics`）が、compilerの解決診断と、hostの有効・無効化中のプラグイン名、作品自身の定義から、文ごとに理由を一つ返す: `plugin_not_installed`（その名前が無い）、`plugin_disabled`（導入済みだが無効）、`plugin_name_mismatch`（登録名と一致しない。同じ見出しの別名前空間、大文字小文字の違い、2文字以内の違いの登録名を候補として一つ示す）、`plugin_version_mismatch`（同じ名前で定義の中身が違う）、`plugin_count_out_of_range`（名前は解決したが、書いた個数が語の受ける範囲の外。§4.6）。Hostは作品の診断に保存し、同じ範囲の汎用診断の代わりに表示する。
+描いた環境でプラグイン名が解決できない文は、その文だけを省略して残りを描き切る。作品全体を止めず、原文のDDLからその文を消さず、LLMに別の語で書き直させない。共有Rust（pipeline binding `explain_plugin_diagnostics`）が、compilerの解決診断と、hostの有効・無効化中のプラグイン名、作品自身の定義から、文ごとに理由を一つ返す: `plugin_not_installed`（その名前が無い）、`plugin_disabled`（導入済みだが無効）、`plugin_name_mismatch`（登録名と一致しない。同じ見出しの別名前空間、大文字小文字の違い、または編集距離が2以内で、正規化した名に共通の文字が一つ以上ある登録名を候補として一つ示す）、`plugin_version_mismatch`（同じ名前で定義の中身が違う）、`plugin_count_out_of_range`（名前は解決したが、書いた個数が語の受ける範囲の外。§4.6）。Hostは作品の診断に保存し、同じ範囲の汎用診断の代わりに表示する。
 
 保存済み作品は使った定義の実物を持つので、プラグインを外しても再演は変わらない。環境をまたいでDDLを持ち運ぶために、作品を`inku.ddl-export.v2`（可視DDL、言語、使った定義とnote、書き出し元）として書き出せる。定義はDDLの字から探さず、作品が実際に使ったlockから選ぶ。読み込んだ定義は新しい作品だけで使い、登録済みの同名定義より優先する。導入はしない。登録済みと中身が違う、または未登録のときは、どちらを使ったかをcatalog診断（`imported_plugin_differs_from_installed`／`imported_plugin_not_installed`）で知らせる。定義はdata-onlyで、読み込み時も共有Rustの検証境界を通る。
 

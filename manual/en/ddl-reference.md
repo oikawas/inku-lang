@@ -58,7 +58,7 @@ A uniquely resolved marked subject, such as `the circle red.`, instead continues
 
 ### 1.6 Separate core words from registered names
 
-Core forms, colors, grounds, and grammar require no plugin. A name such as `Nature.若葉` requires a registered definition or a definition carried by the work or DDL export. Knowing the name does not make it available. Standard examples in this chapter use core DDL without plugins.
+Core forms, colors, grounds, and grammar require no plugin. A name such as `｛若葉｝` requires a registered definition or a definition carried by the work or DDL export. Knowing the name does not make it available. Standard examples in this chapter use core DDL without plugins.
 
 ## 2. Start with simple examples
 

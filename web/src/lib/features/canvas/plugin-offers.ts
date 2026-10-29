@@ -1,5 +1,9 @@
-export type PluginOfferItem = { qualified_name: string; written_ja: string; written_en: string; reason: 'brace' | 'ddl' | 'name' };
+export type PluginOfferItem = { qualified_name: string; written_ja?: string; written_en?: string; reason: 'brace' | 'ddl' | 'name' };
 export type PluginOfferRecord = { stage: string; offered: PluginOfferItem[]; omitted: PluginOfferItem[] };
+
+export function offerName(item: PluginOfferItem, ja: boolean): string {
+	return (ja ? item.written_ja : item.written_en) || item.qualified_name;
+}
 
 export function offerStage(stage: string, ja: boolean): string {
 	const labels: Record<string, [string, string]> = {

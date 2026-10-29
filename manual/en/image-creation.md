@@ -194,7 +194,7 @@ The eleven words under `Surface` each carry a small drawing of how the face is, 
 
 The Saijiki is not autocompletion. Consult it when needed; it does not narrow a description to the existing vocabulary on its own. Picking a word does not start painting.
 
-Plugin words appear in the same row and wear the same face as built-in ones. The separate preview panel carries the name, effect (the package note), example, and picture. A PNG included in the ZIP package supplies the picture; otherwise it is drawn from the example. The bundled leaves' pictures come from the shared core package.
+Plugin words appear in the same row and wear the same face as built-in ones. The separate preview panel carries the primary name, other names, kind, package note, example, and picture. A PNG included in the ZIP package supplies the picture; otherwise it is drawn from the example. The bundled leaves' pictures come from the shared core package.
 
 ## 6. Read and Edit the Instructions
 
@@ -255,8 +255,6 @@ A free line takes only two relations, the "between" words `connected` and `touch
 ### A plugin name that does not exist shows up while you type
 
 Call a word in braces, such as `{green leaves}`. While editing, the shared core checks the work's catalog and marks usable words and reasons such as disabled, misspelled, or ambiguous names. Hover shows the reason or the word's example. Type `{` or `｛` to complete from Japanese and English names; the selection inserts the primary name and closing brace in the instructions' language. The Saijiki and preview show names, kind, note, example, and picture.
-
-Generation information records the plugins offered to AI in this work's run, their reasons, and words omitted by the limit. A run drawn directly from instructions has no such row.
 
 ### A work whose DDL was edited holds its description
 
@@ -434,6 +432,8 @@ Open the provenance drawer at the bottom of the work tab to see the record of th
 | Identity | work ID (UUID), render hash, description hash, render engine, DDL specification, transform layer, Build |
 | Origin | generation, derivation, batch run ID and line number, comment, UI language |
 | Run | elapsed time, token counts |
+
+The `Offered plugins` row records the words offered to AI in this work's run, their reasons, and words omitted by the limit. A run drawn directly from instructions has no such row.
 
 Every row carries an explanation. The render seed is "the seed that fixes the sway of the performance; the same seed and the same score give the same picture"; the description hash is "the fingerprint of the description; it binds works that came from the same words".
 

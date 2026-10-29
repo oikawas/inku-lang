@@ -749,6 +749,18 @@ pub(crate) fn qualified_macro_match(
         .collect::<Vec<_>>();
     let lock_indices = matched.iter().map(|(index, _)| *index).collect::<Vec<_>>();
 
+    if !document.legacy_names_for_migration()
+        && let [(.., length)] = matched.as_slice()
+        && source
+            .get(start_byte + length..)
+            .and_then(|tail| tail.chars().next())
+            .is_some_and(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-'))
+    {
+        return Some(QualifiedMacroMatch::Unlocked {
+            end_byte: unlocked_end,
+        });
+    }
+
     match matched.as_slice() {
         [] => Some(QualifiedMacroMatch::Unlocked {
             end_byte: unlocked_end,

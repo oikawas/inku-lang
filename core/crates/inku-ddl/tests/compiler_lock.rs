@@ -210,7 +210,7 @@ const V21_SEED_DIGEST_KNOWN_ANSWER: &str =
 const V21_EXPANDED_MEANING_SHA256_KNOWN_ANSWER: &str =
     "251884860862eff7347cd6cf9c016c1b562d5a2682ce6739f267556a9b370a1c";
 const V21_FULL_LOCK_KNOWN_ANSWER: &str =
-    "af2f3eaa5cebb36d829edf885eade46ca41975fd9550c77203304b5f5a23482a";
+    "719546cad546a2f780d51025cad7e9d3b4624fe21d5c26a45e8ff40dddb74e4a";
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 16,
     max_depth: 16,
@@ -290,7 +290,7 @@ fn coordinated_group_predicates_have_one_compiler_delivery_owner() {
     let fixture = fixture();
     let definition = fixture_definition(&fixture);
     let macro_group = compile_locked(
-        "place circle and Canon.Empty at center.",
+        "place circle and ｛Empty｝ at center.",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
         None,
@@ -914,7 +914,7 @@ fn multi_head_sequence_reaches_lock_while_unresolved_fields_are_conflicts() {
     let definition = definition_from(
         r#"{"schema":"inku.macro-definition.v1","namespace":"Canon","heading":"Empty","version":"1.0.0","parameters":{},"components":{},"body":[]}"#,
     );
-    for (source, macro_index) in [("Canon.Empty circle", 0), ("circle Canon.Empty", 1)] {
+    for (source, macro_index) in [("｛Empty｝ circle", 0), ("circle ｛Empty｝", 1)] {
         let result = compile_locked(
             source,
             ResolvedInstructionLanguage::En,
@@ -1077,8 +1077,8 @@ fn pre_head_modifier_ownership_reaches_compiler_for_primitive_and_macro_heads() 
         r#"{"schema":"inku.macro-definition.v1","namespace":"Canon","heading":"Empty","version":"1.0.0","parameters":{},"components":{},"body":[]}"#,
     );
     for (source, macro_index) in [
-        ("red Canon.Empty blue circle", 0),
-        ("red circle blue Canon.Empty", 1),
+        ("red ｛Empty｝ blue circle", 0),
+        ("red circle blue ｛Empty｝", 1),
     ] {
         let result = compile_locked(
             source,
@@ -1119,7 +1119,7 @@ fn pre_head_modifier_ownership_reaches_compiler_for_primitive_and_macro_heads() 
     }
 
     let thin_macro = compile_locked(
-        "thin Canon.Empty blue circle",
+        "thin ｛Empty｝ blue circle",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
         None,
@@ -1148,7 +1148,7 @@ fn complete_binding_and_unbound_outer_modifier_keep_distinct_typed_owners() {
         r#"{"schema":"inku.macro-definition.v1","namespace":"Canon","heading":"Color","version":"1.0.0","parameters":{"value":{"type":"semantic_ref","category":"color"}},"components":{},"body":[]}"#,
     );
     let result = compile_locked(
-        "eight Canon.Color white",
+        "eight ｛Color｝ white",
         ResolvedInstructionLanguage::En,
         &[definition],
         Some(11),
@@ -1200,14 +1200,14 @@ fn same_macro_meaning_across_language_and_format_has_same_seed_not_source_digest
         r#"{"schema":"inku.macro-definition.v1","namespace":"Canon","heading":"Empty","version":"1.0.0","parameters":{},"components":{},"body":[]}"#,
     );
     let en = compile_locked(
-        "  Canon.Empty  ",
+        "  ｛Empty｝  ",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
         Some(23),
         LIMITS,
     );
     let ja = compile_locked(
-        "Canon.Empty",
+        "｛Empty｝",
         ResolvedInstructionLanguage::Ja,
         &[definition],
         Some(23),
@@ -1804,7 +1804,7 @@ fn failed_continuation_preserves_preexisting_explicit_fingerprints() {
 fn historical_fixture_is_preserved_and_current_known_answers_bind_exactly() {
     let fixture = fixture();
     let definition = fixture_definition(&fixture);
-    let document = locked_document("Canon.Empty", ResolvedInstructionLanguage::En, &definition);
+    let document = locked_document("｛Empty｝", ResolvedInstructionLanguage::En, &definition);
     let accepted = bind_macro_parameters(&document, std::slice::from_ref(&definition)).unwrap();
     let result = compile_typed_ddl(document, &[definition], Some(7), LIMITS);
 
@@ -2027,14 +2027,14 @@ fn definition_identity_changes_structured_meaning_seed_and_lock_but_not_expanded
     );
 
     let left = compile_locked(
-        "Canon.Meaning",
+        "｛Meaning｝",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&plain),
         Some(17),
         LIMITS,
     );
     let right = compile_locked(
-        "Canon.Meaning",
+        "｛Meaning｝",
         ResolvedInstructionLanguage::En,
         &[unused_component],
         Some(17),
@@ -2066,7 +2066,7 @@ fn definition_identity_changes_structured_meaning_seed_and_lock_but_not_expanded
     );
 
     let different_composition_seed = compile_locked(
-        "Canon.Meaning",
+        "｛Meaning｝",
         ResolvedInstructionLanguage::En,
         &[plain],
         Some(18),
@@ -2197,7 +2197,7 @@ fn exhaustive_delivery_mapping_has_no_default_or_ignored_bucket() {
             // blocks; it is no longer offered as a hole.
             "macro-missing-hole",
             compile(
-                "Canon.Empty",
+                "｛Empty｝",
                 ResolvedInstructionLanguage::En,
                 std::slice::from_ref(&definition),
                 None,
@@ -2208,7 +2208,7 @@ fn exhaustive_delivery_mapping_has_no_default_or_ignored_bucket() {
         (
             "macro-ambiguous-conflict",
             compile_locked(
-                "Canon.Color white black",
+                "｛Color｝ white black",
                 ResolvedInstructionLanguage::En,
                 std::slice::from_ref(&color),
                 None,
@@ -2220,7 +2220,7 @@ fn exhaustive_delivery_mapping_has_no_default_or_ignored_bucket() {
         (
             "expansion-diagnostic-hole",
             compile_locked(
-                "Canon.Two",
+                "｛Two｝",
                 ResolvedInstructionLanguage::En,
                 &[emits_two],
                 None,
@@ -2289,7 +2289,7 @@ fn successful_expanded_nodes_are_explicit_deliveries_without_entering_pre_expans
         r#"{"schema":"inku.macro-definition.v1","namespace":"Canon","heading":"One","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"}}}]}"#,
     );
     let result = compile_locked(
-        "Canon.One",
+        "｛One｝",
         ResolvedInstructionLanguage::En,
         &[definition],
         Some(3),
@@ -2318,14 +2318,14 @@ fn step9h_macro_parameter_continuations_preserve_equal_and_block_different_meani
         r#"{"schema":"inku.macro-definition.v1","namespace":"Review","heading":"Tint","version":"1.0.0","parameters":{"value":{"type":"semantic_ref","category":"color"}},"components":{},"body":[]}"#,
     );
     let inline = compile_locked(
-        "swaying Review.Tint red",
+        "swaying ｛Tint｝ red",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
         Some(19),
         LIMITS,
     );
     let equal = compile_locked(
-        "Review.Tint red. the Review.Tint red swaying",
+        "｛Tint｝ red. the ｛Tint｝ red swaying",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
         Some(19),
@@ -2411,7 +2411,7 @@ fn step9h_macro_parameter_continuations_preserve_equal_and_block_different_meani
     );
 
     let different = compile_locked(
-        "Review.Tint red. the Review.Tint blue swaying",
+        "｛Tint｝ red. the ｛Tint｝ blue swaying",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
         Some(19),
@@ -2435,7 +2435,7 @@ fn step9h_macro_parameter_continuations_preserve_equal_and_block_different_meani
     assert!(stage15_transformation_input(&different).is_err());
 
     let distinct = compile_locked(
-        "Review.Tint red. Review.Tint blue",
+        "｛Tint｝ red. ｛Tint｝ blue",
         ResolvedInstructionLanguage::En,
         &[definition],
         Some(19),
@@ -2487,9 +2487,9 @@ fn step9h_macro_parameter_continuations_preserve_equal_and_block_different_meani
 fn semantic_macro_execution_owner_preserves_continuation_binding_and_stage15_delivery() {
     let definition = center_emit_definition();
     let cases = [
-        ("a red Focus.Center", 1, 0, vec![0], vec![0], 3),
+        ("a red ｛Center｝", 1, 0, vec![0], vec![0], 3),
         (
-            "a Focus.Center; the red Focus.Center",
+            "a ｛Center｝; the red ｛Center｝",
             1,
             1,
             vec![0],
@@ -2497,7 +2497,7 @@ fn semantic_macro_execution_owner_preserves_continuation_binding_and_stage15_del
             3,
         ),
         (
-            "a Focus.Center; a red Focus.Center",
+            "a ｛Center｝; a red ｛Center｝",
             2,
             0,
             vec![0, 1],
@@ -2505,7 +2505,7 @@ fn semantic_macro_execution_owner_preserves_continuation_binding_and_stage15_del
             6,
         ),
         (
-            "a Focus.Center; the red Focus.Center; a blue Focus.Center",
+            "a ｛Center｝; the red ｛Center｝; a blue ｛Center｝",
             2,
             1,
             vec![0, 2],
@@ -2531,10 +2531,10 @@ fn semantic_macro_execution_owner_preserves_continuation_binding_and_stage15_del
             .map(|binding| binding.invocation_ordinal)
             .collect::<Vec<_>>();
         let expected_binding_ordinals = match source {
-            "a red Focus.Center" => vec![0],
-            "a Focus.Center; the red Focus.Center" => vec![0, 1],
-            "a Focus.Center; a red Focus.Center" => vec![0, 1],
-            "a Focus.Center; the red Focus.Center; a blue Focus.Center" => vec![0, 1, 2],
+            "a red ｛Center｝" => vec![0],
+            "a ｛Center｝; the red ｛Center｝" => vec![0, 1],
+            "a ｛Center｝; a red ｛Center｝" => vec![0, 1],
+            "a ｛Center｝; the red ｛Center｝; a blue ｛Center｝" => vec![0, 1, 2],
             _ => unreachable!(),
         };
         assert_eq!(binding_ordinals, expected_binding_ordinals, "{source}");
@@ -2580,7 +2580,7 @@ fn semantic_macro_execution_owner_preserves_continuation_binding_and_stage15_del
             );
             assert_eq!(
                 edge.reintroduced_head.source().surface,
-                "Focus.Center",
+                "｛Center｝",
                 "{source}"
             );
             assert!(
@@ -2599,7 +2599,7 @@ fn semantic_macro_execution_owner_preserves_continuation_binding_and_stage15_del
             assert_eq!(
                 &source[edge.reintroduced_head.source().span.start_byte
                     ..edge.reintroduced_head.source().span.end_byte],
-                "Focus.Center",
+                "｛Center｝",
                 "{source}"
             );
             assert!(
@@ -2669,7 +2669,7 @@ fn semantic_macro_execution_owner_preserves_continuation_binding_and_stage15_del
         assert!(expansion.expanded.iter().all(|invocation| {
             &source[invocation.provenance.source_span.start_byte
                 ..invocation.provenance.source_span.end_byte]
-                == "Focus.Center"
+                == "｛Center｝"
         }));
 
         let lock = result.compiler_lock.as_ref().unwrap();
@@ -2732,8 +2732,8 @@ fn semantic_macro_execution_owner_preserves_continuation_binding_and_stage15_del
 fn macro_source_gap_shares_seed_expanded_and_effective_meaning_without_losing_source_identity() {
     let definition = center_emit_definition();
     let sources = [
-        "a red Focus.Center; a blue Focus.Center",
-        "a Focus.Center; the red Focus.Center; a blue Focus.Center",
+        "a red ｛Center｝; a blue ｛Center｝",
+        "a ｛Center｝; the red ｛Center｝; a blue ｛Center｝",
     ];
     let results = sources.map(|source| {
         compile_locked(
@@ -2824,7 +2824,7 @@ fn macro_source_gap_shares_seed_expanded_and_effective_meaning_without_losing_so
     );
 
     let genuinely_distinct = compile_locked(
-        "a red Focus.Center; a red Focus.Center; a blue Focus.Center",
+        "a red ｛Center｝; a red ｛Center｝; a blue ｛Center｝",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
         Some(19),
@@ -2840,8 +2840,8 @@ fn macro_source_gap_shares_seed_expanded_and_effective_meaning_without_losing_so
 fn named_emit_anchor_and_relation_targets_use_semantic_identity_without_colliding() {
     let definition = named_target_definition();
     let sources = [
-        "a red Focus.Named; a blue Focus.Named",
-        "a Focus.Named; the red Focus.Named; a blue Focus.Named",
+        "a red ｛Named｝; a blue ｛Named｝",
+        "a ｛Named｝; the red ｛Named｝; a blue ｛Named｝",
     ];
     let results = sources.map(|source| {
         compile_locked(
@@ -2885,7 +2885,7 @@ fn incomplete_structured_document_retains_binding_and_does_not_seed_or_expand() 
     let fixture = fixture();
     let definition = fixture_definition(&fixture);
     let result = compile_locked(
-        "Canon.Empty many",
+        "｛Empty｝ many",
         ResolvedInstructionLanguage::En,
         &[definition],
         Some(5),

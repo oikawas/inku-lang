@@ -892,7 +892,7 @@ mod tests {
     fn document(definition: &MacroDefinition) -> NormalizedDdlDocument {
         let identity = definition.identity().unwrap();
         NormalizedDdlDocument::new(
-            "Bind.Owned",
+            "｛Owned｝",
             ResolvedInstructionLanguage::En,
             vec![
                 MacroLock::new(

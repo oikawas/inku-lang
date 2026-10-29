@@ -87,3 +87,19 @@ fn old_notation_is_omitted_and_the_braced_v1_word_still_draws() {
         assert_eq!(with_old.score(), only_new.score(), "{source}");
     }
 }
+
+#[test]
+fn unknown_longer_identifier_does_not_stop_at_a_locked_prefix() {
+    let lock =
+        MacroLock::new("Nature.Leaf", "1.0.0", format!("sha256:{}", "a".repeat(64))).unwrap();
+    let text = "Nature.LeafOther.";
+    let doc =
+        NormalizedDdlDocument::new(text, ResolvedInstructionLanguage::En, vec![lock]).unwrap();
+    let result = resolve_macro_invocations(&doc, &[]).unwrap();
+    assert_eq!(result.diagnostics.len(), 1);
+    assert_eq!(result.diagnostics[0].surface, "Nature.LeafOther");
+    assert_eq!(
+        result.diagnostics[0].kind,
+        MacroInvocationResolutionDiagnosticKind::OldNotation
+    );
+}

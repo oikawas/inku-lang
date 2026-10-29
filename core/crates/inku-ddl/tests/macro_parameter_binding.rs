@@ -29,7 +29,7 @@ fn exact_decimal_dimensions_bind_compound_source_values_atomically() {
         .unwrap()
     };
     let parameters = serde_json::json!({"z":{"type":"exact_decimal","dimension":"width"},"a":{"type":"exact_decimal","dimension":"height"}});
-    let result = bind(parameters.clone(), "Exact.Mark width 0.40 height 0.2");
+    let result = bind(parameters.clone(), "｛Mark｝ width 0.40 height 0.2");
     assert!(result.diagnostics.is_empty(), "{:?}", result.diagnostics);
     let values = &result.complete[0].parameters;
     assert_eq!(values.len(), 2);
@@ -49,21 +49,18 @@ fn exact_decimal_dimensions_bind_compound_source_values_atomically() {
         }
     ));
     for source in [
-        "Exact.Mark width 0.4",
-        "Exact.Mark width 0.4 height 0.2 width 0.3 height 0.1",
+        "｛Mark｝ width 0.4",
+        "｛Mark｝ width 0.4 height 0.2 width 0.3 height 0.1",
     ] {
         assert!(bind(parameters.clone(), source).complete.is_empty());
     }
     let partial = serde_json::json!({"w":{"type":"exact_decimal","dimension":"width"}});
     assert!(
-        bind(partial, "Exact.Mark width 0.4 height 0.2")
+        bind(partial, "｛Mark｝ width 0.4 height 0.2")
             .complete
             .is_empty()
     );
-    let mixed = bind(
-        parameters,
-        "Exact.Mark and red ellipse width 0.4 height 0.2",
-    );
+    let mixed = bind(parameters, "｛Mark｝ and red ellipse width 0.4 height 0.2");
     assert!(mixed.complete.is_empty());
     assert!(
         mixed
@@ -73,7 +70,7 @@ fn exact_decimal_dimensions_bind_compound_source_values_atomically() {
     );
     let xy = serde_json::json!({"y":{"type":"exact_decimal","dimension":"position_x"},"x":{"type":"exact_decimal","dimension":"position_y"}});
     assert!(
-        bind(xy, "Exact.Mark horizontal 0.3 vertical 0.7")
+        bind(xy, "｛Mark｝ horizontal 0.3 vertical 0.7")
             .diagnostics
             .is_empty()
     );
@@ -99,15 +96,15 @@ fn sides_integer_binding_is_owned_and_never_uses_parameter_names() {
         .unwrap()
     };
     let one = serde_json::json!({"n":{"type":"integer"}});
-    let result = bind(one.clone(), "Shape.Mark sides 6");
+    let result = bind(one.clone(), "｛Mark｝ sides 6");
     assert!(result.diagnostics.is_empty());
     assert!(matches!(
         result.complete[0].parameters[0].value,
         BoundMacroParameterValue::Integer { value: 6, .. }
     ));
-    assert!(bind(one, "Shape.Mark").complete.is_empty());
+    assert!(bind(one, "｛Mark｝").complete.is_empty());
     let two = serde_json::json!({"sides":{"type":"integer"},"count":{"type":"integer"}});
-    let ambiguous = bind(two, "Shape.Mark sides 6 three");
+    let ambiguous = bind(two, "｛Mark｝ sides 6 three");
     assert!(ambiguous.complete.is_empty());
     assert!(!ambiguous.diagnostics.is_empty());
 }
@@ -134,7 +131,7 @@ fn fluctuation_matching_is_disjoint_only_when_declared_and_required_stays_requir
                 .unwrap();
         bind_macro_parameters(&document, &[definition]).unwrap()
     };
-    let result = bind(&data, "Sway.Mark narrowly loosely undulating");
+    let result = bind(&data, "｛Mark｝ narrowly loosely undulating");
     assert!(result.diagnostics.is_empty(), "{:?}", result.diagnostics);
     assert_eq!(result.complete.len(), 1);
     let parameters = &result.complete[0].parameters;
@@ -159,7 +156,7 @@ fn fluctuation_matching_is_disjoint_only_when_declared_and_required_stays_requir
             .len(),
         3
     );
-    let missing = bind(&data, "Sway.Mark narrowly");
+    let missing = bind(&data, "｛Mark｝ narrowly");
     assert!(missing.complete.is_empty());
     assert!(
         missing.diagnostics.iter().any(|diagnostic| diagnostic.kind
@@ -168,8 +165,8 @@ fn fluctuation_matching_is_disjoint_only_when_declared_and_required_stays_requir
     let mut broad = data.clone();
     broad["parameters"] =
         serde_json::json!({"token":{"type":"semantic_ref","category":"variation"}});
-    assert_eq!(bind(&broad, "Sway.Mark narrowly").complete.len(), 1);
-    let ambiguous = bind(&broad, "Sway.Mark narrowly loosely");
+    assert_eq!(bind(&broad, "｛Mark｝ narrowly").complete.len(), 1);
+    let ambiguous = bind(&broad, "｛Mark｝ narrowly loosely");
     assert!(ambiguous.complete.is_empty());
     assert!(
         ambiguous
@@ -181,7 +178,7 @@ fn fluctuation_matching_is_disjoint_only_when_declared_and_required_stays_requir
     broad["parameters"]["other"] =
         serde_json::json!({"type":"semantic_ref","category":"variation"});
     assert!(
-        bind(&broad, "Sway.Mark narrowly loosely")
+        bind(&broad, "｛Mark｝ narrowly loosely")
             .complete
             .is_empty()
     );
@@ -423,7 +420,7 @@ fn core_thinness_is_not_promoted_to_a_macro_semantic_fact() {
     )
     .unwrap();
     let document = NormalizedDdlDocument::new(
-        "Bind.ThinParam thin",
+        "｛ThinParam｝ thin",
         ResolvedInstructionLanguage::En,
         vec![lock.clone()],
     )
@@ -450,7 +447,7 @@ fn core_thinness_is_not_promoted_to_a_macro_semantic_fact() {
     );
 
     let document = NormalizedDdlDocument::new(
-        "Bind.ThinParam small circle",
+        "｛ThinParam｝ small circle",
         ResolvedInstructionLanguage::En,
         vec![lock],
     )
@@ -487,23 +484,23 @@ fn declared_core_binding_requires_a_unique_complete_assignment() {
     .unwrap();
     for (source, expected) in [
         (
-            "Core.Mark thin",
+            "｛Mark｝ thin",
             MacroParameterBindingDiagnosticKind::MissingCompatibleFact,
         ),
         (
-            "thin small circle Core.Mark",
+            "thin small circle ｛Mark｝",
             MacroParameterBindingDiagnosticKind::MissingCompatibleFact,
         ),
         (
-            "thin extra-fine small Core.Mark",
+            "thin extra-fine small ｛Mark｝",
             MacroParameterBindingDiagnosticKind::AmbiguousCompleteAssignment,
         ),
         (
-            "thin small large Core.Mark",
+            "thin small large ｛Mark｝",
             MacroParameterBindingDiagnosticKind::AmbiguousCompleteAssignment,
         ),
         (
-            "thin small Core.Mark Core.Mark",
+            "thin small ｛Mark｝ ｛Mark｝",
             MacroParameterBindingDiagnosticKind::SharedFact,
         ),
     ] {
@@ -540,7 +537,7 @@ fn lexical_place_facts_bind_as_one_canonical_value_without_losing_source() {
         format!("sha256:{}", identity.full_digest_hex()),
     )
     .unwrap();
-    let source = format!("Bind.Place {source_surface}");
+    let source = format!("｛Place｝ {source_surface}");
     let document =
         NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, vec![lock]).unwrap();
     let result = bind_macro_parameters(&document, std::slice::from_ref(&definition)).unwrap();

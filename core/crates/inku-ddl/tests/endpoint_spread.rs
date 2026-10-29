@@ -352,7 +352,7 @@ fn macro_endpoint_and_spread_survive_shared_transform_and_compact_materializatio
     ]});
     let definition = MacroDefinition::from_json(&value.to_string()).unwrap();
     let transformed = compile(
-        "Test.Endpoints",
+        "｛Endpoints｝",
         ResolvedInstructionLanguage::En,
         &[definition],
     );

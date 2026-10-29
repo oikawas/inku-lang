@@ -159,7 +159,7 @@ fn selected_score_keeps_macro_outer_envelope_and_inner_count() {
         "schema":"inku.macro-definition.v1", "namespace":"Delivery", "heading":"Pair", "version":"1.0.0",
         "parameters":{}, "components":{}, "body":[emit("circle"),emit("point")]
     }).to_string()).unwrap();
-    for (source, count, omitted) in [("Delivery.Pair", 1, true), ("3 Delivery.Pair", 3, false)] {
+    for (source, count, omitted) in [("｛Pair｝", 1, true), ("3 ｛Pair｝", 3, false)] {
         let delivered = selected_score(
             source,
             ResolvedInstructionLanguage::En,
@@ -223,11 +223,7 @@ fn selected_score_preserves_primitive_group_and_anchor_owner() {
             "position_y":{"expr":"exact_decimal","value":"0.5"}
         }}]
     }).to_string()).unwrap();
-    let anchor = selected_score(
-        "Delivery.Anchor",
-        ResolvedInstructionLanguage::En,
-        &[definition],
-    );
+    let anchor = selected_score("｛Anchor｝", ResolvedInstructionLanguage::En, &[definition]);
     assert!(anchor.score.instructions.is_empty());
     assert_eq!(anchor.score.anchors.len(), 1);
     assert_eq!(anchor.anchor_origins.len(), 1);
@@ -442,7 +438,7 @@ fn declared_macro_and_direct_fill_share_count_geometry_and_clip_recipe() {
             "color":{"expr":"semantic_ref","category":"color","id":"red"}
         }}]
     }).to_string()).unwrap();
-    let generated = stage("Fill.Dots", ResolvedInstructionLanguage::En, &[definition]);
+    let generated = stage("｛Dots｝", ResolvedInstructionLanguage::En, &[definition]);
     let direct = stage("fill red point.", ResolvedInstructionLanguage::En, &[]);
     let generated = plan_verified_stage15(generated.verified_effective_view(), context("square"));
     let direct = plan_verified_stage15(direct.verified_effective_view(), context("square"));
@@ -550,7 +546,7 @@ fn macro_motifs_keep_complete_body_and_share_density_resolution() {
             "parameters":{},"components":{},"body":body
         }).to_string()).unwrap();
         let transformed = stage(
-            "fill with Fill.Motif.",
+            "fill with ｛Motif｝.",
             ResolvedInstructionLanguage::En,
             &[definition],
         );
@@ -589,7 +585,7 @@ fn macro_motifs_keep_complete_body_and_share_density_resolution() {
         "parameters":{},"components":{},"body":[repeated]
     }).to_string()).unwrap();
     let transformed = stage(
-        "fill with Fill.Motif and blue points.",
+        "fill with ｛Motif｝ and blue points.",
         ResolvedInstructionLanguage::En,
         &[definition],
     );

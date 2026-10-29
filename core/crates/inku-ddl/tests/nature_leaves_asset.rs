@@ -255,11 +255,14 @@ fn bundled_nature_leaves_are_valid_bounded_definitions_that_reach_normal_score_l
         .unwrap()
         .with_aliases(definition.alias_qualified_names())
         .unwrap();
-        let canonical_source = format!("{}.", identity.qualified_name());
+        let (ja_names, en_names) =
+            inku_ddl::plugin_names::v1_plugin_names(&definition.heading, &definition.aliases);
+        let canonical_source = format!("{{{}}}.", en_names[0]);
+        let japanese_source = format!("｛{}｝", ja_names[0]);
         let (source, language) = if *qualified_name == "Nature.若葉" {
             (canonical_source.as_str(), ResolvedInstructionLanguage::En)
         } else {
-            (*qualified_name, ResolvedInstructionLanguage::Ja)
+            (japanese_source.as_str(), ResolvedInstructionLanguage::Ja)
         };
         let execution = compile_ddl_to_score(
             NormalizedDdlDocument::new(source, language, vec![lock]).unwrap(),
@@ -423,8 +426,14 @@ fn migrate_and_compile(
         format!("sha256:{}", identity.full_digest_hex()),
     )
     .unwrap();
+    let (ja, en) =
+        inku_ddl::plugin_names::v1_plugin_names(&definition.heading, &definition.aliases);
+    let written = match language {
+        ResolvedInstructionLanguage::Ja => format!("｛{}｝", ja[0]),
+        ResolvedInstructionLanguage::En => format!("{{{}}}.", en[0]),
+    };
     let execution = compile_ddl_to_score(
-        NormalizedDdlDocument::new(source, language, vec![lock]).unwrap(),
+        NormalizedDdlDocument::new(written, language, vec![lock]).unwrap(),
         std::slice::from_ref(&definition),
         Some(37),
         MIGRATION_LIMITS,
@@ -689,14 +698,17 @@ fn a_bundled_word_draws_the_same_score_by_its_canonical_name_or_its_alias() {
     };
     for definition in &definitions {
         let canonical = definition.qualified_name().unwrap();
-        let alias = &definition.alias_qualified_names()[0];
+        let (ja, en) =
+            inku_ddl::plugin_names::v1_plugin_names(&definition.heading, &definition.aliases);
+        let alias = format!("｛{}｝", ja[0]);
+        let english = format!("{{{}}}", en[0]);
         let by_alias = score(
             &format!("背景を白で埋める。\n{alias}。"),
             ResolvedInstructionLanguage::Ja,
         );
         assert_eq!(
             score(
-                &format!("背景を白で埋める。\n{canonical}。"),
+                &format!("背景を白で埋める。\n{english}。"),
                 ResolvedInstructionLanguage::Ja
             ),
             by_alias,
@@ -704,7 +716,7 @@ fn a_bundled_word_draws_the_same_score_by_its_canonical_name_or_its_alias() {
         );
         assert_eq!(
             score(
-                &format!("Fill the background with white.\n{canonical}."),
+                &format!("Fill the background with white.\n{english}."),
                 ResolvedInstructionLanguage::En
             )["instructions"],
             by_alias["instructions"],
@@ -759,7 +771,14 @@ fn every_bundled_word_expands_without_omission_at_many_placement_seeds() {
         .unwrap();
         let execution = compile_ddl_to_score(
             NormalizedDdlDocument::new(
-                identity.qualified_name(),
+                format!(
+                    "｛{}｝",
+                    inku_ddl::plugin_names::v1_plugin_names(
+                        &definition.heading,
+                        &definition.aliases
+                    )
+                    .0[0]
+                ),
                 ResolvedInstructionLanguage::Ja,
                 vec![lock],
             )
@@ -814,12 +833,9 @@ fn counted_words_take_the_written_count_inside_the_word() {
     };
     // Ten leaves are twenty arcs in one word, not the word drawn ten times.
     for (source, language) in [
-        ("Nature.若葉を10枚置く。", ResolvedInstructionLanguage::Ja),
-        (
-            "Place 10 Nature.YoungLeaves.",
-            ResolvedInstructionLanguage::En,
-        ),
-        ("10 Nature.YoungLeaves.", ResolvedInstructionLanguage::En),
+        ("｛若葉｝を10枚置く。", ResolvedInstructionLanguage::Ja),
+        ("Place 10 {young leaves}.", ResolvedInstructionLanguage::En),
+        ("10 {young leaves}.", ResolvedInstructionLanguage::En),
     ] {
         let execution = compile(source, language);
         let score = execution
@@ -837,14 +853,14 @@ fn counted_words_take_the_written_count_inside_the_word() {
     // Each counted word draws the written count inside itself.
     // Undergrowth and WitheredGrass count clumps of three to five blades.
     for (source, arcs) in [
-        ("Nature.下草を3個置く。", 18..=30),
-        ("Nature.青葉を10枚置く。", 20..=20),
-        ("Nature.落葉を16枚置く。", 32..=32),
-        ("Nature.枯草を1個置く。", 6..=10),
-        ("Nature.枯葉を7枚置く。", 14..=14),
+        ("｛下草｝を3個置く。", 18..=30),
+        ("｛青葉｝を10枚置く。", 20..=20),
+        ("｛落葉｝を16枚置く。", 32..=32),
+        ("｛枯草｝を1個置く。", 6..=10),
+        ("｛枯葉｝を7枚置く。", 14..=14),
         // The forms Stage 1 prints, with no action word.
-        ("10枚のNature.若葉。", 20..=20),
-        ("2個のNature.下草。", 12..=20),
+        ("10枚の｛若葉｝。", 20..=20),
+        ("2個の｛下草｝。", 12..=20),
     ] {
         let execution = compile(source, ResolvedInstructionLanguage::Ja);
         let score = execution
@@ -860,7 +876,7 @@ fn counted_words_take_the_written_count_inside_the_word() {
     }
     // Thirteen is past the word's twelve: only the word is left out, with its reason.
     let execution = compile(
-        "Nature.若葉を13枚置く。\n赤い円を置く。",
+        "｛若葉｝を13枚置く。\n赤い円を置く。",
         ResolvedInstructionLanguage::Ja,
     );
     assert_eq!(
@@ -913,7 +929,14 @@ fn every_counted_word_expands_without_omission_at_its_maximum_count() {
                 "{}{}の{}。",
                 count.maximum,
                 count.counter.japanese(),
-                definition.alias_qualified_names()[0]
+                format!(
+                    "｛{}｝",
+                    inku_ddl::plugin_names::v1_plugin_names(
+                        &definition.heading,
+                        &definition.aliases
+                    )
+                    .0[0]
+                )
             ))
         })
         .collect();

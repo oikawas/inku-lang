@@ -2084,7 +2084,7 @@ fn resolved_complete_macro_invocation_becomes_a_semantic_head_without_reexecutio
     .expect("fixture definition parses");
     let identity = definition.identity().expect("fixture definition is valid");
     let document = NormalizedDdlDocument::new(
-        "Nature.Leaf",
+        "｛Leaf｝",
         ResolvedInstructionLanguage::En,
         vec![
             MacroLock::new(
@@ -2137,7 +2137,7 @@ fn complete_macro_parameters_are_owned_once_and_excluded_from_outer_fields() {
         serde_json::json!([]),
     );
     let document = locked_macro_document(
-        "Nature.Leaf circle 8 blue silverpoint",
+        "｛Leaf｝ circle 8 blue silverpoint",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
     );
@@ -2233,7 +2233,7 @@ fn complete_macro_parameters_are_owned_once_and_excluded_from_outer_fields() {
         serde_json::json!([]),
     );
     let outer_document = locked_macro_document(
-        "blue Nature.Outer",
+        "blue ｛Outer｝",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&outer_definition),
     );
@@ -2257,7 +2257,7 @@ fn complete_macro_parameters_are_owned_once_and_excluded_from_outer_fields() {
         serde_json::json!([]),
     );
     let number = macro_association(
-        "Nature.Measure 5",
+        "｛Measure｝ 5",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&number_definition),
     );
@@ -2280,7 +2280,7 @@ fn macro_place_parameter_keeps_lexical_provenance_with_one_typed_identity() {
 
     // The v1 alias `middle` bound the same value; v2 does not read it (SPEC §3.3).
     let source_surface = "center";
-    let source = format!("Bind.Place {source_surface}");
+    let source = format!("｛Place｝ {source_surface}");
     let result = macro_association(
         &source,
         ResolvedInstructionLanguage::En,
@@ -2310,12 +2310,12 @@ fn macro_head_canonical_depends_only_on_definition_and_parameter_meaning() {
         serde_json::json!([]),
     );
     let en = macro_association(
-        "Nature.Leaf circle",
+        "｛Leaf｝ circle",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
     );
     let ja = macro_association(
-        "紙 Nature.Leaf 円",
+        "紙 ｛Leaf｝ 円",
         ResolvedInstructionLanguage::Ja,
         std::slice::from_ref(&definition),
     );
@@ -2329,7 +2329,7 @@ fn macro_head_canonical_depends_only_on_definition_and_parameter_meaning() {
         serde_json::json!([]),
     );
     let ordinal_shifted = macro_association(
-        "Nature.Other! Nature.Leaf circle",
+        "｛Other｝! ｛Leaf｝ circle",
         ResolvedInstructionLanguage::En,
         &[prefix, definition.clone()],
     );
@@ -2363,22 +2363,22 @@ fn macro_head_canonical_depends_only_on_definition_and_parameter_meaning() {
         serde_json::json!([]),
     );
     let changed_version = macro_association(
-        "Nature.Leaf circle",
+        "｛Leaf｝ circle",
         ResolvedInstructionLanguage::En,
         &[version],
     );
     let changed_digest = macro_association(
-        "Nature.Leaf circle",
+        "｛Leaf｝ circle",
         ResolvedInstructionLanguage::En,
         &[digest],
     );
     let changed_name = macro_association(
-        "Nature.Bud circle",
+        "｛Bud｝ circle",
         ResolvedInstructionLanguage::En,
         &[qualified],
     );
     let changed_value = macro_association(
-        "Nature.Leaf square",
+        "｛Leaf｝ square",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
     );
@@ -2399,7 +2399,7 @@ fn macro_diagnostics_and_ambiguous_heads_never_fall_back_or_guess() {
         serde_json::json!([]),
     );
     let unlocked_document =
-        NormalizedDdlDocument::new("Nature.Leaf", ResolvedInstructionLanguage::En, Vec::new())
+        NormalizedDdlDocument::new("｛Leaf｝", ResolvedInstructionLanguage::En, Vec::new())
             .unwrap();
     let unlocked_binding =
         bind_macro_parameters(&unlocked_document, std::slice::from_ref(&zero)).unwrap();
@@ -2415,12 +2415,12 @@ fn macro_diagnostics_and_ambiguous_heads_never_fall_back_or_guess() {
     else {
         panic!("typed macro issue must own exactly one invocation occurrence");
     };
-    assert_eq!(provenance.source.surface, "Nature.Leaf");
-    assert_eq!(provenance.qualified_name.as_deref(), Some("Nature.Leaf"));
+    assert_eq!(provenance.source.surface, "｛Leaf｝");
+    assert_eq!(provenance.qualified_name.as_deref(), None);
     assert_eq!(provenance.ordinal, 0);
 
     let missing_document = locked_macro_document(
-        "Nature.Leaf",
+        "｛Leaf｝",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&zero),
     );
@@ -2440,14 +2440,14 @@ fn macro_diagnostics_and_ambiguous_heads_never_fall_back_or_guess() {
         serde_json::json!([]),
     );
     let morning = semantic_macro_definition(
-        "Nature",
-        "若葉.朝",
+        "Garden",
+        "若葉",
         "1.0.0",
         serde_json::json!({}),
         serde_json::json!([]),
     );
     let ambiguous_lock_document = locked_macro_document(
-        "Nature.若葉.朝",
+        "｛若葉｝",
         ResolvedInstructionLanguage::Ja,
         &[leaf.clone(), morning.clone()],
     );
@@ -2470,7 +2470,7 @@ fn macro_diagnostics_and_ambiguous_heads_never_fall_back_or_guess() {
         serde_json::json!([]),
     );
     let incomplete = macro_association(
-        "Bind.Integer blue",
+        "｛Integer｝ blue",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&integer),
     );
@@ -2487,7 +2487,7 @@ fn macro_diagnostics_and_ambiguous_heads_never_fall_back_or_guess() {
         serde_json::json!([]),
     );
     let ambiguous_binding = macro_association(
-        "Bind.Color blue red",
+        "｛Color｝ blue red",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&color),
     );
@@ -2498,7 +2498,7 @@ fn macro_diagnostics_and_ambiguous_heads_never_fall_back_or_guess() {
     assert!(ambiguous_binding.ast.entities.is_empty());
 
     let primitive_and_macro = macro_association(
-        "Nature.Leaf circle",
+        "｛Leaf｝ circle",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&zero),
     );
@@ -2515,7 +2515,7 @@ fn macro_diagnostics_and_ambiguous_heads_never_fall_back_or_guess() {
     ));
 
     let primitive_then_macro = macro_association(
-        "circle Nature.Leaf",
+        "circle ｛Leaf｝",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&zero),
     );
@@ -2538,7 +2538,7 @@ fn macro_diagnostics_and_ambiguous_heads_never_fall_back_or_guess() {
         serde_json::json!([]),
     );
     let multiple_macro = macro_association(
-        "Nature.Leaf Nature.Other",
+        "｛Leaf｝ ｛Other｝",
         ResolvedInstructionLanguage::En,
         &[zero, other],
     );

@@ -4463,12 +4463,8 @@ mod execution_owner_join_tests {
         )
         .unwrap();
         compilations.push(compile_typed_ddl(
-            NormalizedDdlDocument::new(
-                "Review.Tint red",
-                ResolvedInstructionLanguage::En,
-                vec![lock],
-            )
-            .unwrap(),
+            NormalizedDdlDocument::new("｛Tint｝ red", ResolvedInstructionLanguage::En, vec![lock])
+                .unwrap(),
             std::slice::from_ref(&definition),
             None,
             LIMITS,
@@ -4504,7 +4500,7 @@ mod execution_owner_join_tests {
         )
         .unwrap();
         let document = NormalizedDdlDocument::new(
-            "Review.Tint red. the Review.Tint red swaying",
+            "｛Tint｝ red. the ｛Tint｝ red swaying",
             ResolvedInstructionLanguage::En,
             vec![lock],
         )
@@ -4583,7 +4579,7 @@ mod execution_owner_join_tests {
         )
         .unwrap();
         let document =
-            NormalizedDdlDocument::new("Focus.Center", ResolvedInstructionLanguage::En, vec![lock])
+            NormalizedDdlDocument::new("｛Center｝", ResolvedInstructionLanguage::En, vec![lock])
                 .unwrap();
         let binding = bind_macro_parameters(&document, std::slice::from_ref(&definition)).unwrap();
         let semantic = associate_semantic_document_with_macro_binding(&document, binding.clone());
@@ -4603,7 +4599,7 @@ mod execution_owner_join_tests {
         let mut corrupted_ast = semantic.ast;
         let SemanticHead::MacroInvocation(head) = &mut corrupted_ast.instructions[0].entity.head
         else {
-            panic!("locked Focus.Center remains a semantic macro head");
+            panic!("locked ｛Center｝ remains a semantic macro head");
         };
         head.provenance.source.span.end_byte -= 1;
 
@@ -4649,7 +4645,7 @@ mod execution_owner_join_tests {
         )
         .unwrap();
         let document = NormalizedDdlDocument::new(
-            "a Focus.Named; the red Focus.Named; a blue Focus.Named",
+            "a ｛Named｝; the red ｛Named｝; a blue ｛Named｝",
             ResolvedInstructionLanguage::En,
             vec![lock],
         )

@@ -477,6 +477,20 @@ mod tests {
         );
         let braced = offer_plugins("｛ＹＯＵＮＧ　ＬＥＡＶＥＳ｝", None, &catalog, 8);
         assert_eq!(braced.offered[0].reason, OfferReason::Brace);
+        assert!(
+            offer_plugins("景色", Some("Nature.若葉。"), &catalog, 8)
+                .offered
+                .is_empty()
+        );
+        assert!(
+            offer_plugins("Nature.若葉", None, &catalog, 8)
+                .offered
+                .is_empty()
+        );
+        assert_eq!(
+            offer_plugins("Nature.若葉と若葉", None, &catalog, 8).offered[0].reason,
+            OfferReason::Name
+        );
     }
 
     #[test]

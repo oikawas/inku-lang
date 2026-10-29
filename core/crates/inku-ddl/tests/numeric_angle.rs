@@ -365,7 +365,7 @@ fn a_macro_caller_has_nowhere_to_bind_an_angle() {
     .unwrap();
     let compilation = compile_typed_ddl(
         NormalizedDdlDocument::new(
-            "Draw.Row rotated 30 degrees",
+            "｛Row｝ rotated 30 degrees",
             ResolvedInstructionLanguage::En,
             vec![lock],
         )

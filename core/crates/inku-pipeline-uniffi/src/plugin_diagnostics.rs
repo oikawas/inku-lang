@@ -186,7 +186,11 @@ fn explain(
         let Some(text) = source.get(start..end) else {
             continue;
         };
-        let Some(name) = written_name(text, &known) else {
+        let name = if old_notation {
+            text.to_owned()
+        } else if let Some(name) = written_name(text, &known) {
+            name
+        } else {
             continue;
         };
         let (reason, suggestion) = if old_notation {
@@ -374,6 +378,18 @@ pub fn explain_plugin_diagnostics(input_bytes: Vec<u8>) -> Vec<u8> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn old_notation_keeps_the_compiler_span_even_if_a_known_name_is_a_prefix() {
+        let source = "Nature.LeafOther。";
+        let end = "Nature.LeafOther".len();
+        let diagnostics =
+            [json!({"reason":"plugin_old_notation","span":{"start_byte":0,"end_byte":end}})];
+        let result = explain(source, &diagnostics, &["Nature.Leaf".into()], &[], &[]);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].name, "Nature.LeafOther");
+        assert_eq!((result[0].start_byte, result[0].end_byte), (0, end));
+    }
 
     fn missing(source: &str, sentence: &str, reason: &str) -> Value {
         let start = source.find(sentence).unwrap();

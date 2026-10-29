@@ -196,7 +196,7 @@ fn macro_inside_anonymous_group_keeps_real_source_ownership() {
     )
     .unwrap();
     let result = execute(
-        "Line up five, alternating a group of Draw.Pair and a red circle with a gray arc.",
+        "Line up five, alternating a group of ｛Pair｝ and a red circle with a gray arc.",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
         vec![lock],

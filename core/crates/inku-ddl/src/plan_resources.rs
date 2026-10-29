@@ -1384,10 +1384,10 @@ mod tests {
         let definition = motif(2);
         // Three copies alone are one member of a cells group (I-708).
         for (source, logical, marks, placement, fill, nodes) in [
-            ("Test.Pair", 1, 4, 0, 0, 3),
-            ("three Test.Pair", 3, 12, 1, 0, 4),
+            ("｛Pair｝", 1, 4, 0, 0, 3),
+            ("three ｛Pair｝", 3, 12, 1, 0, 4),
             (
-                "scatter three Test.Pair and five blue circles at center.",
+                "scatter three ｛Pair｝ and five blue circles at center.",
                 8,
                 17,
                 1,
@@ -1395,7 +1395,7 @@ mod tests {
                 5,
             ),
             (
-                "fill with three Test.Pair and five blue circles.",
+                "fill with three ｛Pair｝ and five blue circles.",
                 8,
                 17,
                 0,
@@ -1426,7 +1426,7 @@ mod tests {
 
     #[test]
     fn maximum_macro_products_overflow_without_expansion() {
-        let stage = stage("4294967295 Test.Pair", &[motif(u32::MAX)]);
+        let stage = stage("4294967295 ｛Pair｝", &[motif(u32::MAX)]);
         let plan = plan(&stage);
         assert_eq!(plan.objects.len(), 2);
         let error = preflight_composition_plan(
@@ -1452,7 +1452,7 @@ mod tests {
     #[test]
     fn malformed_private_group_contracts_are_rejected_with_owner() {
         let stage = stage(
-            "fill with three Test.Pair and five blue circles.",
+            "fill with three ｛Pair｝ and five blue circles.",
             &[motif(2)],
         );
         let mut plan = plan(&stage);
@@ -1518,7 +1518,7 @@ mod tests {
     #[test]
     fn shipping_limit_units_keep_macro_emits_separate_and_do_not_clamp_fill() {
         let definition = motif(1);
-        let stage = stage("125 Test.Pair", &[definition]);
+        let stage = stage("125 ｛Pair｝", &[definition]);
         let plan = plan(&stage);
         let mut policy = hard(u64::MAX);
         policy.budget.maximum.primitive_marks = 400;
@@ -1561,7 +1561,7 @@ mod tests {
     fn each_distinct_limit_dimension_rejects_at_its_exact_boundary() {
         for (source, definition, dimension, maximum) in [
             (
-                "241 Test.Pair",
+                "241 ｛Pair｝",
                 Some(motif(1)),
                 ResourceDimension::MaximumPerTemplatePrimitiveMarks,
                 240,
@@ -1573,7 +1573,7 @@ mod tests {
                 2000,
             ),
             (
-                "Test.Pair",
+                "｛Pair｝",
                 Some(motif(1)),
                 ResourceDimension::ObjectTemplates,
                 1,
@@ -1619,7 +1619,7 @@ mod tests {
             }}]
         }).to_string()).unwrap();
         // Three copies are one member of a cells group, its own template node (I-708).
-        let stage = stage("three Test.Anchor", &[definition]);
+        let stage = stage("three ｛Anchor｝", &[definition]);
         let mut plan = plan(&stage);
         let exact = demand(&plan);
         assert_eq!(
@@ -1726,16 +1726,16 @@ mod tests {
     fn selection_never_splits_group_members_or_macro_bodies() {
         for (source, first_kept_index, is_fill) in [
             (
-                "fill with three Test.Pair and five blue circles. place one green square.",
+                "fill with three ｛Pair｝ and five blue circles. place one green square.",
                 3,
                 true,
             ),
             (
-                "scatter three Test.Pair and five blue circles at center. place one green square.",
+                "scatter three ｛Pair｝ and five blue circles at center. place one green square.",
                 3,
                 false,
             ),
-            ("three Test.Pair. place one green square.", 2, false),
+            ("three ｛Pair｝. place one green square.", 2, false),
         ] {
             let stage = stage(source, &[motif(2)]);
             let plan = plan(&stage);
@@ -1764,7 +1764,7 @@ mod tests {
     #[test]
     fn selection_recovers_from_one_unit_overflow_but_not_invalid_contracts() {
         let stage = stage(
-            "4294967295 Test.Pair. place one blue circle.",
+            "4294967295 ｛Pair｝. place one blue circle.",
             &[motif(u32::MAX)],
         );
         let mut plan = plan(&stage);

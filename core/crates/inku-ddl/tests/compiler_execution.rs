@@ -204,7 +204,7 @@ fn exact_decimal_macro_geometry_and_coordinates_share_direct_score_and_recovery(
             fields[key] = json!({"expr":"exact_decimal","value":value});
         }
         let definition = MacroDefinition::from_json(&json!({"schema":"inku.macro-definition.v1","namespace":"Exact","heading":"Mark","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":fields}]}).to_string()).unwrap();
-        let actual = execute_locked("Exact.Mark", &[definition], LIMITS, ScoreErrorPolicy::Stop);
+        let actual = execute_locked("｛Mark｝", &[definition], LIMITS, ScoreErrorPolicy::Stop);
         let expected = execute(
             &format!("place one red {shape} {direct} at horizontal 0.5 vertical 0.5."),
             &[],
@@ -243,7 +243,7 @@ fn exact_decimal_declared_caller_geometry_is_consumed_once_and_numeric_place_con
         "body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"color":{"expr":"semantic_ref","category":"color","id":"red"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"radius":{"expr":"parameter","name":"r"},"position_x":{"expr":"parameter","name":"y"},"position_y":{"expr":"parameter","name":"x"}}}]});
     let definition = MacroDefinition::from_json(&data.to_string()).unwrap();
     let result = execute_locked(
-        "Exact.Mark radius 0.10 horizontal 0.3 vertical 0.7",
+        "｛Mark｝ radius 0.10 horizontal 0.3 vertical 0.7",
         &[definition],
         LIMITS,
         ScoreErrorPolicy::Stop,
@@ -265,7 +265,7 @@ fn exact_decimal_declared_caller_geometry_is_consumed_once_and_numeric_place_con
         json!({"expr":"semantic_ref","category":"place","id":"center"});
     let definition = MacroDefinition::from_json(&data.to_string()).unwrap();
     let conflict = execute_locked(
-        "Exact.Mark radius 0.1 horizontal 0.3 vertical 0.7",
+        "｛Mark｝ radius 0.1 horizontal 0.3 vertical 0.7",
         &[definition],
         LIMITS,
         ScoreErrorPolicy::Stop,
@@ -808,7 +808,7 @@ fn touching_flat_macro_color_binding_has_same_effective_score_and_performance() 
     let mut definition_value = json!({"schema":"inku.macro-definition.v1", "namespace":"Touch", "heading":"Chain", "version":"1.0.0", "parameters":{"tone":{"type":"semantic_ref","category":"color"}}, "components":{}, "body":body});
     let definition = definition_from(&definition_value.to_string());
     let generated = execute_locked(
-        "blue Touch.Chain",
+        "blue ｛Chain｝",
         &[definition],
         LIMITS,
         ScoreErrorPolicy::Stop,
@@ -866,7 +866,7 @@ fn touching_flat_macro_color_binding_has_same_effective_score_and_performance() 
     definition_value["body"][1]["fields"]["angle"] =
         json!({"expr":"semantic_ref", "category":"angle", "id":"horizontal"});
     let conflict = execute_locked(
-        "blue Touch.Chain",
+        "blue ｛Chain｝",
         &[definition_from(&definition_value.to_string())],
         LIMITS,
         ScoreErrorPolicy::Stop,
@@ -945,7 +945,7 @@ fn declared_normal_scale_is_fixed_for_touching_and_preserves_omission_owner() {
             ]
         }).to_string());
         let execution = execute_locked(
-            "normal-sized Touch.Scale",
+            "normal-sized ｛Scale｝",
             &[definition],
             LIMITS,
             ScoreErrorPolicy::Stop,
@@ -1012,8 +1012,8 @@ fn declared_core_binding_failure_and_unbound_caller_keep_their_policy_owners() {
     });
     let definition = definition_from(&data.to_string());
     for source in [
-        "place one red circle at center. Core.One",
-        "place one red circle at center. thin extra-fine Core.One",
+        "place one red circle at center. ｛One｝",
+        "place one red circle at center. thin extra-fine ｛One｝",
     ] {
         let stop = execute_locked(
             source,
@@ -1044,7 +1044,7 @@ fn declared_core_binding_failure_and_unbound_caller_keep_their_policy_owners() {
     data["body"][0]["fields"]["thinness"] =
         json!({"expr":"semantic_ref","category":"thinness","id":"fine"});
     let definition = definition_from(&data.to_string());
-    let source = "place one red circle at center. normal-sized Core.One";
+    let source = "place one red circle at center. normal-sized ｛One｝";
     let stop = execute_locked(
         source,
         std::slice::from_ref(&definition),
@@ -1195,7 +1195,7 @@ fn background_keeps_macro_body_when_only_caller_position_is_omitted() {
         )
     };
 
-    let omitted = "place Guard.Grass at bottom. fill background with white.";
+    let omitted = "place ｛Grass｝ at bottom. fill background with white.";
     let ordinary = execute_locked(
         omitted,
         &definitions,
@@ -1225,7 +1225,7 @@ fn background_keeps_macro_body_when_only_caller_position_is_omitted() {
         assert_eq!(outcome, ScoreLoweringOutcome::CompleteWithOmissions);
     }
 
-    let with_ground = "paper. place Guard.Grass at bottom. fill background with white.";
+    let with_ground = "paper. place ｛Grass｝ at bottom. fill background with white.";
     let ordinary = execute_locked(
         with_ground,
         &definitions,
@@ -1242,7 +1242,7 @@ fn background_keeps_macro_body_when_only_caller_position_is_omitted() {
     }
 
     let with_instruction =
-        "place one red circle at center. place Guard.Grass at bottom. fill background with white.";
+        "place one red circle at center. place ｛Grass｝ at bottom. fill background with white.";
     let ordinary = execute_locked(
         with_instruction,
         &definitions,
@@ -1729,7 +1729,7 @@ fn incomplete_macro_parameters_omit_the_owning_clause_and_failed_continuation_is
         r#"{"schema":"inku.macro-definition.v1","namespace":"Param","heading":"Mark","version":"1.0.0","parameters":{"tone":{"type":"semantic_ref","category":"color"}},"components":{},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"parameter","name":"tone"}}}]}"#,
     );
     let parameter_result = execute_locked(
-        "Param.Mark; place one square at center",
+        "｛Mark｝; place one square at center",
         std::slice::from_ref(&parameterized),
         LIMITS,
         ScoreErrorPolicy::OmitAndContinue,
@@ -1984,7 +1984,7 @@ fn canonical_ready_lowering_omits_a_relation_whose_direct_referent_is_a_macro_sl
         r#"{"schema":"inku.macro-definition.v1","namespace":"Good","heading":"Mark","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"}}}]}"#,
     );
     let result = execute_locked(
-        "Good.Mark! place one green square at center not touching the previous shape.",
+        "｛Mark｝! place one green square at center not touching the previous shape.",
         std::slice::from_ref(&definition),
         LIMITS,
         ScoreErrorPolicy::OmitAndContinue,
@@ -2087,7 +2087,7 @@ fn one_failed_macro_keeps_the_successful_expansion_with_original_seed_provenance
         ..LIMITS
     };
     let result = execute_locked(
-        "Good.Mark Bad.Pair",
+        "｛Mark｝ ｛Pair｝",
         &definitions,
         limits,
         ScoreErrorPolicy::OmitAndContinue,
@@ -2126,7 +2126,7 @@ fn global_macro_budget_stops_both_modes() {
     };
     for policy in [ScoreErrorPolicy::Stop, ScoreErrorPolicy::OmitAndContinue] {
         let result = execute_locked(
-            "Good.Mark Good.Mark",
+            "｛Mark｝ ｛Mark｝",
             std::slice::from_ref(&definition),
             limits,
             policy,
@@ -2201,7 +2201,7 @@ fn connected_full_literals_are_bilingual_and_macro_uses_the_same_score_consumer(
         r#"{"schema":"inku.macro-definition.v1","namespace":"Path","heading":"Pair","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":"first","fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"line"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"}}},{"op":"emit","binding":"second","fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"line"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"blue"}}},{"op":"relation","kind":"connected","from":"first","to":"second"}]}"#,
     );
     let macro_result = execute_locked(
-        "Path.Pair",
+        "｛Pair｝",
         std::slice::from_ref(&definition),
         LIMITS,
         ScoreErrorPolicy::Stop,
@@ -2248,7 +2248,7 @@ fn not_touching_full_literal_and_macro_use_the_same_score_consumer() {
         r#"{"schema":"inku.macro-definition.v1","namespace":"Path","heading":"Separate","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":"first","fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"}}},{"op":"emit","binding":"second","fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"square"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"blue"}}},{"op":"relation","kind":"not_touching","from":"first","to":"second"}]}"#,
     );
     let macro_result = execute_locked(
-        "Path.Separate",
+        "｛Separate｝",
         std::slice::from_ref(&definition),
         LIMITS,
         ScoreErrorPolicy::Stop,
@@ -2282,7 +2282,7 @@ fn macro_not_touching_preserves_emit_adjacency_and_omission_dependencies() {
         r#"{"schema":"inku.macro-definition.v1","namespace":"Path","heading":"UnboundBetween","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":"first","fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"}}},{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"green"}}},{"op":"emit","binding":"second","fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"square"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"blue"}}},{"op":"relation","kind":"not_touching","from":"first","to":"second"}]}"#,
     );
     let continued = execute_locked(
-        "Path.UnboundBetween",
+        "｛UnboundBetween｝",
         std::slice::from_ref(&unbound_between),
         LIMITS,
         ScoreErrorPolicy::OmitAndContinue,
@@ -2315,7 +2315,7 @@ fn macro_not_touching_preserves_emit_adjacency_and_omission_dependencies() {
         r#"{"schema":"inku.macro-definition.v1","namespace":"Path","heading":"OmittedPredecessor","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"green"}}},{"op":"emit","binding":"first","fields":{"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"}}},{"op":"emit","binding":"second","fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"square"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"blue"}}},{"op":"relation","kind":"not_touching","from":"first","to":"second"}]}"#,
     );
     let missing = execute_locked(
-        "Path.OmittedPredecessor",
+        "｛OmittedPredecessor｝",
         std::slice::from_ref(&omitted_predecessor),
         LIMITS,
         ScoreErrorPolicy::OmitAndContinue,
@@ -2345,7 +2345,7 @@ fn nonadjacent_macro_connected_keeps_emits_and_reports_relation_omission_in_both
     );
     for policy in [ScoreErrorPolicy::Stop, ScoreErrorPolicy::OmitAndContinue] {
         let result = execute_locked(
-            "Path.NonAdjacent",
+            "｛NonAdjacent｝",
             std::slice::from_ref(&definition),
             LIMITS,
             policy,
@@ -2428,7 +2428,7 @@ fn checked_render_indices_join_only_to_the_exact_compiler_score_and_owner() {
         r#"{"schema":"inku.macro-definition.v1","namespace":"Path","heading":"OwnerPair","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":"first","fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"line"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"}}},{"op":"emit","binding":"second","fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"line"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"blue"}}},{"op":"relation","kind":"connected","from":"first","to":"second"}]}"#,
     );
     let macro_result = execute_locked(
-        "Path.OwnerPair",
+        "｛OwnerPair｝",
         &[definition],
         LIMITS,
         ScoreErrorPolicy::Stop,
@@ -2452,7 +2452,7 @@ fn checked_render_indices_join_only_to_the_exact_compiler_score_and_owner() {
         r#"{"schema":"inku.macro-definition.v1","namespace":"Path","heading":"AnchorOwner","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":"mark","fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"line"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"}}},{"op":"anchor","name":"origin","fields":{"place":{"expr":"semantic_ref","category":"place","id":"center"}}}]}"#,
     );
     let anchor_result = execute_locked(
-        "Path.AnchorOwner",
+        "｛AnchorOwner｝",
         &[anchor_definition],
         LIMITS,
         ScoreErrorPolicy::Stop,
@@ -2567,7 +2567,7 @@ fn declared_macro_width_and_relative_scale_conflict_recovers_like_ordinary_ddl()
     for policy in [ScoreErrorPolicy::Stop, ScoreErrorPolicy::OmitAndContinue] {
         let ordinary = execute(ordinary_source, &[], LIMITS, policy);
         let declared = execute_locked(
-            "Size.RecoveredCircle",
+            "｛RecoveredCircle｝",
             std::slice::from_ref(&definition),
             LIMITS,
             policy,

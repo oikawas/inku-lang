@@ -284,12 +284,8 @@ fn step9i_input_boundary_checks_all_sidecars_and_consumed_definition_identity() 
     let unused = unused_sidecar_definition();
     let locks = vec![lock_for(&used), lock_for(&unused)];
     let control = compile_typed_ddl(
-        NormalizedDdlDocument::new(
-            "Focus.Center",
-            ResolvedInstructionLanguage::En,
-            locks.clone(),
-        )
-        .unwrap(),
+        NormalizedDdlDocument::new("｛Center｝", ResolvedInstructionLanguage::En, locks.clone())
+            .unwrap(),
         std::slice::from_ref(&used),
         Some(19),
         LIMITS,
@@ -359,7 +355,7 @@ fn step9i_input_boundary_checks_all_sidecars_and_consumed_definition_identity() 
     let replacement_identity = replacement.identity().unwrap();
     let mut stale_consumer = control;
     stale_consumer.document = NormalizedDdlDocument::new(
-        "Focus.Center",
+        "｛Center｝",
         ResolvedInstructionLanguage::En,
         vec![replacement_lock, lock_for(&unused)],
     )
@@ -638,7 +634,7 @@ fn noun_introduction_reaches_stage15_with_distinct_entity_and_macro_provenance()
     assert_eq!(transformed.original_semantic_document(), &semantic.ast);
 
     let definition = center_emit_definition();
-    let macro_source = "a Focus.Center";
+    let macro_source = "a ｛Center｝";
     let macro_compilation = compile_locked(
         macro_source,
         ResolvedInstructionLanguage::En,
@@ -657,10 +653,10 @@ fn noun_introduction_reaches_stage15_with_distinct_entity_and_macro_provenance()
         panic!("locked synthetic macro remains a semantic noun introduction");
     };
     assert_eq!(head.qualified_name, "Focus.Center");
-    assert_eq!(head.provenance.source.surface, "Focus.Center");
+    assert_eq!(head.provenance.source.surface, "｛Center｝");
     assert_eq!(
         &macro_source[head.provenance.source.span.start_byte..head.provenance.source.span.end_byte],
-        "Focus.Center"
+        "｛Center｝"
     );
     let macro_transformed =
         transform_stage15(stage15_transformation_input(&macro_compilation).unwrap()).unwrap();
@@ -707,8 +703,8 @@ fn primitive_inline_and_continuation_share_effective_identity() {
 fn macro_source_gap_keeps_one_effective_identity() {
     let definition = center_emit_definition();
     let compilations = [
-        "a red Focus.Center; a blue Focus.Center",
-        "a Focus.Center; the red Focus.Center; a blue Focus.Center",
+        "a red ｛Center｝; a blue ｛Center｝",
+        "a ｛Center｝; the red ｛Center｝; a blue ｛Center｝",
     ]
     .map(|source| {
         compile_locked(
@@ -754,7 +750,7 @@ fn continuation_target_and_execution_mapping_tampering_fail_closed_before_transf
 
     let definition = center_emit_definition();
     let compilation = compile_locked(
-        "a Focus.Center; the red Focus.Center; a blue Focus.Center",
+        "a ｛Center｝; the red ｛Center｝; a blue ｛Center｝",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
         Some(19),
@@ -798,7 +794,7 @@ fn continuation_target_and_execution_mapping_tampering_fail_closed_before_transf
 
     let named = named_target_definition();
     let mut unmapped = compile_locked(
-        "a Focus.Named; the red Focus.Named; a blue Focus.Named",
+        "a ｛Named｝; the red ｛Named｝; a blue ｛Named｝",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&named),
         Some(19),
@@ -825,7 +821,7 @@ fn step9h_nested_coupled_provenance_tamper_is_rejected() {
     )
     .unwrap();
     let mut coupled = compile_locked(
-        "Review.Nested",
+        "｛Nested｝",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
         Some(19),
@@ -870,7 +866,7 @@ fn step9h_nested_coupled_provenance_tamper_is_rejected() {
 fn coupled_seed_and_generated_provenance_tamper_is_rejected() {
     let definition = center_emit_definition();
     let mut coupled = compile_locked(
-        "Focus.Center",
+        "｛Center｝",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
         Some(19),
@@ -938,7 +934,7 @@ fn definite_imperative_object_groups_do_not_reach_stage15() {
     }
 
     let definition = center_emit_definition();
-    let source = "place the Focus.Center and a line.";
+    let source = "place the ｛Center｝ and a line.";
     let compilation = compile_locked(
         source,
         ResolvedInstructionLanguage::En,
@@ -956,7 +952,7 @@ fn definite_imperative_object_groups_do_not_reach_stage15() {
     ));
     assert_eq!(
         semantic.ast.instructions[0].entity.head.source().surface,
-        "Focus.Center"
+        "｛Center｝"
     );
     assert!(semantic.canonical_bytes.is_none());
     assert_eq!(
@@ -1057,7 +1053,7 @@ fn canonical_ready_gate_and_provenance_integrity_fail_closed() {
 
     let definition = center_emit_definition();
     let mut generated_provenance_corruption = compile_locked(
-        "Focus.Center",
+        "｛Center｝",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
         Some(5),

@@ -4909,7 +4909,7 @@ fn fluctuation_rejections_preserve_instruction_invocation_and_emit_units() {
     for (result, unit, survivors) in [
         (&point, "instruction", 1),
         (&point_emit, "emit", 1),
-        (&unbound, "invocation", 1),
+        (&unbound, "caller_field", 2),
         (&malformed, "emit", 1),
     ] {
         let stopped = lower_verified_stage15_score_with_policy(
@@ -4950,10 +4950,10 @@ fn fluctuation_rejections_preserve_instruction_invocation_and_emit_units() {
                     ) | (
                         ScoreDiagnosticOwner::MacroInvocation { .. },
                         ScoreDiagnosticDisposition::Omitted {
-                            unit: ScoreOmissionUnit::MacroInvocation { .. },
+                            unit: ScoreOmissionUnit::MacroCallerField { .. },
                             ..
                         },
-                        "invocation",
+                        "caller_field",
                     )
                 )
             }),

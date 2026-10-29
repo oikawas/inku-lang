@@ -2173,7 +2173,7 @@
      }
     ]
    },
-   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white. Nature.FallenLeaves.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Scatter 40 broadly loosely swaying black extra-fine pen faint grain falling small lines."
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white. {fallen leaves}.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Scatter 40 broadly loosely swaying black extra-fine pen faint grain falling small lines."
   },
   {
    "id": "en-14",
@@ -2231,7 +2231,7 @@
      }
     ]
    },
-   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with gray. Nature.Undergrowth.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Fill one crayon faint grain full-width square."
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with gray. {undergrowth}.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Fill one crayon faint grain full-width square."
   },
   {
    "id": "en-16",
@@ -3373,7 +3373,7 @@
      }
     ]
    },
-   "message": "記述:\n（記述）\n\n下絵のはじめの行: 和紙。 背景を白で埋める。 Nature.落葉。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 灰の太筆の薄い刷きの全幅の雲形を1個埋める。\n1（束）: 細かく小刻みに揺れる橙の太い太筆の実線の濃い粒の斜めの大きな線を2個引く。〔下絵が付けた場所: 中心〕\n2（束）: 黒のペンの実線の濃い塗りの回転の横長の小さな楕円を1個置く。〔下絵が付けた場所: 中心〕\n3（面）: 灰の鉛筆の程よいとても小さな点を15個散らす。"
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 和紙。 背景を白で埋める。 ｛落葉｝。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 灰の太筆の薄い刷きの全幅の雲形を1個埋める。\n1（束）: 細かく小刻みに揺れる橙の太い太筆の実線の濃い粒の斜めの大きな線を2個引く。〔下絵が付けた場所: 中心〕\n2（束）: 黒のペンの実線の濃い塗りの回転の横長の小さな楕円を1個置く。〔下絵が付けた場所: 中心〕\n3（面）: 灰の鉛筆の程よいとても小さな点を15個散らす。"
   },
   {
    "id": "ja-11",

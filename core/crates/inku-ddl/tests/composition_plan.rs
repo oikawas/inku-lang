@@ -500,7 +500,7 @@ fn macro_direction_uses_definition_binding_and_keeps_caller_roles() {
                 context("square"),
                 policy,
             );
-            assert_eq!(result.outcome(), CompositionPlanOutcome::Stopped);
+            assert_eq!(result.outcome(), CompositionPlanOutcome::ReadyWithOmissions);
             assert!(result.diagnostics().iter().any(|diagnostic| diagnostic.reason == ScoreFieldGap::UnboundMacroCallerMeaning));
         }
     }

@@ -133,6 +133,7 @@ public final class DisplaySettings {
     public private(set) var saveError: String?
     @ObservationIgnored private var fileURL: URL?
     @ObservationIgnored private var previewingTextSize = false
+    @ObservationIgnored private var rememberedSettingsTab: String?
     @ObservationIgnored private let fileWriter = DisplayPreferencesFileWriter()
     @ObservationIgnored private var saveRevision = 0
     public init() {}
@@ -150,6 +151,7 @@ public final class DisplaySettings {
             saveError = "表示設定を読み込めませんでした: \(error.localizedDescription)"
         }
         fileURL = url
+        rememberedSettingsTab = nil
     }
 
     public var colorScheme: ColorScheme? {
@@ -166,6 +168,14 @@ public final class DisplaySettings {
     public func label(_ japanese: String, _ english: String) -> String {
         preferences.language == "en" ? english : japanese
     }
+    /// The selected Settings page does not change the visible workspace. Keep it outside the observable preferences
+    /// so choosing a page does not rebuild every history tile and the canvas.
+    public var settingsTab: String? { rememberedSettingsTab ?? preferences.settingsTab }
+    public func rememberSettingsTab(_ tab: String) {
+        guard settingsTab != tab else { return }
+        rememberedSettingsTab = tab
+        persist()
+    }
     public func previewTextSize(_ step: Int) {
         previewingTextSize = true
         preferences.textSizeStep = min(4, max(0, step))
@@ -177,7 +187,9 @@ public final class DisplaySettings {
     private func persist() {
         guard !previewingTextSize, let fileURL else { return }
         do {
-            let data = try JSONEncoder().encode(preferences)
+            var snapshot = preferences
+            if let rememberedSettingsTab { snapshot.settingsTab = rememberedSettingsTab }
+            let data = try JSONEncoder().encode(snapshot)
             saveRevision += 1
             let revision = saveRevision
             Task {

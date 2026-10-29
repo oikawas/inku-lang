@@ -195,6 +195,7 @@ public final class AppModel {
     @ObservationIgnored private var host: PipelineHost?
     @ObservationIgnored private var settingsStore: ProviderSettingsStore?
     @ObservationIgnored private var settings = HostSettings()
+    @ObservationIgnored private var cachedStageDefaultProviderID = ProviderModelReference.stageDefaultProviderID
     @ObservationIgnored private var bootstrap: Bootstrap?
     /// Cancellation targets the active task, independently of the saved work being viewed.
     @ObservationIgnored private var activeExecutionID: String?
@@ -341,6 +342,7 @@ public final class AppModel {
                                      svgLimitBytes: { try await store.svgLimitBytes() })
             self.settingsStore = store
             self.settings = settings
+            updateStageDefaultProviderID()
             synchronizeNextDrawingModel(previousSettings: nil)
             pruneComparisonModels()
             self.bootstrap = bootstrap
@@ -619,8 +621,10 @@ public final class AppModel {
     }
 
     public func localDataDirectory() -> URL? { database?.url.deletingLastPathComponent() }
-    public var stageDefaultProviderID: String {
-        ProviderModelReference.split(settings.models.stage1Model, providers: settings.providers)?.providerID ?? ProviderModelReference.stageDefaultProviderID
+    public var stageDefaultProviderID: String { cachedStageDefaultProviderID }
+    private func updateStageDefaultProviderID() {
+        cachedStageDefaultProviderID = ProviderModelReference.split(settings.models.stage1Model, providers: settings.providers)?.providerID
+            ?? ProviderModelReference.stageDefaultProviderID
     }
     func reloadPluginPackages() throws {
         guard let directory = localDataDirectory() else { throw HostError("database_unavailable") }
@@ -747,6 +751,7 @@ public final class AppModel {
         settings = try await settingsStore.save(settings)
         let previousSettings = self.settings
         self.settings = settings
+        updateStageDefaultProviderID()
         synchronizeNextDrawingModel(previousSettings: previousSettings)
         pruneComparisonModels()
         if let bootstrap {

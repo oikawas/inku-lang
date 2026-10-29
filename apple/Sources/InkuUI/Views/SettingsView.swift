@@ -54,6 +54,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     @Bindable var maintenance: LocalMaintenance
     @State private var settings = SettingsModel()
     @Binding var section: SettingsSection
+    @FocusState private var closeFocused: Bool
     @State private var confirmRestore = false
     @State private var backupDeleteName: String?
     @State private var backupRestoreName: String?
@@ -82,9 +83,13 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                 .inkuFont(14)
             }
         }
-        .task(id: model.providerSettingsRevision) { await settings.load(model: model) }
+        .task(id: section == .models ? model.providerSettingsRevision : nil) {
+            guard section == .models else { return }
+            await settings.load(model: model)
+        }
         .onAppear {
             if [.plugins, .unread, .limits].contains(section) { model.display.preferences.settingsDetail = "detailed" }
+            closeFocused = true
         }
         .onChange(of: section) { _, value in
             if [.plugins, .unread, .limits].contains(value) { model.display.preferences.settingsDetail = "detailed" }
@@ -146,6 +151,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             .accessibilityLabel(model.display.webCopy("settingsDetailLabel", "表示モード"))
             Button(action: onClose) { Image(systemName: "xmark").inkuFont(15).frame(width: 32, height: 32).contentShape(Rectangle()) }
                 .buttonStyle(.plain).foregroundStyle(.secondary)
+                .focusable().focused($closeFocused)
                 .keyboardShortcut(.cancelAction)
                 .accessibilityLabel(model.display.localized("閉じる"))
         }
@@ -208,8 +214,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         let active = section == item
         return Button {
             section = item
-            // Web `selectTab` saves the author's choice (`settings_tab`); opening at a named page does not.
-            model.display.preferences.settingsTab = item.rawValue
+            // Save the author's last choice without invalidating the canvas and history.
+            model.display.rememberSettingsTab(item.rawValue)
         } label: {
             Text(title(item))
                 .inkuFont(14, weight: active ? .semibold : .regular)

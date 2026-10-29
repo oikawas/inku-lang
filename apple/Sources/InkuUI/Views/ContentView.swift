@@ -111,9 +111,8 @@ public struct ContentView: View {
         ZStack {
             mainShell
                 .opacity(presentation ? 0 : 1)
-                .accessibilityHidden(presentation)
-                .allowsHitTesting(!presentation)
-                .environment(\.inkuTooltipsCovered, presentation || ui.libraryOpen || ui.settingsOpen)
+                .accessibilityHidden(presentation || ui.libraryOpen || ui.settingsOpen)
+                .allowsHitTesting(!presentation && !ui.libraryOpen && !ui.settingsOpen)
             if ui.libraryOpen && !presentation { libraryOverlay }
             if ui.settingsOpen && !presentation { settingsOverlay }
             if presentation { presentationView }
@@ -265,7 +264,6 @@ public struct ContentView: View {
                 .accessibilityHidden(ui.libraryOpen)
                 .allowsHitTesting(!ui.libraryOpen)
         }
-        .disabled(ui.settingsOpen || ui.libraryOpen)
     }
 
     /// Web HistoryManager.svelte:1311 covers the window (`position: fixed; inset: 0`).
@@ -429,7 +427,7 @@ public struct ContentView: View {
         ui.settingsOpen = true
     }
     private var savedSettingsSection: SettingsSection? {
-        guard let section = model.display.preferences.settingsTab.flatMap(SettingsSection.init(rawValue:)) else { return nil }
+        guard let section = model.display.settingsTab.flatMap(SettingsSection.init(rawValue:)) else { return nil }
         let detailedOnly: [SettingsSection] = [.plugins, .unread, .limits]
         return detailedOnly.contains(section) && model.display.preferences.settingsDetail != "detailed" ? nil : section
     }

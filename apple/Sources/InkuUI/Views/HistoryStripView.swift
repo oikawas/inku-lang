@@ -186,19 +186,21 @@ import SwiftUI
         let kept = keptHeights[key] ?? 0
         // The count follows the window width (Web); a narrower strip clips the last tiles instead of widening the window.
         return ScrollViewReader { proxy in
-          ScrollView(.horizontal, showsIndicators: false) {
-            LazyHStack(alignment: .top, spacing: 7) {
-                ForEach(library.works, id: \.id) { work in tile(work).id(work.id) }
-                if let placeholder { emptyTile(placeholder, height: max(58, kept)) }
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(alignment: .top, spacing: 7) {
+                    ForEach(library.works, id: \.id) { work in tile(work).id(work.id) }
+                    if let placeholder { emptyTile(placeholder, height: max(58, kept)) }
+                }
+                // Web f62812ed3: the row never gets lower than it has been for the chosen fields, so a search, or a
+                // page with shorter tiles, does not move the canvas above it.
+                .frame(minHeight: kept > 0 ? kept : nil, alignment: .topLeading)
+                .fixedSize(horizontal: false, vertical: true)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                    if height > (keptHeights[key] ?? 0) { keptHeights[key] = height }
+                }
             }
-        // Web f62812ed3: the row never gets lower than it has been for the chosen fields, so a search, or a page with
-        // shorter tiles, does not move the canvas above it.
-        .frame(minWidth: 0, maxWidth: .infinity, minHeight: kept > 0 ? kept : nil, alignment: .topLeading)
-        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
-            if height > (keptHeights[key] ?? 0) { keptHeights[key] = height }
-        }
-          }
-          .onChange(of: focusedWorkID) { _, id in if let id { proxy.scrollTo(id) } }
+            .fixedSize(horizontal: false, vertical: true)
+            .onChange(of: focusedWorkID) { _, id in if let id { proxy.scrollTo(id) } }
         }
     }
 
@@ -289,7 +291,14 @@ import SwiftUI
         guard !locked else { return .handled }
         guard focusedWorkID == id else { return .ignored }
         Task {
-            guard let next = await history.navigate(app: model, fromWorkID: selectionID ?? id, delta: delta, selectWork: false), !locked else { return }
+            let next: SavedWork?
+            if let index = library.works.firstIndex(where: { $0.id == id }),
+               library.works.indices.contains(index + delta) {
+                next = library.works[index + delta]
+            } else {
+                next = await history.navigate(app: model, fromWorkID: id, delta: delta, selectWork: false)
+            }
+            guard let next, !locked else { return }
             onSelectWork(next)
             await model.selectWork(next)
             guard !locked else { return }

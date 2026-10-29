@@ -358,6 +358,7 @@ pub struct WorkPlanPlugin {
     pub object: bool,
     pub aspect: Option<String>,
     pub appearance_slots: Vec<WorkPlanSlot>,
+    pub primary_color: Option<String>,
 }
 
 impl WorkPlanPlugin {

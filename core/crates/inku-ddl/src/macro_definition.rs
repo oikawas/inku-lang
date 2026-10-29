@@ -469,6 +469,63 @@ pub struct MacroDefinition {
     pub plugin_v2: Option<Box<PluginDefinitionV2>>,
 }
 
+impl MacroDefinition {
+    /// The most frequent literal color in reachable body emits; ties go to the
+    /// first emit. A repeat counts its written body once, not its iterations.
+    pub fn primary_literal_color(&self) -> Option<String> {
+        fn visit(
+            definition: &MacroDefinition,
+            body: &[Statement],
+            active: &mut Vec<String>,
+            counts: &mut Vec<(String, usize)>,
+        ) {
+            for statement in body {
+                match statement {
+                    Statement::Emit { fields, .. } => {
+                        if let Some(Expression::SemanticRef { category, id }) = fields.get("color")
+                            && category == "color"
+                        {
+                            if let Some((_, count)) =
+                                counts.iter_mut().find(|(color, _)| color == id)
+                            {
+                                *count += 1;
+                            } else {
+                                counts.push((id.clone(), 1));
+                            }
+                        }
+                    }
+                    Statement::Use { component, .. } => {
+                        if !active.contains(component)
+                            && let Some(part) = definition.components.get(component)
+                        {
+                            active.push(component.clone());
+                            visit(definition, &part.body, active, counts);
+                            active.pop();
+                        }
+                    }
+                    Statement::Group { body }
+                    | Statement::Repeat { body, .. }
+                    | Statement::Transform { body, .. }
+                    | Statement::Vary { body, .. } => visit(definition, body, active, counts),
+                    Statement::Anchor { .. } | Statement::Relation { .. } => {}
+                }
+            }
+        }
+        let mut counts = Vec::new();
+        visit(self, &self.body, &mut Vec::new(), &mut counts);
+        counts
+            .into_iter()
+            .fold(
+                None,
+                |best: Option<(String, usize)>, candidate| match best {
+                    Some((_, count)) if count >= candidate.1 => best,
+                    _ => Some(candidate),
+                },
+            )
+            .map(|(color, _)| color)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PluginNamesV2 {

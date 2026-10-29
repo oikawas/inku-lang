@@ -169,6 +169,7 @@ impl ExpandedMacroNode {
 pub struct ExpandedMacroInvocation {
     pub provenance: MacroInvocationProvenance,
     pub nodes: Vec<ExpandedMacroNode>,
+    pub primary_literal_color: Option<String>,
 }
 
 /// Stable failure classes. None carries localized prose or a partially generated node.
@@ -504,7 +505,11 @@ fn expand_macros_with_selection(
                             && node.provenance().generated_ordinal < item.node_count
                     }) =>
             {
-                expanded.push(ExpandedMacroInvocation { provenance, nodes });
+                expanded.push(ExpandedMacroInvocation {
+                    provenance,
+                    nodes,
+                    primary_literal_color: definition.primary_literal_color(),
+                });
             }
             Ok(_) => diagnostics.push(invocation_diagnostic(
                 MacroExpansionDiagnosticKind::ProvenanceOwnershipMismatch,

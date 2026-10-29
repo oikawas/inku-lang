@@ -332,6 +332,33 @@ mod object_tests {
         )
         .unwrap();
         let score = delivery.score.unwrap();
+        let mut mixed = score.clone();
+        let template = &mut mixed.object_templates[0];
+        let position = template.instruction_index;
+        let mark = template.body.instructions[0].clone();
+        template.body.instructions.push(mark.clone());
+        let mut accent = mark;
+        accent.color = inku_score::Color::Gray;
+        template.body.instructions.push(accent);
+        crate::colors::paint_object_template(
+            &mut mixed,
+            position,
+            inku_score::Color::Green,
+            inku_score::Color::Blue,
+        );
+        assert_eq!(
+            mixed.object_templates[0]
+                .body
+                .instructions
+                .iter()
+                .map(|mark| mark.color)
+                .collect::<Vec<_>>(),
+            [
+                inku_score::Color::Blue,
+                inku_score::Color::Blue,
+                inku_score::Color::Gray
+            ]
+        );
         let context = crate::laws::LawsContext::new_with_plugins(
             score.clone(),
             &plan,
@@ -369,9 +396,10 @@ mod object_tests {
             config.prompt_limits,
         );
         assert!(
-            prompt.is_err(),
-            "a colorless object offers no recoloring law"
+            prompt.is_ok(),
+            "an object with a primary color offers recoloring"
         );
+        assert!(colors.object_trial_changes_drawn_color(0, inku_score::Color::Blue));
         let mut raw = serde_json::to_value(definition).unwrap();
         raw["parameters"]["hue"] = json!({"type":"semantic_ref","category":"color"});
         raw["body"][0]["fields"]["color"] = json!({"expr":"parameter","name":"hue"});

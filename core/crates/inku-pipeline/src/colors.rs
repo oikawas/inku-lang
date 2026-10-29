@@ -946,7 +946,7 @@ fn drawings(
     Some((now, by_color))
 }
 
-fn paint_object_template(score: &mut Score, position: usize, from: Color, to: Color) {
+pub(crate) fn paint_object_template(score: &mut Score, position: usize, from: Color, to: Color) {
     if let Some(template) = score
         .object_templates
         .iter_mut()
@@ -1082,12 +1082,15 @@ impl ColorsContext {
         let object_sources: BTreeMap<usize, Color> = object_colorable
             .iter()
             .filter_map(|layer| {
-                let source = printed
-                    .plan
-                    .layers
-                    .get(layer.checked_sub(first)?)?
-                    .attributes
-                    .get(&WorkPlanSlot::Color)?;
+                let plan = printed.plan.layers.get(layer.checked_sub(first)?)?;
+                let source = plan.attributes.get(&WorkPlanSlot::Color).or_else(|| {
+                    input
+                        .plugins
+                        .iter()
+                        .find(|plugin| plugin.name == plan.shape)?
+                        .primary_color
+                        .as_ref()
+                })?;
                 Some((*layer, color_named(source)?))
             })
             .collect();
@@ -2965,8 +2968,8 @@ impl ColorsContext {
         lines.extend(self.layer_lines(language));
         if !self.object_labels.is_empty() {
             lines.push(match language {
-                ResolvedInstructionLanguage::Ja => "shape が ｛名｝ の層は物の語（見えない四角の中の絵）。色の引数があるときだけ色を替えられる。色の欄が空でも、箱の仮の黒を描いた色として数えない。".to_owned(),
-                ResolvedInstructionLanguage::En => "A layer whose shape is {name} is an object word (a picture inside an invisible square). Recolor it only when its definition has a color parameter. An empty color cell does not count the box's placeholder black as a drawn color.".to_owned(),
+                ResolvedInstructionLanguage::Ja => "shape が ｛名｝ の層は物の語（見えない四角の中の絵）。色の引数か主の色があるとき色を替えられる。色の欄が空でも、箱の仮の黒を描いた色として数えない。".to_owned(),
+                ResolvedInstructionLanguage::En => "A layer whose shape is {name} is an object word (a picture inside an invisible square). Recolor it when its definition has a color parameter or a primary color. An empty color cell does not count the box's placeholder black as a drawn color.".to_owned(),
             });
         }
         lines.push(String::new());

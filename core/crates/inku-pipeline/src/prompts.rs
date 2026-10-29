@@ -1164,7 +1164,8 @@ pub fn work_plan_plugins<'a>(
             let mut aliases = definition.alias_qualified_names();
             aliases.extend(ja.iter().map(|name| format!("｛{name}｝")));
             aliases.extend(en.iter().map(|name| format!("{{{name}}}")));
-            let appearance_slots = definition
+            let primary_color = object.then(|| definition.primary_literal_color()).flatten();
+            let mut appearance_slots: Vec<_> = definition
                 .parameters
                 .iter()
                 .filter_map(|(_, schema)| match schema {
@@ -1198,6 +1199,11 @@ pub fn work_plan_plugins<'a>(
                     _ => None,
                 })
                 .collect();
+            if primary_color.is_some()
+                && !appearance_slots.contains(&inku_ddl::work_plan::WorkPlanSlot::Color)
+            {
+                appearance_slots.push(inku_ddl::work_plan::WorkPlanSlot::Color);
+            }
             Some(WorkPlanPlugin {
                 name: definition.qualified_name()?,
                 aliases,
@@ -1212,6 +1218,7 @@ pub fn work_plan_plugins<'a>(
                 object,
                 aspect: v2.and_then(|v| v.aspect.clone()),
                 appearance_slots,
+                primary_color,
                 counter: if object {
                     Some(match v2.and_then(|v| v.counter.as_deref()) {
                         Some("flat") => inku_ddl::CountCounter::Flat,

@@ -112,8 +112,8 @@ For an object, caller position, size, angle, count, movement, and relations act 
 - Every declared parameter except the count parameter is required. A call that does not write it is not drawn;
   no default is filled in silently.
 - With two parameters of the same category, names never decide which one a word binds to. Declare one per category.
-- An undeclared appearance word on the call is left out alone with a diagnostic (for example
-  "red" in `Place red {stars}.`). It never overrides values inside the definition.
+- An object word may take a color without declaring a color parameter. It replaces the definition's primary color: count the literal `color` semantic references in its body emits, including those in used components, repeats, varies, and transforms. The most frequent wins; a tie goes to the first in body order. An emit whose color comes from a parameter, cycle, or vary is not counted. Only marks in that primary color change; accent colors stay. Without a primary color, the unbound color is omitted with a diagnostic.
+- A declared color parameter binds as before. An undeclared appearance word of another category, or an undeclared color on a scene word, is left out alone with a diagnostic; it does not override the definition.
 - A sway parameter can name its part with `dimension` (`amplitude`, `frequency`, or `quality`), as in
   `{"type":"semantic_ref","category":"variation","dimension":"amplitude"}`.
 

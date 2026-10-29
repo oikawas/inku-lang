@@ -2410,8 +2410,8 @@ fn message(
     lines.extend(layer_rows(context, language));
     if !context.object_layers.is_empty() {
         lines.push(match language {
-            ResolvedInstructionLanguage::Ja => "shape が ｛名｝ の層は物の語（見えない四角の中の絵）。形は変えられず、置き場・大きさ・数・並べ方は同じ縦横比の四角と同じに変えられる。色は定義に色の引数があるときだけ替えられる。".to_owned(),
-            ResolvedInstructionLanguage::En => "A layer whose shape is {name} is an object word (a picture inside an invisible square). Its shape cannot change; place, size, count, and arrangement can change like a square of the same aspect ratio. Its color can change only when the definition has a color parameter.".to_owned(),
+                ResolvedInstructionLanguage::Ja => "shape が ｛名｝ の層は物の語（見えない四角の中の絵）。形は変えられず、置き場・大きさ・数・並べ方は同じ縦横比の四角と同じに変えられる。色は定義に色の引数か主の色があるとき替えられる。".to_owned(),
+                ResolvedInstructionLanguage::En => "A layer whose shape is {name} is an object word (a picture inside an invisible square). Its shape cannot change; place, size, count, and arrangement can change like a square of the same aspect ratio. Its color can change when the definition has a color parameter or a primary color.".to_owned(),
         });
     }
     lines.push(String::new());
@@ -4569,8 +4569,9 @@ impl Compiler<'_> {
             {
                 return Err(refusal(
                     "object_color_fixed",
-                    "色の引数の無い物の語の色は変えられない".to_owned(),
-                    "an object word without a color parameter cannot change color".to_owned(),
+                    "色の引数も主の色も無い物の語の色は変えられない".to_owned(),
+                    "an object word without a color parameter or primary color cannot change color"
+                        .to_owned(),
                 ));
             }
         }

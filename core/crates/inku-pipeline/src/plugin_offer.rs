@@ -105,13 +105,31 @@ pub fn offer_line(entry: &MacroPromptEntry<'_>, language: ResolvedInstructionLan
         "long" => "本",
         _ => "個",
     };
+    let colorable = object && (definition.primary_literal_color().is_some() || definition.parameters.iter().any(|(_, schema)| matches!(schema, ParameterSchema::SemanticRef { category, .. } if category == "color")));
     let category = match (language, object, count) {
-        (ResolvedInstructionLanguage::Ja, true, _) => format!("物の語（数は「{counter}」・位置・動き・大きさ・傾き。数の寸法は一辺、または幅と高さ）"),
-        (ResolvedInstructionLanguage::En, true, _) => "object word (count, place, action, size, angle; numeric dimensions: side or width and height)".to_owned(),
-        (ResolvedInstructionLanguage::Ja, false, Some(count)) => format!("情景の語（数は「{}」で {}〜{}）", count.counter.japanese(), count.minimum, count.maximum),
-        (ResolvedInstructionLanguage::En, false, Some(count)) => format!("scene word (count {}–{})", count.minimum, count.maximum),
-        (ResolvedInstructionLanguage::Ja, false, None) => "情景の語（数を書くと区画に並べる）".to_owned(),
-        (ResolvedInstructionLanguage::En, false, None) => "scene word (a count lays copies in cells)".to_owned(),
+        (ResolvedInstructionLanguage::Ja, true, _) => format!(
+            "物の語（{}数は「{counter}」・位置・動き・大きさ・傾き。数の寸法は一辺、または幅と高さ）",
+            if colorable { "色・" } else { "" }
+        ),
+        (ResolvedInstructionLanguage::En, true, _) => format!(
+            "object word ({}count, place, action, size, angle; numeric dimensions: side or width and height)",
+            if colorable { "color, " } else { "" }
+        ),
+        (ResolvedInstructionLanguage::Ja, false, Some(count)) => format!(
+            "情景の語（数は「{}」で {}〜{}）",
+            count.counter.japanese(),
+            count.minimum,
+            count.maximum
+        ),
+        (ResolvedInstructionLanguage::En, false, Some(count)) => {
+            format!("scene word (count {}–{})", count.minimum, count.maximum)
+        }
+        (ResolvedInstructionLanguage::Ja, false, None) => {
+            "情景の語（数を書くと区画に並べる）".to_owned()
+        }
+        (ResolvedInstructionLanguage::En, false, None) => {
+            "scene word (a count lays copies in cells)".to_owned()
+        }
     };
     let appearance: Vec<_> = definition
         .parameters

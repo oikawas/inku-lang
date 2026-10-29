@@ -383,19 +383,29 @@ fn recolored_line_with_definitions(
         .ok()?;
     let span = match &instruction.entity.head {
         SemanticHead::MacroInvocation(head) if head.object_aspect.is_some() => {
-            &head
-                .parameters
-                .iter()
-                .find(|parameter| {
-                    matches!(&parameter.schema,
+            let parameter = head.parameters.iter().find(|parameter| {
+                matches!(&parameter.schema,
                 ParameterSchema::SemanticRef { category, .. } if category == "color")
-                })?
-                .provenance
-                .span
+            });
+            if let Some(parameter) = parameter {
+                Some(parameter.provenance.span)
+            } else {
+                let definition = definitions.iter().find(|definition| {
+                    definition.qualified_name().as_deref() == Some(&head.qualified_name)
+                })?;
+                definition.primary_literal_color()?;
+                instruction
+                    .entity
+                    .color
+                    .as_ref()
+                    .map(|term| term.provenance.source.span)
+            }
         }
-        _ => &instruction.entity.color.as_ref()?.provenance.source.span,
+        _ => Some(instruction.entity.color.as_ref()?.provenance.source.span),
     };
-    let word = line.get(span.start_byte..span.end_byte)?;
+    let word = span
+        .and_then(|span| line.get(span.start_byte..span.end_byte))
+        .unwrap_or("");
     let mut replacement = color_word(color, language);
     match language {
         ResolvedInstructionLanguage::Ja => {
@@ -413,11 +423,28 @@ fn recolored_line_with_definitions(
             }
         }
     }
-    let text = format!(
-        "{}{replacement}{}",
-        &line[..span.start_byte],
-        &line[span.end_byte..]
-    );
+    let text = if let Some(span) = span {
+        format!(
+            "{}{replacement}{}",
+            &line[..span.start_byte],
+            &line[span.end_byte..]
+        )
+    } else {
+        let SemanticHead::MacroInvocation(head) = &instruction.entity.head else {
+            return None;
+        };
+        let at = head.provenance.source.span.start_byte;
+        let separator = if language == ResolvedInstructionLanguage::Ja {
+            "の"
+        } else {
+            " "
+        };
+        format!(
+            "{}{replacement}{separator}{}",
+            line.get(..at)?,
+            line.get(at..)?
+        )
+    };
     let [again] = instructions_of_with_definitions(&text, language, definitions)
         .try_into()
         .ok()?;
@@ -426,7 +453,11 @@ fn recolored_line_with_definitions(
             head.parameters.iter().any(|parameter| {
                 matches!(&parameter.value, SemanticMacroParameterValue::SemanticRef(identity)
                 if identity.category == "color" && identity.id == color.as_str())
-            })
+            }) || again
+                .entity
+                .color
+                .as_ref()
+                .is_some_and(|term| term.identity.id == color.as_str())
         }
         _ => again.entity.color.as_ref().is_some_and(|term| {
             term.provenance.canonical_surface_ja
@@ -619,10 +650,54 @@ mod tests {
         )
         .unwrap();
         let source = "画面の横0.3、縦0.7の位置に、一辺0.2の｛舟｝を置く。";
+        let plugins = crate::prompts::work_plan_plugins([&definition]);
+        assert!(
+            plugins[0]
+                .appearance_slots
+                .contains(&inku_ddl::work_plan::WorkPlanSlot::Color)
+        );
+        assert_eq!(plugins[0].primary_color.as_deref(), Some("green"));
+        let entry = crate::prompts::MacroPromptEntry {
+            definition: &definition,
+            localized_summary: "舟。",
+        };
+        assert!(
+            crate::plugin_offer::offer_line(&entry, Ja)
+                .contains("物の語（色・数は「個」・位置・動き・大きさ・傾き。")
+        );
+        assert!(
+            crate::plugin_offer::offer_line(&entry, inku_ddl::ResolvedInstructionLanguage::En)
+                .contains("object word (color, count, place, action, size, angle;")
+        );
         let plan =
             plan_of_with_definitions(source, Ja, &[definition.clone()]).expect("object color plan");
         assert_eq!(plan.printed.plan.layers[0].shape, "TestObject.Boat");
         assert_eq!(plan.lines, [0]);
+        assert_eq!(
+            recolored_line_with_definitions(source, Color::Blue, Ja, &[definition.clone()])
+                .as_deref(),
+            Some("画面の横0.3、縦0.7の位置に、一辺0.2の青の｛舟｝を置く。")
+        );
+        assert_eq!(
+            recolored_line_with_definitions(
+                "赤い｛舟｝を置く。",
+                Color::Blue,
+                Ja,
+                &[definition.clone()]
+            )
+            .as_deref(),
+            Some("青の｛舟｝を置く。")
+        );
+        assert_eq!(
+            recolored_line_with_definitions(
+                "place one {boat} at center.",
+                Color::Blue,
+                inku_ddl::ResolvedInstructionLanguage::En,
+                &[definition.clone()]
+            )
+            .as_deref(),
+            Some("place one blue {boat} at center.")
+        );
         let mut raw = serde_json::to_value(definition).unwrap();
         raw["parameters"]["hue"] = serde_json::json!({"type":"semantic_ref","category":"color"});
         raw["body"][0]["fields"]["color"] = serde_json::json!({"expr":"parameter","name":"hue"});

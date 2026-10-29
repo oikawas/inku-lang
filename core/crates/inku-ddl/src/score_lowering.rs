@@ -1436,7 +1436,31 @@ fn lower_object_plugin_template(
     }
     context.declared_ratio = None;
     context.canvas_fit = None;
+    let has_color_parameter = head.parameters.iter().any(|parameter| matches!(
+        &parameter.schema, crate::ParameterSchema::SemanticRef { category, .. } if category == "color"
+    ));
+    let replacement = if has_color_parameter {
+        None
+    } else {
+        exact_macro_expansion(view, head)
+            .ok()
+            .and_then(|expansion| expansion.primary_literal_color.as_deref())
+            .and_then(|primary| {
+                let caller = instruction.entity.color.as_ref()?;
+                let from =
+                    serde_json::from_value::<Color>(serde_json::Value::String(primary.to_owned()))
+                        .ok()?;
+                let to = serde_json::from_value::<Color>(serde_json::Value::String(
+                    caller.identity.id.clone(),
+                ))
+                .ok()?;
+                Some((from, to))
+            })
+    };
     let mut caller = instruction.clone();
+    if replacement.is_some() {
+        caller.entity.color = None;
+    }
     caller.action = None;
     caller.position = None;
     caller.layout_direction = None;
@@ -1546,7 +1570,7 @@ fn lower_object_plugin_template(
         .ok()
         .and_then(|selected| crate::materialize_selected_composition(&selected).ok())
         .map(|materialized| materialized.score);
-    let Some(body) = body else {
+    let Some(mut body) = body else {
         let reason = ScoreFieldGap::UnsupportedMacroStructure;
         diagnostics.push(ScoreLoweringDiagnostic {
             owner: macro_invocation_owner(source_instruction_index, head, None),
@@ -1560,6 +1584,13 @@ fn lower_object_plugin_template(
         });
         return None;
     };
+    if let Some((from, to)) = replacement {
+        for mark in &mut body.instructions {
+            if mark.color == from {
+                mark.color = to;
+            }
+        }
+    }
     Some((width, height, Box::new(body)))
 }
 

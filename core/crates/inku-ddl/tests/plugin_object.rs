@@ -56,6 +56,144 @@ fn lock(definition: &MacroDefinition) -> MacroLock {
 }
 
 #[test]
+fn an_undeclared_object_color_changes_only_the_primary_literal_color() {
+    let mut hull = arc("hull", "0.3", "0");
+    let mut mast = arc("mast", "0.5", "0");
+    let mut sail = arc("sail", "0.7", "0");
+    hull["fields"]["color"]["id"] = json!("black");
+    mast["fields"]["color"]["id"] = json!("black");
+    sail["fields"]["color"]["id"] = json!("gray");
+    let boat = word("Boat", "舟", "boat", "2:1", json!([hull, mast, sail]));
+    assert_eq!(boat.primary_literal_color().as_deref(), Some("black"));
+    let budget = ResourceBudget {
+        maximum: ResourceDemand {
+            logical_objects: 400,
+            primitive_marks: 400,
+            object_templates: 64,
+            maximum_per_template_primitive_marks: 240,
+            maximum_resolved_count: 2000,
+            template_nodes: 512,
+            anchor_instances: 400,
+            transform_instances: 400,
+            placement_instances: 400,
+            fill_instances: 400,
+        },
+    };
+    let run = |source: &str, definition: &MacroDefinition| {
+        compile_ddl_to_score_with_resources(
+            NormalizedDdlDocument::new(
+                source,
+                ResolvedInstructionLanguage::Ja,
+                vec![lock(definition)],
+            )
+            .unwrap(),
+            std::slice::from_ref(definition),
+            Some(37),
+            MacroExpansionLimits {
+                max_invocations: 64,
+                max_depth: 16,
+                max_evaluation_steps: 8192,
+                max_nodes_per_invocation: 128,
+                max_total_nodes: 128,
+            },
+            ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+            ScoreErrorPolicy::OmitAndContinue,
+            HardResourcePolicy {
+                identity: "object-color-test.v1".into(),
+                budget,
+            },
+            OperationalResourceBudget(budget),
+        )
+    };
+    let result = run("青の｛舟｝を置く。", &boat);
+    assert!(
+        result.upstream_diagnostics().is_empty(),
+        "{:?}",
+        result.upstream_diagnostics()
+    );
+    assert!(
+        result.downstream_diagnostics().is_empty(),
+        "{:?}",
+        result.downstream_diagnostics()
+    );
+    assert_eq!(
+        result.score().unwrap().object_templates[0]
+            .body
+            .instructions
+            .iter()
+            .map(|i| i.color)
+            .collect::<Vec<_>>(),
+        [Color::Blue, Color::Blue, Color::Gray]
+    );
+
+    let mut raw = serde_json::to_value(&boat).unwrap();
+    raw["body"][0]["fields"]["color"]["id"] = json!("gray");
+    raw["components"]["hull"] = json!({"parameters":{},"body":[raw["body"][1].clone()]});
+    raw["body"] = json!([raw["body"][0].clone(), {"op":"use", "component":"hull", "arguments":{}}]);
+    let tie = MacroDefinition::from_json(&raw.to_string()).unwrap();
+    assert_eq!(tie.primary_literal_color().as_deref(), Some("gray"));
+    raw["body"] =
+        json!([{ "op":"use", "component":"hull", "arguments":{} }, raw["body"][0].clone()]);
+    let reverse = MacroDefinition::from_json(&raw.to_string()).unwrap();
+    assert_eq!(reverse.primary_literal_color().as_deref(), Some("black"));
+
+    let mut raw = serde_json::to_value(&boat).unwrap();
+    let black = raw["body"][0].clone();
+    let gray = raw["body"][2].clone();
+    let mut cycled = black.clone();
+    cycled["fields"]["color"] = json!({"expr":"cycle", "items":[{"expr":"semantic_ref","category":"color","id":"gray"}], "index":{"expr":"integer","value":0}});
+    raw["body"] = json!([{"op":"repeat","count":{"expr":"integer","value":5},"maximum":5,"index":"i","body":[black]},
+        {"op":"transform","transform":{"rotate_degrees":{"expr":"number","value":0}},"body":[gray]}, cycled]);
+    let nested = MacroDefinition::from_json(&raw.to_string()).unwrap();
+    assert_eq!(
+        nested.primary_literal_color().as_deref(),
+        Some("black"),
+        "repeat is counted once and a cycle is not counted"
+    );
+
+    let mut raw = serde_json::to_value(&boat).unwrap();
+    let mut parameter_emit = raw["body"][0].clone();
+    parameter_emit["fields"]["color"] = json!({"expr":"parameter", "name":"hue"});
+    raw["components"]["hull"] = json!({"parameters":{"hue":{"type":"semantic_ref", "category":"color"}}, "body":[parameter_emit]});
+    raw["body"] = json!([{ "op":"use", "component":"hull", "arguments":{"hue":{"expr":"semantic_ref","category":"color","id":"black"}} }]);
+    let indirect = MacroDefinition::from_json(&raw.to_string()).unwrap();
+    assert!(
+        indirect.validate().is_valid(),
+        "{:?}",
+        indirect.validate().diagnostics()
+    );
+    assert_eq!(indirect.primary_literal_color(), None);
+    let result = run("青の｛舟｝を置く。", &indirect);
+    assert!(
+        !result.downstream_diagnostics().is_empty(),
+        "a color without a primary is diagnosed"
+    );
+    assert_eq!(
+        result.score().unwrap().object_templates[0]
+            .body
+            .instructions[0]
+            .color,
+        Color::Black
+    );
+
+    let mut raw = serde_json::to_value(&boat).unwrap();
+    raw["kind"] = json!("scene");
+    raw.as_object_mut().unwrap().remove("aspect");
+    raw.as_object_mut().unwrap().remove("counter");
+    let scene = MacroDefinition::from_json(&raw.to_string()).unwrap();
+    assert!(
+        scene.validate().is_valid(),
+        "{:?}",
+        scene.validate().diagnostics()
+    );
+    let result = run("青の｛舟｝。", &scene);
+    assert!(
+        !result.downstream_diagnostics().is_empty(),
+        "scene color remains unbound"
+    );
+}
+
+#[test]
 fn object_word_can_be_read_back_as_a_plan_layer() {
     let leaf = word(
         "Leaf",
@@ -814,15 +952,17 @@ fn object_word_draws_instead_of_being_rejected() {
             result.upstream_diagnostics()
         );
         if source.contains("赤い") {
-            assert_eq!(
-                result.downstream_diagnostics().len(),
-                1,
+            assert!(
+                result.downstream_diagnostics().is_empty(),
                 "{source}: {:?}",
                 result.downstream_diagnostics()
             );
-            assert_eq!(
-                result.downstream_diagnostics()[0].reason,
-                inku_ddl::ScoreFieldGap::UnboundMacroCallerMeaning
+            assert!(
+                result.score().unwrap().object_templates[0]
+                    .body
+                    .instructions
+                    .iter()
+                    .all(|mark| mark.color == Color::Red)
             );
         } else {
             assert!(
@@ -1007,7 +1147,7 @@ fn object_word_draws_instead_of_being_rejected() {
                         .body
                         .instructions
                         .iter()
-                        .all(|item| item.color == Color::Green)
+                        .all(|item| item.color == Color::Red)
                 );
             }
         }

@@ -61,10 +61,10 @@ final class ChatGPTLoopbackChecks: XCTestCase, @unchecked Sendable {
             let duplicate = try await request("/auth/callback?state=offline_state_fixture&state=again&code=offline_code")
             XCTAssertEqual(duplicate, 400)
             XCTAssertEqual(try rawStatus(port: listener.redirectURI.port!,
-                target: "/auth/callback?state=offline_state_fixture&code=offline_code%2B%3D&error_description=ignored#fragment"), 200)
+                target: "/auth/callback?state=offline_state_fixture&client_id=fixture-client&code=offline_code%2B%3D&error_description=ignored#fragment"), 200)
             let callback = try await callbackTask.value
             XCTAssertEqual(callback,
-                ChatGPTLoopbackCallback(code: "offline_code+=", clientID: nil, state: "offline_state_fixture"))
+                ChatGPTLoopbackCallback(code: "offline_code+=", clientID: "fixture-client", state: "offline_state_fixture"))
             await listener.cancel()
         } catch {
             await listener.cancel()
@@ -73,7 +73,7 @@ final class ChatGPTLoopbackChecks: XCTestCase, @unchecked Sendable {
 
         let emptyCode = try await ChatGPTLoopbackListener.start(expectedState: "empty_fixture")
         let emptyWait = Task { try await emptyCode.waitForCallback() }
-        XCTAssertEqual(try rawStatus(port: emptyCode.redirectURI.port!, target: "/auth/callback?state=empty_fixture&code="), 400)
+        XCTAssertEqual(try rawStatus(port: emptyCode.redirectURI.port!, target: "/auth/callback?state=empty_fixture&client_id=fixture-client&code="), 400)
         do { _ = try await emptyWait.value; XCTFail("An empty code was accepted") }
         catch { XCTAssertEqual((error as? HostError)?.code, "chatgpt_auth_unavailable") }
         await emptyCode.cancel()

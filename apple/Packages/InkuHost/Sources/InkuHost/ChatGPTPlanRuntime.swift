@@ -122,7 +122,8 @@ public actor ChatGPTPlanRuntime {
             return value.hostID!
         }
         guard epoch == beginEpoch, attempts.isEmpty else { throw HostError("chatgpt_cancelled") }
-        let listener = try await ChatGPTLoopbackListener.start(expectedState: state, deadline: deadline)
+        let listener = try await ChatGPTLoopbackListener.start(expectedState: state, deadline: deadline,
+                                                               previousClientID: previousClientID)
         do {
             guard epoch == beginEpoch, attempts.isEmpty else { throw HostError("chatgpt_cancelled") }
             _ = try checkedState()

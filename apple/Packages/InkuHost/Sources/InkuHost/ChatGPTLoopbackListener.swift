@@ -24,7 +24,8 @@ public final class ChatGPTLoopbackListener: Sendable {
         redirectURI = URL(string: "http://127.0.0.1:\(port)/auth/callback")!
     }
 
-    public static func start(expectedState: String, deadline: Date = Date().addingTimeInterval(300)) async throws -> ChatGPTLoopbackListener {
+    public static func start(expectedState: String, deadline: Date = Date().addingTimeInterval(300),
+                             previousClientID: String? = nil) async throws -> ChatGPTLoopbackListener {
         guard !expectedState.isEmpty, expectedState.utf8.count <= 256,
               !expectedState.unicodeScalars.contains(where: { $0.value < 32 || $0.value == 127 }) else {
             throw HostError("chatgpt_callback_invalid")
@@ -41,7 +42,7 @@ public final class ChatGPTLoopbackListener: Sendable {
             parameters.includePeerToPeer = false
             parameters.allowLocalEndpointReuse = false
             engine = LoopbackEngine(listener: try NWListener(using: parameters, on: .any),
-                                    lease: lease, expectedState: expectedState, duration: duration)
+                                    lease: lease, expectedState: expectedState, previousClientID: previousClientID, duration: duration)
         } catch {
             LoopbackLease.shared.release(lease)
             throw HostError("chatgpt_auth_unavailable")
@@ -103,6 +104,7 @@ private final class LoopbackEngine: @unchecked Sendable {
     private let lease: UUID
     private let deadline: DispatchTime
     private var expectedState: String?
+    private let previousClientID: String?
     private var port: UInt16?
     private var ready: CheckedContinuation<UInt16, any Error>?
     private var waiter: CheckedContinuation<ChatGPTLoopbackCallback, any Error>?
@@ -121,10 +123,11 @@ private final class LoopbackEngine: @unchecked Sendable {
         init(_ connection: NWConnection) { self.connection = connection }
     }
 
-    init(listener: NWListener, lease: UUID, expectedState: String, duration: TimeInterval) {
+    init(listener: NWListener, lease: UUID, expectedState: String, previousClientID: String?, duration: TimeInterval) {
         self.listener = listener
         self.lease = lease
         self.expectedState = expectedState
+        self.previousClientID = previousClientID
         deadline = .now() + duration
     }
 
@@ -271,6 +274,9 @@ private final class LoopbackEngine: @unchecked Sendable {
                 _ = try ChatGPTPolicy.call("chatgpt_auth_callback", ["state": .string(expectedState),
                     "expected_state": .string(expectedState), "code": .string("error-check"), "error": .string(error)])
             }
+            let issued = query["client_id"]?.array?.first?.string ?? previousClientID ?? ""
+            _ = try ChatGPTPolicy.call("chatgpt_auth_callback_client", ["issued": .string(issued),
+                "previous": previousClientID.map { .object(["client_id": .string($0)]) } ?? .null])
             let answer = try ChatGPTPolicy.call("chatgpt_auth_callback", ["state": .string(expectedState),
                 "expected_state": .string(expectedState), "code": ChatGPTPolicy.string(query["code"]?.array?.first?.string), "error": .null])
             result = .success(ChatGPTLoopbackCallback(code: try answer.requiredString("code"),

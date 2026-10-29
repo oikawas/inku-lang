@@ -73,3 +73,7 @@ def test_run_offer_projection_uses_saved_names_and_includes_chunk_rewrite():
     records = macro_catalog.plugin_offer_records(config, [{"stage": "chunk_rewrite", "offer": {"offered": [], "omitted": []}}])
     assert records[0]["offered"] == [{"qualified_name": "Sky.Stars", "reason": "brace", "written_ja": "｛星｝", "written_en": "{stars}"}]
     assert records[1] == {"stage": "chunk_rewrite", "offered": [], "omitted": []}
+    old = {"definitions": [{"namespace": "Nature", "heading": "YoungLeaves", "aliases": ["若葉"]}],
+           "plugin_offers": [{"stage": "generate_normalized_ddl", "offer": {"offered": [{"qualified_name": "Nature.YoungLeaves", "reason": "name"}], "omitted": []}}]}
+    item = macro_catalog.plugin_offer_records(old)[0]["offered"][0]
+    assert (item["written_ja"], item["written_en"]) == ("｛若葉｝", "{young leaves}")

@@ -138,7 +138,7 @@
 												<span>{entry.word_kind === 'object' ? t().pluginObject : t().pluginScene}</span>
 														{#if note}<span>{note}</span>{/if}
 														{#if example}<span>{t().saijikiPreviewExampleLabel}{example}</span>{/if}
-														{#if plugin.kind === 'package' && isAdmin}
+																{#if plugin.kind === 'package' && plugin.deletable !== false && isAdmin}
 															<span class="plugin-word-actions">
 														<button class="ghost-btn user-plugin-btn" type="button" onclick={() => choosePicture(plugin, entry.word_id)} disabled={pluginBusy}>{t().settingsPluginPictureReplace}</button>
 														{#if entry.custom_preview}<button class="ghost-btn user-plugin-btn" type="button" onclick={() => void resetPicture(plugin, entry.word_id)} disabled={pluginBusy}>{t().settingsPluginPictureReset}</button>{/if}

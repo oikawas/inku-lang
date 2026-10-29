@@ -21,6 +21,10 @@ pub enum OfferReason {
 pub struct OfferItem {
     pub qualified_name: String,
     pub reason: OfferReason,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub written_ja: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub written_en: String,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -266,6 +270,8 @@ pub fn offer_plugins(
                 OfferItem {
                     qualified_name,
                     reason,
+                    written_ja: primary_name(definition, ResolvedInstructionLanguage::Ja),
+                    written_en: primary_name(definition, ResolvedInstructionLanguage::En),
                 },
             ));
         }

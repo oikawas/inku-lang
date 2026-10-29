@@ -203,6 +203,15 @@ test('cursor completions use the DDL language and canonical Macro names, and yie
 	const ja = editor('赤い円。\n{grass');
 	const japanese = await source(new CompletionContext(ja, ja.doc.length, true));
 	assert.ok(japanese?.options.some((word) => word.label === '｛下草｝'));
+	const existing = editor('赤い円。\n{grass}');
+	const beforeClose = existing.doc.length - 1;
+	const choices = await source(new CompletionContext(existing, beforeClose, true));
+	const chosen = choices?.options.find(word => word.label === '｛下草｝');
+	assert.equal(typeof chosen?.apply, 'function');
+	let applied = existing;
+	if (typeof chosen?.apply === 'function') chosen.apply({ state: existing, dispatch: tr => { applied = existing.update(tr).state; } } as never, chosen, choices!.from, beforeClose);
+	assert.equal(applied.doc.toString(), '赤い円。\n｛下草｝');
+	assert.equal(applied.selection.main.head, applied.doc.length);
 	const numeric = open(editor());
 	assert.equal(await source(new CompletionContext(numeric, numeric.selection.main.head, true)), null);
 	assert.equal(await source(new CompletionContext(editor('', true), 0, true)), null);

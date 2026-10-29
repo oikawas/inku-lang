@@ -105,7 +105,11 @@ export function ddlCompletions(options: () => CompletionOptions): CompletionSour
 		if (prefix) {
 			const needle = prefix.text.slice(1).normalize('NFKC').toLowerCase();
 			const candidates: Completion[] = settings.pluginEntries.filter(entry => [...(entry.surface_ja ?? []), ...(entry.surface_en ?? [])].some(name => name.normalize('NFKC').toLowerCase().includes(needle))).map(entry => ({
-				label: pluginDisplayName(entry, lang), type: 'variable', apply: pluginDisplayName(entry, lang),
+				label: pluginDisplayName(entry, lang), type: 'variable', apply: (view, _completion, from, to) => {
+					const inserted = pluginDisplayName(entry, lang);
+					const following = view.state.sliceDoc(to, to + 1);
+					view.dispatch({ changes: { from, to: to + (following === '}' || following === '｝' ? 1 : 0), insert: inserted }, selection: EditorSelection.cursor(from + inserted.length), userEvent: 'input.complete' });
+				},
 				detail: `${entry.word_kind === 'object' ? (settings.isJapanese ? '物の語' : 'Object') : (settings.isJapanese ? '情景の語' : 'Scene')} · ${lang === 'ja' ? entry.note_ja : entry.note_en}`,
 				info: info(() => settings.previewForPlugin(entry, lang))
 			}));

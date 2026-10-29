@@ -15,7 +15,10 @@ export type PluginItem = {
 	reasons?: string[];
 	entries?: Array<{
 		qualified_name: string;
-		aliases?: string[];
+		word_id: string;
+		word_kind: 'object' | 'scene';
+		written_ja: string;
+		written_en: string;
 		surface_ja?: string[];
 		surface_en?: string[];
 		note_ja: string;
@@ -36,7 +39,7 @@ export type PluginItem = {
 	has_definitions?: boolean;
 	/** "document" for a file in the server's plugin directory, "package" for
 	    one an administrator installed from the Web. */
-	kind?: 'document' | 'package';
+	kind?: 'package';
 	deletable?: boolean;
 	description_ja?: string;
 	description_en?: string;
@@ -61,9 +64,11 @@ export type PluginPackageReport = {
 	problems: PluginPackageProblem[];
 	words: Array<{
 		id: string;
-		heading: string;
 		qualified_name: string;
-		aliases: string[];
+		names: { ja: string[]; en: string[] };
+		kind: 'object' | 'scene';
+		aspect?: string | null;
+		counter?: string | null;
 		note_ja: string;
 		note_en: string;
 		example_ja: string;

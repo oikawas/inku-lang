@@ -234,6 +234,24 @@ def api_plugin_set_enabled(
     return next(item for item in PLUGIN_PACKAGE_MANAGER.status_items() if item["id"] == plugin_id)
 
 
+@router.get("/api/plugins/{plugin_id}/words/{heading}/preview", summary="Read a package word's picture")
+def api_plugin_word_preview(plugin_id: str, heading: str) -> Response:
+    """Read a word picture using the package and word identifiers."""
+    bundled, _ = PLUGIN_PACKAGE_MANAGER.bundled()
+    package = bundled if plugin_id == bundled.id else PLUGIN_PACKAGE_MANAGER.get(plugin_id)
+    word = package.word(heading) if package is not None else None
+    if word is None:
+        raise HTTPException(status_code=404, detail="word not found")
+    if package.id == bundled.id:
+        data = PLUGIN_PACKAGE_MANAGER.bundled_preview(word.qualified_name)
+    else:
+        path = PLUGIN_PACKAGE_MANAGER.preview_path(package, word)
+        data = path.read_bytes() if path is not None else None
+    if data is None:
+        raise HTTPException(status_code=404, detail="picture not found")
+    return Response(content=data, media_type="image/png")
+
+
 @router.put("/api/plugins/{plugin_id}/words/{heading}/preview", summary="Replace a package word's Saijiki picture")
 def api_plugin_preview_replace(
     plugin_id: Annotated[str, Path(description="Identifier of a package installed from the Web, as the id field of GET /api/plugins.")],

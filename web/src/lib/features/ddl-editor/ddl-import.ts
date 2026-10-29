@@ -7,6 +7,7 @@
  */
 
 export const DDL_EXPORT_SCHEMA = 'inku.ddl-export.v2';
+import { resolveInstructionLang } from '../../instructionLang';
 const MAX_IMPORTED_PLUGINS = 64;
 
 export type ImportedPlugin = { definition: Record<string, unknown>; note: string };
@@ -22,7 +23,7 @@ function record(value: unknown): Record<string, unknown> | null {
 	return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
 }
 
-export function parseDdlImport(text: string): DdlImport {
+export function parseDdlImport(text: string, language: 'ja' | 'en' = 'ja'): DdlImport {
 	let parsed: unknown = null;
 	try {
 		parsed = JSON.parse(text);
@@ -44,6 +45,12 @@ export function parseDdlImport(text: string): DdlImport {
 		plugins.push({ definition, note: typeof plugin?.note === 'string' ? plugin.note : '' });
 	}
 	if (plugins.length > MAX_IMPORTED_PLUGINS) throw new Error('ddl_export_too_many_plugins');
-	const names = plugins.map(({ definition }) => `${String(definition.namespace)}.${String(definition.id)}`);
+	const wordLanguage = resolveInstructionLang(file.ddl, language);
+	const names = plugins.map(({ definition }) => {
+		const names = record(definition.names);
+		const values = names?.[wordLanguage];
+		const primary = Array.isArray(values) && typeof values[0] === 'string' ? values[0] : String(definition.heading ?? definition.id ?? '');
+		return wordLanguage === 'ja' ? `｛${primary}｝` : `{${primary}}`;
+	});
 	return { ddl: file.ddl, plugins, names };
 }

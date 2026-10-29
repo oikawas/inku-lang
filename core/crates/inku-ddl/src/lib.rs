@@ -198,7 +198,8 @@ pub use opaque_head::{
 pub use parser::{
     CoreModifierDimension, CoreModifierIdentity, CoreModifierSurfaceForms, CoreModifierValue,
     NEUTRAL_LEXEME_PARSER_SCHEMA_ID, NeutralDiagnostic, NeutralDiagnosticKind, NeutralParseResult,
-    NeutralToken, NeutralTokenKind, SourceSpan, core_modifier_surface_forms, parse_neutral_lexemes,
+    NeutralToken, NeutralTokenKind, SourceSpan, bracketed_plugin_at, core_modifier_surface_forms,
+    parse_neutral_lexemes,
 };
 pub use phrase::{
     DETERMINER_PHRASE_EVIDENCE_SCHEMA_ID, DeterminerPhraseEvidenceAvailability,

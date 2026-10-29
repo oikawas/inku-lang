@@ -12,7 +12,7 @@ test('an export restores its DDL and carries the saved plugin definitions', () =
 	}));
 	assert.equal(read.ddl, '背景を白で埋める。\n｛若葉｝。');
 	assert.deepEqual(read.plugins, [{ definition, note: '若葉を上半分へ散らす。' }]);
-	assert.deepEqual(read.names, ['Nature.YoungLeaves']);
+	assert.deepEqual(read.names, ['｛若葉｝']);
 });
 
 test('plain text and unrelated JSON stay the author\'s text without definitions', () => {

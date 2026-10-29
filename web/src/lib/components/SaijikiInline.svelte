@@ -46,14 +46,13 @@
 			<div class="saijiki-list-columns">
 				{#each SAIJIKI as cat (cat.key)}
 					{@const words = saijikiWordsFor(cat.key, wordLang === 'ja')}
-					<div class="saijiki-cat" class:plugin-cat={cat.key.startsWith('plugin-')}>
+					<div class="saijiki-cat">
 						<div class="saijiki-cat-head">{uiIsJapanese ? cat.label : cat.en}</div>
 						<div class="saijiki-chips">
 							{#each words as word, wi (word)}
 								{@const canonicalWord = cat.words[wi] ?? word}
 								<button
 									class="saijiki-chip"
-									class:plugin-chip={cat.key.startsWith('plugin-')}
 									{disabled}
 									onpointerdown={(e) => e.preventDefault()}
 									onclick={() => onInsertWord(word)}
@@ -66,7 +65,7 @@
 				{/each}
 				{#if pluginEntries.length > 0}
 					<div class="saijiki-cat plugin-cat">
-						<div class="saijiki-cat-head">Plugin</div>
+						<div class="saijiki-cat-head">{t().saijikiPlugins}</div>
 						<!-- Packed the same way the built-in words are, and reached the
 						     same way: hover or focus shows the word in the preview, a
 						     click inserts it. -->

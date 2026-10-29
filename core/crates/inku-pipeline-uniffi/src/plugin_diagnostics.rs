@@ -110,6 +110,12 @@ fn edit_distance(left: &str, right: &str) -> usize {
     previous[right.len()]
 }
 
+fn shares_normalized_character(left: &str, right: &str) -> bool {
+    let left = inku_ddl::plugin_names::normalize_plugin_name(left);
+    let right = inku_ddl::plugin_names::normalize_plugin_name(right);
+    left.chars().any(|c| right.contains(c))
+}
+
 /// An enabled name the author probably meant: the same heading under another
 /// namespace, a case-only difference, or at most two edits away.
 fn suggestion(name: &str, enabled: &[String]) -> Option<String> {
@@ -117,6 +123,7 @@ fn suggestion(name: &str, enabled: &[String]) -> Option<String> {
     enabled
         .iter()
         .filter(|candidate| candidate.as_str() != name)
+        .filter(|candidate| shares_normalized_character(name, candidate))
         .map(|candidate| {
             let same_heading = candidate
                 .split_once('.')
@@ -242,21 +249,14 @@ fn explain_bracketed(
         let Some(text) = source.get(start..end) else {
             continue;
         };
-        let Some((offset, open)) = text.char_indices().find(|(_, c)| matches!(c, '{' | '｛'))
-        else {
-            continue;
-        };
-        let begin = offset + open.len_utf8();
-        let Some((length, close)) = text[begin..]
+        let Some((offset, (bracket_end, inner))) = text
             .char_indices()
-            .find(|(_, c)| matches!(c, '}' | '｝'))
+            .filter(|(_, c)| matches!(c, '{' | '｛'))
+            .find_map(|(at, _)| inku_ddl::bracketed_plugin_at(text, at).map(|match_| (at, match_)))
         else {
             continue;
         };
-        let written = text[begin..begin + length].trim();
-        if written.is_empty() {
-            continue;
-        }
+        let written = inner.trim();
         let normalized = inku_ddl::plugin_names::normalize_plugin_name(written);
         let mut exact: Vec<_> = names
             .iter()
@@ -273,6 +273,7 @@ fn explain_bracketed(
         let suggestion = names
             .iter()
             .filter(|n| n.enabled)
+            .filter(|n| shares_normalized_character(written, &n.name))
             .map(|n| {
                 (
                     edit_distance(
@@ -302,12 +303,12 @@ fn explain_bracketed(
             ("plugin_not_installed", None, Vec::new())
         };
         result.push(PluginDiagnostic {
-            name: written.to_owned(),
+            name: text[offset..bracket_end].to_owned(),
             reason: code,
             suggestion,
             candidates,
             start_byte: start + offset,
-            end_byte: start + begin + length + close.len_utf8(),
+            end_byte: start + bracket_end,
         });
     }
     result
@@ -419,6 +420,38 @@ mod tests {
             &disabled,
         );
         assert_eq!(result[0].reason, "plugin_version_mismatch");
+    }
+
+    #[test]
+    fn suggestions_require_a_shared_normalized_character() {
+        let names = ["大空", "若葉", "下草"].map(|name| PluginName {
+            name: name.into(),
+            qualified_name: format!("Nature.{name}"),
+            enabled: true,
+        });
+        for (written, reason, expected) in [
+            ("空", "plugin_name_mismatch", Some("大空")),
+            ("若刃", "plugin_name_mismatch", Some("若葉")),
+            ("菖蒲", "plugin_not_installed", None),
+            ("犬", "plugin_not_installed", None),
+        ] {
+            let source = format!("｛{written}｝。");
+            let result = explain_bracketed(
+                &source,
+                &[missing(
+                    &source,
+                    &format!("｛{written}｝"),
+                    "macro_resolution_missing_lock",
+                )],
+                &names,
+            );
+            assert_eq!(
+                (result[0].reason, result[0].suggestion.as_deref()),
+                (reason, expected)
+            );
+        }
+        assert_eq!(suggestion("犬", &["空".into(), "若葉".into()]), None);
+        assert_eq!(suggestion("空", &["大空".into()]).as_deref(), Some("大空"));
     }
 
     #[test]

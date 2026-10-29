@@ -1,6 +1,5 @@
 import { pipelineDescription } from '$lib/description-labels';
 import { hasDdlBody } from '$lib/ddl-source';
-import { pluginWarningsToShow } from '$lib/plugin-names';
 import { limitNotesToShow } from '$lib/limitNotes';
 import { t, getLang } from '$lib/i18n/index.svelte';
 import { DEFAULT_SKETCH_MODE, normalizeSketchState, type SketchMode, type SketchState } from '$lib/sketch';
@@ -1433,7 +1432,6 @@ export function createWorkState(deps: WorkStateDeps) {
 	return {
 		get showingDemo() { return showingDemo; },
 		get instructionLang() { return instructionLang; },
-		get pluginWarningsShown() { return pluginWarningsToShow(result); },
 		get limitNotesShown() { return limitNotesToShow(result); },
 		get singleRunning() { return (activeRunMode === 'single' && loading) || reloading; },
 		get ddlEditedAfterGeneration() { return ddlEditedAfterGeneration; },

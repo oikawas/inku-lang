@@ -117,8 +117,6 @@ class ComposeResponse(BaseModel):
     ddl: str = Field(description="The committed instructions (normalized DDL) that were drawn.")
     recomposition: RecompositionResult | None = Field(default=None, description="Result of the layout re-choice when recompose_mode was given. None when no re-choice ran.")
     # The committed pipeline document, also used when this work is saved.
-    plugin_provenance: list[dict[str, str]] = Field(default_factory=list, description="Plugins used by the committed instructions, as string records. Empty when none were used.")
-    plugin_warnings: list[str] = Field(default_factory=list, description="Warnings raised while resolving the plugins used by the instructions. Empty when there are none.")
     carriage_warnings: list[str] | None = Field(default=None, description="Warnings from the carriage-contract check. The check only inspects the instructions and does not change the drawing. None when none were recorded.")
     # Score 0.10 is the shared core's opaque delivery document. Compatibility
     # routes must not expand or coerce it through the retired Python model.
@@ -270,8 +268,6 @@ class PaintResponse(BaseModel):
     description: str = Field(description="The description the drawing was made from.")
     ddl: str = Field(description="The committed instructions (normalized DDL) that were drawn.")
     # The committed pipeline document, also used when this work is saved.
-    plugin_provenance: list[dict[str, str]] = Field(default_factory=list, description="Plugins used by the committed instructions, as string records. Empty when none were used.")
-    plugin_warnings: list[str] = Field(default_factory=list, description="Warnings raised while resolving the plugins used by the instructions. Empty when there are none.")
     carriage_warnings: list[str] | None = Field(default=None, description="Warnings from the carriage-contract check. The check only inspects the instructions and does not change the drawing. None when none were recorded.")
     thinking: str | None = Field(default=None, description="Always null. This server does not return the model's reasoning text.")
     score: dict = Field(description="The drawing score (JSON Score) as an object.")

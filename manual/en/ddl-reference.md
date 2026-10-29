@@ -58,7 +58,7 @@ A uniquely resolved marked subject, such as `the circle red.`, instead continues
 
 ### 1.6 Separate core words from registered names
 
-Core forms, colors, grounds, and grammar require no plugin. A name such as `Nature.若葉` requires a registered definition or a definition carried by the work or DDL export. Knowing the name does not make it available. Standard examples in this chapter use core DDL without plugins.
+Core forms, colors, grounds, and grammar require no plugin. A name such as `｛若葉｝` requires a registered definition or a definition carried by the work or DDL export. Knowing the name does not make it available. Standard examples in this chapter use core DDL without plugins.
 
 ## 2. Start with simple examples
 
@@ -669,6 +669,8 @@ Write one of the nine abstract colors and let the work's color catalog resolve i
 ### 3.22 Plugin invocation
 
 DDL 28 writes a visible plugin name in braces, as in `{young leaves}`. Full-width and ASCII braces may be mixed; names match locks after NFKC, lowercasing, and whitespace folding. An unknown or ambiguous name omits its sentence with a diagnostic. The qualified form remains readable during migration.
+
+The editor completes names after a brace and marks the ranges and reasons returned by the shared core, including on hover.
 
 A plugin is a data-only macro naming a composition of core meanings. It adds neither a primitive nor unrestricted plugin-specific natural grammar.
 

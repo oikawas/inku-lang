@@ -160,8 +160,50 @@ def resolve_new_work_macro_catalog(
 
 
 def _installed_plugin_names() -> tuple[list[str], list[str]]:
-    """Visible names of enabled and disabled packages."""
-    return sorted(PLUGIN_PACKAGE_MANAGER.visible_names(enabled=True)), sorted(PLUGIN_PACKAGE_MANAGER.visible_names(enabled=False))
+    """Visible names and legacy identifiers of enabled and disabled packages."""
+    enabled = set(PLUGIN_PACKAGE_MANAGER.visible_names(enabled=True))
+    disabled = set(PLUGIN_PACKAGE_MANAGER.visible_names(enabled=False))
+    for package in (*PLUGIN_PACKAGE_MANAGER.packages(), PLUGIN_PACKAGE_MANAGER.bundled()[0]):
+        target = enabled if PLUGIN_PACKAGE_MANAGER.is_enabled(package.id) else disabled
+        target.update(word.qualified_name for word in package.words)
+    return sorted(enabled), sorted(disabled)
+
+
+def installed_plugin_name_entries() -> list[dict[str, object]]:
+    entries = []
+    for package in (*PLUGIN_PACKAGE_MANAGER.packages(), PLUGIN_PACKAGE_MANAGER.bundled()[0]):
+        active = PLUGIN_PACKAGE_MANAGER.is_enabled(package.id)
+        for word in package.words:
+            entries.extend({"name": name, "qualified_name": word.qualified_name, "enabled": active}
+                           for name in word.visible_qualified_names())
+    return entries
+
+
+def plugin_offer_records(config: Mapping[str, Any], extra: Sequence[Mapping[str, Any]] = ()) -> list[dict[str, Any]]:
+    """Project the run's saved offers using the definitions saved with it."""
+    definitions = {}
+    for definition in config.get("definitions", []):
+        if not isinstance(definition, Mapping):
+            continue
+        identifier = f"{definition.get('namespace', '')}.{definition.get('id') or definition.get('heading', '')}"
+        names = definition.get("names") or {}
+        ja = names.get("ja") or []
+        en = names.get("en") or []
+        definitions[identifier] = (f"｛{ja[0]}｝" if ja else identifier,
+                                   f"{{{en[0]}}}" if en else identifier)
+    result = []
+    for record in [*(config.get("plugin_offers") or []), *extra]:
+        offer = record.get("offer") or {}
+        def items(key):
+            result_items = []
+            for item in offer.get(key, []):
+                qualified = item.get("qualified_name", "")
+                ja, en = definitions.get(qualified, (qualified, qualified))
+                result_items.append({**item, "written_ja": item.get("written_ja") or ja,
+                                     "written_en": item.get("written_en") or en})
+            return result_items
+        result.append({"stage": record.get("stage"), "offered": items("offered"), "omitted": items("omitted")})
+    return result
 
 
 def explain_plugin_diagnostics(
@@ -178,12 +220,7 @@ def explain_plugin_diagnostics(
     if explainer is None or not upstream_diagnostics:
         return []
     enabled, disabled = _installed_plugin_names()
-    plugin_names = []
-    for package in (*PLUGIN_PACKAGE_MANAGER.packages(), PLUGIN_PACKAGE_MANAGER.bundled()[0]):
-        active = PLUGIN_PACKAGE_MANAGER.is_enabled(package.id)
-        for word in package.words:
-            plugin_names.extend({"name": name, "qualified_name": word.qualified_name, "enabled": active}
-                                for name in word.visible_qualified_names())
+    plugin_names = installed_plugin_name_entries()
     work_ids = []
     for item in work_plugins:
         if isinstance(item, str):

@@ -3,6 +3,7 @@
 	import { getLang, t } from '$lib/i18n/index.svelte';
 	import { pluginDisplayName } from '$lib/plugin-names';
 	import { instructionLangOf, type ResolvedInstructionLang } from '$lib/instructionLang';
+	import type { PluginEntry } from '$lib/features/ddl-editor/types';
 
 	type SaijikiPreview = {
 		categoryKey: string;
@@ -17,17 +18,6 @@
 		image2x?: string;
 	};
 
-	type PluginEntry = {
-		qualified_name: string;
-		aliases?: string[];
-		note_ja: string;
-		note_en: string;
-		fires_on_ja?: string[];
-		fires_on_en?: string[];
-		preview_url?: string;
-		preview_url_2x?: string;
-	};
-
 	type Props = {
 		open: boolean;
 		pluginEntries: PluginEntry[];
@@ -37,6 +27,7 @@
 		/** The same preview a built-in word gets, built from the plugin document. */
 		previewForPlugin: (entry: PluginEntry, wordLang: ResolvedInstructionLang) => SaijikiPreview;
 		onInsertWord?: (word: string) => void;
+		ddlLang?: ResolvedInstructionLang | null;
 	};
 
 	let {
@@ -47,13 +38,14 @@
 		previewForWord,
 		previewForPlugin,
 		onInsertWord,
+		ddlLang = null,
 	}: Props = $props();
 
 	let drawerEl = $state<HTMLDivElement | null>(null);
 
 	// The reference keeps the reader's language even when its clicked word is
 	// inserted into the instructions box. The editor's own panel follows DDL.
-	const wordLang = $derived(instructionLangOf(getLang()));
+	const wordLang = $derived(ddlLang ?? instructionLangOf(getLang()));
 
 	function selectWord(word: string, preview: SaijikiPreview): void {
 		onInsertWord?.(word);
@@ -116,7 +108,7 @@
 			</div>
 			{#each SAIJIKI as cat, ci (cat.key)}
 				{@const words = saijikiWordsFor(cat.key, wordLang === 'ja')}
-				<div class="saijiki-cat" class:plugin-cat={cat.key.startsWith("plugin-")} style="border-bottom: {ci < SAIJIKI.length - 1 ? '1px solid var(--border)' : 'none'}">
+				<div class="saijiki-cat" style="border-bottom: {ci < SAIJIKI.length - 1 ? '1px solid var(--border)' : 'none'}">
 					<div class="saijiki-cat-head">
 						<span class="saijiki-cat-ja">{cat.label}</span>
 						<span class="saijiki-cat-en">{cat.en}</span>
@@ -126,7 +118,6 @@
 							{@const canonicalWord = cat.words[wi] ?? word}
 							<button
 								class="saijiki-chip"
-								class:plugin-chip={cat.key.startsWith("plugin-")}
 								onpointerdown={(e) => e.preventDefault()}
 								onclick={() => selectWord(word, previewForWord(cat.key, canonicalWord, word, wordLang))}
 								onpointerenter={() => (activePreview = previewForWord(cat.key, canonicalWord, word, wordLang))}
@@ -139,8 +130,7 @@
 			{#if pluginEntries.length > 0}
 				<div class="saijiki-cat plugin-cat">
 					<div class="saijiki-cat-head">
-						<span class="saijiki-cat-ja">Plugin</span>
-						<span class="saijiki-cat-en">namespaced vocabulary</span>
+						<span class="saijiki-cat-ja">{t().saijikiPlugins}</span>
 					</div>
 					<!-- Packed the same way the built-in words are: the note that
 					     used to sit under each chip is what the preview above now

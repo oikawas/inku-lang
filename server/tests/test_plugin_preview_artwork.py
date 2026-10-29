@@ -35,8 +35,7 @@ def test_every_bundled_word_has_both_pictures(auth_headers):
         if not word["qualified_name"].startswith("Nature."):
             continue
         assert word["preview_url"] and word["preview_url_2x"]
-        assert word["aliases"] == []
-        assert word["fires_on_ja"] == [] and word["fires_on_en"] == []
+        assert not {"aliases", "fires_on_ja", "fires_on_en"} & word.keys()
         assert word["written_ja"].startswith("｛")
         assert not any(isinstance(value, str) and value.startswith("data:") for value in word.values())
         one = client.get(word["preview_url"], headers=auth_headers)

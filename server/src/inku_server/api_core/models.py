@@ -480,6 +480,7 @@ class HistoryItem(HistoryPostBody):
             "the work was drawn through the stages."
         ),
     )
+    plugin_offers: list[dict] | None = Field(default=None, description="Plugin words offered to model requests in this work's run.")
     provider_usage: dict[str, ProviderStageUsage] | None = Field(
         default=None,
         description=(

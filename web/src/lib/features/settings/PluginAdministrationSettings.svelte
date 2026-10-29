@@ -43,10 +43,10 @@
 	function pluginIsEnabled(plugin: PluginItem): boolean {
 		return plugin.enabled ?? plugin.status === 'enabled';
 	}
-	function previewSrc(qualifiedName: string, version = ''): string {
-		const query = new URLSearchParams({ name: qualifiedName, scale: '1' });
+	function previewSrc(plugin: PluginItem, wordId: string, version = ''): string {
+		const query = new URLSearchParams();
 		if (version) query.set('v', version);
-		return `/api/saijiki/plugin-preview?${query}`;
+		return `/api/plugins/${encodeURIComponent(pluginId(plugin))}/words/${encodeURIComponent(wordId)}/preview?${query}`;
 	}
 	function pluginIsDeletable(plugin: PluginItem): boolean {
 		return plugin.deletable ?? !plugin.has_definitions;
@@ -55,9 +55,8 @@
 	let pictureTarget = $state<{ id: string; heading: string } | null>(null);
 	let pictureInput = $state<HTMLInputElement | null>(null);
 
-	function choosePicture(plugin: PluginItem, qualifiedName: string): void {
-		const heading = qualifiedName.slice((plugin.namespace ?? '').length + 1);
-		pictureTarget = { id: pluginId(plugin), heading };
+	function choosePicture(plugin: PluginItem, wordId: string): void {
+		pictureTarget = { id: pluginId(plugin), heading: wordId };
 		pictureInput?.click();
 	}
 
@@ -80,10 +79,10 @@
 		pluginBusy = false;
 	}
 
-	async function resetPicture(plugin: PluginItem, qualifiedName: string): Promise<void> {
+	async function resetPicture(plugin: PluginItem, wordId: string): Promise<void> {
 		if (!isAdmin || pluginBusy) return;
 		pluginBusy = true;
-		await onSetPluginWordPicture(pluginId(plugin), qualifiedName.slice((plugin.namespace ?? '').length + 1), null);
+		await onSetPluginWordPicture(pluginId(plugin), wordId, null);
 		pluginBusy = false;
 	}
 
@@ -118,31 +117,31 @@
 									<div class="system-plugin-title">{plugin.namespace ? `${plugin.namespace}.${plugin.name}` : plugin.name}</div>
 									<span class="plugin-version-pill">{plugin.version ? `v${plugin.version}` : plugin.status}</span>
 									{#if plugin.status === "rejected"}<span class="plugin-rejected">{plugin.status}</span>{/if}
-									<span class="plugin-use-mark" class:not-drawn={!plugin.has_definitions}>{plugin.has_definitions ? t().settingsPluginDrawn : t().settingsPluginNotDrawn}</span>
+								{#if plugin.status !== 'rejected'}<span class="plugin-use-mark">{t().settingsPluginDrawn}</span>{/if}
 								</div>
-								<div class="system-plugin-desc">{plugin.kind === 'package' ? ((isJapanese ? plugin.description_ja : plugin.description_en) || '') : (plugin.path ?? "")}</div>
-								<div class="plugin-use-hint">{plugin.kind === 'package' ? t().settingsPluginPackageHint : plugin.has_definitions ? t().settingsPluginDrawnHint : t().settingsPluginNotDrawnHint}</div>
+								<div class="system-plugin-desc">{(isJapanese ? plugin.description_ja : plugin.description_en) || ''}</div>
+								<div class="plugin-use-hint">{t().settingsPluginPackageHint}</div>
 								{#if plugin.reasons?.length}<div class="db-test-result">{plugin.reasons.join(" / ")}</div>{/if}
 								{#if plugin.entries?.length}
 									<details class="plugin-words">
 										<summary>{t().settingsPluginWords}（{plugin.entries.length}）</summary>
 										<ul class="plugin-word-list">
 											{#each plugin.entries as entry (entry.qualified_name)}
-												{@const surfaces = (isJapanese ? entry.surface_ja : entry.surface_en) ?? []}
+												{@const otherNames = [...(entry.surface_ja ?? []).slice(1), ...(entry.surface_en ?? []).slice(1)]}
 												{@const note = isJapanese ? entry.note_ja : entry.note_en}
 												{@const example = isJapanese ? entry.example_ja : entry.example_en}
 												<li class="plugin-word">
-													{#if entry.has_preview}<img class="plugin-word-preview" src={previewSrc(entry.qualified_name, entry.preview_version)} alt="" loading="lazy" />{:else}<span class="plugin-word-preview" aria-hidden="true"></span>{/if}
+											{#if entry.has_preview}<img class="plugin-word-preview" src={previewSrc(plugin, entry.word_id, entry.preview_version)} alt="" loading="lazy" />{:else}<span class="plugin-word-preview" aria-hidden="true"></span>{/if}
 													<div class="plugin-word-text">
-														<strong>{entry.qualified_name}</strong>
-														{#if entry.aliases?.length}<small>{entry.aliases.join(', ')}</small>{/if}
-														{#if plugin.kind !== 'package' && surfaces.length}<span>{surfaces.join(' | ')}</span>{/if}
+												<strong>{entry.written_ja} / {entry.written_en}</strong>
+														{#if otherNames.length}<small>{otherNames.join(' / ')}</small>{/if}
+												<span>{entry.word_kind === 'object' ? t().pluginObject : t().pluginScene}</span>
 														{#if note}<span>{note}</span>{/if}
 														{#if example}<span>{t().saijikiPreviewExampleLabel}{example}</span>{/if}
-														{#if plugin.kind === 'package' && isAdmin}
+																{#if plugin.kind === 'package' && plugin.deletable !== false && isAdmin}
 															<span class="plugin-word-actions">
-																<button class="ghost-btn user-plugin-btn" type="button" onclick={() => choosePicture(plugin, entry.qualified_name)} disabled={pluginBusy}>{t().settingsPluginPictureReplace}</button>
-																{#if entry.custom_preview}<button class="ghost-btn user-plugin-btn" type="button" onclick={() => void resetPicture(plugin, entry.qualified_name)} disabled={pluginBusy}>{t().settingsPluginPictureReset}</button>{/if}
+														<button class="ghost-btn user-plugin-btn" type="button" onclick={() => choosePicture(plugin, entry.word_id)} disabled={pluginBusy}>{t().settingsPluginPictureReplace}</button>
+														{#if entry.custom_preview}<button class="ghost-btn user-plugin-btn" type="button" onclick={() => void resetPicture(plugin, entry.word_id)} disabled={pluginBusy}>{t().settingsPluginPictureReset}</button>{/if}
 															</span>
 														{/if}
 													</div>

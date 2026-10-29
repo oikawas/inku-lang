@@ -1,7 +1,7 @@
 //! Selection of the installed plugin words relevant to a particular request.
 
 use inku_ddl::{
-    MacroDefinition, ParameterSchema, ResolvedInstructionLanguage,
+    MacroDefinition, ParameterSchema, ResolvedInstructionLanguage, bracketed_plugin_at,
     plugin_names::{normalize_plugin_name, v1_plugin_names},
 };
 use serde::{Deserialize, Serialize};
@@ -21,6 +21,10 @@ pub enum OfferReason {
 pub struct OfferItem {
     pub qualified_name: String,
     pub reason: OfferReason,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub written_ja: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub written_en: String,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -199,40 +203,17 @@ fn occurrence(text: &str, name: &str) -> Option<usize> {
 }
 
 fn braced(text: &str, names: &[String]) -> Option<usize> {
-    let mut start = None;
-    let mut nested = 0usize;
-    let mut invalid = false;
-    for (at, ch) in text.char_indices() {
-        match ch {
-            '{' if start.is_some() => {
-                nested += 1;
-                invalid = true;
-            }
-            '{' => {
-                start = Some(at);
-                invalid = false;
-            }
-            '}' if nested > 0 => {
-                nested -= 1;
-            }
-            '}' => {
-                if let Some(begin) = start.take() {
-                    if invalid {
-                        continue;
-                    }
-                    let inner = normalize_plugin_name(&text[begin + 1..at]);
-                    if names
-                        .iter()
-                        .any(|name| normalize_plugin_name(name) == inner)
-                    {
-                        return Some(begin);
-                    }
-                }
-            }
-            _ => {}
+    text.char_indices().find_map(|(at, ch)| {
+        if !matches!(ch, '{' | '｛') {
+            return None;
         }
-    }
-    None
+        let (_, written) = bracketed_plugin_at(text, at)?;
+        let inner = normalize_plugin_name(written);
+        names
+            .iter()
+            .any(|name| normalize_plugin_name(name) == inner)
+            .then_some(at)
+    })
 }
 
 fn legacy_occurrence(text: &str, name: &str) -> Option<usize> {
@@ -289,6 +270,8 @@ pub fn offer_plugins(
                 OfferItem {
                     qualified_name,
                     reason,
+                    written_ja: primary_name(definition, ResolvedInstructionLanguage::Ja),
+                    written_en: primary_name(definition, ResolvedInstructionLanguage::En),
                 },
             ));
         }
@@ -353,6 +336,15 @@ pub fn with_plugin_offer(
 mod tests {
     use super::*;
     use serde_json::Value;
+
+    #[test]
+    fn braced_offer_uses_the_parser_boundaries() {
+        let names = vec!["young leaves".to_owned()];
+        assert_eq!(braced("｛young leaves｝", &names), Some(0));
+        assert_eq!(braced("{young leaves.}", &names), None);
+        assert_eq!(braced("{\"young leaves\":1}", &names), None);
+        assert_eq!(braced("{young leaves", &names), None);
+    }
 
     #[test]
     fn summary_lines_separate_english_and_mark_truncated_sentences() {

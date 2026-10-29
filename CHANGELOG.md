@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-29 — Plugin names in the editor and Saijiki
+
+The editor marks braced words and their reasons from the shared core and offers name completion and previews. The Saijiki, settings, and check show names and kinds; each work records the words offered to AI.
+
 ### 2026-10-29 — Document native wheel preparation for ChatGPT connections
 
 The connection guide now explains how to prepare and rebuild the Server's native wheel for same-PC, remote-host and container connections. Commands run inside the container use the wheel included in the image.

@@ -759,7 +759,8 @@ pub(crate) fn qualified_macro_match(
 }
 
 /// Recognize only a nonempty, unnested pair wholly within one sentence.
-fn bracketed_plugin_at(source: &str, start: usize) -> Option<(usize, &str)> {
+/// Shared by parsing, plugin offers, and author-facing diagnostics.
+pub fn bracketed_plugin_at(source: &str, start: usize) -> Option<(usize, &str)> {
     let mut chars = source.get(start..)?.char_indices();
     let (_, open) = chars.next()?;
     if !matches!(open, '{' | '｛') {

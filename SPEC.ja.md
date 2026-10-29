@@ -356,9 +356,11 @@ Render Engine は、`JSON Score + render options + server-owned color metadata` 
 
 ### 4.12 未登録のプラグインとDDLの書き出し
 
+編集中のプラグインの範囲と状態は共有 core の `inku.plugin-calls.v1` が作品の目録と有効・無効の名から解き、Web はその答えで印と理由を出す。呼出しは描画や作品の保存を行わない。
+
 括弧の名が複数の lock に当たると `plugin_name_ambiguous` とし、候補を示す。共有診断入口は `plugin_names` に見える名・qualified id・有効状態を受け取れる。
 
-描いた環境でプラグイン名が解決できない文は、その文だけを省略して残りを描き切る。作品全体を止めず、原文のDDLからその文を消さず、LLMに別の語で書き直させない。共有Rust（pipeline binding `explain_plugin_diagnostics`）が、compilerの解決診断と、hostの有効・無効化中のプラグイン名、作品自身の定義から、文ごとに理由を一つ返す: `plugin_not_installed`（その名前が無い）、`plugin_disabled`（導入済みだが無効）、`plugin_name_mismatch`（登録名と一致しない。同じ見出しの別名前空間、大文字小文字の違い、2文字以内の違いの登録名を候補として一つ示す）、`plugin_version_mismatch`（同じ名前で定義の中身が違う）、`plugin_count_out_of_range`（名前は解決したが、書いた個数が語の受ける範囲の外。§4.6）。Hostは作品の診断に保存し、同じ範囲の汎用診断の代わりに表示する。
+描いた環境でプラグイン名が解決できない文は、その文だけを省略して残りを描き切る。作品全体を止めず、原文のDDLからその文を消さず、LLMに別の語で書き直させない。共有Rust（pipeline binding `explain_plugin_diagnostics`）が、compilerの解決診断と、hostの有効・無効化中のプラグイン名、作品自身の定義から、文ごとに理由を一つ返す: `plugin_not_installed`（その名前が無い）、`plugin_disabled`（導入済みだが無効）、`plugin_name_mismatch`（登録名と一致しない。同じ見出しの別名前空間、大文字小文字の違い、または編集距離が2以内で、正規化した名に共通の文字が一つ以上ある登録名を候補として一つ示す）、`plugin_version_mismatch`（同じ名前で定義の中身が違う）、`plugin_count_out_of_range`（名前は解決したが、書いた個数が語の受ける範囲の外。§4.6）。Hostは作品の診断に保存し、同じ範囲の汎用診断の代わりに表示する。
 
 保存済み作品は使った定義の実物を持つので、プラグインを外しても再演は変わらない。環境をまたいでDDLを持ち運ぶために、作品を`inku.ddl-export.v2`（可視DDL、言語、使った定義とnote、書き出し元）として書き出せる。定義はDDLの字から探さず、作品が実際に使ったlockから選ぶ。読み込んだ定義は新しい作品だけで使い、登録済みの同名定義より優先する。導入はしない。登録済みと中身が違う、または未登録のときは、どちらを使ったかをcatalog診断（`imported_plugin_differs_from_installed`／`imported_plugin_not_installed`）で知らせる。定義はdata-onlyで、読み込み時も共有Rustの検証境界を通る。
 
@@ -1106,6 +1108,8 @@ MLXのGemma 4は、[モデルの推奨生成設定](https://ai.google.dev/gemma/
 Stage 1は記述から可視DDLを作り、Stage 2はcompilerが報告したknown holeに対する可視patch候補だけを作る。同じモデルを使うが、各段の制限された入力・prompt・必要な結果は分けたままとする。Scoreの構造化は共有Rustの決定的なlowererが行い、LLMへ委ねない。
 
 ### 12.6 第一段階（解釈）の設計
+
+作品の走りが AI に提示したプラグインの語と選んだ理由、上限で落とした語をその走りの来歴に残し、生成情報に出す。送り直した段は最後の提示を残し、次の走りは親の提示を引き継がない。
 
 Stage 1 は自由記述を、書き手が観察・編集できる正規化 DDL へ有限に写す。原文の明示要素・数量・色・素材・関係を保ち、隠れた視覚要素や「美しい」解釈を追加しない。語彙、閉じた schema、制限値、出典をプロンプト lock として渡し、出力はその lock の内側だけを使う。これは I-640 で同期した有限 typed normalization 契約であり、特定のモデル名やモデル階級を正本にしない。
 

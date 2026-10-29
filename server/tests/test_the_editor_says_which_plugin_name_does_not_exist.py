@@ -148,3 +148,7 @@ def test_editor_uses_the_shared_core_for_braced_and_legacy_calls():
                         json={"source": "13枚の｛若葉｝。", "language": "ja"})
     assert count.status_code == 200, count.text
     assert [call["status"] for call in count.json()["calls"]] == ["plugin_count_out_of_range"]
+    legacy_count = client.post("/api/pipeline/plugin-calls", headers=headers,
+                               json={"source": "13枚のNature.YoungLeaves。", "language": "ja"})
+    assert legacy_count.status_code == 200, legacy_count.text
+    assert [(call["text"], call["status"]) for call in legacy_count.json()["calls"]] == [("Nature.YoungLeaves", "plugin_count_out_of_range")]

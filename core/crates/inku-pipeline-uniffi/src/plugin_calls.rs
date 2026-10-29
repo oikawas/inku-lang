@@ -139,13 +139,21 @@ fn run(bytes: &[u8]) -> Result<Value, ()> {
         calls.push(json!({"start_byte":resolved.span.start_byte,"end_byte":resolved.span.end_byte,"status":"resolved","qualified_name":resolved.lock.qualified_name}));
     }
     for item in explained["plugins"].as_array().ok_or(())? {
-        let start = item["start_byte"].as_u64().ok_or(())?;
-        let end = item["end_byte"].as_u64().ok_or(())?;
+        let mut start = item["start_byte"].as_u64().ok_or(())?;
+        let mut end = item["end_byte"].as_u64().ok_or(())?;
+        let name = item["name"].as_str().ok_or(())?;
+        if !name.starts_with(['{', '｛']) {
+            let text = input.source.get(start as usize..end as usize).ok_or(())?;
+            if let Some(offset) = text.find(name) {
+                start += offset as u64;
+                end = start + name.len() as u64;
+            }
+        }
         calls.retain(|call| {
             !(call["start_byte"].as_u64().unwrap_or(0) < end
                 && call["end_byte"].as_u64().unwrap_or(0) > start)
         });
-        calls.push(json!({"start_byte":item["start_byte"],"end_byte":item["end_byte"],"status":item["reason"],"suggestion":item.get("suggestion"),"candidates":item.get("candidates")}));
+        calls.push(json!({"start_byte":start,"end_byte":end,"status":item["reason"],"suggestion":item.get("suggestion"),"candidates":item.get("candidates")}));
     }
     for call in &mut calls {
         let start = call["start_byte"].as_u64().ok_or(())? as usize;

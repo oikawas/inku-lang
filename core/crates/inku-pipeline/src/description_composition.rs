@@ -2217,6 +2217,51 @@ mod tests {
     }
 
     #[test]
+    fn composition_offer_uses_the_requested_language_and_limit() {
+        let asset: Value = serde_json::from_str(include_str!(
+            "../../inku-ddl/tests/fixtures/nature-leaves-2.1-v1.json"
+        ))
+        .unwrap();
+        let definition =
+            inku_ddl::MacroDefinition::from_json(&asset["entries"][0]["definition"].to_string())
+                .unwrap();
+        let catalog = [MacroPromptEntry {
+            definition: &definition,
+            localized_summary: "Young leaves.",
+        }];
+        let limits = crate::focused_flow::config().prompt_limits;
+        let words = composition_plugin_words(
+            "young leaves",
+            &catalog,
+            ResolvedInstructionLanguage::En,
+            limits,
+        );
+        assert_eq!(
+            words,
+            [CompositionPluginWord {
+                written: "{young leaves}".into(),
+                object: false
+            }]
+        );
+        let schema = composition_response_schema_for(&words);
+        assert_eq!(
+            schema["properties"]["things"]["items"]["properties"]["word"]["enum"],
+            json!(["", "{young leaves}"])
+        );
+        let mut no_offers = limits;
+        no_offers.max_offered_plugins = 0;
+        assert!(
+            composition_plugin_words(
+                "young leaves",
+                &catalog,
+                ResolvedInstructionLanguage::En,
+                no_offers
+            )
+            .is_empty()
+        );
+    }
+
+    #[test]
     fn a_composed_source_is_titled_by_the_words_of_each_thing() {
         let things = [
             thing(1, "満月", "「月」"),

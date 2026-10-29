@@ -237,7 +237,7 @@ Canvasのcanonical ownerはshared coreの`inku.canvas-format-registry.v1`であ�
 
 記述から描く二つの道では、記述に括弧で書かれた語、見直すDDL中の語、記述中に名が現れる語の順に選び、既定8語まで提示する。名は日英の主の名と別名を照らす。要約は最初の一文を100字まで示し、定義本体は送らない。上限で落とした語と選択理由は実行の記録に残す。
 
-語彙pluginはコア語彙の組み合わせに名前を付けるdata-only macroである。Visible invocationは`｛若葉｝`のような括弧の名とし、移行中は`Namespace.Heading`も読む。definition version / canonical digest、document / compiler identity、source / generated provenanceはsidecar lockへ保存する。作者へDDL metadataとして書かせない。
+語彙pluginはコア語彙の組み合わせに名前を付けるdata-only macroである。Visible invocationは`｛若葉｝`のような括弧の名とし、旧`Namespace.Heading`は移行の関数だけが読む。definition version / canonical digest、document / compiler identity、source / generated provenanceはsidecar lockへ保存する。作者へDDL metadataとして書かせない。
 
 全domainはversioned `inku.macro-definition.v1`または`inku.macro-definition.v2`を使う。Tree / human / water等のdomain固有grammar、plugin別parser、plugin codeは作らない。Compilerはvisible invocationをlock解決し、closed typed parameterをbindingした後、attested composition seedとcaller-owned finite boundsでLLMなしにsemantic nodeへlate expansionし、通常のtyped loweringへ合流させる。Rendererはpluginを理解せず、後続の通常Scoreだけを受け取る。Description pathでは選んだ語の名、短い説明と受ける語を渡し、MacroDefinition本文やexpanded DDLは渡さない。Direct DDLのunknown / ambiguous qualified termをhidden LLM fallbackで補わない。その文だけを省略して描き切り、理由を作者に示す（§4.12）。
 
@@ -385,7 +385,7 @@ v2 定義は日本語・英語それぞれの主の名と別名を持つ。名�
 ### 5.1 各層の役割
 
 - **記述**: 人間の層。母語の自然文で書かれる。短歌的な短さを推奨。実行仕様の一段上に立つ詩歌的な層
-- **正規化DDL**: Stage 1 が記述から書き起こす実行仕様（DDL を直接書く入口もある）。有効な語彙pluginはこの時点で`Namespace.Heading`のqualified termを含みうる。plugin展開がStage 1の直後にそれをコアDDLへ決定的に書き下し、Stage 1.5とStage 2はその展開後DDLを読む
+- **正規化DDL**: Stage 1 が記述から書き起こす実行仕様（DDL を直接書く入口もある）。有効な語彙pluginはこの時点で`｛若葉｝`のような括弧の名を含みうる。plugin展開がStage 1の直後にそれをコアDDLへ決定的に書き下し、Stage 1.5とStage 2はその展開後DDLを読む
 - **JSON Score**: 中間の楽譜。言語非依存・機械可読
 - **SVG**: 演奏の結果。一回性。記述は残り、出力は都度生まれ都度消える
 

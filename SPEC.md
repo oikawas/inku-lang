@@ -775,8 +775,8 @@ writes         interprets       expands        structures    draws
   layer standing one step above the executable specification.
 - **Normalized DDL**: the executable specification Stage 1 transcribes from
   the description (there is also an entrance for writing DDL directly). An
-  enabled vocabulary plugin may appear here as a qualified `Namespace.Heading`
-  term. Plugin expansion deterministically writes that term down to core DDL
+  enabled vocabulary plugin may appear here as a braced name such as `{young leaves}`.
+  Plugin expansion deterministically writes that term down to core DDL
   immediately after Stage 1; Stage 1.5 and Stage 2 read the expanded DDL.
 - **JSON Score**: the score in between.  Language-independent and
   machine-readable.

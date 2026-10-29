@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { pluginProblemMessage } from './plugin-package-problems';
+import { pluginProblemMessage, pluginRejectionMessage } from './plugin-package-problems';
 
 const here = new URL('.', import.meta.url);
 const read = (path: string) => readFileSync(new URL(path, here), 'utf8');
@@ -31,4 +31,18 @@ test('every problem the Server writes for a package file is explained in both la
 
 test('a code the table does not know is shown as itself, not hidden', () => {
 	assert.equal(pluginProblemMessage('a_code_from_a_newer_core', true), 'a_code_from_a_newer_core');
+});
+
+test('rejected installed files show translated check reasons and no drawing hint', () => {
+	assert.deepEqual(pluginRejectionMessage('schema: rewrite_as_v2', true), {
+		message: '古い形式（v1）のファイルです。inku.plugin-package.v2 に書き直して入れ直してください。', path: 'schema'
+	});
+	assert.match(pluginRejectionMessage('schema: rewrite_as_v2', false).message, /old v1 format.*inku\.plugin-package\.v2/);
+	assert.deepEqual(pluginRejectionMessage('words[0]: unknown_field', false), { message: pluginProblemMessage('unknown_field', false), path: 'words[0]' });
+	assert.deepEqual(pluginRejectionMessage('schema: future_code', true), { message: 'future_code', path: 'schema' });
+	const settings = read('./PluginAdministrationSettings.svelte');
+	assert.match(settings, /plugin\.status === 'rejected'[\s\S]*?settingsPluginNotLoaded[\s\S]*?\{:else\}[\s\S]*?settingsPluginDrawn/);
+	assert.match(settings, /plugin\.status !== 'rejected'\}<div class="plugin-use-hint">\{t\(\)\.settingsPluginPackageHint\}/);
+	assert.match(settings, /plugin\.kind === 'package' && plugin\.status !== 'rejected'\}<span class="plugin-use-hint">\{t\(\)\.settingsPluginPackageDeleteHint\}/);
+	assert.match(settings, /pluginRejectionMessage\(reason, isJapanese\)/);
 });

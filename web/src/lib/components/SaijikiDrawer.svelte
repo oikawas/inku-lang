@@ -99,7 +99,7 @@
 					</div>
 					<div class="saijiki-preview-copy">
 						<div class="saijiki-preview-title">{activePreview.word}</div>
-						<div class="saijiki-preview-effect">{activePreview.effect}</div>
+						<div class="saijiki-preview-effect" class:plugin-effect={activePreview.categoryKey === 'plugin'}>{activePreview.effect}</div>
 						<div class="saijiki-preview-example"><span class="saijiki-preview-example-label">{t().saijikiPreviewExampleLabel}</span>{activePreview.example}</div>
 					</div>
 				{:else}
@@ -236,6 +236,7 @@
 		line-height: 1.45;
 		color: var(--paper-surface-muted);
 	}
+	.saijiki-preview-effect.plugin-effect { white-space: pre-line; }
 	.saijiki-preview-example {
 		font-size: var(--ui-font-size-10);
 		line-height: 1.4;

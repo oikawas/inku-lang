@@ -1355,6 +1355,7 @@ export const ja: LangPack = {
 	settingsPluginPackageInstalled: '{id} を追加しました。新しい作品で使え、歳時記にも出ます。',
 	settingsPluginPackageExists: '同じ名前のプラグインがもう入っています。もう一度選んで「置き換える」を押してください。',
 	settingsPluginPackageHint: '管理者が追加したプラグインです。語を書くと、この定義で描きます。使わないときは無効にするか、削除します。',
+	settingsPluginNotLoaded: '読み込めない',
 	settingsPluginPackageDeleteHint: '保存済みの作品は、保存した定義でそのまま描けます。',
 	settingsPluginPictureReplace: '絵を差し替える',
 	settingsPluginPictureReset: '元の絵に戻す',

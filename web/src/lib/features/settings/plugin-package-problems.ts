@@ -13,7 +13,7 @@ const MESSAGES: Record<string, Message> = {
 	not_an_object: { ja: '{ } のオブジェクトでなければなりません。', en: 'Must be an object ({ }).' },
 	unknown_field: { ja: '知らない欄です。綴りを確かめるか、欄を消してください。', en: 'Unknown field. Check its spelling or remove it.' },
 	wrong_schema: { ja: 'schema は inku.plugin-package.v2 にします。', en: 'schema must be inku.plugin-package.v2.' },
-	rewrite_as_v2: { ja: 'v2 のファイルに書き直して入れ直してください。', en: 'Rewrite this plugin as a v2 file and install it again.' },
+	rewrite_as_v2: { ja: '古い形式（v1）のファイルです。inku.plugin-package.v2 に書き直して入れ直してください。', en: 'This file uses the old v1 format. Rewrite it as inku.plugin-package.v2 and install it again.' },
 	definition_requires_v2: { ja: '定義を v2 の形で書き直してください。', en: 'Rewrite the definition in v2 form.' },
 	example_without_name: { ja: '例文では括弧つきの主の名で語を呼んでください。', en: 'Use the braced primary name in the example.' },
 	invalid_identifier: { ja: '英字で始め、英数字・_・- だけで書きます。', en: 'Start with a letter and use only letters, digits, _ and -.' },
@@ -115,4 +115,11 @@ export function pluginProblemMessage(code: string, isJapanese: boolean): string 
 	const message = MESSAGES[code];
 	if (!message) return code;
 	return isJapanese ? message.ja : message.en;
+}
+
+/** Installed-package rejection reasons carry a file path before the code. */
+export function pluginRejectionMessage(reason: string, isJapanese: boolean): { message: string; path?: string } {
+	const match = /^(.*):\s*([a-z0-9_]+)$/.exec(reason);
+	const code = match?.[2] ?? reason;
+	return { message: pluginProblemMessage(code, isJapanese), ...(match?.[1] ? { path: match[1] } : {}) };
 }

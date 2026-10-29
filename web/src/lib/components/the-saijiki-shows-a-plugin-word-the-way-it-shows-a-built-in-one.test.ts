@@ -16,6 +16,17 @@ const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf
 const PANELS = ['./SaijikiDrawer.svelte', './SaijikiInline.svelte'];
 const PAGE = '../../routes/+page.svelte';
 
+test('plugin preview details preserve separate lines in both panels without changing built-in words', () => {
+	const page = read(PAGE);
+	const builder = page.slice(page.indexOf('function pluginPreview('), page.indexOf('// ── Color catalog'));
+	assert.match(builder, /\.join\('\\n'\)/);
+	for (const panel of PANELS) {
+		const source = read(panel);
+		assert.match(source, /class:plugin-effect=\{activePreview\.categoryKey === 'plugin'\}/, panel);
+		assert.match(source, /\.saijiki-preview-effect\.plugin-effect\s*\{\s*white-space:\s*pre-line/, panel);
+	}
+});
+
 /** The plugin section of a panel: from its heading to the end of that block. */
 function pluginSection(source: string): string {
 	const start = source.indexOf('{#if pluginEntries.length > 0}');

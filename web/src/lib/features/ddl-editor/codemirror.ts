@@ -157,6 +157,22 @@ export function pluginHoverContent(call: PluginCall, entries: PluginEntry[], lan
 	return { text: reason(call) };
 }
 
+export function pluginHoverElement(content: { text: string; image?: string }, doc: Document = document): HTMLElement {
+	const dom = doc.createElement('div');
+	dom.className = 'cm-ddl-plugin-hover';
+	const text = doc.createElement('div');
+	text.className = 'cm-ddl-plugin-hover-text';
+	text.textContent = content.text;
+	dom.appendChild(text);
+	if (content.image) {
+		const img = doc.createElement('img');
+		img.src = content.image;
+		img.alt = '';
+		dom.appendChild(img);
+	}
+	return dom;
+}
+
 export function createDdlEditor(parent: HTMLElement, value: string, initial: DdlEditorOptions): DdlEditorControl {
 	let options = initial;
 	let view: EditorView | null = null;
@@ -218,12 +234,9 @@ export function createDdlEditor(parent: HTMLElement, value: string, initial: Ddl
 			const call = options.pluginCalls?.find(item => item.start_utf16 <= pos && pos < item.end_utf16);
 			if (!call) return null;
 			return { pos: call.start_utf16, end: call.end_utf16, above: true, create() {
-				const dom = document.createElement('div');
 				const lang = resolveInstructionLang(view.state.doc.toString(), options.isJapanese ? 'ja' : 'en');
 				const content = pluginHoverContent(call, options.pluginEntries, lang, options.previewForPlugin, options.pluginReason ?? (() => ''));
-				dom.textContent = content.text;
-				if (content.image) { const img = document.createElement('img'); img.src = content.image; img.alt = ''; dom.appendChild(img); }
-				dom.style.whiteSpace = 'pre-line'; return { dom };
+				return { dom: pluginHoverElement(content) };
 			} };
 		}),
 		autocompletion({ override: [ddlCompletions(() => options)] }),

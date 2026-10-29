@@ -3,6 +3,7 @@
 	import type { PluginItem, PluginPackageReport, PluginPackageUpload, SettingsStatus } from './server-administration.svelte';
 	import PluginPackageInstaller from './PluginPackageInstaller.svelte';
 	import { fileToBase64, saveBlob } from './plugin-files';
+	import { pluginRejectionMessage } from './plugin-package-problems';
 	import './plugin-administration-settings.css';
 
 	// The drawing uses only definitions written in JSON. An administrator adds
@@ -115,13 +116,21 @@
 							<div class="user-plugin-info">
 								<div class="system-plugin-title-row">
 									<div class="system-plugin-title">{plugin.namespace ? `${plugin.namespace}.${plugin.name}` : plugin.name}</div>
-									<span class="plugin-version-pill">{plugin.version ? `v${plugin.version}` : plugin.status}</span>
-									{#if plugin.status === "rejected"}<span class="plugin-rejected">{plugin.status}</span>{/if}
-								{#if plugin.status !== 'rejected'}<span class="plugin-use-mark">{t().settingsPluginDrawn}</span>{/if}
+									{#if plugin.status === 'rejected'}
+										<span class="plugin-rejected">{t().settingsPluginNotLoaded}</span>
+									{:else}
+										<span class="plugin-version-pill">{plugin.version ? `v${plugin.version}` : plugin.status}</span>
+										<span class="plugin-use-mark">{t().settingsPluginDrawn}</span>
+									{/if}
 								</div>
 								<div class="system-plugin-desc">{(isJapanese ? plugin.description_ja : plugin.description_en) || ''}</div>
-								<div class="plugin-use-hint">{t().settingsPluginPackageHint}</div>
-								{#if plugin.reasons?.length}<div class="db-test-result">{plugin.reasons.join(" / ")}</div>{/if}
+								{#if plugin.status !== 'rejected'}<div class="plugin-use-hint">{t().settingsPluginPackageHint}</div>{/if}
+								{#if plugin.reasons?.length}
+									{#each plugin.reasons as reason}
+										{@const problem = pluginRejectionMessage(reason, isJapanese)}
+										<div class="db-test-result">{problem.message}{#if problem.path} <small>({problem.path})</small>{/if}</div>
+									{/each}
+								{/if}
 								{#if plugin.entries?.length}
 									<details class="plugin-words">
 										<summary>{t().settingsPluginWords}（{plugin.entries.length}）</summary>
@@ -157,7 +166,7 @@
 								{/if}
 								{#if pluginIsDeletable(plugin)}
 									{#if pluginDeleteConfirmId === pluginId(plugin)}
-										{#if plugin.kind === 'package'}<span class="plugin-use-hint">{t().settingsPluginPackageDeleteHint}</span>{/if}
+										{#if plugin.kind === 'package' && plugin.status !== 'rejected'}<span class="plugin-use-hint">{t().settingsPluginPackageDeleteHint}</span>{/if}
 										<button class="ghost-btn user-plugin-btn danger" onclick={() => void confirmDeletePlugin(plugin)} disabled={pluginBusy}>{t().settingsPluginDeleteConfirm}</button>
 										<button class="ghost-btn user-plugin-btn" onclick={() => (pluginDeleteConfirmId = null)} disabled={pluginBusy}>{t().confirmCancel}</button>
 									{:else}

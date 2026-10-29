@@ -288,6 +288,10 @@
 	.ddl-editor-frame :global(.cm-placeholder) { color: var(--fg3); }
 	.ddl-editor-frame :global(.cm-ddl-range-name) { text-decoration: underline dotted; text-underline-offset: 3px; cursor: pointer; }
 	.ddl-editor-frame :global(.cm-tooltip) { border: 1px solid var(--border2); background: var(--panel); color: var(--fg); }
+	.ddl-editor-frame :global(.cm-tooltip:has(.cm-ddl-plugin-hover)) { border: 1px solid var(--tooltip-border); border-radius: var(--r); background: var(--tooltip-bg); color: var(--tooltip-fg); box-shadow: var(--tooltip-shadow); }
+	.ddl-editor-frame :global(.cm-ddl-plugin-hover) { max-width: min(440px, calc(100vw - 48px)); padding: 6px 8px; font-size: var(--ui-font-size-11); line-height: 1.45; overflow-wrap: anywhere; }
+	.ddl-editor-frame :global(.cm-ddl-plugin-hover-text) { white-space: pre-line; }
+	.ddl-editor-frame :global(.cm-ddl-plugin-hover img) { display: block; max-width: 100%; width: 216px; height: auto; margin-top: 6px; }
 	.ddl-editor-frame :global(.cm-tooltip-autocomplete li[aria-selected]) { background: var(--accent); color: var(--panel); }
 	.ddl-editor-frame.readonly { opacity: .72; }
 	.compact { gap: 0; }

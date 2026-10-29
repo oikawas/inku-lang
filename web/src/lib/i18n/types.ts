@@ -1156,6 +1156,7 @@ export interface LangPack {
 	settingsPluginPackageInstalled: string;
 	settingsPluginPackageExists: string;
 	settingsPluginPackageHint: string;
+	settingsPluginNotLoaded: string;
 	settingsPluginPackageDeleteHint: string;
 	settingsPluginPictureReplace: string;
 	settingsPluginPictureReset: string;

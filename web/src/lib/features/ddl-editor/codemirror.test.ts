@@ -3,9 +3,10 @@ import test from 'node:test';
 import { EditorSelection, EditorState } from '@codemirror/state';
 import { history, redo, undo } from '@codemirror/commands';
 import { CompletionContext } from '@codemirror/autocomplete';
+import { readFileSync } from 'node:fs';
 import { readCompositionRanges, scanNumericRanges } from '../../composition-ranges.ts';
 import { ddlPartClass, highlightDDL } from '../../highlight.ts';
-import { ddlCompletions, ddlEditorModel, ddlSyntax, insertDdlWord, pluginHoverContent, replaceDdlValue } from './codemirror.ts';
+import { ddlCompletions, ddlEditorModel, ddlSyntax, insertDdlWord, pluginHoverContent, pluginHoverElement, replaceDdlValue } from './codemirror.ts';
 import * as ddlControls from './codemirror.ts';
 import { compositionChanged, openRangeAt, rangeEditorState, rangeFocusChanged } from './codemirror-ranges.ts';
 
@@ -197,6 +198,29 @@ test('hover shows the resolved preview or the diagnostic reason', () => {
 	const preview = () => ({ categoryKey: 'plugin', word: '｛星｝', canonicalWord: 'Sky.Stars', effect: '星の note', example: '｛星｝。', svg: '', image: '/preview.png' });
 	assert.deepEqual(pluginHoverContent(call, [entry], 'ja', preview, () => 'disabled'), { text: '｛星｝\n星の note\n｛星｝。', image: '/preview.png' });
 	assert.deepEqual(pluginHoverContent({ ...call, status: 'plugin_disabled' }, [entry], 'ja', preview, () => '有効にすると描けます。'), { text: '有効にすると描けます。' });
+});
+
+test('plugin hover places its multiline text above the picture in the tooltip frame', () => {
+	class Element {
+		className = ''; textContent: string | null = null; src = ''; alt = '';
+		children: Element[] = [];
+		readonly tag: string;
+		constructor(tag: string) { this.tag = tag; }
+		appendChild(child: Element) { this.children.push(child); }
+	}
+	const doc = { createElement: (tag: string) => new Element(tag) } as unknown as Document;
+	const resolved = pluginHoverElement({ text: '｛若葉｝\nわかば\n情景の語\nnote\n｛若葉｝。', image: '/leaves.png' }, doc) as unknown as Element;
+	assert.equal(resolved.className, 'cm-ddl-plugin-hover');
+	assert.deepEqual(resolved.children.map(child => child.tag), ['div', 'img']);
+	assert.equal(resolved.children[0].textContent, '｛若葉｝\nわかば\n情景の語\nnote\n｛若葉｝。');
+	assert.equal(resolved.children[1].src, '/leaves.png');
+	const reason = pluginHoverElement({ text: 'この Server にない名前です。' }, doc) as unknown as Element;
+	assert.equal(reason.className, resolved.className);
+	assert.deepEqual(reason.children.map(child => child.tag), ['div']);
+	const css = readFileSync(new URL('../../components/DdlEditor.svelte', import.meta.url), 'utf8');
+	assert.match(css, /\.cm-tooltip:has\(\.cm-ddl-plugin-hover\)[\s\S]*?var\(--tooltip-bg\)/);
+	assert.match(css, /\.cm-ddl-plugin-hover-text\)[^{]*\{[^}]*white-space: pre-line/);
+	assert.match(css, /\.cm-ddl-plugin-hover img\)[^{]*\{[^}]*display: block/);
 });
 
 test('cursor completions use the DDL language and canonical Macro names, and yield to numeric edits', async () => {

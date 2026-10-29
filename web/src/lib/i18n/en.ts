@@ -1357,6 +1357,7 @@ export const en: LangPack = {
 	settingsPluginPackageInstalled: 'Added {id}. New works can use it, and it is in the Saijiki.',
 	settingsPluginPackageExists: 'A plugin with the same name is already installed. Choose the file again and press Replace.',
 	settingsPluginPackageHint: 'A plugin an administrator added. Its words are drawn with these definitions. Switch it off or delete it when it is not wanted.',
+	settingsPluginNotLoaded: 'Not loaded',
 	settingsPluginPackageDeleteHint: 'Saved works still draw with the definitions they saved.',
 	settingsPluginPictureReplace: 'Replace picture',
 	settingsPluginPictureReset: 'Back to the original picture',

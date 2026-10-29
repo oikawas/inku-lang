@@ -8,13 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-29 — Use object plugin words in composition, laws, colors, and chunks
-
-Read and measure an object word like a square of the same aspect ratio. Preserve its shape name and allow recoloring only when its definition declares a color parameter. Scene words remain plugged in shapes.
-### 2026-10-29 — Share ChatGPT plan authorization and registration decisions
-
-Callback, concurrent authorization, purpose and operation, publication constraints, and registration deletion decisions move into the shared core. The Server retains its HTTP 422 validation; clients are unchanged.
-
 ### 2026-10-28 — Complete Android ChatGPT login in the foreground
 
 The browser acknowledges authorization immediately, and inku exchanges the token after returning to the foreground.
@@ -46,18 +39,6 @@ ChatGPT plan authorization, session and model publication decisions use the shar
 ### 2026-10-28 — Share ChatGPT plan policy on macOS
 
 ChatGPT plan publication and authentication decisions use the shared core, while signature verification and encrypted local storage stay native.
-### 2026-10-28 — Draw object words inside invisible boxes
-
-Object words use the square's placement, count, dimensions, angle and relations, then draw their definition inside a box with its aspect (DDL engine 74). Score 0.23.0 retains one body shared by copies and render engine 94 performs it. Older Scores draw as before.
-
-### 2026-10-28 — Offer plugin words named by a description
-
-The drawing prompts offer a bounded selection of words named in the description or the DDL under review. Scene words use the plan's plugins field; object words use its shape field.
-
-### 2026-10-28 — Bracketed plugin names and definition v2
-
-DDL 28 resolves bracketed names such as `{young leaves}` against locked v1 and v2 definitions. Unbound scene caller positions, sizes and similar fields are omitted individually. Object definitions are accepted but not drawn yet. Saved-work migration retains v1 definitions and locks and rewrites only the spelling.
-
 ### 2026-10-28 — Share provider admission calculations on macOS
 
 Input estimates, admission, settlement, daily boundaries and 429 delays use the shared core. The existing stored accounting format and host waiting remain in place. Auxiliary text requests now share the same budget, including Gemini token counting and 429 cooldowns.
@@ -460,6 +441,28 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.295 (2026-10-29 / Build1371)
+
+### 2026-10-29 — Use object plugin words in composition, laws, colors, and chunks
+
+Read and measure an object word like a square of the same aspect ratio. Preserve its shape name and allow recoloring only when its definition declares a color parameter. Scene words remain plugged in shapes.
+
+### 2026-10-29 — Share ChatGPT plan authorization and registration decisions
+
+Callback, concurrent authorization, purpose and operation, publication constraints, and registration deletion decisions move into the shared core. The Server retains its HTTP 422 validation; clients are unchanged.
+
+### 2026-10-28 — Draw object words inside invisible boxes
+
+Object words use the square's placement, count, dimensions, angle and relations, then draw their definition inside a box with its aspect (DDL engine 74). Score 0.23.0 retains one body shared by copies and render engine 94 performs it. Older Scores draw as before.
+
+### 2026-10-28 — Offer plugin words named by a description
+
+The drawing prompts offer a bounded selection of words named in the description or the DDL under review. Scene words use the plan's plugins field; object words use its shape field.
+
+### 2026-10-28 — Bracketed plugin names and definition v2
+
+DDL 28 resolves bracketed names such as `{young leaves}` against locked v1 and v2 definitions. Unbound scene caller positions, sizes and similar fields are omitted individually. Object definitions are accepted but not drawn yet. Saved-work migration retains v1 definitions and locks and rewrites only the spelling.
 
 ## v2.15.294 (2026-10-28 / Build1370)
 

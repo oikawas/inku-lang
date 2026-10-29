@@ -22,11 +22,12 @@ class ChatGptPolicyCoreTest {
         val directory = requireNotNull(File(requireNotNull(System.getProperty("inku.identityCases"))).parentFile)
         val wire = JSONObject(directory.resolve("provider-wire-cases.json").readText()).getJSONArray("chatgpt")
         val addendum = JSONArray(directory.resolve("chatgpt-auth-addendum-cases.json").readText())
+        val rules = JSONArray(directory.resolve("chatgpt-auth-11-15-cases.json").readText())
         val rows = (0 until wire.length()).map { wire.getJSONObject(it) }
             .filter { it.getJSONObject("request").optString("schema") == "inku.model-catalog-request.v1" }
         assertEquals(59, rows.size)
         assertEquals(37, addendum.length())
-        for (row in rows + (0 until addendum.length()).map { addendum.getJSONObject(it) }) {
+        for (row in rows + (0 until addendum.length()).map { addendum.getJSONObject(it) } + (0 until rules.length()).map { rules.getJSONObject(it) }) {
             val request = row.getJSONObject("request").put("schema", "inku.model-catalog-request.v1")
             val result = JSONObject(NativePipelineBridge.modelCatalog(CoreIdentityJson.encode(request).toByteArray()).toString(Charsets.UTF_8))
             val expected = row.getJSONObject("expect")

@@ -33,7 +33,7 @@ class ChatGptPlanManager internal constructor(
     private val modelPolicy: () -> ChatGptModelPolicy = { ChatGptModelPolicy() },
     private val diagnostic: (String) -> Unit = { Log.w("InkuProvider", it) },
     private val foreground: StateFlow<Boolean> = MutableStateFlow(true),
-    private val authorizationTimeoutMs: Long = 300_000,
+    private val authorizationTimeoutMs: Long? = null,
     private val now: () -> Long = System::currentTimeMillis,
 ) : ModelProvider {
     override val providerId: String = CHATGPT_PROVIDER
@@ -103,12 +103,16 @@ class ChatGptPlanManager internal constructor(
 
     suspend fun authorize(profileId: String? = null, consent: Boolean = false, japanese: Boolean = true): String {
         val attempt = synchronized(store) {
-            if (authorization != null) throw ChatGptException("chatgpt_attempt_busy")
+            val count = if (authorization != null) 1 else 0
+            val admission = ChatGptCore.call("chatgpt_auth_attempt", JSONObject().put("pending_count", count).put("owner_count", count))
             val profiles = store.read().getJSONObject("profiles")
-            val previous = profileId?.let { profiles.optJSONObject(it) ?: throw ChatGptException("chatgpt_not_connected") }
+            val existing = profileId?.let(profiles::optJSONObject)
+            val previous = ChatGptCore.call("chatgpt_auth_previous", JSONObject().put("profile_id", profileId ?: JSONObject.NULL)
+                .put("profile", existing?.takeIf { it.has("sub") } ?: JSONObject.NULL)
+                .put("pending", existing?.takeUnless { it.has("sub") } ?: JSONObject.NULL)).optJSONObject("previous")
             ChatGptCore.call("chatgpt_auth_save_check", JSONObject().put("previous", previous ?: JSONObject.NULL)
                 .put("count", profiles.length()).put("expected_generation", JSONObject.NULL))
-            Authorization(profileId ?: UUID.randomUUID().toString(), previous, ServerSocket(0, 4, InetAddress.getByName("127.0.0.1")), japanese, now() + authorizationTimeoutMs)
+            Authorization(profileId ?: UUID.randomUUID().toString(), previous, ServerSocket(0, 4, InetAddress.getByName("127.0.0.1")), japanese, now() + (authorizationTimeoutMs ?: admission.getLong("deadline_seconds") * 1000))
                 .also { authorization = it; updateView() }
         }
         val url = try {
@@ -160,8 +164,12 @@ class ChatGptPlanManager internal constructor(
                         if (!callbackStateMatches(query, attempt.state)) throw ChatGptException("chatgpt_callback_invalid")
                         synchronized(store) {
                             checkAttempt(attempt)
-                            if (attempt.used) throw ChatGptException("chatgpt_callback_invalid")
-                            attempt.used = true; consumed = true
+                            val result = app.inku.mobile.data.catalogRequest("chatgpt_auth_callback_use", JSONObject()
+                                .put("used", attempt.used).put("cancelled", attempt.cancelled || authorization !== attempt)
+                                .put("expired", now() >= attempt.deadline))
+                            attempt.used = result.getBoolean("used")
+                            consumed = result.getBoolean("fail_attempt")
+                            result.optString("error").takeIf(String::isNotEmpty)?.let { throw ChatGptException(it) }
                         }
                         client = issuedClientId(query, attempt.previous)
                         callbackCode = query.getValue("code")
@@ -347,6 +355,8 @@ class ChatGptPlanManager internal constructor(
     fun browserUnavailable() { cancelAuthorization(); updateView("chatgpt_browser_unavailable") }
 
     fun publishModels(ref: ChatGptSessionRef, models: List<String>, purposes: JSONObject? = null): Unit = synchronized(store) {
+        ChatGptCore.call("chatgpt_auth_publication_input", JSONObject().put("profile_id", ref.profileId)
+            .put("generation", ref.generation).put("selected", JSONArray(models)).put("model_purposes", purposes ?: JSONObject.NULL))
         val profile = checkSession(ref)
         val value = store.read()
         ChatGptCore.call("chatgpt_auth_publication_active", JSONObject().put("active", value.optString("active")).put("profile_id", ref.profileId))
@@ -428,7 +438,7 @@ class ChatGptPlanManager internal constructor(
                     val profile = checkSession(ref)
                     val publication = ChatGptCore.call("chatgpt_publication", JSONObject().put("profile", ChatGptCore.toCore(profile, policy.purposes))
                         .put("assessments", policy.assessments)).getJSONObject("publication")
-                    val purpose = if (request.pipelineImages != null || request.imagePng != null || request.imageJpeg != null) "vision" else "llm"
+                    val purpose = chatGptPurpose(request.pipelineAction)
                     if (!ChatGptCore.call("chatgpt_offered", JSONObject().put("models", publication.getJSONArray("models"))
                             .put("model", slug).put("purpose", purpose)).getBoolean("offered")) throw ChatGptException("chatgpt_model_not_offered")
                 }
@@ -494,7 +504,7 @@ class ChatGptPlanManager internal constructor(
         store.write(value); http.cancelAll(); updateView()
     }
 
-    suspend fun signOut(id: String) {
+    suspend fun signOut(id: String): Boolean {
         val old = synchronized(store) {
             cancelAuthorization()
             val profile = store.read().getJSONObject("profiles").optJSONObject(id) ?: throw ChatGptException("chatgpt_not_connected")
@@ -516,6 +526,19 @@ class ChatGptPlanManager internal constructor(
         } catch (cancelled: CancellationException) { updateView(revocationUnconfirmed = true); throw cancelled }
         catch (_: Exception) { /* Local tokens were removed before the network operation. */ }
         updateView(revocationUnconfirmed = !confirmed)
+        return confirmed
+    }
+
+    suspend fun deleteProfile(id: String) {
+        val confirmed = signOut(id)
+        synchronized(store) {
+            val result = ChatGptCore.call("chatgpt_auth_delete", JSONObject().put("value", store.read()).put("profile_id", id))
+            val value = result.getJSONObject("value")
+            if (value.isNull("active")) value.remove("active")
+            store.write(value)
+            http.cancelAll()
+            updateView(revocationUnconfirmed = !confirmed)
+        }
     }
 
     private suspend fun authJson(url: String, method: String = "GET", body: String? = null, check: () -> Unit = {}, status: (Int) -> Unit = {}): JSONObject {

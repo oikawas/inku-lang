@@ -1987,6 +1987,20 @@ class InkuViewModel @JvmOverloads constructor(
         }
     }
 
+    fun deleteChatGptProfile(id: String) {
+        viewModelScope.launch {
+            try {
+                val active = state.value.chatGptPlan.activeProfileId == id
+                repository.chatGptPlan.deleteProfile(id)
+                localState.value = localState.value.copy(
+                    providerModelFetchStates = if (active) localState.value.providerModelFetchStates - "chatgpt" else localState.value.providerModelFetchStates,
+                    message = null,
+                )
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: app.inku.mobile.llm.ChatGptException) { localState.value = localState.value.copy(message = strings().chatGptError(error.code)) }
+        }
+    }
+
     fun publishChatGptModels(session: app.inku.mobile.llm.ChatGptSessionRef, models: List<String>, purposes: Map<String, List<String>>) {
         viewModelScope.launch {
             try {

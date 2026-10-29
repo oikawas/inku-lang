@@ -4989,6 +4989,7 @@ internal fun ChatGptSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, 
     val context = LocalContext.current
     val plan = state.chatGptPlan
     var signOutTarget by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var confirmingDelete by remember { mutableStateOf<String?>(null) }
     Column(
         modifier = modifier.testTag("ChatGPTPlanSettings").verticalScroll(rememberScrollState()).padding(horizontal = Dimens.spaceXs),
         verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
@@ -5000,13 +5001,23 @@ internal fun ChatGptSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, 
                     TextButton(onClick = { viewModel.selectChatGptProfile(profile.id) }, enabled = !plan.pending) {
                         Text((if (plan.activeProfileId == profile.id) "● " else "○ ") + profile.label)
                     }
-                    if (plan.activeProfileId == profile.id) {
-                        WrapRow {
+                    WrapRow {
+                        if (plan.activeProfileId == profile.id) {
                             SecondarySmallButton(S.chatGptReauthenticate, onClick = { viewModel.authorizeChatGpt(profile.id) }, enabled = !plan.pending)
                             if (!profile.planAllowed) SecondarySmallButton(S.chatGptEnablePlan, onClick = { viewModel.authorizeChatGpt(profile.id, consent = true) }, enabled = !plan.pending)
                             // Asked first, as deleting an API key is: signing out
                             // takes a new authorization to undo.
                             SecondarySmallButton(S.chatGptSignOut, onClick = { signOutTarget = profile.id to profile.label }, enabled = !plan.pending)
+                        }
+                        if (confirmingDelete != profile.id) SecondarySmallButton(S.chatGptDelete, onClick = { confirmingDelete = profile.id }, enabled = !plan.pending)
+                    }
+                    if (confirmingDelete == profile.id) {
+                        WrapRow {
+                            Text(S.chatGptDeleteConfirmText)
+                            TextButton(onClick = { confirmingDelete = null; viewModel.deleteChatGptProfile(profile.id) }, enabled = !plan.pending) {
+                                Text(S.chatGptDeleteConfirm, color = MaterialTheme.colorScheme.error)
+                            }
+                            TextButton(onClick = { confirmingDelete = null }) { Text(S.chatGptDeleteCancel) }
                         }
                     }
                 }

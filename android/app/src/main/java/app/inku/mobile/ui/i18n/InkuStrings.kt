@@ -97,6 +97,10 @@ interface InkuStrings {
     val chatGptReauthenticate: String
     val chatGptEnablePlan: String
     val chatGptSignOut: String
+    val chatGptDelete: String
+    val chatGptDeleteConfirmText: String
+    val chatGptDeleteConfirm: String
+    val chatGptDeleteCancel: String
     val chatGptManageUsage: String
     val chatGptPending: String
     val chatGptConnected: String

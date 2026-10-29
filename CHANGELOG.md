@@ -16,6 +16,10 @@ The connection guide now explains how to prepare and rebuild the Server's native
 
 The shared core now decides callback acceptance, concurrent sign-in, operation purpose, model publication input, and registration deletion. Draw-in-words and image-to-drawing effects can use the ChatGPT plan; image effects require a model published for Vision.
 
+### 2026-10-29 — Android ChatGPT plan policy and registration deletion
+
+Use the shared core for callback, attempt, operation and publication checks. Registrations can be deleted after confirmation in Settings.
+
 ### 2026-10-28 — Complete Android ChatGPT login in the foreground
 
 The browser acknowledges authorization immediately, and inku exchanges the token after returning to the foreground.

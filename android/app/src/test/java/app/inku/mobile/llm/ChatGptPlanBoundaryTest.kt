@@ -307,6 +307,20 @@ class ChatGptPlanBoundaryTest {
                 connection.connectTimeout = 2000; connection.readTimeout = 3000
                 return try { connection.responseCode } finally { connection.disconnect() }
             }
+            fun rawCallback(target: String): String {
+                val port = URI(start.getValue("redirect_uri")).port
+                return java.net.Socket("127.0.0.1", port).use { socket ->
+                    socket.soTimeout = 3000
+                    socket.getOutputStream().write("GET $target HTTP/1.1\r\nHost: 127.0.0.1:$port\r\n\r\n".toByteArray())
+                    socket.getInputStream().bufferedReader().readText()
+                }
+            }
+            for (target in listOf("/other?state=${start.getValue("state")}", "/auth/callback?state=a&state=b")) {
+                val response = rawCallback(target)
+                assertTrue(response.startsWith("HTTP/1.1 400"))
+                assertTrue(response.contains("ChatGPTの認証は完了していません"))
+                assertTrue(manager.state.value.pending)
+            }
             assertEquals(400, callback("wrong-state"))
             assertTrue(http.calls.isEmpty()); assertTrue(manager.state.value.pending)
             assertEquals(200, callback(start.getValue("state")))
@@ -323,9 +337,36 @@ class ChatGptPlanBoundaryTest {
             assertEquals("consent", returning["prompt"])
             assertNotEquals(start["state"], returning["state"])
             rejected("chatgpt_registration_incomplete") { issuedClientId(mapOf("client_id" to "another-client", "code" to "x"), store.read().getJSONObject("profiles").getJSONObject(ref.profileId)) }
-            assertEquals("b", callbackParameters("/auth/callback?state=a&state=b")["state"])
+            rejected("chatgpt_callback_invalid") { callbackParameters("/auth/callback?state=a&state=b") }
             assertEquals("a", callbackParameters("//other.invalid/auth/callback?state=a")["state"])
+            rejected("chatgpt_callback_invalid") { callbackParameters("/other?state=a") }
+            assertEquals(mapOf("b" to "ok"), callbackParameters("/auth/callback?a=&b=ok"))
         } finally { manager.cancelAuthorization(); scope.cancel() }
+    }
+
+    @Test fun publicationInputAndProfileDeletion() = runBlocking {
+        val store = Store().apply {
+            value.put("active", "a")
+            value.getJSONObject("profiles").put("a", profile("a").put("published_models", JSONArray().put("model")))
+                .put("b", profile("b").put("published_models", JSONArray().put("other")))
+        }
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val manager = ChatGptPlanManager(store, scope, Http()) { now }
+        try {
+            val ref = ChatGptSessionRef("a", 1)
+            rejected("chatgpt_model_not_offered") { manager.publishModels(ref, List(1025) { "m$it" }) }
+            rejected("chatgpt_model_not_offered") { manager.publishModels(ref, listOf("x".repeat(257))) }
+            rejected("chatgpt_model_not_offered") { manager.publishModels(ref, listOf("m"), JSONObject().put("m", JSONArray().put("other"))) }
+            rejected("chatgpt_session_changed") { ChatGptCore.call("chatgpt_auth_delete", JSONObject().put("value", store.read()).put("profile_id", "a")) }
+            manager.deleteProfile("b")
+            assertFalse(store.read().getJSONObject("profiles").has("b"))
+            assertEquals("a", store.read().getString("active"))
+            manager.deleteProfile("a")
+            assertFalse(store.read().getJSONObject("profiles").has("a"))
+            assertFalse(store.read().has("active"))
+            assertNull(manager.state.value.activeProfileId)
+            assertTrue(manager.state.value.revocationUnconfirmed)
+        } finally { scope.cancel() }
     }
 
     @Test

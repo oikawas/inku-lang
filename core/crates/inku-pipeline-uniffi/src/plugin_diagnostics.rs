@@ -242,21 +242,14 @@ fn explain_bracketed(
         let Some(text) = source.get(start..end) else {
             continue;
         };
-        let Some((offset, open)) = text.char_indices().find(|(_, c)| matches!(c, '{' | '｛'))
-        else {
-            continue;
-        };
-        let begin = offset + open.len_utf8();
-        let Some((length, close)) = text[begin..]
+        let Some((offset, (bracket_end, inner))) = text
             .char_indices()
-            .find(|(_, c)| matches!(c, '}' | '｝'))
+            .filter(|(_, c)| matches!(c, '{' | '｛'))
+            .find_map(|(at, _)| inku_ddl::bracketed_plugin_at(text, at).map(|match_| (at, match_)))
         else {
             continue;
         };
-        let written = text[begin..begin + length].trim();
-        if written.is_empty() {
-            continue;
-        }
+        let written = inner.trim();
         let normalized = inku_ddl::plugin_names::normalize_plugin_name(written);
         let mut exact: Vec<_> = names
             .iter()
@@ -307,7 +300,7 @@ fn explain_bracketed(
             suggestion,
             candidates,
             start_byte: start + offset,
-            end_byte: start + begin + length + close.len_utf8(),
+            end_byte: start + bracket_end,
         });
     }
     result

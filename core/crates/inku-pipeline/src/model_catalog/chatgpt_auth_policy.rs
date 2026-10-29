@@ -13,6 +13,125 @@ const SCOPES: &str =
 fn fail(code: &str) -> Value {
     json!({"error":code})
 }
+
+fn decode_query(value: &str) -> String {
+    let bytes = value.as_bytes();
+    let mut decoded = Vec::new();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%'
+            && i + 2 < bytes.len()
+            && let (Some(a), Some(b)) = (
+                (bytes[i + 1] as char).to_digit(16),
+                (bytes[i + 2] as char).to_digit(16),
+            )
+        {
+            decoded.push((a * 16 + b) as u8);
+            i += 3;
+        } else {
+            decoded.push(if bytes[i] == b'+' { b' ' } else { bytes[i] });
+            i += 1;
+        }
+    }
+    String::from_utf8_lossy(&decoded).into_owned()
+}
+
+fn callback_query(target: &str) -> Value {
+    // urllib.parse.urlsplit removes leading C0 controls and embedded TAB/CR/LF.
+    let cleaned: String = target
+        .trim_start_matches(|c: char| c <= ' ')
+        .chars()
+        .filter(|c| !matches!(c, '\t' | '\r' | '\n'))
+        .collect();
+    let without_fragment = cleaned.split('#').next().unwrap_or("");
+    let (mut path, query) = without_fragment
+        .split_once('?')
+        .unwrap_or((without_fragment, ""));
+    if let Some((scheme, rest)) = path.split_once(':')
+        && scheme
+            .as_bytes()
+            .first()
+            .is_some_and(u8::is_ascii_alphabetic)
+        && scheme
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"+-.".contains(&b))
+    {
+        path = rest;
+    }
+    if let Some(authority) = path.strip_prefix("//") {
+        path = authority.find('/').map_or("", |i| &authority[i..]);
+    }
+    if path != "/auth/callback" {
+        return fail("chatgpt_callback_invalid");
+    }
+    let mut values = serde_json::Map::new();
+    for pair in query.split('&') {
+        let (key, value) = pair.split_once('=').unwrap_or((pair, ""));
+        if value.is_empty() {
+            continue;
+        }
+        let key = decode_query(key);
+        if values.contains_key(&key) {
+            return fail("chatgpt_callback_invalid");
+        }
+        values.insert(key, json!([decode_query(value)]));
+    }
+    json!({"query":values})
+}
+
+const CHATGPT_EFFECTS: &[&str] = &[
+    "generate_sketch",
+    "select_description_catalog",
+    "generate_normalized_ddl",
+    "read_composition",
+    "choose_laws",
+    "choose_colors",
+    "complete_visible_ddl_holes",
+    "read_description",
+    "compose_description",
+    "write_description_ddl",
+];
+const IMAGE_EFFECTS: &[&str] = &[
+    "select_image_catalog",
+    "write_image_ddl",
+    "review_image_ddl",
+    "review_description_ddl",
+];
+
+fn publication_input(r: &Value) -> Value {
+    if !r["profile_id"]
+        .as_str()
+        .is_some_and(|s| (1..=128).contains(&s.chars().count()))
+        || !r["generation"]
+            .as_f64()
+            .is_some_and(|n| n >= 1.0 && n.fract() == 0.0)
+    {
+        return fail("chatgpt_session_changed");
+    }
+    let valid_id = |v: &Value| {
+        v.as_str()
+            .is_some_and(|s| (1..=256).contains(&s.chars().count()))
+    };
+    if !r["selected"].is_null()
+        && !r["selected"]
+            .as_array()
+            .is_some_and(|a| a.len() <= 1024 && a.iter().all(valid_id))
+    {
+        return fail("chatgpt_model_not_offered");
+    }
+    if !r["model_purposes"].is_null()
+        && !r["model_purposes"].as_object().is_some_and(|m| {
+            m.iter().all(|(k, v)| {
+                (1..=256).contains(&k.chars().count())
+                    && v.as_array()
+                        .is_some_and(|a| a.iter().all(|p| p == "llm" || p == "vision"))
+            })
+        })
+    {
+        return fail("chatgpt_model_not_offered");
+    }
+    json!({"valid":true})
+}
 fn valid_endpoint(url: &str) -> bool {
     let Some((scheme, rest)) = url.split_once("://") else {
         return false;
@@ -333,6 +452,83 @@ fn python_repr(value: &Value, nested: bool) -> String {
 pub(super) fn run(r: &Value) -> Value {
     let profile = &r["profile"];
     match r["action"].as_str().unwrap_or("") {
+        "chatgpt_auth_callback_query" => callback_query(r["target"].as_str().unwrap_or("")),
+        "chatgpt_auth_callback_use" => {
+            let used = r["used"] == true;
+            let error = if r["cancelled"] == true || r["expired"] == true {
+                Some("chatgpt_cancelled")
+            } else if used {
+                Some("chatgpt_callback_invalid")
+            } else {
+                None
+            };
+            if let Some(error) = error {
+                json!({"error":error,"used":used,"fail_attempt":used})
+            } else {
+                json!({"used":true,"fail_attempt":true})
+            }
+        }
+        "chatgpt_auth_attempt" => {
+            if r["pending_count"].as_u64().unwrap_or(0) >= 4
+                || r["owner_count"].as_u64().unwrap_or(0) >= 1
+            {
+                fail("chatgpt_attempt_busy")
+            } else {
+                json!({"valid":true,"deadline_seconds":300,"retain_seconds":600})
+            }
+        }
+        "chatgpt_auth_previous" => {
+            if r["profile_id"].is_null() || r["profile_id"] == "" {
+                json!({"previous":null})
+            } else if truthy(&r["profile"]) {
+                json!({"previous":r["profile"]})
+            } else if truthy(&r["pending"]) {
+                let mut previous = r["pending"].clone();
+                previous["pending"] = json!(true);
+                json!({"previous":previous})
+            } else {
+                fail("chatgpt_not_connected")
+            }
+        }
+        "chatgpt_auth_operation" => {
+            let tag = r["tag"].as_str().unwrap_or("");
+            let image = IMAGE_EFFECTS.contains(&tag);
+            let valid = match r["purpose"].as_str() {
+                Some("llm") => CHATGPT_EFFECTS.contains(&tag),
+                Some("vision") => tag == "vision" || image,
+                _ => false,
+            };
+            if valid {
+                json!({"valid":true,"image_effect":image})
+            } else {
+                fail("chatgpt_operation_not_supported")
+            }
+        }
+        "chatgpt_auth_publication_input" => publication_input(r),
+        "chatgpt_auth_delete" => {
+            let mut value = r["value"].clone();
+            let id = r["profile_id"].as_str().unwrap_or("");
+            let profile = &value["profiles"][id];
+            if !truthy(profile) {
+                return fail("chatgpt_not_connected");
+            }
+            if profile["state"] != "signed_out" {
+                return fail("chatgpt_session_changed");
+            }
+            if let Some(profiles) = value["profiles"].as_object_mut() {
+                profiles.remove(id);
+            }
+            if let Some(pending) = value
+                .get_mut("registrations_pending")
+                .and_then(Value::as_object_mut)
+            {
+                pending.remove(id);
+            }
+            if value["active"] == id {
+                value["active"] = Value::Null;
+            }
+            json!({"value":value})
+        }
         "chatgpt_auth_http" => {
             if r["json_valid"] == false {
                 return fail("chatgpt_auth_unavailable");
@@ -491,7 +687,7 @@ pub(super) fn run(r: &Value) -> Value {
             }
         }
         "chatgpt_auth_constants" => {
-            json!({"issuer":ISSUER,"authorize":format!("{ISSUER}/api/accounts/authorize"),"token":format!("{ISSUER}/api/accounts/oauth/token"),"resource":RESOURCE,"scopes":SCOPES})
+            json!({"issuer":ISSUER,"authorize":format!("{ISSUER}/api/accounts/authorize"),"token":format!("{ISSUER}/api/accounts/oauth/token"),"resource":RESOURCE,"scopes":SCOPES,"image_effects":IMAGE_EFFECTS,"effects":CHATGPT_EFFECTS})
         }
         "chatgpt_auth_callback_client" => {
             let issued = r["issued"].as_str().unwrap_or("");

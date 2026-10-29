@@ -23,10 +23,12 @@ from functools import lru_cache
 from types import ModuleType
 from typing import Any
 
+from .verified_model_catalog import core_catalog
+
 # A refusal body is read only this far.
 _REFUSAL_READ_BYTES = 16384
 # The effects that send an image. Read and draw's review sends its drawing.
-IMAGE_EFFECTS = frozenset({"select_image_catalog", "write_image_ddl", "review_image_ddl", "review_description_ddl"})
+IMAGE_EFFECTS = frozenset(core_catalog("chatgpt_auth_constants")["image_effects"])
 # Read and draw's requests (SPEC §12.6.7), recorded apart from Stage 1 and the
 # image tab: the reading, the composition and laws when they are on, the
 # writing and the review.

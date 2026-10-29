@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-29 — Share ChatGPT plan authorization and registration decisions
+
+Callback, concurrent authorization, purpose and operation, publication constraints, and registration deletion decisions move into the shared core. The Server retains its HTTP 422 validation; clients are unchanged.
+
 ### 2026-10-28 — Complete Android ChatGPT login in the foreground
 
 The browser acknowledges authorization immediately, and inku exchanges the token after returning to the foreground.

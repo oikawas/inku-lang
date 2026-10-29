@@ -633,7 +633,7 @@ class PipelineService:
                     raise HTTPException(404, "history_not_found")
                 config = self.config_for(owner, asdict(legacy))
                 catalog = resolve_new_work_macro_catalog(self.binding, config)
-                config = {**config, "definitions": catalog["definitions"]}
+                config = {**config, "definitions": catalog["definitions"], "macro_summaries": catalog["macro_summaries"]}
             else:
                 config, catalog = linked.saved_config, linked.macro_catalog
         elif body.execution_id:
@@ -653,13 +653,21 @@ class PipelineService:
         else:
             config = self.config_for(owner, None)
             catalog = resolve_new_work_macro_catalog(self.binding, config)
-            config = {**config, "definitions": catalog["definitions"]}
+            config = {**config, "definitions": catalog["definitions"], "macro_summaries": catalog["macro_summaries"]}
         locks = []
         for lock in catalog.get("definition_locks", []):
             lock = dict(lock)
             if not lock["digest"].startswith("sha256:"):
                 lock["digest"] = "sha256:" + lock["digest"]
             locks.append(lock)
+        # A saved definition can use an installed picture only if its lock
+        # still identifies the same content; otherwise the editor uses its
+        # neutral fallback rather than showing a different edition.
+        picture_catalog = catalog if not (body.history_id or body.execution_id) else resolve_new_work_macro_catalog(self.binding, self.config_for(owner, None))
+        current_locks = {item["qualified_name"]: item["digest"].removeprefix("sha256:") for item in picture_catalog.get("definition_locks", [])}
+        from urllib.parse import urlencode
+        pictures = {lock["qualified_name"]: "/api/saijiki/plugin-preview?" + urlencode({"name": lock["qualified_name"], "scale": "1"})
+                    for lock in locks if current_locks.get(lock["qualified_name"]) == lock["digest"].removeprefix("sha256:")}
         enabled, disabled = _installed_plugin_names()
         names = installed_plugin_name_entries()
         work_ids = {lock["qualified_name"] for lock in locks}
@@ -671,7 +679,7 @@ class PipelineService:
             for name in (definition.get("names", {}).get("ja", []) + definition.get("names", {}).get("en", [])):
                 names.append({"name": name, "qualified_name": qualified, "enabled": True})
         request = {"source": body.source, "language": body.language or _resolve_instruction_lang(body.source, "auto"),
-                   "definitions": config.get("definitions", []), "locks": locks, "compiler": config.get("compiler"),
+                   "definitions": config.get("definitions", []), "summaries": config.get("macro_summaries", []), "pictures": pictures, "locks": locks, "compiler": config.get("compiler"),
                    "enabled": sorted(set(enabled)), "disabled": disabled, "plugin_names": names}
         result = json.loads(native(json.dumps(request, ensure_ascii=False, allow_nan=False).encode()))
         if result.get("error"):

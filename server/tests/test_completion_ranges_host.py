@@ -206,7 +206,7 @@ def test_plugin_calls_read_work_or_current_catalog_without_starting_a_run(saved_
         return json.dumps(answer).encode()
     monkeypatch.setattr(macro_catalog, "_installed_plugin_names", lambda: ([], []))
     monkeypatch.setattr(macro_catalog, "installed_plugin_name_entries", lambda: [])
-    monkeypatch.setattr(macro_catalog, "resolve_new_work_macro_catalog", lambda *_: {"definitions": [], "definition_locks": []})
+    monkeypatch.setattr(macro_catalog, "resolve_new_work_macro_catalog", lambda *_: {"definitions": [], "macro_summaries": [], "definition_locks": []})
     service = make_service(store, SimpleNamespace(plugin_calls=calls))
     monkeypatch.setattr(service, "execution", lambda *_: pytest.fail("must not resume"))
     store.create_execution("owner", "run", "variation-1", "0", json.dumps({"snapshot": snapshot, "context": {}, "rendered": None}).encode())
@@ -241,6 +241,34 @@ def test_plugin_offers_are_frozen_and_read_with_the_history_context(saved_work):
                                        "fork_context_bytes": encoded, "fork_context_digest": checksum})
     assert records["plugin_offers"][0]["offered"][0]["written_ja"] == "｛星｝"
     assert records["plugin_offers"][1]["stage"] == "chunk_rewrite"
+
+
+def test_saved_editor_only_uses_the_installed_picture_for_the_same_lock(saved_work, monkeypatch):
+    from inku_server import macro_catalog
+
+    store, snapshot = saved_work
+    requests = []
+    def calls(encoded):
+        requests.append(json.loads(encoded))
+        return b'{"schema":"inku.plugin-calls.v1","calls":[],"entries":[]}'
+    monkeypatch.setattr(macro_catalog, "_installed_plugin_names", lambda: ([], []))
+    monkeypatch.setattr(macro_catalog, "installed_plugin_name_entries", lambda: [])
+    monkeypatch.setattr(macro_catalog, "resolve_new_work_macro_catalog", lambda *_: {"definitions": [], "macro_summaries": [], "definition_locks": [
+        {"qualified_name": "Sky.Stars", "digest": "aaa"}, {"qualified_name": "Sky.Moon", "digest": "new"}]})
+    service = make_service(store, SimpleNamespace(plugin_calls=calls))
+    config = {"definitions": [], "macro_summaries": []}
+    locks = [{"qualified_name": "Sky.Stars", "version": "1.0.0", "digest": "aaa"},
+             {"qualified_name": "Sky.Moon", "version": "1.0.0", "digest": "old"}]
+    service._runs[("owner", "run")] = SimpleNamespace(snapshot=lambda: {**snapshot, "config": config},
+                                                       context={"macro_catalog": {"definition_locks": locks}},
+                                                       view=lambda: {"busy": False}, image_data={})
+    app = FastAPI()
+    app.include_router(pipeline_router(service, actor))
+    with TestClient(app) as client:
+        response = client.post("/api/pipeline/plugin-calls", headers={"x-owner": "owner"}, json={"source": "x", "execution_id": "run"})
+        assert response.status_code == 200, response.text
+        assert set(requests[0]["pictures"]) == {"Sky.Stars"}
+    service.close()
 
 
 def test_same_svg_with_updated_record_is_saved_as_a_distinct_performance():

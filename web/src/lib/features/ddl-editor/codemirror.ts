@@ -152,7 +152,7 @@ export function pluginHoverContent(call: PluginCall, entries: PluginEntry[], lan
 	const entry = entries.find(item => item.qualified_name === call.qualified_name);
 	if (entry && call.status === 'resolved') {
 		const preview = previewForPlugin(entry, language);
-		return { text: `${preview.word}\n${preview.effect}\n${preview.example}`, image: preview.image };
+		return { text: `${preview.word}\n${preview.effect}\n${preview.example}`, image: preview.image || (preview.svg ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(preview.svg)}` : undefined) };
 	}
 	return { text: reason(call) };
 }

@@ -17,6 +17,10 @@ struct Input {
     source: String,
     language: inku_ddl::ResolvedInstructionLanguage,
     definitions: Vec<MacroDefinition>,
+    #[serde(default)]
+    summaries: Vec<String>,
+    #[serde(default)]
+    pictures: std::collections::BTreeMap<String, String>,
     locks: Vec<LockedDefinition>,
     compiler: Option<CompilerOptions>,
     #[serde(default)]
@@ -54,6 +58,20 @@ fn run(bytes: &[u8]) -> Result<Value, ()> {
         macro_locks: locks,
         saijiki: SAIJIKI_ASSET_ID.into(),
     };
+    let entries: Vec<Value> = input.definitions.iter().enumerate().filter_map(|(index, definition)| {
+        let identity = definition.identity().ok()?;
+        if !visible.macro_locks.iter().any(|lock| lock.qualified_name == identity.qualified_name()) { return None; }
+        let (ja, en) = inku_pipeline::plugin_offer::visible_names(definition);
+        let note = input.summaries.get(index).cloned().unwrap_or_default();
+        let ja_written = inku_pipeline::plugin_offer::primary_name(definition, inku_ddl::ResolvedInstructionLanguage::Ja);
+        let en_written = inku_pipeline::plugin_offer::primary_name(definition, inku_ddl::ResolvedInstructionLanguage::En);
+        Some(json!({"qualified_name": identity.qualified_name(), "surface_ja": ja, "surface_en": en,
+                    "word_kind": definition.plugin_v2.as_ref().map_or("scene", |v| v.kind.as_str()),
+                    "written_ja": ja_written, "written_en": en_written,
+                    "example_ja": format!("{}。", ja_written), "example_en": format!("{}.", en_written),
+                "note_ja": note, "note_en": note,
+                "preview_url": input.pictures.get(identity.qualified_name()).cloned().unwrap_or_default()}))
+    }).collect();
     let document = visible
         .document()
         .map_err(|_| ())?
@@ -143,7 +161,7 @@ fn run(bytes: &[u8]) -> Result<Value, ()> {
         });
     }
     calls.sort_by_key(|call| call["start_byte"].as_u64().unwrap_or(0));
-    Ok(json!({"schema":"inku.plugin-calls.v1", "calls":calls}))
+    Ok(json!({"schema":"inku.plugin-calls.v1", "calls":calls, "entries":entries}))
 }
 
 #[uniffi::export]
@@ -170,7 +188,7 @@ mod tests {
         let lock = json!({"qualified_name":identity.qualified_name(),"version":identity.version(),"digest":format!("sha256:{}", identity.full_digest_hex())});
         let result = run(&serde_json::to_vec(&json!({
             "source":"😀｛若葉｝。Nature.YoungLeaves。｛若刃｝。{}。{\"x\":1}。｛未完",
-            "language":"ja", "definitions":[definition], "locks":[lock], "compiler":null,
+            "language":"ja", "definitions":[definition], "summaries":["若葉を描く。"], "pictures":{"Nature.YoungLeaves":"/preview"}, "locks":[lock], "compiler":null,
             "enabled":["Nature.YoungLeaves"], "plugin_names":[{"name":"若葉","qualified_name":"Nature.YoungLeaves","enabled":true}]
         })).unwrap()).unwrap();
         let calls = result["calls"].as_array().unwrap();
@@ -179,6 +197,10 @@ mod tests {
         assert_eq!(calls[0]["start_utf16"], 2);
         assert_eq!(calls[1]["status"], "resolved");
         assert_eq!(calls[2]["status"], "plugin_name_mismatch");
+        assert_eq!(result["entries"][0]["written_ja"], "｛若葉｝");
+        assert_eq!(result["entries"][0]["written_en"], "{young leaves}");
+        assert_eq!(result["entries"][0]["note_ja"], "若葉を描く。");
+        assert_eq!(result["entries"][0]["preview_url"], "/preview");
     }
 
     #[test]

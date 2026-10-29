@@ -34,7 +34,7 @@ function actualMethod(path: string, name: string): string {
 
 test('box and modal settings choose line numbers and commit complete drafts', async () => {
 	const { setup } = await harness(`export function setup(compact, value, onChange, onRanges) {
-		const isJapanese = true, disabled = false, pluginEntries = [], ranges = [], callSource = '', calls = [], reason = () => '';
+		const isJapanese = true, disabled = false, visibleEntries = [], ranges = [], callSource = '', calls = [], reason = () => '';
 		const completionSource = value, completionStates = [], completionLabels = {};
 		const previewForWord = () => {}, previewForPlugin = () => {};
 		let activeSaijikiPreview = null;

@@ -1,5 +1,6 @@
 import type { ApiFetch } from '../../transport/api-fetch';
 import type { CompletionRangeWork } from './completion-range-states';
+import type { PluginEntry } from './types';
 
 export type PluginCall = {
 	start_byte: number; end_byte: number; start_utf16: number; end_utf16: number;
@@ -12,14 +13,14 @@ export class PluginCallsQuery {
 	private generation = 0;
 	private controller: AbortController | null = null;
 	cancel(): void { this.generation++; this.controller?.abort(); this.controller = null; }
-	async load(fetch: ApiFetch, work: CompletionRangeWork | null, source: string, language: 'ja' | 'en', publish: (calls: PluginCall[]) => void): Promise<void> {
+	async load(fetch: ApiFetch, work: CompletionRangeWork | null, source: string, language: 'ja' | 'en', publish: (calls: PluginCall[], entries: PluginEntry[]) => void): Promise<void> {
 		this.cancel();
 		const generation = this.generation, controller = this.controller = new AbortController();
 		try {
 			const response = await fetch('/api/pipeline/plugin-calls', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...work, source, language }), signal: controller.signal });
 			if (!response.ok) return;
-			const result = await response.json() as { schema?: string; calls?: PluginCall[] };
-			if (generation === this.generation && result.schema === 'inku.plugin-calls.v1' && Array.isArray(result.calls)) publish(result.calls);
+			const result = await response.json() as { schema?: string; calls?: PluginCall[]; entries?: PluginEntry[] };
+			if (generation === this.generation && result.schema === 'inku.plugin-calls.v1' && Array.isArray(result.calls)) publish(result.calls, Array.isArray(result.entries) ? result.entries : []);
 		} catch { /* Editing remains available if inspection fails. */ }
 		finally { if (this.controller === controller) this.controller = null; }
 	}

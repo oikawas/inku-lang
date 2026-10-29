@@ -54,6 +54,7 @@
 	const completionQuery = new CompletionRangeStatesQuery();
 	const pluginQuery = new PluginCallsQuery();
 	let calls = $state.raw<PluginCall[]>([]);
+	let workEntries = $state.raw<PluginEntry[]>([]);
 	let callSource = $state('');
 	const completionLabels = $derived({ completed: t().ddlCompletionTag, numbers_changed: t().ddlCompletionNumbersTag, words_changed: t().ddlCompletionWordsTag });
 	const completionHint = $derived(completionWordsHint(completionStates, t()));
@@ -73,25 +74,26 @@
 	$effect(() => {
 		const source = value, work = completionWork, fetchCalls = apiFetch;
 		const lang = resolveInstructionLang(source, isJapanese ? 'ja' : 'en');
-		pluginQuery.cancel(); calls = []; callSource = '';
+		pluginQuery.cancel(); calls = []; workEntries = []; callSource = '';
 		if (!fetchCalls) return;
-		const timer = setTimeout(() => { void pluginQuery.load(fetchCalls, work, source, lang, result => { calls = result; callSource = source; }); }, 180);
+		const timer = setTimeout(() => { void pluginQuery.load(fetchCalls, work, source, lang, (result, entries) => { calls = result; workEntries = entries; callSource = source; }); }, 180);
 		return () => { clearTimeout(timer); pluginQuery.cancel(); };
 	});
 
 	const lineNumbers = $derived(value.split('\n'));
 	const unknownNames = $derived(calls.filter(call => call.status !== 'resolved'));
+	const visibleEntries = $derived(completionWork ? workEntries : pluginEntries);
 	const wordLang = $derived(resolveInstructionLang(value, isJapanese ? 'ja' : 'en'));
 	function reason(call: PluginCall): string {
 		const display = (name: string) => {
-			const entry = pluginEntries.find(e => e.qualified_name === name || [...(e.surface_ja ?? []), ...(e.surface_en ?? [])].some(n => n.normalize('NFKC').toLowerCase() === name.normalize('NFKC').toLowerCase()));
+			const entry = visibleEntries.find(e => e.qualified_name === name || [...(e.surface_ja ?? []), ...(e.surface_en ?? [])].some(n => n.normalize('NFKC').toLowerCase() === name.normalize('NFKC').toLowerCase()));
 			return entry ? pluginDisplayName(entry, wordLang) : name.includes('.') ? name : wordLang === 'ja' ? `｛${name}｝` : `{${name}}`;
 		};
 		return t().ddlPluginReason(call.status, call.suggestion ? display(call.suggestion) : null, (call.candidates ?? []).map(display));
 	}
 
 	function configuration(): DdlEditorOptions {
-		return { isJapanese, disabled, pluginEntries, ranges, previewForWord, previewForPlugin,
+		return { isJapanese, disabled, pluginEntries: visibleEntries, ranges, previewForWord, previewForPlugin,
 			pluginCallSource: callSource, pluginCalls: calls, pluginReason: reason,
 			completionSource, completionStates, completionLabels,
 			lineNumbers: !compact, cursorAtEnd: compact,
@@ -177,7 +179,7 @@
 				<SaijikiInline
 					bind:activePreview={activeSaijikiPreview}
 					{wordLang}
-					{pluginEntries}
+					pluginEntries={visibleEntries}
 					onInsertWord={insertWord}
 					{previewForWord}
 					{previewForPlugin}

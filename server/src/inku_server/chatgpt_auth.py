@@ -10,7 +10,6 @@ import time
 import uuid
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from urllib.parse import parse_qs, urlsplit
 
 import httpx
 import jwt
@@ -189,16 +188,7 @@ async def delete_profile(owner: str, profile_id: str) -> dict:
     store = CredentialStore()
     with store.lock("edit:" + owner, time.monotonic() + 5):
         value = store.read(owner)
-        profile = value["profiles"].get(profile_id)
-        if not profile:
-            raise ChatGPTError("chatgpt_not_connected")
-        # A reconnection that landed during revocation is newer than this request.
-        if profile["state"] != "signed_out":
-            raise ChatGPTError("chatgpt_session_changed")
-        del value["profiles"][profile_id]
-        value.get("registrations_pending", {}).pop(profile_id, None)
-        if value["active"] == profile_id:
-            value["active"] = None
+        value = auth_policy("delete", value=value, profile_id=profile_id)["value"]
         store.write(owner, value)
     return {"status": "deleted", "revocation_confirmed": result["revocation_confirmed"]}
 
@@ -239,19 +229,15 @@ class AuthorizationAttempts:
         with self.lock:
             self.attempts = {key: value for key, value in self.attempts.items() if time.monotonic() < value["retain_until"]}
             pending = [value for value in self.attempts.values() if value["status"] == "pending"]
-            if len(pending) >= 4 or sum(value["owner"] == owner for value in pending) >= 1:
-                raise ChatGPTError("chatgpt_attempt_busy")
+            limits = auth_policy("attempt", pending_count=len(pending), owner_count=sum(value["owner"] == owner for value in pending))
             saved = CredentialStore().read(owner) if CredentialStore().root.exists() else {"profiles": {}}
-            previous = saved["profiles"].get(profile_id) if profile_id else None
-            if profile_id and not previous:
-                pending = saved.get("registrations_pending", {}).get(profile_id)
-                if not pending:
-                    raise ChatGPTError("chatgpt_not_connected")
-                previous = {**pending, "pending": True}
+            previous = auth_policy("previous", profile_id=profile_id,
+                                   profile=saved["profiles"].get(profile_id),
+                                   pending=saved.get("registrations_pending", {}).get(profile_id))["previous"]
             attempt = {"id": str(uuid.uuid4()), "owner": owner, "profile_id": profile_id or str(uuid.uuid4()),
                        "status": "pending", "code": None, "state": secrets.token_urlsafe(32), "nonce": secrets.token_urlsafe(32),
                        "verifier": secrets.token_urlsafe(64), "used": False, "cancel": threading.Event(),
-                       "deadline": time.monotonic() + 300, "retain_until": time.monotonic() + 600}
+                       "deadline": time.monotonic() + limits["deadline_seconds"], "retain_until": time.monotonic() + limits["retain_seconds"]}
             def check():
                 guard()
                 if attempt["cancel"].is_set() or time.monotonic() >= attempt["deadline"]:
@@ -272,19 +258,15 @@ class AuthorizationAttempts:
                     pass
 
                 def do_GET(self):
-                    parsed = urlsplit(self.path)
-                    query = parse_qs(parsed.query)
                     status = 400
                     try:
-                        if parsed.path != "/auth/callback" or any(len(value) != 1 for value in query.values()):
-                            raise ChatGPTError("chatgpt_callback_invalid")
+                        query = auth_policy("callback_query", target=self.path)["query"]
                         auth_policy("callback", state=query.get("state", [""])[0],
                                     expected_state=attempt["state"], code="state-check", error=None)
                         with coordinator.lock:
-                            check()
-                            if attempt["used"]:
-                                raise ChatGPTError("chatgpt_callback_invalid")
-                            attempt["used"] = True
+                            guard()
+                            decision = auth_policy("callback_use", used=attempt["used"], cancelled=attempt["cancel"].is_set(), expired=time.monotonic() >= attempt["deadline"])
+                            attempt["used"] = decision["used"]
                         if "error" in query:
                             auth_policy("callback", state=attempt["state"], expected_state=attempt["state"],
                                         code="error-check", error=query["error"][0])

@@ -51,6 +51,10 @@ def saved_publication(owner: str, profile_id: str, generation: int) -> dict:
 
 def save_publication(owner: str, profile_id: str, generation: int, selected: list[str] | None,
                      model_purposes: dict[str, list[str]] | None = None) -> dict:
+    checked = core_catalog("chatgpt_auth_publication_input", profile_id=profile_id, generation=generation,
+                           selected=selected, model_purposes=model_purposes)
+    if "error" in checked:
+        raise ChatGPTError(checked["error"])
     store = CredentialStore()
     with store.lock("edit:" + owner, time.monotonic() + 5):
         profile = check_session(owner, profile_id, generation)

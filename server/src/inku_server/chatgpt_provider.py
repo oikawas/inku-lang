@@ -24,9 +24,7 @@ from . import provider_wire
 
 logger = logging.getLogger(__name__)
 
-EFFECTS = {"generate_sketch", "select_description_catalog", "generate_normalized_ddl", "read_composition", "choose_laws",
-           "choose_colors", "complete_visible_ddl_holes", "read_description", "compose_description",
-           "write_description_ddl"}
+EFFECTS = frozenset(auth_policy("constants")["effects"])
 # The codes a stored diagnostic may keep (pipeline_candidate). The shared core
 # classifies failures with the same list.
 PUBLIC_CODES = {
@@ -166,9 +164,7 @@ async def request(owner: str, profile_id: str, generation: int, model: str, acti
                   limit: int, cancel=None, observation=None, *, purpose: str = "llm",
                   transport: httpx.AsyncBaseTransport | None = None, images: list[str] | None = None,
                   usage: list | None = None) -> str:
-    image_effect = action["tag"] in provider_wire.IMAGE_EFFECTS
-    if (purpose == "llm" and action["tag"] not in EFFECTS) or (purpose == "vision" and action["tag"] != "vision" and not image_effect) or purpose not in {"llm", "vision"}:
-        raise ChatGPTError("chatgpt_operation_not_supported")
+    image_effect = auth_policy("operation", purpose=purpose, tag=action["tag"])["image_effect"]
 
     def capture_body(body: bytes) -> bytes:
         return provider_wire.observation_digest(body) if image_effect else body

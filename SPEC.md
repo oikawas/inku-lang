@@ -1768,6 +1768,8 @@ When joining model-list and send paths, the shared core removes one trailing `/v
 
 The shared core owns the ChatGPT plan's publication, authorization and registration decisions. The host performs HTTP, browser and callback I/O, signature verification, credential storage and locking.
 
+The core also decides callback parsing and single use, concurrent authorization limits, purpose and operation, publication input constraints, and registration deletion. The Server's HTTP input validation continues to reject invalid bodies with 422.
+
 After a successful Server/Web sign-in or reauthorization, Web refreshes that registration's model list once without the cache; a refresh failure is shown as for manual refresh and does not undo sign-in. Opening settings alone still does not fetch the list, and existing publication choices remain.
 
 The shared rules also cover OAuth response and key selection, JWT time and identifier claims, publication's active registration, quota pause and resume, registration conflicts and limits, display fields, refresh catalog invalidation, and sign-out revocation decisions.

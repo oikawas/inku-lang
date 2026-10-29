@@ -376,6 +376,12 @@ mod object_tests {
         .expect("laws prompt");
         assert!(prompt.message.contains("｛舟｝"));
         assert_eq!(context.object_law_choices(0), (true, true, true, false));
+        let aerial = json!({"main_law":"B15", "laws":{"B15":{"layers":[0]}}, "description_counts":[], "reason":"舟"});
+        let changed = crate::laws::apply_laws_without_count_rule(&aerial, &context, &plan);
+        assert!(
+            changed.is_ok(),
+            "a primary-color object accepts B15: {changed:?}"
+        );
         let printed = crate::colors::PrintedPlan::composed(&plan);
         let colors = crate::colors::ColorsContext::new(crate::colors::ColorsInput {
             score: &score,

@@ -24,7 +24,9 @@ use crate::description_ddl::{
 };
 use crate::image_ddl::finish_image_prompt;
 use crate::laws::{LAWS, conform, law_words, laws_request_schema};
-use crate::prompts::{LlmPrompt, LlmStage, PromptError, PromptLimits, hash_prompt, require_within};
+use crate::prompts::{
+    LlmPrompt, LlmStage, MacroPromptEntry, PromptError, PromptLimits, hash_prompt, require_within,
+};
 
 /// The request that decides a read-and-draw work's composition and laws.
 pub const DESCRIPTION_COMPOSITION_PROMPT_ID: &str = "inku.description-composition-prompt.v1";
@@ -61,6 +63,73 @@ pub struct CompositionThing {
     pub role: String,
     pub kind: String,
     pub quote: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub word: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CompositionPluginWord {
+    pub written: String,
+    pub object: bool,
+}
+
+pub fn composition_plugin_words(
+    description: &str,
+    catalog: &[MacroPromptEntry<'_>],
+    language: ResolvedInstructionLanguage,
+    limits: PromptLimits,
+) -> Vec<CompositionPluginWord> {
+    let offer =
+        crate::plugin_offer::offer_plugins(description, None, catalog, limits.max_offered_plugins);
+    offer
+        .offered
+        .iter()
+        .filter_map(|item| {
+            let entry = catalog.iter().find(|entry| {
+                entry.definition.qualified_name().as_deref() == Some(item.qualified_name.as_str())
+            })?;
+            Some(CompositionPluginWord {
+                written: match language {
+                    ResolvedInstructionLanguage::Ja => item.written_ja.clone(),
+                    ResolvedInstructionLanguage::En => item.written_en.clone(),
+                },
+                object: entry
+                    .definition
+                    .plugin_v2
+                    .as_ref()
+                    .is_some_and(|v2| v2.kind == "object"),
+            })
+        })
+        .collect()
+}
+
+pub fn with_composition_plugins(
+    prompt: LlmPrompt,
+    description: &str,
+    catalog: &[MacroPromptEntry<'_>],
+    limits: PromptLimits,
+) -> Result<LlmPrompt, PromptError> {
+    let words = composition_plugin_words(description, catalog, prompt.instruction_language, limits);
+    let (mut prompt, _) =
+        crate::plugin_offer::with_plugin_offer(prompt, description, None, catalog, limits)?;
+    if words.is_empty() {
+        return Ok(prompt);
+    }
+    let instruction = match prompt.instruction_language {
+        ResolvedInstructionLanguage::Ja => {
+            "\n\n記述の物が plugins の語なら物の word にその書き名を書く。物の語には置く・並べる・大きさ・相手の法則だけを当て、カード（C1〜C6）と手（B21）を当てない。情景の語には法則を当てない。"
+        }
+        ResolvedInstructionLanguage::En => {
+            "\n\nWhen a thing in the description is a word in plugins, put its written name in the thing's word. Give object words only placement, row, size, or partner laws, not cards (C1–C6) or handling (B21). Give scene words no laws."
+        }
+    };
+    let rule = crate::plugin_offer::rule(prompt.instruction_language);
+    let at = prompt.system.len() - rule.len();
+    prompt.system.insert_str(at, instruction);
+    prompt.response_schema = composition_response_schema_for(&words);
+    let schema =
+        serde_json::to_string(&prompt.response_schema).map_err(|_| PromptError::Serialization)?;
+    Ok(hash_prompt(prompt, &schema))
 }
 
 /// A composer's answer the tool accepted: the composition's proposition, the
@@ -437,6 +506,29 @@ pub fn composition_response_schema() -> Value {
     })
 }
 
+fn composition_response_schema_for(words: &[CompositionPluginWord]) -> Value {
+    let mut schema = composition_response_schema();
+    if !words.is_empty() {
+        let thing = &mut schema["properties"]["things"]["items"];
+        let mut names = vec![String::new()];
+        for word in words {
+            if !names.contains(&word.written) {
+                names.push(word.written.clone());
+            }
+        }
+        thing["properties"]["word"] = json!({"type": "string", "enum": names});
+        thing["required"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!("word"));
+        thing["propertyOrdering"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!("word"));
+    }
+    schema
+}
+
 /// The laws stage's schema with a layer named a thing: the keys `layer` and
 /// `layers` become `thing` and `things` (in the properties, the required keys
 /// and the order), and an integer from 0 starts from 1.
@@ -498,6 +590,7 @@ pub fn check_composition(
     reading: Option<&DescriptionReading>,
     language: ResolvedInstructionLanguage,
     limits: PromptLimits,
+    words: &[CompositionPluginWord],
 ) -> Result<CompositionAnswer, Vec<CompositionProblem>> {
     let ja = language == ResolvedInstructionLanguage::Ja;
     let problem = |place: &str, reason: String| CompositionProblem {
@@ -526,7 +619,7 @@ pub fn check_composition(
             .to_owned(),
         )]);
     };
-    if let Err(refusal) = conform(&value, &composition_response_schema(), "answer") {
+    if let Err(refusal) = conform(&value, &composition_response_schema_for(words), "answer") {
         return Err(vec![problem(
             "answer",
             if ja { refusal.ja } else { refusal.en },
@@ -567,7 +660,18 @@ pub fn check_composition(
         }
         haystack.push_str(&folded(&reading.note));
     }
+    let mut used_words = BTreeSet::new();
     for thing in &answer.things {
+        if !thing.word.is_empty() && !used_words.insert(&thing.word) {
+            problems.push(problem(
+                &format!("things[{}].word", thing.thing),
+                if ja {
+                    format!("語 {} を二つの物に使っている。", thing.word)
+                } else {
+                    format!("Two things use the word {}.", thing.word)
+                },
+            ));
+        }
         let quote = folded(&thing.quote);
         if quote.is_empty() || !haystack.contains(&quote) {
             problems.push(problem(
@@ -630,6 +734,24 @@ pub fn check_composition(
                 ));
                 continue;
             };
+            if let Some(word) = words.iter().find(|word| word.written == named.word) {
+                if !word.object || takes == Takes::Card || law == "B21" {
+                    problems.push(problem(
+                        &format!("laws.{law}"),
+                        if ja {
+                            format!(
+                                "物 {thing} の語 {} にはこの法則を当てられない。",
+                                word.written
+                            )
+                        } else {
+                            format!(
+                                "Law {law} cannot be applied to thing {thing}'s word {}.",
+                                word.written
+                            )
+                        },
+                    ));
+                }
+            }
             if matches!(
                 takes,
                 Takes::Placed | Takes::Row | Takes::Card | Takes::Sized
@@ -1139,7 +1261,13 @@ pub fn composition_targets(
     let ja = language == ResolvedInstructionLanguage::Ja;
     let name = |thing: Option<u64>| -> String {
         let thing = thing.unwrap_or_default();
-        let what = answer.thing(thing).map_or("", |item| item.what.as_str());
+        let what = answer.thing(thing).map_or("", |item| {
+            if item.word.is_empty() {
+                item.what.as_str()
+            } else {
+                item.word.as_str()
+            }
+        });
         if ja {
             format!("物{thing}（{what}）")
         } else {
@@ -1160,6 +1288,21 @@ pub fn composition_targets(
     };
     let end = if ja { "。" } else { "." };
     let mut out = Vec::new();
+    for item in &answer.things {
+        if !item.word.is_empty() {
+            out.push(if ja {
+                format!(
+                    "{}は語で 1 文に書く。他の形で重ねない。",
+                    name(Some(item.thing))
+                )
+            } else {
+                format!(
+                    "Write {} as one sentence using the word. Do not overlay it with other shapes.",
+                    name(Some(item.thing))
+                )
+            });
+        }
+    }
     for (law, value) in answer.chosen() {
         let targets: Vec<&Value> = value["targets"].as_array().into_iter().flatten().collect();
         match law {
@@ -1986,7 +2129,91 @@ mod tests {
             role: "focal".into(),
             kind: "cluster".into(),
             quote: quote.into(),
+            word: String::new(),
         }
+    }
+
+    #[test]
+    fn plugin_words_in_composition_allow_only_their_applicable_laws() {
+        let words = [
+            CompositionPluginWord {
+                written: "｛舟｝".into(),
+                object: true,
+            },
+            CompositionPluginWord {
+                written: "｛若葉｝".into(),
+                object: false,
+            },
+        ];
+        let answer = |word: &str, law: &str, value: Value| {
+            json!({
+                "thesis":"舟を描く", "form":"one_corner",
+                "things":[{"thing":1,"what":"舟","role":"focal","kind":"row","quote":"舟","word":word}],
+                "main_law":if law == "B21" {"B1"} else {law},
+                "laws":if law == "B21" {json!({"B1":{"targets":[{"thing":1,"at":"point_ul"}]}, "B21":value})} else {json!({law:value})}, "reason":"舟"
+            })
+        };
+        let check = |value: &Value| {
+            check_composition(
+                &value.to_string(),
+                "舟と若葉",
+                None,
+                ResolvedInstructionLanguage::Ja,
+                crate::focused_flow::config().prompt_limits,
+                &words,
+            )
+        };
+        let b1 = json!({"targets":[{"thing":1,"at":"point_ul"}]});
+        let b9 = json!({"targets":[{"thing":1,"form":"row"}]});
+        for (law, value) in [("B1", b1.clone()), ("B9", b9)] {
+            let accepted = check(&answer("｛舟｝", law, value)).unwrap();
+            let targets = composition_targets(&accepted, ResolvedInstructionLanguage::Ja);
+            assert!(
+                targets
+                    .iter()
+                    .any(|target| target
+                        .contains("物1（｛舟｝）は語で 1 文に書く。他の形で重ねない"))
+            );
+            assert!(
+                targets
+                    .iter()
+                    .skip(1)
+                    .any(|target| target.contains("物1（｛舟｝）")),
+                "{law}: {targets:?}"
+            );
+        }
+        for (word, law, value) in [
+            (
+                "｛舟｝",
+                "C2",
+                json!({"thing":1,"pattern":"shippo","area":"whole","unit":"1/8","colors":["white"]}),
+            ),
+            (
+                "｛舟｝",
+                "B21",
+                json!({"targets":[{"thing":1,"hand":"still"}]}),
+            ),
+            ("｛若葉｝", "B1", b1.clone()),
+            ("｛知らない｝", "B1", b1.clone()),
+        ] {
+            let problems = check(&answer(word, law, value)).unwrap_err();
+            if word != "｛知らない｝" {
+                assert!(
+                    problems
+                        .iter()
+                        .any(|problem| problem.place == format!("laws.{law}")),
+                    "{word} {law}: {problems:?}"
+                );
+            }
+        }
+        let mut duplicate = answer("｛舟｝", "B1", b1);
+        duplicate["things"].as_array_mut().unwrap().push(json!({"thing":2,"what":"舟","role":"accent","kind":"cluster","quote":"舟","word":"｛舟｝"}));
+        assert!(
+            check(&duplicate)
+                .unwrap_err()
+                .iter()
+                .any(|p| p.place.ends_with(".word"))
+        );
     }
 
     #[test]

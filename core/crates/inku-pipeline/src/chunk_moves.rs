@@ -1977,6 +1977,7 @@ mod tests {
             role: "main".to_owned(),
             kind: "cluster".to_owned(),
             quote: quote.to_owned(),
+            word: String::new(),
         };
         let composition = Composition {
             owners: vec![0, 1, 1, 2],

@@ -39,8 +39,8 @@ pub struct OfferRecord {
     pub offer: PluginOffer,
 }
 
-pub const PLUGIN_RULE_JA: &str = "\n\n# プラグインの語\nplugins の語だけを使う。記述の物そのものなら使い、色名・たとえ・時など別の意味なら使わない。物の語は形の語（円・四角など）の代わりに書き、その語の行に挙がった語だけを添える。情景の語は数以外を添えず、数は記述にある時だけ（例：｛若葉｝。）。描く物を他の形で重ねない。";
-pub const PLUGIN_RULE_EN: &str = "\n\n# Plugin words\nUse only the words in plugins. Use a word when the description means its thing itself; do not use it for another meaning (a color, simile, or time). An object word replaces a shape word (circle, square, ...) and takes only the words its line lists. A scene word takes only a count, and only when stated (e.g. {young leaves}.). Do not draw its subject again with other shapes.";
+pub const PLUGIN_RULE_JA: &str = "\n\n# プラグインの語\nplugins の語だけを使う。記述の物そのものなら使い、合成語の前の語が景を言う時も含む（川舟の川）。色名・たとえ・時など別の意味なら使わない。物の語は形の語（円・四角など）の代わりに書き、その語の行に挙がった語だけを添える。情景の語は数以外を添えず、数は記述にある時だけ（例：｛若葉｝。）。描く物を他の形で重ねない。";
+pub const PLUGIN_RULE_EN: &str = "\n\n# Plugin words\nUse only the words in plugins. Use a word when the description means its thing itself, including a compound's first word when it names the scene (river in river-boat); do not use it for another meaning (a color, simile, or time). An object word replaces a shape word (circle, square, ...) and takes only the words its line lists. A scene word takes only a count, and only when stated (e.g. {young leaves}.). Do not draw its subject again with other shapes.";
 
 pub fn rule(language: ResolvedInstructionLanguage) -> &'static str {
     match language {
@@ -336,6 +336,18 @@ pub fn with_plugin_offer(
 mod tests {
     use super::*;
     use serde_json::Value;
+
+    #[test]
+    fn plugin_rules_include_compound_scene_words_in_both_languages() {
+        assert_eq!(
+            PLUGIN_RULE_JA,
+            "\n\n# プラグインの語\nplugins の語だけを使う。記述の物そのものなら使い、合成語の前の語が景を言う時も含む（川舟の川）。色名・たとえ・時など別の意味なら使わない。物の語は形の語（円・四角など）の代わりに書き、その語の行に挙がった語だけを添える。情景の語は数以外を添えず、数は記述にある時だけ（例：｛若葉｝。）。描く物を他の形で重ねない。"
+        );
+        assert_eq!(
+            PLUGIN_RULE_EN,
+            "\n\n# Plugin words\nUse only the words in plugins. Use a word when the description means its thing itself, including a compound's first word when it names the scene (river in river-boat); do not use it for another meaning (a color, simile, or time). An object word replaces a shape word (circle, square, ...) and takes only the words its line lists. A scene word takes only a count, and only when stated (e.g. {young leaves}.). Do not draw its subject again with other shapes."
+        );
+    }
 
     #[test]
     fn braced_offer_uses_the_parser_boundaries() {

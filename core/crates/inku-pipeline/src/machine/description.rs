@@ -25,7 +25,8 @@ use crate::description_colors::{
     plan_of_with_definitions, with_layer_things,
 };
 use crate::description_composition::{
-    build_description_composition_prompt, check_composition, composition_targets, laws_text,
+    build_description_composition_prompt, check_composition, composition_plugin_words,
+    composition_targets, laws_text, with_composition_plugins,
     with_description_composition_feedback,
 };
 use crate::description_ddl::{
@@ -270,9 +271,16 @@ impl PipelineSnapshot {
         let prompt = if pending {
             let record = self.description_record()?;
             let context = self.description_context(record)?;
-            build_description_composition_prompt(
+            let prompt = build_description_composition_prompt(
                 &context,
                 self.config.language,
+                self.config.prompt_limits,
+            )
+            .map_err(|_| ProtocolError::SchemaViolation)?;
+            with_composition_plugins(
+                prompt,
+                context.description,
+                &self.plugin_catalog(),
                 self.config.prompt_limits,
             )
             .map_err(|_| ProtocolError::SchemaViolation)?
@@ -305,12 +313,19 @@ impl PipelineSnapshot {
         events: &mut Vec<PipelineEvent>,
     ) -> Result<(), ProtocolError> {
         let record = self.description_record()?;
+        let words = composition_plugin_words(
+            &record.description,
+            &self.plugin_catalog(),
+            self.config.language,
+            self.config.prompt_limits,
+        );
         let checked = check_composition(
             response,
             &record.description,
             record.reading.as_ref(),
             self.config.language,
             self.config.prompt_limits,
+            &words,
         );
         let action = self.action.as_ref().ok_or(ProtocolError::InvalidState)?;
         let asked_again = message_names(&action.payload, "composition_feedback");
@@ -458,16 +473,7 @@ impl PipelineSnapshot {
             }
         };
         let prompt = prompt.map_err(|_| ProtocolError::SchemaViolation)?;
-        let catalog = self
-            .config
-            .definitions
-            .iter()
-            .zip(&self.config.macro_summaries)
-            .map(|(definition, summary)| crate::prompts::MacroPromptEntry {
-                definition,
-                localized_summary: summary,
-            })
-            .collect::<Vec<_>>();
+        let catalog = self.plugin_catalog();
         crate::plugin_offer::with_plugin_offer(
             prompt,
             context.description,
@@ -477,6 +483,18 @@ impl PipelineSnapshot {
         )
         .map(|(prompt, _)| prompt)
         .map_err(|_| ProtocolError::SchemaViolation)
+    }
+
+    fn plugin_catalog(&self) -> Vec<crate::prompts::MacroPromptEntry<'_>> {
+        self.config
+            .definitions
+            .iter()
+            .zip(&self.config.macro_summaries)
+            .map(|(definition, summary)| crate::prompts::MacroPromptEntry {
+                definition,
+                localized_summary: summary,
+            })
+            .collect()
     }
 
     /// Whether a description run chooses its colors before its commit: a
@@ -1361,6 +1379,156 @@ mod tests {
             .composition
             .as_ref()
             .unwrap()
+    }
+
+    #[test]
+    fn composition_receives_the_offer_and_tracks_its_word_through_writing() {
+        let asset: Value = serde_json::from_str(include_str!(
+            "../../../inku-ddl/tests/fixtures/nature-leaves-2.1-v1.json"
+        ))
+        .unwrap();
+        let definition =
+            inku_ddl::MacroDefinition::from_json(&asset["entries"][0]["definition"].to_string())
+                .unwrap();
+        let mut config = read_config(false);
+        config.definitions = vec![definition];
+        config.macro_summaries = vec!["若葉を描く。".into()];
+        let start = |description: &str| {
+            start_with(
+                config.clone(),
+                AuthoringInput::Description {
+                    description: description.into(),
+                    auto_catalog: false,
+                    sketch: SketchRequest::Off,
+                    route: DescriptionRoute::ReadAndDraw,
+                    source_labels: Vec::new(),
+                    composition: CompositionRequest::On,
+                },
+            )
+            .snapshot
+        };
+        let empty = start("紫の妹");
+        let context = empty
+            .description_context(empty.description_record().unwrap())
+            .unwrap();
+        let original = super::build_description_composition_prompt(
+            &context,
+            empty.config.language,
+            empty.config.prompt_limits,
+        )
+        .unwrap();
+        let actual: crate::prompts::LlmPrompt =
+            serde_json::from_value(empty.action.as_ref().unwrap().payload["prompt"].clone())
+                .unwrap();
+        assert_eq!(
+            serde_json::to_value(&original).unwrap(),
+            serde_json::to_value(&actual).unwrap()
+        );
+        assert_eq!(original.prompt_digest, actual.prompt_digest);
+        let state = start("若葉と妹");
+        assert_eq!(tag(&state), "compose_description");
+        assert!(
+            message(&state)["plugins"][0]
+                .as_str()
+                .unwrap()
+                .contains("｛若葉｝")
+        );
+        assert!(
+            prompt(&state)["system"]
+                .as_str()
+                .unwrap()
+                .ends_with(crate::plugin_offer::PLUGIN_RULE_JA)
+        );
+        let schema = &prompt(&state)["response_schema"]["properties"]["things"]["items"];
+        assert_eq!(
+            schema["properties"]["word"]["enum"],
+            json!(["", "｛若葉｝"])
+        );
+        assert!(
+            schema["required"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("word"))
+        );
+        assert!(state.config.plugin_offers.is_empty());
+        let answer = json!({"thesis":"妹と若葉", "form":"one_corner", "things":[
+            {"thing":1,"what":"妹","role":"focal","kind":"cluster","quote":"妹","word":""},
+            {"thing":2,"what":"若葉","role":"field","kind":"surface","quote":"若葉","word":"｛若葉｝"}],
+            "main_law":"B1", "laws":{"B1":{"targets":[{"thing":1,"at":"point_ul"}]}}, "reason":"妹"});
+        let mut bad = answer.clone();
+        bad["laws"]["B1"]["targets"][0]["thing"] = json!(2);
+        let retry = answer_text(&state, &bad.to_string()).snapshot;
+        assert_eq!(tag(&retry), "compose_description");
+        assert!(
+            message(&retry)["composition_feedback"]["problems"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|p| p["where"] == "laws.B1")
+        );
+        let writing = answer_text(&retry, &answer.to_string()).snapshot;
+        assert_eq!(tag(&writing), "write_description_ddl");
+        assert!(
+            message(&writing)["targets"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|v| v.as_str().unwrap().contains("物2（｛若葉｝）は語で 1 文"))
+        );
+        assert_eq!(writing.config.plugin_offers.len(), 1);
+        let drawn = sentences(
+            &writing,
+            &[(0, "背景を白で埋める。"), (1, WOMAN), (2, "｛若葉｝。")],
+        )
+        .snapshot;
+        assert_eq!(tag(&drawn), "commit_visible_normalized_ddl");
+        assert!(composition_record(&drawn).things.contains(&2));
+    }
+
+    #[test]
+    fn object_word_sentence_keeps_its_thing_for_law_measurement() {
+        let definition = inku_ddl::MacroDefinition::from_json(&json!({
+            "schema":"inku.macro-definition.v2", "namespace":"TestObject", "id":"Boat",
+            "names":{"ja":["舟"],"en":["boat"]}, "kind":"object", "aspect":"2:1", "counter":"general",
+            "version":"1.0.0", "parameters":{}, "components":{}, "body":[{"op":"emit","binding":"hull","fields":{
+                "shape":{"expr":"semantic_ref","category":"shape","id":"arc"},
+                "movement":{"expr":"semantic_ref","category":"movement","id":"place"},
+                "color":{"expr":"semantic_ref","category":"color","id":"green"},
+                "position_x":{"expr":"exact_decimal","value":"0.5"}, "position_y":{"expr":"exact_decimal","value":"0.5"},
+                "chord":{"expr":"exact_decimal","value":"0.6"}, "sagitta":{"expr":"exact_decimal","value":"0.2"}
+            }}]
+        }).to_string()).unwrap();
+        let mut config = read_config(false);
+        config.definitions = vec![definition];
+        config.macro_summaries = vec!["舟を描く。".into()];
+        let state = start_with(
+            config,
+            AuthoringInput::Description {
+                description: "舟".into(),
+                auto_catalog: false,
+                sketch: SketchRequest::Off,
+                route: DescriptionRoute::ReadAndDraw,
+                source_labels: Vec::new(),
+                composition: CompositionRequest::On,
+            },
+        )
+        .snapshot;
+        let answer = json!({"thesis":"舟", "form":"one_corner", "things":[{"thing":1,"what":"舟","role":"focal","kind":"cluster","quote":"舟","word":"｛舟｝"}],
+            "main_law":"B1", "laws":{"B1":{"targets":[{"thing":1,"at":"point_ul"}]}}, "reason":"舟"});
+        let writing = answer_text(&state, &answer.to_string()).snapshot;
+        assert_eq!(tag(&writing), "write_description_ddl");
+        let line = "画面の横0.381966、縦0.381966の位置に、一辺0.2の｛舟｝を置く。";
+        let drawn = sentences(&writing, &[(0, "背景を白で埋める。"), (1, line)]).snapshot;
+        let record = composition_record(&drawn);
+        assert_eq!(record.things, [0, 1]);
+        assert!(
+            record.measures[0]
+                .after
+                .iter()
+                .any(|m| m.state == MeasureState::Ok),
+            "{:?}",
+            record.measures
+        );
     }
 
     #[test]

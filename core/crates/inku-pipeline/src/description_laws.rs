@@ -1543,7 +1543,13 @@ pub fn thing_problems(
     let ja = language == ResolvedInstructionLanguage::Ja;
     let words = composition_targets(answer, language);
     let name = |thing: u64| -> String {
-        let what = answer.thing(thing).map_or("", |item| item.what.as_str());
+        let what = answer.thing(thing).map_or("", |item| {
+            if item.word.is_empty() {
+                item.what.as_str()
+            } else {
+                item.word.as_str()
+            }
+        });
         if ja {
             format!("物{thing}（{what}）")
         } else {
@@ -2048,6 +2054,18 @@ mod tests {
         assert_eq!(problems.len(), 1);
         assert_eq!(problems[0].thing, 2);
         assert!(problems[0].target.contains("物2（月）"), "{problems:?}");
+        let mut word_answer = answer.clone();
+        word_answer.things[1].word = "｛満月｝".into();
+        let problems = thing_problems(
+            &doc,
+            &records,
+            &word_answer,
+            ResolvedInstructionLanguage::Ja,
+        );
+        assert!(
+            problems[0].target.contains("物2（｛満月｝）"),
+            "{problems:?}"
+        );
     }
 
     #[test]

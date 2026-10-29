@@ -18,7 +18,7 @@ Vision requests pin the owner, profile ID and generation at the start and send i
 
 ## Connect on the same PC
 
-First synchronize locked dependencies from the Server source directory with `uv sync --frozen --inexact`, preserving the installed native wheel. The startup and authorization helpers below use `--no-sync` to avoid another synchronization. Run with your existing DB and administrator settings:
+First synchronize locked dependencies from the Server source directory with `uv sync --frozen --inexact`. The shared core's native wheel is required: build and install it as described in [Server Setup](../../SETUP.md#server-setup), and rebuild it whenever `core/` changes. The startup and authorization helpers below use `--no-sync` to preserve the installed wheel. Run with your existing DB and administrator settings:
 
 ```sh
 INKU_CHATGPT_PLAN_ENABLED=1 INKU_DEVELOPER_MODE=1 \
@@ -44,6 +44,8 @@ uv run --frozen --no-sync inku-chatgpt serve --self-hosted --host 0.0.0.0 --port
 ```
 
 The operator fixes `inku-chatgpt recipient --owner-id <verified-owner-id>` to the DB-verified account and safely returns its public recipient JSON to the Mac. Store it as a 0600 file, then authorize using this application's dedicated helper:
+
+In the Mac's Server source directory, run `uv sync --frozen --inexact`, then build and install the shared core's native wheel as described in [Server Setup](../../SETUP.md#server-setup). Rebuild the wheel whenever `core/` changes.
 
 ```sh
 INKU_CHATGPT_PLAN_ENABLED=1 INKU_DEVELOPER_MODE=1 \
@@ -73,6 +75,8 @@ For the dedicated Mac helper, the launch link adds `target=container` only when 
 
 For a generic operator workflow, verify the owner ID and create a public recipient in the Compose directory on the container host:
 
+The container image includes the native wheel, so `recipient` and `import` run from the container host need no wheel preparation there.
+
 ```sh
 umask 077
 docker compose exec -T --user 10001:10001 api \
@@ -80,6 +84,8 @@ docker compose exec -T --user 10001:10001 api \
 ```
 
 Send the recipient to the Mac through protected SSH or an equivalent secure connection and save it as a 0600 file. On the Mac, use a dedicated credential directory for this container; the author signs in and consents in Chrome. The callback is on the Mac's `127.0.0.1`, outside Docker.
+
+In the Mac's Server source directory, run `uv sync --frozen --inexact`, then build and install the shared core's native wheel as described in [Server Setup](../../SETUP.md#server-setup). Rebuild the wheel whenever `core/` changes.
 
 ```sh
 INKU_CHATGPT_PLAN_ENABLED=1 INKU_DEVELOPER_MODE=1 \

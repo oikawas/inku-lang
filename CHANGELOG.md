@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-29 — Document native wheel preparation for ChatGPT connections
+
+The connection guide now explains how to prepare and rebuild the Server's native wheel for same-PC, remote-host and container connections. Commands run inside the container use the wheel included in the image.
+
 ### 2026-10-29 — Align macOS ChatGPT plan decisions with the shared core
 
 The shared core now decides callback acceptance, concurrent sign-in, operation purpose, model publication input, and registration deletion. Draw-in-words and image-to-drawing effects can use the ChatGPT plan; image effects require a model published for Vision.

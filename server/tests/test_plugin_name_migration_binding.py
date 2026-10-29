@@ -8,7 +8,7 @@ import inku_render
 
 def test_native_plugin_name_migration_keeps_saved_lock_and_is_idempotent():
     root = Path(__file__).resolve().parents[2]
-    package = json.loads((root / "core/crates/inku-ddl/assets/nature-leaves-v1.json").read_text())
+    package = json.loads((root / "core/crates/inku-ddl/tests/fixtures/nature-leaves-2.1-v1.json").read_text())
     definition = package["entries"][0]["definition"]
     catalog = json.loads(inku_render.pipeline_resolve_macro_catalog(json.dumps({
         "maximum_entries": 1,

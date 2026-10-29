@@ -1,6 +1,7 @@
 //! Host-neutral plugin-package inspection and example-drawing handshake.
 use crate::{plugin_picture, zip_reader};
 use base64::{Engine, engine::general_purpose::STANDARD};
+use inku_ddl::plugin_names::normalize_plugin_name;
 use regex::Regex;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -125,8 +126,15 @@ fn parse(
     for key in unknown {
         problems.push(problem(key, "unknown_field", ""));
     }
-    if s(&raw["schema"]) != "inku.plugin-package.v1" {
-        problems.push(problem("schema", "wrong_schema", "inku.plugin-package.v1"));
+    if s(&raw["schema"]) == "inku.plugin-package.v1" {
+        return Err(vec![problem(
+            "schema",
+            "rewrite_as_v2",
+            "inku.plugin-package.v2",
+        )]);
+    }
+    if s(&raw["schema"]) != "inku.plugin-package.v2" {
+        problems.push(problem("schema", "wrong_schema", "inku.plugin-package.v2"));
     }
     let ident = Regex::new(r"^[A-Za-z][A-Za-z0-9_-]*$").unwrap();
     let mut namespace = s(&raw["namespace"]);
@@ -190,8 +198,6 @@ fn parse(
                 let mut wp = Vec::new();
                 let keys = [
                     "definition",
-                    "summary_ja",
-                    "summary_en",
                     "note_ja",
                     "note_en",
                     "example_ja",
@@ -213,32 +219,18 @@ fn parse(
                         namespace,
                     ));
                 }
-                let summary_ja = text(
-                    &item["summary_ja"],
-                    &format!("{path}.summary_ja"),
-                    &mut wp,
-                    8192,
-                );
-                let summary_en = text(
-                    &item["summary_en"],
-                    &format!("{path}.summary_en"),
-                    &mut wp,
-                    8192,
-                );
-                for (lang, v) in [("ja", &summary_ja), ("en", &summary_en)] {
-                    if v.len() > 8192 {
-                        wp.push(problem(
-                            &format!("{path}.summary_{lang}"),
-                            "text_too_long",
-                            8192,
-                        ));
-                    }
+                if item["definition"]["schema"] != "inku.macro-definition.v2" {
+                    wp.push(problem(
+                        &format!("{path}.definition.schema"),
+                        "definition_requires_v2",
+                        "inku.macro-definition.v2",
+                    ));
                 }
-                if summary_ja.is_empty() && summary_en.is_empty() {
-                    wp.push(problem(&format!("{path}.summary_ja"), "no_summary", ""));
+                let note_ja = text(&item["note_ja"], &format!("{path}.note_ja"), &mut wp, 100);
+                let note_en = text(&item["note_en"], &format!("{path}.note_en"), &mut wp, 100);
+                if note_ja.is_empty() && note_en.is_empty() {
+                    wp.push(problem(&format!("{path}.note_ja"), "no_note", ""));
                 }
-                let note_ja = text(&item["note_ja"], &format!("{path}.note_ja"), &mut wp, 2000);
-                let note_en = text(&item["note_en"], &format!("{path}.note_en"), &mut wp, 2000);
                 let ex_ja = text(
                     &item["example_ja"],
                     &format!("{path}.example_ja"),
@@ -288,24 +280,57 @@ fn parse(
                 }
                 let definition = &item["definition"];
                 let ns = python_string_field(definition, "namespace");
-                let heading = python_string_field(definition, "heading");
-                let aliases: Vec<_> = definition["aliases"]
+                let id = python_string_field(definition, "id");
+                let names_ja: Vec<_> = definition["names"]["ja"]
                     .as_array()
-                    .map(|a| a.iter().filter_map(Value::as_str).collect())
-                    .unwrap_or_default();
-                let qualified = format!("{ns}.{heading}");
-                let visible: Vec<_> = std::iter::once(qualified.clone())
-                    .chain(aliases.iter().map(|a| format!("{ns}.{a}")))
+                    .into_iter()
+                    .flatten()
+                    .filter_map(Value::as_str)
                     .collect();
-                let key = Sha256::digest(heading.as_bytes())
+                let names_en: Vec<_> = definition["names"]["en"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(Value::as_str)
+                    .collect();
+                let qualified = format!("{ns}.{id}");
+                let visible: Vec<_> = names_ja
+                    .iter()
+                    .chain(&names_en)
+                    .map(|name| normalize_plugin_name(name))
+                    .collect();
+                let key = Sha256::digest(id.as_bytes())
                     .iter()
                     .take(8)
                     .map(|b| format!("{b:02x}"))
                     .collect::<String>();
-                let default_ja =
-                    format!("{}.{}。", ns, aliases.first().copied().unwrap_or(&heading));
-                let default_en = format!("{qualified}.");
-                words.push(json!({"index":index,"definition":definition,"heading":heading,"summary_ja":summary_ja,"summary_en":summary_en,"note_ja":note_ja,"note_en":note_en,"example_ja":ex_ja,"example_en":ex_en,"draw_ja":if ex_ja.is_empty(){&default_ja}else{&ex_ja},"draw_en":if ex_en.is_empty(){&default_en}else{&ex_en},"aliases":aliases,"qualified_name":qualified,"visible_qualified_names":visible,"preview_key":key,"problems":wp,"picture":picture}));
+                let main_ja = names_ja.first().copied().unwrap_or(&id);
+                let main_en = names_en.first().copied().unwrap_or(&id);
+                let default_ja = format!("｛{main_ja}｝。");
+                let default_en = format!("{{{main_en}}}.");
+                if !ex_ja.is_empty()
+                    && !names_ja
+                        .iter()
+                        .any(|name| ex_ja.contains(&format!("｛{name}｝")))
+                {
+                    wp.push(problem(
+                        &format!("{path}.example_ja"),
+                        "example_without_name",
+                        main_ja,
+                    ));
+                }
+                if !ex_en.is_empty()
+                    && !names_en
+                        .iter()
+                        .any(|name| ex_en.contains(&format!("{{{name}}}")))
+                {
+                    wp.push(problem(
+                        &format!("{path}.example_en"),
+                        "example_without_name",
+                        main_en,
+                    ));
+                }
+                words.push(json!({"index":index,"definition":definition,"id":id,"names":{"ja":names_ja,"en":names_en},"kind":definition["kind"],"aspect":definition["aspect"],"counter":definition["counter"],"note_ja":note_ja,"note_en":note_en,"example_ja":ex_ja,"example_en":ex_en,"preview":item["preview"],"draw_ja":if ex_ja.is_empty(){&default_ja}else{&ex_ja},"draw_en":if ex_en.is_empty(){&default_en}else{&ex_en},"aliases":[],"qualified_name":qualified,"visible_qualified_names":visible,"preview_key":key,"problems":wp,"picture":picture}));
             }
         }
     }
@@ -319,16 +344,11 @@ fn parse(
 }
 
 fn summary(word: &Value, lang: &str) -> String {
-    let first = s(&word[format!("summary_{lang}")]);
+    let first = s(&word[format!("note_{lang}")]);
     if !first.is_empty() {
         first.to_owned()
     } else {
-        s(&word[if lang == "ja" {
-            "summary_en"
-        } else {
-            "summary_ja"
-        }])
-        .to_owned()
+        s(&word[if lang == "ja" { "note_en" } else { "note_ja" }]).to_owned()
     }
 }
 
@@ -396,8 +416,10 @@ fn start(input: &Value) -> Result<Value, Vec<Value>> {
             else {
                 continue;
             };
-            for name in std::iter::once(&entry["qualified_name"])
-                .chain(entry["aliases"].as_array().into_iter().flatten())
+            for name in words[i]["visible_qualified_names"]
+                .as_array()
+                .into_iter()
+                .flatten()
             {
                 if let Some(holder) = input["taken_names"][s(name)].as_str().filter(|h| *h != id) {
                     def_problems[i].push(problem(
@@ -414,7 +436,7 @@ fn start(input: &Value) -> Result<Value, Vec<Value>> {
         .iter()
         .enumerate()
         .filter(|(i, _)| def_problems[*i].is_empty())
-        .map(|(_, w)| json!({"definition":w["definition"],"summary":summary(w,"en")}))
+        .map(|(_, w)| json!({"definition":w["definition"],"note":summary(w,"en")}))
         .collect();
     let draw:Vec<_>=words.iter().enumerate().filter(|(i,_)|def_problems[*i].is_empty()).flat_map(|(i,w)|["ja","en"].into_iter().map(move |lang|json!({"id":format!("{i}:{lang}"),"language":lang,"ddl":w[format!("draw_{lang}")]}))).collect();
     Ok(
@@ -468,14 +490,7 @@ fn finish(input: &Value) -> Result<Value, ()> {
         if !picture.is_null() {
             pictures.insert(s(&w["preview_key"]).to_owned(), picture);
         }
-        let aliases: Vec<_> = w["visible_qualified_names"]
-            .as_array()
-            .ok_or(())?
-            .iter()
-            .skip(1)
-            .cloned()
-            .collect();
-        reports.push(json!({"heading":w["heading"],"qualified_name":w["qualified_name"],"aliases":aliases,"summary_ja":summary(w,"ja"),"summary_en":summary(w,"en"),"note_ja":w["note_ja"],"note_en":w["note_en"],"example_ja":w["draw_ja"],"example_en":w["draw_en"],"digest":s(&entries[i]["digest"]),"preview_source":if w["picture"].is_null(){"drawn"}else{"file"},"problems":problems}));
+        reports.push(json!({"id":w["id"],"names":w["names"],"kind":w["kind"],"aspect":w["aspect"],"counter":w["counter"],"qualified_name":w["qualified_name"],"aliases":[],"note_ja":summary(w,"ja"),"note_en":summary(w,"en"),"example_ja":w["draw_ja"],"example_en":w["draw_en"],"digest":s(&entries[i]["digest"]),"preview_source":if w["picture"].is_null(){"drawn"}else{"file"},"problems":problems}));
     }
     let package_problems = package["problems"].as_array().ok_or(())?;
     let ok = package_problems.is_empty()
@@ -498,11 +513,13 @@ fn encode_finished(output: &Value) -> Option<Vec<u8>> {
     let report = &output["report"];
     let words = report["words"].as_array()?;
     let word_keys = [
-        "heading",
+        "id",
+        "names",
+        "kind",
+        "aspect",
+        "counter",
         "qualified_name",
         "aliases",
-        "summary_ja",
-        "summary_en",
         "note_ja",
         "note_en",
         "example_ja",
@@ -538,6 +555,56 @@ fn encode_finished(output: &Value) -> Option<Vec<u8>> {
     )
 }
 
+fn bundled_nature() -> Value {
+    let pictures = [
+        (
+            "wakaba",
+            include_bytes!("../../inku-ddl/assets/nature-leaves-v2/wakaba.png").as_slice(),
+            include_bytes!("../../inku-ddl/assets/nature-leaves-v2/wakaba@2x.png").as_slice(),
+        ),
+        (
+            "shitakusa",
+            include_bytes!("../../inku-ddl/assets/nature-leaves-v2/shitakusa.png").as_slice(),
+            include_bytes!("../../inku-ddl/assets/nature-leaves-v2/shitakusa@2x.png").as_slice(),
+        ),
+        (
+            "aoba",
+            include_bytes!("../../inku-ddl/assets/nature-leaves-v2/aoba.png").as_slice(),
+            include_bytes!("../../inku-ddl/assets/nature-leaves-v2/aoba@2x.png").as_slice(),
+        ),
+        (
+            "momiji",
+            include_bytes!("../../inku-ddl/assets/nature-leaves-v2/momiji.png").as_slice(),
+            include_bytes!("../../inku-ddl/assets/nature-leaves-v2/momiji@2x.png").as_slice(),
+        ),
+        (
+            "ochiba",
+            include_bytes!("../../inku-ddl/assets/nature-leaves-v2/ochiba.png").as_slice(),
+            include_bytes!("../../inku-ddl/assets/nature-leaves-v2/ochiba@2x.png").as_slice(),
+        ),
+        (
+            "karekusa",
+            include_bytes!("../../inku-ddl/assets/nature-leaves-v2/karekusa.png").as_slice(),
+            include_bytes!("../../inku-ddl/assets/nature-leaves-v2/karekusa@2x.png").as_slice(),
+        ),
+        (
+            "kareha",
+            include_bytes!("../../inku-ddl/assets/nature-leaves-v2/kareha.png").as_slice(),
+            include_bytes!("../../inku-ddl/assets/nature-leaves-v2/kareha@2x.png").as_slice(),
+        ),
+    ];
+    let pictures: BTreeMap<_, _> = pictures
+        .into_iter()
+        .flat_map(|(name, one, two)| {
+            [
+                (format!("previews/{name}.png"), STANDARD.encode(one)),
+                (format!("previews/{name}@2x.png"), STANDARD.encode(two)),
+            ]
+        })
+        .collect();
+    json!({"outcome":"ok","text":inku_ddl::NATURE_LEAVES_V2_JSON,"pictures":pictures})
+}
+
 #[uniffi::export]
 pub fn plugin_package(input_bytes: Vec<u8>) -> Vec<u8> {
     let output = std::panic::catch_unwind(|| {
@@ -561,7 +628,6 @@ pub fn plugin_package(input_bytes: Vec<u8>) -> Vec<u8> {
                         for word in words {
                             if let Some(fields) = word.as_object_mut() {
                                 fields.remove("picture");
-                                fields.remove("heading");
                                 fields.remove("draw_ja");
                                 fields.remove("draw_en");
                             }
@@ -583,6 +649,7 @@ pub fn plugin_package(input_bytes: Vec<u8>) -> Vec<u8> {
                     Err(p) => refused(vec![p]),
                 }
             }
+            "bundled_nature" => bundled_nature(),
             _ => return Err(()),
         };
         Ok::<_, ()>(result)
@@ -606,6 +673,24 @@ mod tests {
 
     fn call(input: Value) -> Value {
         serde_json::from_slice(&plugin_package(serde_json::to_vec(&input).unwrap())).unwrap()
+    }
+
+    #[test]
+    fn bundled_v2_words_resolve_and_offer_examples() {
+        let bundle = call(json!({"action":"bundled_nature"}));
+        let text = bundle["text"].as_str().unwrap();
+        assert_eq!(bundle["pictures"].as_object().unwrap().len(), 14);
+        let start = call(json!({"action":"check_start","document":text,"taken_names":{}}));
+        assert_eq!(start["outcome"], "ok", "{start}");
+        assert_eq!(start["draw"].as_array().unwrap().len(), 14);
+        assert!(
+            start["state"]["definition_problems"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|p| p.as_array().unwrap().is_empty()),
+            "{start}"
+        );
     }
 
     #[test]
@@ -661,8 +746,8 @@ mod tests {
         raw["version"] = json!("wrong");
         raw["description_ja"] = json!(false);
         raw["authors"] = json!([1]);
-        raw["words"][0]["summary_ja"] = json!("");
-        raw["words"][0]["summary_en"] = json!("");
+        raw["words"][0]["note_ja"] = json!("");
+        raw["words"][0]["note_en"] = json!("");
         raw["words"][0]["preview"] = json!("missing.png");
         let output = call(json!({"action":"read_stored","document":raw.to_string()}));
         assert_eq!(output["outcome"], "ok");
@@ -683,7 +768,7 @@ mod tests {
                 .as_array()
                 .unwrap()
                 .iter()
-                .any(|p| p["code"] == "no_summary")
+                .any(|p| p["code"] == "no_note")
         );
         let start =
             call(json!({"action":"check_start","document":raw.to_string(),"taken_names":{}}));
@@ -735,7 +820,7 @@ mod tests {
             );
         }
         let mut raw = original.clone();
-        raw["words"][0]["summary_ja"] = json!("あ".repeat(3000));
+        raw["words"][0]["note_ja"] = json!("あ".repeat(3000));
         raw["words"][0]["definition"]["namespace"] = json!("Elsewhere");
         let parsed = parse(&raw.to_string(), None, false).unwrap();
         let findings = parsed["words"][0]["problems"].as_array().unwrap();

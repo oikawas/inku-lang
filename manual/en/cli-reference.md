@@ -227,7 +227,7 @@ somebody else's.
 
 | Flag | Contents |
 |---|---|
-| `ddl-export WORK_ID --output` / `-o` | The file to write. Without it, the export goes to standard output. The output is JSON with the schema `inku.ddl-export.v1`, containing the work's DDL and the plugin definitions that DDL names |
+| `ddl-export WORK_ID --output` / `-o` | Output file. The `inku.ddl-export.v2` JSON contains the work's DDL and definitions and notes selected by saved locks |
 | `export-card HASH --out` / `-o` | The destination PNG path. A path ending in `/`, or an existing directory, receives the file as `inku-card-<the work's short hash>-<layout>.png`. Any other path is written as the PNG file itself. Required |
 | `export-card --layout {square,portrait}` | `square` is a 1080×1080 sheet; `portrait` is 1080×1350 |
 | `export-card --no-seal` | Leave off the small `inku` mark printed on the sheet. By default it is printed |
@@ -242,12 +242,11 @@ somebody else's.
 
 | Command | Contents |
 |---|---|
-| `plugin list` | Report loaded and rejected plugin documents, namespaces, versions, and rejection reasons as JSON |
-| `plugin validate FILE` | Send a local document body to the administration API and validate its syntax without executing code or external files |
-| `plugin reload` | Reload `server/plugins/` explicitly, without restarting the server |
+| `plugin list` | Report loaded and rejected v2 packages, namespaces, versions, and rejection reasons as JSON |
+| `plugin validate FILE` | Send a local v2 JSON or zip to the administration API for all three checks |
 | `reference [--md \| --json] [-o FILE]` | A machine-generated dump of the implementation vocabulary and constant tables. Markdown by default |
 
-`plugin` requires an administrator session. `reference` runs under any signed-in session.
+`plugin validate` requires an administrator session; `plugin list` and `reference` run under any signed-in session.
 
 ## Colophon
 

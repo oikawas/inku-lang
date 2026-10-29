@@ -1,5 +1,5 @@
 {
-  "schema": "inku.plugin-package.v1",
+  "schema": "inku.plugin-package.v2",
   "namespace": "Water",
   "name": "nihonga",
   "version": "1.1.0",
@@ -9,9 +9,8 @@
   "words": [
     {
       "definition": {
-        "schema": "inku.macro-definition.v1",
+        "schema": "inku.macro-definition.v2",
         "namespace": "Water",
-        "heading": "Stream",
         "version": "1.0.0",
         "parameters": {
           "line_count": {
@@ -1305,23 +1304,27 @@
             ]
           }
         ],
-        "aliases": [
-          "水流"
-        ]
+        "id": "Stream",
+        "names": {
+          "ja": [
+            "水流"
+          ],
+          "en": [
+            "stream"
+          ]
+        },
+        "kind": "scene"
       },
-      "summary_ja": "画面の中ほどを横切る一筋の水流を描く。流れは左半分で上へ、右半分で下へふくらむS字の帯で、何本もの線が並んで流れ、帯は左右それぞれの半ばで少しふくらみ、両端と中央で締まる。流れの芯には、たらしこみのように滲む群青の太筆の線を一本通す。並ぶ線は細筆と太筆、群青と淡い墨（灰）が混ざり、ゆるやかに細かく揺れる。S字の二つの曲がりの内側に、半円をつないだ小さな渦を一つずつ置く。線の数を書けばその数（1〜12本）、書かなければ7〜9本で、芯の線と二つの渦はいつも描く。帯の傾き（左右に16度まで）、左右の向き、上下の位置は六通りから選ぶ。",
-      "summary_en": "Draw one stream of water crossing the middle of the canvas. The flow is an S-shaped band, bulging upward in the left half and downward in the right half, made of many lines running side by side; the band swells a little in the middle of each half and narrows at both ends and at the center. Through its core runs one thick-brush ultramarine line, bleeding like tarashikomi. The other lines mix thin and thick brush, ultramarine and pale ink (gray), and sway loosely and narrowly. In each of the two inner bends of the S sits a small eddy made of joined semicircles. The written line count (1–12), or 7–9 when none is written; the core line and the two eddies are always drawn. The band's tilt (up to 16 degrees either way), its left-right direction and its height come from six arrangements.",
       "note_ja": "琳派の流水のように、渦を伴って流れるS字の水流。",
       "note_en": "An S-shaped stream with eddies, like Rinpa flowing water.",
-      "example_ja": "8本のWater.水流。",
-      "example_en": "8 Water.Stream.",
+      "example_ja": "8本の｛水流｝。",
+      "example_en": "8 {stream}.",
       "preview": "previews/stream.png"
     },
     {
       "definition": {
-        "schema": "inku.macro-definition.v1",
+        "schema": "inku.macro-definition.v2",
         "namespace": "Water",
-        "heading": "Ripples",
         "version": "3.0.0",
         "parameters": {
           "ring_count": {
@@ -2063,23 +2066,27 @@
             ]
           }
         ],
-        "aliases": [
-          "波紋"
-        ]
+        "id": "Ripples",
+        "names": {
+          "ja": [
+            "波紋"
+          ],
+          "en": [
+            "ripples"
+          ]
+        },
+        "kind": "scene"
       },
-      "summary_ja": "水面を真上から見た波紋を一つ広げる。中心に群青の雫を一滴、たらしこみのように滲ませて置き、そのまわりに輪を内から外へ重ねる。輪は上下二つの弧でできていて、内の二つは閉じ、三つ目から外は途切れ、途切れ目が輪ごとに少しずつ回る。輪の線はゆるやかに揺れ、内の二つは細かく、三つ目から外は大きく揺らぐ。内の三つは群青、外の三つは淡い墨（灰）で、二つ目の輪だけが太筆、ほかは細筆。輪の数を書けばその数（1〜6個）、書かなければ4〜5個。中心は画面の中央からやや下の五つの位置から一つを選び、全体の向きも回す。",
-      "summary_en": "Spread one ripple on the water, seen from straight above. A single drop of ultramarine sits at the center, bleeding like tarashikomi, and rings spread around it from the inside out. Each ring is an upper and a lower arc: the inner two are closed, and from the third outward they break, the breaks turning a little from ring to ring. The ring lines sway loosely, narrowly for the inner two and broadly from the third outward. The inner three are ultramarine and the outer three pale ink (gray); only the second ring is in thick brush, the others in thin brush. The written ring count (1–6), or 4–5 when none is written. The center is one of five positions around and slightly below the middle of the canvas, and the whole is turned as well.",
       "note_ja": "真上から見た波紋。滲む雫と、外ほど途切れる輪。",
       "note_en": "A ripple seen from above: a bleeding drop and rings that break toward the outside.",
-      "example_ja": "5個のWater.波紋。",
-      "example_en": "5 Water.Ripples.",
+      "example_ja": "5個の｛波紋｝。",
+      "example_en": "5 {ripples}.",
       "preview": "previews/ripples.png"
     },
     {
       "definition": {
-        "schema": "inku.macro-definition.v1",
+        "schema": "inku.macro-definition.v2",
         "namespace": "Water",
-        "heading": "Rings",
         "version": "2.0.0",
         "parameters": {
           "ring_count": {
@@ -3126,23 +3133,27 @@
             ]
           }
         ],
-        "aliases": [
-          "水輪"
-        ]
+        "id": "Rings",
+        "names": {
+          "ja": [
+            "水輪"
+          ],
+          "en": [
+            "rings"
+          ]
+        },
+        "kind": "scene"
       },
-      "summary_ja": "水面を斜めから見た波紋（水輪）を一つ広げる。真上から見た波紋と同じ途切れた輪と滲んだ雫を、横に少し広げて縦を約三分の一につぶし、外の輪ほど中心を少し下げて手前へ開かせる。線は細筆で、内の三つは群青、外の三つは淡い墨（灰）。輪の左右と下に、水面に映る光のような淡い墨の短い横線を五本添える。全体は水平から左右に3度までわずかに傾く。輪の数を書けばその数（1〜6個）、書かなければ4〜5個。置き場所は画面の下半分の五つの位置から一つを選ぶ。",
-      "summary_en": "Spread one ripple on the water, seen at a low angle across it (mizuwa). The same broken rings and bleeding drop as the ripple seen from above are widened a little and flattened to about a third of their height, each outer ring's center a little lower so the rings open toward the viewer. The lines are thin brush, the inner three ultramarine and the outer three pale ink (gray). Five short pale-ink horizontal strokes, like light reflected on the water, lie to the sides of and below the rings. The whole tilts slightly, up to 3 degrees either way. The written ring count (1–6), or 4–5 when none is written. It sits at one of five positions in the lower half of the canvas.",
       "note_ja": "斜めから見た波紋。横長の輪と、水面の映り。",
       "note_en": "A ripple seen at a low angle: flattened rings and reflections on the water.",
-      "example_ja": "5個のWater.水輪。",
-      "example_en": "5 Water.Rings.",
+      "example_ja": "5個の｛水輪｝。",
+      "example_en": "5 {rings}.",
       "preview": "previews/rings.png"
     },
     {
       "definition": {
-        "schema": "inku.macro-definition.v1",
+        "schema": "inku.macro-definition.v2",
         "namespace": "Water",
-        "heading": "River",
         "version": "1.0.0",
         "parameters": {
           "flow_count": {
@@ -3679,23 +3690,27 @@
             ]
           }
         ],
-        "aliases": [
-          "川"
-        ]
+        "id": "River",
+        "names": {
+          "ja": [
+            "川"
+          ],
+          "en": [
+            "river"
+          ]
+        },
+        "kind": "scene"
       },
-      "summary_ja": "遠くへ曲がりながら細まる川を、見下ろすように描く。両岸は太筆の淡い墨（灰）の二本の弧で、手前の下端から画面の中ほどの遠くへ寄り、川は奥で片側へ曲がる。岸の間に、群青と淡い墨の細筆の流れの横線を、遠くほど短く詰めて並べ、遠くの線は小刻みに、手前の線はゆるやかに波打つ。流れの線の数を書けばその数（1〜9本）、書かなければ6〜7本で、どの数でも遠くから手前まで広がる。曲がる向き（左右）と上下の位置は四通りから選ぶ。",
-      "summary_en": "Draw a river bending as it narrows into the distance, as if looked down on. The banks are two thick-brush pale-ink (gray) arcs that draw together from the near bottom edge toward the middle of the canvas, the river bending to one side in the distance. Between the banks lie horizontal thin-brush flow lines in ultramarine and pale ink, shorter and closer together farther away; the far ones undulate tightly and the near ones loosely. The written flow line count (1–9), or 6–7 when none is written, spread from far to near at any count. The bend's direction (left or right) and the height come from four arrangements.",
       "note_ja": "遠くへ曲がりながら細まる川。",
       "note_en": "A river bending as it narrows into the distance.",
-      "example_ja": "7本のWater.川。",
-      "example_en": "7 Water.River.",
+      "example_ja": "7本の｛川｝。",
+      "example_en": "7 {river}.",
       "preview": "previews/river.png"
     },
     {
       "definition": {
-        "schema": "inku.macro-definition.v1",
+        "schema": "inku.macro-definition.v2",
         "namespace": "Water",
-        "heading": "Sea",
         "version": "1.0.0",
         "parameters": {
           "wave_count": {
@@ -4404,16 +4419,21 @@
             ]
           }
         ],
-        "aliases": [
-          "海"
-        ]
+        "id": "Sea",
+        "names": {
+          "ja": [
+            "海"
+          ],
+          "en": [
+            "sea"
+          ]
+        },
+        "kind": "scene"
       },
-      "summary_ja": "水平線まで続く海原を描く。画面の中ほどに淡い墨のペンの細い水平線を引き、その下に群青と淡い墨の細筆の波の線を、手前ほど間を広げて並べる。遠くの波は小刻みに、手前の波はゆるやかに波打ち、各列に小さな弧の波頭を二つずつ、手前ほど大きく添える。波の列の数を書けばその数（1〜8本）、書かなければ5〜6本で、どの数でも遠くから手前まで広がる。水平線の高さは三通りから選ぶ。",
-      "summary_en": "Draw open sea reaching to the horizon. A fine pale-ink pen horizon line crosses the middle of the canvas, and below it lie thin-brush wave lines in ultramarine and pale ink, farther apart toward the viewer. The far waves undulate tightly and the near ones loosely, and each row carries two small arc crests, larger toward the viewer. The written wave row count (1–8), or 5–6 when none is written, spread from far to near at any count. The horizon's height comes from three choices.",
       "note_ja": "水平線まで続く海原と波頭。",
       "note_en": "Open sea to the horizon, with crests.",
-      "example_ja": "6本のWater.海。",
-      "example_en": "6 Water.Sea.",
+      "example_ja": "6本の｛海｝。",
+      "example_en": "6 {sea}.",
       "preview": "previews/sea.png"
     }
   ]

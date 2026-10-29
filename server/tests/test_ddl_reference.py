@@ -56,7 +56,7 @@ def test_active_inputs_are_the_three_accepted_meaning_boundaries() -> None:
         "accepted-local-resource-recovery",
     }
     assert cases["accepted-macro-mirror"]["source"] == (
-        "Nature.若葉. Place a small diagonal red arc at top. "
+        "{young leaves}. Place a small diagonal red arc at top. "
         "Place a blue arc at bottom, mirrored with the previous shape."
     )
     assert cases["accepted-ordinary-group-cycle"]["source"] == (

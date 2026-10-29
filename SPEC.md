@@ -442,6 +442,8 @@ specific vocabulary is offered in a form that can be added as an extension.
 
 ### 3.3 Vocabulary Principles
 
+Plugin names cannot claim a core word, and each visible name belongs to only one word in a catalog.
+
 Saijiki words and the grammar's modifiers are shared by the writer, the reader
 (Stage 1), the compiler, and the renderer. A word is added, moved, or changed
 under these principles (author's ruling, 2026-09-29).
@@ -634,7 +636,7 @@ Macros execute in invocation order after meaning resolution. A mention used only
 
 The old `.inku-plugin.md`, `fires_on`, localized expansion templates, and old Stage 1.5 / Stage 2 expander are retired as the semantic canon for new plugins. The compatibility importer returns a `legacy_plugin_format` warning and a per-macro `Imported | Omitted` outcome instead of failing the whole application. Old works prefer their stored Score / expanded artifact; the old expander is not a permanent fallback. An `Omitted` macro with no artifact must not silently render partially or turn into a different figure.
 
-The shared Rust compiler foundation exists through parse / validation / identity / lock / binding / deterministic expansion and carries the finite Emit subset above, including placement-free Groups, through the ordinary lowerer to an actual Score. The normal Server, Web, and Android runtimes and bundled package catalog are connected. The Server installs an `inku.plugin-package.v1` (one JSON of MacroDefinition v1 definitions with their summaries and Saijiki display, also accepted as a zip with the PNGs of its Saijiki pictures, and exported as one) that an administrator adds from the Web only after it passes three checks — its shape, the shared core's definition checks, and drawing its examples — and puts it in a new work's catalog ahead of the bundled editions (`PLUGIN.md` §5.1). Saved works redraw from copies of the definitions they used. A user-package loader on Android and macOS remains unimplemented. `PLUGIN.md` is the current authoring guide governed by this section; it must not treat an unimplemented loader or directory-addition procedure as authority.
+The shared Rust compiler foundation exists through parse / validation / identity / lock / binding / deterministic expansion and carries the finite Emit subset above, including placement-free Groups, through the ordinary lowerer to an actual Score. The normal Server, Web, and Android runtimes and bundled package catalog are connected. The Server installs an `inku.plugin-package.v2` (one JSON of MacroDefinition v2 definitions, bilingual notes and examples, and Saijiki display, also accepted and exported as a ZIP with the PNGs of its pictures) that an administrator adds from the Web only after it passes three checks — its shape, the shared core's definition checks, and drawing its examples — and puts it in a new work's catalog ahead of the bundled editions (`PLUGIN.md` §5.1). Saved works redraw from copies of the definitions they used. Android has no user-package loader yet. macOS has a settings package loader; its old Saijiki resources and tests follow in the device update. `PLUGIN.md` is the current authoring guide governed by this section; it must not treat an unimplemented loader or directory-addition procedure as authority.
 
 Visible source thinness and size bind only a unique complete assignment to parameters explicitly declaring the matching `SemanticRef` category. Size uses the existing modifier-before-head syntax, also recognizing a qualified Macro head. Core values carry no Saijiki asset metadata; their original span, clause, atom, parameter, and definition remain attached, and ordinary entity modifiers do not consume them again. Literals, outer parameters, and definition-local component parameters rejoin the same Emit fields and ordinary lowerer. Missing or ambiguous binding follows the existing upstream error policy; undeclared caller facts follow the existing lowering policy. A bound parameter alone does not become a new continuation predicate, and undeclared attributes do not automatically overlay or fan out. Source or owner integrity failures stop both modes.
 
@@ -682,18 +684,7 @@ dependencies get designed once a second real engine is actually needed.
 
 ### 4.9 Reference Vocabulary Names
 
-`Nature.leaves` is a shared bundled catalog containing `Nature.YoungLeaves`
-(alias `Nature.若葉`), `Nature.Undergrowth` (`Nature.下草`), `Nature.SummerLeaves`
-(`Nature.青葉`), `Nature.AutumnLeaves` (`Nature.紅葉`), `Nature.FallenLeaves`
-(`Nature.落葉`), `Nature.WitheredGrass` (`Nature.枯草`), and `Nature.WitheredLeaves`
-(`Nature.枯葉`). The English heading is canonical and the Japanese name is its
-alias (§4.13). Server and Android read these definitions and their display
-data from the same catalog. This does not claim an external runtime loader, an
-arbitrarily installed package, or a registry for the entire `Nature` namespace.
-`Bamboo`, `Nature.雨`, and `Nature.風` remain future or explanatory reference
-vocabulary names. Any future reference definition must use the same
-MacroDefinition v1 schema and ordinary lock / expansion boundary, with no
-plugin-specific execution path.
+`Nature.leaves` is the bundled `inku.plugin-package.v2` stored in the shared core at `assets/nature-leaves-v2/package.json` with its PNGs. It has seven scene words with ids YoungLeaves, Undergrowth, SummerLeaves, AutumnLeaves, FallenLeaves, WitheredGrass, and WitheredLeaves. The shared asset supplies their Japanese and English names, notes, definitions, examples, and pictures to the host. Server can disable this bundle but cannot delete it. Saved works replay from their locked definitions. `Bamboo`, `Nature.雨`, and `Nature.風` remain future or illustrative names, not current definitions.
 
 ### 4.10 Namespace Convention
 
@@ -751,11 +742,11 @@ A bracketed name matching multiple locks is reported as `plugin_name_ambiguous` 
 
 A sentence whose plugin name does not resolve where it is drawn is omitted alone and the rest is drawn. The work does not stop, the sentence stays in the author's DDL, and no LLM rewrites it into other words. The shared Rust explainer (pipeline binding `explain_plugin_diagnostics`) combines the compiler's resolution diagnostic with the host's enabled and disabled plugin names and the work's own definitions, and returns one reason per sentence: `plugin_not_installed` (no such name), `plugin_disabled` (installed but disabled), `plugin_name_mismatch` (no installed name matches; one installed name with the same heading under another namespace, a case-only difference, or at most two edits away is suggested), `plugin_version_mismatch` (the same name with different content), or `plugin_count_out_of_range` (the name resolves but the written count lies outside what the word receives, §4.6). The host stores it with the work's diagnostics and shows it in place of the generic entry for the same range.
 
-A saved work keeps the exact definitions it used, so removing a plugin does not change its replay. To carry DDL between environments, a work exports as `inku.ddl-export.v1`: the visible DDL, its language, and the definitions and summaries of the plugins it names. Imported definitions are used for the new work only, ahead of an installed definition of the same name, and are never installed. When one differs from the installed edition or is not installed here, a catalog diagnostic (`imported_plugin_differs_from_installed` / `imported_plugin_not_installed`) says which was used. Definitions are data-only and pass the shared Rust validation boundary again when read.
+A saved work keeps the exact definitions it used, so removing a plugin does not change its replay. To carry DDL between environments, a work exports as `inku.ddl-export.v2`: the visible DDL, its language, the definitions it used with their notes, and the export source. Definitions are selected by the work's actual locks, not by searching the DDL text. Imported definitions are used for the new work only, ahead of an installed definition of the same name, and are never installed. When one differs from the installed edition or is not installed here, a catalog diagnostic (`imported_plugin_differs_from_installed` / `imported_plugin_not_installed`) says which was used. Definitions are data-only and pass the shared Rust validation boundary again when read.
 
 ### 4.13 Canonical Names and Aliases
 
-A v2 definition has primary and alternate names in Japanese and English. A name may not match a core word or duplicate another name in the definition after normalization. V1 names are derived from its aliases and its split English heading. V1 digests and saved-work locks remain unchanged. A bracketed name matching multiple locks receives `plugin_name_ambiguous`.
+A v2 definition has primary and alternate names in Japanese and English. A name may not match a core word or duplicate another name in the definition after normalization. V1 definitions remain only in saved-work locks. Their digests and saved-work locks remain unchanged. A bracketed name matching multiple locks receives `plugin_name_ambiguous`.
 
 ### 4.14 Scene and Object Words
 

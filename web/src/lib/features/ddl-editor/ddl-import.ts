@@ -1,15 +1,15 @@
 /** Reading a DDL file back into the editor.
  *
- * An `inku.ddl-export.v1` file carries the visible DDL and the plugin
- * definitions it names. The definitions travel with the next new work only and
+ * An `inku.ddl-export.v2` file carries the visible DDL and the plugin
+ * definitions selected by its saved locks. They travel with the next new work only and
  * are validated again by the server's shared boundary; this module does not
  * interpret them. Any other text is read as plain DDL without definitions.
  */
 
-export const DDL_EXPORT_SCHEMA = 'inku.ddl-export.v1';
+export const DDL_EXPORT_SCHEMA = 'inku.ddl-export.v2';
 const MAX_IMPORTED_PLUGINS = 64;
 
-export type ImportedPlugin = { definition: Record<string, unknown>; summary: string };
+export type ImportedPlugin = { definition: Record<string, unknown>; note: string };
 
 export type DdlImport = {
 	ddl: string;
@@ -30,6 +30,7 @@ export function parseDdlImport(text: string): DdlImport {
 		return { ddl: text, plugins: [], names: [] };
 	}
 	const file = record(parsed);
+	if (file?.schema === 'inku.ddl-export.v1') throw new Error('ddl_export_requires_v2');
 	if (file?.schema !== DDL_EXPORT_SCHEMA) {
 		// JSON that is not an export is still the author's text.
 		return { ddl: text, plugins: [], names: [] };
@@ -40,9 +41,9 @@ export function parseDdlImport(text: string): DdlImport {
 		const plugin = record(item);
 		const definition = record(plugin?.definition);
 		if (!definition) throw new Error('ddl_export_invalid_plugin');
-		plugins.push({ definition, summary: typeof plugin?.summary === 'string' ? plugin.summary : '' });
+		plugins.push({ definition, note: typeof plugin?.note === 'string' ? plugin.note : '' });
 	}
 	if (plugins.length > MAX_IMPORTED_PLUGINS) throw new Error('ddl_export_too_many_plugins');
-	const names = plugins.map(({ definition }) => `${String(definition.namespace)}.${String(definition.heading)}`);
+	const names = plugins.map(({ definition }) => `${String(definition.namespace)}.${String(definition.id)}`);
 	return { ddl: file.ddl, plugins, names };
 }

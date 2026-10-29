@@ -305,7 +305,7 @@ pub(crate) mod tests {
         assert!(
             std::str::from_utf8(&bytes)
                 .unwrap()
-                .contains("inku.plugin-package.v1")
+                .contains("inku.plugin-package.v2")
         );
         assert!(read(zip, package, 1).unwrap().is_none());
         assert!(matches!(members(b"not a zip"), Err(ZipError::Invalid(_))));

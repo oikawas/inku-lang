@@ -1854,7 +1854,10 @@ mod tests {
 
     #[test]
     fn rewrite_offers_only_the_named_plugin_word() {
-        let package: Value = serde_json::from_str(inku_ddl::NATURE_LEAVES_V1_JSON).unwrap();
+        let package: Value = serde_json::from_str(include_str!(
+            "../../inku-ddl/tests/fixtures/nature-leaves-2.1-v1.json"
+        ))
+        .unwrap();
         let definition =
             MacroDefinition::from_json(&package["entries"][0]["definition"].to_string()).unwrap();
         let name = "若葉";

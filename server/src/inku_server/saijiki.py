@@ -3,7 +3,7 @@
 生成語彙の正は共有 core の ``assets/saijiki-v2.json`` にある。このテーブルは
 その内容と同期し、Server 側の次の読み取り用途へ投影する:
 
-- プラグイン閉包マーカー (plugins/document_format.py)
+- reference の旧マーカー表（保存された説明との照合用）
 - reference §1〜§3 の歳時記・マーカー表 (reference.py)
 - 歳時記表示の配信 (Phase 3: GET /api/saijiki と web スナップショット)
 - 保存済み Score の受理に使う互換語彙
@@ -15,7 +15,7 @@ schema からは削除しない。
 フラグの意味:
 - prompt: 共有 asset との同期確認用ブロック・列挙へ出す
 - display: 歳時記表示 (web / API) へ出す
-- marker:  プラグイン閉包マーカーにする (None = prompt に従う)
+- marker: 旧マーカー表に含める (None = prompt に従う)
 
 順序の扱い: words は共有 asset の表示順で持つ。閉包マーカーの順序が
 表示順と異なるカテゴリ (かたち・うごき・あいだ) は marker_order_* で明示する。
@@ -545,8 +545,7 @@ def _relation_markers(lang: str) -> tuple[str, ...]:
 
 
 def core_grammar_markers(lang: str) -> tuple[str, ...]:
-    """閉包マーカーの文法部 (図形 + 動詞 + 関係)。構造マーカー (anchor 等) は
-    プラグイン層 (document_format) が所有し、この前に連結する。"""
+    """旧マーカー表の文法部（図形・動詞・関係）。"""
     return shape_markers(lang) + _operation_markers(lang) + _relation_markers(lang)
 
 
@@ -555,7 +554,7 @@ _MARKER_CLASS_ORDER = ("material", "color", "variation", "angle", "ratio", "plac
 
 
 def saijiki_marker_table() -> dict[str, dict[str, tuple[str, ...]]]:
-    """歳時記修飾カテゴリのマーカー表 (document_format._SAIJIKI_MARKERS の正)。"""
+    """reference に残す歳時記修飾カテゴリの旧マーカー表。"""
     by_class = {
         category.marker_class: category
         for category in SAIJIKI

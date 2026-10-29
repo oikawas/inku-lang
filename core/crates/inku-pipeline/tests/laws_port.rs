@@ -21,8 +21,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use inku_ddl::work_plan::{NumericSize, WorkPlanPlugin, WorkPlanSlot};
 use inku_ddl::{
-    MacroDefinition, MacroLock, NATURE_LEAVES_V1_JSON, NormalizedDdlDocument,
-    ResolvedInstructionLanguage, ScoreLoweringOutcome,
+    MacroDefinition, MacroLock, NormalizedDdlDocument, ResolvedInstructionLanguage,
+    ScoreLoweringOutcome,
 };
 use inku_pipeline::core_boundary::{CompilerOptions, compile_committed};
 use inku_pipeline::laws::{
@@ -107,7 +107,10 @@ fn language(lang: &str) -> ResolvedInstructionLanguage {
 
 /// The bundled Nature words, which one work draws beside its layers.
 fn definitions() -> Vec<MacroDefinition> {
-    let package: Value = serde_json::from_str(NATURE_LEAVES_V1_JSON).expect("the asset is JSON");
+    let package: Value = serde_json::from_str(include_str!(
+        "../../inku-ddl/tests/fixtures/nature-leaves-2.1-v1.json"
+    ))
+    .expect("the fixture is JSON");
     package["entries"]
         .as_array()
         .expect("the asset has entries")

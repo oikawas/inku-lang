@@ -219,16 +219,16 @@ class DbBackupResult(BaseModel):
 
 
 class PluginSettingsStatus(BaseModel):
-    enabled: bool = Field(default=False, description="Whether declarative DDL plugin documents are in use")
+    enabled: bool = Field(default=False, description="Whether DDL plugin packages are available")
     loaded: list[dict[str, object]] = Field(
         default_factory=list,
-        description="Status of each plugin document, as the plugin loader reports it, including the reason a document was rejected",
+        description="Status of each plugin package, including reasons for a rejected file",
     )
     runtime_editable: bool = Field(
         default=False,
-        description="Whether plugin documents can be changed while the server runs, without a restart",
+        description="Whether plugin packages can be changed while the server runs, without a restart",
     )
-    note: str = Field(description="Explanation of how plugin documents are reloaded")
+    note: str = Field(description="Explanation of how installed plugin packages are reloaded")
 
 
 class ThumbnailRebuildStatus(BaseModel):
@@ -491,7 +491,7 @@ class JuxtapositionSettingsStatus(BaseModel):
 class SettingsStatusResponse(BaseModel):
     database: DatabaseSettingsStatus = Field(description="Database connection and file information")
     db_backup: DbBackupStatus = Field(description="Automatic and manual database backups")
-    plugins: PluginSettingsStatus = Field(description="Declarative DDL plugin documents")
+    plugins: PluginSettingsStatus = Field(description="DDL plugin packages")
     output_save: OutputSaveStatus = Field(description="Saving of output files")
     log_retention: LogRetentionStatus = Field(description="Log file retention policy and current log files")
     stage_execution: StageExecutionStatus = Field(description="Worker pool that runs the pipeline's model effects")
@@ -525,7 +525,7 @@ def api_settings_status() -> SettingsStatusResponse:
             enabled=True,
             loaded=plugin_status_items(),
             runtime_editable=True,
-            note="Declarative DDL plugin documents are reloaded without restarting; rejected documents include reasons.",
+            note="Installed v2 package files are reloaded without restarting; rejected files include reasons.",
         ),
         output_save=OutputSaveStatus(
             enabled=bool(output_settings["enabled"]),

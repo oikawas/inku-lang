@@ -86,10 +86,9 @@ Compare the exported PNGs under the same viewing conditions. Check the descripti
 
 ### 0.5 `plugin`
 
-* **`plugin list`** — Returns loaded and rejected declarative plugin documents with namespace, version, and rejection reasons.
-* **`plugin validate <FILE.inku-plugin.md>`** — Sends a local UTF-8 document body to the management API for validation without executing code or external files.
-* **`plugin reload`** — Forces `server/plugins/` to reload without restarting the server.
-* `plugin validate` and `plugin reload` require an administrator session (403 otherwise); `plugin list` requires only a signed-in session. Keep any plugin test artifacts together under one untracked `cli/out2/<build>-<version>-<benchmark>/` run directory.
+* **`plugin list`** — Returns loaded and rejected v2 packages with reasons.
+* **`plugin validate <FILE>`** — Sends a local v2 JSON or zip to the management API for all three checks.
+* `plugin validate` requires an administrator session; `plugin list` requires only a signed-in session. Keep test artifacts untracked.
 
 ### 0.6 `reference`
 

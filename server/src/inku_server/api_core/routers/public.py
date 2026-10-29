@@ -13,8 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 from ...color_catalogs import RENAMED_COLOR_CATALOG_IDS, color_catalogs
 from ...layer_versions import DDL_ENGINE_VERSION, DDL_VERSION
-from ...plugins import DOCUMENT_PLUGIN_MANAGER, PLUGIN_PACKAGE_MANAGER, entries_with_fires_on
-from ...plugins.document_format import preview_path_for_qualified_name
+from ...plugins import PLUGIN_PACKAGE_MANAGER
 from ...reference import build_reference, render_markdown
 from ...saijiki import display_categories
 from ...render_engines import current_render_engine
@@ -268,7 +267,7 @@ def _preview_url(qualified_name: str, *, hidpi: bool, version: str = "") -> str:
     """Where the browser fetches this word's artwork.
 
     The name rides as a query parameter rather than in the path: a qualified
-    name is `Namespace.Word` with the word in the document's own language, and
+    name is the package's `Namespace.id`, and
     a query value needs no decisions about what a path segment may hold.
     `version` changes when an administrator replaces a package word's picture,
     so the day-long cache does not keep showing the old one.
@@ -282,15 +281,7 @@ def _preview_url(qualified_name: str, *, hidpi: bool, version: str = "") -> str:
 
 def _enabled_plugin_entries() -> list[dict[str, object]]:
     entries: list[dict[str, object]] = []
-    for item in DOCUMENT_PLUGIN_MANAGER.items():
-        if item.status != "enabled":
-            continue
-        # This is the list the DDL editor holds, so it carries `fires_on_*`:
-        # without it the editor can only say a qualified name is unknown, not
-        # which plain word it would have fired.
-        entries.extend(entries_with_fires_on(item.entries))
-    # Packages installed from the Web carry their own example (a DDL call)
-    # where a document's word has firing phrases.
+    # Both installed and bundled v2 packages carry their own example.
     entries.extend(PLUGIN_PACKAGE_MANAGER.saijiki_entries())
     # v2.14: the loader says whether a picture exists at each scale; the URL is
     # this layer's to write, since this layer owns the route. A word with no
@@ -310,7 +301,7 @@ def api_saijiki(
     lang: str = Query(default="ja", pattern="^(ja|en)$", description="Language of the words in each category: ja or en. Category names are sent in both languages."),
 ) -> dict[str, object]:
     """Return the Saijiki vocabulary for display: the core categories and the
-    words of the loaded declarative plugins. Requires a signed-in user."""
+    words of enabled v2 plugin packages. Requires a signed-in user."""
     return {
         "categories": display_categories(lang),
         "plugins": _enabled_plugin_entries(),
@@ -321,7 +312,7 @@ def api_saijiki(
 def api_plugin_preview(
     name: str = Query(
         min_length=1, max_length=200,
-        description="Qualified plugin word, written as Namespace.Word with the word in the document's own language.",
+        description="Qualified plugin id, written as Namespace.id.",
     ),
     scale: str = Query(
         default="1", pattern="^[12]$",
@@ -334,12 +325,13 @@ def api_plugin_preview(
     receiving it with every Saijiki listing. Requires a signed-in user. Responds
     404 when the name matches no word of a loaded plugin.
     """
-    path = preview_path_for_qualified_name(name, hidpi=(scale == "2")) or (
-        PLUGIN_PACKAGE_MANAGER.preview_path_for_qualified_name(name, hidpi=(scale == "2"))
-    )
+    bundled = PLUGIN_PACKAGE_MANAGER.bundled_preview(name, hidpi=(scale == "2"))
+    if bundled is not None:
+        return Response(content=bundled, media_type="image/png", headers={"Cache-Control":"private, max-age=86400"})
+    path = PLUGIN_PACKAGE_MANAGER.preview_path_for_qualified_name(name, hidpi=(scale == "2"))
     if path is None:
         raise HTTPException(status_code=404, detail="no preview for that word")
-    # Immutable for a day: a picture changes only when its plugin document is
+    # Immutable for a day: a picture changes only when its plugin package is
     # replaced, and the panel asks for it on every hover.
     return FileResponse(
         path, media_type="image/png", headers={"Cache-Control": "private, max-age=86400"}

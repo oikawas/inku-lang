@@ -17,7 +17,7 @@ use inku_score::{
 };
 use serde_json::Value;
 
-const ASSET: &str = include_str!("../assets/nature-leaves-v1.json");
+const ASSET: &str = include_str!("fixtures/nature-leaves-2.1-v1.json");
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 64,
     max_depth: 16,

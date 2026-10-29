@@ -199,7 +199,7 @@ def test_bundled_macro_enters_new_work_with_localized_summary_and_saved_lock(tmp
     monkeypatch.setattr(db, "engine", engine)
     monkeypatch.setattr(db, "SessionLocal", sessionmaker(bind=engine))
     effects = ProductPipelineEffects(binding, default_manifest(binding))
-    source = "Nature.青葉。"
+    source = "｛青葉｝。"
     config, context = effects.prepare("author", "direct_ddl", source,
         {"instruction_lang": "ja", "catalog_id": "default", "composition_seed": 17, "render_seed": 77,
          "stage1_model": "nvidia:poolside/laguna-xs-2.1"}, None)

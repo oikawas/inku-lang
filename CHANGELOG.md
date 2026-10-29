@@ -28,6 +28,10 @@ Keep the history strip at its content height. When a history tile has focus, the
 
 Persist Description, Image, and Batch tab choices without invalidating all display consumers. Switching between Description and Image no longer resets Batch browsing state.
 
+### 2026-10-29 — Plugin package v2 and saved-work name migration
+
+Plugin files now carry v2 definitions, bilingual names, notes, examples, and pictures. The bundled leaves come from a shared-core v2 package. The old document reader is retired; DDL exports carry the work's locked definitions and notes in v2. Saijiki, settings, reference, and Web follow the new data, and an offline migration tool is available for saved-work names (not run on the operational database).
+
 ### 2026-10-28 — Complete Android ChatGPT login in the foreground
 
 The browser acknowledges authorization immediately, and inku exchanges the token after returning to the foreground.

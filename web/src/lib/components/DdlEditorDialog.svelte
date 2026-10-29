@@ -73,8 +73,9 @@
 			value = read.ddl;
 			importedPlugins = read.plugins;
 			importedNames = read.names;
-		} catch {
-			importError = t().ddlImportInvalid;
+		} catch (error) {
+			importError = error instanceof Error && error.message === 'ddl_export_requires_v2'
+				? t().ddlImportRequiresV2 : t().ddlImportInvalid;
 		}
 	}
 	let editor = $state<DdlEditor>();

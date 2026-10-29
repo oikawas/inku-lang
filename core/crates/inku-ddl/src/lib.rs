@@ -26,7 +26,8 @@ pub use shape_constraint::{SemanticShapeConstraint, ShapeConstraint};
 pub mod language;
 pub mod macro_definition;
 /// Authored, versioned bundled content; definitions use the ordinary Macro language.
-pub const NATURE_LEAVES_V1_JSON: &str = include_str!("../assets/nature-leaves-v1.json");
+/// The installable v2 package bundled with the shared core.
+pub const NATURE_LEAVES_V2_JSON: &str = include_str!("../assets/nature-leaves-v2/package.json");
 pub mod macro_expansion;
 pub mod macro_parameter_binding;
 pub mod macro_resolution;

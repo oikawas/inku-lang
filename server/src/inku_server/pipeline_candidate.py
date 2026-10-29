@@ -352,7 +352,7 @@ class CandidateExecution:
                            "catalog_diagnostics": self.context.get("macro_catalog", {}).get("diagnostics", []),
                            "rendered": self._rendered,
                            "result": json_seeds(self.context.get("result"))})
-            offers = plugin_offer_records(state["config"], self.context.get("chunk_plugin_offers", []))
+            offers = plugin_offer_records(state.get("config", self.config), self.context.get("chunk_plugin_offers", []))
             if offers:
                 result["plugin_offers"] = offers
                 if isinstance(result.get("result"), dict):

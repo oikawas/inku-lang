@@ -193,6 +193,8 @@ export function createDdlEditor(parent: HTMLElement, value: string, initial: Ddl
 			const tr = replaceDdlValue(view.state, next);
 			if (tr) view.dispatch(tr);
 		}
+		const head = view.state.selection.main.head;
+		if (!view.state.readOnly && /^[{｛]$/.test(view.state.sliceDoc(Math.max(0, head - 1), head))) startCompletion(view);
 	};
 	const endComposition = () => { if (compositionTimer !== null) clearTimeout(compositionTimer); compositionTimer = setTimeout(finishComposition, 0); };
 	function watchNativeComposition(): void {

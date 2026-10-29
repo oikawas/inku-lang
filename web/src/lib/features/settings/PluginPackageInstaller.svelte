@@ -101,7 +101,6 @@
 								{#if (isJapanese ? word.note_ja : word.note_en)}<span>{isJapanese ? word.note_ja : word.note_en}</span>{/if}
 								<span>{t().saijikiPreviewExampleLabel}{isJapanese ? word.example_ja : word.example_en}</span>
 								{#if word.preview_png}<small>{word.preview_source === 'file' ? t().settingsPluginPictureFromFile : t().settingsPluginPictureDrawn}</small>{/if}
-								<span class="plugin-word-summary">{t().settingsPluginSummaryLabel}{isJapanese ? word.summary_ja : word.summary_en}</span>
 								{#if word.problems.length}
 									<ul class="plugin-problems">
 										{#each word.problems as problem (problem.path + problem.code)}

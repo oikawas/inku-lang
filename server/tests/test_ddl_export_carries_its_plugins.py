@@ -1,5 +1,4 @@
-"""A DDL export carries the plugin definitions its DDL names, and reading it
-back uses those definitions for the new work ahead of the installed ones."""
+"""A v2 DDL export carries definitions selected by the work's saved locks."""
 
 from __future__ import annotations
 
@@ -18,17 +17,18 @@ def _definition(heading: str, version: str = "1.0.0") -> dict:
             "version": version, "parameters": {}, "components": {}, "body": []}
 
 
-def test_export_keeps_only_the_named_definitions_with_their_summaries():
+def test_export_keeps_only_locked_definitions_with_notes_independent_of_spelling():
     exported = build_ddl_export(
-        "背景を白で埋める。\nNature.若葉。",
+        "背景を白で埋める。\n｛若葉｝。",
         "ja",
         [_definition("紅葉"), _definition("若葉"), _definition("若葉", "2.0.0")],
         ["紅葉の要約", "若葉の要約", "重複"],
         {"build_number": "1104"},
+        locks=[{"qualified_name": "Nature.若葉", "version": "1.0.0", "digest": "saved"}],
     )
     assert exported["schema"] == DDL_EXPORT_SCHEMA
-    assert exported["ddl"].endswith("Nature.若葉。")
-    assert exported["plugins"] == [{"definition": _definition("若葉"), "summary": "若葉の要約"}]
+    assert exported["ddl"].endswith("｛若葉｝。")
+    assert exported["plugins"] == [{"definition": _definition("若葉"), "note": "若葉の要約"}]
     assert build_ddl_export("中央に赤い円を置く。", "ja")["plugins"] == []
 
 
@@ -61,9 +61,9 @@ def _config(*definitions: dict) -> dict:
 def test_imported_definitions_win_and_say_when_they_differ_or_are_new(monkeypatch):
     monkeypatch.setattr(macro_catalog, "_installed_candidates", lambda: ([], []))
     imported = [
-        {"definition": _definition("若葉", "9.0.0"), "summary": "持ち込んだ若葉"},
-        {"definition": _definition("紅葉"), "summary": ""},
-        {"definition": _definition("青葉"), "summary": "持ち込んだ青葉"},
+        {"definition": _definition("若葉", "9.0.0"), "note": "持ち込んだ若葉"},
+        {"definition": _definition("紅葉"), "note": ""},
+        {"definition": _definition("青葉"), "note": "持ち込んだ青葉"},
     ]
     catalog = macro_catalog.resolve_new_work_macro_catalog(
         _FirstWins(), _config(_definition("若葉"), _definition("紅葉")), imported
@@ -84,7 +84,8 @@ def test_imported_plugins_are_bounded_options_for_a_new_work_only():
     assert CandidateHostError("imported_plugins_require_new_work")
 
 
-def test_a_ddl_that_writes_an_alias_still_carries_the_definition():
+def test_a_lock_carries_the_definition_even_when_ddl_does_not_name_it():
     definition = {**_definition("YoungLeaves", "2.0.0"), "aliases": ["若葉"]}
-    exported = build_ddl_export("Nature.若葉。", "ja", [definition], ["若葉の要約"])
-    assert exported["plugins"] == [{"definition": definition, "summary": "若葉の要約"}]
+    exported = build_ddl_export("背景を白で埋める。", "ja", [definition], ["若葉の要約"],
+                                locks=[{"qualified_name": "Nature.YoungLeaves", "version": "2.0.0", "digest": "saved"}])
+    assert exported["plugins"] == [{"definition": definition, "note": "若葉の要約"}]

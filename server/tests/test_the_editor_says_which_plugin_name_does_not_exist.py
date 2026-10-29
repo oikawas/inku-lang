@@ -63,8 +63,8 @@ def _by_name(entries: list[dict]) -> dict[str, dict]:
     return {entry["qualified_name"]: entry for entry in entries}
 
 
-def test_the_list_api_carries_the_firing_phrases():
-    """T-1: `fires_on_*` is on the entry, and `菖蒲` is one of 下草's phrases."""
+def test_the_list_api_carries_v2_names_without_document_firing_phrases():
+    """The v2 word names its own visible spellings; the document triggers retired."""
     headers = _auth()
     entries = _by_name(_plugins_entries(headers))
     assert entries, "no plugin entries were served"
@@ -73,19 +73,20 @@ def test_the_list_api_carries_the_firing_phrases():
         assert isinstance(entry.get("fires_on_en"), list), entry
     undergrowth = entries.get("Nature.Undergrowth")
     assert undergrowth is not None, sorted(entries)
-    # The English heading is canonical; the Japanese name travels as its alias.
-    assert undergrowth["aliases"] == ["Nature.下草"], undergrowth
-    assert "菖蒲" in undergrowth["fires_on_ja"], undergrowth["fires_on_ja"]
-    assert undergrowth["fires_on_en"], undergrowth
+    assert undergrowth["aliases"] == [], undergrowth
+    assert undergrowth["fires_on_ja"] == undergrowth["fires_on_en"] == []
+    assert undergrowth["surface_ja"][0] == "下草"
+    assert undergrowth["written_ja"] == "｛下草｝"
 
 
-def test_the_editors_own_list_carries_them_too():
+def test_the_editors_own_list_carries_v2_names_too():
     """The editor hydrates from /api/saijiki, not /api/plugins."""
     headers = _auth()
     entries = _by_name(_saijiki_entries(headers))
     undergrowth = entries.get("Nature.Undergrowth")
     assert undergrowth is not None, sorted(entries)
-    assert "菖蒲" in undergrowth["fires_on_ja"], undergrowth["fires_on_ja"]
+    assert undergrowth["fires_on_ja"] == undergrowth["fires_on_en"] == []
+    assert undergrowth["written_ja"] == "｛下草｝"
 
 
 def test_no_existing_key_was_dropped_or_renamed():

@@ -1386,7 +1386,10 @@ mod tests {
 
     #[test]
     fn named_words_are_added_to_a_writing_request_without_changing_its_prefix() {
-        let asset: Value = serde_json::from_str(inku_ddl::NATURE_LEAVES_V1_JSON).unwrap();
+        let asset: Value = serde_json::from_str(include_str!(
+            "../../inku-ddl/tests/fixtures/nature-leaves-2.1-v1.json"
+        ))
+        .unwrap();
         let definition =
             inku_ddl::MacroDefinition::from_json(&asset["entries"][0]["definition"].to_string())
                 .unwrap();

@@ -8,18 +8,21 @@
  * record, never the writer. This module gives the editor what it needs to
  * say so while the name is being typed.
  *
- * The server is the authority on what counts as a reference: the pattern
- * below is the same one the expansion layer scans with
- * (`_PLUGIN_REFERENCE_RE`, server/src/inku_server/plugins/document_format.py).
- * Copying the pattern, not just the idea, keeps the two judgements equal:
- * whatever the editor marks is exactly what the server would strip.
+ * This scanner remains for qualified names in older DDL during migration.
+ * V2 words use braced visible names and the shared compiler owns their
+ * resolution and diagnostics.
  */
 
-/** Same source as document_format.py:60. Global so a scan can resume mid-run. */
+/** Legacy qualified-name spelling. Global so a scan can resume mid-run. */
 const REFERENCE_RE = /(?<![A-Za-z0-9_])[A-Z][A-Za-z0-9_-]*\.[^\s、。,;:]+/g;
 
 export type PluginNameEntry = {
 	qualified_name: string;
+	/** A v2 word's visible names and ready-to-insert spelling. */
+	surface_ja?: string[];
+	surface_en?: string[];
+	written_ja?: string;
+	written_en?: string;
 	/** Other qualified names of the same word, such as its Japanese alias. */
 	aliases?: string[];
 	fires_on_ja?: string[];
@@ -162,9 +165,13 @@ export function unknownPluginNames(text: string, index: PluginNameIndex): Unknow
 }
 
 /**
- * The name a word is shown and inserted with: its Japanese alias for Japanese
- * DDL, its canonical (English) name otherwise. Both invoke the same word.
+ * The spelling a word is shown and inserted with. V2 entries supply a braced
+ * visible name; saved legacy entries may still carry a qualified alias.
  */
 export function pluginDisplayName(entry: PluginNameEntry, lang: 'ja' | 'en'): string {
+	const written = lang === 'ja' ? entry.written_ja : entry.written_en;
+	if (written) return written;
+	const primary = (lang === 'ja' ? entry.surface_ja : entry.surface_en)?.[0];
+	if (primary) return lang === 'ja' ? `｛${primary}｝` : `{${primary}}`;
 	return (lang === 'ja' ? entry.aliases?.[0] : undefined) || entry.qualified_name;
 }

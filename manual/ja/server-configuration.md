@@ -132,7 +132,6 @@ sudo editor /etc/inku/pipeline.json
 | 変数 | 目的 | 既定値 |
 |---|---|---|
 | `INKU_LLM_BACKEND` | LLMの接続系統 | `anthropic` |
-| `INKU_DOCUMENT_PLUGIN_DIR` | 宣言的プラグイン文書の置き場 | `server/plugins/` |
 | `INKU_PLUGIN_PACKAGE_DIR` | 管理者がWebから追加したプラグイン（package）の置き場 | `~/.local/share/inku/plugin-packages`（Dockerは`/data/plugin-packages`） |
 | `INKU_OKUGAKI_MODEL` | 奥書の読み手モデルの既定 | vision対応モデル |
 | `INKU_OKUGAKI_CACHE_TTL_SECONDS` | 奥書cacheの保持秒数 | `1800` |
@@ -142,14 +141,14 @@ sudo editor /etc/inku/pipeline.json
 
 設定の`プラグイン`は、語彙プラグインを追加・削除し、有効・無効と語の一覧（名前・別名・表記・注釈・例・見本の絵）を見る画面です。
 
-- `プラグインを追加`でプラグインのファイル（`inku.plugin-package.v1`のJSONか、それと歳時記の絵のPNGをまとめたzip。書き方は`PLUGIN.md` §5.1）を選ぶと、Serverがすぐに検査します。ファイルの形、共有coreによる定義の検査、各語の例文（日本語と英語）を実際に描くこと、の三つです。駄目なところは、ファイルの中の場所と理由が語ごとに出ます。通った語には、歳時記に出る説明・例・絵（zipの絵か、例文から描いたもの）が出ます。全部通ったときだけ`追加する`を押せます。同じ名前（`namespace.name`）のものが入っていれば`置き換える`になります。
-- 追加したプラグインの語は、そのServerの全ての新しい作品で描け、歳時記とDDLエディタの補完に出て、記述から描くときは下絵（Stage 1）に要約が渡ります。保存済みの作品は、保存した定義でそのまま描けます（後から置き換えや削除をしても変わりません）。
+- `プラグインを追加`で v2 のファイル（`inku.plugin-package.v2` JSON または PNG を含む zip。[作成ガイド](../../PLUGIN.ja.md#51-web-からプラグインのファイルを追加する)）を選ぶと、Server が形・定義・日英の例文を描く三つの検査をします。通ったファイルだけ追加できます。同じ id なら置き換えられます。
+- 追加した語は新しい作品と歳時記に入り、note が下絵（Stage 1）の提示にも使われます。保存済みの作品は保存した定義で再演できます。
 - 語ごとに`絵を差し替える`でPNGを上げると、歳時記の絵をその画像にできます。`元の絵に戻す`で、zipの絵か例文から描いた絵に戻ります。置き換えても、差し替えた絵は残ります。
-- `書き出す`で、入っているプラグインを、定義・要約・説明・例文と今の絵をまとめたzipとして保存できます。そのまま別のServerで追加できます。
+- `書き出す`で、定義・note・例文と今の絵をまとめた v2 zip を保存できます。
 - 追加したプラグインは無効にも、削除にもできます。
-- 同梱パッケージ（今は`Nature.leaves`）の文書には`描画に使う`と出ます。削除はできないので、使わないときは無効にします。それ以外の`.inku-plugin.md`は定義を持たない旧形式で、`描画には使われない`と出ます。書いてもその語は省かれ、診断が出ます。旧形式の文書は削除できます。
+- 同梱の `Nature.leaves` は core が持つ v2 ファイルです。設定から無効にできますが、削除と絵の差し替えはできません。旧 v1 ファイルは拒否理由とともに一覧へ出ます。
 
-同梱パッケージかどうかは、文書が`server/plugins/`にあるかで見分けます。`INKU_DOCUMENT_PLUGIN_DIR`を別の場所にすると、そこに置いた`nature-leaves.inku-plugin.md`も旧形式として扱われ、`Nature.leaves`の語は描かれません。設定画面に`描画には使われない`と出たら、この置き場を確かめてください。
+同梱の葉は `INKU_PLUGIN_PACKAGE_DIR` に依存しません。管理者が追加したファイルだけをこの置き場から読みます。
 
 `INKU_LEARNED_FILE`の既定は`/tmp`配下なので、再起動で消えます。永続化する場合は安定したパスを指定してください。
 
@@ -439,7 +438,7 @@ curl -sS -i --max-time 5 \
 | 管理者が誰もログインできない | passwordを忘れた → 2.2の`inku-admin reset-password`。ローカルログインが止まっている → 13.1 |
 | 数の指定が上限に達する | resource診断、§5.1の四つの上限とmanifestのstructural budget。旧Scoreの場合だけ互換設定も確認 |
 | 写生が効いていない | 作品の`sketch_state`。`fallback`ならStage 0.5のtimeoutとprovider |
-| プラグイン語が展開されない | `plugin list`の拒否理由、`INKU_DOCUMENT_PLUGIN_DIR`、`plugin reload` |
+| プラグイン語が展開されない | `plugin list` の拒否理由、`INKU_PLUGIN_PACKAGE_DIR`、有効・無効の状態 |
 
 ### 13.1 ローカルログインを戻す
 

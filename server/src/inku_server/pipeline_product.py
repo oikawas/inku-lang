@@ -113,7 +113,7 @@ def _resource_omission_log_projection(diagnostic: object) -> dict:
 class ImportedPlugin(BaseModel):
     model_config = ConfigDict(extra="forbid")
     definition: dict
-    summary: str = Field(default="", max_length=8192)
+    note: str = Field(default="", max_length=100)
 
 
 class RunOptions(BaseModel):
@@ -669,12 +669,25 @@ class ProductPipelineEffects:
         warnings = _render_warnings(render_metadata, "pipeline performance")
         if warnings:
             result["render_warnings"] = pipeline_diagnostics["render_warnings"] = warnings
-        work_plugins = [
-            f"{item['namespace']}.{heading}"
-            for item in (snapshot.get("config") or {}).get("definitions") or []
-            if isinstance(item, dict) and isinstance(item.get("namespace"), str) and isinstance(item.get("heading"), str)
-            for heading in (item["heading"], *[alias for alias in item.get("aliases") or [] if isinstance(alias, str)])
-        ]
+        work_plugins: list[str | dict[str, str]] = []
+        for item in (snapshot.get("config") or {}).get("definitions") or []:
+            if not isinstance(item, dict) or not isinstance(item.get("namespace"), str):
+                continue
+            identifier = item.get("id") or item.get("heading")
+            if not isinstance(identifier, str):
+                continue
+            qualified = f"{item['namespace']}.{identifier}"
+            if item.get("schema") == "inku.macro-definition.v2":
+                import unicodedata
+                names = item.get("names") or {}
+                for language in ("ja", "en"):
+                    for name in names.get(language) or []:
+                        if isinstance(name, str):
+                            visible = " ".join(unicodedata.normalize("NFKC", name).lower().split())
+                            work_plugins.append({"name": visible, "qualified_name": qualified})
+            else:
+                work_plugins.extend([qualified, *[f"{item['namespace']}.{alias}" for alias in item.get("aliases") or []
+                                                  if isinstance(alias, str)]])
         pipeline_diagnostics["plugin_diagnostics"] = explain_plugin_diagnostics(
             self.binding, document["source"], pipeline_diagnostics["upstream_diagnostics"], work_plugins
         )

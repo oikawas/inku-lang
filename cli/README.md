@@ -265,7 +265,7 @@ positional arguments:
                         seed and seal on one sheet
     api                 call any public inku HTTP API endpoint with the stored
                         session
-    plugin              inspect and reload declarative DDL plugins
+    plugin              inspect and validate DDL plugin packages
     reference           dump implementation vocabulary and constant tables
                         (read-only mirror)
     version             show CLI and server version/build information
@@ -432,6 +432,8 @@ options:
   --input-mode {paint,ddl}
                         paint: a natural-language description through Stage 1;
                         ddl: normalized DDL directly through Stage 2/render
+                        (batch: each line is one DDL, and a title line is
+                        skipped)
   --stage1-provider {nvidia,anthropic,local}
                         provider shown in the run summary only; it is not
                         sent. Name the provider inside --stage1-model as
@@ -560,6 +562,8 @@ options:
   --input-mode {paint,ddl}
                         paint: a natural-language description through Stage 1;
                         ddl: normalized DDL directly through Stage 2/render
+                        (batch: each line is one DDL, and a title line is
+                        skipped)
   --stage1-provider {nvidia,anthropic,local}
                         provider shown in the run summary only; it is not
                         sent. Name the provider inside --stage1-model as
@@ -1276,13 +1280,12 @@ options:
 ```
 usage: inku-cli plugin [-h] [--base-url BASE_URL]
                        [--timeout-seconds TIMEOUT_SECONDS]
-                       {list,validate,reload} ...
+                       {list,validate} ...
 
 positional arguments:
-  {list,validate,reload}
-    list                list loaded and rejected plugin documents
-    validate            validate one local plugin document on the server
-    reload              reload the server plugin directory without restart
+  {list,validate}
+    list                list loaded and rejected plugin packages
+    validate            validate a local v2 plugin package on the server
 
 options:
   -h, --help            show this help message and exit
@@ -1308,17 +1311,7 @@ options:
 usage: inku-cli plugin validate [-h] file
 
 positional arguments:
-  file        UTF-8 .inku-plugin.md file
-
-options:
-  -h, --help  show this help message and exit
-
-```
-
-### `inku-cli plugin reload`
-
-```
-usage: inku-cli plugin reload [-h]
+  file        UTF-8 package.json or package zip
 
 options:
   -h, --help  show this help message and exit

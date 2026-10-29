@@ -85,7 +85,7 @@ test('T-6: a bare unknown word keeps the colour it has today', () => {
 });
 
 test('T-6: the pattern is the server’s own, down to the capital letter', () => {
-	// document_format.py:60 requires [A-Z] after a non-word character.
+	// The migration-era qualified-name scanner requires [A-Z] after a non-word character.
 	assert.deepEqual(scanPluginReferences('nature.下草', INDEX), []);
 	assert.deepEqual(scanPluginReferences('0.5 の比率で薄墨を置く。', INDEX), []);
 });
@@ -286,5 +286,7 @@ test('an alias is a name the server holds, and the display name follows the DDL 
 	assert.deepEqual(scanPluginReferences('Nature.若葉を置く。', index).map((ref) => [ref.text, ref.known]), [['Nature.若葉', true]]);
 	assert.equal(pluginDisplayName(entry, 'ja'), 'Nature.若葉');
 	assert.equal(pluginDisplayName(entry, 'en'), 'Nature.YoungLeaves');
+	assert.equal(pluginDisplayName({ qualified_name: 'Nature.YoungLeaves', written_ja: '｛若葉｝', written_en: '{young leaves}' }, 'ja'), '｛若葉｝');
+	assert.equal(pluginDisplayName({ qualified_name: 'Nature.YoungLeaves', surface_ja: ['若葉'], surface_en: ['young leaves'] }, 'en'), '{young leaves}');
 	assert.equal(pluginDisplayName({ qualified_name: 'Example.Quiet' }, 'ja'), 'Example.Quiet');
 });

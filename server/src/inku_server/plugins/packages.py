@@ -1,7 +1,7 @@
-"""Plugin packages an administrator installs from the Web (`inku.plugin-package.v1`).
+"""Plugin packages an administrator installs from the Web (`inku.plugin-package.v2`).
 
-A package is one JSON file: the MacroDefinition v1 of each word, with the
-summary Stage 1 reads and the note and example the Saijiki shows. It may also
+A package is one JSON file: the MacroDefinition v2 of each word, with the
+note Stage 1 and the Saijiki read and an example. It may also
 come as a zip holding that file as `package.json` beside the PNG pictures its
 words name in `preview`. Nothing in a package is executed. Checking one is
 three steps -- the file's own shape, the shared core's definition checks, and
@@ -33,7 +33,8 @@ from pathlib import Path
 from threading import RLock
 from typing import Any
 
-from .document_format import PREVIEW_HIDPI_MARKER, PREVIEW_SUFFIX
+PREVIEW_HIDPI_MARKER = "@2x"
+PREVIEW_SUFFIX = ".png"
 
 PREVIEW_SEED = 1
 LANGUAGES = ("ja", "en")
@@ -64,9 +65,9 @@ class PluginPackageError(ValueError):
 @dataclass(frozen=True)
 class PackageWord:
     definition: dict[str, Any]
-    summary: dict[str, str]
     note: dict[str, str]
     example: dict[str, str]
+    preview: str = ""
     # Where the word sits in the file's `words`, so its problems name the right place.
     index: int = 0
     # Problems with this word's own fields that still leave its definition checkable.
@@ -80,36 +81,38 @@ class PackageWord:
 
     @property
     def heading(self) -> str:
-        return str(self.definition.get("heading", ""))
+        return str(self.definition.get("id", ""))
 
     @property
     def aliases(self) -> tuple[str, ...]:
-        aliases = self.definition.get("aliases") or ()
-        return tuple(str(alias) for alias in aliases if isinstance(alias, str))
+        return ()
+
+    def names(self, language: str) -> tuple[str, ...]:
+        names = self.definition.get("names", {}).get(language, ())
+        return tuple(name for name in names if isinstance(name, str))
 
     @property
     def qualified_name(self) -> str:
         return f"{self.namespace}.{self.heading}"
 
     def visible_qualified_names(self) -> list[str]:
-        return [self.qualified_name, *(f"{self.namespace}.{alias}" for alias in self.aliases)]
+        import unicodedata
+        return [" ".join(unicodedata.normalize("NFKC", name).lower().split())
+                for language in LANGUAGES for name in self.names(language)]
 
     def example_for(self, language: str) -> str:
         """The written example, or the bare call when the package names none.
 
-        A Japanese example names the word by its first alias when it has one,
-        the way the Japanese DDL a reader writes would.
+        The default names the primary visible word in braces.
         """
         written = self.example.get(language, "").strip()
         if written:
             return written
-        if language == "ja":
-            name = f"{self.namespace}.{self.aliases[0]}" if self.aliases else self.qualified_name
-            return f"{name}。"
-        return f"{self.qualified_name}."
+        name = (self.names(language) or (self.heading,))[0]
+        return f"｛{name}｝。" if language == "ja" else f"{{{name}}}."
 
     def summary_for(self, language: str) -> str:
-        return self.summary.get(language) or self.summary.get("en" if language == "ja" else "ja", "")
+        return self.note.get(language) or self.note.get("en" if language == "ja" else "ja", "")
 
     def preview_key(self) -> str:
         # A heading may hold any visible character, so the file is named by its digest.
@@ -165,9 +168,9 @@ def parse_plugin_package(text: str, *, stored: bool = True) -> PluginPackage:
     raw = result["package"]
     words = tuple(PackageWord(
         definition=w["definition"],
-        summary={lang: w[f"summary_{lang}"] for lang in LANGUAGES},
         note={lang: w[f"note_{lang}"] for lang in LANGUAGES},
         example={lang: w[f"example_{lang}"] for lang in LANGUAGES},
+        preview=str(w.get("preview") or ""),
         index=w["index"], problems=tuple(Problem(**p) for p in w["problems"]),
     ) for w in raw["words"])
     return PluginPackage(namespace=raw["namespace"], name=raw["name"], version=raw["version"],
@@ -201,6 +204,15 @@ class PluginPackageManager:
         self._signature: tuple[tuple[str, int, int], ...] | None = None
         self._packages: tuple[PluginPackage, ...] = ()
         self._rejected: tuple[tuple[str, tuple[str, ...]], ...] = ()
+        self._bundled: tuple[PluginPackage, dict[str, bytes]] | None = None
+
+    def bundled(self) -> tuple[PluginPackage, dict[str, bytes]]:
+        if self._bundled is None:
+            result = package_core({"action": "bundled_nature"})
+            package = parse_plugin_package(result["text"])
+            pictures = {name: base64.b64decode(data) for name, data in result["pictures"].items()}
+            self._bundled = (package, pictures)
+        return self._bundled
 
     def _state_path(self) -> Path:
         return self.directory / ".package-state.json"
@@ -226,6 +238,8 @@ class PluginPackageManager:
             for path in self._package_files():
                 try:
                     package = parse_plugin_package(path.read_text(encoding="utf-8"), stored=True)
+                    if path.parent.name == "Nature.leaves":
+                        raise PluginPackageError([Problem("id", "bundled_package_id")])
                     if not package.is_sound:
                         raise PluginPackageError([*package.problems, *(p for w in package.words for p in w.problems)])
                     if package.id != path.parent.name:
@@ -268,6 +282,8 @@ class PluginPackageManager:
         return bool(_PACKAGE_ID_RE.match(plugin_id))
 
     def has(self, package_id: str) -> bool:
+        if package_id == "Nature.leaves":
+            return True
         if not _PACKAGE_ID_RE.match(package_id):
             return False
         self._reload()
@@ -318,7 +334,7 @@ class PluginPackageManager:
 
     def set_enabled(self, package_id: str, enabled: bool) -> None:
         with self._lock:
-            if not self._package_dir(package_id).is_dir():
+            if package_id != "Nature.leaves" and not self._package_dir(package_id).is_dir():
                 raise FileNotFoundError(package_id)
             disabled = self._disabled()
             (disabled.discard if enabled else disabled.add)(package_id)
@@ -385,9 +401,32 @@ class PluginPackageManager:
         # shows them, and a name belongs to one installed package at most.
         for package in self.packages():
             for word in package.words:
-                if qualified_name in word.visible_qualified_names():
+                if qualified_name == word.qualified_name or qualified_name in word.visible_qualified_names():
                     return self.preview_path(package, word, hidpi=hidpi)
         return None
+
+    def bundled_preview(self, qualified_name: str, *, hidpi: bool = False) -> bytes | None:
+        package, pictures = self.bundled()
+        for word in package.words:
+            if qualified_name == word.qualified_name or qualified_name in word.visible_qualified_names():
+                if word.preview:
+                    name = word.preview.replace(".png", "@2x.png") if hidpi else word.preview
+                    return pictures.get(name)
+        return None
+
+    def bundled_entries(self) -> list[dict[str, object]]:
+        package, _ = self.bundled()
+        return [{
+            "qualified_name": word.qualified_name, "aliases": [],
+            "surface_ja": list(word.names("ja")), "surface_en": list(word.names("en")),
+            "note_ja": word.summary_for("ja"), "note_en": word.summary_for("en"),
+            "example_ja": word.example_for("ja"), "example_en": word.example_for("en"),
+            "fires_on_ja": [], "fires_on_en": [], "has_preview": True,
+            "has_preview_hidpi": True, "preview_version": package.version,
+            "custom_preview": False, "word_id": word.heading,
+            "word_kind": word.definition.get("kind", "scene"),
+            "written_ja": f"｛{word.names('ja')[0]}｝", "written_en": f"{{{word.names('en')[0]}}}",
+        } for word in package.words]
 
     # --- views for the rest of the server ---------------------------------- #
 
@@ -407,16 +446,18 @@ class PluginPackageManager:
         for package in self.enabled_packages():
             for word in package.words:
                 entries.append(self._entry(package, word))
+        if self.is_enabled("Nature.leaves"):
+            entries.extend(self.bundled_entries())
         return entries
 
     def _entry(self, package: PluginPackage, word: PackageWord) -> dict[str, object]:
-        aliases = [f"{word.namespace}.{alias}" for alias in word.aliases]
+        aliases: list[str] = []
         preview = self.preview_path(package, word)
         return {
             "qualified_name": word.qualified_name,
             "aliases": aliases,
-            "surface_ja": list(word.aliases) or [word.heading],
-            "surface_en": [word.heading],
+            "surface_ja": list(word.names("ja")),
+            "surface_en": list(word.names("en")),
             "note_ja": word.note.get("ja") or word.note.get("en", ""),
             "note_en": word.note.get("en") or word.note.get("ja", ""),
             "example_ja": word.example_for("ja"),
@@ -427,8 +468,10 @@ class PluginPackageManager:
             "has_preview_hidpi": self.preview_path(package, word, hidpi=True) is not None,
             "preview_version": str(preview.stat().st_mtime_ns) if preview is not None else "",
             "custom_preview": self.has_custom_preview(package, word),
-            "summary_ja": word.summary_for("ja"),
-            "summary_en": word.summary_for("en"),
+            "word_id": word.heading,
+            "word_kind": word.definition.get("kind", "scene"),
+            "written_ja": f"｛{(word.names('ja') or (word.heading,))[0]}｝",
+            "written_en": f"{{{(word.names('en') or (word.heading,))[0]}}}",
         }
 
     def status_items(self) -> list[dict[str, object]]:
@@ -453,11 +496,18 @@ class PluginPackageManager:
                 "description_ja": package.description.get("ja", ""),
                 "description_en": package.description.get("en", ""),
             })
+        bundled, _ = self.bundled()
+        items.append({"id":bundled.id,"kind":"package","name":bundled.name,"namespace":bundled.namespace,
+                      "version":bundled.version,"status":"enabled" if bundled.id not in disabled else "disabled",
+                      "path":bundled.id,"entries":self.bundled_entries(),
+                      "reasons":[],"enabled":bundled.id not in disabled,"has_definitions":True,"deletable":False,
+                      "description_ja":bundled.description.get("ja", ""),"description_en":bundled.description.get("en", "")})
         for package_id, reasons in self._rejected:
             items.append({
                 "id": package_id, "kind": "package", "name": package_id, "namespace": "", "version": "",
                 "status": "rejected", "path": package_id, "entries": [], "reasons": list(reasons),
-                "enabled": package_id not in disabled, "has_definitions": False, "deletable": True,
+                "enabled": package_id not in disabled, "has_definitions": False,
+                "deletable": package_id != bundled.id,
             })
         return items
 
@@ -473,6 +523,11 @@ class PluginPackageManager:
             for word in package.words:
                 for name in word.visible_qualified_names():
                     names[name] = package.id
+        bundled, _ = self.bundled()
+        if excluding != bundled.id and (enabled is None or (bundled.id not in disabled) == enabled):
+            for word in bundled.words:
+                for name in word.visible_qualified_names():
+                    names[name] = bundled.id
         return names
 
 

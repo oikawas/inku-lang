@@ -1,13 +1,12 @@
 {
-  "schema": "inku.ddl-export.v1",
+  "schema": "inku.ddl-export.v2",
   "language": "ja",
-  "ddl": "和紙。\nSky.空。\nSky.雲。\nSky.雨。",
+  "ddl": "和紙。\n｛大空｝。\n｛雲｝。\n｛雨｝。",
   "plugins": [
     {
       "definition": {
-        "schema": "inku.macro-definition.v1",
+        "schema": "inku.macro-definition.v2",
         "namespace": "Sky",
-        "heading": "Clouds",
         "version": "1.0.0",
         "parameters": {
           "band_count": {
@@ -843,17 +842,23 @@
             ]
           }
         ],
-        "aliases": [
-          "雲"
-        ]
+        "id": "Clouds",
+        "names": {
+          "ja": [
+            "雲"
+          ],
+          "en": [
+            "clouds"
+          ]
+        },
+        "kind": "scene"
       },
-      "summary": "大和絵や琳派のすやり霞のような雲を、画面の上から中ほどに横長の帯で重ねる。帯は両端が丸い細長い輪郭で、淡い墨（灰）の細筆で描き、帯の芯に金（黄）の太筆の線を一本ずつ、滲ませて通す。帯は左右にずらしながら下へ重なり、下の帯ほど短く細い。帯の数を書けばその数（1〜5本）、書かなければ3〜4本。帯の並びの左右の向きと上下の位置は四通りから選ぶ。"
+      "note": "すやり霞の雲。金の芯を通した横長の帯。"
     },
     {
       "definition": {
-        "schema": "inku.macro-definition.v1",
+        "schema": "inku.macro-definition.v2",
         "namespace": "Sky",
-        "heading": "Heavens",
         "version": "1.0.0",
         "parameters": {
           "stroke_count": {
@@ -1175,17 +1180,23 @@
             ]
           }
         ],
-        "aliases": [
-          "空"
-        ]
+        "id": "Heavens",
+        "names": {
+          "ja": [
+            "大空"
+          ],
+          "en": [
+            "heavens"
+          ]
+        },
+        "kind": "scene"
       },
-      "summary": "浮世絵や日本画の一文字ぼかしのように、画面の上端から空を暈す。横いっぱいの滲む筆を上から重ね、上ほど詰まって濃く（太筆の群青）、下へ行くほど間が開き、細筆の群青から淡い墨（灰）へ薄れる。いちばん下の三本は少しずつ短い。筆の数を書けばその数（1〜12本）、書かなければ8〜10本で、上から順に描く。"
+      "note": "一文字ぼかしの空。上端から暈す群青。"
     },
     {
       "definition": {
-        "schema": "inku.macro-definition.v1",
+        "schema": "inku.macro-definition.v2",
         "namespace": "Sky",
-        "heading": "Rain",
         "version": "1.0.0",
         "parameters": {
           "rain_count": {
@@ -1292,17 +1303,23 @@
             }
           }
         ],
-        "aliases": [
-          "雨"
-        ]
+        "id": "Rain",
+        "names": {
+          "ja": [
+            "雨"
+          ],
+          "en": [
+            "rain"
+          ]
+        },
+        "kind": "scene"
       },
-      "summary": "広重の夕立のように、画面いっぱいに雨脚を降らせる。雨脚は細いペンの縦の線で、淡い墨（灰）の長さ0.38の線を散らし、その間に群青のやや長い線を12本散らす。雨脚の数（淡い墨の線の数）を書けばその数（1〜80本）、書かなければ36〜48本。群青の12本はいつも描く。"
+      "note": "広重の夕立のような、細い縦の雨脚。"
     },
     {
       "definition": {
-        "schema": "inku.macro-definition.v1",
+        "schema": "inku.macro-definition.v2",
         "namespace": "Sky",
-        "heading": "Snow",
         "version": "1.0.0",
         "parameters": {
           "flake_count": {
@@ -1438,11 +1455,18 @@
             }
           }
         ],
-        "aliases": [
-          "雪"
-        ]
+        "id": "Snow",
+        "names": {
+          "ja": [
+            "雪"
+          ],
+          "en": [
+            "snow"
+          ]
+        },
+        "kind": "scene"
       },
-      "summary": "胡粉の牡丹雪のように、画面いっぱいに雪を散らす。雪片は滲む白い点で、小さい雪片を書いた数だけ、中くらいを14、大きい牡丹雪を6散らす。白なので、薄墨地・木炭地や青・黒の地のような暗い地に描く。雪片の数（小さい雪片の数）を書けばその数（1〜80個）、書かなければ36〜48個。"
+      "note": "胡粉の牡丹雪。暗い地に向く。"
     }
   ],
   "exported_from": {}

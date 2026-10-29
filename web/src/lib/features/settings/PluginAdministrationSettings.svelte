@@ -111,7 +111,7 @@
 				<input bind:this={pictureInput} class="plugin-installer-file" type="file" accept="image/png" onchange={replacePicture} />
 				{#if pluginActionStatus}<div class="db-test-result">{pluginActionStatus}</div>{/if}
 				{#if vocabularyPlugins.length}
-					{#each vocabularyPlugins as plugin (pluginId(plugin))}
+					{#each vocabularyPlugins as plugin (`${pluginId(plugin)}:${plugin.status}`)}
 						<div class="user-plugin-row">
 							<div class="user-plugin-info">
 								<div class="system-plugin-title-row">

@@ -74,7 +74,8 @@ fn offered_scene_and_object_words_are_normalized_and_printed() {
         print_work_plan_with_plugins(&plan, ResolvedInstructionLanguage::En, &plugins),
         "3 {young leaves}.\nPlace 2 {boat} at the center."
     );
-    let asset: serde_json::Value = serde_json::from_str(inku_ddl::NATURE_LEAVES_V1_JSON).unwrap();
+    let asset: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/nature-leaves-2.1-v1.json")).unwrap();
     let scene =
         inku_ddl::MacroDefinition::from_json(&asset["entries"][0]["definition"].to_string())
             .unwrap();

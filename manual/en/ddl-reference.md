@@ -677,7 +677,7 @@ Namespace.Heading
 Namespace.宣言済み別名
 ```
 
-The transitional qualified form uses an ASCII dot between namespace and heading. In an environment declaring `Nature.YoungLeaves` and `Nature.若葉` as names of one definition, either invokes it. This does **not** make Nature a fixed plugin available everywhere.
+In a new definition, `id` is the stored lock identity and `names.ja/en` are visible DDL names. For bundled leaves, the primary names of `Nature.YoungLeaves` are `｛若葉｝` and `{young leaves}`. The old `Nature.若葉` spelling remains readable for saved works during migration. A visible name cannot claim a core word.
 
 Check the exact registered name and its public parameter types and bounds, and normally make a call one sentence. Versions, digests, locks, definition bodies, and transcribed output are not author-written DDL metadata. Do not invent function syntax such as `Name(count=3)`.
 
@@ -690,7 +690,7 @@ Bind.Integerを八つ置く
 
 They require that explanatory `Bind.Integer` definition; they are not core examples for an ordinary installation. Parameter names imply no meaning. Two same-type parameters with two possible assignments are ambiguous. A number in another sentence cannot supply a missing parameter.
 
-Declared parameters are required except for the special word-count declaration whose definition controls omitted count. Undeclared external colors, tools, angles, sizes, and positions do not become general whole-output overrides. Do not delete an unbindable explicit specification merely to make the call succeed.
+Declared parameters are required except for a scene word's count declaration, which controls omitted count. Composition and rules place, size, and count objects through their outer aspect rectangle. Coloring changes a plugin only when its definition accepts color. For a scene call, an undeclared modifier is omitted with a diagnostic while the call itself remains drawable.
 
 As a group or sequence member, a macro retains its internal counts, positions, and transforms while taking one outer placement slot. Keep outer count distinct from internal primitive demand.
 

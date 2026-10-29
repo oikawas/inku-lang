@@ -94,19 +94,19 @@ RECOVERY_BUDGET = {
 }
 
 NATURE_NAMES = (
-    "Nature.若葉",
-    "Nature.下草",
-    "Nature.青葉",
-    "Nature.紅葉",
-    "Nature.落葉",
-    "Nature.枯草",
-    "Nature.枯葉",
+    "Nature.YoungLeaves",
+    "Nature.Undergrowth",
+    "Nature.SummerLeaves",
+    "Nature.AutumnLeaves",
+    "Nature.FallenLeaves",
+    "Nature.WitheredGrass",
+    "Nature.WitheredLeaves",
 )
 
 CASE_SPECS: dict[str, dict[str, Any]] = {
     "accepted-macro-mirror": {
         "source": (
-            "Nature.若葉. Place a small diagonal red arc at top. "
+            "{young leaves}. Place a small diagonal red arc at top. "
             "Place a blue arc at bottom, mirrored with the previous shape."
         ),
         "language": "en",
@@ -212,10 +212,7 @@ def _nature_catalog(native: Any, language: str) -> tuple[list[dict], list[str]]:
     payload = {
         "maximum_entries": 64,
         "canonical": [],
-        "legacy": [
-            {"source_id": "bundled:Nature.leaves", "qualified_name": name}
-            for name in NATURE_NAMES
-        ],
+        "legacy": [],
         "bundled_packages": ["Nature.leaves"],
         "language": language,
     }

@@ -26,9 +26,10 @@ const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
 /// The bundled Nature words: three works draw a plugin word beside their layers,
 /// and a host recomposes with the definitions it draws with.
 fn definitions() -> Vec<MacroDefinition> {
-    let package: Value =
-        serde_json::from_str(include_str!("../../inku-ddl/assets/nature-leaves-v1.json"))
-            .expect("the Nature package is JSON");
+    let package: Value = serde_json::from_str(include_str!(
+        "../../inku-ddl/tests/fixtures/nature-leaves-2.1-v1.json"
+    ))
+    .expect("the Nature package is JSON");
     package["entries"]
         .as_array()
         .expect("package entries")

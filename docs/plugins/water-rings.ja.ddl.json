@@ -1,13 +1,12 @@
 {
-  "schema": "inku.ddl-export.v1",
+  "schema": "inku.ddl-export.v2",
   "language": "ja",
-  "ddl": "和紙。\n5個のWater.水輪。",
+  "ddl": "和紙。\n5個の｛水輪｝。",
   "plugins": [
     {
       "definition": {
-        "schema": "inku.macro-definition.v1",
+        "schema": "inku.macro-definition.v2",
         "namespace": "Water",
-        "heading": "Rings",
         "version": "2.0.0",
         "parameters": {
           "ring_count": {
@@ -1054,11 +1053,18 @@
             ]
           }
         ],
-        "aliases": [
-          "水輪"
-        ]
+        "id": "Rings",
+        "names": {
+          "ja": [
+            "水輪"
+          ],
+          "en": [
+            "rings"
+          ]
+        },
+        "kind": "scene"
       },
-      "summary": "水面を斜めから見た波紋（水輪）を一つ広げる。真上から見た波紋と同じ途切れた輪と滲んだ雫を、横に少し広げて縦を約三分の一につぶし、外の輪ほど中心を少し下げて手前へ開かせる。線は細筆で、内の三つは群青、外の三つは淡い墨（灰）。輪の左右と下に、水面に映る光のような淡い墨の短い横線を五本添える。全体は水平から左右に3度までわずかに傾く。輪の数を書けばその数（1〜6個）、書かなければ4〜5個。置き場所は画面の下半分の五つの位置から一つを選ぶ。"
+      "note": "斜めから見た波紋。横長の輪と、水面の映り。"
     }
   ],
   "exported_from": {}

@@ -53,7 +53,7 @@ def test_retired_catalog_arrangement_render_save_and_replay(monkeypatch):
     try:
         binding = PipelineBinding()
         effects = ProductPipelineEffects(binding, default_manifest(binding))
-        source = "Nature.青葉。"
+        source = "｛青葉｝。"
         # The complete built-in macro needs no provider, but prepare still
         # checks the user's model catalog. Isolate that fixture preflight;
         # restore the production gate before exercising any API request.

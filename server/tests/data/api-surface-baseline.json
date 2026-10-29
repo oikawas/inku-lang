@@ -1,10 +1,9 @@
 {
-  "endpoint_count": 145,
-  "operation_count": 145,
-  "schema_count": 210,
+  "digest": "e627c832f6954f701b9dd0f623b476ab288c04b4735cf8e3a91382bacf0ba03f",
+  "endpoint_count": 143,
+  "operation_count": 143,
   "operations": [
     {
-      "path": "/api/admin/unread-words",
       "method": "GET",
       "operationId": "api_admin_unread_words_api_admin_unread_words_get",
       "params": [
@@ -12,6 +11,7 @@
         "header:authorization:opt",
         "query:limit:opt"
       ],
+      "path": "/api/admin/unread-words",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"items\":{\"additionalProperties\":true,\"type\":\"object\"},\"title\":\"Response Api Admin Unread Words Api Admin Unread Words Get\",\"type\":\"array\"}}},\"description\":\"Successful Response\"}",
@@ -19,13 +19,13 @@
       }
     },
     {
-      "path": "/api/auth/config",
       "method": "GET",
       "operationId": "api_auth_config_api_auth_config_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/auth/config",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Auth Config Api Auth Config Get\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -33,13 +33,13 @@
       }
     },
     {
-      "path": "/api/auth/config",
       "method": "PUT",
       "operationId": "api_auth_config_update_api_auth_config_put",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/auth/config",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/AuthSettingsBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Auth Config Update Api Auth Config Put\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -47,10 +47,10 @@
       }
     },
     {
-      "path": "/api/auth/login",
       "method": "POST",
       "operationId": "api_auth_login_api_auth_login_post",
       "params": [],
+      "path": "/api/auth/login",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/LoginBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/LoginResponse\"}}},\"description\":\"Successful Response\"}",
@@ -58,13 +58,13 @@
       }
     },
     {
-      "path": "/api/auth/logout",
       "method": "POST",
       "operationId": "api_auth_logout_api_auth_logout_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/auth/logout",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":{\"type\":\"boolean\"},\"title\":\"Response Api Auth Logout Api Auth Logout Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -72,13 +72,13 @@
       }
     },
     {
-      "path": "/api/auth/me",
       "method": "GET",
       "operationId": "api_auth_me_api_auth_me_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/auth/me",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserAccountItem\"}}},\"description\":\"Successful Response\"}",
@@ -86,13 +86,13 @@
       }
     },
     {
-      "path": "/api/auth/me/batch-prompt-history",
       "method": "GET",
       "operationId": "api_auth_me_batch_prompt_history_api_auth_me_batch_prompt_history_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/auth/me/batch-prompt-history",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/BatchPromptHistoryResponse\"}}},\"description\":\"Successful Response\"}",
@@ -100,13 +100,13 @@
       }
     },
     {
-      "path": "/api/auth/me/batch-prompt-history",
       "method": "PUT",
       "operationId": "api_auth_me_update_batch_prompt_history_api_auth_me_batch_prompt_history_put",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/auth/me/batch-prompt-history",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/BatchPromptHistoryBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/BatchPromptHistoryResponse\"}}},\"description\":\"Successful Response\"}",
@@ -114,13 +114,13 @@
       }
     },
     {
-      "path": "/api/auth/me/demo-settings",
       "method": "GET",
       "operationId": "api_auth_me_demo_settings_api_auth_me_demo_settings_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/auth/me/demo-settings",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DemoSettingsBody\"}}},\"description\":\"Successful Response\"}",
@@ -128,13 +128,13 @@
       }
     },
     {
-      "path": "/api/auth/me/demo-settings",
       "method": "PUT",
       "operationId": "api_auth_me_update_demo_settings_api_auth_me_demo_settings_put",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/auth/me/demo-settings",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DemoSettingsBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DemoSettingsBody\"}}},\"description\":\"Successful Response\"}",
@@ -142,13 +142,13 @@
       }
     },
     {
-      "path": "/api/auth/me/export-templates",
       "method": "GET",
       "operationId": "api_auth_me_export_templates_api_auth_me_export_templates_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/auth/me/export-templates",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ExportTemplatesBody\"}}},\"description\":\"Successful Response\"}",
@@ -156,13 +156,13 @@
       }
     },
     {
-      "path": "/api/auth/me/export-templates",
       "method": "PUT",
       "operationId": "api_auth_me_update_export_templates_api_auth_me_export_templates_put",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/auth/me/export-templates",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ExportTemplatesBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ExportTemplatesBody\"}}},\"description\":\"Successful Response\"}",
@@ -170,13 +170,13 @@
       }
     },
     {
-      "path": "/api/auth/me/group-peers",
       "method": "GET",
       "operationId": "api_me_group_peers_api_auth_me_group_peers_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/auth/me/group-peers",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"items\":{\"$ref\":\"#/components/schemas/GroupPeer\"},\"title\":\"Response Api Me Group Peers Api Auth Me Group Peers Get\",\"type\":\"array\"}}},\"description\":\"Successful Response\"}",
@@ -184,13 +184,13 @@
       }
     },
     {
-      "path": "/api/auth/me/plugin-storage",
       "method": "GET",
       "operationId": "api_auth_me_plugin_storage_api_auth_me_plugin_storage_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/auth/me/plugin-storage",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PluginStorageBody\"}}},\"description\":\"Successful Response\"}",
@@ -198,13 +198,13 @@
       }
     },
     {
-      "path": "/api/auth/me/plugin-storage",
       "method": "PUT",
       "operationId": "api_auth_me_update_plugin_storage_api_auth_me_plugin_storage_put",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/auth/me/plugin-storage",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PluginStorageBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PluginStorageBody\"}}},\"description\":\"Successful Response\"}",
@@ -212,7 +212,6 @@
       }
     },
     {
-      "path": "/api/auth/me/plugin-storage/{plugin_id}",
       "method": "PUT",
       "operationId": "api_auth_me_update_plugin_value_api_auth_me_plugin_storage__plugin_id__put",
       "params": [
@@ -220,6 +219,7 @@
         "header:authorization:opt",
         "path:plugin_id:req"
       ],
+      "path": "/api/auth/me/plugin-storage/{plugin_id}",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PluginValueBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PluginStorageBody\"}}},\"description\":\"Successful Response\"}",
@@ -227,13 +227,13 @@
       }
     },
     {
-      "path": "/api/auth/me/profile",
       "method": "PATCH",
       "operationId": "api_auth_me_profile_api_auth_me_profile_patch",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/auth/me/profile",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserProfileUpdateBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserAccountItem\"}}},\"description\":\"Successful Response\"}",
@@ -241,13 +241,13 @@
       }
     },
     {
-      "path": "/api/auth/me/settings",
       "method": "PATCH",
       "operationId": "api_auth_me_settings_api_auth_me_settings_patch",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/auth/me/settings",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserSettingsBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserAccountItem\"}}},\"description\":\"Successful Response\"}",
@@ -255,13 +255,13 @@
       }
     },
     {
-      "path": "/api/client-config",
       "method": "GET",
       "operationId": "api_client_config_api_client_config_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/client-config",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Client Config Api Client Config Get\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -269,7 +269,6 @@
       }
     },
     {
-      "path": "/api/colophon/{colophon_id}",
       "method": "DELETE",
       "operationId": "api_okugaki_delete_api_colophon__colophon_id__delete",
       "params": [
@@ -277,6 +276,7 @@
         "header:authorization:opt",
         "path:colophon_id:req"
       ],
+      "path": "/api/colophon/{colophon_id}",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":{\"type\":\"boolean\"},\"title\":\"Response Api Okugaki Delete Api Colophon  Colophon Id  Delete\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -284,13 +284,13 @@
       }
     },
     {
-      "path": "/api/color-arrangements/plan",
       "method": "POST",
       "operationId": "api_color_arrangement_plan_api_color_arrangements_plan_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/color-arrangements/plan",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ColorArrangementPlanRequest\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Color Arrangement Plan Api Color Arrangements Plan Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -298,13 +298,13 @@
       }
     },
     {
-      "path": "/api/color-catalogs",
       "method": "GET",
       "operationId": "api_color_catalogs_api_color_catalogs_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/color-catalogs",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ColorCatalogsResponse\"}}},\"description\":\"Successful Response\"}",
@@ -312,13 +312,13 @@
       }
     },
     {
-      "path": "/api/compose",
       "method": "POST",
       "operationId": "api_compose_api_compose_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/compose",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ComposeRequest\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ComposeResponse\"}}},\"description\":\"Successful Response\"}",
@@ -326,13 +326,13 @@
       }
     },
     {
-      "path": "/api/composition/ranges",
       "method": "GET",
       "operationId": "composition_ranges_api_composition_ranges_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/composition/ranges",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/CompositionRanges\"}}},\"description\":\"Successful Response\"}",
@@ -340,13 +340,13 @@
       }
     },
     {
-      "path": "/api/demo/instruction",
       "method": "POST",
       "operationId": "api_demo_instruction_api_demo_instruction_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/demo/instruction",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DemoInstructionBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DemoInstructionResponse\"}}},\"description\":\"Successful Response\"}",
@@ -354,13 +354,13 @@
       }
     },
     {
-      "path": "/api/description/mora",
       "method": "POST",
       "operationId": "api_description_mora_api_description_mora_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/description/mora",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DescriptionMoraBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DescriptionMoraResponse\"}}},\"description\":\"Successful Response\"}",
@@ -368,13 +368,13 @@
       }
     },
     {
-      "path": "/api/description/syllables",
       "method": "POST",
       "operationId": "api_description_syllables_api_description_syllables_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/description/syllables",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DescriptionSyllablesBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DescriptionSyllablesResponse\"}}},\"description\":\"Successful Response\"}",
@@ -382,7 +382,6 @@
       }
     },
     {
-      "path": "/api/feedback/unread-words",
       "method": "GET",
       "operationId": "api_my_unread_words_api_feedback_unread_words_get",
       "params": [
@@ -390,6 +389,7 @@
         "header:authorization:opt",
         "query:limit:opt"
       ],
+      "path": "/api/feedback/unread-words",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"items\":{\"additionalProperties\":true,\"type\":\"object\"},\"title\":\"Response Api My Unread Words Api Feedback Unread Words Get\",\"type\":\"array\"}}},\"description\":\"Successful Response\"}",
@@ -397,13 +397,13 @@
       }
     },
     {
-      "path": "/api/feedback/unread-words",
       "method": "POST",
       "operationId": "api_record_unread_words_api_feedback_unread_words_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/feedback/unread-words",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UnreadWordsBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Record Unread Words Api Feedback Unread Words Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -411,13 +411,13 @@
       }
     },
     {
-      "path": "/api/ground-variants/plan",
       "method": "POST",
       "operationId": "api_ground_variant_plan_api_ground_variants_plan_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/ground-variants/plan",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/GroundVariantPlanRequest\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Ground Variant Plan Api Ground Variants Plan Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -425,7 +425,6 @@
       }
     },
     {
-      "path": "/api/history",
       "method": "DELETE",
       "operationId": "api_history_delete_api_history_delete",
       "params": [
@@ -433,6 +432,7 @@
         "header:X-Inku-Confirm:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/history",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"boolean\"}]},\"title\":\"Response Api History Delete Api History Delete\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -440,7 +440,6 @@
       }
     },
     {
-      "path": "/api/history",
       "method": "GET",
       "operationId": "api_history_get_api_history_get",
       "params": [
@@ -457,6 +456,7 @@
         "query:starred:opt",
         "query:trashed:opt"
       ],
+      "path": "/api/history",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryListResponse\"}}},\"description\":\"Successful Response\"}",
@@ -464,7 +464,6 @@
       }
     },
     {
-      "path": "/api/history",
       "method": "POST",
       "operationId": "api_history_post_api_history_post",
       "params": [
@@ -472,6 +471,7 @@
         "header:Idempotency-Key:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/history",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryPostBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryItem\"}}},\"description\":\"Successful Response\"}",
@@ -479,13 +479,13 @@
       }
     },
     {
-      "path": "/api/history/export-animation",
       "method": "POST",
       "operationId": "api_history_export_animation_api_history_export_animation_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/history/export-animation",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/AnimationExportBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
@@ -493,13 +493,13 @@
       }
     },
     {
-      "path": "/api/history/export-card",
       "method": "POST",
       "operationId": "api_history_export_card_api_history_export_card_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/history/export-card",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/CardExportBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
@@ -507,7 +507,6 @@
       }
     },
     {
-      "path": "/api/history/lineage-groups",
       "method": "GET",
       "operationId": "api_history_lineage_groups_api_history_lineage_groups_get",
       "params": [
@@ -525,6 +524,7 @@
         "query:starred:opt",
         "query:trashed:opt"
       ],
+      "path": "/api/history/lineage-groups",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryLineageGroupListResponse\"}}},\"description\":\"Successful Response\"}",
@@ -532,7 +532,6 @@
       }
     },
     {
-      "path": "/api/history/lineage-groups/{root_node_id}/items",
       "method": "GET",
       "operationId": "api_history_lineage_group_items_api_history_lineage_groups__root_node_id__items_get",
       "params": [
@@ -548,6 +547,7 @@
         "query:starred:opt",
         "query:trashed:opt"
       ],
+      "path": "/api/history/lineage-groups/{root_node_id}/items",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryListResponse\"}}},\"description\":\"Successful Response\"}",
@@ -555,13 +555,13 @@
       }
     },
     {
-      "path": "/api/history/permanent-delete",
       "method": "POST",
       "operationId": "api_history_permanent_delete_api_history_permanent_delete_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/history/permanent-delete",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryIdsBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"boolean\"}]},\"title\":\"Response Api History Permanent Delete Api History Permanent Delete Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -569,13 +569,13 @@
       }
     },
     {
-      "path": "/api/history/rebuild-output-files",
       "method": "POST",
       "operationId": "api_history_rebuild_output_files_api_history_rebuild_output_files_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/history/rebuild-output-files",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryIdsBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"boolean\"}]},\"title\":\"Response Api History Rebuild Output Files Api History Rebuild Output Files Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -583,13 +583,13 @@
       }
     },
     {
-      "path": "/api/history/restore",
       "method": "POST",
       "operationId": "api_history_restore_api_history_restore_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/history/restore",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryIdsBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"boolean\"}]},\"title\":\"Response Api History Restore Api History Restore Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -597,13 +597,13 @@
       }
     },
     {
-      "path": "/api/history/state",
       "method": "GET",
       "operationId": "api_history_state_api_history_state_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/history/state",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryStateResponse\"}}},\"description\":\"Successful Response\"}",
@@ -611,13 +611,13 @@
       }
     },
     {
-      "path": "/api/history/trash",
       "method": "POST",
       "operationId": "api_history_trash_api_history_trash_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/history/trash",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryIdsBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"boolean\"}]},\"title\":\"Response Api History Trash Api History Trash Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -625,7 +625,6 @@
       }
     },
     {
-      "path": "/api/history/{item_id}/acl",
       "method": "GET",
       "operationId": "api_history_acl_get_api_history__item_id__acl_get",
       "params": [
@@ -633,6 +632,7 @@
         "header:authorization:opt",
         "path:item_id:req"
       ],
+      "path": "/api/history/{item_id}/acl",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"items\":{\"$ref\":\"#/components/schemas/HistoryAclEntryOut\"},\"title\":\"Response Api History Acl Get Api History  Item Id  Acl Get\",\"type\":\"array\"}}},\"description\":\"Successful Response\"}",
@@ -640,7 +640,6 @@
       }
     },
     {
-      "path": "/api/history/{item_id}/acl",
       "method": "PUT",
       "operationId": "api_history_acl_put_api_history__item_id__acl_put",
       "params": [
@@ -648,6 +647,7 @@
         "header:authorization:opt",
         "path:item_id:req"
       ],
+      "path": "/api/history/{item_id}/acl",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryAclBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"items\":{\"$ref\":\"#/components/schemas/HistoryAclEntryOut\"},\"title\":\"Response Api History Acl Put Api History  Item Id  Acl Put\",\"type\":\"array\"}}},\"description\":\"Successful Response\"}",
@@ -655,7 +655,6 @@
       }
     },
     {
-      "path": "/api/history/{item_id}/for-revision",
       "method": "PATCH",
       "operationId": "api_history_for_revision_api_history__item_id__for_revision_patch",
       "params": [
@@ -663,6 +662,7 @@
         "header:authorization:opt",
         "path:item_id:req"
       ],
+      "path": "/api/history/{item_id}/for-revision",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryForRevisionBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryItem\"}}},\"description\":\"Successful Response\"}",
@@ -670,7 +670,6 @@
       }
     },
     {
-      "path": "/api/history/{item_id}/for-share",
       "method": "PATCH",
       "operationId": "api_history_for_share_api_history__item_id__for_share_patch",
       "params": [
@@ -678,6 +677,7 @@
         "header:authorization:opt",
         "path:item_id:req"
       ],
+      "path": "/api/history/{item_id}/for-share",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryForShareBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryItem\"}}},\"description\":\"Successful Response\"}",
@@ -685,7 +685,6 @@
       }
     },
     {
-      "path": "/api/history/{item_id}/lineage",
       "method": "GET",
       "operationId": "api_history_lineage_api_history__item_id__lineage_get",
       "params": [
@@ -695,6 +694,7 @@
         "query:descendant_depth:opt",
         "query:node_limit:opt"
       ],
+      "path": "/api/history/{item_id}/lineage",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api History Lineage Api History  Item Id  Lineage Get\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -702,7 +702,6 @@
       }
     },
     {
-      "path": "/api/history/{item_id}/star",
       "method": "PATCH",
       "operationId": "api_history_star_api_history__item_id__star_patch",
       "params": [
@@ -710,6 +709,7 @@
         "header:authorization:opt",
         "path:item_id:req"
       ],
+      "path": "/api/history/{item_id}/star",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryStarBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryItem\"}}},\"description\":\"Successful Response\"}",
@@ -717,7 +717,6 @@
       }
     },
     {
-      "path": "/api/history/{item_id}/svg",
       "method": "GET",
       "operationId": "api_history_svg_api_history__item_id__svg_get",
       "params": [
@@ -726,6 +725,7 @@
         "path:item_id:req",
         "query:profile:opt"
       ],
+      "path": "/api/history/{item_id}/svg",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
@@ -733,7 +733,6 @@
       }
     },
     {
-      "path": "/api/history/{item_id}/thumb",
       "method": "GET",
       "operationId": "api_history_thumb_api_history__item_id__thumb_get",
       "params": [
@@ -743,6 +742,7 @@
         "query:scale:opt",
         "query:v:opt"
       ],
+      "path": "/api/history/{item_id}/thumb",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
@@ -750,23 +750,23 @@
       }
     },
     {
-      "path": "/api/info",
       "method": "GET",
       "operationId": "api_info_api_info_get",
       "params": [],
+      "path": "/api/info",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/AppInfoResponse\"}}},\"description\":\"Successful Response\"}"
       }
     },
     {
-      "path": "/api/interpret",
       "method": "POST",
       "operationId": "api_interpret_api_interpret_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/interpret",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/InterpretRequest\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Interpret Api Interpret Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -774,7 +774,6 @@
       }
     },
     {
-      "path": "/api/lineage/{node_id}",
       "method": "GET",
       "operationId": "api_lineage_api_lineage__node_id__get",
       "params": [
@@ -785,6 +784,7 @@
         "query:include_svg:opt",
         "query:node_limit:opt"
       ],
+      "path": "/api/lineage/{node_id}",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Lineage Api Lineage  Node Id  Get\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -792,7 +792,6 @@
       }
     },
     {
-      "path": "/api/lineage/{node_id}/colophon",
       "method": "GET",
       "operationId": "api_okugaki_list_api_lineage__node_id__colophon_get",
       "params": [
@@ -800,6 +799,7 @@
         "header:authorization:opt",
         "path:node_id:req"
       ],
+      "path": "/api/lineage/{node_id}/colophon",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"items\":{\"$ref\":\"#/components/schemas/OkugakiItem\"},\"title\":\"Response Api Okugaki List Api Lineage  Node Id  Colophon Get\",\"type\":\"array\"}}},\"description\":\"Successful Response\"}",
@@ -807,7 +807,6 @@
       }
     },
     {
-      "path": "/api/lineage/{node_id}/colophon",
       "method": "POST",
       "operationId": "api_okugaki_generate_api_lineage__node_id__colophon_post",
       "params": [
@@ -816,6 +815,7 @@
         "header:authorization:opt",
         "path:node_id:req"
       ],
+      "path": "/api/lineage/{node_id}/colophon",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/OkugakiGenerateBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/OkugakiItem\"}}},\"description\":\"Successful Response\"}",
@@ -823,13 +823,13 @@
       }
     },
     {
-      "path": "/api/me/chatgpt",
       "method": "GET",
       "operationId": "state_api_me_chatgpt_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/me/chatgpt",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response State Api Me Chatgpt Get\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -837,7 +837,6 @@
       }
     },
     {
-      "path": "/api/me/chatgpt/attempts/{attempt_id}",
       "method": "GET",
       "operationId": "attempt_api_me_chatgpt_attempts__attempt_id__get",
       "params": [
@@ -845,6 +844,7 @@
         "header:authorization:opt",
         "path:attempt_id:req"
       ],
+      "path": "/api/me/chatgpt/attempts/{attempt_id}",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Attempt Api Me Chatgpt Attempts  Attempt Id  Get\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -852,7 +852,6 @@
       }
     },
     {
-      "path": "/api/me/chatgpt/attempts/{attempt_id}/cancel",
       "method": "POST",
       "operationId": "cancel_api_me_chatgpt_attempts__attempt_id__cancel_post",
       "params": [
@@ -860,6 +859,7 @@
         "header:authorization:opt",
         "path:attempt_id:req"
       ],
+      "path": "/api/me/chatgpt/attempts/{attempt_id}/cancel",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Cancel Api Me Chatgpt Attempts  Attempt Id  Cancel Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -867,13 +867,13 @@
       }
     },
     {
-      "path": "/api/me/chatgpt/authorize",
       "method": "POST",
       "operationId": "authorize_api_me_chatgpt_authorize_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/me/chatgpt/authorize",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/AuthorizeBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Authorize Api Me Chatgpt Authorize Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -881,13 +881,13 @@
       }
     },
     {
-      "path": "/api/me/chatgpt/models",
       "method": "GET",
       "operationId": "get_models_api_me_chatgpt_models_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/me/chatgpt/models",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Get Models Api Me Chatgpt Models Get\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -895,13 +895,13 @@
       }
     },
     {
-      "path": "/api/me/chatgpt/models/refresh",
       "method": "POST",
       "operationId": "refresh_models_api_me_chatgpt_models_refresh_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/me/chatgpt/models/refresh",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Refresh Models Api Me Chatgpt Models Refresh Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -909,13 +909,13 @@
       }
     },
     {
-      "path": "/api/me/chatgpt/models/settings",
       "method": "GET",
       "operationId": "model_settings_api_me_chatgpt_models_settings_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/me/chatgpt/models/settings",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Model Settings Api Me Chatgpt Models Settings Get\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -923,13 +923,13 @@
       }
     },
     {
-      "path": "/api/me/chatgpt/models/settings",
       "method": "PUT",
       "operationId": "publish_models_api_me_chatgpt_models_settings_put",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/me/chatgpt/models/settings",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PublishedModelsBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Publish Models Api Me Chatgpt Models Settings Put\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -937,7 +937,6 @@
       }
     },
     {
-      "path": "/api/me/chatgpt/profiles/{profile_id}/delete",
       "method": "POST",
       "operationId": "delete_api_me_chatgpt_profiles__profile_id__delete_post",
       "params": [
@@ -945,6 +944,7 @@
         "header:authorization:opt",
         "path:profile_id:req"
       ],
+      "path": "/api/me/chatgpt/profiles/{profile_id}/delete",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Delete Api Me Chatgpt Profiles  Profile Id  Delete Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -952,7 +952,6 @@
       }
     },
     {
-      "path": "/api/me/chatgpt/profiles/{profile_id}/retry",
       "method": "POST",
       "operationId": "retry_api_me_chatgpt_profiles__profile_id__retry_post",
       "params": [
@@ -960,6 +959,7 @@
         "header:authorization:opt",
         "path:profile_id:req"
       ],
+      "path": "/api/me/chatgpt/profiles/{profile_id}/retry",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Retry Api Me Chatgpt Profiles  Profile Id  Retry Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -967,7 +967,6 @@
       }
     },
     {
-      "path": "/api/me/chatgpt/profiles/{profile_id}/select",
       "method": "POST",
       "operationId": "select_api_me_chatgpt_profiles__profile_id__select_post",
       "params": [
@@ -975,6 +974,7 @@
         "header:authorization:opt",
         "path:profile_id:req"
       ],
+      "path": "/api/me/chatgpt/profiles/{profile_id}/select",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Select Api Me Chatgpt Profiles  Profile Id  Select Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -982,7 +982,6 @@
       }
     },
     {
-      "path": "/api/me/chatgpt/profiles/{profile_id}/sign-out",
       "method": "POST",
       "operationId": "disconnect_api_me_chatgpt_profiles__profile_id__sign_out_post",
       "params": [
@@ -990,6 +989,7 @@
         "header:authorization:opt",
         "path:profile_id:req"
       ],
+      "path": "/api/me/chatgpt/profiles/{profile_id}/sign-out",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Disconnect Api Me Chatgpt Profiles  Profile Id  Sign Out Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -997,13 +997,13 @@
       }
     },
     {
-      "path": "/api/model-references",
       "method": "POST",
       "operationId": "api_model_references_api_model_references_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/model-references",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ModelReferencesRequest\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ModelReferencesResponse\"}}},\"description\":\"Successful Response\"}",
@@ -1011,13 +1011,13 @@
       }
     },
     {
-      "path": "/api/models",
       "method": "GET",
       "operationId": "api_models_api_models_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/models",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ModelSettingsResponse\"}}},\"description\":\"Successful Response\"}",
@@ -1025,22 +1025,22 @@
       }
     },
     {
-      "path": "/api/notices",
       "method": "GET",
       "operationId": "api_notices_api_notices_get",
       "params": [],
+      "path": "/api/notices",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/NoticesResponse\"}}},\"description\":\"Successful Response\"}"
       }
     },
     {
-      "path": "/api/notices/{notice_id}",
       "method": "GET",
       "operationId": "api_notice_text_api_notices__notice_id__get",
       "params": [
         "path:notice_id:req"
       ],
+      "path": "/api/notices/{notice_id}",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"text/plain\":{\"schema\":{\"type\":\"string\"}}},\"description\":\"Successful Response\"}",
@@ -1048,7 +1048,6 @@
       }
     },
     {
-      "path": "/api/paint",
       "method": "POST",
       "operationId": "api_paint_api_paint_post",
       "params": [
@@ -1056,6 +1055,7 @@
         "header:Idempotency-Key:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/paint",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PaintRequest\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PaintResponse\"}}},\"description\":\"Successful Response\"}",
@@ -1063,7 +1063,6 @@
       }
     },
     {
-      "path": "/api/paint/stream",
       "method": "POST",
       "operationId": "api_paint_stream_api_paint_stream_post",
       "params": [
@@ -1071,6 +1070,7 @@
         "header:Idempotency-Key:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/paint/stream",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PaintRequest\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
@@ -1078,13 +1078,13 @@
       }
     },
     {
-      "path": "/api/pipeline/canvas-formats",
       "method": "GET",
       "operationId": "canvas_formats_api_pipeline_canvas_formats_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/pipeline/canvas-formats",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
@@ -1092,13 +1092,13 @@
       }
     },
     {
-      "path": "/api/pipeline/completion-range-states",
       "method": "POST",
       "operationId": "completion_range_states_api_pipeline_completion_range_states_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/pipeline/completion-range-states",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/CompletionRangeStatesBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
@@ -1106,7 +1106,6 @@
       }
     },
     {
-      "path": "/api/pipeline/executions/{execution_id}/author-ddl",
       "method": "POST",
       "operationId": "author_ddl_api_pipeline_executions__execution_id__author_ddl_post",
       "params": [
@@ -1114,6 +1113,7 @@
         "header:authorization:opt",
         "path:execution_id:req"
       ],
+      "path": "/api/pipeline/executions/{execution_id}/author-ddl",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/AuthorDdlBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
@@ -1121,7 +1121,6 @@
       }
     },
     {
-      "path": "/api/pipeline/executions/{execution_id}/commands",
       "method": "POST",
       "operationId": "command_api_pipeline_executions__execution_id__commands_post",
       "params": [
@@ -1129,6 +1128,7 @@
         "header:authorization:opt",
         "path:execution_id:req"
       ],
+      "path": "/api/pipeline/executions/{execution_id}/commands",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Body\",\"type\":\"object\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
@@ -1136,7 +1136,6 @@
       }
     },
     {
-      "path": "/api/pipeline/executions/{execution_id}/provider-observations",
       "method": "GET",
       "operationId": "provider_observations_api_pipeline_executions__execution_id__provider_observations_get",
       "params": [
@@ -1144,6 +1143,7 @@
         "header:authorization:opt",
         "path:execution_id:req"
       ],
+      "path": "/api/pipeline/executions/{execution_id}/provider-observations",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
@@ -1151,7 +1151,6 @@
       }
     },
     {
-      "path": "/api/pipeline/history/{history_id}",
       "method": "GET",
       "operationId": "history_link_api_pipeline_history__history_id__get",
       "params": [
@@ -1159,6 +1158,7 @@
         "header:authorization:opt",
         "path:history_id:req"
       ],
+      "path": "/api/pipeline/history/{history_id}",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
@@ -1166,7 +1166,6 @@
       }
     },
     {
-      "path": "/api/pipeline/history/{history_id}/ddl-export",
       "method": "GET",
       "operationId": "ddl_export_api_pipeline_history__history_id__ddl_export_get",
       "params": [
@@ -1174,6 +1173,7 @@
         "header:authorization:opt",
         "path:history_id:req"
       ],
+      "path": "/api/pipeline/history/{history_id}/ddl-export",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
@@ -1181,7 +1181,6 @@
       }
     },
     {
-      "path": "/api/pipeline/history/{history_id}/fork",
       "method": "POST",
       "operationId": "fork_linked_history_api_pipeline_history__history_id__fork_post",
       "params": [
@@ -1189,6 +1188,7 @@
         "header:authorization:opt",
         "path:history_id:req"
       ],
+      "path": "/api/pipeline/history/{history_id}/fork",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/LinkedHistoryForkBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
@@ -1196,13 +1196,13 @@
       }
     },
     {
-      "path": "/api/pipeline/images",
       "method": "POST",
       "operationId": "prepare_image_api_pipeline_images_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/pipeline/images",
       "requestBody": "{\"content\":{\"application/octet-stream\":{\"schema\":{\"format\":\"binary\",\"type\":\"string\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PreparedImageView\"}}},\"description\":\"Successful Response\"}",
@@ -1210,7 +1210,6 @@
       }
     },
     {
-      "path": "/api/pipeline/legacy/{history_id}",
       "method": "GET",
       "operationId": "legacy_api_pipeline_legacy__history_id__get",
       "params": [
@@ -1218,6 +1217,7 @@
         "header:authorization:opt",
         "path:history_id:req"
       ],
+      "path": "/api/pipeline/legacy/{history_id}",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
@@ -1225,7 +1225,6 @@
       }
     },
     {
-      "path": "/api/pipeline/legacy/{history_id}/fork",
       "method": "POST",
       "operationId": "fork_legacy_api_pipeline_legacy__history_id__fork_post",
       "params": [
@@ -1233,6 +1232,7 @@
         "header:authorization:opt",
         "path:history_id:req"
       ],
+      "path": "/api/pipeline/legacy/{history_id}/fork",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/NewVariationBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
@@ -1240,13 +1240,13 @@
       }
     },
     {
-      "path": "/api/pipeline/variations",
       "method": "POST",
       "operationId": "start_api_pipeline_variations_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/pipeline/variations",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/NewVariationBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
@@ -1254,7 +1254,6 @@
       }
     },
     {
-      "path": "/api/pipeline/variations/{variation_id}",
       "method": "GET",
       "operationId": "get_api_pipeline_variations__variation_id__get",
       "params": [
@@ -1262,6 +1261,7 @@
         "header:authorization:opt",
         "path:variation_id:req"
       ],
+      "path": "/api/pipeline/variations/{variation_id}",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
@@ -1269,7 +1269,6 @@
       }
     },
     {
-      "path": "/api/pipeline/variations/{variation_id}/fork-description",
       "method": "POST",
       "operationId": "fork_api_pipeline_variations__variation_id__fork_description_post",
       "params": [
@@ -1277,6 +1276,7 @@
         "header:authorization:opt",
         "path:variation_id:req"
       ],
+      "path": "/api/pipeline/variations/{variation_id}/fork-description",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ForkDescriptionBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
@@ -1284,7 +1284,6 @@
       }
     },
     {
-      "path": "/api/pipeline/variations/{variation_id}/system-prompts",
       "method": "GET",
       "operationId": "system_prompts_api_pipeline_variations__variation_id__system_prompts_get",
       "params": [
@@ -1292,6 +1291,7 @@
         "header:authorization:opt",
         "path:variation_id:req"
       ],
+      "path": "/api/pipeline/variations/{variation_id}/system-prompts",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
@@ -1299,13 +1299,13 @@
       }
     },
     {
-      "path": "/api/plugins",
       "method": "GET",
       "operationId": "api_plugins_api_plugins_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/plugins",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Plugins Api Plugins Get\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -1313,13 +1313,13 @@
       }
     },
     {
-      "path": "/api/plugins/packages",
       "method": "POST",
       "operationId": "api_plugin_package_install_api_plugins_packages_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/plugins/packages",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PluginPackageInstallBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Plugin Package Install Api Plugins Packages Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -1327,13 +1327,13 @@
       }
     },
     {
-      "path": "/api/plugins/packages/validate",
       "method": "POST",
       "operationId": "api_plugin_package_validate_api_plugins_packages_validate_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/plugins/packages/validate",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PluginPackageCheckBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Plugin Package Validate Api Plugins Packages Validate Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -1341,35 +1341,6 @@
       }
     },
     {
-      "path": "/api/plugins/reload",
-      "method": "POST",
-      "operationId": "api_plugins_reload_api_plugins_reload_post",
-      "params": [
-        "cookie:inku_session:opt",
-        "header:authorization:opt"
-      ],
-      "requestBody": "null",
-      "responses": {
-        "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Plugins Reload Api Plugins Reload Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
-        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
-      }
-    },
-    {
-      "path": "/api/plugins/validate",
-      "method": "POST",
-      "operationId": "api_plugins_validate_api_plugins_validate_post",
-      "params": [
-        "cookie:inku_session:opt",
-        "header:authorization:opt"
-      ],
-      "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PluginValidateBody\"}}},\"required\":true}",
-      "responses": {
-        "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Plugins Validate Api Plugins Validate Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
-        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
-      }
-    },
-    {
-      "path": "/api/plugins/{plugin_id}",
       "method": "DELETE",
       "operationId": "api_plugin_delete_api_plugins__plugin_id__delete",
       "params": [
@@ -1377,6 +1348,7 @@
         "header:authorization:opt",
         "path:plugin_id:req"
       ],
+      "path": "/api/plugins/{plugin_id}",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Plugin Delete Api Plugins  Plugin Id  Delete\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -1384,7 +1356,6 @@
       }
     },
     {
-      "path": "/api/plugins/{plugin_id}/enabled",
       "method": "PUT",
       "operationId": "api_plugin_set_enabled_api_plugins__plugin_id__enabled_put",
       "params": [
@@ -1392,6 +1363,7 @@
         "header:authorization:opt",
         "path:plugin_id:req"
       ],
+      "path": "/api/plugins/{plugin_id}/enabled",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PluginEnabledBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Plugin Set Enabled Api Plugins  Plugin Id  Enabled Put\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -1399,7 +1371,6 @@
       }
     },
     {
-      "path": "/api/plugins/{plugin_id}/export",
       "method": "GET",
       "operationId": "api_plugin_package_export_api_plugins__plugin_id__export_get",
       "params": [
@@ -1407,6 +1378,7 @@
         "header:authorization:opt",
         "path:plugin_id:req"
       ],
+      "path": "/api/plugins/{plugin_id}/export",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
@@ -1414,7 +1386,6 @@
       }
     },
     {
-      "path": "/api/plugins/{plugin_id}/words/{heading}/preview",
       "method": "DELETE",
       "operationId": "api_plugin_preview_reset_api_plugins__plugin_id__words__heading__preview_delete",
       "params": [
@@ -1423,6 +1394,7 @@
         "path:heading:req",
         "path:plugin_id:req"
       ],
+      "path": "/api/plugins/{plugin_id}/words/{heading}/preview",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Plugin Preview Reset Api Plugins  Plugin Id  Words  Heading  Preview Delete\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -1430,7 +1402,6 @@
       }
     },
     {
-      "path": "/api/plugins/{plugin_id}/words/{heading}/preview",
       "method": "PUT",
       "operationId": "api_plugin_preview_replace_api_plugins__plugin_id__words__heading__preview_put",
       "params": [
@@ -1439,6 +1410,7 @@
         "path:heading:req",
         "path:plugin_id:req"
       ],
+      "path": "/api/plugins/{plugin_id}/words/{heading}/preview",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PluginPreviewBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Plugin Preview Replace Api Plugins  Plugin Id  Words  Heading  Preview Put\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -1446,7 +1418,6 @@
       }
     },
     {
-      "path": "/api/reference",
       "method": "GET",
       "operationId": "api_reference_api_reference_get",
       "params": [
@@ -1454,6 +1425,7 @@
         "header:authorization:opt",
         "query:format:opt"
       ],
+      "path": "/api/reference",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
@@ -1461,7 +1433,6 @@
       }
     },
     {
-      "path": "/api/refine/autonomous",
       "method": "GET",
       "operationId": "api_autonomous_for_history_api_refine_autonomous_get",
       "params": [
@@ -1469,6 +1440,7 @@
         "header:authorization:opt",
         "query:history_id:req"
       ],
+      "path": "/api/refine/autonomous",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/AutonomousRunList\"}}},\"description\":\"Successful Response\"}",
@@ -1476,13 +1448,13 @@
       }
     },
     {
-      "path": "/api/refine/autonomous",
       "method": "POST",
       "operationId": "api_autonomous_start_api_refine_autonomous_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/refine/autonomous",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/AutonomousRunBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/AutonomousRunResponse\"}}},\"description\":\"Successful Response\"}",
@@ -1490,7 +1462,6 @@
       }
     },
     {
-      "path": "/api/refine/autonomous/{run_id}",
       "method": "GET",
       "operationId": "api_autonomous_get_api_refine_autonomous__run_id__get",
       "params": [
@@ -1498,6 +1469,7 @@
         "header:authorization:opt",
         "path:run_id:req"
       ],
+      "path": "/api/refine/autonomous/{run_id}",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/AutonomousRunResponse\"}}},\"description\":\"Successful Response\"}",
@@ -1505,7 +1477,6 @@
       }
     },
     {
-      "path": "/api/refine/autonomous/{run_id}/stop",
       "method": "POST",
       "operationId": "api_autonomous_stop_api_refine_autonomous__run_id__stop_post",
       "params": [
@@ -1513,6 +1484,7 @@
         "header:authorization:opt",
         "path:run_id:req"
       ],
+      "path": "/api/refine/autonomous/{run_id}/stop",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/AutonomousRunResponse\"}}},\"description\":\"Successful Response\"}",
@@ -1520,13 +1492,13 @@
       }
     },
     {
-      "path": "/api/refine/juxtaposition",
       "method": "POST",
       "operationId": "api_juxtaposition_api_refine_juxtaposition_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/refine/juxtaposition",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/JuxtapositionBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/JuxtapositionResponse\"}}},\"description\":\"Successful Response\"}",
@@ -1534,13 +1506,13 @@
       }
     },
     {
-      "path": "/api/render-canvas-fit",
       "method": "POST",
       "operationId": "api_render_canvas_fit_api_render_canvas_fit_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/render-canvas-fit",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/CanvasFitRenderRequest\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/RenderScoreResponse\"}}},\"description\":\"Successful Response\"}",
@@ -1548,13 +1520,13 @@
       }
     },
     {
-      "path": "/api/render-color-arrangement",
       "method": "POST",
       "operationId": "api_render_color_arrangement_api_render_color_arrangement_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/render-color-arrangement",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ColorArrangementRenderRequest\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/RenderScoreResponse\"}}},\"description\":\"Successful Response\"}",
@@ -1562,13 +1534,13 @@
       }
     },
     {
-      "path": "/api/render-ground-variant",
       "method": "POST",
       "operationId": "api_render_ground_variant_api_render_ground_variant_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/render-ground-variant",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/GroundVariantRenderRequest\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/GroundVariantResponse\"}}},\"description\":\"Successful Response\"}",
@@ -1576,13 +1548,13 @@
       }
     },
     {
-      "path": "/api/render-score",
       "method": "POST",
       "operationId": "api_render_score_api_render_score_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/render-score",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/RenderScoreRequest\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/RenderScoreResponse\"}}},\"description\":\"Successful Response\"}",
@@ -1590,13 +1562,13 @@
       }
     },
     {
-      "path": "/api/render-svg",
       "method": "POST",
       "operationId": "api_render_svg_api_render_svg_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/render-svg",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/RenderSvgRequest\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
@@ -1604,13 +1576,13 @@
       }
     },
     {
-      "path": "/api/render-tool-variant",
       "method": "POST",
       "operationId": "api_render_tool_variant_api_render_tool_variant_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/render-tool-variant",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ToolVariantRenderRequest\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ToolVariantResponse\"}}},\"description\":\"Successful Response\"}",
@@ -1618,7 +1590,6 @@
       }
     },
     {
-      "path": "/api/saijiki",
       "method": "GET",
       "operationId": "api_saijiki_api_saijiki_get",
       "params": [
@@ -1626,6 +1597,7 @@
         "header:authorization:opt",
         "query:lang:opt"
       ],
+      "path": "/api/saijiki",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Saijiki Api Saijiki Get\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -1633,7 +1605,6 @@
       }
     },
     {
-      "path": "/api/saijiki/plugin-preview",
       "method": "GET",
       "operationId": "api_plugin_preview_api_saijiki_plugin_preview_get",
       "params": [
@@ -1642,6 +1613,7 @@
         "query:name:req",
         "query:scale:opt"
       ],
+      "path": "/api/saijiki/plugin-preview",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
@@ -1649,13 +1621,13 @@
       }
     },
     {
-      "path": "/api/settings/db-backup",
       "method": "PUT",
       "operationId": "api_settings_update_db_backup_api_settings_db_backup_put",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/settings/db-backup",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DbBackupSettingsBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DbBackupStatus\"}}},\"description\":\"Successful Response\"}",
@@ -1663,13 +1635,13 @@
       }
     },
     {
-      "path": "/api/settings/db-backup/run",
       "method": "POST",
       "operationId": "api_settings_run_db_backup_api_settings_db_backup_run_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/settings/db-backup/run",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DbBackupResult\"}}},\"description\":\"Successful Response\"}",
@@ -1677,7 +1649,6 @@
       }
     },
     {
-      "path": "/api/settings/db-backup/{kind}/{name}",
       "method": "DELETE",
       "operationId": "api_settings_delete_db_backup_api_settings_db_backup__kind___name__delete",
       "params": [
@@ -1686,6 +1657,7 @@
         "path:kind:req",
         "path:name:req"
       ],
+      "path": "/api/settings/db-backup/{kind}/{name}",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DbBackupStatus\"}}},\"description\":\"Successful Response\"}",
@@ -1693,7 +1665,6 @@
       }
     },
     {
-      "path": "/api/settings/db-backup/{kind}/{name}/restore",
       "method": "POST",
       "operationId": "api_settings_restore_db_backup_api_settings_db_backup__kind___name__restore_post",
       "params": [
@@ -1702,6 +1673,7 @@
         "path:kind:req",
         "path:name:req"
       ],
+      "path": "/api/settings/db-backup/{kind}/{name}/restore",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DbBackupRestoreResult\"}}},\"description\":\"Successful Response\"}",
@@ -1709,13 +1681,13 @@
       }
     },
     {
-      "path": "/api/settings/db-write-lock",
       "method": "PUT",
       "operationId": "api_settings_update_db_write_lock_api_settings_db_write_lock_put",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/settings/db-write-lock",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DbWriteLockBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DbWriteLockStatus\"}}},\"description\":\"Successful Response\"}",
@@ -1723,13 +1695,13 @@
       }
     },
     {
-      "path": "/api/settings/description-meter",
       "method": "PUT",
       "operationId": "api_settings_update_description_meter_api_settings_description_meter_put",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/settings/description-meter",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DescriptionMeterBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DescriptionMeterStatus\"}}},\"description\":\"Successful Response\"}",
@@ -1737,13 +1709,13 @@
       }
     },
     {
-      "path": "/api/settings/image-upload-notice",
       "method": "PUT",
       "operationId": "api_settings_update_image_upload_notice_api_settings_image_upload_notice_put",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/settings/image-upload-notice",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ImageUploadNoticeBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ImageUploadNoticeStatus\"}}},\"description\":\"Successful Response\"}",
@@ -1751,13 +1723,13 @@
       }
     },
     {
-      "path": "/api/settings/juxtaposition",
       "method": "PUT",
       "operationId": "api_settings_update_juxtaposition_api_settings_juxtaposition_put",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/settings/juxtaposition",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/JuxtapositionSettingsBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/JuxtapositionSettingsStatus\"}}},\"description\":\"Successful Response\"}",
@@ -1765,13 +1737,13 @@
       }
     },
     {
-      "path": "/api/settings/limits",
       "method": "PUT",
       "operationId": "api_settings_update_limits_api_settings_limits_put",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/settings/limits",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/RenderLimitsBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/RenderLimitsStatus\"}}},\"description\":\"Successful Response\"}",
@@ -1779,13 +1751,13 @@
       }
     },
     {
-      "path": "/api/settings/log-retention",
       "method": "PUT",
       "operationId": "api_settings_update_log_retention_api_settings_log_retention_put",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/settings/log-retention",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/LogRetentionSettingsBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/LogRetentionStatus\"}}},\"description\":\"Successful Response\"}",
@@ -1793,13 +1765,13 @@
       }
     },
     {
-      "path": "/api/settings/models",
       "method": "GET",
       "operationId": "api_settings_models_api_settings_models_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/settings/models",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ModelSettingsResponse\"}}},\"description\":\"Successful Response\"}",
@@ -1807,13 +1779,13 @@
       }
     },
     {
-      "path": "/api/settings/models",
       "method": "PUT",
       "operationId": "api_settings_update_models_api_settings_models_put",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/settings/models",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ModelSettingsPatch\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ModelSettingsResponse\"}}},\"description\":\"Successful Response\"}",
@@ -1821,13 +1793,13 @@
       }
     },
     {
-      "path": "/api/settings/models/validate",
       "method": "POST",
       "operationId": "api_settings_validate_model_provider_api_settings_models_validate_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/settings/models/validate",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ModelProviderValidationBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ModelProviderValidationResult\"}}},\"description\":\"Successful Response\"}",
@@ -1835,7 +1807,6 @@
       }
     },
     {
-      "path": "/api/settings/models/{provider_id}/fetch-models",
       "method": "POST",
       "operationId": "api_settings_fetch_provider_models_api_settings_models__provider_id__fetch_models_post",
       "params": [
@@ -1843,6 +1814,7 @@
         "header:authorization:opt",
         "path:provider_id:req"
       ],
+      "path": "/api/settings/models/{provider_id}/fetch-models",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ModelSettingsResponse\"}}},\"description\":\"Successful Response\"}",
@@ -1850,13 +1822,13 @@
       }
     },
     {
-      "path": "/api/settings/output-save",
       "method": "PUT",
       "operationId": "api_settings_update_output_save_api_settings_output_save_put",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/settings/output-save",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/OutputSaveSettingsBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/OutputSaveStatus\"}}},\"description\":\"Successful Response\"}",
@@ -1864,13 +1836,13 @@
       }
     },
     {
-      "path": "/api/settings/render-concurrency",
       "method": "PUT",
       "operationId": "api_settings_update_render_concurrency_api_settings_render_concurrency_put",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/settings/render-concurrency",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/RenderConcurrencyBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/RenderConcurrencyStatus\"}}},\"description\":\"Successful Response\"}",
@@ -1878,13 +1850,13 @@
       }
     },
     {
-      "path": "/api/settings/single-user",
       "method": "GET",
       "operationId": "api_settings_single_user_api_settings_single_user_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/settings/single-user",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/SingleUserStatus\"}}},\"description\":\"Successful Response\"}",
@@ -1892,13 +1864,13 @@
       }
     },
     {
-      "path": "/api/settings/single-user",
       "method": "PUT",
       "operationId": "api_settings_set_single_user_api_settings_single_user_put",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/settings/single-user",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/SingleUserBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/SingleUserStatus\"}}},\"description\":\"Successful Response\"}",
@@ -1906,13 +1878,13 @@
       }
     },
     {
-      "path": "/api/settings/status",
       "method": "GET",
       "operationId": "api_settings_status_api_settings_status_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/settings/status",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/SettingsStatusResponse\"}}},\"description\":\"Successful Response\"}",
@@ -1920,13 +1892,13 @@
       }
     },
     {
-      "path": "/api/settings/thumbnails",
       "method": "GET",
       "operationId": "api_settings_thumbnails_api_settings_thumbnails_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/settings/thumbnails",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ThumbnailStatus\"}}},\"description\":\"Successful Response\"}",
@@ -1934,13 +1906,13 @@
       }
     },
     {
-      "path": "/api/settings/thumbnails",
       "method": "PUT",
       "operationId": "api_settings_update_thumbnails_api_settings_thumbnails_put",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/settings/thumbnails",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ThumbnailSettingsBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ThumbnailStatus\"}}},\"description\":\"Successful Response\"}",
@@ -1948,13 +1920,13 @@
       }
     },
     {
-      "path": "/api/settings/thumbnails/rebuild",
       "method": "GET",
       "operationId": "api_settings_thumbnail_rebuild_status_api_settings_thumbnails_rebuild_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/settings/thumbnails/rebuild",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ThumbnailStatus\"}}},\"description\":\"Successful Response\"}",
@@ -1962,13 +1934,13 @@
       }
     },
     {
-      "path": "/api/settings/thumbnails/rebuild",
       "method": "POST",
       "operationId": "api_settings_thumbnail_rebuild_api_settings_thumbnails_rebuild_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/settings/thumbnails/rebuild",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ThumbnailStatus\"}}},\"description\":\"Successful Response\"}",
@@ -1976,13 +1948,13 @@
       }
     },
     {
-      "path": "/api/tool-variants/plan",
       "method": "POST",
       "operationId": "api_tool_variant_plan_api_tool_variants_plan_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/tool-variants/plan",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ToolVariantPlanRequest\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Tool Variant Plan Api Tool Variants Plan Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -1990,13 +1962,13 @@
       }
     },
     {
-      "path": "/api/user-groups",
       "method": "GET",
       "operationId": "api_user_groups_list_api_user_groups_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/user-groups",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"items\":{\"$ref\":\"#/components/schemas/UserGroupItem\"},\"title\":\"Response Api User Groups List Api User Groups Get\",\"type\":\"array\"}}},\"description\":\"Successful Response\"}",
@@ -2004,13 +1976,13 @@
       }
     },
     {
-      "path": "/api/user-groups",
       "method": "POST",
       "operationId": "api_user_groups_create_api_user_groups_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/user-groups",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserGroupCreateBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserGroupItem\"}}},\"description\":\"Successful Response\"}",
@@ -2018,7 +1990,6 @@
       }
     },
     {
-      "path": "/api/user-groups/{group_id}",
       "method": "DELETE",
       "operationId": "api_user_groups_delete_api_user_groups__group_id__delete",
       "params": [
@@ -2026,6 +1997,7 @@
         "header:authorization:opt",
         "path:group_id:req"
       ],
+      "path": "/api/user-groups/{group_id}",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":{\"type\":\"boolean\"},\"title\":\"Response Api User Groups Delete Api User Groups  Group Id  Delete\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -2033,7 +2005,6 @@
       }
     },
     {
-      "path": "/api/user-groups/{group_id}",
       "method": "PATCH",
       "operationId": "api_user_groups_update_api_user_groups__group_id__patch",
       "params": [
@@ -2041,6 +2012,7 @@
         "header:authorization:opt",
         "path:group_id:req"
       ],
+      "path": "/api/user-groups/{group_id}",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserGroupUpdateBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserGroupItem\"}}},\"description\":\"Successful Response\"}",
@@ -2048,13 +2020,13 @@
       }
     },
     {
-      "path": "/api/users",
       "method": "GET",
       "operationId": "api_users_list_api_users_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/users",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"items\":{\"$ref\":\"#/components/schemas/UserAccountItem\"},\"title\":\"Response Api Users List Api Users Get\",\"type\":\"array\"}}},\"description\":\"Successful Response\"}",
@@ -2062,13 +2034,13 @@
       }
     },
     {
-      "path": "/api/users",
       "method": "POST",
       "operationId": "api_users_create_api_users_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
+      "path": "/api/users",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserAccountCreateBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserAccountItem\"}}},\"description\":\"Successful Response\"}",
@@ -2076,7 +2048,6 @@
       }
     },
     {
-      "path": "/api/users/{user_id}",
       "method": "DELETE",
       "operationId": "api_users_delete_api_users__user_id__delete",
       "params": [
@@ -2085,6 +2056,7 @@
         "path:user_id:req",
         "query:cascade:opt"
       ],
+      "path": "/api/users/{user_id}",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":{\"type\":\"boolean\"},\"title\":\"Response Api Users Delete Api Users  User Id  Delete\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -2092,7 +2064,6 @@
       }
     },
     {
-      "path": "/api/users/{user_id}",
       "method": "PATCH",
       "operationId": "api_users_update_api_users__user_id__patch",
       "params": [
@@ -2100,6 +2071,7 @@
         "header:authorization:opt",
         "path:user_id:req"
       ],
+      "path": "/api/users/{user_id}",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserAccountUpdateBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserAccountItem\"}}},\"description\":\"Successful Response\"}",
@@ -2107,16 +2079,17 @@
       }
     },
     {
-      "path": "/health",
       "method": "GET",
       "operationId": "health_health_get",
       "params": [],
+      "path": "/health",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":{\"type\":\"boolean\"},\"title\":\"Response Health Health Get\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}"
       }
     }
   ],
+  "schema_count": 211,
   "schemas": {
     "AnchorPoint": "{\"additionalProperties\":false,\"description\":\"A non-drawing explicit point that Relations may target.\",\"properties\":{\"at\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/AtRegion\"},{\"type\":\"null\"}],\"description\":\"Named placement region that is resolved to a point when the work is performed. Set exactly one of position or at.\"},\"position\":{\"anyOf\":[{\"maxItems\":2,\"minItems\":2,\"prefixItems\":[{\"type\":\"number\"},{\"type\":\"number\"}],\"type\":\"array\"},{\"type\":\"null\"}],\"description\":\"Point [x, y] in unit-canvas coordinates, each 0.0-1.0. Set exactly one of position or at.\",\"title\":\"Position\"}},\"title\":\"AnchorPoint\",\"type\":\"object\"}",
     "AnimationExportBody": "{\"properties\":{\"format\":{\"default\":\"apng\",\"description\":\"File format of the animation: apng or gif.\",\"enum\":[\"apng\",\"gif\"],\"title\":\"Format\",\"type\":\"string\"},\"height_px\":{\"anyOf\":[{\"maximum\":12000.0,\"minimum\":64.0,\"type\":\"integer\"},{\"type\":\"null\"}],\"description\":\"Height of each frame in pixels, from 64 to 12000. Omit to use the height of the chosen resolution.\",\"title\":\"Height Px\"},\"hold_seconds\":{\"default\":1.0,\"description\":\"Seconds each frame is held, from 0.1 to 30.\",\"maximum\":30.0,\"minimum\":0.1,\"title\":\"Hold Seconds\",\"type\":\"number\"},\"ids\":{\"description\":\"Ids of the works to animate, in playing order. One id makes a layer animation of that work; several make a sequence. Duplicates are removed, keeping the first.\",\"items\":{\"type\":\"string\"},\"maxItems\":100,\"minItems\":1,\"title\":\"Ids\",\"type\":\"array\"},\"layer_frame_count\":{\"default\":12,\"description\":\"Number of frames in a layer animation of a single work, from 2 to 120. Not used for a sequence.\",\"maximum\":120.0,\"minimum\":2.0,\"title\":\"Layer Frame Count\",\"type\":\"integer\"},\"pattern\":{\"default\":\"cut\",\"description\":\"Transition between works in a sequence: cut, crossfade, fade_white or slide. Not used for a single work.\",\"enum\":[\"cut\",\"crossfade\",\"fade_white\",\"slide\"],\"title\":\"Pattern\",\"type\":\"string\"},\"replay\":{\"default\":\"restart\",\"description\":\"How a layer animation plays: restart (loop from the start), reverse (loop back and forth) or once (play one time). Not used for a sequence.\",\"enum\":[\"restart\",\"reverse\",\"once\"],\"title\":\"Replay\",\"type\":\"string\"},\"resolution\":{\"default\":\"1k\",\"description\":\"Frame height of the animation: 1k is 1080 px, 4k is 2160 px, 8k is 4320 px. Not used when height_px is set.\",\"enum\":[\"1k\",\"4k\",\"8k\"],\"title\":\"Resolution\",\"type\":\"string\"}},\"required\":[\"ids\"],\"title\":\"AnimationExportBody\",\"type\":\"object\"}",
@@ -2149,7 +2122,7 @@
     "ColorArrangementRenderRequest": "{\"properties\":{\"index\":{\"description\":\"Index of the color arrangement to draw, as listed by the plan.\",\"minimum\":0.0,\"title\":\"Index\",\"type\":\"integer\"},\"wild\":{\"anyOf\":[{\"type\":\"boolean\"},{\"type\":\"null\"}],\"description\":\"Lift the stroke limit; omitted or null means off.\",\"title\":\"Wild\"},\"work_id\":{\"description\":\"Id of the saved work to draw in a color arrangement.\",\"maxLength\":200,\"minLength\":1,\"title\":\"Work Id\",\"type\":\"string\"}},\"required\":[\"work_id\",\"index\"],\"title\":\"ColorArrangementRenderRequest\",\"type\":\"object\"}",
     "ColorCatalogsResponse": "{\"properties\":{\"catalogs\":{\"description\":\"The color catalogs in server order. Each entry is a catalog object whose keys are defined by the catalog data.\",\"items\":{\"additionalProperties\":true,\"type\":\"object\"},\"title\":\"Catalogs\",\"type\":\"array\"},\"default_catalog_id\":{\"description\":\"Identifier of the catalog used when a request names none.\",\"title\":\"Default Catalog Id\",\"type\":\"string\"},\"renamed_catalog_ids\":{\"additionalProperties\":{\"type\":\"string\"},\"description\":\"Maps each old catalog identifier to the current identifier that replaces it. An identifier in neither catalogs nor this map is retired.\",\"title\":\"Renamed Catalog Ids\",\"type\":\"object\"}},\"required\":[\"default_catalog_id\",\"catalogs\",\"renamed_catalog_ids\"],\"title\":\"ColorCatalogsResponse\",\"type\":\"object\"}",
     "CompletionRangeStatesBody": "{\"additionalProperties\":false,\"properties\":{\"execution_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"ID of an execution whose completion ranges are read. Give exactly one of history_id and execution_id.\",\"title\":\"Execution Id\"},\"history_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"ID of a saved work whose completion ranges are read. Give exactly one of history_id and execution_id.\",\"title\":\"History Id\"},\"source\":{\"description\":\"DDL source whose completion range states are read.\",\"title\":\"Source\",\"type\":\"string\"}},\"required\":[\"source\"],\"title\":\"CompletionRangeStatesBody\",\"type\":\"object\"}",
-    "ComposeRequest": "{\"properties\":{\"auto_repair\":{\"default\":true,\"description\":\"Deprecated compatibility field; ignored\",\"title\":\"Auto Repair\",\"type\":\"boolean\"},\"canvas_aspect\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Canvas aspect plugin selection\",\"title\":\"Canvas Aspect\"},\"catalog_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"使用するサーバー側色カタログID\",\"title\":\"Catalog Id\"},\"color_map\":{\"anyOf\":[{\"additionalProperties\":{\"type\":\"string\"},\"type\":\"object\"},{\"type\":\"null\"}],\"description\":\"Deprecated: ignored; catalog_id is resolved server-side\",\"title\":\"Color Map\"},\"composition_seed\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"description\":\"Composition seed for shared-pipeline layout; omitted means the placement follows the performance seed\",\"title\":\"Composition Seed\"},\"ddl\":{\"description\":\"正規化DDL テキスト\",\"maxLength\":100000,\"minLength\":1,\"title\":\"Ddl\",\"type\":\"string\"},\"derivation_kind\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Accepted for compatibility. /api/compose saves nothing, so no kind is recorded.\",\"title\":\"Derivation Kind\"},\"derivation_metadata\":{\"additionalProperties\":true,\"description\":\"Accepted for compatibility. /api/compose saves nothing, so nothing is recorded on a lineage edge. Defaults to an empty object.\",\"title\":\"Derivation Metadata\",\"type\":\"object\"},\"description\":{\"anyOf\":[{\"maxLength\":100000,\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"作者が書いた記述 (省略可)\",\"title\":\"Description\"},\"fires_on\":{\"anyOf\":[{\"maxLength\":200,\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Deprecated compatibility field; ignored\",\"title\":\"Fires On\"},\"imported_plugins\":{\"anyOf\":[{\"items\":{\"additionalProperties\":true,\"type\":\"object\"},\"maxItems\":64,\"type\":\"array\"},{\"type\":\"null\"}],\"description\":\"DDL書き出し(inku.ddl-export.v1)が運ぶプラグイン定義。この新しい作品だけで使う\",\"title\":\"Imported Plugins\"},\"instruction_lang\":{\"default\":\"auto\",\"description\":\"指示文言語 (auto / ja / en)\",\"title\":\"Instruction Lang\",\"type\":\"string\"},\"limits\":{\"anyOf\":[{\"additionalProperties\":{\"type\":\"integer\"},\"type\":\"object\"},{\"type\":\"null\"}],\"description\":\"Draw under these limits instead of the installation's settings. Missing keys keep their default, and each value is capped at today's setting -- a request can only lower a limit, never raise one. Omitted means the work's own recorded limits (when a work_id is given) or today's settings. A managed saved work keeps its locked compiler resource policy.\",\"title\":\"Limits\"},\"lineage_parent_node_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Accepted for compatibility. /api/compose saves nothing, so no lineage node or edge is written.\",\"title\":\"Lineage Parent Node Id\"},\"model\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Stage 2 モデル名 (未指定時は利用者の Stage 2 既定)\",\"title\":\"Model\"},\"recompose_mode\":{\"anyOf\":[{\"enum\":[\"principled\",\"chance\"],\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Choose the saved DDL's numeric ranges again; omission keeps the existing rebuild\",\"title\":\"Recompose Mode\"},\"render_seed\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"description\":\"Renderer performance seed for reproducible replay\",\"title\":\"Render Seed\"},\"sketch_grain\":{\"anyOf\":[{\"pattern\":\"^(fine|coarse)$\",\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"写生の区切り fine / coarse (記録・再現用。この経路では 0.5 を呼ばない)\",\"title\":\"Sketch Grain\"},\"sketch_text\":{\"anyOf\":[{\"maxLength\":100000,\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"保存済みの写生文。記述を置換せず補足する。この入口では写生を呼ばない\",\"title\":\"Sketch Text\"},\"ui_lang\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"UI表示言語\",\"title\":\"Ui Lang\"},\"wild\":{\"default\":false,\"description\":\"Unleash the stroke performance (removes the amplitude ceiling); recorded and replayed like the seed\",\"title\":\"Wild\",\"type\":\"boolean\"},\"work_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Id of the saved work being drawn again; the run forks from it with its saved settings and seeds\",\"title\":\"Work Id\"}},\"required\":[\"ddl\"],\"title\":\"ComposeRequest\",\"type\":\"object\"}",
+    "ComposeRequest": "{\"properties\":{\"auto_repair\":{\"default\":true,\"description\":\"Deprecated compatibility field; ignored\",\"title\":\"Auto Repair\",\"type\":\"boolean\"},\"canvas_aspect\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Canvas aspect plugin selection\",\"title\":\"Canvas Aspect\"},\"catalog_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"使用するサーバー側色カタログID\",\"title\":\"Catalog Id\"},\"color_map\":{\"anyOf\":[{\"additionalProperties\":{\"type\":\"string\"},\"type\":\"object\"},{\"type\":\"null\"}],\"description\":\"Deprecated: ignored; catalog_id is resolved server-side\",\"title\":\"Color Map\"},\"composition_seed\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"description\":\"Composition seed for shared-pipeline layout; omitted means the placement follows the performance seed\",\"title\":\"Composition Seed\"},\"ddl\":{\"description\":\"正規化DDL テキスト\",\"maxLength\":100000,\"minLength\":1,\"title\":\"Ddl\",\"type\":\"string\"},\"derivation_kind\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Accepted for compatibility. /api/compose saves nothing, so no kind is recorded.\",\"title\":\"Derivation Kind\"},\"derivation_metadata\":{\"additionalProperties\":true,\"description\":\"Accepted for compatibility. /api/compose saves nothing, so nothing is recorded on a lineage edge. Defaults to an empty object.\",\"title\":\"Derivation Metadata\",\"type\":\"object\"},\"description\":{\"anyOf\":[{\"maxLength\":100000,\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"作者が書いた記述 (省略可)\",\"title\":\"Description\"},\"fires_on\":{\"anyOf\":[{\"maxLength\":200,\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Deprecated compatibility field; ignored\",\"title\":\"Fires On\"},\"imported_plugins\":{\"anyOf\":[{\"items\":{\"additionalProperties\":true,\"type\":\"object\"},\"maxItems\":64,\"type\":\"array\"},{\"type\":\"null\"}],\"description\":\"DDL書き出し(inku.ddl-export.v2)が運ぶプラグイン定義と note。この新しい作品だけで使う\",\"title\":\"Imported Plugins\"},\"instruction_lang\":{\"default\":\"auto\",\"description\":\"指示文言語 (auto / ja / en)\",\"title\":\"Instruction Lang\",\"type\":\"string\"},\"limits\":{\"anyOf\":[{\"additionalProperties\":{\"type\":\"integer\"},\"type\":\"object\"},{\"type\":\"null\"}],\"description\":\"Draw under these limits instead of the installation's settings. Missing keys keep their default, and each value is capped at today's setting -- a request can only lower a limit, never raise one. Omitted means the work's own recorded limits (when a work_id is given) or today's settings. A managed saved work keeps its locked compiler resource policy.\",\"title\":\"Limits\"},\"lineage_parent_node_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Accepted for compatibility. /api/compose saves nothing, so no lineage node or edge is written.\",\"title\":\"Lineage Parent Node Id\"},\"model\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Stage 2 モデル名 (未指定時は利用者の Stage 2 既定)\",\"title\":\"Model\"},\"recompose_mode\":{\"anyOf\":[{\"enum\":[\"principled\",\"chance\"],\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Choose the saved DDL's numeric ranges again; omission keeps the existing rebuild\",\"title\":\"Recompose Mode\"},\"render_seed\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"description\":\"Renderer performance seed for reproducible replay\",\"title\":\"Render Seed\"},\"sketch_grain\":{\"anyOf\":[{\"pattern\":\"^(fine|coarse)$\",\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"写生の区切り fine / coarse (記録・再現用。この経路では 0.5 を呼ばない)\",\"title\":\"Sketch Grain\"},\"sketch_text\":{\"anyOf\":[{\"maxLength\":100000,\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"保存済みの写生文。記述を置換せず補足する。この入口では写生を呼ばない\",\"title\":\"Sketch Text\"},\"ui_lang\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"UI表示言語\",\"title\":\"Ui Lang\"},\"wild\":{\"default\":false,\"description\":\"Unleash the stroke performance (removes the amplitude ceiling); recorded and replayed like the seed\",\"title\":\"Wild\",\"type\":\"boolean\"},\"work_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Id of the saved work being drawn again; the run forks from it with its saved settings and seeds\",\"title\":\"Work Id\"}},\"required\":[\"ddl\"],\"title\":\"ComposeRequest\",\"type\":\"object\"}",
     "ComposeResponse": "{\"properties\":{\"carriage_warnings\":{\"anyOf\":[{\"items\":{\"type\":\"string\"},\"type\":\"array\"},{\"type\":\"null\"}],\"description\":\"Warnings from the carriage-contract check. The check only inspects the instructions and does not change the drawing. None when none were recorded.\",\"title\":\"Carriage Warnings\"},\"coerce_branch_counts\":{\"additionalProperties\":{\"type\":\"integer\"},\"description\":\"Count of coercion results per branch, keyed by branch name.\",\"title\":\"Coerce Branch Counts\",\"type\":\"object\"},\"coerce_relation_drop_rate\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}],\"description\":\"Fraction of relations dropped during coercion. None when there were no relations.\",\"title\":\"Coerce Relation Drop Rate\"},\"coerce_relation_dropped_count\":{\"default\":0,\"description\":\"Number of relations dropped during coercion.\",\"title\":\"Coerce Relation Dropped Count\",\"type\":\"integer\"},\"coerce_relation_input_count\":{\"default\":0,\"description\":\"Number of relations in the input before coercion.\",\"title\":\"Coerce Relation Input Count\",\"type\":\"integer\"},\"coerce_relation_output_count\":{\"default\":0,\"description\":\"Number of relations left after coercion.\",\"title\":\"Coerce Relation Output Count\",\"type\":\"integer\"},\"coerce_warnings\":{\"description\":\"Warnings raised during coercion. Empty when there are none.\",\"items\":{\"type\":\"string\"},\"title\":\"Coerce Warnings\",\"type\":\"array\"},\"compiler_outcome\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Outcome of the score compiler for this drawing.\",\"title\":\"Compiler Outcome\"},\"composition_seed\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Composition seed that the drawing used. None means the placement followed the performance seed. Serialized as a string.\",\"title\":\"Composition Seed\"},\"ddl\":{\"description\":\"The committed instructions (normalized DDL) that were drawn.\",\"title\":\"Ddl\",\"type\":\"string\"},\"ddl_engine_version\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Version of the DDL engine that read the instructions.\",\"title\":\"Ddl Engine Version\"},\"ddl_version\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Version of the instruction (DDL) format the drawing was written in.\",\"title\":\"Ddl Version\"},\"elapsed_ms\":{\"default\":0,\"description\":\"Total time the request took, in milliseconds.\",\"title\":\"Elapsed Ms\",\"type\":\"integer\"},\"fallback_used\":{\"default\":false,\"description\":\"Whether the fallback composition was used instead of the model's answer.\",\"title\":\"Fallback Used\",\"type\":\"boolean\"},\"instruction_lang_requested\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Instruction language the request asked for: auto, ja, or en.\",\"title\":\"Instruction Lang Requested\"},\"instruction_lang_resolved\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Instruction language actually used after resolving auto.\",\"title\":\"Instruction Lang Resolved\"},\"pipeline_diagnostics\":{\"anyOf\":[{\"additionalProperties\":true,\"type\":\"object\"},{\"type\":\"null\"}],\"description\":\"Diagnostics recorded by the pipeline for this drawing. None when none were recorded.\",\"title\":\"Pipeline Diagnostics\"},\"pipeline_execution_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Identifier of the pipeline execution run for this drawing.\",\"title\":\"Pipeline Execution Id\"},\"pipeline_revision\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Revision of the shared pipeline that produced the drawing.\",\"title\":\"Pipeline Revision\"},\"pipeline_variation_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Identifier of the pipeline variation that produced the drawing.\",\"title\":\"Pipeline Variation Id\"},\"plugin_provenance\":{\"description\":\"Plugins used by the committed instructions, as string records. Empty when none were used.\",\"items\":{\"additionalProperties\":{\"type\":\"string\"},\"type\":\"object\"},\"title\":\"Plugin Provenance\",\"type\":\"array\"},\"plugin_warnings\":{\"description\":\"Warnings raised while resolving the plugins used by the instructions. Empty when there are none.\",\"items\":{\"type\":\"string\"},\"title\":\"Plugin Warnings\",\"type\":\"array\"},\"recomposition\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/RecompositionResult\"},{\"type\":\"null\"}],\"description\":\"Result of the layout re-choice when recompose_mode was given. None when no re-choice ran.\"},\"render_build_number\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Build number of the server that rendered the drawing.\",\"title\":\"Render Build Number\"},\"render_canvas_aspect\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Canvas aspect used for the drawing, as the aspect's identifier.\",\"title\":\"Render Canvas Aspect\"},\"render_canvas_aspect_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Identifier of the canvas aspect used.\",\"title\":\"Render Canvas Aspect Id\"},\"render_canvas_aspect_ratio\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}],\"description\":\"Width-to-height ratio of the canvas aspect used.\",\"title\":\"Render Canvas Aspect Ratio\"},\"render_color_catalog_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Identifier of the color catalog used for the drawing.\",\"title\":\"Render Color Catalog Id\"},\"render_color_catalog_name\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Display name of the color catalog used.\",\"title\":\"Render Color Catalog Name\"},\"render_color_catalog_sub\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Secondary display label of the color catalog used.\",\"title\":\"Render Color Catalog Sub\"},\"render_color_map\":{\"anyOf\":[{\"additionalProperties\":{\"type\":\"string\"},\"type\":\"object\"},{\"type\":\"null\"}],\"description\":\"Map from color names to hex colors that the drawing used.\",\"title\":\"Render Color Map\"},\"render_color_profile\":{\"anyOf\":[{\"additionalProperties\":{\"type\":\"string\"},\"type\":\"object\"},{\"type\":\"null\"}],\"description\":\"Color profile of the output (sRGB), as an object of profile fields.\",\"title\":\"Render Color Profile\"},\"render_engine_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Identifier of the render engine that drew the image.\",\"title\":\"Render Engine Id\"},\"render_engine_version\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Version of the render engine that drew the image.\",\"title\":\"Render Engine Version\"},\"render_hash\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Hash that identifies this render from its inputs and output.\",\"title\":\"Render Hash\"},\"render_hash_short\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Short form of render_hash for display.\",\"title\":\"Render Hash Short\"},\"render_limit_notes\":{\"anyOf\":[{\"items\":{\"type\":\"string\"},\"type\":\"array\"},{\"type\":\"null\"}],\"description\":\"Notes on what the hard ceiling changed, when it fired. None when it did not fire.\",\"title\":\"Render Limit Notes\"},\"render_limits\":{\"anyOf\":[{\"additionalProperties\":{\"type\":\"integer\"},\"type\":\"object\"},{\"type\":\"null\"}],\"description\":\"The limits that governed this drawing. None when they were not recorded, which means drawn before they were recorded, not the defaults.\",\"title\":\"Render Limits\"},\"render_limits_source\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Where render_limits came from: request, work, work_unrecorded, or settings.\",\"title\":\"Render Limits Source\"},\"render_seed\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Performance seed that the drawing used, so it can be replayed. Serialized as a string.\",\"title\":\"Render Seed\"},\"render_wild\":{\"anyOf\":[{\"type\":\"boolean\"},{\"type\":\"null\"}],\"description\":\"Whether the wild stroke performance (no amplitude ceiling) was used.\",\"title\":\"Render Wild\"},\"retry_count\":{\"default\":0,\"description\":\"Number of times the composition was retried.\",\"title\":\"Retry Count\",\"type\":\"integer\"},\"retry_reasons\":{\"description\":\"Reasons for each composition retry, in order. Empty when there were no retries.\",\"items\":{\"type\":\"string\"},\"title\":\"Retry Reasons\",\"type\":\"array\"},\"score\":{\"additionalProperties\":true,\"description\":\"The drawing score (JSON Score) as an object.\",\"title\":\"Score\",\"type\":\"object\"},\"sketch_grain\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Grain of the sketch from life: fine or coarse.\",\"title\":\"Sketch Grain\"},\"sketch_state\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"State of the sketch from life for this drawing, such as off, fine, coarse, fallback, not_needed, or supplemented. The client saves it with the drawing.\",\"title\":\"Sketch State\"},\"sketch_text\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Sketch from life text that accompanied the drawing, kept as context beside the description.\",\"title\":\"Sketch Text\"},\"stage2_model\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Name of the model that composed the score (Stage 2). None when not recorded.\",\"title\":\"Stage2 Model\"},\"svg\":{\"description\":\"The rendered SVG markup of the drawing.\",\"title\":\"Svg\",\"type\":\"string\"},\"tokens_in\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"description\":\"Input tokens the model used. None when no model was called or the count was not recorded.\",\"title\":\"Tokens In\"},\"tokens_out\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"description\":\"Output tokens the model produced. None when no model was called or the count was not recorded.\",\"title\":\"Tokens Out\"},\"ui_lang\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Display language of the interface that made the request.\",\"title\":\"Ui Lang\"}},\"required\":[\"ddl\",\"score\",\"svg\"],\"title\":\"ComposeResponse\",\"type\":\"object\"}",
     "CompositionMove": "{\"description\":\"One move of a sentence from one composition range to another.\",\"properties\":{\"from\":{\"description\":\"The display words of the range the layer moves from.\",\"minLength\":1,\"title\":\"From\",\"type\":\"string\"},\"from_key\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"The key of the range the layer moves from, or null when not given.\",\"title\":\"From Key\"},\"layer\":{\"description\":\"The zero-based index of the layer that moves.\",\"minimum\":0.0,\"title\":\"Layer\",\"type\":\"integer\"},\"to\":{\"description\":\"The display words of the range the layer moves to.\",\"minLength\":1,\"title\":\"To\",\"type\":\"string\"},\"to_key\":{\"description\":\"The key of the range the layer moves to.\",\"minLength\":1,\"title\":\"To Key\",\"type\":\"string\"}},\"required\":[\"layer\",\"from\",\"to_key\",\"to\"],\"title\":\"CompositionMove\",\"type\":\"object\"}",
     "CompositionRange": "{\"description\":\"One range of allowed positions for a layer, with its display words.\",\"properties\":{\"bounds\":{\"description\":\"The four corners of the range as exact fractions, each a [numerator, denominator] pair with a numerator of 0 or more and a denominator above 0.\",\"maxItems\":4,\"minItems\":4,\"prefixItems\":[{\"maxItems\":2,\"minItems\":2,\"prefixItems\":[{\"minimum\":0.0,\"type\":\"integer\"},{\"exclusiveMinimum\":0.0,\"type\":\"integer\"}],\"type\":\"array\"},{\"maxItems\":2,\"minItems\":2,\"prefixItems\":[{\"minimum\":0.0,\"type\":\"integer\"},{\"exclusiveMinimum\":0.0,\"type\":\"integer\"}],\"type\":\"array\"},{\"maxItems\":2,\"minItems\":2,\"prefixItems\":[{\"minimum\":0.0,\"type\":\"integer\"},{\"exclusiveMinimum\":0.0,\"type\":\"integer\"}],\"type\":\"array\"},{\"maxItems\":2,\"minItems\":2,\"prefixItems\":[{\"minimum\":0.0,\"type\":\"integer\"},{\"exclusiveMinimum\":0.0,\"type\":\"integer\"}],\"type\":\"array\"}],\"title\":\"Bounds\",\"type\":\"array\"},\"corner\":{\"description\":\"True when the range is a corner of the canvas.\",\"title\":\"Corner\",\"type\":\"boolean\"},\"key\":{\"description\":\"The identifier of the range.\",\"minLength\":1,\"title\":\"Key\",\"type\":\"string\"},\"words\":{\"$ref\":\"#/components/schemas/CompositionRangeWords\",\"description\":\"The Japanese and English display names of the range.\"}},\"required\":[\"key\",\"words\",\"bounds\",\"corner\"],\"title\":\"CompositionRange\",\"type\":\"object\"}",
@@ -2248,6 +2221,7 @@
     "NumericFillTargetAnchor": "{\"additionalProperties\":false,\"properties\":{\"kind\":{\"const\":\"numeric\",\"description\":\"Always \\\"numeric\\\".\",\"title\":\"Kind\",\"type\":\"string\"},\"point\":{\"description\":\"Anchor point [x, y] written in the DDL, in unit-canvas coordinates.\",\"maxItems\":2,\"minItems\":2,\"prefixItems\":[{\"type\":\"number\"},{\"type\":\"number\"}],\"title\":\"Point\",\"type\":\"array\"}},\"required\":[\"kind\",\"point\"],\"title\":\"NumericFillTargetAnchor\",\"type\":\"object\"}",
     "NumericPlacementAnchor": "{\"additionalProperties\":false,\"properties\":{\"kind\":{\"const\":\"numeric\",\"description\":\"Always \\\"numeric\\\".\",\"title\":\"Kind\",\"type\":\"string\"},\"point\":{\"description\":\"Anchor point [x, y] written in the DDL, in unit-canvas coordinates.\",\"maxItems\":2,\"minItems\":2,\"prefixItems\":[{\"type\":\"number\"},{\"type\":\"number\"}],\"title\":\"Point\",\"type\":\"array\"}},\"required\":[\"kind\",\"point\"],\"title\":\"NumericPlacementAnchor\",\"type\":\"object\"}",
     "NumericRangeTargetOwner": "{\"additionalProperties\":false,\"properties\":{\"kind\":{\"const\":\"numeric_range\",\"description\":\"Always \\\"numeric_range\\\".\",\"title\":\"Kind\",\"type\":\"string\"},\"source\":{\"$ref\":\"#/components/schemas/ScoreSourceSite\",\"description\":\"Location of the numeric range in the DDL source text.\"}},\"required\":[\"kind\",\"source\"],\"title\":\"NumericRangeTargetOwner\",\"type\":\"object\"}",
+    "ObjectTemplate": "{\"additionalProperties\":false,\"properties\":{\"aspect\":{\"maxItems\":2,\"minItems\":2,\"prefixItems\":[{\"maximum\":16.0,\"minimum\":1.0,\"type\":\"integer\"},{\"maximum\":16.0,\"minimum\":1.0,\"type\":\"integer\"}],\"title\":\"Aspect\",\"type\":\"array\"},\"body\":{\"$ref\":\"#/components/schemas/ScoreBody\"},\"instruction_index\":{\"minimum\":0.0,\"title\":\"Instruction Index\",\"type\":\"integer\"}},\"required\":[\"instruction_index\",\"aspect\",\"body\"],\"title\":\"ObjectTemplate\",\"type\":\"object\"}",
     "OkugakiGenerateBody": "{\"properties\":{\"language\":{\"default\":\"ja\",\"description\":\"Language of the entry: ja or en.\",\"pattern\":\"^(ja|en)$\",\"title\":\"Language\",\"type\":\"string\"},\"model\":{\"anyOf\":[{\"maxLength\":200,\"minLength\":1,\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Vision model that reads the branch. Omit to use the caller's resolved default vision model.\",\"title\":\"Model\"},\"save\":{\"default\":true,\"description\":\"When true, the entry is stored and can be listed later. When false, it is generated and returned without being stored.\",\"title\":\"Save\",\"type\":\"boolean\"}},\"title\":\"OkugakiGenerateBody\",\"type\":\"object\"}",
     "OkugakiItem": "{\"properties\":{\"at\":{\"description\":\"Time the entry was generated, in milliseconds since the Unix epoch.\",\"title\":\"At\",\"type\":\"integer\"},\"body\":{\"description\":\"Text of the entry.\",\"title\":\"Body\",\"type\":\"string\"},\"branch_snapshot\":{\"description\":\"Ids of the lineage nodes on the branch, from the root to the target, as they were read.\",\"items\":{\"type\":\"string\"},\"title\":\"Branch Snapshot\",\"type\":\"array\"},\"fact_sheet\":{\"additionalProperties\":true,\"description\":\"Facts about the branch that the entry was written from, as a JSON object.\",\"title\":\"Fact Sheet\",\"type\":\"object\"},\"id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Id of the stored entry. None when the entry was not saved.\",\"title\":\"Id\"},\"language\":{\"description\":\"Language of the body: ja or en.\",\"title\":\"Language\",\"type\":\"string\"},\"model\":{\"description\":\"Vision model that wrote the entry.\",\"title\":\"Model\",\"type\":\"string\"},\"target_node_id\":{\"description\":\"Id of the lineage node the entry describes.\",\"title\":\"Target Node Id\",\"type\":\"string\"},\"warnings\":{\"description\":\"Warnings raised while generating the entry. Empty when there are none.\",\"items\":{\"type\":\"string\"},\"title\":\"Warnings\",\"type\":\"array\"}},\"required\":[\"target_node_id\",\"branch_snapshot\",\"model\",\"at\",\"language\",\"body\"],\"title\":\"OkugakiItem\",\"type\":\"object\"}",
     "OmittedBalancedGroupCountOrigin": "{\"additionalProperties\":false,\"properties\":{\"explicit_counts\":{\"description\":\"Count written for each group member, or null where the count was omitted. Each positive when set.\",\"items\":{\"anyOf\":[{\"exclusiveMinimum\":0.0,\"type\":\"integer\"},{\"type\":\"null\"}]},\"title\":\"Explicit Counts\",\"type\":\"array\"},\"kind\":{\"const\":\"omitted_balanced_group\",\"description\":\"Always \\\"omitted_balanced_group\\\": the counts were balanced across the group.\",\"title\":\"Kind\",\"type\":\"string\"},\"reference_extents\":{\"description\":\"Reference extent of each group member used to balance the counts. Each positive.\",\"items\":{\"exclusiveMinimum\":0.0,\"type\":\"number\"},\"title\":\"Reference Extents\",\"type\":\"array\"}},\"required\":[\"kind\",\"reference_extents\",\"explicit_counts\"],\"title\":\"OmittedBalancedGroupCountOrigin\",\"type\":\"object\"}",
@@ -2263,12 +2237,11 @@
     "PlacementGroup": "{\"additionalProperties\":false,\"description\":\"One direct coordinated-group placement over a contiguous Score span.\",\"properties\":{\"at\":{\"$ref\":\"#/components/schemas/AtRegion\",\"description\":\"群全体の中心を一度だけ解決する named 配置領域\"},\"cycle_members\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/CycleMembersV1\"},{\"type\":\"null\"}],\"description\":\"Cycle record when the members repeat as a cycle. Absent otherwise.\"},\"end\":{\"description\":\"配置する Score instruction 範囲の終端 exclusive index\",\"minimum\":0.0,\"title\":\"End\",\"type\":\"integer\"},\"layout\":{\"description\":\"How the group's members are laid out: overlap, horizontal_source_order, scatter, tile or cells.\",\"enum\":[\"overlap\",\"horizontal_source_order\",\"scatter\",\"tile\",\"cells\"],\"title\":\"Layout\",\"type\":\"string\"},\"members\":{\"description\":\"Score 0.9 Macro body boundaries; absent retains the legacy drawable span\",\"items\":{\"$ref\":\"#/components/schemas/PlacementMember\"},\"title\":\"Members\",\"type\":\"array\"},\"resolved\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/ResolvedPlacementGroup\"},{\"type\":\"null\"}],\"description\":\"Resolved placement of the group, filled in when the Score is resolved. Absent when unset.\"},\"start\":{\"description\":\"配置する Score instruction 範囲の開始 index\",\"minimum\":0.0,\"title\":\"Start\",\"type\":\"integer\"}},\"required\":[\"start\",\"end\",\"layout\",\"at\"],\"title\":\"PlacementGroup\",\"type\":\"object\"}",
     "PlacementMember": "{\"additionalProperties\":false,\"description\":\"One atomic source member of a Score 0.9 coordinated placement.\",\"properties\":{\"anchor_indices\":{\"description\":\"Indices of the Score anchors that belong to this member.\",\"items\":{\"minimum\":0.0,\"type\":\"integer\"},\"title\":\"Anchor Indices\",\"type\":\"array\"},\"end\":{\"description\":\"Index just past the last Score instruction of this member (exclusive).\",\"minimum\":0.0,\"title\":\"End\",\"type\":\"integer\"},\"start\":{\"description\":\"Index of the first Score instruction of this member (inclusive).\",\"minimum\":0.0,\"title\":\"Start\",\"type\":\"integer\"},\"symbolic\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/SymbolicMember\"},{\"type\":\"null\"}],\"description\":\"Symbolic description of how many instances this member produces. Absent when not symbolic.\"},\"transform_group_indices\":{\"description\":\"Indices of the Score transform groups that belong to this member.\",\"items\":{\"minimum\":0.0,\"type\":\"integer\"},\"title\":\"Transform Group Indices\",\"type\":\"array\"}},\"required\":[\"start\",\"end\"],\"title\":\"PlacementMember\",\"type\":\"object\"}",
     "PluginEnabledBody": "{\"properties\":{\"enabled\":{\"description\":\"True to switch the plugin package on, False to switch it off.\",\"title\":\"Enabled\",\"type\":\"boolean\"}},\"required\":[\"enabled\"],\"title\":\"PluginEnabledBody\",\"type\":\"object\"}",
-    "PluginPackageCheckBody": "{\"properties\":{\"archive\":{\"anyOf\":[{\"maxLength\":22400000,\"minLength\":1,\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"A zip as base64: package.json (an inku.plugin-package.v1 file) beside the PNG pictures its words name in preview, up to 16 MiB before encoding. Send this or document, not both.\",\"title\":\"Archive\"},\"document\":{\"anyOf\":[{\"maxLength\":1000000,\"minLength\":1,\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"The full text of an inku.plugin-package.v1 JSON file, 1 to 1,000,000 characters. Send this or archive, not both.\",\"title\":\"Document\"}},\"title\":\"PluginPackageCheckBody\",\"type\":\"object\"}",
-    "PluginPackageInstallBody": "{\"properties\":{\"archive\":{\"anyOf\":[{\"maxLength\":22400000,\"minLength\":1,\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"A zip as base64: package.json (an inku.plugin-package.v1 file) beside the PNG pictures its words name in preview, up to 16 MiB before encoding. Send this or document, not both.\",\"title\":\"Archive\"},\"document\":{\"anyOf\":[{\"maxLength\":1000000,\"minLength\":1,\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"The full text of an inku.plugin-package.v1 JSON file, 1 to 1,000,000 characters. Send this or archive, not both.\",\"title\":\"Document\"},\"replace\":{\"default\":false,\"description\":\"True to replace an installed package with the same id. Without it a package whose id is already installed is refused with 409.\",\"title\":\"Replace\",\"type\":\"boolean\"}},\"title\":\"PluginPackageInstallBody\",\"type\":\"object\"}",
+    "PluginPackageCheckBody": "{\"properties\":{\"archive\":{\"anyOf\":[{\"maxLength\":22400000,\"minLength\":1,\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"A zip as base64: package.json (an inku.plugin-package.v2 file) beside the PNG pictures its words name in preview, up to 16 MiB before encoding. Send this or document, not both.\",\"title\":\"Archive\"},\"document\":{\"anyOf\":[{\"maxLength\":1000000,\"minLength\":1,\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"The full text of an inku.plugin-package.v2 JSON file, 1 to 1,000,000 characters. Send this or archive, not both.\",\"title\":\"Document\"}},\"title\":\"PluginPackageCheckBody\",\"type\":\"object\"}",
+    "PluginPackageInstallBody": "{\"properties\":{\"archive\":{\"anyOf\":[{\"maxLength\":22400000,\"minLength\":1,\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"A zip as base64: package.json (an inku.plugin-package.v2 file) beside the PNG pictures its words name in preview, up to 16 MiB before encoding. Send this or document, not both.\",\"title\":\"Archive\"},\"document\":{\"anyOf\":[{\"maxLength\":1000000,\"minLength\":1,\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"The full text of an inku.plugin-package.v2 JSON file, 1 to 1,000,000 characters. Send this or archive, not both.\",\"title\":\"Document\"},\"replace\":{\"default\":false,\"description\":\"True to replace an installed package with the same id. Without it a package whose id is already installed is refused with 409.\",\"title\":\"Replace\",\"type\":\"boolean\"}},\"title\":\"PluginPackageInstallBody\",\"type\":\"object\"}",
     "PluginPreviewBody": "{\"properties\":{\"png_base64\":{\"description\":\"The replacement picture as base64-encoded PNG bytes, up to 2 MB before encoding. It is fitted to the Saijiki frame at both scales.\",\"maxLength\":3000000,\"minLength\":1,\"title\":\"Png Base64\",\"type\":\"string\"}},\"required\":[\"png_base64\"],\"title\":\"PluginPreviewBody\",\"type\":\"object\"}",
-    "PluginSettingsStatus": "{\"properties\":{\"enabled\":{\"default\":false,\"description\":\"Whether declarative DDL plugin documents are in use\",\"title\":\"Enabled\",\"type\":\"boolean\"},\"loaded\":{\"description\":\"Status of each plugin document, as the plugin loader reports it, including the reason a document was rejected\",\"items\":{\"additionalProperties\":true,\"type\":\"object\"},\"title\":\"Loaded\",\"type\":\"array\"},\"note\":{\"description\":\"Explanation of how plugin documents are reloaded\",\"title\":\"Note\",\"type\":\"string\"},\"runtime_editable\":{\"default\":false,\"description\":\"Whether plugin documents can be changed while the server runs, without a restart\",\"title\":\"Runtime Editable\",\"type\":\"boolean\"}},\"required\":[\"note\"],\"title\":\"PluginSettingsStatus\",\"type\":\"object\"}",
+    "PluginSettingsStatus": "{\"properties\":{\"enabled\":{\"default\":false,\"description\":\"Whether DDL plugin packages are available\",\"title\":\"Enabled\",\"type\":\"boolean\"},\"loaded\":{\"description\":\"Status of each plugin package, including reasons for a rejected file\",\"items\":{\"additionalProperties\":true,\"type\":\"object\"},\"title\":\"Loaded\",\"type\":\"array\"},\"note\":{\"description\":\"Explanation of how installed plugin packages are reloaded\",\"title\":\"Note\",\"type\":\"string\"},\"runtime_editable\":{\"default\":false,\"description\":\"Whether plugin packages can be changed while the server runs, without a restart\",\"title\":\"Runtime Editable\",\"type\":\"boolean\"}},\"required\":[\"note\"],\"title\":\"PluginSettingsStatus\",\"type\":\"object\"}",
     "PluginStorageBody": "{\"properties\":{\"storage\":{\"additionalProperties\":true,\"description\":\"Saved plugin data, keyed by plugin id. A plugin id is 1 to 80 characters of letters, digits, hyphens, underscores or dots, and each value must be an object. The whole map is limited to 20,000 bytes of JSON.\",\"title\":\"Storage\",\"type\":\"object\"}},\"title\":\"PluginStorageBody\",\"type\":\"object\"}",
-    "PluginValidateBody": "{\"properties\":{\"document\":{\"description\":\"The full text of the plugin document to check, 1 to 500,000 characters.\",\"maxLength\":500000,\"minLength\":1,\"title\":\"Document\",\"type\":\"string\"}},\"required\":[\"document\"],\"title\":\"PluginValidateBody\",\"type\":\"object\"}",
     "PluginValueBody": "{\"properties\":{\"value\":{\"additionalProperties\":true,\"description\":\"The data object to store for one plugin. It replaces that plugin's saved data. The whole saved map, including other plugins, must stay within 20,000 bytes of JSON.\",\"title\":\"Value\",\"type\":\"object\"}},\"title\":\"PluginValueBody\",\"type\":\"object\"}",
     "PointDimensions": "{\"additionalProperties\":false,\"properties\":{\"kind\":{\"const\":\"point\",\"description\":\"Always \\\"point\\\".\",\"title\":\"Kind\",\"type\":\"string\"},\"radius\":{\"description\":\"Radius of the point mark, in canvas-short-edge units. Positive.\",\"exclusiveMinimum\":0.0,\"title\":\"Radius\",\"type\":\"number\"}},\"required\":[\"kind\",\"radius\"],\"title\":\"PointDimensions\",\"type\":\"object\"}",
     "PolygonDimensions": "{\"additionalProperties\":false,\"properties\":{\"kind\":{\"const\":\"polygon\",\"description\":\"Always \\\"polygon\\\".\",\"title\":\"Kind\",\"type\":\"string\"},\"radius\":{\"description\":\"Radius of the polygon's circumscribed circle, in canvas-short-edge units. Positive.\",\"exclusiveMinimum\":0.0,\"title\":\"Radius\",\"type\":\"number\"},\"sides\":{\"description\":\"Number of vertices of the regular polygon, from 5 to 8.\",\"maximum\":8.0,\"minimum\":5.0,\"title\":\"Sides\",\"type\":\"integer\"}},\"required\":[\"kind\",\"radius\",\"sides\"],\"title\":\"PolygonDimensions\",\"type\":\"object\"}",
@@ -2294,10 +2267,11 @@
     "ResourceBudget": "{\"additionalProperties\":false,\"properties\":{\"maximum\":{\"$ref\":\"#/components/schemas/ResourceDemand\",\"description\":\"Maximum resource demand allowed under this budget.\"}},\"required\":[\"maximum\"],\"title\":\"ResourceBudget\",\"type\":\"object\"}",
     "ResourceDemand": "{\"additionalProperties\":false,\"properties\":{\"anchor_instances\":{\"description\":\"Number of anchor nodes in the source, before repetition. Zero or greater.\",\"minimum\":0.0,\"title\":\"Anchor Instances\",\"type\":\"integer\"},\"fill_instances\":{\"description\":\"Number of fill nodes in the source, before repetition. Zero or greater.\",\"minimum\":0.0,\"title\":\"Fill Instances\",\"type\":\"integer\"},\"logical_objects\":{\"description\":\"Number of logical objects in the Score. Zero or greater.\",\"minimum\":0.0,\"title\":\"Logical Objects\",\"type\":\"integer\"},\"maximum_per_template_primitive_marks\":{\"description\":\"Largest number of primitive marks that a single template produces, counting all outer repetitions. Zero or greater.\",\"minimum\":0.0,\"title\":\"Maximum Per Template Primitive Marks\",\"type\":\"integer\"},\"maximum_resolved_count\":{\"description\":\"Largest resolved count of any single arrangement or group. Zero or greater.\",\"minimum\":0.0,\"title\":\"Maximum Resolved Count\",\"type\":\"integer\"},\"object_templates\":{\"description\":\"Number of object templates. Zero or greater.\",\"minimum\":0.0,\"title\":\"Object Templates\",\"type\":\"integer\"},\"placement_instances\":{\"description\":\"Number of placement nodes in the source, before repetition. Zero or greater.\",\"minimum\":0.0,\"title\":\"Placement Instances\",\"type\":\"integer\"},\"primitive_marks\":{\"description\":\"Number of primitive marks drawn. Zero or greater.\",\"minimum\":0.0,\"title\":\"Primitive Marks\",\"type\":\"integer\"},\"template_nodes\":{\"description\":\"Number of template nodes. Zero or greater.\",\"minimum\":0.0,\"title\":\"Template Nodes\",\"type\":\"integer\"},\"transform_instances\":{\"description\":\"Number of transform nodes in the source, before repetition. Zero or greater.\",\"minimum\":0.0,\"title\":\"Transform Instances\",\"type\":\"integer\"}},\"required\":[\"logical_objects\",\"primitive_marks\",\"object_templates\",\"maximum_per_template_primitive_marks\",\"maximum_resolved_count\",\"template_nodes\",\"anchor_instances\",\"transform_instances\",\"placement_instances\",\"fill_instances\"],\"title\":\"ResourceDemand\",\"type\":\"object\"}",
     "ScatterUniformRecipe": "{\"additionalProperties\":false,\"properties\":{\"kind\":{\"const\":\"scatter_uniform_with_centroid_translation\",\"description\":\"Always \\\"scatter_uniform_with_centroid_translation\\\".\",\"title\":\"Kind\",\"type\":\"string\"}},\"required\":[\"kind\"],\"title\":\"ScatterUniformRecipe\",\"type\":\"object\"}",
-    "Score": "{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"description\":\"Relation が参照できる非描画の明示基準点\",\"items\":{\"$ref\":\"#/components/schemas/AnchorPoint\"},\"title\":\"Anchors\",\"type\":\"array\"},\"background\":{\"default\":\"white\",\"description\":\"背景色: white=白 / black=黒 / blue=青 / red=赤 / green=緑 / gray=灰 / yellow=黄 / orange=橙 / purple=紫 (省略=white)。「背景を黒で埋める」→ black。旧表現「背景を黒で塗りつぶす」も同じ\",\"enum\":[\"white\",\"black\",\"blue\",\"red\",\"green\",\"gray\",\"yellow\",\"orange\",\"purple\"],\"title\":\"Background\",\"type\":\"string\"},\"canvas\":{\"anyOf\":[{\"type\":\"string\"},{\"$ref\":\"#/components/schemas/CanvasSpec\"}],\"default\":\"square\",\"description\":\"キャンバス比率ID、または {aspect, ground}。標準値は square。ground は紙目・薄墨地などの支持体質感を保持する\",\"title\":\"Canvas\"},\"fill_groups\":{\"description\":\"Score 0.10 compact fill recipes; sampled positions are absent\",\"items\":{\"$ref\":\"#/components/schemas/FillGroup\"},\"title\":\"Fill Groups\",\"type\":\"array\"},\"instructions\":{\"description\":\"Drawing instructions, in drawing order. Each one is a single mark or group of marks.\",\"items\":{\"$ref\":\"#/components/schemas/Instruction\"},\"title\":\"Instructions\",\"type\":\"array\"},\"mirror_relations\":{\"description\":\"Score 0.15 binary mirror relations between complete existing bodies\",\"items\":{\"$ref\":\"#/components/schemas/MirrorRelationV1\"},\"title\":\"Mirror Relations\",\"type\":\"array\"},\"placement_groups\":{\"description\":\"通常DDLのdirect coordinated group配置。source順の連続 Score instruction 範囲を overlap、horizontal_source_order、scatter、tile と named 配置領域で一度だけ配置する\",\"items\":{\"$ref\":\"#/components/schemas/PlacementGroup\"},\"title\":\"Placement Groups\",\"type\":\"array\"},\"presence\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/Presence\"},{\"type\":\"null\"}],\"description\":\"人・顔・動物・群れなどの対象物を直接描かず、存在感、重心、対称性、視線の圧力、群れ、輪郭密度へ抽象化した描画パラメータ。目鼻口・四肢・耳・尻尾などの具象部品は禁止\"},\"repetition_groups\":{\"description\":\"Score 0.10 standalone Macro whole-body repetition recipes\",\"items\":{\"$ref\":\"#/components/schemas/RepetitionGroup\"},\"title\":\"Repetition Groups\",\"type\":\"array\"},\"resource_policy\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/ScoreResourcePolicy\"},{\"type\":\"null\"}],\"description\":\"Resource authorities captured for saved-Score replay; demand is recomputed\"},\"transform_groups\":{\"description\":\"Macro のまとまり変換。内側から外側の postorder で、各範囲は Score instruction index の連続区間を表す\",\"items\":{\"$ref\":\"#/components/schemas/TransformGroup\"},\"title\":\"Transform Groups\",\"type\":\"array\"},\"version\":{\"default\":\"0.9.0\",\"description\":\"Score format version. Governs which fields and values are allowed.\",\"enum\":[\"0.22.0\",\"0.21.0\",\"0.20.0\",\"0.19.0\",\"0.18.0\",\"0.17.0\",\"0.16.0\",\"0.15.0\",\"0.14.0\",\"0.13.0\",\"0.12.0\",\"0.11.0\",\"0.10.0\",\"0.9.0\",\"0.8.0\",\"0.7.0\",\"0.6.0\",\"0.5.0\",\"0.4.0\",\"0.3.0\",\"0.2.0\",\"0.1.0\"],\"title\":\"Version\",\"type\":\"string\"}},\"required\":[\"instructions\"],\"title\":\"Score\",\"type\":\"object\"}",
+    "Score": "{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"description\":\"Relation が参照できる非描画の明示基準点\",\"items\":{\"$ref\":\"#/components/schemas/AnchorPoint\"},\"title\":\"Anchors\",\"type\":\"array\"},\"background\":{\"default\":\"white\",\"description\":\"背景色: white=白 / black=黒 / blue=青 / red=赤 / green=緑 / gray=灰 / yellow=黄 / orange=橙 / purple=紫 (省略=white)。「背景を黒で埋める」→ black。旧表現「背景を黒で塗りつぶす」も同じ\",\"enum\":[\"white\",\"black\",\"blue\",\"red\",\"green\",\"gray\",\"yellow\",\"orange\",\"purple\"],\"title\":\"Background\",\"type\":\"string\"},\"canvas\":{\"anyOf\":[{\"type\":\"string\"},{\"$ref\":\"#/components/schemas/CanvasSpec\"}],\"default\":\"square\",\"description\":\"キャンバス比率ID、または {aspect, ground}。標準値は square。ground は紙目・薄墨地などの支持体質感を保持する\",\"title\":\"Canvas\"},\"fill_groups\":{\"description\":\"Score 0.10 compact fill recipes; sampled positions are absent\",\"items\":{\"$ref\":\"#/components/schemas/FillGroup\"},\"title\":\"Fill Groups\",\"type\":\"array\"},\"instructions\":{\"description\":\"Drawing instructions, in drawing order. Each one is a single mark or group of marks.\",\"items\":{\"$ref\":\"#/components/schemas/Instruction\"},\"title\":\"Instructions\",\"type\":\"array\"},\"mirror_relations\":{\"description\":\"Score 0.15 binary mirror relations between complete existing bodies\",\"items\":{\"$ref\":\"#/components/schemas/MirrorRelationV1\"},\"title\":\"Mirror Relations\",\"type\":\"array\"},\"object_templates\":{\"description\":\"Local drawings for invisible square instructions, stored once per object.\",\"items\":{\"$ref\":\"#/components/schemas/ObjectTemplate\"},\"title\":\"Object Templates\",\"type\":\"array\"},\"placement_groups\":{\"description\":\"通常DDLのdirect coordinated group配置。source順の連続 Score instruction 範囲を overlap、horizontal_source_order、scatter、tile と named 配置領域で一度だけ配置する\",\"items\":{\"$ref\":\"#/components/schemas/PlacementGroup\"},\"title\":\"Placement Groups\",\"type\":\"array\"},\"presence\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/Presence\"},{\"type\":\"null\"}],\"description\":\"人・顔・動物・群れなどの対象物を直接描かず、存在感、重心、対称性、視線の圧力、群れ、輪郭密度へ抽象化した描画パラメータ。目鼻口・四肢・耳・尻尾などの具象部品は禁止\"},\"repetition_groups\":{\"description\":\"Score 0.10 standalone Macro whole-body repetition recipes\",\"items\":{\"$ref\":\"#/components/schemas/RepetitionGroup\"},\"title\":\"Repetition Groups\",\"type\":\"array\"},\"resource_policy\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/ScoreResourcePolicy\"},{\"type\":\"null\"}],\"description\":\"Resource authorities captured for saved-Score replay; demand is recomputed\"},\"transform_groups\":{\"description\":\"Macro のまとまり変換。内側から外側の postorder で、各範囲は Score instruction index の連続区間を表す\",\"items\":{\"$ref\":\"#/components/schemas/TransformGroup\"},\"title\":\"Transform Groups\",\"type\":\"array\"},\"version\":{\"default\":\"0.9.0\",\"description\":\"Score format version. Governs which fields and values are allowed.\",\"enum\":[\"0.23.0\",\"0.22.0\",\"0.21.0\",\"0.20.0\",\"0.19.0\",\"0.18.0\",\"0.17.0\",\"0.16.0\",\"0.15.0\",\"0.14.0\",\"0.13.0\",\"0.12.0\",\"0.11.0\",\"0.10.0\",\"0.9.0\",\"0.8.0\",\"0.7.0\",\"0.6.0\",\"0.5.0\",\"0.4.0\",\"0.3.0\",\"0.2.0\",\"0.1.0\"],\"title\":\"Version\",\"type\":\"string\"}},\"required\":[\"instructions\"],\"title\":\"Score\",\"type\":\"object\"}",
+    "ScoreBody": "{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"description\":\"Relation が参照できる非描画の明示基準点\",\"items\":{\"$ref\":\"#/components/schemas/AnchorPoint\"},\"title\":\"Anchors\",\"type\":\"array\"},\"background\":{\"default\":\"white\",\"description\":\"背景色: white=白 / black=黒 / blue=青 / red=赤 / green=緑 / gray=灰 / yellow=黄 / orange=橙 / purple=紫 (省略=white)。「背景を黒で埋める」→ black。旧表現「背景を黒で塗りつぶす」も同じ\",\"enum\":[\"white\",\"black\",\"blue\",\"red\",\"green\",\"gray\",\"yellow\",\"orange\",\"purple\"],\"title\":\"Background\",\"type\":\"string\"},\"canvas\":{\"anyOf\":[{\"type\":\"string\"},{\"$ref\":\"#/components/schemas/CanvasSpec\"}],\"default\":\"square\",\"description\":\"キャンバス比率ID、または {aspect, ground}。標準値は square。ground は紙目・薄墨地などの支持体質感を保持する\",\"title\":\"Canvas\"},\"fill_groups\":{\"description\":\"Score 0.10 compact fill recipes; sampled positions are absent\",\"items\":{\"$ref\":\"#/components/schemas/FillGroup\"},\"title\":\"Fill Groups\",\"type\":\"array\"},\"instructions\":{\"description\":\"Drawing instructions, in drawing order. Each one is a single mark or group of marks.\",\"items\":{\"$ref\":\"#/components/schemas/Instruction\"},\"title\":\"Instructions\",\"type\":\"array\"},\"mirror_relations\":{\"description\":\"Score 0.15 binary mirror relations between complete existing bodies\",\"items\":{\"$ref\":\"#/components/schemas/MirrorRelationV1\"},\"title\":\"Mirror Relations\",\"type\":\"array\"},\"placement_groups\":{\"description\":\"通常DDLのdirect coordinated group配置。source順の連続 Score instruction 範囲を overlap、horizontal_source_order、scatter、tile と named 配置領域で一度だけ配置する\",\"items\":{\"$ref\":\"#/components/schemas/PlacementGroup\"},\"title\":\"Placement Groups\",\"type\":\"array\"},\"presence\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/Presence\"},{\"type\":\"null\"}],\"description\":\"人・顔・動物・群れなどの対象物を直接描かず、存在感、重心、対称性、視線の圧力、群れ、輪郭密度へ抽象化した描画パラメータ。目鼻口・四肢・耳・尻尾などの具象部品は禁止\"},\"repetition_groups\":{\"description\":\"Score 0.10 standalone Macro whole-body repetition recipes\",\"items\":{\"$ref\":\"#/components/schemas/RepetitionGroup\"},\"title\":\"Repetition Groups\",\"type\":\"array\"},\"resource_policy\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/ScoreResourcePolicy\"},{\"type\":\"null\"}],\"description\":\"Resource authorities captured for saved-Score replay; demand is recomputed\"},\"transform_groups\":{\"description\":\"Macro のまとまり変換。内側から外側の postorder で、各範囲は Score instruction index の連続区間を表す\",\"items\":{\"$ref\":\"#/components/schemas/TransformGroup\"},\"title\":\"Transform Groups\",\"type\":\"array\"},\"version\":{\"default\":\"0.9.0\",\"description\":\"Score format version. Governs which fields and values are allowed.\",\"enum\":[\"0.23.0\",\"0.22.0\",\"0.21.0\",\"0.20.0\",\"0.19.0\",\"0.18.0\",\"0.17.0\",\"0.16.0\",\"0.15.0\",\"0.14.0\",\"0.13.0\",\"0.12.0\",\"0.11.0\",\"0.10.0\",\"0.9.0\",\"0.8.0\",\"0.7.0\",\"0.6.0\",\"0.5.0\",\"0.4.0\",\"0.3.0\",\"0.2.0\",\"0.1.0\"],\"title\":\"Version\",\"type\":\"string\"}},\"required\":[\"instructions\"],\"title\":\"ScoreBody\",\"type\":\"object\"}",
     "ScoreResourcePolicy": "{\"additionalProperties\":false,\"properties\":{\"accounting_id\":{\"const\":\"inku.resource-accounting.v1\",\"description\":\"Accounting scheme identifier. Always \\\"inku.resource-accounting.v1\\\".\",\"title\":\"Accounting Id\",\"type\":\"string\"},\"hard_policy\":{\"$ref\":\"#/components/schemas/HardResourcePolicy\",\"description\":\"Hard policy captured with the Score.\"},\"operational_budget\":{\"$ref\":\"#/components/schemas/ResourceBudget\",\"description\":\"Operational budget for the performance.\"}},\"required\":[\"accounting_id\",\"hard_policy\",\"operational_budget\"],\"title\":\"ScoreResourcePolicy\",\"type\":\"object\"}",
     "ScoreSourceSite": "{\"additionalProperties\":false,\"properties\":{\"clause_index\":{\"description\":\"Index of the clause within that region. Zero or greater.\",\"minimum\":0.0,\"title\":\"Clause Index\",\"type\":\"integer\"},\"region_index\":{\"description\":\"Index of the DDL region that contains the source text. Zero or greater.\",\"minimum\":0.0,\"title\":\"Region Index\",\"type\":\"integer\"}},\"required\":[\"region_index\",\"clause_index\"],\"title\":\"ScoreSourceSite\",\"type\":\"object\"}",
-    "SettingsStatusResponse": "{\"properties\":{\"database\":{\"$ref\":\"#/components/schemas/DatabaseSettingsStatus\",\"description\":\"Database connection and file information\"},\"db_backup\":{\"$ref\":\"#/components/schemas/DbBackupStatus\",\"description\":\"Automatic and manual database backups\"},\"db_write_lock\":{\"$ref\":\"#/components/schemas/DbWriteLockStatus\",\"description\":\"Whether writes to the database are locked\"},\"description_meter\":{\"$ref\":\"#/components/schemas/DescriptionMeterStatus\",\"description\":\"Which description languages the meter judges\"},\"image_upload_notice\":{\"$ref\":\"#/components/schemas/ImageUploadNoticeStatus\",\"description\":\"Whether the Web warns before painting from a picture\"},\"juxtaposition\":{\"$ref\":\"#/components/schemas/JuxtapositionSettingsStatus\",\"description\":\"How many sentences Juxtaposition offers the model\"},\"log_retention\":{\"$ref\":\"#/components/schemas/LogRetentionStatus\",\"description\":\"Log file retention policy and current log files\"},\"output_save\":{\"$ref\":\"#/components/schemas/OutputSaveStatus\",\"description\":\"Saving of output files\"},\"plugins\":{\"$ref\":\"#/components/schemas/PluginSettingsStatus\",\"description\":\"Declarative DDL plugin documents\"},\"render_concurrency\":{\"$ref\":\"#/components/schemas/RenderConcurrencyStatus\",\"description\":\"How many renders may run at once\"},\"render_limits\":{\"$ref\":\"#/components/schemas/RenderLimitsStatus\",\"description\":\"Limits on how many marks and how much SVG a work may draw\"},\"stage_execution\":{\"$ref\":\"#/components/schemas/StageExecutionStatus\",\"description\":\"Worker pool that runs the pipeline's model effects\"}},\"required\":[\"database\",\"db_backup\",\"plugins\",\"output_save\",\"log_retention\",\"stage_execution\",\"render_concurrency\",\"render_limits\",\"description_meter\",\"image_upload_notice\",\"db_write_lock\",\"juxtaposition\"],\"title\":\"SettingsStatusResponse\",\"type\":\"object\"}",
+    "SettingsStatusResponse": "{\"properties\":{\"database\":{\"$ref\":\"#/components/schemas/DatabaseSettingsStatus\",\"description\":\"Database connection and file information\"},\"db_backup\":{\"$ref\":\"#/components/schemas/DbBackupStatus\",\"description\":\"Automatic and manual database backups\"},\"db_write_lock\":{\"$ref\":\"#/components/schemas/DbWriteLockStatus\",\"description\":\"Whether writes to the database are locked\"},\"description_meter\":{\"$ref\":\"#/components/schemas/DescriptionMeterStatus\",\"description\":\"Which description languages the meter judges\"},\"image_upload_notice\":{\"$ref\":\"#/components/schemas/ImageUploadNoticeStatus\",\"description\":\"Whether the Web warns before painting from a picture\"},\"juxtaposition\":{\"$ref\":\"#/components/schemas/JuxtapositionSettingsStatus\",\"description\":\"How many sentences Juxtaposition offers the model\"},\"log_retention\":{\"$ref\":\"#/components/schemas/LogRetentionStatus\",\"description\":\"Log file retention policy and current log files\"},\"output_save\":{\"$ref\":\"#/components/schemas/OutputSaveStatus\",\"description\":\"Saving of output files\"},\"plugins\":{\"$ref\":\"#/components/schemas/PluginSettingsStatus\",\"description\":\"DDL plugin packages\"},\"render_concurrency\":{\"$ref\":\"#/components/schemas/RenderConcurrencyStatus\",\"description\":\"How many renders may run at once\"},\"render_limits\":{\"$ref\":\"#/components/schemas/RenderLimitsStatus\",\"description\":\"Limits on how many marks and how much SVG a work may draw\"},\"stage_execution\":{\"$ref\":\"#/components/schemas/StageExecutionStatus\",\"description\":\"Worker pool that runs the pipeline's model effects\"}},\"required\":[\"database\",\"db_backup\",\"plugins\",\"output_save\",\"log_retention\",\"stage_execution\",\"render_concurrency\",\"render_limits\",\"description_meter\",\"image_upload_notice\",\"db_write_lock\",\"juxtaposition\"],\"title\":\"SettingsStatusResponse\",\"type\":\"object\"}",
     "ShapeFillTargetGeometry": "{\"additionalProperties\":false,\"properties\":{\"anchor\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/NumericFillTargetAnchor\"},{\"$ref\":\"#/components/schemas/GeneratedNumericFillTargetAnchor\"},{\"$ref\":\"#/components/schemas/NamedFillTargetAnchor\"}],\"description\":\"Anchor that the target shape is placed around.\",\"title\":\"Anchor\"},\"arc_form\":{\"anyOf\":[{\"const\":\"crescent\",\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Arc form of the target when it is an arc. Null otherwise.\",\"title\":\"Arc Form\"},\"contour_variation\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/Variation\"},{\"type\":\"null\"}],\"description\":\"Variation applied to the outline of the target. Null means none.\"},\"dimensions\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/BboxDimensions\"},{\"$ref\":\"#/components/schemas/RegularTriangleDimensions\"},{\"$ref\":\"#/components/schemas/PolygonDimensions\"},{\"$ref\":\"#/components/schemas/LineDimensions\"},{\"$ref\":\"#/components/schemas/CircleDimensions\"},{\"$ref\":\"#/components/schemas/ArcDimensions\"},{\"$ref\":\"#/components/schemas/PointDimensions\"},{\"$ref\":\"#/components/schemas/CenteredSizeDimensions\"},{\"$ref\":\"#/components/schemas/SquareDimensions\"}],\"description\":\"Resolved dimensions of the target shape.\",\"title\":\"Dimensions\"},\"kind\":{\"const\":\"shape\",\"description\":\"Always \\\"shape\\\".\",\"title\":\"Kind\",\"type\":\"string\"},\"primitive\":{\"description\":\"Primitive of the target shape.\",\"enum\":[\"line\",\"circle\",\"ellipse\",\"triangle\",\"square\",\"polygon\",\"arc\",\"point\",\"cloudform\",\"free_line\"],\"title\":\"Primitive\",\"type\":\"string\"},\"rotation_degrees\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}],\"description\":\"Rotation of the target shape in degrees. Null means no rotation.\",\"title\":\"Rotation Degrees\"}},\"required\":[\"kind\",\"primitive\",\"dimensions\",\"anchor\"],\"title\":\"ShapeFillTargetGeometry\",\"type\":\"object\"}",
     "SingleUserBody": "{\"properties\":{\"user_id\":{\"description\":\"Id of the account to hand the server to; it must hold the admins permission group\",\"maxLength\":100,\"minLength\":1,\"title\":\"User Id\",\"type\":\"string\"}},\"required\":[\"user_id\"],\"title\":\"SingleUserBody\",\"type\":\"object\"}",
     "SingleUserCandidate": "{\"properties\":{\"id\":{\"description\":\"Id of the account\",\"title\":\"Id\",\"type\":\"string\"},\"username\":{\"description\":\"Name of the account\",\"title\":\"Username\",\"type\":\"string\"}},\"required\":[\"id\",\"username\"],\"title\":\"SingleUserCandidate\",\"type\":\"object\"}",
@@ -2328,6 +2302,5 @@
     "ValidationError": "{\"properties\":{\"ctx\":{\"title\":\"Context\",\"type\":\"object\"},\"input\":{\"title\":\"Input\"},\"loc\":{\"items\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"integer\"}]},\"title\":\"Location\",\"type\":\"array\"},\"msg\":{\"title\":\"Message\",\"type\":\"string\"},\"type\":{\"title\":\"Error Type\",\"type\":\"string\"}},\"required\":[\"loc\",\"msg\",\"type\"],\"title\":\"ValidationError\",\"type\":\"object\"}",
     "Variation": "{\"additionalProperties\":false,\"properties\":{\"amplitude\":{\"default\":\"medium\",\"description\":\"揺れ幅: fine=細かく・震える / medium=中程度 / broad=大きく\",\"enum\":[\"fine\",\"medium\",\"broad\"],\"title\":\"Amplitude\",\"type\":\"string\"},\"dimensions\":{\"description\":\"揺れ軸: 横線→[position_y] / 縦線→[position_x] / 斜め→[position_x,position_y]\",\"items\":{\"enum\":[\"position_x\",\"position_y\",\"angle\",\"length\",\"rotation\",\"radius\"],\"type\":\"string\"},\"title\":\"Dimensions\",\"type\":\"array\"},\"frequency\":{\"default\":\"medium\",\"description\":\"揺れ頻度: slow=ゆっくり / medium=普通 / high=速く\",\"enum\":[\"slow\",\"medium\",\"high\"],\"title\":\"Frequency\",\"type\":\"string\"},\"quality\":{\"default\":\"none\",\"description\":\"揺れ種類: perlin=細かい揺れ・震える / wave=ゆっくり揺れる・波打つ / pink=滲む / white=白色雑音 / none=なし\",\"enum\":[\"none\",\"white\",\"perlin\",\"pink\",\"wave\"],\"title\":\"Quality\",\"type\":\"string\"}},\"title\":\"Variation\",\"type\":\"object\"}",
     "VerticalLineRecipe": "{\"additionalProperties\":false,\"properties\":{\"cell_height\":{\"description\":\"Vertical spacing between successive copies, in canvas-short-edge units. Positive.\",\"exclusiveMinimum\":0.0,\"title\":\"Cell Height\",\"type\":\"number\"},\"kind\":{\"const\":\"vertical_line\",\"description\":\"Always \\\"vertical_line\\\".\",\"title\":\"Kind\",\"type\":\"string\"}},\"required\":[\"kind\",\"cell_height\"],\"title\":\"VerticalLineRecipe\",\"type\":\"object\"}"
-  },
-  "digest": "9f3b8cdbcce4879655c73d61b092183dc57c545f702418ce6d89b19b46f11a3f"
+  }
 }

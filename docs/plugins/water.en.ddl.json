@@ -1,13 +1,12 @@
 {
-  "schema": "inku.ddl-export.v1",
+  "schema": "inku.ddl-export.v2",
   "language": "en",
-  "ddl": "Washi.\nWater.Stream.\nWater.Ripples.\nWater.Rings.",
+  "ddl": "Washi.\n{stream}.\n{ripples}.\n{rings}.",
   "plugins": [
     {
       "definition": {
-        "schema": "inku.macro-definition.v1",
+        "schema": "inku.macro-definition.v2",
         "namespace": "Water",
-        "heading": "Stream",
         "version": "1.0.0",
         "parameters": {
           "line_count": {
@@ -1301,17 +1300,23 @@
             ]
           }
         ],
-        "aliases": [
-          "水流"
-        ]
+        "id": "Stream",
+        "names": {
+          "ja": [
+            "水流"
+          ],
+          "en": [
+            "stream"
+          ]
+        },
+        "kind": "scene"
       },
-      "summary": "Draw one stream of water crossing the middle of the canvas. The flow is an S-shaped band, bulging upward in the left half and downward in the right half, made of many lines running side by side; the band swells a little in the middle of each half and narrows at both ends and at the center. Through its core runs one thick-brush ultramarine line, bleeding like tarashikomi. The other lines mix thin and thick brush, ultramarine and pale ink (gray), and sway loosely and narrowly. In each of the two inner bends of the S sits a small eddy made of joined semicircles. The written line count (1–12), or 7–9 when none is written; the core line and the two eddies are always drawn. The band's tilt (up to 16 degrees either way), its left-right direction and its height come from six arrangements."
+      "note": "An S-shaped stream with eddies, like Rinpa flowing water."
     },
     {
       "definition": {
-        "schema": "inku.macro-definition.v1",
+        "schema": "inku.macro-definition.v2",
         "namespace": "Water",
-        "heading": "Ripples",
         "version": "3.0.0",
         "parameters": {
           "ring_count": {
@@ -2053,17 +2058,23 @@
             ]
           }
         ],
-        "aliases": [
-          "波紋"
-        ]
+        "id": "Ripples",
+        "names": {
+          "ja": [
+            "波紋"
+          ],
+          "en": [
+            "ripples"
+          ]
+        },
+        "kind": "scene"
       },
-      "summary": "Spread one ripple on the water, seen from straight above. A single drop of ultramarine sits at the center, bleeding like tarashikomi, and rings spread around it from the inside out. Each ring is an upper and a lower arc: the inner two are closed, and from the third outward they break, the breaks turning a little from ring to ring. The ring lines sway loosely, narrowly for the inner two and broadly from the third outward. The inner three are ultramarine and the outer three pale ink (gray); only the second ring is in thick brush, the others in thin brush. The written ring count (1–6), or 4–5 when none is written. The center is one of five positions around and slightly below the middle of the canvas, and the whole is turned as well."
+      "note": "A ripple seen from above: a bleeding drop and rings that break toward the outside."
     },
     {
       "definition": {
-        "schema": "inku.macro-definition.v1",
+        "schema": "inku.macro-definition.v2",
         "namespace": "Water",
-        "heading": "Rings",
         "version": "2.0.0",
         "parameters": {
           "ring_count": {
@@ -3110,17 +3121,23 @@
             ]
           }
         ],
-        "aliases": [
-          "水輪"
-        ]
+        "id": "Rings",
+        "names": {
+          "ja": [
+            "水輪"
+          ],
+          "en": [
+            "rings"
+          ]
+        },
+        "kind": "scene"
       },
-      "summary": "Spread one ripple on the water, seen at a low angle across it (mizuwa). The same broken rings and bleeding drop as the ripple seen from above are widened a little and flattened to about a third of their height, each outer ring's center a little lower so the rings open toward the viewer. The lines are thin brush, the inner three ultramarine and the outer three pale ink (gray). Five short pale-ink horizontal strokes, like light reflected on the water, lie to the sides of and below the rings. The whole tilts slightly, up to 3 degrees either way. The written ring count (1–6), or 4–5 when none is written. It sits at one of five positions in the lower half of the canvas."
+      "note": "A ripple seen at a low angle: flattened rings and reflections on the water."
     },
     {
       "definition": {
-        "schema": "inku.macro-definition.v1",
+        "schema": "inku.macro-definition.v2",
         "namespace": "Water",
-        "heading": "River",
         "version": "1.0.0",
         "parameters": {
           "flow_count": {
@@ -3657,17 +3674,23 @@
             ]
           }
         ],
-        "aliases": [
-          "川"
-        ]
+        "id": "River",
+        "names": {
+          "ja": [
+            "川"
+          ],
+          "en": [
+            "river"
+          ]
+        },
+        "kind": "scene"
       },
-      "summary": "Draw a river bending as it narrows into the distance, as if looked down on. The banks are two thick-brush pale-ink (gray) arcs that draw together from the near bottom edge toward the middle of the canvas, the river bending to one side in the distance. Between the banks lie horizontal thin-brush flow lines in ultramarine and pale ink, shorter and closer together farther away; the far ones undulate tightly and the near ones loosely. The written flow line count (1–9), or 6–7 when none is written, spread from far to near at any count. The bend's direction (left or right) and the height come from four arrangements."
+      "note": "A river bending as it narrows into the distance."
     },
     {
       "definition": {
-        "schema": "inku.macro-definition.v1",
+        "schema": "inku.macro-definition.v2",
         "namespace": "Water",
-        "heading": "Sea",
         "version": "1.0.0",
         "parameters": {
           "wave_count": {
@@ -4376,11 +4399,18 @@
             ]
           }
         ],
-        "aliases": [
-          "海"
-        ]
+        "id": "Sea",
+        "names": {
+          "ja": [
+            "海"
+          ],
+          "en": [
+            "sea"
+          ]
+        },
+        "kind": "scene"
       },
-      "summary": "Draw open sea reaching to the horizon. A fine pale-ink pen horizon line crosses the middle of the canvas, and below it lie thin-brush wave lines in ultramarine and pale ink, farther apart toward the viewer. The far waves undulate tightly and the near ones loosely, and each row carries two small arc crests, larger toward the viewer. The written wave row count (1–8), or 5–6 when none is written, spread from far to near at any count. The horizon's height comes from three choices."
+      "note": "Open sea to the horizon, with crests."
     }
   ],
   "exported_from": {}

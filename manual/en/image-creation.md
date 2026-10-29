@@ -194,7 +194,7 @@ The eleven words under `Surface` each carry a small drawing of how the face is, 
 
 The Saijiki is not autocompletion. Consult it when needed; it does not narrow a description to the existing vocabulary on its own. Picking a word does not start painting.
 
-Plugin words appear in the same row and wear the same face as built-in ones. The explanation is not under the word but in a preview panel separate from the list, which carries four parts: name, effect, example, and picture. The picture appears only when the plugin document ships one; a word without one gets the same fallback picture a built-in word gets.
+Plugin words appear in the same row and wear the same face as built-in ones. The separate preview panel carries the name, effect (the package note), example, and picture. A PNG included in the ZIP package supplies the picture; otherwise it is drawn from the example. The bundled leaves' pictures come from the shared core package.
 
 ## 6. Read and Edit the Instructions
 

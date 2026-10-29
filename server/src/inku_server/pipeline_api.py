@@ -719,7 +719,7 @@ class PipelineService:
         return self.start(owner, kind, text, parent={"kind": "legacy_history", "id": history_id}, source_work=work, **choices)
 
     def ddl_export(self, owner: str, history_id: str) -> dict:
-        """The work's visible DDL with the plugin definitions it names."""
+        """The work's visible DDL with the definitions in its saved locks."""
         from .api_core.common import _build_number
         from .ddl_export import build_ddl_export
 
@@ -738,6 +738,7 @@ class PipelineService:
             config.get("definitions") or [],
             config.get("macro_summaries") or [],
             {"build_number": _build_number(), "render_engine_version": history.metadata.get("render_engine_version")},
+            locks=(linked.macro_catalog.get("definition_locks") or []) if linked is not None else [],
         )
 
     def fork_description(self, owner: str, variation_id: str, body: ForkDescriptionBody) -> dict:

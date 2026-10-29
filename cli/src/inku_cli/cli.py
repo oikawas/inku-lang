@@ -2100,15 +2100,17 @@ def _compose_payload(
     return {k: v for k, v in payload.items() if v is not None}
 
 
-DDL_EXPORT_SCHEMA = "inku.ddl-export.v1"
+DDL_EXPORT_SCHEMA = "inku.ddl-export.v2"
 
 
 def _read_ddl_export(text: str) -> tuple[str, list[dict[str, Any]]]:
-    """An inku.ddl-export.v1 file gives its DDL and plugins; other text is DDL alone."""
+    """A v2 export gives its DDL and plugins; v1 must be exported again."""
     try:
         data = json.loads(text)
     except json.JSONDecodeError:
         return text, []
+    if isinstance(data, dict) and data.get("schema") == "inku.ddl-export.v1":
+        raise CliError("export this DDL again as inku.ddl-export.v2")
     if not isinstance(data, dict) or data.get("schema") != DDL_EXPORT_SCHEMA:
         return text, []
     ddl, plugins = data.get("ddl"), data.get("plugins", [])
@@ -2116,7 +2118,7 @@ def _read_ddl_export(text: str) -> tuple[str, list[dict[str, Any]]]:
         isinstance(item, dict) and isinstance(item.get("definition"), dict) for item in plugins
     ):
         raise CliError("the DDL export file is malformed")
-    return ddl, [{"definition": item["definition"], "summary": str(item.get("summary") or "")} for item in plugins]
+    return ddl, [{"definition": item["definition"], "note": str(item.get("note") or "")} for item in plugins]
 
 
 def command_ddl_export(args: argparse.Namespace) -> int:
@@ -4416,12 +4418,15 @@ def command_plugin(args: argparse.Namespace) -> int:
     elif args.plugin_action == "validate":
         path = Path(args.file)
         try:
-            document = path.read_text(encoding="utf-8")
+            if path.suffix.lower() == ".zip":
+                upload = {"archive": base64.b64encode(path.read_bytes()).decode("ascii")}
+            else:
+                upload = {"document": path.read_text(encoding="utf-8")}
         except (OSError, UnicodeError) as exc:
-            raise CliError(f"cannot read plugin document: {exc}") from exc
-        data, _ = client.request("POST", "/api/plugins/validate", data={"document": document})
+            raise CliError(f"cannot read plugin package: {exc}") from exc
+        data, _ = client.request("POST", "/api/plugins/packages/validate", data=upload)
     else:
-        data, _ = client.request("POST", "/api/plugins/reload")
+        raise CliError("unknown plugin action")
     _print_json(data)
     return 0
 
@@ -4999,13 +5004,12 @@ def build_parser() -> argparse.ArgumentParser:
     api_command.add_argument("--output", "-o", help="write the raw response body to a file")
     api_command.set_defaults(func=command_api)
 
-    plugin_cmd = subparsers.add_parser("plugin", help="inspect and reload declarative DDL plugins")
+    plugin_cmd = subparsers.add_parser("plugin", help="inspect and validate DDL plugin packages")
     _add_common_server_args(plugin_cmd)
     plugin_sub = plugin_cmd.add_subparsers(dest="plugin_action", required=True)
-    plugin_sub.add_parser("list", help="list loaded and rejected plugin documents")
-    plugin_validate = plugin_sub.add_parser("validate", help="validate one local plugin document on the server")
-    plugin_validate.add_argument("file", help="UTF-8 .inku-plugin.md file")
-    plugin_sub.add_parser("reload", help="reload the server plugin directory without restart")
+    plugin_sub.add_parser("list", help="list loaded and rejected plugin packages")
+    plugin_validate = plugin_sub.add_parser("validate", help="validate a local v2 plugin package on the server")
+    plugin_validate.add_argument("file", help="UTF-8 package.json or package zip")
     plugin_cmd.set_defaults(func=command_plugin)
 
     reference_cmd = subparsers.add_parser(

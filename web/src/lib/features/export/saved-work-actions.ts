@@ -151,7 +151,7 @@ export function makeSavedWorkExportActions(deps: SavedWorkExportActionsDeps) {
 			const item = await oneSavedWork(snapshot);
 			return downloadCard(deps.apiFetch, item.id as string, exportSettings.card);
 		},
-		/** The visible DDL with the plugin definitions it names (inku.ddl-export.v1). */
+		/** The visible DDL with its locked plugin definitions (inku.ddl-export.v2). */
 		onDownloadDdl: async (snapshot: SavedWorkExportSnapshot) => {
 			const item = await oneSavedWork(snapshot);
 			const response = await deps.apiFetch(`/api/pipeline/history/${encodeURIComponent(item.id as string)}/ddl-export`, { cache: 'no-store' });

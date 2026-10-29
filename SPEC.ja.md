@@ -176,6 +176,7 @@ Webの歳時記previewも現行カテゴリに合わせる。おもて9語は同
 
 - **ありのままを描く**：可視DDLに書かれた語は、書かれたとおりに描く。compiler・lowerer・rendererは、組み合わせや前後の語を理由に、語を別の語や別の値へ読み替えない（例: 淡さを添えた面を、添えない面として描かない）。§8.4で、作者が書いた位置を焦点の候補へ読み替えるのをやめたのと同じ理由による。
 - **偏りは語彙で直す**：読み手の選び方が特定の語や組み合わせへ偏り、表現の幅を狭めるときは、原因を歳時記の語・カテゴリ・説明と、その投影（下絵の語の一覧・受理行列・応答の型）に求めて直す。描く段の補正や、歳時記の外の隠れ辞書では直さない。**ただし歳時記を無個性な中立にはしない** —— 完全に中立な語彙は芸術的に無意味であり、限られた語の選び方そのものが作品世界の性格をつくる（§1.1）。
+- **プラグインの名**：基本語と同じ字はプラグインの名に使えず、一つの目録の中では見える名を一つの語だけが持つ。
 - **一語一意**：歳時記の一つの語は一つの意味だけを持ち、文の中の位置や前後の語で意味を読み分けない。日本語と英語の両方で守り、構文の修飾語（太さ・大きさ）とも同じ語を別の意味で使わない。読み手（Stage 1）が読み書きする下絵の応答の型の値と欄の名も語として扱い、同じ原則に従う。多義や掛詞は記述（§5.1の詩歌の層）の自由であり、読み手がそれを可視DDLの一つの語へ読み解く。
 - **語はその性質のカテゴリに置き、名は意味を言う**：おもては面の技法を、ゆらぎは痕の揺れの形を言う。
 - **構造で伝える**：語は持ち主（歳時記の共有assetと構文の修飾語の表）で変え、下絵の語の一覧・受理行列・応答の型へ投影して読み手に届ける。指示文の説明だけを変えて済ませない。
@@ -296,7 +297,7 @@ Macroは意味解決後のinvocation順に実行する。照応だけのmention�
 
 旧`.inku-plugin.md`、`fires_on`、localized expansion template、旧Stage 1.5 / Stage 2 expanderは、新規pluginのsemantic canonとして退役した。Compatibility importerはapplication全体をerrorにせず`legacy_plugin_format` warningとper-macro `Imported | Omitted` outcomeを返す。旧作品は保存Score / expanded artifactを優先して表示し、旧expanderを恒久fallbackにしない。Artifact不足の`Omitted`をsilent partial renderや別図形へ変えない。
 
-Shared Rust compiler foundationはparse / validate / identity / lock / binding / deterministic expansionに加え、上記finite Emit（配置を持たないGroup内を含む）を通常lowerer経由でactual Scoreへ届ける。通常Server／Web／Android runtimeとbundled package catalogは接続済みである。Serverは、管理者がWebから追加する`inku.plugin-package.v1`（MacroDefinition v1の定義と要約・歳時記の表示をまとめたJSON。歳時記の絵のPNGと一緒にzipでも渡せ、入っているものはzipで書き出せる）を、形・共有coreの定義検査・例文の描画の三つの検査に通ったときだけ導入し、新しい作品のcatalogへ同梱editionより先に入れる（`PLUGIN.md` §5.1）。保存済みの作品は使った定義の写しで描き直す。Android・macOSの利用者のpackage loaderは未実装である。`PLUGIN.md`は本節に従う現行authoring guideであり、未実装loaderやdirectory追加手順をauthorityとしてはならない。
+Shared Rust compiler foundationはparse / validate / identity / lock / binding / deterministic expansionに加え、上記finite Emit（配置を持たないGroup内を含む）を通常lowerer経由でactual Scoreへ届ける。通常Server／Web／Android runtimeとbundled package catalogは接続済みである。Serverは、管理者がWebから追加する`inku.plugin-package.v2`（MacroDefinition v2の定義、日英のnote・例・絵をまとめたJSON。絵のPNGを同梱するzipでも渡せ、入っているものはzipで書き出せる）を、形・共有coreの定義検査・例文の描画の三つの検査に通ったときだけ導入し、新しい作品のcatalogへ同梱editionより先に入れる（`PLUGIN.md` §5.1）。保存済みの作品は使った定義の写しで描き直す。Androidの利用者package loaderは未実装である。macOSの設定にはpackage loaderがあるが、歳時記の旧資源と試験の追従は端末の改修で扱う。`PLUGIN.md`は本節に従う現行authoring guideであり、未実装loaderやdirectory追加手順をauthorityとしてはならない。
 
 Visible sourceの細さと大小は、同じdimensionの`SemanticRef` categoryを明示宣言したparameterへ、一意で完全なassignmentだけをbindingする。大小は既存のhead前修飾でqualified Macro headも認識する。Core由来の値はSaijiki asset metadataを持たず、元span / clause / atom / parameter / definitionへ結び、通常entity修飾として二重消費しない。Literal、外側parameter、definition-local component parameterの値はいずれも同じEmit fieldと通常lowererへ合流する。Missing / ambiguous bindingは既存上流error policy、未宣言caller factは既存lowering policyに従う。Bound parameterだけを新しいcontinuation predicateへ昇格せず、未宣言属性の自動overlay / fan-outを行わない。Source / owner integrity不良は両modeを停止する。
 
@@ -327,7 +328,7 @@ Render Engine は、`JSON Score + render options + server-owned color metadata` 
 
 ### 4.9 Reference vocabulary names
 
-`Nature.leaves`は、`Nature.YoungLeaves`（別名`Nature.若葉`）、`Nature.Undergrowth`（`Nature.下草`）、`Nature.SummerLeaves`（`Nature.青葉`）、`Nature.AutumnLeaves`（`Nature.紅葉`）、`Nature.FallenLeaves`（`Nature.落葉`）、`Nature.WitheredGrass`（`Nature.枯草`）、`Nature.WitheredLeaves`（`Nature.枯葉`）を同梱するshared catalogである。英語の見出しが正式名で、日本語名は別名（§4.13）。ServerとAndroidは同じcatalogからこれらの定義と表示を読む。これは外部runtime loader、任意にinstallするpackage、または`Nature`名前空間全体のregistryを実装したという主張ではない。`Bamboo`、`Nature.雨`、`Nature.風`は将来または説明用のreference vocabulary名として残る。将来reference definitionを提供する場合も、同じMacroDefinition v1 schemaと通常のlock / expansion境界に従い、plugin固有の実行経路を持たない。
+`Nature.leaves`は、共有 core の `assets/nature-leaves-v2/package.json` と PNG を持つ `inku.plugin-package.v2` の同梱パッケージである。七つの情景の語の id は YoungLeaves、Undergrowth、SummerLeaves、AutumnLeaves、FallenLeaves、WitheredGrass、WitheredLeaves。日本語と英語の主の名・別名、note、定義、例、絵を同じ資産から host へ渡す。Server は同梱パッケージを切り替えられるが消せない。保存済みの作品はその lock にある定義で再演する。`Bamboo`、`Nature.雨`、`Nature.風`は将来または説明用の名であり、現在の定義ではない。
 
 ### 4.10 名前空間の規約
 
@@ -359,11 +360,11 @@ Render Engine は、`JSON Score + render options + server-owned color metadata` 
 
 描いた環境でプラグイン名が解決できない文は、その文だけを省略して残りを描き切る。作品全体を止めず、原文のDDLからその文を消さず、LLMに別の語で書き直させない。共有Rust（pipeline binding `explain_plugin_diagnostics`）が、compilerの解決診断と、hostの有効・無効化中のプラグイン名、作品自身の定義から、文ごとに理由を一つ返す: `plugin_not_installed`（その名前が無い）、`plugin_disabled`（導入済みだが無効）、`plugin_name_mismatch`（登録名と一致しない。同じ見出しの別名前空間、大文字小文字の違い、2文字以内の違いの登録名を候補として一つ示す）、`plugin_version_mismatch`（同じ名前で定義の中身が違う）、`plugin_count_out_of_range`（名前は解決したが、書いた個数が語の受ける範囲の外。§4.6）。Hostは作品の診断に保存し、同じ範囲の汎用診断の代わりに表示する。
 
-保存済み作品は使った定義の実物を持つので、プラグインを外しても再演は変わらない。環境をまたいでDDLを持ち運ぶために、作品を`inku.ddl-export.v1`（可視DDL、言語、DDLが名前を書く定義とその要約）として書き出せる。読み込んだ定義は新しい作品だけで使い、登録済みの同名定義より優先する。導入はしない。登録済みと中身が違う、または未登録のときは、どちらを使ったかをcatalog診断（`imported_plugin_differs_from_installed`／`imported_plugin_not_installed`）で知らせる。定義はdata-onlyで、読み込み時も共有Rustの検証境界を通る。
+保存済み作品は使った定義の実物を持つので、プラグインを外しても再演は変わらない。環境をまたいでDDLを持ち運ぶために、作品を`inku.ddl-export.v2`（可視DDL、言語、使った定義とnote、書き出し元）として書き出せる。定義はDDLの字から探さず、作品が実際に使ったlockから選ぶ。読み込んだ定義は新しい作品だけで使い、登録済みの同名定義より優先する。導入はしない。登録済みと中身が違う、または未登録のときは、どちらを使ったかをcatalog診断（`imported_plugin_differs_from_installed`／`imported_plugin_not_installed`）で知らせる。定義はdata-onlyで、読み込み時も共有Rustの検証境界を通る。
 
 ### 4.13 正式名と別名
 
-v2 定義は日本語・英語それぞれの主の名と別名を持つ。名は基本語と一致できず、定義内で正規化後に重複できない。v1 では日本語名を別名から、英語名を見出しの語分割から作る。v1 の digest と保存済み作品の lock は変えない。複数 lock に当たる括弧の名は `plugin_name_ambiguous` とする。
+v2 定義は日本語・英語それぞれの主の名と別名を持つ。名は基本語と一致できず、定義内で正規化後に重複できない。v1 の定義は保存済み作品の lock にだけ残る。v1 の digest と保存済み作品の lock は変えない。複数 lock に当たる括弧の名は `plugin_name_ambiguous` とする。
 
 ### 4.14 情景の語と物の語
 

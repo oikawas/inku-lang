@@ -60,11 +60,10 @@ export type PluginPackageReport = {
 	exists?: boolean;
 	problems: PluginPackageProblem[];
 	words: Array<{
+		id: string;
 		heading: string;
 		qualified_name: string;
 		aliases: string[];
-		summary_ja: string;
-		summary_en: string;
 		note_ja: string;
 		note_en: string;
 		example_ja: string;

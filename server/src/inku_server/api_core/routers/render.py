@@ -98,7 +98,7 @@ class ComposeRequest(BaseModel):
     imported_plugins: list[dict] | None = Field(
         default=None,
         max_length=64,
-        description="DDL書き出し(inku.ddl-export.v1)が運ぶプラグイン定義。この新しい作品だけで使う",
+        description="DDL書き出し(inku.ddl-export.v2)が運ぶプラグイン定義と note。この新しい作品だけで使う",
     )
     # This endpoint does not run a sketch. Supplied text is retained as context
     # beside the description; it does not replace the authored DDL or description.

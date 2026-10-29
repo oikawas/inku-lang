@@ -1,13 +1,12 @@
 {
-  "schema": "inku.ddl-export.v1",
+  "schema": "inku.ddl-export.v2",
   "language": "en",
-  "ddl": "Washi.\n5 Water.Ripples.",
+  "ddl": "Washi.\n5 {ripples}.",
   "plugins": [
     {
       "definition": {
-        "schema": "inku.macro-definition.v1",
+        "schema": "inku.macro-definition.v2",
         "namespace": "Water",
-        "heading": "Ripples",
         "version": "3.0.0",
         "parameters": {
           "ring_count": {
@@ -749,11 +748,18 @@
             ]
           }
         ],
-        "aliases": [
-          "波紋"
-        ]
+        "id": "Ripples",
+        "names": {
+          "ja": [
+            "波紋"
+          ],
+          "en": [
+            "ripples"
+          ]
+        },
+        "kind": "scene"
       },
-      "summary": "Spread one ripple on the water, seen from straight above. A single drop of ultramarine sits at the center, bleeding like tarashikomi, and rings spread around it from the inside out. Each ring is an upper and a lower arc: the inner two are closed, and from the third outward they break, the breaks turning a little from ring to ring. The ring lines sway loosely, narrowly for the inner two and broadly from the third outward. The inner three are ultramarine and the outer three pale ink (gray); only the second ring is in thick brush, the others in thin brush. The written ring count (1–6), or 4–5 when none is written. The center is one of five positions around and slightly below the middle of the canvas, and the whole is turned as well."
+      "note": "A ripple seen from above: a bleeding drop and rings that break toward the outside."
     }
   ],
   "exported_from": {}

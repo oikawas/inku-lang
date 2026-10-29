@@ -1,5 +1,3 @@
-from types import SimpleNamespace
-
 from inku_server import macro_catalog
 
 
@@ -48,30 +46,14 @@ class _Binding:
         ).encode()
 
 
-def test_only_enabled_installed_bundle_selects_shared_edition(monkeypatch):
-    installed = SimpleNamespace(
-        source_path=str(macro_catalog.Path(macro_catalog.__file__).resolve().parents[2]
-                        / "plugins/nature-leaves.inku-plugin.md"),
-        manifest=SimpleNamespace(namespace="Nature", name="leaves"),
-        entries=(SimpleNamespace(qualified_name=lambda namespace: f"{namespace}.若葉"),),
-    )
-    custom = SimpleNamespace(
-        source_path="/custom/nature-leaves.inku-plugin.md",
-        manifest=SimpleNamespace(namespace="Nature", name="leaves"),
-        entries=(SimpleNamespace(qualified_name=lambda namespace: f"{namespace}.若葉"),),
-    )
-    monkeypatch.setattr(macro_catalog.DOCUMENT_PLUGIN_MANAGER, "documents", lambda: (installed, custom))
-    legacy, packages = macro_catalog._installed_candidates()
-    assert packages == ["Nature.leaves"]
-    assert legacy == [
-        {"source_id": "bundled:Nature.leaves", "qualified_name": "Nature.若葉"},
-        {"source_id": "nature-leaves.inku-plugin.md", "qualified_name": "Nature.若葉"},
-    ]
-    monkeypatch.setattr(macro_catalog.DOCUMENT_PLUGIN_MANAGER, "documents", lambda: ())
+def test_only_enabled_bundled_package_selects_shared_edition(monkeypatch):
+    monkeypatch.setattr(macro_catalog.PLUGIN_PACKAGE_MANAGER, "is_enabled", lambda _id: True)
+    assert macro_catalog._installed_candidates() == ([], ["Nature.leaves"])
+    monkeypatch.setattr(macro_catalog.PLUGIN_PACKAGE_MANAGER, "is_enabled", lambda _id: False)
     assert macro_catalog._installed_candidates() == ([], [])
 
 
-def test_new_work_catalog_keeps_canonical_entries_and_reports_legacy_omission(monkeypatch):
+def test_new_work_catalog_keeps_canonical_entries_before_packages(monkeypatch):
     definition = {
         "schema": "inku.macro-definition.v1",
         "namespace": "Example",
@@ -81,16 +63,8 @@ def test_new_work_catalog_keeps_canonical_entries_and_reports_legacy_omission(mo
         "components": {},
         "body": [],
     }
-    document = SimpleNamespace(
-        source_path="legacy.inku-plugin.md",
-        manifest=SimpleNamespace(namespace="Nature", name="leaves"),
-        entries=(SimpleNamespace(qualified_name=lambda namespace: f"{namespace}.若葉"),),
-    )
-    monkeypatch.setattr(
-        macro_catalog.DOCUMENT_PLUGIN_MANAGER,
-        "documents",
-        lambda: (document,),
-    )
+    monkeypatch.setattr(macro_catalog.PLUGIN_PACKAGE_MANAGER, "is_enabled", lambda _id: True)
+    monkeypatch.setattr(macro_catalog.PLUGIN_PACKAGE_MANAGER, "catalog_candidates", lambda _lang: [])
     resolved = macro_catalog.resolve_new_work_macro_catalog(
         _Binding(),
         {
@@ -104,5 +78,4 @@ def test_new_work_catalog_keeps_canonical_entries_and_reports_legacy_omission(mo
     assert resolved["definition_locks"] == [
         {"qualified_name": "Example.Quiet", "version": "1.0.0", "digest": "abc"}
     ]
-    assert resolved["diagnostics"][0]["qualified_name"] == "Nature.若葉"
-    assert resolved["diagnostics"][0]["warnings"] == ["legacy_plugin_format"]
+    assert resolved["diagnostics"] == []

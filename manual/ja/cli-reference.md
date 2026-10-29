@@ -226,7 +226,7 @@ uv run inku-cli replay WORK_ID --save-child
 
 | 旗 | 内容 |
 |---|---|
-| `ddl-export WORK_ID --output` / `-o` | 書き出し先のファイル。省略すると標準出力に書きます。出力は `inku.ddl-export.v1` のJSONで、作品のDDLと、そのDDLが名指すプラグインの定義を含みます |
+| `ddl-export WORK_ID --output` / `-o` | 書き出し先。出力は `inku.ddl-export.v2` で、作品の DDL と保存した lock が選ぶ定義・note を含みます |
 | `export-card HASH --out` / `-o` | 保存先のPNGパス。末尾が `/` のパス、または既存のディレクトリを指定すると、その中に `inku-card-<作品の短いhash>-<layout>.png` の名前で書きます。それ以外のパスは、そのままPNGファイルとして書きます。必須です |
 | `export-card --layout {square,portrait}` | `square` は1080×1080、`portrait` は1080×1350の紙です |
 | `export-card --no-seal` | 紙に小さく入る `inku` の印を入れません。省略時は入ります |
@@ -241,12 +241,11 @@ uv run inku-cli replay WORK_ID --save-child
 
 | コマンド | 内容 |
 |---|---|
-| `plugin list` | ロード済み／拒否されたプラグイン文書、namespace、version、拒否理由をJSONで取得する |
-| `plugin validate FILE` | ローカルの文書本文を管理APIへ送り、コードや外部ファイルを実行せず構文検証する |
-| `plugin reload` | サーバーを再起動せず `server/plugins/` を明示再読込する |
+| `plugin list` | ロード済み／拒否された v2 パッケージ、namespace、version、拒否理由を JSON で取得する |
+| `plugin validate FILE` | ローカルの v2 JSON または zip を管理 API の三段階の検査へ送る |
 | `reference [--md \| --json] [-o FILE]` | 実装内の語彙・定数テーブルの機械生成ダンプ。既定はMarkdown |
 
-`plugin` は管理者セッションを必要とします。`reference` はログイン済みセッションで実行できます。
+`plugin validate` は管理者セッション、`plugin list` と `reference` はログイン済みセッションを必要とします。
 
 ## 奥書
 

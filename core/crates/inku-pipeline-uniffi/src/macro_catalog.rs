@@ -6,7 +6,7 @@ use std::{
 };
 
 use inku_ddl::{
-    LegacyImportOutcome, MacroDefinition, NATURE_LEAVES_V1_JSON, ResolvedInstructionLanguage,
+    LegacyImportOutcome, MacroDefinition, NATURE_LEAVES_V2_JSON, ResolvedInstructionLanguage,
 };
 use serde::{Deserialize, Serialize};
 
@@ -33,20 +33,14 @@ fn default_language() -> ResolvedInstructionLanguage {
 
 #[derive(Deserialize)]
 struct BundledPackage {
-    package_id: String,
-    entries: Vec<BundledEntry>,
+    words: Vec<BundledEntry>,
 }
 
 #[derive(Deserialize)]
 struct BundledEntry {
     definition: serde_json::Value,
-    summaries: BundledSummaries,
-}
-
-#[derive(Deserialize)]
-struct BundledSummaries {
-    ja: String,
-    en: String,
+    note_ja: String,
+    note_en: String,
 }
 
 #[derive(Deserialize)]
@@ -143,7 +137,7 @@ fn resolve(input_bytes: &[u8]) -> Result<CatalogOutput, ()> {
     // through the same parser, validation, identity and resource boundary.
     for package_id in input.bundled_packages {
         let package: BundledPackage = match package_id.as_str() {
-            "Nature.leaves" => serde_json::from_str(NATURE_LEAVES_V1_JSON).map_err(|_| ())?,
+            "Nature.leaves" => serde_json::from_str(NATURE_LEAVES_V2_JSON).map_err(|_| ())?,
             _ => {
                 diagnostics.push(omitted(
                     package_id,
@@ -155,13 +149,13 @@ fn resolve(input_bytes: &[u8]) -> Result<CatalogOutput, ()> {
                 continue;
             }
         };
-        for entry in package.entries {
+        for entry in package.words {
             input.canonical.push(CanonicalCandidate {
-                source_id: format!("bundled:{}", package.package_id),
+                source_id: format!("bundled:{package_id}"),
                 definition_json: entry.definition.to_string(),
                 summary: match input.language {
-                    ResolvedInstructionLanguage::Ja => entry.summaries.ja,
-                    ResolvedInstructionLanguage::En => entry.summaries.en,
+                    ResolvedInstructionLanguage::Ja => entry.note_ja,
+                    ResolvedInstructionLanguage::En => entry.note_en,
                 },
             });
         }

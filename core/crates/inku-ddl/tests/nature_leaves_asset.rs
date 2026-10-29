@@ -11,7 +11,7 @@ use inku_score::{Color, Frequency, InkSpread, Primitive, Quality, RelationType};
 use serde::Deserialize;
 use serde_json::Value;
 
-const ASSET: &str = include_str!("../assets/nature-leaves-v1.json");
+const ASSET: &str = include_str!("fixtures/nature-leaves-2.1-v1.json");
 /// The bundled package before draw-system04 (1.0.0 / 1.0.1 editions), which
 /// saved works may still hold. Its words are Saijiki v1.
 const PACKAGE_1_0: &str = include_str!("fixtures/nature-leaves-1.0-package.json");

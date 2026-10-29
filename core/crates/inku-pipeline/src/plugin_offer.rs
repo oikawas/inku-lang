@@ -356,7 +356,10 @@ mod tests {
 
     #[test]
     fn summary_lines_separate_english_and_mark_truncated_sentences() {
-        let asset: Value = serde_json::from_str(inku_ddl::NATURE_LEAVES_V1_JSON).unwrap();
+        let asset: Value = serde_json::from_str(include_str!(
+            "../../inku-ddl/tests/fixtures/nature-leaves-2.1-v1.json"
+        ))
+        .unwrap();
         let definition =
             MacroDefinition::from_json(&asset["entries"][0]["definition"].to_string()).unwrap();
         let summary = "Scatter fallen leaves widely and unevenly to both sides of a drift from upper left to lower right, gently gathering near the edge.";
@@ -403,7 +406,10 @@ mod tests {
 
     #[test]
     fn selection_prioritizes_braces_then_ddl_then_mentions_and_respects_word_boundaries() {
-        let asset: Value = serde_json::from_str(inku_ddl::NATURE_LEAVES_V1_JSON).unwrap();
+        let asset: Value = serde_json::from_str(include_str!(
+            "../../inku-ddl/tests/fixtures/nature-leaves-2.1-v1.json"
+        ))
+        .unwrap();
         let leaves =
             MacroDefinition::from_json(&asset["entries"][0]["definition"].to_string()).unwrap();
         let mut rain = leaves.clone();
@@ -456,7 +462,10 @@ mod tests {
 
     #[test]
     fn no_offer_keeps_the_prompt_bytes_and_review_offers_the_locked_word() {
-        let asset: Value = serde_json::from_str(inku_ddl::NATURE_LEAVES_V1_JSON).unwrap();
+        let asset: Value = serde_json::from_str(include_str!(
+            "../../inku-ddl/tests/fixtures/nature-leaves-2.1-v1.json"
+        ))
+        .unwrap();
         let definition =
             MacroDefinition::from_json(&asset["entries"][0]["definition"].to_string()).unwrap();
         let catalog = [MacroPromptEntry {

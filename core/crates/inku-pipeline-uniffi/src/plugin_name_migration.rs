@@ -187,7 +187,10 @@ mod tests {
 
     #[test]
     fn definitions_only_migrate_and_missing_lock_is_reported() {
-        let package: Value = serde_json::from_str(inku_ddl::NATURE_LEAVES_V1_JSON).unwrap();
+        let package: Value = serde_json::from_str(include_str!(
+            "../../inku-ddl/tests/fixtures/nature-leaves-2.1-v1.json"
+        ))
+        .unwrap();
         let old = package["entries"][0]["definition"].clone();
         let output = run(&serde_json::to_vec(&json!({"definitions":[old]})).unwrap()).unwrap();
         assert_eq!(output["definitions"][0]["changed"], true);
@@ -239,7 +242,10 @@ mod tests {
 
     #[test]
     fn a_locked_scene_migrates_without_changing_score_and_is_idempotent() {
-        let package: Value = serde_json::from_str(inku_ddl::NATURE_LEAVES_V1_JSON).unwrap();
+        let package: Value = serde_json::from_str(include_str!(
+            "../../inku-ddl/tests/fixtures/nature-leaves-2.1-v1.json"
+        ))
+        .unwrap();
         let old =
             MacroDefinition::from_json(&package["entries"][0]["definition"].to_string()).unwrap();
         let old_id = old.identity().unwrap();

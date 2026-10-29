@@ -4,12 +4,10 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
-from pathlib import Path
 from typing import Any
 
 from .pipeline_candidate import CandidateHostError
-from .plugins import DOCUMENT_PLUGIN_MANAGER, bundled_package_for
-from .plugins.packages import PLUGIN_PACKAGE_MANAGER
+from .plugins import PLUGIN_PACKAGE_MANAGER
 
 
 def _bytes(value: Mapping[str, Any]) -> bytes:
@@ -46,28 +44,7 @@ def _canonical_candidates(
 
 
 def _installed_candidates() -> tuple[list[dict[str, str]], list[str]]:
-    candidates = []
-    bundled_packages = []
-    for document in DOCUMENT_PLUGIN_MANAGER.documents():
-        # The installed document remains the enable/disable handle. Arbitrary
-        # user Markdown with the same namespace is not translated implicitly.
-        package_id = bundled_package_for(document.source_path)
-        is_bundled = package_id is not None
-        if is_bundled:
-            bundled_packages.append(package_id)
-        source_id = (
-            f"bundled:{package_id}" if is_bundled else Path(document.source_path).name
-            if document.source_path
-            else document.manifest.name
-        )
-        for entry in document.entries:
-            candidates.append(
-                {
-                    "source_id": source_id,
-                    "qualified_name": entry.qualified_name(document.manifest.namespace),
-                }
-            )
-    return candidates, bundled_packages
+    return [], ["Nature.leaves"] if PLUGIN_PACKAGE_MANAGER.is_enabled("Nature.leaves") else []
 
 
 def _imported_candidates(imported: Sequence[Mapping[str, Any]]) -> list[dict[str, str]]:
@@ -76,8 +53,8 @@ def _imported_candidates(imported: Sequence[Mapping[str, Any]]) -> list[dict[str
             "source_id": f"imported:{index}",
             "definition_json": json.dumps(item["definition"], ensure_ascii=False, allow_nan=False, separators=(",", ":")),
             # Stage 1 requires a summary; an export without one still names the plugin.
-            "summary": str(item.get("summary") or "").strip()
-            or f"{item['definition'].get('namespace')}.{item['definition'].get('heading')}",
+            "summary": str(item.get("note") or "").strip()
+            or f"{item['definition'].get('namespace')}.{item['definition'].get('id') or item['definition'].get('heading')}",
         }
         for index, item in enumerate(imported)
     ]
@@ -183,36 +160,13 @@ def resolve_new_work_macro_catalog(
 
 
 def _installed_plugin_names() -> tuple[list[str], list[str]]:
-    """Qualified names of enabled and of installed-but-disabled plugin documents."""
-    from .plugins.document_format import PluginFormatError, parse_plugin_document
-
-    enabled = sorted(
-        name
-        for document in DOCUMENT_PLUGIN_MANAGER.documents()
-        for entry in document.entries
-        for name in entry.visible_qualified_names(document.manifest.namespace)
-    )
-    disabled = []
-    for item in DOCUMENT_PLUGIN_MANAGER.items():
-        if item.enabled:
-            continue
-        try:
-            document = parse_plugin_document(
-                (DOCUMENT_PLUGIN_MANAGER.directory / item.path).read_text(encoding="utf-8"),
-                source_path=item.path,
-            )
-        except (OSError, PluginFormatError):
-            continue
-        disabled.extend(
-            name for entry in document.entries for name in entry.visible_qualified_names(document.manifest.namespace)
-        )
-    enabled = sorted([*enabled, *PLUGIN_PACKAGE_MANAGER.visible_names(enabled=True)])
-    disabled.extend(PLUGIN_PACKAGE_MANAGER.visible_names(enabled=False))
-    return enabled, sorted(disabled)
+    """Visible names of enabled and disabled packages."""
+    return sorted(PLUGIN_PACKAGE_MANAGER.visible_names(enabled=True)), sorted(PLUGIN_PACKAGE_MANAGER.visible_names(enabled=False))
 
 
 def explain_plugin_diagnostics(
-    binding: object, source: str, upstream_diagnostics: Sequence[Any], work_plugins: Sequence[str] = ()
+    binding: object, source: str, upstream_diagnostics: Sequence[Any],
+    work_plugins: Sequence[str | Mapping[str, str]] = (),
 ) -> list[dict[str, Any]]:
     """Author-facing reasons for plugin sentences the compiler withheld.
 
@@ -224,14 +178,29 @@ def explain_plugin_diagnostics(
     if explainer is None or not upstream_diagnostics:
         return []
     enabled, disabled = _installed_plugin_names()
+    plugin_names = []
+    for package in (*PLUGIN_PACKAGE_MANAGER.packages(), PLUGIN_PACKAGE_MANAGER.bundled()[0]):
+        active = PLUGIN_PACKAGE_MANAGER.is_enabled(package.id)
+        for word in package.words:
+            plugin_names.extend({"name": name, "qualified_name": word.qualified_name, "enabled": active}
+                                for name in word.visible_qualified_names())
+    work_ids = []
+    for item in work_plugins:
+        if isinstance(item, str):
+            work_ids.append(item)
+            plugin_names.append({"name": item, "qualified_name": item, "enabled": True})
+        elif isinstance(item, Mapping) and isinstance(item.get("name"), str) and isinstance(item.get("qualified_name"), str):
+            work_ids.append(item["qualified_name"])
+            plugin_names.append({"name": item["name"], "qualified_name": item["qualified_name"], "enabled": True})
     output = json.loads(
         explainer(
             _bytes(
                 {
                     "source": source,
                     "upstream_diagnostics": list(upstream_diagnostics),
-                    "enabled": sorted(set(enabled) | set(work_plugins)),
+                    "enabled": sorted(set(enabled) | set(work_ids)),
                     "disabled": disabled,
+                    "plugin_names": plugin_names,
                 }
             )
         )

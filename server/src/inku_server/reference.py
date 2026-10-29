@@ -8,12 +8,11 @@ coercion — reading the reference has no effect on any produced work.
 Sections (stable JSON keys):
     1 saijiki                — core vocabulary categories (ja/en) + plugin words
     2 normalized_ddl_phrases — relation literals, ground/background handling
-    3 expansion_layer        — core markers, regions, repetition, plugin expansion
-    4 score_schema           — pydantic JSON Schema + enums
-    5 color_resolution       — core-6 colors per catalog
-    6 weight_properties      — stroke width / dash / opacity / texture per weight
-    7 performance            — canvas aspects, svg profiles, wobble tables, seeds
-    8 verification           — geometry-assertion thresholds
+    3 score_schema           — pydantic JSON Schema + enums
+    4 color_resolution       — core-6 colors per catalog
+    5 weight_properties      — stroke width / dash / opacity / texture per weight
+    6 performance            — canvas aspects, svg profiles, wobble tables, seeds
+    7 verification           — geometry-assertion thresholds
 """
 
 from __future__ import annotations
@@ -36,24 +35,12 @@ from .geometry_thresholds import (
 from .saijiki import (
     reference_categories as saijiki_reference_categories,
     relation_literal_markers,
-    shape_markers,
 )
 from .plugins import (
     CANVAS_ASPECTS,
     DEFAULT_CANVAS_ASPECT_ID,
+    PLUGIN_PACKAGE_MANAGER,
     plugin_status_items,
-)
-from .plugins.document_format import (
-    ANCHOR_PREFIX,
-    DOCUMENT_PLUGIN_MANAGER,
-    MAX_ENTRY_INSTRUCTIONS,
-    METAPHOR_MARKERS,
-    SINGULAR_MEMBER,
-    _CORE_MARKERS,
-    _RANGE_RE,
-    entry_preview_path,
-    _REGIONS,
-    _SAIJIKI_MARKERS,
 )
 from .plugins.system.canvas_aspect import CANVAS_BASE_PX
 from .render_engines import SVG_PROFILES
@@ -133,32 +120,9 @@ def _meta() -> dict[str, Any]:
 # §1 saijiki                                                                   #
 # --------------------------------------------------------------------------- #
 def _plugin_words() -> list[dict[str, Any]]:
-    words: list[dict[str, Any]] = []
-    for document in DOCUMENT_PLUGIN_MANAGER.documents():
-        namespace = document.manifest.namespace
-        for entry in document.entries:
-            words.append(
-                {
-                    "qualified_name": entry.qualified_name(namespace),
-                    "aliases": entry.alias_qualified_names(namespace),
-                    "namespace": namespace,
-                    "surface_ja": list(entry.surfaces.get("ja", ())),
-                    "surface_en": list(entry.surfaces.get("en", ())),
-                    "fires_on_ja": list(entry.fires_on.get("ja", ())),
-                    "fires_on_en": list(entry.fires_on.get("en", ())),
-                    "note_ja": entry.notes.get("ja", ""),
-                    "note_en": entry.notes.get("en", ""),
-                    # v2.14: the saijiki preview shows the same four things for
-                    # a plugin word as for a built-in one -- name, effect,
-                    # example, artwork. The first three are already here; this
-                    # names the fourth. The mirror records what the document
-                    # declared, not the bytes: it is a table of the tables, and
-                    # the picture itself has its own route.
-                    "preview": entry.preview,
-                    "preview_ready": entry_preview_path(document, entry) is not None,
-                }
-            )
-    return words
+    return [{**entry, "namespace": entry["qualified_name"].split(".", 1)[0],
+             "preview_ready": entry["has_preview"]}
+            for entry in PLUGIN_PACKAGE_MANAGER.saijiki_entries()]
 
 
 def _saijiki() -> dict[str, Any]:
@@ -220,61 +184,7 @@ def _normalized_ddl_phrases() -> dict[str, Any]:
 
 
 # --------------------------------------------------------------------------- #
-# §3 expansion_layer                                                           #
-# --------------------------------------------------------------------------- #
-def _classify_marker(marker: str) -> str:
-    lowered = marker.lower()
-    if marker == ANCHOR_PREFIX.strip() or "領域" in marker or "region" in lowered:
-        return "structural"
-    primitive_surfaces = {
-        term.lower() for lang in ("ja", "en") for term in shape_markers(lang)
-    }
-    if lowered in primitive_surfaces or marker in ("雲形", "cloudform"):
-        return "shape"
-    for category, langs in _SAIJIKI_MARKERS.items():
-        if any(marker in words for words in langs.values()):
-            return category  # material / color / variation / angle / ratio / place
-    return "operation"
-
-
-def _classified_markers(markers: tuple[str, ...]) -> list[dict[str, str]]:
-    return [{"marker": marker, "class": _classify_marker(marker)} for marker in markers]
-
-
-def _expansion_layer() -> dict[str, Any]:
-    return {
-        "core_markers": {
-            "ja": _classified_markers(_CORE_MARKERS["ja"]),
-            "en": _classified_markers(_CORE_MARKERS["en"]),
-        },
-        "regions": {key: list(value) for key, value in _REGIONS.items()},
-        "repetition_range_regex": _RANGE_RE.pattern,
-        "singular_member": dict(SINGULAR_MEMBER),
-        "anchor_prefix": ANCHOR_PREFIX,
-        "instruction_budget": {
-            "max_entry_instructions": MAX_ENTRY_INSTRUCTIONS,
-            "rule": (
-                "Anchor lines cost 0; a line with a repetition range costs its "
-                "upper bound; every other line costs 1. Both the parse-time and "
-                "runtime expansions must stay within max_entry_instructions."
-            ),
-        },
-        "fires_on_matching": {
-            "order": [
-                "Explicit namespaced word (e.g. Nature.wind) present in the DDL "
-                "or the source text fires unconditionally.",
-                "Otherwise a fires_on phrase present in the source text fires, "
-                "unless it sits inside a metaphor window.",
-            ],
-            "metaphor_markers": {
-                lang: list(markers) for lang, markers in METAPHOR_MARKERS.items()
-            },
-        },
-    }
-
-
-# --------------------------------------------------------------------------- #
-# §4 score_schema                                                              #
+# §3 score_schema                                                              #
 # --------------------------------------------------------------------------- #
 _ENUM_ALIASES = (
     "Primitive",
@@ -319,7 +229,7 @@ def _score_schema() -> dict[str, Any]:
 
 
 # --------------------------------------------------------------------------- #
-# §5 color_resolution                                                          #
+# §4 color_resolution                                                          #
 # --------------------------------------------------------------------------- #
 def _color_resolution() -> dict[str, Any]:
     return {
@@ -337,14 +247,14 @@ def _color_resolution() -> dict[str, Any]:
 
 
 # --------------------------------------------------------------------------- #
-# §6 weight_properties                                                         #
+# §5 weight_properties                                                         #
 # --------------------------------------------------------------------------- #
 def _weight_properties() -> dict[str, Any]:
     return _renderer_reference()["weight_properties"]
 
 
 # --------------------------------------------------------------------------- #
-# §7 performance                                                               #
+# §6 performance                                                               #
 # --------------------------------------------------------------------------- #
 def _performance() -> dict[str, Any]:
     renderer = _renderer_reference()["performance"]
@@ -364,7 +274,6 @@ def _performance() -> dict[str, Any]:
         "canvas_base_px": CANVAS_BASE_PX,
         "svg_profiles": sorted(SVG_PROFILES),
         **renderer,
-        "default_anchor_region": list(_REGIONS["中域"]),
         "seed_summary": (
             "The JSON Score is deterministic; wobble and scatter are performed by "
             "the Rust renderer from a performance seed. composition_seed re-salts "
@@ -375,7 +284,7 @@ def _performance() -> dict[str, Any]:
 
 
 # --------------------------------------------------------------------------- #
-# §8 verification                                                              #
+# §7 verification                                                              #
 # --------------------------------------------------------------------------- #
 def _verification() -> dict[str, Any]:
     return {
@@ -403,7 +312,6 @@ def build_reference() -> dict[str, Any]:
         "meta": _meta(),
         "saijiki": _saijiki(),
         "normalized_ddl_phrases": _normalized_ddl_phrases(),
-        "expansion_layer": _expansion_layer(),
         "score_schema": _score_schema(),
         "color_resolution": _color_resolution(),
         "weight_properties": _weight_properties(),
@@ -489,16 +397,18 @@ def render_markdown(reference: dict[str, Any] | None = None) -> str:
         out.append("### Plugin words")
         out.append("")
         out += _table(
-            ["qualified_name", "surface_ja", "surface_en", "fires_on_ja", "fires_on_en", "note_ja", "note_en"],
+            ["qualified_name", "word_id", "word_kind", "surface_ja", "surface_en", "note_ja", "note_en", "example_ja", "example_en"],
             [
                 [
                     word["qualified_name"],
+                    word["word_id"],
+                    word["word_kind"],
                     word["surface_ja"],
                     word["surface_en"],
-                    word["fires_on_ja"],
-                    word["fires_on_en"],
                     word["note_ja"],
                     word["note_en"],
+                    word["example_ja"],
+                    word["example_en"],
                 ]
                 for word in saijiki["plugin_words"]
             ],
@@ -529,51 +439,9 @@ def render_markdown(reference: dict[str, Any] | None = None) -> str:
         out.append(f"- {note}")
     out.append("")
 
-    # §3 expansion layer
-    expansion = ref["expansion_layer"]
-    out.append("## 3. Expansion layer")
-    out.append("")
-    out.append("### Core markers")
-    out.append("")
-    for lang in ("ja", "en"):
-        out.append(f"**{lang}**")
-        out.append("")
-        out += _table(
-            ["marker", "class"],
-            [[item["marker"], item["class"]] for item in expansion["core_markers"][lang]],
-        )
-        out.append("")
-    out.append("### Regions")
-    out.append("")
-    out += _table(
-        ["key", "region [x0,y0,x1,y1]"],
-        [[key, value] for key, value in expansion["regions"].items()],
-    )
-    out.append("")
-    out += _table(
-        ["field", "value"],
-        [
-            ["repetition_range_regex", f"`{expansion['repetition_range_regex']}`"],
-            ["singular_member", expansion["singular_member"]],
-            ["anchor_prefix", f"`{expansion['anchor_prefix']}`"],
-            ["max_entry_instructions", expansion["instruction_budget"]["max_entry_instructions"]],
-        ],
-    )
-    out.append("")
-    out.append(f"- Instruction budget: {expansion['instruction_budget']['rule']}")
-    out.append(f"- fires_on order: {' '.join(expansion['fires_on_matching']['order'])}")
-    out.append(
-        "- Metaphor markers: "
-        + "; ".join(
-            f"{lang}: {', '.join(markers)}"
-            for lang, markers in expansion["fires_on_matching"]["metaphor_markers"].items()
-        )
-    )
-    out.append("")
-
-    # §4 score schema
+    # §3 score schema
     score = ref["score_schema"]
-    out.append("## 4. Score schema")
+    out.append("## 3. Score schema")
     out.append("")
     out.append(f"Score version: `{score['version']}`. Full JSON Schema is in the `--json` output.")
     out.append("")
@@ -583,9 +451,9 @@ def render_markdown(reference: dict[str, Any] | None = None) -> str:
     )
     out.append("")
 
-    # §5 color resolution
+    # §4 color resolution
     color = ref["color_resolution"]
-    out.append("## 5. Color resolution")
+    out.append("## 4. Color resolution")
     out.append("")
     out.append(f"Core keys: {', '.join(color['core_keys'])}. Default catalog: `{color['default_catalog_id']}`.")
     out.append("")
@@ -598,9 +466,9 @@ def render_markdown(reference: dict[str, Any] | None = None) -> str:
     )
     out.append("")
 
-    # §6 weight properties
+    # §5 weight properties
     weight = ref["weight_properties"]
-    out.append("## 6. Weight properties")
+    out.append("## 5. Weight properties")
     out.append("")
     out += _table(
         [
@@ -628,9 +496,9 @@ def render_markdown(reference: dict[str, Any] | None = None) -> str:
     )
     out.append("")
 
-    # §7 performance
+    # §6 performance
     performance = ref["performance"]
-    out.append("## 7. Performance")
+    out.append("## 6. Performance")
     out.append("")
     out += _table(
         ["id", "category", "label", "ratio_w", "ratio_h", "intent"],
@@ -653,16 +521,15 @@ def render_markdown(reference: dict[str, Any] | None = None) -> str:
             ["blur_ratio", performance["blur_ratio"]],
             ["segment_target_ratio", performance["segment_target_ratio"]],
             ["segment_count_range", performance["segment_count_range"]],
-            ["default_anchor_region", performance["default_anchor_region"]],
         ],
     )
     out.append("")
     out.append(f"- Seeds: {performance['seed_summary']}")
     out.append("")
 
-    # §8 verification
+    # §7 verification
     verification = ref["verification"]
-    out.append("## 8. Verification")
+    out.append("## 7. Verification")
     out.append("")
     out += _table(
         ["threshold", "value"],

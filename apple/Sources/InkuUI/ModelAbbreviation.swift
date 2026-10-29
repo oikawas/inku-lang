@@ -11,6 +11,7 @@ public struct ModelNaming: Sendable {
 
     private let connections: [ProviderSettings]
     private let stageDefault: String
+    private static let resolutionCache = ModelResolutionCache()
 
     public init(providers: [ProviderSettings] = [], stageProvider: String = defaultProvider) {
         connections = providers
@@ -18,13 +19,17 @@ public struct ModelNaming: Sendable {
     }
 
     private func displayResolution(_ reference: String, defaultProvider: String? = nil) -> [String: Any] {
+        let key = ModelResolutionCache.Key(reference: reference, provider: defaultProvider ?? stageDefault)
+        if let cached = Self.resolutionCache.get(key, connections: connections) { return cached }
         var providers = ProviderModelReference.referenceProviders(connections)
         if let plan = connections.first(where: { $0.kind == .chatGPTPlan && $0.id == "chatgpt" }) {
             providers["chatgpt"] = ["id": "chatgpt", "label": "ChatGPT plan", "active": true,
                 "models": (plan.models ?? []).map { ["id": $0.id, "label": $0.label] }] as [String: Any]
         }
-        return (try? ProviderCoreSettings.call("resolve_display", ["ref": reference,
+        let resolved = (try? ProviderCoreSettings.call("resolve_display", ["ref": reference,
             "providers": providers, "default_provider": defaultProvider ?? stageDefault])) ?? [:]
+        Self.resolutionCache.put(resolved, for: key, connections: connections)
+        return resolved
     }
 
     // MARK: models.ts
@@ -87,7 +92,10 @@ public struct ModelNaming: Sendable {
     /// Web `historyModelStage1Short`, the history strip form.
     public func stripModel(_ reference: String?) -> String {
         guard let reference, !reference.isEmpty else { return "-" }
-        return Self.abbreviateStripModel(owner: providerLabel(resolve(reference).provider), name: modelShortName(reference))
+        let (provider, model) = resolve(reference)
+        let label = modelLabel(provider: provider, model: model) ?? model
+        let name = label.firstIndex(of: "/").map { String(label[label.index(after: $0)...]) } ?? label
+        return Self.abbreviateStripModel(owner: providerLabel(provider), name: name)
     }
 
     // MARK: historyStripFields.ts
@@ -168,5 +176,39 @@ public struct ModelNaming: Sendable {
         }
         return [Line(role: .interpretation, compact: interpretation.map(shortModel), full: interpretation.map(displayName)),
                 Line(role: .drawing, compact: drawing.map(shortModel), full: drawing.map(displayName))]
+    }
+}
+
+/// A tab change rebuilds the history row, but its saved model names and provider catalog have not changed.
+/// Separate provider snapshots so a changed connection cannot reuse stale labels.
+private final class ModelResolutionCache: @unchecked Sendable {
+    struct Key: Hashable {
+        let reference: String
+        let provider: String
+    }
+
+    private let lock = NSLock()
+    private struct Snapshot {
+        let connections: [ProviderSettings]
+        var resolutions: [Key: [String: Any]] = [:]
+    }
+    private var snapshots: [Snapshot] = []
+
+    func get(_ key: Key, connections current: [ProviderSettings]) -> [String: Any]? {
+        lock.withLock {
+            snapshots.first(where: { $0.connections == current })?.resolutions[key]
+        }
+    }
+
+    func put(_ value: [String: Any], for key: Key, connections current: [ProviderSettings]) {
+        lock.withLock {
+            if let index = snapshots.firstIndex(where: { $0.connections == current }) {
+                if snapshots[index].resolutions.count >= 256 { snapshots[index].resolutions.removeAll(keepingCapacity: true) }
+                snapshots[index].resolutions[key] = value
+            } else {
+                if snapshots.count >= 4 { snapshots.removeFirst() }
+                snapshots.append(Snapshot(connections: current, resolutions: [key: value]))
+            }
+        }
     }
 }

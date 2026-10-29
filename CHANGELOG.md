@@ -20,6 +20,14 @@ The shared core now decides callback acceptance, concurrent sign-in, operation p
 
 Use the shared core for callback, attempt, operation and publication checks. Registrations can be deleted after confirmation in Settings.
 
+### 2026-10-29 — Reduce macOS tab switching stalls
+
+Save tab choices without blocking the screen on the settings file write. Keep the artwork and lineage views mounted across switches. Build only visible history thumbnails, reuse model-name resolutions, and avoid rereading connections and Keychain on each Settings tab switch.
+
+Keep the history strip at its content height. When a history tile has focus, the left and right arrow keys show adjacent works; movement within the current page avoids a database refresh. Save the selected Settings tab separately from observable display preferences. Keep the covered creation workspace out of hit testing and accessibility. Resolve the history tile's default provider only when connection settings change, and read connection settings and Keychain only when opening the Models page.
+
+Persist Description, Image, and Batch tab choices without invalidating all display consumers. Switching between Description and Image no longer resets Batch browsing state.
+
 ### 2026-10-28 — Complete Android ChatGPT login in the foreground
 
 The browser acknowledges authorization immediately, and inku exchanges the token after returning to the foreground.

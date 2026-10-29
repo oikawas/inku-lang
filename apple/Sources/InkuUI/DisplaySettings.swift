@@ -133,6 +133,10 @@ public final class DisplaySettings {
     public private(set) var saveError: String?
     @ObservationIgnored private var fileURL: URL?
     @ObservationIgnored private var previewingTextSize = false
+    @ObservationIgnored private var rememberedSettingsTab: String?
+    @ObservationIgnored private var rememberedInputTab: String?
+    @ObservationIgnored private let fileWriter = DisplayPreferencesFileWriter()
+    @ObservationIgnored private var saveRevision = 0
     public init() {}
 
     public func connect(directory: URL?) {
@@ -148,6 +152,8 @@ public final class DisplaySettings {
             saveError = "表示設定を読み込めませんでした: \(error.localizedDescription)"
         }
         fileURL = url
+        rememberedSettingsTab = nil
+        rememberedInputTab = nil
     }
 
     public var colorScheme: ColorScheme? {
@@ -164,6 +170,21 @@ public final class DisplaySettings {
     public func label(_ japanese: String, _ english: String) -> String {
         preferences.language == "en" ? english : japanese
     }
+    /// The selected Settings page does not change the visible workspace. Keep it outside the observable preferences
+    /// so choosing a page does not rebuild every history tile and the canvas.
+    public var settingsTab: String? { rememberedSettingsTab ?? preferences.settingsTab }
+    public func rememberSettingsTab(_ tab: String) {
+        guard settingsTab != tab else { return }
+        rememberedSettingsTab = tab
+        persist()
+    }
+    /// Input tab selection is owned by AutomationModel. Persist it without invalidating unrelated display consumers.
+    public var inputTab: String? { rememberedInputTab ?? preferences.inputTab }
+    public func rememberInputTab(_ tab: String) {
+        guard inputTab != tab else { return }
+        rememberedInputTab = tab
+        persist()
+    }
     public func previewTextSize(_ step: Int) {
         previewingTextSize = true
         preferences.textSizeStep = min(4, max(0, step))
@@ -175,8 +196,33 @@ public final class DisplaySettings {
     private func persist() {
         guard !previewingTextSize, let fileURL else { return }
         do {
-            try JSONEncoder().encode(preferences).write(to: fileURL, options: .atomic)
-            saveError = nil
+            var snapshot = preferences
+            if let rememberedSettingsTab { snapshot.settingsTab = rememberedSettingsTab }
+            if let rememberedInputTab { snapshot.inputTab = rememberedInputTab }
+            let data = try JSONEncoder().encode(snapshot)
+            saveRevision += 1
+            let revision = saveRevision
+            Task {
+                let error = await fileWriter.write(data, to: fileURL, revision: revision)
+                if saveRevision == revision { saveError = error }
+            }
         } catch { saveError = "表示設定を保存できませんでした: \(error.localizedDescription)" }
+    }
+}
+
+/// Atomic file replacement can stall the main thread when a tab choice changes.
+/// The actor serializes writes and skips an older snapshot if a newer one arrived first.
+private actor DisplayPreferencesFileWriter {
+    private var latestRevision = 0
+
+    func write(_ data: Data, to url: URL, revision: Int) -> String? {
+        guard revision > latestRevision else { return nil }
+        latestRevision = revision
+        do {
+            try data.write(to: url, options: .atomic)
+            return nil
+        } catch {
+            return "表示設定を保存できませんでした: \(error.localizedDescription)"
+        }
     }
 }

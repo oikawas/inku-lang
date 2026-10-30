@@ -485,6 +485,10 @@ Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal 
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
 
+## macOS 1.1.6 (2026-10-30)
+
+The Server reference is v2.15.296 / Build 1372. This release includes drawing from words and images, shared provider decisions, plugin v2 and saved-work migration, and improvements to history and the interface. The macOS Build is allocated at packaging time.
+
 ## v2.15.296 (2026-10-29 / Build1372)
 
 Updated the displayed version and Build number.

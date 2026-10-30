@@ -1,7 +1,7 @@
 {
  "schema": "inku.macos-third-party-notices.v1",
  "inputs": {
-  "core/Cargo.lock": "14c2386b2922b9017d60596cd7721e0dbcb09fd641bd4430e8de13b7906a8cfb",
+  "core/Cargo.lock": "09117c2fd097bf567bd269cdf5a6748e5dfc8d28b5e527eeeb43ec485b0b0a0b",
   "apple/Package.resolved": "23397c5afe667533ac1394c1e35f27136e80cb6a872ad93e6a789727d9162acb"
  },
  "components": [
@@ -885,6 +885,20 @@
    "version": "2.4.0",
    "license": "Unicode-3.0",
    "source": "https://crates.io/crates/icu_properties/2.4.0",
+   "note": "From crates.io.",
+   "texts": [
+    {
+     "label": "LICENSE",
+     "text": "f367c1b8e1aa2624"
+    }
+   ]
+  },
+  {
+   "group": "rust",
+   "name": "icu_properties_data",
+   "version": "2.4.0",
+   "license": "Unicode-3.0",
+   "source": "https://crates.io/crates/icu_properties_data/2.4.0",
    "note": "From crates.io.",
    "texts": [
     {

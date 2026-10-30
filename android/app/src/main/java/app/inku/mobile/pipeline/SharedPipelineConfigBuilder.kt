@@ -30,7 +30,7 @@ internal fun paintNames(catalog: ColorCatalog, palette: JSONObject, language: St
     }
 }
 
-/** One definition carried by an `inku.ddl-export.v1` file, offered to a new work only. */
+/** One definition carried by an `inku.ddl-export.v2` file, offered to a new work only. */
 data class ImportedPluginDefinition(
     val definitionJson: String,
     val summary: String,
@@ -51,6 +51,7 @@ data class SharedPipelineConfigRequest(
     val canvasFit: String? = null,
     /** Set for a run written from an image: whether its DDL is reviewed beside its drawing. */
     val imageReview: Boolean? = null,
+    val descriptionReview: Boolean? = null,
 )
 
 data class PreparedPipelineConfig(
@@ -228,6 +229,7 @@ class SharedPipelineConfigBuilder(
             // A run written from an image (SPEC §12.6.6) has the image stages;
             // the server sets the review round on for every such run.
             .also { config -> request.imageReview?.let { config.put("image", JSONObject().put("review", it)) } }
+            .also { config -> request.descriptionReview?.let { config.put("description_ddl", JSONObject().put("review", it).put("colors", true)) } }
 
         return PreparedPipelineConfig(
             configJson = config.toString(),
@@ -409,10 +411,18 @@ class SharedPipelineConfigBuilder(
     }
 
     /** Every name of the bundled package, including aliases, whatever its enabled state. */
-    fun bundledPluginNames(language: String): List<String> = pluginVisibleNames(bundledPluginDefinitions(language))
+    internal fun bundledPluginWords(language: String): List<PluginWord> = bundledPluginEntries(language).objects().map {
+        pluginWord(it.requiredObject("definition"), it.requiredString("qualified_name"))
+    }
 
     /** The bundled package's definitions, resolved as if it were enabled. */
     fun bundledPluginDefinitions(language: String): JSONArray {
+        return JSONArray().also { definitions ->
+            bundledPluginEntries(language).objects().forEach { definitions.put(it.requiredObject("definition")) }
+        }
+    }
+
+    private fun bundledPluginEntries(language: String): JSONArray {
         val output = resolveMacroCatalog(
             SharedPipelineConfigRequest(
                 resolvedLanguage = language,
@@ -421,8 +431,31 @@ class SharedPipelineConfigBuilder(
             ),
             imported = emptyList(),
         )
-        return JSONArray().also { definitions ->
-            output.requiredArray("entries").objects().forEach { definitions.put(it.requiredObject("definition")) }
+        return output.requiredArray("entries")
+    }
+
+    internal fun editorCatalog(language: String, enabled: Boolean, imported: List<ImportedPluginDefinition>): JSONObject =
+        resolveMacroCatalog(SharedPipelineConfigRequest(resolvedLanguage = language, canvasFormatId = "square",
+            catalogSelectionId = "default", bundledPluginsEnabled = enabled), imported)
+
+    /** Ask core for visible names, including names derived from a saved v1 definition. */
+    internal fun wordsForDefinitions(definitions: JSONArray, language: String): List<PluginWord> {
+        val imported = (0 until definitions.length()).mapNotNull { definitions.optJSONObject(it) }
+            .map { ImportedPluginDefinition(it.toString(), "plugin") }
+        if (imported.isEmpty()) return emptyList()
+        val catalog = editorCatalog(language, false, imported)
+        val entries = catalog.requiredArray("entries").objects()
+        val input = JSONObject().put("source", "").put("language", language)
+            .put("definitions", JSONArray(entries.map { it.requiredObject("definition") }))
+            .put("locks", app.inku.mobile.data.db.SaijikiV1Migration.documentLocks(catalog.requiredArray("locks")))
+            .put("compiler", JSONObject.NULL)
+        val result = JSONObject(NativePipelineBridge.pluginCalls(input.toString().toByteArray()).decodeToString())
+        return (result.optJSONArray("entries") ?: JSONArray()).objects().map { entry ->
+            fun names(key: String): List<String> {
+                val items = entry.optJSONArray(key) ?: JSONArray()
+                return (0 until items.length()).map { items.getString(it) }
+            }
+            PluginWord(entry.requiredString("qualified_name"), names("surface_ja"), names("surface_en"))
         }
     }
 

@@ -1,3 +1,4 @@
+import InkuHost
 import InkuPersistence
 import SwiftUI
 
@@ -12,9 +13,8 @@ enum LibraryWorkPresentation {
         if !work.effectiveSourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return work.effectiveSourceText
         }
-        return work.ddl?.split(whereSeparator: \.isNewline)
-            .first(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty })
-            .map(String.init) ?? untitled
+        // A title line (DDL 27), or an empty 「」 that ends a chunk, names no work.
+        return work.ddl.flatMap(DdlTitles.firstSentenceLine) ?? untitled
     }
 }
 

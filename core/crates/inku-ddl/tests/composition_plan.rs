@@ -41,7 +41,7 @@ fn surface_intensity_stays_one_recipe_at_maximum_repetition() {
                 "surface_intensity":{"expr":"semantic_ref","category":"handling","id":level}
             }}]
         }).to_string()).unwrap();
-        let generated = stage("Fill.Row", ResolvedInstructionLanguage::En, &[definition]);
+        let generated = stage("｛Row｝", ResolvedInstructionLanguage::En, &[definition]);
         let generated_plan =
             plan_verified_stage15(generated.verified_effective_view(), context("wide"));
         let generated_objects = generated_plan
@@ -59,7 +59,7 @@ fn exact_decimal_generated_repetition_plan_keeps_must_fit_anchor_and_dimensions(
     let definition = MacroDefinition::from_json(&json!({"schema":"inku.macro-definition.v1","namespace":"Exact","heading":"Row","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{
         "shape":{"expr":"semantic_ref","category":"shape","id":"ellipse"},"movement":{"expr":"semantic_ref","category":"movement","id":"tile"},"color":{"expr":"semantic_ref","category":"color","id":"red"},"count":{"expr":"integer","value":3},"width":{"expr":"exact_decimal","value":"0.3"},"height":{"expr":"exact_decimal","value":"0.2"},"position_x":{"expr":"exact_decimal","value":"0.4"},"position_y":{"expr":"exact_decimal","value":"0.5"}
     }}]}).to_string()).unwrap();
-    let generated = stage("Exact.Row", ResolvedInstructionLanguage::En, &[definition]);
+    let generated = stage("｛Row｝", ResolvedInstructionLanguage::En, &[definition]);
     let direct = stage(
         "tile three red ellipse width 0.3 height 0.2 at horizontal 0.4 vertical 0.5.",
         ResolvedInstructionLanguage::En,
@@ -194,11 +194,7 @@ fn bounds_relations_share_direct_macro_score_and_symbolic_plan_delivery() {
     ] {
         for place in ["center", "top"] {
             let definition = bounds_definition(kind, place, None);
-            let generated = stage(
-                "Bounds.Trio",
-                ResolvedInstructionLanguage::En,
-                &[definition],
-            );
+            let generated = stage("｛Trio｝", ResolvedInstructionLanguage::En, &[definition]);
             let direct = stage(
                 &format!(
                     "place one red circle at {place}. place one blue circle at {place}. place one green circle at {place} {phrase}."
@@ -240,11 +236,7 @@ fn bounds_relations_share_direct_macro_score_and_symbolic_plan_delivery() {
 fn between_keeps_both_original_emit_owners_when_either_reference_is_omitted() {
     for omitted in [0, 1] {
         let definition = bounds_definition("between", "center", Some(omitted));
-        let transformed = stage(
-            "Bounds.Trio",
-            ResolvedInstructionLanguage::En,
-            &[definition],
-        );
+        let transformed = stage("｛Trio｝", ResolvedInstructionLanguage::En, &[definition]);
         for policy in [ScoreErrorPolicy::Stop, ScoreErrorPolicy::OmitAndContinue] {
             let score = lower_verified_stage15_score_with_policy(
                 transformed.verified_effective_view(),
@@ -448,14 +440,14 @@ fn macro_direction_uses_definition_binding_and_keeps_caller_roles() {
         json!({"axis":{"type":"semantic_ref","category":"angle"}}),
     );
     let missing = compile(
-        "Draw.Direction",
+        "｛Direction｝",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&parameter),
     );
     assert!(stage15_transformation_input(&missing).is_err());
     for (source, language) in [
-        ("vertical Draw.Direction", ResolvedInstructionLanguage::En),
-        ("垂直Draw.Direction", ResolvedInstructionLanguage::Ja),
+        ("vertical ｛Direction｝", ResolvedInstructionLanguage::En),
+        ("垂直｛Direction｝", ResolvedInstructionLanguage::Ja),
     ] {
         let transformed = stage(source, language, std::slice::from_ref(&parameter));
         let result =
@@ -476,7 +468,7 @@ fn macro_direction_uses_definition_binding_and_keeps_caller_roles() {
             json!({}),
         );
         let transformed = stage(
-            "Draw.Direction",
+            "｛Direction｝",
             ResolvedInstructionLanguage::En,
             std::slice::from_ref(&definition),
         );
@@ -490,7 +482,7 @@ fn macro_direction_uses_definition_binding_and_keeps_caller_roles() {
             assert!(result.objects().unwrap()[0].layout_direction().is_some());
         }
         let caller = stage(
-            "Draw.Direction vertically",
+            "｛Direction｝ vertically",
             ResolvedInstructionLanguage::En,
             &[definition],
         );
@@ -500,7 +492,7 @@ fn macro_direction_uses_definition_binding_and_keeps_caller_roles() {
                 context("square"),
                 policy,
             );
-            assert_eq!(result.outcome(), CompositionPlanOutcome::Stopped);
+            assert_eq!(result.outcome(), CompositionPlanOutcome::ReadyWithOmissions);
             assert!(result.diagnostics().iter().any(|diagnostic| diagnostic.reason == ScoreFieldGap::UnboundMacroCallerMeaning));
         }
     }
@@ -512,7 +504,7 @@ fn macro_direction_uses_definition_binding_and_keeps_caller_roles() {
     let emit = local["body"][0].clone();
     local["body"] = json!([{"op":"vary","binding":"axis","domain":"layout-axis","choices":[{"expr":"semantic_ref","category":"angle","id":"vertical"}],"range":null,"body":[emit]}]);
     let local = MacroDefinition::from_json(&local.to_string()).unwrap();
-    let transformed = stage("Draw.Direction", ResolvedInstructionLanguage::En, &[local]);
+    let transformed = stage("｛Direction｝", ResolvedInstructionLanguage::En, &[local]);
     let result = plan_verified_stage15(transformed.verified_effective_view(), context("square"));
     assert_eq!(
         result.objects().unwrap()[0]
@@ -527,7 +519,7 @@ fn macro_direction_uses_definition_binding_and_keeps_caller_roles() {
     );
     assert!(
         stage15_transformation_input(&compile(
-            "horizontal vertical Draw.Direction",
+            "horizontal vertical ｛Direction｝",
             ResolvedInstructionLanguage::En,
             &[ambiguous]
         ))
@@ -852,7 +844,7 @@ fn definition(declared: bool, count: Option<Value>) -> MacroDefinition {
 fn declared_macro_explicit_integer_count_reaches_plan() {
     for count in [1_u32, 4, 8, u32::MAX] {
         let definition = definition(false, Some(json!({"expr":"integer","value":count})));
-        let transformed = stage("Draw.Plan", ResolvedInstructionLanguage::En, &[definition]);
+        let transformed = stage("｛Plan｝", ResolvedInstructionLanguage::En, &[definition]);
         let result =
             plan_verified_stage15(transformed.verified_effective_view(), context("square"));
         let object = &result.objects().unwrap()[0];
@@ -867,8 +859,8 @@ fn macro_group_delivery_keeps_symbolic_count_and_exact_generated_origin() {
     let mut grouped = serde_json::to_value(&flat).unwrap();
     grouped["body"] = json!([{"op":"group","body":[{"op":"group","body":grouped["body"]}]}]);
     let grouped = MacroDefinition::from_json(&grouped.to_string()).unwrap();
-    let flat_stage = stage("Draw.Plan", ResolvedInstructionLanguage::En, &[flat]);
-    let group_stage = stage("Draw.Plan", ResolvedInstructionLanguage::En, &[grouped]);
+    let flat_stage = stage("｛Plan｝", ResolvedInstructionLanguage::En, &[flat]);
+    let group_stage = stage("｛Plan｝", ResolvedInstructionLanguage::En, &[grouped]);
     let flat_plan = plan_verified_stage15(flat_stage.verified_effective_view(), context("square"));
     let group_plan =
         plan_verified_stage15(group_stage.verified_effective_view(), context("square"));
@@ -902,12 +894,12 @@ fn bilingual_direct_and_declared_flat_macro_share_values_and_preserve_origins() 
         (
             ResolvedInstructionLanguage::En,
             "scatter large red circle at left-edge.",
-            "large Draw.Plan",
+            "large ｛Plan｝",
         ),
         (
             ResolvedInstructionLanguage::Ja,
             "左端に、大きい赤い円を散らす。",
-            "大きいDraw.Plan",
+            "大きい｛Plan｝",
         ),
     ] {
         let direct = stage(source, language, &[]);
@@ -945,7 +937,7 @@ fn bilingual_direct_and_declared_flat_macro_share_values_and_preserve_origins() 
         );
     }
     let missing = compile(
-        "Draw.Plan",
+        "｛Plan｝",
         ResolvedInstructionLanguage::En,
         &[definition(true, None)],
     );
@@ -957,7 +949,7 @@ fn bilingual_direct_and_declared_flat_macro_share_values_and_preserve_origins() 
     ] {
         let definition = definition(false, Some(count));
         assert!(definition.identity().is_ok());
-        let transformed = stage("Draw.Plan", ResolvedInstructionLanguage::En, &[definition]);
+        let transformed = stage("｛Plan｝", ResolvedInstructionLanguage::En, &[definition]);
         let result =
             plan_verified_stage15(transformed.verified_effective_view(), context("square"));
         assert_eq!(result.outcome(), CompositionPlanOutcome::Stopped);
@@ -987,7 +979,7 @@ fn integer_parameter_and_local_counts_keep_existing_type_and_binding_checks() {
     assert!(integer_parameter.identity().is_ok());
     assert!(
         stage15_transformation_input(&compile(
-            "Draw.Plan",
+            "｛Plan｝",
             ResolvedInstructionLanguage::En,
             &[integer_parameter]
         ))

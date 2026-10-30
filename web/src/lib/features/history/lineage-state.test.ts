@@ -100,7 +100,7 @@ test('T-273: a same-tree refresh retains browsing state but fresh roots and reje
 		focus_node_id: 'root',
 		nodes: [
 			{ id: 'root', state: 'active', at: 1, history: null },
-			{ id: 'shown', state: 'lineage_only', at: 2, redacted: 'not_permitted', history: null }
+			{ id: 'shown', state: 'active', at: 2, redacted: 'not_permitted', history: null }
 		],
 		edges: [{ id: 'root-shown', parent_node_id: 'root', child_node_id: 'shown', derivation_kind: 'replay' }]
 	}));

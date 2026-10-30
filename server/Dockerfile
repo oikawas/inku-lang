@@ -1,4 +1,6 @@
-# This immutable builder contains Rust 1.95.0, maturin 1.13.3, and CPython 3.12.
+# This immutable builder contains maturin 1.13.3, CPython 3.12, and rustup. No
+# published maturin image carries Rust 1.99.1 (the newest has 1.98.0), so rustup
+# installs the toolchain pinned in core/rust-toolchain.toml on top of it.
 # Only the native wheel crosses into the runtime image; Rust and Cargo do not.
 FROM ghcr.io/pyo3/maturin@sha256:2519833ac5bf071e02fa231ce368b5b69fac8be1b0774376e3de103f9bed2578 AS native-builder
 
@@ -6,6 +8,10 @@ WORKDIR /build
 COPY core/ /build/core/
 COPY server/scripts/build_rust_notices.py /build/server/scripts/
 COPY scripts/skia_notices.py /build/scripts/
+RUN toolchain="$(sed -n 's/^channel = "\(.*\)"/\1/p' /build/core/rust-toolchain.toml)" \
+    && rustup toolchain install "$toolchain" --profile minimal \
+    && rustup default "$toolchain" \
+    && test "$(rustc --version | cut -d ' ' -f 2)" = "$toolchain"
 RUN cargo fetch --manifest-path /build/core/Cargo.toml --locked \
     && maturin build \
     --manifest-path /build/core/crates/inku-render-python/Cargo.toml \

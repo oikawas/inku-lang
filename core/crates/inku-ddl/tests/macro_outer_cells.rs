@@ -17,7 +17,7 @@ use inku_score::{
 };
 use serde_json::Value;
 
-const ASSET: &str = include_str!("../assets/nature-leaves-v1.json");
+const ASSET: &str = include_str!("fixtures/nature-leaves-2.1-v1.json");
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 64,
     max_depth: 16,
@@ -103,14 +103,11 @@ fn complete_score(source: &str, result: &CompilerResourceExecutionResult) -> Sco
 #[test]
 fn a_count_on_a_word_without_one_becomes_a_one_member_group() {
     for (source, layout) in [
-        ("Nature.紅葉を3枚置く。", GroupLayout::Cells),
-        ("Nature.紅葉を3枚散らす。", GroupLayout::Cells),
-        ("3枚のNature.紅葉。", GroupLayout::Cells),
-        (
-            "Nature.紅葉を3枚並べる。",
-            GroupLayout::HorizontalSourceOrder,
-        ),
-        ("Nature.紅葉を3枚敷き詰める。", GroupLayout::Tile),
+        ("｛紅葉｝を3枚置く。", GroupLayout::Cells),
+        ("｛紅葉｝を3枚散らす。", GroupLayout::Cells),
+        ("3枚の｛紅葉｝。", GroupLayout::Cells),
+        ("｛紅葉｝を3枚並べる。", GroupLayout::HorizontalSourceOrder),
+        ("｛紅葉｝を3枚敷き詰める。", GroupLayout::Tile),
     ] {
         let score = complete_score(source, &execute(source));
         assert!(score.repetition_groups.is_empty(), "{source}");
@@ -157,7 +154,7 @@ fn a_count_on_a_word_without_one_becomes_a_one_member_group() {
 
 #[test]
 fn one_copy_a_fill_and_a_word_that_takes_the_count_keep_their_paths() {
-    for source in ["Nature.紅葉を1枚置く。", "Nature.若葉を10枚置く。"] {
+    for source in ["｛紅葉｝を1枚置く。", "｛若葉｝を10枚置く。"] {
         let result = execute(source);
         let score = result
             .score()
@@ -175,7 +172,7 @@ fn one_copy_a_fill_and_a_word_that_takes_the_count_keep_their_paths() {
             "{source}"
         );
     }
-    let result = execute("Nature.紅葉を3枚埋める。");
+    let result = execute("｛紅葉｝を3枚埋める。");
     let score = result.score().unwrap();
     assert!(score.placement_groups.is_empty());
     assert_eq!(score.fill_groups.len(), 1);
@@ -183,7 +180,7 @@ fn one_copy_a_fill_and_a_word_that_takes_the_count_keep_their_paths() {
 
 #[test]
 fn a_cells_group_and_a_later_coordinated_group_stay_in_source_order() {
-    let source = "Nature.紅葉を2枚置く。赤い円と青い円を並べる。";
+    let source = "｛紅葉｝を2枚置く。赤い円と青い円を並べる。";
     let score = complete_score(source, &execute(source));
     assert_eq!(
         score
@@ -198,7 +195,7 @@ fn a_cells_group_and_a_later_coordinated_group_stay_in_source_order() {
 
 #[test]
 fn performed_copies_of_a_maple_leaf_take_separate_cells() {
-    let source = "Nature.紅葉を3枚置く。";
+    let source = "｛紅葉｝を3枚置く。";
     let score = complete_score(source, &execute(source));
     let plan = resolve_checked_performance_with_resources(
         PerformanceRequest {
@@ -235,7 +232,7 @@ fn performed_copies_of_a_maple_leaf_take_separate_cells() {
 
 #[test]
 fn copies_on_a_wide_canvas_take_cells_on_it() {
-    let source = "Nature.紅葉を3枚置く。";
+    let source = "｛紅葉｝を3枚置く。";
     let score = complete_score(source, &execute_on(source, "wide"));
     let plan = resolve_checked_performance_with_resources(
         PerformanceRequest {

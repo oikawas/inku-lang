@@ -24,7 +24,8 @@ public final class ChatGPTLoopbackListener: Sendable {
         redirectURI = URL(string: "http://127.0.0.1:\(port)/auth/callback")!
     }
 
-    public static func start(expectedState: String, deadline: Date = Date().addingTimeInterval(300)) async throws -> ChatGPTLoopbackListener {
+    public static func start(expectedState: String, deadline: Date = Date().addingTimeInterval(300),
+                             previousClientID: String? = nil) async throws -> ChatGPTLoopbackListener {
         guard !expectedState.isEmpty, expectedState.utf8.count <= 256,
               !expectedState.unicodeScalars.contains(where: { $0.value < 32 || $0.value == 127 }) else {
             throw HostError("chatgpt_callback_invalid")
@@ -41,7 +42,7 @@ public final class ChatGPTLoopbackListener: Sendable {
             parameters.includePeerToPeer = false
             parameters.allowLocalEndpointReuse = false
             engine = LoopbackEngine(listener: try NWListener(using: parameters, on: .any),
-                                    lease: lease, expectedState: expectedState, duration: duration)
+                                    lease: lease, expectedState: expectedState, previousClientID: previousClientID, duration: duration)
         } catch {
             LoopbackLease.shared.release(lease)
             throw HostError("chatgpt_auth_unavailable")
@@ -103,11 +104,13 @@ private final class LoopbackEngine: @unchecked Sendable {
     private let lease: UUID
     private let deadline: DispatchTime
     private var expectedState: String?
+    private let previousClientID: String?
     private var port: UInt16?
     private var ready: CheckedContinuation<UInt16, any Error>?
     private var waiter: CheckedContinuation<ChatGPTLoopbackCallback, any Error>?
     private var terminal: Result<ChatGPTLoopbackCallback, HostError>?
     private var waitClaimed = false
+    private var used = false
     private var closed = false
     private var deadlineTask: DispatchWorkItem?
     private var requests: [ObjectIdentifier: Request] = [:]
@@ -120,10 +123,11 @@ private final class LoopbackEngine: @unchecked Sendable {
         init(_ connection: NWConnection) { self.connection = connection }
     }
 
-    init(listener: NWListener, lease: UUID, expectedState: String, duration: TimeInterval) {
+    init(listener: NWListener, lease: UUID, expectedState: String, previousClientID: String?, duration: TimeInterval) {
         self.listener = listener
         self.lease = lease
         self.expectedState = expectedState
+        self.previousClientID = previousClientID
         deadline = .now() + duration
     }
 
@@ -245,25 +249,40 @@ private final class LoopbackEngine: @unchecked Sendable {
 
     private func handle(_ id: ObjectIdentifier, header: Data) {
         guard !closed, let port, let expectedState else { respond(id, status: 400); return }
-        guard DispatchTime.now() < deadline else {
+        guard let target = Self.target(header: header, port: port) else { respond(id, status: 400); return }
+        let query: [String: ExactJSON]
+        do {
+            let parsed = try ChatGPTPolicy.call("chatgpt_auth_callback_query", ["target": .string(target)])
+            query = parsed["query"].object ?? [:]
+            _ = try ChatGPTPolicy.call("chatgpt_auth_callback", ["state": ChatGPTPolicy.string(query["state"]?.array?.first?.string),
+                "expected_state": .string(expectedState), "code": .string("state-check"), "error": .null])
+        } catch { respond(id, status: 400); return }
+        let decision: ExactJSON
+        do {
+            decision = try ChatGPTPolicy.result("chatgpt_auth_callback_use", ["used": .bool(used),
+                "cancelled": .bool(closed), "expired": .bool(DispatchTime.now() >= deadline)])
+        } catch { respond(id, status: 400); return }
+        used = decision["used"].bool ?? used
+        if let code = decision["error"].string {
             respond(id, status: 400)
-            finish(.failure(HostError("chatgpt_cancelled")), keeping: id)
+            if decision["fail_attempt"].bool == true { finish(.failure(HostError(code)), keeping: id) }
             return
         }
-        guard let query = Self.query(header: header, port: port), let state = query["state"],
-              state.utf8.count <= 256, Self.equal(state, expectedState) else {
-            respond(id, status: 400)
-            return
-        }
-        // State is checked before interpreting a consent error or consuming this attempt.
         let result: Result<ChatGPTLoopbackCallback, HostError>
-        if query["error"] != nil || query["error_description"] != nil {
-            result = .failure(HostError("chatgpt_consent_declined"))
-        } else if let code = query["code"], !code.isEmpty {
-            result = .success(ChatGPTLoopbackCallback(code: code, clientID: query["client_id"], state: state))
-        } else {
-            result = .failure(HostError("chatgpt_callback_invalid"))
-        }
+        do {
+            if let error = query["error"]?.array?.first?.string {
+                _ = try ChatGPTPolicy.call("chatgpt_auth_callback", ["state": .string(expectedState),
+                    "expected_state": .string(expectedState), "code": .string("error-check"), "error": .string(error)])
+            }
+            let issued = query["client_id"]?.array?.first?.string ?? previousClientID ?? ""
+            _ = try ChatGPTPolicy.call("chatgpt_auth_callback_client", ["issued": .string(issued),
+                "previous": previousClientID.map { .object(["client_id": .string($0)]) } ?? .null])
+            let answer = try ChatGPTPolicy.call("chatgpt_auth_callback", ["state": .string(expectedState),
+                "expected_state": .string(expectedState), "code": ChatGPTPolicy.string(query["code"]?.array?.first?.string), "error": .null])
+            result = .success(ChatGPTLoopbackCallback(code: try answer.requiredString("code"),
+                clientID: query["client_id"]?.array?.first?.string, state: expectedState))
+        } catch let error as HostError { result = .failure(error) }
+        catch { result = .failure(HostError("chatgpt_callback_invalid")) }
         respond(id, status: (try? result.get()) == nil ? 400 : 200)
         finish(result, keeping: id)
     }
@@ -310,7 +329,7 @@ private final class LoopbackEngine: @unchecked Sendable {
         }
     }
 
-    private static func query(header: Data, port: UInt16) -> [String: String]? {
+    private static func target(header: Data, port: UInt16) -> String? {
         guard header.allSatisfy({ $0 == 9 || $0 == 10 || $0 == 13 || (32...126).contains($0) }),
               let text = String(data: header, encoding: .utf8) else { return nil }
         let lines = text.components(separatedBy: "\r\n")
@@ -328,47 +347,7 @@ private final class LoopbackEngine: @unchecked Sendable {
         }
         guard headers["host"] == "127.0.0.1:\(port)", headers["transfer-encoding"] == nil,
               headers["content-length"] == nil || headers["content-length"] == "0" else { return nil }
-        let target = String(parts[1])
-        guard let delimiter = target.firstIndex(of: "?"), target[..<delimiter] == "/auth/callback",
-              !target.contains("#") else { return nil }
-        var query: [String: String] = [:]
-        let pairs = target[target.index(after: delimiter)...].split(separator: "&", omittingEmptySubsequences: false)
-        guard !pairs.isEmpty, pairs.count <= 32 else { return nil }
-        for pair in pairs {
-            let fields = pair.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
-            guard fields.count == 2, let name = decode(fields[0]), let value = decode(fields[1]),
-                  !name.isEmpty, name.utf8.count <= 128, value.utf8.count <= 4096,
-                  query[name] == nil else { return nil }
-            query[name] = value
-        }
-        return query
-    }
-
-    private static func decode(_ raw: Substring) -> String? {
-        let bytes = Array(raw.utf8)
-        var index = 0
-        while index < bytes.count {
-            if bytes[index] == 37 {
-                guard index + 2 < bytes.count, hexadecimal(bytes[index + 1]), hexadecimal(bytes[index + 2]) else { return nil }
-                index += 3
-            } else { index += 1 }
-        }
-        guard let value = String(raw).replacingOccurrences(of: "+", with: " ").removingPercentEncoding,
-              !value.unicodeScalars.contains(where: { $0.value < 32 || $0.value == 127 }) else { return nil }
-        return value
-    }
-
-    private static func hexadecimal(_ byte: UInt8) -> Bool {
-        (48...57).contains(byte) || (65...70).contains(byte) || (97...102).contains(byte)
-    }
-
-    private static func equal(_ lhs: String, _ rhs: String) -> Bool {
-        let a = Array(lhs.utf8), b = Array(rhs.utf8)
-        var difference = a.count ^ b.count
-        for index in 0..<max(a.count, b.count) {
-            difference |= Int((index < a.count ? a[index] : 0) ^ (index < b.count ? b[index] : 0))
-        }
-        return difference == 0
+        return String(parts[1])
     }
 
     deinit {

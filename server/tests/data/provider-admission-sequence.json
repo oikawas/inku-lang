@@ -1,0 +1,90 @@
+{
+  "source": "7419a3d8162c4c132088092c2603b06f3a227864",
+  "limits": {
+    "rpm": 30,
+    "tpm": 16000,
+    "rpd": 10
+  },
+  "steps": [
+    {
+      "action": "reserve",
+      "value": 100,
+      "now": 1790917200.0,
+      "id": "id0",
+      "status": "ok",
+      "json": "{\"events\":[{\"id\":\"id0\",\"at\":1790917200.0,\"tokens\":100}],\"day\":\"2026-10-01\",\"daily\":1,\"not_before\":0}"
+    },
+    {
+      "action": "settle",
+      "value": 75,
+      "now": 1790917200.0,
+      "id": "id1",
+      "status": "ok",
+      "json": "{\"events\":[{\"id\":\"id0\",\"at\":1790917200.0,\"tokens\":75}],\"day\":\"2026-10-01\",\"daily\":1,\"not_before\":0}"
+    },
+    {
+      "action": "reserve",
+      "value": 200,
+      "now": 1790917200.0,
+      "id": "id2",
+      "status": "ok",
+      "json": "{\"events\":[{\"id\":\"id0\",\"at\":1790917200.0,\"tokens\":75},{\"id\":\"id2\",\"at\":1790917200.0,\"tokens\":200}],\"day\":\"2026-10-01\",\"daily\":2,\"not_before\":0}"
+    },
+    {
+      "action": "pause",
+      "value": 90,
+      "now": 1790917200.0,
+      "id": "id3",
+      "status": "ok",
+      "json": "{\"events\":[{\"id\":\"id0\",\"at\":1790917200.0,\"tokens\":75},{\"id\":\"id2\",\"at\":1790917200.0,\"tokens\":200}],\"day\":\"2026-10-01\",\"daily\":2,\"not_before\":1790917290.0}"
+    },
+    {
+      "action": "reserve",
+      "value": 300,
+      "now": 1790917200.0,
+      "id": "id4",
+      "status": "wait:90.0",
+      "json": "{\"events\":[{\"id\":\"id0\",\"at\":1790917200.0,\"tokens\":75},{\"id\":\"id2\",\"at\":1790917200.0,\"tokens\":200}],\"day\":\"2026-10-01\",\"daily\":2,\"not_before\":1790917290.0}"
+    },
+    {
+      "action": "advance",
+      "value": 91,
+      "now": 1790917291.0,
+      "id": "id5",
+      "status": "ok",
+      "json": "{\"events\":[{\"id\":\"id0\",\"at\":1790917200.0,\"tokens\":75},{\"id\":\"id2\",\"at\":1790917200.0,\"tokens\":200}],\"day\":\"2026-10-01\",\"daily\":2,\"not_before\":1790917290.0}"
+    },
+    {
+      "action": "reserve",
+      "value": 300,
+      "now": 1790917291.0,
+      "id": "id6",
+      "status": "ok",
+      "json": "{\"events\":[{\"id\":\"id6\",\"at\":1790917291.0,\"tokens\":300}],\"day\":\"2026-10-01\",\"daily\":3,\"not_before\":1790917290.0}"
+    },
+    {
+      "action": "settle",
+      "value": null,
+      "now": 1790917291.0,
+      "id": "id7",
+      "status": "ok",
+      "json": "{\"events\":[{\"id\":\"id6\",\"at\":1790917291.0,\"tokens\":300}],\"day\":\"2026-10-01\",\"daily\":3,\"not_before\":1790917353.0}"
+    },
+    {
+      "action": "advance",
+      "value": 63,
+      "now": 1790917354.0,
+      "id": "id8",
+      "status": "ok",
+      "json": "{\"events\":[{\"id\":\"id6\",\"at\":1790917291.0,\"tokens\":300}],\"day\":\"2026-10-01\",\"daily\":3,\"not_before\":1790917353.0}"
+    },
+    {
+      "action": "reserve",
+      "value": 100,
+      "now": 1790917354.0,
+      "id": "id9",
+      "status": "ok",
+      "json": "{\"events\":[{\"id\":\"id9\",\"at\":1790917354.0,\"tokens\":100}],\"day\":\"2026-10-01\",\"daily\":4,\"not_before\":1790917353.0}"
+    }
+  ]
+}

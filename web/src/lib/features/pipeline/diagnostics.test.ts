@@ -96,6 +96,23 @@ test('a withheld plugin sentence is explained in the author\'s language', () => 
 	);
 });
 
+test('retired notation names the braced replacement in both languages', () => {
+	const entry = { qualified_name: 'Nature.YoungLeaves', surface_ja: ['若葉'], surface_en: ['young leaves'] };
+	const diagnostic = { channel: 'plugin' as const, value: { name: 'Nature.若葉', reason: 'plugin_old_notation', suggestion: 'Nature.YoungLeaves', start_byte: 0, end_byte: 13 } };
+	assert.equal(formatPipelineDiagnostic(diagnostic, ja, [entry]), 'Nature.若葉 は古い書き方です。｛若葉｝ で書いてください。');
+	assert.equal(formatPipelineDiagnostic(diagnostic, en, [entry]), 'Nature.若葉 uses the old notation. Write {young leaves} instead.');
+});
+
+test('an ambiguous name names its candidates by their primary names', () => {
+	const entries = [
+		{ qualified_name: 'Sky.Stars', surface_ja: ['星'], surface_en: ['stars'] },
+		{ qualified_name: 'Garden.Light', surface_ja: ['灯'], surface_en: ['light'] },
+	];
+	const diagnostic = { channel: 'plugin' as const, value: { name: '｛ひかり｝', reason: 'plugin_name_ambiguous', candidates: ['Sky.Stars', 'Garden.Light'], start_byte: 0, end_byte: 1 } };
+	assert.match(formatPipelineDiagnostic(diagnostic, ja, entries), /｛ひかり｝.*｛星｝、｛灯｝/);
+	assert.match(formatPipelineDiagnostic(diagnostic, en, entries), /\{stars\}.*\{light\}/);
+});
+
 test('a render warning names the color the core would not use, and that drawing went on', () => {
 	const actual = formatPipelineDiagnostic({ channel: 'warning', value: { kind: 'invalid_color', name: 'black' } }, ja);
 	assert.equal(actual, '色表の「black」の値が#rrggbbの形ではないため、この値は使わずに描きました。名前つきの色は既定の色で描いています。');

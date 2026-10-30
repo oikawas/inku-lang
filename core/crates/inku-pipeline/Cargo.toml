@@ -12,7 +12,13 @@ inku-ddl.workspace = true
 inku-render.workspace = true
 inku-score.workspace = true
 serde.workspace = true
-serde_json.workspace = true
+serde_json = { workspace = true, features = ["raw_value"] }
 sha2.workspace = true
 roxmltree = "=0.21.1"
 unicode-normalization = "=0.1.25"
+icu_collator = "=2.4.0"
+icu_properties = "=2.4.0"
+jiff = { version = "=0.2.37", default-features = false, features = ["std", "tz-fat"] }
+httpdate = "=1.0.3"
+base64 = "=0.23.1"
+subtle = "=2.6.1"

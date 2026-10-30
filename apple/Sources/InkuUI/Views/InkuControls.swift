@@ -286,8 +286,14 @@ struct InkuPanelTab: View {
                     Text(progress).inkuFont(11).monospacedDigit().foregroundStyle(.secondary).lineLimit(1)
                 }
                 if running {
-                    Circle().fill(Color.accentColor).frame(width: 6, height: 6)
-                        .shadow(color: Color.accentColor.opacity(0.35), radius: 3)
+                    TimelineView(.animation) { context in
+                        let phase = context.date.timeIntervalSinceReferenceDate
+                        let pulse = (1 + cos(phase * 2 * .pi)) / 2
+                        Circle().fill(Color.accentColor).frame(width: 6, height: 6)
+                            .scaleEffect(0.7 + 0.3 * pulse)
+                            .opacity(0.4 + 0.6 * pulse)
+                            .shadow(color: Color.accentColor.opacity(0.35), radius: 3)
+                    }.frame(width: 6, height: 6)
                 }
             }
             .inkuFont(12)
@@ -295,7 +301,18 @@ struct InkuPanelTab: View {
             .frame(maxWidth: .infinity, minHeight: 38)
             .background(running ? Color.accentColor.opacity(0.08) : Color.clear)
             .overlay(alignment: .bottom) {
-                Rectangle().fill(selected || running ? Color.accentColor : Color.clear).frame(height: 2)
+                if running {
+                    TimelineView(.animation) { context in
+                        GeometryReader { geometry in
+                            let phase = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.1) / 1.1
+                            LinearGradient(colors: [.clear, .accentColor, .clear], startPoint: .leading, endPoint: .trailing)
+                                .frame(width: geometry.size.width * 1.8)
+                                .offset(x: geometry.size.width * (1 - 2.8 * phase))
+                        }.clipped()
+                    }.frame(height: 2).padding(.horizontal, 12)
+                } else if selected {
+                    Rectangle().fill(Color.accentColor).frame(height: 2)
+                }
             }
             .contentShape(Rectangle())
         }

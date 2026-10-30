@@ -76,7 +76,9 @@ fn filled_contour(svg: &str, occurrence: usize) -> Vec<Point> {
         .collect::<Vec<_>>();
     assert_eq!(coordinates.len() % 2, 0);
     coordinates
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|pair| Point::new(pair[0], pair[1]))
         .collect()
 }

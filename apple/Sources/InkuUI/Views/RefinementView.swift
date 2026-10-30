@@ -40,8 +40,7 @@ public struct RefinementView: View {
                     .inkuFont(11).foregroundStyle(.secondary)
                 RefinementDrawingModelPicker(model: model, reference: $refinement.modelReference, disabled: controlsDisabled)
                 HStack {
-                    Text(model.display.localized(self.refinement.inheritWild ? "筆致制限（継承）" : "筆致制限")).inkuFont(12).foregroundStyle(.secondary)
-                    Button(model.display.localized("暴れる")) {
+                    Button(model.display.localized("筆致制限を外す")) {
                         refinement.wildOverride = !effectiveWild; refinement.inheritWild = false
                     }.buttonStyle(.bordered).tint(effectiveWild ? Color.accentColor : Color.secondary)
                         .accessibilityValue(model.display.localized(effectiveWild ? "入" : "切"))
@@ -109,7 +108,7 @@ private struct RefinementDrawingModelPicker: View {
             Text(model.display.localized("描画モデル")).inkuFont(11).foregroundStyle(.secondary)
             Button { showModels = true } label: {
                 HStack(spacing: 10) {
-                    Text(reference.isEmpty ? model.display.localized("選択してください") : ModelNaming(providers: providers).displayName(reference))
+                    Text(reference.isEmpty ? model.display.localized("選択してください") : ModelNaming(providers: providers, stageProvider: model.stageDefaultProviderID).displayName(reference))
                         .inkuFont(12).multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 0)
                     Text(model.display.webCopy("modelSelectButton", "モデル選択")).inkuFont(10).foregroundStyle(Color.accentColor)

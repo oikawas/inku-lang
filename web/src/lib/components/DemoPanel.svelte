@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
-	import { pickerSelection, qualifiedModelId, type Provider, type ProviderGroup } from '$lib/models';
+	import { pickerSelection, qualifiedModelRef, type Provider, type ProviderGroup } from '$lib/models';
 	import { demoInstructionModelGroups, type DemoSettings } from '$lib/demo';
 	import PaintButton from './PaintButton.svelte';
 	import RunStatus from './RunStatus.svelte';
@@ -79,7 +79,7 @@
 	}: Props = $props();
 
 	const promptProviderGroups = $derived(demoInstructionModelGroups(providerGroups));
-	const promptSelection = $derived(pickerSelection(promptProviderGroups, qualifiedModelId(settings.prompt_provider, settings.prompt_model)));
+	const promptSelection = $derived(pickerSelection(promptProviderGroups, qualifiedModelRef(settings.prompt_provider, settings.prompt_model)));
 
 	function updateSettings(patch: Partial<DemoSettings>) {
 		settings = { ...settings, ...patch };
@@ -135,7 +135,7 @@
 				oninput={(event) => updateSettings({ seed_phrase: (event.currentTarget as HTMLTextAreaElement).value })}
 			></textarea>
 		</label>
-		<div class="wide"><ModelCardPicker label={t().demoPromptModel} selectedModel={qualifiedModelId(settings.prompt_provider, settings.prompt_model)} providerGroups={promptProviderGroups} disabled={running} onSelect={(provider: Provider, model: string) => updateSettings({ prompt_provider: provider, prompt_model: model })} /></div>
+		<div class="wide"><ModelCardPicker label={t().demoPromptModel} selectedModel={qualifiedModelRef(settings.prompt_provider, settings.prompt_model)} providerGroups={promptProviderGroups} disabled={running} onSelect={(provider: Provider, model: string) => updateSettings({ prompt_provider: provider, prompt_model: model })} /></div>
 		<!-- The shared button row and the settings readout follow the model that
 		     reads the seed phrase, so the tab is read top to bottom in the order
 		     it is filled in. -->

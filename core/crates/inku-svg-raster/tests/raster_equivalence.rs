@@ -92,8 +92,10 @@ fn compare(name: &str, svg: &str, side: u32) {
     assert_eq!(actual.pixels.len(), expected.data().len(), "{name}");
     let changed_pixels = actual
         .pixels
-        .chunks_exact(4)
-        .zip(expected.data().chunks_exact(4))
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .zip(expected.data().as_chunks::<4>().0)
         .filter(|(a, b)| a != b)
         .count();
     let digest: String = Sha256::digest(&actual.pixels)

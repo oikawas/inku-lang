@@ -520,7 +520,7 @@ const NINE_COLORS: [Color; 9] = [
 
 /// The colour word a sentence in `language` writes for `color`, from the
 /// Saijiki's いろ row.
-fn color_word(color: Color, language: ResolvedInstructionLanguage) -> String {
+pub(crate) fn color_word(color: Color, language: ResolvedInstructionLanguage) -> String {
     saijiki_asset()
         .categories
         .iter()
@@ -1297,6 +1297,7 @@ pub(crate) mod tests {
         let ja = ResolvedInstructionLanguage::Ja;
         let limits = crate::focused_flow::config().prompt_limits;
         let limits = PromptLimits {
+            max_offered_plugins: 8,
             max_source_bytes: 400_000,
             max_response_bytes: 1_000_000,
             ..limits

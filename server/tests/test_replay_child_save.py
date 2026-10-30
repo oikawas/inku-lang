@@ -34,7 +34,7 @@ def test_replay_child_matches_preview_and_rejects_unbound_source(monkeypatch):
     try:
         binding = PipelineBinding()
         effects = ProductPipelineEffects(binding, default_manifest(binding))
-        source = "Nature.青葉。"
+        source = "｛青葉｝。"
         with monkeypatch.context() as preparation:
             preparation.setattr(common, "_model_offered_to", lambda *args, **kwargs: True)
             config, context = effects.prepare(user["id"], "direct_ddl", source,
@@ -103,7 +103,8 @@ def test_replay_child_matches_preview_and_rejects_unbound_source(monkeypatch):
             assert parent["stage1_prompt_digest"] == "recorded-prompt"
             assert child.get("stage1_prompt_digest") is None
             assert child["interpretation_seed"] == "reading"
-            assert child["history_visibility"] == "normal"
+            with db.SessionLocal() as session:
+                assert session.query(HistoryRow).filter_by(id=child["id"]).one().history_visibility == "normal"
             assert child["lineage_parent_node_id"] == parent["lineage_node_id"]
             assert child["derivation_kind"] == "replay"
             assert db.get_items(user["id"], [parent["id"]])[0] == parent
@@ -148,7 +149,7 @@ def test_managed_replay_child_replays_its_inherited_saved_policy(monkeypatch):
     try:
         binding = PipelineBinding()
         effects = ProductPipelineEffects(binding, default_manifest(binding))
-        source = "Nature.青葉。"
+        source = "｛青葉｝。"
         with monkeypatch.context() as preparation:
             preparation.setattr(common, "_model_offered_to", lambda *args, **kwargs: True)
             config, context = effects.prepare(user["id"], "direct_ddl", source,

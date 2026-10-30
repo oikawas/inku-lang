@@ -6,21 +6,22 @@ import org.json.JSONObject
 /** The plugin package shipped with the app; its document is the enable/disable handle. */
 const val BUNDLED_PLUGIN_PACKAGE = "Nature.leaves"
 
-/**
- * Every name a set of definitions answers to: `Namespace.Heading` and each
- * `Namespace.Alias` (DDL Spec 14). Hosts pass both so a sentence written with
- * either name is explained the same way.
- */
-internal fun pluginVisibleNames(definitions: JSONArray?): List<String> {
-    if (definitions == null) return emptyList()
-    return (0 until definitions.length()).flatMap { index ->
-        val definition = definitions.optJSONObject(index) ?: return@flatMap emptyList()
-        val namespace = definition.optString("namespace").takeIf { it.isNotEmpty() } ?: return@flatMap emptyList()
-        val heading = definition.optString("heading").takeIf { it.isNotEmpty() } ?: return@flatMap emptyList()
-        val aliases = definition.optJSONArray("aliases")
-            ?.let { array -> (0 until array.length()).mapNotNull { array.opt(it) as? String } }
-            .orEmpty()
-        (listOf(heading) + aliases).map { "$namespace.$it" }
+internal data class PluginWord(val qualifiedName: String, val ja: List<String>, val en: List<String>)
+
+internal fun pluginWord(definition: JSONObject, qualifiedName: String): PluginWord {
+    val names = definition.optJSONObject("names")
+    fun values(language: String): List<String> {
+        val array = names?.optJSONArray(language) ?: return emptyList()
+        return (0 until array.length()).mapNotNull { array.opt(it) as? String }
+    }
+    return PluginWord(qualifiedName, values("ja"), values("en"))
+}
+
+internal fun pluginNameEntries(words: List<PluginWord>, enabled: Boolean): List<JSONObject> = words.flatMap { word ->
+    (word.ja + word.en).map { name ->
+        val normalized = java.text.Normalizer.normalize(name, java.text.Normalizer.Form.NFKC)
+            .lowercase(java.util.Locale.ROOT).trim().replace(Regex("(?U)\\s+"), " ")
+        JSONObject().put("name", normalized).put("qualified_name", word.qualifiedName).put("enabled", enabled)
     }
 }
 

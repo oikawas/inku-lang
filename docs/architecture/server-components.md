@@ -71,7 +71,7 @@ flowchart LR
     COMPAT["pipeline_compat.py\nrequest → options, result projection, idempotent resend"]
     SERVICE["PipelineService\nthread pool, retained runs, effect steps"]
     EXEC["CandidateExecution\nserializes one execution"]
-    BINDING["PipelineBinding\ninku_render wheel\nstep / render_saved / colors / canvas / Macro catalog\nsaved_variants / juxtaposition / autonomous_refine / image"]
+    BINDING["PipelineBinding\ninku_render wheel\nstep / render_saved / colors / canvas / Macro catalog\nsaved_variants / juxtaposition / autonomous_refine / chunk_moves / image"]
     IMAGES["pipeline_images.py\nimage intake and review drawing"]
     VARIANT_ROUTE["render router\nreplacements, fit, juxtaposition, composition ranges"]
     CORE["Shared Rust core\ninku-pipeline + inku-ddl + inku-render"]
@@ -152,8 +152,8 @@ The current `db.py` no longer owns direct SQL, transactions, migration sessions,
 flowchart LR
     PYBIND["inku-render-python\nCPython: render + pipeline_*"]
     JNI["inku-render-android\nJNI: render + raster + pipeline"]
-    UNIFFI["inku-pipeline-uniffi\nbyte facade\nstep / canvas / colors / Macro catalog\nStage 1 projection / render_saved\nsaved_variants / autonomous_refine / provider_wire / display"]
-    PIPE["inku-pipeline\nmachine / protocol / authority\nprompts / core_boundary / hole_completion / replay\ncomposition / laws / colors / image_ddl / provider_wire\nsaved_variants / juxtaposition / autonomous_refine / identity"]
+    UNIFFI["inku-pipeline-uniffi\nbyte facade\nstep / canvas / colors / Macro catalog\nStage 1 projection / render_saved\nsaved_variants / autonomous_refine / chunk_moves / provider_wire / display"]
+    PIPE["inku-pipeline\nmachine / protocol / authority\nprompts / core_boundary / hole_completion / replay\ncomposition / laws / colors / image_ddl / provider_wire\nsaved_variants / juxtaposition / autonomous_refine / chunk_moves / identity"]
     DDL["inku-ddl\ntyped compiler / Stage 1.5 / Plan / materializer\nunderdrawing / visible patch / ratio declaration / saijiki asset"]
     DISPLAY["inku-display\nSkia screen display (optional skia feature)"]
     DISPLAY_GPU["inku-display-gpu\nmacOS zoomed windows (Graphite, separate process)"]
@@ -235,7 +235,7 @@ The per-router counts count the live app's routes by endpoint module the way `te
 
 - `/api/paint`, `/api/paint/stream`, `/api/interpret`, and `/api/compose` go through `pipeline_compat.py` to the same `PipelineService`. The stream re-reads the execution, reports `sketch`, `stage1`, `score`, and `done` in order, and returns a failure after the first event as an in-band `error` event. When a completion proposal needs approval, the three other routes answer 409 with the current view, and the stream answers 409 before its first event or an `error` event after it. A description start hands only the label-cut description to the core and refuses a label-only description with 400.
 - `/api/pipeline/variations` starts a variation from a description, direct DDL or an image (`kind: image`, with the temporary ID `/api/pipeline/images` holds); `/executions/{id}/commands` accepts author commands (approve, decline, request completion, regenerate, perform, cancel), and `/executions/{id}/author-ddl` accepts DDL edits. A DDL edit that changes settings leaves the original intact and creates a parent-linked variation. `/variations/{id}/fork-description` makes a child with a changed description, and `/completion-range-states` returns the completion ranges' states the DDL editor shows.
-- `/api/refine/autonomous` starts, lists and stops autonomous refinement runs. The Server drives a run, and its children are drawn through ordinary pipeline runs.
+- `/api/refine/autonomous` starts, lists and stops autonomous refinement runs. The Server drives a run, and its children are drawn through ordinary pipeline runs. For the chunk move (`kinds: ["chunks"]`, alone), the run sends the provider the requests the shared core's `chunk_moves` makes to choose the move and rewrite the chunk, and draws the DDL the core applied the move to as direct DDL.
 - Replacing a saved work's parts (`/api/render-tool-variant` and the like) and fitting it (`/api/render-canvas-fit`) draw a child with the shared core's `saved_variants`, without a run.
 - `/api/pipeline/history/{id}` returns the variation and revision of a work saved through the shared pipeline, and `/history/{id}/fork` derives from that moment's configuration, host context, and Macro definitions. `/history/{id}/ddl-export` exports the work's visible DDL together with the plugin definitions it names. `/legacy/{id}` and `/legacy/{id}/fork` read an older work without a link and derive from it without changing the original row.
 - `/api/render-score` and `/api/render-svg` branch on the Score version: compact Scores go through `ProductPipelineEffects.replay`, and those below 0.10 through `saved_score_compat.py`.

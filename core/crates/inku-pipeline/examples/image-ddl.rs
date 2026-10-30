@@ -39,6 +39,7 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 
 const LIMITS: PromptLimits = PromptLimits {
+    max_offered_plugins: 8,
     max_catalog_entries: 64,
     max_summary_bytes: 8192,
     max_catalog_serialized_bytes: 1024 * 1024,

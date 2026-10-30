@@ -21,6 +21,16 @@ from inku_server import provider_wire
 from inku_server.pipeline_provider import ProviderOptions, SingleAttemptProvider
 
 CASES = json.loads((pathlib.Path(__file__).parent / "data" / "provider-wire-cases.json").read_text(encoding="utf-8"))
+
+
+def test_chatgpt_policy_matches_frozen_server():
+    from inku_server.verified_model_catalog import core_catalog
+    for row in (row for row in CASES["chatgpt"] if row["request"].get("schema") == "inku.model-catalog-request.v1"):
+        request = dict(row["request"])
+        request.pop("schema")
+        action = request.pop("action")
+        answer = core_catalog(action, **request)
+        assert {key: answer.get(key) for key in row["expect"]} == row["expect"], row["why"]
 # What httpx adds to every request, which the rows leave out.
 _CLIENT_HEADERS = {"host", "content-length", "accept", "accept-encoding", "connection", "user-agent"}
 
@@ -54,6 +64,16 @@ def test_every_shared_request_is_written_as_server_wrote_it(section, rows):
             assert sent == expect["headers"], row["why"]
         compared += 1
     assert compared == rows
+
+
+def test_versioned_provider_bases_use_the_same_api_root():
+    for row in CASES["base_url_requests"]:
+        built = _built(row)
+        assert built["url"] == row["expect"]["url"], row["why"]
+        assert built["body"] == row["expect"]["body"], row["why"]
+        assert {name.lower(): value for name, value in provider_wire.headers(built, "KEY").items()} == row["expect"]["headers"], row["why"]
+        if row["request"]["action"] == "pipeline_request" and row["request"]["connection"]["kind"] == "gemini":
+            assert built["count_tokens"]["url"] == built["url"].removesuffix(":generateContent") + ":countTokens"
 
 
 def test_the_pipeline_transport_sends_the_bytes_server_sent(monkeypatch):
@@ -117,6 +137,11 @@ def test_every_shared_chatgpt_row_goes_through_servers_transport_as_it_did():
     for row in CASES["chatgpt"]:
         request, expect = row["request"], row["expect"]
         action = request["action"]
+        if request.get("schema") == "inku.model-catalog-request.v1":
+            import inku_render
+            answer = json.loads(inku_render.pipeline_provider_wire(json.dumps(request).encode()))
+            assert {key: answer.get(key) for key in expect} == expect, row["why"]
+            continue
         if action in {"chatgpt_request", "chatgpt_vision_request"}:
             if expect["outcome"] == "refused":
                 with pytest.raises(provider_wire.ProviderWireRefused, match=expect["detail"]):

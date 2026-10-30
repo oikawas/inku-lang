@@ -61,7 +61,7 @@ LAWS_RECORD_KEYS = ("laws_layers", "laws_basis")
 _OPTIONAL_FORK_CONTEXT_KEYS = ("completion_ranges", *LAWS_RECORD_KEYS, "description_ddl")
 # The host's records a saved work keeps, each only when the run made it: the
 # tokens its sends used by stage (2026-10-26).
-_OPTIONAL_HOST_CONTEXT_KEYS = ("provider_usage",)
+_OPTIONAL_HOST_CONTEXT_KEYS = ("provider_usage", "chunk_plugin_offers")
 _PIPELINE_DIAGNOSTIC_KEYS = frozenset(
     {
         "upstream_diagnostics",
@@ -798,7 +798,12 @@ def history_link_records(
     """The diagnostics and the optional records (read and draw's, the tokens by
     stage) frozen on one history link, each record only when it was kept."""
     payload, pipeline_diagnostics = _decode_history_fork_context_payload(row)
-    return pipeline_diagnostics, {key: payload[key] for key in ("description_ddl", "provider_usage") if payload.get(key) is not None}
+    records = {key: payload[key] for key in ("description_ddl", "provider_usage") if payload.get(key) is not None}
+    from ..macro_catalog import plugin_offer_records
+    offers = plugin_offer_records(payload["config"], payload.get("chunk_plugin_offers", []))
+    if offers:
+        records["plugin_offers"] = offers
+    return pipeline_diagnostics, records
 
 
 def _decode_history_fork_context(

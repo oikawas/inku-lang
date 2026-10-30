@@ -63,14 +63,17 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
         let results = ["generate_sketch": "sketch_generated", "select_description_catalog": "description_catalog_selected",
                        "generate_normalized_ddl": "normalized_ddl_generated", "read_composition": "composition_read",
                        "choose_laws": "laws_chosen", "choose_colors": "colors_chosen",
-                       "complete_visible_ddl_holes": "visible_ddl_hole_patch_generated"]
+                       "complete_visible_ddl_holes": "visible_ddl_hole_patch_generated", "select_image_catalog": "image_catalog_selected",
+                       "write_image_ddl": "image_ddl_written", "review_image_ddl": "image_ddl_reviewed",
+                       "read_description": "description_read", "compose_description": "description_composed",
+                       "write_description_ddl": "description_ddl_written", "review_description_ddl": "description_ddl_reviewed"]
         guard let resultTag = results[tag],
               let timeoutMS = UInt64(try effect.requiredString("timeout_ms")),
               timeoutMS <= UInt64.max / 1_000_000 else { throw HostError("pipeline_schema_violation") }
         let began = ContinuousClock.now
         let deadline = budget.now().addingTimeInterval(Double(timeoutMS) / 1000)
         let modelReference = tag == "complete_visible_ddl_holes" ? models.stage2Model : models.stage1Model
-        let maxTokens = tag == "complete_visible_ddl_holes" ? models.holeMaxTokens : models.stage1MaxTokens
+        let maxTokens = tag == "complete_visible_ddl_holes" ? models.holeMaxTokens : (["write_image_ddl", "review_image_ddl", "read_description", "compose_description", "write_description_ddl", "review_description_ddl"].contains(tag) ? 8192 : models.stage1MaxTokens)
         var failure: String?
         var response: String?
         let rateWait = ProviderRateWait()
@@ -78,7 +81,8 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
         do {
             // Server raises TimeoutError for a non-positive attempt timeout.
             guard timeoutMS > 0 else { throw HostError("transport_timeout") }
-            let (provider, model) = try resolve(modelReference, providers: providers)
+            let defaultProvider = ProviderModelReference.split(models.stage1Model, providers: providers)?.providerID ?? ProviderModelReference.stageDefaultProviderID
+            let (provider, model) = try resolve(modelReference, providers: providers, defaultProvider: defaultProvider)
             recorder?.setEndpoint(provider.baseURL)
             let key = try await credentials.key(for: provider.credentialID)
             recorder?.addSecrets(key.map { [$0] } ?? [])
@@ -104,15 +108,16 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
                 // The provider slot is held for the whole attempt, inside its deadline (provider_limits.py).
                 group.addTask { [self] in try await ProviderConcurrencySlots.shared.holding(provider.id) {
                     let limits = provider.effectiveRateLimits
-                    var inputTokens = limits.tokensPerMinute > 0 ? (boundedRequest.httpBody?.count ?? 0) + 128 : 0
+                    var estimate = try ProviderAdmission.estimate(kind: provider.kind, tpm: limits.tokensPerMinute,
+                                                                  bodyBytes: boundedRequest.httpBody?.count ?? 0)
                     // Gemini token accounting asks the provider for the same exact request.
-                    if provider.kind == .gemini, limits.tokensPerMinute > 0 {
+                    if estimate["decision"].string == "need_count" {
                         recorder?.setOperation(.admission)
                         try await self.budget.prepare(provider: provider)
                         recorder?.setOperation(.tokenCount)
                         do {
                             guard let boundedTokenRequest else { throw HostError("pipeline_schema_violation") }
-                            inputTokens = try await self.countGeminiTokens(boundedTokenRequest, session: attemptSession)
+                            estimate = try await self.countGeminiTokens(boundedTokenRequest, tpm: limits.tokensPerMinute, session: attemptSession)
                         }
                         catch {
                             if let status = error as? HTTPFailure, status.status == 429 {
@@ -123,6 +128,10 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
                             throw error
                         }
                     }
+                    guard estimate["decision"].string == "estimate" else { throw HostError("rate_limited") }
+                    let exactTokens = estimate["input_tokens"]
+                    try ProviderAdmission.preflight(exactTokens, limits: limits)
+                    guard let inputTokens = exactTokens.number.flatMap(Int.init), inputTokens >= 0 else { throw HostError("rate_limited") }
                     recorder?.setOperation(.admission)
                     rateWait.set(true)
                     let reservation = try await self.budget.reserve(provider: provider, inputTokens: inputTokens, deadline: deadline)
@@ -258,29 +267,87 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
         return data
     }
 
-    private func resolve(_ reference: String, providers: [ProviderSettings]) throws -> (ProviderSettings, String) {
-        let (providerID, model) = ProviderModelReference.resolve(reference, providers: providers)
+    private func resolve(_ reference: String, providers: [ProviderSettings], defaultProvider: String = ProviderModelReference.stageDefaultProviderID) throws -> (ProviderSettings, String) {
+        let (providerID, model) = ProviderModelReference.resolve(reference, providers: providers, defaultProvider: defaultProvider)
         guard !model.isEmpty, let provider = providers.first(where: { $0.id == providerID }) else { throw HostError("provider_selection_required") }
-        return (provider, model)
+        return (try ProviderCoreSettings.connection(provider), model)
     }
 
-    /// Vision and other auxiliary routes share HTTP policy, not pipeline accounting.
+    /// Vision and other text routes share the provider's durable admission budget.
     public func performAuxiliary(prompt: AuxiliaryPrompt, modelReference: String, settings: HostSettings,
                                  credentials: any CredentialStore,
                                  onBytes: @escaping @Sendable (Int) -> Void) async throws -> String {
-        let (provider, model) = try resolve(modelReference, providers: settings.providers)
+        let defaultProvider = ProviderModelReference.split(settings.models.stage1Model, providers: settings.providers)?.providerID ?? ProviderModelReference.stageDefaultProviderID
+        let (provider, model) = try resolve(modelReference, providers: settings.providers, defaultProvider: defaultProvider)
         let key = try await credentials.key(for: provider.credentialID)
         let wire = try ProviderWire.prepareText(prompt: prompt, provider: provider, model: model, key: key)
         var request = wire.request; request.timeoutInterval = prompt.timeoutSeconds
+        var tokenRequest = wire.countTokens; tokenRequest?.timeoutInterval = prompt.timeoutSeconds
+        let countRequest = tokenRequest
+        let deadline = budget.now().addingTimeInterval(prompt.timeoutSeconds)
+        let rateWait = ProviderRateWait()
         do {
-            let raw = try await auxiliaryAttempt(request, timeout: prompt.timeoutSeconds, onBytes: onBytes)
+            let boundedRequest = request
+            let read = try await withThrowingTaskGroup(of: ExactJSON.self) { group in
+                group.addTask { [self] in
+                    let session = self.http == nil ? Self.makeSession() : nil
+                    defer { session?.invalidateAndCancel() }
+                    let limits = provider.effectiveRateLimits
+                    var estimate = try ProviderAdmission.estimate(kind: provider.kind, tpm: limits.tokensPerMinute,
+                                                                  bodyBytes: boundedRequest.httpBody?.count ?? 0)
+                    if estimate["decision"].string == "need_count" {
+                        try await self.budget.prepare(provider: provider)
+                        do {
+                            guard let countRequest else { throw HostError("pipeline_schema_violation") }
+                            estimate = try await self.countGeminiTokens(countRequest, tpm: limits.tokensPerMinute, session: session)
+                        } catch {
+                            if let status = error as? HTTPFailure, status.status == 429 {
+                                try await self.budget.coolDown(providerID: provider.id, seconds: status.retryAfter)
+                            }
+                            throw error
+                        }
+                    }
+                    guard estimate["decision"].string == "estimate" else { throw HostError("rate_limited") }
+                    let exactTokens = estimate["input_tokens"]
+                    try ProviderAdmission.preflight(exactTokens, limits: limits)
+                    guard let inputTokens = exactTokens.number.flatMap(Int.init), inputTokens >= 0 else { throw HostError("rate_limited") }
+                    rateWait.set(true)
+                    let reservation = try await self.budget.reserve(provider: provider, inputTokens: inputTokens, deadline: deadline)
+                    rateWait.set(false)
+                    var result: ExactJSON?, used: Int?, attemptError: (any Error)?
+                    do {
+                        try Task.checkCancellation()
+                        guard self.budget.now() < deadline else { throw HostError("rate_limited") }
+                        let raw = try await self.readObserved(boundedRequest, session: session, maximum: self.maximumResponseBytes,
+                                                              onBytes: onBytes, onResponse: { _ in })
+                        result = try ProviderWire.readResponse(raw, format: wire.format, text: true, includeUsage: true)
+                        used = result?["input_tokens"].number.flatMap(Int.init)
+                    } catch { attemptError = error }
+                    if let status = attemptError as? HTTPFailure, status.status == 429 {
+                        try await self.budget.coolDown(providerID: provider.id, seconds: status.retryAfter)
+                    }
+                    try await self.budget.settle(providerID: provider.id, reservation: reservation,
+                                                 used: used ?? (limits.tokensPerMinute == 0 ? 0 : nil))
+                    if let attemptError { throw attemptError }
+                    guard let result else { throw HostError("malformed_payload") }
+                    return result
+                }
+                group.addTask {
+                    try await Task.sleep(for: .seconds(prompt.timeoutSeconds))
+                    throw ProviderAttemptDeadline()
+                }
+                defer { group.cancelAll() }
+                guard let result = try await group.next() else { throw HostError("transport_unavailable") }
+                return result
+            }
             try Task.checkCancellation()
-            let read = try ProviderWire.readResponse(raw, format: wire.format, text: true)
             if prompt.purpose == .vision {
                 ProviderOutputLimit.log(read, outputBudget: wire.outputBudget, provider: provider.id, model: model, action: "vision")
             }
             return try ProviderWire.answer(read)
         } catch is CancellationError { throw CancellationError() }
+        catch is ProviderAttemptDeadline { throw HostError(rateWait.value ? "rate_limited" : "transport_timeout") }
+        catch let error as HostError where error.code == "provider_response_too_large" { throw HostError("malformed_payload") }
         catch let error as HTTPFailure {
             let read = try ProviderWire.readResponse(error.body ?? Data(), format: wire.format, status: error.status, text: true)
             throw HostError(try read.requiredString("failure"))
@@ -290,64 +357,16 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
         }
     }
 
-    private func countGeminiTokens(_ request: URLRequest, session: URLSession?) async throws -> Int {
+    private func countGeminiTokens(_ request: URLRequest, tpm: Int, session: URLSession?) async throws -> ExactJSON {
         let value = try ExactJSON(data: await readObserved(request, session: session, maximum: min(16384, maximumResponseBytes),
             onBytes: { _ in }, onResponse: { _ in }))
-        guard value.object != nil else { throw HostError("malformed_payload") }
-        guard let count = value["totalTokens"].number.flatMap(Int.init), count >= 0, count <= (Int.max - 9) / 11 else { throw HostError("rate_limited") }
-        return (count * 11 + 9) / 10
+        let answer = try ProviderAdmission.estimate(kind: .gemini, tpm: tpm, bodyBytes: 0, countResponse: value)
+        if answer["decision"].string == "invalid_response" { throw HostError("malformed_payload") }
+        guard answer["decision"].string == "estimate" else { throw HostError("rate_limited") }
+        return answer
     }
 
-    private func auxiliaryAttempt(_ request: URLRequest, timeout: Double, onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {
-        try await withThrowingTaskGroup(of: Data.self) { group in
-            group.addTask { [self] in
-                try await self.read(request, maximum: self.maximumResponseBytes, onBytes: onBytes)
-            }
-            group.addTask {
-                try await Task.sleep(for: .seconds(timeout))
-                throw HostError("transport_timeout")
-            }
-            defer { group.cancelAll() }
-            guard let bytes = try await group.next() else { throw HostError("transport_unavailable") }
-            return bytes
-        }
-    }
 
-    private func read(_ request: URLRequest, maximum: Int, onBytes: @Sendable (Int) -> Void) async throws -> Data {
-        // One HTTP client per request, as Server opens one for each auxiliary call.
-        let session = Self.makeSession()
-        defer { session.invalidateAndCancel() }
-        let (bytes, response) = try await session.bytes(for: request)
-        defer { bytes.task.cancel() }
-        guard let response = response as? HTTPURLResponse else { throw HostError("transport_unavailable") }
-        let success = (200...299).contains(response.statusCode)
-        if success && response.expectedContentLength > Int64(maximum) { throw HostError("malformed_payload") }
-        let limit = success ? maximum : min(maximum, 65_536)
-        var raw = Data(); raw.reserveCapacity(min(maximum, 65536))
-        do {
-            for try await byte in bytes {
-                try Task.checkCancellation()
-                guard raw.count < limit else {
-                    if success { throw HostError("malformed_payload") }
-                    break
-                }
-                raw.append(byte)
-                if raw.count % 4096 == 0 { onBytes(raw.count) }
-            }
-        } catch {
-            if !success && !Task.isCancelled {
-                throw HTTPFailure(status: response.statusCode,
-                    retryAfter: ProviderRateBudget.retryAfter(response.value(forHTTPHeaderField: "Retry-After"), raw: raw, now: budget.now()), body: raw)
-            }
-            throw error
-        }
-        onBytes(raw.count)
-        if !success {
-            throw HTTPFailure(status: response.statusCode,
-                retryAfter: ProviderRateBudget.retryAfter(response.value(forHTTPHeaderField: "Retry-After"), raw: raw, now: budget.now()), body: raw)
-        }
-        return raw
-    }
 }
 
 private struct ProviderAttemptDeadline: Error {}

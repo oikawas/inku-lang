@@ -58,7 +58,7 @@ A uniquely resolved marked subject, such as `the circle red.`, instead continues
 
 ### 1.6 Separate core words from registered names
 
-Core forms, colors, grounds, and grammar require no plugin. A name such as `Nature.若葉` requires a registered definition or a definition carried by the work or DDL export. Knowing the name does not make it available. Standard examples in this chapter use core DDL without plugins.
+Core forms, colors, grounds, and grammar require no plugin. A name such as `｛若葉｝` requires a registered definition or a definition carried by the work or DDL export. Knowing the name does not make it available. Standard examples in this chapter use core DDL without plugins.
 
 ## 2. Start with simple examples
 
@@ -132,9 +132,22 @@ DDL has two resolved languages, `ja` and `en`. If the host requests `auto`, Japa
 
 English core words and grammar are ASCII case-insensitive. `Place` and `place`, or `THE BACKGROUND WITH` and `the background with`, have the same grammar. Plugin names have separate identity rules and do not inherit that behavior.
 
-`。`, `.`, and line breaks delimit clauses. `!`, `?`, and their full-width counterparts also close sentences. Decimal points and dots inside recognized qualified plugin names remain inside their tokens. Commas, Japanese commas, and middle dots aid reading; they do not freely alter ownership or references.
+`。`, `.`, and line breaks delimit clauses. `!`, `?`, and their full-width counterparts also close sentences. Decimal points remain inside numeric tokens. Commas, Japanese commas, and middle dots aid reading; they do not freely alter ownership or references.
 
 Keep each command on one line. Close separate commands with a sentence terminator before a line break. Parentheses do not introduce command blocks or nested programs. Numeric-range annotations and noun-phrase groups have their own constructions.
+
+A **title line** (DDL 27) is a line of only a quoted name, such as `"lighthouse"` (`「灯台」` in Japanese), and names the chunk of sentences up to the next title. A title draws nothing and takes no sentence number. Blank lines are decoration, an empty `""` ends a chunk, and a title whose name is already used goes on with that chunk. A title makes no block and nests nothing: each sentence in a chunk is still one command. Drawing `In words` with `Composition, laws, colors` passed writes each thing's title when the work is committed.
+
+```text
+Aspect ratio 1:1.
+fill the background with white.
+
+"upon a hill"
+place one gray flat ellipse width 0.72, height 0.4 at horizontal 0.5, vertical 0.76.
+
+"a jar in Tennessee"
+place one red flat circle diameter 0.17 at horizontal 0.5, vertical 0.5.
+```
 
 ### 3.2 Standalone shapes, modifiers, and counts
 
@@ -655,27 +668,31 @@ Write one of the nine abstract colors and let the work's color catalog resolve i
 
 ### 3.22 Plugin invocation
 
+DDL 28 writes a visible plugin name in braces, as in `{young leaves}`. Full-width and ASCII braces may be mixed; names match locks after NFKC, lowercasing, and whitespace folding. An unknown or ambiguous name omits its sentence with a diagnostic. Only the migration function reads the old qualified form; drawing does not.
+
+The editor completes names after a brace and marks the ranges and reasons returned by the shared core, including on hover.
+
 A plugin is a data-only macro naming a composition of core meanings. It adds neither a primitive nor unrestricted plugin-specific natural grammar.
 
 ```text
-Namespace.Heading
-Namespace.宣言済み別名
+{primary name}
+{other name}
 ```
 
-Use an ASCII dot between namespace and heading. Only the formal heading and declared aliases in that namespace resolve. For an environment declaring `Nature.YoungLeaves` and `Nature.若葉` as the formal name and alias of one definition, either names that definition. This does **not** make Nature a fixed plugin available everywhere.
+In a new definition, `id` is the stored lock identity and `names.ja/en` are visible DDL names. For bundled leaves, the primary names of `Nature.YoungLeaves` are `｛若葉｝` and `{young leaves}`. Only the migration function reads the old `Nature.若葉` spelling. A visible name cannot claim a core word.
 
 Check the exact registered name and its public parameter types and bounds, and normally make a call one sentence. Versions, digests, locks, definition bodies, and transcribed output are not author-written DDL metadata. Do not invent function syntax such as `Name(count=3)`.
 
 Parameters bind uniquely to compatible recognized facts in the same clause. A fixture definition declaring one integer can bind these forms:
 
 ```text
-Bind.Integer with 8
-Bind.Integerを八つ置く
+{Integer} with 8
+｛Integer｝を八つ置く
 ```
 
 They require that explanatory `Bind.Integer` definition; they are not core examples for an ordinary installation. Parameter names imply no meaning. Two same-type parameters with two possible assignments are ambiguous. A number in another sentence cannot supply a missing parameter.
 
-Declared parameters are required except for the special word-count declaration whose definition controls omitted count. Undeclared external colors, tools, angles, sizes, and positions do not become general whole-output overrides. Do not delete an unbindable explicit specification merely to make the call succeed.
+Declared parameters are required except for a scene word's count declaration, which controls omitted count. Composition and rules place, size, and count objects through their outer aspect rectangle. Coloring changes a plugin only when its definition accepts color. For a scene call, an undeclared modifier is omitted with a diagnostic while the call itself remains drawable.
 
 As a group or sequence member, a macro retains its internal counts, positions, and transforms while taking one outer placement slot. Keep outer count distinct from internal primitive demand.
 
@@ -684,6 +701,8 @@ As a group or sequence member, a macro retains its internal counts, positions, a
 | plugin_not_installed | No matching definition |
 | plugin_disabled | Installed but disabled |
 | plugin_name_mismatch | Name, alias, namespace, or case differs from registration |
+| plugin_name_ambiguous | A bracketed name matches more than one definition |
+| plugin_old_notation | The old qualified spelling must be rewritten with braces |
 | plugin_version_mismatch | Same name, different pinned definition content |
 | plugin_count_out_of_range | Count outside that word's range |
 
@@ -1125,6 +1144,7 @@ The following constructions are available grammar, rather than new rows in the 1
 | Numeric geometry | Radius, diameter, length, side, width and height, chord and sagitta, numeric position, range, endpoints, and rotation in degrees | Finite constructions connecting numbers to dimensions and owners. Distinguish the rotated word from a numeric angle. |
 | Groups, repetition, fading, color shift | 組, 繰り返して, 左から右へ薄れさせて, 順に段々に移して | Instructions about structure and distribution; no additional category or word chip. |
 | Canvas formats | Host options such as `square`, `a4`, and `wide` | The paper, selected outside the DDL text; a format name is not written in DDL. What a DDL writes is the declaration of the ratio it was laid out in, `Aspect ratio W:H.` (3.27). Distinct from form and proportion words with the same spelling. |
+| Title lines | `"lighthouse"`, `""` / `「灯台」`, `「」` | A line of only a quoted name; it names the chunk of sentences up to the next title (3.1). It draws nothing and takes no sentence number, and its words are not read as drawing words. |
 | Vocabulary Macros | Qualified names such as `Nature.YoungLeaves` | A separate registered vocabulary catalog, outside the core Saijiki's 102 rows. |
 
 ### Sources and verification scope

@@ -1,23 +1,26 @@
 import { Compartment, EditorSelection, EditorState, Facet, StateField, Transaction, type Extension } from '@codemirror/state';
-import { Decoration, EditorView, drawSelection, keymap, lineNumbers, placeholder, type DecorationSet } from '@codemirror/view';
+import { Decoration, EditorView, drawSelection, hoverTooltip, keymap, lineNumbers, placeholder, type DecorationSet } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, isolateHistory } from '@codemirror/commands';
-import { autocompletion, completeFromList, type Completion, type CompletionSource } from '@codemirror/autocomplete';
+import { autocompletion, completeFromList, startCompletion, type Completion, type CompletionSource } from '@codemirror/autocomplete';
 import { annotate, ddlPartClass, type Part } from '../../highlight';
-import { pluginDisplayName, type PluginNameIndex } from '../../plugin-names';
+import { pluginDisplayName } from '../../plugin-names';
 import { resolveInstructionLang } from '../../instructionLang';
+import { ddlTitleName } from '../../ddl-titles';
 import { SAIJIKI, saijikiWordsFor } from '../../saijiki';
 import type { CompositionRange } from '../../composition-ranges';
 import type { PluginEntry, PreviewForPlugin, PreviewForWord, SaijikiPreview } from './types';
 import { compositionChanged, externalDdlValue, hoveredRange, numericRangeEditing, openRangeAt, rangeEditorState, rangeFocusChanged, type RangeEditorStatus } from './codemirror-ranges';
 import { completionRangeTagState, completionRangeTagsChanged, type CompletionRangeLabels } from './completion-range-tags';
 import type { CompletionRangeState } from './completion-range-states';
+import type { PluginCall } from './plugin-calls';
 
-const pluginNames = Facet.define<PluginNameIndex, PluginNameIndex>({ combine: (values) => values[0] ?? { names: [], firesOn: [] } });
+const pluginCalls = Facet.define<{ source: string; calls: readonly PluginCall[] }, { source: string; calls: readonly PluginCall[] }>({ combine: values => values[0] ?? { source: '', calls: [] } });
 type Token = { from: number; to: number; part: Part };
 
 function syntaxFor(state: EditorState): { tokens: Token[]; decorations: DecorationSet } {
 	let from = 0;
-	const tokens = annotate(state.doc.toString(), state.facet(pluginNames)).map((part) => {
+	const source = state.doc.toString(), answer = state.facet(pluginCalls);
+	const tokens = annotate(source, answer.source === source ? answer.calls : [], true).map((part) => {
 		const token = { from, to: from + part.text.length, part };
 		from = token.to;
 		return token;
@@ -44,9 +47,9 @@ export const ddlSyntax = StateField.define<{ tokens: Token[]; decorations: Decor
 
 const protectReadOnly = EditorState.transactionFilter.of((tr) => tr.startState.readOnly && tr.docChanged && !tr.annotation(externalDdlValue) ? [] : tr);
 
-export function ddlEditorModel(ranges: readonly CompositionRange[], names: PluginNameIndex, disabled = false, composing: () => boolean = () => false): Extension {
+export function ddlEditorModel(ranges: readonly CompositionRange[], disabled = false, composing: () => boolean = () => false, answer: { source: string; calls: readonly PluginCall[] } = { source: '', calls: [] }): Extension {
 	return [EditorState.lineSeparator.of('\n'), EditorState.readOnly.of(disabled), numericRangeEditing(ranges, composing),
-		pluginNames.of(names), ddlSyntax, protectReadOnly];
+		pluginCalls.of(answer), ddlSyntax, protectReadOnly];
 }
 
 export function replaceDdlValue(state: EditorState, value: string): Transaction | null {
@@ -85,8 +88,12 @@ export function ddlCompletions(options: () => CompletionOptions): CompletionSour
 		if (context.state.readOnly || context.state.field(rangeEditorState).composing) return null;
 		const active = context.state.field(rangeEditorState).active;
 		if (active && context.pos >= active.bodyStart && context.pos <= active.bodyEnd) return null;
+		// A title line names a chunk and draws nothing, so it offers no word (DDL 27).
+		if (ddlTitleName(context.state.doc.lineAt(context.pos).text) !== null) return null;
 		const settings = options();
-		const lang = resolveInstructionLang(context.state.doc.toString(), settings.isJapanese ? 'ja' : 'en');
+		const prefix = context.matchBefore(/[｛{][^{}｛｝\n]*$/);
+		const documentText = context.state.doc.toString();
+		const lang = resolveInstructionLang(prefix ? documentText.slice(0, prefix.from) + documentText.slice(context.pos) : documentText, settings.isJapanese ? 'ja' : 'en');
 		const info = (read: () => SaijikiPreview) => () => {
 			const preview = read();
 			settings.onPreview(preview);
@@ -95,10 +102,22 @@ export function ddlCompletions(options: () => CompletionOptions): CompletionSour
 			dom.textContent = preview.effect + '\n' + preview.example;
 			return dom;
 		};
+		if (prefix) {
+			const needle = prefix.text.slice(1).normalize('NFKC').toLowerCase();
+			const candidates: Completion[] = settings.pluginEntries.filter(entry => [...(entry.surface_ja ?? []), ...(entry.surface_en ?? [])].some(name => name.normalize('NFKC').toLowerCase().includes(needle))).map(entry => ({
+				label: pluginDisplayName(entry, lang), type: 'variable', apply: (view, _completion, from, to) => {
+					const inserted = pluginDisplayName(entry, lang);
+					const following = view.state.sliceDoc(to, to + 1);
+					view.dispatch({ changes: { from, to: to + (following === '}' || following === '｝' ? 1 : 0), insert: inserted }, selection: EditorSelection.cursor(from + inserted.length), userEvent: 'input.complete' });
+				},
+				detail: `${entry.word_kind === 'object' ? (settings.isJapanese ? '物の語' : 'Object') : (settings.isJapanese ? '情景の語' : 'Scene')} · ${lang === 'ja' ? entry.note_ja : entry.note_en}`,
+				info: info(() => settings.previewForPlugin(entry, lang))
+			}));
+			return { from: prefix.from, options: candidates, filter: false };
+		}
 		const words: Completion[] = SAIJIKI.flatMap((category) => saijikiWordsFor(category.key, lang === 'ja').map((word, index) => ({
 			label: word, type: 'keyword', info: info(() => settings.previewForWord(category.key, category.words[index] ?? word, word, lang))
 		})));
-		for (const entry of settings.pluginEntries) words.push({ label: pluginDisplayName(entry, lang), type: 'variable', info: info(() => settings.previewForPlugin(entry, lang)) });
 		return completeFromList(words)(context);
 	};
 }
@@ -110,7 +129,9 @@ export type DdlEditorOptions = CompletionOptions & {
 	disabled: boolean;
 	lineNumbers?: boolean;
 	cursorAtEnd?: boolean;
-	pluginNameIndex: PluginNameIndex;
+	pluginCallSource?: string;
+	pluginCalls?: readonly PluginCall[];
+	pluginReason?: (call: PluginCall) => string;
 	ranges: readonly CompositionRange[];
 	label: string;
 	placeholder: string;
@@ -127,6 +148,31 @@ export type DdlEditorControl = {
 	destroy: () => void;
 };
 
+export function pluginHoverContent(call: PluginCall, entries: PluginEntry[], language: 'ja' | 'en', previewForPlugin: PreviewForPlugin, reason: (call: PluginCall) => string): { text: string; image?: string } {
+	const entry = entries.find(item => item.qualified_name === call.qualified_name);
+	if (entry && call.status === 'resolved') {
+		const preview = previewForPlugin(entry, language);
+		return { text: `${preview.word}\n${preview.effect}\n${preview.example}`, image: preview.image || (preview.svg ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(preview.svg)}` : undefined) };
+	}
+	return { text: reason(call) };
+}
+
+export function pluginHoverElement(content: { text: string; image?: string }, doc: Document = document): HTMLElement {
+	const dom = doc.createElement('div');
+	dom.className = 'cm-ddl-plugin-hover';
+	const text = doc.createElement('div');
+	text.className = 'cm-ddl-plugin-hover-text';
+	text.textContent = content.text;
+	dom.appendChild(text);
+	if (content.image) {
+		const img = doc.createElement('img');
+		img.src = content.image;
+		img.alt = '';
+		dom.appendChild(img);
+	}
+	return dom;
+}
+
 export function createDdlEditor(parent: HTMLElement, value: string, initial: DdlEditorOptions): DdlEditorControl {
 	let options = initial;
 	let view: EditorView | null = null;
@@ -137,7 +183,7 @@ export function createDdlEditor(parent: HTMLElement, value: string, initial: Ddl
 	let cursorPlaced = false;
 	const configuration = new Compartment();
 	const composing = () => view?.composing ?? false;
-	const configurable = () => [ddlEditorModel(options.ranges, options.pluginNameIndex, options.disabled, composing),
+	const configurable = () => [ddlEditorModel(options.ranges, options.disabled, composing, { source: options.pluginCallSource ?? '', calls: options.pluginCalls ?? [] }),
 		EditorView.editable.of(!options.disabled), EditorView.contentAttributes.of({ 'aria-label': options.label, spellcheck: 'false', tabindex: options.disabled ? '-1' : '0' }),
 		placeholder(options.placeholder), options.lineNumbers === false ? [] : lineNumbers()];
 	const reportRanges = () => {
@@ -163,6 +209,8 @@ export function createDdlEditor(parent: HTMLElement, value: string, initial: Ddl
 			const tr = replaceDdlValue(view.state, next);
 			if (tr) view.dispatch(tr);
 		}
+		const head = view.state.selection.main.head;
+		if (!view.state.readOnly && /^[{｛]$/.test(view.state.sliceDoc(Math.max(0, head - 1), head))) startCompletion(view);
 	};
 	const endComposition = () => { if (compositionTimer !== null) clearTimeout(compositionTimer); compositionTimer = setTimeout(finishComposition, 0); };
 	function watchNativeComposition(): void {
@@ -181,6 +229,16 @@ export function createDdlEditor(parent: HTMLElement, value: string, initial: Ddl
 		completionRangeTagState,
 		configuration.of(configurable()), history(), keymap.of([...defaultKeymap, ...historyKeymap]),
 		drawSelection(), EditorView.lineWrapping,
+		hoverTooltip((view, pos) => {
+			if (options.pluginCallSource !== view.state.doc.toString()) return null;
+			const call = options.pluginCalls?.find(item => item.start_utf16 <= pos && pos < item.end_utf16);
+			if (!call) return null;
+			return { pos: call.start_utf16, end: call.end_utf16, above: true, create() {
+				const lang = resolveInstructionLang(view.state.doc.toString(), options.isJapanese ? 'ja' : 'en');
+				const content = pluginHoverContent(call, options.pluginEntries, lang, options.previewForPlugin, options.pluginReason ?? (() => ''));
+				return { dom: pluginHoverElement(content) };
+			} };
+		}),
 		autocompletion({ override: [ddlCompletions(() => options)] }),
 		EditorView.domEventHandlers({
 			mousedown(event, editor) {
@@ -201,6 +259,11 @@ export function createDdlEditor(parent: HTMLElement, value: string, initial: Ddl
 		}),
 		EditorView.updateListener.of((update) => {
 			watchNativeComposition();
+			if (update.docChanged && !update.state.field(rangeEditorState).composing && !update.state.readOnly) {
+				let opened = false;
+				update.changes.iterChanges((_fromA, _toA, _fromB, _toB, inserted) => { if (/^[{｛]$/.test(inserted.toString())) opened = true; });
+				if (opened) queueMicrotask(() => { if (view) startCompletion(view); });
+			}
 			if (update.docChanged && !update.transactions.every((tr) => tr.annotation(externalDdlValue))) options.onChange(update.state.doc.toString());
 			reportRanges();
 			if ((update.docChanged || update.selectionSet) && !update.state.field(rangeEditorState).composing) {
@@ -208,7 +271,8 @@ export function createDdlEditor(parent: HTMLElement, value: string, initial: Ddl
 				const token = update.state.field(ddlSyntax).tokens.find(({ from, to, part }) => from <= position && position <= to && part.kind !== 'plain');
 				const lang = resolveInstructionLang(update.state.doc.toString(), options.isJapanese ? 'ja' : 'en');
 				if (token?.part.kind === 'plugin-name' && token.part.known) {
-					const entry = options.pluginEntries.find((entry) => entry.qualified_name === token.part.text || entry.aliases?.includes(token.part.text));
+					const call = options.pluginCalls?.find(item => item.start_utf16 === token.from && item.end_utf16 === token.to);
+					const entry = options.pluginEntries.find((entry) => entry.qualified_name === call?.qualified_name);
 					if (entry) options.onPreview(options.previewForPlugin(entry, lang));
 				} else if (token?.part.kind === 'saijiki' && token.part.categoryKey) {
 					const category = SAIJIKI.find((entry) => entry.key === token.part.categoryKey);
@@ -227,7 +291,7 @@ export function createDdlEditor(parent: HTMLElement, value: string, initial: Ddl
 		configure(next) {
 			const previous = options;
 			options = next;
-			if (view && (previous.disabled !== next.disabled || previous.pluginNameIndex !== next.pluginNameIndex || previous.ranges !== next.ranges
+			if (view && (previous.disabled !== next.disabled || previous.pluginCalls !== next.pluginCalls || previous.pluginCallSource !== next.pluginCallSource || previous.ranges !== next.ranges
 				|| previous.label !== next.label || previous.placeholder !== next.placeholder || previous.lineNumbers !== next.lineNumbers)) view.dispatch({ effects: configuration.reconfigure(configurable()) });
 			if (view && next.completionLabels && (previous.completionSource !== next.completionSource || previous.completionStates !== next.completionStates || previous.completionLabels !== next.completionLabels)) {
 				view.dispatch({ effects: completionRangeTagsChanged.of({ source: next.completionSource ?? '', ranges: next.completionStates ?? [], labels: next.completionLabels }) });

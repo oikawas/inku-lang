@@ -98,7 +98,7 @@ class ComposeRequest(BaseModel):
     imported_plugins: list[dict] | None = Field(
         default=None,
         max_length=64,
-        description="DDL書き出し(inku.ddl-export.v1)が運ぶプラグイン定義。この新しい作品だけで使う",
+        description="DDL書き出し(inku.ddl-export.v2)が運ぶプラグイン定義と note。この新しい作品だけで使う",
     )
     # This endpoint does not run a sketch. Supplied text is retained as context
     # beside the description; it does not replace the authored DDL or description.
@@ -117,8 +117,6 @@ class ComposeResponse(BaseModel):
     ddl: str = Field(description="The committed instructions (normalized DDL) that were drawn.")
     recomposition: RecompositionResult | None = Field(default=None, description="Result of the layout re-choice when recompose_mode was given. None when no re-choice ran.")
     # The committed pipeline document, also used when this work is saved.
-    plugin_provenance: list[dict[str, str]] = Field(default_factory=list, description="Plugins used by the committed instructions, as string records. Empty when none were used.")
-    plugin_warnings: list[str] = Field(default_factory=list, description="Warnings raised while resolving the plugins used by the instructions. Empty when there are none.")
     carriage_warnings: list[str] | None = Field(default=None, description="Warnings from the carriage-contract check. The check only inspects the instructions and does not change the drawing. None when none were recorded.")
     # Score 0.10 is the shared core's opaque delivery document. Compatibility
     # routes must not expand or coerce it through the retired Python model.
@@ -232,7 +230,6 @@ class PaintRequest(BaseModel):
     history_display_label: str | None = Field(default=None, description="バッチ番号やdemoなどの表示ラベル")
     batch_line_number: int | None = Field(default=None, description="Line number of this drawing in a batch run, recorded with the history row. None when not part of a batch.")
     batch_run_id: str | None = Field(default=None, description="Identifier of the batch run this drawing belongs to. None when not part of a batch.")
-    history_visibility: str = Field(default="normal", description="Where the drawing appears in history: normal, or lineage_only to keep it out of the main history list. Recorded only when save_history is true.")
     lineage_parent_node_id: str | None = Field(default=None, description="Lineage node id of the work this drawing is derived from. Omitted (None) starts a new lineage. Recorded only when save_history is true.")
     derivation_kind: str | None = Field(default=None, description="How this drawing derives from its parent, recorded on the lineage edge when save_history is true (for example ddl_edit or description_edit). With a lineage parent and no kind given, the server records ddl_edit or description_edit; without a parent, no kind is recorded.")
     derivation_metadata: dict[str, object] = Field(default_factory=dict, description="Extra values stored with the lineage edge for this derivation when save_history is true. Defaults to an empty object.")
@@ -256,6 +253,14 @@ class PaintRequest(BaseModel):
             "description first and sketch_text is the author's edited reading."
         ),
     )
+    composition: Literal["off", "on"] | None = Field(
+        default=None,
+        description=(
+            "With read_and_draw only: on decides a composition and laws from the description (and its reading) "
+            "before the DDL is written, and writes, measures and corrects the DDL toward them; off or left out "
+            "draws read and draw as before. Ignored by stages."
+        ),
+    )
     limits: dict[str, int] | None = Field(default=None, description=_LIMITS_FIELD_DESCRIPTION)
 
 
@@ -263,8 +268,6 @@ class PaintResponse(BaseModel):
     description: str = Field(description="The description the drawing was made from.")
     ddl: str = Field(description="The committed instructions (normalized DDL) that were drawn.")
     # The committed pipeline document, also used when this work is saved.
-    plugin_provenance: list[dict[str, str]] = Field(default_factory=list, description="Plugins used by the committed instructions, as string records. Empty when none were used.")
-    plugin_warnings: list[str] = Field(default_factory=list, description="Warnings raised while resolving the plugins used by the instructions. Empty when there are none.")
     carriage_warnings: list[str] | None = Field(default=None, description="Warnings from the carriage-contract check. The check only inspects the instructions and does not change the drawing. None when none were recorded.")
     thinking: str | None = Field(default=None, description="Always null. This server does not return the model's reasoning text.")
     score: dict = Field(description="The drawing score (JSON Score) as an object.")
@@ -431,6 +434,7 @@ class ColorArrangementPlanRequest(BaseModel):
 class ColorArrangementRenderRequest(BaseModel):
     work_id: str = Field(min_length=1, max_length=200, description="Id of the saved work to draw in a color arrangement.")
     index: int = Field(ge=0, strict=True, description="Index of the color arrangement to draw, as listed by the plan.")
+    wild: bool | None = Field(default=None, description="Lift the stroke limit; omitted or null means off.")
 
 
 def _saved_color_map(work: dict) -> tuple[dict[str, str], str]:
@@ -474,7 +478,7 @@ def _with_laws_records(metadata: dict, laws_records: dict | None) -> dict:
 
 
 def _render_color_arrangement_for_work(
-    actor: dict, work: dict, index: int, laws_records: dict | None = None,
+    actor: dict, work: dict, index: int, laws_records: dict | None = None, *, wild: bool | None = None,
 ) -> RenderScoreResponse:
     color_map, catalog_id = _saved_color_map(work)
     try:
@@ -489,7 +493,7 @@ def _render_color_arrangement_for_work(
         score=work["score"], input=work.get("input") or "", ddl=work.get("ddl"),
         catalog_id=catalog_id, canvas_aspect=work.get("render_canvas_aspect_id") or work.get("render_canvas_aspect"),
         render_seed=render_seed, composition_seed=work.get("composition_seed"),
-        wild=bool(work.get("render_wild")),
+        wild=wild is True,
     ), actor, snapshot)
     result.render_color_source = "color_arrangement"
     # The instructions are the parent's, so its laws records hold as they are.
@@ -500,7 +504,7 @@ def _render_color_arrangement_for_work(
 @router.post("/api/render-color-arrangement", response_model=RenderScoreResponse, response_model_exclude_none=True, summary="Render a color arrangement")
 def api_render_color_arrangement(req: ColorArrangementRenderRequest, actor: dict = Depends(_current_user)) -> RenderScoreResponse:
     """Draw a saved work in the color arrangement at the given index and return its score, SVG and render metadata. Requires a signed-in user. Raises 422 when the saved work has no performance seed or the arrangement is refused."""
-    return _render_color_arrangement_for_work(actor, _work_for_color_snapshot(actor, req.work_id), req.index)
+    return _render_color_arrangement_for_work(actor, _work_for_color_snapshot(actor, req.work_id), req.index, wild=req.wild)
 
 
 class GroundVariantPlanRequest(BaseModel):
@@ -510,6 +514,7 @@ class GroundVariantPlanRequest(BaseModel):
 class GroundVariantRenderRequest(BaseModel):
     work_id: str = Field(min_length=1, max_length=200, description="Id of the saved work to draw on another ground.")
     material: str = Field(min_length=1, max_length=40, description="Name of the ground to draw on, as listed by the ground plan.")
+    wild: bool | None = Field(default=None, description="Lift the stroke limit; omitted or null means off.")
 
 
 class GroundVariantResponse(RenderScoreResponse):
@@ -527,7 +532,7 @@ def api_ground_variant_plan(req: GroundVariantPlanRequest, actor: dict = Depends
 
 
 def _render_ground_variant_for_work(
-    actor: dict, work: dict, material: str, laws_records: dict | None = None,
+    actor: dict, work: dict, material: str, laws_records: dict | None = None, *, wild: bool | None = None,
 ) -> GroundVariantResponse:
     score = work.get("score")
     try:
@@ -544,7 +549,7 @@ def _render_ground_variant_for_work(
         catalog_id=work.get("render_color_catalog_id") or work.get("catalog_id"),
         canvas_aspect=work.get("render_canvas_aspect_id") or work.get("render_canvas_aspect"),
         render_seed=render_seed, composition_seed=work.get("composition_seed"),
-        wild=bool(work.get("render_wild")),
+        wild=wild is True,
     ), actor, work)
     # Only the ground sentence changes, and the layers record names no ground. The
     # basis keeps the parent's digest, so the laws move stops on the new DDL.
@@ -555,7 +560,7 @@ def _render_ground_variant_for_work(
 @router.post("/api/render-ground-variant", response_model=GroundVariantResponse, response_model_exclude_none=True, summary="Render a ground variant")
 def api_render_ground_variant(req: GroundVariantRenderRequest, actor: dict = Depends(_current_user)) -> GroundVariantResponse:
     """Draw a saved work on the ground named by material, keeping its performance seed. Returns the score, SVG, the instructions with the new ground sentence (ddl) and render metadata. Requires a signed-in user. Raises 422 when the ground change is refused or the saved work has no performance seed."""
-    return _render_ground_variant_for_work(actor, _work_for_color_snapshot(actor, req.work_id), req.material)
+    return _render_ground_variant_for_work(actor, _work_for_color_snapshot(actor, req.work_id), req.material, wild=req.wild)
 
 
 class CanvasFitRenderRequest(BaseModel):
@@ -607,6 +612,7 @@ class ToolVariantRenderRequest(BaseModel):
     mode: Literal["uniform", "per_sentence"] = Field(default="uniform", description="uniform: one tool for every sentence. per_sentence: a tool chosen for each sentence.")
     # The tool asked for each sentence, keyed by its instruction index.
     tools: dict[str, str] = Field(min_length=1, max_length=200, description="Tool word for each sentence, keyed by the sentence's instruction index. At least one entry is required.")
+    wild: bool | None = Field(default=None, description="Lift the stroke limit; omitted or null means off.")
 
 
 class ToolVariantResponse(RenderScoreResponse):
@@ -638,7 +644,7 @@ def api_tool_variant_plan(req: ToolVariantPlanRequest, actor: dict = Depends(_cu
 
 
 def _render_tool_variant_for_work(
-    actor: dict, work: dict, mode: str, asked: dict[str, str], laws_records: dict | None = None,
+    actor: dict, work: dict, mode: str, asked: dict[str, str], laws_records: dict | None = None, *, wild: bool | None = None,
 ) -> ToolVariantResponse:
     render_seed = work.get("render_seed")
     if render_seed is None:
@@ -656,7 +662,7 @@ def _render_tool_variant_for_work(
         catalog_id=work.get("render_color_catalog_id") or work.get("catalog_id"),
         canvas_aspect=work.get("render_canvas_aspect_id") or work.get("render_canvas_aspect"),
         render_seed=render_seed, composition_seed=work.get("composition_seed"),
-        wild=bool(work.get("render_wild")),
+        wild=wild is True,
     ), actor, work)
     # The basis keeps the parent's digest, so the laws move stops on the new DDL.
     kept = {key: value for key, value in laws_records.items() if key != "laws_layers"}
@@ -669,7 +675,7 @@ def _render_tool_variant_for_work(
 @router.post("/api/render-tool-variant", response_model=ToolVariantResponse, response_model_exclude_none=True, summary="Render a tool variant")
 def api_render_tool_variant(req: ToolVariantRenderRequest, actor: dict = Depends(_current_user)) -> ToolVariantResponse:
     """Draw a saved work with the tool word chosen for each sentence, keyed by instruction index. Returns the score, SVG, the changed instructions (ddl) and render metadata. Requires a signed-in user. Raises 422 when the change is refused or the saved work has no performance seed."""
-    return _render_tool_variant_for_work(actor, _work_for_color_snapshot(actor, req.work_id), req.mode, req.tools)
+    return _render_tool_variant_for_work(actor, _work_for_color_snapshot(actor, req.work_id), req.mode, req.tools, wild=req.wild)
 
 
 class JuxtapositionBody(BaseModel):

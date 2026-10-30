@@ -202,6 +202,8 @@ export function runningStageLabel(
 	// Read and draw (SPEC 12.6.7): the reading, the writing, and the correction
 	// beside the drawing; a request asked again after the check revises.
 	if (attempt?.action === 'read_description') return strings.readDrawReading;
+	// The composition and laws, after the reading and before the writing (2026-10-26).
+	if (attempt?.action === 'compose_description') return attempt.asked_again ? strings.readDrawRecomposing : strings.readDrawComposing;
 	if (attempt?.action === 'write_description_ddl') return attempt.asked_again ? strings.readDrawRevising : strings.readDrawWriting;
 	if (attempt?.action === 'review_description_ddl') return attempt.asked_again ? strings.readDrawRevising : strings.readDrawReviewing;
 	if (attempt?.action === 'read_composition') return strings.stageReadingComposition;

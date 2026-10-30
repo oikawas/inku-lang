@@ -17,6 +17,70 @@ import org.junit.Test
  * model in place of the provider. No device and no provider is involved.
  */
 class ImageDdlPipelineTest {
+    @Test
+    fun sourceLabelsUseCoreScalarOffsetsIncludingEmoji() {
+        val labels = descriptionSourceLabels(NativePipelineBridge, "1. 🌸花 [ 作者 ] ［本］")
+        assertEquals(listOf("作者", "本"), (0 until labels.length()).map { labels.getString(it) })
+    }
+
+    @Test
+    fun editedReadingIsSuppliedWithoutCallingTheReader() = runBlocking {
+        val fixture = Fixture(mapOf("write_description_ddl" to """{"ddl":"中心に赤の円を1個置く。","figures":[]}"""))
+        val result = fixture.pipeline.paint(PaintRequest(
+            description = "赤い円", stage1Model = "anthropic:claude-opus-5-5", stage2Model = "anthropic:claude-opus-5-5",
+            colorCatalogId = "default", canvasAspect = "square", autoRepair = true, renderSeed = 7,
+            uiLang = "ja", sketch = SketchInput(text = "作者が直した読み"), readAndDraw = true,
+        ))
+        assertEquals(listOf("write_description_ddl"), fixture.requests.map { it.pipelineAction })
+        assertEquals("作者が直した読み", result.sketchText)
+        assertEquals("supplied", JSONObject(result.renderMetadataJson).getJSONObject("description_ddl").getString("reading_state"))
+    }
+
+    @Test
+    fun compositionAndColorsAreDrivenAndSaved() = runBlocking {
+        val composition = """{"thesis":"女を左上に置く","form":"one_corner","things":[{"thing":1,"what":"女の姿","role":"focal","kind":"cluster","quote":"妹"},{"thing":2,"what":"紫の影","role":"accent","kind":"cluster","quote":"紫"}],"main_law":"B1","laws":{"B1":{"targets":[{"thing":1,"at":"point_ul"}]}},"reason":"妹を左上に置く"}"""
+        val written = """{"sentences":[{"thing":0,"text":"背景を白で埋める。"},{"thing":1,"text":"画面の横0.4、縦0.4の位置に、直径0.3の紫の塗りの円を1個置く。"},{"thing":2,"text":"画面の横0.6、縦0.6の位置に、幅0.2、高さ0.15の灰の薄い塗りの三角を1個置く。"}],"figures":[]}"""
+        val fixture = Fixture(mapOf("compose_description" to composition, "write_description_ddl" to written,
+            "review_description_ddl" to written, "choose_colors" to """{"main_law":"D5","laws":{"D5":{"hue":"blue","layer":1}},"reason":"青を軸にまとめる"}"""))
+        val result = fixture.pipeline.paint(PaintRequest(
+            description = "紫の妹", stage1Model = "anthropic:claude-opus-5-5", stage2Model = "anthropic:claude-opus-5-5",
+            colorCatalogId = "default", canvasAspect = "square", autoRepair = true, renderSeed = 7,
+            uiLang = "ja", readAndDraw = true, descriptionComposition = true, descriptionReview = true,
+        ))
+        assertEquals(listOf("compose_description", "write_description_ddl", "review_description_ddl", "choose_colors"), fixture.requests.map { it.pipelineAction })
+        val record = JSONObject(result.renderMetadataJson).getJSONObject("description_ddl").getJSONObject("composition")
+        assertEquals("used", record.getString("state"))
+        assertEquals("used", record.getJSONObject("colors").getString("state"))
+    }
+
+    @Test
+    fun readAndDrawReadsWritesReviewsAndKeepsItsRecord() = runBlocking {
+        val fixture = Fixture(mapOf(
+            "read_description" to """{"viewpoint":{"speaker":"我","speaker_quote":"我","eye":"女を見ている","addressee_quote":"妹","speaker_seen_quote":""},"core":["紫の女"],"items":[{"kind":"scene","quote":"紫の妹","image":"紫の女"}],"reading":"紫の姿を見ている。"}""",
+            "write_description_ddl" to """{"ddl":"背景を黄で埋める。\n中心に赤の円を1個置く。","figures":[{"who":"addressee","what":"妹"}]}""",
+            "review_description_ddl" to """{"ddl":"背景を黄で埋める。\n中心に赤の円を1個置く。","figures":[{"who":"addressee","what":"妹"}]}""",
+        ))
+        val result = try { fixture.pipeline.paint(PaintRequest(
+            description = "紫の妹を我は見る [大海人皇子]", stage1Model = "anthropic:claude-opus-5-5",
+            stage2Model = "anthropic:claude-opus-5-5", colorCatalogId = "default", canvasAspect = "square",
+            autoRepair = true, renderSeed = 7, uiLang = "ja", sketch = SketchInput(requested = true),
+            readAndDraw = true, descriptionReview = true,
+        )) } catch (error: PipelineInteractionRequired) {
+            throw AssertionError("phase=${error.view.phaseReason} failure=${error.view.providerFailure} events=${error.view.eventsJson} requests=${fixture.requests.map { it.pipelineAction }}", error)
+        }
+        assertEquals(listOf("read_description", "write_description_ddl", "review_description_ddl"), fixture.requests.map { it.pipelineAction })
+        val metadata = JSONObject(result.renderMetadataJson)
+        assertEquals("read_and_draw", metadata.getString("route"))
+        assertEquals("大海人皇子", metadata.getJSONObject("description_ddl").getJSONArray("source_labels").getString(0))
+        assertEquals("supplemented", result.sketchState)
+        assertTrue(result.sketchText.orEmpty().isNotBlank())
+        assertEquals(1, fixture.requests.last().pipelineImages!!.dataUrls.size)
+        val prompts = metadata.getJSONObject("sent_system_prompts")
+        assertTrue(prompts.getJSONObject("reading").getString("message").isNotBlank())
+        assertTrue(prompts.getJSONObject("description_ddl").getString("message").isNotBlank())
+        assertTrue(prompts.getJSONObject("description_review").getString("message").isNotBlank())
+    }
+
     private class Fixture(private val answers: Map<String, String>) {
         val requests = mutableListOf<ModelRequest>()
         /** The Anthropic body each request would be sent as. */

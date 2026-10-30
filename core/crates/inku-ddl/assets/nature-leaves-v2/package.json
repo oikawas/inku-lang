@@ -1,0 +1,4449 @@
+{
+  "schema": "inku.plugin-package.v2",
+  "namespace": "Nature",
+  "name": "leaves",
+  "version": "2.1.0",
+  "description_ja": "一年の葉を描く七つの語。",
+  "description_en": "Seven words for leaves through the year.",
+  "authors": [
+    "Shinichiro Oikawa"
+  ],
+  "license": "MIT",
+  "words": [
+    {
+      "definition": {
+        "schema": "inku.macro-definition.v2",
+        "namespace": "Nature",
+        "version": "2.1.0",
+        "parameters": {
+          "leaf_count": {
+            "type": "integer",
+            "receives": "count",
+            "minimum": 1,
+            "maximum": 12,
+            "omitted": [
+              4,
+              5,
+              6
+            ],
+            "counter": "flat"
+          }
+        },
+        "components": {
+          "leaf_form": {
+            "parameters": {
+              "lean": {
+                "type": "semantic_ref",
+                "category": "angle"
+              },
+              "x": {
+                "type": "exact_decimal",
+                "dimension": "position_x"
+              },
+              "y": {
+                "type": "exact_decimal",
+                "dimension": "position_y"
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "binding": "edge_a",
+                "fields": {
+                  "angle": {
+                    "expr": "parameter",
+                    "name": "lean"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.095"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "green"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "swaying"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "parameter",
+                    "name": "x"
+                  },
+                  "position_y": {
+                    "expr": "parameter",
+                    "name": "y"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.020"
+                  },
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "surface": {
+                    "expr": "semantic_ref",
+                    "category": "surface",
+                    "id": "solid"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "pencil"
+                  }
+                }
+              },
+              {
+                "op": "emit",
+                "binding": "edge_b",
+                "fields": {
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.095"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "green"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "swaying"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.020"
+                  },
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "surface": {
+                    "expr": "semantic_ref",
+                    "category": "surface",
+                    "id": "solid"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "pencil"
+                  }
+                }
+              },
+              {
+                "op": "relation",
+                "kind": "touching",
+                "from": "edge_a",
+                "to": "edge_b"
+              }
+            ]
+          }
+        },
+        "body": [
+          {
+            "op": "repeat",
+            "count": {
+              "expr": "parameter",
+              "name": "leaf_count"
+            },
+            "maximum": 12,
+            "index": "leaf_index",
+            "body": [
+              {
+                "op": "vary",
+                "binding": "leaf_x",
+                "domain": "wakaba_cell_x",
+                "choices": [
+                  {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "leaf_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.200"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.760"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.536"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.424"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.200"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.760"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.424"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.536"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.312"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.648"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.312"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.648"
+                      }
+                    ]
+                  },
+                  {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "leaf_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.220"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.780"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.556"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.444"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.220"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.780"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.444"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.556"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.332"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.668"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.332"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.668"
+                      }
+                    ]
+                  },
+                  {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "leaf_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.240"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.800"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.576"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.464"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.240"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.800"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.464"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.576"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.352"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.688"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.352"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.688"
+                      }
+                    ]
+                  }
+                ],
+                "range": null,
+                "body": [
+                  {
+                    "op": "vary",
+                    "binding": "leaf_y",
+                    "domain": "wakaba_cell_y",
+                    "choices": [
+                      {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "leaf_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.140"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.320"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.140"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.320"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.320"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.140"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.140"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.320"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.140"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.140"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.320"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.320"
+                          }
+                        ]
+                      },
+                      {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "leaf_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.160"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.340"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.160"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.340"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.340"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.160"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.160"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.340"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.160"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.160"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.340"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.340"
+                          }
+                        ]
+                      },
+                      {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "leaf_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.180"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.360"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.180"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.360"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.360"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.180"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.180"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.360"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.180"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.180"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.360"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.360"
+                          }
+                        ]
+                      },
+                      {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "leaf_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.200"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.380"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.200"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.380"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.380"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.200"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.200"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.380"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.200"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.200"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.380"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.380"
+                          }
+                        ]
+                      },
+                      {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "leaf_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.220"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.400"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.220"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.400"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.400"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.220"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.220"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.400"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.220"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.220"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.400"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.400"
+                          }
+                        ]
+                      }
+                    ],
+                    "range": null,
+                    "body": [
+                      {
+                        "op": "use",
+                        "component": "leaf_form",
+                        "arguments": {
+                          "lean": {
+                            "expr": "cycle",
+                            "index": {
+                              "expr": "local",
+                              "name": "leaf_index"
+                            },
+                            "items": [
+                              {
+                                "expr": "semantic_ref",
+                                "category": "angle",
+                                "id": "vertical"
+                              },
+                              {
+                                "expr": "semantic_ref",
+                                "category": "angle",
+                                "id": "left_rising"
+                              },
+                              {
+                                "expr": "semantic_ref",
+                                "category": "angle",
+                                "id": "vertical"
+                              },
+                              {
+                                "expr": "semantic_ref",
+                                "category": "angle",
+                                "id": "rising"
+                              },
+                              {
+                                "expr": "semantic_ref",
+                                "category": "angle",
+                                "id": "vertical"
+                              },
+                              {
+                                "expr": "semantic_ref",
+                                "category": "angle",
+                                "id": "left_rising"
+                              }
+                            ]
+                          },
+                          "x": {
+                            "expr": "local",
+                            "name": "leaf_x"
+                          },
+                          "y": {
+                            "expr": "local",
+                            "name": "leaf_y"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "id": "YoungLeaves",
+        "names": {
+          "ja": [
+            "若葉",
+            "わかば"
+          ],
+          "en": [
+            "young leaves",
+            "new leaves"
+          ]
+        },
+        "kind": "scene"
+      },
+      "note_ja": "若葉を上半分の6列2段の12の区画へ、1枚ずつ別の区画に散らす。",
+      "note_en": "Scatter young leaves over twelve upper-half cells, one per cell: 1–12 when counted, otherwise 4–6.",
+      "preview": "previews/wakaba.png"
+    },
+    {
+      "definition": {
+        "schema": "inku.macro-definition.v2",
+        "namespace": "Nature",
+        "version": "2.1.0",
+        "parameters": {
+          "clump_count": {
+            "type": "integer",
+            "receives": "count",
+            "minimum": 1,
+            "maximum": 3,
+            "omitted": [
+              1,
+              2
+            ],
+            "counter": "general"
+          }
+        },
+        "components": {
+          "rooted_blade": {
+            "parameters": {
+              "chord": {
+                "type": "exact_decimal",
+                "dimension": "chord"
+              },
+              "rotation": {
+                "type": "number"
+              },
+              "x": {
+                "type": "exact_decimal",
+                "dimension": "position_x"
+              },
+              "y": {
+                "type": "exact_decimal",
+                "dimension": "position_y"
+              }
+            },
+            "body": [
+              {
+                "op": "anchor",
+                "name": "root",
+                "fields": {
+                  "position_x": {
+                    "expr": "parameter",
+                    "name": "x"
+                  },
+                  "position_y": {
+                    "expr": "parameter",
+                    "name": "y"
+                  }
+                }
+              },
+              {
+                "op": "transform",
+                "transform": {
+                  "translate_x": null,
+                  "translate_y": null,
+                  "scale_x": null,
+                  "scale_y": null,
+                  "rotate_degrees": {
+                    "expr": "parameter",
+                    "name": "rotation"
+                  }
+                },
+                "body": [
+                  {
+                    "op": "emit",
+                    "binding": "edge_a",
+                    "fields": {
+                      "angle": {
+                        "expr": "semantic_ref",
+                        "category": "angle",
+                        "id": "horizontal"
+                      },
+                      "chord": {
+                        "expr": "parameter",
+                        "name": "chord"
+                      },
+                      "color": {
+                        "expr": "semantic_ref",
+                        "category": "color",
+                        "id": "green"
+                      },
+                      "movement": {
+                        "expr": "semantic_ref",
+                        "category": "movement",
+                        "id": "place"
+                      },
+                      "sagitta": {
+                        "expr": "exact_decimal",
+                        "value": "0.012"
+                      },
+                      "shape": {
+                        "expr": "semantic_ref",
+                        "category": "shape",
+                        "id": "arc"
+                      },
+                      "surface": {
+                        "expr": "semantic_ref",
+                        "category": "surface",
+                        "id": "solid"
+                      },
+                      "touch": {
+                        "expr": "semantic_ref",
+                        "category": "touch",
+                        "id": "brush_thin"
+                      }
+                    }
+                  },
+                  {
+                    "op": "emit",
+                    "binding": "edge_b",
+                    "fields": {
+                      "chord": {
+                        "expr": "parameter",
+                        "name": "chord"
+                      },
+                      "color": {
+                        "expr": "semantic_ref",
+                        "category": "color",
+                        "id": "green"
+                      },
+                      "movement": {
+                        "expr": "semantic_ref",
+                        "category": "movement",
+                        "id": "place"
+                      },
+                      "sagitta": {
+                        "expr": "exact_decimal",
+                        "value": "0.012"
+                      },
+                      "shape": {
+                        "expr": "semantic_ref",
+                        "category": "shape",
+                        "id": "arc"
+                      },
+                      "surface": {
+                        "expr": "semantic_ref",
+                        "category": "surface",
+                        "id": "solid"
+                      },
+                      "touch": {
+                        "expr": "semantic_ref",
+                        "category": "touch",
+                        "id": "brush_thin"
+                      }
+                    }
+                  },
+                  {
+                    "op": "relation",
+                    "kind": "connected",
+                    "from": "root",
+                    "to": "edge_a"
+                  },
+                  {
+                    "op": "relation",
+                    "kind": "touching",
+                    "from": "edge_a",
+                    "to": "edge_b"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "body": [
+          {
+            "op": "repeat",
+            "count": {
+              "expr": "parameter",
+              "name": "clump_count"
+            },
+            "maximum": 3,
+            "index": "clump_index",
+            "body": [
+              {
+                "op": "vary",
+                "binding": "clump_x",
+                "domain": "shitakusa_clump_x",
+                "choices": [
+                  {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "clump_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.270"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.690"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.480"
+                      }
+                    ]
+                  },
+                  {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "clump_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.300"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.720"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.510"
+                      }
+                    ]
+                  },
+                  {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "clump_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.330"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.750"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.540"
+                      }
+                    ]
+                  }
+                ],
+                "range": null,
+                "body": [
+                  {
+                    "op": "vary",
+                    "binding": "clump_shape",
+                    "domain": "shitakusa_clump_shape",
+                    "choices": [
+                      {
+                        "expr": "integer",
+                        "value": 0
+                      },
+                      {
+                        "expr": "integer",
+                        "value": 1
+                      },
+                      {
+                        "expr": "integer",
+                        "value": 2
+                      },
+                      {
+                        "expr": "integer",
+                        "value": 3
+                      }
+                    ],
+                    "range": null,
+                    "body": [
+                      {
+                        "op": "vary",
+                        "binding": "blade_count",
+                        "domain": "shitakusa_blade_count",
+                        "choices": [
+                          {
+                            "expr": "integer",
+                            "value": 3
+                          },
+                          {
+                            "expr": "integer",
+                            "value": 4
+                          },
+                          {
+                            "expr": "integer",
+                            "value": 5
+                          }
+                        ],
+                        "range": null,
+                        "body": [
+                          {
+                            "op": "repeat",
+                            "count": {
+                              "expr": "local",
+                              "name": "blade_count"
+                            },
+                            "maximum": 5,
+                            "index": "blade_index",
+                            "body": [
+                              {
+                                "op": "use",
+                                "component": "rooted_blade",
+                                "arguments": {
+                                  "chord": {
+                                    "expr": "cycle",
+                                    "index": {
+                                      "expr": "local",
+                                      "name": "clump_shape"
+                                    },
+                                    "items": [
+                                      {
+                                        "expr": "cycle",
+                                        "index": {
+                                          "expr": "local",
+                                          "name": "blade_index"
+                                        },
+                                        "items": [
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.40"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.52"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.34"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.46"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.30"
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "expr": "cycle",
+                                        "index": {
+                                          "expr": "local",
+                                          "name": "blade_index"
+                                        },
+                                        "items": [
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.52"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.34"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.46"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.30"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.40"
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "expr": "cycle",
+                                        "index": {
+                                          "expr": "local",
+                                          "name": "blade_index"
+                                        },
+                                        "items": [
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.46"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.40"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.30"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.52"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.34"
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "expr": "cycle",
+                                        "index": {
+                                          "expr": "local",
+                                          "name": "blade_index"
+                                        },
+                                        "items": [
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.34"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.46"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.40"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.30"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.52"
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  },
+                                  "rotation": {
+                                    "expr": "cycle",
+                                    "index": {
+                                      "expr": "local",
+                                      "name": "clump_shape"
+                                    },
+                                    "items": [
+                                      {
+                                        "expr": "cycle",
+                                        "index": {
+                                          "expr": "local",
+                                          "name": "blade_index"
+                                        },
+                                        "items": [
+                                          {
+                                            "expr": "number",
+                                            "value": -96.0
+                                          },
+                                          {
+                                            "expr": "number",
+                                            "value": -86.0
+                                          },
+                                          {
+                                            "expr": "number",
+                                            "value": -104.0
+                                          },
+                                          {
+                                            "expr": "number",
+                                            "value": -80.0
+                                          },
+                                          {
+                                            "expr": "number",
+                                            "value": -110.0
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "expr": "cycle",
+                                        "index": {
+                                          "expr": "local",
+                                          "name": "blade_index"
+                                        },
+                                        "items": [
+                                          {
+                                            "expr": "number",
+                                            "value": -86.0
+                                          },
+                                          {
+                                            "expr": "number",
+                                            "value": -104.0
+                                          },
+                                          {
+                                            "expr": "number",
+                                            "value": -80.0
+                                          },
+                                          {
+                                            "expr": "number",
+                                            "value": -110.0
+                                          },
+                                          {
+                                            "expr": "number",
+                                            "value": -96.0
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "expr": "cycle",
+                                        "index": {
+                                          "expr": "local",
+                                          "name": "blade_index"
+                                        },
+                                        "items": [
+                                          {
+                                            "expr": "number",
+                                            "value": -80.0
+                                          },
+                                          {
+                                            "expr": "number",
+                                            "value": -96.0
+                                          },
+                                          {
+                                            "expr": "number",
+                                            "value": -110.0
+                                          },
+                                          {
+                                            "expr": "number",
+                                            "value": -86.0
+                                          },
+                                          {
+                                            "expr": "number",
+                                            "value": -104.0
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "expr": "cycle",
+                                        "index": {
+                                          "expr": "local",
+                                          "name": "blade_index"
+                                        },
+                                        "items": [
+                                          {
+                                            "expr": "number",
+                                            "value": -104.0
+                                          },
+                                          {
+                                            "expr": "number",
+                                            "value": -80.0
+                                          },
+                                          {
+                                            "expr": "number",
+                                            "value": -96.0
+                                          },
+                                          {
+                                            "expr": "number",
+                                            "value": -110.0
+                                          },
+                                          {
+                                            "expr": "number",
+                                            "value": -86.0
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  },
+                                  "x": {
+                                    "expr": "local",
+                                    "name": "clump_x"
+                                  },
+                                  "y": {
+                                    "expr": "exact_decimal",
+                                    "value": "0.90"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "id": "Undergrowth",
+        "names": {
+          "ja": [
+            "下草",
+            "したくさ"
+          ],
+          "en": [
+            "undergrowth",
+            "grasses"
+          ]
+        },
+        "kind": "scene"
+      },
+      "note_ja": "下端に、菖蒲の剣のような長く細い葉を3〜5本ずつ同じ根元から、ほぼ平行に少し開いて上へ伸ばした株を置く。",
+      "note_en": "Raise three to five slim blades per bottom root: 1–3 clumps when counted, otherwise 1–2.",
+      "preview": "previews/shitakusa.png"
+    },
+    {
+      "definition": {
+        "schema": "inku.macro-definition.v2",
+        "namespace": "Nature",
+        "version": "2.1.0",
+        "parameters": {
+          "leaf_count": {
+            "type": "integer",
+            "receives": "count",
+            "minimum": 1,
+            "maximum": 12,
+            "omitted": [
+              6,
+              7,
+              8
+            ],
+            "counter": "flat"
+          }
+        },
+        "components": {},
+        "body": [
+          {
+            "op": "emit",
+            "binding": "branch",
+            "fields": {
+              "angle": {
+                "expr": "semantic_ref",
+                "category": "angle",
+                "id": "horizontal"
+              },
+              "color": {
+                "expr": "semantic_ref",
+                "category": "color",
+                "id": "gray"
+              },
+              "fluctuation_frequency": {
+                "expr": "semantic_ref",
+                "category": "variation",
+                "id": "loosely"
+              },
+              "fluctuation_quality": {
+                "expr": "semantic_ref",
+                "category": "variation",
+                "id": "undulating"
+              },
+              "length": {
+                "expr": "exact_decimal",
+                "value": "0.68"
+              },
+              "movement": {
+                "expr": "semantic_ref",
+                "category": "movement",
+                "id": "draw"
+              },
+              "position_x": {
+                "expr": "exact_decimal",
+                "value": "0.50"
+              },
+              "position_y": {
+                "expr": "exact_decimal",
+                "value": "0.50"
+              },
+              "shape": {
+                "expr": "semantic_ref",
+                "category": "shape",
+                "id": "line"
+              },
+              "touch": {
+                "expr": "semantic_ref",
+                "category": "touch",
+                "id": "brush_thick"
+              }
+            }
+          },
+          {
+            "op": "repeat",
+            "count": {
+              "expr": "parameter",
+              "name": "leaf_count"
+            },
+            "maximum": 12,
+            "index": "leaf_index",
+            "body": [
+              {
+                "op": "transform",
+                "transform": {
+                  "translate_x": null,
+                  "translate_y": null,
+                  "scale_x": null,
+                  "scale_y": null,
+                  "rotate_degrees": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "leaf_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "number",
+                        "value": 39.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": -52.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": 32.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": -45.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": 36.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": -48.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": -41.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": 43.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": 47.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": -34.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": -37.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": 50.0
+                      }
+                    ]
+                  }
+                },
+                "body": [
+                  {
+                    "op": "emit",
+                    "binding": "edge_a",
+                    "fields": {
+                      "angle": {
+                        "expr": "semantic_ref",
+                        "category": "angle",
+                        "id": "horizontal"
+                      },
+                      "chord": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "leaf_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.117"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.150"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.098"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.131"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.107"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.141"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.122"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.126"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.136"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.103"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.112"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.145"
+                          }
+                        ]
+                      },
+                      "color": {
+                        "expr": "semantic_ref",
+                        "category": "color",
+                        "id": "green"
+                      },
+                      "movement": {
+                        "expr": "semantic_ref",
+                        "category": "movement",
+                        "id": "place"
+                      },
+                      "sagitta": {
+                        "expr": "exact_decimal",
+                        "value": "0.030"
+                      },
+                      "shape": {
+                        "expr": "semantic_ref",
+                        "category": "shape",
+                        "id": "arc"
+                      },
+                      "surface": {
+                        "expr": "semantic_ref",
+                        "category": "surface",
+                        "id": "solid"
+                      },
+                      "touch": {
+                        "expr": "semantic_ref",
+                        "category": "touch",
+                        "id": "brush_thin"
+                      }
+                    }
+                  },
+                  {
+                    "op": "emit",
+                    "binding": "edge_b",
+                    "fields": {
+                      "chord": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "leaf_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.117"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.150"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.098"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.131"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.107"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.141"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.122"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.126"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.136"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.103"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.112"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.145"
+                          }
+                        ]
+                      },
+                      "color": {
+                        "expr": "semantic_ref",
+                        "category": "color",
+                        "id": "green"
+                      },
+                      "movement": {
+                        "expr": "semantic_ref",
+                        "category": "movement",
+                        "id": "place"
+                      },
+                      "sagitta": {
+                        "expr": "exact_decimal",
+                        "value": "0.030"
+                      },
+                      "shape": {
+                        "expr": "semantic_ref",
+                        "category": "shape",
+                        "id": "arc"
+                      },
+                      "surface": {
+                        "expr": "semantic_ref",
+                        "category": "surface",
+                        "id": "solid"
+                      },
+                      "touch": {
+                        "expr": "semantic_ref",
+                        "category": "touch",
+                        "id": "brush_thin"
+                      }
+                    }
+                  },
+                  {
+                    "op": "relation",
+                    "kind": "connected",
+                    "from": "branch",
+                    "to": "edge_a",
+                    "target_path_position": {
+                      "expr": "cycle",
+                      "index": {
+                        "expr": "local",
+                        "name": "leaf_index"
+                      },
+                      "items": [
+                        {
+                          "expr": "number",
+                          "value": 0.615
+                        },
+                        {
+                          "expr": "number",
+                          "value": 0.08
+                        },
+                        {
+                          "expr": "number",
+                          "value": 0.92
+                        },
+                        {
+                          "expr": "number",
+                          "value": 0.385
+                        },
+                        {
+                          "expr": "number",
+                          "value": 0.767
+                        },
+                        {
+                          "expr": "number",
+                          "value": 0.233
+                        },
+                        {
+                          "expr": "number",
+                          "value": 0.538
+                        },
+                        {
+                          "expr": "number",
+                          "value": 0.462
+                        },
+                        {
+                          "expr": "number",
+                          "value": 0.309
+                        },
+                        {
+                          "expr": "number",
+                          "value": 0.844
+                        },
+                        {
+                          "expr": "number",
+                          "value": 0.691
+                        },
+                        {
+                          "expr": "number",
+                          "value": 0.156
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "op": "relation",
+                    "kind": "touching",
+                    "from": "edge_a",
+                    "to": "edge_b"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "id": "SummerLeaves",
+        "names": {
+          "ja": [
+            "青葉",
+            "あおば"
+          ],
+          "en": [
+            "summer leaves",
+            "green leaves"
+          ]
+        },
+        "kind": "scene"
+      },
+      "note_ja": "中域の水平な灰の太筆枝をゆるやかに波打たせ、その上に青葉を上下交互に、枝先の方へ斜めに出す。",
+      "note_en": "Grow summer leaves alternately above and below a wavy gray branch through the middle.",
+      "preview": "previews/aoba.png"
+    },
+    {
+      "definition": {
+        "schema": "inku.macro-definition.v2",
+        "namespace": "Nature",
+        "version": "2.0.0",
+        "parameters": {},
+        "components": {},
+        "body": [
+          {
+            "op": "anchor",
+            "name": "palm_center",
+            "fields": {
+              "position_x": {
+                "expr": "exact_decimal",
+                "value": "0.50"
+              },
+              "position_y": {
+                "expr": "exact_decimal",
+                "value": "0.50"
+              }
+            }
+          },
+          {
+            "op": "vary",
+            "binding": "blade_count",
+            "domain": "momiji_blade_count",
+            "choices": [
+              {
+                "expr": "integer",
+                "value": 5
+              },
+              {
+                "expr": "integer",
+                "value": 7
+              }
+            ],
+            "range": null,
+            "body": [
+              {
+                "op": "repeat",
+                "count": {
+                  "expr": "local",
+                  "name": "blade_count"
+                },
+                "maximum": 7,
+                "index": "blade_index",
+                "body": [
+                  {
+                    "op": "transform",
+                    "transform": {
+                      "translate_x": null,
+                      "translate_y": null,
+                      "scale_x": null,
+                      "scale_y": null,
+                      "rotate_degrees": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "blade_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "number",
+                            "value": -90.0
+                          },
+                          {
+                            "expr": "number",
+                            "value": -50.0
+                          },
+                          {
+                            "expr": "number",
+                            "value": -130.0
+                          },
+                          {
+                            "expr": "number",
+                            "value": -14.0
+                          },
+                          {
+                            "expr": "number",
+                            "value": -166.0
+                          },
+                          {
+                            "expr": "number",
+                            "value": 22.0
+                          },
+                          {
+                            "expr": "number",
+                            "value": 158.0
+                          }
+                        ]
+                      }
+                    },
+                    "body": [
+                      {
+                        "op": "emit",
+                        "binding": "edge_a",
+                        "fields": {
+                          "angle": {
+                            "expr": "semantic_ref",
+                            "category": "angle",
+                            "id": "horizontal"
+                          },
+                          "chord": {
+                            "expr": "cycle",
+                            "index": {
+                              "expr": "local",
+                              "name": "blade_index"
+                            },
+                            "items": [
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.230"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.205"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.205"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.155"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.155"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.085"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.085"
+                              }
+                            ]
+                          },
+                          "color": {
+                            "expr": "semantic_ref",
+                            "category": "color",
+                            "id": "red"
+                          },
+                          "movement": {
+                            "expr": "semantic_ref",
+                            "category": "movement",
+                            "id": "place"
+                          },
+                          "sagitta": {
+                            "expr": "exact_decimal",
+                            "value": "0.018"
+                          },
+                          "shape": {
+                            "expr": "semantic_ref",
+                            "category": "shape",
+                            "id": "arc"
+                          },
+                          "surface": {
+                            "expr": "semantic_ref",
+                            "category": "surface",
+                            "id": "solid"
+                          },
+                          "touch": {
+                            "expr": "semantic_ref",
+                            "category": "touch",
+                            "id": "rotring"
+                          }
+                        }
+                      },
+                      {
+                        "op": "emit",
+                        "binding": "edge_b",
+                        "fields": {
+                          "chord": {
+                            "expr": "cycle",
+                            "index": {
+                              "expr": "local",
+                              "name": "blade_index"
+                            },
+                            "items": [
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.230"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.205"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.205"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.155"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.155"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.085"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.085"
+                              }
+                            ]
+                          },
+                          "color": {
+                            "expr": "semantic_ref",
+                            "category": "color",
+                            "id": "red"
+                          },
+                          "movement": {
+                            "expr": "semantic_ref",
+                            "category": "movement",
+                            "id": "place"
+                          },
+                          "sagitta": {
+                            "expr": "exact_decimal",
+                            "value": "0.018"
+                          },
+                          "shape": {
+                            "expr": "semantic_ref",
+                            "category": "shape",
+                            "id": "arc"
+                          },
+                          "surface": {
+                            "expr": "semantic_ref",
+                            "category": "surface",
+                            "id": "solid"
+                          },
+                          "touch": {
+                            "expr": "semantic_ref",
+                            "category": "touch",
+                            "id": "rotring"
+                          }
+                        }
+                      },
+                      {
+                        "op": "relation",
+                        "kind": "connected",
+                        "from": "palm_center",
+                        "to": "edge_a"
+                      },
+                      {
+                        "op": "relation",
+                        "kind": "touching",
+                        "from": "edge_a",
+                        "to": "edge_b"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "op": "emit",
+            "binding": "stem",
+            "fields": {
+              "angle": {
+                "expr": "semantic_ref",
+                "category": "angle",
+                "id": "vertical"
+              },
+              "color": {
+                "expr": "semantic_ref",
+                "category": "color",
+                "id": "red"
+              },
+              "length": {
+                "expr": "exact_decimal",
+                "value": "0.24"
+              },
+              "movement": {
+                "expr": "semantic_ref",
+                "category": "movement",
+                "id": "draw"
+              },
+              "shape": {
+                "expr": "semantic_ref",
+                "category": "shape",
+                "id": "line"
+              },
+              "touch": {
+                "expr": "semantic_ref",
+                "category": "touch",
+                "id": "rotring"
+              }
+            }
+          },
+          {
+            "op": "relation",
+            "kind": "connected",
+            "from": "palm_center",
+            "to": "stem"
+          }
+        ],
+        "id": "AutumnLeaves",
+        "names": {
+          "ja": [
+            "紅葉",
+            "もみじ"
+          ],
+          "en": [
+            "autumn leaves",
+            "maple leaves"
+          ]
+        },
+        "kind": "scene"
+      },
+      "note_ja": "中域の掌の中心から、紅葉の葉5枚または7枚を上半分へ扇形に並べる。",
+      "note_en": "From a palm center in the middle, fan 5 or 7 maple lobes over the upper half.",
+      "preview": "previews/momiji.png"
+    },
+    {
+      "definition": {
+        "schema": "inku.macro-definition.v2",
+        "namespace": "Nature",
+        "version": "2.1.0",
+        "parameters": {
+          "leaf_count": {
+            "type": "integer",
+            "receives": "count",
+            "minimum": 1,
+            "maximum": 16,
+            "omitted": [
+              8,
+              9,
+              10,
+              11,
+              12
+            ],
+            "counter": "flat"
+          }
+        },
+        "components": {
+          "fallen_leaf": {
+            "parameters": {
+              "color": {
+                "type": "semantic_ref",
+                "category": "color"
+              },
+              "lean": {
+                "type": "semantic_ref",
+                "category": "angle"
+              },
+              "x": {
+                "type": "exact_decimal",
+                "dimension": "position_x"
+              },
+              "y": {
+                "type": "exact_decimal",
+                "dimension": "position_y"
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "binding": "edge_a",
+                "fields": {
+                  "angle": {
+                    "expr": "parameter",
+                    "name": "lean"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.110"
+                  },
+                  "color": {
+                    "expr": "parameter",
+                    "name": "color"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "parameter",
+                    "name": "x"
+                  },
+                  "position_y": {
+                    "expr": "parameter",
+                    "name": "y"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.022"
+                  },
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "surface": {
+                    "expr": "semantic_ref",
+                    "category": "surface",
+                    "id": "solid"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "crayon"
+                  }
+                }
+              },
+              {
+                "op": "emit",
+                "binding": "edge_b",
+                "fields": {
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.110"
+                  },
+                  "color": {
+                    "expr": "parameter",
+                    "name": "color"
+                  },
+                  "ink_spread": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "bleeding"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.022"
+                  },
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "surface": {
+                    "expr": "semantic_ref",
+                    "category": "surface",
+                    "id": "solid"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "crayon"
+                  }
+                }
+              },
+              {
+                "op": "relation",
+                "kind": "touching",
+                "from": "edge_a",
+                "to": "edge_b"
+              }
+            ]
+          }
+        },
+        "body": [
+          {
+            "op": "repeat",
+            "count": {
+              "expr": "parameter",
+              "name": "leaf_count"
+            },
+            "maximum": 16,
+            "index": "leaf_index",
+            "body": [
+              {
+                "op": "vary",
+                "binding": "leaf_spot",
+                "domain": "ochiba_spot",
+                "choices": [
+                  {
+                    "expr": "integer",
+                    "value": 0
+                  },
+                  {
+                    "expr": "integer",
+                    "value": 1
+                  },
+                  {
+                    "expr": "integer",
+                    "value": 2
+                  },
+                  {
+                    "expr": "integer",
+                    "value": 3
+                  }
+                ],
+                "range": null,
+                "body": [
+                  {
+                    "op": "use",
+                    "component": "fallen_leaf",
+                    "arguments": {
+                      "color": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "leaf_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "semantic_ref",
+                            "category": "color",
+                            "id": "red"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "color",
+                            "id": "gray"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "color",
+                            "id": "red"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "color",
+                            "id": "red"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "color",
+                            "id": "red"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "color",
+                            "id": "red"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "color",
+                            "id": "gray"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "color",
+                            "id": "gray"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "color",
+                            "id": "gray"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "color",
+                            "id": "gray"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "color",
+                            "id": "gray"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "color",
+                            "id": "gray"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "color",
+                            "id": "gray"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "color",
+                            "id": "red"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "color",
+                            "id": "red"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "color",
+                            "id": "red"
+                          }
+                        ]
+                      },
+                      "lean": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "leaf_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "semantic_ref",
+                            "category": "angle",
+                            "id": "rising"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "angle",
+                            "id": "rotated"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "angle",
+                            "id": "falling"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "angle",
+                            "id": "diagonal"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "angle",
+                            "id": "left_falling"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "angle",
+                            "id": "horizontal"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "angle",
+                            "id": "left_rising"
+                          }
+                        ]
+                      },
+                      "x": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "leaf_spot"
+                        },
+                        "items": [
+                          {
+                            "expr": "cycle",
+                            "index": {
+                              "expr": "local",
+                              "name": "leaf_index"
+                            },
+                            "items": [
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.424"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.831"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.206"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.402"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.233"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.587"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.685"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.134"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.305"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.330"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.496"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.515"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.675"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.603"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.757"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.759"
+                              }
+                            ]
+                          },
+                          {
+                            "expr": "cycle",
+                            "index": {
+                              "expr": "local",
+                              "name": "leaf_index"
+                            },
+                            "items": [
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.367"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.930"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.340"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.534"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.178"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.717"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.623"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.080"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.438"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.274"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.627"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.457"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.802"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.543"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.882"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.691"
+                              }
+                            ]
+                          },
+                          {
+                            "expr": "cycle",
+                            "index": {
+                              "expr": "local",
+                              "name": "leaf_index"
+                            },
+                            "items": [
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.415"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.887"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.272"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.466"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.226"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.650"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.673"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.128"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.370"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.322"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.560"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.506"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.736"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.592"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.817"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.742"
+                              }
+                            ]
+                          },
+                          {
+                            "expr": "cycle",
+                            "index": {
+                              "expr": "local",
+                              "name": "leaf_index"
+                            },
+                            "items": [
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.347"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.900"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.273"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.469"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.156"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.655"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.609"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.070"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.372"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.253"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.564"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.439"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.743"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.526"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.826"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.684"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      "y": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "leaf_spot"
+                        },
+                        "items": [
+                          {
+                            "expr": "cycle",
+                            "index": {
+                              "expr": "local",
+                              "name": "leaf_index"
+                            },
+                            "items": [
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.518"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.799"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.147"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.351"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.319"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.544"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.791"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.216"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.250"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.420"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.449"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.613"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.636"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.705"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.722"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.868"
+                              }
+                            ]
+                          },
+                          {
+                            "expr": "cycle",
+                            "index": {
+                              "expr": "local",
+                              "name": "leaf_index"
+                            },
+                            "items": [
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.647"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.735"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.098"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.300"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.450"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.491"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.913"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.347"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.201"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.550"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.398"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.740"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.581"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.830"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.664"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.930"
+                              }
+                            ]
+                          },
+                          {
+                            "expr": "cycle",
+                            "index": {
+                              "expr": "local",
+                              "name": "leaf_index"
+                            },
+                            "items": [
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.582"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.784"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.143"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.346"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.384"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.537"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.850"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.282"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.246"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.484"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.443"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.676"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.627"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.766"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.711"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.922"
+                              }
+                            ]
+                          },
+                          {
+                            "expr": "cycle",
+                            "index": {
+                              "expr": "local",
+                              "name": "leaf_index"
+                            },
+                            "items": [
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.583"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.726"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.072"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.277"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.383"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.470"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.856"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.280"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.176"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.484"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.375"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.678"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.562"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.770"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.648"
+                              },
+                              {
+                                "expr": "exact_decimal",
+                                "value": "0.930"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "id": "FallenLeaves",
+        "names": {
+          "ja": [
+            "落葉",
+            "おちば",
+            "落ち葉"
+          ],
+          "en": [
+            "fallen leaves",
+            "falling leaves"
+          ]
+        },
+        "kind": "scene"
+      },
+      "note_ja": "落葉を左上から右下へ流れる斜めの帯に、流れの左右へ大きく不揃いに散らし、下ほど密に集める。",
+      "note_en": "Scatter fallen leaves unevenly along an upper-left to lower-right drift, denser below.",
+      "preview": "previews/ochiba.png"
+    },
+    {
+      "definition": {
+        "schema": "inku.macro-definition.v2",
+        "namespace": "Nature",
+        "version": "2.1.0",
+        "parameters": {
+          "clump_count": {
+            "type": "integer",
+            "receives": "count",
+            "minimum": 1,
+            "maximum": 3,
+            "omitted": [
+              1,
+              2
+            ],
+            "counter": "general"
+          }
+        },
+        "components": {
+          "rooted_blade": {
+            "parameters": {
+              "chord": {
+                "type": "exact_decimal",
+                "dimension": "chord"
+              },
+              "rotation": {
+                "type": "number"
+              },
+              "x": {
+                "type": "exact_decimal",
+                "dimension": "position_x"
+              },
+              "y": {
+                "type": "exact_decimal",
+                "dimension": "position_y"
+              }
+            },
+            "body": [
+              {
+                "op": "anchor",
+                "name": "root",
+                "fields": {
+                  "position_x": {
+                    "expr": "parameter",
+                    "name": "x"
+                  },
+                  "position_y": {
+                    "expr": "parameter",
+                    "name": "y"
+                  }
+                }
+              },
+              {
+                "op": "transform",
+                "transform": {
+                  "translate_x": null,
+                  "translate_y": null,
+                  "scale_x": null,
+                  "scale_y": null,
+                  "rotate_degrees": {
+                    "expr": "parameter",
+                    "name": "rotation"
+                  }
+                },
+                "body": [
+                  {
+                    "op": "emit",
+                    "binding": "edge_a",
+                    "fields": {
+                      "angle": {
+                        "expr": "semantic_ref",
+                        "category": "angle",
+                        "id": "horizontal"
+                      },
+                      "chord": {
+                        "expr": "parameter",
+                        "name": "chord"
+                      },
+                      "color": {
+                        "expr": "semantic_ref",
+                        "category": "color",
+                        "id": "gray"
+                      },
+                      "fluctuation_frequency": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "tightly"
+                      },
+                      "ink_spread": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "bleeding"
+                      },
+                      "movement": {
+                        "expr": "semantic_ref",
+                        "category": "movement",
+                        "id": "place"
+                      },
+                      "sagitta": {
+                        "expr": "exact_decimal",
+                        "value": "0.014"
+                      },
+                      "shape": {
+                        "expr": "semantic_ref",
+                        "category": "shape",
+                        "id": "arc"
+                      },
+                      "surface": {
+                        "expr": "semantic_ref",
+                        "category": "surface",
+                        "id": "solid"
+                      },
+                      "touch": {
+                        "expr": "semantic_ref",
+                        "category": "touch",
+                        "id": "chalk"
+                      }
+                    }
+                  },
+                  {
+                    "op": "emit",
+                    "binding": "edge_b",
+                    "fields": {
+                      "chord": {
+                        "expr": "parameter",
+                        "name": "chord"
+                      },
+                      "color": {
+                        "expr": "semantic_ref",
+                        "category": "color",
+                        "id": "gray"
+                      },
+                      "fluctuation_frequency": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "tightly"
+                      },
+                      "ink_spread": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "bleeding"
+                      },
+                      "movement": {
+                        "expr": "semantic_ref",
+                        "category": "movement",
+                        "id": "place"
+                      },
+                      "sagitta": {
+                        "expr": "exact_decimal",
+                        "value": "0.014"
+                      },
+                      "shape": {
+                        "expr": "semantic_ref",
+                        "category": "shape",
+                        "id": "arc"
+                      },
+                      "surface": {
+                        "expr": "semantic_ref",
+                        "category": "surface",
+                        "id": "solid"
+                      },
+                      "touch": {
+                        "expr": "semantic_ref",
+                        "category": "touch",
+                        "id": "chalk"
+                      }
+                    }
+                  },
+                  {
+                    "op": "relation",
+                    "kind": "connected",
+                    "from": "root",
+                    "to": "edge_a"
+                  },
+                  {
+                    "op": "relation",
+                    "kind": "touching",
+                    "from": "edge_a",
+                    "to": "edge_b"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "body": [
+          {
+            "op": "repeat",
+            "count": {
+              "expr": "parameter",
+              "name": "clump_count"
+            },
+            "maximum": 3,
+            "index": "clump_index",
+            "body": [
+              {
+                "op": "vary",
+                "binding": "clump_x",
+                "domain": "karekusa_clump_x",
+                "choices": [
+                  {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "clump_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.270"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.690"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.480"
+                      }
+                    ]
+                  },
+                  {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "clump_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.300"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.720"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.510"
+                      }
+                    ]
+                  },
+                  {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "clump_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.330"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.750"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.540"
+                      }
+                    ]
+                  }
+                ],
+                "range": null,
+                "body": [
+                  {
+                    "op": "vary",
+                    "binding": "clump_shape",
+                    "domain": "karekusa_clump_shape",
+                    "choices": [
+                      {
+                        "expr": "integer",
+                        "value": 0
+                      },
+                      {
+                        "expr": "integer",
+                        "value": 1
+                      },
+                      {
+                        "expr": "integer",
+                        "value": 2
+                      },
+                      {
+                        "expr": "integer",
+                        "value": 3
+                      }
+                    ],
+                    "range": null,
+                    "body": [
+                      {
+                        "op": "vary",
+                        "binding": "blade_count",
+                        "domain": "karekusa_blade_count",
+                        "choices": [
+                          {
+                            "expr": "integer",
+                            "value": 3
+                          },
+                          {
+                            "expr": "integer",
+                            "value": 4
+                          },
+                          {
+                            "expr": "integer",
+                            "value": 5
+                          }
+                        ],
+                        "range": null,
+                        "body": [
+                          {
+                            "op": "repeat",
+                            "count": {
+                              "expr": "local",
+                              "name": "blade_count"
+                            },
+                            "maximum": 5,
+                            "index": "blade_index",
+                            "body": [
+                              {
+                                "op": "use",
+                                "component": "rooted_blade",
+                                "arguments": {
+                                  "chord": {
+                                    "expr": "cycle",
+                                    "index": {
+                                      "expr": "local",
+                                      "name": "clump_shape"
+                                    },
+                                    "items": [
+                                      {
+                                        "expr": "cycle",
+                                        "index": {
+                                          "expr": "local",
+                                          "name": "blade_index"
+                                        },
+                                        "items": [
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.42"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.34"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.48"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.28"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.38"
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "expr": "cycle",
+                                        "index": {
+                                          "expr": "local",
+                                          "name": "blade_index"
+                                        },
+                                        "items": [
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.34"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.48"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.28"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.38"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.42"
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "expr": "cycle",
+                                        "index": {
+                                          "expr": "local",
+                                          "name": "blade_index"
+                                        },
+                                        "items": [
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.28"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.42"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.38"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.34"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.48"
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "expr": "cycle",
+                                        "index": {
+                                          "expr": "local",
+                                          "name": "blade_index"
+                                        },
+                                        "items": [
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.48"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.28"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.42"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.38"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.34"
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  },
+                                  "rotation": {
+                                    "expr": "cycle",
+                                    "index": {
+                                      "expr": "local",
+                                      "name": "clump_shape"
+                                    },
+                                    "items": [
+                                      {
+                                        "expr": "cycle",
+                                        "index": {
+                                          "expr": "local",
+                                          "name": "blade_index"
+                                        },
+                                        "items": [
+                                          {
+                                            "expr": "number",
+                                            "value": -94.0
+                                          },
+                                          {
+                                            "expr": "number",
+                                            "value": -62.0
+                                          },
+                                          {
+                                            "expr": "number",
+                                            "value": -84.0
+                                          },
+                                          {
+                                            "expr": "number",
+                                            "value": -24.0
+                                          },
+                                          {
+                                            "expr": "number",
+                                            "value": -44.0
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "expr": "cycle",
+                                        "index": {
+                                          "expr": "local",
+                                          "name": "blade_index"
+                                        },
+                                        "items": [
+                                          {
+                                            "expr": "number",
+                                            "value": -62.0
+                                          },
+                                          {
+                                            "expr": "number",
+                                            "value": -84.0
+                                          },
+                                          {
+                                            "expr": "number",
+                                            "value": -24.0
+                                          },
+                                          {
+                                            "expr": "number",
+                                            "value": -44.0
+                                          },
+                                          {
+                                            "expr": "number",
+                                            "value": -94.0
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "expr": "cycle",
+                                        "index": {
+                                          "expr": "local",
+                                          "name": "blade_index"
+                                        },
+                                        "items": [
+                                          {
+                                            "expr": "number",
+                                            "value": -24.0
+                                          },
+                                          {
+                                            "expr": "number",
+                                            "value": -94.0
+                                          },
+                                          {
+                                            "expr": "number",
+                                            "value": -44.0
+                                          },
+                                          {
+                                            "expr": "number",
+                                            "value": -62.0
+                                          },
+                                          {
+                                            "expr": "number",
+                                            "value": -84.0
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "expr": "cycle",
+                                        "index": {
+                                          "expr": "local",
+                                          "name": "blade_index"
+                                        },
+                                        "items": [
+                                          {
+                                            "expr": "number",
+                                            "value": -84.0
+                                          },
+                                          {
+                                            "expr": "number",
+                                            "value": -24.0
+                                          },
+                                          {
+                                            "expr": "number",
+                                            "value": -94.0
+                                          },
+                                          {
+                                            "expr": "number",
+                                            "value": -44.0
+                                          },
+                                          {
+                                            "expr": "number",
+                                            "value": -62.0
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  },
+                                  "x": {
+                                    "expr": "local",
+                                    "name": "clump_x"
+                                  },
+                                  "y": {
+                                    "expr": "exact_decimal",
+                                    "value": "0.90"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "id": "WitheredGrass",
+        "names": {
+          "ja": [
+            "枯草",
+            "枯れ草"
+          ],
+          "en": [
+            "withered grass",
+            "dry grass"
+          ]
+        },
+        "kind": "scene"
+      },
+      "note_ja": "下端に、枯れた長い葉を3〜5本ずつ同じ根元から上へ伸ばした株を置く。",
+      "note_en": "Raise three to five withered blades per bottom root: 1–3 clumps when counted, otherwise 1–2.",
+      "preview": "previews/karekusa.png"
+    },
+    {
+      "definition": {
+        "schema": "inku.macro-definition.v2",
+        "namespace": "Nature",
+        "version": "2.1.0",
+        "parameters": {
+          "leaf_count": {
+            "type": "integer",
+            "receives": "count",
+            "minimum": 1,
+            "maximum": 8,
+            "omitted": [
+              2,
+              3,
+              4
+            ],
+            "counter": "flat"
+          }
+        },
+        "components": {
+          "withered_leaf": {
+            "parameters": {
+              "color": {
+                "type": "semantic_ref",
+                "category": "color"
+              },
+              "lean": {
+                "type": "semantic_ref",
+                "category": "angle"
+              },
+              "x": {
+                "type": "exact_decimal",
+                "dimension": "position_x"
+              },
+              "y": {
+                "type": "exact_decimal",
+                "dimension": "position_y"
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "binding": "edge_a",
+                "fields": {
+                  "angle": {
+                    "expr": "parameter",
+                    "name": "lean"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.130"
+                  },
+                  "color": {
+                    "expr": "parameter",
+                    "name": "color"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "swaying"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "parameter",
+                    "name": "x"
+                  },
+                  "position_y": {
+                    "expr": "parameter",
+                    "name": "y"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.034"
+                  },
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "surface": {
+                    "expr": "semantic_ref",
+                    "category": "surface",
+                    "id": "solid"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "chalk"
+                  }
+                }
+              },
+              {
+                "op": "emit",
+                "binding": "edge_b",
+                "fields": {
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.130"
+                  },
+                  "color": {
+                    "expr": "parameter",
+                    "name": "color"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "narrowly"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "swaying"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.010"
+                  },
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "surface": {
+                    "expr": "semantic_ref",
+                    "category": "surface",
+                    "id": "solid"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "chalk"
+                  }
+                }
+              },
+              {
+                "op": "relation",
+                "kind": "touching",
+                "from": "edge_a",
+                "to": "edge_b"
+              }
+            ]
+          }
+        },
+        "body": [
+          {
+            "op": "repeat",
+            "count": {
+              "expr": "parameter",
+              "name": "leaf_count"
+            },
+            "maximum": 8,
+            "index": "leaf_index",
+            "body": [
+              {
+                "op": "vary",
+                "binding": "leaf_side",
+                "domain": "kareha_side",
+                "choices": [
+                  {
+                    "expr": "integer",
+                    "value": 0
+                  },
+                  {
+                    "expr": "integer",
+                    "value": 1
+                  }
+                ],
+                "range": null,
+                "body": [
+                  {
+                    "op": "vary",
+                    "binding": "leaf_spot",
+                    "domain": "kareha_spot",
+                    "choices": [
+                      {
+                        "expr": "integer",
+                        "value": 0
+                      },
+                      {
+                        "expr": "integer",
+                        "value": 1
+                      },
+                      {
+                        "expr": "integer",
+                        "value": 2
+                      },
+                      {
+                        "expr": "integer",
+                        "value": 3
+                      }
+                    ],
+                    "range": null,
+                    "body": [
+                      {
+                        "op": "vary",
+                        "binding": "leaf_lean",
+                        "domain": "kareha_fallen_lean",
+                        "choices": [
+                          {
+                            "expr": "semantic_ref",
+                            "category": "angle",
+                            "id": "horizontal"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "angle",
+                            "id": "falling"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "angle",
+                            "id": "left_falling"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "angle",
+                            "id": "diagonal"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "angle",
+                            "id": "rotated"
+                          }
+                        ],
+                        "range": null,
+                        "body": [
+                          {
+                            "op": "use",
+                            "component": "withered_leaf",
+                            "arguments": {
+                              "color": {
+                                "expr": "cycle",
+                                "index": {
+                                  "expr": "local",
+                                  "name": "leaf_index"
+                                },
+                                "items": [
+                                  {
+                                    "expr": "semantic_ref",
+                                    "category": "color",
+                                    "id": "gray"
+                                  },
+                                  {
+                                    "expr": "semantic_ref",
+                                    "category": "color",
+                                    "id": "yellow"
+                                  }
+                                ]
+                              },
+                              "lean": {
+                                "expr": "local",
+                                "name": "leaf_lean"
+                              },
+                              "x": {
+                                "expr": "cycle",
+                                "index": {
+                                  "expr": "local",
+                                  "name": "leaf_side"
+                                },
+                                "items": [
+                                  {
+                                    "expr": "cycle",
+                                    "index": {
+                                      "expr": "local",
+                                      "name": "leaf_spot"
+                                    },
+                                    "items": [
+                                      {
+                                        "expr": "cycle",
+                                        "index": {
+                                          "expr": "local",
+                                          "name": "leaf_index"
+                                        },
+                                        "items": [
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.115"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.400"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.305"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.210"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.115"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.400"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.210"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.305"
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "expr": "cycle",
+                                        "index": {
+                                          "expr": "local",
+                                          "name": "leaf_index"
+                                        },
+                                        "items": [
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.165"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.450"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.355"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.260"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.165"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.450"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.260"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.355"
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "expr": "cycle",
+                                        "index": {
+                                          "expr": "local",
+                                          "name": "leaf_index"
+                                        },
+                                        "items": [
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.160"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.445"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.350"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.255"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.160"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.445"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.255"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.350"
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "expr": "cycle",
+                                        "index": {
+                                          "expr": "local",
+                                          "name": "leaf_index"
+                                        },
+                                        "items": [
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.120"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.405"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.310"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.215"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.120"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.405"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.215"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.310"
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "expr": "cycle",
+                                    "index": {
+                                      "expr": "local",
+                                      "name": "leaf_spot"
+                                    },
+                                    "items": [
+                                      {
+                                        "expr": "cycle",
+                                        "index": {
+                                          "expr": "local",
+                                          "name": "leaf_index"
+                                        },
+                                        "items": [
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.885"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.600"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.695"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.790"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.885"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.600"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.790"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.695"
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "expr": "cycle",
+                                        "index": {
+                                          "expr": "local",
+                                          "name": "leaf_index"
+                                        },
+                                        "items": [
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.835"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.550"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.645"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.740"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.835"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.550"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.740"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.645"
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "expr": "cycle",
+                                        "index": {
+                                          "expr": "local",
+                                          "name": "leaf_index"
+                                        },
+                                        "items": [
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.840"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.555"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.650"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.745"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.840"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.555"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.745"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.650"
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "expr": "cycle",
+                                        "index": {
+                                          "expr": "local",
+                                          "name": "leaf_index"
+                                        },
+                                        "items": [
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.880"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.595"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.690"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.785"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.880"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.595"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.785"
+                                          },
+                                          {
+                                            "expr": "exact_decimal",
+                                            "value": "0.690"
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                ]
+                              },
+                              "y": {
+                                "expr": "cycle",
+                                "index": {
+                                  "expr": "local",
+                                  "name": "leaf_spot"
+                                },
+                                "items": [
+                                  {
+                                    "expr": "cycle",
+                                    "index": {
+                                      "expr": "local",
+                                      "name": "leaf_index"
+                                    },
+                                    "items": [
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.830"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.720"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.830"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.720"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.720"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.830"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.830"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.720"
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "expr": "cycle",
+                                    "index": {
+                                      "expr": "local",
+                                      "name": "leaf_index"
+                                    },
+                                    "items": [
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.870"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.760"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.870"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.760"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.760"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.870"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.870"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.760"
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "expr": "cycle",
+                                    "index": {
+                                      "expr": "local",
+                                      "name": "leaf_index"
+                                    },
+                                    "items": [
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.825"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.715"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.825"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.715"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.715"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.825"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.825"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.715"
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "expr": "cycle",
+                                    "index": {
+                                      "expr": "local",
+                                      "name": "leaf_index"
+                                    },
+                                    "items": [
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.875"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.765"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.875"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.765"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.765"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.875"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.875"
+                                      },
+                                      {
+                                        "expr": "exact_decimal",
+                                        "value": "0.765"
+                                      }
+                                    ]
+                                  }
+                                ]
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "id": "WitheredLeaves",
+        "names": {
+          "ja": [
+            "枯葉",
+            "かれは",
+            "枯れ葉"
+          ],
+          "en": [
+            "withered leaves",
+            "dry leaves"
+          ]
+        },
+        "kind": "scene"
+      },
+      "note_ja": "縮れた枯葉を下の左右の隅に置く。",
+      "note_en": "Place curled withered leaves in the lower corners: 1–8 when counted, otherwise 2–4.",
+      "preview": "previews/kareha.png"
+    }
+  ]
+}

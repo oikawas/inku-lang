@@ -108,13 +108,13 @@ struct CreationCanvasControls: View {
         HStack(spacing: 6) {
             // CanvasArtworkWorkspace `leadingCornerControls`: before the hash, in every interface mode.
             if let threeDimensional { Ddl3DModeButton(display: model.display, threeDimensional: threeDimensional) }
-            if model.display.visible("detail_status"), let hash = work?.renderHash, !hash.isEmpty {
+            if saved, model.display.visible("detail_status"), let id = work?.id, !id.isEmpty {
                 // CanvasArtworkWorkspace.svelte:278: the bubble says the copy happened, for 1.2 s.
                 Button { perform("copy-hash") } label: { Text("#").fontWeight(.semibold) }
-                    .buttonStyle(InkuFloatingCircleButtonStyle(active: model.library.copiedHash == hash))
-                    .accessibilityLabel(model.display.localized("full hash をコピー"))
+                    .buttonStyle(InkuFloatingCircleButtonStyle(active: model.library.copiedHash == id))
+                    .accessibilityLabel(model.display.webCopy("historyIdCopyTitle", "クリックで作品のUUIDをコピーします"))
                     .disabled(browsingDisabled)
-                    .inkuTooltip(model.display.tooltip(model.library.copiedHash == hash ? "コピーしました" : "クリックでfull hashをコピーします"))
+                    .inkuTooltip(model.display.tooltip("", serverKey: model.library.copiedHash == id ? "historyHashCopied" : "historyIdCopyTitle"))
             }
             if model.display.visible("work_tools") {
                 Button { if let work { onReplayWork(work) } } label: { Image(systemName: "arrow.clockwise") }
@@ -392,6 +392,8 @@ struct CreationDisplayedProcess: View {
     private var boxText: String { model.ddlBoxText(for: work) }
     private var boxEditable: Bool { saved && !disabled && !work.trashed && !model.isBusy }
     @State private var confirmingDiscard = false
+    @State private var displayedContext: SavedAuthoringContext?
+    private var readRecord: Data? { displayedContext?.descriptionDDL ?? (model.selectedWorkID == work.id ? model.savedDescriptionDDL : nil) }
     private var canEditSketch: Bool { saved && model.workActionState(for: work)?.canReadDescription == true }
     private var ddlHeading: String {
         let requested = InkuCore.normalizeInstructionLanguage(value: work.instructionLangResolved, defaultLanguage: "auto") ?? "auto"
@@ -435,7 +437,7 @@ struct CreationDisplayedProcess: View {
                                 .inkuFont(12).foregroundStyle(.secondary)
                         }
                     }.padding(.top, 6)
-                } label: { Text(model.display.webCopy("sketchLabel", "写生（Stage 0.5）")).inkuFont(12, weight: .semibold) }
+                } label: { Text(readRecord != nil ? model.display.webCopy("readDrawReadingLabel", "写生（読み）") : model.display.webCopy("sketchLabel", "写生（Stage 0.5）")).inkuFont(12, weight: .semibold) }
                 .inkuTooltip(model.display.tooltip("写生層が書いた文章を表示します。", serverKey: "tooltipSketchToggle"))
                 if let sketch {
                     // `+page.svelte:2794`: editing needs the prose on screen, so the button unfolds the section.
@@ -489,10 +491,20 @@ struct CreationDisplayedProcess: View {
                 }
             }
         }
+        .task(id: work.id) {
+            displayedContext = nil
+            guard saved else { return }
+            let context = try? await model.savedConfiguration(workID: work.id)
+            guard !Task.isCancelled else { return }
+            displayedContext = context
+        }
     }
 
     private var sketchNote: String {
-        switch work.sketchState {
+        if let data = readRecord, let record = try? ExactJSON(data: data) {
+            return DrawPresentation.readingNote(record["reading_state"].string, japanese: model.display.preferences.language != "en")
+        }
+        return switch work.sketchState {
         case "fine", "coarse": ""
         case "supplemented": "記述に足りない場所の広がりや季節・時刻の光を補って描いた"
         case "not_needed": "写生を通したが、補うものがなかった"

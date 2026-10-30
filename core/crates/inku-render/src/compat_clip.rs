@@ -556,7 +556,7 @@ fn shape_path(element: &Element, tolerance: f64) -> Result<BezPath, ClipError> {
             if coordinates.len() % 2 != 0 {
                 return Err(invalid("points"));
             }
-            for (i, point) in coordinates.chunks_exact(2).enumerate() {
+            for (i, point) in coordinates.as_chunks::<2>().0.iter().enumerate() {
                 if i == 0 {
                     path.move_to((point[0], point[1]));
                 } else {

@@ -16,7 +16,7 @@
 | 法則の段 effect | 構図を入れた文書 + 楽譜の層の要約 → 選んだ法則 → 変えた層だけを数の形で印字し直したDDL | 絵画・意匠・音楽の法則から読み手が選び（`choose_laws`、prompt `inku.laws-prompt.v2`）、coreが答えを確かめ、拒んだ理由を添えて予算内で聞き直す。当てられなければ構図のままcommitする。作品に法則の記録（`laws_layers`・`laws_basis`）を残す | `inku-pipeline/src/{laws,laws_record}.rs`; `inku-ddl/src/work_plan.rs` |
 | 配色の段 effect（Serverの既定） | 法則の段の後の文書 + 描いた見え方の見積もり → 選んだ配色 → 色を書き換えたDDL | 色の法則から読み手が選び（`choose_colors`、prompt `inku.colors-prompt.v2`）、地から見えない色や法則の成り立たない色は選び直させる。記述が言った色と地は替えない。当てられなければ法則の段の後の文書のままcommitする | `inku-pipeline/src/{colors,appearance}.rs` |
 | 画像から書く作品 effect（Server・Web） | 画像の参照 + DDLの手引き → Visionのモデルが書いたDDL → 見比べて直したDDL | 写生・作品計画・構図・法則・配色は通らない。画像から色カタログを選び（任意）、DDLを書かせ（`write_image_ddl`）、compilerの所見で一度だけ聞き直す。hostが描いた画（`draw_image_review`）と元の画像を見比べて一度直させる（`review_image_ddl`）。画像はcoreに入らない | `inku-pipeline/src/{image_ddl,machine/image}.rs`; host provider adapter |
-| CAS保存 | DDL候補 + revision → 保存済みvisible DDL | 一致するatomic save acknowledgment後だけsourceとauthorityを進め、exact saved bytesを再parseする。新しいDDL（記述からのcommit、残部のcommit、親の無い新しいdirect DDL）は1文目に紙の比を、画像からのcommitは画像の比を宣言する（DDL 26）。保存作品の編集・描き直しでは足さない | authority store / pipeline host |
+| CAS保存 | DDL候補 + revision → 保存済みvisible DDL | 一致するatomic save acknowledgment後だけsourceとauthorityを進め、exact saved bytesを再parseする。新しいDDL（記述からのcommit、残部のcommit、親の無い新しいdirect DDL）は1文目に紙の比を、画像からのcommitは画像の比を宣言する（DDL 26）。構図と法則ありの読んで描くのcommitは、物ごとの題の行も印字する（DDL 27）。保存作品の編集・描き直しでは足さない | authority store / pipeline host |
 | Typed compiler | visible DDL + definition locks → verified meaning + diagnostics | source、provenance、Macro definitionをlock検証し、bounded expansionする。曖昧さをfirst/nearest/lastで推測しない。lockは`canonical_ready` / `incomplete_known_hole` / `blocked_conflict` / `blocked_diagnostic`のいずれか。形の無い文は、抱える穴が無ければ範囲つきの止める診断で名指して省く（DDL engine 71） | `core/crates/inku-ddl` |
 | Hole補完（Stage 2） | known hole → patch候補 → 作者承認 | known holeだけをspanとdigestに閉じて自動要求する。HoleなしではStage 2 LLMを呼ばない。承認patchもCAS保存後に再parseする。辞退・失敗は保存済みDDLを保って作者の編集を待つ | shared state machine + host provider/store |
 | Typed Stage 1.5 | verified meaning + composition seed → effective meaning | LLMを使わずに入力を検証し、effective meaningの同一性を固定する（focusの読み替えは2026-09-27、明示変奏は2026-10-04に外した）。原文の意味や明示属性を上書きしない | `core/crates/inku-ddl` |
@@ -133,6 +133,7 @@ ServerのPython adapter、AndroidのKotlin/JNI adapter、macOSのSwift/UniFFI ad
 | はめ込み | 保存Score、版、指示書、種 | 宣言と違う比の紙へ、保存Scoreを版を変えずに枠へ描き直す（`fit_render`）。系譜は`はめ込み`の子 |
 | 法則の手（AI自動推敲、保存作品から） | 親の指示書と記述、設定・種・色・比・限り、補完の控え、法則の記録 | 入力`SavedLaws`で法則の段をやり直す。Stage 1と構図の読みはやり直さず、親の設定に配色の段があれば続けて行う |
 | 取り合わせ（推敲、AI自動推敲の手） | 元作品 | 共有coreの`juxtaposition`が選ばせた一文を記述の後ろに足し、`description_edit`の子を描く |
+| まとまりの手（AI自動推敲、保存作品から） | 親の題つきの指示書（題が無ければ構図の記録から印字）、色カタログ・描きの種・画面比・`render_wild` | 共有coreの`chunk_moves`が手を当てた指示書を、親付きのdirect DDLとして描く。派生は`chunk_move`。手を選ぶ回と描き直す回の送信はServerのrunが行い、pipelineのLLMのstageではない |
 | 見比べる前の指示書から描く（画像起点の作品） | 元作品と記録の`image_ddl.before_review` | その本文を作品の親付きDDL編集（`ddl_edit`）として描く |
 | 旧作品からの派生 | 元history行を変更しない | `legacy/{history_id}/fork`で`legacy_description_fork` / `legacy_ddl_fork`の新variation |
 
@@ -173,7 +174,7 @@ ServerのPython adapter、AndroidのKotlin/JNI adapter、macOSのSwift/UniFFI ad
 | 構図の読み・法則・配色 | `inku-pipeline/src/{composition_reading,composition,recompose,laws,laws_entry,laws_record,colors,appearance}.rs` |
 | 画像から書く作品 | `inku-pipeline/src/{image_ddl,machine/image}.rs` |
 | providerへの要求本文と答えの読み | `inku-pipeline/src/provider_wire.rs`、`provider_wire/chatgpt.rs` |
-| 保存作品の推敲の規則 | `inku-pipeline/src/{saved_variants,retouch,juxtaposition,autonomous_refine}.rs` |
+| 保存作品の推敲の規則 | `inku-pipeline/src/{saved_variants,retouch,juxtaposition,autonomous_refine,chunk_moves}.rs` |
 | 作品の同一性 | `inku-pipeline/src/identity.rs` |
 | Typed compiler / 下絵 / Stage 1.5 / lowerer / 画面比の宣言 | `core/crates/inku-ddl`（`canvas_ratio.rs`、`completion_record.rs`を含む） |
 | Score schema / compatibility / resource policy | `core/crates/inku-score` |

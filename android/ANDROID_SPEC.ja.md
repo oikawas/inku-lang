@@ -3,7 +3,19 @@
 このディレクトリは、ネイティブ単体 Android アプリのワークスペースであり、Git 管理対象とする。
 ローカル専用成果物、端末ID、ダウンロード済みモデル、ログ、秘密情報は追跡対象に含めない。
 
-最終更新: 2026-10-26。
+最終更新: 2026-10-27。
+
+## 2026-10-27 言葉で描く
+
+制作とバッチの条件は「言葉で描く」を既定とし、選ぶと写生が点く。端末内LiteRTでは選べず、型で描く。構図・法則・配色は言葉で描くでは任意、型で描くでは常に通す。描き方と構図は設定に保存せず、作品を開くと保存された記録から戻す。筆致制限の切り替えは制作条件に置く。
+
+モデル・色カタログ・キャンバスは見出しと変更の下に名前を出す。描き方は一体の選択帯、通す段とオプションは点灯・消灯と鍵を図形で示すスイッチ。流れは段を区切って並べ、任意の段はアクセント色、両端は薄い色で示す。表示文言は日英の言語パックに置く。
+
+共通coreの`read_and_draw`へ札、写生、任意の構図を渡す。公開モデルにVision用途があるときは、指示書を描いたPNGを添えて見直す。読み、各回、構図と配色の記録を`description_ddl`として作品に保存し、読みの文を写生として扱う。Room schemaは変えない。
+
+## 2026-10-27 DDLの題の行（DDL 27）を見出しとして見せる
+
+行の前後の空白を除いた全体が`「名」`・`"名"`・`“名”`の行は題で、描かない（共有coreの`chunk_title.rs`の`ddl_title_name`、Webの`ddl-titles.ts`を`ui/DdlTitles.kt`に写した）。DDLの編集欄と範囲つきのDDL表示は題の行を太字にし、中の語に色を付けない。語彙バーの「検出した語」は題の行を除いたDDLから拾う。描く画と楽譜は題の無いDDLと同じ。
 
 ## 2026-10-26 モデル設定を、モデル選択を先頭にした形に整理する
 
@@ -181,7 +193,7 @@ ChatGPTプランの要求とSSEは次の段（上の節）で移した。専用V
 
 **端末内のVisionモデルでは構図を読まない（作者の決定 2026-10-17）。** `composition.read`は`!isLocalVisionModel(modelId)`とし、外部providerのモデルではtrueを保つ。E2Bで構図読取りの4回の試行に約114秒を費やして既定読みに切り替わった受入結果により、端末内モデルだけ元の動作へ戻した。Serverが常にtrueとする点との意図的な差である。新規実行と保存作品からのforkの設定に同じ規則を使う。外部providerの再試行・応答の判定・fallbackは既存の共有pipelineを使う。
 
-providerは、明示した`provider:model`、そのモデルを公開する有効なproviderが1つ、利用者の段の既定provider、の順で選ぶ。Stage 2は`complete_visible_ddl_holes`、それ以外はStage 1の既定を使う。モデル選択の確定時に`model_selection`へ`stage1_provider`・`stage2_provider`も保存する。旧設定は各段の修飾付きモデルからproviderを読めるためRoom移行は不要。初回の既定は従来の端末内モデルを引き継ぎ、解決できない設定や無効な既定から端末内へ勝手に切り替えない。ChatGPTプランも同じ解決順で選び、開始時に固定したsession参照を使う。
+providerは、明示した`provider:model`、そのモデルを一覧に持つ有効なproviderが1つ、利用者の段の既定provider、の順で共通coreが選ぶ。Stage 2は`complete_visible_ddl_holes`、それ以外はStage 1の既定を使う。モデル選択の確定時に`model_selection`へ`stage1_provider`・`stage2_provider`も保存する。旧設定は各段の修飾付きモデルからproviderを読めるためRoom移行は不要。初回の既定は従来の端末内モデルを引き継ぎ、解決できない設定や無効な既定から端末内へ勝手に切り替えない。ChatGPTプランも同じ解決順で選び、開始時に固定したsession参照を使う。
 
 自律推敲のVision助言は保存SVGを縦横比を保って768×768に収まるよう画像化し、透明な正方形の中央へ置いてPNGで送る。本文のMIMEは`image/png`、IHDRは768×768である。カメラ画像のJPEG前処理と端末内モデルへの写真経路は変えない。
 
@@ -229,14 +241,16 @@ Anthropicの対象Claudeモデルは、通常描画とVisionを含むrequestで�
 
 ## 2026-10-13 モデル情報の正本と札
 
-モデル情報の正本は `server/src/inku_server/model_catalog.json`（`inku.model-catalog.v2`）。
-Gradleの`syncModelCatalog`がgenerated assetsへ写し、通常のAPKに同梱する。Androidには
+プロバイダ表、設定の正規化・更新・検査、モデル参照、一覧取得・更新、用途とアクセス判定は共有coreの `modelCatalog` を使う。Roomの暗号化済み鍵は復号せずcoreへ渡し、そのまま保存する。端末内モデルは端末の資産一覧をcoreへ渡す。URLはcoreの検査に加え、AndroidでHTTPSまたは端末自身へのHTTPに制限する。ChatGPTプランの登録は従来どおり別管理する。
+
+モデル情報の正本は `core/crates/inku-pipeline/data/model_catalog.json`（`inku.model-catalog.v2`）。
+共有coreが一覧を埋め込み、AndroidはJNIの`modelCatalog`から一覧・札・選択の判定を受け取る。Androidには
 評価・候補・初期公開モデル・札の文言の写しをcommitしない。既存の公開選択は起動時に保持する。
 ChatGPTプランも`providers.chatgpt`の評価を使い、本人の一覧と公開選択は従来の登録内に保つ。
 
 モデル管理は、札の表の順に6つの折りたたみを並べ、件数を付けて初めは閉じる。
 全ての札を行と説明に表示し、公開できない札は警告色、公開できる札は控えめな色にする。
-最後の札が折りたたみを決め、全ての札が`publishable`のモデルだけを新しく公開・選択できる。
+最後の札が折りたたみを決め、coreの`selection`が公開・選択の可否を決める。並べ順もcoreの用途・stageごとの鍵を使い、Webと同じ名前の照合順にする。
 用途が残らないモデルには`no_response`、計測項目が無く他の札が全て公開可能なら`unmeasured`を付ける（2026-10-26から`no_response`は公開できる札で、警告色のまま）。
 推奨度（LLM・Stage 1・Stage 2・Vision）、平均秒数、概算USDコスト、コメントを
 正本にある範囲でモデル管理と描画のモデル選択に表示する。未確認の値は作らない。
@@ -244,7 +258,7 @@ ChatGPTプランも`providers.chatgpt`の評価を使い、本人の一覧と公
 端末で一覧を取り直した結果に無いモデルは`eol`、再提供されたモデルはその札を外す。
 以前の一覧のモデルも保持し、消えたモデルを一覧から隠さない。自分の鍵での要求の成功は
 `subscription`を外し、402／403は付ける。Ollama Cloudにはモデルごとの「この鍵で確かめる」を置き、
-明示操作した1モデルに`max_tokens: 1`だけ送る。200は使用可、402／403は使用不可、
+明示操作した1モデルについて `/api/show` を確認し、必要なら `max_tokens: 1` の要求を送る。410は終了日を記録し、200は使用可、402／403は使用不可、
 他の状態や通信失敗は未決で札を変えない。自動の大量プローブ・実測は行わない。
 観測は既存の`app_settings`に保存し、鍵・接続先の変更で無効化する。正本・評価は変更しない。
 Roomの表・migrationは追加しない。共通15件の照合とPixel 9の表示確認を受入とする。
@@ -469,7 +483,7 @@ Server／Webとの差の監査で見つけた差を、次の規則に揃えた�
   - 鍵が要るproviderはServerの定義（openai・anthropic・gemini・nvidia・ollama-cloud）に従う。OpenAI互換は鍵が空なら`Bearer none`を送る。
   - 成功の応答は1 MiB（bytes）まで読み、エラーの本文は先頭16 KiBで分類する。ChatGPTの引数の上限は1 MiBとし、失敗の分類とSSEの区切りはServerと同じにする。
   - GeminiのモデルIDは、Pythonの`quote(model, safe="")`と同じに符号化する。
-  - 流量制御は、429の後に`Retry-After`／`RetryInfo`と62秒の長い方まで同じproviderへの要求を待たせることと、ollama-cloudの同時2本だけを持つ。rpm／tpm／rpdの予算と`countTokens`は持たない。Androidには上限を上げる手段が無く、既定の上限では大きなGeminiの要求が一度も送られなくなるためである（作者の決定、2026-10-06）。
+  - 外部 provider の流量制御は共有coreの受付を使う（ChatGPT プランを除く）。既定の Gemini は分27回・分14,400入力トークン・日14,400回で、送信前に `countTokens` を1回呼ぶ。429後の待ちは共有coreが決め、`provider_rate_usage:<id>` に保存する。設定が壊れていれば送信せず、上限の変更画面は設けない。ollama-cloudの同時2本も保つ（作者の決定、2026-10-28）。
 - **保存する記録**:
   - 新作には`render_color_profile`、`compiler_outcome`、`render_limits`（4値）、`render_limits_source`（新作は`settings`、保存した設定から派生した作品は`work`）、`ui_lang`、`elapsed_stage1_ms`／`elapsed_stage2_ms`／`elapsed_total_ms`（modelの時間の段ごとの合計）を記録する。
   - 再演には、カタログの名前とsub、`render_color_source`、`render_color_profile`、`seed_text`、`render_limits`／`render_limits_source`を記録する。
@@ -519,11 +533,19 @@ DDLの正本と記述からの新規作成を説明する画面文言は「作�
 
 ## 2026-10-04 ChatGPTプランの本人接続
 
+認証の戻りは共有coreで道と重複を検査し、空の値を除く。不正な戻りは断り待ち受けを続ける。公開設定も共有coreで件数・ID・用途を検査する。設定の各登録は行内の確認後に削除でき、接続解除を先に行い、登録と公開設定を消す。選択中の登録を削除すると選択も消える。
+
 Androidは端末で本人が使うsingle-user hostとして、Serverを介さずChatGPTプランへ直接接続する。設定の独立した「ChatGPTプラン」から「ChatGPTで続ける」を押し、端末のChromeで本人認証を行う。Macの移送アプリやAPIキーは使わない。接続が完了したらinkuへ戻り、初回の利用枠の案内を確認して「モデル設定を開く」へ進む。
+
+Android は裏の通信を止めることがあるため、認可の戻りに先に返事をし、token の交換は認証の期限内に inku が前に出てから行う。
 
 設定「モデル」のChatGPTプランで「モデル選択」から本人の一覧を取得し、使うモデルを選んで保存する。取得だけでは公開しない。公開済みかつ本人の一覧にあるモデルだけが描画候補に現れ、Stage 1/2に同じ`chatgpt:<slug>`を使う。提供終了の公開指定や保存済み作品のモデルIDは保持する。設定画面を開くだけではモデル一覧を取得しない。共有のAPIキー設定、bare名の所有、カメラ写真の観察、デモ指示文の生成にはこの接続を提供しない（Androidは奥書を持たない）。2026-10-24から、カメラは共通coreの画像の実行でこの接続を使える（「ChatGPTプランでカメラを使う」）。モデル検分と自律推敲の専用Vision助言には、公開済みの本人モデルを使える。
 
-登録を複数保持でき、本人確認済みのアカウントと発行client IDをラベルで見分けて選ぶ。再認証と明示した再同意、認証中止、切断、利用枠を管理するリンクを提供する。描画画面にも利用中のプランと登録を示す。本人確認だけではプラン利用を許可せず、`resource.invoke`と`chatgpt.tokens.use.direct`のscopeを確認する。上限に達した後は追加描画を止め、一覧の明示した再取得で利用可能性を確認できる。切断は端末のtokenを先に除去し、遠隔の失効が確認できない場合はその旨を示す。公開モデルと登録の識別情報は保持する。
+登録を複数保持でき、本人確認済みのアカウントと発行client IDをラベルで見分けて選ぶ。再認証と明示した再同意、認証中止、切断、利用枠を管理するリンクを提供する。描画画面にも利用中のプランと登録を示す。本人確認だけではプラン利用を許可せず、`chatgpt.tokens.use.direct`のscopeを確認する。上限に達した後は追加描画を止め、一覧の明示した再取得で利用可能性を確認できる。切断は端末のtokenを先に除去し、遠隔の失効が確認できない場合はその旨を示す。公開モデルと登録の識別情報は保持する。
+
+ChatGPT の認証、セッションとモデル公開の判定は共有 core を使う。暗号化した登録の保管、ブラウザと listener、HTTP、署名の暗号検証は端末が受け持つ。公開モデルは選んだ用途に対応し、本人の一覧にある必要がある。用途の選択は端末のモデル設定に保持する。ログイン成功後は、返事を待たせず本人のモデル一覧をバックグラウンドで更新する。
+
+ログインと自動の一覧取得の失敗は、手順・失敗の印・例外の種類・端末のソース位置を Logcat に 1 行で残す。認証 HTTP の応答があれば状態番号も残す。認証情報、戻りの値、URL、本文、本人情報と例外の message は出さない。
 
 OAuthは端末の`127.0.0.1`の一時listenerを先に開き、dynamic registration、PKCE S256、state、nonce、OpenAIのJWKSによるID token署名とissuer/audience/期限の照合を行う。host UUIDはアプリの保存領域で固定し、発行されたclient IDを再認証・refreshに使う。refreshは直列化し、更新されたrefresh tokenと`earliest_refresh_at`を保持する。token・本人情報・本人の公開モデルはAndroid Keystoreで暗号化した`noBackupFilesDir`内のAtomicFileへ保存する。URLやtokenをLogcat、作品JSON、Roomへ書かない。Room14と既存の作品データは変更しない。
 
@@ -557,7 +579,7 @@ Geminiへ渡す応答の型は、各objectの `propertyOrdering` に沿って `p
 
 指示書エディタと再描画は保存した統合本文を使い、本文なしの描画入口を無効にする。記述をDDLの代わりに用いない。保存Scoreの再演・コピーは元のNULL・空文字・空白と由来を保ち、新たな共有pipelineの描画は確定document.sourceと新しいauthorityを保存する。由来から過去の入力やauthoring authorityを推測しない。旧expanded本文は旧エンジンの補完出力であり、現行エンジンとの100%互換は保証しない。
 
-現行作品JSON（`inku.history_item`、形式0.2.0）と`inku.ddl-export.v1`は`ddl`と`ddl_source_origin`を出力し、旧二本文のキーを出さない。JSONの指示書読込みでは旧`ddl`／`normalized_ddl`と`expanded_ddl`にも同じ選択規則を当て、由来を読み書きで保持する。読込んだ本文から描く作品は新しい作品であり、旧authorityは復元しない。画面・テキスト書出しはNULLを空文字として扱う。
+現行作品JSON（`inku.history_item`、形式0.2.0）と`inku.ddl-export.v2`は`ddl`と`ddl_source_origin`を出力し、旧二本文のキーを出さない。JSONの指示書読込みでは旧`ddl`／`normalized_ddl`と`expanded_ddl`にも同じ選択規則を当て、由来を読み書きで保持する。読込んだ本文から描く作品は新しい作品であり、旧authorityは復元しない。画面・テキスト書出しはNULLを空文字として扱う。
 
 ## 2026-10-01 DDLの無い作品をNULLで保存
 
@@ -617,7 +639,7 @@ Androidへの転送は、Rustのpremultiplied RGBAをNDKの`RGBA_8888` Bitmapへ
 
 接続形式ごとに、Serverの`pipeline_provider.py`と同じ形で送る。`openai-compatible`はOpenAI APIの描画を除き`/chat/completions`、`gemini`は`/v1beta/models/{model}:generateContent`、`anthropic`（Claude API）は`/v1/messages`で、`x-api-key`と`anthropic-version: 2023-06-01`を付け、描画の応答は強制したtool呼び出しの`input`（ただし`anthropic`はServerと同じく、どのClaudeのモデルにも答えのtoolを`tool_choice` `auto`で渡し、その呼び出しを答えとし、本文で答えたときは最初の`{`から最後の`}`までを読む。thinkingのブロックは読まず、対象が無ければ`malformed_payload`。Claude Opus 5.5は強制したtoolを断るため）、写真はbase64の画像ブロックで送る。既定の接続先はServerの一覧と同じで、ovmsを持たず、Ollama Cloud（`ollama-cloud`、`https://ollama.com/v1`、キー必須）を持つ。ただしローカルのOllama（`ollama`、`http://127.0.0.1:11434/v1`）はAndroidでは持たない（作者の裁定、2026-09-27）。端末自身にOllamaは動かず、LANのOllamaへの平文のhttpは断るためである。接続先のモデル選択で一覧を取得する前に出す候補も、Serverの組み込みの一覧と同じにする（Geminiは`gemini-3.5-flash-lite`と`gemma-4-31b-it`。2.5系は提供終了の後に作ったAPIアカウントでは呼べない）。一覧から外したovmsとローカルのOllamaの行は、キー・名前・Base URL・モデル一覧のどれかを作者が設定していれば作者の接続先として残し、既定のままなら起動時に消す。`openai-compatible`の描画の答えは強制した関数呼び出しで求めるが、`ollama`だけはJSON schemaの`response_format`で求める。Ollamaの推論指定と出力枠は上の「Ollamaの推論指定と出力枠」に従う。hostが`api.openai.com`の描画はResponses APIを使い、推論と補助機能の要求も上の「OpenAI APIの描画と推論指定」に従う。提供元がpipelineの呼び出しをHTTPで断ったとき、pipelineが残すのは失敗の分類だけなので、Serverと同じく提供元の理由をLogcat（tag `InkuProvider`）に`provider_http_error`の1行で残す。行には、操作・モデルid・状態と、提供元のエラーの`code`・`type`・`param`・`status`、鍵に見える文字列を伏せた短いmessageを入れる。既定の接続先は起動時に不足分を補うだけで、作者が変えたサービス名とBase URLを保持する（接続形式は既定のまま、端末内の接続先のBase URLは目印なので変えない）。既定の接続先の「サービス削除」は行を消さず、Serverと同じく無効にして一覧から隠し、APIキーを消す。同じIDで追加すれば戻る。作者が追加した接続先は行ごと消す。端末内の接続先は消せない。APIキーは伏せ字とパスワード用キーボード（予測・学習なし）で入力し、「AIサービスを追加」は閉じると入力値を消す。「ローカルLLMはキー無しで使える場合がある」の注記は、キーが必須でない接続先にだけ出す。
 
-描画表現「暴れる（Wild）」は`app_settings`の`render_wild`（`{"enabled":bool}`）に保存し、記述からの新しい描画（単発・バッチ・デモ・カメラ）に載せる。作品からのDDL描画は作品のWild（`render_metadata.render_wild`）を、推敲の候補は親作品のWildを継ぐ（Webの`targetWild`・`effectiveRefineWild`と同じ）。作品を選ぶと、その作品の色カタログ（自動で描いた作品は自動）とキャンバスを次の描画に使う。起動時に作品が表示されていれば、保存済みの色カタログ・キャンバスより作品の値を優先する。「履歴選択時のキャンバス・色カタログ」「DDL再描画を新しい履歴として保存」は処理を持たなかったため削除した。色カタログ選択ダイアログの戻る・外側タップはキャンセルで、キャンセルは保存値も元に戻す。作品画面・全画面の送り・検索は全作品を対象にする（以前は新しい100件だけ）。
+描画表現「暴れる（Wild）」（画面の名は「筆致制限を外す」、英語 Lift the stroke limit。点けると外れ、既定は消えた状態。生成情報は「外した」・「外さない」。2026-10-27に作者が改めた。Webと同じ）は`app_settings`の`render_wild`（`{"enabled":bool}`）に保存し、記述からの新しい描画（単発・バッチ・デモ・カメラ）に載せる。作品からのDDL描画は作品のWild（`render_metadata.render_wild`）を、推敲の候補は親作品のWildを継ぐ（Webの`targetWild`・`effectiveRefineWild`と同じ）。作品を選ぶと、その作品の色カタログ（自動で描いた作品は自動）とキャンバスを次の描画に使う。起動時に作品が表示されていれば、保存済みの色カタログ・キャンバスより作品の値を優先する。「履歴選択時のキャンバス・色カタログ」「DDL再描画を新しい履歴として保存」は処理を持たなかったため削除した。色カタログ選択ダイアログの戻る・外側タップはキャンセルで、キャンセルは保存値も元に戻す。作品画面・全画面の送り・検索は全作品を対象にする（以前は新しい100件だけ）。
 
 書き出しの表示用SVGは保存したSVGそのもの、編集用SVG・汎用SVG・ライブ用SVG（`live`。編集用の構造に表示用の質感とタッチを持ち、Webの「ライブ用」と同じ）は保存Scoreを作品の色・seed・Wildでそのprofileに描き直したもの（Serverの`GET /api/history/{id}/svg?profile=`と同じ）。共有用に`cacheDir/exports`へ書いたファイルは、1日を過ぎたものを次の書き出しで消す。
 
@@ -641,13 +663,15 @@ Androidへの転送は、Rustのpremultiplied RGBAをNDKの`RGBA_8888` Bitmapへ
 
 下絵の任意`plugins`とその個数（`count`）、Stage 1の登録プラグイン節、正式名と別名（DDL Spec 14、同梱`Nature.leaves` 2.1.0）の照合と、語に書いた個数の受け取り（SPEC §4.6）は、同梱した共有Rust coreがそのまま行う。lockの任意`aliases`はRoomへそのまま運ぶ。
 
-同梱パッケージ`Nature.leaves`の有効・無効は、設定「その他」の「同梱プラグイン」で切り替える（Serverの文書単位と同じ粒度）。値は`plugin_settings`のキー`bundled:Nature.leaves:enabled`に`{"enabled":bool}`で保存し、欠落・壊れた値は有効とする。無効なら新しい作品のcatalog解決の`bundled_packages`から外す。保存済み作品は自分のconfigの定義で描き直す。語の名前は、日本語表示では別名（若葉など）、英語表示では正式名で示し、どちらも共有coreの定義から取る。
+同梱パッケージ`Nature.leaves`の有効・無効は、設定「その他」の「同梱プラグイン」で切り替える（Serverの文書単位と同じ粒度）。値は`plugin_settings`のキー`bundled:Nature.leaves:enabled`に`{"enabled":bool}`で保存し、欠落・壊れた値は有効とする。無効なら新しい作品のcatalog解決の`bundled_packages`から外す。保存済み作品は自分のconfigの定義で描き直す。v2 の語は `｛若葉｝`／`{young leaves}` と書く。設定には共有coreの資産から絵、日英の主の名、ほかの名、種類、説明、例文を出す。
 
-作品を保存するとき、上流診断が1件以上あれば共有`explain_plugin_diagnostics`（JNI`NativePipelineBridge.explainPluginDiagnostics`）を呼び、結果を`pipeline_diagnostics.plugin_diagnostics`（配列）に保存する。`enabled`は作品configの定義の正式名と別名、および有効な同梱パッケージの名前、`disabled`は無効な同梱パッケージの名前である。保存時の検査は、必須チャンネルの完全一致に加え、任意チャンネル`plugin_diagnostics`を配列として受け付け、この項目の無い保存済みの行も読む。描画の診断は、同じ範囲の上流診断の代わりに、Webの`pipelinePluginDiagnostic`と同じ文言で理由（未登録・無効・名前の不一致と候補・版の不一致）を示す。
+作品を保存するとき、上流診断が1件以上あれば共有`explain_plugin_diagnostics`（JNI `NativePipelineBridge.explainPluginDiagnostics`）を呼び、結果を`pipeline_diagnostics.plugin_diagnostics`に保存する。`enabled`・`disabled`には定義の識別名、`plugin_names`には全ての語の名を正規化し、識別名と有効状態を添えて渡す。作品自身の定義は有効として扱う。保存時の検査は必須チャンネルの完全一致に加え、任意チャンネル`plugin_diagnostics`を配列として受け付け、この項目の無い保存済みの行も読む。描画の診断は、同じ範囲の上流診断の代わりに、Webの`pipelinePluginDiagnostic`と同じ文言で理由（未登録・無効・名前の不一致と候補・版の不一致）を示す。
 
 描画coreが描画を止めずに残す警告（描画のmetadataの`render_warnings`。いまは`#rrggbb`でない色表の値を既定の色で描いた`invalid_color`と色の名前）は、Logcat（tag `InkuRender`）に記録し、作品の描画の診断にWebの`pipelineRenderWarning`と同じ文言で示す。警告があれば`pipeline_diagnostics.render_warnings`（配列）にも保存し、保存時の検査はこれも任意チャンネルとして受け付ける。保存Score再演（`renderSaved`）が断ったときは、coreの理由コードを「このScoreは描けません:」に続けてWebの`renderRefusalReason`と同じ文言で示し、coreの`message`はLogcatにだけ記録する。
 
-DDLの書き出しは、保存作品の書き出しシートの「DDL（プラグイン定義付き）」で、`inku.ddl-export.v1`（DDLと、それが正式名または別名で書く定義だけ、`exported_from`はbuildとrender engine）を`inku-<id>-<日時>.inku-ddl.json`として共有する。DDL編集の「読込」で書き出しファイルを読むと、DDLを編集欄へ入れ、定義を次の新しい作品のcatalog解決だけに先頭の候補として渡す（登録しない、既存作品の編集には渡さない）。登録済みに無い名前は`imported_plugin_not_installed`、中身が違う名前は`imported_plugin_differs_from_installed`のcatalog診断を付ける。書き出し形式でないファイルはそのままDDLとして読む。描画のseedとキャンバスは書き出しに含まれないため、読み込んだ作品は同じ構図（Scoreが同じ）で描かれる。制作画面のDDL欄は、読み取り専用のテキスト欄がタップを取り、DDL編集を開けなかったため、欄全体でタップを受けるよう直した。
+DDLの書き出しは、保存作品の書き出しシートの「DDL（プラグイン定義付き）」で、`inku.ddl-export.v2`（DDLと、保存した lock の名前と版に一致する定義だけを note と共に運び、`exported_from`はbuildとrender engine）を`inku-<id>-<日時>.inku-ddl.json`として共有する。DDL編集の「読込」でv2の書き出しファイルを読むと、DDLを編集欄へ入れ、定義を次の新しい作品のcatalog解決だけに先頭の候補として渡す（登録しない、既存作品の編集には渡さない）。v1 は再書き出しを求めて断り、編集欄を変えない。登録済みに無い名前は`imported_plugin_not_installed`、中身が違う名前は`imported_plugin_differs_from_installed`のcatalog診断を付ける。書き出し形式でないファイルと旧`inku.history_item`は従来どおり読む。描画のseedとキャンバスは書き出しに含まれないため、読み込んだ作品は同じ構図（Scoreが同じ）で描かれる。制作画面のDDL欄は、読み取り専用のテキスト欄がタップを取り、DDL編集を開けなかったため、欄全体でタップを受けるよう直した。
+
+起動時に一度、共有coreで保存済みDDLの古いプラグイン名を移し、作品・variation と関連 digest を一つの transaction で更新する。定義、lock、Score、SVG、記述は変更しない。断った単位と部分移行は報告に記録する。編集欄は共有coreのプラグイン呼出しを強調・診断し、有効な語の補完を出す。作品詳細には保存した提示の記録を出す。
 
 DDL SpecとDDL engineの版はServerの`layer_versions.py`が名乗り、Androidは版の定数を持たない。
 

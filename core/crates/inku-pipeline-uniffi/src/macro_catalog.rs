@@ -6,7 +6,7 @@ use std::{
 };
 
 use inku_ddl::{
-    LegacyImportOutcome, MacroDefinition, NATURE_LEAVES_V1_JSON, ResolvedInstructionLanguage,
+    LegacyImportOutcome, MacroDefinition, NATURE_LEAVES_V2_JSON, ResolvedInstructionLanguage,
 };
 use serde::{Deserialize, Serialize};
 
@@ -33,20 +33,14 @@ fn default_language() -> ResolvedInstructionLanguage {
 
 #[derive(Deserialize)]
 struct BundledPackage {
-    package_id: String,
-    entries: Vec<BundledEntry>,
+    words: Vec<BundledEntry>,
 }
 
 #[derive(Deserialize)]
 struct BundledEntry {
     definition: serde_json::Value,
-    summaries: BundledSummaries,
-}
-
-#[derive(Deserialize)]
-struct BundledSummaries {
-    ja: String,
-    en: String,
+    note_ja: String,
+    note_en: String,
 }
 
 #[derive(Deserialize)]
@@ -136,12 +130,14 @@ fn resolve(input_bytes: &[u8]) -> Result<CatalogOutput, ()> {
     let mut locks = Vec::new();
     let mut diagnostics = Vec::new();
     let mut names = BTreeSet::new();
+    let mut plugin_names = BTreeSet::new();
+    let mut v2_names = BTreeSet::new();
 
     // Explicit installation definitions precede bundled editions. Both travel
     // through the same parser, validation, identity and resource boundary.
     for package_id in input.bundled_packages {
         let package: BundledPackage = match package_id.as_str() {
-            "Nature.leaves" => serde_json::from_str(NATURE_LEAVES_V1_JSON).map_err(|_| ())?,
+            "Nature.leaves" => serde_json::from_str(NATURE_LEAVES_V2_JSON).map_err(|_| ())?,
             _ => {
                 diagnostics.push(omitted(
                     package_id,
@@ -153,13 +149,13 @@ fn resolve(input_bytes: &[u8]) -> Result<CatalogOutput, ()> {
                 continue;
             }
         };
-        for entry in package.entries {
+        for entry in package.words {
             input.canonical.push(CanonicalCandidate {
-                source_id: format!("bundled:{}", package.package_id),
+                source_id: format!("bundled:{package_id}"),
                 definition_json: entry.definition.to_string(),
                 summary: match input.language {
-                    ResolvedInstructionLanguage::Ja => entry.summaries.ja,
-                    ResolvedInstructionLanguage::En => entry.summaries.en,
+                    ResolvedInstructionLanguage::Ja => entry.note_ja,
+                    ResolvedInstructionLanguage::En => entry.note_en,
                 },
             });
         }
@@ -204,11 +200,32 @@ fn resolve(input_bytes: &[u8]) -> Result<CatalogOutput, ()> {
         };
         let qualified_name = identity.qualified_name().to_owned();
         let aliases = definition.alias_qualified_names();
+        let visible = if let Some(v2) = &definition.plugin_v2 {
+            v2.names
+                .ja
+                .iter()
+                .chain(&v2.names.en)
+                .map(|name| inku_ddl::plugin_names::normalize_plugin_name(name))
+                .collect::<Vec<_>>()
+        } else {
+            let (ja, en) =
+                inku_ddl::plugin_names::v1_plugin_names(&definition.heading, &definition.aliases);
+            ja.into_iter()
+                .chain(en)
+                .map(|name| inku_ddl::plugin_names::normalize_plugin_name(&name))
+                .collect::<Vec<_>>()
+        };
+        let conflict = if definition.plugin_v2.is_some() {
+            visible.iter().any(|name| plugin_names.contains(name))
+        } else {
+            visible.iter().any(|name| v2_names.contains(name))
+        };
         // A canonical name and every alias share one namespace of visible
         // names: the first definition to claim any of them keeps it.
-        if std::iter::once(&qualified_name)
-            .chain(&aliases)
-            .any(|name| names.contains(name))
+        if conflict
+            || std::iter::once(&qualified_name)
+                .chain(&aliases)
+                .any(|name| names.contains(name))
             || !names.insert(qualified_name.clone())
         {
             diagnostics.push(omitted(
@@ -231,6 +248,10 @@ fn resolve(input_bytes: &[u8]) -> Result<CatalogOutput, ()> {
             continue;
         }
         names.extend(aliases.iter().cloned());
+        plugin_names.extend(visible.iter().cloned());
+        if definition.plugin_v2.is_some() {
+            v2_names.extend(visible);
+        }
         let version = identity.version().to_owned();
         let digest = identity.full_digest_hex().to_owned();
         let canonical = serde_json::from_slice(identity.canonical_json_bytes()).map_err(|_| ())?;
@@ -315,6 +336,24 @@ pub fn resolve_macro_catalog(input_bytes: Vec<u8>) -> Vec<u8> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn v2_name_conflicts_with_v1_but_two_v1_generated_names_can_coexist() {
+        let v1 = |namespace: &str| json!({"schema":"inku.macro-definition.v1","namespace":namespace,"heading":"YoungLeaves","aliases":["若葉"],"version":"1.0.0","parameters":{},"components":{},"body":[]});
+        let v2 = json!({"schema":"inku.macro-definition.v2","namespace":"Other","id":"Leaf","names":{"ja":["若葉"],"en":["new leaf"]},"kind":"scene","version":"1.0.0","parameters":{},"components":{},"body":[]});
+        let output = resolve(
+            &serde_json::to_vec(&json!({"maximum_entries":10,"canonical":[
+                {"source_id":"one","definition_json":v1("Nature").to_string(),"summary":"a"},
+                {"source_id":"two","definition_json":v1("Garden").to_string(),"summary":"b"},
+                {"source_id":"three","definition_json":v2.to_string(),"summary":"c"}
+            ]}))
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(output.entries.len(), 2);
+        assert_eq!(output.diagnostics.len(), 1);
+        assert_eq!(output.diagnostics[0].reason, "duplicate_qualified_name");
+    }
 
     #[test]
     fn an_alias_may_not_claim_a_name_another_definition_already_holds() {

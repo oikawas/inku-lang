@@ -19,7 +19,11 @@ use crate::core_boundary::{
     SerializableClipPolicy, compile_committed, render_delivery, render_delivery_with_svg_limit,
 };
 use crate::description_ddl::{
-    DrawnFigure, parse_description_ddl_response, with_description_ddl_feedback,
+    DrawnFigure, parse_composed_description_ddl_response, parse_description_ddl_response,
+    with_composed_description_ddl_feedback, with_description_ddl_feedback,
+};
+use crate::description_laws::{
+    CardGround, ThingDocument, ThingProblem, ThingSentence, build_cards, measure, thing_problems,
 };
 use crate::image_ddl::{
     ImageDdlCheck, REVIEW_DRAWING_MEDIA_TYPE, check_image_document, image_ddl_source,
@@ -114,13 +118,29 @@ impl PipelineSnapshot {
         }
     }
 
-    /// An answer's source and the figures it names.
+    /// An answer's source and the figures it names. A composed run's answer
+    /// is its sentences with their things, which the run keeps.
     fn written_source(
-        &self,
+        &mut self,
         written: Written,
         response: &str,
     ) -> Result<Option<(String, Vec<DrawnFigure>)>, ProtocolError> {
         let limits = self.config.prompt_limits;
+        if written == Written::Description && self.composed().is_some() {
+            let Ok((sentences, figures)) =
+                parse_composed_description_ddl_response(response, self.config.language, limits)
+            else {
+                return Ok(None);
+            };
+            let ddl = sentences
+                .iter()
+                .map(|item| item.text.as_str())
+                .collect::<Vec<_>>()
+                .join("\n");
+            let source = self.description_ddl_source(&ddl)?;
+            self.composition_mut()?.known.extend(sentences);
+            return Ok(Some((source, figures)));
+        }
         Ok(match written {
             Written::Image => parse_image_ddl_response(response, limits)
                 .ok()
@@ -141,6 +161,201 @@ impl PipelineSnapshot {
                 })
                 .transpose()?,
         })
+    }
+
+    /// A composed run's committed source with a title before each thing's
+    /// sentences (DDL 27). The run reaches its commit without titles, so its
+    /// requests and records read the sentences as they were written. A source
+    /// the titles would carry past the source limit is committed without them,
+    /// as one the ratio declaration would.
+    fn with_thing_titles(
+        &self,
+        document: VisibleDocument,
+        owners: &[u64],
+    ) -> Result<VisibleDocument, ProtocolError> {
+        let Some(answer) = self
+            .composed()
+            .and_then(|composition| composition.answer.as_ref())
+        else {
+            return Ok(document);
+        };
+        let source = crate::description_composition::titled_composed_source(
+            &document.source,
+            owners,
+            &answer.things,
+            self.config.language,
+        );
+        if source == document.source || source.len() > self.config.prompt_limits.max_source_bytes {
+            return Ok(document);
+        }
+        let wire = VisibleDocument { source, ..document };
+        Ok(VisibleDocument::from_document(&wire.document()?))
+    }
+
+    /// A composed source's ratio sentence and its other sentences, each with
+    /// the thing the answers that wrote it said it draws.
+    fn thing_sentences(&self, source: &str) -> (String, Vec<ThingSentence>) {
+        let mut lines = source.lines();
+        let head = lines.next().unwrap_or_default().to_owned();
+        let sentences = lines
+            .map(str::trim)
+            .filter(|line| !line.is_empty())
+            .map(|line| ThingSentence {
+                thing: self
+                    .composed()
+                    .map_or(0, |composition| composition.thing_of(line)),
+                text: line.to_owned(),
+            })
+            .collect();
+        (head, sentences)
+    }
+
+    /// The canvas in units of its short side.
+    fn paper_units(&self) -> Result<[f64; 2], ProtocolError> {
+        let ratio = self.paper_ratio()?;
+        let short = f64::from(ratio.width_units.min(ratio.height_units));
+        Ok([
+            f64::from(ratio.width_units) / short,
+            f64::from(ratio.height_units) / short,
+        ])
+    }
+
+    /// What a composed run's writing answer is asked again about: the things
+    /// far from their laws, the things no sentence draws, and the cards'
+    /// things written in too many sentences. None for any other answer.
+    fn thing_problems_of(
+        &self,
+        stage: LlmStage,
+        candidate: &VisibleDocument,
+    ) -> Result<Vec<ThingProblem>, ProtocolError> {
+        let Some(composition) = self.composed() else {
+            return Ok(Vec::new());
+        };
+        if stage != LlmStage::WriteDescriptionDdl {
+            return Ok(Vec::new());
+        }
+        let answer = composition
+            .answer
+            .as_ref()
+            .ok_or(ProtocolError::InternalInvariant)?;
+        let (_, sentences) = self.thing_sentences(&candidate.source);
+        let doc = ThingDocument::new_with_definitions(
+            &sentences,
+            self.config.language,
+            self.paper_units()?,
+            &self.config.definitions,
+        );
+        let records = measure(&mut doc.clone(), answer, true);
+        Ok(thing_problems(&doc, &records, answer, self.config.language))
+    }
+
+    /// A composed run's DDL after a writing or review answer: measured, the
+    /// things a little off fitted (kept when the fit compiles with no more
+    /// problems), and the cards built (kept on the same terms); the measures,
+    /// the cards and the sentences' things are recorded. Any other run's DDL
+    /// is as it was.
+    fn composed_description_document(
+        &mut self,
+        document: VisibleDocument,
+        stage: LlmStage,
+    ) -> Result<VisibleDocument, ProtocolError> {
+        let Some(composition) = self.composed() else {
+            return Ok(document);
+        };
+        let answer = composition
+            .answer
+            .clone()
+            .ok_or(ProtocolError::InternalInvariant)?;
+        let language = self.config.language;
+        let units = self.paper_units()?;
+        let (head, sentences) = self.thing_sentences(&document.source);
+        let joined = |sentences: &[ThingSentence]| {
+            std::iter::once(head.as_str())
+                .chain(sentences.iter().map(|item| item.text.as_str()))
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+        let problems_of = |source: String| -> Option<(bool, usize)> {
+            let candidate = self.new_document(source).ok()?;
+            let check = self.check_written(&candidate).ok()?;
+            Some((check.drawable, check.problems.len()))
+        };
+        let doc = ThingDocument::new_with_definitions(
+            &sentences,
+            language,
+            units,
+            &self.config.definitions,
+        );
+        let written = measure(&mut doc.clone(), &answer, false);
+        let mut fitted = doc.clone();
+        let fit = measure(&mut fitted, &answer, true);
+        let base = problems_of(joined(&sentences));
+        let fitted = fitted.sentences();
+        let (fit_kept, mut current) = if fitted == sentences {
+            (
+                base.is_some_and(|(drawable, _)| drawable),
+                sentences.clone(),
+            )
+        } else {
+            match (base, problems_of(joined(&fitted))) {
+                (Some((_, before)), Some((true, after))) if after <= before => (true, fitted),
+                _ => (false, sentences.clone()),
+            }
+        };
+        let ground = CardGround {
+            palette: self.config.compiler.host.palette(),
+            canvas_format_id: self.config.compiler.host.canvas_format_id(),
+        };
+        let compile = |source: &str| {
+            let candidate = self.new_document(source.to_owned()).ok()?;
+            self.compile_for_run(&candidate)?.score().cloned()
+        };
+        let (carded, mut cards) = build_cards(
+            &current,
+            &head,
+            &answer,
+            &ground,
+            language,
+            &self.config.definitions,
+            &compile,
+        );
+        if cards.iter().any(|card| card.built) {
+            let before = problems_of(joined(&current));
+            match (before, problems_of(joined(&carded))) {
+                (Some((_, before)), Some((true, after))) if after <= before => current = carded,
+                _ => {
+                    for card in cards.iter_mut().filter(|card| card.built) {
+                        card.built = false;
+                        "compile".clone_into(&mut card.reason);
+                    }
+                }
+            }
+        }
+        let after = measure(
+            &mut ThingDocument::new_with_definitions(
+                &current,
+                language,
+                units,
+                &self.config.definitions,
+            ),
+            &answer,
+            false,
+        );
+        let source = joined(&current);
+        let composition = self.composition_mut()?;
+        composition.measures.push(super::CompositionMeasures {
+            stage,
+            written,
+            fit,
+            fit_kept,
+            after,
+        });
+        composition.cards = cards;
+        composition.known.extend(current.iter().cloned());
+        if stage == LlmStage::WriteDescriptionDdl {
+            composition.drawn = current;
+        }
+        self.new_document(source)
     }
 
     /// Read a DDL written or reviewed. Lines the compiler did not draw are
@@ -164,6 +379,7 @@ impl PipelineSnapshot {
         let Ok(check) = self.check_written(&candidate) else {
             return self.failure(ProviderFailure::SemanticViolation, spent_ms, events);
         };
+        let things = self.thing_problems_of(stage, &candidate)?;
         let action = self.action.as_ref().ok_or(ProtocolError::InvalidState)?;
         let asked_again = message_names(&action.payload, "compiler_feedback");
         let prompt: LlmPrompt = serde_json::from_value(action.payload["prompt"].clone())
@@ -177,9 +393,9 @@ impl PipelineSnapshot {
             instructions: check.instructions,
             figures,
         });
-        if !check.problems.is_empty()
+        if (!check.problems.is_empty() || !things.is_empty())
             && !asked_again
-            && self.ask_written_again(stage, prompt, &candidate, &check, total, events)?
+            && self.ask_written_again(stage, prompt, &candidate, &check, &things, total, events)?
         {
             return Ok(());
         }
@@ -204,7 +420,7 @@ impl PipelineSnapshot {
             }
         } else {
             let document = match usable {
-                Some(document) => document,
+                Some(document) => self.composed_description_document(document, stage)?,
                 None => {
                     self.event(
                         events,
@@ -229,14 +445,17 @@ impl PipelineSnapshot {
         .map_err(|_| ProtocolError::SemanticViolation)
     }
 
-    /// Ask once more with the lines the compiler did not draw, within the
-    /// stage's budget. A drawable candidate is kept for a failed answer.
+    /// Ask once more with the lines the compiler did not draw (and in a
+    /// composed run, the things the tool measured), within the stage's
+    /// budget. A drawable candidate is kept for a failed answer.
+    #[allow(clippy::too_many_arguments)]
     fn ask_written_again(
         &mut self,
         stage: LlmStage,
         prompt: LlmPrompt,
         candidate: &VisibleDocument,
         check: &ImageDdlCheck,
+        things: &[ThingProblem],
         total: u64,
         events: &mut Vec<PipelineEvent>,
     ) -> Result<bool, ProtocolError> {
@@ -263,13 +482,24 @@ impl PipelineSnapshot {
                     .description_ddl
                     .as_ref()
                     .is_some_and(|record| record.reading.is_some());
-                with_description_ddl_feedback(
-                    prompt,
-                    &candidate.source,
-                    &check.problems,
-                    read,
-                    limits,
-                )
+                if self.composed().is_some() {
+                    with_composed_description_ddl_feedback(
+                        prompt,
+                        &candidate.source,
+                        &check.problems,
+                        things,
+                        read,
+                        limits,
+                    )
+                } else {
+                    with_description_ddl_feedback(
+                        prompt,
+                        &candidate.source,
+                        &check.problems,
+                        read,
+                        limits,
+                    )
+                }
             }
         };
         let Ok(again) = again else {
@@ -286,7 +516,7 @@ impl PipelineSnapshot {
                 "identity": self.action.as_ref().unwrap().identity,
                 "failure": ProviderFailure::SemanticViolation,
                 "detail": format!("{}_ddl_problems", written.prefix()),
-                "problems": check.problems.len(),
+                "problems": check.problems.len() + things.len(),
             }),
         )?;
         Ok(true)
@@ -321,6 +551,12 @@ impl PipelineSnapshot {
         document: VisibleDocument,
         events: &mut Vec<PipelineEvent>,
     ) -> Result<(), ProtocolError> {
+        let document = match written {
+            Written::Image => document,
+            Written::Description => {
+                self.composed_description_document(document, LlmStage::WriteDescriptionDdl)?
+            }
+        };
         let review = match written {
             Written::Image => self.config.image.is_some_and(|config| config.review),
             Written::Description => self
@@ -454,9 +690,8 @@ impl PipelineSnapshot {
         }
     }
 
-    /// Commit the DDL a run is left with: an image's as a DDL edit, a
-    /// description's as a description's work, whose description stays the
-    /// work's own and can be drawn again.
+    /// Commit the DDL a run is left with; a composed description's work
+    /// chooses its colors first when the run does.
     fn commit_written(
         &mut self,
         written: Written,
@@ -464,6 +699,27 @@ impl PipelineSnapshot {
         events: &mut Vec<PipelineEvent>,
     ) -> Result<(), ProtocolError> {
         self.image_fallback = None;
+        if written == Written::Description && self.colors_before_commit() {
+            return self.begin_description_colors(document, events);
+        }
+        self.commit_written_document(written, document, events)
+    }
+
+    /// Commit a written DDL: an image's as a DDL edit, a description's as a
+    /// description's work, whose description stays the work's own and can be
+    /// drawn again.
+    pub(super) fn commit_written_document(
+        &mut self,
+        written: Written,
+        mut document: VisibleDocument,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<(), ProtocolError> {
+        if written == Written::Description && self.composed().is_some() {
+            let (_, sentences) = self.thing_sentences(&document.source);
+            let things = sentences.iter().map(|item| item.thing).collect::<Vec<_>>();
+            document = self.with_thing_titles(document, &things)?;
+            self.composition_mut()?.things = things;
+        }
         let revision = self.authority.revision();
         let (outcome, reason) = match written {
             Written::Image => (

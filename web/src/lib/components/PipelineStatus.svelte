@@ -4,11 +4,13 @@
 	import { formatPipelineDiagnostic, type PipelineDiagnostic } from '$lib/features/pipeline/diagnostics';
 	import { pipelineAttentionText, type PipelineProviderFailure } from '$lib/features/pipeline/attention';
 	import type { HoleCompletionIssue } from '$lib/features/pipeline/hole-completion';
+	import type { PluginNameEntry } from '$lib/plugin-names';
 
 	type Props = {
 		patch: PipelinePhase | null;
 		committedDdl: string;
 		diagnostics: PipelineDiagnostic[];
+		pluginEntries?: PluginNameEntry[];
 		diagnosticsUnavailable: boolean;
 		busy: boolean;
 		reason: string | null;
@@ -22,6 +24,7 @@
 		patch,
 		committedDdl,
 		diagnostics,
+		pluginEntries = [],
 		diagnosticsUnavailable,
 		busy,
 		reason,
@@ -67,7 +70,7 @@
 		<ul class="pipeline-diagnostic-list">
 			{#each diagnostics as diagnostic}
 				<li>
-					<p>{formatPipelineDiagnostic(diagnostic, t())}</p>
+					<p>{formatPipelineDiagnostic(diagnostic, t(), pluginEntries)}</p>
 					<details>
 						<summary>{t().pipelineDiagnosticDetails}</summary>
 						<pre>{JSON.stringify(diagnostic.value, null, 2)}</pre>

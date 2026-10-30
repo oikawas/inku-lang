@@ -37,6 +37,25 @@ import org.junit.Test
 
 class SharedPipelineHostTest {
     @Test
+    fun descriptionRouteFieldsAreOnlySentForReadAndDraw() = runBlocking {
+        val binding = ScriptedBinding(uniqueExecutions = true)
+        val host = host(binding, RecordingEffectProvider(), RecordingCommitStore(), MemoryExecutionStore())
+        host.start(startRequest(PipelineAuthoring.Description("mist", false)))
+        val old = binding.inputs.first().getJSONObject("authoring")
+        assertEquals(JSONObject().put("tag", "description").put("description", "mist")
+            .put("auto_catalog", false).put("sketch", PipelineSketchRequest.Off.toJson()).toString(), old.toString())
+        assertFalse(old.has("route"))
+        assertFalse(old.has("source_labels"))
+        assertFalse(old.has("composition"))
+        host.start(startRequest(PipelineAuthoring.Description("mist", false, PipelineSketchRequest.On,
+            "read_and_draw", "[\"source\"]", "{\"mode\":\"on\"}")))
+        val next = binding.inputs.last { it.optString("tag") == "start" }.getJSONObject("authoring")
+        assertEquals("read_and_draw", next.getString("route"))
+        assertEquals("source", next.getJSONArray("source_labels").getString(0))
+        assertEquals("on", next.getJSONObject("composition").getString("mode"))
+    }
+
+    @Test
     fun descriptionRedrawKeepsItsSavedParentAfterOnePrecommitStop() = descriptionRedrawAfterStops(true, 1)
 
     @Test

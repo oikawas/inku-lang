@@ -1,36 +1,85 @@
 // How a description is drawn (2026-10-25, SPEC 12.6.7). Single source for the
 // values and labels.
 //
-// 'stages' is the drawing as it was: Stage 1, the composition reading, the laws
-// and the colors. 'read_and_draw' reads the description from the speaker's eye,
-// writes what that eye sees as DDL, and corrects it once beside its drawing.
-// Chosen per draw, like the sketch, and never kept as a setting: a work opened
-// from the history sets it to the way that work was drawn.
+// 'stages' fills a fixed plan (Stage 1), then passes the composition reading,
+// the laws and the colors. 'read_and_draw' reads the description from the
+// speaker's eye, writes what that eye sees as DDL, and corrects it once beside
+// its drawing. Chosen per draw, like the sketch, and never kept as a setting: a
+// work opened from the history sets it to the way that work was drawn.
 //
 // The sketch keeps its two choices on both routes. On read_and_draw, 'on' is
 // the reading and 'off' writes from the description alone; choosing
 // read_and_draw starts the sketch on (the author's answer, 2026-10-25), and the
-// current stages keep their default, off.
+// stages keep their default, off.
+//
+// The names (the author's choice, 2026-10-27): 型で描く and 言葉で描く, by what
+// the AI writes -- the fields of a plan, or the instructions themselves. They
+// replaced 今の流れ and 読んで描く, which named a time and a thing both routes do.
+//
+// The Web starts on read_and_draw, listed first (the author, 2026-10-27). The
+// Server's and CLI's default stays 'stages', and a work with no record of a
+// route was drawn by the stages (`SAVED_WORK_ROUTE`).
 import type { SketchMode } from './sketch';
 
 export type DrawRoute = 'stages' | 'read_and_draw';
-export const DRAW_ROUTES: DrawRoute[] = ['stages', 'read_and_draw'];
-export const DEFAULT_DRAW_ROUTE: DrawRoute = 'stages';
+export const DRAW_ROUTES: DrawRoute[] = ['read_and_draw', 'stages'];
+export const DEFAULT_DRAW_ROUTE: DrawRoute = 'read_and_draw';
+/** The route of a saved work or run that names none: the stages, which drew
+ *  every work before read and draw and every one that keeps no record. */
+export const SAVED_WORK_ROUTE: DrawRoute = 'stages';
 
 export function drawRouteLabel(route: DrawRoute, isJapanese: boolean): string {
-	if (route === 'read_and_draw') return isJapanese ? '読んで描く' : 'Read and draw';
-	return isJapanese ? '今の流れ' : 'Current stages';
+	if (route === 'read_and_draw') return isJapanese ? '言葉で描く' : 'In words';
+	return isJapanese ? '型で描く' : 'With a plan';
 }
 
 export function drawRouteHint(route: DrawRoute, isJapanese: boolean): string {
 	if (route === 'read_and_draw') {
 		return isJapanese
-			? '記述を語り手の目から読み、見えた景を指示書に書いて、描いた画を見て一度直す'
-			: "Read the description from the speaker's eye, write what that eye sees, and correct it once beside its drawing";
+			? 'AI が指示書を自分で書き、描けた画を見て一度直す'
+			: 'The AI writes the instructions itself and corrects them once beside the drawing';
 	}
 	return isJapanese
-		? '解釈・構図の読み・法則・配色の段を通して描く'
-		: 'Draw through interpretation, the composition reading, the laws and the colors';
+		? 'AI が決まった型の欄を選び、プログラムが指示書にする'
+		: 'The AI fills the fields of a fixed plan, and the program writes the instructions from it';
+}
+
+/** The two steps a run can leave out, named the same on both routes. The
+ *  composition's switch names the colors too (the author, 2026-10-27): they
+ *  come and go with it, and no switch leaves them out alone. */
+export type DrawSwitch = 'sketch' | 'composition';
+
+export function drawSwitchLabel(name: DrawSwitch, isJapanese: boolean): string {
+	if (name === 'composition') return isJapanese ? '構図・法則・配色' : 'Composition, laws, colors';
+	return isJapanese ? '写生' : 'Sketch from life';
+}
+
+/** Whether a route passes the composition and laws: the stages always do. */
+export function compositionPassed(route: DrawRoute, mode: CompositionMode): boolean {
+	return route === 'stages' || mode === 'on';
+}
+
+export type DrawFlowStep = { label: string; kind: 'end' | 'switch' | 'fixed' };
+
+/** The steps a run passes, in the order it passes them (2026-10-27), for the
+ *  line under the switches. The stages fill the plan, then pass the
+ *  composition reading, the laws and the colors; read and draw decides its
+ *  composition and laws before it writes, and chooses their colors after the
+ *  review, only when they are on. 'switch' marks a step a switch put there. */
+export function drawFlow(route: DrawRoute, sketch: SketchMode, composition: CompositionMode, isJapanese: boolean): DrawFlowStep[] {
+	const step = (ja: string, en: string, kind: DrawFlowStep['kind']): DrawFlowStep => ({ label: isJapanese ? ja : en, kind });
+	const steps = [step('記述', 'Description', 'end')];
+	if (sketch === 'on') steps.push(step('写生', 'Sketch', 'switch'));
+	if (route === 'stages') {
+		steps.push(step('型を埋める', 'Fill the plan', 'fixed'), step('構図と法則', 'Composition and laws', 'fixed'), step('配色', 'Colors', 'fixed'));
+	} else {
+		const composed = composition === 'on';
+		if (composed) steps.push(step('構図と法則', 'Composition and laws', 'switch'));
+		steps.push(step('言葉で書く', 'Write in words', 'fixed'), step('見て直す', 'Look and correct', 'fixed'));
+		if (composed) steps.push(step('配色', 'Colors', 'switch'));
+	}
+	steps.push(step('画', 'Picture', 'end'));
+	return steps;
 }
 
 /** The sketch a route starts from when the author chooses it. */
@@ -46,7 +95,7 @@ export function normalizeDrawRoute(value: unknown): DrawRoute | null {
 export function drawRouteOf(work: { route?: unknown; description_ddl?: unknown } | null | undefined): DrawRoute {
 	const named = normalizeDrawRoute(work?.route);
 	if (named) return named;
-	return work?.description_ddl && typeof work.description_ddl === 'object' ? 'read_and_draw' : DEFAULT_DRAW_ROUTE;
+	return work?.description_ddl && typeof work.description_ddl === 'object' ? 'read_and_draw' : SAVED_WORK_ROUTE;
 }
 
 /** How the work on screen was drawn, as the strip above the canvas names it:
@@ -57,6 +106,156 @@ export function workRouteLabel(
 ): string {
 	if (work?.image_ddl && typeof work.image_ddl === 'object') return isJapanese ? '画像から書く' : 'Written from a picture';
 	return drawRouteLabel(drawRouteOf(work), isJapanese);
+}
+
+// The composition and laws (2026-10-26, SPEC 12.6.7): a switch inside read and
+// draw. 'on' decides a composition and laws from the description (and its
+// reading) before the DDL is written; 'off', the default, writes without them.
+// The stages always pass theirs, so the switch shows on and locked there.
+// Chosen per draw like the route and never kept as a setting; a work opened
+// from the history sets it to the way that work was drawn.
+export type CompositionMode = 'off' | 'on';
+export const DEFAULT_COMPOSITION_MODE: CompositionMode = 'off';
+
+export function normalizeCompositionMode(value: unknown): CompositionMode | null {
+	return value === 'off' || value === 'on' ? value : null;
+}
+
+/** Whether a work was drawn with the composition and laws: its record says so,
+ *  a fallback included (it was asked for and could not be used). */
+export function compositionModeOf(work: { description_ddl?: unknown } | null | undefined): CompositionMode {
+	const record = work?.description_ddl;
+	return record && typeof record === 'object' && (record as DescriptionDdlRecord).composition ? 'on' : DEFAULT_COMPOSITION_MODE;
+}
+
+/** The run option the switch adds: only read and draw sends it. */
+export function compositionOption(route: DrawRoute, mode: CompositionMode): { composition?: CompositionMode } {
+	return route === 'read_and_draw' ? { composition: mode } : {};
+}
+
+/** The composition and laws as the core records them (SPEC 12.6.7). */
+export type CompositionRecord = {
+	state?: 'pending' | 'used' | 'fallback';
+	fallback?: string | null;
+	answer?: {
+		thesis?: string;
+		form?: string;
+		things?: { thing?: number; what?: string; role?: string; kind?: string; quote?: string }[];
+		main_law?: string;
+		laws?: Record<string, unknown>;
+		reason?: string;
+	} | null;
+	targets?: string[];
+	rounds?: { prompt_id?: string; prompt_digest?: string; asked_again?: boolean; problems?: { where?: string; reason?: string }[] }[];
+	measures?: {
+		stage?: string;
+		fit_kept?: boolean;
+		after?: { law?: string; thing?: number | number[] | null; deviation?: number | null; unit?: string; state?: string; detail?: string }[];
+		[key: string]: unknown;
+	}[];
+	cards?: { law?: string; things?: number[]; motif?: string; built?: boolean; reason?: string | null }[];
+	things?: number[];
+	colors?: CompositionColorsRecord | null;
+	[key: string]: unknown;
+};
+
+/** The colors chosen after the review, before the commit (2026-10-26). */
+export type CompositionColorsRecord = {
+	state?: 'used' | 'fallback';
+	fallback?: string | null;
+	main_law?: string | null;
+	laws?: string[];
+	ground?: string | null;
+	changes?: { line?: number | null; how?: string; before?: string; after?: string[] }[];
+};
+
+const COLORS_CHANGE_LABELS: Record<string, [string, string]> = {
+	color_word: ['色の語を書き換えた', 'color word rewritten'],
+	printed: ['数つきで印字し直した', 'printed again with numbers'],
+	ground: ['背景の文を替えた', 'background sentence changed'],
+	ground_added: ['背景の文を足した', 'background sentence added'],
+};
+
+export const compositionColorsChangeLabel = (how: unknown, isJapanese: boolean) => labelOf(COLORS_CHANGE_LABELS, how, isJapanese);
+
+export function compositionColorsStateNote(record: CompositionColorsRecord, isJapanese: boolean): string {
+	if (record.state === 'used') return isJapanese ? '配色を選び、当てて確定した' : 'Colors were chosen and applied before the commit';
+	return isJapanese
+		? `配色を当てられず、配色の前の指示書で確定した（${record.fallback ?? ''}）`
+		: `No colors could be applied, so the DDL before them was committed (${record.fallback ?? ''})`;
+}
+
+/** How many lines the colors wrote, by how, in the order they first appear. */
+export function compositionColorsChanges(record: CompositionColorsRecord | null | undefined): [string, number][] {
+	const counts = new Map<string, number>();
+	for (const change of record?.changes ?? []) counts.set(change.how ?? '', (counts.get(change.how ?? '') ?? 0) + 1);
+	return [...counts.entries()];
+}
+
+const FORM_LABELS: Record<string, [string, string]> = {
+	one_corner: ['一角', 'one corner'],
+	all_over: ['全面', 'all over'],
+	bands: ['横の帯', 'bands'],
+	dividing_line: ['場を分ける線', 'dividing line'],
+	grid: ['格子', 'grid'],
+	flock_and_stray: ['群れと一つの逸脱', 'flock and a stray'],
+	unequal_triangle: ['不等辺の三角', 'unequal triangle'],
+};
+const ROLE_LABELS: Record<string, [string, string]> = {
+	field: ['場', 'field'], focal: ['主', 'focal'], secondary: ['従', 'secondary'],
+	scattered: ['散在', 'scattered'], accent: ['添え', 'accent'],
+};
+const KIND_LABELS: Record<string, [string, string]> = {
+	cluster: ['1か所の形', 'cluster'], row: ['列', 'row'], surface: ['面', 'surface'], line: ['線', 'line'],
+};
+const MEASURE_LABELS: Record<string, [string, string]> = {
+	ok: ['合う', 'fits'], off: ['少しずれ', 'a little off'], far: ['大きくずれ', 'far off'],
+	fitted: ['合わせた', 'fitted'], clamped: ['範囲の端に合わせた', 'clamped'], off_canvas: ['画の外', 'off the canvas'],
+	unmeasurable: ['測れない', 'unmeasurable'], not_measured: ['測っていない', 'not measured'],
+};
+
+function labelOf(table: Record<string, [string, string]>, value: unknown, isJapanese: boolean): string {
+	const pair = typeof value === 'string' ? table[value] : undefined;
+	return pair ? pair[isJapanese ? 0 : 1] : typeof value === 'string' ? value : '';
+}
+
+export const compositionFormLabel = (form: unknown, isJapanese: boolean) => labelOf(FORM_LABELS, form, isJapanese);
+export const compositionRoleLabel = (role: unknown, isJapanese: boolean) => labelOf(ROLE_LABELS, role, isJapanese);
+export const compositionKindLabel = (kind: unknown, isJapanese: boolean) => labelOf(KIND_LABELS, kind, isJapanese);
+export const compositionMeasureLabel = (state: unknown, isJapanese: boolean) => labelOf(MEASURE_LABELS, state, isJapanese);
+
+export function compositionStateNote(record: CompositionRecord | null | undefined, isJapanese: boolean): string {
+	if (record?.state === 'used') return isJapanese ? '構図と法則を決め、それに沿って書いた' : 'A composition and laws were decided, and the DDL was written toward them';
+	if (record?.state === 'fallback') {
+		const reason = record.fallback === 'refused'
+			? (isJapanese ? '答えが決まりに合わなかった' : 'the answers broke the rules')
+			: (record.fallback ?? '');
+		return isJapanese
+			? `構図と法則を決められず、構図と法則なしで書いた（${reason}）`
+			: `No composition and laws could be decided, so it was written without them (${reason})`;
+	}
+	return isJapanese ? '構図と法則を決めている途中' : 'Deciding the composition and laws';
+}
+
+/** The last measure's states, counted, and the pairs that did not fit. A pair
+ * the tool does not measure (the hand of B21, drawn by the writer) is counted
+ * but did not miss. */
+export function compositionMeasureSummary(record: CompositionRecord | null | undefined): {
+	counts: [string, number][];
+	misses: { law: string; thing: string; state: string }[];
+} {
+	const last = record?.measures?.at(-1)?.after ?? [];
+	const counts = new Map<string, number>();
+	const misses: { law: string; thing: string; state: string }[] = [];
+	for (const measure of last) {
+		const state = measure.state ?? '';
+		counts.set(state, (counts.get(state) ?? 0) + 1);
+		if (state !== 'ok' && state !== 'fitted' && state !== 'clamped' && state !== 'not_measured') {
+			const thing = Array.isArray(measure.thing) ? measure.thing.join('・') : measure.thing == null ? '' : String(measure.thing);
+			misses.push({ law: measure.law ?? '', thing, state });
+		}
+	}
+	return { counts: [...counts.entries()], misses };
 }
 
 /** The record the core keeps for a read-and-draw run (SPEC 12.6.7). */
@@ -75,6 +274,8 @@ export type DescriptionDdlRecord = {
 	drawing?: Record<string, unknown> | null;
 	/** Lines left out because each alone stopped the whole work. */
 	dropped?: string[];
+	/** The composition and laws, when the run was drawn with them. */
+	composition?: CompositionRecord | null;
 	[key: string]: unknown;
 };
 

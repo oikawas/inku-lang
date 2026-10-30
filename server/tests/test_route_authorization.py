@@ -102,7 +102,9 @@ PUBLIC = {  # every entry needs a reason
 #   PUT and DELETE /api/plugins/{plugin_id}/words/{heading}/preview (2026-10-26).
 #   +1 for GET /api/plugins/{plugin_id}/export, a package as a zip with its
 #   pictures (2026-10-26).
-EXPECTED_ROUTE_COUNT = 144
+# The old document-only validate and reload routes retired with the v2 package cutover.
+# Editor inspection and package-word preview add two authenticated routes.
+EXPECTED_ROUTE_COUNT = 145
 
 
 def _guard_names(dependant, seen=None) -> set[str]:
@@ -208,8 +210,6 @@ def test_only_stronger_admin_guards_remain_as_unused_route_arguments():
         ("plugins.py", "api_plugin_preview_replace", "_admin_user"),
         ("plugins.py", "api_plugin_preview_reset", "_admin_user"),
         ("plugins.py", "api_plugin_set_enabled", "_admin_user"),
-        ("plugins.py", "api_plugins_reload", "_admin_user"),
-        ("plugins.py", "api_plugins_validate", "_admin_user"),
     }
 
 

@@ -31,11 +31,47 @@ class AndroidSharedPipelineTest {
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
     private var database: InkuDatabase? = null
     private var repository: InkuRepository? = null
+    private var isolatedFiles: File? = null
 
     @After
     fun tearDown(): Unit = runBlocking {
         repository?.close()
         database?.close()
+        isolatedFiles?.deleteRecursively()
+    }
+
+    @Test
+    fun readAndDrawSavesTheReadingAndRecord() = runBlocking {
+        val provider = object : ModelProvider {
+            override val providerId = "fixture"
+            override suspend fun generate(request: ModelRequest): ModelResponse {
+                val response = when (request.pipelineAction) {
+                    "read_description" -> """{"viewpoint":{"speaker":"我","speaker_quote":"我","eye":"女を見ている","addressee_quote":"妹","speaker_seen_quote":""},"core":["紫の女"],"items":[{"kind":"scene","quote":"紫の妹","image":"紫の女"}],"reading":"紫の姿を見ている。"}"""
+                    "write_description_ddl", "review_description_ddl" -> """{"ddl":"背景を黄で埋める。\n中心に赤の円を1個置く。","figures":[{"who":"addressee","what":"妹"}]}"""
+                    else -> error("unexpected action ${request.pipelineAction}")
+                }
+                return ModelResponse(response, request.modelId)
+            }
+        }
+        val db = Room.inMemoryDatabaseBuilder(context, InkuDatabase::class.java).build().also { database = it }
+        // The test's in-memory Room must not share thumbnail files with the author's database.
+        val files = File(context.cacheDir, "read-and-draw-test-${java.util.UUID.randomUUID()}").also { check(it.mkdir()); isolatedFiles = it }
+        val isolatedContext = object : android.content.ContextWrapper(context) {
+            override fun getFilesDir(): File = files
+        }
+        val repo = InkuRepository(isolatedContext, db, modelProviderOverride = provider).also { repository = it }
+        val work = repo.paint(
+            description = "紫の妹を我は見る [大海人皇子]", catalogId = "default", canvasAspect = "square",
+            stage1ModelId = MODEL, stage2ModelId = MODEL, instructionLang = "ja", uiLang = "ja",
+            sketch = SketchInput(requested = true), readAndDraw = true, descriptionReview = true,
+        )
+        val saved = requireNotNull(db.historyDao().getById(work.id))
+        assertEquals("supplemented", saved.sketchState)
+        assertTrue(saved.sketchText.orEmpty().isNotBlank())
+        val metadata = JSONObject(saved.renderMetadataJson)
+        assertEquals("read_and_draw", metadata.getString("route"))
+        assertEquals("大海人皇子", metadata.getJSONObject("description_ddl").getJSONArray("source_labels").getString(0))
+        assertTrue(saved.displaySvg.startsWith("<svg"))
     }
 
     @Test
@@ -394,6 +430,6 @@ class AndroidSharedPipelineTest {
         const val MODEL = "fixture:model"
         const val COMPOSITION_READING = """{"thesis":"One quiet circle","roles":["focal"],"relations":[],"tension":{"motion":"still","focus":"unspecified","vertical":"unspecified","balance":"unspecified","symmetry":"unspecified","void":"unspecified"},"stated_places":[]}"""
         const val EDITED_DDL = "place one red circle at center."
-        const val STEP16_DDL = "Nature.若葉. Place a small diagonal red arc at top. Place a blue arc at bottom, mirrored with the previous shape."
+        const val STEP16_DDL = "｛若葉｝. Place a small diagonal red arc at top. Place a blue arc at bottom, mirrored with the previous shape."
     }
 }

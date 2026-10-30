@@ -66,8 +66,8 @@ class ModelProviderHttpException(
     val refusal: JSONObject = JSONObject(),
     /** The answer's `Retry-After` header, as sent: seconds or an HTTP date. */
     val retryAfter: String? = null,
-    /** Gemini's `google.rpc.RetryInfo.retryDelay` in the refusal body, in seconds. */
-    val retryDelaySeconds: Double? = null,
+    /** Bounded raw refusal, for the shared core's retry decision. */
+    val retryBody: String = "",
     /** The shared core's failure class, when this answer crossed provider_wire. */
     val failure: String? = null,
 ) : IllegalStateException(message)
@@ -78,10 +78,14 @@ class ModelProviderHttpException(
  * the same answers with `data["choices"][0]["message"]` and a non-empty text
  * check, whose KeyError/IndexError/TypeError it classifies `malformed_payload`.
  */
-class MalformedProviderResponseException(message: String) : IllegalStateException(message)
+internal interface ProviderInputUsage { val inputTokens: Long? }
+
+class MalformedProviderResponseException(message: String, override val inputTokens: Long? = null) :
+    IllegalStateException(message), ProviderInputUsage
 
 /** A cut-off tool input cannot become a complete pipeline answer. */
-class ProviderOutputLimitException : IllegalStateException("Provider output reached its token limit.")
+class ProviderOutputLimitException(override val inputTokens: Long? = null) :
+    IllegalStateException("Provider output reached its token limit."), ProviderInputUsage
 
 /**
  * The builtin services that need a key, as the server's builtin definitions
@@ -110,14 +114,13 @@ internal data class ProviderHttpBody(
     val status: Int,
     val body: String,
     val retryAfter: String?,
-    val retryDelaySeconds: Double?,
 )
 
 /** HTTP framing and bounded I/O stay in the host; the core judges the response. */
-internal fun readProviderHttpBody(connection: HttpURLConnection): ProviderHttpBody {
+internal fun readProviderHttpBody(connection: HttpURLConnection, successLimit: Int = MAX_PROVIDER_RESPONSE_BYTES): ProviderHttpBody {
     val status = connection.responseCode
     val success = status in 200..299
-    val limit = if (success) MAX_PROVIDER_RESPONSE_BYTES else MAX_PROVIDER_ERROR_BYTES
+    val limit = if (success) successLimit else MAX_PROVIDER_ERROR_BYTES
     val (bytes, over) = readBounded(if (success) connection.inputStream else connection.errorStream, limit)
     require(!success || !over) { "Remote response was too large." }
     val body = try {
@@ -126,7 +129,7 @@ internal fun readProviderHttpBody(connection: HttpURLConnection): ProviderHttpBo
         if (success) throw MalformedProviderResponseException("Provider response was not UTF-8.")
         ""
     }
-    return ProviderHttpBody(status, body, connection.getHeaderField("Retry-After"), retryInfoDelaySeconds(body))
+    return ProviderHttpBody(status, body, connection.getHeaderField("Retry-After"))
 }
 
 /** Map the core's decision to the host's existing effect and observation types. */
@@ -147,12 +150,12 @@ internal fun providerWireModelResponse(
         Log.w("InkuProvider", "provider_output_limit " + JSONObject()
             .put("action", request.pipelineAction).put("model", request.modelId)
             .put("cut", answer.getJSONObject("cut")))
-        throw ProviderOutputLimitException()
+        throw ProviderOutputLimitException((answer.opt("input_tokens") as? Number)?.toLong())
     }
-    "malformed" -> throw MalformedProviderResponseException(answer.getString("detail"))
+    "malformed" -> throw MalformedProviderResponseException(answer.getString("detail"), (answer.opt("input_tokens") as? Number)?.toLong())
     "http_error" -> throw ModelProviderHttpException(
         http.status, "HTTP ${http.status} from $host: ${answer.getString("failure")}",
-        answer.getJSONObject("refusal"), http.retryAfter, http.retryDelaySeconds,
+        answer.getJSONObject("refusal"), http.retryAfter, http.body,
         failure = answer.getString("failure"),
     )
     "refused" -> throw IllegalArgumentException(answer.getString("detail"))

@@ -5,6 +5,7 @@ import android.util.Log
 import app.inku.mobile.data.db.InkuDatabase
 import app.inku.mobile.data.db.RoomV10ResetCoordinator
 import app.inku.mobile.data.db.SaijikiV1Migration
+import app.inku.mobile.data.db.PluginNamesV2Migration
 import app.inku.mobile.data.model.CanvasAspects
 import app.inku.mobile.pipeline.NativePipelineBridge
 import kotlinx.coroutines.CoroutineScope
@@ -19,8 +20,29 @@ internal const val MIGRATION_REPORT = "saijiki-v2-migration.json"
 
 class InkuApplication : Application() {
     val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    internal val activityForeground = kotlinx.coroutines.flow.MutableStateFlow(false)
+    private val chatGptAssessments by lazy {
+        val rows = app.inku.mobile.data.catalogRequest("catalog").getJSONObject("catalog")
+            .getJSONObject("providers").getJSONObject("chatgpt").getJSONArray("models")
+        org.json.JSONObject().apply { for (index in 0 until rows.length()) {
+            val row = rows.getJSONObject(index); put(row.getString("id"), row)
+        } }
+    }
     val chatGptPlan by lazy {
-        app.inku.mobile.llm.ChatGptPlanManager(app.inku.mobile.llm.AndroidChatGptCredentialStore(this), applicationScope)
+        app.inku.mobile.llm.ChatGptPlanManager(app.inku.mobile.llm.AndroidChatGptCredentialStore(this), applicationScope,
+            foreground = activityForeground,
+            modelPolicy = {
+                kotlinx.coroutines.runBlocking(Dispatchers.IO) {
+                    val settings = database.settingsDao()
+                    val purposes = runCatching { org.json.JSONObject(settings.get("model_purposes")?.valueJson ?: "{}")
+                        .optJSONObject("chatgpt") ?: org.json.JSONObject() }.getOrDefault(org.json.JSONObject())
+                    val records = runCatching { org.json.JSONObject(settings.get("model_catalog_observations:chatgpt")?.valueJson ?: "{}")
+                        .optJSONObject("records") ?: org.json.JSONObject() }.getOrDefault(org.json.JSONObject())
+                    val assessments = org.json.JSONObject(chatGptAssessments.toString())
+                    records.keys().forEachRemaining { id -> assessments.put(id, records.get(id)) }
+                    app.inku.mobile.llm.ChatGptModelPolicy(purposes, assessments)
+                }
+            })
     }
     private val databaseLock = Any()
 
@@ -82,14 +104,20 @@ class InkuApplication : Application() {
         }.getOrElse { error ->
             Log.e(MIGRATION_LOG_TAG, "Saijiki v2 migration failed; nothing was written", error)
             return
-        } ?: return
-        runCatching { filesDir.resolve(MIGRATION_REPORT).writeText(report.toString(1)) }
-        Log.i(
-            MIGRATION_LOG_TAG,
-            "Saijiki v2 migration written: ${report.optLong("total_ms")} ms, " +
-                "${report.optInt("statements")} statements, " +
-                "${report.optJSONArray("refused_records")?.length() ?: 0} refused records",
-        )
+        }
+        if (report != null) {
+            runCatching { filesDir.resolve(MIGRATION_REPORT).writeText(report.toString(1)) }
+            Log.i(MIGRATION_LOG_TAG, "Saijiki v2 migration written: ${report.optLong("total_ms")} ms, " +
+                "${report.optInt("statements")} statements, ${report.optJSONArray("refused_records")?.length() ?: 0} refused records")
+        }
+        val pluginReport = runCatching { PluginNamesV2Migration(NativePipelineBridge::migratePluginNames).runOnce(db) }
+            .getOrElse { error ->
+                Log.e(MIGRATION_LOG_TAG, "Plugin names v2 migration failed; nothing was written", error)
+                return
+            } ?: return
+        runCatching { filesDir.resolve("plugin-names-v2-migration.json").writeText(pluginReport.toString(1)) }
+        Log.i(MIGRATION_LOG_TAG, "Plugin names v2 migration: ${pluginReport.optInt("history_changed")} histories, " +
+            "${pluginReport.optInt("variation_changed")} variations, ${pluginReport.optJSONArray("refused_records")?.length() ?: 0} refused or partial")
     }
 
     override fun onTerminate() {

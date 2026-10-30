@@ -350,7 +350,7 @@
     1000.0,
     1000.0
    ],
-   "ddl": "和紙。\n背景を白で埋める。\nNature.落葉。\n下の3分の2（横0〜1、縦1/3〜1）に、灰の太筆の薄い刷きの全幅の雲形を1個埋める。\n左下（横0〜1/3、縦2/3〜1）に、細かく小刻みに揺れる橙の太い太筆の実線の濃い粒の斜めの大きな線を2個引く。\n左中央（横0〜1/3、縦1/3〜2/3）に、黒のペンの実線の濃い塗りの回転の横長の小さな楕円を1個置く。\n左下の四半分（横0〜1/2、縦1/2〜1）に、灰の鉛筆の程よいとても小さな点を15個散らす。",
+   "ddl": "和紙。\n背景を白で埋める。\n｛落葉｝。\n下の3分の2（横0〜1、縦1/3〜1）に、灰の太筆の薄い刷きの全幅の雲形を1個埋める。\n左下（横0〜1/3、縦2/3〜1）に、細かく小刻みに揺れる橙の太い太筆の実線の濃い粒の斜めの大きな線を2個引く。\n左中央（横0〜1/3、縦1/3〜2/3）に、黒のペンの実線の濃い塗りの回転の横長の小さな楕円を1個置く。\n左下の四半分（横0〜1/2、縦1/2〜1）に、灰の鉛筆の程よいとても小さな点を15個散らす。",
    "host": {
     "background": "white",
     "canvas_format_id": "square",
@@ -518,7 +518,7 @@
     1778.0,
     1000.0
    ],
-   "ddl": "Paper.\nFill the background with white.\nNature.FallenLeaves.\nScatter 40 broadly loosely swaying black extra-fine pen faint grain falling small lines at the lower left quarter (horizontal 0 to 1/2, vertical 1/2 to 1).",
+   "ddl": "Paper.\nFill the background with white.\n{fallen leaves}.\nScatter 40 broadly loosely swaying black extra-fine pen faint grain falling small lines at the lower left quarter (horizontal 0 to 1/2, vertical 1/2 to 1).",
    "host": {
     "background": "white",
     "canvas_format_id": "hd_monitor",

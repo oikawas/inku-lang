@@ -113,7 +113,7 @@ def _resource_omission_log_projection(diagnostic: object) -> dict:
 class ImportedPlugin(BaseModel):
     model_config = ConfigDict(extra="forbid")
     definition: dict
-    summary: str = Field(default="", max_length=8192)
+    note: str = Field(default="", max_length=100)
 
 
 class RunOptions(BaseModel):
@@ -139,10 +139,13 @@ class RunOptions(BaseModel):
     # How a description is drawn (SPEC §12.6.7): the stages (the default) or
     # read and draw. Left out, a child takes its parent's.
     route: Literal["stages", "read_and_draw"] | None = None
+    # Whether read and draw first decides a composition and laws (SPEC
+    # §12.6.7): off (the default) or on. Only read and draw sends it; left
+    # out, a child takes its parent's, like the route.
+    composition: Literal["off", "on"] | None = None
     history_display_label: str | None = None
     batch_line_number: int | None = None
     batch_run_id: str | None = None
-    history_visibility: Literal["normal", "lineage_only"] | None = None
     lineage_parent_node_id: str | None = None
     derivation_kind: str | None = None
     derivation_metadata: dict = Field(default_factory=dict)
@@ -255,18 +258,20 @@ _SYSTEM_PROMPT_STAGES = {
     "choose_colors": "colors",
     "complete_visible_ddl_holes": "stage2",
     "read_description": "reading",
+    "compose_description": "description_composition",
     "write_description_ddl": "description_ddl",
     "review_description_ddl": "description_review",
 }
 # The stages whose message the tab shows as sent too (2026-10-13): no other
 # view shows what the sketch, the composition reading, the laws stage, the
 # color stage and read and draw's reading were given.
-_MESSAGE_STAGES = {"sketch", "composition", "laws", "colors", "reading",
+_MESSAGE_STAGES = {"sketch", "composition", "laws", "colors", "reading", "description_composition",
                    "catalog", "image_catalog", "image_ddl", "image_review"}
 # The requests given the image tab's answer limit: the image tab's DDL and
-# read and draw's three, as they were measured (8192 tokens, 2026-10-25).
-_WRITTEN_DDL_EFFECTS = frozenset({"write_image_ddl", "review_image_ddl", "read_description", "write_description_ddl",
-                                  "review_description_ddl"})
+# read and draw's, as they were measured (8192 tokens, 2026-10-25; the
+# composition and laws answered at most 1,662 tokens, 2026-10-26).
+_WRITTEN_DDL_EFFECTS = frozenset({"write_image_ddl", "review_image_ddl", "read_description", "compose_description",
+                                  "write_description_ddl", "review_description_ddl"})
 # The stages an execution saved before 2026-10-13 kept.
 _EARLIER_STAGES = ["stage1", "stage2"]
 
@@ -366,8 +371,9 @@ class ProductPipelineEffects:
                      "instruction_lang_requested", "ui_lang"):
             if metadata.get(name) is not None:
                 previous["instruction_lang" if name == "instruction_lang_requested" else name] = metadata[name]
-        if metadata.get("render_wild") is not None:
-            previous["wild"] = str(metadata["render_wild"]).lower() in {"true", "1"}
+        # Each new run starts with the requested switch, not the parent's.
+        # None and omission both mean OFF; saved-score replay has its own path.
+        options["wild"] = options.get("wild") is True
         imported_plugins = options.pop("imported_plugins", None)
         if imported_plugins and work and "saved_config" in work:
             raise CandidateHostError("imported_plugins_require_new_work")
@@ -484,8 +490,10 @@ class ProductPipelineEffects:
                 raise CandidateHostError("image_model_not_vision")
             if kind == "description" and selected.get("route") == "read_and_draw":
                 # The drawing is seen once only by a model that reads images;
-                # another's DDL is committed as written (PLAN-PRODUCT §12).
-                config["description_ddl"] = {"review": reads_images()}
+                # another's DDL is committed as written (PLAN-PRODUCT §12). A run
+                # with its composition and laws then chooses its colors before
+                # the commit (2026-10-26); the core asks no other run.
+                config["description_ddl"] = {"review": reads_images(), "colors": True}
             for stage in (() if kind == "image" else
                           (("stage1", "stage2") if kind in {"description", "saved_laws"} else ("stage2",))):
                 if not _model_offered_to(
@@ -661,12 +669,25 @@ class ProductPipelineEffects:
         warnings = _render_warnings(render_metadata, "pipeline performance")
         if warnings:
             result["render_warnings"] = pipeline_diagnostics["render_warnings"] = warnings
-        work_plugins = [
-            f"{item['namespace']}.{heading}"
-            for item in (snapshot.get("config") or {}).get("definitions") or []
-            if isinstance(item, dict) and isinstance(item.get("namespace"), str) and isinstance(item.get("heading"), str)
-            for heading in (item["heading"], *[alias for alias in item.get("aliases") or [] if isinstance(alias, str)])
-        ]
+        work_plugins: list[str | dict[str, str]] = []
+        for item in (snapshot.get("config") or {}).get("definitions") or []:
+            if not isinstance(item, dict) or not isinstance(item.get("namespace"), str):
+                continue
+            identifier = item.get("id") or item.get("heading")
+            if not isinstance(identifier, str):
+                continue
+            qualified = f"{item['namespace']}.{identifier}"
+            if item.get("schema") == "inku.macro-definition.v2":
+                import unicodedata
+                names = item.get("names") or {}
+                for language in ("ja", "en"):
+                    for name in names.get(language) or []:
+                        if isinstance(name, str):
+                            visible = " ".join(unicodedata.normalize("NFKC", name).lower().split())
+                            work_plugins.append({"name": visible, "qualified_name": qualified})
+            else:
+                work_plugins.extend([qualified, *[f"{item['namespace']}.{alias}" for alias in item.get("aliases") or []
+                                                  if isinstance(alias, str)]])
         pipeline_diagnostics["plugin_diagnostics"] = explain_plugin_diagnostics(
             self.binding, document["source"], pipeline_diagnostics["upstream_diagnostics"], work_plugins
         )
@@ -725,7 +746,7 @@ class ProductPipelineEffects:
             "elapsed_ms": result["elapsed_total_ms"], "idempotency_key": idempotency,
             "catalog_mode": settings["catalog_mode"], "display_label": settings.get("history_display_label"),
             "batch_line_number": settings.get("batch_line_number"), "batch_run_id": settings.get("batch_run_id"),
-            "history_visibility": settings.get("history_visibility") or "normal", "lineage_parent_node_id": parent,
+            "lineage_parent_node_id": parent,
             "derivation_kind": (settings.get("derivation_kind") or ("ddl_edit" if context.get("derivation_kind") in {"legacy_ddl_fork", "variation_ddl_fork"} else "description_edit")) if parent else None,
             "derivation_metadata": settings.get("derivation_metadata", {}),
         })

@@ -3,6 +3,21 @@ package app.inku.mobile.ui
 import androidx.compose.foundation.text.input.TextFieldBuffer
 import androidx.compose.ui.text.TextRange
 
+internal fun pluginCompletionMatches(entry: org.json.JSONObject, query: String): Boolean {
+    fun normalized(value: String) = java.text.Normalizer.normalize(value, java.text.Normalizer.Form.NFKC).lowercase(java.util.Locale.ROOT)
+    val needle = normalized(query)
+    return listOf("surface_ja", "surface_en").any { key ->
+        val names = entry.optJSONArray(key) ?: org.json.JSONArray()
+        (0 until names.length()).any { normalized(names.optString(it)).contains(needle) }
+    }
+}
+
+internal fun pluginCompletionEnd(source: String, cursor: Int): Int =
+    cursor + if (source.getOrNull(cursor) == '}' || source.getOrNull(cursor) == '｝') 1 else 0
+
+internal fun pluginKindLabel(kind: String, strings: app.inku.mobile.ui.i18n.InkuStrings): String =
+    if (kind == "object") strings.bundledPluginObject else strings.bundledPluginScene
+
 /** Selection events never republish stale text over an externally updated draft. */
 internal class DdlEditorSynchronization(private var published: String) {
     fun adopt(source: String) { published = source }

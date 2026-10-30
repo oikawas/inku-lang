@@ -1,13 +1,12 @@
 {
-  "schema": "inku.ddl-export.v1",
+  "schema": "inku.ddl-export.v2",
   "language": "en",
-  "ddl": "Washi.\n5 Water.Rings.",
+  "ddl": "Washi.\n5 {rings}.",
   "plugins": [
     {
       "definition": {
-        "schema": "inku.macro-definition.v1",
+        "schema": "inku.macro-definition.v2",
         "namespace": "Water",
-        "heading": "Rings",
         "version": "2.0.0",
         "parameters": {
           "ring_count": {
@@ -1054,11 +1053,18 @@
             ]
           }
         ],
-        "aliases": [
-          "水輪"
-        ]
+        "id": "Rings",
+        "names": {
+          "ja": [
+            "水輪"
+          ],
+          "en": [
+            "rings"
+          ]
+        },
+        "kind": "scene"
       },
-      "summary": "Spread one ripple on the water, seen at a low angle across it (mizuwa). The same broken rings and bleeding drop as the ripple seen from above are widened a little and flattened to about a third of their height, each outer ring's center a little lower so the rings open toward the viewer. The lines are thin brush, the inner three ultramarine and the outer three pale ink (gray). Five short pale-ink horizontal strokes, like light reflected on the water, lie to the sides of and below the rings. The whole tilts slightly, up to 3 degrees either way. The written ring count (1–6), or 4–5 when none is written. It sits at one of five positions in the lower half of the canvas."
+      "note": "A ripple seen at a low angle: flattened rings and reflections on the water."
     }
   ],
   "exported_from": {}

@@ -187,17 +187,16 @@ class CredentialStore:
         with self.lock("edit:" + owner, deadline or time.monotonic() + 5):
             value = self.read(owner)
             previous = value["profiles"].get(profile["id"])
-            if expected_generation is not None and (not previous or previous["generation"] != expected_generation):
-                raise ChatGPTError("chatgpt_session_changed")
-            if previous and any(previous[key] != profile[key] for key in ("issuer", "sub", "client_id")):
-                raise ChatGPTError("chatgpt_identity_mismatch")
+            from .verified_model_catalog import core_catalog
+            answer = core_catalog("chatgpt_auth_save_check", previous=previous, expected_generation=expected_generation, count=len(value["profiles"]))
+            if "error" in answer:
+                raise ChatGPTError(answer["error"])
             if previous:
                 # Token refresh and reauthorization must not replace newer model choices.
-                profile = {**profile, "published_models": previous.get("published_models", []),
-                           "model_purposes": previous.get("model_purposes", {}),
-                           "model_metadata": previous.get("model_metadata", {})}
-            if not previous and len(value["profiles"]) >= 8:
-                raise ChatGPTError("chatgpt_profile_limit")
+                answer = core_catalog("chatgpt_auth_preserve", profile=profile, previous=previous)
+                if "error" in answer:
+                    raise ChatGPTError(answer["error"])
+                profile = answer["profile"]
             value["profiles"][profile["id"]] = profile
             if activate:
                 value["active"] = profile["id"]

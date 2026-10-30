@@ -129,11 +129,8 @@ test('T-19: every toggle writes its own field to the server', () => {
 test('T-19: the server keeps the sketch fold and ignores the retired field', () => {
 	// Unknown keys do not survive normalize_user_model_settings: a web-only
 	// change here would round-trip to the default on the next login.
-	const model = readFileSync(
-		new URL('../../../../../server/src/inku_server/model_settings.py', import.meta.url),
-		'utf8'
-	);
-	assert.match(model, /"sketch_open": True/);
-	assert.match(model, /clean\["sketch_open"\] = settings\.get\("sketch_open"\) is not False/);
-	assert.doesNotMatch(model, /ddl_expanded_open/);
+	const cases = JSON.parse(readFileSync(new URL('../../../../../server/tests/data/provider-settings-cases.json', import.meta.url), 'utf8'));
+	assert.equal(cases.user_normalization.find((item: {input: unknown}) => item.input === null).result.sketch_open, true);
+	assert.equal(cases.user_normalization.find((item: {input: {sketch_open?: boolean} | null}) => item.input?.sketch_open === false).result.sketch_open, false);
+	assert.ok(cases.user_normalization.every((item: {result: Record<string, unknown>}) => !('ddl_expanded_open' in item.result)));
 });

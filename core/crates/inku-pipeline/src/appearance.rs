@@ -988,7 +988,7 @@ fn geometry(node: roxmltree::Node<'_, '_>) -> Option<(Runs, Option<f64>)> {
         ),
         "polyline" | "polygon" => {
             let values = numbers(node.attribute("points")?);
-            let points: Vec<[f64; 2]> = values.chunks_exact(2).map(|p| [p[0], p[1]]).collect();
+            let points: Vec<[f64; 2]> = values.as_chunks::<2>().0.to_vec();
             (vec![(points, node.tag_name().name() == "polygon")], None)
         }
         _ => return None,

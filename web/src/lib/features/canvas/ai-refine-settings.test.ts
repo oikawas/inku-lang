@@ -11,9 +11,17 @@ test('the choices kept for the browser loop open the Server run with their gener
 });
 
 test('the run keeps its moves, its two moves and its direction', () => {
+	// Kept before the chunk move (2026-10-27), which opens off.
 	const kept = { moves: 3, laws: false, juxtaposition: true, note: '夜の静けさへ' };
-	assert.deepEqual(parseAiRefineSettings(JSON.stringify(kept)), kept);
+	assert.deepEqual(parseAiRefineSettings(JSON.stringify(kept)), { ...kept, chunks: false });
 	assert.equal(parseAiRefineSettings(JSON.stringify({ note: 'あ'.repeat(1200) })).note.length, 1000);
+});
+
+test('a kept chunk move opens alone, the other two moves off', () => {
+	const kept = { moves: 4, laws: false, juxtaposition: false, chunks: true, note: '具象から抽象へ寄せる。' };
+	assert.deepEqual(parseAiRefineSettings(JSON.stringify(kept)), kept);
+	// Written by hand or by another build: the Server would refuse the three together.
+	assert.deepEqual(parseAiRefineSettings(JSON.stringify({ ...kept, laws: true, juxtaposition: true })), kept);
 });
 
 test('nothing kept, or something unreadable, opens with the defaults field by field', () => {

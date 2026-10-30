@@ -31,7 +31,7 @@ fn cycle_keeps_odd_counts_and_exact_ordered_values() {
         ]}]
     }).to_string()).unwrap();
     assert!(definition.validate().diagnostics().is_empty());
-    let source = "Pattern.Marks";
+    let source = "｛Marks｝";
     let binding = binding(&definition, source, "en");
     let seeds = seeds(&binding, source, 7);
     let result = expand_macros(binding, &[definition], &seeds, LIMITS);
@@ -94,7 +94,7 @@ fn exact_decimal_survives_source_parameter_component_and_choices() {
         "body":[{"op":"use","component":"mark","arguments":{"v":{"expr":"parameter","name":"r"}}},
             {"op":"vary","binding":"size","domain":"size","choices":[{"expr":"exact_decimal","value":"0.20"}],"range":null,"body":[{"op":"emit","binding":null,"fields":{"diameter":{"expr":"local","name":"size"}}}]}]
     }).to_string()).unwrap();
-    let source = "Exact.Mark radius 0.10";
+    let source = "｛Mark｝ radius 0.10";
     let binding = binding(&definition, source, "en");
     assert!(binding.diagnostics.is_empty(), "{:?}", binding.diagnostics);
     let seeds = seeds(&binding, source, 7);
@@ -314,7 +314,7 @@ fn crossed_seed_is_not_accounted_by_name_or_ordinal_alone() {
             .unwrap()
         })
         .collect();
-    let source = "Expand.Empty Expand.Other";
+    let source = "｛Empty｝ ｛Other｝";
     let document =
         NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, locks).unwrap();
     let binding = bind_macro_parameters(&document, &definitions).unwrap();
@@ -416,7 +416,7 @@ fn vary_framing_paths_and_modulo_match_fixed_known_answers() {
     );
 
     let different_seed = derive_macro_seed(
-        &all.source,
+        &seed_vector_source(&all.source),
         &MacroInvocation::new("studio", "枝組.共通", 0).unwrap(),
         Some(all.composition_seed + 1),
     );
@@ -480,8 +480,8 @@ fn vary_framing_paths_and_modulo_match_fixed_known_answers() {
 fn identity_expression_repeat_and_budget_failures_are_atomic_stable_diagnostics() {
     let fixture = load_fixture();
     let empty = definition(&fixture, "empty");
-    let empty_binding = binding(&empty, "Expand.Empty", "en");
-    let empty_seed = seeds(&empty_binding, "Expand.Empty", 0);
+    let empty_binding = binding(&empty, "｛Empty｝", "en");
+    let empty_seed = seeds(&empty_binding, "｛Empty｝", 0);
 
     assert_global_failure(
         expand_macros(
@@ -496,8 +496,8 @@ fn identity_expression_repeat_and_budget_failures_are_atomic_stable_diagnostics(
         MacroExpansionDiagnosticKind::InvalidLimits,
     );
 
-    let two_binding = binding(&empty, "Expand.Empty。Expand.Empty", "ja");
-    let two_seeds = seeds(&two_binding, "Expand.Empty。Expand.Empty", 13);
+    let two_binding = binding(&empty, "｛Empty｝。｛Empty｝", "ja");
+    let two_seeds = seeds(&two_binding, "｛Empty｝。｛Empty｝", 13);
     assert_global_failure(
         expand_macros(
             two_binding,
@@ -512,8 +512,8 @@ fn identity_expression_repeat_and_budget_failures_are_atomic_stable_diagnostics(
     );
 
     let all = definition(&fixture, "all");
-    let all_binding = binding(&all, "studio.枝組.共通 2", "en");
-    let all_seed = seeds(&all_binding, "studio.枝組.共通 2", 7);
+    let all_binding = binding(&all, "｛枝組共通｝ 2", "en");
+    let all_seed = seeds(&all_binding, "｛枝組共通｝ 2", 7);
     assert_global_failure(
         expand_macros(
             all_binding.clone(),
@@ -576,7 +576,7 @@ fn identity_expression_repeat_and_budget_failures_are_atomic_stable_diagnostics(
         MacroExpansionDiagnosticKind::DuplicateSeed,
     );
     let wrong_seed = derive_macro_seed(
-        "studio.枝組.共通 2",
+        "｛枝組共通｝ 2",
         &MacroInvocation::new("studio", "枝組.共通", 1).unwrap(),
         Some(7),
     );
@@ -590,7 +590,7 @@ fn identity_expression_repeat_and_budget_failures_are_atomic_stable_diagnostics(
         MacroExpansionDiagnosticKind::MismatchedSeed,
     );
     let ordinal_only_seed = derive_macro_seed(
-        "studio.枝組.共通 2",
+        "｛枝組共通｝ 2",
         &MacroInvocation::new("Other", "Seed", 0).unwrap(),
         Some(7),
     );
@@ -604,7 +604,7 @@ fn identity_expression_repeat_and_budget_failures_are_atomic_stable_diagnostics(
         MacroExpansionDiagnosticKind::MismatchedSeed,
     );
     let both_mismatch_seed = derive_macro_seed(
-        "studio.枝組.共通 2",
+        "｛枝組共通｝ 2",
         &MacroInvocation::new("Other", "Seed", 9).unwrap(),
         Some(7),
     );
@@ -640,8 +640,8 @@ fn identity_expression_repeat_and_budget_failures_are_atomic_stable_diagnostics(
         MacroExpansionDiagnosticKind::BindingOwnershipMismatch,
     );
 
-    let repeat_binding = binding(&all, "studio.枝組.共通 4", "en");
-    let repeat_seed = seeds(&repeat_binding, "studio.枝組.共通 4", 7);
+    let repeat_binding = binding(&all, "｛枝組共通｝ 4", "en");
+    let repeat_seed = seeds(&repeat_binding, "｛枝組共通｝ 4", 7);
     assert_invocation_failure(
         expand_macros(
             repeat_binding,
@@ -653,8 +653,8 @@ fn identity_expression_repeat_and_budget_failures_are_atomic_stable_diagnostics(
     );
 
     let mismatch = definition(&fixture, "component-mismatch");
-    let mismatch_binding = binding(&mismatch, "Expand.Mismatch", "en");
-    let mismatch_seed = seeds(&mismatch_binding, "Expand.Mismatch", 0);
+    let mismatch_binding = binding(&mismatch, "｛Mismatch｝", "en");
+    let mismatch_seed = seeds(&mismatch_binding, "｛Mismatch｝", 0);
     assert_invocation_failure(
         expand_macros(mismatch_binding, &[mismatch], &mismatch_seed, LIMITS),
         MacroExpansionDiagnosticKind::ExpressionMismatch,
@@ -676,7 +676,7 @@ fn identity_expression_repeat_and_budget_failures_are_atomic_stable_diagnostics(
 fn incomplete_i581_outcome_is_owned_unchanged_and_never_expanded() {
     let fixture = load_fixture();
     let all = definition(&fixture, "all");
-    let binding = binding(&all, "studio.枝組.共通", "en");
+    let binding = binding(&all, "｛枝組共通｝", "en");
     assert!(binding.complete.is_empty());
     assert_eq!(binding.diagnostics.len(), 1);
     let accepted = binding.clone();
@@ -713,8 +713,8 @@ fn definition_local_place_materializes_its_canonical_value() {
     // The v1 alias `middle` is an unknown id in v2; the migration rewrote it to `center`.
     let id = "center";
     let definition = definition(id);
-    let binding = binding(&definition, "Alias.Place", "en");
-    let seeds = seeds(&binding, "Alias.Place", 17);
+    let binding = binding(&definition, "｛Place｝", "en");
+    let seeds = seeds(&binding, "｛Place｝", 17);
     let result = expand_macros(binding, &[definition], &seeds, LIMITS);
     assert!(result.diagnostics.is_empty(), "{id}");
     let ExpandedMacroNode::Emit { fields, .. } = &result.expanded[0].nodes[0] else {
@@ -772,9 +772,9 @@ fn proportion_width_extent_and_arc_form_preserve_literal_parameter_and_local_val
     .unwrap();
     assert!(definition.validate().is_valid());
 
-    let binding = binding(&definition, "Proportion.Fields full-width", "en");
+    let binding = binding(&definition, "｛Fields｝ full-width", "en");
     assert_eq!(binding.complete.len(), 1, "{:?}", binding.diagnostics);
-    let seeds = seeds(&binding, "Proportion.Fields full-width", 17);
+    let seeds = seeds(&binding, "｛Fields｝ full-width", 17);
     let result = expand_macros(binding, std::slice::from_ref(&definition), &seeds, LIMITS);
     assert!(result.diagnostics.is_empty(), "{:?}", result.diagnostics);
     let emitted = flatten(&result.expanded[0].nodes)
@@ -825,7 +825,7 @@ fn fluctuation_use_checks_deferred_broad_values_and_preserves_semantic_identity(
         "body":[{"op":"use","component":"part","arguments":{"q":{"expr":"parameter","name":"token"}}}]
     }).to_string()).unwrap();
     assert!(definition.validate().is_valid());
-    for (source, succeeds) in [("Sway.Mark swaying", true), ("Sway.Mark narrowly", false)] {
+    for (source, succeeds) in [("｛Mark｝ swaying", true), ("｛Mark｝ narrowly", false)] {
         let binding = binding(&definition, source, "en");
         assert_eq!(binding.complete.len(), 1);
         let seeds = seeds(&binding, source, 17);
@@ -925,6 +925,11 @@ fn binding(
         format!("sha256:{}", identity.full_digest_hex()),
     )
     .unwrap();
+    let lock = if identity.qualified_name() == "studio.枝組.共通" {
+        lock.with_aliases(["studio.枝組共通".to_owned()]).unwrap()
+    } else {
+        lock
+    };
     let language = match language {
         "ja" => ResolvedInstructionLanguage::Ja,
         "en" => ResolvedInstructionLanguage::En,
@@ -944,9 +949,22 @@ fn seeds(
         .iter()
         .map(|complete| {
             let resolved = &binding.macro_resolution.resolved[complete.invocation_index];
-            derive_macro_seed(canonical_ddl, &resolved.invocation, Some(composition_seed))
+            derive_macro_seed(
+                &seed_vector_source(canonical_ddl),
+                &resolved.invocation,
+                Some(composition_seed),
+            )
         })
         .collect()
+}
+
+// The seed vectors exercise the standalone seed algorithm with the same
+// historical input bytes; the invocation itself is parsed from current DDL.
+fn seed_vector_source(source: &str) -> String {
+    source
+        .replace("｛Empty｝", "Expand.Empty")
+        .replace("｛Typed｝", "Expand.Typed")
+        .replace("｛枝組共通｝", "studio.枝組.共通")
 }
 
 fn flatten(nodes: &[ExpandedMacroNode]) -> Vec<&ExpandedMacroNode> {

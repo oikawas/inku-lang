@@ -2,17 +2,144 @@
 
 import json
 import asyncio
+from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from threading import Barrier
 
 import httpx
+import pytest
 from sqlalchemy import create_engine, select
 
 from inku_server.model_settings import connection_for, public_model_settings, update_model_settings
 from inku_server.persistence.schema import AppSettingRow
 from inku_server.pipeline_provider import ProviderOptions, SingleAttemptProvider
-from inku_server.provider_rate_limits import ProviderRateBudget, RateLimitUnavailable
+import inku_render
+from inku_server.provider_rate_limits import ProviderRateBudget, RateLimitUnavailable, RateAccountingUnavailable, _replace_state, estimate_input_tokens, retry_after_seconds
+
+
+def test_core_admission_matches_shared_cases_and_preserves_json():
+    cases = json.loads((Path(__file__).parent / "data/provider-admission-cases.json").read_text())["cases"]
+    for case in cases:
+        actual = json.loads(inku_render.pipeline_provider_admission(json.dumps(case["request"]).encode()))
+        assert actual == case["expected"], case["name"]
+        if "state" in actual:
+            old = case["request"]["state"]
+            _replace_state(old, actual)
+            assert json.dumps(old, separators=(",", ":")) == json.dumps(case["expected"]["state"], separators=(",", ":")), case["name"]
+
+
+def test_overflow_refuses_corrupt_state(tmp_path):
+    state = {"events": [{"id": "a", "at": 1000.0, "tokens": 2**64 - 1}], "day": "1970-01-01", "daily": 0, "not_before": 0}
+    request = {"action": "admit", "state": state, "now": 1001.0, "kind": "openai", "limits": {"rpm": 0, "tpm": 0, "rpd": 0}, "id": "b", "input_tokens": 1}
+    assert json.loads(inku_render.pipeline_provider_admission(json.dumps(request).encode())) == {"error": "corrupt_state"}
+    engine = create_engine(f"sqlite:///{tmp_path / 'corrupt.db'}")
+    AppSettingRow.__table__.create(engine)
+    raw = json.dumps(state, separators=(",", ":"))
+    with engine.begin() as connection:
+        connection.execute(AppSettingRow.__table__.insert().values(key="provider_rate_usage:p", value=raw, at=0))
+    with pytest.raises(RateAccountingUnavailable):
+        asyncio.run(ProviderRateBudget(engine, clock=lambda: 1001.0).reserve("p", "openai", request["limits"], 1))
+    with engine.connect() as connection:
+        assert connection.execute(select(AppSettingRow.value)).scalar_one() == raw
+
+
+def test_large_integer_count_is_estimated_exactly_and_rejected_by_budget():
+    count = 2**64
+    estimate = estimate_input_tokens("gemini", 16000, 100, {"totalTokens": count})
+    assert estimate == (count * 11 + 9) // 10
+    with pytest.raises(RateLimitUnavailable, match="request exceeds the configured input-token budget"):
+        asyncio.run(ProviderRateBudget(None).reserve("fixture", "gemini", {"rpm": 0, "tpm": 16000, "rpd": 0}, estimate))
+
+
+@pytest.mark.parametrize("payload", [{"totalTokens": -1}, {"totalTokens": True}, {"totalTokens": 1.0}, {}, [], None])
+def test_invalid_count_refuses_before_generation(payload, monkeypatch):
+    monkeypatch.setattr("inku_server.pipeline_provider.provider_for_model", lambda *args, **kwargs: ("gemini", "m"))
+    monkeypatch.setattr("inku_server.pipeline_provider.connection_for", lambda *args: {
+        "id": "gemini", "kind": "gemini", "base_url": "https://provider.invalid",
+        "api_key": "fixture-only", "requires_api_key": True,
+        "rate_limits": {"rpm": 30, "tpm": 16000, "rpd": 10},
+    })
+    calls = []
+    async def request(value):
+        calls.append(value.url.path)
+        return httpx.Response(200, content=json.dumps(payload).encode())
+    class Budget:
+        async def reserve(self, *args):
+            pytest.fail("an invalid count must not reserve or send")
+    provider = SingleAttemptProvider(ProviderOptions({}, "gemini:m", "gemini:m", 2048, 8192),
+                                     transport=httpx.MockTransport(request), rate_budget=Budget())
+    action = {"tag": "generate_normalized_ddl", "identity": {"action_id": "a", "attempt": 1, "request_digest": "b"},
+              "timeout_ms": "120000", "payload": {"prompt": {"system": "s", "message": "m",
+              "action_name": "generate_normalized_ddl", "response_schema": {"type": "object", "properties": {}}}}}
+    assert provider(action)["failure"] == ("rate_limited" if isinstance(payload, dict) else "malformed_payload")
+    assert len(calls) == 1 and calls[0].endswith(":countTokens")
+
+
+def test_disabled_tpm_skips_gemini_count_and_reserves_zero(monkeypatch):
+    monkeypatch.setattr("inku_server.pipeline_provider.provider_for_model", lambda *args, **kwargs: ("gemini", "m"))
+    monkeypatch.setattr("inku_server.pipeline_provider.connection_for", lambda *args: {
+        "id": "gemini", "kind": "gemini", "base_url": "https://provider.invalid",
+        "api_key": "fixture-only", "requires_api_key": True,
+        "rate_limits": {"rpm": 0, "tpm": 0, "rpd": 0},
+    })
+    calls, reservations = [], []
+    async def request(value):
+        calls.append(value.url.path)
+        return httpx.Response(200, json={"candidates": [{"content": {"parts": [{"functionCall": {
+            "name": "submit_pipeline_response", "args": {"normalized_ddl": "fixture"},
+        }}]}}]})
+    class Budget:
+        async def reserve(self, provider, kind, limits, tokens):
+            reservations.append(tokens)
+            return "fixture"
+        def settle(self, *args):
+            pass
+    provider = SingleAttemptProvider(ProviderOptions({}, "gemini:m", "gemini:m", 2048, 8192),
+                                     transport=httpx.MockTransport(request), rate_budget=Budget())
+    action = {"tag": "generate_normalized_ddl", "identity": {"action_id": "a", "attempt": 1, "request_digest": "b"},
+              "timeout_ms": "120000", "payload": {"prompt": {"system": "s", "message": "m",
+              "action_name": "generate_normalized_ddl", "response_schema": {"type": "object", "properties": {}}}}}
+    assert provider(action)["tag"] != "provider_failed"
+    assert reservations == [0]
+    assert len(calls) == 1 and calls[0].endswith(":generateContent")
+
+
+def test_retry_info_accepts_json_byte_encodings():
+    body = '{"error":{"details":[{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"91s"}]}}'
+    for encoding in ("utf-8", "utf-8-sig", "utf-16", "utf-16-be", "utf-32", "utf-32-be"):
+        assert retry_after_seconds({}, body.encode(encoding), now=0) == 91
+
+
+def test_db_json_matches_original_sequence(tmp_path, monkeypatch):
+    fixture = json.loads((Path(__file__).parent / "data/provider-admission-sequence.json").read_text())
+    engine = create_engine(f"sqlite:///{tmp_path / 'sequence.db'}")
+    AppSettingRow.__table__.create(engine)
+    now = [0.0]
+
+    class Paused(Exception):
+        pass
+
+    async def wait(seconds):
+        raise Paused(seconds)
+
+    budget = ProviderRateBudget(engine, clock=lambda: now[0], sleep=wait)
+    for step in fixture["steps"]:
+        now[0] = step["now"]
+        status = "ok"
+        try:
+            if step["action"] == "reserve":
+                monkeypatch.setattr("inku_server.provider_rate_limits.uuid.uuid4", lambda: type("Id", (), {"hex": step["id"]})())
+                asyncio.run(budget.reserve("fixture", "gemini", fixture["limits"], step["value"]))
+            elif step["action"] == "settle":
+                budget.settle("fixture", "id0", step["value"])
+            elif step["action"] == "pause":
+                budget.cool_down("fixture", step["value"])
+        except Paused as error:
+            status = "wait:" + str(error.args[0])
+        assert status == step["status"]
+        with engine.connect() as connection:
+            assert connection.execute(select(AppSettingRow.value)).scalar_one() == step["json"]
 
 
 def test_batch_admission_counts_all_stages_waits_on_tpm_and_429_and_keeps_daily_usage(tmp_path, monkeypatch):

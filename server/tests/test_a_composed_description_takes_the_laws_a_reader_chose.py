@@ -131,6 +131,6 @@ def test_a_composed_description_is_printed_with_the_laws_its_reader_chose(author
     kept = prompts.json()
     assert kept["stages"] == ["catalog", "image_catalog", "image_ddl", "image_review",
                               "sketch", "stage1", "composition", "laws", "colors", "stage2",
-                              "reading", "description_ddl", "description_review"]
+                              "reading", "description_composition", "description_ddl", "description_review"]
     assert kept["laws"]["system"] == laws["system"]
     assert kept["laws"]["message"] == laws["message"]

@@ -49,6 +49,10 @@ class SingleAttemptModelEffectProvider(
             "select_image_catalog" -> "image_catalog_selected"
             "write_image_ddl" -> "image_ddl_written"
             "review_image_ddl" -> "image_ddl_reviewed"
+            "read_description" -> "description_read"
+            "compose_description" -> "description_composed"
+            "write_description_ddl" -> "description_ddl_written"
+            "review_description_ddl" -> "description_ddl_reviewed"
             else -> throw PipelineHostException("unsupported_provider_effect")
         }
         val identity = action.requiredObject("identity")
@@ -59,7 +63,7 @@ class SingleAttemptModelEffectProvider(
         // The catalog choice keeps Stage 1's limit, as on the server.
         val maxTokens = when {
             stage2 -> models.holeMaxTokens
-            tag == "write_image_ddl" || tag == "review_image_ddl" -> models.imageMaxTokens
+            tag in setOf("write_image_ddl", "review_image_ddl", "read_description", "compose_description", "write_description_ddl", "review_description_ddl") -> models.imageMaxTokens
             else -> models.stage1MaxTokens
         }
         val pipelineImages = prompt.optJSONArray("images")?.takeIf { it.length() > 0 }?.let { references ->
@@ -111,6 +115,7 @@ class SingleAttemptModelEffectProvider(
         val detail = (cause as? InkuFailure)?.detail
             ?: when (cause) {
                 is ProviderRateLimitWaitException -> "rate_limit_wait"
+                is app.inku.mobile.llm.ProviderBudgetRejectedException -> "rate_limit_wait"
                 is ProviderOutputLimitException -> "output_limit_reached"
                 else -> null
             }
@@ -142,6 +147,7 @@ class SingleAttemptModelEffectProvider(
         is MalformedProviderResponseException -> "malformed_payload"
         is ProviderOutputLimitException -> "malformed_payload"
         is ProviderRateLimitWaitException -> "rate_limited"
+        is app.inku.mobile.llm.ProviderBudgetRejectedException -> "rate_limited"
         is app.inku.mobile.llm.ChatGptException -> error.failure
         is ModelProviderHttpException -> error.failure ?: when {
             error.statusCode == 429 -> "rate_limited"

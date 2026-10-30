@@ -86,10 +86,9 @@ uv run inku-cli lineage show PARENT_ID
 
 ### 0.5 `plugin`
 
-* **`plugin list`** — サーバーの宣言的プラグイン文書について、ロード済み／拒否、namespace、version、拒否理由をJSONで取得します。
-* **`plugin validate <FILE.inku-plugin.md>`** — ローカルのUTF-8文書本文を管理APIへ送り、コードや外部ファイルを実行せず構文検証します。
-* **`plugin reload`** — サーバーを再起動せず `server/plugins/` を明示再読込します。
-* `plugin validate`と`plugin reload`は管理者セッションを必要とします（管理者でない場合は403）。`plugin list`はログイン済みセッションで実行できます。プラグイン試験で生成するファイルは `cli/out2/<build>-<version>-<benchmark>/` の一つのrunディレクトリにまとめ、Git追跡しません。
+* **`plugin list`** — ロード済み／拒否された v2 パッケージと理由を JSON で取得します。
+* **`plugin validate <FILE>`** — ローカルの v2 JSON または zip を管理 API の三段階の検査へ送ります。
+* `plugin validate` は管理者セッション、`plugin list` はログイン済みセッションで実行できます。試験で生成するファイルは Git 追跡しません。
 
 ### 0.6 `reference`
 
@@ -118,8 +117,6 @@ uv run inku-cli paint "TEXT" --stage1-model chatgpt:gpt-6-luna --sketch --catalo
 * **`lineage show <ITEM_ID> [--depth D] [--limit L] [--json]`**
   * 指定したIDを基点とする系譜ツリーを表示します。
   * `--json` を指定すると、ツリーに含まれる全ノードとエッジの接続情報（`parent_node_id`, `child_node_id`）を取得できます。
-* **`lineage promote <NODE_ID>`**
-  * 中間ノード（通常履歴に表示されない `lineage_only`）を通常履歴に昇格させます。
 
 ### 2. `refine`
 * **`refine perform <ITEM_ID> --kind {layout|color} [-o DIR] [--png] [--no-save]`**

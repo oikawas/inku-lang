@@ -1,6 +1,6 @@
 import { t } from '$lib/i18n/index.svelte';
 import { setModelLabelTable } from '$lib/modelMeta';
-import { PROVIDER_GROUPS, type ModelLabel, type ModelOption, type Provider, type ProviderGroup } from '$lib/models';
+import { type ModelLabel, type ModelOption, type Provider, type ProviderGroup } from '$lib/models';
 import type { ApiFetch } from '$lib/transport/api-fetch';
 import type { SettingsActor } from './navigation-state.svelte';
 
@@ -71,13 +71,8 @@ type ChatGPTPublication = {
 	models: ModelOption[];
 	enabled_models: Record<string, boolean>;
 	model_labels?: ModelLabel[];
+	assessment_keys?: (keyof ModelOption)[];
 };
-
-// What a ChatGPT plan model is assessed to be: the shared keys every provider's
-// models carry, apart from the purposes a person ticks.
-const ASSESSMENT_KEYS = ['unsupported_purposes', 'not_supported', 'recommendation_llm', 'recommendation_stage1',
-	'recommendation_stage2', 'recommendation_vision', 'speed_class', 'speed_label', 'cost_usd_llm', 'cost_usd_vision',
-	'speed_llm_seconds', 'speed_vision_seconds', 'comment_ja', 'comment_en'] as const;
 
 export function createModelAdministration<TActor extends SettingsActor>(
 	deps: ModelAdministrationDeps<TActor>
@@ -86,8 +81,9 @@ export function createModelAdministration<TActor extends SettingsActor>(
 	let modelSettingsStatus = $state<string | null>(null);
 	let modelFetchResults = $state<Record<string, ModelFetchResult>>({});
 	let modelSettingsLoading = $state(false);
-	let modelCatalog = $state<ProviderGroup[]>(PROVIDER_GROUPS.filter((group) => group.id !== 'nvidia'));
+	let modelCatalog = $state<ProviderGroup[]>([]);
 	let chatgptPublication = $state<ChatGPTPublication | null>(null);
+	let assessmentKeys = $state<(keyof ModelOption)[]>([]);
 	let boundOwner = $state<string | undefined>(undefined);
 	let revision = 0;
 
@@ -99,6 +95,7 @@ export function createModelAdministration<TActor extends SettingsActor>(
 		revision++;
 		boundOwner = undefined;
 		chatgptPublication = null;
+		assessmentKeys = [];
 		modelSettings = null;
 		modelSettingsStatus = null;
 		modelFetchResults = {};
@@ -112,6 +109,7 @@ export function createModelAdministration<TActor extends SettingsActor>(
 
 	function acceptChatGPT(data: ChatGPTPublication): void {
 		setModelLabelTable(data.model_labels);
+		if (data.assessment_keys) assessmentKeys = data.assessment_keys;
 		const models = data.models.map((model) => ({ ...model, purposes: model.purposes ?? ['llm', 'vision'] as ('llm' | 'vision')[] }));
 		chatgptPublication = { ...data, models };
 		const provider: ProviderGroup = { id: 'chatgpt', label: t().chatgptPlanLabel,
@@ -139,8 +137,9 @@ export function createModelAdministration<TActor extends SettingsActor>(
 
 	// The Server response is authoritative for both catalog metadata and stored
 	// provider settings; never retain a locally assembled approximation after a save.
-	function acceptModelResponse(data: { catalog: ProviderGroup[]; settings: ModelSettings; model_labels?: ModelLabel[] }, status: string): void {
+	function acceptModelResponse(data: { catalog: ProviderGroup[]; settings: ModelSettings; model_labels?: ModelLabel[]; assessment_keys?: (keyof ModelOption)[] }, status: string): void {
 		setModelLabelTable(data.model_labels);
+		if (data.assessment_keys) assessmentKeys = data.assessment_keys;
 		modelCatalog = data.catalog;
 		modelSettings = data.settings;
 		if (personalModelsAllowed() && chatgptPublication) acceptChatGPT(chatgptPublication);
@@ -158,6 +157,9 @@ export function createModelAdministration<TActor extends SettingsActor>(
 		boundOwner = owner;
 		const version = revision;
 		modelSettingsLoading = true;
+		modelSettings = null;
+		modelCatalog = [];
+		modelSettingsStatus = null;
 		try {
 			if (isAdministrator()) {
 				const response = await deps.apiFetch('/api/settings/models', { cache: 'no-store' });
@@ -182,7 +184,11 @@ export function createModelAdministration<TActor extends SettingsActor>(
 			}
 			modelSettingsStatus = null;
 		} catch (error) {
-			if (sameOwner(owner, version)) modelSettingsStatus = error instanceof Error ? error.message : String(error);
+			if (sameOwner(owner, version)) {
+				modelSettings = null;
+				modelCatalog = [];
+				modelSettingsStatus = error instanceof Error ? error.message : String(error);
+			}
 		} finally {
 			if (sameOwner(owner, version)) modelSettingsLoading = false;
 		}
@@ -405,8 +411,8 @@ export function createModelAdministration<TActor extends SettingsActor>(
 			// person's publication, whose answer then carries it.
 			const assessments = isAdministrator() ? chatgptPublication.models.flatMap((model) => {
 				const draft = draftModels.find((item) => item.id === model.id);
-				if (!draft || ASSESSMENT_KEYS.every((key) => JSON.stringify(draft[key] ?? null) === JSON.stringify(model[key] ?? null))) return [];
-				return [{ id: model.id, label: model.label, ...Object.fromEntries(ASSESSMENT_KEYS
+				if (!draft || assessmentKeys.every((key) => JSON.stringify(draft[key] ?? null) === JSON.stringify(model[key] ?? null))) return [];
+				return [{ id: model.id, label: model.label, ...Object.fromEntries(assessmentKeys
 					.filter((key) => draft[key] !== undefined && draft[key] !== '').map((key) => [key, draft[key]])) }];
 			}) : [];
 			modelSettingsLoading = true;

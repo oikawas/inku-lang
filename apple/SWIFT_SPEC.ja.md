@@ -1,10 +1,12 @@
 # inku Swift 実装仕様
 
+macOS の履歴帯は矢印キーでページをまたいで移動し、キャンバスとライブラリの `#` は作品 UUID をコピーする。生成情報にはコメントと段ごとのプロンプト digest を表示し、診断は Web の文で示す。自動バックアップの保持世代は確認のうえ削除または復元でき、復元前には現行 DB の控えを残す。筆致制限を外す既定値は次の作品の札とは独立する。AI 推敲のまとまりの手は方向を必須とし、他の手と併用しない。推敲の子はすべて通常の履歴に保存し、既存の中間作品は DB 移行で通常の履歴へ移す。移行前に SQLite の控えを作る。
+
 このディレクトリは、macOS先行のnative SwiftUIクライアントとApple向け共通packageのworkspaceである。本書をSwift host固有の仕様正本とし、[SWIFT_SPEC.md](SWIFT_SPEC.md)を対応英語版とする。共有DDL、Score、prompt、authoring authority、pipeline状態遷移、seed、描画の意味は[製品仕様](../SPEC.ja.md)を正本とし、Serverを開発上のprimaryとして同じRust coreへ追随する。Swift側に意味処理を複製しない。
 
 最終更新: 2026-10-23。
 
-binding／protocolの版は同梱Rust coreのversion report、描画層の版はrender metadataと[Serverの層定義](../server/src/inku_server/layer_versions.py)を参照する。本書へ共通engineの版定数を複製しない。macOSアプリの版は`apple/VERSION`と`apple/BUILD_NUMBER`を正本とする独自の版で、Server／Webの版とは別に採番する（初回は1.0.0／Build 1）。対応するServerの版はアプリの「inkuについて」と変更履歴に併記する。共有層の版が一致しても、host機能とnative UIの移植が完了したことにはならない。
+binding／protocolの版は同梱Rust coreのversion report、描画層の版はrender metadataと[Serverの層定義](../server/src/inku_server/layer_versions.py)を参照する。本書へ共通engineの版定数を複製しない。macOSアプリの版は`apple/VERSION`、Build番号の下限は`apple/BUILD_NUMBER`を正本とし、Server／Webの版とは別に採番する（初回は1.0.0／Build 1）。対応するServerの版はアプリの「inkuについて」と変更履歴に併記する。共有層の版が一致しても、host機能とnative UIの移植が完了したことにはならない。
 
 作品識別`dh1`／`rh3`・正準JSON、指示言語の正規化と判定、記述ラベルの本文と除外位置はUniFFI経由で共有coreを呼ぶ。Swiftには同じ規則を複製せず、coreが返すUnicode scalar位置だけをmacOSエディタのUTF-16位置へ変換する。保存済みの識別値を書き換えない。`ExactJSON.text`は数値の表記を保持する転送用、`canonicalText`はcoreによる正準形とし、prompt用の空白付き`pythonText`は別の書式として保持する。
 
@@ -17,6 +19,28 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 確定した実装変更と残る範囲は本書の日付付き節へ記し、製品の変更履歴は共通の[CHANGELOG.ja.md](../CHANGELOG.ja.md)／[CHANGELOG.md](../CHANGELOG.md)へ同期して記す。Swift専用CHANGELOGを分けない。
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
+
+## 2026-10-29 プラグイン v2 と保存作品の移行
+
+同梱の葉、編集時の参照と診断は共有 core の答えを使う。歳時記・補完・設定・生成情報には括弧つきの名を出す。DDL の持ち運びは `inku.ddl-export.v2` と作品の lock に基づき、v1 ファイルを拒否する。DB v6 は起動時に検証済み `.inku-before-v6-*.sqlite` を残してから作品の DDL の写しを移し、core が断った作品は保持し理由を DB の横の JSON に記録する。定義・lock・Score・SVG は保持する。
+
+## 2026-10-27 macOSのBuild番号
+
+現行の左下表示はBuild番号の数字だけとし、版とラベルを付けない。ダークモードでは白、ライトモードでは標準の文字色を使う。
+
+左下にはアプリのBuild番号だけを明るく表示する。`build-macos.sh`は変更の有無にかかわらず開始ごとに新しい番号を確保し、Info.plistへ入れる。番号はこのMacの`~/Library/Application Support/Inku/build-numbers`に保存し、作業木間で共有する。排他と原子的な保存で同時buildの重複を防ぎ、`apple/BUILD_NUMBER`は既存版との下限とする。失敗したbuildの番号は再使用しない。直接のXcode buildは番号が渡されなければ失敗する。配布用のpackageは完成appの番号を読む。採番記録を消した場合や別のMacでは、それまでの番号の継続は保証しない。
+
+## 2026-10-27 ChatGPTプラン登録の管理
+
+ChatGPTプラン設定では接続状態を再確認でき、接続解除とは別に登録を削除できる。削除前に公開モデル設定も消えることを示して確認する。削除はまずローカル接続を無効にし、提供元への失効を試み、失効が確認できなければその旨を知らせる。登録とその公開モデル設定、対応する未完了登録を取り除き、選択中だった場合は選択を空にする。他の登録と保存作品は保持する。失効待ちの間に新しい接続が成立した場合は新しい登録を消さない。
+
+## 2026-10-27 macOSの画像から描く
+
+制作の画像タブはJPEG・PNG・GIF・TIFFを受け、GIFの先頭、Exifの向きと白地の透明合成をImageIOで扱う。共有coreの画像方針と画面の関数に従って縮めたJPEGをVisionモデルへ渡し、指示書の言語は日本語とする。画像の画素は実行中のメモリだけに置き、参照が失われたら送信前に`image_missing`で取り消す。見比べの画は共有coreのSVGをPNGにして同じ実行で渡す。開発者向けの生通信記録にも画像のリクエストを保存しない。
+
+来歴は描画の入力にせず作品と保存する。ファイル名とExifの自動記入は設定の「画像」でそれぞれ切り替えられ、GPSを含めない。画像送信の警告はアプリ起動ごとの初回に出す。画像作品の保存記録は画像の参照と`image_ddl`を持ち、画像本体は持たない。指示書編集や見た目の子は来歴と画像記録を引き継ぐ。見比べ前の指示書があれば表示し、その指示書から子を描ける。
+
+画像フォルダのバッチは下位フォルダを含め、隠し項目を除きパスの自然順に処理し、失敗を記録して次へ進む。フォルダ別のバッチ記録にパス・サイズ・更新日時と結果を残し、同じフォルダを選び直して続けられる。終了前の結果が不明な画像は不明のまま残し、自動では再送しない。「最初から描く」は明示的に全件をやり直す。`InkuAppCheck --image-run-only`は隔離DBと偽providerで画像の用意・保存と来歴の分離を確認する。
 
 ## 2026-10-23 画面比の宣言とはめ込み
 
@@ -41,12 +65,12 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 ## 2026-10-21 AI自動推敲を共有coreの法則の手・取り合わせの手にする
 
 - AI自動推敲プロセスは、UniFFIの`autonomous_refine`（`inku.autonomous-refine.v1`）を呼ぶ。`next`が手番と終端、`measure`が親子のSVGの見える差、`record`が子の辺の`ai_move`を決める。端末は送信・描画・保存・画面だけを担当し、Server APIは呼ばない。
-- 手数は1〜10（既定5）、使う手は法則・取り合わせの1つ以上、方向性は前後を除いて1,000 UTF-16単位以内。モデルは既存の取り合わせと同じVision用途のpickerで1つ選び、一文の選択・Stage 1・Stage 2・法則の段をそのモデルに固定する。言語は画面の言語。暴れるは指定しなければ親のまま。手数・使う手・方向性を`interface.json`の`autonomousRefine`に覚える。
+- 手数は1〜10（既定5）、使う手は法則・取り合わせの1つ以上、方向性は前後を除いて1,000 UTF-16単位以内。モデルは既存の取り合わせと同じVision用途のpickerで1つ選び、一文の選択・Stage 1・Stage 2・法則の段をそのモデルに固定する。言語は画面の言語。「筆致制限を外す」は指定しなければ親のまま。手数・使う手・方向性を`interface.json`の`autonomousRefine`に覚える。
 - 法則の手は親の指示書・記述・completion_ranges・laws_layers・laws_basisを共有pipelineの`saved_laws`へ渡す。親の保存条件・種・palette・キャンバス・限りを使い、子は記述固定で`laws_change`（札は「法則」／Laws）になる。取り合わせの手は既存の`juxtaposition`を使い、coreの`rank`・`reuse`・除外文と系譜ですでに足した文を尊重して`joined`から描く。子は`description_edit`で、辺に`edited_from_history_id`・`juxtaposition`とcoreの`ai_move`を残す。
 - 法則の手はStage 1と構図の読みを再送しない。親の保存設定に`colors`があれば`choose_laws`の後に`choose_colors`も送り、無ければ`choose_laws`だけを送る。段を選ぶのは共有coreで、端末は保存設定を保つ。
 - 子はすべて`lineage_only`で保存する。`kept`だけを次の親にし、差が小さい子も系譜に残す。終端は`moves_done`・`nothing_available`・`stalled`・`stopped`・`interrupted`・`failed`。停止時は進行中の送信・描画を取り消す。終端では最後の`kept`だけを通常履歴に出す。可視差は品質・順位・採否の判定ではなく、スター等は作者が決める。
 - runはAppModelが1つずつ回し、画面を閉じても続く。進み具合は作品DBと別の、DB名に対応する`.autonomous-runs.json`へatomic writeで残す。作品の正本は作品と辺の記録。次の起動で走行中のrunを`interrupted`にし、最後の`kept`を履歴へ出す。自動でLLM送信を再開しない。
-- 画面はWebと同じ順に、題・説明・固定注記・モデル・使う手・手数と暴れる・方向性・開始を出す。実行中は試みごとの小さな画・手番・手・結果・見える差・一文か主の法則・理由、終端後は終わり方と最後の子を開くボタンを出す。Webの`aiRefine*`を同梱し直し、常駐先の文だけ「サーバー」から「アプリ」へ適応する。
+- 画面はWebと同じ順に、題・説明・固定注記・モデル・使う手・手数と「筆致制限を外す」・方向性・開始を出す。実行中は試みごとの小さな画・手番・手・結果・見える差・一文か主の法則・理由、終端後は終わり方と最後の子を開くボタンを出す。Webの`aiRefine*`を同梱し直し、常駐先の文だけ「サーバー」から「アプリ」へ適応する。
 - 旧Vision方式の自動実行と`aiRefine`の設定は廃止する。前の作品の`autonomous_refine_mode`（vision／random）や`vision_*`はそのまま読める。10-18節の自動推敲の方式・確認は、その時点の履歴である。
 - `--shared-autonomous-refine-only <cases>`は`server/tests/data/autonomous-refine-cases.json`の全行をUniFFI経由で照合する。`--auxiliary-provenance-only`は偽providerと一時SQLiteで両方の手・辺・可視差・履歴昇格・停止・再起動を確かめる。`--saved-laws-stages-only`は保存設定の配色あり・なしで、法則の手の送信順とStage 1・構図の読みを再送しないことを確かめる。実providerと作者の画面受入は別に確認する。
 
@@ -58,7 +82,7 @@ Webの「取り合わせ」（Build 1282。決まりはBuild 1294で共有core�
 - 決まりはUniFFIの`juxtaposition`（`inku.juxtaposition.v1`）に任せ、Swiftに写さない。候補を集める`gather`、頼む文の`prompt`、答えを確かめて足した後の記述を返す`check`を、Serverの`juxtaposition.py`と同じ順に呼ぶ。Swiftは候補の元を集め、画を作り、Visionへ送り、子を描く。
 - 候補の元は、ゴミ箱でない、系譜だけでない（`history_visibility`が`normal`）、札が`DDL`・`[demo]`でない、コメントに`test data`が無い（大文字小文字を問わない）、記述がある、今の作品でない作品。記述が固定されているかは、メニューと同じ保存条件（Stage 1の生成で`description_authoritative`）で決める。記述のラベルはcoreで除く。系譜は根から今の作品までの記述（ラベルを除き、続けて同じものは1つ）と、辺の記録の`juxtaposition.sentence`を渡す。seedは要求ごとのUInt64を十進の文字列で渡す。候補の上限はServerの設定の初期値の400に決める（macOSに設定は置かない）。
 - Visionへは、作品の画（768×768のPNG、画像助言と同じ作り方）を添え、温度0.35、上限1200で送る。頼む言葉は画面の言葉。モデルは設定のVisionモデルが既定で、ダイアログで選ぶと設定にも保存する。coreが答えを断ったら、その理由を添えて1回だけ送り直し、2回目も断られたら理由を出して止まる。
-- 一文を選んで「この記述で描く」を押すと、coreの`joined`（保存した記述にラベルごと一文を足したもの）から、「記述を変える」と同じ道で子を描いて保存する。辺の記録は`edited_from_history_id`と、Webの`juxtapositionMetadata`と同じ`juxtaposition`の7欄（`sentence`・`history_ids`・`rank`・`reason`・`position`・`candidates`・`model`）。暴れる・色カタログ・キャンバスは親のまま。「選び直す」は、このダイアログで出した一文をすべて除いて頼み直す。
+- 一文を選んで「この記述で描く」を押すと、coreの`joined`（保存した記述にラベルごと一文を足したもの）から、「記述を変える」と同じ道で子を描いて保存する。辺の記録は`edited_from_history_id`と、Webの`juxtapositionMetadata`と同じ`juxtaposition`の7欄（`sentence`・`history_ids`・`rank`・`reason`・`position`・`candidates`・`model`）。「筆致制限を外す」・色カタログ・キャンバスは親のまま。「選び直す」は、このダイアログで出した一文をすべて除いて頼み直す。
 - 同梱の`ui-reference.json`はBuild 1294から作り直した。取り合わせの鍵のほか、Webの履歴の絞り込みの札（「スターのみ」→「スター」、「推敲マークのみ」→「推敲」、「グループ共有のみ」→「共有」と、その吹き出し）の変化も入った。
 - 確かめ：`--shared-juxtaposition-only <cases>`は、共通の表`server/tests/data/juxtaposition-cases.json`のgather 5行・check 8行・prompt 2行を、Swiftの要求の組み立てを通してcoreに頼み、表と比べる。`--juxtaposition-only`は、候補の元の除き方、DBの読み出し、1回の送り直し、子の記録と系譜の下で同じ一文を出さないことを、偽の送り口と一時的なSQLiteで見る。
 
@@ -234,13 +258,13 @@ Webと同じく、起動時は通常の保存作品を保存時刻の新しい�
 
 ## 2026-10-15 バッチタブ
 
-バッチの見出し・補足・本文の字体と行間、空欄の3行の例と行番号、件数と入力履歴の順をWebへ揃える。入力欄の右下をドラッグすると高さを変えられる。入力履歴は高さをウインドウの半分までに抑えたスクロール一覧で、先頭行を表示し、選択すると入力欄だけを復元して閉じる。次の条件のモデル・色カタログと写生・暴れる・キャンバス・新規作成を同じ並びに置き、nativeのseed詳細は条件見出しの三点へ置く。実行中の無効な条件欄は開始時の記録を表示し、次回用の設定値を書き換えない。
+バッチの見出し・補足・本文の字体と行間、空欄の3行の例と行番号、件数と入力履歴の順をWebへ揃える。入力欄の右下をドラッグすると高さを変えられる。入力履歴は高さをウインドウの半分までに抑えたスクロール一覧で、先頭行を表示し、選択すると入力欄だけを復元して閉じる。次の条件のモデル・色カタログと写生・「筆致制限を外す」・キャンバス・新規作成を同じ並びに置き、nativeのseed詳細は条件見出しの三点へ置く。実行中の無効な条件欄は開始時の記録を表示し、次回用の設定値を書き換えない。
 
 再開cardは中断の札、元の行番号・残件・完了数、元の入力と条件を使い完了済みの作品を描き直さない説明と再開操作を示す。実行中は現在行をcompactに表示し、次の条件を編集不可で表示した下に進捗と停止をまとめる。その下に直前に保存できた行の写生と指示書を読み取り専用で表示し、次の処理行の番号へ付け替えない。指示書のトークンはその保存作品の実測記録を読み、欠落は`-`とする。全成功の固定summaryは出さず、失敗がある場合だけ元行・本文・理由を展開したreportと失敗行の再描画を出す。背景バッチの失敗を単一描画の全体エラー欄へ複写しない。nativeの全行結果と結果不明の行の明示した再試行／省略は保持する。開始・再開・停止・固定request・保存契約は変えない。
 
 ## 2026-10-15 記述タブと指示書エディタ
 
-記述タブの次のモデルはサービスとモデルを区切って表示し、ChatGPTプランを選んだときは使用状況への入口を併記する。色カタログの自動選択とキャンバスの表記をWebへ揃え、条件の主な行は写生・暴れる・キャンバスの3操作とする。nativeのシード／配色の詳細は「次に描く条件」の見出しの三点ボタンから開ける。接続先の不足やローカルbackupの案内は保持する。
+記述タブの次のモデルはサービスとモデルを区切って表示し、ChatGPTプランを選んだときは使用状況への入口を併記する。色カタログの自動選択とキャンバスの表記をWebへ揃え、条件の主な行は写生・「筆致制限を外す」・キャンバスの3操作とする。nativeのシード／配色の詳細は「次に描く条件」の見出しの三点ボタンから開ける。接続先の不足やローカルbackupの案内は保持する。
 
 既存作品と新規DDLはWebと同じ大きい指示書エディタを使う。本文へ最初のfocusを置き、下に既定で開く歳時記、右に押した保存作品の画像と編集中の範囲の枠を置く。新規では描画後に画像が出る旨を示す。語彙と簡易ガイドは本文上のボタンで開閉し、語彙のhover／focusで作例、クリックで本文のcaret／選択へ挿入する。別sheetは開かない。
 
@@ -297,10 +321,10 @@ AI自動推敲プロセスは、記述ロック・DDL直接入力の作品もVis
 
 作者の指示（Server Build 1190との差の取り込み、段C-3）。正本はWebの`features/ddl-editor/codemirror.ts`の`ddlCompletions`。
 
-- 指示書の箱とエディタで、カーソルの前の語の始まり（大文字小文字は問わない）に合う候補を、macOSの補完の一覧で出す。候補は指示書の言語（`AppModel.instructionLanguage(for:)`）の歳時記の語と、マクロの名（日本語は別名の1つ目、ほかは修飾名、Webの`pluginDisplayName`）。有効なプラグインの語だけ。
+- 指示書の箱とエディタでは、指示書の言語（`AppModel.instructionLanguage(for:)`）の歳時記の語と有効なプラグインの名を候補に出す。プラグインの主の名とほかの名で照合し、主の名を括弧ごと入れる。
 - 一覧は作者が打った時だけ開き、選ぶまで文を変えない（初めは何も選ばない）。語を選んで入れた時・名前の追従・外から文を戻した時は開かない。読み取り専用・変換中・開いた範囲の数の中では出さない。
 - 語の始まりは、カーソルの前の空白・句読点・記号の無い並びのうち、候補の始まりに合う最も長いもの。英字の語の途中からは始めない（`.`と`_`は語の中に含める）。日本語は区切りが無いので、候補に合う最も長い末尾を取る。Webは曖昧な一致で並べるが、Swiftは始まりの一致だけ。
-- 確認：AppCheck `--ddl-box-only`（本物の歳時記とマクロで、日本語・英語・別名・修飾名が出ること、英字の語の途中・空白の後・開いた範囲では出ないこと）。
+- 確認：AppCheck `--ddl-box-only` は本物の歳時記とプラグインを使い、UI 試験は括弧の補完とほかの名を確かめる。
 
 ## 2026-10-13 指示書の数の範囲を畳み、絵の上で確かめ、打ち直す
 
@@ -418,6 +442,7 @@ Geminiへの描画pipeline・Vision・デモの指示文は、共有coreの[`pro
 ## 2026-10-12 左下に版とBuildを常に出す
 
 作者の指示「アプリの左下に、バージョン番号とビルド番号を常時表示する」による。
+以下は当時の表示記録。現行の表示は上記「2026-10-27 macOSのBuild番号」に従う。
 
 - 左端の操作列（[`AppRailView`](Sources/InkuUI/Views/AppRailView.swift)）の一番下、窓の左下に、アプリの版とBuild（`apple/VERSION`・`apple/BUILD_NUMBER`から入る`CFBundleShortVersionString`・`CFBundleVersion`）を出す。畳んだ列では`1.1.2`と`Build 4`の2行、広げた列では`1.1.2 · Build 4`の1行。
 - 見た目はWebの操作列の一番下のBuildの表示（`.rail-build`）に合わせる：10pt、淡い文字、等幅の数字。ツールチップは`Build 4`。
@@ -514,7 +539,7 @@ macOS版を初めて配布するにあたり、画面・操作・保存した選
 
 ### 選択の保存
 
-- 制作条件（色カタログとその自動選択、用紙、暴れる）、設定画面の最後のタブ、作品／系譜、記述／バッチ、ライブラリの表示方式と表示形式、推敲の種類、自律推敲の前回設定、モデル比較の選択を、表示設定（`interface.json`）へ保存する。保存した値がもう無いカタログ・用紙のときは既定に戻す。
+- 制作条件（色カタログとその自動選択、用紙、「筆致制限を外す」）、設定画面の最後のタブ、作品／系譜、記述／バッチ、ライブラリの表示方式と表示形式、推敲の種類、自律推敲の前回設定、モデル比較の選択を、表示設定（`interface.json`）へ保存する。保存した値がもう無いカタログ・用紙のときは既定に戻す。
 - 表示設定とデモ設定は項目ごとに読み、欠けた項目や型の合わない項目だけを既定に戻す。読めないファイルは上書きせず、日時付きの名前で残す。版を上げても他の選択は失われない。
 - デモで選んだモデルが一時的に使えないときは、表示だけをStage 1のモデルにし、保存した選択は書き換えない。
 - 新しく作る表示設定の既定は、Webと同じくテーマdark、写生欄を開く。既存の保存値は変えない。
@@ -525,6 +550,7 @@ macOS版を初めて配布するにあたり、画面・操作・保存した選
 - DDL編集済みの作品では記述を固定し、「この記述から新しい作品を作る」で元作品の子として新しい作品を作る（Serverの`fork_linked_history`と同じ）。
 - 表示中作品の写生文をその場で直せる。直した文はそのまま解釈へ渡る。
 - DDL editorは行数・文字数、行番号、ハイライト、言語ラベル、未登録プラグイン名、簡易ガイドを出し、語をキャレット位置へ挿入する。
+- 題の行（DDL 27、前後の空白を除いた行の全体が`「名」`・`"名"`・`“名”`）は描かないので、DDLの表示では見出しの色と下線で出し、中の語に色を付けず、語を補完しない。名の無い`「」`を含めて作品一覧の題に使わず、履歴帯の題と未読語の判定は題の行を除いたDDLで読む（決まりはcoreの`chunk_title.rs`、写しは`DdlTitles`）。
 - バッチは番号・コメントだけの行を送らず、件数もWebと同じく本文のある行だけを数える。行番号は保つ。
 - ツールチップはWebと同じく、hoverから0.12秒で出て、キーボードのフォーカスでも出る。押せない部品では理由を出す。macOS標準のtool tipと同じく、操作中の窓（キーウインドウ）の上でだけ出し、背面の窓の上を通っても出さない。Webの173箇所のうち、単一利用者のアプリに無い9箇所を除いて対応する。メニュー項目の中だけはmacOS標準のtool tipを使う。
 
@@ -532,13 +558,13 @@ macOS版を初めて配布するにあたり、画面・操作・保存した選
 
 - 非正方形の用紙は、Serverと同じく既定の高さ1000を保ち、幅を偶数丸めで出す（16:9は1778×1000）。新規の生成と再演奏の両方に適用する。
 - 指示書の言語はWebと同じく常に自動で、記述またはDDLの文字（日本語→英字→UI言語）で決める。言語の選択肢は置かない。
-- Personal ChatGPTの応答解析、HTTP sessionの寿命（要求ごと）、失敗の分類（応答過大、期限0）、rateの待ち方とGeminiのtoken計数の順序、Ollama Cloudの同時2本、model一覧の取得（ページ送り、新しいmodelは無効で登録、消えたmodelはEOLとして残す）、model参照の解決、Gemini schemaの`propertyOrdering`、自動配色の`catalog_mode`、デモの再試行と「暴れる」切、推敲助言と奥書の文脈JSON、失敗文言、PNGの撮影日時、DDL書出しの`exported_from`、描画警告の保存をServer／Webに合わせた。
+- Personal ChatGPTの応答解析、HTTP sessionの寿命（要求ごと）、失敗の分類（応答過大、期限0）、rateの待ち方とGeminiのtoken計数の順序、Ollama Cloudの同時2本、model一覧の取得（ページ送り、新しいmodelは無効で登録、消えたmodelはEOLとして残す）、model参照の解決、Gemini schemaの`propertyOrdering`、自動配色の`catalog_mode`、デモの再試行と「筆致制限を外す」切、推敲助言と奥書の文脈JSON、失敗文言、PNGの撮影日時、DDL書出しの`exported_from`、描画警告の保存をServer／Webに合わせた。
 - 型の欄の並び：coreの型のJSONは欄を名前の順に書くので、hostは`propertyOrdering`を持つオブジェクトの`properties`をその順に書き直して送る（名の無い欄は後ろに名前の順、ほかの鍵と値は変えない）。Geminiだけでなく、OpenAI API（Responses）、OpenAI互換のtools、Ollama・mlxのresponse_format、Anthropicのinput_schema、Personal ChatGPTも同じに送る（描画セッションの依頼、作者の選択、2026-10-13）。今の`propertyOrdering`は構図の読みの型だけにあり、ほかの要求のバイトは変わらない。
 - Geminiのrate設定で欄が欠けた場合は、旧版が0（無制限）を欄の省略で保存していたため、無制限として読む扱いを残す。独自のproviderでkindがanthropic／geminiのものは、kindに合わせて送る。
 
 ### 版・署名・配布
 
-- 版は`apple/VERSION`と`apple/BUILD_NUMBER`からbuild時にInfo.plistへ入れ、作品の来歴の`build`とDDL書出しの`build_number`にも使う。
+- 版は`apple/VERSION`から、Build番号は`apple/BUILD_NUMBER`を下限とするローカル採番からbuild時にInfo.plistへ入れる。完成appの番号を作品の来歴の`build`とDDL書出しの`build_number`にも使う。
 - 配布物は`apple/scripts/package-macos-release.sh`で作る。Universal Release build、第三者通知の照合、Developer ID署名（Hardened Runtime、timestamp、entitlementsは空）、`.dmg`の作成と署名、Appleの公証とstaple、Gatekeeperの確認、SHA-256の記録までを行う。署名identityと公証のprofileは引数か環境変数で渡し、sourceに書かない。
 - 配布アプリはbundle ID `app.inku.macos`と既定のデータ場所を使う。`--database`起動引数とbundleの`InkuDatabasePath`は開発用に残すが、配布物には`InkuDatabasePath`を入れない。
 - 第三者通知はRust crate（registry・git・path・vendored由来）、GRDB、辞書（SudachiDictのUniDic部分を含む）、フォントを網羅し、「inkuについて」の「ライセンス」から全文を読める。
@@ -653,13 +679,13 @@ toolbarの「描画ログ」で直近100件のpipeline実行を新しい順に�
 
 ## 2026-10-04 バッチの入力・選択ダイアログをWebへ揃える
 
-新規バッチは1行に1作品分の記述を入力する。DDLからの新規バッチ描画を選択できず、制作の入力mode・DDL・指定写生を引き継がない。写生はバッチ独立の「なし／あり」で既定は「なし」、各選択にWebと同じ説明を表示する。暴れるは「切／入」を切り替え、開始時の値を全行に固定する。言語とseedは詳細から変更する。
+新規バッチは1行に1作品分の記述を入力する。DDLからの新規バッチ描画を選択できず、制作の入力mode・DDL・指定写生を引き継がない。写生はバッチ独立の「なし／あり」で既定は「なし」、各選択にWebと同じ説明を表示する。「筆致制限を外す」は「切／入」を切り替え、開始時の値を全行に固定する。言語とseedは詳細から変更する。
 
 モデル変更はWebのモデル選択dialogへ揃え、Stage 1/2の共通tab、仮選択の要約、説明、サービス別card、取消・決定を表示する。card選択はdraftだけを変え、決定で次のモデルへ適用し、×・取消・Escapeは破棄する。候補は設定の登録catalogまたは同じ標準接続の同梱catalogにある使用中LLMに限る。登録外の参照を候補や次のバッチの値へ補わず、登録外の既定値では使用中モデルを選ぶまで開始できない。提供終了・契約専用cardは選択不可とし、段別評価は低い段の順に並べる。ChatGPTの順序はcatalogを保つ。hover／keyboard focusで用途・段別評価・速度・表示言語のcommentを示す。dialogを開くだけでHTTP・Keychain・設定保存を行わない。保存済み設定と作品の参照は保持する。
 
 色dialogは「記述から自動選択」の独立cardを先頭に置き、カタログ名・ID・説明と10色の見本・HEX・色名の行を続ける。日本語色名は日本語表示でだけ追加し、幅が狭いときは5列へ折り返す。ランダムの新選択肢は設けない。選択はdraftとし、決定と×で適用、キャンセル・Escapeで破棄する。制作と共有する色dialogでも新規のrandom選択を撤去する。新バッチはautoかfixedを捕捉し、旧random状態は固定されたcatalogとして扱う。
 
-旧バッチ記録のDDL・指定写生・random条件や開始済みrequestは変換しない。再開は従来の凍結requestを使用する。限定確認は既存`InkuAppCheck --batch-ui-only`の2入力に、新規バッチと制作の条件分離・on/auto捕捉・登録外モデル拒否を加える。dialogのdraft確定／取消、写生・暴れる、色行の見た目はnativeとWebの実画面で比較し、実provider推論・作者のデザイン受入・iOSは別の確認とする。
+旧バッチ記録のDDL・指定写生・random条件や開始済みrequestは変換しない。再開は従来の凍結requestを使用する。限定確認は既存`InkuAppCheck --batch-ui-only`の2入力に、新規バッチと制作の条件分離・on/auto捕捉・登録外モデル拒否を加える。dialogのdraft確定／取消、写生・「筆致制限を外す」、色行の見た目はnativeとWebの実画面で比較し、実provider推論・作者のデザイン受入・iOSは別の確認とする。
 
 ## 2026-10-04 バッチの表示崩れと画面構成の修正
 
@@ -681,15 +707,15 @@ macOSのバッチ入力はNSScrollView、NSClipView、NSRulerViewとSwiftUI host
 
 APIキーの存在は秘密値を取得せず照会する。設定済みキーを表示・再入力せず、変更は明示した削除確認後に新しいキーを保存する。接続・model・名前・メモ・rateの通常保存はKeychainを読み書きしない。サービス削除もKeychain項目を削除せず、そのサービスの描画既定参照だけを解除する。APIキーと設定JSONは別資源なので、キー書込後に設定保存が失敗した場合はKeychain項目だけ残りうる。状態を再確認して同じ操作を完了する。取得・推論・OAuthを起動時に自動実行しない。
 
-限定確認は`InkuAppCheck --model-settings-ui-only`を使用する。一時設定／SQLiteと秘密値を扱わないmockで個別保存、invalid URLの拒否、旧設定の読込、draftの破棄、用途・評価・使用設定の再読込、描画候補の制御、keyなし追加・削除を確認する。実APIキー・モデル取得・推論とnative画面の目視受入は別に行う。共有Rustと作品DB schemaは変更しない。
+限定確認は`InkuAppCheck --model-settings-ui-only`を使用する。一時設定／SQLiteと秘密値を扱わないmockで個別保存、共有 core の URL 検査、正規化済み設定の読込、draftの破棄、用途・評価・使用設定の再読込、描画候補の制御、keyなし追加・削除を確認する。実APIキー・モデル取得・推論とnative画面の目視受入は別に行う。作品DB schemaは変更しない。
 
 ## 2026-10-04 Server準拠の標準providerセット
 
-同じcheckoutのServerの公開provider定義から、OpenAI API Platform、Claude API、Gemini API、NVIDIA NIM、Ollama、Ollama Cloudの6接続を同梱する。表示名、接続方式、default URLとAPIキー要否はServer sourceから生成し、環境変数やServerの実設定・credentialは取り込まない。Personal ChatGPTは専用設定で明示して有効にする。
+共有 core の provider 定義から OpenAI API Platform、Claude API、Gemini API、NVIDIA NIM、Ollama、Ollama Cloud の6接続を読む。環境変数や Server の実設定・credential は取り込まない。Personal ChatGPT は専用設定で明示して有効にする。
 
-新規設定と旧設定の初回読込で不足するIDだけを追加し、既存接続のURL・方式・credential ID・制限値、モデル選択、plugin・描画設定を保持する。`providers.json`に追加済みmarkerを原子的に保存し、以後の起動で重複追加や設定再保存を行わない。作者が削除した標準接続も自動で復活させない。APIキーは作者が設定画面で入力してKeychainへ保存する。追加処理はKeychainへアクセスせず、HTTP・モデル取得・生成を開始しない。
+`providers.json` の読み込みと更新は共有 core で正規化し、既存の URL・方式・credential ID・モデル選択と plugin・描画設定を保持する。以前に削除した組み込み接続は無効のまま保存し、設定に戻さない。正規化後の全モデルに公開の真偽を記録し、以前に公開されていなかったモデルを勝手に公開しない。鍵の値は Keychain に置き、core の設定へ渡さない。
 
-設定と制作のモデルchooserは、同じServerの同梱catalogを候補として表示する。同じprovider IDと接続方式に限って使用し、カスタム接続へ流用しない。提供終了モデルは新選択候補から除くが、既存の選択値と手入力を保持する。明示して取得した接続先の候補を優先して併合し、サービスが現在提供するモデルや契約の利用可否を同梱候補から保証しない。Claudeは`/v1/models`、Geminiは`/v1beta/models?pageSize=1000`、OpenAI互換は`/models`へ明示取得する。バッチdialogの登録済み候補と確定操作は上の現行契約に従う。
+設定・制作のモデル候補、参照の引き当て、一覧取得の URL・ページと結果の併合は共有 core を使う。HTTP と credential の管理は Swift に残す。提供終了モデルは新選択候補から除くが、既存の選択値と手入力を保持する。
 
 限定確認は`InkuAppCheck --provider-defaults-only`を使用する。一時設定とSQLiteで新規追加、旧設定の保持、再読込と明示削除、offline候補・一覧取得URLを確認する。実APIキーの入力・モデル取得・推論とnative画面の受入は別に行う。共有Rustと作品DB schemaは変更しない。
 
@@ -747,9 +773,9 @@ DB指定は`--database`、任意のbundle設定`InkuDatabasePath`、従来のApp
 
 制作画面で登録済みのserviceと描画modelを選択する。設定したmodelと明示取得したmodel一覧を表示し、一覧取得は利用者のbutton操作だけで始める。選択した次のmodelは記述解釈と構造化の両段へ渡し、設定画面の保存defaultや親作品のmodelを書き換えない。新しい生成要求・推敲・比較の初期選択は次のmodelを使い、開始済みbatch／demoのmodelはそのsnapshotへ固定する。未接続時はモデル設定へ案内する。
 
-制作とモデル設定の「モデルの適性・用途」は`server/src/inku_server/model_catalog.json`（`inku.model-catalog.v2`）を`server-defaults.json`の`model_catalog`としてそのまま同梱し、ChatGPTプランも同じ正本から読む。用途、解釈／構造化と両段の評価、Visionの評価、日英comment、平均秒数・概算USD費用、更新日時と提供状態を表示する。両段の評価は弱い段階の値、段階別評価がない場合はLLM評価を使う。正確なcatalog service ID・接続方式・model IDで照合し、Ollama tagの`:`を保持する。custom serviceや未登録modelを名前やURLから推測で評価しない。Serverのdeveloper専用速度情報は公開環境と同じく表示しない。登録資料と接続先から明示取得した入力上限・対応機能は別欄にし、案内を読むだけで選択・保存default・開始時snapshotを変更しない。
+制作とモデル設定の「モデルの適性・用途」は`core/crates/inku-pipeline/data/model_catalog.json`（`inku.model-catalog.v2`）を埋め込んだcoreからUniFFIで受け取り、ChatGPTプランも同じ正本から読む。用途、解釈／構造化と両段の評価、Visionの評価、日英comment、平均秒数・概算USD費用、更新日時と提供状態を表示する。両段の評価は弱い段階の値、段階別評価がない場合はLLM評価を使う。正確なcatalog service ID・接続方式・model IDで照合し、Ollama tagの`:`を保持する。custom serviceや未登録modelを名前やURLから推測で評価しない。Serverのdeveloper専用速度情報は公開環境と同じく表示しない。登録資料と接続先から明示取得した入力上限・対応機能は別欄にし、案内を読むだけで選択・保存default・開始時snapshotを変更しない。
 
-札の名前・順序・公開可否は正本の`labels`表だけから読む（Host用の小さい札の表もexportで生成する）。記録の札に端末の確かめによるsubscription・eolを重ね、用途が無ければno_responseを足す。計測欄を1つも持たず他の札がすべて公開可能ならunmeasuredを足す。空配列・nullでも計測欄の存在として数える。折りたたみは最後の札、札が無ければ通常一覧、選べるかはすべての札の`publishable`で決まる。モデル設定・ChatGPTプランの公開選択・描画選択・比較は非空の折りたたみを表の順に件数付きで初期は閉じて表示し、行と詳細にすべての札を出す。公開できない札は警告色、ほかは控えめな色にする。保存済みの名前・用途・明示的な利用可否補正を保ち、正本にあるモデルの評価と非アクセス札は最新正本で置き換える。正本評価は読取表示、カスタムモデルは端末で編集できる。ChatGPTプランの公開と用途は本人の保存値を使い、正本defaultsから自動公開しない。`InkuAppCheck --model-catalog-only <server/tests/data/model-catalog-cases.json>`で共通15件の札・折りたたみ・公開可否と正本の同梱、保存値との重ね合わせを確かめる。
+札の名前・順序・公開可否、段階と並べ順はcoreの答えを使い、端末のsubscription・eolの観測を入力に重ねる。空配列・nullでも計測欄の存在として数える。設定の一覧はWebと同じ字の順で並べる。モデル設定・ChatGPTプランの公開選択・描画選択・比較は非空の折りたたみを表の順に件数付きで初期は閉じて表示し、行と詳細にすべての札を出す。公開できない札は警告色、ほかは控えめな色にする。保存済みの名前・用途・明示的な利用可否補正を保ち、正本にあるモデルの評価と非アクセス札は最新正本で置き換える。正本評価は読取表示、カスタムモデルは端末で編集できる。ChatGPTプランの公開と用途は本人の保存値を使い、正本defaultsから自動公開しない。`InkuAppCheck --model-catalog-only <core/crates/inku-pipeline/data/model-catalog-cases.json>`で共通の札・選択・並べ順とcoreの一覧、保存値との重ね合わせを確かめる。
 
 計測で応答の無かった用途（`unsupported_purposes`）も選べる（2026-10-26作者指示、Server v2.15.261 / Build 1337に合わせた）。モデルの公開選択のLLM・Visionボタンは押せるが赤枠で示し、ヒントで「システムとしては推奨しない」ことを伝える。明示して選んだ用途だけをモデルの`allowedUnsupportedPurposes`に保存し、正本のdefaultsや正本との重ね合わせ、一覧の取り直しから来る用途からは今までどおり外す。no_responseは、用途から応答の無かった用途を除くと空になる時に付き（明示して選んだ用途があっても残る）、公開可能だが警告色のまま表示する。用途の無いモデルは公開せず、「表示中を全て選択」でも公開しない。描画のモデル選択と比較のカードは、その用途に応答の無かったモデルを赤枠にして「推奨しません（計測で応答なし）」と示し、モデル選択では応答したモデルの後に並べる。ChatGPTプランの公開選択は変えず、応答の無かった用途は選べない。
 
@@ -773,7 +799,9 @@ private executionの`ProviderAttemptObservation`は本文を任意に持ち、�
 
 macOS menuはactive sceneの操作可否を使う。⌘Nは新規制作、⌘Oは画面buttonと共通のDDL file読込、⌘,は設定、⌘1〜4は制作／library／系譜／batch・demo、⇧⌘Eは書出し、⇧⌘Cは画像copy。既存の⌘Return生成、Escape停止、⇧⌘Fプレゼンテーションと併用する。生成・自動実行・読込・dialog・presentationの状態に合わせて対象操作を無効化し、menu経由で別の書込みを割り込ませない。設定はsystem sidebarとgrouped formを使い、モデル設定への導線は該当categoryを開く。
 
-同梱の歳時記、13色catalog、11用紙と7語のMacro／plugin定義はServer sourceから生成し、共通Rustで定義とdigest lockを解決する。pluginの有効切替は新作品へ適用し、保存作品の定義を置き換えない。DDL packageのimportは`inku.ddl-export.v1`の本文・付属定義・lock・整数表現を検証し、次の新作品へ添える。4MiB／64定義を超える入力や不完全な定義は拒否し、途中結果を採用しない。
+同梱の歳時記、13色catalog、11用紙と7語のMacro／plugin定義はServer sourceから生成し、共通Rustで定義とdigest lockを解決する。pluginの有効切替は新作品へ適用し、保存作品の定義を置き換えない。DDL packageのimportは`inku.ddl-export.v2`の本文・付属定義・lock・整数表現を検証し、次の新作品へ添える。4MiB／64定義を超える入力や不完全な定義は拒否し、途中結果を採用しない。
+
+macOS の設定では plugin package の JSON／zip を選び、共通 core の検査と provider を使わない例の描画の結果を語ごとに確認して追加・置き換えできる。追加した package は DB と同じ場所の `plugin-packages` に置き、有効な語を新作品の catalog、歳時記、DDL の補完と強調に使う。読み込めない package は理由を表示して削除できる。同梱 package は削除できず、有効・無効だけを切り替える。削除後も保存作品の定義は保持する。
 
 色カタログのnative chooserはID、言語に応じた説明、順序付き色見本、HEXと日英の色名を表示する。固定／記述から自動選択をdraftとして編集し、決定・×で次の条件だけへ適用、キャンセル・Escapeで破棄する。新しいrandom選択は用意しない。直接DDLでは自動選択を使わず、入力をDDLへ切り替えた時に既存auto選択をfixedへ戻す。
 
@@ -813,7 +841,7 @@ Swift物理schemaはv4で、10table構成を保ち、local annotationの廃止�
 
 catalog／model比較は開始時の作品・Score・設定を固定する。候補は採用前に通常履歴／系譜へ保存せず、選択した候補だけをidempotentに保存する。model比較は使用中の登録LLMを最大4件選び、catalog比較は元を除くcatalog候補を使う。Swiftでは逐次生成する。停止とdialogのcloseは処理の終了を待ち、遅れて届いた候補を混入させない。
 
-model助言、random／Vision推敲、奥書は通常生成と同じprovider transportを使う。通常pipeline外の補助要求はServerと同じく描画pipelineの共有rate予算へ加算しない。推敲は色カタログ・配置の2種類で、親の保存DDLを使い、記述を上書きしない。方向性はVisionの観察にだけ渡し、助言を描画の記述に追加しない。中間の推敲作品は`lineage_only`として保持する。自動推敲の各child edgeはWebと同じ`autonomous_refine_mode`を記録し、Visionではその世代の`vision_model`／`vision_observation`／`vision_next_direction`も記録する。randomの来歴へ以前の画面上のVision助言を混ぜない。奥書は生成した原文を成功時にimmutable recordとして追記し、既存本文を上書きしない。旧採用本文は互換読取を保持し、DB backupへ含める。
+model助言、random／Vision推敲、奥書は通常生成と同じprovider transportを使う。補助のテキスト要求も描画と同じrate予算を使い、GeminiのcountTokens、精算と429後の待ちを行う。同時数の待ち合わせには通さず、ChatGPTプランは予算の対象外とする。推敲は色カタログ・配置の2種類で、親の保存DDLを使い、記述を上書きしない。方向性はVisionの観察にだけ渡し、助言を描画の記述に追加しない。中間の推敲作品は`lineage_only`として保持する。自動推敲の各child edgeはWebと同じ`autonomous_refine_mode`を記録し、Visionではその世代の`vision_model`／`vision_observation`／`vision_next_direction`も記録する。randomの来歴へ以前の画面上のVision助言を混ぜない。奥書は生成した原文を成功時にimmutable recordとして追記し、既存本文を上書きしない。旧採用本文は互換読取を保持し、DB backupへ含める。
 
 batchは空行を除く最大1000入力を受け、元の行番号とmodel、provider、定義、seed等を開始時に固定する。一巡後の失敗行だけを既定0／最大5回再実行する。明示した再開でも固定条件を保持する。再起動時に実行結果が不明な行は利用者の再試行／省略選択を待ち、自動再送しない。demoは開始時の設定を固定し、生成記述と作品を表示する。履歴保存は既定で無効、間隔1〜3600秒、実行時間60〜86400秒。間隔はiteration開始から測り、満了は次の開始を止める。停止は実行と保存結果の終了を待つ。
 
@@ -827,11 +855,25 @@ batchは空行を除く最大1000入力を受け、元の行番号とmodel、pro
 
 RPM／入力TPMは62秒windowで設定値の90%を使用し、正の小さい設定は最低1とする。Geminiはsystem／本文／schemaを含むcountTokensに10%の余裕を加え、他方式は実際の送信JSONのUTF-8 byte数に128を加えた保守的な予算を用いる。成功時は実入力usageで精算し、入力usageや送信状態が不明な場合は入力TPMが有効なときだけ予約を保って62秒待つ。日次要求数は既知429と再試行も含み、GeminiはAmerica/Los_Angeles、他方式はUTCの午前0時に切り替える。429は62秒、Retry-Afterの秒数／HTTP日時、Gemini RetryInfoの最大値を待ち、既存の待機期限を短縮しない。待機は共通coreが定めた有限の試行期限へ含め、Host独自の再試行を追加しない。
 
+これらの計算は共有 core の provider admission を使い、予約の判断と状態更新は既存 SQLite transaction 内で行う。保存状態と旧 JSON の取込記録は保ち、待機・期限・HTTP は Swift が扱う。Gemini の大きな countTokens は整数を丸めず上限判定へ渡す。429 の本文は UTF-8・UTF-16・UTF-32 を共通 core が読み、読めない RetryInfo の値では後続の値を使わない。
+
 設定値は0〜1,000,000,000の整数で、0は上限なし。rate設定全体がない標準`gemini` serviceは30／16,000／14,400を使い、他serviceは0を使う。既存のrate設定objectで個々の値が欠落している場合は、従来の「0＝上限なし」を保持する。設定画面は3値と隣接する説明buttonを表示し、0を明示保存できる。
 
 自動backupは既定で無効であり、アプリ起動中に生成・復元・自動実行の終了を待つ。検証済みbackupの成功後にmanifestを確定し、アプリ自身が記録した世代だけを削除する。手動backupを自動世代管理へ含めない。任意の生成結果logは実際に保存した作品だけを記録し、古い作品を開くだけでは作らない。
 
+記述からの描画は言葉で読み指示書を書く方法を既定とし、写生と構図を選べる。従来の型で描く方法も選べ、作品に描き方と読みの記録を保持する。
+
 ### Personal ChatGPT
+
+新規接続・再認証・同意の更新に成功した後、モデル一覧を一度更新して描画のモデル選びに反映する。一覧取得に失敗しても接続の成功は保ち、取得の失敗を表示する。設定を開いただけでは一覧を取得しない。
+
+
+
+ChatGPT プランの公開と認証の判断は共有 core を使い、モデル評価、認可、戻り、claim、署名鍵の選択、token の期限と quota の状態を扱う。暗号署名の検証、端末の保存と HTTP は Swift に残す。再認証では既存の暗号化された登録と公開の選択を保持する。
+
+戻りの対象と使用済みの判定、同時の認可試行、前の登録、操作の用途、公開入力、登録削除も共有 core の `model_catalog` に従う。戻りの対象や state が不正なら HTTP 400 を返して listener は待ち続け、state が正しく一度使用済みにした後の失敗は試みを終える。登録削除は接続解除後も signed out の登録だけを消し、別の接続済み登録は保持する。
+
+
 
 Personal ChatGPTは通常のAPI key接続と別に扱い、既定は無効とする。利用者が明示して有効化・接続し、公開したmodelを描画modelとして選ぶ。Stage1／Stage2は同じ描画modelを使用する。本人の接続を複数保存しても、作品DBは一つのローカルlibraryであり、multi-user機能を追加しない。
 
@@ -842,6 +884,8 @@ ChatGPTプランのmodelはVisionにも使う（作者裁定、2026-10-12。契�
 本人認証は127.0.0.1の一時listenerと`/auth/callback`、state／nonce／PKCE、発行済みclient ID、検証したidentityと許可scopeを使用する。資格情報は最大1MiBのAES-GCM暗号化vaultへ原子的に保存し、device-localの32byte keyをKeychainへ置く。平文token fallbackを持たず、SQLite backupに資格情報を含めない。初期無効状態で認証や推論を開始しない。
 
 開始時にprofile ID／generationを固定し、queued要求やbatch／demoの再開で接続を付け替えない。接続解除・切替・quota後は古いrefreshや遅延応答を採用せず、別providerへ暗黙に切り替えない。共有Rustの記述解釈、写生、自動配色、構図の読み、DDL補完と、Vision推敲・奥書をResponses／SSEへ接続する。要求本文、SSEの読み、失敗の分類、モデル一覧の読みは共有coreの`provider_wire`が行う（2026-10-17）。demo用記述とmodel検査はこの接続では未対応として表示する。実本人OAuth、model取得、推論の受入はoffline確認と分ける。
+
+ChatGPT プランの操作判定が共有 core に揃い、言葉で描く4操作と画像から描く3操作も送信できる。画像の操作は Vision 用途に公開したモデルを使い、画像を含む要求本文をモデル一覧取得や token 更新より先に検査する。画像を含む送信の生の記録は残さない。
 
 ### 保存作品の書出しとnative raster
 
@@ -944,7 +988,7 @@ restoreは生成中のUIから開始できず、hostの実行を停止してか�
 
 ### 初期macOS UIと未接続項目
 
-`NavigationSplitView`のrailに作成、ライブラリ、系譜、設定を置く。作成画面は記述／直接DDL、言語、共通catalog／canvas、seed、暴れる設定をapp modelへbindする。初期入力はmodel未接続でも試せる英語の直接DDLである。生成・取消、保存作品の選択と再演奏、read-onlyのDDL／Score、canvasの拡大・移動、最近の作品、library内検索、provider設定、SVG／PNG書出し、画像コピー、manual backup／restoreを接続している。
+`NavigationSplitView`のrailに作成、ライブラリ、系譜、設定を置く。作成画面は記述／直接DDL、言語、共通catalog／canvas、seed、「筆致制限を外す」設定をapp modelへbindする。初期入力はmodel未接続でも試せる英語の直接DDLである。生成・取消、保存作品の選択と再演奏、read-onlyのDDL／Score、canvasの拡大・移動、最近の作品、library内検索、provider設定、SVG／PNG書出し、画像コピー、manual backup／restoreを接続している。
 
 libraryと最近の作品は通常表示の非trash作品を扱い、処理中の選択を無効化する。検索は読出した作品内のローカル検索であり、DB全件のFTS／pagination UIではない。本文が空の作品は表示名を「無題」とし、保存本文を補わない。
 

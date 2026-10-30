@@ -65,7 +65,7 @@ The new password must be at least eight characters. **It does not change unless 
 
 1. Open the `Describe` tab.
 2. Write a short sentence in the description area.
-3. Under `Conditions for the next work`, set `Model`, `Color catalog`, `Sketch from life`, `Wild`, and `Canvas` if needed.
+3. Under `Conditions for the next work`, set `Model`, `Color catalog`, `Sketch from life`, `Lift the stroke limit`, and `Canvas` if needed.
 4. Press `Paint`.
 5. Confirm that the performance appears in the `Work` tab and is saved to history.
 
@@ -149,14 +149,22 @@ If the layer does not answer, the description goes to interpretation unchanged a
 
 `Sketch from life (Stage 0.5)` folds from the triangle in its heading. This state is saved on the account and starts open. The instructions box stays visible. Folding numeric ranges within its editor is separate from collapsing the whole box.
 
-### Read and Draw a Description
+### The Drawing and the Steps It Passes (With a Plan, In Words)
 
-`Drawing` under `Conditions for the next work` in the Describe and Batch tabs chooses `Current stages` (the default) or `Read and draw`. With `Read and draw`, the model reads the description from the speaker's eye, writes what that eye sees as instructions, and corrects them once beside their drawing before the work is made. The composition reading, the laws stage and the color stage are not passed through. The work stays a description's work and can be drawn again from its description or an edited reading. Editing it in the DDL tab holds its description, as it does for any work.
+`Conditions for the next work` in the Describe and Batch tabs has three lines: `Drawing`, `Steps` and `Flow`.
 
-| Sketch | Meaning with `Read and draw` |
+| Line | What it holds |
 |---|---|
-| On | The description is read before the instructions are written. Choosing `Read and draw` turns the sketch on |
-| Off | The instructions are written from the description alone, without a reading |
+| Drawing | `In words` (the default, which starts with the sketch lit) or `With a plan`. In words, the model writes the instructions itself and corrects them once beside the drawing. With a plan, the model fills the fields of a fixed plan and the program writes the instructions from it |
+| Steps | The chips `Sketch from life` and `Composition, laws, colors`. A press lights one (passed); another press turns it off. Their names and hints are the same on both drawings. The colors come with the composition and laws and cannot be left out alone. With a plan always passes all three, so that chip stays lit with a lock |
+| Flow | The steps the current choices pass, in their order, on one line, such as `Description › Sketch › Composition and laws › Write in words › Look and correct › Colors › Picture`. A step a chip added is colored |
+
+With a plan passes the sketch (when lit), the plan, then the composition reading, the laws stage and the color stage. The rest of this section is about In words. With `In words`, the model reads the description from the speaker's eye, writes what that eye sees as instructions, and corrects them once beside their drawing before the work is made. The composition reading, the laws stage and the color stage of With a plan are not passed through. The work stays a description's work and can be drawn again from its description or an edited reading. Editing it in the DDL tab holds its description, as it does for any work.
+
+| Sketch | Meaning with `In words` |
+|---|---|
+| Passed | The description is read before the instructions are written. Choosing `In words` lights the sketch |
+| Not passed | The instructions are written from the description alone, without a reading |
 
 Only the reading reads what the description's bracketed labels hold (such as `[Ki no Tomonori / Kokinshū]`). The choice is not kept as a setting. Opening a work from the history sets it to the way that work was drawn. A child drawn again by a pairing or by AI refinement takes its parent's way.
 
@@ -170,7 +178,9 @@ While it waits, the display names the step at work.
 | `Correcting the instructions beside the drawing…` | The model is shown the drawing of its instructions and corrects them once. A model that cannot read images is not shown it |
 | `Saving the work…` | The committed instructions are drawn and saved |
 
-The reading appears under `Sketch from life (reading)` in the description panel. Editing it with `Edit` and drawing again writes from the edited reading without asking for a new one. `Read and draw` in Generation Info shows the reading, the items dropped because neither the description nor a label holds them, each round (writing and review, with the people drawn), and the instructions before the review. When only instructions that draw nothing could be written, the run stops with the reason.
+The reading appears under `Sketch from life (reading)` in the description panel. Editing it with `Edit` and drawing again writes from the edited reading without asking for a new one. `In words` in Generation Info shows the reading, the items dropped because neither the description nor a label holds them, each round (writing and review, with the people drawn), and the instructions before the review. When only instructions that draw nothing could be written, the run stops with the reason.
+
+With `In words`, the `Composition, laws, colors` chip can be lit or left off (off by default). Lit, after the reading, a composition (its thesis, form, things and laws) is decided first from the description (and its reading), and the instructions are written toward it. The tool measures the written instructions against the laws thing by thing, moves a thing that is a little off into place, and has one far off written again; it builds the things that are patterns, rows and scatters. While it waits it shows "Deciding the composition and laws…". When no composition and laws can be decided, the instructions are written without them. After the review and before the commit, the colors (the colors and the ground) are chosen while the drawing's shapes and places stay ("Choosing the colors…"). When the colors cannot be applied, the instructions before them are committed. `Composition and laws` in Generation Info shows what was decided, the last measure, the pairs that did not fit, the cards, the colors, and the thing each sentence draws. Opening a work sets the chip to whether the work was drawn with the composition and laws passed.
 
 ## 5. Consult the Saijiki
 
@@ -184,7 +194,7 @@ The eleven words under `Surface` each carry a small drawing of how the face is, 
 
 The Saijiki is not autocompletion. Consult it when needed; it does not narrow a description to the existing vocabulary on its own. Picking a word does not start painting.
 
-Plugin words appear in the same row and wear the same face as built-in ones. The explanation is not under the word but in a preview panel separate from the list, which carries four parts: name, effect, example, and picture. The picture appears only when the plugin document ships one; a word without one gets the same fallback picture a built-in word gets.
+Plugin words appear in the same row and wear the same face as built-in ones. The separate preview panel carries the primary name, other names, kind, package note, example, and picture. A PNG included in the ZIP package supplies the picture; otherwise it is drawn from the example. The bundled leaves' pictures come from the shared core package.
 
 ## 6. Read and Edit the Instructions
 
@@ -207,7 +217,7 @@ The instructions box on the Describe tab also lets you edit the whole text direc
 
 `Discard edits` in the box and `Instruction editor` asks for confirmation. Press `Discard` to return to the saved instructions the target work was drawn from. Opening the editor from the box still returns to that work's instructions, rather than the box's draft. The box returns its draft; the editor returns only its own text and leaves the box's draft unchanged. Returning never draws. The button is disabled when the text matches, while read-only or while drawing, and is absent from `New instructions`. Cancel leaves the text unchanged. After discarding, ⌘Z (Ctrl+Z) in that editor restores the text from before the discard.
 
-There are two entrances to the instruction dialog. Both use the same dialog and editor. The text shows line numbers, syntax color, line and character counts; choose the painting model and `Wild` outside the text. While painting, the text, Saijiki, condition changes and close control are unavailable. A failed or stopped painting keeps the text.
+There are two entrances to the instruction dialog. Both use the same dialog and editor. The text shows line numbers, syntax color, line and character counts; choose the painting model and `Lift the stroke limit` outside the text. While painting, the text, Saijiki, condition changes and close control are unavailable. A failed or stopped painting keeps the text.
 
 | Action | Contents |
 |---|---|
@@ -244,13 +254,7 @@ A free line takes only two relations, the "between" words `connected` and `touch
 
 ### A plugin name that does not exist shows up while you type
 
-A `namespace.word` such as `Nature.青葉` is marked in the plugin color only when that qualified name is registered on this server. **A name that is not registered takes a different color, and the reason is listed under the editor.**
-
-- **If the word is a firing word, the editor says how to drop the prefix.** `Nature.菖蒲` reads `Remove "Nature." and it fires as "下草"`, because `菖蒲` is one of the words that fire `Nature.下草` while the qualified name itself does not exist.
-- **If it is not a firing word either**, the editor says `This name is not registered`.
-- **The color means caution, not error.** Plugins can be added later, so a name missing today may be valid tomorrow.
-- **⚠ A qualified name that does not exist costs the whole sentence.** When the expansion layer strips `namespace.`, it removes that sentence with a warning. **The same warning stays under the work after it is painted.**
-- **A word without a dot is unchanged.** Written as plain `菖蒲` it stays an ordinary word and keeps its color.
+Call a word in braces, such as `{green leaves}`. While editing, the shared core checks the work's catalog and marks usable words and reasons such as disabled, misspelled, or ambiguous names. Hover shows the reason or the word's example. Type `{` or `｛` to complete from Japanese and English names; the selection inserts the primary name and closing brace in the instructions' language. The Saijiki and preview show names, kind, note, example, and picture.
 
 ### A work whose DDL was edited holds its description
 
@@ -261,9 +265,9 @@ A work whose instructions (DDL) were edited follows its DDL, not its description
 - A child made by layout or color (or by touch, before it was removed) carries the DDL and is held as well. A child made by reading the description again is not.
 - A work painted from an image (§16) also follows its DDL, not a description, and is held in the same way.
 - The history strip shows a lock mark, and a lineage card shows `Held (DDL edited)`.
-- Autonomous refinement takes laws moves only (a juxtaposition move adds a sentence to the description, so it cannot be taken).
+- Autonomous refinement can take laws moves and chunk moves (a juxtaposition move adds a sentence to the description, so it cannot be taken).
 
-## 7. Choose Model, Color Catalog, Sketch, Wild, and Canvas
+## 7. Choose Model, Color Catalog, Sketch, Stroke Limit, and Canvas
 
 `Conditions for the next work` on the Describe tab apply to the next painting. The input tabs are `Describe`, `Image`, and `Batch`. Batch shows the same kind of choices as its own `Drawing conditions for the next batch`. See §16 for the Image tab's conditions.
 
@@ -272,7 +276,7 @@ A work whose instructions (DDL) were edited follows its DDL, not its description
 | Model | The drawing model used for both Stage 1 and Stage 2 |
 | Color catalog | The catalog that maps abstract color names such as `red`, `blue`, and `gray` onto actual colors |
 | Sketch from life | The grain for Stage 0.5, described in §4 |
-| Wild | Removes the stroke limit |
+| Lift the stroke limit | Removes the stroke limit |
 | Canvas | The aspect ratio |
 
 Drawing uses the same model for Stage 1 and Stage 2. Models measured per stage are ordered by the lower of the two stages. The model for Vision, which reads images, is chosen separately. The Image tab (§16) paints with this Vision model.
@@ -281,7 +285,7 @@ The color catalog list includes `From the description`. Choose it and the server
 
 A work records the colors it was drawn in on its own row. **Redrawing an older work therefore draws it in those colors, not in today's definition of its catalog.** It still draws if the catalog has since been renamed, and it still draws if the catalog has been retired. The catalog name in the status area carries a note in those cases: `Retired` when the catalog is gone, and `No record of its colors` for an older work that has no recorded colors — that one is drawn from the current definition.
 
-`Wild` off is the predictable standard; on, the strokes break, curl, and overlap freely. It applies to the whole work, is recorded on it, and replays.
+`Lift the stroke limit` left off is the predictable standard; lit, the strokes break, curl, and overlap freely. In the next work's conditions it sits on the `Options` line (named `Wild` until 2026-10-27). Set its default for this browser under Settings → Display and operation; it starts off. The input chip chooses for the current drawing and does not change the saved default. Derived works also start from the default rather than the parent, and you can choose again in the dialog. The choice applies to the whole work, is recorded on it, and is used when replaying the saved work as it stands.
 
 There are eleven canvases.
 
@@ -373,7 +377,7 @@ Choosing, saving, and discarding options work as in 8.2.
 Choosing `Juxtapose` (marked `LLM`) under `Redraw from the description` in the work-editing menu opens a dialog that adds a sentence from another work's description after this one. Opening it draws nothing.
 
 1. Choose the Vision model that picks the sentences (by default the account's Vision model) and press `Pick sentences`. From the first sentences of the descriptions of your other works, the AI picks four. Each is shown as its `Sentence` and its `Reason`, one sentence on how adding it moves the idea of the work.
-2. Once the four are shown, `Pick again` and `Draw with this description` take the place of `Pick sentences`. Choosing one shows `The description with the sentence`. `Draw with this description` draws a child of the selected work from Stage 1 and saves it to the lineage, as `Change the description` does. The color catalog, canvas, seeds and Wild come from the original work.
+2. Once the four are shown, `Pick again` and `Draw with this description` take the place of `Pick sentences`. Choosing one shows `The description with the sentence`. `Draw with this description` draws a child of the selected work from Stage 1 and saves it to the lineage, as `Change the description` does. The color catalog, canvas and seeds come from the original work; choose `Lift the stroke limit` in this dialog.
 3. If none fits, press `Pick again`. The sentences shown earlier in this dialog are left out and four are picked again.
 
 Only the descriptions of works you own are candidates; shared works and other people's works are never read. Works in the trash, DDL-authored works, works whose comment says `test data`, and works whose description is held are not used either. Sentences that differ only in spacing or spelling count once. A sentence matching the description of this work or of its lineage, and one this lineage already added by a juxtaposition, is not offered. At most the administrator's `Most sentences to choose from` (in `Other (server)` of Settings, 400 by default) go to the AI; when there are more candidates, each request draws that many at random from all of them.
@@ -386,18 +390,23 @@ Only sentences in the language of the current description are candidates: a desc
 
 From `Autonomous refinement process` in the work-editing menu (`Refine` on the Work tab, or `…` on each work in the Lineage tab), the AI can take moves on a work one after another. The Server takes the refinement, so it goes on after the dialog is closed (since 2026-10-21; before, the browser took it and Vision chose between the color catalog and the composition).
 
-The AI takes two moves.
+The AI takes three moves. The laws move and the juxtaposition move can be chosen together; the chunk move (since 2026-10-27) is chosen alone, without the other two.
 
 - **Laws move**: the work's laws stage again. The laws its parent used are left out so that others are chosen, and a card is invited as the main law. The child is drawn from the saved instructions, so its description is held. Its lineage edge reads `Laws`.
 - **Juxtaposition move**: as `Juxtapose` in the work-editing menu, a sentence is chosen from the descriptions of your other works and added after the description. A sentence the same refinement has shown, or one the lineage already added, is not offered again. It cannot be taken from a work whose description is held or from a DDL-authored work.
+- **Chunk move**: one of the chunks the title lines of the instructions divide the work into (DDL Reference, 3.1) is chosen, and one of these is taken toward the direction: **Omit** (remove the chunk; the last one cannot be removed), **Simplify** (redraw it with half its sentences or fewer), **Move or resize** (move it to a crossing of the golden section, a line of thirds or the center, or make it 0.618 or 1.618 times its size), **Break apart** (shift and turn its sentences against each other), **Repeat** (copy it into a row of 2 to 4) and **Merge** (redraw two chunks as one surface or mass). The AI chooses only the move, the chunk and a reason; a tool rewrites the numbers. For Simplify and Merge, the AI is asked once more to write the new title and sentences. The child is drawn from the instructions, so its description is held. Its lineage edge reads `Chunk move`. It can be taken from a work with title lines or with a composition record (a work drawn `In words` with the `Composition, laws, colors` chip lit), and from a work whose description is held.
 
-A turn makes at most two tries. The first turn starts with the juxtaposition move, and each later turn first tries the move its last kept child was not made by (a laws move's child takes no juxtaposition). A child is kept, and becomes the next turn's parent, only when it looks different from its parent (when a fifth or more of what is drawn changed). A child with too little change stays in the lineage too. The refinement stops when its moves are done, when neither move can start, and when two turns in a row keep no child.
+With the laws and juxtaposition moves, a turn makes at most two tries. The first turn starts with the juxtaposition move, and each later turn first tries the move its last kept child was not made by (a laws move's child takes no juxtaposition). A child is kept, and becomes the next turn's parent, only when it looks different from its parent (when a fifth or more of what is drawn changed). A child with too little change stays in the lineage too.
 
-In the dialog you choose the model for the refinement, the moves to take, the number of moves (1 to 10, 5 by default), Wild and a direction. **The model you choose picks the sentences, takes the laws stage and draws the children.** The direction (up to 1,000 characters) reaches the laws move only, not the juxtaposition move's request. The dialog remembers the number of moves, the moves to take and the direction you chose last time, and opens with them next time (kept in this browser). The wild switch is not remembered; it starts from the work being refined.
+With the chunk move, a turn makes one try. When the AI's answer or the drawn picture fails the checks (nothing leaves the canvas; a rewrite's number of sentences, place and size; no more diagnostics than the parent; and so on), the AI is asked once more with the reason, and if it fails again the turn keeps no child. The instructions a move made are checked before they are drawn too: when they have a line that would not be drawn and the parent has no such line (a sentence that gives one shape two colors, for example), they are not drawn, and the AI is asked again with the line and the reason (since 2026-10-27). No child is dropped for too little change (changes to thin lines and small shapes hardly show in the share that changed). A child that passes the checks becomes the next turn's parent.
 
-After `Start refining`, the progress appears every few seconds: for each turn, the move taken, its outcome (Kept, Too little change, Could not start, Not usable), how much changed, the sentence added or the law chosen, and a thumbnail of the child. `Stop` cancels the child being drawn and keeps the children so far. Closing the dialog does not stop the refinement, and opening the work again shows its progress. One refinement of yours runs at a time.
+The refinement stops when its moves are done, when no move can start, and when two turns in a row keep no child.
 
-When the refinement ends (or is stopped), its last kept child enters the history and opens with `Open the last kept child`. The children before it stay in the lineage only. A refinement cut off by a Server restart reads as cut off.
+In the dialog you choose the model for the refinement, the moves to take, the number of moves (1 to 10, 5 by default), Lift the stroke limit and a direction. **The model you choose picks the sentences, takes the laws stage, chooses the chunk moves and writes their rewrites, and draws the children.** The direction (up to 1,000 characters) reaches the laws move and the chunk move, not the juxtaposition move's request. The chunk move needs a direction and does not start with the field empty; the empty field shows an example in grey ("Move from the figurative toward the abstract. …"). Choosing `Chunk move` among the moves to take clears the other two. The dialog remembers the number of moves, the moves to take and the direction you chose last time, and opens with them next time (kept in this browser). Lift the stroke limit starts from the saved default.
+
+After `Start refining`, the progress appears every few seconds: for each turn, the move taken, its outcome (Kept, Too little change, Could not start, Not usable), how much changed, the sentence added or the law chosen (for a chunk move, the move and the chunk's title, and a rewrite's new title; for example `Simplify “Mount Fuji” → “Overlapping slopes”`), and a thumbnail of the child. `Stop` cancels the child being drawn and keeps the children so far. Closing the dialog does not stop the refinement, and opening the work again shows its progress. One refinement of yours runs at a time.
+
+Every drawn child enters the history, including those that did not pass the gate. When the refinement ends (or is stopped), `Open the last kept child` opens the last child kept as a parent. A refinement cut off by a Server restart reads as cut off. A lineage card's `Details` show the AI move that made the child (which move of the run, the move, what it did, the reason and the change from the parent; since 2026-10-27).
 
 ## 10. Change the Model
 
@@ -419,10 +428,12 @@ Open the provenance drawer at the bottom of the work tab to see the record of th
 |---|---|
 | Sketch | The sketch record and the paper grain (**the record of the work on screen**, not the setting for the next painting) |
 | Interpretation | Stage 1 model, Stage 1 language, requested language, interpretation seed, interpretation fallback and Score fallback records |
-| Performance | Stage 2 model, Stage 2 language, focus, Variation (retired) and its seed (old works only), composition seed, render seed, seed text, Wild, the colour words this work was drawn in, the colour catalogue, the canvas and its ratio, and **three rows for how heavy the drawing is** (`SVG size` / `SVG objects` / `SVG points`) |
+| Performance | Stage 2 model, Stage 2 language, focus, Variation (retired) and its seed (old works only), composition seed, render seed, seed text, Lift the stroke limit, the colour words this work was drawn in, the colour catalogue, the canvas and its ratio, and **three rows for how heavy the drawing is** (`SVG size` / `SVG objects` / `SVG points`) |
 | Identity | work ID (UUID), render hash, description hash, render engine, DDL specification, transform layer, Build |
 | Origin | generation, derivation, batch run ID and line number, comment, UI language |
 | Run | elapsed time, token counts |
+
+The `Offered plugins` row records the words offered to AI in this work's run, their reasons, and words omitted by the limit. A run drawn directly from instructions has no such row.
 
 Every row carries an explanation. The render seed is "the seed that fixes the sway of the performance; the same seed and the same score give the same picture"; the description hash is "the fingerprint of the description; it binds works that came from the same words".
 
@@ -443,8 +454,8 @@ Ordinary Stage 1 generation stops as a failure if its finite retries cannot succ
 The `Lineage` tab shows which explicit action a work was derived from. Performance, composition, reading, model, language, instruction edits, description edits, repaints, canvas changes, fits, and changes of sketch-from-life grain are recorded as parent-child relations. Works made by an earlier variation keep a "Variation (retired)" edge.
 
 - Parentage is never inferred from visual similarity, an identical description, or timing alone.
-- Intermediate works stay in the lineage as `lineage_only` and do not appear in ordinary history. Promoting one moves it into ordinary history.
-- From a lineage card you can promote to ordinary history, comment, star, mark for revision, and move to trash.
+- Intermediate refinement works also appear in ordinary history.
+- From a lineage card you can comment, star, mark for revision, and move to trash.
 - Double-click a lineage card to show that work large in the Work tab.
 - You may also select a work from the lineage and repaint it from its description or instructions.
 - A work painted from an image starts a lineage. A child drawn from its edited instructions, or from `Instructions before review` (§16), is an instruction-edit child and, like color and composition children, keeps the source note.
@@ -487,7 +498,7 @@ Combine `Thumbnails` with `By lineage` to show lineages with at least two works 
 - Syncing to the displayed work and jumping to the oldest or latest page
 - **The words for moving agree everywhere.** On the canvas, the strip and Library alike, left is newer and right is older, and `prev`, `next` and `first` are not used (`← newer` / `older →` / `Latest` / `Oldest`)
 
-`By lineage` groups only on stored lineage nodes and edges. `lineage_only` intermediate works and tombstones are not counted in ordinary history.
+`By lineage` groups only on stored lineage nodes and edges. Deleted tombstones are not counted in ordinary history.
 
 The revision mark is a second mark, independent of the star. Use it for works you mean to return to.
 
@@ -595,7 +606,7 @@ The first time you paint from a picture after signing in, a warning says that pa
 | Color catalog | `Choose from image automatically` lets the model read the image and choose the work's color catalog. Choose another catalog to paint with it |
 | Canvas | `Use image aspect ratio` (the default) chooses, from the eleven papers (§7), the one closest to the image's ratio. Another paper can be chosen as well |
 
-Sketch from life and Wild do not appear on the Image tab; both are off. The instructions are written in Japanese whatever the UI language.
+Sketch from life and Lift the stroke limit do not appear on the Image tab; both are off. The instructions are written in Japanese whatever the UI language.
 
 While you wait, the indicator names the step at work.
 
@@ -727,7 +738,7 @@ Flags you omit fall back to the server defaults. Sketch from life defaults to of
 | Not what you meant | Read the instructions and make place, count, shape, and material concrete |
 | The description is read too coarsely | Turn the sketch on to supplement place and light; review its text and edit it before drawing again if needed |
 | The picture is monotonous | Add one of touch, sway, composition, or color. Or try `Another composition` |
-| The lines are too tidy | Turn `Wild` on |
+| The lines are too tidy | Light `Lift the stroke limit` |
 | Too many elements | State the count explicitly, as in `three lines` or `twelve` |
 | A stated count is reduced | Check the literal ceiling under `Limits` in the settings |
 | Painting is slow | If the running indicator says `Retrying (try 2/4)`, an earlier attempt timed out or its answer could not be used. Wait on the provider's queue, or choose a lighter model |

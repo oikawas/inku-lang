@@ -11,6 +11,8 @@
     {"id": "resolve-explicit-ja", "operation": "resolve", "input": {"text": "one black line", "requested": "ja", "fallback": "en"}, "expected": {"result": "ja"}},
     {"id": "resolve-explicit-en", "operation": "resolve", "input": {"text": "一滴の墨", "requested": "en", "fallback": "ja"}, "expected": {"result": "en"}},
     {"id": "resolve-auto-japanese", "operation": "resolve", "input": {"text": "一滴の墨", "requested": "auto", "fallback": "en"}, "expected": {"result": "ja"}},
+    {"id": "resolve-auto-english-beside-a-japanese-title", "operation": "resolve", "input": {"text": "\"灯台\"\nplace one white circle at center.\n「」", "requested": "auto", "fallback": "ja"}, "expected": {"result": "en"}},
+    {"id": "resolve-auto-japanese-beside-an-english-title", "operation": "resolve", "input": {"text": "\"lighthouse\"\n中心に白い円を置く。", "requested": "auto", "fallback": "en"}, "expected": {"result": "ja"}},
     {"id": "resolve-auto-latin", "operation": "resolve", "input": {"text": "one black line", "requested": "auto", "fallback": "ja"}, "expected": {"result": "en"}},
     {"id": "resolve-auto-mixed-japanese-first", "operation": "resolve", "input": {"text": "black 墨", "requested": "auto", "fallback": "en"}, "expected": {"result": "ja"}},
     {"id": "resolve-digit-punctuation-fallback-ja", "operation": "resolve", "input": {"text": "12345!?", "requested": "auto", "fallback": "ja"}, "expected": {"result": "ja"}},

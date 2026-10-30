@@ -10,7 +10,7 @@
 use std::collections::BTreeMap;
 
 use inku_ddl::work_plan::WorkPlan;
-use inku_ddl::{MacroDefinition, NATURE_LEAVES_V1_JSON, ResolvedInstructionLanguage};
+use inku_ddl::{MacroDefinition, ResolvedInstructionLanguage};
 use inku_pipeline::composition_reading::{
     COMPOSITION_READING_PROMPT_ID, build_composition_reading_prompt,
 };
@@ -46,7 +46,10 @@ fn language(lang: &str) -> ResolvedInstructionLanguage {
 
 /// The bundled nature plugins, which the plans of the run name.
 fn nature_definitions() -> Vec<MacroDefinition> {
-    let package: Value = serde_json::from_str(NATURE_LEAVES_V1_JSON).expect("the asset is JSON");
+    let package: Value = serde_json::from_str(include_str!(
+        "../../inku-ddl/tests/fixtures/nature-leaves-2.1-v1.json"
+    ))
+    .expect("the fixture is JSON");
     package["entries"]
         .as_array()
         .expect("the asset has entries")
@@ -85,6 +88,7 @@ fn the_reading_request_is_built_as_the_prototype_built_it() {
     let definitions = nature_definitions();
     let plugins = work_plan_plugins(&definitions);
     let limits = PromptLimits {
+        max_offered_plugins: 8,
         max_catalog_entries: 64,
         max_summary_bytes: 8192,
         max_catalog_serialized_bytes: 1024 * 1024,

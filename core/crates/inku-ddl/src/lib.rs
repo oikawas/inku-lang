@@ -4,6 +4,7 @@
 
 pub mod attachment;
 pub mod canvas_ratio;
+pub mod chunk_title;
 pub mod clause;
 pub mod compiler_execution;
 pub mod compiler_lock;
@@ -25,13 +26,15 @@ pub use shape_constraint::{SemanticShapeConstraint, ShapeConstraint};
 pub mod language;
 pub mod macro_definition;
 /// Authored, versioned bundled content; definitions use the ordinary Macro language.
-pub const NATURE_LEAVES_V1_JSON: &str = include_str!("../assets/nature-leaves-v1.json");
+/// The installable v2 package bundled with the shared core.
+pub const NATURE_LEAVES_V2_JSON: &str = include_str!("../assets/nature-leaves-v2/package.json");
 pub mod macro_expansion;
 pub mod macro_parameter_binding;
 pub mod macro_resolution;
 pub mod macro_seed;
 pub mod noun_phrase;
 pub mod numeric_range;
+pub mod plugin_names;
 pub use numeric_range::{
     ExactFraction, FadeDirection, FadeLexeme, NumericAngleLexeme, NumericRangeLexeme,
     NumericSegmentLexeme,
@@ -96,6 +99,10 @@ pub use canvas_ratio::{
     CANVAS_RATIO_HEAD_EN, CANVAS_RATIO_HEAD_JA, CanvasRatioDeclaration, CanvasRatioWriting,
     canvas_ratio_sentence, declare_canvas_ratio, declared_canvas_ratio, source_canvas_ratio,
     without_canvas_ratio,
+};
+pub use chunk_title::{
+    DdlChunk, DdlTitleLine, ddl_title_lines, ddl_title_name, ddl_title_text, print_ddl_titles,
+    split_ddl_titles, without_ddl_title_lines,
 };
 pub use clause::{
     CLAUSE_STREAM_SCHEMA_ID, ClauseAtom, ClauseSegment, ClauseSeparator, ClauseSeparatorKind,
@@ -191,7 +198,8 @@ pub use opaque_head::{
 pub use parser::{
     CoreModifierDimension, CoreModifierIdentity, CoreModifierSurfaceForms, CoreModifierValue,
     NEUTRAL_LEXEME_PARSER_SCHEMA_ID, NeutralDiagnostic, NeutralDiagnosticKind, NeutralParseResult,
-    NeutralToken, NeutralTokenKind, SourceSpan, core_modifier_surface_forms, parse_neutral_lexemes,
+    NeutralToken, NeutralTokenKind, SourceSpan, bracketed_plugin_at, core_modifier_surface_forms,
+    parse_neutral_lexemes,
 };
 pub use phrase::{
     DETERMINER_PHRASE_EVIDENCE_SCHEMA_ID, DeterminerPhraseEvidenceAvailability,

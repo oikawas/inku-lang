@@ -550,7 +550,7 @@ mod tests {
         )
         .unwrap();
         let document =
-            NormalizedDdlDocument::new("Guard.Mark", ResolvedInstructionLanguage::En, vec![lock])
+            NormalizedDdlDocument::new("｛Mark｝", ResolvedInstructionLanguage::En, vec![lock])
                 .unwrap();
         let mut compilation =
             compile_typed_ddl(document, std::slice::from_ref(&definition), Some(5), LIMITS);

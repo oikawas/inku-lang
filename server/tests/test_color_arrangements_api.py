@@ -53,7 +53,7 @@ def test_retired_catalog_arrangement_render_save_and_replay(monkeypatch):
     try:
         binding = PipelineBinding()
         effects = ProductPipelineEffects(binding, default_manifest(binding))
-        source = "Nature.青葉。"
+        source = "｛青葉｝。"
         # The complete built-in macro needs no provider, but prepare still
         # checks the user's model catalog. Isolate that fixture preflight;
         # restore the production gate before exercising any API request.
@@ -87,7 +87,11 @@ def test_retired_catalog_arrangement_render_save_and_replay(monkeypatch):
         plan = plan_response.json()
         assert len(plan["entries"]) == 8
         index = plan["entries"][0]["index"]
-        selected_response = client.post("/api/render-color-arrangement", json={"work_id": parent["id"], "index": index}, headers=headers)
+        for supplied in ({}, {"wild": None}, {"wild": False}):
+            response = client.post("/api/render-color-arrangement", json={"work_id": parent["id"], "index": index, **supplied}, headers=headers)
+            assert response.status_code == 200, response.text
+            assert response.json()["render_wild"] is False
+        selected_response = client.post("/api/render-color-arrangement", json={"work_id": parent["id"], "index": index, "wild": True}, headers=headers)
         assert selected_response.status_code == 200, selected_response.text
         selected = selected_response.json()
         assert selected["render_color_source"] == "color_arrangement"
@@ -131,7 +135,7 @@ def test_retired_catalog_arrangement_render_save_and_replay(monkeypatch):
         save = client.post("/api/history", json={
             "input": "untrusted replacement", "ddl": "untrusted replacement", "score": {}, "at": 2,
             "catalog_id": "untrusted catalog", "render_color_map": {"black": "#000000"},
-            "render_seed": 999, "render_wild": False, "save_artifacts": False,
+            "render_seed": 999, "render_wild": True, "save_artifacts": False,
             "lineage_parent_node_id": parent["lineage_node_id"], "derivation_kind": "color_arrangement_change",
             "derivation_metadata": {"color_arrangement_index": index},
         }, headers=headers)

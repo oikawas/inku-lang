@@ -82,6 +82,65 @@ def _registry_row(engine) -> tuple[int, str, str]:
     return int(row[0]), str(row[1]), str(row[2])
 
 
+def _v5_with_intermediate_works(path: Path):
+    engine = _engine(path)
+    with engine.begin() as connection:
+        _create_history_schema(connection)
+        connection.exec_driver_sql("ALTER TABLE history ADD COLUMN history_visibility TEXT NOT NULL DEFAULT 'normal'")
+        connection.exec_driver_sql("CREATE TABLE lineage_nodes (id TEXT PRIMARY KEY, state TEXT NOT NULL)")
+        connection.exec_driver_sql("CREATE TABLE lineage_edges (id TEXT PRIMARY KEY, parent_id TEXT, child_id TEXT)")
+        connection.exec_driver_sql("INSERT INTO history(id, input, score, svg, history_visibility) VALUES "
+                                   "('old', 'preserved', '{}', '<svg/>', 'lineage_only'), "
+                                   "('normal', 'child', '{}', '<svg/>', 'normal')")
+        connection.exec_driver_sql("INSERT INTO lineage_nodes VALUES ('old-node', 'lineage_only'), "
+                                   "('normal-node', 'active'), ('deleted-node', 'tombstone')")
+        connection.exec_driver_sql("INSERT INTO lineage_edges VALUES ('edge', 'old-node', 'normal-node')")
+        connection.exec_driver_sql(migrations._REGISTRY_DDL)
+        connection.execute(text("INSERT INTO schema_migrations VALUES (:version, :name, :checksum, 1)"),
+                           {"version": migrations.IMAGE_VERSION, "name": migrations.IMAGE_NAME,
+                            "checksum": migrations.IMAGE_CHECKSUM})
+    return engine
+
+
+@pytest.mark.parametrize("fail", [False, True])
+def test_v5_history_normalization_is_atomic_and_preserves_the_backup(tmp_path, monkeypatch, fail):
+    path = tmp_path / "history.db"
+    engine = _v5_with_intermediate_works(path)
+    if fail:
+        monkeypatch.setattr(migrations, "require_integrity", lambda _connection: (_ for _ in ()).throw(RuntimeError("injected")))
+    def run():
+        return ensure_current_schema(engine=engine, database_path=path, create_schema=_no_op,
+                                     seed_fresh=_no_op, apply_legacy=_no_op)
+    if fail:
+        with pytest.raises(migrations.MigrationExecutionError) as error:
+            run()
+        snapshot = error.value.snapshot
+    else:
+        outcome = run()
+        snapshot = outcome.snapshot
+        assert (outcome.normalized_works, outcome.normalized_nodes) == (1, 1)
+        assert run().mode == "current"
+    with sqlite3.connect(snapshot.path) as original, sqlite3.connect(path) as current:
+        assert original.execute("SELECT history_visibility FROM history WHERE id='old'").fetchone() == ("lineage_only",)
+        assert current.execute("SELECT history_visibility FROM history WHERE id='old'").fetchone() == (("lineage_only" if fail else "normal"),)
+        assert current.execute("SELECT state FROM lineage_nodes ORDER BY id").fetchall() == [
+            ("tombstone",), ("active",), ("lineage_only" if fail else "active",)]
+        assert current.execute("SELECT * FROM lineage_edges").fetchall() == [("edge", "old-node", "normal-node")]
+        assert current.execute("SELECT input, score, svg FROM history WHERE id='old'").fetchone() == ("preserved", "{}", "<svg/>")
+    engine.dispose()
+
+
+def test_old_history_visibility_field_follows_the_models_extra_policy():
+    from pydantic import ValidationError
+    from inku_server.api_core.models import HistoryPostBody
+    from inku_server.pipeline_product import RunOptions
+
+    body = HistoryPostBody(input="test", score={"instructions": []}, at=1, history_visibility="lineage_only")
+    assert "history_visibility" not in body.model_dump()
+    with pytest.raises(ValidationError):
+        RunOptions(history_visibility="lineage_only")
+
+
 def test_fresh_database_records_baseline_and_second_start_skips_legacy(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -111,8 +111,8 @@ public struct ContentView: View {
         ZStack {
             mainShell
                 .opacity(presentation ? 0 : 1)
-                .accessibilityHidden(presentation)
-                .allowsHitTesting(!presentation)
+                .accessibilityHidden(presentation || ui.libraryOpen || ui.settingsOpen)
+                .allowsHitTesting(!presentation && !ui.libraryOpen && !ui.settingsOpen)
                 .environment(\.inkuTooltipsCovered, presentation || ui.libraryOpen || ui.settingsOpen)
             if ui.libraryOpen && !presentation { libraryOverlay }
             if ui.settingsOpen && !presentation { settingsOverlay }
@@ -169,7 +169,7 @@ public struct ContentView: View {
         }
         .background {
             // Esc leaves the canvas full screen wherever the keyboard is (the viewer takes it first otherwise).
-            if ui.canvasFullScreen {
+            if ui.canvasFullScreen && !ui.libraryOpen && !ui.settingsOpen {
                 Button("") { ui.exitCanvasFullScreen() }
                     .keyboardShortcut(.escape, modifiers: [])
                     .frame(width: 0, height: 0).opacity(0).accessibilityHidden(true)
@@ -196,7 +196,7 @@ public struct ContentView: View {
             }
         }
         .onChange(of: ui.workspaceTab) { _, tab in remember { $0.workspaceTab = tab } }
-        .onChange(of: automation.workspaceInputMode) { _, mode in remember { $0.inputTab = mode } }
+        .onChange(of: automation.workspaceInputMode) { _, mode in model.display.rememberInputTab(mode) }
         .onChange(of: model.library.layout) { _, layout in
             if layout != .lineage { remember { $0.libraryLayout = layout.rawValue } }
         }
@@ -265,7 +265,6 @@ public struct ContentView: View {
                 .accessibilityHidden(ui.libraryOpen)
                 .allowsHitTesting(!ui.libraryOpen)
         }
-        .disabled(ui.settingsOpen || ui.libraryOpen)
     }
 
     /// Web HistoryManager.svelte:1311 covers the window (`position: fixed; inset: 0`).
@@ -429,7 +428,7 @@ public struct ContentView: View {
         ui.settingsOpen = true
     }
     private var savedSettingsSection: SettingsSection? {
-        guard let section = model.display.preferences.settingsTab.flatMap(SettingsSection.init(rawValue:)) else { return nil }
+        guard let section = model.display.settingsTab.flatMap(SettingsSection.init(rawValue:)) else { return nil }
         let detailedOnly: [SettingsSection] = [.plugins, .unread, .limits]
         return detailedOnly.contains(section) && model.display.preferences.settingsDetail != "detailed" ? nil : section
     }
@@ -439,7 +438,7 @@ public struct ContentView: View {
         let saved = model.display.preferences
         if let tab = saved.workspaceTab, ["artwork", "lineage"].contains(tab) { ui.workspaceTab = tab }
         // Web returns to the description tab when the input switch is hidden.
-        if saved.inputTab == "batch", model.display.visible("input_modes"), !automation.isOccupied {
+        if model.display.inputTab == "batch", model.display.visible("input_modes"), !automation.isOccupied {
             automation.workspaceInputMode = "batch"
         }
         if model.descriptionText.isEmpty, model.selectedWork == nil {
@@ -569,7 +568,7 @@ public struct ContentView: View {
         case "presentation":
             if threeDimensionalShown, work.id == workspaceWork?.id { ui.toggleCanvasFullScreen() }
             else { Task { await preparePresentation(work: work) } }
-        case "copy-hash": model.library.copyHash(work.renderHash)
+        case "copy-hash": model.library.copyHash(work.id)
         case "export-card": dialog = .export(ExportSession(works: [work], preserveOrder: false, directCard: true))
         case "draw-ddl":
             // Web DdlViewer: the box's draft is what is drawn, once.

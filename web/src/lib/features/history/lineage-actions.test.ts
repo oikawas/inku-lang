@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import type { HistoryItem } from '../../historyManagerState.svelte.ts';
 import type { LineageNode } from './types.ts';
-import { focusSavedLineageChild, promoteLineageNode, saveLineageNote } from './lineage-actions.ts';
+import { focusSavedLineageChild, saveLineageNote } from './lineage-actions.ts';
 
 const item = (overrides: Partial<HistoryItem> = {}): HistoryItem => ({
 	id: 'work-1',
@@ -38,26 +38,6 @@ test('T-296: saved child focus clears a hiding filter before canvas and lineage 
 		missingWorkError: () => new Error('work')
 	});
 	assert.deepEqual(order, ['fetch:work-2', 'clear', 'fetch:work-2', 'display:work-2', 'lineage:node-2']);
-});
-
-test('T-296: promote drops a response after the current target changes', async () => {
-	let version = 1;
-	const effects: string[] = [];
-	await promoteLineageNode({ id: 'node-1' }, {
-		apiFetch: async () => {
-			version = 2;
-			return jsonResponse(item({ id: 'work-1' }));
-		},
-		contextVersion: () => version,
-		currentItem: () => item(),
-		setCurrentItem: () => effects.push('set'),
-		activeHistoryId: () => 'work-1',
-		currentOffset: () => 0,
-		syncToItem: async () => { effects.push('sync'); },
-		fetchOffset: async () => { effects.push('fetch'); return true; },
-		loadLineage: async () => { effects.push('lineage'); }
-	});
-	assert.deepEqual(effects, []);
 });
 
 test('T-296: note save uses the star projection before lineage reload', async () => {

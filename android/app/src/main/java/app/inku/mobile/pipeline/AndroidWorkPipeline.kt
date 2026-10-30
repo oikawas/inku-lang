@@ -110,16 +110,38 @@ class AndroidWorkPipeline(
         return completionRangeStates(binding, config.toString(), source, record)
     }
 
-    /**
-     * The bundled package's words for display: the Japanese alias in Japanese,
-     * the canonical English heading otherwise (DDL Spec 14).
-     */
+    suspend fun pluginEditorAnalysis(source: String, language: String, executionId: String?, historyId: String?, imported: List<ImportedPluginDefinition>): JSONObject {
+        val enabled = bundledPluginsEnabled()
+        val bundled = configBuilder.bundledPluginWords(language)
+        val execution = executionId?.let { host.executionContext(OWNER_ID, it) }
+        val history = if (execution == null) historyId?.let { readHistory(it) } else null
+        val context = execution?.hostContextJson?.let(::JSONObject) ?: history?.forkContextJson?.let(::JSONObject)
+        val config = execution?.configJson?.let(::JSONObject) ?: context?.optJSONObject("config")
+        val catalog = if (config == null) configBuilder.editorCatalog(language, enabled, imported) else null
+        val definitions = config?.optJSONArray("definitions") ?: JSONArray().also { result ->
+            val entries = catalog?.optJSONArray("entries") ?: JSONArray()
+            for (i in 0 until entries.length()) result.put(entries.getJSONObject(i).getJSONObject("definition"))
+        }
+        val summaries = config?.optJSONArray("macro_summaries") ?: JSONArray().also { result ->
+            val entries = catalog?.optJSONArray("entries") ?: JSONArray()
+            for (i in 0 until entries.length()) result.put(entries.getJSONObject(i).optString("summary"))
+        }
+        val locks = app.inku.mobile.data.db.SaijikiV1Migration.documentLocks(
+            context?.optJSONObject("macro_catalog")?.optJSONArray("definition_locks") ?: catalog?.optJSONArray("locks"))
+        val work = configBuilder.wordsForDefinitions(definitions, language)
+        val ids = work.map { it.qualifiedName }.toSet()
+        val names = pluginNameEntries(work, true) + pluginNameEntries(bundled.filterNot { it.qualifiedName in ids }, enabled)
+        val input = JSONObject().put("source", source).put("language", language).put("definitions", definitions)
+            .put("summaries", summaries).put("locks", locks).put("compiler", JSONObject.NULL)
+            .put("enabled", JSONArray(ids.toList())).put("disabled", JSONArray(if (enabled) emptyList<String>() else bundled.map { it.qualifiedName }.filterNot { it in ids }))
+            .put("plugin_names", JSONArray(names))
+        return JSONObject(NativePipelineBridge.pluginCalls(input.toString().toByteArray()).decodeToString())
+    }
+
+    /** The bundled words' primary v2 spellings for the settings summary. */
     fun bundledPluginWords(japanese: Boolean): List<String> {
-        val definitions = configBuilder.bundledPluginDefinitions(if (japanese) "ja" else "en")
-        return (0 until definitions.length()).mapNotNull { index ->
-            val definition = definitions.optJSONObject(index) ?: return@mapNotNull null
-            val alias = definition.optJSONArray("aliases")?.optString(0)?.takeIf { it.isNotEmpty() }
-            if (japanese && alias != null) alias else definition.optString("heading").takeIf { it.isNotEmpty() }
+        return configBuilder.bundledPluginWords(if (japanese) "ja" else "en").mapNotNull { word ->
+            if (japanese) word.ja.firstOrNull()?.let { "｛$it｝" } else word.en.firstOrNull()?.let { "{$it}" }
         }
     }
 
@@ -662,12 +684,20 @@ class AndroidWorkPipeline(
             throw PipelineInteractionRequired(view)
         }
         val execution = host.executionContext(OWNER_ID, view.executionId)
-        val sketch = savedSketchResult(view.sketch)
         val hostContext = JSONObject(execution.hostContextJson)
         val resultOptions = hostContext.requiredObject("result_options")
         val hostOptions = hostContext.requiredObject("host_options")
         val colorMaps = hostContext.requiredObject("color_maps")
         val snapshot = JSONObject(execution.snapshotJson)
+        val descriptionRecord = snapshot.optJSONObject("description_ddl")
+        val sketch = descriptionRecord?.let { record ->
+            val text = record.optString("reading_text").takeIf { it.isNotBlank() }
+            when (record.optString("reading_state")) {
+                "read", "supplied" -> if (text != null) PipelineSketchResult(text, "supplemented") else PipelineSketchResult()
+                "fallback" -> PipelineSketchResult(state = "fallback")
+                else -> PipelineSketchResult()
+            }
+        } ?: savedSketchResult(view.sketch)
         require(snapshot.optString("sequence") == view.sequence) { "pipeline view changed before its prompt record was saved" }
         val document = snapshot.requiredObject("document")
         val delivery = snapshot.requiredObject("delivery")
@@ -740,6 +770,10 @@ class AndroidWorkPipeline(
         // server keeps `image_ddl`: references and rounds, no image or SVG.
         snapshot.optJSONObject("image_ddl")?.let { record ->
             metadata.put("image_ddl", record).put("elapsed_image_ms", execution.metrics["image"] ?: 0L)
+        }
+        descriptionRecord?.let { record ->
+            metadata.put("description_ddl", record).put("route", "read_and_draw")
+                .put("elapsed_read_and_draw_ms", execution.metrics["read_and_draw"] ?: 0L)
         }
         val renderHash = renderHash(delivery.requiredObject("score"), metadata, catalogId)
         metadata.put("render_hash", renderHash).put("render_hash_short", renderHash.takeLast(4).uppercase())
@@ -930,6 +964,7 @@ class AndroidWorkPipeline(
                     drawingModelId = request.drawingModel,
                     canvasFit = request.canvasFit,
                     imageReview = imageReview,
+                    descriptionReview = request.descriptionReview.takeIf { descriptionFlow && request.readAndDraw },
                 ),
             )
             else -> {
@@ -943,7 +978,12 @@ class AndroidWorkPipeline(
                 if (preserveSavedConfig) parentConfig else deriveSavedConfig(parentConfig, request, renderSeed, language)
             }
         }
-        val resolvedLang = JSONObject(config.configJson).requiredString("language")
+        val effectiveConfig = if (descriptionFlow && request.readAndDraw) {
+            config.copy(configJson = JSONObject(config.configJson).put(
+                "description_ddl", JSONObject().put("review", request.descriptionReview).put("colors", true),
+            ).toString())
+        } else config
+        val resolvedLang = JSONObject(effectiveConfig.configJson).requiredString("language")
         val context = when {
             parentVariationId != null -> AuthoringContext(
                 description = request.description,
@@ -967,7 +1007,7 @@ class AndroidWorkPipeline(
                 ownerId = OWNER_ID,
                 text = drawn,
                 originalInput = request.originalText,
-                config = config,
+                config = effectiveConfig,
                 models = pinModelSession(PipelineModelSelection(request.drawingModel, request.drawingModel)),
                 context = context,
                 renderSeed = renderSeed,
@@ -978,6 +1018,9 @@ class AndroidWorkPipeline(
                 renderLimitsSource = if (inherited != null || saved != null) "work" else "settings",
                 saveHistory = request.saveHistory,
                 sketch = PipelineSketchRequest.from(request.sketch),
+                route = "read_and_draw".takeIf { descriptionFlow && request.readAndDraw },
+                sourceLabelsJson = if (descriptionFlow && request.readAndDraw) descriptionSourceLabels(binding, text).toString() else null,
+                compositionJson = "{\"mode\":\"on\"}".takeIf { descriptionFlow && request.readAndDraw && request.descriptionComposition },
                 parentHistoryId = request.parentHistoryId,
                 inputProvenanceJson = request.inputProvenance?.toJson()?.toString(),
                 completionRangesJson = when {
@@ -1186,16 +1229,19 @@ class AndroidWorkPipeline(
      */
     private suspend fun pluginDiagnostics(source: String, upstream: JSONArray, config: JSONObject): JSONArray {
         if (upstream.length() == 0) return JSONArray()
-        val bundled = configBuilder.bundledPluginNames(config.optString("language", "ja"))
+        val bundled = configBuilder.bundledPluginWords(config.optString("language", "ja"))
+        val definitions = config.optJSONArray("definitions") ?: JSONArray()
+        val work = configBuilder.wordsForDefinitions(definitions, config.optString("language", "ja"))
         val enabledBundled = bundledPluginsEnabled()
-        val enabled = (pluginVisibleNames(config.optJSONArray("definitions")) + if (enabledBundled) bundled else emptyList())
+        val enabled = (work.map { it.qualifiedName } + if (enabledBundled) bundled.map { it.qualifiedName } else emptyList())
             .toSortedSet()
-        val disabled = if (enabledBundled) emptyList() else bundled.filterNot { it in enabled }.sorted()
+        val disabled = if (enabledBundled) emptyList() else bundled.map { it.qualifiedName }.filterNot { it in enabled }.sorted()
         val input = JSONObject()
             .put("source", source)
             .put("upstream_diagnostics", upstream)
             .put("enabled", JSONArray(enabled.toList()))
             .put("disabled", JSONArray(disabled))
+            .put("plugin_names", JSONArray(pluginNameEntries(work, true) + pluginNameEntries(bundled, enabledBundled)))
         val output = JSONObject(binding.explainPluginDiagnostics(input.toString().encodeToByteArray()).decodeToString())
         return output.optJSONArray("plugins")
             ?.takeIf { output.optString("schema") == "inku.plugin-diagnostics.v1" }

@@ -1577,7 +1577,7 @@ fn macro_parameter_ground_is_not_redelivered_but_unbound_ground_reaches_document
             "ground": {"type": "semantic_ref", "category": "ground"}
         }),
     );
-    let bound_source = format!("Nature.Bound {ground_surface}");
+    let bound_source = format!("｛Bound｝ {ground_surface}");
     let bound_document =
         document_macro_document(&bound_source, std::slice::from_ref(&bound_definition));
     let bound_binding =
@@ -1612,7 +1612,7 @@ fn macro_parameter_ground_is_not_redelivered_but_unbound_ground_reaches_document
     assert!(bound_canonical["ground"].is_null());
 
     let outer_definition = document_macro_definition("Outer", serde_json::json!({}));
-    let outer_source = format!("Nature.Outer {ground_surface}");
+    let outer_source = format!("｛Outer｝ {ground_surface}");
     let outer_document =
         document_macro_document(&outer_source, std::slice::from_ref(&outer_definition));
     let outer_binding =
@@ -1656,8 +1656,8 @@ fn declared_core_values_keep_exact_non_asset_owner_and_ordinary_modifiers() {
         }),
     );
     for source in [
-        "thin small Nature.Core! extra-fine large circle.",
-        "small Nature.Core thin. extra-fine large circle.",
+        "thin small ｛Core｝! extra-fine large circle.",
+        "small ｛Core｝ thin. extra-fine large circle.",
     ] {
         let document = document_macro_document(source, std::slice::from_ref(&definition));
         let binding = bind_macro_parameters(&document, std::slice::from_ref(&definition)).unwrap();

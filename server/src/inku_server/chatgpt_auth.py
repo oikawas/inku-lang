@@ -3,29 +3,27 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
-import hmac
 import json
-import math
 import secrets
 import threading
 import time
 import uuid
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from urllib.parse import parse_qs, urlencode, urlsplit
 
 import httpx
 import jwt
 
 from .chatgpt_runtime import check_owner, check_session, guarded
-from .chatgpt_store import ChatGPTError, CredentialStore, b64
+from .chatgpt_store import ChatGPTError, CredentialStore
+from .verified_model_catalog import core_catalog
 
-ISSUER = "https://auth.openai.com"
-AUTHORIZE = ISSUER + "/api/accounts/authorize"
-TOKEN = ISSUER + "/api/accounts/oauth/token"
-RESOURCE = "https://api.openai.com/v1"
-SCOPES = "openid profile email offline_access resource.invoke chatgpt.tokens.use.direct"
+_AUTH_CONSTANTS = core_catalog("chatgpt_auth_constants")
+ISSUER = _AUTH_CONSTANTS["issuer"]
+AUTHORIZE = _AUTH_CONSTANTS["authorize"]
+TOKEN = _AUTH_CONSTANTS["token"]
+RESOURCE = _AUTH_CONSTANTS["resource"]
+SCOPES = _AUTH_CONSTANTS["scopes"]
 USAGE_URL = "https://chatgpt.com/settings/usage"
 
 
@@ -43,10 +41,14 @@ def callback_page(language: str, *, completed: bool) -> bytes:
 
 
 def auth_endpoint(url: str) -> str:
-    parsed = urlsplit(url)
-    if parsed.scheme != "https" or parsed.netloc != "auth.openai.com" or parsed.fragment:
-        raise ChatGPTError("chatgpt_identity_invalid")
-    return url
+    return auth_policy("endpoint", url=url)["url"]
+
+
+def auth_policy(action, **fields):
+    result = core_catalog("chatgpt_auth_" + action, **fields)
+    if "error" in result:
+        raise ChatGPTError(result["error"])
+    return result
 
 
 async def read_limited(response: httpx.Response, check, deadline: float, limit: int) -> bytes:
@@ -74,27 +76,16 @@ async def auth_json(client: httpx.AsyncClient, method: str, url: str, check, dea
     try:
         value = json.loads(content)
     except ValueError as error:
+        auth_policy("http", status=response.status_code, json_valid=False)
         raise ChatGPTError("chatgpt_auth_unavailable") from error
-    if not response.is_success:
-        code = value.get("error") if isinstance(value, dict) else None
-        if isinstance(code, dict):
-            code = code.get("code")
-        terminal = {"invalid_grant", "invalid_refresh_token", "token_expired", "refresh_token_expired", "refresh_token_invalidated", "refresh_token_reused"}
-        if code in terminal:
-            raise ChatGPTError("chatgpt_reauthentication_required")
-        if response.status_code >= 500:
-            raise ChatGPTError("chatgpt_auth_unavailable")
-        raise ChatGPTError("chatgpt_auth_rejected")
-    if not isinstance(value, dict):
-        raise ChatGPTError("chatgpt_identity_invalid")
+    if auth_policy("http", status=response.status_code, json_valid=True, value=value).get("type_error"):
+        raise TypeError("unhashable OAuth error code")
     return value
 
 
 async def discovery(client, check, deadline) -> dict:
     value = await auth_json(client, "GET", ISSUER + "/.well-known/openid-configuration", check, deadline)
-    if value.get("issuer") != ISSUER:
-        raise ChatGPTError("chatgpt_identity_invalid")
-    auth_endpoint(value["jwks_uri"])
+    auth_policy("discovery", discovery=value)
     return value
 
 
@@ -103,21 +94,12 @@ async def validate_identity(client, token: str, client_id: str, nonce: str | Non
     keys = await auth_json(client, "GET", auth_endpoint(metadata["jwks_uri"]), check, deadline)
     try:
         header = jwt.get_unverified_header(token)
-        allowed = set(metadata.get("id_token_signing_alg_values_supported", ["RS256"])) & {"RS256", "ES256"}
-        if header.get("alg") not in allowed:
-            raise ValueError
-        matches = [key for key in keys["keys"] if key.get("kid") == header.get("kid") and key.get("use", "sig") == "sig"]
-        if len(matches) != 1:
-            raise ValueError
-        key = jwt.PyJWK.from_dict(matches[0], algorithm=header["alg"]).key
-        claims = jwt.decode(token, key, algorithms=[header["alg"]], audience=client_id, issuer=ISSUER,
-                            options={"require": ["iss", "aud", "exp", "sub"]})
-        if not isinstance(claims["sub"], str) or not claims["sub"]:
-            raise ValueError
-        if nonce is not None and not hmac.compare_digest(str(claims.get("nonce", "")), nonce):
-            raise ValueError
-        if isinstance(claims["aud"], list) and len(claims["aud"]) > 1 and claims.get("azp") != client_id:
-            raise ValueError
+        chosen = auth_policy("key", header=header, discovery=metadata, keys=keys)
+        key = jwt.PyJWK.from_dict(chosen["key"], algorithm=chosen["alg"]).key
+        claims = jwt.decode(token, key, algorithms=[header["alg"]],
+                            options={"verify_iss": False, "verify_aud": False, "verify_exp": False,
+                                     "verify_iat": False, "verify_nbf": False, "verify_jti": False})
+        auth_policy("claims", claims=claims, client_id=client_id, nonce=nonce, now=time.time())
     except (jwt.PyJWTError, ValueError, KeyError, TypeError) as error:
         raise ChatGPTError("chatgpt_identity_invalid") from error
     check()
@@ -125,22 +107,17 @@ async def validate_identity(client, token: str, client_id: str, nonce: str | Non
 
 
 def token_fields(value: dict, previous: dict | None = None) -> dict:
-    if value.get("token_type") != "Bearer" and str(value.get("token_type", "")).lower() != "bearer":
-        raise ChatGPTError("chatgpt_identity_invalid")
-    if any(not isinstance(value.get(key), str) or not 0 < len(value[key]) <= 65536 for key in ("access_token", "refresh_token")):
-        raise ChatGPTError("chatgpt_identity_invalid")
-    expiry = float(value["expires_in"])
-    if not math.isfinite(expiry) or not 0 < expiry <= 86400:
-        raise ChatGPTError("chatgpt_identity_invalid")
-    earliest = value.get("earliest_refresh_at", 0)
+    offset = None
+    earliest = value.get("earliest_refresh_at")
     if isinstance(earliest, str):
-        earliest = datetime.fromisoformat(earliest.replace("Z", "+00:00")).timestamp()
-    if not math.isfinite(float(earliest)) or ("scope" in value and not isinstance(value["scope"], str)):
-        raise ChatGPTError("chatgpt_identity_invalid")
-    return {"access_token": value["access_token"], "refresh_token": value["refresh_token"],
-            "id_token": value.get("id_token", (previous or {}).get("id_token", "")),
-            "scopes": value["scope"].split() if "scope" in value else (previous or {}).get("scopes", []),
-            "expires_at": time.time() + expiry, "earliest_refresh_at": float(earliest)}
+        try:
+            local = datetime.fromisoformat(earliest.replace("Z", "+00:00"))
+            if local.tzinfo is None:
+                offset = int(local.astimezone().utcoffset().total_seconds())
+        except (TypeError, ValueError, OverflowError):
+            pass
+    return auth_policy("tokens", value=value, previous=previous, now=time.time(),
+                       local_offset_seconds=offset)["tokens"]
 
 
 async def access_token(owner: str, profile_id: str, generation: int, deadline: float, cancel=None) -> str:
@@ -149,14 +126,8 @@ async def access_token(owner: str, profile_id: str, generation: int, deadline: f
     store = CredentialStore()
     with store.lock(owner, deadline, check):
         profile = check()
-        if profile.get("refresh_owner") != "runtime":
-            raise ChatGPTError("chatgpt_session_transferred")
-        if profile["expires_at"] > time.time() + 60:
+        if auth_policy("access", profile=profile, now=time.time())["decision"] == "use":
             return profile["access_token"]
-        if time.time() < profile.get("earliest_refresh_at", 0):
-            if profile["expires_at"] > time.time():
-                return profile["access_token"]
-            raise ChatGPTError("chatgpt_refresh_not_ready")
         try:
             async with httpx.AsyncClient(follow_redirects=False) as client:
                 result = await auth_json(client, "POST", TOKEN, check, deadline, data={
@@ -165,17 +136,13 @@ async def access_token(owner: str, profile_id: str, generation: int, deadline: f
                 })
                 if result.get("id_token"):
                     claims = await validate_identity(client, result["id_token"], profile["client_id"], None, check, deadline)
-                    if claims["sub"] != profile["sub"]:
-                        raise ChatGPTError("chatgpt_identity_mismatch")
+                    auth_policy("identity", previous=profile, sub=claims["sub"])
             check()
-            profile.update(token_fields(result, profile))
-            profile.pop("catalog", None)
+            profile = auth_policy("refresh_profile", profile=profile, tokens=token_fields(result, profile))["profile"]
             store.save_profile(owner, profile, expected_generation=generation, activate=False, deadline=deadline)
         except ChatGPTError as error:
             if error.code == "chatgpt_reauthentication_required":
-                profile.update(state="reauthentication_required", generation=generation + 1)
-                for key in ("access_token", "refresh_token", "id_token", "catalog"):
-                    profile.pop(key, None)
+                profile = auth_policy("transition", profile=profile, state="reauthentication_required")["profile"]
                 store.save_profile(owner, profile, expected_generation=generation, activate=False, deadline=deadline)
             raise
         return profile["access_token"]
@@ -192,14 +159,13 @@ async def sign_out(owner: str, profile_id: str) -> dict:
         if not profile:
             raise ChatGPTError("chatgpt_not_connected")
         old = dict(profile)
-        profile.update(state="signed_out", generation=profile["generation"] + 1)
-        for key in ("access_token", "refresh_token", "id_token", "catalog"):
-            profile.pop(key, None)
+        profile = auth_policy("transition", profile=profile, state="signed_out")["profile"]
+        value["profiles"][profile_id] = profile
         store.write(owner, value)
     confirmed = False
     try:
         deadline = time.monotonic() + 10
-        if old.get("refresh_token") and old.get("refresh_owner") == "runtime":
+        if auth_policy("revocation", profile=old)["send"]:
             async with httpx.AsyncClient(follow_redirects=False) as client:
                 metadata = await discovery(client, lambda: check_owner(owner), deadline)
                 stream = client.stream("POST", auth_endpoint(metadata["revocation_endpoint"]), data={
@@ -208,7 +174,7 @@ async def sign_out(owner: str, profile_id: str) -> dict:
                 response = await guarded(stream.__aenter__(), lambda: check_owner(owner), deadline)
                 try:
                     await read_limited(response, lambda: check_owner(owner), deadline, 64 * 1024)
-                    confirmed = response.status_code == 200
+                    confirmed = auth_policy("revocation", profile=old, status=response.status_code)["confirmed"]
                 finally:
                     await stream.__aexit__(None, None, None)
     except (ChatGPTError, httpx.HTTPError, TimeoutError, KeyError):
@@ -222,16 +188,7 @@ async def delete_profile(owner: str, profile_id: str) -> dict:
     store = CredentialStore()
     with store.lock("edit:" + owner, time.monotonic() + 5):
         value = store.read(owner)
-        profile = value["profiles"].get(profile_id)
-        if not profile:
-            raise ChatGPTError("chatgpt_not_connected")
-        # A reconnection that landed during revocation is newer than this request.
-        if profile["state"] != "signed_out":
-            raise ChatGPTError("chatgpt_session_changed")
-        del value["profiles"][profile_id]
-        value.get("registrations_pending", {}).pop(profile_id, None)
-        if value["active"] == profile_id:
-            value["active"] = None
+        value = auth_policy("delete", value=value, profile_id=profile_id)["value"]
         store.write(owner, value)
     return {"status": "deleted", "revocation_confirmed": result["revocation_confirmed"]}
 
@@ -272,19 +229,15 @@ class AuthorizationAttempts:
         with self.lock:
             self.attempts = {key: value for key, value in self.attempts.items() if time.monotonic() < value["retain_until"]}
             pending = [value for value in self.attempts.values() if value["status"] == "pending"]
-            if len(pending) >= 4 or sum(value["owner"] == owner for value in pending) >= 1:
-                raise ChatGPTError("chatgpt_attempt_busy")
+            limits = auth_policy("attempt", pending_count=len(pending), owner_count=sum(value["owner"] == owner for value in pending))
             saved = CredentialStore().read(owner) if CredentialStore().root.exists() else {"profiles": {}}
-            previous = saved["profiles"].get(profile_id) if profile_id else None
-            if profile_id and not previous:
-                pending = saved.get("registrations_pending", {}).get(profile_id)
-                if not pending:
-                    raise ChatGPTError("chatgpt_not_connected")
-                previous = {**pending, "pending": True}
+            previous = auth_policy("previous", profile_id=profile_id,
+                                   profile=saved["profiles"].get(profile_id),
+                                   pending=saved.get("registrations_pending", {}).get(profile_id))["previous"]
             attempt = {"id": str(uuid.uuid4()), "owner": owner, "profile_id": profile_id or str(uuid.uuid4()),
                        "status": "pending", "code": None, "state": secrets.token_urlsafe(32), "nonce": secrets.token_urlsafe(32),
                        "verifier": secrets.token_urlsafe(64), "used": False, "cancel": threading.Event(),
-                       "deadline": time.monotonic() + 300, "retain_until": time.monotonic() + 600}
+                       "deadline": time.monotonic() + limits["deadline_seconds"], "retain_until": time.monotonic() + limits["retain_seconds"]}
             def check():
                 guard()
                 if attempt["cancel"].is_set() or time.monotonic() >= attempt["deadline"]:
@@ -305,25 +258,23 @@ class AuthorizationAttempts:
                     pass
 
                 def do_GET(self):
-                    parsed = urlsplit(self.path)
-                    query = parse_qs(parsed.query)
                     status = 400
                     try:
-                        if parsed.path != "/auth/callback" or any(len(value) != 1 for value in query.values()):
-                            raise ChatGPTError("chatgpt_callback_invalid")
-                        if not hmac.compare_digest(query.get("state", [""])[0], attempt["state"]):
-                            raise ChatGPTError("chatgpt_callback_invalid")
+                        query = auth_policy("callback_query", target=self.path)["query"]
+                        auth_policy("callback", state=query.get("state", [""])[0],
+                                    expected_state=attempt["state"], code="state-check", error=None)
                         with coordinator.lock:
-                            check()
-                            if attempt["used"]:
-                                raise ChatGPTError("chatgpt_callback_invalid")
-                            attempt["used"] = True
+                            guard()
+                            decision = auth_policy("callback_use", used=attempt["used"], cancelled=attempt["cancel"].is_set(), expired=time.monotonic() >= attempt["deadline"])
+                            attempt["used"] = decision["used"]
                         if "error" in query:
-                            raise ChatGPTError("chatgpt_consent_declined")
+                            auth_policy("callback", state=attempt["state"], expected_state=attempt["state"],
+                                        code="error-check", error=query["error"][0])
                         issued = query.get("client_id", [previous["client_id"] if previous else ""])[0]
-                        if not issued or issued == "dynamic_agent_client" or (previous and issued != previous["client_id"]):
-                            raise ChatGPTError("chatgpt_registration_incomplete")
-                        asyncio.run(coordinator._exchange(attempt, issued, query["code"][0], previous, check))
+                        auth_policy("callback_client", issued=issued, previous=previous)
+                        code = auth_policy("callback", state=attempt["state"], expected_state=attempt["state"],
+                                           code=query.get("code", [None])[0], error=None)["code"]
+                        asyncio.run(coordinator._exchange(attempt, issued, code, previous, check))
                         status = 200
                     except Exception as error:
                         if attempt["used"]:
@@ -349,18 +300,12 @@ class AuthorizationAttempts:
                     server.server_close()
                     for field in ("state", "nonce", "verifier"):
                         attempt.pop(field, None)
-            query = {"client_id": previous["client_id"] if previous else "dynamic_agent_client", "ext_agent_host_id": registration_host_id or CredentialStore().host_id(),
-                     "response_type": "code", "redirect_uri": attempt["redirect_uri"], "scope": SCOPES, "resource": RESOURCE,
-                     "state": attempt["state"], "nonce": attempt["nonce"], "code_challenge_method": "S256",
-                     "code_challenge": b64(hashlib.sha256(attempt["verifier"].encode()).digest())}
-            if previous and previous.get("email"):
-                query["login_hint"] = previous["email"]
-            if not previous:
-                query["agent_name_hint"] = "inku"
-            if consent:
-                query["prompt"] = "consent"
+            url = auth_policy("url", previous=previous, consent=consent,
+                              host_id=registration_host_id or CredentialStore().host_id(),
+                              redirect_uri=attempt["redirect_uri"], state=attempt["state"],
+                              nonce=attempt["nonce"], verifier=attempt["verifier"])["url"]
             threading.Thread(target=listen, daemon=True, name="inku-chatgpt-callback").start()
-            return {"attempt_id": attempt["id"], "profile_id": attempt["profile_id"], "authorization_url": AUTHORIZE + "?" + urlencode(query)}
+            return {"attempt_id": attempt["id"], "profile_id": attempt["profile_id"], "authorization_url": url}
 
     async def _exchange(self, attempt, issued, code, previous, check):
         store = CredentialStore()
@@ -368,8 +313,7 @@ class AuthorizationAttempts:
             with store.lock("edit:" + attempt["owner"], attempt["deadline"], check):
                 value = store.read(attempt["owner"])
                 registrations = value.setdefault("registrations_pending", {})
-                if attempt["profile_id"] not in registrations and len(registrations) >= 8:
-                    raise ChatGPTError("chatgpt_profile_limit")
+                auth_policy("pending_check", exists=attempt["profile_id"] in registrations, count=len(registrations))
                 registrations[attempt["profile_id"]] = {"client_id": issued}
                 store.write(attempt["owner"], value)
         async with httpx.AsyncClient(follow_redirects=False) as client:
@@ -378,11 +322,12 @@ class AuthorizationAttempts:
                 "redirect_uri": attempt["redirect_uri"], "resource": RESOURCE,
             })
             claims = await validate_identity(client, tokens["id_token"], issued, attempt["nonce"], check, attempt["deadline"])
-        if previous and not previous.get("pending") and claims["sub"] != previous["sub"]:
-            raise ChatGPTError("chatgpt_identity_mismatch")
+        auth_policy("identity", previous=previous, sub=claims["sub"])
+        display = auth_policy("display", claims=claims, client_id=issued,
+                              email_json=json.dumps(claims["email"], ensure_ascii=False) if "email" in claims else None)
         profile = {"id": attempt["profile_id"], "issuer": ISSUER, "sub": claims["sub"], "client_id": issued,
-                   "email": str(claims.get("email", ""))[:254], "label": str(claims.get("email", "ChatGPT"))[:254] + " / " + issued[-8:],
-                   "generation": (previous or {}).get("generation", 0) + 1, "state": "connected", "refresh_owner": "runtime",
+                   "email": display["email"], "label": display["label"],
+                   "generation": auth_policy("generation", previous=previous)["generation"], "state": "connected", "refresh_owner": "runtime",
                    "oidc_nonce": attempt["nonce"], **token_fields(tokens)}
         with store.lock(attempt["owner"], attempt["deadline"], check):
             # Cancellation and verified adoption have one linearization point.

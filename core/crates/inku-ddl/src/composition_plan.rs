@@ -407,6 +407,9 @@ pub enum PlacementRecipe {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ObjectPlacementPlan {
+    /// A local body is retained once while the square's placement recipe is
+    /// expanded for each copy.
+    pub(crate) plugin_template: Option<(u8, u8, Box<inku_score::Score>)>,
     pub(crate) generated_geometries: Vec<crate::geometry::ExactGeometry>,
     pub(crate) arc_form: Option<inku_score::ArcForm>,
     pub(crate) proportion_width_extent: Option<crate::SemanticIdentity>,

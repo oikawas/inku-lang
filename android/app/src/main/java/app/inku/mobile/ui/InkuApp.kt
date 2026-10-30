@@ -856,6 +856,26 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
     var rangeStatus by remember { mutableStateOf(DdlEditorRangeStatus()) }
     val editorValue = TextFieldValue(editorState.text.toString(), editorState.selection, editorState.composition)
     var completionStates by remember { mutableStateOf(emptyList<app.inku.mobile.pipeline.CompletionRangeState>()) }
+    var pluginCalls by remember { mutableStateOf(emptyList<PluginEditorCall>()) }
+    var pluginEntries by remember { mutableStateOf(emptyList<org.json.JSONObject>()) }
+    val pluginLanguage = InstructionLanguages.ofDdl(editorValue.text, state.selectedHistory?.normalizedDdl,
+        state.selectedHistory?.instructionLangResolved, LocalUiLanguage.current.code)
+    LaunchedEffect(editorValue.text, pluginLanguage, state.selectedHistory?.id, state.lineageDetached, state.bundledPluginsEnabled, state.importedPlugins, state.pipelineView?.executionId, state.pipelineView?.sequence) {
+        pluginCalls = emptyList()
+        pluginEntries = emptyList()
+        kotlinx.coroutines.delay(250)
+        val output = runCatching { viewModel.pluginEditorAnalysis(editorValue.text, pluginLanguage) }.getOrNull()
+        if (output?.optString("schema") == "inku.plugin-calls.v1" && !output.has("error")) {
+            val calls = output.optJSONArray("calls") ?: org.json.JSONArray()
+            pluginCalls = (0 until calls.length()).mapNotNull { calls.optJSONObject(it) }.map {
+                val candidates = it.optJSONArray("candidates") ?: org.json.JSONArray()
+                PluginEditorCall(it.getInt("start_utf16"), it.getInt("end_utf16"), it.optString("text"), it.optString("status"), it.optString("suggestion").takeIf(String::isNotEmpty),
+                    (0 until candidates.length()).map { index -> candidates.getString(index) })
+            }
+            val entries = output.optJSONArray("entries") ?: org.json.JSONArray()
+            pluginEntries = (0 until entries.length()).mapNotNull { entries.optJSONObject(it) }
+        }
+    }
     LaunchedEffect(editorValue.text, state.selectedHistory?.id, state.lineageDetached,
         state.pipelineView?.executionId, state.pipelineView?.sequence) {
         completionStates = emptyList()
@@ -867,7 +887,8 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
     val vocabularyTokens = rememberDdlVocabularyTokens(lang)
     val allVocabularyWords = remember(vocabularyTokens) { vocabularyTokens.map { it.word } }
     val detectedWords = remember(editorValue.text, vocabularyTokens) {
-        vocabularyTokens.filter { editorValue.text.contains(it.word) }
+        val drawn = withoutDdlTitleLines(editorValue.text)
+        vocabularyTokens.filter { drawn.contains(it.word) }
     }
     val selectedWord = remember(editorValue.selection, editorValue.text, vocabularyTokens) {
         selectedVocabularyToken(editorValue, vocabularyTokens)
@@ -925,7 +946,7 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
                 viewModel.ddlImportFailed()
                 return@launch
             }
-            viewModel.importDdlFile(text)
+            if (!viewModel.importDdlFile(text)) return@launch
             val imported = viewModel.state.value.ddl
             session.reset()
             synchronization.adopt(imported)
@@ -1016,12 +1037,38 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
                     readOnly = state.isDrawing,
                     tokens = vocabularyTokens,
                     completionTags = completionRangeEditorTags(completionStates, S),
+                    pluginCalls = pluginCalls,
                     onWordTap = {
                         val current = TextFieldValue(editorState.text.toString(), editorState.selection)
                         val selected = selectVocabularyAtOffset(current, current.selection.start, allVocabularyWords)
                         if (current.selection != selected.selection) editorState.edit { selection = selected.selection }
                     },
                 )
+                pluginCalls.filter { it.status != "resolved" }.forEach { call ->
+                    Text("${call.text}: ${S.pluginEditorReason(call.status, call.suggestion, call.candidates)}",
+                        color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
+                }
+                if (focused && editorState.selection.collapsed && editorState.composition == null) {
+                    val cursor = editorState.selection.start.coerceIn(0, editorValue.text.length)
+                    val before = editorValue.text.substring(0, cursor)
+                    val open = maxOf(before.lastIndexOf('｛'), before.lastIndexOf('{'))
+                    if (open >= 0 && before.substring(open + 1).none { it in "｝}\n\r" }) {
+                        val query = before.substring(open + 1)
+                        val field = if (pluginLanguage == "en") "written_en" else "written_ja"
+                        val matches = pluginEntries.filter { entry -> pluginCompletionMatches(entry, query) }
+                        if (matches.isNotEmpty()) WrapRow {
+                            matches.forEach { entry ->
+                                val written = entry.optString(field)
+                                SecondarySmallButton(written, onClick = {
+                                    editorState.edit {
+                                        val end = pluginCompletionEnd(asCharSequence().toString(), cursor)
+                                        replace(open, end, written); selection = TextRange(open + written.length)
+                                    }
+                                }, enabled = !state.isDrawing)
+                            }
+                        }
+                    }
+                }
                 completionRangeEditorNote(completionStates, S)?.let { note ->
                     Text(note, style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -2644,13 +2691,85 @@ internal fun providerAttemptText(attempt: ProviderAttempt?, strings: InkuStrings
  */
 @Composable
 private fun DrawSettingsRow(state: InkuUiState, viewModel: InkuViewModel) {
+    val local = app.inku.mobile.llm.isLocalVisionModel(state.selectedModelId)
+    val route = if (local) DrawRoute.Stages else state.drawRoute
+    val strings = S
     Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-        WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceXs) {
-            MiniPill(text = shortModelLabel(state), onClick = viewModel::openModelSelection)
-            MiniPill(text = shortCatalogLabel(state), onClick = viewModel::openCatalogSelection)
-            MiniPill(text = shortCanvasLabel(state), onClick = viewModel::openCanvasSelection)
+        Text(strings.nextDrawConditions, style = MaterialTheme.typography.titleSmall)
+        DrawConditionChoice(strings.conditionModel, shortModelLabel(state), strings.conditionChange, viewModel::openModelSelection)
+        DrawConditionChoice(strings.conditionCatalog, shortCatalogLabel(state), strings.conditionChange, viewModel::openCatalogSelection)
+        CompactLabel(strings.drawRouteHeading)
+        Row(Modifier.fillMaxWidth().border(Dimens.hairline, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Dimens.radiusCard)).padding(Dimens.spaceXs)) {
+            listOf(DrawRoute.ReadAndDraw to strings.drawRouteWords, DrawRoute.Stages to strings.drawRoutePlan).forEach { (option, name) ->
+                val enabled = !state.isDrawing && (option != DrawRoute.ReadAndDraw || !local)
+                Box(Modifier.weight(1f).background(if (route == option) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent, RoundedCornerShape(Dimens.radiusCard))
+                    .semantics { selected = route == option }.clickable(enabled = enabled, role = Role.RadioButton) { viewModel.setDrawRoute(option) }
+                    .padding(Dimens.spaceM), contentAlignment = Alignment.Center) {
+                    Text(name, style = MaterialTheme.typography.labelMedium, color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
         }
-        SketchModeRow(state, viewModel)
+        if (local) Text(strings.drawRouteLocalUnavailable, style = MaterialTheme.typography.bodySmall)
+        CompactLabel(strings.drawSteps)
+        WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceXs) {
+            DrawSwitchChip(strings.drawSketch, on = state.sketchMode == SketchMode.On, enabled = !state.isDrawing,
+                onClick = { viewModel.setSketchMode(if (state.sketchMode == SketchMode.On) SketchMode.Off else SketchMode.On) })
+            val composed = route == DrawRoute.Stages || state.descriptionComposition
+            DrawSwitchChip(strings.drawCompositionSwitch, on = composed, locked = route == DrawRoute.Stages, enabled = !state.isDrawing,
+                onClick = { viewModel.setDescriptionComposition(!state.descriptionComposition) })
+        }
+        CompactLabel(strings.drawFlowLabel)
+        WrapRow(horizontal = Dimens.spaceXs, vertical = Dimens.spaceXs) {
+            drawFlow(route, state.sketchMode == SketchMode.On, state.descriptionComposition, strings).forEachIndexed { index, step ->
+                if (index > 0) Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
+                Text(step.label, color = when (step.kind) {
+                    DrawFlowKind.End -> MaterialTheme.colorScheme.onSurfaceVariant
+                    DrawFlowKind.Switch -> MaterialTheme.colorScheme.primary
+                    DrawFlowKind.Fixed -> MaterialTheme.colorScheme.onSurface
+                }, style = MaterialTheme.typography.labelSmall)
+            }
+        }
+        CompactLabel(strings.drawOptions)
+        DrawSwitchChip(strings.wildToggle, on = state.renderWild,
+            enabled = !state.isDrawing, onClick = { viewModel.setRenderWild(!state.renderWild) })
+        DrawConditionChoice(strings.conditionCanvas, shortCanvasLabel(state), strings.conditionChange, viewModel::openCanvasSelection)
+    }
+}
+
+@Composable
+private fun DrawConditionChoice(heading: String, value: String, change: String, onChange: () -> Unit) {
+    Column {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            CompactLabel(heading)
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = onChange) { Text(change) }
+        }
+        Text(value, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+@Composable
+private fun DrawSwitchChip(label: String, on: Boolean, enabled: Boolean, locked: Boolean = false, onClick: () -> Unit) {
+    val accent = MaterialTheme.colorScheme.primary
+    val mark = if (on) accent else MaterialTheme.colorScheme.onSurfaceVariant
+    Row(Modifier.border(Dimens.hairline, if (on) accent else MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(100))
+        .background(if (on) MaterialTheme.colorScheme.primaryContainer else Color.Transparent, RoundedCornerShape(100))
+        .semantics { selected = on }
+        .clickable(enabled = enabled && !locked, role = Role.Switch, onClick = onClick)
+        .padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceXs),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
+        Canvas(Modifier.size(Dimens.spaceL)) {
+            val w = size.width
+            val stroke = w * 0.10f
+            if (locked) {
+                drawRoundRect(mark, topLeft = Offset(w * .2f, w * .45f), size = Size(w * .6f, w * .4f), cornerRadius = CornerRadius(w * .08f), style = Stroke(stroke))
+                drawArc(mark, 180f, 180f, false, topLeft = Offset(w * .3f, w * .1f), size = Size(w * .4f, w * .6f), style = Stroke(stroke))
+            } else if (on) {
+                val path = Path().apply { moveTo(w * .18f, w * .52f); lineTo(w * .42f, w * .75f); lineTo(w * .82f, w * .25f) }
+                drawPath(path, mark, style = Stroke(stroke))
+            } else drawCircle(mark, radius = w * .32f, style = Stroke(stroke))
+        }
+        Text(label, style = MaterialTheme.typography.labelMedium)
     }
 }
 
@@ -2779,6 +2898,10 @@ private fun CanvasHeroCard(
                                     canvasMessage = strings.hashCopied
                                 },
                             )
+                            val routeMetadata = remember(it.id, it.renderMetadataJson) { runCatching { JSONObject(it.renderMetadataJson) }.getOrElse { JSONObject() } }
+                            val routeLabel = if (routeMetadata.optJSONObject("image_ddl") != null) S.drawRouteImage
+                            else if (drawRouteOf(routeMetadata) == DrawRoute.ReadAndDraw) S.drawRouteWords else S.drawRoutePlan
+                            Text(routeLabel, style = MaterialTheme.typography.labelSmall)
                             // Next to the hash, as on web; it names where it goes.
                             if (ddl3dOffered) {
                                 MiniPill(
@@ -3070,7 +3193,7 @@ private fun CanvasHeroCard(
         )
     }
     if (showControls && generationInfoOpen && state.refinementPreviewId == null) item?.let {
-        GenerationInfoSheet(item = it, onDismiss = { generationInfoOpen = false })
+        GenerationInfoSheet(item = it, viewModel = viewModel, onDismiss = { generationInfoOpen = false })
     }
     if (!presentation && showControls && pngExporting) {
         Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), verticalAlignment = Alignment.CenterVertically) {
@@ -3178,33 +3301,6 @@ private fun exportTemplateDescription(description: String, heightPx: Int): Strin
 }
 
 /**
- * 写生 is off by default; the author can ask for it on this drawing.
- */
-@Composable
-private fun SketchModeRow(state: InkuUiState, viewModel: InkuViewModel) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
-    ) {
-        CompactLabel(S.sketchFromLife)
-        Spacer(Modifier.weight(1f))
-        Sketches.MODES.forEach { mode ->
-            MiniPill(
-                text = Sketches.modeLabel(mode, isJapanese = state.uiLanguage.code == "ja"),
-                selected = state.sketchMode == mode,
-                onClick = { viewModel.setSketchMode(mode) },
-            )
-        }
-    }
-    Text(
-        Sketches.modeHint(state.sketchMode, isJapanese = state.uiLanguage.code == "ja"),
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-}
-
-/**
  * The description and the action that draws it.
  *
  * The settings that used to head this panel -- the model, the colour catalog,
@@ -3267,7 +3363,9 @@ private fun DrawPanel(
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(S.description, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            TextButton(onClick = viewModel::clearPrompt, enabled = !state.isDrawing) { Text(S.newWork) }
         }
+        Text(S.descriptionHint, style = MaterialTheme.typography.bodySmall)
         if (state.descriptionLocked && !state.historyAuthorityLoading) {
             Text(S.pipelineDdlAuthority, style = MaterialTheme.typography.bodySmall)
             TextButton(onClick = viewModel::startDescriptionVariation, enabled = !state.historyAuthorityLoading && !state.isDrawing) {
@@ -3293,6 +3391,7 @@ private fun DrawPanel(
             )
             CameraOriginalPhotoThumbnail(state.cameraSourcePhotoPath, state.uiLanguage.isEnglish)
         }
+        Text(S.descriptionCommentHint, style = MaterialTheme.typography.bodySmall)
         cameraStatusText(state.cameraCaptureState)?.let { cameraStatus ->
             Text(
                 cameraStatus,
@@ -3301,7 +3400,6 @@ private fun DrawPanel(
                 style = MaterialTheme.typography.labelSmall,
             )
         }
-        Text(S.nextDrawingConditions, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         DrawSettingsRow(state, viewModel)
         // While the keyboard is up the same button is pinned above it, and two
         // 「描画する」 on one screen is a question about which one draws.
@@ -4767,13 +4865,6 @@ private fun DemoSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
                 )
             }
         }
-        SettingsCard(S.renderExpression, S.renderExpressionSubtitle, if (state.renderWild) "ON (Wild)" else "OFF (Standard)") {
-            SettingCheckRow(
-                checked = state.renderWild,
-                text = S.wildToggle,
-                onCheckedChange = viewModel::setRenderWild,
-            )
-        }
     }
 }
 
@@ -4880,11 +4971,48 @@ private fun MiscSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
                 text = S.bundledPluginsToggle(words.joinToString(S.listSeparator)),
                 onCheckedChange = viewModel::setBundledPluginsEnabled,
             )
+            BundledPluginDetails(LocalUiLanguage.current.isEnglish)
         }
         SettingsCard(S.mascotTitle, S.mascotSubtitle, state.mascotKind) {
             Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                 ChipButton(S.mascotIncu, selected = state.mascotKind == "incu", onClick = { viewModel.setMascotKind("incu") })
                 ChipButton(S.mascotYuragi, selected = state.mascotKind == "yuragi", onClick = { viewModel.setMascotKind("yuragi") })
+            }
+        }
+    }
+}
+
+@Composable
+private fun BundledPluginDetails(english: Boolean) {
+    val words by produceState<List<Pair<org.json.JSONObject, ImageBitmap?>>>(emptyList()) {
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                val request = org.json.JSONObject().put("action", "bundled_nature")
+                val result = org.json.JSONObject(app.inku.mobile.pipeline.NativePipelineBridge.pluginPackage(request.toString().toByteArray()).decodeToString())
+                val packageWords = org.json.JSONObject(result.getString("text")).getJSONArray("words")
+                val pictures = result.getJSONObject("pictures")
+                (0 until packageWords.length()).map { i ->
+                    val word = packageWords.getJSONObject(i)
+                    val bytes = java.util.Base64.getDecoder().decode(pictures.getString(word.getString("preview")))
+                    word to BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+                }
+            }.getOrDefault(emptyList())
+        }
+    }
+    words.forEach { (word, picture) ->
+        val definition = word.getJSONObject("definition")
+        val names = definition.getJSONObject("names")
+        val ja = names.getJSONArray("ja"); val en = names.getJSONArray("en")
+        val mainJa = ja.getString(0); val mainEn = en.getString(0)
+        val aliases = (1 until ja.length()).map { ja.getString(it) } + (1 until en.length()).map { en.getString(it) }
+        Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+            picture?.let { Image(it, contentDescription = null, modifier = Modifier.size(Dimens.ddlEditorPreviewSize)) }
+            Column {
+                Text("｛$mainJa｝ / {$mainEn}", fontWeight = FontWeight.SemiBold)
+                if (aliases.isNotEmpty()) Text(aliases.joinToString(" / "), style = MaterialTheme.typography.bodySmall)
+                Text(pluginKindLabel(definition.optString("kind"), S), style = MaterialTheme.typography.bodySmall)
+                Text(word.optString(if (english) "note_en" else "note_ja"), style = MaterialTheme.typography.bodySmall)
+                Text(S.bundledPluginExample(if (english) mainEn else mainJa), style = MaterialTheme.typography.bodySmall)
             }
         }
     }
@@ -4944,6 +5072,7 @@ internal fun ChatGptSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, 
     val context = LocalContext.current
     val plan = state.chatGptPlan
     var signOutTarget by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var confirmingDelete by remember { mutableStateOf<String?>(null) }
     Column(
         modifier = modifier.testTag("ChatGPTPlanSettings").verticalScroll(rememberScrollState()).padding(horizontal = Dimens.spaceXs),
         verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
@@ -4955,13 +5084,23 @@ internal fun ChatGptSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, 
                     TextButton(onClick = { viewModel.selectChatGptProfile(profile.id) }, enabled = !plan.pending) {
                         Text((if (plan.activeProfileId == profile.id) "● " else "○ ") + profile.label)
                     }
-                    if (plan.activeProfileId == profile.id) {
-                        WrapRow {
+                    WrapRow {
+                        if (plan.activeProfileId == profile.id) {
                             SecondarySmallButton(S.chatGptReauthenticate, onClick = { viewModel.authorizeChatGpt(profile.id) }, enabled = !plan.pending)
                             if (!profile.planAllowed) SecondarySmallButton(S.chatGptEnablePlan, onClick = { viewModel.authorizeChatGpt(profile.id, consent = true) }, enabled = !plan.pending)
                             // Asked first, as deleting an API key is: signing out
                             // takes a new authorization to undo.
                             SecondarySmallButton(S.chatGptSignOut, onClick = { signOutTarget = profile.id to profile.label }, enabled = !plan.pending)
+                        }
+                        if (confirmingDelete != profile.id) SecondarySmallButton(S.chatGptDelete, onClick = { confirmingDelete = profile.id }, enabled = !plan.pending)
+                    }
+                    if (confirmingDelete == profile.id) {
+                        WrapRow {
+                            Text(S.chatGptDeleteConfirmText)
+                            TextButton(onClick = { confirmingDelete = null; viewModel.deleteChatGptProfile(profile.id) }, enabled = !plan.pending) {
+                                Text(S.chatGptDeleteConfirm, color = MaterialTheme.colorScheme.error)
+                            }
+                            TextButton(onClick = { confirmingDelete = null }) { Text(S.chatGptDeleteCancel) }
                         }
                     }
                 }
@@ -5056,8 +5195,7 @@ private fun ChatGptModelCard(state: InkuUiState, viewModel: InkuViewModel) {
             fetchState = state.providerModelFetchStates["chatgpt"],
             onSave = { models, purposes ->
                 picker = false
-                viewModel.publishChatGptModels(session, models)
-                viewModel.saveModelPurposes("chatgpt", purposes)
+                viewModel.publishChatGptModels(session, models, purposes)
             },
         )
     }
@@ -5901,12 +6039,7 @@ private fun parsePublishedModelIds(value: String): List<String> {
     synchronized(PublishedModelIdCache) {
         PublishedModelIdCache[value]?.let { return it }
     }
-    val parsed = runCatching {
-        val array = JSONArray(value)
-        (0 until array.length()).mapNotNull { array.optString(it).takeIf { id -> id.isNotBlank() } }
-    }.getOrElse {
-        value.lines().map { it.trim() }.filter { it.isNotBlank() }
-    }
+    val parsed = app.inku.mobile.data.ProviderSettingsCodec.parseModelIds(value)
     synchronized(PublishedModelIdCache) {
         PublishedModelIdCache[value] = parsed
     }
@@ -5938,7 +6071,9 @@ private fun connectionKindLabel(value: String): String {
 
 private fun catalogModelFor(state: InkuUiState, providerId: String, modelId: String): app.inku.mobile.data.CatalogModel {
     val id = app.inku.mobile.data.ModelCatalog.rawId(providerId, modelId)
-    return state.modelCatalog.resolve(providerId, id, state.providerModelCandidates[providerId]?.toSet(), state.modelCatalogObservations[providerId]?.access?.get(id))
+    val observation = state.modelCatalogObservations[providerId]
+    return state.modelCatalog.resolve(providerId, id, state.providerModelCandidates[providerId]?.toSet(),
+        observation?.access?.get(id), observation?.records?.get(id))
 }
 
 private fun modelChoicesFor(state: InkuUiState, includeChatGpt: Boolean = true): List<ModelChoice> {
@@ -5950,7 +6085,7 @@ private fun modelChoicesFor(state: InkuUiState, includeChatGpt: Boolean = true):
         .filter { it.isEnabled && !it.isDefaultLocal && !(!includeChatGpt && it.providerId == "chatgpt") }
         .forEach { provider ->
             availablePublishedModels(provider, state).forEach { modelId ->
-                val qualified = qualifyModelId(provider.providerId, modelId)
+                val qualified = qualifyModelId(provider.providerId, modelId, state)
                 val label = if (provider.providerId == "chatgpt") state.chatGptPlan.models?.firstOrNull { it.id == modelId }?.label ?: catalogModelFor(state, provider.providerId, modelId).name else catalogModelFor(state, provider.providerId, modelId).name
                 choices += ModelChoice(qualified, label, if (provider.providerId == "chatgpt") stringsFor(state.uiLanguage).chatGptPlan else provider.displayName)
             }
@@ -6016,7 +6151,7 @@ private fun modelOptionsForProvider(state: InkuUiState, providerId: String, stri
         .map { id ->
         ModelOptionChoice(
             rawId = id,
-            qualifiedId = qualifyModelId(provider.providerId, id),
+            qualifiedId = qualifyModelId(provider.providerId, id, state),
             label = if (providerId == "chatgpt") state.chatGptPlan.models?.firstOrNull { it.id == id }?.label ?: catalogModelFor(state, providerId, id).name else catalogModelFor(state, providerId, id).name,
             notes = id,
             notRecommended = (if (state.modelSelectionForCamera) listOf("llm", "vision") else listOf("llm"))
@@ -6026,19 +6161,25 @@ private fun modelOptionsForProvider(state: InkuUiState, providerId: String, stri
 }
 
 private fun providerOfModelId(modelId: String, state: InkuUiState): String {
-    state.providerSettings.firstOrNull { modelId.startsWith("${it.providerId}:") }?.let { return it.providerId }
-    state.providerSettings.firstOrNull { provider ->
-        provider.providerId != "chatgpt" && parsePublishedModelIds(provider.publishedModelsJson).contains(modelId)
-    }?.let { return it.providerId }
-    return "local-litert-lm"
+    val rows = providerReferenceRows(state)
+    return app.inku.mobile.data.catalogRequest("resolve_display", JSONObject().put("providers", rows)
+        .put("ref", modelId).put("default_provider", "local-litert-lm")).getString("provider")
 }
 
 private fun availablePublishedModels(provider: app.inku.mobile.data.db.ProviderSettingEntity, state: InkuUiState): List<String> {
     val published = parsePublishedModelIds(provider.publishedModelsJson)
     val usable = published.filter { catalogModelFor(state, provider.providerId, it).publishable }
     if (provider.providerId != "chatgpt") return usable
-    val offered = state.chatGptPlan.models.orEmpty().map { it.id }.toSet()
-    return usable.filter { it in offered }
+    val profile = JSONObject().put("published_models", JSONArray(published))
+        .put("model_purposes", JSONObject().apply { state.modelPurposes["chatgpt"].orEmpty().forEach { (id, purposes) -> put(id, JSONArray(purposes)) } })
+    val models = JSONArray().apply { state.chatGptPlan.models.orEmpty().forEach { put(JSONObject().put("id", it.id).put("label", it.label)) } }
+    val observations = state.modelCatalogObservations["chatgpt"]
+    val assessments = JSONObject().apply { state.chatGptPlan.models.orEmpty().forEach { model ->
+        put(model.id, state.modelCatalog.resolve("chatgpt", model.id, observedRecord = observations?.records?.get(model.id)).record)
+    } }
+    val rows = app.inku.mobile.data.catalogRequest("chatgpt_publication", JSONObject().put("profile", profile)
+        .put("models", models).put("assessments", assessments)).getJSONObject("publication").getJSONArray("models")
+    return (0 until rows.length()).map { rows.getJSONObject(it) }.filter { it.optBoolean("enabled") }.map { it.getString("id") }
 }
 
 private fun modelChoiceStatusLabel(downloadState: String, strings: InkuStrings): String {
@@ -6050,9 +6191,16 @@ private fun modelChoiceStatusLabel(downloadState: String, strings: InkuStrings):
     }
 }
 
-private fun qualifyModelId(providerId: String, modelId: String): String {
-    return if (modelId.startsWith("$providerId:")) modelId else "$providerId:$modelId"
+private fun providerReferenceRows(state: InkuUiState) = JSONObject().also { rows ->
+    state.providerSettings.forEach { provider -> rows.put(provider.providerId,
+        app.inku.mobile.data.ProviderSettingsCodec.toCore(provider.copy(encryptedApiKey = null), if (provider.isDefaultLocal)
+            app.inku.mobile.data.ProviderSettingsCodec.parseModelIds(provider.publishedModelsJson)
+            else state.providerModelCandidates[provider.providerId] ?: app.inku.mobile.data.ProviderSettingsCodec.catalogIds(provider.providerId))) }
 }
+
+private fun qualifyModelId(providerId: String, modelId: String, state: InkuUiState): String =
+    app.inku.mobile.data.catalogRequest("qualify_ref", JSONObject().put("providers", providerReferenceRows(state))
+        .put("provider", providerId).put("ref", modelId)).getString("ref")
 
 /** A model's name, followed by the supported mark when Android is verified to draw with it. */
 @Composable
@@ -6475,7 +6623,7 @@ private fun CanvasPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: 
         }
     }
     if (generationInfoOpen && state.refinementPreviewId == null) item?.let {
-        GenerationInfoSheet(item = it, onDismiss = { generationInfoOpen = false })
+        GenerationInfoSheet(item = it, viewModel = viewModel, onDismiss = { generationInfoOpen = false })
     }
 }
 
@@ -6673,9 +6821,12 @@ internal fun generationInfoSections(item: HistoryItemEntity): List<GenerationInf
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun GenerationInfoSheet(item: HistoryItemEntity, onDismiss: () -> Unit) {
+private fun GenerationInfoSheet(item: HistoryItemEntity, viewModel: InkuViewModel, onDismiss: () -> Unit) {
     val clipboard = LocalClipboardManager.current
     val parityText = savedWorkParityStrings(LocalUiLanguage.current)
+    val english = LocalUiLanguage.current.isEnglish
+    val strings = S
+    val offerConfig by produceState<JSONObject?>(null, item.id) { value = viewModel.pluginOfferConfig(item.id) }
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
@@ -6686,6 +6837,49 @@ private fun GenerationInfoSheet(item: HistoryItemEntity, onDismiss: () -> Unit) 
             verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
         ) {
             Text(S.generationInfoTitle, style = MaterialTheme.typography.titleMedium)
+            offerConfig?.let { config ->
+                val offers = config.optJSONArray("plugin_offers") ?: org.json.JSONArray()
+                val definitions = config.optJSONArray("definitions") ?: org.json.JSONArray()
+                val names = (0 until definitions.length()).mapNotNull { definitions.optJSONObject(it) }.associate { definition ->
+                    val id = definition.optString("id").ifEmpty { definition.optString("heading") }
+                    val primary = definition.optJSONObject("names")?.optJSONArray(if (english) "en" else "ja")?.optString(0).orEmpty()
+                    val name = if (primary.isEmpty()) "${definition.optString("namespace")}.$id" else if (english) "{$primary}" else "｛$primary｝"
+                    "${definition.optString("namespace")}.$id" to name
+                }
+                fun offerName(entry: JSONObject): String {
+                    val id = entry.optString("qualified_name")
+                    return entry.optString(if (english) "written_en" else "written_ja").ifEmpty { names[id] ?: id }
+                }
+                if (offers.length() > 0) Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
+                    CompactLabel(S.pluginOffersTitle)
+                    for (i in 0 until offers.length()) {
+                        val record = offers.optJSONObject(i) ?: continue
+                        val offer = record.optJSONObject("offer") ?: JSONObject()
+                        val offered = offer.optJSONArray("offered") ?: org.json.JSONArray()
+                        val omitted = offer.optJSONArray("omitted") ?: org.json.JSONArray()
+                        val text = (0 until offered.length()).mapNotNull { offered.optJSONObject(it) }.joinToString(strings.listSeparator) {
+                            "${offerName(it)}（${strings.pluginOfferReason(it.optString("reason"))}）"
+                        }.ifEmpty { strings.pluginOffersNone }
+                        Text("${S.pluginOfferStage(record.optString("stage"))}: $text", style = MaterialTheme.typography.bodySmall)
+                        if (omitted.length() > 0) Text("${S.pluginOffersOmitted}: " +
+                            (0 until omitted.length()).mapNotNull { omitted.optJSONObject(it) }.joinToString(S.listSeparator, transform = ::offerName), style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+            val descriptionRecord = remember(item.id, item.renderMetadataJson) {
+                runCatching { JSONObject(item.renderMetadataJson).optJSONObject("description_ddl") }.getOrNull()
+            }
+            descriptionRecord?.let { record ->
+                Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+                    CompactLabel(S.drawRouteWords)
+                    descriptionDetails(record, S).forEach { (name, value) ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+                            Text(name, Modifier.weight(0.42f), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(value, Modifier.weight(0.58f), style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
             generationInfoSections(item).forEach { section ->
                 Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                     CompactLabel(generationInfoSectionLabel(section.id))
@@ -6827,8 +7021,8 @@ internal fun generationInfoDisplayValue(row: GenerationInfoRow, strings: InkuStr
     row.field == GenerationInfoField.InputRoute && row.value == "image_ddl_to_pipeline" -> strings.generationInfoInputRouteImageDdlToPipeline
     row.field == GenerationInfoField.VisionOutputMode && row.value == "description" -> strings.generationInfoVisionOutputModeDescription
     row.field == GenerationInfoField.VisionOutputMode && row.value == "ddl" -> strings.generationInfoVisionOutputModeDdl
-    row.field == GenerationInfoField.RenderWild && row.value == "true" -> strings.generationInfoOn
-    row.field == GenerationInfoField.RenderWild && row.value == "false" -> strings.generationInfoOff
+    row.field == GenerationInfoField.RenderWild && row.value == "true" -> strings.generationInfoWildLifted
+    row.field == GenerationInfoField.RenderWild && row.value == "false" -> strings.generationInfoWildNotLifted
     row.field == GenerationInfoField.VariationAmplitude && row.value != "—" -> strings.variationAmplitudeLabel(row.value)
     else -> row.value
 }
@@ -7397,37 +7591,25 @@ internal fun androidx.compose.ui.graphics.drawscope.DrawScope.drawDdlKeywordHigh
     tokens: List<DdlVocabularyToken>,
 ) {
     if (text.isBlank() || tokens.isEmpty()) return
-    val occupied = BooleanArray(text.length)
     val horizontalPad = Dimens.hairline.toPx()
     val verticalPad = Dimens.hairline.toPx()
     val radius = Dimens.highlightCorner.toPx()
-    tokens.forEach { token ->
-        val word = token.word
-        if (word.isBlank()) return@forEach
-        var start = text.indexOf(word)
-        while (start >= 0) {
-            val end = start + word.length
-            val overlaps = (start until end).any { occupied[it] }
-            if (!overlaps) {
-                var segmentStart = start
-                while (segmentStart < end) {
-                    val line = layout.getLineForOffset(segmentStart)
-                    val segmentEnd = minOf(end, layout.getLineEnd(line, visibleEnd = false))
-                    val firstBox = layout.getBoundingBox(segmentStart)
-                    val lastBox = layout.getBoundingBox(segmentEnd - 1)
-                    val top = minOf(firstBox.top, lastBox.top) + verticalPad
-                    val bottom = maxOf(firstBox.bottom, lastBox.bottom) - verticalPad
-                    drawRoundRect(
-                        color = token.color.copy(alpha = 0.92f),
-                        topLeft = Offset(firstBox.left - horizontalPad, top),
-                        size = Size((lastBox.right - firstBox.left) + horizontalPad * 2f, bottom - top),
-                        cornerRadius = CornerRadius(radius, radius),
-                    )
-                    segmentStart = segmentEnd
-                }
-                for (i in start until end) occupied[i] = true
-            }
-            start = text.indexOf(word, startIndex = end)
+    ddlKeywordSpans(text, tokens.map { it.word }).forEach { (index, start, end) ->
+        var segmentStart = start
+        while (segmentStart < end) {
+            val line = layout.getLineForOffset(segmentStart)
+            val segmentEnd = minOf(end, layout.getLineEnd(line, visibleEnd = false))
+            val firstBox = layout.getBoundingBox(segmentStart)
+            val lastBox = layout.getBoundingBox(segmentEnd - 1)
+            val top = minOf(firstBox.top, lastBox.top) + verticalPad
+            val bottom = maxOf(firstBox.bottom, lastBox.bottom) - verticalPad
+            drawRoundRect(
+                color = tokens[index].color.copy(alpha = 0.92f),
+                topLeft = Offset(firstBox.left - horizontalPad, top),
+                size = Size((lastBox.right - firstBox.left) + horizontalPad * 2f, bottom - top),
+                cornerRadius = CornerRadius(radius, radius),
+            )
+            segmentStart = segmentEnd
         }
     }
 }
@@ -7440,26 +7622,12 @@ internal class DdlKeywordHighlightTransformation(
             return TransformedText(text, OffsetMapping.Identity)
         }
         val builder = AnnotatedString.Builder(text)
-        val occupied = BooleanArray(text.text.length)
-        tokens.forEach { token ->
-            val word = token.word
-            if (word.isBlank()) return@forEach
-            var start = text.text.indexOf(word)
-            while (start >= 0) {
-                val end = start + word.length
-                val overlaps = (start until end).any { occupied[it] }
-                if (!overlaps) {
-                    builder.addStyle(
-                        SpanStyle(
-                            color = if (isLightColor(token.color)) PillInkOnLight else PillInkOnDark,
-                        ),
-                        start,
-                        end,
-                    )
-                    for (i in start until end) occupied[i] = true
-                }
-                start = text.text.indexOf(word, startIndex = end)
-            }
+        ddlTitleLineSpans(text.text).forEach { span ->
+            builder.addStyle(SpanStyle(fontWeight = FontWeight.Bold), span.first, span.last + 1)
+        }
+        ddlKeywordSpans(text.text, tokens.map { it.word }).forEach { (index, start, end) ->
+            val color = tokens[index].color
+            builder.addStyle(SpanStyle(color = if (isLightColor(color)) PillInkOnLight else PillInkOnDark), start, end)
         }
         return TransformedText(builder.toAnnotatedString(), OffsetMapping.Identity)
     }

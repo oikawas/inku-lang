@@ -13,7 +13,7 @@
 		document.addEventListener('visibilitychange', recheck);
 		return () => { window.removeEventListener('focus', recheck); document.removeEventListener('visibilitychange', recheck); };
 	});
-	onDestroy(() => { void connection.cancel(); });
+	onDestroy(() => { if (!connection.helperUrl && !connection.finishingAuthorization) void connection.cancel(); });
 </script>
 
 <section class="chatgpt-connection" aria-busy={connection.busy}>

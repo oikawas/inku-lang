@@ -34,8 +34,8 @@ internal class UrlConnectionChatGptHttp : ChatGptHttp {
         withContext(Dispatchers.IO) {
             coroutineScope {
                 val uri = URI(url)
-                if (uri.scheme != "https" || uri.host !in setOf("auth.openai.com", "api.openai.com") ||
-                    uri.userInfo != null || uri.fragment != null || (uri.port != -1 && uri.port != 443)) {
+                if (!uri.scheme.equals("https", ignoreCase = true) || uri.host !in setOf("auth.openai.com", "api.openai.com") ||
+                    uri.userInfo != null || !uri.fragment.isNullOrEmpty() || (uri.port != -1 && uri.port != 443)) {
                     throw ChatGptException("chatgpt_identity_invalid")
                 }
                 check()

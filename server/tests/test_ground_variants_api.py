@@ -28,7 +28,7 @@ def test_ground_variant_render_save_and_replay(monkeypatch):
     try:
         binding = PipelineBinding()
         effects = ProductPipelineEffects(binding, default_manifest(binding))
-        source = "Nature.青葉。"
+        source = "｛青葉｝。"
         with monkeypatch.context() as preparation:
             preparation.setattr(common, "_model_offered_to", lambda *args, **kwargs: True)
             config, context = effects.prepare(user["id"], "direct_ddl", source,

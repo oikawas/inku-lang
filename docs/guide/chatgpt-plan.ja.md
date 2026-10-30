@@ -18,7 +18,7 @@ Visionの要求は開始時の本人・profile ID・generationを固定してRes
 
 ## 同じPCで接続する
 
-Serverのソースディレクトリで、先に`uv sync --frozen --inexact`でlock済み依存を同期します。既存のnative wheelを保持し、以下の起動・認証helperでは`--no-sync`で再同期を避けます。既存のDB・管理者設定とともに起動します。
+Serverのソースディレクトリで、先に`uv sync --frozen --inexact`でlock済み依存を同期します。共有コアのnative wheelが必要です。[サーバーのセットアップ](../../SETUP.ja.md#サーバーのセットアップ)に従って作成・インストールし、`core/`を更新したら作り直します。以下の起動・認証helperでは`--no-sync`で既存のwheelを保持します。既存のDB・管理者設定とともに起動します。
 
 ```sh
 INKU_CHATGPT_PLAN_ENABLED=1 INKU_DEVELOPER_MODE=1 \
@@ -44,6 +44,8 @@ uv run --frozen --no-sync inku-chatgpt serve --self-hosted --host 0.0.0.0 --port
 ```
 
 運用者はDBで検証済みの本人ownerへ固定した`inku-chatgpt recipient --owner-id <verified-owner-id>`を実行し、公開recipient JSONをMacへ安全に渡します。Macで0600ファイルとして保存し、このアプリ専用の認証を行います。
+
+MacのServerのソースディレクトリで`uv sync --frozen --inexact`を実行した後、[サーバーのセットアップ](../../SETUP.ja.md#サーバーのセットアップ)に従って共有コアのnative wheelを作成・インストールします。`core/`を更新したらwheelを作り直してください。
 
 ```sh
 INKU_CHATGPT_PLAN_ENABLED=1 INKU_DEVELOPER_MODE=1 \
@@ -73,6 +75,8 @@ exportはMacのtokenを消し、更新所有権を手放してから完了しま
 
 汎用の運用手順では、コンテナhost上のCompose directoryで本人IDを検証し、公開recipientを作ります。
 
+コンテナimageにはnative wheelが入っているため、コンテナhostから実行する`recipient`・`import`にwheelの準備は不要です。
+
 ```sh
 umask 077
 docker compose exec -T --user 10001:10001 api \
@@ -80,6 +84,8 @@ docker compose exec -T --user 10001:10001 api \
 ```
 
 recipientを保護されたSSH等でMacへ渡し、0600 fileとして保存します。Macではコンテナ専用の認証保存先を使い、作者がChromeで認証・同意します。callbackはMacの`127.0.0.1`であり、Docker内では受けません。
+
+MacのServerのソースディレクトリで`uv sync --frozen --inexact`を実行した後、[サーバーのセットアップ](../../SETUP.ja.md#サーバーのセットアップ)に従って共有コアのnative wheelを作成・インストールします。`core/`を更新したらwheelを作り直してください。
 
 ```sh
 INKU_CHATGPT_PLAN_ENABLED=1 INKU_DEVELOPER_MODE=1 \

@@ -14,8 +14,13 @@ public struct EffectiveProviderRateLimits: Sendable, Equatable {
     public init(requestsPerMinute: Int, tokensPerMinute: Int, requestsPerDay: Int) {
         self.requestsPerMinute = requestsPerMinute; self.tokensPerMinute = tokensPerMinute; self.requestsPerDay = requestsPerDay
     }
-    public var minuteRequestBudget: Int { requestsPerMinute == 0 ? 0 : max(1, requestsPerMinute * 9 / 10) }
-    public var minuteInputTokenBudget: Int { tokensPerMinute == 0 ? 0 : max(1, tokensPerMinute * 9 / 10) }
+    private func budget(_ key: String) -> Int {
+        guard let result = try? ProviderAdmission.call(.object(["action": .string("limits"), "limits": ProviderAdmission.limits(self)])),
+              let value = result[key].number.flatMap(Int.init) else { preconditionFailure("Invalid shared provider limits") }
+        return value
+    }
+    public var minuteRequestBudget: Int { budget("rpm") }
+    public var minuteInputTokenBudget: Int { budget("tpm") }
 }
 
 public struct ProviderRateLimits: Codable, Sendable, Equatable {
@@ -27,12 +32,19 @@ public struct ProviderRateLimits: Codable, Sendable, Equatable {
         self.requestsPerDay = requestsPerDay
     }
     public static func defaults(providerID: String) -> ProviderRateLimits {
-        providerID == "gemini" ? .init(requestsPerMinute: 30, tokensPerMinute: 16_000, requestsPerDay: 14_400)
-            : .init(requestsPerMinute: 0, tokensPerMinute: 0, requestsPerDay: 0)
+        fromCore(providerID: providerID, limits: nil)
     }
-    /// Older settings saved zero as a missing member in an existing object.
     public func effective(providerID: String) -> EffectiveProviderRateLimits {
-        .init(requestsPerMinute: requestsPerMinute ?? 0, tokensPerMinute: tokensPerMinute ?? 0, requestsPerDay: requestsPerDay ?? 0)
+        let resolved = Self.fromCore(providerID: providerID, limits: self)
+        return .init(requestsPerMinute: resolved.requestsPerMinute ?? 0, tokensPerMinute: resolved.tokensPerMinute ?? 0, requestsPerDay: resolved.requestsPerDay ?? 0)
+    }
+    private static func fromCore(providerID: String, limits: ProviderRateLimits?) -> ProviderRateLimits {
+        var input: [String: Int] = [:]
+        if let value = limits?.requestsPerMinute { input["rpm"] = value }
+        if let value = limits?.tokensPerMinute { input["tpm"] = value }
+        if let value = limits?.requestsPerDay { input["rpd"] = value }
+        let result = (try? ProviderCoreSettings.call("rate_limits", ["provider": providerID, "value": input])["rate_limits"] as? [String: Int]) ?? [:]
+        return .init(requestsPerMinute: result["rpm"] ?? 0, tokensPerMinute: result["tpm"] ?? 0, requestsPerDay: result["rpd"] ?? 0)
     }
 }
 
@@ -74,25 +86,17 @@ public struct ProviderSettings: Codable, Sendable, Equatable, Identifiable {
                 throw HostError("chatgpt_provider_settings_invalid")
             }
         }
-        guard !id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              !credentialID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              let parts = URLComponents(url: baseURL, resolvingAgainstBaseURL: false),
-              let host = parts.host, !host.isEmpty,
-              parts.user == nil, parts.password == nil, parts.query == nil, parts.fragment == nil,
-              parts.scheme == "https" || parts.scheme == "http"
-        else { throw HostError("provider_base_url_invalid") }
-        if let limits = rateLimits {
-            guard [limits.requestsPerMinute, limits.tokensPerMinute, limits.requestsPerDay].compactMap({ $0 }).allSatisfy({ (0...1_000_000_000).contains($0) })
-            else { throw HostError("invalid_provider_rate_limits") }
-        }
-        if let models {
-            guard Set(models.map(\.id)).count == models.count else { throw HostError("duplicate_provider_model") }
-            try models.forEach { try $0.validate() }
-        }
-        if let enabledModels {
-            guard enabledModels.keys.allSatisfy({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
-            else { throw HostError("provider_model_settings_invalid") }
-        }
+        guard !credentialID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw HostError("provider_base_url_invalid") }
+        if kind == .chatGPTPlan { return }
+        let defaults = ProviderRateLimits.defaults(providerID: id)
+        let rates: [String: Int] = ["rpm": rateLimits?.requestsPerMinute ?? defaults.requestsPerMinute ?? 0,
+            "tpm": rateLimits?.tokensPerMinute ?? defaults.tokensPerMinute ?? 0,
+            "rpd": rateLimits?.requestsPerDay ?? defaults.requestsPerDay ?? 0]
+        let result = try ProviderCoreSettings.call("validate_settings", ["host": "macos", "provider": id,
+            "base_url": baseURL.absoluteString, "rate_limits": rates, "models": (models ?? []).map(\.coreCatalogRecord)])
+        guard result["provider_valid"] as? Bool == true, result["url_valid"] as? Bool == true else { throw HostError("provider_base_url_invalid") }
+        guard result["rate_limits_valid"] as? Bool == true else { throw HostError("invalid_provider_rate_limits") }
+        guard (result["duplicate_models"] as? [String] ?? []).isEmpty else { throw HostError("duplicate_provider_model") }
     }
     public static var personalPlan: ProviderSettings {
         .init(id: "chatgpt", kind: .chatGPTPlan, baseURL: URL(string: "https://api.openai.com/v1")!, requiresAPIKey: false)
@@ -160,6 +164,8 @@ public struct HostSettings: Codable, Sendable, Equatable {
     public var drawingLimits: [String: UInt32]?
     public var svgLimitMiB: Int?
     public var providerDefaultsInstalled: Bool?
+    /// Built-ins explicitly removed on this installation, kept inactive across normalization.
+    public var inactiveBuiltinProviderIDs: [String]?
     public init(providers: [ProviderSettings] = [], models: ModelSelection = .init(), operationalLimits: [String: UInt32]? = nil,
                 plugins: PluginPreferences? = nil, drawingLimits: [String: UInt32]? = nil,
                 providerDefaultsInstalled: Bool? = nil, svgLimitMiB: Int? = nil) {
@@ -175,28 +181,29 @@ public struct HostSettings: Codable, Sendable, Equatable {
 public actor ProviderSettingsStore {
     public nonisolated let url: URL
     public init(url: URL) { self.url = url }
-    public func load() throws -> HostSettings {
+    private func readRaw() throws -> HostSettings {
         guard FileManager.default.fileExists(atPath: url.path) else { return .init() }
         let settings = try JSONDecoder().decode(HostSettings.self, from: Data(contentsOf: url))
-        try settings.providers.forEach { try $0.validate() }
         _ = try SVGGenerationLimit.bytes(settings.svgLimitMiB)
         return settings
     }
-    public func load(installingDefaults defaults: [ProviderSettings]) throws -> HostSettings {
-        var settings = try load()
-        guard settings.providerDefaultsInstalled != true else { return settings }
-        try defaults.forEach { try $0.validate() }
-        guard Set(defaults.map(\.id)).count == defaults.count else { throw HostError("duplicate_provider") }
-        let existingIDs = Set(settings.providers.map(\.id))
-        settings.providers.append(contentsOf: defaults.filter { !existingIDs.contains($0.id) })
-        settings.providerDefaultsInstalled = true
-        try save(settings)
+    public func load() throws -> HostSettings {
+        let before = try readRaw()
+        let settings = try ProviderCoreSettings.normalize(before)
+        if settings != before { try write(settings) }
         return settings
     }
-    public func save(_ settings: HostSettings) throws {
+    public func loadNormalized() throws -> HostSettings { try load() }
+    @discardableResult public func save(_ settings: HostSettings) throws -> HostSettings {
         try settings.providers.forEach { try $0.validate() }
         _ = try SVGGenerationLimit.bytes(settings.svgLimitMiB)
         guard Set(settings.providers.map(\.id)).count == settings.providers.count else { throw HostError("duplicate_provider") }
+        let before = try readRaw()
+        let normalized = try ProviderCoreSettings.update(before, to: settings)
+        try write(normalized)
+        return normalized
+    }
+    private func write(_ settings: HostSettings) throws {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try JSONEncoder().encode(settings).write(to: url, options: .atomic)
     }

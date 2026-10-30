@@ -471,6 +471,7 @@ pub fn export_geometry(
             let geometry = MarkGeometry::of(instruction).map_err(|e| e.to_string())?;
             let context = MarkContext {
                 canvas,
+                clip_canvas: None,
                 color_map: &colors,
                 work_assignment: &assignment,
                 render_seed: request.options.render_seed,
@@ -895,6 +896,7 @@ mod tests {
         let assignment = BTreeMap::new();
         let context = MarkContext {
             canvas: CanvasSize::new(1000.0, 1000.0),
+            clip_canvas: None,
             color_map: &colors,
             work_assignment: &assignment,
             render_seed: Some(163717),
@@ -953,6 +955,7 @@ mod tests {
         let assignment = BTreeMap::new();
         let context = MarkContext {
             canvas: CanvasSize::new(1000.0, 1000.0),
+            clip_canvas: None,
             color_map: &colors,
             work_assignment: &assignment,
             render_seed: Some(163717),
@@ -1022,6 +1025,7 @@ mod tests {
         let assignment = BTreeMap::new();
         let context = MarkContext {
             canvas: CanvasSize::new(1000.0, 1000.0),
+            clip_canvas: None,
             color_map: &colors,
             work_assignment: &assignment,
             render_seed: Some(163717),

@@ -16,7 +16,7 @@ final class ProviderRateLimitChecks: XCTestCase, @unchecked Sendable {
         let databaseURL = folder.appendingPathComponent("works.sqlite")
         try Self.makeV2(databaseURL)
         let firstDB = try InkuDatabase(url: databaseURL)
-        XCTAssertEqual(try Self.integerSQL(databaseURL, "PRAGMA user_version"), 4)
+        XCTAssertEqual(try Self.integerSQL(databaseURL, "PRAGMA user_version"), 6)
         let retained = try await firstDB.work(id: "fixture-work")
         XCTAssertEqual(retained?.svg, "<svg/>")
         let secondDB = try InkuDatabase(url: databaseURL)
@@ -24,10 +24,14 @@ final class ProviderRateLimitChecks: XCTestCase, @unchecked Sendable {
         let gemini = ProviderSettings(id: "gemini", kind: .gemini, baseURL: URL(string: "https://fixture.invalid")!, requiresAPIKey: false)
         XCTAssertEqual(gemini.effectiveRateLimits, .init(requestsPerMinute: 30, tokensPerMinute: 16_000, requestsPerDay: 14_400))
         var old = gemini; old.rateLimits = ProviderRateLimits()
-        XCTAssertEqual(old.effectiveRateLimits, .init(requestsPerMinute: 0, tokensPerMinute: 0, requestsPerDay: 0))
+        // The shared settings normalizer fills missing Gemini rate members from its defaults.
+        XCTAssertEqual(old.effectiveRateLimits, .init(requestsPerMinute: 30, tokensPerMinute: 16_000, requestsPerDay: 14_400))
         old.rateLimits = .init(requestsPerMinute: 0, tokensPerMinute: 0, requestsPerDay: 0); try old.validate()
         XCTAssertEqual(ProviderRateLimits.defaults(providerID: "custom").effective(providerID: "custom"), old.effectiveRateLimits)
         XCTAssertEqual(EffectiveProviderRateLimits(requestsPerMinute: 1, tokensPerMinute: 1, requestsPerDay: 0).minuteRequestBudget, 1)
+        let maximum = EffectiveProviderRateLimits(requestsPerMinute: Int.max, tokensPerMinute: Int.max, requestsPerDay: 0)
+        XCTAssertEqual(maximum.minuteRequestBudget, Int.max / 10 * 9 + (Int.max % 10) * 9 / 10)
+        XCTAssertEqual(maximum.minuteInputTokenBudget, maximum.minuteRequestBudget)
 
         // One slot at 90% of RPM2, acquired concurrently through separate connections.
         // One transport uses the normal API and one the durable observation API.
@@ -72,6 +76,35 @@ final class ProviderRateLimitChecks: XCTestCase, @unchecked Sendable {
         let zero = try await state(firstDB, "usage")
         XCTAssertEqual(zero.events.first?.tokens, 0); XCTAssertEqual(zero.notBefore, held.notBefore)
 
+        // A core result too large for the persisted Swift state must roll back atomically.
+        let overflowProvider = Self.provider("overflow")
+        try await limiter.prepare(provider: overflowProvider)
+        let overflowDay = try ProviderRateBudget.day(clock.now, kind: overflowProvider.kind)
+        try await firstDB.changeProviderRateState(providerID: overflowProvider.id) { state in
+            state.day = overflowDay; state.daily = Int.max
+        }
+        let beforeOverflow = try await state(firstDB, overflowProvider.id)
+        do {
+            _ = try await limiter.reserve(provider: overflowProvider, inputTokens: 0, deadline: clock.now.addingTimeInterval(2))
+            XCTFail("Overflowing persisted daily count must fail")
+        } catch PersistenceError.corruptDatabase { }
+        let afterOverflow = try await state(firstDB, overflowProvider.id)
+        XCTAssertEqual(afterOverflow, beforeOverflow)
+        let sumProvider = Self.provider("overflow-sum")
+        try await limiter.prepare(provider: sumProvider)
+        let instant = clock.now.timeIntervalSince1970
+        try await firstDB.changeProviderRateState(providerID: sumProvider.id) { state in
+            state.day = overflowDay; state.daily = 2
+            state.events = [.init(id: "a", at: instant, tokens: Int.max), .init(id: "b", at: instant, tokens: Int.max)]
+        }
+        let beforeSum = try await state(firstDB, sumProvider.id)
+        do {
+            _ = try await limiter.reserve(provider: sumProvider, inputTokens: 2, deadline: clock.now.addingTimeInterval(2))
+            XCTFail("Overflowing core token sum must fail")
+        } catch PersistenceError.corruptDatabase { }
+        let afterSum = try await state(firstDB, sumProvider.id)
+        XCTAssertEqual(afterSum, beforeSum)
+
         // Real transport admission rejects a one-request TPM oversize before HTTP.
         let tiny = Self.provider("tiny", limits: .init(tokensPerMinute: 1))
         let tinyHTTP = RateCheckHTTP(database: firstDB, providerID: tiny.id, mode: .ordinary)
@@ -95,10 +128,25 @@ final class ProviderRateLimitChecks: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(missing["failure"].string, "rate_limited")
         let missingGenerations = await missingHTTP.generations; XCTAssertEqual(missingGenerations, 0)
 
+        // Exact wide counts reach the shared preflight; non-object responses retain their failure class.
+        for (id, mode, failure) in [("wide-count", RateCheckHTTP.Mode.wideCount, "rate_limited"),
+                                    ("array-count", .arrayCount, "malformed_payload")] {
+            let provider = Self.provider(id, kind: .gemini, limits: .init(tokensPerMinute: 1_000))
+            let http = RateCheckHTTP(database: firstDB, providerID: id, mode: mode)
+            let transport = URLSessionProviderTransport(usageURL: absent, http: http, database: firstDB, environment: clock.environment)
+            let result = try ExactJSON(data: await transport.perform(action: Self.action(id), models: Self.models(id), providers: [provider], credentials: RateCheckCredentials(), onBytes: { _ in }))
+            XCTAssertEqual(result["failure"].string, failure)
+            let generations = await http.generations; XCTAssertEqual(generations, 0)
+        }
+
         let retryInfo = Data(#"{"error":{"details":[{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"125s"}]}}"#.utf8)
         let formatter = DateFormatter(); formatter.locale = Locale(identifier: "en_US_POSIX"); formatter.timeZone = TimeZone(secondsFromGMT: 0)
         formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
         XCTAssertEqual(ProviderRateBudget.retryAfter(formatter.string(from: clock.now.addingTimeInterval(90)), raw: retryInfo, now: clock.now), 125)
+        let badFirst = Data(#"{"error":{"details":[{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"bad s"},{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"999s"}]}}"#.utf8)
+        XCTAssertEqual(ProviderRateBudget.retryAfter(nil, raw: badFirst, now: clock.now), 62)
+        let utf32 = Data([0, 0, 0xfe, 0xff]) + String(decoding: retryInfo, as: UTF8.self).data(using: .utf32BigEndian)!
+        XCTAssertEqual(ProviderRateBudget.retryAfter(nil, raw: utf32, now: clock.now), 125)
         let retryProvider = Self.provider("retry", limits: .init(requestsPerDay: 2))
         let retryHTTP = RateCheckHTTP(database: firstDB, providerID: retryProvider.id, mode: .retry429)
         let retryTransport = URLSessionProviderTransport(usageURL: absent, http: retryHTTP, database: firstDB, environment: clock.environment)
@@ -133,7 +181,7 @@ final class ProviderRateLimitChecks: XCTestCase, @unchecked Sendable {
         _ = try await legacyBudget.reserve(provider: legacyGemini, inputTokens: 0, deadline: legacyClock.now.addingTimeInterval(2))
         let midnight = try await state(secondDB, "gemini")
         XCTAssertEqual(midnight.day, "2026-10-03"); XCTAssertEqual(midnight.daily, 1)
-        XCTAssertEqual(ProviderRateBudget.day(legacyClock.now.addingTimeInterval(-1), kind: .openAICompatible), "2026-10-03")
+        XCTAssertEqual(try ProviderRateBudget.day(legacyClock.now.addingTimeInterval(-1), kind: .openAICompatible), "2026-10-03")
 
         let brokenJSON = folder.appendingPathComponent("broken.json"); try Data("{".utf8).write(to: brokenJSON)
         let brokenProvider = Self.provider("broken")
@@ -232,7 +280,7 @@ private actor RateCheckSink {
     func save(_ value: ProviderAttemptObservation) throws { try JSONEncoder().encode(value).write(to: url, options: .atomic); records.append(value) }
 }
 private actor RateCheckHTTP: ProviderHTTPClient {
-    enum Mode: Sendable, Equatable { case ordinary, gemini, missingCount, retry429 }
+    enum Mode: Sendable, Equatable { case ordinary, gemini, missingCount, wideCount, arrayCount, retry429 }
     let database: InkuDatabase
     let providerID: String
     let mode: Mode
@@ -245,7 +293,14 @@ private actor RateCheckHTTP: ProviderHTTPClient {
         let body = try ExactJSON(data: request.httpBody!)
         if request.url!.path.hasSuffix(":countTokens") {
             counts += 1; countBody = body["generateContentRequest"]
-            let data = (mode == .missingCount ? ExactJSON.object([:]) : .object(["totalTokens": .integer(100)])).data
+            let result: ExactJSON
+            switch mode {
+            case .missingCount: result = .object([:])
+            case .wideCount: result = .object(["totalTokens": .number("18446744073709551615")])
+            case .arrayCount: result = .array([])
+            default: result = .object(["totalTokens": .integer(100)])
+            }
+            let data = result.data
             onResponse(.init(status: 200, data: data, sent: true, complete: true, truncated: false))
             return .init(status: 200, data: data)
         }
@@ -262,7 +317,7 @@ private actor RateCheckHTTP: ProviderHTTPClient {
             guard .object(fields) == body, state.events.first?.tokens == 110 else { throw HostError("fixture_count_estimate_or_schema_changed") }
             value = .object(["usageMetadata": .object(["promptTokenCount": .integer(85)]), "candidates": .array([.object(["content": .object(["parts": .array([
                 .object(["functionCall": .object(["name": .string(ProviderWire.responseName), "args": .object(["composition": .string("fixture")])])])])])])])])
-        case .missingCount: throw HostError("fixture_missing_count_sent_generation")
+        case .missingCount, .wideCount, .arrayCount: throw HostError("fixture_missing_count_sent_generation")
         case .retry429:
             status = 429; value = .object(["error": .object(["details": .array([.object(["@type": .string("type.googleapis.com/google.rpc.RetryInfo"), "retryDelay": .string("99s")])])])])
         }

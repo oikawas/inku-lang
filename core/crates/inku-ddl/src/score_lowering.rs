@@ -235,8 +235,16 @@ fn project_source_instruction<'a>(
     instruction_index: usize,
     instruction: &'a SemanticInstruction,
 ) -> Option<ScoreLoweringInput<'a>> {
-    let SemanticHead::Primitive(term) = &instruction.entity.head else {
-        return None;
+    let (primitive, object_aspect) = match &instruction.entity.head {
+        SemanticHead::Primitive(term) => ((&term.identity).into(), None),
+        SemanticHead::MacroInvocation(head) if head.object_aspect.is_some() => (
+            SemanticInputIdentity {
+                category: "shape",
+                id: "square",
+            },
+            head.object_aspect,
+        ),
+        SemanticHead::MacroInvocation(_) => return None,
     };
     Some(ScoreLoweringInput {
         fill_target: project_fill_target(view, instruction.fill_target.as_ref()),
@@ -267,7 +275,8 @@ fn project_source_instruction<'a>(
             .aspect
             .as_ref()
             .map(|term| (&term.identity).into()),
-        primitive: (&term.identity).into(),
+        primitive,
+        object_aspect,
         count: instruction
             .entity
             .quantity
@@ -1382,6 +1391,209 @@ fn lower_macro_instruction(
     }
 }
 
+/// Lower a plugin body once in local box coordinates. Caller placement and
+/// geometry belong to the square; only unbound appearance is diagnosed here.
+fn lower_object_plugin_template(
+    view: VerifiedStage15EffectiveView<'_>,
+    source_instruction_index: usize,
+    instruction: &SemanticInstruction,
+    head: &SemanticMacroInvocationHead,
+    mut context: ScoreLoweringContext,
+    error_policy: ScoreErrorPolicy,
+    diagnostics: &mut Vec<ScoreLoweringDiagnostic>,
+) -> Option<(u8, u8, Box<Score>)> {
+    let (width, height) = head.object_aspect?;
+    context.canvas_format.width_units = u32::from(width);
+    context.canvas_format.height_units = u32::from(height);
+    // Explicit width and height may override the definition's aspect. Lower
+    // offsets (line ends, arc centers, rectangle corners) in that same box;
+    // otherwise their normalized coordinates would retain the old ratio.
+    if let Some(SemanticExplicitGeometry::WidthHeight { width, height }) =
+        &instruction.entity.explicit_geometry
+        && let Ok(w) = Rational::from_decimal(width.decimal.value)
+        && let Ok(h) = Rational::from_decimal(height.decimal.value)
+        && let Ok(ratio) = w.div(h)
+    {
+        let ratio = reduced_ratio(ratio);
+        if let (Ok(w), Ok(h)) = (
+            u32::try_from(ratio.numerator()),
+            u32::try_from(ratio.denominator()),
+        ) && w > 0
+            && h > 0
+        {
+            context.canvas_format.width_units = w;
+            context.canvas_format.height_units = h;
+        } else if let (Ok(w), Ok(h)) = (w.to_f64(), h.to_f64())
+            && w > 0.0
+            && h > 0.0
+        {
+            // CanvasFormat uses a u32 ratio; keep as much precision as that
+            // representation permits for longer exact decimal spellings.
+            let scale = f64::from(u32::MAX) / w.max(h);
+            context.canvas_format.width_units = (w * scale).round().max(1.0) as u32;
+            context.canvas_format.height_units = (h * scale).round().max(1.0) as u32;
+        }
+    }
+    context.declared_ratio = None;
+    context.canvas_fit = None;
+    let has_color_parameter = head.parameters.iter().any(|parameter| matches!(
+        &parameter.schema, crate::ParameterSchema::SemanticRef { category, .. } if category == "color"
+    ));
+    let replacement = if has_color_parameter {
+        None
+    } else {
+        exact_macro_expansion(view, head)
+            .ok()
+            .and_then(|expansion| expansion.primary_literal_color.as_deref())
+            .and_then(|primary| {
+                let caller = instruction.entity.color.as_ref()?;
+                let from =
+                    serde_json::from_value::<Color>(serde_json::Value::String(primary.to_owned()))
+                        .ok()?;
+                let to = serde_json::from_value::<Color>(serde_json::Value::String(
+                    caller.identity.id.clone(),
+                ))
+                .ok()?;
+                Some((from, to))
+            })
+    };
+    let mut caller = instruction.clone();
+    if replacement.is_some() {
+        caller.entity.color = None;
+    }
+    caller.action = None;
+    caller.position = None;
+    caller.layout_direction = None;
+    caller.relation = None;
+    caller.fill_target = None;
+    caller.sequence = None;
+    caller.entity.quantity = None;
+    caller.entity.relative_scale = None;
+    caller.entity.explicit_geometry = None;
+    caller.entity.additional_relative_scales.clear();
+    caller.entity.additional_explicit_geometries.clear();
+    caller.entity.additional_width_extents.clear();
+    caller.entity.numeric_position = None;
+    caller.entity.numeric_range = None;
+    caller.entity.numeric_segment = None;
+    caller.entity.angle = None;
+    caller.entity.numeric_angle = None;
+    caller.entity.shape_constraint = None;
+    caller.entity.proportion = Default::default();
+    caller.entity.fade = None;
+    let mut instructions = Vec::new();
+    let mut anchors = Vec::new();
+    let mut anchor_origins = Vec::new();
+    let mut instruction_origins = Vec::new();
+    let mut transform_groups = Vec::new();
+    let mut objects = Vec::new();
+    let mut planned_transforms = Vec::new();
+    lower_macro_instruction(
+        view,
+        source_instruction_index,
+        &caller,
+        head,
+        None,
+        context,
+        error_policy,
+        &mut instructions,
+        &mut anchors,
+        &mut anchor_origins,
+        &mut instruction_origins,
+        diagnostics,
+        Some(&mut objects),
+        Some(&mut planned_transforms),
+        &mut transform_groups,
+    );
+    let repetitions = if objects.is_empty() && anchors.is_empty() {
+        Vec::new()
+    } else {
+        vec![PlacementMemberPlan {
+            source_instruction_index,
+            source_instruction_indices: vec![source_instruction_index],
+            member: inku_score::PlacementMember {
+                start: 0,
+                end: objects.len(),
+                anchor_indices: (0..anchors.len()).collect(),
+                transform_group_indices: (0..planned_transforms.len()).collect(),
+                symbolic: None,
+            },
+            kind: PlacementMemberKind::Macro,
+            source_count: 1,
+            count_was_omitted: true,
+        }]
+    };
+    let plan = crate::CompositionPlanResult {
+        view,
+        context,
+        policy_digest: String::new(),
+        error_policy,
+        outcome: crate::CompositionPlanOutcome::Ready,
+        objects,
+        anchors,
+        anchor_origins,
+        transform_groups: planned_transforms,
+        placement_groups: Vec::new(),
+        fill_groups: Vec::new(),
+        standalone_macro_repetitions: repetitions,
+        mirror_relations: Vec::new(),
+        ground: None,
+        diagnostics: Vec::new(),
+    };
+    // The containing work's policy accounts the body multiplied by its box
+    // count. This local policy is used only after that outer admission to
+    // replay the body's recipes; its maximum remains exactly representable by
+    // JSON consumers that use IEEE-754 numbers.
+    const LOCAL_POLICY_MAX: u64 = (1_u64 << 53) - 1;
+    let maximum = inku_score::ResourceDemand {
+        logical_objects: LOCAL_POLICY_MAX,
+        primitive_marks: LOCAL_POLICY_MAX,
+        object_templates: LOCAL_POLICY_MAX,
+        maximum_per_template_primitive_marks: LOCAL_POLICY_MAX,
+        maximum_resolved_count: LOCAL_POLICY_MAX,
+        template_nodes: LOCAL_POLICY_MAX,
+        anchor_instances: LOCAL_POLICY_MAX,
+        transform_instances: LOCAL_POLICY_MAX,
+        placement_instances: LOCAL_POLICY_MAX,
+        fill_instances: LOCAL_POLICY_MAX,
+    };
+    let budget = inku_score::ResourceBudget { maximum };
+    let selected = crate::select_composition_plan_resources(
+        &plan,
+        inku_score::HardResourcePolicy {
+            identity: "inku.object-template.v1".into(),
+            budget,
+        },
+        inku_score::OperationalResourceBudget(budget),
+    );
+    let body = selected
+        .ok()
+        .and_then(|selected| crate::materialize_selected_composition(&selected).ok())
+        .map(|materialized| materialized.score);
+    let Some(mut body) = body else {
+        let reason = ScoreFieldGap::UnsupportedMacroStructure;
+        diagnostics.push(ScoreLoweringDiagnostic {
+            owner: macro_invocation_owner(source_instruction_index, head, None),
+            disposition: diagnostic_disposition(
+                error_policy,
+                &reason,
+                macro_invocation_unit(source_instruction_index, head),
+                None,
+            ),
+            reason,
+        });
+        return None;
+    };
+    if let Some((from, to)) = replacement {
+        for mark in &mut body.instructions {
+            if mark.color == from {
+                mark.color = to;
+            }
+        }
+    }
+    Some((width, height, Box::new(body)))
+}
+
 fn exact_macro_expansion<'a>(
     view: VerifiedStage15EffectiveView<'a>,
     head: &SemanticMacroInvocationHead,
@@ -1528,41 +1740,142 @@ fn append_macro_caller_diagnostics(
             reason,
         });
     }
-    if macro_caller_has_unbound_geometry(instruction) {
-        invalid = true;
-        append_macro_invocation_diagnostic(
-            source_instruction_index,
-            head,
-            ScoreFieldGap::UnboundMacroCallerMeaning,
-            error_policy,
-            diagnostics,
-        );
+    let entity = &instruction.entity;
+    let fields = [
+        (
+            ScoreMacroCallerField::Thinness,
+            entity.thinness.as_ref().map(|v| v.provenance.span),
+        ),
+        (
+            ScoreMacroCallerField::RelativeScale,
+            entity.relative_scale.as_ref().map(|v| v.provenance.span),
+        ),
+        (
+            ScoreMacroCallerField::ExplicitGeometry,
+            entity.explicit_geometry.as_ref().map(|v| v.source().span),
+        ),
+        (
+            ScoreMacroCallerField::NumericPosition,
+            entity
+                .numeric_position
+                .as_ref()
+                .map(|v| v.x.keyword_provenance.span),
+        ),
+        (
+            ScoreMacroCallerField::NumericRange,
+            entity.numeric_range.as_ref().map(|v| v.provenance.span),
+        ),
+        (
+            ScoreMacroCallerField::NumericSegment,
+            entity.numeric_segment.as_ref().map(|v| v.provenance.span),
+        ),
+        (
+            ScoreMacroCallerField::Angle,
+            entity.angle.as_ref().map(|v| v.provenance.source.span),
+        ),
+        (
+            ScoreMacroCallerField::NumericAngle,
+            entity.numeric_angle.as_ref().map(|v| v.provenance.span),
+        ),
+        (
+            ScoreMacroCallerField::Fade,
+            entity.fade.as_ref().map(|v| v.provenance.span),
+        ),
+        (
+            ScoreMacroCallerField::FluctuationAmplitude,
+            entity
+                .fluctuation
+                .amplitude
+                .as_ref()
+                .map(|v| v.provenance.source.span),
+        ),
+        (
+            ScoreMacroCallerField::FluctuationFrequency,
+            entity
+                .fluctuation
+                .frequency
+                .as_ref()
+                .map(|v| v.provenance.source.span),
+        ),
+        (
+            ScoreMacroCallerField::FluctuationQuality,
+            entity
+                .fluctuation
+                .quality
+                .as_ref()
+                .map(|v| v.provenance.source.span),
+        ),
+        (
+            ScoreMacroCallerField::FluctuationSpread,
+            entity
+                .fluctuation
+                .spread
+                .as_ref()
+                .map(|v| v.provenance.source.span),
+        ),
+        (
+            ScoreMacroCallerField::ShapeConstraint,
+            entity.shape_constraint.as_ref().map(|v| v.provenance.span),
+        ),
+        (
+            ScoreMacroCallerField::Aspect,
+            entity
+                .proportion
+                .aspect
+                .as_ref()
+                .map(|v| v.provenance.source.span),
+        ),
+        (
+            ScoreMacroCallerField::WidthExtent,
+            entity
+                .proportion
+                .width_extent
+                .as_ref()
+                .map(|v| v.provenance.source.span),
+        ),
+        (
+            ScoreMacroCallerField::ArcForm,
+            entity
+                .proportion
+                .arc_form
+                .as_ref()
+                .map(|v| v.provenance.source.span),
+        ),
+        (
+            ScoreMacroCallerField::LayoutDirection,
+            instruction
+                .layout_direction
+                .as_ref()
+                .map(|v| v.provenance.source.span),
+        ),
+        (
+            ScoreMacroCallerField::Position,
+            instruction
+                .position
+                .as_ref()
+                .map(|v| v.provenance.source.span),
+        ),
+    ];
+    for (field, span) in fields {
+        let Some(span) = span else { continue };
+        let reason = ScoreFieldGap::UnboundMacroCallerMeaning;
+        diagnostics.push(ScoreLoweringDiagnostic {
+            owner: ScoreDiagnosticOwner::MacroInvocation {
+                source_instruction_index,
+                invocation_ordinal: head.provenance.ordinal,
+                field: None,
+                spans: vec![span],
+            },
+            disposition: diagnostic_disposition(
+                error_policy,
+                &reason,
+                macro_caller_field_unit(source_instruction_index, head, field),
+                None,
+            ),
+            reason,
+        });
     }
     invalid
-}
-
-/// Geometry or a position written on a Macro caller has no binding in the
-/// intact body, so the whole call is left out.
-fn macro_caller_has_unbound_geometry(instruction: &SemanticInstruction) -> bool {
-    instruction.entity.thinness.is_some()
-        || instruction.entity.relative_scale.is_some()
-        || instruction.entity.explicit_geometry.is_some()
-        || instruction.entity.numeric_position.is_some()
-        || instruction.entity.numeric_range.is_some()
-        || instruction.entity.numeric_segment.is_some()
-        || instruction.entity.angle.is_some()
-        || instruction.entity.numeric_angle.is_some()
-        || instruction.entity.fade.is_some()
-        || instruction.entity.fluctuation.amplitude.is_some()
-        || instruction.entity.fluctuation.frequency.is_some()
-        || instruction.entity.fluctuation.quality.is_some()
-        || instruction.entity.fluctuation.spread.is_some()
-        || instruction.entity.shape_constraint.is_some()
-        || instruction.entity.proportion.aspect.is_some()
-        || instruction.entity.proportion.width_extent.is_some()
-        || instruction.entity.proportion.arc_form.is_some()
-        || instruction.layout_direction.is_some()
-        || instruction.position.is_some()
 }
 
 /// Whether a mirror takes this instruction's body as its target: a mirror
@@ -1826,6 +2139,7 @@ fn project_macro_emit<'a>(
         shape_constraint,
         proportion_aspect,
         primitive: primitive.expect("required macro shape field checked"),
+        object_aspect: None,
         count,
         color,
         color_cycle: &[],
@@ -2642,6 +2956,7 @@ fn lower_verified_stage15_shared<'a>(
     // body. The body keeps its own actions, quantities, anchors and transforms.
     for (projected_index, instruction) in document.instructions.iter().enumerate() {
         if !matches!(instruction.entity.head, SemanticHead::MacroInvocation(_))
+            || matches!(&instruction.entity.head, SemanticHead::MacroInvocation(head) if head.object_aspect.is_some())
             || instruction
                 .action
                 .as_ref()
@@ -2691,11 +3006,16 @@ fn lower_verified_stage15_shared<'a>(
     // one-member group that the caller's action lays out once: one copy per
     // cell for no action, placing, scattering or drawing, and the action's
     // own layout for a line-up or a tile. Performance sizes the cells from
-    // the drawn copies. A caller with a position, a fill, an order, a
+    // the drawn copies. Unbound caller position is omitted before placement.
+    // A caller with a fill, an order, a
     // relation, or a mirror after it keeps the outer repetition in place.
     if objects.is_some() {
         for (projected_index, instruction) in document.instructions.iter().enumerate() {
             if !matches!(instruction.entity.head, SemanticHead::MacroInvocation(_)) {
+                continue;
+            }
+            if matches!(&instruction.entity.head, SemanticHead::MacroInvocation(head) if head.object_aspect.is_some())
+            {
                 continue;
             }
             let Some(count) = instruction
@@ -2710,7 +3030,6 @@ fn lower_verified_stage15_shared<'a>(
             if instruction.fill_target.is_some()
                 || instruction.sequence.is_some()
                 || instruction.relation.is_some()
-                || macro_caller_has_unbound_geometry(instruction)
                 || mirror_takes_body_of(document, projected_index)
                 || group_members.contains_key(&projected_index)
                 || omitted_group_members.contains(&projected_index)
@@ -2757,6 +3076,7 @@ fn lower_verified_stage15_shared<'a>(
     }
 
     let mut instructions = Vec::new();
+    let mut object_templates = Vec::new();
     let mut anchors = Vec::new();
     let mut anchor_origins = Vec::new();
     let mut instruction_origins = Vec::new();
@@ -3000,13 +3320,52 @@ fn lower_verified_stage15_shared<'a>(
             continue;
         }
         match &instruction.entity.head {
-            SemanticHead::Primitive(_) => {
+            SemanticHead::Primitive(_)
+            | SemanticHead::MacroInvocation(SemanticMacroInvocationHead {
+                object_aspect: Some(_),
+                ..
+            }) => {
+                let mut plugin_template =
+                    if let SemanticHead::MacroInvocation(head) = &instruction.entity.head {
+                        let Some(template) = lower_object_plugin_template(
+                            candidate.verified_effective_view(),
+                            instruction_index,
+                            instruction,
+                            head,
+                            context,
+                            error_policy,
+                            &mut diagnostics,
+                        ) else {
+                            continue;
+                        };
+                        Some(template)
+                    } else {
+                        None
+                    };
                 let mut input = project_source_instruction(
                     candidate.verified_effective_view(),
                     instruction_index,
                     instruction,
                 )
                 .expect("source projection is called only for primitive heads");
+                if plugin_template.is_some() {
+                    // The box is invisible, so this finite placeholder has
+                    // no effect on the plugin body's own appearance.
+                    input.color = Some(SemanticInputIdentity {
+                        category: "color",
+                        id: "black",
+                    });
+                    input.color_cycle = &[];
+                    input.touch = None;
+                    input.continuity = None;
+                    input.surface = None;
+                    input.surface_intensity = None;
+                    input.surface_fineness = None;
+                    input.surface_underlayer = None;
+                    input.thinness = None;
+                    input.fluctuation = [None; 3];
+                    input.ink_spread = None;
+                }
                 if let Some((region, count)) = group_members.get(&projected_index) {
                     // The group alone owns action and target; members retain appearance
                     // and quantities while resolving geometry in a local Place recipe.
@@ -3073,6 +3432,7 @@ fn lower_verified_stage15_shared<'a>(
                     if let Some(index) = object_index {
                         objects[index].relation = relation;
                         objects[index].count_was_omitted = instruction.entity.quantity.is_none();
+                        objects[index].plugin_template = plugin_template.take();
                     }
                 } else if let Some(relation) = instruction
                     .relation
@@ -3134,6 +3494,15 @@ fn lower_verified_stage15_shared<'a>(
                         &mut diagnostics,
                     );
                 }
+                if let Some((width, height, body)) = plugin_template
+                    && instructions.len() > body_start
+                {
+                    object_templates.push(inku_score::ObjectTemplate {
+                        instruction_index: body_start,
+                        aspect: [width, height],
+                        body,
+                    });
+                }
             }
             SemanticHead::MacroInvocation(head) => {
                 if let Some(relation) = instruction
@@ -3159,7 +3528,13 @@ fn lower_verified_stage15_shared<'a>(
                 {
                     body_caller = instruction.clone();
                     body_caller.action = None;
-                    body_caller.position = None;
+                    let implicit_repetition = group_members.contains_key(&projected_index)
+                        && !document.coordinated_head_groups.iter().any(|group| {
+                            group.member_instruction_indices.contains(&projected_index)
+                        });
+                    if !implicit_repetition {
+                        body_caller.position = None;
+                    }
                     body_caller.fill_target = None;
                     body_caller.sequence = None;
                     &body_caller
@@ -3208,6 +3583,10 @@ fn lower_verified_stage15_shared<'a>(
                     },
                     kind: match instruction.entity.head {
                         SemanticHead::Primitive(_) => PlacementMemberKind::Primitive,
+                        SemanticHead::MacroInvocation(SemanticMacroInvocationHead {
+                            object_aspect: Some(_),
+                            ..
+                        }) => PlacementMemberKind::Primitive,
                         SemanticHead::MacroInvocation(_) => PlacementMemberKind::Macro,
                     },
                     source_count: u32::try_from(*count)
@@ -3216,7 +3595,7 @@ fn lower_verified_stage15_shared<'a>(
                 },
             );
         } else if objects.is_some()
-            && matches!(instruction.entity.head, SemanticHead::MacroInvocation(_))
+            && matches!(&instruction.entity.head, SemanticHead::MacroInvocation(head) if head.object_aspect.is_none())
             && (body_start < body_end || anchor_start < anchors.len())
         {
             // Count one still owns a complete body, including Anchor-only macros.
@@ -3598,7 +3977,9 @@ fn lower_verified_stage15_shared<'a>(
         ScoreLoweringOutcome::Complete
     };
     let score = (objects.is_none() && outcome != ScoreLoweringOutcome::Stopped).then(|| Score {
-        version: if inku_score::instructions_use_brushmarks(&instructions) {
+        version: if !object_templates.is_empty() {
+            inku_score::ScoreEdition::V0_23.as_str().to_owned()
+        } else if inku_score::instructions_use_brushmarks(&instructions) {
             inku_score::ScoreEdition::V0_22.as_str().to_owned()
         } else if inku_score::instructions_use_free_line(&instructions) {
             inku_score::ScoreEdition::V0_21.as_str().to_owned()
@@ -3649,6 +4030,7 @@ fn lower_verified_stage15_shared<'a>(
         background: context.background,
         presence: None,
         instructions,
+        object_templates,
         anchors: anchors.clone(),
         transform_groups: score_transform_groups,
         placement_groups: placement_groups
@@ -4702,6 +5084,7 @@ fn macro_caller_field_owner(
             .action
             .as_ref()
             .map(|term| term.provenance.source.span),
+        _ => None,
     }
     .unwrap_or(head.provenance.source.span);
     ScoreDiagnosticOwner::MacroInvocation {
@@ -4889,6 +5272,7 @@ struct ScoreLoweringInput<'a> {
     shape_constraint: Option<crate::ShapeConstraint>,
     proportion_aspect: Option<SemanticInputIdentity<'a>>,
     primitive: SemanticInputIdentity<'a>,
+    object_aspect: Option<(u8, u8)>,
     count: Option<u64>,
     color: Option<SemanticInputIdentity<'a>>,
     color_cycle: &'a [crate::SemanticTerm],
@@ -5210,6 +5594,7 @@ fn resolve_object_plan(
             None => (inku_score::Fade::None, false),
         };
         Ok(ObjectPlacementPlan {
+            plugin_template: None,
             arc_form: resolved.arc_form,
             proportion_width_extent: input.proportion_width_extent.map(|identity| {
                 crate::SemanticIdentity {
@@ -6607,8 +6992,16 @@ fn resolve_complete_object<'a>(
         }
         _ => unreachable!("checked position authority"),
     };
-    let (dimensions, _) =
+    let (mut dimensions, _) =
         resolve_size_candidates(input, context, primitive).map_err(|gap| vec![gap])?;
+    if let Some(aspect) = input.object_aspect {
+        let explicit_box = matches!(
+            input.explicit_geometry,
+            Some(crate::SemanticExplicitGeometry::WidthHeight { .. })
+        );
+        dimensions =
+            object_box_dimensions(dimensions, aspect, explicit_box).map_err(|gap| vec![gap])?;
+    }
     if let ScorePlacement::Numeric(position) = placement {
         let x = Rational::from_decimal(position.x).map_err(|gap| vec![gap])?;
         let y = Rational::from_decimal(position.y).map_err(|gap| vec![gap])?;
@@ -7129,6 +7522,77 @@ pub enum ResolvedGeometryDimensions {
     Point { radius: Rational },
     CenteredSize { width: Rational, height: Rational },
     Square { side: Rational },
+}
+
+/// A word's ordinary or side-sized box keeps the long side resolved for a
+/// square. Explicit width and height instead retain the author's dimensions.
+fn object_box_dimensions(
+    dimensions: ResolvedGeometryDimensions,
+    aspect: (u8, u8),
+    explicit_box: bool,
+) -> Result<ResolvedGeometryDimensions, ScoreFieldGap> {
+    if explicit_box {
+        return Ok(dimensions);
+    }
+    let long = match dimensions {
+        ResolvedGeometryDimensions::Square { side } => side,
+        ResolvedGeometryDimensions::Bbox { width, height } => {
+            if width.le(height)? {
+                height
+            } else {
+                width
+            }
+        }
+        _ => {
+            return Err(ScoreFieldGap::GeometryDimensionMismatch {
+                primitive: Primitive::Square,
+            });
+        }
+    };
+    let (width, height) = (i128::from(aspect.0), i128::from(aspect.1));
+    let longest = width.max(height);
+    if width == 0 || height == 0 {
+        return Err(ScoreFieldGap::GeometryRepresentationLimit);
+    }
+    Ok(ResolvedGeometryDimensions::Bbox {
+        width: reduced_ratio(long.mul_ratio(width, longest)?),
+        height: reduced_ratio(long.mul_ratio(height, longest)?),
+    })
+}
+
+#[cfg(test)]
+mod object_box_tests {
+    use super::*;
+
+    #[test]
+    fn a_box_uses_the_square_long_side_unless_width_and_height_are_explicit() {
+        let side = Rational::from_ratio(6, 25).unwrap();
+        let short = Rational::from_ratio(3, 25).unwrap();
+        assert_eq!(
+            object_box_dimensions(ResolvedGeometryDimensions::Square { side }, (2, 1), false)
+                .unwrap(),
+            ResolvedGeometryDimensions::Bbox {
+                width: side,
+                height: short
+            }
+        );
+        assert_eq!(
+            object_box_dimensions(ResolvedGeometryDimensions::Square { side }, (1, 2), false)
+                .unwrap(),
+            ResolvedGeometryDimensions::Bbox {
+                width: short,
+                height: side
+            }
+        );
+        let written = ResolvedGeometryDimensions::Bbox {
+            width: short,
+            height: side,
+        };
+        assert_eq!(
+            object_box_dimensions(written, (2, 1), true).unwrap(),
+            written
+        );
+    }
 }
 
 /// The reference extent is measured before any instruction rotation or ink variation.

@@ -44,6 +44,7 @@ func runSavedLawsStageChecks() async throws {
         let transport = LawsColorsCheckProvider(refuseColors: true)
         let app = AppModel(databaseURL: folder.appendingPathComponent("colors-\(hasColors).sqlite"), transport: transport)
         await app.initialize()
+    app.selectDrawRoute("stages"); app.sketchMode = "off"
         try await app.updateHostSettings(HostSettings(providers: [service], models: .init(stage1Model: "laws-check:parent", stage2Model: "laws-check:parent")))
         app.inputMode = "description"; app.language = "ja"; app.seedText = "7"; app.sketchMode = "off"
         app.descriptionText = "円がひとつ浮かび、下に点が散らばる"
@@ -94,6 +95,7 @@ func runAuxiliaryProvenanceChecks() async throws {
     let transport = AutonomousCheckProvider()
     let app = AppModel(databaseURL: databaseURL, transport: transport)
     await app.initialize()
+    app.selectDrawRoute("stages"); app.sketchMode = "off"
     let service = ProviderSettings(id: "auto-check", baseURL: URL(string: "http://127.0.0.1:1/v1")!, requiresAPIKey: false,
         models: [.init(id: "parent"), .init(id: "one", purposes: ["llm", "vision"])])
     try await app.updateHostSettings(HostSettings(providers: [service], models: .init(stage1Model: "auto-check:parent", stage2Model: "auto-check:parent")))
@@ -143,8 +145,8 @@ func runAuxiliaryProvenanceChecks() async throws {
     await transport.changeDrawing(true)
     runner.inheritWild = false
     await runner.initialize(app: app, work: first)
-    guard runner.run == nil, runner.moves == 1, runner.enabledKinds == ["laws"], runner.note == "  余白を動かす  ", runner.inheritWild else {
-        throw CheckFailure.message("Reopening a finished run must restore choices and offer a new run, with wild inherited")
+    guard runner.run == nil, runner.moves == 1, runner.enabledKinds == ["laws"], runner.note == "  余白を動かす  ", !runner.inheritWild else {
+        throw CheckFailure.message("Reopening a finished run must restore choices and use the wild default")
     }
     runner.moves = 1; runner.enabledKinds = ["juxtaposition"]; runner.note = ""
     await runner.start(app: app)
@@ -162,21 +164,21 @@ func runAuxiliaryProvenanceChecks() async throws {
           await transport.auxiliaryModels == ["auto-check:one"], await transport.lastDrawingModel == "auto-check:one" else {
         throw CheckFailure.message("Juxtaposition child lost its sentence, ai_move or model: \(moved.text)")
     }
-    // An identical draw stays only in the lineage and never becomes the next parent.
+    // An identical draw is visible in history but never becomes the next parent.
     await runner.initialize(app: app, work: child)
     runner.moves = 1; runner.enabledKinds = ["juxtaposition"]
     await runner.start(app: app)
     guard runner.run?.lastKeptID == nil, !runner.children.isEmpty else { throw CheckFailure.message("Identical draw fixture: \(runner.run?.turns.map(\.text) ?? []) / \(runner.run?.error ?? "nil")") }
     for generated in runner.children.values {
-        guard try await database.work(id: generated.id)?.historyVisibility == "lineage_only",
+        guard try await database.work(id: generated.id)?.historyVisibility == "normal",
               let node = generated.lineageNodeID, let edge = try await database.edge(childNodeID: node),
               edge.parentNodeID == childNode,
               try ExactJSON(data: Data(edge.metadataJSON.utf8))["ai_move"]["outcome"].string == "not_visible" else {
-            throw CheckFailure.message("Not-visible child was promoted or became a parent")
+            throw CheckFailure.message("Not-visible child was hidden or became a parent")
         }
     }
 
-    // The second laws request waits, so stop and crash recovery both have a kept, still-hidden first child.
+    // The second laws request waits, so stop and crash recovery both have a kept first child in history.
     await transport.changeDrawing(false)
     await transport.pauseLaws(after: 1)
     await runner.initialize(app: app, work: first)
@@ -185,7 +187,7 @@ func runAuxiliaryProvenanceChecks() async throws {
     let deadline = ContinuousClock.now.advanced(by: .seconds(10))
     while !(await transport.waiting) && ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(10)) }
     guard await transport.waiting, let interrupted = runner.run, let last = interrupted.lastKeptID,
-          try await database.work(id: last)?.historyVisibility == "lineage_only" else {
+          try await database.work(id: last)?.historyVisibility == "normal" else {
         task.cancel(); await runner.stop(app: app)
         throw CheckFailure.message("Stop fixture never reached a second laws request: \(runner.run?.error ?? "nil")")
     }
@@ -210,7 +212,73 @@ func runAuxiliaryProvenanceChecks() async throws {
           try await database.work(id: last)?.historyVisibility == "normal" else {
         throw CheckFailure.message("Stopped run did not cancel and promote its last kept child")
     }
-    print("Autonomous host passed: saved_laws + laws_change + basis + ai_move with explicit null main_layer through the run's record; juxtaposition + description_edit + both records; one pinned model; invisible children stay lineage-only and never parent; stop cancels, restart interrupts, both promote last kept. Fake providers and temporary SQLite only.")
+    print("Autonomous host passed: laws and juxtaposition records, pinned model, all children in history, invisible children never parent, stop and restart recovery. Fake providers and temporary SQLite only.")
+}
+
+@MainActor func runChunkMoveChecks() async throws {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-chunk-move-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let transport = AutonomousCheckProvider()
+    let app = AppModel(databaseURL: folder.appendingPathComponent("works.sqlite"), transport: transport)
+    await app.initialize()
+    let service = ProviderSettings(id: "auto-check", baseURL: URL(string: "http://127.0.0.1:1/v1")!, requiresAPIKey: false,
+        models: [.init(id: "one", purposes: ["llm", "vision"])])
+    try await app.updateHostSettings(HostSettings(providers: [service], models: .init(stage1Model: "auto-check:one", stage2Model: "auto-check:one")))
+    app.seedText = "7"
+    let ddl = "画面比1:1。\n背景を白で埋める。\n\n「灯台」\n画面の横0.6、縦0.4の位置に、幅0.1、高さ0.3の白の塗りの四角を1個置く。\n\n「波の筋」\n画面の横0.1、縦0.8から横0.9、縦0.8まで、灰の細い線を1本引く。"
+    guard await app.drawNewDDL(ddl), let parent = app.selectedWork else { throw CheckFailure.message("Chunk fixture parent: \(app.errorText ?? app.status)") }
+    let database = try app.auxiliaryDatabase()
+    await app.library.saveNote(id: parent.id, note: "test data")
+    let runner = AutonomousRefinementModel(provider: AuxiliaryProvider(transport: transport, credentials: AutonomousCheckCredentials()))
+    await runner.initialize(app: app, work: parent)
+    runner.moves = 1; runner.enabledKinds = ["chunks"]; runner.note = "具象から抽象へ"; runner.modelReference = "auto-check:one"
+    await runner.start(app: app)
+    guard let childID = runner.run?.lastKeptID, let child = try await database.work(id: childID),
+          child.historyVisibility == "normal", let node = child.lineageNodeID,
+          let edge = try await database.edge(childNodeID: node) else {
+        throw CheckFailure.message("Chunk move did not save: \(runner.run?.turns.map(\.text) ?? []) / \(runner.run?.error ?? runner.errorText ?? "")")
+    }
+    let metadata = try ExactJSON(data: Data(edge.metadataJSON.utf8))
+    guard edge.derivationKind == "chunk_move", metadata["ai_move"]["kind"].string == "chunks",
+          metadata["ai_move"]["chunks"]["move"].string == "omit", await transport.chunkCalls == 2, await transport.chunkImageValid,
+          !(child.ddl ?? "").contains("波の筋") else { throw CheckFailure.message("Chunk move record or drawing: \(metadata.text)") }
+    await app.library.saveNote(id: child.id, note: "test data")
+    print("Chunk move: fake provider, real core asks again after invalid choice, saves normal child and ai_move; no external send.")
+}
+
+@MainActor func runLineageMigrationReplayChecks() async throws {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-migrate-replay-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let transport = AutonomousCheckProvider()
+    let app = AppModel(databaseURL: folder.appendingPathComponent("source.sqlite"), transport: transport)
+    await app.initialize(); app.selectDrawRoute("stages"); app.sketchMode = "off"
+    let service = ProviderSettings(id: "auto-check", baseURL: URL(string: "http://127.0.0.1:1/v1")!, requiresAPIKey: false,
+        models: [.init(id: "one", purposes: ["llm", "vision"])])
+    try await app.updateHostSettings(HostSettings(providers: [service], models: .init(stage1Model: "auto-check:one", stage2Model: "auto-check:one")))
+    app.seedText = "7"; app.descriptionText = "青い円が一つ浮かぶ"
+    await app.generate()
+    guard let original = app.selectedWork, let node = original.lineageNodeID else { throw CheckFailure.message("Migration replay fixture: \(app.errorText ?? app.status)") }
+    await app.library.saveNote(id: original.id, note: "test data")
+    let source = try app.auxiliaryDatabase(), legacyURL = folder.appendingPathComponent("legacy.sqlite")
+    try await source.backup(to: legacyURL)
+    let sql = "UPDATE history SET history_visibility='lineage_only'; UPDATE lineage_nodes SET state='lineage_only'; DELETE FROM schema_migrations WHERE identifier='swift-v5-show-lineage-works'; PRAGMA user_version=4;"
+    let sqlite = Process(); sqlite.executableURL = URL(fileURLWithPath: "/usr/bin/sqlite3"); sqlite.arguments = [legacyURL.path, sql]
+    try sqlite.run(); sqlite.waitUntilExit()
+    guard sqlite.terminationStatus == 0 else { throw CheckFailure.message("Could not prepare isolated legacy database") }
+    let migrated = try InkuDatabase(url: legacyURL)
+    guard let work = try await migrated.work(id: original.id), work.historyVisibility == "normal",
+          try await migrated.node(id: node)?.state == "active", try await migrated.libraryPage().total == 1,
+          work.ddl == original.ddl, work.score == original.score, work.svg == original.svg else {
+        throw CheckFailure.message("Migration changed artwork or failed to expose the work")
+    }
+    let host = PipelineHost(database: migrated, transport: transport, credentials: AutonomousCheckCredentials())
+    let replay = try await host.replay(workID: work.id)
+    guard replay.ddl == original.ddl, replay.score == original.score, replay.svg == original.svg else {
+        throw CheckFailure.message("Migrated work replay changed DDL, Score or SVG")
+    }
+    print("Migrated 1 lineage-only work and node to normal history; DDL, Score, SVG and replay are unchanged.")
 }
 
 private actor AutonomousCheckCredentials: CredentialStore {
@@ -226,12 +294,21 @@ private actor AutonomousCheckProvider: ProviderTransport, AuxiliaryTransport {
     private(set) var lawsModels: [String] = []
     private(set) var auxiliaryModels: [String] = []
     private(set) var lastDrawingModel = ""
+    private(set) var chunkCalls = 0
+    private(set) var chunkImageValid = false
     func changeDrawing(_ value: Bool) { changed = value }
     func pauseLaws(after count: Int) { pauseAfter = count; lawsCount = 0 }
 
     func perform(action: Data, models: ModelSelection, providers: [ProviderSettings], credentials: any CredentialStore,
                  onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {
         let input = try ExactJSON(data: action)
+        if (input["payload"]["prompt"]["prompt_id"].string ?? "").hasPrefix("inku.chunk-moves-") {
+            chunkCalls += 1
+            let imageValid = input["payload"]["prompt"]["response_schema"].object != nil && input["payload"]["prompt"]["images"].array?.count == 1 && (input["_transient_images"].array?.first?.string?.hasPrefix("data:image/png;base64,") == true)
+            chunkImageValid = chunkCalls == 1 ? imageValid : chunkImageValid && imageValid
+            return ExactJSON.object(["tag": .string("ddl_interpreted"), "identity": input["identity"],
+                "response": .string(chunkCalls == 1 ? #"{"move":"unknown","targets":[2],"reason":"波"}"# : #"{"move":"omit","targets":[2],"reason":"波を省く"}"#), "elapsed_ms": .string("1")]).data
+        }
         if input["tag"].string == "choose_laws" {
             lawsCount += 1; lawsModels.append(models.stage1Model)
             if let pauseAfter, lawsCount > pauseAfter {

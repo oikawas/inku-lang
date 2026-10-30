@@ -950,6 +950,249 @@
      ]
     }
    }
+  },
+  {
+   "why": "a chunk run starts with a chunk move toward its note, trimmed",
+   "request": {
+    "action": "next",
+    "moves": 5,
+    "kinds": [
+     "chunks"
+    ],
+    "parent": {
+     "description_locked": true,
+     "chunks": 3
+    },
+    "note": "  具象から抽象へ寄せる。  "
+   },
+   "answer": {
+    "schema": "inku.autonomous-refine.v1",
+    "outcome": "ok",
+    "next": {
+     "kind": "chunks",
+     "turn": 1,
+     "attempt": 1,
+     "note": "具象から抽象へ寄せる。"
+    }
+   }
+  },
+  {
+   "why": "a chunk child kept under the gate is followed by the next turn",
+   "request": {
+    "action": "next",
+    "moves": 5,
+    "kinds": [
+     "chunks"
+    ],
+    "parent": {
+     "description_locked": true,
+     "chunks": 3
+    },
+    "note": "  具象から抽象へ寄せる。  ",
+    "turns": [
+     {
+      "attempts": [
+       {
+        "kind": "chunks",
+        "outcome": "kept",
+        "share": 0.05
+       }
+      ]
+     }
+    ]
+   },
+   "answer": {
+    "schema": "inku.autonomous-refine.v1",
+    "outcome": "ok",
+    "next": {
+     "kind": "chunks",
+     "turn": 2,
+     "attempt": 1,
+     "note": "具象から抽象へ寄せる。"
+    }
+   }
+  },
+  {
+   "why": "a chunk try that keeps nothing ends its turn",
+   "request": {
+    "action": "next",
+    "moves": 5,
+    "kinds": [
+     "chunks"
+    ],
+    "parent": {
+     "description_locked": true,
+     "chunks": 3
+    },
+    "note": "  具象から抽象へ寄せる。  ",
+    "turns": [
+     {
+      "attempts": [
+       {
+        "kind": "chunks",
+        "outcome": "failed",
+        "reason": "the move could not be applied"
+       }
+      ]
+     }
+    ]
+   },
+   "answer": {
+    "schema": "inku.autonomous-refine.v1",
+    "outcome": "ok",
+    "next": {
+     "kind": "chunks",
+     "turn": 2,
+     "attempt": 1,
+     "note": "具象から抽象へ寄せる。"
+    }
+   }
+  },
+  {
+   "why": "two chunk turns that keep nothing stop the run",
+   "request": {
+    "action": "next",
+    "moves": 5,
+    "kinds": [
+     "chunks"
+    ],
+    "parent": {
+     "description_locked": true,
+     "chunks": 3
+    },
+    "note": "  具象から抽象へ寄せる。  ",
+    "turns": [
+     {
+      "attempts": [
+       {
+        "kind": "chunks",
+        "outcome": "failed",
+        "reason": "the move could not be applied"
+       }
+      ]
+     },
+     {
+      "attempts": [
+       {
+        "kind": "chunks",
+        "outcome": "failed",
+        "reason": "the move could not be applied"
+       }
+      ]
+     }
+    ]
+   },
+   "answer": {
+    "schema": "inku.autonomous-refine.v1",
+    "outcome": "ok",
+    "stop": {
+     "reason": "stalled",
+     "turns": 2,
+     "kept": 0
+    }
+   }
+  },
+  {
+   "why": "a parent with no chunks has nothing to try",
+   "request": {
+    "action": "next",
+    "moves": 5,
+    "kinds": [
+     "chunks"
+    ],
+    "parent": {
+     "chunks": 0
+    },
+    "note": "  具象から抽象へ寄せる。  "
+   },
+   "answer": {
+    "schema": "inku.autonomous-refine.v1",
+    "outcome": "ok",
+    "stop": {
+     "reason": "nothing_available",
+     "turns": 0,
+     "kept": 0
+    }
+   }
+  },
+  {
+   "why": "a chunk move that cannot start stops the run",
+   "request": {
+    "action": "next",
+    "moves": 5,
+    "kinds": [
+     "chunks"
+    ],
+    "parent": {
+     "description_locked": true,
+     "chunks": 3
+    },
+    "note": "  具象から抽象へ寄せる。  ",
+    "turns": [
+     {
+      "attempts": [
+       {
+        "kind": "chunks",
+        "outcome": "unavailable",
+        "reason": "no_chunks"
+       }
+      ]
+     }
+    ]
+   },
+   "answer": {
+    "schema": "inku.autonomous-refine.v1",
+    "outcome": "ok",
+    "stop": {
+     "reason": "nothing_available",
+     "turns": 0,
+     "kept": 0
+    }
+   }
+  },
+  {
+   "why": "a chunk run stops when its turns are done",
+   "request": {
+    "action": "next",
+    "moves": 2,
+    "kinds": [
+     "chunks"
+    ],
+    "parent": {
+     "description_locked": true,
+     "chunks": 3
+    },
+    "note": "  具象から抽象へ寄せる。  ",
+    "turns": [
+     {
+      "attempts": [
+       {
+        "kind": "chunks",
+        "outcome": "kept",
+        "share": 0.05
+       }
+      ]
+     },
+     {
+      "attempts": [
+       {
+        "kind": "chunks",
+        "outcome": "failed",
+        "reason": "the move could not be applied"
+       }
+      ]
+     }
+    ]
+   },
+   "answer": {
+    "schema": "inku.autonomous-refine.v1",
+    "outcome": "ok",
+    "stop": {
+     "reason": "moves_done",
+     "turns": 2,
+     "kept": 1
+    }
+   }
   }
  ],
  "record": [
@@ -1377,6 +1620,132 @@
      }
     }
    }
+  },
+  {
+   "why": "a chunk child is kept under the gate, which it records and does not apply",
+   "request": {
+    "action": "record",
+    "run": "run-1",
+    "turn": 1,
+    "moves": 5,
+    "attempt": 1,
+    "kind": "chunks",
+    "model": "chatgpt/gpt-6-luna",
+    "outcome": "kept",
+    "share": 0.0123,
+    "chunks": {
+     "move": "simplify",
+     "targets": [
+      "富士の高嶺"
+     ],
+     "params": {},
+     "reason": " 稜線を二つの斜面にする。 ",
+     "title": " 重なる斜面 ",
+     "sentences": 2,
+     "tries": 1
+    },
+    "note": "  具象から抽象へ寄せる。 "
+   },
+   "answer": {
+    "schema": "inku.autonomous-refine.v1",
+    "outcome": "ok",
+    "metadata": {
+     "ai_move": {
+      "schema": "inku.ai-move.v1",
+      "run": "run-1",
+      "turn": 1,
+      "moves": 5,
+      "attempt": 1,
+      "kind": "chunks",
+      "model": "chatgpt/gpt-6-luna",
+      "outcome": "kept",
+      "visible": {
+       "share": 0.0123,
+       "passes": false,
+       "level": 12,
+       "threshold": 0.2,
+       "grid": 48,
+       "size": 384,
+       "gate": false
+      },
+      "note": "具象から抽象へ寄せる。",
+      "chunks": {
+       "move": "simplify",
+       "targets": [
+        "富士の高嶺"
+       ],
+       "params": {},
+       "reason": "稜線を二つの斜面にする。",
+       "tries": 1,
+       "title": "重なる斜面",
+       "sentences": 2
+      }
+     }
+    }
+   }
+  },
+  {
+   "why": "a chunk move keeps the options it wrote",
+   "request": {
+    "action": "record",
+    "run": "run-1",
+    "turn": 1,
+    "moves": 5,
+    "attempt": 1,
+    "kind": "chunks",
+    "model": "chatgpt/gpt-6-luna",
+    "outcome": "kept",
+    "share": 0.52,
+    "chunks": {
+     "move": "place",
+     "targets": [
+      "灯台"
+     ],
+     "params": {
+      "at": "golden_ul",
+      "size": "smaller"
+     },
+     "reason": "灯台を黄金分割の交点へ",
+     "tries": 2
+    }
+   },
+   "answer": {
+    "schema": "inku.autonomous-refine.v1",
+    "outcome": "ok",
+    "metadata": {
+     "ai_move": {
+      "schema": "inku.ai-move.v1",
+      "run": "run-1",
+      "turn": 1,
+      "moves": 5,
+      "attempt": 1,
+      "kind": "chunks",
+      "model": "chatgpt/gpt-6-luna",
+      "outcome": "kept",
+      "visible": {
+       "share": 0.52,
+       "passes": true,
+       "level": 12,
+       "threshold": 0.2,
+       "grid": 48,
+       "size": 384,
+       "gate": false
+      },
+      "chunks": {
+       "move": "place",
+       "targets": [
+        "灯台"
+       ],
+       "params": {
+        "at": "golden_ul",
+        "size": "smaller"
+       },
+       "reason": "灯台を黄金分割の交点へ",
+       "tries": 2
+      }
+     }
+    }
+   }
   }
  ],
  "refused": [
@@ -1720,6 +2089,102 @@
    }
   },
   {
+   "why": "chunks with another move",
+   "request": {
+    "action": "next",
+    "moves": 5,
+    "kinds": [
+     "chunks",
+     "laws"
+    ],
+    "parent": {
+     "description_locked": true,
+     "chunks": 3
+    },
+    "note": "  具象から抽象へ寄せる。  "
+   },
+   "answer": {
+    "schema": "inku.autonomous-refine.v1",
+    "outcome": "refused",
+    "reason": "kinds"
+   }
+  },
+  {
+   "why": "a chunk run without a note",
+   "request": {
+    "action": "next",
+    "moves": 5,
+    "kinds": [
+     "chunks"
+    ],
+    "parent": {
+     "description_locked": true,
+     "chunks": 3
+    }
+   },
+   "answer": {
+    "schema": "inku.autonomous-refine.v1",
+    "outcome": "refused",
+    "reason": "note_required"
+   }
+  },
+  {
+   "why": "a chunk run with a blank note",
+   "request": {
+    "action": "next",
+    "moves": 5,
+    "kinds": [
+     "chunks"
+    ],
+    "parent": {
+     "description_locked": true,
+     "chunks": 3
+    },
+    "note": "   "
+   },
+   "answer": {
+    "schema": "inku.autonomous-refine.v1",
+    "outcome": "refused",
+    "reason": "note_required"
+   }
+  },
+  {
+   "why": "a chunk turn of two tries",
+   "request": {
+    "action": "next",
+    "moves": 5,
+    "kinds": [
+     "chunks"
+    ],
+    "parent": {
+     "description_locked": true,
+     "chunks": 3
+    },
+    "note": "  具象から抽象へ寄せる。  ",
+    "turns": [
+     {
+      "attempts": [
+       {
+        "kind": "chunks",
+        "outcome": "failed",
+        "reason": "the move could not be applied"
+       },
+       {
+        "kind": "chunks",
+        "outcome": "failed",
+        "reason": "the move could not be applied"
+       }
+      ]
+     }
+    ]
+   },
+   "answer": {
+    "schema": "inku.autonomous-refine.v1",
+    "outcome": "refused",
+    "reason": "turns_out_of_order"
+   }
+  },
+  {
    "why": "a kept child below the gate",
    "request": {
     "action": "record",
@@ -2039,6 +2504,142 @@
     "outcome": "refused",
     "reason": "record_shape"
    }
+  },
+  {
+   "why": "a chunk child recorded as not visible",
+   "request": {
+    "action": "record",
+    "run": "run-1",
+    "turn": 1,
+    "moves": 5,
+    "attempt": 1,
+    "kind": "chunks",
+    "model": "chatgpt/gpt-6-luna",
+    "outcome": "not_visible",
+    "share": 0.01,
+    "chunks": {
+     "move": "simplify",
+     "targets": [
+      "富士の高嶺"
+     ],
+     "params": {},
+     "reason": " 稜線を二つの斜面にする。 ",
+     "title": " 重なる斜面 ",
+     "sentences": 2,
+     "tries": 1
+    }
+   },
+   "answer": {
+    "schema": "inku.autonomous-refine.v1",
+    "outcome": "refused",
+    "reason": "record_shape"
+   }
+  },
+  {
+   "why": "a chunk move that is not one of the six",
+   "request": {
+    "action": "record",
+    "run": "run-1",
+    "turn": 1,
+    "moves": 5,
+    "attempt": 1,
+    "kind": "chunks",
+    "model": "chatgpt/gpt-6-luna",
+    "outcome": "kept",
+    "share": 0.3125,
+    "chunks": {
+     "move": "fold",
+     "targets": [
+      "富士の高嶺"
+     ],
+     "params": {},
+     "reason": " 稜線を二つの斜面にする。 ",
+     "title": " 重なる斜面 ",
+     "sentences": 2,
+     "tries": 1
+    }
+   },
+   "answer": {
+    "schema": "inku.autonomous-refine.v1",
+    "outcome": "refused",
+    "reason": "record_shape"
+   }
+  },
+  {
+   "why": "a chunk move with a third try",
+   "request": {
+    "action": "record",
+    "run": "run-1",
+    "turn": 1,
+    "moves": 5,
+    "attempt": 1,
+    "kind": "chunks",
+    "model": "chatgpt/gpt-6-luna",
+    "outcome": "kept",
+    "share": 0.3125,
+    "chunks": {
+     "move": "simplify",
+     "targets": [
+      "富士の高嶺"
+     ],
+     "params": {},
+     "reason": " 稜線を二つの斜面にする。 ",
+     "title": " 重なる斜面 ",
+     "sentences": 2,
+     "tries": 3
+    }
+   },
+   "answer": {
+    "schema": "inku.autonomous-refine.v1",
+    "outcome": "refused",
+    "reason": "record_shape"
+   }
+  },
+  {
+   "why": "a laws move carrying a chunk move",
+   "request": {
+    "action": "record",
+    "run": "run-1",
+    "turn": 1,
+    "moves": 5,
+    "attempt": 1,
+    "kind": "laws",
+    "model": "chatgpt/gpt-6-luna",
+    "outcome": "kept",
+    "share": 0.3125,
+    "laws": {
+     "main_law": " B1 ",
+     "main_layer": null,
+     "laws": [
+      {
+       "law": "B1",
+       "layer": 2,
+       "value": 0.618
+      }
+     ],
+     "reason": "主の層を黄金分割に置き、余白を語らせる。",
+     "excluded": [
+      "A3"
+     ],
+     "cards": "invite"
+    },
+    "chunks": {
+     "move": "simplify",
+     "targets": [
+      "富士の高嶺"
+     ],
+     "params": {},
+     "reason": " 稜線を二つの斜面にする。 ",
+     "title": " 重なる斜面 ",
+     "sentences": 2,
+     "tries": 1
+    }
+   },
+   "answer": {
+    "schema": "inku.autonomous-refine.v1",
+    "outcome": "refused",
+    "reason": "record_shape"
+   }
   }
  ],
  "invalid": [
@@ -2073,6 +2674,35 @@
     "kinds": [
      "layout"
     ]
+   },
+   "answer": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "why": "a chunk move with a field it does not have",
+   "request": {
+    "action": "record",
+    "run": "run-1",
+    "turn": 1,
+    "moves": 5,
+    "attempt": 1,
+    "kind": "chunks",
+    "model": "chatgpt/gpt-6-luna",
+    "outcome": "kept",
+    "share": 0.3,
+    "chunks": {
+     "move": "simplify",
+     "targets": [
+      "富士の高嶺"
+     ],
+     "params": {},
+     "reason": " 稜線を二つの斜面にする。 ",
+     "title": " 重なる斜面 ",
+     "sentences": 2,
+     "tries": 1,
+     "seed": 1
+    }
    },
    "answer": {
     "error": "invalid_request"

@@ -23,14 +23,17 @@ public enum SketchRequest: Codable, Sendable {
 public enum GenerationAuthoring: Codable, Sendable {
     case directDDL(String)
     case description(String, autoCatalog: Bool, sketch: SketchRequest = .off)
+    case image(input: Data, autoCatalog: Bool)
     var json: ExactJSON {
         switch self {
         case .directDDL(let source): .object(["tag": .string("direct_ddl"), "source": .string(source)])
         case .description(let text, let auto, let sketch):
             .object(["tag": .string("description"), "description": .string(text), "auto_catalog": .bool(auto), "sketch": sketch.json])
+        case .image(let input, let auto):
+            .object(["tag": .string("image"), "image": (try? ExactJSON(data: input)) ?? .null, "auto_catalog": .bool(auto)])
         }
     }
-    var isDirect: Bool { if case .directDDL = self { true } else { false } }
+    public var isDirect: Bool { if case .directDDL = self { true } else { false } }
 }
 
 public struct ModelSelection: Codable, Sendable, Equatable {
@@ -79,6 +82,10 @@ public struct GenerationProvenance: Codable, Sendable {
 
 public struct GenerationRequest: Codable, Sendable {
     public var authoring: GenerationAuthoring
+    /// Absent for the original stages route and older saved executions.
+    public var drawRoute: String?
+    public var descriptionComposition: Bool?
+    public var descriptionReview: Bool?
     public var configuration: Data
     public var renderOptions: Data
     public var clipPolicy: Data
@@ -99,6 +106,8 @@ public struct GenerationRequest: Codable, Sendable {
     public var captureProviderIO: Bool?
     public var disabledPluginNames: [String]?
     public var provenance: GenerationProvenance?
+    public var imageProvenance: String?
+    public var inheritedImageDDL: Data?
     /// The parent work's completion range record (`inku.completion-ranges.v1`), carried into a child drawn from it.
     public var completionRanges: Data?
     /// The parent work's laws records (`laws_layers`, `laws_basis`), carried into a child drawn from it.
@@ -186,6 +195,7 @@ public struct PipelineView: Sendable {
     public var completionRangesJSON: Data?
     /// Holes the completion left uncompleted, shown when the author must decide or edit (Web holeCompletionIssues).
     public var completionIssues: [HoleCompletionIssue] = []
+    public var actionTag: String? = nil
 }
 
 /// One range a completion wrote, as the author has since left it (core `completion_range_states`).
@@ -294,6 +304,10 @@ public struct SavedAuthoringContext: Sendable {
     public var completionRanges: Data?
     /// The laws records saved with the work, as one object (absent for a work without laws).
     public var lawsRecords: Data?
+    public var imageDDL: Data?
+    public var imageProvenance: String?
+    public var drawRoute: String?
+    public var descriptionDDL: Data?
     public var originKind: AuthoringOrigin? { AuthoringOrigin(rawValue: origin) }
 }
 

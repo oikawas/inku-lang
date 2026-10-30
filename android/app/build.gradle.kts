@@ -66,11 +66,6 @@ fun nextAndroidBuildNumber(): Int {
 }
 
 val androidVersionName = rootProject.file("VERSION").readText().trim()
-val modelCatalogAssets = layout.buildDirectory.dir("generated/modelCatalogAssets")
-val syncModelCatalog = tasks.register<Sync>("syncModelCatalog") {
-    from(rootProject.file("../server/src/inku_server/model_catalog.json"))
-    into(modelCatalogAssets)
-}
 // The experimental 3D viewer is Web's registered build, copied unchanged at
 // build time and never committed (experiments/ddl-3d/README.md). The copy holds
 // the registration, the native parent page and the build it names; with no
@@ -98,11 +93,14 @@ tasks.withType<Test>().configureEach {
     systemProperty("inku.ddl3dCopy", ddl3dViewerAssets.get().dir("ddl3d").asFile.absolutePath)
     systemProperty("inku.ddl3dRegistration", ddl3dRegistration.absolutePath)
     systemProperty("inku.ddl3dFixture", rootProject.file("../experiments/ddl-3d/fixtures/solids.json").absolutePath)
-    systemProperty("inku.modelCatalogSource", rootProject.file("../server/src/inku_server/model_catalog.json").absolutePath)
-    systemProperty("inku.modelCatalogCases", rootProject.file("../server/tests/data/model-catalog-cases.json").absolutePath)
+    systemProperty("inku.modelCatalogSource", rootProject.file("../core/crates/inku-pipeline/data/model_catalog.json").absolutePath)
+    systemProperty("inku.modelCatalogCases", rootProject.file("../core/crates/inku-pipeline/data/model-catalog-cases.json").absolutePath)
+    systemProperty("inku.providerSettingsCases", rootProject.file("../server/tests/data/provider-settings-cases.json").absolutePath)
+    systemProperty("inku.providerAdmissionCases", rootProject.file("../server/tests/data/provider-admission-cases.json").absolutePath)
+    systemProperty("inku.providerAdmissionSequence", rootProject.file("../server/tests/data/provider-admission-sequence.json").absolutePath)
     systemProperty("inku.identityCases", rootProject.file("../server/tests/data/identity-cases.json").absolutePath)
     systemProperty("inku.instructionLanguageCases", rootProject.file("../server/tests/data/instruction-language-cases.json").absolutePath)
-    inputs.files(rootProject.file("../server/tests/data/identity-cases.json"),
+    inputs.files(rootProject.file("../server/tests/data/chatgpt-auth-addendum-cases.json"), rootProject.file("../server/tests/data/provider-wire-cases.json"), rootProject.file("../server/tests/data/provider-admission-cases.json"), rootProject.file("../server/tests/data/provider-admission-sequence.json"), rootProject.file("../server/tests/data/provider-settings-cases.json"), rootProject.file("../server/tests/data/identity-cases.json"),
         rootProject.file("../server/tests/data/instruction-language-cases.json"))
 }
 val androidVersionCode = nextAndroidBuildNumber()
@@ -183,7 +181,6 @@ android {
         jniLibs.srcDir(displayCheckJniDirectory)
     }
     sourceSets.getByName("main") {
-        assets.srcDir(modelCatalogAssets)
         assets.srcDir(ddl3dViewerAssets)
         jniLibs.srcDir(rustGeneratedJniLibsDirectory)
     }
@@ -197,7 +194,7 @@ android {
     }
 }
 
-tasks.named("preBuild") { dependsOn(syncModelCatalog, syncDdl3dViewer) }
+tasks.named("preBuild") { dependsOn(syncDdl3dViewer) }
 
 val rustNdkDirectory = androidComponents.sdkComponents.ndkDirectory
 val rustLibrary = rustTargetDirectory.map {
@@ -206,9 +203,9 @@ val rustLibrary = rustTargetDirectory.map {
 
 fun Exec.configureRustAndroidCompiler() {
     val pinnedRustc = providers.exec {
-        commandLine("rustup", "which", "--toolchain", "1.95.0", "rustc")
+        commandLine("rustup", "which", "--toolchain", "1.99.1", "rustc")
     }.standardOutput.asText.get().trim()
-    require(file(pinnedRustc).isFile) { "Pinned Rust 1.95.0 rustc was not found" }
+    require(file(pinnedRustc).isFile) { "Pinned Rust 1.99.1 rustc was not found" }
     val toolchainBin = rustNdkDirectory.get()
         .dir("toolchains/llvm/prebuilt/$rustNdkHostTag/bin").asFile
     val clang = toolchainBin.resolve("aarch64-linux-android${rustAndroidApi}-clang")
@@ -252,7 +249,7 @@ val buildRustAndroidArm64 = tasks.register<Exec>("buildRustAndroidArm64") {
     workingDir(rootProject.file("../core"))
     inputs.files(
         rootProject.fileTree("../core") {
-            include("Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "crates/**/Cargo.toml", "crates/**/src/**/*.rs", "crates/**/assets/**", "vendor/resvg/Cargo.toml", "vendor/resvg/src/**/*.rs")
+            include("Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "crates/**/Cargo.toml", "crates/**/src/**/*.rs", "crates/**/assets/**", "crates/inku-pipeline/data/model_catalog.json", "vendor/resvg/Cargo.toml", "vendor/resvg/src/**/*.rs")
             exclude("target/**")
         },
     )
@@ -268,7 +265,7 @@ val buildRustAndroidArm64 = tasks.register<Exec>("buildRustAndroidArm64") {
     commandLine(
         "rustup",
         "run",
-        "1.95.0",
+        "1.99.1",
         "cargo",
         "build",
         "--locked",
@@ -290,12 +287,12 @@ val buildRustHostJni = tasks.register<Exec>("buildRustHostJni") {
     workingDir(rootProject.file("../core"))
     inputs.files(rootProject.fileTree("../core") {
         include("Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "crates/**/Cargo.toml",
-            "crates/**/src/**/*.rs", "crates/**/assets/**", "vendor/resvg/Cargo.toml",
+            "crates/**/src/**/*.rs", "crates/**/assets/**", "crates/inku-pipeline/data/model_catalog.json", "vendor/resvg/Cargo.toml",
             "vendor/resvg/src/**/*.rs")
         exclude("target/**")
     })
     outputs.file(rustHostJniLibrary)
-    commandLine("rustup", "run", "1.95.0", "cargo", "build", "--locked", "--package",
+    commandLine("rustup", "run", "1.99.1", "cargo", "build", "--locked", "--package",
         "inku-render-android", "--lib", "--target-dir", rustHostTargetDirectory.get().asFile.absolutePath)
 }
 
@@ -330,7 +327,7 @@ val buildDisplayCheckAndroid = tasks.register<Exec>("buildDisplayCheckAndroid") 
     })
     outputs.file(displayCheckLibrary)
     doFirst { configureRustAndroidCompiler() }
-    commandLine("rustup", "run", "1.95.0", "cargo", "build", "--locked", "--package", "inku-display",
+    commandLine("rustup", "run", "1.99.1", "cargo", "build", "--locked", "--package", "inku-display",
         "--example", "display_check_android", "--target", rustAndroidTarget, "--release",
         "--target-dir", rustTargetDirectory.get().asFile.absolutePath)
 }
@@ -403,7 +400,7 @@ val generateRustParityExpected = tasks.register<Exec>("generateRustParityExpecte
     workingDir(rootProject.file("../core"))
     inputs.files(
         rootProject.fileTree("../core") {
-            include("Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "crates/**/Cargo.toml", "crates/**/src/**/*.rs", "crates/**/examples/**/*.rs", "crates/**/assets/**", "vendor/resvg/Cargo.toml", "vendor/resvg/src/**/*.rs")
+            include("Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "crates/**/Cargo.toml", "crates/**/src/**/*.rs", "crates/**/examples/**/*.rs", "crates/**/assets/**", "crates/inku-pipeline/data/model_catalog.json", "vendor/resvg/Cargo.toml", "vendor/resvg/src/**/*.rs")
             exclude("target/**")
         },
     )
@@ -414,15 +411,15 @@ val generateRustParityExpected = tasks.register<Exec>("generateRustParityExpecte
             "Generate Rust comparison fixtures on Linux, then import them with -PinkuRustParityExpectedDir=<directory>."
         }
         val pinnedRustc = providers.exec {
-            commandLine("rustup", "which", "--toolchain", "1.95.0", "rustc")
+            commandLine("rustup", "which", "--toolchain", "1.99.1", "rustc")
         }.standardOutput.asText.get().trim()
-        require(file(pinnedRustc).isFile) { "Pinned Rust 1.95.0 rustc was not found" }
+        require(file(pinnedRustc).isFile) { "Pinned Rust 1.99.1 rustc was not found" }
         environment("RUSTC", pinnedRustc)
         rustParityExpectedDirectory.get().asFile.deleteRecursively()
     }
     commandLine(
         listOf(
-            "rustup", "run", "1.95.0", "cargo", "run", "--locked", "--release",
+            "rustup", "run", "1.99.1", "cargo", "run", "--locked", "--release",
             "--package", "inku-render-android", "--example", "render-parity-expected",
             "--target-dir", rustHostTargetDirectory.get().asFile.absolutePath,
             "--",

@@ -110,7 +110,7 @@ tooltip の型: 一文目に「何が起きるか」、二文目に「何が保�
 | 語 | 許される意味 | 許容キー（これ以外は error） |
 |---|---|---|
 | `generat*` | **世代**の意味、または PNG/SVG のファイル生成という技術文脈 | `settingsDbBackupMaxGenerations` / `okugakiDescription` / `okugakiBranchConfirm` / `okugakiProgress` / `svgExportDisplayUse` / `svgExportEditableFeature` / `svgExportCompatFeature` / `provenanceLabelGeneration` / `provenanceHintGeneration`（生成情報ドロワーの**世代**の行） / `historyGenerationTitle`（履歴管理の作品パネルの**世代番号**） / `settingsDbBackupListGeneration` / `settingsDbBackupEstimatedDiskHint`（DB バックアップの**保存世代**） / `historyStripFieldGeneration`（履歴帯に添える**世代**の札） |
-| `prompt` | **LLM プロンプトそのもの**の表示 | `tabPrompts` / `tooltipCanvasTabPrompts` / `promptStage1System` / `promptStage2System` / `promptSketchSystem` / `promptCompositionSystem` / `promptLawsSystem` / `promptColorsSystem` / `promptReadingSystem` / `promptDescriptionDdlSystem` / `promptDescriptionReviewSystem` / `promptCatalogSystem` / `promptImageCatalogSystem` / `promptImageDdlSystem` / `promptImageReviewSystem`（作品が実際に送ったシステムプロンプト） / `CanvasPanel` の provenance 説明文 / `provenanceLabelStage1PromptDigest` / `provenanceLabelStage1PromptBaseDigest` / `provenanceLabelStage2PromptDigest` と対応する `provenanceHint*`（プロンプト digest の行。digest はプロンプトそのものの指紋なので description では言い換えられない） |
+| `prompt` | **LLM プロンプトそのもの**の表示 | `tabPrompts` / `tooltipCanvasTabPrompts` / `promptStage1System` / `promptStage2System` / `promptSketchSystem` / `promptCompositionSystem` / `promptLawsSystem` / `promptColorsSystem` / `promptReadingSystem` / `promptDescriptionCompositionSystem` / `promptDescriptionDdlSystem` / `promptDescriptionReviewSystem` / `promptCatalogSystem` / `promptImageCatalogSystem` / `promptImageDdlSystem` / `promptImageReviewSystem`（作品が実際に送ったシステムプロンプト） / `CanvasPanel` の provenance 説明文 / `provenanceLabelStage1PromptDigest` / `provenanceLabelStage1PromptBaseDigest` / `provenanceLabelStage2PromptDigest` と対応する `provenanceHint*`（プロンプト digest の行。digest はプロンプトそのものの指紋なので description では言い換えられない） |
 | `creat*` | **完了・日時・肩書き** | `appInfoCreatorTitle` / `settingsDbBackupRunDone` / `bootstrapAdminNote` / `historyCreatedAtHeader` / `Created`（列見出し） |
 | `image` | **Vision が実際に画像を見る**文脈、またはInfoの作者指定文で心にある像を指す用法 | `appInfoConceptBody` / `modelSelectionVisionHint` / 画像タブの `imageTab`・`imageTabHint`・`imageChooseFile`・`imageUploading`・`imageThumbnailAlt`・`imageVisionRequired`・`imageCanvasAspect`・`imageCatalogAuto`・`imageCatalogAutoHint`・`imageWritingDdl`・`imageReviewingDdl`・`imageSelectingCatalog`・`imageMissing`・`imageInvalid`・`imageTooLarge`・`imageDdlFailed` |
 | `render*` | **サーバー側の技術設定・DB フィールド名・置換トークン** | `canvasSeedSummary`(`{render}`) / `settingsRenderConcurrency*`(5 件) / `historyReplayMissingSeed`(`render_seed`) / `replayComparisonTitle`(Renderer) |
@@ -200,7 +200,7 @@ DB 列 `history.tenkei`、`tenkei_for_node()` 等の内部識別子、web の `t
 
 1. `en.ts` と `ja.ts` の**鍵集合が完全一致**すること
    表示文言の検査では、入れ子の対応表にあるAPIフィールド名も鍵として除外します。
-2. §3 の固定ラベル（四操作・配置の選び `By principle` / `By chance`・古い作品の強度・`Paint`・`Wild`）が**一字一句その語**であること
+2. §3 の固定ラベル（四操作・配置の選び `By principle` / `By chance`・古い作品の強度・`Paint`・`Lift the stroke limit`）が**一字一句その語**であること
 3. §5-1 の禁止語が**どこにも無い**こと
 4. §5-2 の制限語が**許容キー以外に無い**こと
 5. `...`（三点）と感嘆符が無いこと

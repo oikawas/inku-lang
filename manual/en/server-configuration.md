@@ -8,7 +8,7 @@ Settings belong to three boundaries.
 
 1. OS and service: `/etc/inku/inku-api.env`, systemd, reverse proxy, and filesystem permissions
 2. Administrator: provider connections, published models, limits, DB backups, artifacts, log policy, and users
-3. User: one drawing model shared by Stage 1/2, Vision model, UI language, UI mode, theme, text size, canvas, color catalog, sketch, Wild, download folder, and history-selection behavior
+3. User: one drawing model shared by Stage 1/2, Vision model, UI language, UI mode, theme, text size, canvas, color catalog, sketch, Lift the stroke limit, download folder, and history-selection behavior
 
 Provider API key environment variables are initial values. A provider key saved from the admin UI is stored encrypted in the DB. Never put host-specific details or secrets in Git-tracked documentation.
 
@@ -132,7 +132,6 @@ Explicitly set the additional structural limits in both `pipeline.compiler.hard_
 | Variable | Purpose | Default |
 |---|---|---|
 | `INKU_LLM_BACKEND` | Which LLM backend family to use | `anthropic` |
-| `INKU_DOCUMENT_PLUGIN_DIR` | Where declarative plugin documents live | `server/plugins/` |
 | `INKU_PLUGIN_PACKAGE_DIR` | Where plugins (packages) an administrator added from the Web live | `~/.local/share/inku/plugin-packages` (`/data/plugin-packages` in Docker) |
 | `INKU_OKUGAKI_MODEL` | Default reader model for the colophon | a vision-capable model |
 | `INKU_OKUGAKI_CACHE_TTL_SECONDS` | Colophon cache lifetime | `1800` |
@@ -142,14 +141,14 @@ Explicitly set the additional structural limits in both `pipeline.compiler.hard_
 
 The `Plugins` settings add and delete vocabulary plugins and show whether each is on and its words (name, aliases, surfaces, notes, example, preview).
 
-- `Add a plugin` takes a plugin file (`inku.plugin-package.v1` JSON, or a zip holding it with the PNGs of its Saijiki pictures; `PLUGIN.md` §5.1 says how to write one) and the Server checks it at once: the file's shape, the shared core's checks of each definition, and drawing each word's Japanese and English example. Whatever is wrong is listed word by word with its place in the file and the reason. A word that passed shows the note, example, and picture the Saijiki will show (the zip's picture, or one drawn from its example). `Add` is offered only when everything passed; when a plugin with the same name (`namespace.name`) is installed it becomes `Replace`.
-- An added plugin's words can be drawn in every new work on that Server, appear in the Saijiki and in DDL editor completion, and reach Stage 1 through their summaries when drawing from a description. Saved works keep drawing with the definitions they saved, whatever is replaced or deleted later.
+- `Add a plugin` accepts an `inku.plugin-package.v2` JSON file or a zip with PNGs (see the [guide](../../PLUGIN.md#51-adding-a-plugin-file-from-the-web)). The Server checks the file's shape, each shared-core definition, and drawings of the Japanese and English examples. Only a fully checked file can be installed. An installed file with the same id can be replaced.
+- Installed words enter new works and the Saijiki, and their notes feed the Stage 1 offer. Saved works replay with their saved definitions after replacement or deletion.
 - `Replace picture` on a word uploads a PNG the Saijiki shows instead; `Back to the original picture` returns to the zip's picture or the one drawn from the example. Replacing the plugin keeps replaced pictures.
-- `Export` saves an installed plugin as a zip with its definitions, summaries, notes, examples, and current pictures; another Server can add it as it is.
+- `Export` saves a v2 zip with definitions, notes, examples, and current pictures; another Server can add it as it is.
 - An added plugin can be switched off or deleted.
-- A bundled package's document (today `Nature.leaves`) is marked `Used for drawing`; it cannot be deleted, so switch it off when it is not wanted. Any other `.inku-plugin.md` is a legacy document without definitions and is marked `Not used for drawing`: writing its words leaves them out with a diagnostic. A legacy document can be deleted.
+- Bundled `Nature.leaves` is a v2 file in the core. It can be disabled but not deleted or given a replacement picture. Old v1 files appear as rejected with reasons.
 
-A document counts as a bundled package only where it sits in `server/plugins/`. With `INKU_DOCUMENT_PLUGIN_DIR` pointed elsewhere, a `nature-leaves.inku-plugin.md` placed there is treated as legacy and the `Nature.leaves` words are not drawn. If the settings mark it `Not used for drawing`, check that directory.
+Bundled leaves do not depend on `INKU_PLUGIN_PACKAGE_DIR`; only administrator-installed files are read there.
 
 The default for `INKU_LEARNED_FILE` is under `/tmp`, so it does not survive a restart. Give it a stable path to persist it.
 
@@ -266,7 +265,7 @@ To change the published models as an administrator:
 2. Find models with search and filters, and check those to publish. The bulk selection action applies only to the currently filtered results shown in the list and in open folds.
 3. Use `Save` to apply the selection, or `Cancel` to close without saving it. Fetching the model list is unavailable while there are unsaved changes; save or discard them first.
 
-Models carry labels, and a labelled model is filed into a fold below the list. The folds come in the order `Not measured`, `Older model`, `Paid plan only`, `No response when measured`, `Not supported`, `End of life`, each headed with its count (`Older model (n)`), closed at first; a model with more than one label goes into the fold of the later one. Models labelled `Not measured` or `Older model` can be checked and published. A model labelled `No response when measured` can be published as not recommended once its purpose button (framed in red) is chosen. Models with any of the other three labels cannot. Search and filters count the models inside the folds too. `Not measured` marks a model with no measurement at all, `Older model` one the provider has superseded with a newer generation (the OpenAI API up to GPT-5.4, for one), `No response when measured` one that answered neither purpose when measured, and `Not supported` a kind left out of the benchmark (speech, music, video, embeddings and the like). A model's row and hover card show every label it carries. Assessments and labels come from the model catalog the server ships (`model_catalog.json`); when it is updated, assessments an administrator edited go back to the catalog's values. Ollama Cloud (ollama.com) returns its list whatever the key's plan, so each `Fetch model list` makes one short call to every listed model with the configured API key. A retired model is marked `End of life`, one the plan does not reach (HTTP 402 or 403) is marked `Paid plan only`, and one the key can call loses the `Paid plan only` mark. A model that could not be checked, because the service was busy or the call timed out, keeps its earlier mark. With one call per model the fetch can take a minute or two, and it spends a little of the Ollama Cloud allowance.
+Models carry labels, and a labelled model is filed into a fold below the list. The folds come in the order `Not measured`, `Older model`, `Paid plan only`, `No response when measured`, `Not supported`, `End of life`, each headed with its count (`Older model (n)`), closed at first; a model with more than one label goes into the fold of the later one. Models labelled `Not measured` or `Older model` can be checked and published. A model labelled `No response when measured` can be published as not recommended once its purpose button (framed in red) is chosen. Models with any of the other three labels cannot. Search and filters count the models inside the folds too. `Not measured` marks a model with no measurement at all, `Older model` one the provider has superseded with a newer generation (the OpenAI API up to GPT-5.4, for one), `No response when measured` one that answered neither purpose when measured, and `Not supported` a kind left out of the benchmark (speech, music, video, embeddings and the like). A model's row and hover card show every label it carries. Assessments and labels come from the model catalog embedded in the shared core (`model_catalog.json`); when it is updated, assessments an administrator edited go back to the catalog's values. Ollama Cloud (ollama.com) returns its list whatever the key's plan, so each `Fetch model list` makes one short call to every listed model with the configured API key. A retired model is marked `End of life`, one the plan does not reach (HTTP 402 or 403) is marked `Paid plan only`, and one the key can call loses the `Paid plan only` mark. A model that could not be checked, because the service was busy or the call timed out, keeps its earlier mark. With one call per model the fetch can take a minute or two, and it spends a little of the Ollama Cloud allowance.
 
 A model left unpublished, or one the connection service does not list, is not called when a member outside `admins` names it through the API or the CLI; the request is refused with 403 (`model_not_offered` for drawing). Models are called with the server's API keys, so what you publish is also what members may spend. Models of a connection service that developer mode hides (the built-in Stage defaults among them) stay callable unless you unpublish them. `admins` may call any configured model, to try one before publishing it.
 
@@ -338,7 +337,7 @@ Variation is retired. Its seed, amplitude and focus columns and saved values sta
 
 The API's JSON answers carry `render_seed` and `composition_seed` as decimal strings (`"1553303611486672067"`). A seed can take 64 bits (one made from `seed_text` before it was removed, for example), past what a JavaScript number holds exactly, and a rounded seed sent back draws another picture. Send a seed back as it came; requests take either a number or a decimal string.
 
-`render_wild` applies to the whole work and is part of the `rh3` material. The same score and the same seed with a different Wild setting is a different edition.
+`render_wild` applies to the whole work and is part of the `rh3` material. The same score and the same seed with the stroke limit lifted in one and not the other is a different edition.
 
 History replay uses the saved Score, color catalog, canvas, seeds, and render-engine version. Engine version is recorded for audit; bit-identical output across different engine versions is not assumed.
 
@@ -451,7 +450,7 @@ A 401 response for the wrong password confirms the path from Web to API. Monitor
 | No administrator can sign in | A forgotten password: `inku-admin reset-password` in 2.2. Local sign-in turned off: 13.1 |
 | A stated count reaches a ceiling | Resource diagnostics, the four limits in §5.1, and the manifest's structural budget; check compatibility settings only for an old Score |
 | The sketch layer seems not to run | The work's `sketch_state`. `fallback` points at the Stage 0.5 timeout and the provider |
-| Plugin words are not expanded | Rejection reasons from `plugin list`, `INKU_DOCUMENT_PLUGIN_DIR`, and `plugin reload` |
+| Plugin words are not expanded | Rejection reasons from `plugin list`, `INKU_PLUGIN_PACKAGE_DIR`, and enabled state |
 
 ### 13.1 Turning Local Sign-in Back On
 

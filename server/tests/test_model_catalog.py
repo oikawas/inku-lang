@@ -21,9 +21,9 @@ from inku_server.model_settings import (
     normalize_model_settings,
     update_model_settings,
 )
-from inku_server.verified_model_catalog import MODEL_CATALOG, MODEL_CONFIG_VERSION, STORED_LABEL_KEYS
+from inku_server.verified_model_catalog import MODEL_CATALOG, MODEL_CONFIG_VERSION, STORED_LABEL_KEYS, core_catalog
 
-CASES = json.loads((Path(__file__).parent / "data/model-catalog-cases.json").read_text(encoding="utf-8"))
+CASES = json.loads((Path(__file__).parents[2] / "core/crates/inku-pipeline/data/model-catalog-cases.json").read_text(encoding="utf-8"))
 _PUBLISHABLE = {label["id"]: label["publishable"] for label in MODEL_LABELS}
 
 
@@ -49,6 +49,19 @@ def test_a_model_is_labelled_and_filed_as_the_shared_cases_say():
         assert (labels, model_fold(labels), all(_PUBLISHABLE[label] for label in labels)) == (
             case["labels"], case["fold"], case["publishable"]), case["name"]
     assert len(CASES["cases"]) == 15
+
+
+def test_core_selection_and_validation_cases():
+    for case in CASES["selection_cases"]:
+        selection = core_catalog("label", model=case["model"])["model"]["selection"]
+        assert selection["unselectable"] == case["unselectable"], case["name"]
+        assert selection["unsupported"][case["purpose"]] == case["unsupported"], case["name"]
+        assert selection["levels"][case["purpose"]][case["stage"]] == case["level"], case["name"]
+    for case in CASES["sort_cases"]:
+        answer = core_catalog("sort", models=case["models"], purpose="llm")
+        assert [model["id"] for model in answer["models"]] == case["order"], case["name"]
+    for case in CASES["problem_cases"]:
+        assert core_catalog("problems", catalog=case["catalog"])["problems"] == case["problems"], case["name"]
 
 
 def test_a_changed_catalog_replaces_the_model_information_an_installation_kept():

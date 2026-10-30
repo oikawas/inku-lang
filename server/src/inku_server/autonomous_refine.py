@@ -10,10 +10,16 @@ different from its parent (``measure``), and the record a child keeps on its
 lineage edge (``record``). This module takes the tries, draws and saves the
 children through the ordinary pipeline runs, and keeps where each run stands.
 
-A child is saved as the run draws it, lineage only; its record is written to its
-edge once it is measured. A child that passes the gate is the next turn's parent,
-and the last one kept is shown in the history when the run ends. A child that
-does not pass stays in the lineage only (the author's answer, 2026-10-20).
+A child is saved in the history as the run draws it; its record is written to
+its edge once it is measured. A child that passes the gate is the next turn's
+parent. Children that do not pass also remain in the history.
+
+A chunk move (まとまりの手, 2026-10-27) runs alone, toward the run's note: the
+shared core's chunk moves (``chunk_moves.rs``) choose one move for one chunk of
+the parent's titled DDL, apply it and check the child; this module sends the
+requests the core asks for, as the second chunk prototype sent them, and draws
+the child from its DDL. The child is kept when the core's checks pass: the gate
+is measured for its record, not applied (the author's answer, 2026-10-27).
 
 Where each run stands is kept in a store of its own beside the canonical
 database (``<name>-autonomous-runs.db``; ``INKU_AUTONOMOUS_RUNS_DB_URL`` names
@@ -24,6 +30,8 @@ run the Server was taking when it stopped reads as interrupted when it starts.
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import importlib
 import json
 import logging
@@ -68,6 +76,75 @@ def _core(request: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(answer, dict) or answer.get("error"):
         raise RuntimeError(f"autonomous refinement core: {answer!r}")
     return answer
+
+
+def _chunk_core(request: dict[str, Any]) -> dict[str, Any]:
+    """The shared core's chunk moves (``inku-pipeline/src/chunk_moves.rs``)."""
+    native = importlib.import_module("inku_render")
+    answer = json.loads(native.pipeline_chunk_moves(json.dumps(request, ensure_ascii=False).encode("utf-8")))
+    if not isinstance(answer, dict) or answer.get("error"):
+        raise RuntimeError(f"chunk moves core ({request.get('action')}): {answer!r}")
+    return answer
+
+
+#: What a chunk move's requests are sent as: the action the second chunk prototype sent them as.
+CHUNK_ACTION = "generate_normalized_ddl"
+#: How long one of its requests may take, as the prototype allowed.
+CHUNK_TIMEOUT_MS = 300_000
+#: The side of the picture a choose request shows (the prototype's PNG, laid square).
+CHUNK_PICTURE_SIDE = 1024
+#: The failures after which a request is sent once more, a moment later.
+_CHUNK_TRANSIENT = frozenset({"rate_limited", "transport_timeout", "transport_unavailable"})
+_CHUNK_RESEND_SECONDS = 2.0
+
+
+def _composition_of(item: dict[str, Any]) -> dict[str, Any] | None:
+    """A read-and-draw work's composition record as the core titles a DDL from it: each line's thing, and the things."""
+    record = item.get("description_ddl")
+    composition = record.get("composition") if isinstance(record, dict) else None
+    if not isinstance(composition, dict):
+        return None
+    owners, things = composition.get("things"), (composition.get("answer") or {}).get("things")
+    if isinstance(owners, list) and isinstance(things, list):
+        return {"owners": owners, "things": things}
+    return None
+
+
+def _chunk_count(item: dict[str, Any]) -> int:
+    """The chunks a chunk move could take on a work: its title lines, or its composition's things."""
+    request = {"action": "units", "ddl": str(item.get("ddl") or ""),
+               "language": item.get("instruction_lang_resolved") or "ja"}
+    composition = _composition_of(item)
+    if composition is not None:
+        request["composition"] = composition
+    answer = _chunk_core(request)
+    return len(answer.get("units") or []) if answer.get("outcome") == "ok" else 0
+
+
+def _diagnostic_count(item: dict[str, Any]) -> int:
+    """The diagnostics a saved work's drawing carries, every kind counted."""
+    found = item.get("pipeline_diagnostics") or {}
+    if not isinstance(found, dict):
+        return 0
+    count = sum(len(found.get(name) or []) for name in (
+        "upstream_diagnostics", "downstream_diagnostics", "plugin_diagnostics", "relation_omissions",
+        "resource_omissions"))
+    return count + len((found.get("render_diagnostics") or {}).get("diagnostics") or [])
+
+
+def _marks(item: dict[str, Any]) -> int:
+    found = item.get("pipeline_diagnostics") or {}
+    demand = ((found.get("resource_execution") or {}).get("demand") or {}) if isinstance(found, dict) else {}
+    return int(demand.get("primitive_marks") or 0)
+
+
+def _picture(svg: str) -> tuple[str, dict[str, Any]]:
+    """The parent's picture as a choose request shows it: the PNG's data URL, and the image as the prompt names it
+    (its type, length and SHA-256; the shared core sends no image its prompt does not name)."""
+    from inku_analysis.rasterizer import svg_to_png
+    png = svg_to_png(svg, width=CHUNK_PICTURE_SIDE, height=CHUNK_PICTURE_SIDE)
+    named = {"media_type": "image/png", "byte_len": len(png), "sha256": hashlib.sha256(png).hexdigest()}
+    return "data:image/png;base64," + base64.b64encode(png).decode("ascii"), named
 
 
 # ---------------------------------------------------------------------------
@@ -238,11 +315,18 @@ class AutonomousRunner:
     def start(self, actor: dict, *, history_id: str, moves: int, kinds: list[str], note: str | None,
               model: str, language: str, wild: bool | None) -> dict[str, Any]:
         owner = actor["id"]
-        parent = self._work(owner, history_id)
+        chunks = "chunks" in kinds
+        note = (note or "").strip() or None
+        if chunks and len(set(kinds)) != 1:
+            raise HTTPException(422, {"code": "autonomous_chunks_alone",
+                                      "message": "The chunk move runs alone, without the other moves."})
+        if chunks and note is None:
+            raise HTTPException(422, {"code": "autonomous_note_required",
+                                      "message": "The chunk move needs the run's direction in the note."})
+        parent = self._work(owner, history_id, chunks=chunks)
         if not str(parent["item"].get("svg") or ""):
             raise HTTPException(422, {"code": "autonomous_source_has_no_image",
                                       "message": "The work has no image to compare its children with."})
-        note = (note or "").strip() or None
         with self._lock:
             if self._closing:
                 raise HTTPException(503, {"code": "autonomous_closing", "message": "The Server is stopping."})
@@ -291,7 +375,6 @@ class AutonomousRunner:
         """When the Server starts: the runs it was taking were cut off."""
         for run in self.store.interrupt_running():
             _logger.warning("autonomous_run_interrupted run=%s", run["id"])
-            self._show_last_kept(run)
 
     def close(self) -> None:
         """Stop every run without waiting for a model's answer; the next start marks any
@@ -304,8 +387,9 @@ class AutonomousRunner:
 
     # -- one run ----------------------------------------------------------------
 
-    def _work(self, owner: str, history_id: str) -> dict[str, Any]:
-        """A work of the owner's as a try starts from it, with what the core reads of it."""
+    def _work(self, owner: str, history_id: str, *, chunks: bool = False) -> dict[str, Any]:
+        """A work of the owner's as a try starts from it, with what the core reads of it (and, for a chunk
+        run, how many chunks it has)."""
         from .pipeline_api import laws_records_of
         from .pipeline_runtime import get_service
 
@@ -320,6 +404,8 @@ class AutonomousRunner:
                  "laws": _law_names(basis)}
         if basis.get("main_law"):
             facts["main_law"] = basis["main_law"]
+        if chunks:
+            facts["chunks"] = _chunk_count(item)
         return {"id": history_id, "item": item, "facts": facts}
 
     def _drive(self, run: dict[str, Any], actor: dict, parent: dict[str, Any], stop: threading.Event) -> None:
@@ -343,12 +429,15 @@ class AutonomousRunner:
                 self.store.save(run)
                 if step["kind"] == "laws":
                     taken = self._laws(run, parent, step, stop)
+                elif step["kind"] == "chunks":
+                    taken = self._chunks(run, parent, step, stop)
                 else:
                     taken = self._juxtaposition(run, actor, parent, step, stop, answers)
                 self._add(run, step, taken)
                 if taken["outcome"] == "kept":
                     run["last_kept_history_id"] = taken["history_id"]
-                    parent = self._work(run["owner_id"], taken["history_id"])
+                    parent = self._work(run["owner_id"], taken["history_id"],
+                                        chunks="chunks" in settings["kinds"])
                 run["current"] = None
                 self.store.save(run)
         except _Stopped:
@@ -374,30 +463,15 @@ class AutonomousRunner:
         self.store.save(run)
         _logger.info("autonomous_run_ended run=%s state=%s reason=%s turns=%s", run["id"], state, reason,
                      len(run["turns"]))
-        self._show_last_kept(run)
-
-    @staticmethod
-    def _show_last_kept(run: dict[str, Any]) -> None:
-        """The last child the run kept is shown in the history; the others stay in the lineage."""
-        last = run.get("last_kept_history_id")
-        if not last:
-            return
-        try:
-            items = _db.get_items(run["owner_id"], [last])
-            node = items[0].get("lineage_node_id") if items else None
-            if node:
-                _db.promote_lineage_node(run["owner_id"], node)
-        except Exception:  # noqa: BLE001
-            _logger.warning("autonomous_run_promote_failed run=%s child=%s", run["id"], last, exc_info=True)
 
     # -- the moves --------------------------------------------------------------
 
     def _options(self, run: dict[str, Any], parent: dict[str, Any], *, kind: str, metadata: dict) -> dict:
-        """The run options of a child: the parent's settings, the run's one model, kept in the lineage only."""
+        """The run options of a child: the parent's settings and the run's one model."""
         item, settings = parent["item"], run["settings"]
         options: dict[str, Any] = {
             "stage1_model": settings["model"], "stage2_model": settings["model"],
-            "catalog_mode": "fixed", "history_visibility": "lineage_only",
+            "catalog_mode": "fixed",
             "lineage_parent_node_id": item.get("lineage_node_id"), "derivation_kind": kind,
             "derivation_metadata": metadata, "count_generation": True, "ui_lang": settings["language"],
         }
@@ -406,8 +480,7 @@ class AutonomousRunner:
             options["catalog_id"] = catalog
         if item.get("render_canvas_aspect_id"):
             options["canvas_aspect"] = item["render_canvas_aspect_id"]
-        if settings.get("wild") is not None:
-            options["wild"] = settings["wild"]
+        options["wild"] = settings.get("wild") is True
         return options
 
     def _settle(self, owner: str, start: Callable[[], dict], stop: threading.Event) -> dict:
@@ -437,13 +510,15 @@ class AutonomousRunner:
         return phase.get("reason")
 
     def _measured(self, run: dict[str, Any], parent: dict[str, Any], step: dict[str, Any], kind: str,
-                  child: dict[str, Any], record: dict[str, Any], initial: dict[str, Any]) -> dict[str, Any]:
-        """Measure a drawn child against its parent, and write its move on its lineage edge."""
+                  child: dict[str, Any], record: dict[str, Any], initial: dict[str, Any],
+                  *, gated: bool = True) -> dict[str, Any]:
+        """Measure a drawn child against its parent, and write its move on its lineage edge. A chunk move's
+        child is kept whatever the share (``gated`` false): the share is recorded, the gate not applied."""
         measured = _core({"action": "measure", "before": str(parent["item"].get("svg") or ""),
                           "after": str(child.get("svg") or "")})
         if measured.get("outcome") != "ok":
             raise RuntimeError(f"measure refused: {measured.get('reason')}: {measured.get('detail')}")
-        outcome = "kept" if measured["passes"] else "not_visible"
+        outcome = "kept" if measured["passes"] or not gated else "not_visible"
         settings = run["settings"]
         recorded = _core({"action": "record", "run": run["id"], "turn": step["turn"], "moves": settings["moves"],
                           "attempt": step["attempt"], "kind": kind, "model": settings["model"], "outcome": outcome,
@@ -538,6 +613,147 @@ class AutonomousRunner:
             return _try("juxtaposition", "failed", reason=_code(error), sentence=choice["sentence"], rank=rank)
         taken = self._measured(run, parent, step, "juxtaposition", view["result"], {"juxtaposition": moved}, initial)
         return _try("juxtaposition", taken.pop("outcome"), sentence=choice["sentence"], rank=rank, **taken)
+
+    @staticmethod
+    def _chunk_context(owner: str, item: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any] | None]:
+        """What a chunk move shows beside the parent's DDL, and the parent's composition record when its DDL
+        has no title lines. The description is the parent's; the reading's core images and the composition's
+        proposition are those of the nearest work up the lineage that keeps a composition (a chunk move's
+        child keeps none); the moves so far are the chunk moves on the lineage's edges, root first."""
+        chain, moves = [item], []
+        node = item.get("lineage_node_id")
+        if node:
+            lineage = _db.get_lineage(owner, node, descendant_depth=0, node_limit=60, include_svg=False) or {}
+            nodes = {entry["id"]: entry for entry in lineage.get("nodes") or []}
+            edge_into: dict[str, dict] = {}
+            for edge in lineage.get("edges") or []:
+                edge_into.setdefault(edge["child_node_id"], edge)
+            current, seen = node, set()
+            while current in edge_into and current not in seen:
+                seen.add(current)
+                edge = edge_into[current]
+                ai_move = (edge.get("metadata") or {}).get("ai_move") or {}
+                if ai_move.get("kind") == "chunks" and isinstance(ai_move.get("chunks"), dict):
+                    moves.append(ai_move["chunks"])
+                current = edge["parent_node_id"]
+                history = (nodes.get(current) or {}).get("history")
+                if isinstance(history, dict):
+                    chain.append(history)
+        moves.reverse()
+        record = next((work["description_ddl"] for work in chain
+                       if isinstance(work.get("description_ddl"), dict) and work["description_ddl"].get("composition")),
+                      {})
+        composition = record.get("composition") or {}
+        context = {
+            "description": pipeline_description(item.get("source_text") or item.get("input") or "").strip(),
+            "reading_core": list((record.get("reading") or {}).get("core") or []),
+            "thesis": str((composition.get("answer") or {}).get("thesis") or ""),
+            "history": [{"generation": place, "move": move.get("move"), "targets": list(move.get("targets") or []),
+                         "reason": move.get("reason"), "applied": True}
+                        for place, move in enumerate(moves, start=1)],
+        }
+        return context, _composition_of(item)
+
+    def _send_chunk(self, run: dict[str, Any], step: dict[str, Any], context: dict, request: dict,
+                    picture: tuple[str, dict[str, Any]] | None, sent: int, stop: threading.Event,
+                    language: str) -> tuple[str | None, str | None]:
+        """Send one request the core asked for, as the prototype sent it: the answer's text, or the failure."""
+        from .pipeline_runtime import get_service
+
+        prompt = {"system": request["system"], "message": request["text"],
+                  "response_schema": request["response_schema"], "action_name": CHUNK_ACTION}
+        if picture is not None:
+            # The picture goes only where the prompt names it (provider_wire refuses it otherwise).
+            prompt["images"] = [picture[1]]
+        digest = hashlib.sha256(json.dumps(prompt, ensure_ascii=False, sort_keys=True,
+                                           separators=(",", ":")).encode("utf-8")).hexdigest()
+        # What the pipeline's record of a sent system prompt reads; the provider body leaves them out.
+        prompt.update(prompt_id=f"inku.chunk-moves-{request['purpose']}.v1", prompt_digest=f"sha256:{digest}",
+                      instruction_language=language)
+        perform = get_service().provider_with_context(run["owner_id"], context,
+                                                      [picture[0]] if picture is not None else None)
+        failure = None
+        for attempt in (1, 2):
+            if stop.is_set():
+                raise _Stopped
+            action = {"tag": CHUNK_ACTION, "timeout_ms": str(CHUNK_TIMEOUT_MS), "payload": {"prompt": prompt},
+                      "identity": {"action_id": f"{run['id']}-t{step['turn']}-{request['purpose']}-{sent}",
+                                   "attempt": attempt, "request_digest": digest}}
+            result = perform(action)
+            if result["tag"] != "provider_failed":
+                return str(result.get("response") or ""), None
+            failure = str(result.get("failure") or "provider_failed")
+            if failure not in _CHUNK_TRANSIENT or stop.wait(_CHUNK_RESEND_SECONDS):
+                break
+        return None, failure
+
+    def _chunks(self, run: dict[str, Any], parent: dict[str, Any], step: dict[str, Any],
+                stop: threading.Event) -> dict[str, Any]:
+        """One chunk move: the core's turn (``chunk_moves``) asked to send, draw, keep or give up."""
+        from .pipeline_api import saved_work_parent
+        from .pipeline_runtime import get_service
+
+        owner, service, settings, item = run["owner_id"], get_service(), run["settings"], parent["item"]
+        options = self._options(run, parent, kind="chunk_move", metadata={})
+        try:
+            relation, source_work = saved_work_parent(service.store, owner, parent["id"])
+            config, context = service.prepare_for(owner, "direct_ddl", str(item.get("ddl") or ""), options,
+                                                  source_work)
+        except (HTTPException, CandidateHostError) as error:
+            return _try("chunks", "unavailable", reason=_code(error))
+        shown, composition = self._chunk_context(owner, item)
+        done = len(shown["history"])
+        seed = int(hashlib.sha256(f"{run['id']}:{step['turn']}".encode()).hexdigest()[:15], 16)
+        request = {"action": "start", "config": config, "ddl": str(item.get("ddl") or ""),
+                   "context": {**shown, "direction": settings["note"] or "", "generation": done + 1,
+                               "of": done + settings["moves"] - step["turn"] + 1},
+                   "seed": str(seed), "diagnostics": _diagnostic_count(item)}
+        if composition is not None:
+            request["composition"] = composition
+        answer = _chunk_core(request)
+        if answer.get("outcome") != "ok":
+            return _try("chunks", "unavailable", reason=str(answer.get("reason")))
+        picture = _picture(str(item.get("svg") or ""))
+        child: dict[str, Any] | None = None
+        sent = 0
+        chunk_offers: dict[str, dict] = {}
+        while True:
+            if stop.is_set():
+                raise _Stopped
+            todo, state = answer["todo"], answer["state"]
+            choice = state.get("choice") or {}
+            if todo == "send":
+                sent += 1
+                asked = answer["request"]
+                if asked["purpose"] == "rewrite":
+                    chunk_offers["rewrite"] = {"stage": "chunk_rewrite", "offer": asked.get("plugin_offer") or {"offered": [], "omitted": []}}
+                text, failure = self._send_chunk(run, step, context, asked,
+                                                 picture if asked["image"] else None, sent, stop,
+                                                 str(config.get("language") or "ja"))
+                if text is None:
+                    return _try("chunks", "failed", reason=failure, move=choice.get("move"))
+                answer = _chunk_core({"action": "answer", "config": config, "state": state, "answer": text})
+            elif todo == "draw":
+                ddl = answer["ddl"]
+                try:
+                    view = self._settle(owner, lambda: service.start(
+                        owner, "direct_ddl", ddl, parent=relation,
+                        source_work={**source_work, "chunk_plugin_offers": list(chunk_offers.values())}, options=options), stop)
+                    child = view["result"]
+                    saved = _db.get_items(owner, [child["history_id"]])
+                    drawn_item = saved[0] if saved else {}
+                    drawn = {"rendered": bool(child.get("svg")), "diagnostics": _diagnostic_count(drawn_item),
+                             "marks": _marks(drawn_item)}
+                except (HTTPException, CandidateHostError):
+                    child, drawn = None, {"rendered": False}
+                answer = _chunk_core({"action": "drawn", "config": config, "state": state, "drawn": drawn})
+            elif todo == "keep" and child is not None:
+                record = answer["record"]
+                taken = self._measured(run, parent, step, "chunks", child, {"chunks": record}, {}, gated=False)
+                return _try("chunks", taken.pop("outcome"), move=record["move"], targets=record["targets"],
+                            title=record.get("title"), **taken)
+            else:
+                return _try("chunks", "failed", reason=str(answer.get("reason") or todo), move=choice.get("move"))
 
 
 _runner: AutonomousRunner | None = None

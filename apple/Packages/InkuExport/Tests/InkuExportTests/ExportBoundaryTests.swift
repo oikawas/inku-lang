@@ -124,17 +124,18 @@ final class ExportBoundaryTests: XCTestCase, @unchecked Sendable {
 
     // Failure: the DDL envelope loses aliases, includes unused plugins, or rounds a u64 definition value.
     func testDDLExportRetainsOnlyNamedDefinitionsWithoutRounding() throws {
-        let definition = try ExactJSON(data: Data(#"{"schema":"inku.macro-definition.v1","namespace":"Nature","heading":"leaves","aliases":["foliage"],"seed":18446744073709551615}"#.utf8))
-        let unused = try ExactJSON(data: Data(#"{"namespace":"Nature","heading":"unused"}"#.utf8))
-        var work = source().work; work.ddl = "Nature.foliage"; work.instructionLangResolved = "en"
+        let definition = try ExactJSON(data: Data(#"{"schema":"inku.macro-definition.v2","namespace":"Nature","id":"leaves","names":{"ja":["葉"],"en":["foliage"]},"kind":"scene","version":"1.0.0","parameters":{},"components":{},"body":[]}"#.utf8))
+        let unused = try ExactJSON(data: Data(#"{"schema":"inku.macro-definition.v2","namespace":"Nature","id":"unused","names":{"ja":["未使用"],"en":["unused"]},"kind":"scene","version":"1.0.0","parameters":{},"components":{},"body":[]}"#.utf8))
+        var work = source().work; work.ddl = "{foliage} 18446744073709551615"; work.instructionLangResolved = "en"
         let originalSVG = work.svg
-        let exported = try ExactJSON(data: ExportService.ddl(ExportSource(work: work, pluginDefinitions: [definition, unused, definition], pluginSummaries: ["saved definition"])))
-        XCTAssertEqual(exported["schema"].string, "inku.ddl-export.v1")
+        let lock: ExactJSON = .object(["qualified_name": .string("Nature.leaves"), "version": .string("1.0.0")])
+        let exported = try ExactJSON(data: ExportService.ddl(ExportSource(work: work, pluginDefinitions: [definition, unused, definition], pluginSummaries: ["saved definition"], pluginLocks: [lock])))
+        XCTAssertEqual(exported["schema"].string, "inku.ddl-export.v2")
         XCTAssertEqual(exported["ddl"].string, work.ddl)
         let plugins = try XCTUnwrap(exported["plugins"].array)
         XCTAssertEqual(plugins.count, 1)
-        XCTAssertEqual(plugins[0]["definition"]["seed"].number, "18446744073709551615")
-        XCTAssertEqual(plugins[0]["summary"].string, "saved definition")
+        XCTAssertEqual(plugins[0]["definition"], definition)
+        XCTAssertEqual(plugins[0]["note"].string, "saved definition")
         var options = ExportOptions(); options.format = .svg; options.svgProfile = "canonical"
         XCTAssertEqual(try ExportService.render(sources: [ExportSource(work: work)], options: options)[0].data, Data(originalSVG.utf8))
         options.svgProfile = "compat"

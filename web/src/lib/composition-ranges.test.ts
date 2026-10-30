@@ -87,6 +87,7 @@ test('the actual viewer SSR uses the common editor and keeps its full-source dra
 		'$lib/saijiki': new URL('./saijiki.ts', import.meta.url).href,
 		'$lib/features/ddl-editor/codemirror': new URL('./features/ddl-editor/codemirror.ts', import.meta.url).href,
 		'$lib/features/ddl-editor/completion-range-states': new URL('./features/ddl-editor/completion-range-states.ts', import.meta.url).href,
+		'$lib/features/ddl-editor/plugin-calls': new URL('./features/ddl-editor/plugin-calls.ts', import.meta.url).href,
 		'$lib/i18n/index.svelte': runeModule('./i18n/index.svelte.ts', 'server')
 	};
 	function component(path: string): string {
@@ -142,6 +143,7 @@ test('the existing replay action reserves one drawing before awaiting its saved 
 		const hasDdlBody = () => true, submitWouldRefine = () => false, resetTargetScopedState = () => {};
 		const currentRefineParent = () => null, confirmFallbackRefine = async () => true;
 		const effectiveCanvasAspectId = () => 'square', startTimer = () => {}, stopTimer = () => {};
+		const wildSettings = { enabled: false }, wildOverride = (enabled) => ({ wild: enabled });
 		// A DDL without a ratio to go by is drawn without the fit question (DDL 26).
 		const declaredCanvasRatio = () => null, canvasRatioOfAspect = () => null;
 		const chooseCanvasFit = async () => 'stretch', drawFittedSavedWork = async () => {};

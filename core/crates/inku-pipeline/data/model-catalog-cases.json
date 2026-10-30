@@ -1,0 +1,36 @@
+{
+ "schema": "inku.model-catalog-cases.v1",
+ "about": "How a model is labelled and filed, by the label table of core/crates/inku-pipeline/data/model_catalog.json (the author, 2026-10-13). Each case gives a model in the common format: `labels` lists its stored labels, the ones written in the catalog (legacy, subscription, not_supported, eol), which an installation corrects for its own key (subscription after its key's probe, eol when a refetched list no longer offers the model); `purposes` are those it is offered for, already without its `unsupported_purposes` except those an administrator chose against the measurement (2026-10-26), and an absent `purposes` means [\"llm\"]. Two labels are worked out from the model: no_response when no purpose it is offered for is one it answers (`purposes` without `unsupported_purposes` is empty; since 2026-10-26 it can be published, as not recommended), and unmeasured when it carries no measurement and every other label lets it be published. A measurement is any of recommendation_llm, recommendation_vision, recommendation_stage1, recommendation_stage2, recommendation_level, speed_class, speed_label, speed_llm_seconds, speed_vision_seconds, cost_usd_llm, cost_usd_vision, comment_ja, comment_en, unsupported_purposes. Expected: every label in the table's order, the fold (the label that comes last in the table, or null to stay in the list) and whether it can be published (every label allows it). The Server, the Web, macOS and Android check themselves against these cases.",
+ "cases": [
+  {"name": "measured and usable", "model": {"purposes": ["llm", "vision"], "recommendation_llm": 3}, "labels": [], "fold": null, "publishable": true},
+  {"name": "never measured", "model": {"purposes": ["llm"]}, "labels": ["unmeasured"], "fold": "unmeasured", "publishable": true},
+  {"name": "never measured, purposes absent", "model": {}, "labels": ["unmeasured"], "fold": "unmeasured", "publishable": true},
+  {"name": "a comment is a measurement", "model": {"comment_ja": "描画は速い。"}, "labels": [], "fold": null, "publishable": true},
+  {"name": "older and measured", "model": {"purposes": ["llm"], "labels": ["legacy"], "speed_llm_seconds": 3.8}, "labels": ["legacy"], "fold": "legacy", "publishable": true},
+  {"name": "older and never measured", "model": {"labels": ["legacy"]}, "labels": ["unmeasured", "legacy"], "fold": "legacy", "publishable": true},
+  {"name": "Vision only", "model": {"purposes": ["vision"], "unsupported_purposes": ["llm"]}, "labels": [], "fold": null, "publishable": true},
+  {"name": "paid plan only", "model": {"purposes": ["llm"], "labels": ["subscription"], "comment_ja": "Free プランでは使えない（402）。"}, "labels": ["subscription"], "fold": "subscription", "publishable": false},
+  {"name": "paid plan only and never measured", "model": {"labels": ["subscription"]}, "labels": ["subscription"], "fold": "subscription", "publishable": false},
+  {"name": "answered neither purpose", "model": {"purposes": [], "unsupported_purposes": ["llm", "vision"]}, "labels": ["no_response"], "fold": "no_response", "publishable": true},
+  {"name": "older and answered neither purpose", "model": {"purposes": [], "unsupported_purposes": ["llm", "vision"], "labels": ["legacy"]}, "labels": ["legacy", "no_response"], "fold": "no_response", "publishable": true},  {"name": "not supported", "model": {"labels": ["not_supported"]}, "labels": ["not_supported"], "fold": "not_supported", "publishable": false},
+  {"name": "older and not supported", "model": {"labels": ["legacy", "not_supported"]}, "labels": ["legacy", "not_supported"], "fold": "not_supported", "publishable": false},
+  {"name": "not supported and retired", "model": {"labels": ["not_supported", "eol"]}, "labels": ["not_supported", "eol"], "fold": "eol", "publishable": false},
+  {"name": "retired older model that was measured", "model": {"purposes": ["llm"], "labels": ["legacy", "eol"], "comment_ja": "描画は遅い。"}, "labels": ["legacy", "eol"], "fold": "eol", "publishable": false}
+ ],
+ "selection_cases": [
+  {"name":"blocked subscription", "model":{"id":"x", "label":"x", "requires_subscription":true}, "unselectable":true, "purpose":"llm", "stage":"none", "level":0, "unsupported":false},
+  {"name":"measured no response remains selectable", "model":{"id":"x", "label":"x", "purposes":["llm"], "unsupported_purposes":["llm"], "recommendation_llm":4}, "unselectable":false, "purpose":"llm", "stage":"none", "level":4, "unsupported":true},
+  {"name":"stage falls back to llm", "model":{"id":"x", "label":"x", "recommendation_llm":4, "recommendation_stage1":2}, "unselectable":false, "purpose":"llm", "stage":"stage2", "level":4, "unsupported":false},
+  {"name":"both uses weaker stage", "model":{"id":"x", "label":"x", "recommendation_stage1":2, "recommendation_stage2":4}, "unselectable":false, "purpose":"llm", "stage":"both", "level":2, "unsupported":false}
+ ],
+ "sort_cases": [
+  {"name":"same rating uses name", "models":[{"id":"b", "label":"beta", "recommendation_llm":3},{"id":"a", "label":"alpha", "recommendation_llm":3}], "order":["a","b"]},
+  {"name":"unavailable after available", "models":[{"id":"a", "label":"alpha", "eol":true},{"id":"b", "label":"beta"}], "order":["b","a"]},
+  {"name":"locale comparison for custom names", "models":[{"id":"dash", "label":"a-1"},{"id":"under", "label":"a_1"},{"id":"dot", "label":"a.1"},{"id":"space", "label":"a 1"},{"id":"plain", "label":"a1"},{"id":"colon", "label":"a:1"},{"id":"slash", "label":"a/1"},{"id":"upper", "label":"A"},{"id":"lower", "label":"a"}], "order":["lower","upper","space","under","dash","colon","dot","slash","plain"]}
+ ],
+ "problem_cases": [
+  {"name":"wrong schema and no labels", "catalog":{"schema":"bad", "labels":[], "providers":{}}, "problems":["schema 'bad'", "stored label legacy missing from the table", "stored label subscription missing from the table", "stored label not_supported missing from the table", "stored label eol missing from the table"]},
+  {"name":"bad provider entry", "catalog":{"schema":"inku.model-catalog.v2", "labels":[{"id":"legacy","ja":"旧","en":"old","publishable":true},{"id":"subscription","ja":"有料","en":"paid","publishable":false},{"id":"not_supported","ja":"未対応","en":"unsupported","publishable":false},{"id":"eol","ja":"終了","en":"end","publishable":false}], "providers":{"example":{"defaults":["absent"],"models":[{"id":"one","unexpected":1,"labels":["wrong"],"purposes":["audio"]}]} }}, "problems":["example: default absent has no entry", "example/one: unknown keys ['unexpected']", "example/one: label wrong is not written in the catalog", "example/one: purposes"]},
+  {"name":"boolean schema and provider order", "catalog":{"schema":false, "labels":[], "providers":{"z":{"defaults":["z-missing"],"models":[]},"a":{"defaults":["a-missing"],"models":[]}}}, "provider_order":["z","a"], "problems":["schema False", "stored label legacy missing from the table", "stored label subscription missing from the table", "stored label not_supported missing from the table", "stored label eol missing from the table", "z: default z-missing has no entry", "a: default a-missing has no entry"]}
+ ]
+}

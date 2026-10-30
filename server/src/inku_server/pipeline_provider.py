@@ -15,12 +15,12 @@ from typing import Any
 
 import httpx
 
-from .api_core.common import _is_qualified_model_id
+from .api_core.common import _resolved_default_model
 from .model_settings import connection_for, provider_for_model
 from .provider_limits import provider_slot
 from . import provider_wire
 from .provider_observation import ProviderObservationError, ProviderObservationStore
-from .provider_rate_limits import ProviderRateBudget, RateAccountingUnavailable, RateLimitUnavailable, retry_after_seconds
+from .provider_rate_limits import ProviderRateBudget, RateAccountingUnavailable, RateLimitUnavailable, estimate_input_tokens, retry_after_seconds
 from .chatgpt_store import ChatGPTError
 
 _logger = logging.getLogger(__name__)
@@ -66,13 +66,9 @@ def resolved_drawing_model(model: str | None, actor: dict | None) -> str:
     One model draws both stages (2026-09-30), so this reads the Stage 1 keys; a
     stored Stage 2 choice that still differs is not consulted.
     """
-    settings = (actor or {}).get("model_settings") or {}
-    default_model = "google/gemma-4-31b-it"
-    provider = str(settings.get("stage1_provider", "nvidia") or "nvidia")
-    model_id = str(settings.get("stage1_model", default_model) or default_model)
     if model:
         return str(model).strip()
-    return model_id if _is_qualified_model_id(model_id) else f"{provider}:{model_id}"
+    return _resolved_default_model("stage1", actor)
 
 
 class SingleAttemptProvider:
@@ -110,6 +106,7 @@ class SingleAttemptProvider:
             "write_image_ddl": "image_ddl_written",
             "review_image_ddl": "image_ddl_reviewed",
             "read_description": "description_read",
+            "compose_description": "description_composed",
             "write_description_ddl": "description_ddl_written",
             "review_description_ddl": "description_ddl_reviewed",
         }
@@ -245,8 +242,8 @@ class SingleAttemptProvider:
             async with asyncio.timeout(timeout):
                 async with httpx.AsyncClient(timeout=timeout, transport=self.transport, follow_redirects=False) as client:
                     if budget is not None and limits is not None:
-                        input_tokens = len(body_bytes) + 128 if limits["tpm"] else 0
-                        if kind == "gemini" and limits["tpm"]:
+                        input_tokens = estimate_input_tokens(kind, limits["tpm"], len(body_bytes))
+                        if input_tokens is None:
                             # Count the exact system, content and function schema,
                             # rather than guessing Japanese tokens from characters.
                             count_raw = bytearray()
@@ -261,12 +258,7 @@ class SingleAttemptProvider:
                                     self._refusal = {**refusal(refused_raw), "operation": "count_tokens"}
                                     counted.raise_for_status()
                             count_data = json.loads(count_raw)
-                            if not isinstance(count_data, dict):
-                                raise TypeError("token count response is not an object")
-                            count = count_data.get("totalTokens")
-                            if not isinstance(count, int) or isinstance(count, bool) or count < 0:
-                                raise RateLimitUnavailable("input token count is unavailable")
-                            input_tokens = (count * 11 + 9) // 10
+                            input_tokens = estimate_input_tokens(kind, limits["tpm"], len(body_bytes), count_data)
                         self.failure_detail = "rate_limit_wait"
                         reservation = await budget.reserve(str(connection["id"]), kind, limits, input_tokens)
                         self.failure_detail = None

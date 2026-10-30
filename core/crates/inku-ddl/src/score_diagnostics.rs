@@ -227,6 +227,25 @@ pub enum ScoreInstructionField {
 #[serde(rename_all = "snake_case")]
 pub enum ScoreMacroCallerField {
     Action,
+    Thinness,
+    RelativeScale,
+    ExplicitGeometry,
+    NumericPosition,
+    NumericRange,
+    NumericSegment,
+    Angle,
+    NumericAngle,
+    Fade,
+    FluctuationAmplitude,
+    FluctuationFrequency,
+    FluctuationQuality,
+    FluctuationSpread,
+    ShapeConstraint,
+    Aspect,
+    WidthExtent,
+    ArcForm,
+    LayoutDirection,
+    Position,
 }
 
 /// Actual default or retained value used after one appearance omission.

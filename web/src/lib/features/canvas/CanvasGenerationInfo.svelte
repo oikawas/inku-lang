@@ -10,13 +10,19 @@
 	import { hashDigest, hashRowLabel } from '$lib/hashIdentity';
 	import { t } from '$lib/i18n/index.svelte';
 	import { normalizeSketchGrain, normalizeSketchState, sketchGrainLabel, sketchStateNote } from '$lib/sketch';
-	import { drawRouteLabel, droppedReadingLines, figureWhoLabel, readingStateNote, type DescriptionDdlRecord } from '$lib/draw-route';
+	import {
+		compositionColorsChangeLabel, compositionColorsChanges, compositionColorsStateNote,
+		compositionFormLabel, compositionKindLabel, compositionMeasureLabel, compositionMeasureSummary, compositionRoleLabel,
+		compositionStateNote, drawRouteLabel, droppedReadingLines, figureWhoLabel, readingStateNote, type DescriptionDdlRecord
+	} from '$lib/draw-route';
 	import type { SvgWeight } from '$lib/svgWeight';
 	import { loadSystemPrompts, type SystemPromptsState } from './system-prompts';
 	import { generationInfoSettings } from './generation-info-settings.svelte';
 	import { tokenStageLabel, tokenStageRows, type ProviderUsage } from './generation-info-tokens';
+	import { offerName, offerReason, offerStage, type PluginOfferRecord } from './plugin-offers';
 
 	export type GenerationInfoWork = {
+		plugin_offers?: PluginOfferRecord[] | null;
 		image_ddl?: Record<string, unknown> | null;
 		/** The read-and-draw record; present only on a work drawn that way. */
 		description_ddl?: DescriptionDdlRecord | null;
@@ -198,8 +204,23 @@
 	// Read and draw (SPEC 12.6.7): the reading, what its anchor check dropped,
 	// each answer the run read, and whether the drawing was seen.
 	const detailReadRecord = $derived(statusHistoryItem?.description_ddl ?? result?.description_ddl ?? null);
+	const detailPluginOffers = $derived(statusHistoryItem?.plugin_offers ?? result?.plugin_offers ?? null);
 	const detailReadDropped = $derived(droppedReadingLines(detailReadRecord));
 	const detailReadReviewed = $derived(!!detailReadRecord?.rounds?.some((round) => round.stage === 'review_description_ddl'));
+	// The composition and laws (2026-10-26): what was decided, how the last
+	// measure came out, and which thing each sentence draws.
+	const detailComposition = $derived(detailReadRecord?.composition ?? null);
+	const detailCompositionMeasure = $derived(compositionMeasureSummary(detailComposition));
+	// The colors chosen after the review (2026-10-26), on a run that reached them.
+	const detailCompositionColors = $derived(detailComposition?.colors ?? null);
+	const detailCompositionColorsChanges = $derived(compositionColorsChanges(detailCompositionColors));
+	const detailCompositionSentences = $derived(
+		(Array.isArray(detailComposition?.known) ? detailComposition.known : []) as { thing?: number; text?: string }[]
+	);
+	const detailCompositionThing = (thing: unknown) => {
+		const found = detailComposition?.answer?.things?.find((item) => item.thing === thing);
+		return found ? `${thing}（${found.what ?? ''}）` : String(thing ?? '');
+	};
 	const readRoundLabel = (stage: unknown) => stage === 'review_description_ddl'
 		? (isJapanese ? '見比べ' : 'Review')
 		: (isJapanese ? '書く' : 'Writing');
@@ -307,6 +328,15 @@
 				<dt><Tooltip placement="right" text={hint}><span>{label}</span></Tooltip></dt>
 			{/snippet}
 			<div class="generation-details" bind:this={detailsScrollEl}>
+				{#if detailPluginOffers?.length}
+					<section class="detail-group">
+						<h4>{isJapanese ? '提示したプラグイン' : 'Offered plugins'}</h4>
+						{#each detailPluginOffers as record, index (index)}
+							<p class="detail-note">{offerStage(record.stage, isJapanese)}: {record.offered.length ? record.offered.map(item => `${offerName(item, isJapanese)}（${offerReason(item.reason, isJapanese)}）`).join(isJapanese ? '、' : ', ') : (isJapanese ? '提示なし' : 'None offered')}</p>
+							{#if record.omitted.length}<p class="detail-note">{isJapanese ? '上限で落とした語' : 'Omitted by the limit'}: {record.omitted.map(item => offerName(item, isJapanese)).join(isJapanese ? '、' : ', ')}</p>{/if}
+						{/each}
+					</section>
+				{/if}
 				{#if detailImageRecord}
 					<section class="detail-group">
 						<h4>{t().imageTab} · {t().imageProvenanceLabel}</h4>
@@ -387,6 +417,94 @@
 							<details class="detail-read-before">
 								<summary>{isJapanese ? '見比べる前の指示書' : 'Instructions before the review'}</summary>
 								<pre>{detailReadRecord.before_review}</pre>
+							</details>
+						{/if}
+					</section>
+				{/if}
+				{#if detailComposition}
+					<section class="detail-group">
+						<h4>{isJapanese ? '構図と法則' : 'Composition and laws'}</h4>
+						<dl>
+							{@render term(isJapanese ? '状態' : 'State', t().provenanceHintComposition)}<dd>{compositionStateNote(detailComposition, isJapanese)}</dd>
+							{#if detailComposition.answer}
+								{@render term(isJapanese ? '命題' : 'Thesis', t().provenanceHintComposition)}<dd>{detailComposition.answer.thesis ?? '-'}</dd>
+								{@render term(isJapanese ? '画の型' : 'Form', t().provenanceHintComposition)}<dd>{compositionFormLabel(detailComposition.answer.form, isJapanese) || '-'}</dd>
+								{@render term(isJapanese ? '主の法則' : 'Main law', t().provenanceHintComposition)}<dd>{detailComposition.answer.main_law ?? '-'}</dd>
+								{@render term(isJapanese ? '法則' : 'Laws', t().provenanceHintComposition)}<dd>{Object.keys(detailComposition.answer.laws ?? {}).join(isJapanese ? '、' : ', ') || '-'}</dd>
+							{/if}
+							{#if detailCompositionMeasure.counts.length}
+								{@render term(isJapanese ? '最後の測り' : 'Last measure', t().provenanceHintCompositionMeasure)}<dd>{detailCompositionMeasure.counts.map(([state, count]) => `${compositionMeasureLabel(state, isJapanese)} ${count}`).join(isJapanese ? '、' : ', ')}</dd>
+							{/if}
+						</dl>
+						{#if detailComposition.answer?.reason}
+							<p class="detail-note">{isJapanese ? '理由' : 'Reason'}: {detailComposition.answer.reason}</p>
+						{/if}
+						{#if detailComposition.answer?.things?.length}
+							<p class="detail-note">{isJapanese ? '物' : 'Things'}</p>
+							<ul class="detail-read-list">
+								{#each detailComposition.answer.things as thing, index (index)}
+									<li>{thing.thing} {thing.what ?? ''} · {compositionRoleLabel(thing.role, isJapanese)} · {compositionKindLabel(thing.kind, isJapanese)}{thing.quote ? ` · 「${thing.quote}」` : ''}</li>
+								{/each}
+							</ul>
+						{/if}
+						{#if detailComposition.targets?.length}
+							<p class="detail-note">{isJapanese ? '法則が決めた目標' : 'Targets the laws set'}</p>
+							<ul class="detail-read-list">
+								{#each detailComposition.targets as target, index (index)}<li>{target}</li>{/each}
+							</ul>
+						{/if}
+						{#if detailCompositionMeasure.misses.length}
+							<p class="detail-note">{isJapanese ? '合わなかった組' : 'Pairs that did not fit'}</p>
+							<ul class="detail-read-list">
+								{#each detailCompositionMeasure.misses as miss, index (index)}
+									<li>{miss.law} · {isJapanese ? '物' : 'thing'} {detailCompositionThing(Number(miss.thing))} · {compositionMeasureLabel(miss.state, isJapanese)}</li>
+								{/each}
+							</ul>
+						{/if}
+						{#if detailComposition.cards?.length}
+							<p class="detail-note">{isJapanese ? 'カード' : 'Cards'}</p>
+							<ul class="detail-read-list">
+								{#each detailComposition.cards as card, index (index)}
+									<li>{card.law} · {card.built ? (isJapanese ? '作った' : 'built') : `${isJapanese ? '作らなかった' : 'not built'}${card.reason ? `（${card.reason}）` : ''}`}{card.motif ? ` · ${card.motif}` : ''}</li>
+								{/each}
+							</ul>
+						{/if}
+						{#if detailCompositionColors}
+							<p class="detail-note">{isJapanese ? '配色' : 'Colors'}</p>
+							<dl>
+								{@render term(isJapanese ? '状態' : 'State', t().provenanceHintCompositionColors)}<dd>{compositionColorsStateNote(detailCompositionColors, isJapanese)}</dd>
+								{#if detailCompositionColors.main_law}
+									{@render term(isJapanese ? '主の法則' : 'Main law', t().provenanceHintCompositionColors)}<dd>{detailCompositionColors.main_law}</dd>
+								{/if}
+								{#if detailCompositionColors.laws?.length}
+									{@render term(isJapanese ? '法則' : 'Laws', t().provenanceHintCompositionColors)}<dd>{detailCompositionColors.laws.join(isJapanese ? '、' : ', ')}</dd>
+								{/if}
+								{#if detailCompositionColors.ground}
+									{@render term(isJapanese ? '地' : 'Ground', t().provenanceHintCompositionColors)}<dd>{colorWordLabel(detailCompositionColors.ground, isJapanese)}</dd>
+								{/if}
+								{#if detailCompositionColorsChanges.length}
+									{@render term(isJapanese ? '変えた文' : 'Lines changed', t().provenanceHintCompositionColors)}<dd>{detailCompositionColorsChanges.map(([how, count]) => `${compositionColorsChangeLabel(how, isJapanese)} ${count}`).join(isJapanese ? '、' : ', ')}</dd>
+								{/if}
+							</dl>
+							{#if detailCompositionColors.changes?.length}
+								<details class="detail-read-before">
+									<summary>{isJapanese ? '配色が変えた文' : 'The lines the colors changed'}</summary>
+									<ul class="detail-read-list">
+										{#each detailCompositionColors.changes as change, index (index)}
+											<li>{change.before ? `${change.before} → ` : ''}{(change.after ?? []).join(' ')}</li>
+										{/each}
+									</ul>
+								</details>
+							{/if}
+						{/if}
+						{#if detailCompositionSentences.length}
+							<details class="detail-read-before">
+								<summary>{isJapanese ? '文ごとの物' : 'The thing each sentence draws'}</summary>
+								<ol class="detail-read-list">
+									{#each detailCompositionSentences as sentence, index (index)}
+										<li>{isJapanese ? '物' : 'thing'} {detailCompositionThing(sentence.thing)}: {sentence.text ?? ''}</li>
+									{/each}
+								</ol>
 							</details>
 						{/if}
 					</section>

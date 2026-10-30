@@ -84,10 +84,11 @@ def _item(user_id: str, text: str, at: int, **extra) -> dict:
     }
 
 
-def test_branch_fact_sheet_handles_lineage_only_and_tombstone():
+def test_branch_fact_sheet_handles_legacy_visibility_and_tombstone():
     user = _user()
     try:
         root = db.add_item(_item(user["id"], "root", 1000))
+        # The former lineage-only input now saves as a normal active work.
         hidden = db.add_item(_item(
             user["id"],
             "hidden",
@@ -107,7 +108,7 @@ def test_branch_fact_sheet_handles_lineage_only_and_tombstone():
 
         branch = db.get_lineage_branch(user["id"], child["lineage_node_id"])
         assert branch is not None
-        assert [node["state"] for node in branch["nodes"]] == ["tombstone", "lineage_only", "active"]
+        assert [node["state"] for node in branch["nodes"]] == ["tombstone", "active", "active"]
         assert [edge["derivation_kind"] for edge in branch["edges"]] == ["ddl_edit", "touch_change"]
         sheet = build_fact_sheet(branch)
         assert sheet["branch_snapshot"] == [node["id"] for node in branch["nodes"]]

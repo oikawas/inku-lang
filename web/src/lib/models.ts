@@ -2,7 +2,14 @@ export type Provider = string;
 
 export type ModelOption = {
 	id: string;
+	qualified_id?: string;
 	label: string;
+	selection?: {
+		unselectable: boolean;
+		unsupported: Record<'llm' | 'vision', boolean>;
+		levels: Record<'none' | 'llm' | 'vision', Record<'none' | 'stage1' | 'stage2' | 'both', number>>;
+		sort_keys: Record<'none' | 'llm' | 'vision', Record<'none' | 'stage1' | 'stage2' | 'both', string>>;
+	};
 	notes?: string;
 	purposes?: ('llm' | 'vision')[];
 	// Purposes the model was measured not to answer (2026-10-13). The server keeps
@@ -69,352 +76,48 @@ export type ProviderGroup = {
 	models: ModelOption[];
 };
 
-// Model ids here are bare, exactly as the server catalog states them. They used
-// to be written qualified for some providers and bare for others, which left no
-// way to ask "which providers list this model".
-export const PROVIDER_GROUPS: ProviderGroup[] = [
-	{
-		id: 'openai',
-		label: 'OpenAI API Platform',
-		models: [
-			{ id: 'gpt-5.6-luna', label: 'gpt-5.6-luna' },
-			{ id: 'gpt-5.6-terra', label: 'gpt-5.6-terra' },
-			{ id: 'gpt-6-luna', label: 'gpt-6-luna' }
-		]
-	},
-	{
-		id: 'nvidia',
-		label: 'NVIDIA NIM',
-		models: [
-			{ id: 'google/gemma-4-31b-it', label: 'Google Gemma 4 31B Instruct' },
-			{ id: 'meta/llama-3.3-70b-instruct', label: 'Meta Llama 3.3 70B Instruct' },
-			{ id: 'mistralai/mistral-large-2-instruct', label: 'Mistral AI Mistral Large 2 Instruct' }
-		]
-	},
-	{
-		id: 'anthropic',
-		label: 'Claude API',
-		models: [
-			{ id: 'claude-opus-4-7', label: 'Anthropic Claude Opus 4.7' },
-			{ id: 'claude-sonnet-4-6', label: 'Anthropic Claude Sonnet 4.6' },
-			{ id: 'claude-haiku-4-5-20251001', label: 'Anthropic Claude Haiku 4.5' }
-		]
-	},
-	{
-		id: 'gemini',
-		label: 'Gemini API',
-		// Kept in step with the server's builtin list (model_settings.py): the 2.5
-		// models refuse API accounts made after their retirement.
-		models: [
-			{ id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite' },
-			{ id: 'gemma-4-31b-it', label: 'Gemma 4 31B Instruct' }
-		]
-	},
-	{
-		id: 'ollama',
-		label: 'Ollama',
-		// Fallback until the API catalog arrives. Keep its order and ids aligned with
-		// VERIFIED_OLLAMA_LOCAL_MODELS in verified_model_catalog.py. Measured comments
-		// and speeds come from the API. Quantization stays in each tag because an
-		// upstream replacement of a bare tag would detach it from its measurement.
-		models: [
-			{ id: 'qwen3.5:4b-q4_K_M', label: 'qwen3.5:4b-q4_K_M (3.4GB)' },
-			{
-				id: 'ministral-3:8b-instruct-2512-q4_K_M',
-				label: 'ministral-3:8b-instruct-2512-q4_K_M (6.0GB)'
-			},
-			{ id: 'gemma4:e4b-it-q4_K_M', label: 'gemma4:e4b-it-q4_K_M (9.6GB)' },
-			{ id: 'gemma4:31b-it-q4_K_M', label: 'gemma4:31b-it-q4_K_M (19GB)' },
-			{ id: 'gemma4:12b-it-q4_K_M', label: 'gemma4:12b-it-q4_K_M (7.6GB)' },
-			{ id: 'qwen3.5:27b-q4_K_M', label: 'qwen3.5:27b-q4_K_M (17GB)' },
-			{ id: 'qwen3.5:9b-q4_K_M', label: 'qwen3.5:9b-q4_K_M (6.6GB)' },
-			{ id: 'granite4.1:8b-q4_K_M', label: 'granite4.1:8b-q4_K_M (5.3GB)' },
-			{ id: 'qwen3.5:2b-q4_K_M', label: 'qwen3.5:2b-q4_K_M (1.9GB)' },
-			{ id: 'qwen3.5:0.8b-q8_0', label: 'qwen3.5:0.8b-q8_0 (1.0GB)' }
-		]
-	},
-	{
-		id: 'ollama-cloud',
-		label: 'Ollama Cloud (ollama.com)',
-		// Fallback while the API catalog is loading. Keep this list aligned with
-		// VERIFIED_OLLAMA_CLOUD_MODELS so ownership resolution is stable from startup.
-		models: [
-			{ id: 'nemotron-3-ultra', label: 'nemotron-3-ultra' },
-			{ id: 'minimax-m2.5', label: 'minimax-m2.5' },
-			{ id: 'nemotron-3-super', label: 'nemotron-3-super' },
-			{ id: 'gemma4:31b', label: 'gemma4:31b' },
-			{ id: 'nemotron-3-nano:30b', label: 'nemotron-3-nano:30b' },
-			{ id: 'gpt-oss:120b', label: 'gpt-oss:120b' },
-			{ id: 'gpt-oss:20b', label: 'gpt-oss:20b' },
-			{ id: 'minimax-m3', label: 'minimax-m3', requires_subscription: true },
-			{ id: 'deepseek-v4-flash', label: 'deepseek-v4-flash', requires_subscription: true },
-			{ id: 'deepseek-v4-pro', label: 'deepseek-v4-pro', requires_subscription: true },
-			{ id: 'glm-5.1', label: 'glm-5.1', requires_subscription: true },
-			{ id: 'glm-5.2', label: 'glm-5.2', requires_subscription: true },
-			{ id: 'kimi-k2.5', label: 'kimi-k2.5', requires_subscription: true },
-			{ id: 'kimi-k2.6', label: 'kimi-k2.6', requires_subscription: true },
-			{ id: 'kimi-k2.7-code', label: 'kimi-k2.7-code', requires_subscription: true },
-			{ id: 'minimax-m2.7', label: 'minimax-m2.7', requires_subscription: true },
-			{ id: 'mistral-large-3:675b', label: 'mistral-large-3:675b', requires_subscription: true },
-			{ id: 'qwen3.5:397b', label: 'qwen3.5:397b', requires_subscription: true }
-		]
-	}
-];
-
-// Providers withdrawn from the catalog. They are offered nowhere -- every picker
-// reads PROVIDER_GROUPS -- but artworks made before the withdrawal still name
-// their models, and the name is the only thing left to honour: without an entry
-// here the six ovms artworks would read "NVIDIA NIM / ovms:gemma3-4b-api", which
-// is worse than the id alone because it also names the wrong machine.
-//
-// A retired provider takes part in *naming* and never in *routing*: its ids are
-// recognised when a reference is split (so "ovms:x" is not read as a bare model)
-// and its labels are looked up for display, but it is kept out of the ownership
-// table, so rule 2 can never send new work to an endpoint that stopped serving.
-const RETIRED_PROVIDER_GROUPS: ProviderGroup[] = [
-	{
-		// Intel OVMS, the local OpenAI-compatible backend until 2026-07-30.
-		// Six artworks name gemma3-4b-api: five as 'ovms:gemma3-4b-api', one bare
-		// (measured 2026-07-30). No artwork names the other three models.
-		id: 'ovms',
-		label: 'Intel OVMS',
-		models: [
-			{ id: 'qwen3-api', label: 'Qwen3 8B Instruct' },
-			{ id: 'qwen-api', label: 'Qwen2.5 7B Instruct' },
-			{ id: 'gemma3-12b-api', label: 'Google Gemma 3 12B Instruct' },
-			{ id: 'gemma3-4b-api', label: 'Google Gemma 3 4B Instruct' }
-		]
-	}
-];
-
-const retiredProviderIds = new Set<Provider>(RETIRED_PROVIDER_GROUPS.map((group) => group.id));
+// The API supplies model-reference decisions from core.
+import { modelReference } from './modelReferences';
 
 export const DEFAULT_PROVIDER: Provider = 'nvidia';
 export const DEFAULT_MODEL = 'google/gemma-4-31b-it';
-
-export function modelsForProvider(provider: Provider): ModelOption[] {
-	return PROVIDER_GROUPS.find((g) => g.id === provider)?.models ?? [];
+export function qualifiedModelRef(provider: Provider, ref: string): string {
+    if (!provider || !ref) return ref || '';
+    return modelReference({action:'qualify_ref', provider, ref})?.ref ?? '';
 }
-
-// The catalog the resolution rules read when a caller does not name one. It
-// starts as the built-in list and grows as the server catalogs arrive, so the
-// ~40 call sites of qualifiedModelId() stay correct for providers the operator
-// added without threading a catalog through every one of them.
-// Retired ids join the id set and both label maps, and stay out of the owner
-// map: naming, never routing.
-let registeredProviderIds = new Set<Provider>(
-	[...PROVIDER_GROUPS, ...RETIRED_PROVIDER_GROUPS].map((group) => group.id).concat('chatgpt')
-);
-let registeredModelOwners = ownersOf(PROVIDER_GROUPS);
-let registeredProviderLabels = providerLabelsOf([...PROVIDER_GROUPS, ...RETIRED_PROVIDER_GROUPS]);
-let registeredModelLabels = modelLabelsOf([...PROVIDER_GROUPS, ...RETIRED_PROVIDER_GROUPS]);
-const retiredModelOwners = ownersOf(RETIRED_PROVIDER_GROUPS);
-
-function providerLabelsOf(groups: ProviderGroup[]): Map<Provider, string> {
-	const labels = new Map<Provider, string>();
-	for (const group of groups) if (group.label) labels.set(group.id, group.label);
-	return labels;
+export function splitModelReference(ref: string, _groups?: ProviderGroup[]): {provider: Provider | null; model: string} {
+    const answer = modelReference({action:'split_ref', ref});
+    return {provider: answer?.provider ?? null, model: answer?.model ?? ref};
 }
-
-function modelLabelsOf(groups: ProviderGroup[]): Map<string, string> {
-	const labels = new Map<string, string>();
-	for (const group of groups) {
-		for (const model of group.models) if (model.label) labels.set(`${group.id}:${model.id}`, model.label);
-	}
-	return labels;
+export function displayModelReference(ref: string, _groups?: ProviderGroup[], defaultProvider?: Provider): {provider: Provider; model: string; providerLabel: string} {
+    const answer = modelReference({action:'resolve_display', ref, default_provider: defaultProvider});
+    return {provider: answer?.provider ?? '', model: answer?.model ?? ref, providerLabel: answer?.provider_label ?? ''};
 }
-
-function ownersOf(groups: ProviderGroup[]): Map<string, Set<Provider>> {
-	const owners = new Map<string, Set<Provider>>();
-	for (const group of groups) {
-		if (group.id === 'chatgpt') continue;
-		for (const model of group.models) {
-			const seen = owners.get(model.id) ?? new Set<Provider>();
-			seen.add(group.id);
-			owners.set(model.id, seen);
-		}
-	}
-	return owners;
-}
-
-/** Teach the rules about the providers and models this server actually serves. */
-export function registerModelCatalog(groups: ProviderGroup[]): void {
-	if (!Array.isArray(groups) || groups.length === 0) return;
-	const ids = new Set<Provider>(registeredProviderIds);
-	const owners = new Map<string, Set<Provider>>(registeredModelOwners);
-	for (const group of groups) {
-		ids.add(group.id);
-		if (group.id === 'chatgpt') continue;
-		for (const model of group.models) {
-			const seen = new Set<Provider>(owners.get(model.id) ?? []);
-			seen.add(group.id);
-			owners.set(model.id, seen);
-		}
-	}
-	registeredProviderIds = ids;
-	registeredModelOwners = owners;
-	registeredProviderLabels = new Map([...registeredProviderLabels, ...providerLabelsOf(groups)]);
-	registeredModelLabels = new Map([...registeredModelLabels, ...modelLabelsOf(groups)]);
-}
-
-export function clearChatGPTModelCatalog(): void {
-	registeredModelLabels = new Map([...registeredModelLabels].filter(([key]) => !key.startsWith('chatgpt:')));
-	registeredProviderLabels.delete('chatgpt');
-}
-
-/** The provider's own name, falling back to its id when the catalog has none. */
-export function providerLabel(provider: Provider, groups?: ProviderGroup[]): string {
-	const id = String(provider ?? '');
-	if (!id) return '';
-	const fromArgument = groups?.find((group) => group.id === id)?.label;
-	return fromArgument || registeredProviderLabels.get(id) || id;
-}
-
-/**
- * How a model is named on screen: "<provider> / <model>".
- *
- * A model id alone does not say where it runs, and since gpt-oss:20b is served
- * by two providers the name is not even unique. Every place that shows a model
- * to a person goes through here.
- */
-export function modelDisplayName(
-	modelId: string | null | undefined,
-	groups?: ProviderGroup[],
-	stageProvider: Provider = DEFAULT_PROVIDER
-): string {
-	const ref = String(modelId ?? '').trim();
+export function modelDisplayName(ref: string | null | undefined, _groups?: ProviderGroup[], defaultProvider?: Provider): string {
+	ref = ref?.trim();
 	if (!ref) return '';
-	const { provider, model } = resolveModelRefForDisplay(ref, groups, stageProvider);
-	const fromArgument = groups?.find((group) => group.id === provider)?.models.find((item) => item.id === model)?.label;
-	const name = fromArgument || registeredModelLabels.get(`${provider}:${model}`) || model;
-	const owner = providerLabel(provider, groups);
-	return owner ? `${owner} / ${name}` : name;
+    const answer = modelReference({action:'resolve_display', ref, default_provider: defaultProvider});
+    if (!answer) return ref;
+    return answer.provider_label ? `${answer.provider_label} / ${answer.model_label}` : (answer.model_label ?? ref);
 }
-
-/**
- * The short form: the model alone, for places too narrow for the provider.
- *
- * Differs from modelDisplayName in exactly one way -- no provider prefix -- and
- * additionally drops the vendor prefix a served id often carries
- * ("google/gemma-4-31b-it" -> "gemma-4-31b-it"), because that prefix repeats
- * across a whole catalog and buys no distinction inside one.
- *
- * The string is never truncated. gemma-4-31b-it and gemma-4-31b-it-v2 are
- * different models and a cut tail makes them the same word; overflow is the
- * caller's problem, to be solved with text-overflow on a box that has a width.
- */
-export function modelShortName(
-	modelId: string | null | undefined,
-	groups?: ProviderGroup[],
-	stageProvider: Provider = DEFAULT_PROVIDER
-): string {
-	const ref = String(modelId ?? '').trim();
+export function modelShortName(ref: string | null | undefined, _groups?: ProviderGroup[], defaultProvider?: Provider): string {
+	ref = ref?.trim();
 	if (!ref) return '';
-	const { provider, model } = resolveModelRefForDisplay(ref, groups, stageProvider);
-	const fromArgument = groups?.find((group) => group.id === provider)?.models.find((item) => item.id === model)?.label;
-	const name = fromArgument || registeredModelLabels.get(`${provider}:${model}`) || model;
-	const slash = name.indexOf('/');
-	return slash === -1 ? name : name.slice(slash + 1);
+    const answer = modelReference({action:'resolve_display', ref, default_provider: defaultProvider});
+    const name = answer?.model_label ?? ref;
+    const slash = name.indexOf('/');
+    return slash === -1 ? name : name.slice(slash + 1);
 }
-
-/**
- * Split "provider:model"; provider is null when the reference is not qualified.
- *
- * Written with indexOf/slice on purpose. `'a:b:c'.split(':', 1)` returns
- * `['a']` in JavaScript -- the limit drops the tail instead of capping the
- * number of splits the way Python's `split(':', 1)` does, so the model id
- * would silently lose everything after its own colon.
- */
-export function splitModelRef(
-	ref: string,
-	groups?: ProviderGroup[]
-): { provider: Provider | null; model: string } {
-	const text = String(ref ?? '');
-	const index = text.indexOf(':');
-	if (index <= 0) return { provider: null, model: text };
-	const head = text.slice(0, index);
-	const rest = text.slice(index + 1);
-	// Retired ids are recognised whichever catalog is handed in: "ovms:gemma3-4b-api"
-	// must never be read as a bare model id whose name happens to contain a colon.
-	const known = groups
-		? new Set<Provider>(['chatgpt', ...groups.map((group) => group.id), ...retiredProviderIds])
-		: registeredProviderIds;
-	if (rest && known.has(head)) return { provider: head, model: rest };
-	return { provider: null, model: text };
-}
-
-/**
- * Prefix the provider unless the reference is already qualified by a *known*
- * provider. Testing only for one's own id produced 'ollama:ollama-cloud:...'.
- */
-export function qualifiedModelId(provider: Provider, modelId: string, groups?: ProviderGroup[]): string {
-	const cleanProvider = String(provider || '').trim();
-	const cleanModel = String(modelId || '').trim();
-	if (!cleanProvider || !cleanModel) return cleanModel;
-	return splitModelRef(cleanModel, groups).provider ? cleanModel : `${cleanProvider}:${cleanModel}`;
-}
-
-/** What a model picker offers, and where the stored id sits in it (ledger I-297). */
 export type PickerSelection = {
-	/** Providers with at least one model; empty when nothing is published for the purpose. */
-	groups: ProviderGroup[];
-	selected: { group: ProviderGroup; model: ModelOption } | null;
-	/** A stored id that none of the offered models is: shown as it stands and marked. */
-	notInList: boolean;
+    groups: ProviderGroup[];
+    selected: {group: ProviderGroup; model: ModelOption} | null;
+    notInList: boolean;
 };
-
 export function pickerSelection(providerGroups: ProviderGroup[], selectedModel: string): PickerSelection {
-	const groups = providerGroups.filter((group) => group.models.length > 0);
-	for (const group of groups) {
-		const model = group.models.find((item) => item.id === selectedModel || qualifiedModelId(group.id, item.id) === selectedModel);
-		if (model) return { groups, selected: { group, model }, notInList: false };
-	}
-	return { groups, selected: null, notInList: selectedModel.trim() !== '' };
-}
-
-/**
- * Resolve a reference to (provider, model). Same three rules as the server's
- * provider_for_model(): explicit qualification, then sole ownership, then the
- * stage default. Nothing is guessed from the shape of the string.
- */
-export function resolveModelRef(
-	modelId: string,
-	groups?: ProviderGroup[],
-	stageProvider: Provider = DEFAULT_PROVIDER
-): { provider: Provider; model: string } {
-	const split = splitModelRef(modelId, groups);
-	if (split.provider) return { provider: split.provider, model: split.model };
-	const owners = groups ? ownersOf(groups).get(split.model) : registeredModelOwners.get(split.model);
-	if (owners && owners.size === 1) return { provider: [...owners][0], model: split.model };
-	return { provider: stageProvider, model: split.model };
-}
-
-export function providerOfModel(
-	modelId: string,
-	groups?: ProviderGroup[],
-	stageProvider: Provider = DEFAULT_PROVIDER
-): Provider {
-	return resolveModelRef(modelId, groups, stageProvider).provider;
-}
-
-/**
- * Resolve a reference the way a *label* should read it: the same three rules,
- * with retired ownership consulted between rule 2 and rule 3.
- *
- * Kept separate from resolveModelRef() so the retired entries can name an old
- * artwork without ever becoming a place new work is sent. Only the two functions
- * that produce text for a person go through here.
- */
-export function resolveModelRefForDisplay(
-	modelId: string,
-	groups?: ProviderGroup[],
-	stageProvider: Provider = DEFAULT_PROVIDER
-): { provider: Provider; model: string } {
-	const split = splitModelRef(modelId, groups);
-	if (split.provider) return { provider: split.provider, model: split.model };
-	const owners = groups ? ownersOf(groups).get(split.model) : registeredModelOwners.get(split.model);
-	if (owners && owners.size === 1) return { provider: [...owners][0], model: split.model };
-	const retired = retiredModelOwners.get(split.model);
-	if (retired && retired.size === 1) return { provider: [...retired][0], model: split.model };
-	return { provider: stageProvider, model: split.model };
+    const groups = providerGroups.filter((group) => group.models.length > 0);
+    for (const group of groups) {
+        const model = group.models.find((item) => item.id === selectedModel || item.qualified_id === selectedModel);
+        if (model) return {groups, selected:{group, model}, notInList:false};
+    }
+    return {groups, selected:null, notInList:selectedModel.trim() !== ''};
 }

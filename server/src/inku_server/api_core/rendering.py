@@ -214,7 +214,7 @@ _RENDER_REFUSAL_PREFIX = "render failed: "
 # Score versions whose saved resource policy governs every performance. The
 # plain render refuses them, so their redraws go through the shared replay
 # (`replay_for`) instead.
-_COMPACT_SCORE_VERSIONS = frozenset({"0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0"})
+_COMPACT_SCORE_VERSIONS = frozenset({"0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0", "0.20.0", "0.21.0", "0.22.0", "0.23.0"})
 
 
 @contextmanager
@@ -643,7 +643,6 @@ def _add_history_item(
     display_label: str | None = None,
     batch_line_number: int | None = None,
     batch_run_id: str | None = None,
-    history_visibility: str = "normal",
     lineage_parent_node_id: str | None = None,
     derivation_kind: str | None = None,
     derivation_metadata: dict[str, object] | None = None,
@@ -697,7 +696,6 @@ def _add_history_item(
 "display_label": display_label,
 "batch_line_number": batch_line_number,
 "batch_run_id": batch_run_id,
-"history_visibility": history_visibility,
 "lineage_parent_node_id": lineage_parent_node_id,
 "derivation_kind": derivation_kind,
 "derivation_metadata": derivation_metadata or {},

@@ -1,0 +1,4 @@
+IANA Time Zone Database, 2026e rearguard.
+America/Los_Angeles TZif compiled from the system's tzdata.zi (2026e-rearguard).
+The IANA time zone database is in the public domain:
+https://data.iana.org/time-zones/tz-link.html

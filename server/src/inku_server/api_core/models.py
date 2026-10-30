@@ -314,13 +314,6 @@ class HistoryPostBody(BaseModel):
     batch_run_id: str | None = Field(
         default=None, description="The identifier of the batch run the work belongs to. Null when it was not a batch work.",
     )
-    history_visibility: str = Field(
-        default="normal",
-        description=(
-            "Where the work is listed: normal (in the history) or lineage_only (kept in the lineage "
-            "without being listed in the history). Omitting it means normal."
-        ),
-    )
     lineage_parent_node_id: str | None = Field(
         default=None,
         description="The identifier of the lineage node of the work this one was derived from. Null for an origin work.",
@@ -487,6 +480,7 @@ class HistoryItem(HistoryPostBody):
             "the work was drawn through the stages."
         ),
     )
+    plugin_offers: list[dict] | None = Field(default=None, description="Plugin words offered to model requests in this work's run.")
     provider_usage: dict[str, ProviderStageUsage] | None = Field(
         default=None,
         description=(
@@ -590,11 +584,11 @@ class HistoryItem(HistoryPostBody):
         ge=1,
         description="The generation of the work in its lineage, counted from the root as 1. Null when there is no lineage. Not included in a save response.",
     )
-    lineage_state: Literal["active", "lineage_only", "tombstone"] | None = Field(
+    lineage_state: Literal["active", "tombstone"] | None = Field(
         default=None,
         description=(
-            "The state of the work's lineage node: active (the work is listed), lineage_only (kept in the "
-            "lineage but not listed) or tombstone (the work was deleted and only its node remains). "
+            "The state of the work's lineage node: active (the work is listed) "
+            "or tombstone (the work was deleted and only its node remains). "
             "Not included in a save response."
         ),
     )
@@ -678,6 +672,11 @@ def _model_label_table() -> list[dict]:
     return [dict(label) for label in MODEL_LABELS]
 
 
+def _model_assessment_keys() -> list[str]:
+    from ..model_catalog import ASSESSMENT_KEYS
+    return list(ASSESSMENT_KEYS)
+
+
 class ModelSettingsResponse(BaseModel):
     """The model catalog and the model settings the interface needs."""
 
@@ -691,6 +690,8 @@ class ModelSettingsResponse(BaseModel):
             "and whether it lets the model be published."
         ),
     )
+    assessment_keys: list[str] = Field(default_factory=_model_assessment_keys,
+        description="Model assessment fields shared by the model administration screen.")
     catalog: list[dict] = Field(
         default_factory=list,
         description="The model providers and their models, as the model settings page lists them.",
@@ -714,5 +715,5 @@ class ModelSettingsResponse(BaseModel):
         default=False, description="True when the caller can use a ChatGPT plan for models.",
     )
     settings: dict = Field(
-        default_factory=dict, description="The model settings, as a free-form object. Empty when none are set.",
+        default_factory=dict, description="The model settings, as a free-form object. On /api/models, model_defaults contains the shared-core user defaults.",
     )

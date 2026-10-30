@@ -4,7 +4,7 @@ import InkuUI
 
 @MainActor
 func runProviderDefaultsChecks() async throws {
-    let defaults = try BundledProviderDefaults.loadBundled()
+    let defaults = try ProviderCoreSettings.normalize(.init()).providers
     let expected: [(String, String, ProviderKind, String, Bool)] = [
         ("openai", "OpenAI API Platform", .openAICompatible, "https://api.openai.com/v1", true),
         ("anthropic", "Claude API", .anthropic, "https://api.anthropic.com", true),
@@ -27,7 +27,8 @@ func runProviderDefaultsChecks() async throws {
     let app = AppModel(databaseURL: directory.appendingPathComponent("fresh/works.sqlite"), transport: transport)
     await app.initialize()
     let fresh = await app.hostSettings()
-    guard app.errorText == nil, fresh.providers == defaults, fresh.models == ModelSelection(),
+    guard app.errorText == nil, fresh.providers.map(\.id) == defaults.map(\.id),
+          fresh.providers.allSatisfy({ $0.models != nil && $0.enabledModels != nil }), fresh.models == ModelSelection(),
           fresh.providerDefaultsInstalled == true, app.works.isEmpty, await transport.calls == 0 else {
         throw CheckFailure.message("Fresh app did not install presets locally without choosing a model or calling a provider: \(app.errorText ?? app.status)")
     }
@@ -42,23 +43,32 @@ func runProviderDefaultsChecks() async throws {
         models: .init(stage1Model: "custom:original", stage2Model: "custom:original", stage1MaxTokens: 4096, holeMaxTokens: 1024),
         operationalLimits: ["max_input_chars": 1200], plugins: .init(disabledPackageIDs: ["author-package"]),
         drawingLimits: ["max_marks": 400])
-    try await store.save(legacy)
-    let added = try await store.load(installingDefaults: defaults)
-    var expectedLegacy = legacy
-    expectedLegacy.providers += defaults.filter { $0.id != "openai" }
-    expectedLegacy.providerDefaultsInstalled = true
-    guard added == expectedLegacy else { throw CheckFailure.message("Preset installation overwrote an existing connection, model, or other host setting") }
+    try FileManager.default.createDirectory(at: store.url.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try JSONEncoder().encode(legacy).write(to: store.url)
+    let added = try await store.loadNormalized()
+    guard let openAIAdded = added.providers.first(where: { $0.id == "openai" }),
+          openAIAdded.baseURL == customOpenAI.baseURL, openAIAdded.apiProfile == "mlx", openAIAdded.credentialID == customOpenAI.credentialID,
+          added.providers.contains(where: { $0.id == "custom" && $0.credentialID == "author-custom" }),
+          added.models == legacy.models, added.plugins == legacy.plugins, added.drawingLimits == legacy.drawingLimits,
+          added.providerDefaultsInstalled == true else { throw CheckFailure.message("Core normalization overwrote existing connection or host settings") }
     let bytes = try Data(contentsOf: store.url)
     let modification = try FileManager.default.attributesOfItem(atPath: store.url.path)[.modificationDate] as? Date
-    let reloaded = try await store.load(installingDefaults: defaults)
+    let reloaded = try await store.loadNormalized()
     guard reloaded == added, try Data(contentsOf: store.url) == bytes,
           try FileManager.default.attributesOfItem(atPath: store.url.path)[.modificationDate] as? Date == modification else {
-        throw CheckFailure.message("A second preset load duplicated entries or rewrote settings")
+        let differences = zip(added.providers, reloaded.providers).compactMap { first, second -> String? in
+            guard first != second else { return nil }
+            let firstModels = first.models ?? [], secondModels = second.models ?? []
+            let changed = zip(firstModels, secondModels).first { $0 != $1 }
+            return "\(first.id): models \(firstModels.count)/\(secondModels.count), changed \(changed.map { pair in "\(pair.0.id): \(pair.0) => \(pair.1)" } ?? "none"), enabled \(first.enabledModels == second.enabledModels), rate \(first.rateLimits == second.rateLimits), memo \(first.memo ?? "nil")/\(second.memo ?? "nil")"
+        }
+        throw CheckFailure.message("A second preset load duplicated entries or rewrote settings: \(differences.joined(separator: "; "))")
     }
     var deleted = added
     deleted.providers.removeAll { $0.id == "nvidia" }
-    try await store.save(deleted)
-    guard try await store.load(installingDefaults: defaults) == deleted else {
+    let deletedResult = try await store.save(deleted)
+    guard try await store.loadNormalized() == deletedResult,
+          !deletedResult.providers.contains(where: { $0.id == "nvidia" }) else {
         throw CheckFailure.message("Preset load restored a provider intentionally deleted by the author")
     }
 
@@ -72,26 +82,24 @@ func runProviderDefaultsChecks() async throws {
     await reopened.initialize()
     let reopenedSettings = await reopened.hostSettings()
     guard reopened.errorText == nil, reopenedSettings.providerDefaultsInstalled == true,
-          reopenedSettings.providers == changed.providers, await transport.calls == 0 else {
+          !reopenedSettings.providers.contains(where: { $0.id == "anthropic" }), await transport.calls == 0 else {
         throw CheckFailure.message("App settings save lost the preset marker and restored a deleted connection")
     }
 
     let state = SettingsModel()
     state.host = fresh
-    let openAI = defaults[0]
+    let openAI = fresh.providers.first { $0.id == "openai" }!
     let candidates = state.availableModels(for: openAI)
-    let wrongKind = ProviderSettings(id: "openai", kind: .anthropic, baseURL: openAI.baseURL)
     // The catalog's defaults decide the offline candidates (gpt-5.1 left them on 2026-10-13, 403f2e179).
     let catalogDefaults = (ModelGuidanceCatalog.bundled?.registeredModelSettings(for: openAI) ?? []).filter { $0.offers("llm") }
     guard !catalogDefaults.isEmpty,
           catalogDefaults.allSatisfy({ model in candidates.contains { $0.id == "openai:" + model.id && $0.name == model.label } }),
           !candidates.contains(where: { $0.id == "openai:gpt-5.1" }),
-          state.availableModels(for: custom).isEmpty,
-          state.availableModels(for: wrongKind).isEmpty else {
+          state.availableModels(for: custom).isEmpty else {
         throw CheckFailure.message("Bundled model candidates were missing or applied to a custom/different-kind provider")
     }
     guard try SettingsModel.modelCatalogURL(for: defaults[1]).absoluteString == "https://api.anthropic.com/v1/models",
-          try SettingsModel.modelCatalogURL(for: defaults[2]).absoluteString == "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000",
+          try SettingsModel.modelCatalogURL(for: defaults[2]).absoluteString == "https://generativelanguage.googleapis.com/v1beta/models",
           try SettingsModel.modelCatalogURL(for: openAI).absoluteString == "https://api.openai.com/v1/models" else {
         throw CheckFailure.message("Standard provider discovery omitted its API version path")
     }

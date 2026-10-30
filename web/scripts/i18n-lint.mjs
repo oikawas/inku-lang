@@ -36,7 +36,8 @@ const FIXED = {
 	retiredVariationMedium: 'Moderate',
 	retiredVariationLarge: 'Sweeping',
 	submitBtn: 'Paint',
-	wildButton: 'Wild',
+	// Renamed from Wild by the author, 2026-10-27 (docs/i18n/glossary.md).
+	wildButton: 'Lift the stroke limit',
 };
 
 // Words that must never appear in an English display string, whatever the context.
@@ -71,7 +72,7 @@ const RESTRICTED = [
 		keys: [
 			'tabPrompts', 'tooltipCanvasTabPrompts', 'promptStage1System', 'promptStage2System',
 			'promptSketchSystem', 'promptCompositionSystem', 'promptLawsSystem', 'promptColorsSystem',
-			'promptReadingSystem', 'promptDescriptionDdlSystem', 'promptDescriptionReviewSystem',
+			'promptReadingSystem', 'promptDescriptionCompositionSystem', 'promptDescriptionDdlSystem', 'promptDescriptionReviewSystem',
 			'promptCatalogSystem', 'promptImageCatalogSystem', 'promptImageDdlSystem', 'promptImageReviewSystem',
 			'provenanceLabelStage1PromptDigest', 'provenanceLabelStage1PromptBaseDigest',
 			'provenanceLabelStage2PromptDigest', 'provenanceHintStage1PromptDigest',

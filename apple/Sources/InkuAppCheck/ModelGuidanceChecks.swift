@@ -6,8 +6,7 @@ import InkuUI
     // The missing native guidance must map the generated Server evaluations to
     // the actual selected ID, without turning unknown services into rated ones.
     let catalog = try ModelGuidanceCatalog.loadBundled()
-    guard let manifest = try JSONSerialization.jsonObject(with: ModelGuidanceCatalog.bundledManifestData()) as? [String: Any],
-          let canonical = manifest["model_catalog"] as? [String: Any],
+    guard let canonical = try JSONSerialization.jsonObject(with: SharedModelCatalog.catalogData) as? [String: Any],
           canonical["schema"] as? String == "inku.model-catalog.v2",
           let records = canonical["providers"] as? [String: [String: Any]] else {
         throw CheckFailure.message("Native guidance canonical v2 records unavailable")

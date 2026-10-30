@@ -34,10 +34,15 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import app.inku.mobile.data.CatalogModel
 import app.inku.mobile.data.ModelCatalog
+import app.inku.mobile.data.catalogRequest
+import app.inku.mobile.data.strings
 import app.inku.mobile.ui.i18n.InkuStrings
 import app.inku.mobile.ui.theme.ActiveRowTint
 import app.inku.mobile.ui.theme.Dimens
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
+import org.json.JSONArray
+import org.json.JSONObject
 
 /** Matches the Web picker: purpose first, then the legacy score for old catalog rows. */
 internal fun modelRecommendationStars(model: CatalogModel, purpose: String? = null, stage: String? = null): String {
@@ -53,30 +58,12 @@ internal fun modelRecommendationStars(model: CatalogModel, purpose: String? = nu
 
 /** Web `modelRecommendationLevel`: the stored 0-5 level that also orders the cards. */
 internal fun modelRecommendationLevel(model: CatalogModel, purpose: String? = null, stage: String? = null): Double {
-    val record = model.record
-    fun score(key: String): Double? = if (record.has(key) && !record.isNull(key))
-        record.optDouble(key).takeIf(Double::isFinite) else null
-    val llm = score("recommendation_llm") ?: score("recommendation_level") ?: 0.0
-    val vision = score("recommendation_vision") ?: score("recommendation_level") ?: 0.0
-    val stageScores = listOfNotNull(score("recommendation_stage1"), score("recommendation_stage2"))
-    val stagedLlm = when (stage) {
-        "stage1" -> score("recommendation_stage1") ?: llm
-        "stage2" -> score("recommendation_stage2") ?: llm
-        "both" -> stageScores.minOrNull() ?: llm
-        else -> llm
-    }
-    val purposes = record.optJSONArray("purposes")?.let { array ->
-        (0 until array.length()).map(array::optString)
-    } ?: listOf("llm")
-    return when (purpose) {
-        "llm" -> stagedLlm
-        "vision" -> vision
-        else -> maxOf(if ("llm" in purposes) stagedLlm else 0.0, if ("vision" in purposes) vision else 0.0)
-    }.coerceIn(0.0, 5.0)
+    val p = purpose.takeIf { it == "llm" || it == "vision" } ?: "none"
+    val s = stage.takeIf { it == "stage1" || it == "stage2" || it == "both" } ?: "none"
+    return model.selection.getJSONObject("levels").getJSONObject(p).getDouble(s)
 }
 
-private fun CatalogModel.listed(key: String): List<String> =
-    record.optJSONArray(key)?.let { array -> (0 until array.length()).map(array::optString) }.orEmpty()
+private val purposeCache = ConcurrentHashMap<String, List<String>>()
 
 /**
  * Web `purposeUnsupported`: the benchmark found the model does not answer this
@@ -84,7 +71,7 @@ private fun CatalogModel.listed(key: String): List<String> =
  * control that chooses it is framed in red (the author, 2026-10-26).
  */
 internal fun purposeUnsupported(model: CatalogModel, purpose: String): Boolean =
-    purpose in model.listed("unsupported_purposes")
+    model.selection.getJSONObject("unsupported").optBoolean(purpose, false)
 
 /**
  * The purposes a published model serves, as Server normalises them: the ones
@@ -94,11 +81,18 @@ internal fun purposeUnsupported(model: CatalogModel, purpose: String): Boolean =
  * A catalog row with neither purpose and nothing measured serves LLM.
  */
 internal fun modelPurposes(model: CatalogModel, ticked: List<String>? = null): List<String> {
-    if (ticked != null) return listOf("llm", "vision").filter { it in ticked }
-    val unsupported = model.listed("unsupported_purposes")
-    val chosen = model.record.optJSONArray("purposes")?.let { model.listed("purposes") }
-        ?.takeIf { it.isNotEmpty() || unsupported.isNotEmpty() } ?: listOf("llm")
-    return listOf("llm", "vision").filter { it in chosen && it !in unsupported }
+    val record = JSONObject(model.record.toString())
+    if (ticked != null) record.put("purposes", JSONArray(ticked)).put("allowed_unsupported_purposes", JSONArray(ticked))
+    return purposeCache.computeIfAbsent(record.toString()) {
+        val normalized = catalogRequest("normalize_models", JSONObject().put("models", JSONArray().put(record))).getJSONArray("models")
+        // An explicit empty selection is a host preference, not missing catalog metadata.
+        if (ticked != null && ticked.isEmpty()) normalized.getJSONObject(0).put("purposes", JSONArray())
+        val provider = JSONObject().put("id", "android").put("active", true).put("models", normalized)
+        val settings = JSONObject().put("providers", JSONObject().put("android", provider))
+        val groups = catalogRequest("provider_catalog", JSONObject().put("settings", settings)
+            .put("order", JSONArray().put("android"))).getJSONArray("providers")
+        groups.getJSONObject(0).getJSONArray("models").getJSONObject(0).optJSONArray("purposes").strings()
+    }
 }
 
 /**
@@ -114,17 +108,17 @@ internal fun modelPurposeBadges(model: CatalogModel, ticked: List<String>? = nul
  * Web `isModelUnselectable`: a label that keeps it from publication. No
  * response when measured no longer does (2026-10-26).
  */
-internal fun isModelUnselectable(model: CatalogModel): Boolean = !model.publishable
+internal fun isModelUnselectable(model: CatalogModel): Boolean = model.selection.getBoolean("unselectable")
 
 /**
  * Web `sortModels`: selectable first, then those that answered the purpose when
  * measured, then by the purpose's level, then by name.
  */
-internal fun <T> sortModels(models: List<T>, purpose: String, catalog: (T) -> CatalogModel, name: (T) -> String): List<T> =
-    models.sortedWith(compareBy<T> { isModelUnselectable(catalog(it)) }
-        .thenBy { purposeUnsupported(catalog(it), purpose) }
-        .thenByDescending { modelRecommendationLevel(catalog(it), purpose) }
-        .thenBy { name(it) })
+internal fun <T> sortModels(models: List<T>, purpose: String, catalog: (T) -> CatalogModel, @Suppress("UNUSED_PARAMETER") name: (T) -> String, stage: String? = null): List<T> {
+    val key = purpose.takeIf { it == "llm" || it == "vision" } ?: "none"
+    val stageKey = stage.takeIf { it == "stage1" || it == "stage2" || it == "both" } ?: "none"
+    return models.sortedBy { catalog(it).selection.getJSONObject("sort_keys").getJSONObject(key).getString(stageKey) }
+}
 
 /** Place beside ModelLabelWithSupportMark in a model choice heading. */
 @Composable

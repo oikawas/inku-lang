@@ -43,12 +43,12 @@ import InkuUI
     let completions = app.ddlCompletions
     guard let japanese = app.saijiki.flatMap(\.words).first(where: { ($0.japanese as NSString).length >= 2 }),
           let english = app.saijiki.flatMap(\.words).compactMap(\.english).first(where: { ($0 as NSString).length >= 3 }),
-          let plugin = app.pluginWords.first(where: { !$0.aliases.isEmpty }) else {
+          let plugin = app.pluginWords.first(where: { !$0.japanese.isEmpty && !$0.english.isEmpty }) else {
         throw CheckFailure.message("Completion: no saijiki word or aliased macro to offer")
     }
     func offered(_ before: String, _ typed: String, _ word: String) -> Bool {
         let text = before + typed
-        guard let match = DdlCompletions.match(text: text, caret: (text as NSString).length, words: completions.words(for: text)) else { return false }
+        guard let match = completions.match(text: text, caret: (text as NSString).length) else { return false }
         return match.items.contains(word) && NSMaxRange(match.range) == (text as NSString).length && match.range.length >= (typed as NSString).length
     }
     let japanesePrefix = String(japanese.japanese.prefix(1))
@@ -59,8 +59,8 @@ import InkuUI
     let inRange = DdlCompletions.match(text: "赤い円" + japanesePrefix, caret: 3 + (japanesePrefix as NSString).length,
                                        words: completions.japanese, excluded: NSRange(location: 2, length: 4))
     guard offered("赤い円を", japanesePrefix, japanese.japanese), !offered("place one ", String(english.prefix(2)), japanese.japanese),
-          offered("place one ", englishPrefix, english), offered("赤い円を", String(alias.prefix(1)), alias),
-          offered("place one ", String(qualified.prefix(3)), qualified),
+          offered("place one ", englishPrefix, english), offered("赤い円を", "｛" + String(plugin.japanese[0].prefix(1)), alias),
+          offered("place one ", "{" + String(plugin.english[0].prefix(2)), qualified),
           DdlCompletions.match(text: midWord, caret: (midWord as NSString).length, words: completions.english).map({ $0.range.location == 7 }) != true,
           DdlCompletions.match(text: "place one ", caret: 10, words: completions.english) == nil, inRange == nil else {
         throw CheckFailure.message("Completion offered the wrong words")

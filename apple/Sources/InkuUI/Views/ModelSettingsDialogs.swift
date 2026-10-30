@@ -183,8 +183,9 @@ struct ProviderServiceEditorSheet: View {
 
     private var normalizedID: String { serviceID.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
     private var serviceIDIssue: String? {
-        guard !normalizedID.isEmpty,
-              normalizedID.range(of: "^[a-z0-9_-]+$", options: .regularExpression) != nil
+        let result = try? ProviderCoreSettings.call("validate_settings", ["host": "macos", "provider": normalizedID,
+            "base_url": "https://example.invalid", "rate_limits": ["rpm": 0, "tpm": 0, "rpd": 0], "models": []])
+        guard result?["provider_valid"] as? Bool == true
         else { return "サービスIDには英数字・ハイフン・アンダースコアを使ってください。" }
         guard normalizedID != "chatgpt" else { return "このサービスIDは予約されています。" }
         return settings.host.providers.contains { $0.id == normalizedID } ? "同じサービスIDが登録されています。" : nil

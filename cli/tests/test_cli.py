@@ -253,6 +253,32 @@ def test_ddl_commands_send_performance_options_only_when_requested(command, flag
     capsys.readouterr()
 
 
+def test_a_ddl_batch_draws_no_title_line(monkeypatch, tmp_path, capsys):
+    """A title line (DDL 27) names a chunk and draws nothing, so it is no work."""
+    sent = []
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def request(self, method, path, *, data=None, **kwargs):
+            if (method, path) == ("GET", "/api/color-catalogs"):
+                return {"default_catalog_id": "default", "catalogs": list(CATALOG_DATA["catalogs"].values())}, None
+            assert (method, path) == ("POST", "/api/compose")
+            sent.append(data)
+            return {"svg": "<svg/>", "score": {}}, None
+
+    monkeypatch.setattr(cli, "ApiClient", FakeClient)
+    monkeypatch.setattr(cli, "load_config", lambda: cli.CliConfig())
+    source = tmp_path / "input.ddl"
+    source.write_text("「線」\n白い背景に黒い線を一本引く。\n\n\"circle\"\nplace one red circle at center.\n", encoding="utf-8")
+    base = ["batch", "--file", str(source), "--out-dir", str(tmp_path / "outputs"), "--input-mode", "ddl", "--no-progress"]
+
+    assert cli.main(base) == 0
+    assert [item["ddl"] for item in sent] == ["白い背景に黒い線を一本引く。", "place one red circle at center."]
+    capsys.readouterr()
+
+
 def test_history_payload_from_compose_result():
     parser = cli.build_parser()
     args = parser.parse_args(["paint", "白い背景に黒い線を一本引く。", "--input-mode", "ddl", "--save-history"])
@@ -1600,20 +1626,20 @@ def test_score_metrics_reports_cloudform_usage_and_context_as_mirror_only():
     }
 
 
-def test_plugin_parser_supports_list_validate_and_reload():
+def test_plugin_parser_supports_list_and_package_validation():
     parser = cli.build_parser()
     listed = parser.parse_args(["plugin", "list"])
-    validated = parser.parse_args(["plugin", "validate", "sample.inku-plugin.md"])
-    reloaded = parser.parse_args(["plugin", "reload"])
+    validated = parser.parse_args(["plugin", "validate", "package.json"])
     assert listed.func is cli.command_plugin
     assert listed.plugin_action == "list"
-    assert validated.file == "sample.inku-plugin.md"
-    assert reloaded.plugin_action == "reload"
+    assert validated.file == "package.json"
+    with pytest.raises(SystemExit):
+        parser.parse_args(["plugin", "reload"])
 
 
-def test_plugin_validate_sends_document_body(monkeypatch, tmp_path, capsys):
-    plugin_file = tmp_path / "sample.inku-plugin.md"
-    plugin_file.write_text("---\nnamespace: Test\n---\n", encoding="utf-8")
+def test_plugin_validate_sends_package_body(monkeypatch, tmp_path, capsys):
+    plugin_file = tmp_path / "package.json"
+    plugin_file.write_text('{"schema":"inku.plugin-package.v2"}', encoding="utf-8")
     calls = []
 
     class FakeClient:
@@ -1629,7 +1655,7 @@ def test_plugin_validate_sends_document_body(monkeypatch, tmp_path, capsys):
     args = parser.parse_args(["plugin", "validate", str(plugin_file)])
     assert cli.command_plugin(args) == 0
     assert calls == [
-        ("POST", "/api/plugins/validate", {"document": "---\nnamespace: Test\n---\n"})
+        ("POST", "/api/plugins/packages/validate", {"document": '{"schema":"inku.plugin-package.v2"}'})
     ]
     assert json.loads(capsys.readouterr().out) == {"valid": True}
 
@@ -3429,9 +3455,9 @@ def test_a_ddl_export_file_gives_its_ddl_and_plugins_and_plain_text_stays_ddl():
     from inku_cli import cli as module
 
     definition = {"schema": "inku.macro-definition.v1", "namespace": "Nature", "heading": "若葉"}
-    exported = json.dumps({"schema": "inku.ddl-export.v1", "language": "ja", "ddl": "Nature.若葉。",
-                           "plugins": [{"definition": definition, "summary": "若葉"}]}, ensure_ascii=False)
-    assert module._read_ddl_export(exported) == ("Nature.若葉。", [{"definition": definition, "summary": "若葉"}])
+    exported = json.dumps({"schema": "inku.ddl-export.v2", "language": "ja", "ddl": "｛若葉｝。",
+                           "plugins": [{"definition": definition, "note": "若葉"}]}, ensure_ascii=False)
+    assert module._read_ddl_export(exported) == ("｛若葉｝。", [{"definition": definition, "note": "若葉"}])
     assert module._read_ddl_export("中央に赤い円を置く。") == ("中央に赤い円を置く。", [])
     with pytest.raises(module.CliError):
         module._read_ddl_export(json.dumps({"schema": "inku.ddl-export.v1", "ddl": "x", "plugins": [{}]}))

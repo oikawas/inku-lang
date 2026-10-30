@@ -17,6 +17,8 @@ pub struct MacroLock {
     digest: String,
     /// Other visible names of the same locked definition (`Namespace.Alias`).
     aliases: Vec<String>,
+    /// Names derived from the exact locked definition; not part of lock identity.
+    plugin_names: Vec<String>,
 }
 
 impl MacroLock {
@@ -44,6 +46,7 @@ impl MacroLock {
             version,
             digest,
             aliases: Vec::new(),
+            plugin_names: Vec::new(),
         })
     }
 
@@ -69,6 +72,10 @@ impl MacroLock {
         &self.aliases
     }
 
+    pub(crate) fn plugin_names(&self) -> &[String] {
+        &self.plugin_names
+    }
+
     /// Every visible name that invokes this lock: the canonical name first.
     pub fn visible_names(&self) -> impl Iterator<Item = &str> {
         std::iter::once(self.qualified_name.as_str()).chain(self.aliases.iter().map(String::as_str))
@@ -89,9 +96,42 @@ pub struct NormalizedDdlDocument {
     source: String,
     language: ResolvedInstructionLanguage,
     macro_locks: Vec<MacroLock>,
+    legacy_names_for_migration: bool,
 }
 
 impl NormalizedDdlDocument {
+    /// Enable the retired qualified spelling solely to locate migration edits.
+    pub fn with_legacy_names_for_migration(mut self) -> Self {
+        self.legacy_names_for_migration = true;
+        self
+    }
+    pub(crate) const fn legacy_names_for_migration(&self) -> bool {
+        self.legacy_names_for_migration
+    }
+    /// Attach visible names only from definitions matching the complete lock identity.
+    pub fn with_definition_names(mut self, definitions: &[crate::MacroDefinition]) -> Self {
+        for lock in &mut self.macro_locks {
+            let matches: Vec<_> = definitions
+                .iter()
+                .filter_map(|definition| {
+                    let identity = definition.identity().ok()?;
+                    (identity.qualified_name() == lock.qualified_name
+                        && identity.version() == lock.version
+                        && format!("sha256:{}", identity.full_digest_hex()) == lock.digest)
+                        .then_some(definition)
+                })
+                .collect();
+            if let [definition] = matches.as_slice() {
+                let (ja, en) = if let Some(v2) = &definition.plugin_v2 {
+                    (v2.names.ja.clone(), v2.names.en.clone())
+                } else {
+                    crate::plugin_names::v1_plugin_names(&definition.heading, &definition.aliases)
+                };
+                lock.plugin_names = ja.into_iter().chain(en).collect();
+            }
+        }
+        self
+    }
     /// Construct document metadata without parsing or normalizing visible DDL source.
     pub fn new(
         source: impl Into<String>,
@@ -119,6 +159,7 @@ impl NormalizedDdlDocument {
             source: source.into(),
             language,
             macro_locks,
+            legacy_names_for_migration: false,
         })
     }
 
@@ -133,6 +174,18 @@ impl NormalizedDdlDocument {
 
     pub fn macro_locks(&self) -> &[MacroLock] {
         &self.macro_locks
+    }
+
+    /// The same document over other bytes of the same length: its source with
+    /// the title lines blanked, as the lexer reads it (DDL 27).
+    pub(crate) fn with_source(&self, source: String) -> Self {
+        debug_assert_eq!(source.len(), self.source.len());
+        Self {
+            source,
+            language: self.language,
+            macro_locks: self.macro_locks.clone(),
+            legacy_names_for_migration: self.legacy_names_for_migration,
+        }
     }
 }
 

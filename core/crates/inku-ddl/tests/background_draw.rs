@@ -699,7 +699,7 @@ fn direct_and_macro_draw_share_geometry_and_repeated_plan() {
     let source = "draw one red arc chord 0.2 sagitta 0.05 at horizontal 0.5 vertical 0.5.";
     let direct = execute(source, Language::En, &[], context());
     let macro_result = execute(
-        "Draw.Arc",
+        "｛Arc｝",
         Language::En,
         std::slice::from_ref(&definition),
         context(),
@@ -765,7 +765,7 @@ fn omitted_position_is_a_shared_execution_default_with_explicit_position_priorit
         "color":{"expr":"semantic_ref","category":"color","id":"red"}
     }}]}).to_string()).unwrap();
     let macro_result = execute(
-        "Default.Circle",
+        "｛Circle｝",
         Language::En,
         std::slice::from_ref(&definition),
         context(),
@@ -836,7 +836,7 @@ fn omitted_position_is_a_shared_execution_default_with_explicit_position_priorit
         "color":{"expr":"semantic_ref","category":"color","id":"red"},
         "count":{"expr":"integer","value":3}
     }}]}).to_string()).unwrap();
-    let macro_stage = stage("Default.Tile", std::slice::from_ref(&tile_definition));
+    let macro_stage = stage("｛Tile｝", std::slice::from_ref(&tile_definition));
     let macro_tile = plan_verified_stage15(macro_stage.verified_effective_view(), context());
     assert!(
         macro_tile.diagnostics().is_empty(),
@@ -869,7 +869,7 @@ fn omitted_position_is_a_shared_execution_default_with_explicit_position_priorit
         PLACED_CENTER
     );
     let mixed_stage = stage(
-        "scatter three Default.Circle and one blue square.",
+        "scatter three ｛Circle｝ and one blue square.",
         std::slice::from_ref(&definition),
     );
     let mixed = plan_verified_stage15(mixed_stage.verified_effective_view(), context());

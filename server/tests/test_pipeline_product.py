@@ -199,7 +199,7 @@ def test_bundled_macro_enters_new_work_with_localized_summary_and_saved_lock(tmp
     monkeypatch.setattr(db, "engine", engine)
     monkeypatch.setattr(db, "SessionLocal", sessionmaker(bind=engine))
     effects = ProductPipelineEffects(binding, default_manifest(binding))
-    source = "Nature.青葉。"
+    source = "｛青葉｝。"
     config, context = effects.prepare("author", "direct_ddl", source,
         {"instruction_lang": "ja", "catalog_id": "default", "composition_seed": 17, "render_seed": 77,
          "stage1_model": "nvidia:poolside/laguna-xs-2.1"}, None)
@@ -428,6 +428,25 @@ def test_one_model_draws_both_stages(tmp_path, monkeypatch, requested, expected)
     engine.dispose()
 
 
+@pytest.mark.parametrize("supplied, expected", [({}, False), ({"wild": None}, False), ({"wild": False}, False), ({"wild": True}, True)])
+def test_fork_does_not_inherit_the_parent_stroke_limit(tmp_path, monkeypatch, supplied, expected):
+    from inku_server import db
+    from inku_server.api_core import common
+
+    binding = PipelineBinding()
+    engine = create_engine(f"sqlite:///{tmp_path / 'wild.db'}")
+    Base.metadata.create_all(engine)
+    monkeypatch.setattr(db, "engine", engine)
+    monkeypatch.setattr(db, "SessionLocal", sessionmaker(bind=engine))
+    monkeypatch.setattr(common, "_model_offered_to", lambda *args, **kwargs: True)
+    effects = ProductPipelineEffects(binding, default_manifest(binding))
+    parent = {"host_options": {"wild": True}, "metadata": {"render_wild": True}}
+    _config, context = effects.prepare("author", "direct_ddl", "Nature.青葉。",
+        {"instruction_lang": "ja", "catalog_id": "default", "stage1_model": "fixture:one", **supplied}, parent)
+    assert context["host_options"]["wild"] is expected
+    engine.dispose()
+
+
 def test_compact_delivery_preserves_authority_in_normal_history(tmp_path, monkeypatch, caplog):
     from inku_server import db
     from inku_server.api_core import rendering, thumbnails
@@ -461,10 +480,10 @@ def test_compact_delivery_preserves_authority_in_normal_history(tmp_path, monkey
     }]
     manifest["pipeline"]["macro_summaries"] = ["A black circle at the center"]
     effects = ProductPipelineEffects(binding, manifest)
-    source = "Example.Circle."
+    source = "｛Circle｝。"
     legacy_parent = db.add_item({
         "id": "legacy-parent", "user_id": "author", "at": 1,
-        "input": "Old description", "ddl": source, "ddl_source_origin": "legacy_expanded",
+        "input": "Old description", "ddl": "Example.Circle.", "ddl_source_origin": "legacy_expanded",
         "score": {}, "svg": "<svg id='old-parent'/>",
     })
     options, context = effects.prepare("author", "direct_ddl", source,

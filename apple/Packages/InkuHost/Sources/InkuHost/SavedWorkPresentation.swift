@@ -39,8 +39,10 @@ public struct SavedWorkPresentation: Sendable {
 
 enum SavedPresentation {
     /// Server `_SYSTEM_PROMPT_STAGES`: the actions the prompt tab shows, in the order a work calls them.
-    /// The catalog choice is not shown.
-    static let promptStages = [("generate_sketch", "sketch"), ("generate_normalized_ddl", "stage1"),
+    static let promptStages = [("select_description_catalog", "catalog"), ("read_description", "reading"), ("compose_description", "description_composition"),
+                               ("write_description_ddl", "description_ddl"), ("review_description_ddl", "description_review"),
+                               ("select_image_catalog", "image_catalog"), ("write_image_ddl", "image_ddl"),
+                               ("review_image_ddl", "image_review"), ("generate_sketch", "sketch"), ("generate_normalized_ddl", "stage1"),
                                ("read_composition", "composition"), ("choose_laws", "laws"), ("choose_colors", "colors"),
                                ("complete_visible_ddl_holes", "stage2")]
     /// A work saved before 2026-10-13 kept Stage 1 and Stage 2 only.
@@ -77,6 +79,12 @@ enum SavedPresentation {
         let records = try prompts.map { try ExactJSON(data: $0).array ?? [] } ?? []
         // Server records only the last actually requested prompt of each stage.
         let latest = promptStages.compactMap { tag, _ in records.last { $0["action"].string == tag } }
+        let hasImage = records.contains { ["select_image_catalog", "write_image_ddl", "review_image_ddl"].contains($0["action"].string ?? "") }
+        let hasReadAndDraw = records.contains { ["read_description", "compose_description", "write_description_ddl", "review_description_ddl"].contains($0["action"].string ?? "") }
+        let hasCatalogChoice = records.contains { $0["action"].string == "select_description_catalog" }
+        let stages = promptStages.filter { entry in
+            (hasImage || !entry.1.hasPrefix("image_")) && (entry.1 != "catalog" || (!hasImage && hasCatalogChoice)) && (hasReadAndDraw || !["reading", "description_composition", "description_ddl", "description_review"].contains(entry.1))
+        }
         let metadata = rendered["metadata"]
         var diagnostics: ExactJSON = .object([
             "upstream_diagnostics": delivery["upstream_diagnostics"],
@@ -87,17 +95,13 @@ enum SavedPresentation {
             "resource_execution": metadata["resource_execution"],
         ])
         diagnostics = withRenderWarnings(diagnostics, metadata)
-        let names = (configuration["definitions"].array ?? []).flatMap { definition -> [ExactJSON] in
-            guard let namespace = definition["namespace"].string, let heading = definition["heading"].string else { return [] }
-            return ([heading] + (definition["aliases"].array?.compactMap(\.string) ?? []))
-                .map { .string(namespace + "." + $0) }
-        }
+        let names = (document["macro_locks"].array ?? []).compactMap { $0["qualified_name"].string }.map(ExactJSON.string)
         let pluginInput: ExactJSON = .object(["source": document["source"],
             "upstream_diagnostics": delivery["upstream_diagnostics"], "enabled": .array(names),
             "disabled": .array(disabledPluginNames.map(ExactJSON.string))])
         diagnostics["plugin_diagnostics"] = try ExactJSON(data: InkuCore.explainPluginDiagnostics(pluginInput.data))
         return .object(["schema": .string("inku.swift-saved-presentation.v1"),
-            "prompts": .array(latest), "prompt_stages": .array(promptStages.map { .string($0.1) }), "delivery": delivery,
+            "prompts": .array(latest), "prompt_stages": .array(stages.map { .string($0.1) }), "delivery": delivery,
             // The work owns its saved SVG; presentation keeps render diagnostics only.
             "rendered": .object(["metadata": metadata]), "diagnostics": diagnostics,
             "events": try ExactJSON(data: events),

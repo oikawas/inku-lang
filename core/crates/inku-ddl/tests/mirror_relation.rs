@@ -52,7 +52,7 @@ fn ordinary_mirror_is_bilingual_and_delivers_fixed_binary_refs() {
 fn mirror_preserves_whole_macro_and_ordinary_group_boundaries() {
     let definition = pair_of_arcs();
     let macro_result = execute(
-        "Mirror.Pair!. mirrored with the previous shape Mirror.Pair!",
+        "｛Pair｝!. mirrored with the previous shape ｛Pair｝!",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
         vec![macro_lock(&definition)],

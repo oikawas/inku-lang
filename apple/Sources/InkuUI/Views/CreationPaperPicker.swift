@@ -3,7 +3,14 @@ import SwiftUI
 @MainActor
 struct CreationPaperPicker: View {
     @Bindable var model: AppModel
+    var imageSelection = false
     let onClose: () -> Void
+
+    private var selectedID: String { imageSelection ? model.imageCanvasID : model.canvasID }
+    private func select(_ id: String) {
+        if imageSelection { model.imageCanvasID = id } else { model.canvasID = id }
+        onClose()
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -16,11 +23,22 @@ struct CreationPaperPicker: View {
             Divider()
             ScrollView {
                 LazyVStack(spacing: 4) {
+                    if imageSelection {
+                        Button { select("image") } label: {
+                            HStack {
+                                Text(model.display.localized("画像の縦横比を使う"))
+                                Spacer()
+                                if selectedID == "image" { Image(systemName: "checkmark").foregroundStyle(Color.accentColor) }
+                            }.padding(10).frame(maxWidth: .infinity, alignment: .leading)
+                                .background(selectedID == "image" ? Color.primary.opacity(0.07) : .clear,
+                                            in: RoundedRectangle(cornerRadius: 8))
+                        }.buttonStyle(.plain).disabled(model.isBusy)
+                            .accessibilityValue(selectedID == "image" ? model.display.localized("選択中") : "")
+                    }
                     ForEach(model.canvases) { option in
                         Button {
                             guard !model.isBusy else { return }
-                            model.canvasID = option.id
-                            onClose()
+                            select(option.id)
                         } label: {
                             HStack(alignment: .top, spacing: 12) {
                                 CanvasPaperShape(option: option).frame(width: 44, height: 48).accessibilityHidden(true)
@@ -29,7 +47,7 @@ struct CreationPaperPicker: View {
                                         Text(option.label).inkuFont(13, weight: .medium)
                                         Text("\(option.widthRatio):\(option.heightRatio)").inkuFont(12).monospacedDigit().foregroundStyle(.secondary)
                                         Spacer(minLength: 0)
-                                        if option.id == model.canvasID { Image(systemName: "checkmark").foregroundStyle(Color.accentColor) }
+                                        if option.id == selectedID { Image(systemName: "checkmark").foregroundStyle(Color.accentColor) }
                                     }
                                     Text(option.category).inkuFont(12).foregroundStyle(.secondary)
                                     Text(model.display.preferences.language == "en" ? option.intentEn : option.intentJa)
@@ -38,13 +56,13 @@ struct CreationPaperPicker: View {
                                 }
                             }
                             .padding(10).frame(maxWidth: .infinity, alignment: .leading)
-                            .background(option.id == model.canvasID ? Color.primary.opacity(0.07) : .clear,
+                            .background(option.id == selectedID ? Color.primary.opacity(0.07) : .clear,
                                         in: RoundedRectangle(cornerRadius: 8))
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain).disabled(model.isBusy)
                         .accessibilityElement(children: .combine)
-                        .accessibilityValue(option.id == model.canvasID ? model.display.localized("選択中") : "")
+                        .accessibilityValue(option.id == selectedID ? model.display.localized("選択中") : "")
                         .inkuTooltip(tip("この用紙を次の作品に使います。保存作品の用紙は変わりません。"))
                     }
                 }.padding(6)

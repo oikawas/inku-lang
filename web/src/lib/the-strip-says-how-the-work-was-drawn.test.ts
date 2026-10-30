@@ -23,18 +23,19 @@ test('the route and the sketch stand between the canvas and the size', () => {
 });
 
 test('the route names the work on screen, a picture going through neither', () => {
-	assert.equal(workRouteLabel({ description_ddl: { reading_state: 'read' } }, true), '読んで描く');
-	assert.equal(workRouteLabel({}, true), '今の流れ');
+	assert.equal(workRouteLabel({ description_ddl: { reading_state: 'read' } }, true), '言葉で描く');
+	assert.equal(workRouteLabel({}, true), '型で描く');
 	assert.equal(workRouteLabel({ image_ddl: { review: true } }, true), '画像から書く');
-	assert.equal(workRouteLabel(null, false), 'Current stages');
+	assert.equal(workRouteLabel(null, false), 'With a plan');
 });
 
 test('the sketch says what it did, and a missing record is not Off', () => {
-	assert.equal(sketchStateShort('fine', true), 'あり');
-	assert.equal(sketchStateShort('supplemented', true), 'あり');
-	assert.equal(sketchStateShort('not_needed', true), 'あり（補いなし）');
+	// The words follow the input's switch (2026-10-27): 通した／通さない.
+	assert.equal(sketchStateShort('fine', true), '通した');
+	assert.equal(sketchStateShort('supplemented', true), '通した');
+	assert.equal(sketchStateShort('not_needed', true), '通した（補いなし）');
 	assert.equal(sketchStateShort('fallback', true), '届かず');
-	assert.equal(sketchStateShort('off', true), 'なし');
+	assert.equal(sketchStateShort('off', true), '通さない');
 	assert.equal(sketchStateShort(null, true), '記録なし');
 	assert.notEqual(sketchStateShort(null, false), sketchStateShort('off', false));
 });

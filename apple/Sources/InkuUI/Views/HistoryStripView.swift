@@ -16,6 +16,7 @@ import SwiftUI
     @State private var collapsed = false
     @State private var measuredWindowWidth: CGFloat = 0
     @State private var providers: [ProviderSettings] = []
+    @FocusState private var focusedWorkID: String?
     /// Web `heldWorks`: the strip has held works since it appeared, so an emptied strip awaiting works keeps its place.
     @State private var heldWorks = false
     /// Web `keptHeights`: the highest the thumbnail row has been, for each choice of fields under the pictures.
@@ -184,17 +185,23 @@ import SwiftUI
         let key = fieldsKey
         let kept = keptHeights[key] ?? 0
         // The count follows the window width (Web); a narrower strip clips the last tiles instead of widening the window.
-        return HStack(alignment: .top, spacing: 7) {
-            ForEach(library.works, id: \.id) { work in tile(work) }
-            if let placeholder { emptyTile(placeholder, height: max(58, kept)) }
+        return ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(alignment: .top, spacing: 7) {
+                    ForEach(library.works, id: \.id) { work in tile(work).id(work.id) }
+                    if let placeholder { emptyTile(placeholder, height: max(58, kept)) }
+                }
+                // Web f62812ed3: the row never gets lower than it has been for the chosen fields, so a search, or a
+                // page with shorter tiles, does not move the canvas above it.
+                .frame(minHeight: kept > 0 ? kept : nil, alignment: .topLeading)
+                .fixedSize(horizontal: false, vertical: true)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                    if height > (keptHeights[key] ?? 0) { keptHeights[key] = height }
+                }
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .onChange(of: focusedWorkID) { _, id in if let id { proxy.scrollTo(id) } }
         }
-        // Web f62812ed3: the row never gets lower than it has been for the chosen fields, so a search, or a page with
-        // shorter tiles, does not move the canvas above it.
-        .frame(minWidth: 0, maxWidth: .infinity, minHeight: kept > 0 ? kept : nil, alignment: .topLeading)
-        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
-            if height > (keptHeights[key] ?? 0) { keptHeights[key] = height }
-        }
-        .clipped()
     }
 
     /// Web `.thumb.thumb-empty`: one dashed tile a thumbnail wide and the row high, its words in the middle.
@@ -270,10 +277,34 @@ import SwiftUI
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .focusable()
+        .focused($focusedWorkID, equals: work.id)
+        .onKeyPress(.leftArrow) { moveFocus(from: work.id, delta: -1) }
+        .onKeyPress(.rightArrow) { moveFocus(from: work.id, delta: 1) }
         .overlay(alignment: .topTrailing) { starButton(work).padding(3) }
         .task(id: work.id) { await model.loadWorkActionState(work) }
         .inkuTooltip(display.tooltipValue(detailsTip(work)))
         .accessibilityLabel(display.localizedFormat("作品を開く: %@", title(work)))
+    }
+
+    private func moveFocus(from id: String, delta: Int) -> KeyPress.Result {
+        guard !locked else { return .handled }
+        guard focusedWorkID == id else { return .ignored }
+        Task {
+            let next: SavedWork?
+            if let index = library.works.firstIndex(where: { $0.id == id }),
+               library.works.indices.contains(index + delta) {
+                next = library.works[index + delta]
+            } else {
+                next = await history.navigate(app: model, fromWorkID: id, delta: delta, selectWork: false)
+            }
+            guard let next, !locked else { return }
+            onSelectWork(next)
+            await model.selectWork(next)
+            guard !locked else { return }
+            focusedWorkID = next.id
+        }
+        return .handled
     }
 
     /// Web `.thumb-star`: an 18px plate on the picture that stars or unstars the work.
@@ -295,7 +326,7 @@ import SwiftUI
 
     private func metadata(_ work: SavedWork) -> [(short: String, full: String, model: Bool)] {
         let fields = display.preferences.historyStripFields
-        let naming = ModelNaming(providers: providers)
+        let naming = ModelNaming(providers: providers, stageProvider: model.stageDefaultProviderID)
         var output: [(short: String, full: String, model: Bool)] = []
         if fields.contains("generation") { let label = generationLabel(work); output.append((label, label, false)) }
         if fields.contains("model") {
@@ -331,9 +362,13 @@ import SwiftUI
     }
 
     private func title(_ work: SavedWork) -> String {
+        if let provenance = model.imageWorkProvenance[work.id] {
+            return display.label("画像", "Image") + (provenance.isEmpty ? "" : " · " + provenance)
+        }
         let source = work.effectiveSourceText
         if !source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return source }
-        if let ddl = work.ddl, !ddl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return ddl }
+        // Without its title lines (DDL 27), which draw nothing.
+        if let ddl = work.ddl.map(DdlTitles.withoutTitleLines), !ddl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return ddl }
         return work.id
     }
 
@@ -345,7 +380,7 @@ import SwiftUI
 
     /// Web `.thumb-tooltip` rows, with the native SVG size.
     private func detailsTip(_ work: SavedWork) -> String {
-        let naming = ModelNaming(providers: providers)
+        let naming = ModelNaming(providers: providers, stageProvider: model.stageDefaultProviderID)
         let unrecorded = display.localized("未記録")
         let saved = Date(timeIntervalSince1970: Double(work.at) / 1000).formatted(date: .numeric, time: .shortened)
         return [title(work),

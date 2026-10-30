@@ -3,7 +3,7 @@ import type { PaintResult, Seed } from '$lib/features/run/current-work';
 import type { ApiFetch } from '$lib/transport/api-fetch';
 import type { PipelineDiagnostic, PipelineHistoryDiagnostics, PluginDiagnostic } from './diagnostics';
 import type { ImportedPlugin } from '../ddl-editor/ddl-import';
-import type { DescriptionDdlRecord, DrawRoute } from '$lib/draw-route';
+import type { CompositionMode, DescriptionDdlRecord, DrawRoute } from '$lib/draw-route';
 
 export type PipelineAuthority = {
 	revision: string;
@@ -49,6 +49,7 @@ export type PipelineHoleCompletionCheck = {
 };
 
 export type PipelineView = {
+	plugin_offers?: import('../canvas/plugin-offers').PluginOfferRecord[];
 	image_ddl?: Record<string, unknown> | null;
 	/** How the description is drawn; absent on a view from before the route. */
 	route?: DrawRoute;
@@ -85,6 +86,8 @@ export type PipelineOptions = {
 	imported_plugins?: ImportedPlugin[];
 	/** How a description is drawn; left out, a fork takes its parent's. */
 	route?: DrawRoute;
+	/** The composition and laws inside read and draw; left out, a fork takes its parent's. */
+	composition?: CompositionMode;
 	sketch?: 'off' | 'on';
 	sketch_text?: string;
 	stage1_model?: string;
@@ -102,7 +105,6 @@ export type PipelineOptions = {
 	history_display_label?: string;
 	batch_line_number?: number;
 	batch_run_id?: string;
-	history_visibility?: 'normal' | 'lineage_only';
 	lineage_parent_node_id?: string;
 	derivation_kind?: string;
 	derivation_metadata?: Record<string, unknown>;
@@ -272,7 +274,7 @@ export function pipelineDiagnostics(
 	// A plugin sentence's explanation replaces the compiler's generic entry for the same source range.
 	const explained = (value: unknown) => {
 		const span = (value as { span?: { start_byte?: unknown; end_byte?: unknown } } | null)?.span;
-		return plugins.some((plugin) => plugin.start_byte === span?.start_byte && plugin.end_byte === span?.end_byte);
+		return typeof span?.start_byte === 'number' && typeof span.end_byte === 'number' && plugins.some((plugin) => plugin.start_byte < (span.end_byte as number) && plugin.end_byte > (span.start_byte as number));
 	};
 	return [
 		...plugins.map((value) => ({ channel: 'plugin' as const, value })),

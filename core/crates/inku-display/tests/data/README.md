@@ -44,3 +44,5 @@ The 17 public DDL texts of stage 1 (with where each was taken from) and the exac
 compile and render inputs the macOS app built for them: the shared macro definitions,
 locks, compiler options and clip policy once, and each work's host options (canvas and
 palette) and render options. The C6 test draws them again with the current core.
+The plugin calls in `p02` and `p03` use the current braced notation; their
+historical `public/` SVG and Chrome images remain the original stage 1 captures.

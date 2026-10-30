@@ -23,13 +23,17 @@ from functools import lru_cache
 from types import ModuleType
 from typing import Any
 
+from .verified_model_catalog import core_catalog
+
 # A refusal body is read only this far.
 _REFUSAL_READ_BYTES = 16384
 # The effects that send an image. Read and draw's review sends its drawing.
-IMAGE_EFFECTS = frozenset({"select_image_catalog", "write_image_ddl", "review_image_ddl", "review_description_ddl"})
-# Read and draw's three requests (SPEC §12.6.7), recorded apart from Stage 1
-# and the image tab.
-READ_AND_DRAW_EFFECTS = frozenset({"read_description", "write_description_ddl", "review_description_ddl"})
+IMAGE_EFFECTS = frozenset(core_catalog("chatgpt_auth_constants")["image_effects"])
+# Read and draw's requests (SPEC §12.6.7), recorded apart from Stage 1 and the
+# image tab: the reading, the composition and laws when they are on, the
+# writing and the review.
+READ_AND_DRAW_EFFECTS = frozenset({"read_description", "compose_description", "write_description_ddl",
+                                   "review_description_ddl"})
 
 
 def observation_digest(body: bytes) -> bytes:
@@ -79,6 +83,12 @@ def text_request(connection: dict, model: str, *, system: str, text: str, images
                  temperature: float, max_tokens: int) -> dict:
     """The request for one text answer, with images when there are any."""
     return _ask("text_request", connection=_connection(connection), model=model, system=system, text=text,
+                images=list(images), temperature=temperature, max_tokens=max_tokens)
+
+
+def text_request_with_count(connection: dict, model: str, *, system: str, text: str, images: list[str],
+                            temperature: float, max_tokens: int) -> dict:
+    return _ask("text_request_with_count", connection=_connection(connection), model=model, system=system, text=text,
                 images=list(images), temperature=temperature, max_tokens=max_tokens)
 
 
@@ -161,3 +171,7 @@ def usage(format_name: str, raw: bytes) -> dict | None:
 def read_text(format_name: str, status: int, raw: bytes) -> dict:
     """The answer to a text response: ``answer`` with ``text`` (and ``cut`` when it was cut off), or ``malformed``."""
     return _ask("text_response", format=format_name, status=status, body=_body_text(raw))
+
+
+def read_text_with_usage(format_name: str, status: int, raw: bytes) -> dict:
+    return _ask("text_response_with_usage", format=format_name, status=status, body=_body_text(raw))

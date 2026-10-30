@@ -32,6 +32,7 @@ object NativePipelineBridge : SharedPipelineBinding {
     external override fun providerAttempt(snapshotBytes: ByteArray): ByteArray
     external override fun pipelineDescription(text: String): String
     external override fun descriptionHash(text: String): String
+    external override fun descriptionLabelSpans(text: String): String
     external override fun renderHash(itemJson: String): String?
     external override fun canonicalJson(valueJson: String): String?
     external override fun resolveInstructionLanguage(text: String, requested: String?, fallback: String): String?
@@ -44,7 +45,12 @@ object NativePipelineBridge : SharedPipelineBinding {
      * `{"json": "<input>"}` or `{"error": "<reason>"}` out.
      */
     external fun ddl3dSnapshot(inputBytes: ByteArray): ByteArray
+    external fun modelCatalog(inputBytes: ByteArray): ByteArray
+    external fun providerAdmission(inputBytes: ByteArray): ByteArray
 
     /** One saved Saijiki v1 unit in, the same unit in the current edition out (SPEC §3.3). */
     external fun migrateSaijikiV1(inputBytes: ByteArray): ByteArray
+    external fun migratePluginNames(inputBytes: ByteArray): ByteArray
+    external fun pluginPackage(inputBytes: ByteArray): ByteArray
+    external fun pluginCalls(inputBytes: ByteArray): ByteArray
 }

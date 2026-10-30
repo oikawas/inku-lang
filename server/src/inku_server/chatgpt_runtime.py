@@ -122,12 +122,10 @@ def check_session(owner: str, profile_id: str, generation: int, cancel: threadin
     if cancel is not None and cancel.is_set():
         raise ChatGPTError("chatgpt_cancelled")
     profile = CredentialStore().profile(owner, profile_id)
-    if profile["generation"] != generation:
-        raise ChatGPTError("chatgpt_session_changed")
-    if profile["state"] != "connected":
-        raise ChatGPTError("chatgpt_" + profile["state"])
-    if "chatgpt.tokens.use.direct" not in profile["scopes"]:
-        raise ChatGPTError("chatgpt_scope_required")
+    from .verified_model_catalog import core_catalog
+    result = core_catalog("chatgpt_auth_session", profile=profile, generation=generation)
+    if "error" in result:
+        raise ChatGPTError(result["error"])
     return profile
 
 

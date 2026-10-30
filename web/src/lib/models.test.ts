@@ -2,21 +2,21 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { modelDisplayName, modelShortName, pickerSelection, splitModelRef, type ProviderGroup } from './models.ts';
+import { modelDisplayName, modelShortName, pickerSelection, splitModelReference, type ProviderGroup } from './models.ts';
 
 const GROUPS: ProviderGroup[] = [
 	{
 		id: 'nim',
 		label: 'NVIDIA NIM (Cloud)',
 		models: [
-			{ id: 'google/gemma-4-31b-it', label: 'google/gemma-4-31b-it' },
-			{ id: 'plain-model', label: 'Plain Model' },
+			{ id: 'google/gemma-4-31b-it', label: 'google/gemma-4-31b-it', qualified_id: 'nim:google/gemma-4-31b-it' },
+			{ id: 'plain-model', label: 'Plain Model', qualified_id: 'nim:plain-model' },
 		],
 	} as ProviderGroup,
 ];
 
 test('a disconnected ChatGPT reference stays qualified even with an empty explicit catalog', () => {
-	assert.deepEqual(splitModelRef('chatgpt:model', []), { provider: 'chatgpt', model: 'model' });
+	assert.deepEqual(splitModelReference('chatgpt:model', []), { provider: 'chatgpt', model: 'model' });
 	assert.equal(pickerSelection(GROUPS, 'chatgpt:plain-model').selected, null);
 });
 

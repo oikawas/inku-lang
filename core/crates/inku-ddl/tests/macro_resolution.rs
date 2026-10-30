@@ -114,7 +114,7 @@ fn locked_visible_macros_resolve_in_source_order_without_changing_i579() {
 
             assert_eq!(
                 actual.invocation.qualified_name(),
-                expected.surface,
+                expected_identity.qualified_name(),
                 "{}",
                 case.id
             );
@@ -131,7 +131,12 @@ fn locked_visible_macros_resolve_in_source_order_without_changing_i579() {
                 "{}",
                 case.id
             );
-            assert_eq!(actual.lock.qualified_name, expected.surface, "{}", case.id);
+            assert_eq!(
+                actual.lock.qualified_name,
+                expected_identity.qualified_name(),
+                "{}",
+                case.id
+            );
             assert_eq!(
                 actual.lock.version,
                 expected_identity.version(),
@@ -183,7 +188,7 @@ fn locked_visible_macros_resolve_in_source_order_without_changing_i579() {
                     &case.source[span.start_byte..span.end_byte]
                 })
                 .collect::<Vec<_>>();
-            assert_eq!(surfaces, ["Nature.若葉", "を", "上", "に", "八つ", "置く"]);
+            assert_eq!(surfaces, ["｛若葉｝", "を", "上", "に", "八つ", "置く"]);
         }
     }
 }

@@ -30,6 +30,11 @@ export function createChatGPTSettings(deps: {
 	let timer: ReturnType<typeof setTimeout> | null = null;
 	let epoch = 0;
 	let abort: AbortController | null = null;
+	let helperBefore: ChatGPTState | null = null;
+	let helperProfile: string | undefined;
+	let helperChecking = false;
+	let catalogFailure = false;
+	let finishingAuthorization = false;
 
 	function stop() {
 		epoch++;
@@ -39,10 +44,12 @@ export function createChatGPTSettings(deps: {
 		attemptId = null;
 		authorizationUrl = null;
 		helperUrl = null;
+		helperBefore = null;
+		helperProfile = undefined;
 		busy = false;
 	}
 
-	function reset() { stop(); state = null; code = null; boundOwner = undefined; }
+	function reset() { stop(); state = null; code = null; catalogFailure = false; boundOwner = undefined; }
 	const current = (owner: string | undefined, stamp: number) => Boolean(owner && owner === deps.owner() && stamp === epoch && deps.available());
 	const visible = () => boundOwner === deps.owner() && deps.available();
 
@@ -65,21 +72,44 @@ export function createChatGPTSettings(deps: {
 	async function load() {
 		const owner = deps.owner();
 		if (!owner || !deps.available()) { reset(); return; }
+		if (finishingAuthorization && owner === boundOwner) return;
+		if (helperUrl && owner === boundOwner) { await recheck(); return; }
+		if (owner !== boundOwner) { catalogFailure = false; code = null; }
 		await cancel();
 		boundOwner = owner;
 		const stamp = epoch;
 		abort = new AbortController();
 		try {
-			await refresh(owner, stamp);
+			await refresh(owner, stamp, catalogFailure ? code : null);
 		} catch (error) {
 			if (current(owner, stamp)) code = error instanceof Error ? error.message : 'chatgpt_operation_failed';
 		}
 	}
 
+	async function refreshAfterLogin(owner: string, stamp: number) {
+		deps.invalidate();
+		catalogFailure = false;
+		finishingAuthorization = true;
+		try {
+			const response = await deps.apiFetch('/api/me/chatgpt/models/refresh', { method: 'POST', cache: 'no-store', signal: abort?.signal });
+			if (!response.ok) {
+				const value = await response.json().catch(() => ({}));
+				if (current(owner, stamp)) { code = typeof value?.detail?.code === 'string' ? value.detail.code : 'chatgpt_transport_unavailable'; catalogFailure = true; }
+			}
+		} catch {
+			if (current(owner, stamp)) { code = 'chatgpt_transport_unavailable'; catalogFailure = true; }
+		} finally {
+			try { if (current(owner, stamp)) await deps.changed(); }
+			finally { finishingAuthorization = false; }
+		}
+	}
+
 	async function mutate(path: string) {
 		stop(); deps.invalidate();
+		catalogFailure = false;
 		const stamp = epoch, owner = deps.owner();
 		if (!owner || !deps.available()) return;
+		if (owner !== boundOwner) state = null;
 		boundOwner = owner;
 		abort = new AbortController(); busy = true; code = null;
 		try {
@@ -102,17 +132,25 @@ export function createChatGPTSettings(deps: {
 			}
 			attemptId = null; authorizationUrl = null; busy = false;
 			await refresh(owner, stamp, result.status === 'pending' ? 'chatgpt_cancelled' : result.code);
-			if (current(owner, stamp)) await deps.changed();
+			if (current(owner, stamp) && result.status === 'completed' && state?.active_profile_id === result.profile_id) {
+				await refreshAfterLogin(owner, stamp);
+			} else if (current(owner, stamp)) await deps.changed();
 		} catch (error) { if (current(owner, stamp)) { code = error instanceof Error ? error.message : 'chatgpt_operation_failed'; stop(); } }
 	}
 
 	async function authorize(profileId?: string, consent = false) {
 		await cancel();
+		catalogFailure = false;
 		const stamp = epoch, owner = deps.owner();
 		if (!owner || !deps.available()) return;
+		if (owner !== boundOwner) state = null;
 		boundOwner = owner;
 		abort = new AbortController(); busy = true; code = null;
 		try {
+			if (!state) {
+				await refresh(owner, stamp);
+				if (!current(owner, stamp)) return;
+			}
 			const language = deps.language?.() === 'en' ? 'en' : 'ja';
 			const result = await call('/authorize', { profile_id: profileId ?? null, consent, language });
 			if (!current(owner, stamp)) return;
@@ -129,8 +167,17 @@ export function createChatGPTSettings(deps: {
 				if (result.helper_target === 'container') url.searchParams.set('target', 'container');
 				if (!current(owner, stamp)) return;
 				helperUrl = url.href;
+				helperBefore = state;
+				helperProfile = profileId;
 				code = 'chatgpt_helper_requested'; busy = false;
 				window.location.assign(url.href);
+				const deadline = Date.now() + 300_000;
+				const watch = async () => {
+					if (!current(owner, stamp) || !helperUrl || Date.now() >= deadline) return;
+					await recheck();
+					if (current(owner, stamp) && helperUrl) timer = setTimeout(() => void watch(), 1000);
+				};
+				timer = setTimeout(() => void watch(), 1000);
 				return;
 			}
 			const url = new URL(result.authorization_url);
@@ -145,12 +192,24 @@ export function createChatGPTSettings(deps: {
 	// keeping the helper link and its message.
 	async function recheck() {
 		const owner = deps.owner();
-		if (!helperUrl || busy || !owner || owner !== boundOwner || !deps.available()) return;
+		if (!helperUrl || busy || helperChecking || !owner || owner !== boundOwner || !deps.available()) return;
 		const stamp = epoch, before = JSON.stringify(state);
+		helperChecking = true;
 		try {
 			await refresh(owner, stamp, code);
-			if (current(owner, stamp) && JSON.stringify(state) !== before) await deps.changed();
+			if (!current(owner, stamp)) return;
+			const active = state?.profiles.find((profile) => profile.id === state?.active_profile_id);
+			const previous = helperBefore?.profiles.find((profile) => profile.id === active?.id);
+			if (active?.state === 'connected' && (!helperProfile || active.id === helperProfile)
+				&& (!previous || active.generation !== previous.generation)) {
+				helperBefore = null; helperProfile = undefined; code = null;
+				if (timer) clearTimeout(timer);
+				timer = null;
+				await refreshAfterLogin(owner, stamp);
+				if (current(owner, stamp)) helperUrl = null;
+			} else if (JSON.stringify(state) !== before) await deps.changed();
 		} catch { /* The explicit check button reports errors. */ }
+		finally { helperChecking = false; }
 	}
 
 	async function cancel() {
@@ -166,6 +225,7 @@ export function createChatGPTSettings(deps: {
 		get state() { return visible() ? state : null; }, get code() { return visible() ? code : null; }, get busy() { return visible() && busy; },
 		get authorizationUrl() { return visible() ? authorizationUrl : null; },
 		get helperUrl() { return visible() ? helperUrl : null; },
+		get finishingAuthorization() { return visible() && finishingAuthorization; },
 		load, reset, stop, cancel, authorize, recheck,
 		select: (id: string) => mutate('/profiles/' + encodeURIComponent(id) + '/select'),
 		signOut: (id: string) => mutate('/profiles/' + encodeURIComponent(id) + '/sign-out'),

@@ -32,7 +32,7 @@ struct LibraryView: View {
     @State private var previewComment = LibraryNoteEditorModel()
     private var library: LibraryModel { model.library }
     private var display: DisplaySettings { model.display }
-    private var naming: ModelNaming { ModelNaming(providers: providers) }
+    private var naming: ModelNaming { ModelNaming(providers: providers, stageProvider: model.stageDefaultProviderID) }
     private var writingDisabled: Bool { model.isBusy || writingLocked }
     private var hasFilters: Bool {
         !library.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -268,7 +268,7 @@ struct LibraryView: View {
         let label = display.webCopy("historySearchLabel", "検索（記述 / ハッシュ値 / 作品ID）")
         return Group {
             #if os(macOS)
-            InkuSearchField(value: $library.query, placeholder: placeholder, label: label, onCancel: onClose,
+            InkuSearchField(value: $library.query, placeholder: placeholder, label: label, borderless: true, onCancel: onClose,
                             onSearch: { library.query = $0 })
                 .inkuSearchFieldHeight()
             #else
@@ -277,6 +277,7 @@ struct LibraryView: View {
         }
         // Web `.history-search`: flex 0 1 22rem, at least 10rem.
         .frame(minWidth: 130, idealWidth: 286, maxWidth: 286)
+        .overlay(RoundedRectangle(cornerRadius: 4).stroke(library.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? InkuColor.border2 : Color.accentColor))
         .inkuTooltip(display.webCopy("historySearchHint", "ハッシュ値と作品IDは全体か先頭部分、ハッシュ値は下位4桁でも検索できます。"), focus: .text)
     }
 
@@ -409,8 +410,8 @@ struct LibraryView: View {
             browsingLocked: model.isBrowsingLocked,
             writingDisabled: writingDisabled,
             mutating: library.mutating,
-            hashCopied: work.renderHash != nil && library.copiedHash == work.renderHash,
-            modelLines: modelLines.lines(for: work, providers: providers),
+            hashCopied: library.copiedHash == work.id,
+            modelLines: modelLines.lines(for: work, providers: providers, stageProvider: model.stageDefaultProviderID),
             focus: $focusedSlot,
             actions: LibraryGridCardActions(open: openWork, openThumbnail: openThumbnail, openLineage: openLineage,
                                             recordHeight: recordCardHeight, menu: menuActions))
@@ -431,7 +432,7 @@ struct LibraryView: View {
         let selected = library.selectedIDs.contains(work.id)
         return Button { library.toggleSelection(work.id) } label: { LibrarySelectionBox(selected: selected) }
             .buttonStyle(.plain)
-            .accessibilityLabel(display.localizedFormat("%@ を選択", LibraryWorkPresentation.title(work, untitled: display.localized("無題"))))
+            .accessibilityLabel(display.localizedFormat("%@ を選択", model.workPresentationTitle(work)))
             .accessibilityValue(display.localized(selected ? "選択済み" : "未選択"))
             .disabled(library.mutating || model.isBrowsingLocked)
             .inkuTooltip(display.tooltip(selected ? "作品の選択を解除" : "作品を選択"))
@@ -480,12 +481,10 @@ struct LibraryView: View {
                 Text(ByteCountFormatter.string(fromByteCount: svgBytes(row.work), countStyle: .file))
                     .inkuFont(12).monospacedDigit()
             }.width(74)
-            TableColumn(display.webCopy("historyHashHeader", fallback: "ハッシュ")) { row in
-                if let hash = row.work.renderHash {
-                    Button("#\(hash.suffix(4))") { library.copyHash(hash) }.buttonStyle(.borderless)
-                        .inkuFont(11, design: .monospaced)
-                        .inkuTooltip(hashCopyTooltip(hash))
-                }
+            TableColumn(display.webCopy("historyIdHeader", fallback: "ID")) { row in
+                Button("#") { library.copyHash(row.work.id) }.buttonStyle(.borderless)
+                    .inkuFont(11, design: .monospaced)
+                    .inkuTooltip(hashCopyTooltip(row.work.id))
             }.width(72)
             TableColumn(display.webCopy("historyActionHeader", fallback: "操作")) { row in
                 HStack(spacing: 4) {
@@ -571,7 +570,7 @@ struct LibraryView: View {
                     .inkuTooltip(display.tooltip("作品プレビュー", serverKey: "historyPreviewTitle"))
                 }
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(LibraryWorkPresentation.title(group.representative.work, untitled: display.localized("無題")))
+                    Text(model.workPresentationTitle(group.representative.work))
                         .inkuFont(12, weight: .semibold).lineLimit(1)
                     Text(groupSummary(group)).inkuFont(10).foregroundStyle(.tertiary).lineLimit(1)
                     if current {
@@ -666,7 +665,7 @@ struct LibraryView: View {
                     ArtworkThumbnail(work: work, thumbnails: model.thumbnails)
                         .aspectRatio(82.0 / 58.0, contentMode: .fit)
                         .frame(maxWidth: .infinity, maxHeight: 110)
-                    Text(LibraryWorkPresentation.title(work, untitled: display.localized("無題")))
+                    Text(model.workPresentationTitle(work))
                         .inkuFont(10).foregroundStyle(.secondary).lineLimit(1)
                 }
             }
@@ -702,7 +701,7 @@ struct LibraryView: View {
             Button { openWork(work) } label: {
                 HStack(spacing: 8) {
                     ArtworkThumbnail(work: work, thumbnails: model.thumbnails).frame(width: 48, height: 48)
-                    Text(LibraryWorkPresentation.title(work, untitled: display.localized("無題")))
+                    Text(model.workPresentationTitle(work))
                         .inkuFont(10).foregroundStyle(.secondary).lineLimit(1)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }.contentShape(Rectangle())
@@ -845,7 +844,7 @@ struct LibraryView: View {
     /// HistoryManager.svelte:1134,1198: "copied" for 1.2 s after the click.
     private func hashCopyTooltip(_ hash: String) -> String {
         library.copiedHash == hash ? display.tooltip("コピーしました", serverKey: "historyHashCopied")
-            : display.tooltip("描画ハッシュ全体をコピー", serverKey: "historyHashCopyTitle")
+            : display.tooltip("作品UUIDをコピー", serverKey: "historyIdCopyTitle")
     }
 
     @ViewBuilder private func generationBadge(_ work: SavedWork, plate: Bool) -> some View {
@@ -882,13 +881,15 @@ private final class LibraryGridMeasurements {
 @MainActor
 private final class LibraryModelLineMemo {
     private var providers: [ProviderSettings] = []
+    private var stageProvider = ""
     private var naming = ModelNaming()
     private var lines: [String: [ModelNaming.Line]] = [:]
 
-    func lines(for work: SavedWork, providers: [ProviderSettings]) -> [ModelNaming.Line] {
-        if providers != self.providers {
+    func lines(for work: SavedWork, providers: [ProviderSettings], stageProvider: String) -> [ModelNaming.Line] {
+        if providers != self.providers || stageProvider != self.stageProvider {
             self.providers = providers
-            naming = ModelNaming(providers: providers)
+            self.stageProvider = stageProvider
+            naming = ModelNaming(providers: providers, stageProvider: stageProvider)
             lines.removeAll()
         }
         let key = (work.stage1Model ?? "") + "\u{0}" + (work.stage2Model ?? "")
@@ -921,6 +922,18 @@ private struct LibraryPager: View {
 
     var body: some View {
         HStack(spacing: 6) {
+            if !library.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Button {
+                    library.query = ""
+                } label: {
+                    Text(display.webCopyFormat("historySearchActive", "検索中「%@」", library.query.trimmingCharacters(in: .whitespacesAndNewlines)) + " ×")
+                        .lineLimit(1).truncationMode(.tail).frame(maxWidth: 256)
+                        .padding(.horizontal, 10).padding(.vertical, 5)
+                        .foregroundStyle(Color.accentColor)
+                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.accentColor))
+                }.buttonStyle(.plain)
+                    .inkuTooltip(display.tooltip("検索を解除", serverKey: "historySearchClear"))
+            }
             Button(display.webCopy("historyLatest", fallback: "最新")) { Task { await library.setLatestPage() } }
                 .buttonStyle(LibraryGhostButtonStyle(minWidth: 54))
                 .disabled(!library.hasNewer || library.loading)
@@ -1190,7 +1203,7 @@ private struct LibraryWorkMenu: View {
             .disabled(library.mutating || writingDisabled)
         Button(display.localized("推敲の印"), systemImage: library.annotation(for: work.id).forRevision ? "pencil.circle.fill" : "pencil.circle") { Task { await library.toggleRevision(work) } }
             .disabled(library.mutating || writingDisabled)
-        if let hash = work.renderHash { Button(display.localized("描画ハッシュ全体をコピー"), systemImage: "doc.on.doc") { library.copyHash(hash) } }
+        Button(display.label("作品 UUID をコピー", "Copy work UUID"), systemImage: "doc.on.doc") { library.copyHash(work.id) }
         Divider()
         if work.trashed {
             // HistoryManager.svelte:1069-1070,1215-1226: the per-work buttons' titles, on the menu items that replace them.
@@ -1263,7 +1276,7 @@ private struct LibraryGridCard: View, Equatable {
 
     var body: some View {
         LibraryPerformanceProbe.cardBody()
-        let title = LibraryWorkPresentation.title(work, untitled: display.localized("無題"))
+        let title = model.workPresentationTitle(work)
         return VStack(alignment: .leading, spacing: 5) {
             Button { actions.open(work) } label: {
                 ArtworkThumbnail(work: work, thumbnails: model.thumbnails)
@@ -1321,13 +1334,10 @@ private struct LibraryGridCard: View, Equatable {
     private var cardActions: some View {
         HStack(spacing: 4) {
             LibraryWorkMarks(model: model, work: work, spacing: 4).disabled(writingDisabled)
-            if let hash = work.renderHash {
-                Button("#\(hash.suffix(4))") { library.copyHash(hash) }
-                    .inkuFont(10, design: .monospaced)
-                    // HistoryManager.svelte:1134,1198: "copied" for 1.2 s after the click.
-                    .inkuTooltip(hashCopied ? display.tooltip("コピーしました", serverKey: "historyHashCopied")
-                                 : display.tooltip("描画ハッシュ全体をコピー", serverKey: "historyHashCopyTitle"))
-            }
+            Button("#") { library.copyHash(work.id) }
+                .inkuFont(10, design: .monospaced)
+                .inkuTooltip(hashCopied ? display.tooltip("コピーしました", serverKey: "historyHashCopied")
+                             : display.tooltip("作品UUIDをコピー", serverKey: "historyIdCopyTitle"))
             if work.lineageNodeID != nil {
                 Button { actions.openLineage(work) } label: { Image(systemName: "point.3.connected.trianglepath.dotted") }
                     .accessibilityLabel(display.localized("系譜")).disabled(browsingLocked)
@@ -1396,7 +1406,8 @@ struct LibraryWorkDetails: View {
                 HStack(alignment: .top, spacing: 14) { heading; Spacer(minLength: 12); workActions }
                 VStack(alignment: .leading, spacing: 10) { heading; workActions }
             }
-            ArtworkCanvas(svg: work.svg, renderer: model.displayRenderer, caption: work.effectiveSourceText)
+            ArtworkCanvas(svg: work.svg, renderer: model.displayRenderer,
+                          caption: model.imageWorkProvenance[work.id] == nil ? work.effectiveSourceText : model.workPresentationTitle(work))
                 .frame(height: 280)
                 // HistoryManager.svelte:915-921: a double click on the preview opens the work.
                 .simultaneousGesture(TapGesture(count: 2).onEnded {
@@ -1440,7 +1451,11 @@ struct LibraryWorkDetails: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 10) {
                         OutputView(ddl: work.ddl ?? "", score: work.score).frame(height: 160)
-                        if !work.effectiveSourceText.isEmpty { Text(model.display.localizedFormat("記述: %@", work.effectiveSourceText)).textSelection(.enabled) }
+                        if model.imageWorkProvenance[work.id] != nil {
+                            Text(model.workPresentationTitle(work)).textSelection(.enabled)
+                        } else if !work.effectiveSourceText.isEmpty {
+                            Text(model.display.localizedFormat("記述: %@", work.effectiveSourceText)).textSelection(.enabled)
+                        }
                         Text(Date(timeIntervalSince1970: Double(work.at) / 1000), format: .dateTime.year().month().day().hour().minute().second())
                             .inkuFont(12).foregroundStyle(.secondary)
                         Text(model.display.localizedFormat("作品 ID: %@", work.id)).inkuFont(12, design: .monospaced).textSelection(.enabled)

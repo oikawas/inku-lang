@@ -5,7 +5,7 @@
 // works were drawn under -- is arithmetic over a list and a listing, and is
 // testable on its own. Same reason retry.ts is a module and not a closure.
 
-import { drawRouteOf, type DrawRoute } from '../../draw-route.ts';
+import { compositionModeOf, drawRouteOf, type CompositionMode, type DrawRoute } from '../../draw-route.ts';
 
 /** One line of a batch prompt, numbered the way the run numbers it. */
 export type NumberedLine = {
@@ -143,6 +143,8 @@ export type BatchRunConditions = {
 	 *  record was drawn by the stages, so a work always says; a run that
 	 *  records no conditions leaves it null. */
 	route?: DrawRoute | null;
+	/** Read and draw's composition and laws; null for the stages or when not recorded. */
+	composition?: CompositionMode | null;
 };
 
 /**
@@ -163,5 +165,6 @@ export function conditionsOfWork(work: BatchWork): BatchRunConditions {
 		wild: typeof work.render_wild === 'boolean' ? work.render_wild : null,
 		canvasAspectId: work.render_canvas_aspect_id ?? work.render_canvas_aspect ?? null,
 		route: drawRouteOf(work),
+		composition: drawRouteOf(work) === 'read_and_draw' ? compositionModeOf(work) : null,
 	};
 }

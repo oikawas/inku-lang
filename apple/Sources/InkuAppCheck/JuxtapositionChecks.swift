@@ -168,6 +168,7 @@ private func juxtapositionChildChecks() async throws {
     let transport = JuxtapositionVision(answers: [])
     let app = AppModel(databaseURL: databaseURL, transport: transport)
     await app.initialize()
+    app.selectDrawRoute("stages"); app.sketchMode = "off"
     let service = ProviderSettings(id: "check", baseURL: URL(string: "http://localhost:1/v1")!, requiresAPIKey: false,
                                    models: [.init(id: "generation"), .init(id: "vision", purposes: ["llm", "vision"])])
     try await app.updateHostSettings(HostSettings(providers: [service],
@@ -184,6 +185,7 @@ private func juxtapositionChildChecks() async throws {
     }
     let reopened = AppModel(databaseURL: databaseURL, transport: transport)
     await reopened.initialize()
+    reopened.selectDrawRoute("stages"); reopened.sketchMode = "off"
     let database = try InkuDatabase(url: databaseURL)
     guard let parent = try await database.list(limit: 10).first(where: { $0.effectiveSourceText.hasPrefix("1.") }) else {
         throw CheckFailure.message("Juxtaposition fixture lost its labelled parent")
@@ -211,7 +213,7 @@ private func juxtapositionChildChecks() async throws {
           record["sentence"].string == choice.sentence, record["rank"].number == "2", record["candidates"].number == "4",
           record["model"].string == "check:vision", record["history_ids"].array?.compactMap(\.string) == choice.historyIDs,
           child.effectiveSourceText == "1. 夜の港で、灯台の光だけが揺れていた。" + choice.sentence,
-          child.renderWild == parent.renderWild, child.renderColorCatalogID == parent.renderColorCatalogID,
+          child.renderWild == false, parent.renderWild == true, child.renderColorCatalogID == parent.renderColorCatalogID,
           child.renderCanvasAspectID == parent.renderCanvasAspectID else {
         throw CheckFailure.message("Juxtaposition child record: \(edge.derivationKind) \(metadata.text); \(child.effectiveSourceText)")
     }

@@ -14,11 +14,14 @@ export type SaijikiPreview = {
 
 export type PluginEntry = {
 	qualified_name: string;
-	aliases?: string[];
+	word_id?: string;
+	word_kind?: 'object' | 'scene';
+	surface_ja?: string[];
+	surface_en?: string[];
+	written_ja?: string;
+	written_en?: string;
 	note_ja: string;
 	note_en: string;
-	fires_on_ja?: string[];
-	fires_on_en?: string[];
 	example_ja?: string;
 	example_en?: string;
 	preview_url?: string;

@@ -41,7 +41,8 @@ class ProviderAdmissionTest {
         val refused = gemini(429, mapOf("Retry-After" to "65"), RETRY_INFO_90S)
         val error = assertThrows(ModelProviderHttpException::class.java) { runBlocking { send(refused) } }
         assertEquals("65", error.retryAfter)
-        assertEquals(90.0, error.retryDelaySeconds!!, 0.0)
+        assertEquals(90.0, SharedProviderAdmission.call(JSONObject().put("action", "retry").put("now", start / 1000.0)
+            .put("retry_after", error.retryAfter).put("raw", error.retryBody)).getDouble("seconds"), 0.0)
         assertEquals(emptyList<Long>(), waits)
 
         send(gemini(200))

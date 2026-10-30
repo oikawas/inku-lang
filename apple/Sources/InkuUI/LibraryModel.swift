@@ -871,10 +871,6 @@ public final class LibraryModel {
         lineageAnnotations[id] ?? annotation(for: id)
     }
 
-    public func promote(_ nodeID: String) async {
-        await mutate { try await $0.promoteLineageNode(id: nodeID); return "作品をライブラリへ追加しました" }
-    }
-
     public func copyHash(_ hash: String?) {
         guard let hash, !hash.isEmpty else { return }
         #if os(macOS)

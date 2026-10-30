@@ -62,20 +62,25 @@ public final class ChatGPTURLSessionClient: ObservedChatGPTHTTPClient, Sendable 
 }
 
 enum ChatGPTEndpoints {
-    static let issuer = "https://auth.openai.com"
-    static let resource = "https://api.openai.com/v1"
-    static let token = URL(string: issuer + "/api/accounts/oauth/token")!
-    static let authorize = URL(string: issuer + "/api/accounts/authorize")!
+    private static let constants = try! ChatGPTPolicy.call("chatgpt_auth_constants")
+    static let issuer = try! constants.requiredString("issuer")
+    static let resource = try! constants.requiredString("resource")
+    static let token = URL(string: try! constants.requiredString("token"))!
+    static let authorize = URL(string: try! constants.requiredString("authorize"))!
     static let discovery = URL(string: issuer + "/.well-known/openid-configuration")!
     static let models = URL(string: resource + "/models")!
     static let responses = URL(string: resource + "/responses")!
     static let usage = URL(string: "https://chatgpt.com/settings/usage")!
-    static let scope = "openid profile email offline_access resource.invoke chatgpt.tokens.use.direct"
+    static let scope = try! constants.requiredString("scopes")
     static func validate(_ url: URL, authenticationOnly: Bool = false) throws {
+        if authenticationOnly || url.host == "auth.openai.com" {
+            _ = try ChatGPTPolicy.call("chatgpt_auth_endpoint", ["url": .string(url.absoluteString)])
+            return
+        }
         guard let value = URLComponents(url: url, resolvingAgainstBaseURL: false), value.scheme == "https",
               value.user == nil, value.password == nil, value.port == nil, value.fragment == nil,
-              value.host == "auth.openai.com" || (!authenticationOnly && value.host == "api.openai.com" && ["/v1/models", "/v1/responses"].contains(value.path)),
-              value.host == "auth.openai.com" || value.query == nil else { throw HostError("chatgpt_endpoint_invalid") }
+              value.host == "api.openai.com", ["/v1/models", "/v1/responses"].contains(value.path), value.query == nil
+        else { throw HostError("chatgpt_endpoint_invalid") }
     }
     static func form(_ fields: [String: String]) -> Data {
         let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~")

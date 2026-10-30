@@ -38,7 +38,7 @@ struct LibraryRemovalSearchTests {
                 (try Int.fetchOne(database, sql: "PRAGMA user_version"),
                  try String.fetchAll(database, sql: "SELECT name FROM pragma_table_info('library_annotations')"))
             }
-            #expect(fields.0 == 4)
+            #expect(fields.0 == 6)
             #expect(fields.1 == ["history_id", "note", "for_revision"])
             try inspect.close()
         }

@@ -65,6 +65,27 @@ final class ChatGPTIdentityChecks: XCTestCase, @unchecked Sendable {
         reject { _ = try ChatGPTIdentityVerifier.verify(idToken: input + "." + b64(signature.derRepresentation), clientID: "oaiapp_fixture", nonce: nil, discovery: discovery("ES256"), jwks: jwks, now: now) }
     }
 
+    func testCoreClaimsKeySelectionAndDisplayAfterSignature() throws {
+        let privateKey = try P256.Signing.PrivateKey(rawRepresentation: Data(repeating: 0, count: 31) + Data([1]))
+        let bytes = privateKey.publicKey.x963Representation
+        let key: ExactJSON = .object(["kty": .string("EC"), "crv": .string("P-256"), "kid": .string("fixture-key"),
+            "alg": .string("ignored-by-core"), "key_ops": .array([]),
+            "x": .string(b64(bytes.subdata(in: 1..<33))), "y": .string(b64(bytes.subdata(in: 33..<65)))])
+        let header = b64(ExactJSON.object(["alg": .string("ES256"), "kid": .string("fixture-key"), "crit": .array([.string("ignored")])]).data)
+        func token(_ payload: String) throws -> String {
+            let input = header + "." + b64(Data(payload.utf8))
+            return input + "." + b64(try privateKey.signature(for: Data(input.utf8)).rawRepresentation)
+        }
+        let payload = #"{"iss":"https://auth.openai.com","aud":"oaiapp_fixture","sub":"fixture-subject","exp":150,"iat":"9_0","email":{"first":1e20,"wide":123456789012345678901}}"#
+        let identity = try ChatGPTIdentityVerifier.verify(idToken: token(payload), clientID: "oaiapp_fixture", nonce: nil,
+            discovery: discovery("ES256"), jwks: .object(["keys": .array([key])]), now: now)
+        XCTAssertEqual(identity.email, "{'first': 1e+20, 'wide': 123456789012345678901}")
+        XCTAssertEqual(identity.label, "{'first': 1e+20, 'wide': 123456789012345678901} / _fixture")
+        let invalid = payload.replacingOccurrences(of: "\"iat\":\"9_0\"", with: "\"iat\":\"9_0\",\"jti\":3")
+        reject { _ = try ChatGPTIdentityVerifier.verify(idToken: token(invalid), clientID: "oaiapp_fixture", nonce: nil,
+            discovery: discovery("ES256"), jwks: .object(["keys": .array([key])]), now: now) }
+    }
+
     private func rsaNumbers(_ data: Data) throws -> (Data, Data) {
         let bytes = Array(data); var index = 0
         func length() throws -> Int {

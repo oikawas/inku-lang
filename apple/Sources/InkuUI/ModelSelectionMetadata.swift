@@ -17,12 +17,12 @@ struct RegisteredModelMetadataView: View {
                 ModelPurposeBadgesView(entry: entry, language: display.preferences.language)
             }
             if purpose == "vision" {
-                row("オススメ度", ModelGuidance.recommendation(entry.recommendationVision ?? entry.recommendationLevel))
+                row("オススメ度", ModelGuidance.recommendation(entry.catalogLevel(purpose: "vision")))
             } else if entry.recommendationStage1 != nil || entry.recommendationStage2 != nil {
-                row("オススメ度 / Stage 1", ModelGuidance.recommendation(entry.recommendationStage1 ?? entry.recommendationLLM ?? entry.recommendationLevel))
-                row("オススメ度 / Stage 2", ModelGuidance.recommendation(entry.recommendationStage2 ?? entry.recommendationLLM ?? entry.recommendationLevel))
+                row("オススメ度 / Stage 1", ModelGuidance.recommendation(entry.catalogLevel(purpose: "llm", stage: "stage1")))
+                row("オススメ度 / Stage 2", ModelGuidance.recommendation(entry.catalogLevel(purpose: "llm", stage: "stage2")))
             } else {
-                row("オススメ度", ModelGuidance.recommendation(entry.recommendationLLM ?? entry.recommendationLevel))
+                row("オススメ度", ModelGuidance.recommendation(entry.catalogLevel(purpose: "llm")))
             }
             let guidance = ModelGuidanceCatalog.bundled?.guidance(for: provider.id + ":" + entry.id, providers: [provider])
             row(display.preferences.language == "en" ? "Est. cost" : "概算コスト",

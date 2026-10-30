@@ -7,13 +7,23 @@ enum DrawingFailureMessage {
     /// native diagnosis (stage, network/host reason, operation, HTTP status, URL error code) as details.
     /// `chatGPTCode` is the ChatGPT plan diagnostic this execution reported; Web `pipelineAttentionText` then names it
     /// with `chatgptStatus(code)` instead of the generic cause.
-    static func text(for view: PipelineView, language: String, chatGPTCode: String? = nil) -> String? {
+    static func text(for view: PipelineView, language: String, chatGPTCode: String? = nil, copy: ((String, String) -> String)? = nil) -> String? {
         guard view.phase == "failed" else { return nil }
         let english = language == "en"
         let events = (try? ExactJSON(data: view.eventsJSON).array) ?? []
         let failure = events.last { $0["tag"].string == "failed" }?["payload"]
         let action = failure?["stage"].string
         let reason = failure?["reason"].string
+        if reason == "description_ddl_failed" {
+            return copy?("descriptionDdlFailed", "記述から指示書を書けませんでした。モデルを変えて、もう一度描いてください") ?? (english ? "no instructions could be written from the description; change the model and draw again" : "記述から指示書を書けませんでした。モデルを変えて、もう一度描いてください")
+        }
+        if reason == "description_ddl_undrawable" {
+            return copy?("descriptionDdlUndrawable", "書いた指示書から何も描けませんでした。記述かモデルを変えて、もう一度描いてください") ?? (english ? "the instructions written drew nothing; change the description or the model and draw again" : "書いた指示書から何も描けませんでした。記述かモデルを変えて、もう一度描いてください")
+        }
+        if action == "write_image_ddl" || reason == "image_ddl_failed" || reason == "image_ddl_undrawable" {
+            return english ? "Instructions could not be written from the image. Choose another model and paint again."
+                : "画像から指示書を書けませんでした。モデルを変えて、もう一度描いてください。"
+        }
         if reason == "svg_too_large", let limit = failure?["svg_limit_mib"].number.flatMap(Int.init) {
             return svgLimitText(limit, language: language)
         }
@@ -94,6 +104,9 @@ enum DrawingFailureMessage {
     }
 
     private static let stages: [String: (String, String)] = [
+        "select_image_catalog": ("画像の色カタログ選択", "Image catalog selection"),
+        "write_image_ddl": ("画像の指示書生成", "Image instruction writing"),
+        "review_image_ddl": ("画像の見比べ", "Image review"),
         "render": ("SVG生成処理", "SVG drawing processing"),
         "generate_sketch": ("写生生成処理", "Sketch generation processing"),
         "select_description_catalog": ("配色選択処理", "Catalog selection processing"),

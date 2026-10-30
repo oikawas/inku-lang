@@ -3,35 +3,6 @@
     "Nature.leaves"
   ],
   "canonical": [],
-  "legacy": [
-    {
-      "qualified_name": "Nature.YoungLeaves",
-      "source_id": "bundled:Nature.leaves"
-    },
-    {
-      "qualified_name": "Nature.Undergrowth",
-      "source_id": "bundled:Nature.leaves"
-    },
-    {
-      "qualified_name": "Nature.SummerLeaves",
-      "source_id": "bundled:Nature.leaves"
-    },
-    {
-      "qualified_name": "Nature.AutumnLeaves",
-      "source_id": "bundled:Nature.leaves"
-    },
-    {
-      "qualified_name": "Nature.FallenLeaves",
-      "source_id": "bundled:Nature.leaves"
-    },
-    {
-      "qualified_name": "Nature.WitheredGrass",
-      "source_id": "bundled:Nature.leaves"
-    },
-    {
-      "qualified_name": "Nature.WitheredLeaves",
-      "source_id": "bundled:Nature.leaves"
-    }
-  ],
+  "legacy": [],
   "maximum_entries": 64
 }

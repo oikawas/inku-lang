@@ -1913,7 +1913,7 @@ fn macro_head_retains_unbound_action_position_and_mixed_relation_order() {
         .find(|relation| relation.relation_type == "along")
         .and_then(|relation| relation.literals_en.first())
         .expect("accepted along literal");
-    let source = format!("circle! {motion} Nature.Leaf at {place} {along}! square {along}!");
+    let source = format!("circle! {motion} ｛Leaf｝ at {place} {along}! square {along}!");
     let document = instruction_macro_document(&source, std::slice::from_ref(&definition));
     let binding = bind_macro_parameters(&document, std::slice::from_ref(&definition)).unwrap();
     let result = associate_semantic_instructions_with_macro_binding(&document, binding);
@@ -1982,7 +1982,7 @@ fn macro_head_retains_unbound_action_position_and_mixed_relation_order() {
         .find(|relation| relation.relation_type == "between")
         .and_then(|relation| relation.literals_en.first())
         .expect("accepted between literal");
-    let previous_two_source = format!("circle! Nature.Leaf! square {between}!");
+    let previous_two_source = format!("circle! ｛Leaf｝! square {between}!");
     let previous_two_document =
         instruction_macro_document(&previous_two_source, std::slice::from_ref(&definition));
     let previous_two_binding =
@@ -2017,7 +2017,7 @@ fn bound_action_and_position_are_not_redelivered_to_outer_instruction_fields() {
         }),
     );
     let source = format!(
-        "Nature.Bound {} {}",
+        "｛Bound｝ {} {}",
         english_role_surface("ugoki"),
         english_role_surface("basho")
     );
@@ -2043,11 +2043,11 @@ fn macro_first_coordinated_heads_claim_the_shared_predicate_in_source_order() {
     for (language, source) in [
         (
             ResolvedInstructionLanguage::En,
-            "arrange Draw.Pair and one blue square at center.",
+            "arrange ｛Pair｝ and one blue square at center.",
         ),
         (
             ResolvedInstructionLanguage::Ja,
-            "Draw.Pairと青い四角を中心に並べる",
+            "｛Pair｝と青い四角を中心に並べる",
         ),
     ] {
         let document = instruction_macro_document_in_language(

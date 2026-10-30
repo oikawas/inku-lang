@@ -885,6 +885,8 @@ pub struct ColorsContext {
     stated_ground: Option<String>,
     plugins: BTreeSet<usize>,
     summaries: Vec<laws::LayerSummary>,
+    object_labels: BTreeMap<usize, (String, String)>,
+    object_sources: BTreeMap<usize, Color>,
     /// How the Score is drawn now, and how each layer is drawn in each of the
     /// nine colors (the layers that may be recolored drawn in it, the others
     /// as they are).
@@ -921,6 +923,7 @@ fn drawings(
     painter: &Painter,
     score: &Score,
     colorable: &[usize],
+    object_sources: &BTreeMap<usize, Color>,
 ) -> Option<(Drawing, Vec<Drawing>)> {
     let mut shares = Shares::default();
     let now = painter.drawing(score, &mut shares)?;
@@ -932,12 +935,29 @@ fn drawings(
             for layer in colorable {
                 for position in positions.get(layer).into_iter().flatten() {
                     paint_instruction(&mut recolored.instructions[*position], *color);
+                    if let Some(from) = object_sources.get(layer) {
+                        paint_object_template(&mut recolored, *position, *from, *color);
+                    }
                 }
             }
             painter.drawing(&recolored, &mut shares)
         })
         .collect::<Option<Vec<Drawing>>>()?;
     Some((now, by_color))
+}
+
+pub(crate) fn paint_object_template(score: &mut Score, position: usize, from: Color, to: Color) {
+    if let Some(template) = score
+        .object_templates
+        .iter_mut()
+        .find(|template| template.instruction_index == position)
+    {
+        for instruction in &mut template.body.instructions {
+            if instruction.color == from {
+                paint_instruction(instruction, to);
+            }
+        }
+    }
 }
 
 /// The pairs of touching layers D3 may take: a layer and a neighbour the
@@ -967,9 +987,20 @@ pub struct ColorsInput<'a> {
     pub seeds: Seeds,
     pub error_policy: inku_score::ScoreErrorPolicy,
     pub description: &'a str,
+    pub plugins: &'a [WorkPlanPlugin],
 }
 
 impl ColorsContext {
+    #[cfg(test)]
+    pub(crate) fn object_trial_changes_drawn_color(&self, layer: usize, color: Color) -> bool {
+        self.colorable.contains(&layer)
+            && self.now.looks.get(&layer).and_then(|look| look.lab)
+                != self.by_color[index_of(color)]
+                    .looks
+                    .get(&layer)
+                    .and_then(|look| look.lab)
+    }
+
     /// The context of the document the laws stage left. `None` when its
     /// Score does not have one layer per printed sentence, the palette does
     /// not observe the nine colors, or the renderer does not draw it.
@@ -1018,6 +1049,51 @@ impl ColorsContext {
             .filter(|summary| summary.arranged == Some("plugin"))
             .map(|summary| summary.layer)
             .collect();
+        let object_colorable: BTreeSet<usize> = score
+            .object_templates
+            .iter()
+            .filter_map(|template| {
+                let (layer, _) =
+                    laws::layer_of(score.instructions.get(template.instruction_index)?)?;
+                let shape = &printed.plan.layers.get(layer.checked_sub(first)?)?.shape;
+                let plugin = input.plugins.iter().find(|plugin| plugin.name == *shape)?;
+                plugin
+                    .appearance_slots
+                    .contains(&WorkPlanSlot::Color)
+                    .then_some(layer)
+            })
+            .collect();
+        let objects: BTreeSet<usize> = score
+            .object_templates
+            .iter()
+            .filter_map(|template| {
+                laws::layer_of(score.instructions.get(template.instruction_index)?)
+                    .map(|(layer, _)| layer)
+            })
+            .collect();
+        let object_labels: BTreeMap<usize, (String, String)> = objects
+            .iter()
+            .filter_map(|layer| {
+                let shape = &printed.plan.layers.get(layer.checked_sub(first)?)?.shape;
+                let plugin = input.plugins.iter().find(|plugin| plugin.name == *shape)?;
+                Some((*layer, (plugin.name_ja.clone(), plugin.name_en.clone())))
+            })
+            .collect();
+        let object_sources: BTreeMap<usize, Color> = object_colorable
+            .iter()
+            .filter_map(|layer| {
+                let plan = printed.plan.layers.get(layer.checked_sub(first)?)?;
+                let source = plan.attributes.get(&WorkPlanSlot::Color).or_else(|| {
+                    input
+                        .plugins
+                        .iter()
+                        .find(|plugin| plugin.name == plan.shape)?
+                        .primary_color
+                        .as_ref()
+                })?;
+                Some((*layer, color_named(source)?))
+            })
+            .collect();
         let (stated, stated_ground) = stated(input.description, &score);
         let fixed: BTreeMap<usize, String> = input
             .handoff
@@ -1031,9 +1107,13 @@ impl ColorsContext {
         let colorable: Vec<usize> = found
             .iter()
             .copied()
-            .filter(|layer| !stated.contains_key(layer) && !plugins.contains(layer))
+            .filter(|layer| {
+                !stated.contains_key(layer)
+                    && !plugins.contains(layer)
+                    && (!objects.contains(layer) || object_colorable.contains(layer))
+            })
             .collect();
-        let (now, by_color) = drawings(&painter, &score, &colorable)?;
+        let (now, by_color) = drawings(&painter, &score, &colorable, &object_sources)?;
         let by = |layer: usize| summaries.iter().find(|summary| summary.layer == layer);
         let movable = |layer: &usize| {
             by(*layer).is_some_and(|summary| !matches!(summary.arranged, Some("plugin" | "fill")))
@@ -1081,6 +1161,8 @@ impl ColorsContext {
             stated_ground,
             plugins,
             summaries,
+            object_labels,
+            object_sources,
             now,
             by_color,
             painter,
@@ -1109,8 +1191,12 @@ impl ColorsContext {
     fn regrounded(&self, ground: Color) -> Option<Self> {
         let mut context = self.clone();
         context.score.background = ground;
-        (context.now, context.by_color) =
-            drawings(&context.painter, &context.score, &context.colorable)?;
+        (context.now, context.by_color) = drawings(
+            &context.painter,
+            &context.score,
+            &context.colorable,
+            &context.object_sources,
+        )?;
         let layers: Vec<usize> = context.layers().collect();
         context.pairs = touching(&layers, &context.colorable, &context.now);
         context.ground_from = Some(self.ground());
@@ -1901,7 +1987,7 @@ const SYSTEM_JA: &str = "あなたは、作品の配色を決める係です。
 1. 主の配色の法則（main_law）を一つ決めます。画を見た人が最初に感じ取る、色の骨組みになる法則です。支える法則の数は決めません。この画ですでに成り立っている法則（本文の「この作品で当てられる法則と選べる値」に印がある）は、主には選べません。支えには使えます。主には、画の色を変える法則を選びます。画を何も変えない答えは退けられます。
 2. C9・D1・D2・D5・B19・B20 は、当てる層を法則の値（layer・layers）で選びます。
 3. 記述が色の言葉で言った層と地は、道具が決めました（「記述の色」に書いたもの）。その色は、どの法則でも替えません（替える答えは退けられます）。
-4. 層の要約に fixed がある層は、前の段が色を決めた層です。色を替えてかまいませんが、空気遠近 B15 の遠い層は、地との描いた明るさの差を 0.2 以上で、遠くない層のうち地との差がいちばん大きい層より小さく保ちます（遠い物ほど地に溶けます）。文様 C2 の層は、地から見えるように保ちます。差し込みの形の層（arranged が plugin）は、色を替えられません。
+4. 層の要約に fixed がある層は、前の段が色を決めた層です。色を替えてかまいませんが、空気遠近 B15 の遠い層は、地との描いた明るさの差を 0.2 以上で、遠くない層のうち地との差がいちばん大きい層より小さく保ちます（遠い物ほど地に溶けます）。文様 C2 の層は、地から見えるように保ちます。情景の語の層（arranged が plugin）は、色を替えられません。
 5. 色の元は一つです: colors（各層の色。B17〜B20 のどれかを使う時だけ書く）か、C8 か、どちらも無し（楽譜の色のまま）。D1・D5・D7 は値を一つ選ぶだけで、ほかの層の色は道具が色相環の位置と描いた明るさで決めます。その上に、B11・B13・B14・B16・C7・C9・D2・D3・D4・D6 が重なります。
 6. 地（背景）は画面の大部分を占め、画の色の印象をほとんど決めます（「画面」に割合を書きました）。記述が地の色を言っていない時は、地の色も選べます（ground）。地を替えると、道具が全ての層を新しい地の上で見て確かめます。
 7. 色の表の looks（見え方）と wheel・place（色相環の位置）は、その名が実際に描く絵具のものです。名と違う色に見える絵具があります（暗い黄がオリーブに見える、など）。補色・類似色・色相の対比・色の和音・寒暖は、名でなく、この位置で決まります。二つの名が同じ絵具の時は、一つの色と数えます。
@@ -1918,7 +2004,7 @@ Rules:
 1. Choose one main color law (main_law): the color framework a viewer feels first. The number of laws that support it is not fixed. A law that already holds in this picture (marked in “The laws this work can take and their values” in the message) cannot be the main law; it can support. As the main law, choose a law that changes the picture's colors. An answer that changes nothing in the picture is refused.
 2. C9, D1, D2, D5, B19 and B20 choose the layers they work on by their values (layer, layers).
 3. The tool has decided the layers and the ground whose colors the description states in color words (listed under “Stated colors”). No law changes those colors; an answer that does is refused.
-4. A layer with fixed in its summary got its color from the previous stage. It may be recolored, but a distant layer of aerial perspective B15 keeps a drawn lightness difference from the ground of 0.2 or more and less than that of the layer, among the ones not distant, farthest from the ground (distant things melt into the ground), and a pattern layer of C2 stays seen against the ground. A plugged-in layer (arranged plugin) cannot change its color.
+4. A layer with fixed in its summary got its color from the previous stage. It may be recolored, but a distant layer of aerial perspective B15 keeps a drawn lightness difference from the ground of 0.2 or more and less than that of the layer, among the ones not distant, farthest from the ground (distant things melt into the ground), and a pattern layer of C2 stays seen against the ground. A scene word layer (arranged plugin) cannot change its color.
 5. The colors come from one source: colors (each layer's color, written only with one of B17 to B20), or C8, or neither (the Score's colors stay). D1, D5 and D7 take one value, and the tool decides the other layers' colors by their places on the color wheel and their drawn lightness. B11, B13, B14, B16, C7, C9, D2, D3, D4 and D6 come on top.
 6. The ground (the background) covers most of the canvas and decides most of the picture's impression of color (its share is under “Canvas”). When the description does not state the ground's color, the ground's color may be chosen too (ground). On a new ground, the tool looks at every layer on it again and checks them.
 7. In the color table, looks (how it looks) and wheel and place (its place on the color wheel) describe the paint the name actually draws. Some paints look like another color than their name (a dark yellow looks olive, for one). Complements, analogous colors, hue contrast, chords and warm and cool go by these places, not by the names. Two names that draw one paint count as one color.
@@ -1930,8 +2016,8 @@ Return the answer as JSON of the given shape. In laws, key each law you use by i
 /// The legend of the Score's layers, a table since 2026-10-25 (one line a
 /// layer instead of a JSON object repeating every key).
 const LAYER_NOTE: [&str; 2] = [
-    "## 楽譜の層の表\n本文の楽譜の層は表で示す。1 行目が欄の名で、2 行目から 1 層 1 行。欄は | で、一つの欄の中の値はコンマで区切る（- は無し）。box は層の痕が占める矩形 x0,y0,x1,y1（画面を 0〜1 とする）、mark_size は痕1つの幅,高さ。arranged は並べ方: place は1か所に置く（数が2以上なら同じ所に重ねた束）、row_horizontal・row_vertical・row_diagonal は列、grid は格子、scatter は散らす、fill はほかの形の中に塗り込める形、plugin は差し込みの形（色を替えられない）。",
-    "## The table of the Score's layers\nThe message shows the Score's layers as a table: the first line names the columns, and each line after it is one layer. Columns are separated by |, and the values inside one column by commas (- is none). box is the rectangle x0,y0,x1,y1 the layer's marks cover (the canvas is 0 to 1); mark_size is the width,height of one mark. arranged is how the layer is arranged: place puts it at one spot (with a count of 2 or more, a bundle at that spot), row_horizontal, row_vertical and row_diagonal are rows, grid is a grid, scatter scatters, fill is a shape filled inside another shape, and plugin is a plugged-in shape (its color cannot change).",
+    "## 楽譜の層の表\n本文の楽譜の層は表で示す。1 行目が欄の名で、2 行目から 1 層 1 行。欄は | で、一つの欄の中の値はコンマで区切る（- は無し）。box は層の痕が占める矩形 x0,y0,x1,y1（画面を 0〜1 とする）、mark_size は痕1つの幅,高さ。arranged は並べ方: place は1か所に置く（数が2以上なら同じ所に重ねた束）、row_horizontal・row_vertical・row_diagonal は列、grid は格子、scatter は散らす、fill はほかの形の中に塗り込める形、plugin は情景の語（色を替えられない）。",
+    "## The table of the Score's layers\nThe message shows the Score's layers as a table: the first line names the columns, and each line after it is one layer. Columns are separated by |, and the values inside one column by commas (- is none). box is the rectangle x0,y0,x1,y1 the layer's marks cover (the canvas is 0 to 1); mark_size is the width,height of one mark. arranged is how the layer is arranged: place puts it at one spot (with a count of 2 or more, a bundle at that spot), row_horizontal, row_vertical and row_diagonal are rows, grid is a grid, scatter scatters, fill is a shape filled inside another shape, and plugin is a scene word (its color cannot change).",
 ];
 
 const LAYER_COLUMNS: &str = "layer | shape | tool | count | color | filled | arranged | box | mark_size | handling | area | contrast | chroma | unseen | neighbors | fixed | stated";
@@ -2439,7 +2525,7 @@ impl ColorsContext {
 
     /// The Score's layers as the request's table: the columns, then a row a
     /// layer (2026-10-25: a table instead of a JSON object a row).
-    fn layer_lines(&self) -> Vec<String> {
+    fn layer_lines(&self, language: ResolvedInstructionLanguage) -> Vec<String> {
         let mut rows = vec![LAYER_COLUMNS.to_owned()];
         rows.extend(self.summaries.iter().map(|summary| {
             let layer = summary.layer;
@@ -2470,12 +2556,20 @@ impl ColorsContext {
                 stated: self.stated.get(&layer).cloned(),
             };
             let summary = &line.summary;
+            let object = self.object_labels.get(&summary.layer);
+            let shape = object.map_or_else(
+                || summary.shape.to_owned(),
+                |(ja, en)| match language {
+                    ResolvedInstructionLanguage::Ja => ja.clone(),
+                    ResolvedInstructionLanguage::En => en.clone(),
+                },
+            );
             laws::table_row(&[
                 json!(summary.layer),
-                json!(summary.shape),
+                json!(shape),
                 json!(summary.tool),
                 json!(summary.count),
-                json!(summary.color),
+                json!(if object.is_some() { "" } else { summary.color }),
                 json!(summary.filled),
                 json!(summary.arranged),
                 json!(summary.covered),
@@ -2871,7 +2965,13 @@ impl ColorsContext {
             }
             .to_owned(),
         );
-        lines.extend(self.layer_lines());
+        lines.extend(self.layer_lines(language));
+        if !self.object_labels.is_empty() {
+            lines.push(match language {
+                ResolvedInstructionLanguage::Ja => "shape が ｛名｝ の層は物の語（見えない四角の中の絵）。色の引数か主の色があるとき色を替えられる。色の欄が空でも、箱の仮の黒を描いた色として数えない。".to_owned(),
+                ResolvedInstructionLanguage::En => "A layer whose shape is {name} is an object word (a picture inside an invisible square). Recolor it when its definition has a color parameter or a primary color. An empty color cell does not count the box's placeholder black as a drawn color.".to_owned(),
+            });
+        }
         lines.push(String::new());
         let table = self.table(at);
         let row = table.iter().find(|row| row.name == ground);
@@ -3223,7 +3323,7 @@ fn kept_because(context: &ColorsContext, layer: usize) -> Option<(String, String
     }
     context.plugins.contains(&layer).then(|| {
         (
-            "差し込みの形の色".to_owned(),
+            "情景の語の色".to_owned(),
             "a plugged-in shape whose color cannot change".to_owned(),
         )
     })
@@ -3649,6 +3749,9 @@ impl<'a> Painting<'a> {
     fn set_layer_color(&mut self, layer: usize, color: Color) {
         for position in self.positions(layer) {
             paint_instruction(&mut self.out.score.instructions[position], color);
+            if let Some(from) = self.context.object_sources.get(&layer) {
+                paint_object_template(&mut self.out.score, position, *from, color);
+            }
         }
         self.out.cycles.remove(&layer);
     }

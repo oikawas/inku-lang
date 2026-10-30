@@ -59,6 +59,9 @@
 	let descriptionDdlSystemExpanded = $state(false);
 	let descriptionReviewSystemExpanded = $state(false);
 	const readingSystem = $derived(systemPrompts.state === 'recorded' ? systemPrompts.reading : null);
+	// The composition and laws, between the reading and the writing (2026-10-26).
+	let descriptionCompositionSystemExpanded = $state(false);
+	const descriptionCompositionSystem = $derived(systemPrompts.state === 'recorded' ? systemPrompts.description_composition : null);
 	const descriptionDdlSystem = $derived(systemPrompts.state === 'recorded' ? systemPrompts.description_ddl : null);
 	const descriptionReviewSystem = $derived(systemPrompts.state === 'recorded' ? systemPrompts.description_review : null);
 	const readAndDrawSent = $derived(!!(readingSystem || descriptionDdlSystem || descriptionReviewSystem));
@@ -98,7 +101,7 @@
 
 <!-- The sketch, the composition reading, the laws stage and the color stage: what each was given, then its system prompt. -->
 {#snippet sentStage(
-	kind: 'catalog' | 'image_catalog' | 'image_ddl' | 'image_review' | 'sketch' | 'composition' | 'laws' | 'colors' | 'reading' | 'description_ddl' | 'description_review',
+	kind: 'catalog' | 'image_catalog' | 'image_ddl' | 'image_review' | 'sketch' | 'composition' | 'laws' | 'colors' | 'reading' | 'description_composition' | 'description_ddl' | 'description_review',
 	inputLabel: string,
 	systemLabel: string,
 	sent: SentSystemPrompt | null,
@@ -154,6 +157,9 @@
 		{@render sentStage('sketch', t().promptSketchInput, t().promptSketchSystem, sketchSystem, sketchSystemExpanded, () => (sketchSystemExpanded = !sketchSystemExpanded))}
 		{#if readAndDrawSent}
 			{@render sentStage('reading', t().promptReadingInput, t().promptReadingSystem, readingSystem, readingSystemExpanded, () => (readingSystemExpanded = !readingSystemExpanded))}
+			{#if descriptionCompositionSystem}
+				{@render sentStage('description_composition', t().promptDescriptionCompositionInput, t().promptDescriptionCompositionSystem, descriptionCompositionSystem, descriptionCompositionSystemExpanded, () => (descriptionCompositionSystemExpanded = !descriptionCompositionSystemExpanded))}
+			{/if}
 			{@render sentStage('description_ddl', t().promptDescriptionDdlInput, t().promptDescriptionDdlSystem, descriptionDdlSystem, descriptionDdlSystemExpanded, () => (descriptionDdlSystemExpanded = !descriptionDdlSystemExpanded))}
 			{@render sentStage('description_review', t().promptDescriptionReviewInput, t().promptDescriptionReviewSystem, descriptionReviewSystem, descriptionReviewSystemExpanded, () => (descriptionReviewSystemExpanded = !descriptionReviewSystemExpanded))}
 		{/if}

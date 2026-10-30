@@ -1166,7 +1166,7 @@ pub(crate) fn render_surface(
                 path.set_attr("filter", format!("url(#{id})"));
             }
             // A fitted frame's region covers its paper (render engine 93).
-            let paper = context.canvas.paper();
+            let paper = context.clip_canvas.unwrap_or(context.canvas).paper();
             let mut mask = Element::new("mask")
                 .attr("id", &mask_id)
                 .attr("maskUnits", "userSpaceOnUse")
@@ -1203,6 +1203,7 @@ mod tests {
     fn context<'a>(colors: &'a BTreeMap<String, String>) -> MarkContext<'a> {
         MarkContext {
             canvas: CanvasSize::new(1000.0, 1000.0),
+            clip_canvas: None,
             color_map: colors,
             work_assignment: colors,
             render_seed: Some(431),

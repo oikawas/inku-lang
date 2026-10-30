@@ -350,7 +350,7 @@ test('T-15  every test that existed before this contract still runs and still pa
 
 	const run = spawnSync(
 		process.execPath,
-		['--import', './scripts/ts-extensionless-resolve.mjs', '--test', '--test-reporter=tap',
+		['--import', './scripts/ts-extensionless-resolve.mjs', '--import', './scripts/model-reference-test-setup.mjs', '--test', '--test-reporter=tap',
 			...others.map((f) => relative(WEB, f))],
 		// NODE_TEST_CONTEXT is how the runner tells a process it is already inside
 		// one. Inherited, the child reports "skipping running files" and runs

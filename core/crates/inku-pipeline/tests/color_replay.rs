@@ -25,6 +25,7 @@ use serde_json::{Value, json};
 
 /// Limits wide enough for any of the prototype's descriptions.
 const LIMITS: PromptLimits = PromptLimits {
+    max_offered_plugins: 8,
     max_catalog_entries: 16,
     max_summary_bytes: 1024,
     max_catalog_serialized_bytes: 32768,
@@ -123,6 +124,7 @@ fn paints_the_recorded_answers_again() {
             seeds,
             error_policy: ScoreErrorPolicy::OmitAndContinue,
             description,
+            plugins: &[],
         });
         let row = match context {
             None => json!({"id": item["id"], "state": "no_context"}),

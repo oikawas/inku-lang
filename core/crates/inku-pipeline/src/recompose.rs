@@ -375,7 +375,8 @@ fn read_layers(
         }
         pinned_group = None;
         let after_pinned = read.last().is_some_and(|last| last.pinned.is_some());
-        if matches!(instruction.entity.head, SemanticHead::MacroInvocation(_)) {
+        if matches!(&instruction.entity.head, SemanticHead::MacroInvocation(head) if head.object_aspect.is_none())
+        {
             // A plugin word is not a plan layer and the composition never places it.
             if range.is_some() || instruction.position.is_some() {
                 return Err("unsupported_sentence");
@@ -422,6 +423,19 @@ fn read_layers(
             });
         }
         let Some(range) = range else {
+            if matches!(&instruction.entity.head, SemanticHead::MacroInvocation(head) if head.object_aspect.is_some())
+                && instruction.entity.numeric_position.is_some()
+            {
+                let boxed = pinned_box(instruction, &layer).ok_or("unsupported_sentence")?;
+                read.push(ReadLayer {
+                    layer,
+                    moving: None,
+                    current: None,
+                    bounds: None,
+                    pinned: Some(vec![boxed]),
+                });
+                continue;
+            }
             if layer.attributes.contains_key(&WorkPlanSlot::Position) {
                 read.push(ReadLayer {
                     layer,

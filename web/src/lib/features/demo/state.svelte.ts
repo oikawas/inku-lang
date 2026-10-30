@@ -1,6 +1,7 @@
 import { composeFallbackValue } from '../../composeFallback.ts';
 import { DEFAULT_DEMO_SETTINGS, demoInstructionModelGroups, type DemoSettings } from '../../demo.ts';
-import { qualifiedModelId, splitModelRef, type ProviderGroup } from '../../models.ts';
+import { qualifiedModelRef, splitModelReference, type ProviderGroup } from '../../models.ts';
+import { loadModelReferences } from '../../modelReferences';
 import type { CanvasAspectId } from '../../plugins/system/canvas-aspect/index.ts';
 import type { ApiFetch } from '../../transport/api-fetch.ts';
 import type {
@@ -81,6 +82,7 @@ export class DemoState<TResult extends CurrentWorkResult = CurrentWorkResult> {
 
 	private readonly deps: DemoStateDependencies;
 	private runIdentity = 0;
+	private settingsRevision = 0;
 	private activeRefreshAfterRun: (() => Promise<void>) | null = null;
 
 	constructor(deps: DemoStateDependencies) {
@@ -97,7 +99,7 @@ export class DemoState<TResult extends CurrentWorkResult = CurrentWorkResult> {
 	normalizeSettings(settings: DemoSettings): DemoSettings {
 		// Older rows kept the provider inside prompt_model. Normalize that legacy
 		// representation at the same boundary as current server responses.
-		const prompt = splitModelRef(settings.prompt_model || DEFAULT_DEMO_SETTINGS.prompt_model);
+		const prompt = splitModelReference(settings.prompt_model || DEFAULT_DEMO_SETTINGS.prompt_model);
 		return {
 			save_db: !!settings.save_db,
 			save_files: !!settings.save_files,
@@ -114,18 +116,33 @@ export class DemoState<TResult extends CurrentWorkResult = CurrentWorkResult> {
 			this.resetForSignedOut();
 			return;
 		}
+		const revision = this.settingsRevision;
 		try {
 			const response = await this.deps.apiFetch('/api/auth/me/demo-settings', { cache: 'no-store' });
 			if (!response.ok) throw new Error(`HTTP ${response.status}`);
-			this.settings = this.normalizeSettings(await response.json() as DemoSettings);
+			const saved = await response.json() as DemoSettings;
+			await loadModelReferences([{action: 'split_ref', ref: saved.prompt_model || DEFAULT_DEMO_SETTINGS.prompt_model}]);
+			if (revision !== this.settingsRevision || !this.deps.signedIn()) return;
+			this.settings = this.normalizeSettings(saved);
 			this.settingsLoaded = true;
 		} catch (cause) {
+			if (revision !== this.settingsRevision) return;
 			this.resetForSignedOut();
 			this.warn('failed to load demo settings', cause);
 		}
 	}
 
 	async saveSettings(settings: DemoSettings): Promise<void> {
+		const revision = this.settingsRevision;
+		this.settings = this.normalizeSettings(settings);
+		if (!this.deps.signedIn() || !this.settingsLoaded) return;
+		try {
+			await loadModelReferences([{action: 'split_ref', ref: settings.prompt_model || DEFAULT_DEMO_SETTINGS.prompt_model}]);
+		} catch (cause) {
+			this.warn('failed to resolve demo model', cause);
+			return;
+		}
+		if (revision !== this.settingsRevision || !this.deps.signedIn()) return;
 		const next = this.normalizeSettings(settings);
 		this.settings = next;
 		if (!this.deps.signedIn() || !this.settingsLoaded) return;
@@ -136,7 +153,10 @@ export class DemoState<TResult extends CurrentWorkResult = CurrentWorkResult> {
 				body: JSON.stringify(next),
 			});
 			if (!response.ok) throw new Error(`HTTP ${response.status}`);
-			this.settings = this.normalizeSettings(await response.json() as DemoSettings);
+			const saved = await response.json() as DemoSettings;
+			await loadModelReferences([{action: 'split_ref', ref: saved.prompt_model || DEFAULT_DEMO_SETTINGS.prompt_model}]);
+			if (revision !== this.settingsRevision || !this.deps.signedIn()) return;
+			this.settings = this.normalizeSettings(saved);
 		} catch (cause) {
 			this.warn('failed to save demo settings', cause);
 		}
@@ -161,6 +181,7 @@ export class DemoState<TResult extends CurrentWorkResult = CurrentWorkResult> {
 	}
 
 	resetForSignedOut(): void {
+		this.settingsRevision++;
 		this.settings = { ...DEFAULT_DEMO_SETTINGS };
 		this.settingsLoaded = false;
 	}
@@ -371,7 +392,7 @@ export class DemoState<TResult extends CurrentWorkResult = CurrentWorkResult> {
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				seed_phrase: settings.seed_phrase,
-				model: qualifiedModelId(settings.prompt_provider, settings.prompt_model),
+				model: qualifiedModelRef(settings.prompt_provider, settings.prompt_model),
 				instruction_lang: this.deps.instructionLang(),
 				ui_lang: this.deps.uiLang(),
 			}),

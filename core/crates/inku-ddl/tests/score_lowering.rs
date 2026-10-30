@@ -579,15 +579,15 @@ fn shared_shape_macro_parameters_and_locals_use_the_same_consumer() {
             };
             let definition = MacroDefinition::from_json(&json!({"schema":"inku.macro-definition.v1","namespace":"Shape","heading":"Mark","version":"1.0.0","parameters": if route == "parameter" { json!({"input":schema}) } else {json!({})},"components":{},"body":body}).to_string()).unwrap();
             let source = if route == "parameter" {
-                format!("Shape.Mark {caller}")
+                format!("｛Mark｝ {caller}")
             } else {
-                "Shape.Mark".to_owned()
+                "｛Mark｝".to_owned()
             };
             for policy in [ScoreErrorPolicy::Stop, ScoreErrorPolicy::OmitAndContinue] {
                 let invalid_source = if route == "parameter" {
-                    "Shape.Mark".to_owned()
+                    "｛Mark｝".to_owned()
                 } else {
-                    format!("Shape.Mark {caller}")
+                    format!("｛Mark｝ {caller}")
                 };
                 let execution = inku_ddl::compile_ddl_to_score(
                     NormalizedDdlDocument::new(
@@ -813,7 +813,7 @@ fn declared_and_literal_macro_positions_match_ordinary_and_keep_generated_owners
     ] {
         let parameter = parameter_bound_definition();
         let generated = stage15_locked(
-            &format!("Param.One red place {word} pencil"),
+            &format!("｛One｝ red place {word} pencil"),
             ResolvedInstructionLanguage::En,
             std::slice::from_ref(&parameter),
         );
@@ -828,7 +828,7 @@ fn declared_and_literal_macro_positions_match_ordinary_and_keep_generated_owners
             fields[key] = serde_json::json!({"expr":"semantic_ref", "category":category, "id":id});
         }
         let literal = MacroDefinition::from_json(&literal.to_string()).unwrap();
-        let literal = stage15_locked("Param.One", ResolvedInstructionLanguage::En, &[literal]);
+        let literal = stage15_locked("｛One｝", ResolvedInstructionLanguage::En, &[literal]);
         let direct = stage15_seeded(
             &format!("place one red circle at {word}."),
             ResolvedInstructionLanguage::En,
@@ -890,8 +890,7 @@ fn noncenter_macro_relation_is_delivered_in_both_modes() {
                 serde_json::json!({"op":"relation", "kind":kind, "from":"first", "to":"second"}),
             );
             let definition = MacroDefinition::from_json(&definition.to_string()).unwrap();
-            let result =
-                stage15_locked("Draw.Pair", ResolvedInstructionLanguage::En, &[definition]);
+            let result = stage15_locked("｛Pair｝", ResolvedInstructionLanguage::En, &[definition]);
             for policy in [ScoreErrorPolicy::Stop, ScoreErrorPolicy::OmitAndContinue] {
                 let lowered = lower_verified_stage15_score_with_policy(
                     result.verified_effective_view(),
@@ -1206,7 +1205,7 @@ fn endpoint_family_explicit_geometry_and_japanese_point_reach_the_same_typed_low
 fn endpoint_family_normal_flat_macro_emit_uses_the_same_effective_defaults() {
     let definition = endpoint_family_emit_definition();
     let macro_result = stage15_locked(
-        "Endpoint.Normal!",
+        "｛Normal｝!",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
     );
@@ -1556,7 +1555,7 @@ fn relation_requires_original_surviving_direct_referents_and_retains_dependents(
 
     let macro_before_direct_referents = stage15_locked(
         concat!(
-            "Draw.Pair! ",
+            "｛Pair｝! ",
             "place one red circle at center. ",
             "place one blue ellipse at center. ",
             "place one green square at center between the previous two."
@@ -1580,7 +1579,7 @@ fn relation_requires_original_surviving_direct_referents_and_retains_dependents(
     );
 
     let macro_referent = stage15_locked(
-        "Draw.Pair! place one green square at center not touching the previous shape.",
+        "｛Pair｝! place one green square at center not touching the previous shape.",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
     );
@@ -2658,7 +2657,7 @@ fn surface_intensity_reaches_direct_and_macro_scores_with_owned_provenance() {
             }}]
         }).to_string()).unwrap();
         let transformed = stage15_locked(
-            &format!("place one red flat {level} circle at center. Draw.Intensity"),
+            &format!("place one red flat {level} circle at center. ｛Intensity｝"),
             ResolvedInstructionLanguage::En,
             &[definition],
         );
@@ -2761,7 +2760,7 @@ fn delivered_surface_ids_use_shared_defaults_and_flat_macro_parity() {
     ] {
         let definition = surface_emit_definition(surface);
         let result = stage15_locked(
-            "Draw.Surface",
+            "｛Surface｝",
             ResolvedInstructionLanguage::En,
             std::slice::from_ref(&definition),
         );
@@ -2786,7 +2785,7 @@ fn delivered_surface_ids_use_shared_defaults_and_flat_macro_parity() {
 
     let definition = surface_emit_definition("grain");
     let paired = stage15_locked(
-        "place one red grain circle at center; Draw.Surface",
+        "place one red grain circle at center; ｛Surface｝",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
     );
@@ -2807,7 +2806,7 @@ fn flat_macro_thinness_uses_literal_and_component_parameter_through_the_shared_l
     let definition = thinness_pair_definition();
     let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
     let paired = stage15_locked(
-        "place one thin red circle at center. Draw.ThinnessPair",
+        "place one thin red circle at center. ｛ThinnessPair｝",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
     );
@@ -2834,7 +2833,7 @@ fn flat_macro_thinness_uses_literal_and_component_parameter_through_the_shared_l
     ));
 
     let caller = stage15_locked(
-        "place one green circle at center. extra-fine Draw.ThinnessPair",
+        "place one green circle at center. extra-fine ｛ThinnessPair｝",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
     );
@@ -2855,11 +2854,15 @@ fn flat_macro_thinness_uses_literal_and_component_parameter_through_the_shared_l
         stop.gaps()
             .contains(&ScoreFieldGap::UnboundMacroCallerMeaning)
     );
-    assert_eq!(continued.score().unwrap().instructions.len(), 1);
+    assert_eq!(continued.score().unwrap().instructions.len(), 3);
     assert_eq!(continued.score().unwrap().instructions[0].thinness, None);
     assert!(matches!(
         continued.instruction_origins(),
-        [ScoreInstructionOrigin::SourceInstruction { .. }]
+        [
+            ScoreInstructionOrigin::SourceInstruction { .. },
+            ScoreInstructionOrigin::MacroEmit { .. },
+            ScoreInstructionOrigin::MacroEmit { .. }
+        ]
     ));
 }
 
@@ -3217,7 +3220,7 @@ fn absent_count_and_size_remain_unspecified() {
 fn mixed_owner_view_keeps_expansion_with_exact_identity_and_order() {
     let definition = center_emit_definition();
     let result = stage15_locked(
-        "place one thin pencil line at the center. place circle and Focus.Center at center.",
+        "place one thin pencil line at the center. place circle and ｛Center｝ at center.",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
     );
@@ -3262,7 +3265,7 @@ fn mixed_owner_view_keeps_expansion_with_exact_identity_and_order() {
 fn complete_flat_macro_sequence_reaches_actual_score() {
     let definition = complete_flat_emit_definition();
     let result = stage15_locked(
-        "one Draw.Pair",
+        "one ｛Pair｝",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
     );
@@ -3304,7 +3307,7 @@ fn complete_flat_macro_sequence_reaches_actual_score() {
     )
     .unwrap();
     let empty = stage15_locked(
-        "Draw.Empty",
+        "｛Empty｝",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&empty_definition),
     );
@@ -3322,12 +3325,12 @@ fn complete_flat_macro_sequence_reaches_actual_score() {
 fn macro_caller_action_omits_only_action_and_preserves_the_macro_body() {
     let definition = complete_flat_emit_definition();
     let baseline = stage15_locked(
-        "Draw.Pair",
+        "｛Pair｝",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
     );
     let action = stage15_locked(
-        "scatter Draw.Pair",
+        "scatter ｛Pair｝",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
     );
@@ -3377,32 +3380,74 @@ fn macro_caller_action_omits_only_action_and_preserves_the_macro_body() {
     )));
 
     let still_unbound = stage15_locked(
-        "extra-fine Draw.Pair",
+        "extra-fine ｛Pair｝",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
     );
-    let stopped = lower_verified_stage15_score_with_policy(
+    let recovered_thinness = lower_verified_stage15_score_with_policy(
         still_unbound.verified_effective_view(),
         context,
         ScoreErrorPolicy::OmitAndContinue,
     );
-    assert_eq!(stopped.outcome(), ScoreLoweringOutcome::Stopped);
-    assert!(stopped.score().is_none());
-    assert!(stopped.instruction_origins().is_empty());
-    assert!(stopped.diagnostics().iter().any(|diagnostic| matches!(
-        diagnostic.disposition,
-        ScoreDiagnosticDisposition::Omitted {
-            unit: ScoreOmissionUnit::MacroInvocation { .. },
-            ..
-        }
-    )));
+    assert_eq!(
+        recovered_thinness.outcome(),
+        ScoreLoweringOutcome::CompleteWithOmissions
+    );
+    assert_eq!(recovered_thinness.score(), baseline.score());
+    assert!(
+        recovered_thinness
+            .diagnostics()
+            .iter()
+            .any(|diagnostic| matches!(
+                diagnostic.disposition,
+                ScoreDiagnosticDisposition::Omitted {
+                    unit: ScoreOmissionUnit::MacroCallerField {
+                        field: ScoreMacroCallerField::Thinness,
+                        ..
+                    },
+                    ..
+                }
+            ))
+    );
+}
+
+#[test]
+fn macro_caller_position_and_scale_keep_the_generated_body() {
+    let definition = complete_flat_emit_definition();
+    let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
+    let baseline = stage15_locked(
+        "｛Pair｝",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+    );
+    let baseline = lower_verified_stage15_score(baseline.verified_effective_view(), context);
+    for (source, field) in [
+        ("place ｛Pair｝ at bottom", ScoreMacroCallerField::Position),
+        ("large ｛Pair｝", ScoreMacroCallerField::RelativeScale),
+    ] {
+        let result = stage15_locked(
+            source,
+            ResolvedInstructionLanguage::En,
+            std::slice::from_ref(&definition),
+        );
+        let lowered = lower_verified_stage15_score(result.verified_effective_view(), context);
+        assert_eq!(
+            lowered.outcome(),
+            ScoreLoweringOutcome::CompleteWithOmissions,
+            "{source}"
+        );
+        assert_eq!(lowered.score(), baseline.score(), "{source}");
+        assert!(lowered.diagnostics().iter().any(|d| matches!(d.disposition,
+            ScoreDiagnosticDisposition::Omitted { unit: ScoreOmissionUnit::MacroCallerField { field: actual, .. }, .. } if actual == field
+        )), "{source}: {:?}", lowered.diagnostics());
+    }
 }
 
 #[test]
 fn macro_continuation_executes_once_and_keeps_source_ordinal_at_no_score_boundary() {
     let definition = complete_center_emit_definition();
     let result = stage15_locked(
-        "a Focus.Center; the red Focus.Center; a Focus.Center",
+        "a ｛Center｝; the red ｛Center｝; a ｛Center｝",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
     );
@@ -3496,7 +3541,7 @@ fn direct_macro_direct_order_and_same_effective_input_share_the_lowerer() {
     let result = stage15_locked(
         concat!(
             "place one red circle at center; ",
-            "Draw.Pair; ",
+            "｛Pair｝; ",
             "place one blue square at center"
         ),
         ResolvedInstructionLanguage::En,
@@ -3551,12 +3596,12 @@ fn japanese_and_english_four_shape_macro_uses_shared_defaults_and_geometry() {
     let context =
         ScoreLoweringContext::resolve_with_palette("wide", Color::White, palette).unwrap();
     let ja = stage15_locked(
-        "Draw.Defaults",
+        "｛Defaults｝",
         ResolvedInstructionLanguage::Ja,
         std::slice::from_ref(&definition),
     );
     let en = stage15_locked(
-        "Draw.Defaults",
+        "｛Defaults｝",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
     );
@@ -3592,7 +3637,7 @@ fn flat_macro_angle_uses_the_shared_resolver_for_square() {
     let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
     let horizontal = angle_emit_definition("circle", "horizontal");
     let macro_horizontal = stage15_locked(
-        "Angle.Mark",
+        "｛Mark｝",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&horizontal),
     );
@@ -3612,7 +3657,7 @@ fn flat_macro_angle_uses_the_shared_resolver_for_square() {
 
     let circle = angle_emit_definition("circle", "rotated");
     let result = stage15_locked(
-        "Angle.Mark",
+        "｛Mark｝",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&circle),
     );
@@ -3637,7 +3682,7 @@ fn flat_macro_angle_uses_the_shared_resolver_for_square() {
 
     let left_facing = angle_emit_definition("circle", "left_rising");
     let result = stage15_locked(
-        "Angle.Mark",
+        "｛Mark｝",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&left_facing),
     );
@@ -3647,7 +3692,7 @@ fn flat_macro_angle_uses_the_shared_resolver_for_square() {
 
     let square = angle_emit_definition("square", "horizontal");
     let result = stage15_locked(
-        "place one green circle at center. Angle.Mark",
+        "place one green circle at center. ｛Mark｝",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&square),
     );
@@ -3664,7 +3709,7 @@ fn flat_macro_angle_uses_the_shared_resolver_for_square() {
 fn parameter_bound_fields_and_an_unused_parameter_lower_once() {
     let definition = parameter_bound_definition();
     let result = stage15_locked(
-        "Param.One red place center pencil",
+        "｛One｝ red place center pencil",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
     );
@@ -3686,7 +3731,7 @@ fn declared_core_thinness_source_reaches_actual_score() {
         r#"{"schema":"inku.macro-definition.v1","namespace":"Core","heading":"Mark","version":"1.0.0","parameters":{"width":{"type":"semantic_ref","category":"thinness"}},"components":{},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"},"thinness":{"expr":"parameter","name":"width"}}}]}"#,
     ).unwrap();
     let result = stage15_locked(
-        "Core.Mark thin",
+        "｛Mark｝ thin",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
     );
@@ -3724,28 +3769,28 @@ fn declared_core_fields_and_literals_share_ordinary_effective_score() {
     for (language, source, ordinary, width, scale) in [
         (
             ResolvedInstructionLanguage::En,
-            "thin normal-sized Core.Fields",
+            "thin normal-sized ｛Fields｝",
             "place one thin normal-sized red circle at center.",
             "fine",
             "normal",
         ),
         (
             ResolvedInstructionLanguage::En,
-            "very large Core.Fields extra-fine",
+            "very large ｛Fields｝ extra-fine",
             "place one extra-fine very large red circle at center.",
             "extra_fine",
             "very_large",
         ),
         (
             ResolvedInstructionLanguage::Ja,
-            "細い普通の大きさCore.Fields",
+            "細い普通の大きさ｛Fields｝",
             "細い普通の大きさ赤い円を中心に置く。",
             "fine",
             "normal",
         ),
         (
             ResolvedInstructionLanguage::Ja,
-            "ごく細いとても大きいCore.Fields",
+            "ごく細いとても大きい｛Fields｝",
             "ごく細いとても大きい赤い円を中心に置く。",
             "extra_fine",
             "very_large",
@@ -3760,7 +3805,7 @@ fn declared_core_fields_and_literals_share_ordinary_effective_score() {
         literal["body"][0]["fields"]["relative_scale"] =
             serde_json::json!({"expr":"semantic_ref","category":"relative_scale","id":scale});
         let literal = MacroDefinition::from_json(&literal.to_string()).unwrap();
-        let literal = stage15_locked("Core.Fields", language, &[literal]);
+        let literal = stage15_locked("｛Fields｝", language, &[literal]);
         let mut scores = Vec::new();
         for result in [&generated, &direct, &literal] {
             let lowered = lower_verified_stage15_score(result.verified_effective_view(), context);
@@ -3783,7 +3828,7 @@ fn declared_core_fields_and_literals_share_ordinary_effective_score() {
 fn flat_use_repeat_and_vary_emits_are_consumed_without_origin_rejection() {
     let definition = flat_operator_definition();
     let result = stage15_locked(
-        "Flat.Operators",
+        "｛Operators｝",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
     );
@@ -3827,7 +3872,7 @@ fn macro_group_delivery_keeps_unsupported_emit_and_caller_stop_policy() {
     let cases = [
         (
             missing_movement_definition(),
-            "Bad.MissingMovement",
+            "｛MissingMovement｝",
             ScoreFieldGap::MissingMacroEmitField {
                 key: "movement".to_owned(),
             },
@@ -3836,12 +3881,12 @@ fn macro_group_delivery_keeps_unsupported_emit_and_caller_stop_policy() {
             // Transform bodies are delivered; the colorless emit still needs the
             // resolved palette context the caller did not provide.
             structural_definition(),
-            "Bad.Structure",
+            "｛Structure｝",
             ScoreFieldGap::MissingResolvedPaletteContext,
         ),
         (
             complete_flat_emit_definition(),
-            "red Draw.Pair",
+            "red ｛Pair｝",
             ScoreFieldGap::UnboundMacroCallerMeaning,
         ),
     ];
@@ -3909,7 +3954,7 @@ fn placement_free_nested_macro_group_delivers_typed_along_and_cutting() {
         ]}
     ]));
     let result = stage15_locked(
-        "Draw.Pair",
+        "｛Pair｝",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
     );
@@ -3953,7 +3998,7 @@ fn macro_path_connection_preserves_nonadjacent_host_in_score_and_plan() {
          "target_path_position":"interior"}
     ]);
     let definition = macro_group_definition(body.clone());
-    let transformed = stage15_locked("Draw.Pair", ResolvedInstructionLanguage::En, &[definition]);
+    let transformed = stage15_locked("｛Pair｝", ResolvedInstructionLanguage::En, &[definition]);
     let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
     let lowered = lower_verified_stage15_score(transformed.verified_effective_view(), context);
     assert_eq!(
@@ -3985,7 +4030,7 @@ fn macro_path_connection_preserves_nonadjacent_host_in_score_and_plan() {
 
     body[3]["target_path_position"] = json!({"expr":"number","value":0.375});
     let exact = macro_group_definition(body.clone());
-    let transformed = stage15_locked("Draw.Pair", ResolvedInstructionLanguage::En, &[exact]);
+    let transformed = stage15_locked("｛Pair｝", ResolvedInstructionLanguage::En, &[exact]);
     let lowered = lower_verified_stage15_score(transformed.verified_effective_view(), context);
     assert_eq!(lowered.outcome(), ScoreLoweringOutcome::Complete);
     let score = lowered.score().unwrap();
@@ -4004,7 +4049,7 @@ fn macro_path_connection_preserves_nonadjacent_host_in_score_and_plan() {
         .unwrap()
         .remove("target_path_position");
     let ordinary = macro_group_definition(body);
-    let transformed = stage15_locked("Draw.Pair", ResolvedInstructionLanguage::En, &[ordinary]);
+    let transformed = stage15_locked("｛Pair｝", ResolvedInstructionLanguage::En, &[ordinary]);
     let rejected = lower_verified_stage15_score_with_policy(
         transformed.verified_effective_view(),
         context,
@@ -4044,7 +4089,7 @@ fn macro_rotation_preserves_nested_postorder_ranges_and_fixed_member_indices() {
         ]}
     ]));
     let transformed = stage15_locked(
-        "Draw.Pair",
+        "｛Pair｝",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
     );
@@ -4099,7 +4144,7 @@ fn macro_rotation_keeps_external_connected_intent_in_score_and_plan() {
         ]}
     ]));
     let transformed = stage15_locked(
-        "Draw.Pair",
+        "｛Pair｝",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
     );
@@ -4162,7 +4207,7 @@ fn macro_group_delivery_keeps_nested_order_scope_ids_and_relation_targets() {
     ]));
     assert!(definition.validate().is_valid());
     let transformed = stage15_locked(
-        "place one yellow circle at center; Draw.Pair; place one blue circle at center.",
+        "place one yellow circle at center; ｛Pair｝; place one blue circle at center.",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
     );
@@ -4290,7 +4335,7 @@ fn macro_group_delivery_never_rebinds_across_failed_emit_or_structural_subtree()
         ]);
         let definition = macro_group_definition(json!([{"op":"group","body":body}]));
         let transformed =
-            stage15_locked("Draw.Pair", ResolvedInstructionLanguage::En, &[definition]);
+            stage15_locked("｛Pair｝", ResolvedInstructionLanguage::En, &[definition]);
         for policy in [ScoreErrorPolicy::Stop, ScoreErrorPolicy::OmitAndContinue] {
             let result = lower_verified_stage15_score_with_policy(
                 transformed.verified_effective_view(),
@@ -4369,7 +4414,7 @@ fn explicit_anchor_delivery_keeps_forward_target_owner_and_anchor_only_groups() 
             {"op":"anchor","name":"sibling","fields":{"place":{"expr":"semantic_ref","category":"place","id":"center"}}}
         ]}
     ]));
-    let transformed = stage15_locked("Draw.Pair", ResolvedInstructionLanguage::En, &[definition]);
+    let transformed = stage15_locked("｛Pair｝", ResolvedInstructionLanguage::En, &[definition]);
     let context = ScoreLoweringContext::resolve("square", Color::White).unwrap();
     let lowered = lower_verified_stage15_score_with_policy(
         transformed.verified_effective_view(),
@@ -4420,7 +4465,7 @@ fn explicit_anchor_delivery_keeps_forward_target_owner_and_anchor_only_groups() 
 fn macro_group_delivery_keeps_affine_transform_and_emit_omission_units() {
     let definition = mixed_omission_definition();
     let result = stage15_locked(
-        "Mixed.Omissions",
+        "｛Omissions｝",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
     );
@@ -4482,7 +4527,7 @@ fn macro_group_delivery_keeps_affine_transform_and_emit_omission_units() {
 fn flat_macro_surface_uses_the_same_shared_lowerer() {
     let definition = surface_emit_definition("grain");
     let result = stage15_locked(
-        "Draw.Surface",
+        "｛Surface｝",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
     );
@@ -4703,7 +4748,7 @@ fn fluctuation_closed_words_defaults_and_six_consumers_reach_score() {
             slots.push(("quality", "swaying"));
         }
         let definition = fluctuation_definition(&slots, false, "circle");
-        let result = stage15_locked("Draw.Pair", ResolvedInstructionLanguage::En, &[definition]);
+        let result = stage15_locked("｛Pair｝", ResolvedInstructionLanguage::En, &[definition]);
         let lowered = lower_verified_stage15_score(result.verified_effective_view(), context);
         assert_eq!(
             lowered.outcome(),
@@ -4720,7 +4765,7 @@ fn fluctuation_closed_words_defaults_and_six_consumers_reach_score() {
     }
     for shape in ["line", "arc", "circle", "ellipse", "square", "cloudform"] {
         let definition = fluctuation_definition(&[("quality", "undulating")], false, shape);
-        let result = stage15_locked("Draw.Pair", ResolvedInstructionLanguage::En, &[definition]);
+        let result = stage15_locked("｛Pair｝", ResolvedInstructionLanguage::En, &[definition]);
         let lowered = lower_verified_stage15_score(result.verified_effective_view(), context);
         assert_eq!(
             lowered.outcome(),
@@ -4751,7 +4796,7 @@ fn fluctuation_ordinary_literal_and_declared_macro_share_effective_score_and_own
         (
             ResolvedInstructionLanguage::En,
             "place one red narrowly loosely undulating circle at left-edge.",
-            "Draw.Pair narrowly loosely undulating",
+            "｛Pair｝ narrowly loosely undulating",
             vec![
                 ("amplitude", "narrowly"),
                 ("frequency", "loosely"),
@@ -4762,7 +4807,7 @@ fn fluctuation_ordinary_literal_and_declared_macro_share_effective_score_and_own
         (
             ResolvedInstructionLanguage::Ja,
             "左端に、赤い円をひとつ置く。円は細かくゆるやかに波打つ。",
-            "Draw.Pair 細かくゆるやかに波打つ",
+            "｛Pair｝ 細かくゆるやかに波打つ",
             vec![
                 ("amplitude", "narrowly"),
                 ("frequency", "loosely"),
@@ -4774,7 +4819,7 @@ fn fluctuation_ordinary_literal_and_declared_macro_share_effective_score_and_own
         (
             ResolvedInstructionLanguage::En,
             "place one red narrowly circle at left-edge.",
-            "Draw.Pair narrowly",
+            "｛Pair｝ narrowly",
             vec![("amplitude", "narrowly")],
             vec![ScoreFieldGap::FluctuationAmplitudeWithoutQuality {
                 category: "variation".into(),
@@ -4789,7 +4834,7 @@ fn fluctuation_ordinary_literal_and_declared_macro_share_effective_score_and_own
             &[fluctuation_definition(&slots, true, "circle")],
         );
         let literal = stage15_locked(
-            "Draw.Pair",
+            "｛Pair｝",
             language,
             &[fluctuation_definition(&slots, false, "circle")],
         );
@@ -4830,7 +4875,7 @@ fn fluctuation_rejections_preserve_instruction_invocation_and_emit_units() {
         ResolvedInstructionLanguage::En,
     );
     let point_emit = stage15_locked(
-        "place one blue circle at left-edge. Draw.Pair",
+        "place one blue circle at left-edge. ｛Pair｝",
         ResolvedInstructionLanguage::En,
         &[fluctuation_definition(
             &[("quality", "swaying")],
@@ -4839,7 +4884,7 @@ fn fluctuation_rejections_preserve_instruction_invocation_and_emit_units() {
         )],
     );
     let unbound = stage15_locked(
-        "place one blue circle at left-edge. swaying Draw.Pair",
+        "place one blue circle at left-edge. swaying ｛Pair｝",
         ResolvedInstructionLanguage::En,
         &[fluctuation_definition(&[], false, "circle")],
     );
@@ -4856,14 +4901,14 @@ fn fluctuation_rejections_preserve_instruction_invocation_and_emit_units() {
         .remove("dimension");
     let malformed = MacroDefinition::from_json(&malformed.to_string()).unwrap();
     let malformed = stage15_locked(
-        "place one blue circle at left-edge. Draw.Pair narrowly",
+        "place one blue circle at left-edge. ｛Pair｝ narrowly",
         ResolvedInstructionLanguage::En,
         &[malformed],
     );
     for (result, unit, survivors) in [
         (&point, "instruction", 1),
         (&point_emit, "emit", 1),
-        (&unbound, "invocation", 1),
+        (&unbound, "caller_field", 2),
         (&malformed, "emit", 1),
     ] {
         let stopped = lower_verified_stage15_score_with_policy(
@@ -4904,10 +4949,10 @@ fn fluctuation_rejections_preserve_instruction_invocation_and_emit_units() {
                     ) | (
                         ScoreDiagnosticOwner::MacroInvocation { .. },
                         ScoreDiagnosticDisposition::Omitted {
-                            unit: ScoreOmissionUnit::MacroInvocation { .. },
+                            unit: ScoreOmissionUnit::MacroCallerField { .. },
                             ..
                         },
-                        "invocation",
+                        "caller_field",
                     )
                 )
             }),

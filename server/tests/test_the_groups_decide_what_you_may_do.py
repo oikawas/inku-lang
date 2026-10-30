@@ -238,7 +238,7 @@ def test_t8_the_api_surface_delta_is_exactly_the_three_user_schemas() -> None:
     # The Vision advice of the browser-driven refinement left when the Server
     # took the runs (2026-10-21); the records it wrote remain readable.
     declared_retirements = {
-        "PromptsResponse", "PluginCreateBody", "PluginUpdateBody",
+            "PromptsResponse", "PluginCreateBody", "PluginUpdateBody", "PluginValidateBody",
         "VariationSeedsRequest", "VariationSeedsResponse",
         "VisionRefineAdviceBody", "VisionRefineAdviceResponse",
     }

@@ -32,7 +32,9 @@ public enum ProviderWire {
         let envelope: ExactJSON = .object(["action": .string("pipeline_request"), "connection": connection(provider),
             "model": .string(model), "max_tokens": .integer(maxTokens)])
         // Passing the original prompt preserves variant member order as well as propertyOrdering.
-        let input = Data((String(envelope.text.dropLast()) + ",\"prompt\":" + String(decoding: prompt, as: UTF8.self) + "}").utf8)
+        let transient = try ExactJSON(data: action)["_transient_images"]
+        let images = transient.array == nil ? "" : ",\"images\":" + transient.text
+        let input = Data((String(envelope.text.dropLast()) + ",\"prompt\":" + String(decoding: prompt, as: UTF8.self) + images + "}").utf8)
         return try prepared(evaluate(input), provider: provider, key: key)
     }
 
@@ -41,7 +43,7 @@ public enum ProviderWire {
         guard provider.kind != .chatGPTPlan else { throw HostError("chatgpt_operation_not_supported") }
         guard !model.isEmpty, prompt.maximumTokens > 0, prompt.temperature.isFinite,
               prompt.timeoutSeconds > 0, prompt.timeoutSeconds.isFinite else { throw HostError("invalid_auxiliary_request") }
-        let input: ExactJSON = .object(["action": .string("text_request"), "connection": connection(provider),
+        let input: ExactJSON = .object(["action": .string("text_request_with_count"), "connection": connection(provider),
             "model": .string(model), "system": .string(prompt.system), "text": .string(prompt.message),
             "images": .array(prompt.images.map(ExactJSON.string)),
             "temperature": try ExactJSON(data: JSONEncoder().encode(prompt.temperature)),
@@ -71,8 +73,9 @@ public enum ProviderWire {
         try prepare(action: action, provider: provider, model: model, maxTokens: maxTokens, key: key).request
     }
 
-    static func readResponse(_ data: Data, format: String, status: Int = 200, text: Bool = false) throws -> ExactJSON {
-        try evaluate(ExactJSON.object(["action": .string(text ? "text_response" : "pipeline_response"),
+    static func readResponse(_ data: Data, format: String, status: Int = 200, text: Bool = false, includeUsage: Bool = false) throws -> ExactJSON {
+        let action = text ? (includeUsage ? "text_response_with_usage" : "text_response") : "pipeline_response"
+        return try evaluate(ExactJSON.object(["action": .string(action),
             "format": .string(format), "status": .integer(status), "body": .string(String(decoding: data, as: UTF8.self))]).data)
     }
 

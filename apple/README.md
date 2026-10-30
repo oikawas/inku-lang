@@ -44,7 +44,7 @@ A log-read failure retains its cause. Try loading again retries the read; Dismis
 
 ## Operating systems and build environment
 
-Minimum deployment versions are macOS 14 and iOS 17. SDK versions are independent of deployment minimums. The checked environment uses Xcode 27.0/Swift 6.4, Rust 1.95.0, and XcodeGen 2.46.0. Swift packages require tools 6.1, and the project requires XcodeGen 2.44.0 or newer.
+Minimum deployment versions are macOS 14 and iOS 17. SDK versions are independent of deployment minimums. The checked environment uses Xcode 27.0/Swift 6.4, Rust 1.99.1, and XcodeGen 2.46.0. Swift packages require tools 6.1, and the project requires XcodeGen 2.44.0 or newer.
 
 Building requires macOS, Xcode command-line tools, XcodeGen, Python 3.11 or newer, Node.js 22.13 or newer, uv, and official rustup. Node.js [`stripTypeScriptTypes`](https://nodejs.org/download/release/v22.14.0/docs/api/module.html#modulestriptypescripttypescode-options) extracts Web text, canvas metadata, and Saijiki previews during explicit reference updates. Normal builds use reviewed bundled snapshots; Python/uv also prepare pinned dictionaries. None of these runtimes is embedded in the app. The first build needs network access for pinned Cargo, SwiftPM, and Server uv.lock dependencies.
 
@@ -55,16 +55,14 @@ Key pinned dependencies are UniFFI 0.32.0 and GRDB 7.11.1. Rust versions are gov
 Run these commands from the product repository root. After preparing Xcode and the required tools, install the pinned Rust toolchain and Mac targets. Scripts do not install toolchains or change Xcode or Apple account settings automatically.
 
 ```sh
-rustup toolchain install 1.95.0 --profile minimal --component rustfmt --component clippy
-rustup target add --toolchain 1.95.0 aarch64-apple-darwin x86_64-apple-darwin
+rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy
+rustup target add --toolchain 1.99.1 aarch64-apple-darwin x86_64-apple-darwin
 apple/scripts/build-macos.sh Release
 ```
 
 After checking prerequisites, `build-macos.sh` runs the [stop helper](scripts/stop-existing-macos.py) before changing resources, core artifacts, or the app. It validates known Inku bundle IDs and executables owned by the current user, rechecks PID identity, and stops them with SIGKILL. If shutdown cannot be confirmed within ten seconds, the build stops; the result is recorded in `apple/build/macOS/stop-existing.json`. An unknown Inku-like process causes a validation error without receiving a signal.
 
 Normal builds use committed, reviewed reference/default/catalog snapshots and prepare locked build dependencies with `uv sync --project server --frozen`. The [dictionary script](scripts/prepare-meter-resources.py) verifies hashes for Sudachi small (about 113 MiB), reading configuration, and CMUdict, then copies them with their licenses into InkuHost resources. The [3D viewer script](scripts/sync-ddl3d-viewer.py) copies the Web's registered 3D viewer unchanged into InkuUI resources and compares it with the Web's (see the 3D viewer below). It builds shared Rust/bindings/XCFramework, generates the Xcode project, and builds a generic Mac destination with `ARCHS=arm64 x86_64` and `ONLY_ACTIVE_ARCH=NO`, then verifies both slices. This is an unsigned local build without an Apple account, Team, or certificate. The signed and notarized distribution is built as described in Building the distribution below.
-
-To avoid Rust 1.95's macOS host proc-macro [LINKEDIT alignment issue](https://github.com/rust-lang/rust/issues/157750), release builds disable stripping only for host build dependencies. Target Rust archive optimization and stripping remain enabled. No cache deletion or toolchain change is required.
 
 The default is a Release application with release Rust archives. Selecting a Debug Xcode application still uses release Rust unless explicitly overridden. For both debug configurations, use:
 
@@ -86,7 +84,7 @@ open apple/build/macOS/DerivedData/Build/Products/Release/Inku.app
 
 ### Building the distribution
 
-The following builds the distribution dmg: a Universal Release build, a check of the third-party notices, Developer ID signing with Hardened Runtime, creating and signing the dmg, notarization and stapling, a Gatekeeper check, the SHA-256, and a plain-text copy of the third-party notices for the Release. Output goes to `apple/build/release/Inku-<version>-<build>/`. The version comes from `apple/VERSION` and `apple/BUILD_NUMBER`. Pass the signing identity and the notary keychain profile as arguments or environment variables (`INKU_MACOS_SIGN_IDENTITY` / `INKU_MACOS_NOTARY_PROFILE`).
+The following builds the distribution dmg: a Universal Release build, a check of the third-party notices, Developer ID signing with Hardened Runtime, creating and signing the dmg, notarization and stapling, a Gatekeeper check, the SHA-256, and a plain-text copy of the third-party notices for the Release. Output goes to `apple/build/release/Inku-<version>-<build>/`. The version comes from `apple/VERSION` and the build number from the completed app. Pass the signing identity and the notary keychain profile as arguments or environment variables (`INKU_MACOS_SIGN_IDENTITY` / `INKU_MACOS_NOTARY_PROFILE`).
 
 ```sh
 apple/scripts/package-macos-release.sh --identity "Developer ID Application: <name> (<team>)" --notary-profile <profile>
@@ -121,7 +119,7 @@ The database is not copied or moved. Its path is retained in the `InkuDatabasePa
 
 Batch takes one description per work on each line. Full-width history, previous-run resume information, next conditions, and the new-batch action follow the editor. New batches offer no DDL input. The model row's Change button opens service-grouped cards for shared Stage 1/2 selection; choose a draft and Confirm to apply it. Cancel and close retain the original selection. An enabled registered LLM is required; an unknown default waits for selection. The color dialog offers an automatic-description card followed by catalogs with ten color samples. Confirm or close applies the draft; Cancel discards it. There is no random choice.
 
-Check sketch from life Off/On, Wild Off/On, and canvas, then choose Draw new batch. Batch sketch is independent of Paint and does not inherit a supplied sketch. Seed is under Details; the instruction language follows the characters of the description. The start action sits immediately after conditions; narrow layouts scroll through the work area as well. Blank lines retain original numbering, long lines scroll horizontally, and ruler numbers stay inside the editor.
+Check sketch from life Off/On, Lift the stroke limit Off/On, and canvas, then choose Draw new batch. Batch sketch is independent of Paint and does not inherit a supplied sketch. Seed is under Details; the instruction language follows the characters of the description. The start action sits immediately after conditions; narrow layouts scroll through the work area as well. Blank lines retain original numbering, long lines scroll horizontally, and ruler numbers stay inside the editor.
 
 Explicit history restoration replaces only editor text. Interrupted-run cards show remaining rows and frozen starting conditions; resuming preserves completed works. Distinguish the currently processed line from the displayed successful work, and inspect history before explicitly retrying or skipping ambiguous rows. When no batch work has been observed, the selected saved work remains on the right.
 
@@ -192,7 +190,7 @@ apple/scripts/build-core.sh macos
 For iOS artifacts, add the targets and select `all`:
 
 ```sh
-rustup target add --toolchain 1.95.0 aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
+rustup target add --toolchain 1.99.1 aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
 apple/scripts/build-core.sh all
 ```
 

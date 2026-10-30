@@ -169,6 +169,7 @@ impl ExpandedMacroNode {
 pub struct ExpandedMacroInvocation {
     pub provenance: MacroInvocationProvenance,
     pub nodes: Vec<ExpandedMacroNode>,
+    pub primary_literal_color: Option<String>,
 }
 
 /// Stable failure classes. None carries localized prose or a partially generated node.
@@ -504,7 +505,11 @@ fn expand_macros_with_selection(
                             && node.provenance().generated_ordinal < item.node_count
                     }) =>
             {
-                expanded.push(ExpandedMacroInvocation { provenance, nodes });
+                expanded.push(ExpandedMacroInvocation {
+                    provenance,
+                    nodes,
+                    primary_literal_color: definition.primary_literal_color(),
+                });
             }
             Ok(_) => diagnostics.push(invocation_diagnostic(
                 MacroExpansionDiagnosticKind::ProvenanceOwnershipMismatch,
@@ -1684,7 +1689,7 @@ mod execution_owner_tests {
 
     #[test]
     fn execution_owner_selection_blocks_invalid_duplicate_and_mismatched_ownership() {
-        let (binding, definition, seed) = fixture("Focus.Center");
+        let (binding, definition, seed) = fixture("｛Center｝");
         for selection in [
             MacroExpansionSelection::exact(vec![owner(1, 0)], vec![0]),
             MacroExpansionSelection::exact(vec![owner(0, 0), owner(0, 1)], vec![0]),
@@ -1725,7 +1730,7 @@ mod execution_owner_tests {
 
     #[test]
     fn execution_owner_selection_requires_exact_seeds_and_retains_source_invocation_budget() {
-        let (binding, definition, seed) = fixture("Focus.Center");
+        let (binding, definition, seed) = fixture("｛Center｝");
         let missing = expand_selected_macros(
             binding.clone(),
             std::slice::from_ref(&definition),
@@ -1768,7 +1773,7 @@ mod execution_owner_tests {
         ));
 
         let (referenced_binding, referenced_definition, referenced_seed) =
-            fixture("Focus.Center; the Focus.Center");
+            fixture("｛Center｝; the ｛Center｝");
         assert_eq!(
             referenced_binding
                 .macro_resolution

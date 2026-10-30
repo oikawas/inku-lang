@@ -102,9 +102,9 @@ def test_history_item_position_preserves_visibility_filters_flags_and_zero_based
     reader = history.HistoryItemPositionReader(
         sessions, lambda user_id: {"id": user_id, "permission_groups": [], "group_id": None}
     )
-    assert reader.item_position("owner", "a") == 0
-    assert reader.item_position("owner", "b") == 1
-    assert reader.item_position("owner", "c") == 2
+    assert reader.item_position("owner", "a") == 1
+    assert reader.item_position("owner", "b") == 2
+    assert reader.item_position("owner", "c") == 3
     assert reader.item_position("owner", "trash", trashed=True) == 0
     assert reader.item_position("owner", "c", starred=True) == 0
     assert reader.item_position("owner", "c", for_revision=True) == 0
@@ -112,7 +112,7 @@ def test_history_item_position_preserves_visibility_filters_flags_and_zero_based
     assert reader.item_position("owner", "b", starred=True) is None
     assert reader.item_position("owner", "b", for_revision=True) is None
     assert reader.item_position("owner", "b", for_share=True) is None
-    assert reader.item_position("owner", "hidden") is None
+    assert reader.item_position("owner", "hidden") == 0
     assert reader.item_position("owner", "missing") is None
     assert reader.item_position("recipient", "granted") == 0
     assert reader.item_position("recipient", "private") is None

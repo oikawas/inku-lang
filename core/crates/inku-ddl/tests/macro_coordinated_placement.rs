@@ -137,7 +137,7 @@ fn checked_relation_delivery_preserves_direct_macro_score_and_symbolic_meaning()
         };
         let single_body = relation_body(kind, numeric, constrained, 1);
         let direct_stage = stage(&source(1), &single_body);
-        let macro_stage = stage("Draw.Pair", &single_body);
+        let macro_stage = stage("｛Pair｝", &single_body);
         let direct =
             lower_verified_stage15_score(direct_stage.verified_effective_view(), context());
         let generated =
@@ -181,7 +181,7 @@ fn checked_relation_delivery_preserves_direct_macro_score_and_symbolic_meaning()
         }
         let repeated_body = relation_body(kind, numeric, constrained, 2);
         let repeated_direct = stage(&source(2), &repeated_body);
-        let repeated_macro = stage("Draw.Pair", &repeated_body);
+        let repeated_macro = stage("｛Pair｝", &repeated_body);
         let mut plans = Vec::new();
         for transformed in [
             &direct_stage,
@@ -227,7 +227,7 @@ fn checked_relation_delivery_preserves_direct_macro_score_and_symbolic_meaning()
     let body = definition(json!([emit("line", "red", "0.2", 1), omitted, survivor,
         {"op":"relation","kind":"connected","from":"missing","to":"survivor"}]));
     for source in [
-        "Draw.Pair",
+        "｛Pair｝",
         "place one red line at center. place 0 blue line at center. place 2 green line at center connected to the previous shape.",
     ] {
         let transformed = stage(source, &body);
@@ -240,7 +240,7 @@ fn checked_relation_delivery_preserves_direct_macro_score_and_symbolic_meaning()
             diagnostic.disposition,
             ScoreDiagnosticDisposition::RelationOmitted
         )));
-        if source == "Draw.Pair" {
+        if source == "｛Pair｝" {
             assert!(matches!(
                 objects[1].origin(),
                 ScoreInstructionOrigin::MacroEmit {
@@ -271,7 +271,7 @@ fn anchor_only_transform_body() -> MacroDefinition {
 #[test]
 fn checked_relation_delivery_anchor_member_uses_source_body_cursor() {
     let body = anchor_only_transform_body();
-    let transformed = stage("arrange one green circle and Draw.Pair at center.", &body);
+    let transformed = stage("arrange one green circle and ｛Pair｝ at center.", &body);
     let lowered = lower_verified_stage15_score(transformed.verified_effective_view(), context());
     let plan = plan_verified_stage15(transformed.verified_effective_view(), context());
     assert!(lowered.diagnostics().is_empty());
@@ -319,7 +319,7 @@ fn checked_relation_numeric_recovery_and_anchor_member_reach_native_performer() 
         .unwrap()
     };
     let body = relation_body("along", true, false, 1);
-    let transformed = stage("Draw.Pair", &body);
+    let transformed = stage("｛Pair｝", &body);
     let lowered = lower_verified_stage15_score(transformed.verified_effective_view(), context());
     assert!(lowered.diagnostics().is_empty());
     let score = lowered.score().unwrap();
@@ -354,7 +354,7 @@ fn checked_relation_numeric_recovery_and_anchor_member_reach_native_performer() 
     );
 
     let body = anchor_only_transform_body();
-    let transformed = stage("arrange one green circle and Draw.Pair at center.", &body);
+    let transformed = stage("arrange one green circle and ｛Pair｝ at center.", &body);
     let lowered = lower_verified_stage15_score(transformed.verified_effective_view(), context());
     let score = lowered.score().unwrap();
     assert!(score.validate_transform_groups().is_ok());
@@ -367,7 +367,7 @@ fn checked_relation_numeric_recovery_and_anchor_member_reach_native_performer() 
 #[test]
 fn macro_members_preserve_complete_bodies_and_source_quantity_authority() {
     let single = definition(json!([emit("circle", "red", "0.5", 1)]));
-    let mixed = stage("arrange Draw.Pair and one blue square at center.", &single);
+    let mixed = stage("arrange ｛Pair｝ and one blue square at center.", &single);
     let direct = stage(
         "arrange one red circle and one blue square at center.",
         &single,
@@ -395,8 +395,8 @@ fn macro_members_preserve_complete_bodies_and_source_quantity_authority() {
         emit("circle", "red", "0.3", 2),
         emit("square", "blue", "0.6", 1)
     ]));
-    let standalone = stage("Draw.Pair", &body);
-    let grouped = stage("scatter three Draw.Pair and green triangle at top.", &body);
+    let standalone = stage("｛Pair｝", &body);
+    let grouped = stage("scatter three ｛Pair｝ and green triangle at top.", &body);
     let baseline = plan_verified_stage15(standalone.verified_effective_view(), context());
     let plan = plan_verified_stage15(grouped.verified_effective_view(), context());
     assert!(plan.diagnostics().is_empty(), "{:?}", plan.diagnostics());
@@ -439,7 +439,7 @@ fn macro_members_preserve_complete_bodies_and_source_quantity_authority() {
         }
     ));
     assert!(plan.standalone_macro_repetitions().is_empty());
-    let repeated = stage("three Draw.Pair", &body);
+    let repeated = stage("three ｛Pair｝", &body);
     let repeated = plan_verified_stage15(repeated.verified_effective_view(), context());
     assert!(
         repeated.diagnostics().is_empty(),
@@ -473,7 +473,7 @@ fn macro_members_keep_generated_recovery_and_anchor_only_source_heads() {
         {"op":"emit","binding":null,"fields":{"color":{"expr":"semantic_ref","category":"color","id":"blue"}}},
     ]));
     let transformed = stage(
-        "place Draw.Pair and one green triangle at center. place one blue square at top.",
+        "place ｛Pair｝ and one green triangle at center. place one blue square at top.",
         &body,
     );
     let lowered = lower_verified_stage15_score(transformed.verified_effective_view(), context());
@@ -499,10 +499,7 @@ fn macro_members_keep_generated_recovery_and_anchor_only_source_heads() {
         "position_x":{"expr":"exact_decimal","value":"0.2"},
         "position_y":{"expr":"exact_decimal","value":"0.5"},
     }}]));
-    let transformed = stage(
-        "arrange Draw.Pair and one green circle at center.",
-        &anchors,
-    );
+    let transformed = stage("arrange ｛Pair｝ and one green circle at center.", &anchors);
     let lowered = lower_verified_stage15_score(transformed.verified_effective_view(), context());
     assert!(
         lowered.diagnostics().is_empty(),
@@ -559,8 +556,8 @@ fn macro_member_geometry_finishes_internal_scopes_before_outer_placement() {
         .unwrap()
     };
     let body = transformed_body();
-    let standalone = stage("Draw.Pair", &body);
-    let mixed = stage("arrange Draw.Pair and one green circle at center.", &body);
+    let standalone = stage("｛Pair｝", &body);
+    let mixed = stage("arrange ｛Pair｝ and one green circle at center.", &body);
     let base_lower = lower_verified_stage15_score(standalone.verified_effective_view(), context());
     let mixed_lower = lower_verified_stage15_score(mixed.verified_effective_view(), context());
     assert!(
@@ -609,7 +606,7 @@ fn macro_member_geometry_finishes_internal_scopes_before_outer_placement() {
     // Omission can make an internal transform equal the remaining placement range.
     // Its explicit source ownership still puts it before placement; an unowned
     // transform over that same range remains an outer operation.
-    let recovered = stage("arrange Draw.Pair and 0 green circle at center.", &body);
+    let recovered = stage("arrange ｛Pair｝ and 0 green circle at center.", &body);
     let recovered = lower_verified_stage15_score(recovered.verified_effective_view(), context());
     let mut recovered_score = recovered.score().unwrap().clone();
     recovered_score.placement_groups[0].at.region = [0.5; 4];
@@ -633,10 +630,7 @@ fn macro_member_geometry_finishes_internal_scopes_before_outer_placement() {
         "position_x":{"expr":"exact_decimal","value":"0.2"},
         "position_y":{"expr":"exact_decimal","value":"0.5"},
     }}]));
-    let anchored = stage(
-        "arrange Draw.Pair and one green circle at center.",
-        &anchors,
-    );
+    let anchored = stage("arrange ｛Pair｝ and one green circle at center.", &anchors);
     let anchored = lower_verified_stage15_score(anchored.verified_effective_view(), context());
     let mut anchored_score = anchored.score().unwrap().clone();
     anchored_score.instructions.push(serde_json::from_value(json!({

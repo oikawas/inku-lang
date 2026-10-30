@@ -22,7 +22,7 @@ public struct ComparisonView: View {
                 RefinementDialog(model: model, title: comparison.kind == .catalog ? "色カタログを変える" : "モデルを変える", work: work,
                     closeDisabled: comparison.running || comparison.hasUnsaved || model.isBusy, onClose: { dismiss() },
                     targetTitle: comparison.kind == .model ? model.display.webCopy("modelCompareTargetTitle", "対象作品") : "推敲対象",
-                    targetModelName: comparison.kind == .model ? ModelNaming(providers: namingProviders).displayName(work.stage1Model ?? work.stage2Model) : nil,
+                    targetModelName: comparison.kind == .model ? ModelNaming(providers: namingProviders, stageProvider: model.stageDefaultProviderID).displayName(work.stage1Model ?? work.stage2Model) : nil,
                     topControls: comparison.kind == .model ? AnyView(modelChoices) : nil) {
                     VStack(alignment: .leading, spacing: 12) {
                         if comparison.kind == .catalog { catalogControls }
@@ -96,8 +96,7 @@ public struct ComparisonView: View {
     private var modelChoices: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(model.display.localized(comparison.inheritWild ? "筆致制限（継承）" : "筆致制限")).inkuFont(12).foregroundStyle(.secondary)
-                Button(model.display.localized("暴れる")) {
+                Button(model.display.localized("筆致制限を外す")) {
                     comparison.wildOverride = !effectiveWild; comparison.inheritWild = false
                 }.disabled(comparison.running || model.isBusy)
                     .buttonStyle(.bordered).tint(effectiveWild ? Color.accentColor : Color.secondary)
@@ -167,11 +166,10 @@ public struct ComparisonView: View {
                 : language == "en" ? " (not selectable)" : "（選べません）")
         }.joined(separator: " / ")
         let comments = language == "en" ? [entry.commentEN, entry.commentJA] : [entry.commentJA, entry.commentEN]
-        let recommendation = entry.recommendationLLM ?? entry.recommendationLevel
         let recommendations = entry.recommendationStage1 != nil || entry.recommendationStage2 != nil
-            ? [("オススメ度 / Stage 1", ModelGuidance.recommendation(entry.recommendationStage1 ?? recommendation)),
-               ("オススメ度 / Stage 2", ModelGuidance.recommendation(entry.recommendationStage2 ?? recommendation))]
-            : [("オススメ度", ModelGuidance.recommendation(recommendation))]
+            ? [("オススメ度 / Stage 1", ModelGuidance.recommendation(entry.catalogLevel(purpose: "llm", stage: "stage1"))),
+               ("オススメ度 / Stage 2", ModelGuidance.recommendation(entry.catalogLevel(purpose: "llm", stage: "stage2")))]
+            : [("オススメ度", ModelGuidance.recommendation(entry.catalogLevel(purpose: "llm")))]
         let rows = [("用途", purpose)] + recommendations
             + [("概算コスト", ModelMetadataPresentation.cost(entry, language: language)),
                ("速度", ModelMetadataPresentation.speed(entry, hidden: guidance?.speedHidden == true, language: language)),

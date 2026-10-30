@@ -29,6 +29,36 @@ public actor InkuDatabase {
             // Inspect existing bytes read-only before enabling any writer configuration.
             let inspection = try Self.readOnlyQueue(at: self.url)
             try inspection.read { try Self.validateRestore($0) }
+            if try inspection.read({ try Int.fetchOne($0, sql: "PRAGMA user_version") ?? 0 }) < 5 {
+                let backupURL = self.url.deletingLastPathComponent().appendingPathComponent(".inku-before-v5-\(UUID().uuidString).sqlite")
+                let backup = try DatabaseQueue(path: backupURL.path)
+                do {
+                    try inspection.backup(to: backup)
+                    try backup.writeWithoutTransaction { try $0.execute(sql: "PRAGMA journal_mode = DELETE") }
+                    try backup.read { try Self.validateRestore($0) }
+                    try backup.close()
+                    try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: backupURL.path)
+                } catch {
+                    try? backup.close()
+                    try? FileManager.default.removeItem(at: backupURL)
+                    throw error
+                }
+            }
+            if try inspection.read({ try Int.fetchOne($0, sql: "PRAGMA user_version") ?? 0 }) < 6 {
+                let backupURL = self.url.deletingLastPathComponent().appendingPathComponent(".inku-before-v6-\(UUID().uuidString).sqlite")
+                let backup = try DatabaseQueue(path: backupURL.path)
+                do {
+                    try inspection.backup(to: backup)
+                    try backup.writeWithoutTransaction { try $0.execute(sql: "PRAGMA journal_mode = DELETE") }
+                    try backup.read { try Self.validateRestore($0) }
+                    try backup.close()
+                    try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: backupURL.path)
+                } catch {
+                    try? backup.close()
+                    try? FileManager.default.removeItem(at: backupURL)
+                    throw error
+                }
+            }
             try inspection.close()
         } else {
             try FileManager.default.createDirectory(
@@ -41,7 +71,8 @@ public actor InkuDatabase {
         if !exists {
             try queue.write { db in try db.execute(sql: Self.schemaSQL()) }
         } else {
-            try queue.write { db in
+            let reportURL = self.url.deletingLastPathComponent().appendingPathComponent(".inku-plugin-names-v6-\(UUID().uuidString).json")
+            do { try queue.write { db in
                 if try Int.fetchOne(db, sql: "PRAGMA user_version") == 1 {
                     try Self.validateSchema(db)
                     try db.execute(sql: Self.resourceSQL("migration-v2"))
@@ -54,6 +85,21 @@ public actor InkuDatabase {
                     try Self.validateSchema(db)
                     try db.execute(sql: Self.resourceSQL("migration-v4"))
                 }
+                if try Int.fetchOne(db, sql: "PRAGMA user_version") == 4 {
+                    try Self.validateSchema(db)
+                    try db.execute(sql: Self.resourceSQL("migration-v5"))
+                }
+                if try Int.fetchOne(db, sql: "PRAGMA user_version") == 5 {
+                    try Self.validateSchema(db)
+                    let report = try PluginNamesMigration.run(db)
+                    let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+                    try encoder.encode(report).write(to: reportURL, options: .atomic)
+                    try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: reportURL.path)
+                    try db.execute(sql: Self.resourceSQL("migration-v6"))
+                }
+            } } catch {
+                try? FileManager.default.removeItem(at: reportURL)
+                throw error
             }
         }
         try queue.read { try Self.validateSchema($0) }
@@ -521,16 +567,6 @@ public actor InkuDatabase {
         }
     }
 
-    /// Promotion changes visibility, without changing any of the saved work's content.
-    public func promoteLineageNode(id: String) throws {
-        try queue.write { db in
-            guard let node = try LineageNode.fetchOne(db, key: id), node.state == "lineage_only",
-                  let historyID = node.historyID else { throw PersistenceError.invalidRecord("node cannot be promoted") }
-            try db.execute(sql: "UPDATE lineage_nodes SET state = 'active' WHERE id = ?", arguments: [id])
-            try db.execute(sql: "UPDATE history SET history_visibility = 'normal' WHERE id = ?", arguments: [historyID])
-        }
-    }
-
     /// Web's explicit overview reads from the root, keeping the selected focus.
     public func lineageOverview(focusNodeID: String, nodeLimit: Int = 200) throws -> LineageGraph? {
         guard let rootID = try queue.read({ db in
@@ -785,7 +821,9 @@ public actor InkuDatabase {
                         ON a.execution_id = wanted.execution_id AND a.effect_id = wanted.effect_id
                     )
                     SELECT work_id, json_extract(document, '$.performance.authority.authority') AS authority,
-                           json_extract(document, '$.performance.authority.origin') AS origin
+                           json_extract(document, '$.performance.authority.origin') AS origin,
+                           json_type(document, '$.performance.image_ddl') = 'object' AS is_image,
+                           json_extract(document, '$.performance.image_provenance') AS image_provenance
                     FROM records
                     WHERE json_extract(document, '$.work_id') = work_id
                     AND json_type(document, '$.performance.configuration') = 'object'
@@ -797,7 +835,8 @@ public actor InkuDatabase {
                     AND json_type(document, '$.performance.authority.revision') = 'text'
                     """, arguments: StatementArguments(arguments))
                 for row in rows {
-                    result[row["work_id"]] = SavedAuthoringSummary(authority: row["authority"], origin: row["origin"])
+                    result[row["work_id"]] = SavedAuthoringSummary(authority: row["authority"], origin: row["origin"],
+                        isImage: (row["is_image"] as Bool?) ?? false, imageProvenance: row["image_provenance"])
                 }
             }
             return result
@@ -892,6 +931,9 @@ public actor InkuDatabase {
         }
         try original.backup(to: isolated)
         try isolated.read { try Self.validateRestore($0) }
+        let reportURL = url.deletingLastPathComponent().appendingPathComponent(".inku-plugin-names-v6-restore-\(UUID().uuidString).json")
+        var restored = false
+        defer { if !restored { try? FileManager.default.removeItem(at: reportURL) } }
         try isolated.write { db in
             if try Int.fetchOne(db, sql: "PRAGMA user_version") == 1 {
                 try db.execute(sql: Self.resourceSQL("migration-v2"))
@@ -902,12 +944,23 @@ public actor InkuDatabase {
             if try Int.fetchOne(db, sql: "PRAGMA user_version") == 3 {
                 try db.execute(sql: Self.resourceSQL("migration-v4"))
             }
+            if try Int.fetchOne(db, sql: "PRAGMA user_version") == 4 {
+                try db.execute(sql: Self.resourceSQL("migration-v5"))
+            }
+            if try Int.fetchOne(db, sql: "PRAGMA user_version") == 5 {
+                let report = try PluginNamesMigration.run(db)
+                let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+                try encoder.encode(report).write(to: reportURL, options: .atomic)
+                try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: reportURL.path)
+                try db.execute(sql: Self.resourceSQL("migration-v6"))
+            }
         }
         try isolated.read { try Self.validateRestore($0) }
         // Artwork rollback must not reopen reservations already charged by this DB.
         try retainLiveProviderRates(in: isolated)
         try isolated.read { try Self.validateRestore($0) }
         try isolated.backup(to: queue)
+        restored = true
     }
 
     private static func insert(
@@ -992,13 +1045,17 @@ public actor InkuDatabase {
         return try String(contentsOf: resource, encoding: .utf8)
     }
 
-    private static func schemaSQL(version: Int = 4) throws -> String {
+    private static func schemaSQL(version: Int = 6) throws -> String {
         let baseline = try resourceSQL("schema-v1")
         if version == 1 { return baseline }
         let second = baseline + "\n" + (try resourceSQL("migration-v2"))
         if version == 2 { return second }
         let third = second + "\n" + (try resourceSQL("migration-v3"))
-        return version == 3 ? third : third + "\n" + (try resourceSQL("migration-v4"))
+        if version == 3 { return third }
+        let fourth = third + "\n" + (try resourceSQL("migration-v4"))
+        if version == 4 { return fourth }
+        let fifth = fourth + "\n" + (try resourceSQL("migration-v5"))
+        return version == 5 ? fifth : fifth + "\n" + (try resourceSQL("migration-v6"))
     }
 
     private struct SchemaObject: Equatable {
@@ -1020,7 +1077,7 @@ public actor InkuDatabase {
     }
 
     private static func validateSchema(_ db: Database) throws {
-        guard let version = try Int.fetchOne(db, sql: "PRAGMA user_version"), [1, 2, 3, 4].contains(version) else {
+        guard let version = try Int.fetchOne(db, sql: "PRAGMA user_version"), [1, 2, 3, 4, 5, 6].contains(version) else {
             throw PersistenceError.unknownSchema
         }
         let expected = try DatabaseQueue()
@@ -1030,6 +1087,8 @@ public actor InkuDatabase {
         if version >= 2 { identifiers.append("swift-v2-library-annotations") }
         if version >= 3 { identifiers.append("swift-v3-provider-rate-state") }
         if version >= 4 { identifiers.append("swift-v4-remove-export-mark") }
+        if version >= 5 { identifiers.append("swift-v5-show-lineage-works") }
+        if version >= 6 { identifiers.append("swift-v6-plugin-names-v2") }
         guard try schemaObjects(in: db) == expectedObjects,
               try String.fetchAll(db, sql: "SELECT identifier FROM schema_migrations ORDER BY identifier")
                 == identifiers else {

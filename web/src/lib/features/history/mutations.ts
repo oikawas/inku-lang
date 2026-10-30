@@ -49,7 +49,7 @@ export type HistoryMutationBrowsing = {
 	clearForRevisionFilter: () => void;
 	clearForShareFilter: () => void;
 	clearSelection: () => void;
-	syncToItem: (item: Pick<HistoryItem, 'id' | 'trashed' | 'history_visibility'>) => Promise<void>;
+	syncToItem: (item: Pick<HistoryItem, 'id' | 'trashed'>) => Promise<void>;
 	fetchOffset: (offset: number, options?: FetchHistoryOptions) => Promise<boolean>;
 	fetchTrashPage: () => Promise<void>;
 };

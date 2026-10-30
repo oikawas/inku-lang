@@ -11,7 +11,7 @@ use inku_score::{Color, Frequency, InkSpread, Primitive, Quality, RelationType};
 use serde::Deserialize;
 use serde_json::Value;
 
-const ASSET: &str = include_str!("../assets/nature-leaves-v1.json");
+const ASSET: &str = include_str!("fixtures/nature-leaves-2.1-v1.json");
 /// The bundled package before draw-system04 (1.0.0 / 1.0.1 editions), which
 /// saved works may still hold. Its words are Saijiki v1.
 const PACKAGE_1_0: &str = include_str!("fixtures/nature-leaves-1.0-package.json");
@@ -45,6 +45,142 @@ fn canonical(alias: &str) -> &'static str {
         "Nature.枯葉" => "Nature.WitheredLeaves",
         other => panic!("no canonical name for {other}"),
     }
+}
+
+#[test]
+fn bracketed_young_leaves_bind_the_same_locked_definition() {
+    let package: Package = serde_json::from_str(ASSET).unwrap();
+    let definitions: Vec<_> = package
+        .entries
+        .iter()
+        .map(|entry| MacroDefinition::from_json(&entry.definition.to_string()).unwrap())
+        .collect();
+    let locks = definitions
+        .iter()
+        .map(|definition| {
+            let identity = definition.identity().unwrap();
+            MacroLock::new(
+                identity.qualified_name(),
+                identity.version(),
+                format!("sha256:{}", identity.full_digest_hex()),
+            )
+            .unwrap()
+        })
+        .collect::<Vec<_>>();
+    let limits = MacroExpansionLimits {
+        max_invocations: 64,
+        max_depth: 16,
+        max_evaluation_steps: 8192,
+        max_nodes_per_invocation: 128,
+        max_total_nodes: 128,
+    };
+    for source in ["｛若葉｝。", "{young leaves}。", "下に｛若葉｝を置く。"] {
+        let result = compile_ddl_to_score(
+            NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::Ja, locks.clone())
+                .unwrap(),
+            &definitions,
+            Some(37),
+            limits,
+            ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+            ScoreErrorPolicy::OmitAndContinue,
+        );
+        assert!(
+            result
+                .score()
+                .is_some_and(|score| !score.instructions.is_empty()),
+            "{source}: {:?} {:?}",
+            result.upstream_diagnostics(),
+            result.downstream_diagnostics()
+        );
+    }
+}
+
+#[test]
+fn v2_scene_keeps_v1_body_and_empty_object_keeps_its_box() {
+    let package: Package = serde_json::from_str(ASSET).unwrap();
+    let mut raw = package.entries[0].definition.clone();
+    let id = raw["heading"].clone();
+    raw.as_object_mut().unwrap().remove("heading");
+    raw.as_object_mut().unwrap().remove("aliases");
+    raw["schema"] = serde_json::json!("inku.macro-definition.v2");
+    raw["id"] = id;
+    raw["names"] = serde_json::json!({"ja":["若葉"],"en":["young leaves"]});
+    raw["kind"] = serde_json::json!("scene");
+    let definition = MacroDefinition::from_json(&raw.to_string()).unwrap();
+    assert!(
+        definition.validate().is_valid(),
+        "{:?}",
+        definition.validate().diagnostics()
+    );
+    let identity = definition.identity().unwrap();
+    let canonical: Value = serde_json::from_slice(identity.canonical_json_bytes()).unwrap();
+    assert_eq!(canonical["id"], "YoungLeaves");
+    assert!(canonical.get("heading").is_none());
+    let lock = MacroLock::new(
+        identity.qualified_name(),
+        identity.version(),
+        format!("sha256:{}", identity.full_digest_hex()),
+    )
+    .unwrap();
+    let limits = MacroExpansionLimits {
+        max_invocations: 64,
+        max_depth: 16,
+        max_evaluation_steps: 8192,
+        max_nodes_per_invocation: 128,
+        max_total_nodes: 128,
+    };
+    let scene = compile_ddl_to_score(
+        NormalizedDdlDocument::new("｛若葉｝。", ResolvedInstructionLanguage::Ja, vec![lock])
+            .unwrap(),
+        &[definition],
+        Some(37),
+        limits,
+        ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+    assert!(
+        scene.score().is_some_and(|s| !s.instructions.is_empty()),
+        "{:?}",
+        scene.upstream_diagnostics()
+    );
+    raw["kind"] = serde_json::json!("object");
+    raw["aspect"] = serde_json::json!("1:1");
+    raw["parameters"] = serde_json::json!({});
+    raw["body"] = serde_json::json!([]);
+    let object = MacroDefinition::from_json(&raw.to_string()).unwrap();
+    let id = object.identity().unwrap();
+    let lock = MacroLock::new(
+        id.qualified_name(),
+        id.version(),
+        format!("sha256:{}", id.full_digest_hex()),
+    )
+    .unwrap();
+    let result = compile_ddl_to_score(
+        NormalizedDdlDocument::new(
+            "｛若葉｝を置く。",
+            ResolvedInstructionLanguage::Ja,
+            vec![lock],
+        )
+        .unwrap(),
+        &[object],
+        Some(37),
+        limits,
+        ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+    assert!(
+        result.upstream_diagnostics().is_empty(),
+        "{:?}",
+        result.upstream_diagnostics()
+    );
+    assert_eq!(
+        result
+            .score()
+            .unwrap_or_else(|| panic!("{:?}", result.downstream_diagnostics()))
+            .object_templates
+            .len(),
+        1
+    );
 }
 
 #[test]
@@ -119,11 +255,14 @@ fn bundled_nature_leaves_are_valid_bounded_definitions_that_reach_normal_score_l
         .unwrap()
         .with_aliases(definition.alias_qualified_names())
         .unwrap();
-        let canonical_source = format!("{}.", identity.qualified_name());
+        let (ja_names, en_names) =
+            inku_ddl::plugin_names::v1_plugin_names(&definition.heading, &definition.aliases);
+        let canonical_source = format!("{{{}}}.", en_names[0]);
+        let japanese_source = format!("｛{}｝", ja_names[0]);
         let (source, language) = if *qualified_name == "Nature.若葉" {
             (canonical_source.as_str(), ResolvedInstructionLanguage::En)
         } else {
-            (*qualified_name, ResolvedInstructionLanguage::Ja)
+            (japanese_source.as_str(), ResolvedInstructionLanguage::Ja)
         };
         let execution = compile_ddl_to_score(
             NormalizedDdlDocument::new(source, language, vec![lock]).unwrap(),
@@ -213,7 +352,7 @@ fn bundled_nature_leaves_are_valid_bounded_definitions_that_reach_normal_score_l
         }
         if *qualified_name == "Nature.枯葉" {
             // Curled withered leaves: a deep and a shallow chalk arc, gray and yellow in turn.
-            for (leaf_index, pair) in score.instructions.chunks_exact(2).enumerate() {
+            for (leaf_index, pair) in score.instructions.as_chunks::<2>().0.iter().enumerate() {
                 let expected_color = if leaf_index % 2 == 0 {
                     Color::Gray
                 } else {
@@ -228,7 +367,7 @@ fn bundled_nature_leaves_are_valid_bounded_definitions_that_reach_normal_score_l
         }
         if *qualified_name == "Nature.落葉" {
             // Each leaf is red or gray in its drift cell; both arcs share it.
-            for pair in score.instructions.chunks_exact(2) {
+            for pair in score.instructions.as_chunks::<2>().0 {
                 assert!(matches!(pair[0].color, Color::Red | Color::Gray));
                 assert!(
                     pair.iter()
@@ -287,8 +426,14 @@ fn migrate_and_compile(
         format!("sha256:{}", identity.full_digest_hex()),
     )
     .unwrap();
+    let (ja, en) =
+        inku_ddl::plugin_names::v1_plugin_names(&definition.heading, &definition.aliases);
+    let written = match language {
+        ResolvedInstructionLanguage::Ja => format!("｛{}｝", ja[0]),
+        ResolvedInstructionLanguage::En => format!("{{{}}}.", en[0]),
+    };
     let execution = compile_ddl_to_score(
-        NormalizedDdlDocument::new(source, language, vec![lock]).unwrap(),
+        NormalizedDdlDocument::new(written, language, vec![lock]).unwrap(),
         std::slice::from_ref(&definition),
         Some(37),
         MIGRATION_LIMITS,
@@ -553,14 +698,17 @@ fn a_bundled_word_draws_the_same_score_by_its_canonical_name_or_its_alias() {
     };
     for definition in &definitions {
         let canonical = definition.qualified_name().unwrap();
-        let alias = &definition.alias_qualified_names()[0];
+        let (ja, en) =
+            inku_ddl::plugin_names::v1_plugin_names(&definition.heading, &definition.aliases);
+        let alias = format!("｛{}｝", ja[0]);
+        let english = format!("{{{}}}", en[0]);
         let by_alias = score(
             &format!("背景を白で埋める。\n{alias}。"),
             ResolvedInstructionLanguage::Ja,
         );
         assert_eq!(
             score(
-                &format!("背景を白で埋める。\n{canonical}。"),
+                &format!("背景を白で埋める。\n{english}。"),
                 ResolvedInstructionLanguage::Ja
             ),
             by_alias,
@@ -568,7 +716,7 @@ fn a_bundled_word_draws_the_same_score_by_its_canonical_name_or_its_alias() {
         );
         assert_eq!(
             score(
-                &format!("Fill the background with white.\n{canonical}."),
+                &format!("Fill the background with white.\n{english}."),
                 ResolvedInstructionLanguage::En
             )["instructions"],
             by_alias["instructions"],
@@ -623,7 +771,14 @@ fn every_bundled_word_expands_without_omission_at_many_placement_seeds() {
         .unwrap();
         let execution = compile_ddl_to_score(
             NormalizedDdlDocument::new(
-                identity.qualified_name(),
+                format!(
+                    "｛{}｝",
+                    inku_ddl::plugin_names::v1_plugin_names(
+                        &definition.heading,
+                        &definition.aliases
+                    )
+                    .0[0]
+                ),
                 ResolvedInstructionLanguage::Ja,
                 vec![lock],
             )
@@ -678,12 +833,9 @@ fn counted_words_take_the_written_count_inside_the_word() {
     };
     // Ten leaves are twenty arcs in one word, not the word drawn ten times.
     for (source, language) in [
-        ("Nature.若葉を10枚置く。", ResolvedInstructionLanguage::Ja),
-        (
-            "Place 10 Nature.YoungLeaves.",
-            ResolvedInstructionLanguage::En,
-        ),
-        ("10 Nature.YoungLeaves.", ResolvedInstructionLanguage::En),
+        ("｛若葉｝を10枚置く。", ResolvedInstructionLanguage::Ja),
+        ("Place 10 {young leaves}.", ResolvedInstructionLanguage::En),
+        ("10 {young leaves}.", ResolvedInstructionLanguage::En),
     ] {
         let execution = compile(source, language);
         let score = execution
@@ -701,14 +853,14 @@ fn counted_words_take_the_written_count_inside_the_word() {
     // Each counted word draws the written count inside itself.
     // Undergrowth and WitheredGrass count clumps of three to five blades.
     for (source, arcs) in [
-        ("Nature.下草を3個置く。", 18..=30),
-        ("Nature.青葉を10枚置く。", 20..=20),
-        ("Nature.落葉を16枚置く。", 32..=32),
-        ("Nature.枯草を1個置く。", 6..=10),
-        ("Nature.枯葉を7枚置く。", 14..=14),
+        ("｛下草｝を3個置く。", 18..=30),
+        ("｛青葉｝を10枚置く。", 20..=20),
+        ("｛落葉｝を16枚置く。", 32..=32),
+        ("｛枯草｝を1個置く。", 6..=10),
+        ("｛枯葉｝を7枚置く。", 14..=14),
         // The forms Stage 1 prints, with no action word.
-        ("10枚のNature.若葉。", 20..=20),
-        ("2個のNature.下草。", 12..=20),
+        ("10枚の｛若葉｝。", 20..=20),
+        ("2個の｛下草｝。", 12..=20),
     ] {
         let execution = compile(source, ResolvedInstructionLanguage::Ja);
         let score = execution
@@ -724,7 +876,7 @@ fn counted_words_take_the_written_count_inside_the_word() {
     }
     // Thirteen is past the word's twelve: only the word is left out, with its reason.
     let execution = compile(
-        "Nature.若葉を13枚置く。\n赤い円を置く。",
+        "｛若葉｝を13枚置く。\n赤い円を置く。",
         ResolvedInstructionLanguage::Ja,
     );
     assert_eq!(
@@ -774,10 +926,11 @@ fn every_counted_word_expands_without_omission_at_its_maximum_count() {
                 .iter()
                 .find_map(|(_, schema)| schema.count_parameter())?;
             Some(format!(
-                "{}{}の{}。",
+                "{}{}の｛{}｝。",
                 count.maximum,
                 count.counter.japanese(),
-                definition.alias_qualified_names()[0]
+                inku_ddl::plugin_names::v1_plugin_names(&definition.heading, &definition.aliases).0
+                    [0]
             ))
         })
         .collect();

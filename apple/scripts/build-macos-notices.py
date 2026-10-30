@@ -262,6 +262,10 @@ def font_name(path: Path, wanted: int) -> str:
 
 
 def bundled_resources(notices: Notices) -> None:
+    notices.add("resources", "IANA Time Zone Database", "2026e rearguard", "Public domain",
+                "https://data.iana.org/time-zones/",
+                [notices.text("tzdata-NOTICE.txt", read_text(ROOT / "core/crates/inku-pipeline/data/tzdata-NOTICE.txt"))],
+                "The shared core embeds the America/Los_Angeles TZif file.")
     manifest = json.loads(METER_MANIFEST.read_text())
     meter_license = METER_RESOURCES / "SudachiDict-LICENSE.txt"
     if not meter_license.is_file():

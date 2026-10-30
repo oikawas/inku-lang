@@ -6,15 +6,16 @@ let package = Package(
     platforms: [.macOS(.v14), .iOS(.v17)],
     products: [.library(name: "InkuPersistence", targets: ["InkuPersistence"])],
     dependencies: [
-        .package(url: "https://github.com/groue/GRDB.swift.git", exact: "7.11.1")
+        .package(url: "https://github.com/groue/GRDB.swift.git", exact: "7.11.1"),
+        .package(path: "../InkuCore")
     ],
     targets: [
         .target(
             name: "InkuPersistence",
-            dependencies: [.product(name: "GRDB", package: "GRDB.swift")],
-            resources: [.copy("Resources/schema-v1.sql"), .copy("Resources/migration-v2.sql"), .copy("Resources/migration-v3.sql"), .copy("Resources/migration-v4.sql")]),
+            dependencies: [.product(name: "GRDB", package: "GRDB.swift"), "InkuCore"],
+            resources: [.copy("Resources/schema-v1.sql"), .copy("Resources/migration-v2.sql"), .copy("Resources/migration-v3.sql"), .copy("Resources/migration-v4.sql"), .copy("Resources/migration-v5.sql"), .copy("Resources/migration-v6.sql")]),
         .testTarget(name: "InkuPersistenceTests", dependencies: [
-            "InkuPersistence", .product(name: "GRDB", package: "GRDB.swift")
+            "InkuPersistence", "InkuCore", .product(name: "GRDB", package: "GRDB.swift")
         ])
     ],
     swiftLanguageModes: [.v6]

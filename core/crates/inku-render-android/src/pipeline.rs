@@ -186,6 +186,36 @@ pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_explai
 
 #[unsafe(no_mangle)]
 #[allow(non_snake_case)]
+pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_migratePluginNames(
+    env: JNIEnv<'_>,
+    _receiver: JObject<'_>,
+    input: JByteArray<'_>,
+) -> jbyteArray {
+    unary_bytes(env, input, inku_pipeline_uniffi::migrate_plugin_names)
+}
+
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
+pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_pluginPackage(
+    env: JNIEnv<'_>,
+    _receiver: JObject<'_>,
+    input: JByteArray<'_>,
+) -> jbyteArray {
+    unary_bytes(env, input, inku_pipeline_uniffi::plugin_package)
+}
+
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
+pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_pluginCalls(
+    env: JNIEnv<'_>,
+    _receiver: JObject<'_>,
+    input: JByteArray<'_>,
+) -> jbyteArray {
+    unary_bytes(env, input, inku_pipeline_uniffi::plugin_calls)
+}
+
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
 pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_recompose(
     env: JNIEnv<'_>,
     _receiver: JObject<'_>,
@@ -232,6 +262,26 @@ pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_autono
     input: JByteArray<'_>,
 ) -> jbyteArray {
     unary_bytes(env, input, inku_pipeline_uniffi::autonomous_refine)
+}
+
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
+pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_modelCatalog(
+    env: JNIEnv<'_>,
+    _receiver: JObject<'_>,
+    input: JByteArray<'_>,
+) -> jbyteArray {
+    unary_bytes(env, input, inku_pipeline_uniffi::model_catalog)
+}
+
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
+pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_providerAdmission(
+    env: JNIEnv<'_>,
+    _receiver: JObject<'_>,
+    input: JByteArray<'_>,
+) -> jbyteArray {
+    unary_bytes(env, input, inku_pipeline_uniffi::provider_admission)
 }
 
 #[unsafe(no_mangle)]
@@ -350,6 +400,19 @@ pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_pipeli
     jni_boundary(env, null_mut(), |env| {
         let text = java_string(env, text)?;
         new_java_string(env, &inku_pipeline_uniffi::pipeline_description(&text))
+    })
+}
+
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
+pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_descriptionLabelSpans(
+    env: JNIEnv<'_>,
+    _receiver: JObject<'_>,
+    text: JString<'_>,
+) -> jstring {
+    jni_boundary(env, null_mut(), |env| {
+        let text = java_string(env, text)?;
+        new_java_string(env, &inku_pipeline_uniffi::description_label_spans(text))
     })
 }
 

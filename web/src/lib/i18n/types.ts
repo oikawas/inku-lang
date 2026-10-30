@@ -57,6 +57,8 @@ export interface LangPack {
 	imageSelectingCatalog: string;
 	/** Read and draw (SPEC 12.6.7): what the run is doing. */
 	readDrawReading: string;
+	readDrawComposing: string;
+	readDrawRecomposing: string;
 	readDrawWriting: string;
 	readDrawRevising: string;
 	readDrawReviewing: string;
@@ -225,6 +227,9 @@ export interface LangPack {
 	saijikiLabel: string;
 	saijikiToggleBtn: string;
 	saijikiTitle: string;
+	saijikiPlugins: string;
+	pluginObject: string;
+	pluginScene: string;
 	saijikiHint: string;
 	currentSetting: string;
 	saveCurrentBtn: string;
@@ -373,6 +378,7 @@ export interface LangPack {
 	ddlImportButton: string;
 	ddlImportedPlugins: (names: string[]) => string;
 	ddlImportInvalid: string;
+	ddlImportRequiresV2: string;
 	ddlNewDialogTitle: string;
 	ddlNewDialogSubtitle: string;
 	ddlEditDialogSubtitle: string;
@@ -385,12 +391,15 @@ export interface LangPack {
 	ddlEditorSyntaxGuideToggle: string;
 	ddlEditorStatus: (lines: number, chars: number) => string;
 	modelSelectionFailed: string;
+	modelCatalogLoading: string;
+	modelCatalogLoadFailed: string;
+	modelCatalogRetry: string;
 	ddlDialogDrawingModel: string;
 	// A namespaced name the server does not hold. Not an error: plugins can be
 	// installed later, so the wording says "not on this server", not "wrong".
 	ddlUnknownNameTitle: string;
-	ddlUnknownNameFires: (namespace: string, word: string) => string;
 	ddlUnknownNameUnregistered: string;
+	ddlPluginReason: (reason: string, suggestion: string | null, candidates: string[]) => string;
 	// The same loss, seen after the drawing: the warnings the server recorded.
 	ddlPluginWarningsTitle: string;
 	renderLimitNotesTitle: string;
@@ -521,9 +530,8 @@ export interface LangPack {
 	tooltipInputClear: string;
 	tooltipInputSketch: string;
 	tooltipInputRoute: string;
+	tooltipInputComposition: string;
 	wildButton: string;
-	wildEnabled: string;
-	wildDisabled: string;
 	tooltipInputWild: string;
 	tooltipInputCanvas: string;
 	tooltipDdlNew: string;
@@ -594,6 +602,13 @@ export interface LangPack {
 	aiRefineKindsLabel: string;
 	aiRefineKindLaws: string;
 	aiRefineKindJuxtaposition: string;
+	aiRefineKindChunks: string;
+	aiRefineChunksNote: string;
+	aiRefineChunksDirectionLabel: string;
+	aiRefineChunksDirectionPlaceholder: string;
+	aiRefineChunksNoteRequired: string;
+	aiRefineChunkMoveName: (move: string) => string;
+	aiRefineChunkMove: (name: string, targets: string[], title: string | null) => string;
 	aiRefineKindsError: string;
 	aiRefineStartButton: string;
 	aiRefineGoesOn: string;
@@ -608,7 +623,9 @@ export interface LangPack {
 	aiRefineShare: (percent: string) => string;
 	aiRefineEndedMovesDone: string;
 	aiRefineEndedNothingAvailable: string;
+	aiRefineEndedNothingAvailableChunks: string;
 	aiRefineEndedStalled: string;
+	aiRefineEndedStalledChunks: string;
 	aiRefineEndedStopped: string;
 	aiRefineEndedInterrupted: string;
 	aiRefineEndedFailed: string;
@@ -663,6 +680,8 @@ export interface LangPack {
 	promptColorsSystem: string;
 	promptReadingInput: string;
 	promptReadingSystem: string;
+	promptDescriptionCompositionInput: string;
+	promptDescriptionCompositionSystem: string;
 	promptDescriptionDdlInput: string;
 	promptDescriptionDdlSystem: string;
 	promptDescriptionReviewInput: string;
@@ -807,7 +826,6 @@ export interface LangPack {
 
 	// Settings / catalog
 	unsavedRefinementPreviewLabel: string;
-	lineageIntermediateSavedNotice: string;
 	historyStarredFilterClearedNotice: string;
 	historyForRevisionFilterClearedNotice: string;
 	lineageIntermediateSaveFailed: string;
@@ -879,6 +897,8 @@ export interface LangPack {
 	clipboardUnsupported: string;
 	clipboardNeedsSavedWork: string;
 	settingsTabMisc: string;
+	settingsWildDefault: string;
+	settingsWildDefaultDescription: string;
 	uiModeLabel: string;
 	uiModeDescription: string;
 	uiModeSimple: string;
@@ -1121,8 +1141,6 @@ export interface LangPack {
 	settingsUserPlugins: string;
 	settingsPluginDrawn: string;
 	settingsPluginDrawnHint: string;
-	settingsPluginNotDrawn: string;
-	settingsPluginNotDrawnHint: string;
 	settingsPluginWords: string;
 	settingsUserPluginsAddTitle: string;
 	settingsUserPluginsAddDescription: string;
@@ -1138,6 +1156,7 @@ export interface LangPack {
 	settingsPluginPackageInstalled: string;
 	settingsPluginPackageExists: string;
 	settingsPluginPackageHint: string;
+	settingsPluginNotLoaded: string;
 	settingsPluginPackageDeleteHint: string;
 	settingsPluginPictureReplace: string;
 	settingsPluginPictureReset: string;
@@ -1349,6 +1368,7 @@ export interface LangPack {
 	historyPageJumpLabel: (total: number) => string;
 	historySearchHint: string;
 	historySearchClear: string;
+	historySearchActive: (query: string) => string;
 	canvasSearchLabel: string;
 	canvasSearchPlaceholder: string;
 	canvasSearchHint: string;
@@ -1453,6 +1473,9 @@ export interface LangPack {
 	provenanceHintDrawRoute: string;
 	provenanceHintReading: string;
 	provenanceHintReadReview: string;
+	provenanceHintComposition: string;
+	provenanceHintCompositionMeasure: string;
+	provenanceHintCompositionColors: string;
 	provenanceHintReadLabels: string;
 	provenanceHintCatalog: string;
 	provenanceHintColorMap: string;

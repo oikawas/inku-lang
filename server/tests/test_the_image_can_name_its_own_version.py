@@ -81,7 +81,8 @@ def test_the_scan_finds_the_readers_it_is_meant_to_find():
     assert len(read) >= 2, f"the scan found only {sorted(read)}"
     assert "web/APP_VERSION" in read
     assert "web/BUILD_NUMBER" in read
-    assert "server/plugins/nature-leaves.inku-plugin.md" in read
+    # The bundled leaves now come from the native core asset, not a Server file.
+    assert "server/plugins/nature-leaves.inku-plugin.md" not in read
 
 
 @pytest.mark.parametrize("relative", ["web/APP_VERSION", "web/BUILD_NUMBER"])

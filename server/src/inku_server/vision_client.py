@@ -23,6 +23,7 @@ import httpx
 from . import provider_wire
 from .chatgpt_store import ChatGPTError
 from .model_settings import connection_for
+from .text_provider import send_text
 
 _logger = logging.getLogger(__name__)
 
@@ -73,13 +74,10 @@ def vision_text(connection: dict[str, Any], model_id: str, *, system: str, text:
             raise ChatGPTError("chatgpt_response_invalid") from None
     if connection.get("requires_api_key") and not connection.get("api_key"):
         raise ValueError(f"{connection.get('id')} API key is not configured")
-    built = provider_wire.text_request(connection, model_id, system=system, text=text, images=images,
-                                       temperature=temperature, max_tokens=max_tokens)
     timeout = float(os.getenv("INKU_LLM_REQUEST_TIMEOUT_SECONDS", "180"))
     try:
-        with httpx.Client(timeout=timeout, transport=transport, follow_redirects=False) as client:
-            response = client.post(built["url"], headers=provider_wire.headers(built, str(connection.get("api_key") or "")),
-                                   content=built["body"].encode("utf-8"))
+        built, response, read = send_text(connection, model_id, system=system, text=text, images=images,
+                                          temperature=temperature, max_tokens=max_tokens, timeout=timeout, transport=transport)
     except httpx.TimeoutException as exc:
         raise TimeoutError("Vision provider timed out") from exc
     if response.status_code >= 400:
@@ -89,7 +87,6 @@ def vision_text(connection: dict[str, Any], model_id: str, *, system: str, text:
             "status": response.status_code, **provider_wire.refusal(response.content[:16384]),
         }, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
     response.raise_for_status()
-    read = provider_wire.read_text(built["format"], response.status_code, response.content)
     if read["outcome"] != "answer":
         detail = read.get("detail") or "provider returned an unexpected answer"
         raise (ValueError if detail == "provider response is not JSON" else TypeError)(detail)

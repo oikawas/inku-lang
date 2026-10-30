@@ -3,10 +3,10 @@ import test from 'node:test';
 import { EditorSelection, EditorState } from '@codemirror/state';
 import { history, redo, undo } from '@codemirror/commands';
 import { CompletionContext } from '@codemirror/autocomplete';
+import { readFileSync } from 'node:fs';
 import { readCompositionRanges, scanNumericRanges } from '../../composition-ranges.ts';
-import { buildPluginNameIndex, unknownPluginNames } from '../../plugin-names.ts';
 import { ddlPartClass, highlightDDL } from '../../highlight.ts';
-import { ddlCompletions, ddlEditorModel, ddlSyntax, insertDdlWord, replaceDdlValue } from './codemirror.ts';
+import { ddlCompletions, ddlEditorModel, ddlSyntax, insertDdlWord, pluginHoverContent, pluginHoverElement, replaceDdlValue } from './codemirror.ts';
 import * as ddlControls from './codemirror.ts';
 import { compositionChanged, openRangeAt, rangeEditorState, rangeFocusChanged } from './codemirror-ranges.ts';
 
@@ -14,10 +14,9 @@ const ranges = readCompositionRanges({ schema: 'inku.composition-ranges.v1', ran
 	{ key: 'left', words: { ja: '左上', en: 'top left' }, bounds: [[0, 1], [0, 1], [1, 3], [1, 3]], corner: false },
 	{ key: 'right', words: { ja: '右下', en: 'bottom right' }, bounds: [[2, 3], [2, 3], [1, 1], [1, 1]], corner: false }
 ] });
-const names = buildPluginNameIndex([{ qualified_name: 'Nature.Grass', aliases: ['Nature.下草'], fires_on_ja: ['草'] }]);
 const source = '  紙。\r\n［構図］右下（横2/3〜1、縦2/3〜1）に、赤い円。\n青い線。  ';
 function editor(doc = source, disabled = false, table = ranges) {
-	return EditorState.create({ doc, selection: { anchor: doc.length }, extensions: [ddlEditorModel(table, names, disabled), history()] });
+	return EditorState.create({ doc, selection: { anchor: doc.length }, extensions: [ddlEditorModel(table, disabled), history()] });
 }
 function hidden(state: EditorState): [number, number][] {
 	const replacements: [number, number][] = [];
@@ -178,34 +177,79 @@ test('word insertion, read-only changes and external value synchronization use t
 	assert.equal(replaceDdlValue(changed, incoming), null, 'bind:value echo must not replace the document');
 });
 
-test('the editor decorations share the existing palette and qualified/unknown Macro semantics', () => {
-	const doc = 'Nature.下草と、Nature.草、赤い円。';
-	const state = editor(doc);
+test('editor decorations follow the core ranges and keep the palette', () => {
+	const doc = '｛下草｝と、｛青葉｝、赤い円。';
+	const calls = [{ start_byte: 0, end_byte: 12, start_utf16: 0, end_utf16: 4, text: '｛下草｝', spelling: 'braced' as const, status: 'resolved' }, { start_byte: 18, end_byte: 30, start_utf16: 6, end_utf16: 10, text: '｛青葉｝', spelling: 'braced' as const, status: 'plugin_not_installed' }];
+	const state = EditorState.create({ doc, extensions: [ddlEditorModel([], false, () => false, { source: doc, calls })] });
 	const syntax = state.field(ddlSyntax);
 	assert.equal(syntax.tokens.map((token) => token.part.text).join(''), doc);
 	const marks: string[] = [];
 	syntax.decorations.between(0, state.doc.length, (_from, _to, decoration) => marks.push(decoration.spec.class));
 	for (const token of syntax.tokens) {
 		const cls = ddlPartClass(token.part);
-		if (cls) { assert.ok(marks.includes(cls)); assert.ok(highlightDDL(doc, null, names).includes(cls)); }
+		if (cls) { assert.ok(marks.includes(cls)); assert.ok(highlightDDL(doc, null, calls).includes(cls)); }
 	}
-	assert.deepEqual(unknownPluginNames(doc, names), [{ text: 'Nature.草', namespace: 'Nature', firesAs: 'Grass' }]);
 	assert.ok(marks.includes('ddl-token ddl-token-unknown'));
+});
+
+test('hover shows the resolved preview or the diagnostic reason', () => {
+	const entry = { qualified_name: 'Sky.Stars', surface_ja: ['星'], surface_en: ['stars'], note_ja: '星の note', note_en: 'star note' };
+	const call = { start_byte: 0, end_byte: 9, start_utf16: 0, end_utf16: 3, text: '｛星｝', spelling: 'braced' as const, status: 'resolved', qualified_name: 'Sky.Stars' };
+	const preview = () => ({ categoryKey: 'plugin', word: '｛星｝', canonicalWord: 'Sky.Stars', effect: '星の note', example: '｛星｝。', svg: '', image: '/preview.png' });
+	assert.deepEqual(pluginHoverContent(call, [entry], 'ja', preview, () => 'disabled'), { text: '｛星｝\n星の note\n｛星｝。', image: '/preview.png' });
+	assert.deepEqual(pluginHoverContent({ ...call, status: 'plugin_disabled' }, [entry], 'ja', preview, () => '有効にすると描けます。'), { text: '有効にすると描けます。' });
+});
+
+test('plugin hover places its multiline text above the picture in the tooltip frame', () => {
+	class Element {
+		className = ''; textContent: string | null = null; src = ''; alt = '';
+		children: Element[] = [];
+		readonly tag: string;
+		constructor(tag: string) { this.tag = tag; }
+		appendChild(child: Element) { this.children.push(child); }
+	}
+	const doc = { createElement: (tag: string) => new Element(tag) } as unknown as Document;
+	const resolved = pluginHoverElement({ text: '｛若葉｝\nわかば\n情景の語\nnote\n｛若葉｝。', image: '/leaves.png' }, doc) as unknown as Element;
+	assert.equal(resolved.className, 'cm-ddl-plugin-hover');
+	assert.deepEqual(resolved.children.map(child => child.tag), ['div', 'img']);
+	assert.equal(resolved.children[0].textContent, '｛若葉｝\nわかば\n情景の語\nnote\n｛若葉｝。');
+	assert.equal(resolved.children[1].src, '/leaves.png');
+	const reason = pluginHoverElement({ text: 'この Server にない名前です。' }, doc) as unknown as Element;
+	assert.equal(reason.className, resolved.className);
+	assert.deepEqual(reason.children.map(child => child.tag), ['div']);
+	const css = readFileSync(new URL('../../components/DdlEditor.svelte', import.meta.url), 'utf8');
+	assert.match(css, /\.cm-tooltip:has\(\.cm-ddl-plugin-hover\)[\s\S]*?var\(--tooltip-bg\)/);
+	assert.match(css, /\.cm-ddl-plugin-hover-text\)[^{]*\{[^}]*white-space: pre-line/);
+	assert.match(css, /\.cm-ddl-plugin-hover img\)[^{]*\{[^}]*display: block/);
 });
 
 test('cursor completions use the DDL language and canonical Macro names, and yield to numeric edits', async () => {
 	let previews = 0;
 	const source = ddlCompletions(() => ({ isJapanese: true,
-		pluginEntries: [{ qualified_name: 'Nature.Grass', aliases: ['Nature.下草'], note_ja: '', note_en: '' }],
+		pluginEntries: [{ qualified_name: 'Nature.Grass', surface_ja: ['下草', '草'], surface_en: ['grass'], note_ja: '', note_en: '', word_kind: 'object' }],
 		previewForWord: () => { previews++; throw new Error('previews must be lazy'); },
 		previewForPlugin: () => { previews++; throw new Error('previews must be lazy'); }, onPreview() {} }));
-	const en = editor('Draw a red circle at the top left.\n');
+	const en = editor('Draw a red circle.\n{草');
 	const completions = await source(new CompletionContext(en, en.doc.length, true));
-	assert.ok(completions?.options.some((word) => word.label === 'Nature.Grass'));
-	assert.ok(!completions?.options.some((word) => word.label === 'Nature.下草'));
-	const ja = editor('赤い円。\n');
+	assert.ok(completions?.options.some((word) => word.label === '{grass}'));
+	const ja = editor('赤い円。\n{grass');
 	const japanese = await source(new CompletionContext(ja, ja.doc.length, true));
-	assert.ok(japanese?.options.some((word) => word.label === 'Nature.下草'));
+	assert.ok(japanese?.options.some((word) => word.label === '｛下草｝'));
+	const fullWidth = editor('Draw a red circle.\n｛草');
+	const fullWidthOptions = await source(new CompletionContext(fullWidth, fullWidth.doc.length, true));
+	assert.ok(fullWidthOptions?.options.some((word) => word.label === '{grass}'));
+	const folded = editor('赤い円。\n｛ＧＲＡＳＳ');
+	const foldedOptions = await source(new CompletionContext(folded, folded.doc.length, true));
+	assert.ok(foldedOptions?.options.some((word) => word.label === '｛下草｝'));
+	const existing = editor('赤い円。\n{grass}');
+	const beforeClose = existing.doc.length - 1;
+	const choices = await source(new CompletionContext(existing, beforeClose, true));
+	const chosen = choices?.options.find(word => word.label === '｛下草｝');
+	assert.equal(typeof chosen?.apply, 'function');
+	let applied = existing;
+	if (typeof chosen?.apply === 'function') chosen.apply({ state: existing, dispatch: tr => { applied = existing.update(tr).state; } } as never, chosen, choices!.from, beforeClose);
+	assert.equal(applied.doc.toString(), '赤い円。\n｛下草｝');
+	assert.equal(applied.selection.main.head, applied.doc.length);
 	const numeric = open(editor());
 	assert.equal(await source(new CompletionContext(numeric, numeric.selection.main.head, true)), null);
 	assert.equal(await source(new CompletionContext(editor('', true), 0, true)), null);

@@ -68,8 +68,8 @@
     }
   },
   "valid_cases": [
-    {"id": "empty-body", "definition": "empty", "source": "Expand.Empty", "language": "en", "composition_seed": 0, "expected_definition_digest": "d4a4816d6a9ebc26bf1174ac4830961a37019603610169aab636515872554192", "expected_seed_digests": ["c67b204469deb190c10a0d5112a532d6a9692d0b6baf957fdb58312ca2ae0665"], "expected_node_kinds": [], "expected_node_count": 0, "expected_nodes": []},
-    {"id": "all-operators-parameter-component-group-relation-repeat-transform-vary", "definition": "all", "source": "studio.枝組.共通 2", "language": "en", "composition_seed": 7, "expected_definition_digest": "d81d6e92d196561231b9e5528f20e750bc79eda4b354158728d73a308ddd12cf", "expected_seed_digests": ["5499bd5106f3049ba9e60609a634410768e611e490dec7c2174733430cc2306b"], "expected_node_kinds": ["emit", "anchor", "emit", "anchor", "group", "anchor", "emit", "relation", "transform", "emit", "transform", "emit"], "expected_node_count": 12, "expected_nodes": [
+    {"id": "empty-body", "definition": "empty", "source": "｛Empty｝", "language": "en", "composition_seed": 0, "expected_definition_digest": "d4a4816d6a9ebc26bf1174ac4830961a37019603610169aab636515872554192", "expected_seed_digests": ["c67b204469deb190c10a0d5112a532d6a9692d0b6baf957fdb58312ca2ae0665"], "expected_node_kinds": [], "expected_node_count": 0, "expected_nodes": []},
+    {"id": "all-operators-parameter-component-group-relation-repeat-transform-vary", "definition": "all", "source": "｛枝組共通｝ 2", "language": "en", "composition_seed": 7, "expected_definition_digest": "d81d6e92d196561231b9e5528f20e750bc79eda4b354158728d73a308ddd12cf", "expected_seed_digests": ["5499bd5106f3049ba9e60609a634410768e611e490dec7c2174733430cc2306b"], "expected_node_kinds": ["emit", "anchor", "emit", "anchor", "group", "anchor", "emit", "relation", "transform", "emit", "transform", "emit"], "expected_node_count": 12, "expected_nodes": [
       "0|emit|R0/C0:mark|binding=0:R0/C0:mark:mark;fields=shape=ref(shape,circle),surface=ref(surface,solid),touch=ref(touch,crayon);children=0",
       "1|anchor|R0/C1:mark|target=0:R0/C1:mark:mark_anchor;children=0",
       "2|emit|R1/C0:mark|binding=0:R1/C0:mark:mark;fields=shape=ref(shape,circle),surface=ref(surface,solid),touch=ref(touch,crayon);children=0",
@@ -83,11 +83,11 @@
       "10|transform|R3/P0:1|tx=1;ty=0;sx=-;sy=-;rotate=-;children=1",
       "11|emit|R3/P0:1/T0/V0:0|binding=-;fields=color=ref(color,black);children=0"
     ]},
-    {"id": "recursive-list-boolean-integer-to-number-and-range", "definition": "typed", "source": "Expand.Typed", "language": "en", "composition_seed": 11, "expected_definition_digest": "46e2584421008c6fb3cbc57cab3444c5887266234f8585b1d6be5bb5d370ebc6", "expected_seed_digests": ["6eb1daec41d64ca6c895b5b2abe366612267a91d397e06b025e45ef905337357"], "expected_node_kinds": ["transform", "anchor"], "expected_node_count": 2, "expected_nodes": [
+    {"id": "recursive-list-boolean-integer-to-number-and-range", "definition": "typed", "source": "｛Typed｝", "language": "en", "composition_seed": 11, "expected_definition_digest": "46e2584421008c6fb3cbc57cab3444c5887266234f8585b1d6be5bb5d370ebc6", "expected_seed_digests": ["6eb1daec41d64ca6c895b5b2abe366612267a91d397e06b025e45ef905337357"], "expected_node_kinds": ["transform", "anchor"], "expected_node_count": 2, "expected_nodes": [
       "0|transform|R0/C0:typed|tx=1;ty=-;sx=-;sy=-;rotate=-;children=1",
       "1|anchor|R0/C0:typed/T0/V0:0|target=0:R0/C0:typed/T0/V0:0:point;children=0"
     ]},
-    {"id": "two-invocations-distinct-seeds", "definition": "empty", "source": "Expand.Empty。Expand.Empty", "language": "ja", "composition_seed": 13, "expected_definition_digest": "d4a4816d6a9ebc26bf1174ac4830961a37019603610169aab636515872554192", "expected_seed_digests": ["17feffb07acb0bba810132b4ef8e9cb8332bbe15da860b23c226ccd08528348d", "05e62f42b5e7b62476f1b220b96d6af82c51f2c2c0512b289c5b43ade9934c4b"], "expected_node_kinds": [], "expected_node_count": 0, "expected_nodes": []}
+    {"id": "two-invocations-distinct-seeds", "definition": "empty", "source": "｛Empty｝。｛Empty｝", "language": "ja", "composition_seed": 13, "expected_definition_digest": "d4a4816d6a9ebc26bf1174ac4830961a37019603610169aab636515872554192", "expected_seed_digests": ["17feffb07acb0bba810132b4ef8e9cb8332bbe15da860b23c226ccd08528348d", "05e62f42b5e7b62476f1b220b96d6af82c51f2c2c0512b289c5b43ade9934c4b"], "expected_node_kinds": [], "expected_node_count": 0, "expected_nodes": []}
   ],
   "known_answers": {
     "all_seed_digest": "5499bd5106f3049ba9e60609a634410768e611e490dec7c2174733430cc2306b",

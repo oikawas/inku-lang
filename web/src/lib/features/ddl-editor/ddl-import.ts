@@ -1,15 +1,16 @@
 /** Reading a DDL file back into the editor.
  *
- * An `inku.ddl-export.v1` file carries the visible DDL and the plugin
- * definitions it names. The definitions travel with the next new work only and
+ * An `inku.ddl-export.v2` file carries the visible DDL and the plugin
+ * definitions selected by its saved locks. They travel with the next new work only and
  * are validated again by the server's shared boundary; this module does not
  * interpret them. Any other text is read as plain DDL without definitions.
  */
 
-export const DDL_EXPORT_SCHEMA = 'inku.ddl-export.v1';
+export const DDL_EXPORT_SCHEMA = 'inku.ddl-export.v2';
+import { resolveInstructionLang } from '../../instructionLang';
 const MAX_IMPORTED_PLUGINS = 64;
 
-export type ImportedPlugin = { definition: Record<string, unknown>; summary: string };
+export type ImportedPlugin = { definition: Record<string, unknown>; note: string };
 
 export type DdlImport = {
 	ddl: string;
@@ -22,7 +23,7 @@ function record(value: unknown): Record<string, unknown> | null {
 	return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
 }
 
-export function parseDdlImport(text: string): DdlImport {
+export function parseDdlImport(text: string, language: 'ja' | 'en' = 'ja'): DdlImport {
 	let parsed: unknown = null;
 	try {
 		parsed = JSON.parse(text);
@@ -30,6 +31,7 @@ export function parseDdlImport(text: string): DdlImport {
 		return { ddl: text, plugins: [], names: [] };
 	}
 	const file = record(parsed);
+	if (file?.schema === 'inku.ddl-export.v1') throw new Error('ddl_export_requires_v2');
 	if (file?.schema !== DDL_EXPORT_SCHEMA) {
 		// JSON that is not an export is still the author's text.
 		return { ddl: text, plugins: [], names: [] };
@@ -40,9 +42,15 @@ export function parseDdlImport(text: string): DdlImport {
 		const plugin = record(item);
 		const definition = record(plugin?.definition);
 		if (!definition) throw new Error('ddl_export_invalid_plugin');
-		plugins.push({ definition, summary: typeof plugin?.summary === 'string' ? plugin.summary : '' });
+		plugins.push({ definition, note: typeof plugin?.note === 'string' ? plugin.note : '' });
 	}
 	if (plugins.length > MAX_IMPORTED_PLUGINS) throw new Error('ddl_export_too_many_plugins');
-	const names = plugins.map(({ definition }) => `${String(definition.namespace)}.${String(definition.heading)}`);
+	const wordLanguage = resolveInstructionLang(file.ddl, language);
+	const names = plugins.map(({ definition }) => {
+		const names = record(definition.names);
+		const values = names?.[wordLanguage];
+		const primary = Array.isArray(values) && typeof values[0] === 'string' ? values[0] : String(definition.heading ?? definition.id ?? '');
+		return wordLanguage === 'ja' ? `｛${primary}｝` : `{${primary}}`;
+	});
 	return { ddl: file.ddl, plugins, names };
 }

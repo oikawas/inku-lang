@@ -37,22 +37,26 @@ public struct ChatGPTPlanModel: Identifiable, Codable, Sendable, Equatable {
 /// Server chatgpt_models.publication: the active profile's saved catalog with its published marks.
 public struct ChatGPTPlanPublication: Sendable, Equatable {
     /// A ChatGPT plan model takes images, so a model without a saved choice serves both purposes.
-    public static let defaultPurposes = ["llm", "vision"]
+    public static let defaultPurposes: [String] = {
+        (try? ChatGPTPolicy.call("chatgpt_usable", ["profile": .object([:]), "model": .string("")])["purposes"].array?.compactMap(\.string)) ?? []
+    }()
     public let profileID: String
     public let generation: Int64
     public let models: [ChatGPTPlanModel]
     public let published: Set<String>
     /// Every catalog model's purposes, in `llm`, `vision` order.
     public let purposes: [String: [String]]
+    public let assessedModels: [String: ProviderModelSettings]
     public init(profileID: String, generation: Int64, models: [ChatGPTPlanModel], published: Set<String>,
-                purposes: [String: [String]] = [:]) {
+                purposes: [String: [String]] = [:], assessedModels: [String: ProviderModelSettings] = [:]) {
         self.profileID = profileID; self.generation = generation; self.models = models; self.published = published
+        self.assessedModels = assessedModels
         self.purposes = Dictionary(uniqueKeysWithValues: models.map { ($0.id, Self.ordered(purposes[$0.id] ?? Self.defaultPurposes)) })
     }
     /// In catalog order, as Server's drawing and Vision catalogs list them.
     public var publishedModels: [ChatGPTPlanModel] { models.filter { published.contains($0.id) } }
     public func purposes(of id: String) -> [String] { purposes[id] ?? Self.defaultPurposes }
-    static func ordered(_ purposes: [String]) -> [String] { ["llm", "vision"].filter(purposes.contains) }
+    static func ordered(_ purposes: [String]) -> [String] { defaultPurposes.filter(purposes.contains) }
 }
 
 struct ChatGPTStoredProfile: Codable, Sendable {

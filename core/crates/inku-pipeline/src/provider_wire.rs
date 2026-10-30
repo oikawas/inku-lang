@@ -35,12 +35,13 @@ const OPENAI_API_HOST: &str = "api.openai.com";
 /// sampling (COMPOSITION-PRODUCT-DESIGN section 12), and so are the laws, the
 /// colors and the three stages that read and draw a description (their
 /// prototypes' requests went as Stage 1's).
-const STAGE1_SAMPLED_ACTIONS: [&str; 7] = [
+const STAGE1_SAMPLED_ACTIONS: [&str; 8] = [
     "generate_normalized_ddl",
     "read_composition",
     "choose_laws",
     "choose_colors",
     "read_description",
+    "compose_description",
     "write_description_ddl",
     "review_description_ddl",
 ];
@@ -455,11 +456,12 @@ fn ordered_schema(value: &Value, named: bool) -> Value {
 }
 
 /// The stages whose system text and schema are the same for every work
-/// (2026-10-25). Anthropic is asked to keep them (`cache_control`): the next
-/// work's request and a request asked again read them at the cache's price.
-/// Another stage's system text or schema changes with the work, and a mark
-/// would only write a new entry each time.
-const CACHED_ACTIONS: [&str; 2] = ["choose_laws", "choose_colors"];
+/// (2026-10-25; the composition of a read-and-draw run, 2026-10-26).
+/// Anthropic is asked to keep them (`cache_control`): the next work's request
+/// and a request asked again read them at the cache's price. Another stage's
+/// system text or schema changes with the work, and a mark would only write a
+/// new entry each time.
+const CACHED_ACTIONS: [&str; 3] = ["choose_laws", "choose_colors", "compose_description"];
 
 /// Anthropic's system: the text, as one block the cache keeps for the stages
 /// that send the same system text and schema to every work.
@@ -1021,7 +1023,7 @@ fn pipeline_request(
     } else {
         0.0
     });
-    let base = connection.base();
+    let base = crate::provider_url::api_root(&connection.kind, connection.base());
     let user = |parts: Value| {
         let content = if images.is_empty() {
             string(message)
@@ -1268,7 +1270,7 @@ fn text_request(
     temperature: &Value,
     max_tokens: i64,
 ) -> Result<Built, Refusal> {
-    let base = connection.base();
+    let base = crate::provider_url::api_root(&connection.kind, connection.base());
     match connection.kind.as_str() {
         "openai_compatible" => {
             let content = if images.is_empty() {
@@ -2025,7 +2027,7 @@ fn answer(request: &Value) -> Result<Value, Refusal> {
             )?;
             Ok(built.answer(true, model))
         }
-        "text_request" => {
+        "text_request" | "text_request_with_count" => {
             let connection = connection_of(request)?;
             let model = model()?;
             let field = |name: &str| {
@@ -2053,9 +2055,9 @@ fn answer(request: &Value) -> Result<Value, Refusal> {
                 temperature,
                 tokens_of(request, "max_tokens")?,
             )?;
-            Ok(built.answer(false, model))
+            Ok(built.answer(action == "text_request_with_count", model))
         }
-        "pipeline_response" | "text_response" => {
+        "pipeline_response" | "text_response" | "text_response_with_usage" => {
             let format = as_str(get(request, "format"))
                 .filter(|format| {
                     ["openai_responses", "openai_chat", "anthropic", "gemini"].contains(format)
@@ -2069,12 +2071,17 @@ fn answer(request: &Value) -> Result<Value, Refusal> {
             };
             let body = as_str(get(request, "body"))
                 .ok_or_else(|| Refusal::invalid("body must be a string"))?;
-            Ok(read_response(
-                format,
-                status,
-                body,
-                action == "text_response",
-            ))
+            let mut result = read_response(format, status, body, action != "pipeline_response");
+            if action == "text_response_with_usage" && (200..300).contains(&status) {
+                let tokens = python_loads(body)
+                    .ok()
+                    .and_then(|data| input_tokens(format, &data))
+                    .unwrap_or(Value::Null);
+                if let Value::Object(members) = &mut result {
+                    members.push(("input_tokens".to_owned(), tokens));
+                }
+            }
+            Ok(result)
         }
         "usage" => {
             // The ChatGPT plan's terminal response is read as `openai_responses`.
@@ -2166,6 +2173,32 @@ fn answer(request: &Value) -> Result<Value, Refusal> {
             let empty = Value::Null;
             Ok(chatgpt::catalog_answer(
                 get(request, "value").unwrap_or(&empty),
+            ))
+        }
+        action
+            if action.starts_with("chatgpt_auth_")
+                || [
+                    "chatgpt_publication",
+                    "chatgpt_publication_update",
+                    "chatgpt_usable",
+                    "chatgpt_offered",
+                    "chatgpt_cache",
+                ]
+                .contains(&action) =>
+        {
+            let response = crate::model_catalog::model_catalog_json(dumps(request).as_bytes());
+            let text = std::str::from_utf8(&response)
+                .map_err(|_| Refusal::invalid("invalid policy response"))?;
+            let Value::Object(fields) =
+                python_loads(text).map_err(|_| Refusal::invalid("invalid policy response"))?
+            else {
+                return Err(Refusal::invalid("invalid policy response"));
+            };
+            Ok(Value::Object(
+                fields
+                    .into_iter()
+                    .filter(|(key, _)| key != "schema")
+                    .collect(),
             ))
         }
         _ => Err(Refusal::invalid("action is unknown")),
@@ -2276,6 +2309,26 @@ mod tests {
     }
 
     #[test]
+    fn versioned_provider_bases_use_one_shared_api_root() {
+        assert_eq!(check_requests("base_url_requests"), 28);
+        for row in cases()["base_url_requests"].as_array().unwrap() {
+            if row["request"]["action"] == "pipeline_request"
+                && row["request"]["connection"]["kind"] == "gemini"
+            {
+                let answer = ask(&row["request"]);
+                let generation_url = answer["url"].as_str().unwrap();
+                assert_eq!(
+                    answer["count_tokens"]["url"],
+                    format!(
+                        "{}:countTokens",
+                        generation_url.strip_suffix(":generateContent").unwrap()
+                    )
+                );
+            }
+        }
+    }
+
+    #[test]
     fn every_shared_response_is_read_as_server_read_it() {
         let cases = cases();
         let mut compared = 0;
@@ -2302,7 +2355,7 @@ mod tests {
             }
             compared += 1;
         }
-        assert_eq!(compared, 162);
+        assert_eq!(compared, 221);
     }
 
     #[test]
@@ -2424,12 +2477,36 @@ mod tests {
         assert_eq!(stage1, serde_json::json!(0.3));
         for action_name in [
             "read_description",
+            "compose_description",
             "write_description_ddl",
             "review_description_ddl",
         ] {
             assert_eq!(temperature(action_name), stage1, "{action_name}");
         }
         assert_eq!(temperature("write_image_ddl"), serde_json::json!(0.0));
+    }
+
+    /// A read-and-draw composition's system text and schema are the same for
+    /// every work, so Anthropic is asked to keep them, as the laws' and the
+    /// colors' are; the writing request's are not marked (2026-10-26).
+    #[test]
+    fn the_composition_of_a_description_is_kept_in_anthropics_cache() {
+        let system = |action_name: &str| {
+            let answer = ask(&serde_json::json!({
+                "action": "pipeline_request",
+                "connection": {"id": "x", "kind": "anthropic", "base_url": "https://api.anthropic.com"},
+                "model": "m",
+                "prompt": {"system": "s", "message": "m", "action_name": action_name,
+                           "response_schema": {"type": "object"}},
+                "max_tokens": 64,
+            }));
+            sent_body(&answer)["system"].clone()
+        };
+        assert_eq!(
+            system("compose_description"),
+            serde_json::json!([{"type": "text", "text": "s", "cache_control": {"type": "ephemeral"}}])
+        );
+        assert_eq!(system("write_description_ddl"), serde_json::json!("s"));
     }
 
     /// The ChatGPT body ends with a cache routing hint, the same for the

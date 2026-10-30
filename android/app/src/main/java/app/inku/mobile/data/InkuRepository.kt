@@ -129,6 +129,7 @@ class InkuRepository(
     }
     private val providerModelCandidatePrefix = "provider_model_candidates:"
     private val modelObservationPrefix = "model_catalog_observations:"
+    private val providerKeyGuard = ProviderSettingsKeyGuard()
     val modelCatalog: ModelCatalog by lazy { ModelCatalog.load(context) }
     private val localLiteRtProvider = LocalLiteRtLmProvider(context.applicationContext, database.modelAssetDao())
     val chatGptPlan: app.inku.mobile.llm.ChatGptPlanManager
@@ -346,9 +347,23 @@ class InkuRepository(
         val provider = database.providerSettingDao().get(providerId) ?: inkuError { it.errorServiceNotFound(providerId) }
         val key = provider.encryptedApiKey?.let(AndroidSecretBox::decryptOrPlain)
         if (key.isNullOrBlank()) inkuError { it.errorProviderApiKeyMissing(provider.displayName) }
-        val result = app.inku.mobile.llm.ModelAccessProbe.check(requireNotNull(provider.baseUrl), key, ModelCatalog.rawId(providerId, modelId))
-        result?.let { recordModelAccess(provider, modelId, it) }
-        return result
+        val id = ModelCatalog.rawId(providerId, modelId)
+        val answer = app.inku.mobile.llm.ModelAccessProbe.checkDetailed(requireNotNull(provider.baseUrl), key, id)
+        if (answer.has("retired")) {
+            database.withTransaction {
+                val current = database.providerSettingDao().get(providerId) ?: return@withTransaction
+                if (current.encryptedApiKey != provider.encryptedApiKey || current.baseUrl != provider.baseUrl || current.kind != provider.kind) return@withTransaction
+                val observationKey = "$modelObservationPrefix$providerId"
+                val old = ModelCatalogObservation.read(database.settingsDao().get(observationKey)?.valueJson)
+                val record = old.records[id] ?: catalogRequest("internal", JSONObject().put("model", modelCatalog.resolve(providerId, id).record)).getJSONObject("model")
+                val applied = catalogRequest("access_apply", JSONObject().put("models", JSONArray().put(record))
+                    .put("answers", JSONArray().put(answer))).getJSONArray("models").getJSONObject(0)
+                saveSetting(observationKey, old.copy(seen = (old.seen + id).distinct(), records = old.records + (id to applied)).json())
+            }
+        }
+        val available = if (answer.has("subscription")) !answer.getBoolean("subscription") else null
+        available?.let { recordModelAccess(provider, modelId, it) }
+        return available
     }
 
     fun exportTemplates(): Flow<List<ExportTemplateEntity>> = database.exportTemplateDao().observeAll()
@@ -569,14 +584,13 @@ class InkuRepository(
     }
 
     /**
-     * The saved work as `inku.ddl-export.v1`: its visible DDL and the plugin
-     * definitions that DDL names, from the work's own saved configuration.
+     * The saved work as `inku.ddl-export.v2`, with its locked plugin definitions.
      */
     suspend fun ddlExportJson(item: HistoryItemEntity): String {
-        val config = readManagedHistory(AndroidWorkPipeline.OWNER_ID, item.id)
+        val context = readManagedHistory(AndroidWorkPipeline.OWNER_ID, item.id)
             ?.forkContextJson
             ?.let(::JSONObject)
-            ?.optJSONObject("config")
+        val config = context?.optJSONObject("config")
         val language = config?.optString("language")?.takeIf { it.isNotBlank() }
             ?: item.instructionLangResolved
             ?: "ja"
@@ -590,6 +604,7 @@ class InkuRepository(
                 .put("build_number", BuildConfig.BUILD_NUMBER)
                 .put("render_engine_version", engineVersion ?: JSONObject.NULL),
             ddlSourceOrigin = item.ddlSourceOrigin,
+            locks = context?.optJSONObject("macro_catalog")?.optJSONArray("definition_locks"),
         ).toString(2)
     }
 
@@ -749,20 +764,24 @@ class InkuRepository(
     }
 
     suspend fun ensureDefaultProviderSettings() {
-        dropUntouchedRetiredProviders()
-        defaultProviderSettings().forEach { setting ->
-            val existing = database.providerSettingDao().get(setting.providerId)
-            database.providerSettingDao().upsert(
-                builtInProviderSetting(setting, existing).copy(
-                    encryptedApiKey = existing?.encryptedApiKey?.let { key ->
-                        if (AndroidSecretBox.isEncrypted(key)) key else AndroidSecretBox.decryptOrPlain(key)?.let(AndroidSecretBox::encrypt)
-                    } ?: setting.encryptedApiKey,
-                    publishedModelsJson = normalizedPublishedModels(setting, existing),
-                    updatedAt = System.currentTimeMillis(),
-                ),
-            )
+        database.withTransaction {
+            val dao = database.providerSettingDao()
+            val previous = dao.listAll()
+            val normalized = providerKeyGuard.normalize(previous, DefaultModelDownloads.all.map { it.modelId }, storedModelCandidates(), storedModelObservations())
+            val kept = normalized.map { it.providerId }.toSet()
+            previous.filter { it.providerId != "chatgpt" && it.providerId !in kept }
+                .forEach { dao.deleteCustom(it.providerId) }
+            normalized.forEach { dao.upsert(it) }
         }
     }
+
+    private suspend fun storedModelCandidates(): Map<String, List<String>> = database.settingsDao().listAll()
+        .filter { it.key.startsWith(providerModelCandidatePrefix) && it.valueJson != "null" }
+        .associate { it.key.removePrefix(providerModelCandidatePrefix) to ProviderSettingsCodec.parseModelIds(it.valueJson) }
+
+    private suspend fun storedModelObservations(): Map<String, ModelCatalogObservation> = database.settingsDao().listAll()
+        .filter { it.key.startsWith(modelObservationPrefix) }
+        .associate { it.key.removePrefix(modelObservationPrefix) to ModelCatalogObservation.read(it.valueJson) }
 
     suspend fun ensureDefaultExportTemplates() {
         // The built-in 4320px row is retired with the 2160px ceiling (the
@@ -784,6 +803,12 @@ class InkuRepository(
     }.getOrNull() ?: true
 
     fun bundledPluginWords(japanese: Boolean): List<String> = pipeline.bundledPluginWords(japanese)
+
+    suspend fun pluginEditorAnalysis(source: String, language: String, executionId: String?, historyId: String?, imported: List<app.inku.mobile.pipeline.ImportedPluginDefinition>): JSONObject =
+        pipeline.pluginEditorAnalysis(source, language, executionId, historyId, imported)
+
+    suspend fun pluginOfferConfig(historyId: String): JSONObject? =
+        readManagedHistory(AndroidWorkPipeline.OWNER_ID, historyId)?.forkContextJson?.let(::JSONObject)?.optJSONObject("config")
 
     suspend fun setBundledPluginPackageEnabled(enabled: Boolean) {
         database.pluginSettingDao().upsert(
@@ -832,8 +857,14 @@ class InkuRepository(
     ) {
         val cleanId = providerId.trim().lowercase()
         if (cleanId == "chatgpt") throw app.inku.mobile.llm.ChatGptException("chatgpt_reserved_provider")
-        if (!cleanId.matches(Regex("[a-z0-9][a-z0-9_-]*"))) inkuError { it.errorServiceIdFormat }
         val cleanBaseUrl = baseUrl?.trim()?.ifBlank { null }
+        val validation = catalogRequest("validate_settings", JSONObject().put("host", "android")
+            .put("provider", cleanId).put("base_url", cleanBaseUrl ?: "")
+            .put("models", JSONArray(publishedModels.map { JSONObject().put("id", it.trim()) }))
+            .put("rate_limits", JSONObject().put("rpm", 0).put("tpm", 0).put("rpd", 0)))
+        if (!validation.getBoolean("provider_valid")) inkuError { it.errorServiceIdFormat }
+        if (!validation.getBoolean("url_valid")) inkuError { it.errorBaseUrlInvalid }
+        if (validation.getJSONArray("duplicate_models").length() != 0) inkuError { it.errorDuplicateModelIds }
         if (cleanId != "local-litert-lm" && cleanBaseUrl != null) {
             ProviderUrlValidator.validateRemoteBaseUrl(cleanBaseUrl)
         }
@@ -846,15 +877,26 @@ class InkuRepository(
             encryptedApiKey = apiKey
                 ?.takeIf { it.isNotBlank() }
                 ?.let { AndroidSecretBox.encrypt(it) }
-                ?: existing?.encryptedApiKey?.let { key ->
-                    if (AndroidSecretBox.isEncrypted(key)) key else AndroidSecretBox.decryptOrPlain(key)?.let(AndroidSecretBox::encrypt)
-                },
+                ?: existing?.encryptedApiKey,
             publishedModelsJson = JSONArray(publishedModels.map { it.trim() }.filter { it.isNotBlank() }).toString(),
             isEnabled = enabled,
             isDefaultLocal = existing?.isDefaultLocal ?: false,
             updatedAt = System.currentTimeMillis(),
         )
-        database.providerSettingDao().upsert(next)
+        database.withTransaction {
+            val dao = database.providerSettingDao()
+            val current = dao.listAll()
+            val candidates = storedModelCandidates()
+            val changedConnection = !apiKey.isNullOrBlank() || existing?.baseUrl != next.baseUrl || existing?.kind != next.kind
+            val observations = storedModelObservations().let { if (changedConnection) it - cleanId else it }
+            val updated = providerKeyGuard.save(current, next, DefaultModelDownloads.all.map { it.modelId },
+                candidates, observations, modelCatalog.ids(cleanId))
+            val saved = updated.firstOrNull { it.providerId == cleanId } ?: inkuError { it.errorServiceIdFormat }
+            val allowed = ProviderSettingsCodec.parseModelIds(saved.publishedModelsJson)
+            val requested = ProviderSettingsCodec.parseModelIds(next.publishedModelsJson)
+            dao.upsert(saved.copy(publishedModelsJson = JSONArray(requested.filter { it in allowed } + allowed.filter { it !in requested }).toString(),
+                updatedAt = next.updatedAt))
+        }
         if (!apiKey.isNullOrBlank() || existing?.baseUrl != next.baseUrl || existing?.kind != next.kind) {
             saveSetting("$modelObservationPrefix$cleanId", ModelCatalogObservation().json())
             saveSetting("$providerModelCandidatePrefix$cleanId", "null")
@@ -863,49 +905,61 @@ class InkuRepository(
 
     suspend fun clearProviderApiKey(providerId: String) {
         if (providerId == "chatgpt") throw app.inku.mobile.llm.ChatGptException("chatgpt_reserved_provider")
-        val existing = database.providerSettingDao().get(providerId) ?: return
-        database.providerSettingDao().upsert(existing.copy(encryptedApiKey = null, updatedAt = System.currentTimeMillis()))
-        saveSetting("$modelObservationPrefix$providerId", ModelCatalogObservation().json())
-        saveSetting("$providerModelCandidatePrefix$providerId", "null")
+        database.withTransaction {
+            val dao = database.providerSettingDao()
+            if (dao.get(providerId) == null) return@withTransaction
+            val updated = providerKeyGuard.update(dao.listAll(), DefaultModelDownloads.all.map { it.modelId }, providerId,
+                JSONObject().put("clear_api_key", true), storedModelCandidates(), storedModelObservations())
+                .firstOrNull { it.providerId == providerId } ?: return@withTransaction
+            dao.upsert(updated.copy(updatedAt = System.currentTimeMillis()))
+            saveSetting("$modelObservationPrefix$providerId", ModelCatalogObservation().json())
+            saveSetting("$providerModelCandidatePrefix$providerId", "null")
+        }
     }
 
     suspend fun fetchProviderModels(providerId: String): List<String> {
         if (providerId == "chatgpt") return chatGptPlan.refreshModels()
         ensureDefaultProviderSettings()
         val before = database.providerSettingDao().get(providerId) ?: inkuError { it.errorServiceNotFound(providerId) }
-        val models = modelRouter.fetchModels(providerId)
+        val fetched = modelRouter.fetchModelRows(providerId)
+        val models = (0 until fetched.length()).map { fetched.getJSONObject(it).getString("id") }
         database.withTransaction {
             val existing = database.providerSettingDao().get(providerId) ?: inkuError { it.errorServiceNotFound(providerId) }
             check(existing.encryptedApiKey == before.encryptedApiKey && existing.baseUrl == before.baseUrl && existing.kind == before.kind) { "Connection changed while fetching models." }
-            val selected = parseModelIds(existing.publishedModelsJson).filter { ModelCatalog.rawId(providerId, it) in models }
             val observationKey = "$modelObservationPrefix$providerId"
             val old = ModelCatalogObservation.read(database.settingsDao().get(observationKey)?.valueJson)
             val previous = database.settingsDao().get("$providerModelCandidatePrefix$providerId")?.valueJson?.takeUnless { it == "null" }?.let(::parseModelIds).orEmpty()
-            saveSetting(observationKey, old.copy(seen = (old.seen + previous + models + parseModelIds(existing.publishedModelsJson).map { ModelCatalog.rawId(providerId, it) }).distinct()).json())
+            val selected = parseModelIds(existing.publishedModelsJson).map { ModelCatalog.rawId(providerId, it) }
+            val oldIds = (old.seen + previous + selected + old.records.keys).distinct()
+            val oldRows = JSONArray(oldIds.map { id -> old.records[id] ?: catalogRequest("internal",
+                JSONObject().put("model", modelCatalog.resolve(providerId, id).record)).getJSONObject("model") })
+            val enabled = JSONObject().also { value -> oldIds.forEach { value.put(it, it in selected) } }
+            val beforeRefresh = JSONObject().put("models", oldRows).put("enabled_models", enabled)
+            val finished = ProviderSettingsCodec.refresh(providerId, fetched, beforeRefresh, java.time.LocalDate.now().toString(), old.access)
+            val finalRows = finished.getJSONArray("models")
+            val finalEnabled = finished.getJSONObject("enabled_models")
+            val records = (0 until finalRows.length()).associate { index ->
+                val record = finalRows.getJSONObject(index)
+                record.getString("id") to record
+            }
+            saveSetting(observationKey, old.copy(seen = records.keys.toList(), records = records).json())
             saveSetting("$providerModelCandidatePrefix$providerId", JSONArray(models).toString())
-            database.providerSettingDao().upsert(existing.copy(publishedModelsJson = JSONArray(selected).toString(), updatedAt = System.currentTimeMillis()))
+            database.providerSettingDao().upsert(existing.copy(publishedModelsJson = JSONArray(selected.filter { finalEnabled.optBoolean(it) }).toString(), updatedAt = System.currentTimeMillis()))
         }
         return models
     }
 
-    /**
-     * Removes a connection. A built-in one cannot leave the catalog -- the next
-     * start would put it back with its defaults -- so, as the server does
-     * (`model_settings.py` `update_model_settings`), it is switched off and
-     * hidden instead, and its key is forgotten. Adding a service with the same
-     * id brings it back.
-     */
+    /** Delete through the shared settings policy, keeping ChatGPT separate. */
     suspend fun deleteProvider(providerId: String) {
         if (providerId == "chatgpt") throw app.inku.mobile.llm.ChatGptException("chatgpt_reserved_provider")
-        val builtIn = defaultProviderSettings().any { it.providerId == providerId && !it.isDefaultLocal }
-        if (!builtIn) {
-            database.providerSettingDao().deleteCustom(providerId)
-            return
+        database.withTransaction {
+            val dao = database.providerSettingDao()
+            if (dao.get(providerId) == null) return@withTransaction
+            val updated = providerKeyGuard.update(dao.listAll(), DefaultModelDownloads.all.map { it.modelId },
+                providerId, JSONObject().put("delete", true), storedModelCandidates(), storedModelObservations()).firstOrNull { it.providerId == providerId }
+            if (updated == null) dao.deleteCustom(providerId)
+            else dao.upsert(updated.copy(updatedAt = System.currentTimeMillis()))
         }
-        val existing = database.providerSettingDao().get(providerId) ?: return
-        database.providerSettingDao().upsert(
-            existing.copy(isEnabled = false, encryptedApiKey = null, updatedAt = System.currentTimeMillis()),
-        )
     }
 
     suspend fun acceptModelLicense(modelId: String) {
@@ -984,7 +1038,7 @@ class InkuRepository(
         companion object Key : CoroutineContext.Key<PerformanceSaveObserver>
     }
 
-    suspend fun paint(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, historyInput: String? = null, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, uiLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput(), parentHistoryId: String? = null, inputProvenance: CameraInputProvenance? = null, renderWild: Boolean? = null, onPerformanceSaved: suspend () -> Unit = {}): HistoryItemEntity {
+    suspend fun paint(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, historyInput: String? = null, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, uiLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput(), parentHistoryId: String? = null, inputProvenance: CameraInputProvenance? = null, renderWild: Boolean? = null, readAndDraw: Boolean = false, descriptionComposition: Boolean = false, descriptionReview: Boolean = false, onPerformanceSaved: suspend () -> Unit = {}): HistoryItemEntity {
         val started = System.currentTimeMillis()
         val stage1Text = description
         val result = withContext(PerformanceSaveObserver(onPerformanceSaved)) {
@@ -1003,6 +1057,9 @@ class InkuRepository(
                     instructionLang = instructionLang,
                     uiLang = uiLang,
                     sketch = sketch,
+                    readAndDraw = readAndDraw,
+                    descriptionComposition = descriptionComposition,
+                    descriptionReview = descriptionReview,
                     parentHistoryId = parentHistoryId,
                     inputProvenance = inputProvenance,
                     renderWild = renderWild,
@@ -1695,127 +1752,7 @@ class InkuRepository(
             ?: error("Unknown model: $modelId")
     }
 
-    private fun defaultProviderSettings(): List<ProviderSettingEntity> {
-        fun models(vararg ids: String): String = JSONArray(ids.toList()).toString()
-        val localModels = JSONArray().apply {
-            DefaultModelDownloads.all.forEach { spec -> put(spec.modelId) }
-        }.toString()
-        return listOf(
-            ProviderSettingEntity(
-                providerId = "local-litert-lm",
-                displayName = "LiteRT-LM / Local",
-                kind = "litert-lm",
-                baseUrl = "local://litert-lm",
-                encryptedApiKey = null,
-                publishedModelsJson = localModels,
-                isEnabled = true,
-                isDefaultLocal = true,
-                updatedAt = System.currentTimeMillis(),
-            ),
-            ProviderSettingEntity(
-                providerId = "openai",
-                displayName = "OpenAI API Platform",
-                kind = "openai-compatible",
-                baseUrl = "https://api.openai.com/v1",
-                encryptedApiKey = null,
-                publishedModelsJson = models(),
-                isEnabled = true,
-                isDefaultLocal = false,
-                updatedAt = System.currentTimeMillis(),
-            ),
-            ProviderSettingEntity(
-                providerId = "nvidia",
-                displayName = "NVIDIA NIM",
-                kind = "openai-compatible",
-                baseUrl = "https://integrate.api.nvidia.com/v1",
-                encryptedApiKey = null,
-                publishedModelsJson = models(),
-                isEnabled = true,
-                isDefaultLocal = false,
-                updatedAt = System.currentTimeMillis(),
-            ),
-            ProviderSettingEntity(
-                providerId = "anthropic",
-                displayName = "Claude API",
-                kind = "anthropic",
-                baseUrl = "https://api.anthropic.com",
-                encryptedApiKey = null,
-                publishedModelsJson = models(),
-                isEnabled = true,
-                isDefaultLocal = false,
-                updatedAt = System.currentTimeMillis(),
-            ),
-            ProviderSettingEntity(
-                providerId = "gemini",
-                displayName = "Gemini API",
-                kind = "gemini",
-                baseUrl = "https://generativelanguage.googleapis.com",
-                encryptedApiKey = null,
-                publishedModelsJson = models(),
-                isEnabled = true,
-                isDefaultLocal = false,
-                updatedAt = System.currentTimeMillis(),
-            ),
-            // The server's catalog (model_settings.py): ovms left it on
-            // 2026-07-30 and Ollama Cloud took its place. Local Ollama is not
-            // offered on Android (RETIRED_BUILT_IN_PROVIDERS).
-            ProviderSettingEntity(
-                providerId = "ollama-cloud",
-                displayName = "Ollama Cloud (ollama.com)",
-                kind = "openai-compatible",
-                baseUrl = "https://ollama.com/v1",
-                encryptedApiKey = null,
-                publishedModelsJson = models(),
-                isEnabled = true,
-                isDefaultLocal = false,
-                updatedAt = System.currentTimeMillis(),
-            ),
-        ).map { setting ->
-            if (setting.isDefaultLocal) setting else setting.copy(publishedModelsJson = JSONArray(modelCatalog.defaults(setting.providerId)).toString())
-        }
-    }
-
-    /**
-     * Removes a withdrawn built-in connection that is still as the catalog
-     * seeded it.
-     *
-     * The server drops a withdrawn id on the way in (`RETIRED_PROVIDER_IDS`).
-     * Here a row the author configured -- a key, or a name, address or model
-     * list of their own -- is kept as a connection of their own, key and all,
-     * and only an untouched one goes.
-     */
-    private suspend fun dropUntouchedRetiredProviders() {
-        RETIRED_BUILT_IN_PROVIDERS.forEach { retired ->
-            val existing = database.providerSettingDao().get(retired.providerId) ?: return@forEach
-            val models = parseModelIds(existing.publishedModelsJson).toSet()
-            val untouched = existing.encryptedApiKey == null &&
-                existing.displayName == retired.displayName &&
-                existing.baseUrl == retired.baseUrl &&
-                (models.isEmpty() || models == retired.seededModels)
-            if (untouched) database.providerSettingDao().deleteCustom(retired.providerId)
-        }
-    }
-
-    private fun normalizedPublishedModels(defaultSetting: ProviderSettingEntity, existing: ProviderSettingEntity?): String {
-        val current = existing?.publishedModelsJson ?: return defaultSetting.publishedModelsJson
-        val currentIds = parseModelIds(current)
-        if (defaultSetting.isDefaultLocal) {
-            // The author's pick among the on-device models, less the ones the
-            // catalog no longer offers.
-            val offered = parseModelIds(defaultSetting.publishedModelsJson)
-            return JSONArray(currentIds.filter { it in offered }.ifEmpty { offered }).toString()
-        }
-        return current
-    }
-
-    private fun parseModelIds(value: String): List<String> {
-        return runCatching {
-            val array = JSONArray(value)
-            List(array.length()) { index -> array.optString(index).trim() }.filter { it.isNotBlank() }
-        }.getOrElse {
-            value.lines().map { it.trim() }.filter { it.isNotBlank() }
-        }
-    }
+    private fun parseModelIds(value: String): List<String> = ProviderSettingsCodec.parseModelIds(value)
 
     private fun createHistoryThumbnail(svgText: String, renderHash: String): ThumbnailInfo? {
         return runCatching {
@@ -1856,32 +1793,6 @@ class InkuRepository(
             ExportTemplateEntity("png-2160", "PNG 2160px", "", 2160, 1, true, now),
         )
     }
-}
-
-/**
- * A built-in connection as it is stored again at start-up.
- *
- * The author may rename a built-in service and point it at another base URL
- * (ANDROID_SPEC 2026-05-08), and the server keeps both edits
- * (`model_settings.py` `normalize_model_settings`). This used to write the
- * catalog's name and URL back over them on every start and before every model
- * list fetch, so an edited Ollama URL was gone before the fetch it was made
- * for. The kind still comes from the catalog. The switch is kept, because
- * off is how a deleted built-in stays deleted; adding a service with the same
- * id turns it back on. The local provider's URL is only a marker and stays
- * the catalog's, and the local provider cannot be switched off.
- */
-internal fun builtInProviderSetting(
-    catalog: ProviderSettingEntity,
-    existing: ProviderSettingEntity?,
-): ProviderSettingEntity {
-    if (existing == null) return catalog
-    return catalog.copy(
-        displayName = existing.displayName.takeIf { it.isNotBlank() } ?: catalog.displayName,
-        baseUrl = if (catalog.isDefaultLocal) catalog.baseUrl else existing.baseUrl?.takeIf { it.isNotBlank() } ?: catalog.baseUrl,
-        // Off means deleted (`deleteProvider`); the local model cannot be.
-        isEnabled = catalog.isDefaultLocal || existing.isEnabled,
-    )
 }
 
 internal fun refinementColorSnapshot(parent: RefinementParent, plan: RefinementPlan) =
@@ -1954,29 +1865,3 @@ internal fun staleThumbnailFiles(
 }
 
 private const val STALE_THUMBNAIL_AGE_MS = 10 * 60_000L
-
-/** A built-in connection that was withdrawn, as the catalog once seeded it. */
-private data class RetiredProvider(
-    val providerId: String,
-    val displayName: String,
-    val baseUrl: String,
-    val seededModels: Set<String>,
-)
-
-private val RETIRED_BUILT_IN_PROVIDERS = listOf(
-    RetiredProvider(
-        providerId = "ovms",
-        displayName = "Intel OVMS",
-        baseUrl = "http://127.0.0.1:8101/v3",
-        seededModels = setOf("qwen3-api", "qwen-api", "gemma3-12b-api", "gemma3-4b-api"),
-    ),
-    // Withdrawn on Android only, by the author's ruling of 2026-09-27: it
-    // pointed at the phone itself, where no Ollama runs, and plain http to a
-    // LAN Ollama is refused. The server still offers it on its own host.
-    RetiredProvider(
-        providerId = "ollama",
-        displayName = "Ollama",
-        baseUrl = "http://127.0.0.1:11434/v1",
-        seededModels = setOf("ollama:llama3.2", "ollama:gpt-oss:20b", "ollama:qwen3:8b"),
-    ),
-)

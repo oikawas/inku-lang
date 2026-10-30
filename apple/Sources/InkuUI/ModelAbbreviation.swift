@@ -4,67 +4,52 @@ import InkuHost
 /// How a saved model reference is named on screen, ported from the Build1162 Web functions:
 /// `shortModelName`/`shortModel` (routes/+page.svelte), `abbreviateStripModel` (lib/historyStripFields.ts),
 /// and `providerLabel`/`modelDisplayName`/`modelShortName`/`resolveModelRefForDisplay` (lib/models.ts).
-/// The configured services take the place of the Server catalog; the bundled Server defaults fill the rest.
+/// The configured services and published personal-plan models supply the names resolved by the shared core.
 public struct ModelNaming: Sendable {
     /// Web `DEFAULT_PROVIDER`, the stage default of rule 3.
     public static let defaultProvider = "nvidia"
 
     private let connections: [ProviderSettings]
+    private let stageDefault: String
+    private static let resolutionCache = ModelResolutionCache()
 
-    public init(providers: [ProviderSettings] = []) {
-        var seen = Set(providers.map(\.id))
-        connections = providers + Self.bundledProviders.filter { seen.insert($0.id).inserted }
+    public init(providers: [ProviderSettings] = [], stageProvider: String = defaultProvider) {
+        connections = providers
+        stageDefault = stageProvider
     }
 
-    private static let bundledProviders: [ProviderSettings] = (try? BundledProviderDefaults.loadBundled()) ?? []
-
-    /// Web `RETIRED_PROVIDER_GROUPS`: named, never routed.
-    private static let retiredLabels = ["ovms": "Intel OVMS"]
-    private static let retiredModels: [String: [String: String]] = [
-        "ovms": ["qwen3-api": "Qwen3 8B Instruct", "qwen-api": "Qwen2.5 7B Instruct",
-                 "gemma3-12b-api": "Google Gemma 3 12B Instruct", "gemma3-4b-api": "Google Gemma 3 4B Instruct"],
-    ]
+    private func displayResolution(_ reference: String, defaultProvider: String? = nil) -> [String: Any] {
+        let key = ModelResolutionCache.Key(reference: reference, provider: defaultProvider ?? stageDefault)
+        if let cached = Self.resolutionCache.get(key, connections: connections) { return cached }
+        var providers = ProviderModelReference.referenceProviders(connections)
+        if let plan = connections.first(where: { $0.kind == .chatGPTPlan && $0.id == "chatgpt" }) {
+            providers["chatgpt"] = ["id": "chatgpt", "label": "ChatGPT plan", "active": true,
+                "models": (plan.models ?? []).map { ["id": $0.id, "label": $0.label] }] as [String: Any]
+        }
+        let resolved = (try? ProviderCoreSettings.call("resolve_display", ["ref": reference,
+            "providers": providers, "default_provider": defaultProvider ?? stageDefault])) ?? [:]
+        Self.resolutionCache.put(resolved, for: key, connections: connections)
+        return resolved
+    }
 
     // MARK: models.ts
 
     /// The provider's own name, falling back to its id when the catalog has none.
     public func providerLabel(_ provider: String) -> String {
         guard !provider.isEmpty else { return "" }
-        if let label = connections.first(where: { $0.id == provider })?.label, !label.isEmpty { return label }
-        if provider == "chatgpt" { return "ChatGPT plan" }
-        return Self.retiredLabels[provider] ?? provider
+        return displayResolution(provider + ":_", defaultProvider: provider)["provider_label"] as? String ?? provider
     }
 
     private func modelLabel(provider: String, model: String) -> String? {
-        if let connection = connections.first(where: { $0.id == provider }) {
-            let models = ModelGuidanceCatalog.bundled?.registeredModelSettings(for: connection) ?? connection.models ?? []
-            if let label = models.first(where: { $0.id == model })?.label, !label.isEmpty { return label }
-        }
-        return ModelGuidanceCatalog.bundled?.savedModelLabel(providerID: provider, modelID: model)
-            ?? Self.retiredModels[provider]?[model]
-    }
-
-    private var knownProviders: Set<String> { Set(connections.map(\.id)).union(["chatgpt"]).union(Self.retiredLabels.keys) }
-
-    private func owners(of model: String) -> Set<String> {
-        Set(connections.filter { connection in
-            connection.id != "chatgpt"
-                && (ModelGuidanceCatalog.bundled?.registeredModelSettings(for: connection) ?? connection.models ?? []).contains { $0.id == model }
-        }.map(\.id)).union(ModelGuidanceCatalog.bundled?.savedModelOwners(modelID: model) ?? [])
+        guard connections.contains(where: { $0.id == provider && $0.kind != .chatGPTPlan })
+                || ProviderModelReference.retiredProviderIDs.contains(provider) || provider == "chatgpt" else { return model }
+        return displayResolution(provider + ":" + model, defaultProvider: provider)["model_label"] as? String
     }
 
     /// Web `resolveModelRefForDisplay`: explicit qualification, sole ownership, retired ownership, then the stage default.
     public func resolve(_ reference: String, stageProvider: String = ModelNaming.defaultProvider) -> (provider: String, model: String) {
-        if let colon = reference.firstIndex(of: ":"), colon > reference.startIndex {
-            let head = String(reference[..<colon])
-            let rest = String(reference[reference.index(after: colon)...])
-            if !rest.isEmpty, knownProviders.contains(head) { return (head, rest) }
-        }
-        let owned = owners(of: reference)
-        if owned.count == 1, let only = owned.first { return (only, reference) }
-        let retired = Self.retiredModels.filter { $0.value[reference] != nil }.map(\.key)
-        if retired.count == 1 { return (retired[0], reference) }
-        return (stageProvider, reference)
+        let answer = displayResolution(reference, defaultProvider: stageProvider == Self.defaultProvider ? stageDefault : stageProvider)
+        return (answer["provider"] as? String ?? stageProvider, answer["model"] as? String ?? reference)
     }
 
     /// Web `modelDisplayName`: "<provider> / <model label>".
@@ -107,7 +92,10 @@ public struct ModelNaming: Sendable {
     /// Web `historyModelStage1Short`, the history strip form.
     public func stripModel(_ reference: String?) -> String {
         guard let reference, !reference.isEmpty else { return "-" }
-        return Self.abbreviateStripModel(owner: providerLabel(resolve(reference).provider), name: modelShortName(reference))
+        let (provider, model) = resolve(reference)
+        let label = modelLabel(provider: provider, model: model) ?? model
+        let name = label.firstIndex(of: "/").map { String(label[label.index(after: $0)...]) } ?? label
+        return Self.abbreviateStripModel(owner: providerLabel(provider), name: name)
     }
 
     // MARK: historyStripFields.ts
@@ -188,5 +176,39 @@ public struct ModelNaming: Sendable {
         }
         return [Line(role: .interpretation, compact: interpretation.map(shortModel), full: interpretation.map(displayName)),
                 Line(role: .drawing, compact: drawing.map(shortModel), full: drawing.map(displayName))]
+    }
+}
+
+/// A tab change rebuilds the history row, but its saved model names and provider catalog have not changed.
+/// Separate provider snapshots so a changed connection cannot reuse stale labels.
+private final class ModelResolutionCache: @unchecked Sendable {
+    struct Key: Hashable {
+        let reference: String
+        let provider: String
+    }
+
+    private let lock = NSLock()
+    private struct Snapshot {
+        let connections: [ProviderSettings]
+        var resolutions: [Key: [String: Any]] = [:]
+    }
+    private var snapshots: [Snapshot] = []
+
+    func get(_ key: Key, connections current: [ProviderSettings]) -> [String: Any]? {
+        lock.withLock {
+            snapshots.first(where: { $0.connections == current })?.resolutions[key]
+        }
+    }
+
+    func put(_ value: [String: Any], for key: Key, connections current: [ProviderSettings]) {
+        lock.withLock {
+            if let index = snapshots.firstIndex(where: { $0.connections == current }) {
+                if snapshots[index].resolutions.count >= 256 { snapshots[index].resolutions.removeAll(keepingCapacity: true) }
+                snapshots[index].resolutions[key] = value
+            } else {
+                if snapshots.count >= 4 { snapshots.removeFirst() }
+                snapshots.append(Snapshot(connections: current, resolutions: [key: value]))
+            }
+        }
     }
 }

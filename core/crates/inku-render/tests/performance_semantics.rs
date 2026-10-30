@@ -541,7 +541,7 @@ fn composite_square_members_keep_their_physical_offset_on_a_wide_canvas() {
         canvas: Some(canvas),
     });
     assert_eq!(result.score.instructions.len(), 4);
-    for pair in result.score.instructions.chunks_exact(2) {
+    for pair in result.score.instructions.as_chunks::<2>().0 {
         let square = &pair[0];
         let circle = &pair[1];
         let position = square.position.unwrap();

@@ -8,20 +8,89 @@
 //! run commits as Stage 1 does, so the description, or an edited reading, can
 //! be drawn again.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use inku_ddl::CanvasRatioWriting;
-use serde_json::json;
+use serde_json::{Value, json};
 
-use super::{DescriptionDdlRecord, PipelineSnapshot, ReadingState, SketchRequest};
-use crate::description_ddl::{
-    DescriptionDdlContext, build_description_ddl_prompt, build_description_ddl_review_prompt,
-    build_description_reading_prompt, parse_description_reading_response, parse_supplied_reading,
-    reading_text,
+use super::written::Written;
+use super::{
+    CompositionRequest, CompositionRound, CompositionState, DescriptionColorsRecord,
+    DescriptionCompositionRecord, DescriptionDdlRecord, PendingColors, PipelineSnapshot,
+    ReadingState, SketchRequest, VisibleDocument, message_names,
 };
+use crate::colors::{self, ColorsContext, LawsHandoff};
+use crate::description_colors::{
+    ColorsChangeHow, DescribedPlan, LayerThing, apply_colors_with_definitions, drawn_layers,
+    plan_of_with_definitions, with_layer_things,
+};
+use crate::description_composition::{
+    build_description_composition_prompt, check_composition, composition_plugin_words,
+    composition_targets, laws_text, with_composition_plugins,
+    with_description_composition_feedback,
+};
+use crate::description_ddl::{
+    ComposedContext, DescriptionDdlContext, build_composed_description_ddl_prompt,
+    build_composed_description_ddl_review_prompt, build_description_ddl_prompt,
+    build_description_ddl_review_prompt, build_description_reading_prompt,
+    parse_description_reading_response, parse_supplied_reading, reading_text,
+};
+use crate::description_laws::ThingSentence;
 use crate::image_ddl::ImageDdlLimits;
-use crate::prompts::{LlmPrompt, PromptImage};
+use crate::prompts::{LlmPrompt, LlmStage, PromptError, PromptImage};
 use crate::protocol::{PipelineEvent, ProtocolError, ProviderFailure};
+
+impl DescriptionCompositionRecord {
+    fn pending() -> Self {
+        Self {
+            state: CompositionState::Pending,
+            fallback: None,
+            answer: None,
+            targets: Vec::new(),
+            rounds: Vec::new(),
+            measures: Vec::new(),
+            cards: Vec::new(),
+            known: Vec::new(),
+            drawn: Vec::new(),
+            things: Vec::new(),
+            colors: None,
+        }
+    }
+
+    /// The thing a sentence draws, as the latest answer that wrote it said
+    /// (0 for a sentence no answer wrote).
+    pub(super) fn thing_of(&self, text: &str) -> u64 {
+        self.known
+            .iter()
+            .rev()
+            .find(|item| item.text == text)
+            .map_or(0, |item| item.thing)
+    }
+
+    /// The sentences of the DDL the review was shown, a built card's thing as
+    /// the drawer wrote it.
+    fn shown(&self) -> Vec<ThingSentence> {
+        let built: Vec<_> = self.cards.iter().filter(|card| card.built).collect();
+        let mut done = BTreeSet::new();
+        let mut out = Vec::new();
+        for item in &self.drawn {
+            match built.iter().find(|card| card.things.contains(&item.thing)) {
+                Some(card) => {
+                    if done.insert(item.thing) {
+                        out.extend(
+                            card.motif
+                                .iter()
+                                .filter(|motif| motif.thing == item.thing)
+                                .cloned(),
+                        );
+                    }
+                }
+                None => out.push(item.clone()),
+            }
+        }
+        out
+    }
+}
 
 impl PipelineSnapshot {
     /// The run's record, from its request: a reading to ask for, the author's
@@ -31,6 +100,7 @@ impl PipelineSnapshot {
         description: String,
         sketch: SketchRequest,
         source_labels: Vec<String>,
+        composition: CompositionRequest,
     ) -> Result<(), ProtocolError> {
         if self.config.description_ddl.is_none() {
             return Err(ProtocolError::InvalidPolicy);
@@ -70,8 +140,28 @@ impl PipelineSnapshot {
             before_review: None,
             drawing: None,
             dropped: Vec::new(),
+            composition: (composition == CompositionRequest::On)
+                .then(DescriptionCompositionRecord::pending),
         });
         Ok(())
+    }
+
+    /// The run's composition when it draws by one.
+    pub(super) fn composed(&self) -> Option<&DescriptionCompositionRecord> {
+        self.description_ddl
+            .as_ref()?
+            .composition
+            .as_ref()
+            .filter(|composition| composition.state == CompositionState::Used)
+    }
+
+    pub(super) fn composition_mut(
+        &mut self,
+    ) -> Result<&mut DescriptionCompositionRecord, ProtocolError> {
+        self.description_record_mut()?
+            .composition
+            .as_mut()
+            .ok_or(ProtocolError::InternalInvariant)
     }
 
     fn description_record(&self) -> Result<&DescriptionDdlRecord, ProtocolError> {
@@ -168,36 +258,476 @@ impl PipelineSnapshot {
         self.write_description_ddl(events)
     }
 
+    /// The writing request, or first the composition when the run decides one.
     fn write_description_ddl(
         &mut self,
         events: &mut Vec<PipelineEvent>,
     ) -> Result<(), ProtocolError> {
-        let prompt = self.description_ddl_prompt(None)?;
+        let pending = self
+            .description_record()?
+            .composition
+            .as_ref()
+            .is_some_and(|composition| composition.state == CompositionState::Pending);
+        let prompt = if pending {
+            let record = self.description_record()?;
+            let context = self.description_context(record)?;
+            let prompt = build_description_composition_prompt(
+                &context,
+                self.config.language,
+                self.config.prompt_limits,
+            )
+            .map_err(|_| ProtocolError::SchemaViolation)?;
+            with_composition_plugins(
+                prompt,
+                context.description,
+                &self.plugin_catalog(),
+                self.config.prompt_limits,
+            )
+            .map_err(|_| ProtocolError::SchemaViolation)?
+        } else {
+            self.description_ddl_prompt(None)?
+        };
         self.begin_llm(prompt, None, Vec::new(), events)
     }
 
-    /// The request that writes the DDL, or with a drawing and the DDL it was
-    /// drawn from, the request that reviews it.
-    pub(super) fn description_ddl_prompt(
-        &self,
-        review: Option<(&PromptImage, &str)>,
-    ) -> Result<LlmPrompt, ProtocolError> {
-        let record = self.description_record()?;
-        let context = DescriptionDdlContext {
+    fn description_context<'a>(
+        &'a self,
+        record: &'a DescriptionDdlRecord,
+    ) -> Result<DescriptionDdlContext<'a>, ProtocolError> {
+        Ok(DescriptionDdlContext {
             description: &record.description,
             reading: record.reading.as_ref(),
             canvas: self.paper_ratio()?,
             palette: self.config.compiler.host.palette(),
             limits: ImageDdlLimits::of(&self.config.compiler),
+        })
+    }
+
+    /// Keep a composition the tool accepts, and write by it. One the tool
+    /// refuses is asked for once more with its problems within the budget;
+    /// then the DDL is written as without a composition.
+    pub(super) fn description_composition_response(
+        &mut self,
+        response: &str,
+        total: u64,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<(), ProtocolError> {
+        let record = self.description_record()?;
+        let words = composition_plugin_words(
+            &record.description,
+            &self.plugin_catalog(),
+            self.config.language,
+            self.config.prompt_limits,
+        );
+        let checked = check_composition(
+            response,
+            &record.description,
+            record.reading.as_ref(),
+            self.config.language,
+            self.config.prompt_limits,
+            &words,
+        );
+        let action = self.action.as_ref().ok_or(ProtocolError::InvalidState)?;
+        let asked_again = message_names(&action.payload, "composition_feedback");
+        let attempt = action.identity.attempt;
+        let prompt: LlmPrompt = serde_json::from_value(action.payload["prompt"].clone())
+            .map_err(|_| ProtocolError::InternalInvariant)?;
+        let problems = checked.as_ref().err().cloned().unwrap_or_default();
+        self.composition_mut()?.rounds.push(CompositionRound {
+            prompt_id: prompt.prompt_id.clone(),
+            prompt_digest: prompt.prompt_digest.clone(),
+            asked_again,
+            problems: problems.clone(),
+        });
+        let answer = match checked {
+            Ok(answer) => answer,
+            Err(problems) => {
+                if !asked_again
+                    && let Some(next) = self
+                        .retry_policy(LlmStage::ComposeDescription)
+                        .next_budgeted_attempt(attempt, total)
+                    && let Ok(again) = with_description_composition_feedback(
+                        prompt,
+                        response,
+                        &problems,
+                        self.config.prompt_limits,
+                    )
+                {
+                    self.reissue(
+                        LlmStage::ComposeDescription,
+                        again,
+                        None,
+                        total,
+                        next,
+                        events,
+                    )?;
+                    return self.event(
+                        events,
+                        "retry_scheduled",
+                        json!({
+                            "identity": self.action.as_ref().ok_or(ProtocolError::InternalInvariant)?.identity,
+                            "failure": ProviderFailure::SemanticViolation,
+                            "detail": "description_composition_problems",
+                            "problems": problems.len(),
+                        }),
+                    );
+                }
+                self.action = None;
+                return self.composition_fallback("refused", events);
+            }
         };
+        self.action = None;
+        let targets = composition_targets(&answer, self.config.language);
+        let payload = json!({
+            "state": CompositionState::Used,
+            "main_law": answer.main_law,
+            "laws": answer.chosen().map(|(law, _)| law).collect::<Vec<_>>(),
+            "things": answer.things.len(),
+        });
+        let composition = self.composition_mut()?;
+        composition.state = CompositionState::Used;
+        composition.answer = Some(answer);
+        composition.targets = targets;
+        self.event(events, "description_composition_ready", payload)?;
+        self.write_description_ddl(events)
+    }
+
+    /// The composition whose attempts are spent: write without it.
+    pub(super) fn description_composition_failed(
+        &mut self,
+        failure: ProviderFailure,
+        detail: Option<&str>,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<(), ProtocolError> {
+        let reason = match detail {
+            Some(detail) => detail.to_owned(),
+            None => serde_json::to_value(failure)
+                .ok()
+                .and_then(|value| value.as_str().map(str::to_owned))
+                .unwrap_or_else(|| "failed".to_owned()),
+        };
+        self.composition_fallback(&reason, events)
+    }
+
+    fn composition_fallback(
+        &mut self,
+        reason: &str,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<(), ProtocolError> {
+        let composition = self.composition_mut()?;
+        composition.state = CompositionState::Fallback;
+        composition.fallback = Some(reason.to_owned());
+        self.event(
+            events,
+            "description_composition_fallback",
+            json!({"reason": reason}),
+        )?;
+        self.write_description_ddl(events)
+    }
+
+    /// The request that writes the DDL, or with a drawing and the DDL it was
+    /// drawn from, the request that reviews it; a composed run's request
+    /// carries its composition and targets, and its review the sentences the
+    /// drawing was drawn from with their things.
+    pub(super) fn description_ddl_prompt(
+        &self,
+        review: Option<(&PromptImage, &str)>,
+    ) -> Result<LlmPrompt, ProtocolError> {
+        let record = self.description_record()?;
+        let context = self.description_context(record)?;
         let (language, limits) = (self.config.language, self.config.prompt_limits);
-        match review {
-            None => build_description_ddl_prompt(&context, language, limits),
-            Some((drawing, current)) => {
-                build_description_ddl_review_prompt(&context, drawing, current, language, limits)
+        let prompt = if let Some(composition) = self.composed() {
+            let answer = composition
+                .answer
+                .as_ref()
+                .ok_or(ProtocolError::InternalInvariant)?;
+            let laws_text = laws_text(answer, language);
+            let composed = ComposedContext {
+                answer,
+                laws_text: &laws_text,
+                targets: &composition.targets,
+            };
+            match review {
+                None => {
+                    build_composed_description_ddl_prompt(&context, &composed, language, limits)
+                }
+                Some((drawing, current)) => {
+                    let head = current.lines().next().unwrap_or_default();
+                    build_composed_description_ddl_review_prompt(
+                        &context,
+                        &composed,
+                        drawing,
+                        head,
+                        &composition.shown(),
+                        language,
+                        limits,
+                    )
+                }
+            }
+        } else {
+            match review {
+                None => build_description_ddl_prompt(&context, language, limits),
+                Some((drawing, current)) => build_description_ddl_review_prompt(
+                    &context, drawing, current, language, limits,
+                ),
+            }
+        };
+        let prompt = prompt.map_err(|_| ProtocolError::SchemaViolation)?;
+        let catalog = self.plugin_catalog();
+        crate::plugin_offer::with_plugin_offer(
+            prompt,
+            context.description,
+            review.map(|(_, current)| current),
+            &catalog,
+            limits,
+        )
+        .map(|(prompt, _)| prompt)
+        .map_err(|_| ProtocolError::SchemaViolation)
+    }
+
+    fn plugin_catalog(&self) -> Vec<crate::prompts::MacroPromptEntry<'_>> {
+        self.config
+            .definitions
+            .iter()
+            .zip(&self.config.macro_summaries)
+            .map(|(definition, summary)| crate::prompts::MacroPromptEntry {
+                definition,
+                localized_summary: summary,
+            })
+            .collect()
+    }
+
+    /// Whether a description run chooses its colors before its commit: a
+    /// composed run whose host asks for them and whose run has the color stage.
+    pub(super) fn colors_before_commit(&self) -> bool {
+        self.composed().is_some()
+            && self
+                .config
+                .description_ddl
+                .is_some_and(|config| config.colors)
+            && self.config.colors.is_some()
+    }
+
+    /// What each layer of a composed DDL draws: the thing its sentence draws,
+    /// as the answers that wrote it said, and the thing's name.
+    fn layer_things(&self, source: &str, plan: &DescribedPlan) -> Vec<LayerThing> {
+        let composition = self.composed();
+        let lines: Vec<&str> = source.lines().collect();
+        plan.lines
+            .iter()
+            .map(|line| {
+                let text = lines.get(*line).map_or("", |text| text.trim());
+                let thing = composition.map_or(0, |composition| composition.thing_of(text));
+                let what = composition
+                    .and_then(|composition| composition.answer.as_ref())
+                    .and_then(|answer| answer.thing(thing))
+                    .map(|item| item.what.clone())
+                    .unwrap_or_default();
+                LayerThing { thing, what }
+            })
+            .collect()
+    }
+
+    /// A composed document's sentences the run's compile drew, as the color
+    /// stage's layers.
+    fn described_plan(&self, document: &VisibleDocument) -> Option<DescribedPlan> {
+        let compiled = self.compile_for_run(document)?;
+        let (_, drawn) = drawn_layers(compiled.score()?);
+        plan_of_with_definitions(
+            &document.source,
+            self.config.language,
+            &self.config.definitions,
+        )?
+        .drawn(&drawn)
+    }
+
+    /// What the colors read of a composed document: the sentences the run's
+    /// compile drew as the stage's layers (a sentence it left out keeps its
+    /// words and takes no colors), their context, and how much the compile
+    /// diagnosed or left out.
+    fn described_colors(
+        &self,
+        document: &VisibleDocument,
+        description: &str,
+    ) -> Option<(DescribedPlan, ColorsContext, usize)> {
+        let compiled = self.compile_for_run(document)?;
+        let (score, drawn) = drawn_layers(compiled.score()?);
+        let plan = plan_of_with_definitions(
+            &document.source,
+            self.config.language,
+            &self.config.definitions,
+        )?
+        .drawn(&drawn)?;
+        let context =
+            self.colors_context_of(&score, &plan.printed, &LawsHandoff::default(), description)?;
+        Some((plan, context, super::shortfalls(&compiled)))
+    }
+
+    /// The color request with the thing each layer of the document waiting
+    /// for its colors draws, in a description run; any other run's as it is.
+    pub(super) fn with_described_things(
+        &self,
+        prompt: LlmPrompt,
+    ) -> Result<LlmPrompt, PromptError> {
+        let (Some(_), Some(pending)) = (&self.description_ddl, &self.colors) else {
+            return Ok(prompt);
+        };
+        let plan = self
+            .described_plan(&pending.document)
+            .ok_or(PromptError::EmptyField { field: "colors" })?;
+        with_layer_things(
+            prompt,
+            &self.layer_things(&pending.document.source, &plan),
+            self.config.prompt_limits,
+        )
+    }
+
+    /// Ask for a composed work's colors before its commit, with the thing each
+    /// layer draws; when the request cannot be made, commit the work as it is.
+    pub(super) fn begin_description_colors(
+        &mut self,
+        document: VisibleDocument,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<(), ProtocolError> {
+        let description = self.description_record()?.description.clone();
+        let (language, limits) = (self.config.language, self.config.prompt_limits);
+        let Some((plan, context, _)) = self.described_colors(&document, &description) else {
+            return self.description_colors_fallback(
+                document,
+                json!({"failure": "context"}),
+                events,
+            );
+        };
+        let prompt = colors::build_colors_prompt(&description, &context, language, limits)
+            .and_then(|prompt| {
+                with_layer_things(prompt, &self.layer_things(&document.source, &plan), limits)
+            });
+        let Ok(prompt) = prompt else {
+            return self.description_colors_fallback(
+                document,
+                json!({"failure": "prompt"}),
+                events,
+            );
+        };
+        self.colors = Some(PendingColors {
+            printed: plan.printed,
+            document,
+            reason: "description_ddl".to_owned(),
+            handoff: LawsHandoff::default(),
+        });
+        self.begin_llm(prompt, Some(description), Vec::new(), events)
+    }
+
+    /// Read the colors reply for a composed work, write the colors into its
+    /// DDL and commit it. A reply the tool refuses is asked again with the
+    /// reason within the stage's budget. When the written DDL does not compile
+    /// to the colors chosen, or with more problems, the work is committed
+    /// without them.
+    pub(super) fn description_colors_response(
+        &mut self,
+        response: &str,
+        spent_ms: u64,
+        description: Option<String>,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<(), ProtocolError> {
+        let pending = self
+            .colors
+            .as_ref()
+            .ok_or(ProtocolError::InternalInvariant)?;
+        let language = self.config.language;
+        let read = description.and_then(|text| {
+            let (plan, context, before) = self.described_colors(&pending.document, &text)?;
+            Some((text, plan, context, before))
+        });
+        let Some((text, plan, context, before)) = read else {
+            return self.colors_fallback(json!({"failure": "context"}), events);
+        };
+        let chosen = match colors::choose_colors(response, &context, self.config.prompt_limits) {
+            Ok(chosen) => chosen,
+            Err(refusal) => {
+                return self.ask_colors_again(&context, &refusal, text, spent_ms, events);
+            }
+        };
+        let (source, changes) = apply_colors_with_definitions(
+            &pending.document.source,
+            &plan,
+            &chosen,
+            language,
+            &self.config.definitions,
+        );
+        let Some((document, compiled)) = self.laws_document(source) else {
+            return self.colors_fallback(json!({"failure": "compile"}), events);
+        };
+        // The written DDL keeps the sentences left out: its drawn layers are
+        // numbered as the colors numbered them.
+        if compiled
+            .score()
+            .is_none_or(|score| !chosen.compiled_as_chosen(&drawn_layers(score).0))
+            || super::shortfalls(&compiled) > before
+        {
+            return self.colors_fallback(json!({"failure": "compile"}), events);
+        }
+        self.action = None;
+        self.colors = None;
+        self.event(
+            events,
+            "colors_chosen",
+            json!({
+                "laws": chosen.laws,
+                "main_law": chosen.main_law,
+                "main_layer": null,
+                "ground": chosen.ground.map(inku_score::Color::as_str),
+                "notes": chosen.notes,
+            }),
+        )?;
+        let composition = self.composition_mut()?;
+        for change in &changes {
+            if matches!(
+                change.how,
+                ColorsChangeHow::ColorWord | ColorsChangeHow::Printed
+            ) {
+                let thing = composition.thing_of(change.before.trim());
+                composition
+                    .known
+                    .extend(change.after.iter().map(|text| ThingSentence {
+                        thing,
+                        text: text.clone(),
+                    }));
             }
         }
-        .map_err(|_| ProtocolError::SchemaViolation)
+        composition.colors = Some(DescriptionColorsRecord {
+            state: CompositionState::Used,
+            fallback: None,
+            main_law: Some(chosen.main_law.clone()),
+            laws: chosen.laws.iter().map(|law| (*law).to_owned()).collect(),
+            ground: chosen.ground,
+            changes,
+        });
+        self.commit_written_document(Written::Description, document, events)
+    }
+
+    /// Commit a composed work without its colors and say why.
+    pub(super) fn description_colors_fallback(
+        &mut self,
+        document: VisibleDocument,
+        payload: Value,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<(), ProtocolError> {
+        let reason = payload["detail"]
+            .as_str()
+            .or_else(|| payload["failure"].as_str())
+            .unwrap_or("failed")
+            .to_owned();
+        self.event(events, "colors_fallback", payload)?;
+        self.composition_mut()?.colors = Some(DescriptionColorsRecord {
+            state: CompositionState::Fallback,
+            fallback: Some(reason),
+            main_law: None,
+            laws: Vec::new(),
+            ground: None,
+            changes: Vec::new(),
+        });
+        self.commit_written_document(Written::Description, document, events)
     }
 
     /// The source a written DDL becomes: the paper's ratio declared as its
@@ -223,11 +753,13 @@ mod tests {
 
     use crate::authority::{AuthoringAuthority, VariationAuthorityState};
     use crate::core_boundary::{CatalogMode, ResolvedHostOptions};
+    use crate::description_laws::MeasureState;
     use crate::focused_flow::{ack, config, envelope, event, run, run_error, tags};
     use crate::image_ddl::tests::{a4_compiler, palette};
     use crate::machine::written::DRAW_IMAGE_REVIEW;
     use crate::machine::{
-        AuthoringInput, CatalogCandidate, DescriptionDdlConfig, DescriptionRoute, PipelineConfig,
+        AuthoringInput, CatalogCandidate, ColorsConfig, CompositionRequest, CompositionState,
+        DescriptionColorsRecord, DescriptionDdlConfig, DescriptionRoute, PipelineConfig,
         PipelineInput, PipelinePhase, PipelineSnapshot, ReadingState, SketchRequest, StepOutput,
     };
     use crate::prompts::{DescriptionCatalogEntry, LlmStage, PromptImage};
@@ -248,7 +780,10 @@ mod tests {
         let mut pipeline_config = config();
         pipeline_config.language = ResolvedInstructionLanguage::Ja;
         pipeline_config.compiler = a4_compiler();
-        pipeline_config.description_ddl = Some(DescriptionDdlConfig { review });
+        pipeline_config.description_ddl = Some(DescriptionDdlConfig {
+            review,
+            colors: false,
+        });
         pipeline_config
     }
 
@@ -270,6 +805,7 @@ mod tests {
             sketch,
             route: DescriptionRoute::ReadAndDraw,
             source_labels: vec![format!(" {LABEL} "), "  ".into()],
+            composition: CompositionRequest::Off,
         }
     }
 
@@ -307,6 +843,11 @@ mod tests {
         let elapsed_ms = DecimalU64::new(20);
         let result = match action.tag.as_str() {
             "read_description" => EffectResult::DescriptionRead {
+                identity,
+                response,
+                elapsed_ms,
+            },
+            "compose_description" => EffectResult::DescriptionComposed {
                 identity,
                 response,
                 elapsed_ms,
@@ -752,6 +1293,7 @@ mod tests {
                         sketch: SketchRequest::On,
                         route,
                         source_labels: Vec::new(),
+                        composition: CompositionRequest::Off,
                     },
                 ),
             )
@@ -765,5 +1307,684 @@ mod tests {
         let record = read.description_ddl.as_ref().unwrap();
         assert!(record.rounds.is_empty() && record.source_labels.is_empty());
         assert_eq!(record.reading_state, ReadingState::Pending);
+    }
+
+    // --- composition and laws (2026-10-26) ---------------------------------------------------
+
+    const WOMAN: &str = "画面の横0.4、縦0.4の位置に、直径0.3の紫の塗りの円を1個置く。";
+    const SHADE: &str =
+        "画面の横0.6、縦0.6の位置に、幅0.2、高さ0.15の灰の薄い塗りの三角を1個置く。";
+
+    fn composed_start(sketch: SketchRequest) -> StepOutput {
+        let AuthoringInput::Description {
+            description,
+            auto_catalog,
+            sketch,
+            route,
+            source_labels,
+            ..
+        } = authoring(sketch, false)
+        else {
+            unreachable!()
+        };
+        start_with(
+            read_config(true),
+            AuthoringInput::Description {
+                description,
+                auto_catalog,
+                sketch,
+                route,
+                source_labels,
+                composition: CompositionRequest::On,
+            },
+        )
+    }
+
+    /// A composition that puts the woman (thing 1) on the golden section's
+    /// upper left crossing, with the laws named in `laws`.
+    fn composition(laws: Value) -> Value {
+        json!({
+            "thesis": "女の姿を黄金分割の左上の交点に置き、右下を広く空ける。",
+            "form": "one_corner",
+            "things": [
+                {"thing": 1, "what": "女の姿", "role": "focal", "kind": "cluster", "quote": "妹"},
+                {"thing": 2, "what": "紫の影", "role": "accent", "kind": "cluster", "quote": "紫"}
+            ],
+            "main_law": "B1",
+            "laws": laws,
+            "reason": "「紫のにほへる妹」の姿を画の骨にするため、黄金分割の交点に置いた。"
+        })
+    }
+
+    fn golden() -> Value {
+        json!({"B1": {"targets": [{"thing": 1, "at": "point_ul"}]}})
+    }
+
+    fn sentences(state: &PipelineSnapshot, items: &[(u64, &str)]) -> StepOutput {
+        let sentences: Vec<Value> = items
+            .iter()
+            .map(|(thing, text)| json!({"thing": thing, "text": text}))
+            .collect();
+        answer_text(
+            state,
+            &json!({"sentences": sentences, "figures": []}).to_string(),
+        )
+    }
+
+    fn composition_record(state: &PipelineSnapshot) -> &super::DescriptionCompositionRecord {
+        state
+            .description_ddl
+            .as_ref()
+            .unwrap()
+            .composition
+            .as_ref()
+            .unwrap()
+    }
+
+    #[test]
+    fn composition_receives_the_offer_and_tracks_its_word_through_writing() {
+        let asset: Value = serde_json::from_str(include_str!(
+            "../../../inku-ddl/tests/fixtures/nature-leaves-2.1-v1.json"
+        ))
+        .unwrap();
+        let definition =
+            inku_ddl::MacroDefinition::from_json(&asset["entries"][0]["definition"].to_string())
+                .unwrap();
+        let mut config = read_config(false);
+        config.definitions = vec![definition];
+        config.macro_summaries = vec!["若葉を描く。".into()];
+        let start = |description: &str| {
+            start_with(
+                config.clone(),
+                AuthoringInput::Description {
+                    description: description.into(),
+                    auto_catalog: false,
+                    sketch: SketchRequest::Off,
+                    route: DescriptionRoute::ReadAndDraw,
+                    source_labels: Vec::new(),
+                    composition: CompositionRequest::On,
+                },
+            )
+            .snapshot
+        };
+        let empty = start("紫の妹");
+        let context = empty
+            .description_context(empty.description_record().unwrap())
+            .unwrap();
+        let original = super::build_description_composition_prompt(
+            &context,
+            empty.config.language,
+            empty.config.prompt_limits,
+        )
+        .unwrap();
+        let actual: crate::prompts::LlmPrompt =
+            serde_json::from_value(empty.action.as_ref().unwrap().payload["prompt"].clone())
+                .unwrap();
+        assert_eq!(
+            serde_json::to_value(&original).unwrap(),
+            serde_json::to_value(&actual).unwrap()
+        );
+        assert_eq!(original.prompt_digest, actual.prompt_digest);
+        let state = start("若葉と妹");
+        assert_eq!(tag(&state), "compose_description");
+        assert!(
+            message(&state)["plugins"][0]
+                .as_str()
+                .unwrap()
+                .contains("｛若葉｝")
+        );
+        assert!(
+            prompt(&state)["system"]
+                .as_str()
+                .unwrap()
+                .ends_with(crate::plugin_offer::PLUGIN_RULE_JA)
+        );
+        let schema = &prompt(&state)["response_schema"]["properties"]["things"]["items"];
+        assert_eq!(
+            schema["properties"]["word"]["enum"],
+            json!(["", "｛若葉｝"])
+        );
+        assert!(
+            schema["required"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("word"))
+        );
+        assert!(state.config.plugin_offers.is_empty());
+        let answer = json!({"thesis":"妹と若葉", "form":"one_corner", "things":[
+            {"thing":1,"what":"妹","role":"focal","kind":"cluster","quote":"妹","word":""},
+            {"thing":2,"what":"若葉","role":"field","kind":"surface","quote":"若葉","word":"｛若葉｝"}],
+            "main_law":"B1", "laws":{"B1":{"targets":[{"thing":1,"at":"point_ul"}]}}, "reason":"妹"});
+        let mut bad = answer.clone();
+        bad["laws"]["B1"]["targets"][0]["thing"] = json!(2);
+        let retry = answer_text(&state, &bad.to_string()).snapshot;
+        assert_eq!(tag(&retry), "compose_description");
+        assert!(
+            message(&retry)["composition_feedback"]["problems"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|p| p["where"] == "laws.B1")
+        );
+        let writing = answer_text(&retry, &answer.to_string()).snapshot;
+        assert_eq!(tag(&writing), "write_description_ddl");
+        assert!(
+            message(&writing)["targets"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|v| v.as_str().unwrap().contains("物2（｛若葉｝）は語で 1 文"))
+        );
+        assert_eq!(writing.config.plugin_offers.len(), 1);
+        let drawn = sentences(
+            &writing,
+            &[(0, "背景を白で埋める。"), (1, WOMAN), (2, "｛若葉｝。")],
+        )
+        .snapshot;
+        assert_eq!(tag(&drawn), "commit_visible_normalized_ddl");
+        assert!(composition_record(&drawn).things.contains(&2));
+    }
+
+    #[test]
+    fn object_word_sentence_keeps_its_thing_for_law_measurement() {
+        let definition = inku_ddl::MacroDefinition::from_json(&json!({
+            "schema":"inku.macro-definition.v2", "namespace":"TestObject", "id":"Boat",
+            "names":{"ja":["舟"],"en":["boat"]}, "kind":"object", "aspect":"2:1", "counter":"general",
+            "version":"1.0.0", "parameters":{}, "components":{}, "body":[{"op":"emit","binding":"hull","fields":{
+                "shape":{"expr":"semantic_ref","category":"shape","id":"arc"},
+                "movement":{"expr":"semantic_ref","category":"movement","id":"place"},
+                "color":{"expr":"semantic_ref","category":"color","id":"green"},
+                "position_x":{"expr":"exact_decimal","value":"0.5"}, "position_y":{"expr":"exact_decimal","value":"0.5"},
+                "chord":{"expr":"exact_decimal","value":"0.6"}, "sagitta":{"expr":"exact_decimal","value":"0.2"}
+            }}]
+        }).to_string()).unwrap();
+        let mut config = read_config(false);
+        config.definitions = vec![definition];
+        config.macro_summaries = vec!["舟を描く。".into()];
+        let state = start_with(
+            config,
+            AuthoringInput::Description {
+                description: "舟".into(),
+                auto_catalog: false,
+                sketch: SketchRequest::Off,
+                route: DescriptionRoute::ReadAndDraw,
+                source_labels: Vec::new(),
+                composition: CompositionRequest::On,
+            },
+        )
+        .snapshot;
+        let answer = json!({"thesis":"舟", "form":"one_corner", "things":[{"thing":1,"what":"舟","role":"focal","kind":"cluster","quote":"舟","word":"｛舟｝"}],
+            "main_law":"B1", "laws":{"B1":{"targets":[{"thing":1,"at":"point_ul"}]}}, "reason":"舟"});
+        let writing = answer_text(&state, &answer.to_string()).snapshot;
+        assert_eq!(tag(&writing), "write_description_ddl");
+        let line = "画面の横0.381966、縦0.381966の位置に、一辺0.2の｛舟｝を置く。";
+        let drawn = sentences(&writing, &[(0, "背景を白で埋める。"), (1, line)]).snapshot;
+        let record = composition_record(&drawn);
+        assert_eq!(record.things, [0, 1]);
+        assert!(
+            record.measures[0]
+                .after
+                .iter()
+                .any(|m| m.state == MeasureState::Ok),
+            "{:?}",
+            record.measures
+        );
+    }
+
+    #[test]
+    fn a_composed_run_decides_its_laws_writes_by_them_and_fits_what_is_a_little_off() {
+        let read = answer_text(
+            &composed_start(SketchRequest::On).snapshot,
+            &reading().to_string(),
+        );
+        let state = read.snapshot;
+        assert_eq!(tag(&state), "compose_description");
+        let system = prompt(&state)["system"].as_str().unwrap();
+        assert!(
+            system.starts_with("あなたは inku の構図の係である。"),
+            "{system}"
+        );
+        assert!(system.contains("# 構図の理論"));
+        assert!(system.contains("11. 記述が名指す物と、読みの核の像の物は"));
+        assert!(!system.contains("# response_schema"));
+        assert!(message(&state).get("reading").is_some());
+
+        let composed = answer_text(&state, &composition(golden()).to_string());
+        assert_eq!(
+            event(&composed, "description_composition_ready"),
+            Some(&json!({"state": "used", "main_law": "B1", "laws": ["B1"], "things": 2}))
+        );
+        let state = composed.snapshot;
+        let record = composition_record(&state);
+        assert_eq!(record.state, CompositionState::Used);
+        assert_eq!(
+            record.targets,
+            ["物1（女の姿）の中心を 横0.381966、縦0.381966 に置く（B1 黄金分割の左上の交点）。"]
+        );
+        assert_eq!(tag(&state), "write_description_ddl");
+        let sent = message(&state);
+        assert_eq!(sent["composition"]["main_law"], "B1");
+        assert_eq!(sent["targets"], json!(record.targets));
+        assert!(
+            sent["laws_text"]["B1"]
+                .as_str()
+                .unwrap()
+                .contains("0.382 : 0.618")
+        );
+        let system = prompt(&state)["system"].as_str().unwrap();
+        assert!(system.contains("# 構図と法則\n25. "));
+        assert!(system.contains("\n29. 法則が決めるのは"));
+        assert!(prompt(&state)["response_schema"]["properties"]["sentences"].is_object());
+
+        // The woman is 0.03 off its crossing on A4: fitted, not asked again.
+        let written = sentences(&state, &[(0, "背景を白で埋める。"), (1, WOMAN), (2, SHADE)]);
+        let state = written.snapshot;
+        let action = state.action.as_ref().unwrap();
+        assert_eq!(action.tag, DRAW_IMAGE_REVIEW);
+        let fitted = "画面の横0.381966、縦0.381966の位置に、直径0.3の紫の塗りの円を1個置く。";
+        let drawn_source = action.payload["document"]["source"].as_str().unwrap();
+        assert!(drawn_source.contains(fitted), "{drawn_source}");
+        let record = composition_record(&state);
+        assert_eq!(record.measures[0].fit[0].state, MeasureState::Fitted);
+        assert_eq!(record.measures[0].after[0].state, MeasureState::Ok);
+        assert!(record.measures[0].fit_kept);
+
+        let reviewing = reply(&state, drawn(&state)).snapshot;
+        assert_eq!(tag(&reviewing), "review_description_ddl");
+        let sent = message(&reviewing);
+        assert_eq!(
+            sent["current_sentences"][1],
+            json!({"thing": 1, "text": fitted})
+        );
+        assert!(
+            prompt(&reviewing)["system"]
+                .as_str()
+                .unwrap()
+                .contains("# 構図と法則を見る")
+        );
+        let state = sentences(
+            &reviewing,
+            &[(0, "背景を白で埋める。"), (1, fitted), (2, SHADE)],
+        )
+        .snapshot;
+        let source = committed_source(&state);
+        assert!(source.contains(fitted), "{source}");
+        let record = composition_record(&state);
+        assert_eq!(record.things, [0, 1, 2]);
+        assert_eq!(record.measures.len(), 2);
+        assert_eq!(
+            rounds(&state),
+            [
+                (LlmStage::WriteDescriptionDdl, false, 0),
+                (LlmStage::ReviewDescriptionDdl, false, 0)
+            ]
+        );
+    }
+
+    #[test]
+    fn a_composition_refused_twice_leaves_the_run_to_write_as_without_one() {
+        let state = composed_start(SketchRequest::Off).snapshot;
+        assert_eq!(tag(&state), "compose_description");
+        assert!(message(&state).get("reading").is_none());
+        let refused = composition(json!({"B3": {"targets": [{"thing": 1, "at": "point_ul"}]}}));
+        let asked = answer_text(&state, &refused.to_string());
+        assert_eq!(
+            event(&asked, "retry_scheduled").unwrap()["detail"],
+            "description_composition_problems"
+        );
+        let state = asked.snapshot;
+        assert_eq!(tag(&state), "compose_description");
+        let feedback = &message(&state)["composition_feedback"];
+        assert_eq!(feedback["problems"][0]["where"], "main_law");
+        let again = answer_text(&state, &refused.to_string());
+        assert_eq!(
+            event(&again, "description_composition_fallback"),
+            Some(&json!({"reason": "refused"}))
+        );
+        let state = again.snapshot;
+        assert_eq!(composition_record(&state).state, CompositionState::Fallback);
+        assert_eq!(composition_record(&state).rounds.len(), 2);
+        assert_eq!(tag(&state), "write_description_ddl");
+        assert!(prompt(&state)["response_schema"]["properties"]["ddl"].is_object());
+        assert!(message(&state).get("composition").is_none());
+    }
+
+    #[test]
+    fn only_a_read_and_draw_run_decides_a_composition() {
+        let error = run_error(
+            None,
+            &envelope(
+                None,
+                PipelineInput::Start {
+                    variation_id: "read".into(),
+                    authoring_nonce: "read-1".into(),
+                    config: Box::new(read_config(true)),
+                    authority: VariationAuthorityState::new_description(),
+                    authoring: AuthoringInput::Description {
+                        description: POEM.into(),
+                        auto_catalog: false,
+                        sketch: SketchRequest::Off,
+                        route: DescriptionRoute::Stages,
+                        source_labels: Vec::new(),
+                        composition: CompositionRequest::On,
+                    },
+                },
+            ),
+        );
+        assert_eq!(error["payload"]["code"], "invalid_policy");
+    }
+
+    #[test]
+    fn a_far_thing_and_a_thing_no_sentence_draws_are_asked_about_once() {
+        let state = composed_start(SketchRequest::Off).snapshot;
+        let state = answer_text(&state, &composition(golden()).to_string()).snapshot;
+        let far = "画面の横0.7、縦0.7の位置に、直径0.3の紫の塗りの円を1個置く。";
+        let asked = sentences(&state, &[(0, "背景を白で埋める。"), (1, far)]);
+        assert_eq!(
+            event(&asked, "retry_scheduled").unwrap()["detail"],
+            "description_ddl_problems"
+        );
+        let state = asked.snapshot;
+        let sent = message(&state);
+        assert_eq!(sent["compiler_feedback"]["problems"], json!([]));
+        let problems = sent["composition_feedback"]["problems"].as_array().unwrap();
+        assert_eq!(problems[0]["thing"], 1);
+        assert_eq!(problems[0]["law"], "B1");
+        assert_eq!(problems[1]["thing"], 2);
+        assert_eq!(problems[1]["measured"], "文が無い");
+        let system = prompt(&state)["system"].as_str().unwrap();
+        assert!(system.contains("composition_feedback がある時は"));
+        let state =
+            sentences(&state, &[(0, "背景を白で埋める。"), (1, WOMAN), (2, SHADE)]).snapshot;
+        assert_eq!(state.action.as_ref().unwrap().tag, DRAW_IMAGE_REVIEW);
+        assert_eq!(
+            rounds(&state),
+            [
+                (LlmStage::WriteDescriptionDdl, false, 0),
+                (LlmStage::WriteDescriptionDdl, true, 0)
+            ]
+        );
+    }
+
+    #[test]
+    fn a_card_is_built_by_the_tool_from_the_sentence_the_drawer_wrote() {
+        let state = composed_start(SketchRequest::Off).snapshot;
+        let laws = json!({
+            "B1": {"targets": [{"thing": 1, "at": "point_ul"}]},
+            "C1": {"targets": [{"thing": 2, "count": 20}], "spot": "golden_lr", "extent": "0.15"}
+        });
+        let state = answer_text(&state, &composition(laws).to_string()).snapshot;
+        let scatter = "画面の横0.1〜0.3、縦0.1〜0.3の範囲に、直径0.02の紫の点を20個散らす。";
+        let state = sentences(
+            &state,
+            &[(0, "背景を白で埋める。"), (1, WOMAN), (2, scatter)],
+        )
+        .snapshot;
+        let record = composition_record(&state);
+        assert_eq!(record.cards.len(), 1);
+        assert!(record.cards[0].built, "{:?}", record.cards[0]);
+        assert_eq!(record.cards[0].motif[0].text, scatter);
+        let built: Vec<_> = record.drawn.iter().filter(|item| item.thing == 2).collect();
+        assert_eq!(built.len(), 1);
+        assert_ne!(built[0].text, scatter);
+        assert!(built[0].text.contains("20個散らす"), "{}", built[0].text);
+        // The review is shown the sentence the drawer wrote.
+        let reviewing = reply(&state, drawn(&state)).snapshot;
+        assert_eq!(
+            message(&reviewing)["current_sentences"][2],
+            json!({"thing": 2, "text": scatter})
+        );
+    }
+
+    const FITTED: &str = "画面の横0.381966、縦0.381966の位置に、直径0.3の紫の塗りの円を1個置く。";
+
+    /// A composed run whose host has the colors chosen before the commit.
+    fn colored_config() -> PipelineConfig {
+        let mut pipeline_config = read_config(true);
+        pipeline_config.description_ddl = Some(DescriptionDdlConfig {
+            review: true,
+            colors: true,
+        });
+        pipeline_config.colors = Some(ColorsConfig::default());
+        pipeline_config
+    }
+
+    fn composed_with(pipeline_config: PipelineConfig) -> PipelineSnapshot {
+        let AuthoringInput::Description {
+            description,
+            auto_catalog,
+            sketch,
+            route,
+            source_labels,
+            ..
+        } = authoring(SketchRequest::Off, false)
+        else {
+            unreachable!()
+        };
+        start_with(
+            pipeline_config,
+            AuthoringInput::Description {
+                description,
+                auto_catalog,
+                sketch,
+                route,
+                source_labels,
+                composition: CompositionRequest::On,
+            },
+        )
+        .snapshot
+    }
+
+    /// The run composed by the golden section, written, shown its drawing and
+    /// reviewed as the woman fitted and the shade.
+    fn reviewed(pipeline_config: PipelineConfig) -> StepOutput {
+        let state = composed_with(pipeline_config);
+        let state = answer_text(&state, &composition(golden()).to_string()).snapshot;
+        let state =
+            sentences(&state, &[(0, "背景を白で埋める。"), (1, WOMAN), (2, SHADE)]).snapshot;
+        let state = reply(&state, drawn(&state)).snapshot;
+        sentences(
+            &state,
+            &[(0, "背景を白で埋める。"), (1, FITTED), (2, SHADE)],
+        )
+    }
+
+    fn colors_answer(state: &PipelineSnapshot, answer: &Value) -> StepOutput {
+        let action = state.action.as_ref().unwrap();
+        assert_eq!(action.tag, "choose_colors");
+        reply(
+            state,
+            EffectResult::ColorsChosen {
+                identity: action.identity.clone(),
+                response: answer.to_string(),
+                elapsed_ms: DecimalU64::new(20),
+            },
+        )
+    }
+
+    fn colors_record(state: &PipelineSnapshot) -> &DescriptionColorsRecord {
+        composition_record(state).colors.as_ref().unwrap()
+    }
+
+    #[test]
+    fn a_composed_runs_colors_are_asked_with_the_thing_each_layer_draws() {
+        let state = reviewed(colored_config()).snapshot;
+        assert_eq!(tag(&state), "choose_colors");
+        let prompt = prompt(&state);
+        assert_eq!(prompt["prompt_id"], "inku.colors-prompt.v2");
+        let message = prompt["message"].as_str().unwrap();
+        assert!(
+            message.ends_with(
+                "\n\n## 層の物（読んで描くの構図と法則）\n層の表の番号の層が、どの物を描くか。一つの物が何層にも分かれることがある。\n- layer 0: 物 1（女の姿）\n- layer 1: 物 2（紫の影）\n"
+            ),
+            "{message}"
+        );
+        // The description's purple is the woman's, which the colors keep.
+        assert!(message.contains("- layer 0: 「紫」（purple）"), "{message}");
+    }
+
+    #[test]
+    fn the_chosen_colors_rewrite_only_the_color_word_of_the_sentence_they_change() {
+        let state = reviewed(colored_config()).snapshot;
+        let answer = json!({"main_law": "D5", "laws": {"D5": {"hue": "blue", "layer": 1}},
+                            "reason": "影を青に寄せる。"});
+        let chosen = colors_answer(&state, &answer);
+        assert_eq!(event(&chosen, "colors_chosen").unwrap()["main_law"], "D5");
+        let state = chosen.snapshot;
+        let shade = "画面の横0.6、縦0.6の位置に、幅0.2、高さ0.15の青の薄い塗りの三角を1個置く。";
+        // Each thing's sentences are committed under its title (DDL 27).
+        assert_eq!(
+            committed_source(&state),
+            declared(&format!(
+                "背景を白で埋める。\n\n「妹」\n{FITTED}\n\n「紫」\n{shade}"
+            ))
+        );
+        let record = colors_record(&state);
+        assert_eq!(record.state, CompositionState::Used);
+        assert_eq!(record.main_law.as_deref(), Some("D5"));
+        assert_eq!(record.changes.len(), 1);
+        assert_eq!(record.changes[0].line, Some(3));
+        assert_eq!(record.changes[0].before, SHADE);
+        assert_eq!(record.changes[0].after, [shade]);
+        // The rewritten sentence still draws its thing.
+        assert_eq!(composition_record(&state).things, [0, 1, 2]);
+    }
+
+    #[test]
+    fn a_chosen_ground_prints_the_background_sentence() {
+        let state = reviewed(colored_config()).snapshot;
+        let answer = json!({"main_law": "D5", "laws": {"D5": {"hue": "blue", "layer": 1}},
+                            "ground": "black", "reason": "夜の地にする。"});
+        let state = colors_answer(&state, &answer).snapshot;
+        let source = committed_source(&state);
+        assert!(source.contains("\n背景を黒で埋める。\n"), "{source}");
+        let record = colors_record(&state);
+        assert_eq!(record.ground, Some(Color::Black));
+        assert_eq!(record.changes[0].before, "背景を白で埋める。");
+        // A DDL without a background sentence is given one after its ratio.
+        let state = composed_with(colored_config());
+        let state = answer_text(&state, &composition(golden()).to_string()).snapshot;
+        let state = sentences(&state, &[(1, WOMAN), (2, SHADE)]).snapshot;
+        let state = reply(&state, drawn(&state)).snapshot;
+        let state = sentences(&state, &[(1, FITTED), (2, SHADE)]).snapshot;
+        let state = colors_answer(&state, &answer).snapshot;
+        let source = committed_source(&state);
+        assert_eq!(
+            source.lines().nth(1),
+            Some("背景を黒で埋める。"),
+            "{source}"
+        );
+        assert_eq!(composition_record(&state).things, [0, 1, 2]);
+    }
+
+    #[test]
+    fn a_refused_answer_is_asked_again_with_the_things_and_the_reason() {
+        let state = reviewed(colored_config()).snapshot;
+        let first = prompt(&state)["message"].as_str().unwrap().to_owned();
+        // D2 already holds in the picture: it cannot be the main law.
+        let refused = json!({"main_law": "D2", "laws": {"D2": {"layer": 0, "vivid": "purple"}},
+                             "reason": "紫を鮮やかに。"});
+        let asked = colors_answer(&state, &refused);
+        assert!(event(&asked, "retry_scheduled").is_some());
+        let state = asked.snapshot;
+        let message = prompt(&state)["message"].as_str().unwrap();
+        assert!(message.starts_with(&first), "{message}");
+        assert!(
+            message[first.len()..]
+                .starts_with("\n\n## 前の答えへの道具の返事\n前の答えは使えなかった: "),
+            "{message}"
+        );
+        assert!(message.ends_with("\n直した答えを返す。"), "{message}");
+        let answer = json!({"main_law": "D5", "laws": {"D5": {"hue": "blue", "layer": 1}},
+                            "reason": "影を青に寄せる。"});
+        let state = colors_answer(&state, &answer).snapshot;
+        assert!(committed_source(&state).contains("の青の薄い塗りの三角"));
+    }
+
+    #[test]
+    fn colors_whose_attempts_are_spent_leave_the_work_as_its_review_left_it() {
+        let mut step = reviewed(colored_config());
+        while tag(&step.snapshot) == "choose_colors" {
+            step = failed(&step.snapshot);
+        }
+        assert_eq!(
+            event(&step, "colors_fallback").unwrap()["failure"],
+            "transport_timeout"
+        );
+        let state = step.snapshot;
+        assert_eq!(
+            committed_source(&state),
+            declared(&format!(
+                "背景を白で埋める。\n\n「妹」\n{FITTED}\n\n「紫」\n{SHADE}"
+            ))
+        );
+        let record = colors_record(&state);
+        assert_eq!(record.state, CompositionState::Fallback);
+        assert_eq!(record.fallback.as_deref(), Some("transport_timeout"));
+        assert_eq!(composition_record(&state).things, [0, 1, 2]);
+    }
+
+    /// A sentence the compile leaves out (a semicircle's chord and sagitta in
+    /// a tiling): the live work e5b0d996's of 2026-10-26, which fell back.
+    const LEFT_OUT: &str = "画面の横0.0〜1.0、縦0.618〜1.0の範囲に、弦長0.083333、矢高0.041667の灰の細かくゆるやかに揺れる細い半円の弧を60個敷き詰める。";
+
+    #[test]
+    fn a_sentence_the_compile_leaves_out_keeps_its_words_and_takes_no_colors() {
+        let mut state = composed_with(colored_config());
+        state = answer_text(&state, &composition(golden()).to_string()).snapshot;
+        let written = [
+            (0, "背景を白で埋める。"),
+            (1, WOMAN),
+            (0, LEFT_OUT),
+            (2, SHADE),
+        ];
+        let reviewed = [
+            (0, "背景を白で埋める。"),
+            (1, FITTED),
+            (0, LEFT_OUT),
+            (2, SHADE),
+        ];
+        // The left-out line is given back once in each stage, and kept.
+        loop {
+            state = match tag(&state) {
+                "write_description_ddl" => sentences(&state, &written).snapshot,
+                DRAW_IMAGE_REVIEW => reply(&state, drawn(&state)).snapshot,
+                "review_description_ddl" => sentences(&state, &reviewed).snapshot,
+                _ => break,
+            };
+        }
+        assert_eq!(tag(&state), "choose_colors");
+        // The layers are the sentences drawn: the shade is layer 1.
+        let message = prompt(&state)["message"].as_str().unwrap();
+        assert!(
+            message.ends_with("- layer 0: 物 1（女の姿）\n- layer 1: 物 2（紫の影）\n"),
+            "{message}"
+        );
+        let answer = json!({"main_law": "D5", "laws": {"D5": {"hue": "blue", "layer": 1}},
+                            "reason": "影を青に寄せる。"});
+        let state = colors_answer(&state, &answer).snapshot;
+        let source = committed_source(&state);
+        assert!(source.contains(LEFT_OUT), "{source}");
+        assert!(source.contains("の青の薄い塗りの三角"), "{source}");
+        assert_eq!(colors_record(&state).state, CompositionState::Used);
+        assert_eq!(composition_record(&state).things, [0, 1, 0, 2]);
+    }
+
+    #[test]
+    fn a_run_without_the_color_stage_commits_after_its_review() {
+        let mut pipeline_config = colored_config();
+        pipeline_config.colors = None;
+        let state = reviewed(pipeline_config).snapshot;
+        assert!(committed_source(&state).contains(SHADE));
+        assert!(composition_record(&state).colors.is_none());
+        // Without the host's word, the same: the run commits as it did.
+        let mut pipeline_config = colored_config();
+        pipeline_config.description_ddl = Some(DescriptionDdlConfig {
+            review: true,
+            colors: false,
+        });
+        let state = reviewed(pipeline_config).snapshot;
+        assert!(committed_source(&state).contains(SHADE));
+        assert!(composition_record(&state).colors.is_none());
     }
 }

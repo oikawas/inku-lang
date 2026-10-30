@@ -81,12 +81,13 @@ export function sketchStateNote(state: SketchState | null, isJapanese: boolean):
 }
 
 /** The sketch of the work on screen in a word or two, for the strip above the
- *  canvas; `sketchStateNote` says it in full. A missing record is not Off. */
+ *  canvas; `sketchStateNote` says it in full. A missing record is not Off.
+ *  The words follow the switch's 通す (2026-10-27), not あり／なし. */
 export function sketchStateShort(state: SketchState | null, isJapanese: boolean): string {
-	if (state === 'fine' || state === 'coarse' || state === 'supplemented') return isJapanese ? 'あり' : 'On';
-	if (state === 'not_needed') return isJapanese ? 'あり（補いなし）' : 'On, nothing added';
+	if (state === 'fine' || state === 'coarse' || state === 'supplemented') return isJapanese ? '通した' : 'On';
+	if (state === 'not_needed') return isJapanese ? '通した（補いなし）' : 'On, nothing added';
 	if (state === 'fallback') return isJapanese ? '届かず' : 'No answer';
-	if (state === 'off') return isJapanese ? 'なし' : 'Off';
+	if (state === 'off') return isJapanese ? '通さない' : 'Off';
 	if (state === 'not_applicable') return isJapanese ? '対象外' : 'Not applicable';
 	return isJapanese ? '記録なし' : 'Not recorded';
 }

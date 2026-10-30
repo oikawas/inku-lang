@@ -265,7 +265,7 @@ positional arguments:
                         seed and seal on one sheet
     api                 call any public inku HTTP API endpoint with the stored
                         session
-    plugin              inspect and reload declarative DDL plugins
+    plugin              inspect and validate DDL plugin packages
     reference           dump implementation vocabulary and constant tables
                         (read-only mirror)
     version             show CLI and server version/build information
@@ -387,7 +387,8 @@ usage: inku-cli paint [-h] [--base-url BASE_URL]
                       [--composition-seed COMPOSITION_SEED] [--sketch]
                       [--sketch-grain {fine,coarse}]
                       [--sketch-text SKETCH_TEXT]
-                      [--route {stages,read_and_draw}] [--wild]
+                      [--route {stages,read_and_draw}]
+                      [--composition {off,on}] [--wild]
                       [--limits KEY=VALUE [KEY=VALUE ...]]
                       [--catalog-mode {fixed,auto,random}]
                       [--instruction-lang {auto,ja,en}] [--ui-lang UI_LANG]
@@ -431,6 +432,8 @@ options:
   --input-mode {paint,ddl}
                         paint: a natural-language description through Stage 1;
                         ddl: normalized DDL directly through Stage 2/render
+                        (batch: each line is one DDL, and a title line is
+                        skipped)
   --stage1-provider {nvidia,anthropic,local}
                         provider shown in the run summary only; it is not
                         sent. Name the provider inside --stage1-model as
@@ -472,6 +475,12 @@ options:
                         drawing); with read_and_draw, --sketch reads the
                         description first and --sketch-text is an edited
                         reading
+  --composition {off,on}
+                        with --route read_and_draw only: on first decides a
+                        composition and laws from the description (and its
+                        reading), then writes, measures and corrects the DDL
+                        toward them, and chooses its colors before the commit;
+                        off (the server default) draws read and draw as before
   --wild                remove the amplitude ceiling on the stroke performance
                         for prose or DDL input, letting the renderer swing
                         further
@@ -524,7 +533,8 @@ usage: inku-cli batch [-h] [--base-url BASE_URL]
                       [--composition-seed COMPOSITION_SEED] [--sketch]
                       [--sketch-grain {fine,coarse}]
                       [--sketch-text SKETCH_TEXT]
-                      [--route {stages,read_and_draw}] [--wild]
+                      [--route {stages,read_and_draw}]
+                      [--composition {off,on}] [--wild]
                       [--limits KEY=VALUE [KEY=VALUE ...]]
                       [--catalog-mode {fixed,auto,random}]
                       [--instruction-lang {auto,ja,en}] [--ui-lang UI_LANG]
@@ -552,6 +562,8 @@ options:
   --input-mode {paint,ddl}
                         paint: a natural-language description through Stage 1;
                         ddl: normalized DDL directly through Stage 2/render
+                        (batch: each line is one DDL, and a title line is
+                        skipped)
   --stage1-provider {nvidia,anthropic,local}
                         provider shown in the run summary only; it is not
                         sent. Name the provider inside --stage1-model as
@@ -593,6 +605,12 @@ options:
                         drawing); with read_and_draw, --sketch reads the
                         description first and --sketch-text is an edited
                         reading
+  --composition {off,on}
+                        with --route read_and_draw only: on first decides a
+                        composition and laws from the description (and its
+                        reading), then writes, measures and corrects the DDL
+                        toward them, and chooses its colors before the commit;
+                        off (the server default) draws read and draw as before
   --wild                remove the amplitude ceiling on the stroke performance
                         for prose or DDL input, letting the renderer swing
                         further
@@ -1262,13 +1280,12 @@ options:
 ```
 usage: inku-cli plugin [-h] [--base-url BASE_URL]
                        [--timeout-seconds TIMEOUT_SECONDS]
-                       {list,validate,reload} ...
+                       {list,validate} ...
 
 positional arguments:
-  {list,validate,reload}
-    list                list loaded and rejected plugin documents
-    validate            validate one local plugin document on the server
-    reload              reload the server plugin directory without restart
+  {list,validate}
+    list                list loaded and rejected plugin packages
+    validate            validate a local v2 plugin package on the server
 
 options:
   -h, --help            show this help message and exit
@@ -1294,17 +1311,7 @@ options:
 usage: inku-cli plugin validate [-h] file
 
 positional arguments:
-  file        UTF-8 .inku-plugin.md file
-
-options:
-  -h, --help  show this help message and exit
-
-```
-
-### `inku-cli plugin reload`
-
-```
-usage: inku-cli plugin reload [-h]
+  file        UTF-8 package.json or package zip
 
 options:
   -h, --help  show this help message and exit
@@ -1349,12 +1356,11 @@ options:
 ```
 usage: inku-cli lineage [-h] [--base-url BASE_URL]
                         [--timeout-seconds TIMEOUT_SECONDS]
-                        {show,promote} ...
+                        {show} ...
 
 positional arguments:
-  {show,promote}
+  {show}
     show                show lineage tree for a work
-    promote             promote a lineage-only node to regular history
 
 options:
   -h, --help            show this help message and exit
@@ -1379,19 +1385,6 @@ options:
   --limit LIMIT  max lineage edges to load, counted outward from the work's
                  node (default 200)
   --json         output raw JSON
-
-```
-
-### `inku-cli lineage promote`
-
-```
-usage: inku-cli lineage promote [-h] node_id
-
-positional arguments:
-  node_id     lineage node ID to promote
-
-options:
-  -h, --help  show this help message and exit
 
 ```
 
@@ -1496,7 +1489,6 @@ options:
 usage: inku-cli refine save [-h] --kind {layout,color} --file FILE
                             [--svg-file SVG_FILE] --input-text INPUT_TEXT
                             [--ddl-text DDL_TEXT]
-                            [--visibility {normal,lineage_only}]
                             parent_node_id
 
 positional arguments:
@@ -1511,8 +1503,6 @@ options:
   --input-text INPUT_TEXT
                         original user text
   --ddl-text DDL_TEXT   normalized DDL text
-  --visibility {normal,lineage_only}
-                        history visibility
 
 ```
 

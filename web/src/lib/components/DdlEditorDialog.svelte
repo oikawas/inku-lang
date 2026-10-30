@@ -42,7 +42,6 @@
 		apiFetch?: ApiFetch;
 		artworkUrl?: string | null;
 		wildValue?: boolean;
-		wildInherited?: boolean;
 		onSelectWild?: (value: boolean) => void;
 		/** Imported plugin definitions travel only with a new work. */
 		onDraw: (ddl: string, signal?: AbortSignal, importedPlugins?: ImportedPlugin[]) => void | Promise<void>;
@@ -53,7 +52,7 @@
 		open, mode, isJapanese, initialDdl, savedDdl = null, discardDisabled = false, onConfirmDiscard, returnFocusTo = null, drawing,
 		stage2ModelLabel, drawingModelId, drawingModelGroups, onSelectDrawingModel,
 		runTokensIn, runTokensOut, runAttempt = null, error, previewForWord, previewForPlugin,
-		pluginEntries = [], ranges = [], completionWork = null, apiFetch, artworkUrl = null, wildValue = false, wildInherited = true, onSelectWild, onDraw, onClose,
+		pluginEntries = [], ranges = [], completionWork = null, apiFetch, artworkUrl = null, wildValue = false, onSelectWild, onDraw, onClose,
 	}: Props = $props();
 
 	let value = $state('');
@@ -70,12 +69,13 @@
 		if (!file) return;
 		importError = null;
 		try {
-			const read = parseDdlImport(await file.text());
+			const read = parseDdlImport(await file.text(), isJapanese ? 'ja' : 'en');
 			value = read.ddl;
 			importedPlugins = read.plugins;
 			importedNames = read.names;
-		} catch {
-			importError = t().ddlImportInvalid;
+		} catch (error) {
+			importError = error instanceof Error && error.message === 'ddl_export_requires_v2'
+				? t().ddlImportRequiresV2 : t().ddlImportInvalid;
 		}
 	}
 	let editor = $state<DdlEditor>();
@@ -209,7 +209,7 @@
 				{/if}
 				{#if mode === 'edit' && onSelectWild}
 					<div class="ddled-settings" inert={drawing}>
-						<WildToggle value={wildValue} {isJapanese} inherited={wildInherited} onSelect={onSelectWild} />
+						<WildToggle value={wildValue} onSelect={onSelectWild} />
 					</div>
 				{/if}
 			</div>

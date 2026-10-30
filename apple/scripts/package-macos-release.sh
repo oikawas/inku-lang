@@ -52,7 +52,6 @@ DIRTY="$(git -C "$ROOT" status --porcelain)"
 [[ -z "$DIRTY" || "$ALLOW_DIRTY" == true ]] || fail 'The checkout has uncommitted changes; commit them or pass --allow-dirty.'
 
 VERSION="$(tr -d '[:space:]' < "$APPLE/VERSION")"
-BUILD_NUMBER="$(tr -d '[:space:]' < "$APPLE/BUILD_NUMBER")"
 if [[ "$BUILD_APP" == true ]]; then
     # The release uses release Rust archives and the committed resource snapshot.
     env -u INKU_APPLE_REFERENCE_ROOT INKU_APPLE_PROFILE=release "$APPLE/scripts/build-macos.sh" Release --keep-running
@@ -67,8 +66,11 @@ python3 "$APPLE/scripts/sync-ddl3d-viewer.py" --check --app "$BUILT_APP" \
     || fail 'The 3D viewer copy differs from the Web registration; run apple/scripts/sync-ddl3d-viewer.py and rebuild.'
 
 plist() { /usr/libexec/PlistBuddy -c "Print :$2" "$1/Contents/Info.plist" 2>/dev/null; }
+BUILD_NUMBER="$(plist "$BUILT_APP" CFBundleVersion)"
+BUILD_FLOOR="$(tr -d '[:space:]' < "$APPLE/BUILD_NUMBER")"
 [[ "$(plist "$BUILT_APP" CFBundleShortVersionString)" == "$VERSION" \
-    && "$(plist "$BUILT_APP" CFBundleVersion)" == "$BUILD_NUMBER" ]] || fail 'The built app version differs from apple/VERSION and apple/BUILD_NUMBER.'
+    && "$BUILD_NUMBER" =~ ^[1-9][0-9]*$ && "$BUILD_FLOOR" =~ ^[1-9][0-9]*$ \
+    && "$BUILD_NUMBER" -ge "$BUILD_FLOOR" ]] || fail 'The built app version or build number is invalid.'
 [[ "$(plist "$BUILT_APP" CFBundleIdentifier)" == "$BUNDLE_ID" ]] || fail "The release bundle identifier must be $BUNDLE_ID."
 # The author's review database path is installed only into the unsigned local app.
 ! plist "$BUILT_APP" InkuDatabasePath >/dev/null || fail 'The release app must not name a database path.'

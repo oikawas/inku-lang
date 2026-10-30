@@ -16,7 +16,7 @@ import time
 
 import httpx
 
-from .chatgpt_auth import RESOURCE, access_token, read_limited
+from .chatgpt_auth import RESOURCE, access_token, auth_policy, read_limited
 from .chatgpt_runtime import check_session, guarded
 from .chatgpt_store import ChatGPTError, CredentialStore
 from .chatgpt_models import publication
@@ -24,8 +24,7 @@ from . import provider_wire
 
 logger = logging.getLogger(__name__)
 
-EFFECTS = {"generate_sketch", "select_description_catalog", "generate_normalized_ddl", "read_composition", "choose_laws",
-           "choose_colors", "complete_visible_ddl_holes", "read_description", "write_description_ddl"}
+EFFECTS = frozenset(auth_policy("constants")["effects"])
 # The codes a stored diagnostic may keep (pipeline_candidate). The shared core
 # classifies failures with the same list.
 PUBLIC_CODES = {
@@ -63,9 +62,10 @@ def pause_quota(owner: str, profile_id: str, generation: int, deadline: float) -
     with store.lock("edit:" + owner, deadline):
         saved = store.read(owner)
         profile = saved["profiles"].get(profile_id)
-        if profile and profile["generation"] == generation and profile["state"] != "quota":
-            profile["state"] = "quota"
-            profile.pop("catalog", None)
+        from .verified_model_catalog import core_catalog
+        result = core_catalog("chatgpt_auth_pause_quota", profile=profile, generation=generation)
+        if result["changed"]:
+            saved["profiles"][profile_id] = result["profile"]
             store.write(owner, saved)
 
 
@@ -122,7 +122,8 @@ async def catalog(owner: str, profile_id: str, generation: int, deadline: float,
         return check_session(owner, profile_id, generation, cancel)
     profile = check()
     cache = profile.get("catalog")
-    if not force and cache and cache["expires_at"] > time.time():
+    from .verified_model_catalog import core_catalog
+    if core_catalog("chatgpt_cache", cache=cache, force=force, now=time.time())["fresh"]:
         return publication(profile, cache["models"])["models"]
     # A current, validated catalog is local data. Only a refresh needs the
     # wire slot held by inference; recheck both session and cache after waiting.
@@ -141,7 +142,7 @@ async def catalog(owner: str, profile_id: str, generation: int, deadline: float,
     value = json.loads(content)
     if not response.is_success:
         error = response_error(value, response.status_code, response.headers.get("x-request-id"))
-        if error.code == "subscription_sharing_usage_limit_exceeded":
+        if auth_policy("quota_failure", code=error.code)["pause"]:
             pause_quota(owner, profile_id, generation, deadline)
         raise error
     listed = provider_wire.chatgpt_catalog(value)
@@ -151,7 +152,7 @@ async def catalog(owner: str, profile_id: str, generation: int, deadline: float,
     store = CredentialStore()
     with store.lock("edit:" + owner, deadline, check):
         profile = check()
-        profile["catalog"] = {"expires_at": time.time() + 300, "models": models}
+        profile["catalog"] = {"expires_at": core_catalog("chatgpt_cache", now=time.time())["expires_at"], "models": models}
         # The caller holds the edit lock; atomic write preserves other accounts.
         saved = store.read(owner)
         saved["profiles"][profile_id] = profile
@@ -163,9 +164,7 @@ async def request(owner: str, profile_id: str, generation: int, model: str, acti
                   limit: int, cancel=None, observation=None, *, purpose: str = "llm",
                   transport: httpx.AsyncBaseTransport | None = None, images: list[str] | None = None,
                   usage: list | None = None) -> str:
-    image_effect = action["tag"] in provider_wire.IMAGE_EFFECTS
-    if (purpose == "llm" and action["tag"] not in EFFECTS) or (purpose == "vision" and action["tag"] != "vision" and not image_effect) or purpose not in {"llm", "vision"}:
-        raise ChatGPTError("chatgpt_operation_not_supported")
+    image_effect = auth_policy("operation", purpose=purpose, tag=action["tag"])["image_effect"]
 
     def capture_body(body: bytes) -> bytes:
         return provider_wire.observation_digest(body) if image_effect else body
@@ -237,7 +236,7 @@ async def request(owner: str, profile_id: str, generation: int, model: str, acti
         except ResponseFailure as error:
             if image_effect:
                 error.request_id, error.param = safe_identifier(error.request_id), safe_identifier(error.param)
-            if error.code == "subscription_sharing_usage_limit_exceeded":
+            if auth_policy("quota_failure", code=error.code)["pause"]:
                 pause_quota(owner, profile_id, generation, deadline)
             raise
 
@@ -263,7 +262,8 @@ def offered(owner: str, model: str, *, profile_id: str | None = None, generation
         if profile_id is None or generation is None:
             profile_id, generation = pin(owner)
         models = asyncio.run(catalog(owner, profile_id, generation, time.monotonic() + 15))
-        return any(entry["id"] == model and entry["enabled"] and purpose in entry["purposes"] for entry in models)
+        from .verified_model_catalog import core_catalog
+        return core_catalog("chatgpt_offered", models=models, model=model, purpose=purpose)["offered"]
     except (httpx.HTTPError, TimeoutError, ValueError, KeyError, TypeError):
         # Unable to check is not evidence that a model is absent. Preserve
         # explicit registration/provider refusals; let the host report them.

@@ -5,9 +5,13 @@ import InkuHost
 public struct ProviderProgressSnapshot: Sendable, Equatable {
     public enum Outcome: Sendable, Equatable { case running, succeeded, failed, cancelled, awaitingReview }
     public enum Stage: Sendable, Equatable {
-        case sketch, catalog, interpretation, composition, laws, colors, completion
+        case sketch, catalog, interpretation, composition, laws, colors, completion, imageCatalog, imageWriting, imageReview, descriptionReading, descriptionComposition, descriptionWriting, descriptionReview
         init?(action: String) {
             switch action {
+            case "read_description": self = .descriptionReading
+            case "compose_description": self = .descriptionComposition
+            case "write_description_ddl": self = .descriptionWriting
+            case "review_description_ddl": self = .descriptionReview
             case "generate_sketch": self = .sketch
             case "select_description_catalog": self = .catalog
             case "generate_normalized_ddl": self = .interpretation
@@ -15,11 +19,18 @@ public struct ProviderProgressSnapshot: Sendable, Equatable {
             case "choose_laws": self = .laws
             case "choose_colors": self = .colors
             case "complete_visible_ddl_holes": self = .completion
+            case "select_image_catalog": self = .imageCatalog
+            case "write_image_ddl": self = .imageWriting
+            case "review_image_ddl": self = .imageReview
             default: return nil
             }
         }
         var titleKey: String {
             switch self {
+            case .descriptionReading: "読んでいます"
+            case .descriptionComposition: "構図と法則を決めています"
+            case .descriptionWriting: "書いています"
+            case .descriptionReview: "見て直しています"
             case .sketch: "写生"
             case .catalog: "色カタログの選択"
             case .interpretation: "解釈"
@@ -27,6 +38,9 @@ public struct ProviderProgressSnapshot: Sendable, Equatable {
             case .laws: "法則の選択"
             case .colors: "配色の選択"
             case .completion: "指示書の補完"
+            case .imageCatalog: "画像から色カタログを選んでいます…"
+            case .imageWriting: "画像から指示書を書いています…"
+            case .imageReview: "画像と描いた画を見比べています…"
             }
         }
     }
@@ -53,6 +67,15 @@ public struct ProviderProgressSnapshot: Sendable, Equatable {
     public private(set) var actionIdentity: ProviderActionIdentity?
 
     public var stageTitleKey: String { stage?.titleKey ?? "モデルの応答" }
+    @MainActor func displayTitle(_ display: DisplaySettings) -> String {
+        switch stage {
+        case .descriptionReading: return display.webCopy("readDrawReading", "記述を読んでいます…")
+        case .descriptionComposition: return display.webCopy(askedAgain ? "readDrawRecomposing" : "readDrawComposing", askedAgain ? "構図と法則を決め直しています…" : "構図と法則を決めています…")
+        case .descriptionWriting: return display.webCopy(askedAgain ? "readDrawRevising" : "readDrawWriting", askedAgain ? "指示書を直しています…" : "指示書を書いています…")
+        case .descriptionReview: return display.webCopy(askedAgain ? "readDrawRevising" : "readDrawReviewing", askedAgain ? "指示書を直しています…" : "描いた画を見て直しています…")
+        default: return display.localized(stageTitleKey)
+        }
+    }
     public var clockRunning: Bool { outcome == .running && stageEndedAt == nil }
     public func stageElapsed(at date: Date) -> TimeInterval {
         max(0, (stageEndedAt ?? date).timeIntervalSince(stageBeganAt))
@@ -73,7 +96,7 @@ public struct ProviderProgressSnapshot: Sendable, Equatable {
         let reference: String?
         switch stage {
         case .some(.completion): reference = models?.stage2Model
-        case .some(.sketch), .some(.catalog), .some(.interpretation), .some(.composition), .some(.laws), .some(.colors):
+        case .some(.sketch), .some(.catalog), .some(.interpretation), .some(.composition), .some(.laws), .some(.colors), .some(.imageCatalog), .some(.imageWriting), .some(.imageReview), .some(.descriptionReading), .some(.descriptionComposition), .some(.descriptionWriting), .some(.descriptionReview):
             reference = models?.stage1Model
         case .none: reference = nil
         }

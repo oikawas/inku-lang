@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import json
-import math
 import time
 import uuid
-from datetime import datetime, timezone
-from email.utils import parsedate_to_datetime
 from typing import Callable
-from zoneinfo import ZoneInfo
+
+import inku_render
 
 from sqlalchemy import insert, select, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -29,26 +27,56 @@ class RateAccountingUnavailable(Exception):
 
 
 def retry_after_seconds(headers, raw: bytes, *, now: float) -> float:
-    values = [WINDOW_SECONDS]
-    value = headers.get("retry-after")
-    if value:
-        try:
-            values.append(float(value))
-        except ValueError:
-            try:
-                values.append(parsedate_to_datetime(value).timestamp() - now)
-            except (TypeError, ValueError, OverflowError):
-                pass
+    return _core("retry", now=now, retry_after=headers.get("retry-after"),
+                 raw_bytes=list(raw))["seconds"]
+
+
+def _core(action, **fields):
     try:
-        details = json.loads(raw).get("error", {}).get("details", [])
-        for detail in details:
-            if isinstance(detail, dict) and detail.get("@type") == "type.googleapis.com/google.rpc.RetryInfo":
-                delay = detail.get("retryDelay")
-                if isinstance(delay, str) and delay.endswith("s"):
-                    values.append(float(delay[:-1]))
-    except (ValueError, TypeError, AttributeError):
-        pass
-    return max(value for value in values if math.isfinite(value))
+        request = json.dumps({"action": action, **fields}, allow_nan=False, separators=(",", ":")).encode()
+        response = json.loads(inku_render.pipeline_provider_admission(request))
+        if "error" in response:
+            raise ValueError(response["error"])
+        return response
+    except (ValueError, TypeError, KeyError, OverflowError) as error:
+        raise RateAccountingUnavailable from error
+
+
+_COUNT_NOT_RECEIVED = object()
+
+
+def estimate_input_tokens(kind: str, tpm: int, body_bytes: int, count_response=_COUNT_NOT_RECEIVED) -> int | None:
+    fields = {"kind": kind, "tpm": tpm, "body_bytes": body_bytes}
+    if count_response is not _COUNT_NOT_RECEIVED:
+        fields["count_response"] = count_response
+    answer = _core("estimate", **fields)
+    if answer["decision"] == "need_count":
+        return None
+    if answer["decision"] == "invalid_response":
+        raise TypeError(answer["reason"])
+    if answer["decision"] == "reject":
+        raise RateLimitUnavailable(answer["reason"])
+    return answer["input_tokens"]
+
+
+def _replace_state(state, result):
+    # Preserve the insertion order used by the existing compact DB encoding.
+    old_events = {event["id"]: event for event in state["events"]}
+    new = result["state"]
+    events = []
+    for event in new["events"]:
+        old = old_events.get(event["id"], {})
+        ordered = {key: event[key] for key in old if key in event}
+        ordered.update(event)
+        if not old:
+            ordered = {key: event[key] for key in ("id", "at", "tokens")}
+        events.append(ordered)
+    new["events"] = events
+    for key in state:
+        state[key] = new[key]
+    for key in new:
+        if key not in state:
+            state[key] = new[key]
 
 
 class ProviderRateBudget:
@@ -84,30 +112,19 @@ class ProviderRateBudget:
 
     async def reserve(self, provider: str, kind: str, limits: dict, input_tokens: int) -> str:
         token = uuid.uuid4().hex
-        rpm = max(1, limits["rpm"] * 9 // 10) if limits["rpm"] else 0
-        tpm = max(1, limits["tpm"] * 9 // 10) if limits["tpm"] else 0
-        if tpm and input_tokens > tpm:
-            raise RateLimitUnavailable("request exceeds the configured input-token budget")
+        preflight = _core("preflight", limits=limits, input_tokens=input_tokens)
+        if preflight["decision"] == "reject":
+            raise RateLimitUnavailable(preflight["reason"])
         while True:
             now = self.clock()
-            zone = ZoneInfo("America/Los_Angeles") if kind == "gemini" else timezone.utc
-            day = datetime.fromtimestamp(now, zone).date()
 
             def admit(state):
-                state["events"] = [event for event in state["events"] if event["at"] + WINDOW_SECONDS > now]
-                if state["day"] != day.isoformat():
-                    state["day"], state["daily"] = day.isoformat(), 0
-                if limits["rpd"] and state["daily"] >= limits["rpd"]:
-                    raise RateLimitUnavailable("provider daily request budget exhausted")
-                delay = max(0.0, state["not_before"] - now)
-                if ((rpm and len(state["events"]) >= rpm)
-                        or (tpm and sum(event["tokens"] for event in state["events"]) + input_tokens > tpm)):
-                    delay = max(delay, min(event["at"] for event in state["events"]) + WINDOW_SECONDS - now)
-                if delay > 0:
-                    return delay
-                state["events"].append({"id": token, "at": now, "tokens": input_tokens})
-                state["daily"] += 1
-                return 0.0
+                result = _core("admit", state=state, now=now, kind=kind, limits=limits,
+                               input_tokens=input_tokens, id=token)
+                if result["decision"] == "reject":
+                    raise RateLimitUnavailable(result["reason"])
+                _replace_state(state, result)
+                return result.get("seconds", 0.0)
 
             delay = self._change(provider, admit)
             if not delay:
@@ -116,14 +133,13 @@ class ProviderRateBudget:
 
     def settle(self, provider: str, token: str, input_tokens: int | None):
         def reconcile(state):
-            for event in state["events"]:
-                if event["id"] == token and input_tokens is not None:
-                    event["tokens"] = input_tokens
-            if input_tokens is None:
-                state["not_before"] = max(state["not_before"], self.clock() + WINDOW_SECONDS)
+            result = _core("settle", state=state, now=self.clock() if input_tokens is None else 0,
+                           id=token, input_tokens=input_tokens)
+            _replace_state(state, result)
         self._change(provider, reconcile)
 
     def cool_down(self, provider: str, seconds: float):
         def pause(state):
-            state["not_before"] = max(state["not_before"], self.clock() + seconds)
+            result = _core("pause", state=state, now=self.clock(), seconds=seconds)
+            _replace_state(state, result)
         self._change(provider, pause)

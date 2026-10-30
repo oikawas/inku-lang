@@ -44,6 +44,16 @@ struct LineageDetailsView: View {
                             row("Stage 2", work.stage2Model.map(naming.displayName))
                             row("seed", [work.renderSeed, work.compositionSeed, work.interpretationSeed].map { $0 ?? "—" }.joined(separator: " / "))
                             row(model.display.localized("派生"), operation)
+                            if let edge = information?.edge, let metadata = try? ExactJSON(data: Data(edge.metadataJSON.utf8)),
+                               let kind = metadata["ai_move"]["kind"].string, ["laws", "juxtaposition", "chunks"].contains(kind) {
+                                let move = metadata["ai_move"]
+                                let kindName = model.display.webCopy(kind == "chunks" ? "aiRefineKindChunks" : kind == "laws" ? "aiRefineKindLaws" : "aiRefineKindJuxtaposition", kind)
+                                let detail = chunkMoveText(move["chunks"], display: model.display) ?? move["juxtaposition"]["sentence"].string ?? move["laws"]["main_law"].string
+                                let turn = move["turn"].number.map { model.display.webCopyFormat("aiRefineTurn", "手番 %@", $0) }
+                                row(model.display.label("AIの手", "AI move"), [turn, kindName, detail].compactMap { $0 }.joined(separator: " · "))
+                                if let reason = (move["chunks"]["reason"].string ?? move["laws"]["reason"].string ?? move["juxtaposition"]["reason"].string)?.trimmingCharacters(in: .whitespacesAndNewlines), !reason.isEmpty { row(model.display.label("手の理由", "Why this move"), reason) }
+                                if let share = move["visible"]["share"].number.flatMap(Double.init) { row(model.display.label("親との差", "Change from the parent"), "\(Int((share * 100).rounded()))%") }
+                            }
                         }.frame(maxWidth: .infinity, alignment: .leading)
                         Divider()
                         Text(model.display.localized("作品へのコメント")).foregroundStyle(.secondary)

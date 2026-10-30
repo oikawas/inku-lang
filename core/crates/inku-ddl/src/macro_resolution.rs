@@ -38,11 +38,13 @@ pub struct ResolvedMacroInvocation {
     pub atom_index: usize,
     pub lock: MacroLockResolutionIdentity,
     pub definition_identity: MacroDefinitionIdentity,
+    pub object_aspect: Option<(u8, u8)>,
 }
 
 /// Stable failure classes for one source-ordered visible macro occurrence.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MacroInvocationResolutionDiagnosticKind {
+    OldNotation,
     MissingLock,
     AmbiguousLockPrefix,
     MissingDefinition,
@@ -93,6 +95,13 @@ pub fn resolve_macro_invocations(
         .enumerate()
         .map(|(index, definition)| DefinitionRecord {
             index,
+            object_aspect: definition
+                .plugin_v2
+                .as_ref()
+                .filter(|v| v.kind == "object")
+                .and_then(|v| v.aspect.as_deref())
+                .and_then(|aspect| aspect.split_once(':'))
+                .and_then(|(w, h)| Some((w.parse().ok()?, h.parse().ok()?))),
             qualified_name: definition.qualified_name(),
             identity: definition.identity().map_err(|validation| {
                 validation
@@ -113,6 +122,7 @@ pub fn resolve_macro_invocations(
 #[derive(Clone)]
 struct DefinitionRecord {
     index: usize,
+    object_aspect: Option<(u8, u8)>,
     qualified_name: Option<String>,
     identity: Result<MacroDefinitionIdentity, Vec<&'static str>>,
 }
@@ -156,6 +166,18 @@ fn build_resolution(
                 continue;
             }
 
+            if !document.legacy_names_for_migration()
+                && !occurrence.surface.starts_with(['{', '｛'])
+            {
+                diagnostics.push(occurrence.diagnostic(
+                    MacroInvocationResolutionDiagnosticKind::OldNotation,
+                    None,
+                    None,
+                    Vec::new(),
+                ));
+                continue;
+            }
+
             match occurrence.lock_indices.as_slice() {
                 [] => diagnostics.push(occurrence.diagnostic(
                     MacroInvocationResolutionDiagnosticKind::MissingLock,
@@ -167,6 +189,15 @@ fn build_resolution(
                     let macro_lock = &document.macro_locks()[*lock_index];
                     match resolve_definition(macro_lock, definitions) {
                         DefinitionResolution::Resolved(identity) => {
+                            let object_aspect = definitions
+                                .iter()
+                                .find(|definition| {
+                                    definition
+                                        .identity
+                                        .as_ref()
+                                        .is_ok_and(|candidate| candidate == &identity)
+                                })
+                                .and_then(|definition| definition.object_aspect);
                             resolved.push(ResolvedMacroInvocation {
                                 invocation: occurrence
                                     .invocation
@@ -176,6 +207,7 @@ fn build_resolution(
                                 atom_index,
                                 lock: macro_lock.into(),
                                 definition_identity: identity,
+                                object_aspect,
                             });
                         }
                         DefinitionResolution::Diagnostic {
@@ -285,7 +317,11 @@ fn occurrence(
     // An alias invokes its lock's canonical definition: past this point the
     // invocation carries the canonical name, and only the span keeps the alias.
     let invocation = match lock_indices.as_slice() {
-        [index] if document.macro_locks()[*index].aliases().contains(&surface) => {
+        [index]
+            if document.macro_locks()[*index].aliases().contains(&surface)
+                || surface.starts_with('{')
+                || surface.starts_with('｛') =>
+        {
             invocation(document.macro_locks()[*index].qualified_name(), ordinal)
         }
         _ => invocation(&surface, ordinal),
@@ -497,6 +533,7 @@ mod tests {
         };
         diagnostic.surface = "corrupt".to_owned();
         let definitions = vec![DefinitionRecord {
+            object_aspect: None,
             index: 0,
             qualified_name: definition.qualified_name(),
             identity: Ok(identity),

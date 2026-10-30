@@ -20,12 +20,15 @@ public struct ModelGuidanceCatalog: Decodable, Sendable {
     }
 
     public static func loadBundled() throws -> ModelGuidanceCatalog {
-        let envelope = try JSONDecoder().decode(GuidanceManifest.self, from: bundledManifestData())
-        var catalog = envelope.modelCatalog
+        var catalog = try JSONDecoder().decode(ModelGuidanceCatalog.self, from: SharedModelCatalog.catalogData)
         guard catalog.schema == "inku.model-catalog.v2", catalog.labelDefinitions == ModelCatalogLabels.definitions else {
             throw HostError("model_catalog_schema_invalid")
         }
-        catalog.providerDefinitions = envelope.providerDefaults.providers
+        catalog.providerDefinitions = ProviderCoreSettings.definitions.compactMap { row in
+            guard let id = row["id"] as? String, let kind = row["kind"] as? String else { return nil }
+            return GuidanceProviderDefinition(id: id, kind: kind == "mlx" ? "openai_compatible" : kind,
+                                              speedHidden: row["speed_developer_only"] as? Bool ?? false)
+        }
         return catalog
     }
 
@@ -41,6 +44,7 @@ public struct ModelGuidanceCatalog: Decodable, Sendable {
     }
 
     public func applyingCatalog(to model: ProviderModelSettings, providerID: String, kind: ProviderKind) -> ProviderModelSettings {
+        if kind != .chatGPTPlan { return model }
         guard let source = knownProvider(providerID, kind: kind)?.models.first(where: { $0.id == model.id })?.settings else { return model }
         var result = source
         result.label = model.label
@@ -68,6 +72,7 @@ public struct ModelGuidanceCatalog: Decodable, Sendable {
     }
 
     public func registeredModelSettings(for connection: ProviderSettings) -> [ProviderModelSettings] {
+        if connection.kind != .chatGPTPlan { return connection.models ?? [] }
         if let models = connection.models {
             return models.map { applyingCatalog(to: $0, providerID: connection.id, kind: connection.kind) }
         }
@@ -111,8 +116,7 @@ public struct ModelGuidance: Sendable {
     public let purposes: [String]
     private let stage1: Int?
     private let stage2: Int?
-    private let llm: Int?
-    private let vision: Int?
+    private let levels: SharedModelCatalog.Decision.Selection
     public let speedLabel: String?
     public let speedClass: String?
     public let speedHidden: Bool
@@ -133,8 +137,7 @@ public struct ModelGuidance: Sendable {
     fileprivate init(providerID: String, model: ProviderModelSettings, speedHidden: Bool) {
         self.providerID = providerID; self.modelID = model.id; self.label = model.label; self.purposes = model.purposes
         self.stage1 = model.recommendationStage1; self.stage2 = model.recommendationStage2
-        self.llm = model.recommendationLLM ?? model.recommendationLevel
-        self.vision = model.recommendationVision ?? model.recommendationLevel
+        self.levels = SharedModelCatalog.decision(for: model).selection
         self.speedLabel = speedHidden ? nil : model.speedLabel; self.speedClass = speedHidden ? nil : model.speedClass
         self.speedHidden = speedHidden; self.japaneseComment = model.commentJA; self.englishComment = model.commentEN
         self.resolvedLabels = model.resolvedLabels; self.modelFold = model.modelFold
@@ -147,11 +150,14 @@ public struct ModelGuidance: Sendable {
     }
 
     public var hasStageRecommendations: Bool { stage1 != nil || stage2 != nil }
-    public var stage1Level: Int? { Self.level(stage1 ?? llm) }
-    public var stage2Level: Int? { Self.level(stage2 ?? llm) }
-    // A two-stage selection uses the weaker measured stage; Vision never raises it.
-    public var bothStagesLevel: Int? { Self.level([stage1, stage2].compactMap { $0 }.min() ?? llm) }
-    public var visionLevel: Int? { Self.level(vision) }
+    private func level(_ purpose: String, _ stage: String) -> Int? {
+        guard let value = levels.levels[purpose]?[stage], value > 0 else { return nil }
+        return Int(value)
+    }
+    public var stage1Level: Int? { level("llm", "stage1") }
+    public var stage2Level: Int? { level("llm", "stage2") }
+    public var bothStagesLevel: Int? { level("llm", "both") }
+    public var visionLevel: Int? { level("vision", "none") }
 
     public func comment(language: String) -> String? {
         let preferred = language == "en" ? englishComment : japaneseComment
@@ -176,15 +182,6 @@ public struct ModelGuidance: Sendable {
     }
 }
 
-private struct GuidanceManifest: Decodable {
-    let modelCatalog: ModelGuidanceCatalog
-    let providerDefaults: GuidanceProviderDefaults
-    enum CodingKeys: String, CodingKey {
-        case modelCatalog = "model_catalog", providerDefaults = "provider_defaults"
-    }
-}
-
-private struct GuidanceProviderDefaults: Decodable { let providers: [GuidanceProviderDefinition] }
 private struct GuidanceProviderDefinition: Decodable, Sendable {
     let id: String
     let kind: String
@@ -200,6 +197,8 @@ private struct GuidanceModel: Decodable, Sendable {
     let label: String
     let purposes: [String]?
     let labels: [String]
+    let eol: Bool?
+    let requiresSubscription: Bool?
     let recommendationLLM: Int?
     let recommendationVision: Int?
     let recommendationStage1: Int?
@@ -222,7 +221,7 @@ private struct GuidanceModel: Decodable, Sendable {
               recommendationLevel: recommendationLevel, recommendationLLM: recommendationLLM,
               recommendationVision: recommendationVision, recommendationStage1: recommendationStage1,
               recommendationStage2: recommendationStage2, speedClass: speedClass, speedLabel: speedLabel,
-              commentJA: commentJA, commentEN: commentEN, eolDate: eolDate,
+              commentJA: commentJA, commentEN: commentEN, eol: eol, eolDate: eolDate, requiresSubscription: requiresSubscription,
               labels: labels, unsupportedPurposes: unsupportedPurposes,
               speedLLMSeconds: speedLLMSeconds, speedVisionSeconds: speedVisionSeconds,
               costUSDLLM: costUSDLLM, costUSDVision: costUSDVision, catalogMeasurementPresent: measurementPresent)
@@ -233,7 +232,12 @@ private struct GuidanceModel: Decodable, Sendable {
         id = try values.decodeIfPresent(String.self, forKey: .id) ?? "catalog-case"
         label = try values.decodeIfPresent(String.self, forKey: .label) ?? id
         purposes = try values.decodeIfPresent([String].self, forKey: .purposes)
-        labels = try values.decodeIfPresent([String].self, forKey: .labels) ?? []
+        var storedLabels = try values.decodeIfPresent([String].self, forKey: .labels) ?? []
+        if try values.decodeIfPresent(Bool.self, forKey: .legacy) == true { storedLabels.append("legacy") }
+        if try values.decodeIfPresent(Bool.self, forKey: .notSupported) == true { storedLabels.append("not_supported") }
+        labels = storedLabels
+        eol = try values.decodeIfPresent(Bool.self, forKey: .eol)
+        requiresSubscription = try values.decodeIfPresent(Bool.self, forKey: .requiresSubscription)
         recommendationLLM = try values.decodeIfPresent(Int.self, forKey: .recommendationLLM)
         recommendationVision = try values.decodeIfPresent(Int.self, forKey: .recommendationVision)
         recommendationStage1 = try values.decodeIfPresent(Int.self, forKey: .recommendationStage1)
@@ -256,7 +260,8 @@ private struct GuidanceModel: Decodable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, label, purposes, labels
+        case id, label, purposes, labels, eol, legacy
+        case requiresSubscription = "requires_subscription", notSupported = "not_supported"
         case recommendationLLM = "recommendation_llm", recommendationVision = "recommendation_vision"
         case recommendationStage1 = "recommendation_stage1", recommendationStage2 = "recommendation_stage2"
         case recommendationLevel = "recommendation_level", speedLabel = "speed_label", speedClass = "speed_class"

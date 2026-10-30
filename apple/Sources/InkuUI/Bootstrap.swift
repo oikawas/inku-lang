@@ -58,7 +58,6 @@ public struct SaijikiCategory: Identifiable, Sendable {
 
 public struct PluginWord: Identifiable, Sendable {
     public let id: String
-    public let aliases: [String]
     public let japanese: [String]
     public let english: [String]
     public let note: String
@@ -66,11 +65,17 @@ public struct PluginWord: Identifiable, Sendable {
     public let packageID: String?
     public let sourceFile: String?
     public let englishNote: String?
-    public let firesOnJapanese: [String]
-    public let firesOnEnglish: [String]
+    public var exampleJapanese: String? = nil
+    public var exampleEnglish: String? = nil
+    public var previewData: Data? = nil
+    public var kind: String = ""
+    public var aspect: String? = nil
+    public var counter: String? = nil
+    public var visibleNames: [String] = []
 
     public func displayName(language: String) -> String {
-        (language == "ja" ? aliases.first : nil) ?? id
+        let name = (language == "en" ? english : japanese).first ?? ""
+        return language == "en" ? "{\(name)}" : "｛\(name)｝"
     }
 }
 
@@ -81,10 +86,12 @@ struct Bootstrap {
     private let macroSources: [String: Any]
     let saijiki: [SaijikiCategory]
     let pluginWords: [PluginWord]
+    let bundledPluginWords: [PluginWord]
+    let installedPluginPackages: [InstalledPluginPackage]
     let productReference: ProductReference
     let drawingLimitDefinition: DrawingLimitDefinition
 
-    init() throws {
+    init(pluginDataDirectory: URL? = nil) throws {
         func resource(_ name: String) throws -> Data {
             guard let url = Bundle.module.url(forResource: name, withExtension: "json") else {
                 throw HostError("bundled_resources_unavailable")
@@ -106,8 +113,7 @@ struct Bootstrap {
         macroSources = try Self.object(resource("macro-sources"))
         let vocabulary = try Self.object(resource("saijiki"))
         guard vocabulary["asset_id"] as? String == "inku.saijiki.v2",
-              let categories = vocabulary["categories"] as? [[String: Any]],
-              let plugins = try JSONSerialization.jsonObject(with: resource("plugin-words")) as? [[String: Any]] else {
+              let categories = vocabulary["categories"] as? [[String: Any]] else {
             throw HostError("bundled_vocabulary_invalid")
         }
         var displayCategories = try categories.map { category in
@@ -145,18 +151,20 @@ struct Bootstrap {
                 englishDetail: "", preview: reference.saijikiPreviews["aida:" + ja])
         }, englishName: "relations"))
         saijiki = displayCategories
-        pluginWords = try plugins.map { item in
-            guard let id = item["id"] as? String, let surfaces = item["surfaces"] as? [String: [String]],
-                  let notes = item["notes"] as? [String: String] else { throw HostError("bundled_plugins_invalid") }
-            let preview = (item["preview"] as? String).flatMap {
-                Bundle.module.url(forResource: $0, withExtension: nil, subdirectory: "plugin-previews")
-            }
-            return PluginWord(id: id, aliases: item["aliases"] as? [String] ?? [], japanese: surfaces["ja"] ?? [],
-                english: surfaces["en"] ?? [], note: notes["ja"] ?? "", previewURL: preview, packageID: item["package_id"] as? String,
-                sourceFile: item["source_file"] as? String,
-                englishNote: notes["en"], firesOnJapanese: (item["fires_on"] as? [String: [String]])?["ja"] ?? [],
-                firesOnEnglish: (item["fires_on"] as? [String: [String]])?["en"] ?? [])
+        let bundle = try PluginPackageRepository.call(.object(["action": .string("bundled_nature")]))
+        guard bundle["outcome"].string == "ok", let document = bundle["text"].string else { throw HostError("bundled_plugins_invalid") }
+        let parsed = try PluginPackageRepository.call(.object(["action": .string("read_stored"), "document": .string(document)]))
+        guard parsed["outcome"].string == "ok", let entries = parsed["package"]["words"].array else { throw HostError("bundled_plugins_invalid") }
+        let bundled = entries.compactMap { word -> PluginWord? in
+            let path = word["preview"].string ?? ""
+            let highResolution = path.hasSuffix(".png") ? String(path.dropLast(4)) + "@2x.png" : path
+            let data = (bundle["pictures"][highResolution].string ?? bundle["pictures"][path].string).flatMap { Data(base64Encoded: $0) }
+            return InstalledPluginPackage.pluginWord(word, packageID: "Nature.leaves", previewURL: nil, previewData: data)
         }
+        guard bundled.count == entries.count else { throw HostError("bundled_plugins_invalid") }
+        bundledPluginWords = bundled
+        installedPluginPackages = try pluginDataDirectory.map { try PluginPackageRepository(dataDirectory: $0).load() } ?? []
+        pluginWords = bundled + installedPluginPackages.flatMap { $0.pluginWords() }
     }
 
     var catalogs: [ColorCatalogOption] {
@@ -356,7 +364,7 @@ struct Bootstrap {
             derivationKind: derivationKind,
             disabledPluginNames: pluginWords.filter {
                 $0.packageID.map { settings.plugins?.disabledPackageIDs.contains($0) == true } ?? false
-            }.flatMap { [$0.id] + $0.aliases },
+            }.map(\.id) + Array(settings.plugins?.disabledPackageIDs ?? []),
             provenance: GenerationProvenance(ddlVersion: productReference.versions["ddlSpec"],
                 ddlEngineVersion: productReference.versions["ddlEngine"],
                 build: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String,
@@ -373,12 +381,11 @@ struct Bootstrap {
         request["language"] = language
         let disabled = settings.plugins?.disabledPackageIDs ?? []
         request["bundled_packages"] = (macroSources["bundled_packages"] as? [String] ?? []).filter { !disabled.contains($0) }
-        request["legacy"] = (macroSources["legacy"] as? [[String: Any]] ?? []).filter {
-            guard let source = $0["source_id"] as? String, source.hasPrefix("bundled:") else { return true }
-            return !disabled.contains(String(source.dropFirst("bundled:".count)))
-        }
+        request["legacy"] = []
         var exact = try ExactJSON(data: Self.bytes(request))
-        exact["canonical"] = .array(importedPlugins.enumerated().map { $0.element.canonicalCandidate(index: $0.offset) } + (exact["canonical"].array ?? []))
+        let installed = installedPluginPackages.filter { !disabled.contains($0.id) }.flatMap { $0.candidateWords(language: language) }
+        exact["canonical"] = .array(importedPlugins.enumerated().map { $0.element.canonicalCandidate(index: $0.offset) }
+                                    + (exact["canonical"].array ?? []) + installed)
         let output = try ExactJSON(data: InkuCore.resolveMacroCatalog(exact.data))
         guard output["schema"].string == "inku.macro-catalog-resolution.v1", output["error"] == .null else {
             throw HostError(output["error"].string ?? "macro_catalog_invalid")

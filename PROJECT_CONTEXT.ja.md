@@ -1,6 +1,6 @@
 # inku プロジェクトコンテキスト
 
-**対象バージョン: v2.15.264 / Build 1340**
+**対象バージョン: v2.15.296 / Build 1372**
 
 この文書は、開発者とAIが毎回 `SPEC.ja.md` 全文を読み直さずに作業を始めるための入口である。
 設計判断の正本は `SPEC.ja.md` であり、この文書と食い違う場合は日本語仕様を優先する。
@@ -66,7 +66,7 @@ API、認証、DB、共有pipelineのhost adapter、描画、系譜と旧作品�
 
 Webの画像タブはVisionのモデルで画像から直接DDLを書く。`POST /api/pipeline/images`で前処理した画像は所有者別のworkerメモリに置き、15分または実行終了で破棄する。比較用PNGも保存しない。`image_provenance`はコメントとして表示し、描画の記述とは別にする。`image_ddl`は画像の参照とDDLの経過だけを持つ。記録に`before_review`があれば、描画後に見比べ前の指示書を開き、既存のDDL編集で子作品を描ける。保存schema v5は、v4の確認済みbackupを作ってからnullableな2列を追加する。
 
-記述タブとバッチの`描き方`で「読んで描く」を選ぶと、記述を語り手の目から読み、その目に映る景をDDLとして直接書き、描いた画を見て一度直す（SPEC §12.6.7。runの選択肢`route`）。構図の読み・法則・配色は通らない。写生ありが読みを通し、読みは写生の文として保存されて直せる。記録`description_ddl`は作品の保存済みの文脈に置き、DBの形は変えない。
+記述タブとバッチの`描き方`で「言葉で描く」を選ぶと、記述を語り手の目から読み、その目に映る景をDDLとして直接書き、描いた画を見て一度直す（SPEC §12.6.7。runの選択肢`route`）。構図の読み・法則・配色は通らない。写生ありが読みを通し、読みは写生の文として保存されて直せる。記録`description_ddl`は作品の保存済みの文脈に置き、DBの形は変えない。
 
 ## 守るべき設計契約
 
@@ -301,7 +301,7 @@ UI、provider通信、Room、履歴はAndroid hostが所有し、`dh1`・`rh3`�
 `reference-corpus` は凍結コーパスの再生成を照合するが、手動dispatchでだけ走る。通常のpush・PRでは `checks` が
 **server（ruff と pytest）・cli（ruff と pytest）・web（`npm run check`・`test:unit`・`lint:i18n`）・
 公開文書（`check_docs.py`）**を回す。`android-native` は共有Rust core / raster / JNI / Android hostの
-変更だけで起動し、Rust 1.95、NDK 29、`arm64-v8a` native library、境界のhost JVM testを検査する。
+変更だけで起動し、Rust 1.99、NDK 29、`arm64-v8a` native library、境界のhost JVM testを検査する。
 
 **⚠ CI が見ていないものは残っている。**
 **① 実providerの受入**（通常のpytest成功は、本人の接続・利用枠を使った描画やVisionの成功を証明しない）、

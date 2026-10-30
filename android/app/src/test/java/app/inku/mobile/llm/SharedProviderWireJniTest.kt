@@ -1,6 +1,7 @@
 package app.inku.mobile.llm
 
 import app.inku.mobile.pipeline.CoreIdentityJson
+import app.inku.mobile.pipeline.NativePipelineBridge
 import java.io.File
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -24,6 +25,7 @@ class SharedProviderWireJniTest {
         var section = ""
         for (line in fixture.readLines()) {
             val text = line.trim().removeSuffix(",")
+            if (text.startsWith("\"base_url_requests\": [")) section = "base_url_requests"
             if (text.startsWith("\"requests\": [")) section = "requests"
             if (text.startsWith("\"text_requests\": [")) section = "text_requests"
             if (text.startsWith("\"responses\": [")) section = "responses"
@@ -109,6 +111,9 @@ class SharedProviderWireJniTest {
     @Test
     fun allTextRequestsMatchServerWireBytes() = requests("text_requests", 81)
 
+    @Test
+    fun providerVersionedBasesUseSharedRoot() = requests("base_url_requests", 28)
+
     /** Server passes a `models/` Gemini name to the core unchanged; Android's send path must too. */
     @Test
     fun androidSendsModelsPrefixedGeminiNamesUnchanged() {
@@ -164,15 +169,17 @@ class SharedProviderWireJniTest {
     @Test
     fun allChatGptRowsMatchServer() {
         val rows = requireNotNull(cases["chatgpt"])
-        assertEquals(162, rows.size)
+        assertEquals(221, rows.size)
         val actions = mutableMapOf<String, Int>()
         for ((index, item) in rows.withIndex()) {
             val row = item.row
             val why = "chatgpt[$index] ${row.getString("why")}"
             val action = row.getJSONObject("request").getString("action")
-            actions[action] = (actions[action] ?: 0) + 1
+            if (!row.getJSONObject("request").has("schema")) actions[action] = (actions[action] ?: 0) + 1
             val expected = row.getJSONObject("expect")
-            val answer = SharedProviderWire.call(item.requestJson)
+            val answer = if (row.getJSONObject("request").has("schema")) {
+                JSONObject(NativePipelineBridge.providerWire(item.requestJson.encodeToByteArray()).decodeToString())
+            } else SharedProviderWire.call(item.requestJson)
             assertEquals(why, SharedProviderWire.SCHEMA, answer.getString("schema"))
             for (key in expected.keys().asSequence()) {
                 assertTrue("$why missing $key", answer.has(key))

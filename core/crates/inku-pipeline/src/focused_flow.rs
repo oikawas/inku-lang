@@ -13,8 +13,9 @@ use crate::core_boundary::{
     ResolvedPaletteColorDto, ResolvedPaletteDto,
 };
 use crate::machine::{
-    AuthoringInput, ColorsConfig, CompositionConfig, DescriptionRoute, LawsConfig, PipelineConfig,
-    PipelineInput, PipelinePhase, PipelineSnapshot, SketchRequest, SketchState, StepOutput,
+    AuthoringInput, ColorsConfig, CompositionConfig, CompositionRequest, DescriptionRoute,
+    LawsConfig, PipelineConfig, PipelineInput, PipelinePhase, PipelineSnapshot, SketchRequest,
+    SketchState, StepOutput,
 };
 use crate::prompts::PromptLimits;
 use crate::protocol::{
@@ -71,6 +72,7 @@ pub(crate) fn config() -> PipelineConfig {
         retry_delay_ms: DecimalU64::new(10),
     };
     PipelineConfig {
+        plugin_offers: Vec::new(),
         envelope_limits: EnvelopeLimits {
             max_input_bytes: 1_000_000,
             max_snapshot_bytes: 1_000_000,
@@ -98,6 +100,7 @@ pub(crate) fn config() -> PipelineConfig {
         macro_summaries: vec![],
         catalogs: vec![],
         prompt_limits: PromptLimits {
+            max_offered_plugins: 8,
             max_catalog_entries: 16,
             max_summary_bytes: 1024,
             max_catalog_serialized_bytes: 32768,
@@ -186,6 +189,75 @@ pub(crate) fn ack(state: &PipelineSnapshot) -> PipelineInput {
 }
 
 #[test]
+fn stage1_records_the_offer_in_the_saved_config() {
+    let asset: serde_json::Value = serde_json::from_str(include_str!(
+        "../../inku-ddl/tests/fixtures/nature-leaves-2.1-v1.json"
+    ))
+    .unwrap();
+    let definition =
+        inku_ddl::MacroDefinition::from_json(&asset["entries"][0]["definition"].to_string())
+            .unwrap();
+    let mut config = config();
+    config.language = inku_ddl::ResolvedInstructionLanguage::Ja;
+    config.definitions = vec![definition];
+    config.macro_summaries = vec!["若葉を描く。".into()];
+    let start = envelope(
+        None,
+        PipelineInput::Start {
+            variation_id: "offer-record".into(),
+            authoring_nonce: "offer-1".into(),
+            config: Box::new(config),
+            authority: VariationAuthorityState::new_description(),
+            authoring: AuthoringInput::Description {
+                description: "｛若葉｝".into(),
+                auto_catalog: false,
+                sketch: SketchRequest::Off,
+                route: DescriptionRoute::Stages,
+                source_labels: Vec::new(),
+                composition: CompositionRequest::Off,
+            },
+        },
+    );
+    let snapshot = run(None, &start).snapshot;
+    let saved = serde_json::to_value(&snapshot.config).unwrap();
+    assert_eq!(
+        saved["plugin_offers"][0]["stage"],
+        "generate_normalized_ddl"
+    );
+    assert_eq!(
+        saved["plugin_offers"][0]["offer"]["offered"][0]["reason"],
+        "brace"
+    );
+    assert_eq!(saved["plugin_offers"][0]["offer"]["omitted"], json!([]));
+}
+
+#[test]
+fn direct_ddl_run_does_not_inherit_the_parent_offer() {
+    let mut config = config();
+    config.plugin_offers.push(crate::plugin_offer::OfferRecord {
+        stage: crate::prompts::LlmStage::GenerateNormalizedDdl,
+        offer: crate::plugin_offer::PluginOffer::default(),
+    });
+    let start = envelope(
+        None,
+        PipelineInput::Start {
+            variation_id: "fresh-offer".into(),
+            authoring_nonce: "new".into(),
+            config: Box::new(config),
+            authority: VariationAuthorityState::new_description(),
+            authoring: AuthoringInput::DirectDdl {
+                source: "Place a circle.".into(),
+                declare_canvas: false,
+                completion_ranges: None,
+                laws_layers: None,
+                laws_basis: None,
+            },
+        },
+    );
+    assert!(run(None, &start).snapshot.config.plugin_offers.is_empty());
+}
+
+#[test]
 fn canonical_macro_crosses_owned_start_and_commit() {
     let definition = inku_ddl::MacroDefinition::from_json(
         &json!({
@@ -215,7 +287,7 @@ fn canonical_macro_crosses_owned_start_and_commit() {
             config: Box::new(selected),
             authority: VariationAuthorityState::new_direct_ddl(),
             authoring: AuthoringInput::DirectDdl {
-                source: "Example.Circle.".into(),
+                source: "{circle}.".into(),
                 completion_ranges: None,
                 laws_layers: None,
                 laws_basis: None,
@@ -402,6 +474,7 @@ fn stage1_compiler_feedback_retries_before_the_corrected_ddl_commits() {
                 sketch: SketchRequest::Off,
                 route: DescriptionRoute::Stages,
                 source_labels: Vec::new(),
+                composition: CompositionRequest::Off,
             },
         },
     );
@@ -419,6 +492,11 @@ fn stage1_compiler_feedback_retries_before_the_corrected_ddl_commits() {
     );
     let rejected_output = run(Some(&state), &rejected);
     state = rejected_output.snapshot;
+    assert_eq!(
+        state.config.plugin_offers.len(),
+        1,
+        "a reissued stage replaces its offer record"
+    );
     assert!(state.document.is_none() && state.delivery.is_none());
     assert!(
         rejected_output
@@ -525,6 +603,7 @@ fn stage1_compiler_feedback_uses_the_shared_attempt_budget() {
                 sketch: SketchRequest::Off,
                 route: DescriptionRoute::Stages,
                 source_labels: Vec::new(),
+                composition: CompositionRequest::Off,
             },
         },
     );
@@ -551,7 +630,7 @@ fn stage1_compiler_feedback_uses_the_shared_attempt_budget() {
         PipelineInput::EffectResult {
             result: EffectResult::NormalizedDdlGenerated {
                 identity: state.action.as_ref().unwrap().identity.clone(),
-                response: json!({"normalized_ddl": "Unknown.Macro."}).to_string(),
+                response: json!({"normalized_ddl": "{unknown macro}."}).to_string(),
                 elapsed_ms: DecimalU64::new(20),
             },
         },
@@ -595,6 +674,7 @@ fn a_retrying_stage1_reports_its_attempt_and_budget() {
                 sketch: SketchRequest::Off,
                 route: DescriptionRoute::Stages,
                 source_labels: Vec::new(),
+                composition: CompositionRequest::Off,
             },
         },
     );
@@ -644,6 +724,7 @@ fn exhausted_stage1_proposes_sealed_residual_only_after_visible_ack() {
                 sketch: SketchRequest::Off,
                 route: DescriptionRoute::Stages,
                 source_labels: Vec::new(),
+                composition: CompositionRequest::Off,
             },
         },
     );
@@ -706,7 +787,7 @@ fn stage1_does_not_correct_canonical_ddl_when_macro_expansion_exceeds_its_budget
         .to_string(),
     )
     .unwrap();
-    let source = "Example.Circle. Example.Circle.";
+    let source = "{circle}. {circle}.";
     let identity = definition.identity().unwrap();
     let document = inku_ddl::NormalizedDdlDocument::new(
         source,
@@ -754,6 +835,7 @@ fn stage1_does_not_correct_canonical_ddl_when_macro_expansion_exceeds_its_budget
                 sketch: SketchRequest::Off,
                 route: DescriptionRoute::Stages,
                 source_labels: Vec::new(),
+                composition: CompositionRequest::Off,
             },
         },
     );
@@ -867,6 +949,7 @@ fn committed_ddl_and_approved_hole_patch_share_one_replayable_path() {
                 sketch: SketchRequest::Off,
                 route: DescriptionRoute::Stages,
                 source_labels: Vec::new(),
+                composition: CompositionRequest::Off,
             },
         },
     )];
@@ -1914,6 +1997,7 @@ fn sketch_start(sketch: SketchRequest) -> PipelineSnapshot {
                 sketch,
                 route: DescriptionRoute::Stages,
                 source_labels: Vec::new(),
+                composition: CompositionRequest::Off,
             },
         },
     );
@@ -2022,6 +2106,7 @@ fn ground_start(pipeline_config: PipelineConfig) -> PipelineSnapshot {
                 sketch: SketchRequest::Off,
                 route: DescriptionRoute::Stages,
                 source_labels: Vec::new(),
+                composition: CompositionRequest::Off,
             },
         },
     );
@@ -2404,6 +2489,7 @@ fn started_description(pipeline_config: PipelineConfig) -> PipelineSnapshot {
                 sketch: SketchRequest::Off,
                 route: DescriptionRoute::Stages,
                 source_labels: Vec::new(),
+                composition: CompositionRequest::Off,
             },
         },
     );
@@ -3253,6 +3339,7 @@ fn started_with(pipeline_config: PipelineConfig, description: &str) -> PipelineS
                 sketch: SketchRequest::Off,
                 route: DescriptionRoute::Stages,
                 source_labels: Vec::new(),
+                composition: CompositionRequest::Off,
             },
         },
     );
@@ -4074,6 +4161,48 @@ fn the_laws_from_a_saved_work_print_what_a_description_run_printed() {
         authority.next_state.authority(),
         AuthoringAuthority::DdlAuthoritative
     );
+}
+
+#[test]
+fn the_laws_from_a_titled_saved_work_title_the_child_again() {
+    // A work whose DDL has title lines (DDL 27): the laws read its sentences
+    // without the titles, and the child is titled as the work was, after its
+    // declaration.
+    let asked = plan_answer(&laws_start(Some(LawsConfig {}))).snapshot;
+    let composed = asked.laws.as_ref().unwrap().document.source.clone();
+    let described = laws_answer(&asked, &two_laws());
+    let saved = declared(&composed);
+    let lines = saved.split('\n').collect::<Vec<_>>();
+    let chunks = (0..lines.len())
+        .map(|line| match line {
+            0 => None,
+            1 => Some("the first"),
+            _ => Some("the rest"),
+        })
+        .collect::<Vec<_>>();
+    let titled =
+        inku_ddl::print_ddl_titles(&lines, &chunks, inku_ddl::ResolvedInstructionLanguage::En);
+    let from_work =
+        saved_laws_start(&titled, crate::laws::LawsDirection::default(), None, None).snapshot;
+    assert_eq!(from_work.action.as_ref().unwrap().tag, "choose_laws");
+    let moved = laws_answer(&from_work, &two_laws());
+    let child = committed_source(&described.snapshot);
+    let child_lines = child.split('\n').collect::<Vec<_>>();
+    assert_eq!(child_lines.len(), lines.len());
+    assert_eq!(
+        committed_source(&moved.snapshot),
+        inku_ddl::print_ddl_titles(
+            &child_lines,
+            &chunks,
+            inku_ddl::ResolvedInstructionLanguage::En
+        )
+    );
+    let basis = moved.snapshot.laws_basis.as_ref().expect("a laws basis");
+    assert_eq!(basis.composed, composed);
+    let PipelinePhase::AwaitingVisibleDdlCommit { document, .. } = &moved.snapshot.phase else {
+        panic!("not committing: {:?}", moved.snapshot.phase);
+    };
+    assert_eq!(basis.committed_digest, document.source_digest());
 }
 
 #[test]

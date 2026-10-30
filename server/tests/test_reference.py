@@ -20,9 +20,8 @@ from inku_server.geometry_thresholds import (
     SAGITTA_RELATIVE_LIMIT,
 )
 from inku_server.plugins import CANVAS_ASPECTS, plugin_status_items
-from inku_server.plugins.document_format import _CORE_MARKERS, _REGIONS
 from inku_server.render_engines import SVG_PROFILES
-from inku_server.saijiki import relation_literal_markers, shape_markers
+from inku_server.saijiki import relation_literal_markers
 
 
 def _ref() -> dict:
@@ -38,7 +37,6 @@ def test_sections_are_stable() -> None:
         "meta",
         "saijiki",
         "normalized_ddl_phrases",
-        "expansion_layer",
         "score_schema",
         "color_resolution",
         "weight_properties",
@@ -133,30 +131,6 @@ def test_reference_does_not_tell_the_reader_gray_backgrounds_are_refused() -> No
     assert "gray" in notes
 
 
-def test_core_markers_and_regions_match_document_format() -> None:
-    expansion = _ref()["expansion_layer"]
-    for lang in ("ja", "en"):
-        markers = [item["marker"] for item in expansion["core_markers"][lang]]
-        assert markers == list(_CORE_MARKERS[lang])
-    assert expansion["regions"] == {
-        key: list(value) for key, value in _REGIONS.items()
-    }
-    assert len(expansion["regions"]) == len(_REGIONS)
-
-
-def test_marker_classes_use_known_buckets() -> None:
-    expansion = _ref()["expansion_layer"]
-    primitive_surfaces = {
-        term.lower() for lang in ("ja", "en") for term in shape_markers(lang)
-    }
-    allowed = {"structural", "shape", "operation", "material", "color", "variation", "angle", "ratio", "place"}
-    for lang in ("ja", "en"):
-        for item in expansion["core_markers"][lang]:
-            assert item["class"] in allowed
-            if item["marker"].lower() in primitive_surfaces:
-                assert item["class"] == "shape"
-
-
 def test_score_schema_enums_match_get_args() -> None:
     enums = _ref()["score_schema"]["enums"]
     for name in reference._ENUM_ALIASES:
@@ -220,12 +194,11 @@ def test_markdown_renders_all_sections() -> None:
     for heading in (
         "## 1. Saijiki",
         "## 2. Normalized DDL phrases",
-        "## 3. Expansion layer",
-        "## 4. Score schema",
-        "## 5. Color resolution",
-        "## 6. Weight properties",
-        "## 7. Performance",
-        "## 8. Verification",
+        "## 3. Score schema",
+        "## 4. Color resolution",
+        "## 5. Weight properties",
+        "## 6. Performance",
+        "## 7. Verification",
     ):
         assert heading in md
     # A representative implementation value must survive into the rendered page.

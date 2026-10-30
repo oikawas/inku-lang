@@ -26,7 +26,6 @@
 		refineDrawingModelId: string;
 		refineDrawingModelGroups: ProviderGroup[];
 		refineWildValue: boolean;
-		refineWildInherited: boolean;
 		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4) => void | Promise<void>;
 		/** Save the chosen options, then leave; the rest are dropped. */
 		onSaveAndClose: () => void | Promise<void>;
@@ -49,7 +48,6 @@
 		refineDrawingModelId,
 		refineDrawingModelGroups,
 		refineWildValue,
-		refineWildInherited,
 		onGenerateVariationCandidates,
 		onSaveAndClose,
 		onDiscardAndClose,
@@ -129,7 +127,7 @@
 								onSelect={onSelectRefineDrawingModel}
 							/>
 						</div>
-						<div class="refine-settings-row"><WildToggle value={refineWildValue} {isJapanese} inherited={refineWildInherited} onSelect={(next) => onSetRefineWild(next)} /></div>
+						<div class="refine-settings-row"><WildToggle value={refineWildValue} onSelect={(next) => onSetRefineWild(next)} /></div>
 
 					{#if refinementSession.busy || refinementSession.gridBusy}
 						<RunStatus

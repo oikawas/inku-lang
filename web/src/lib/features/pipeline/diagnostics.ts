@@ -1,4 +1,5 @@
 import type { LangPack } from '../../i18n/types.ts';
+import { pluginDisplayName, type PluginNameEntry } from '../../plugin-names.ts';
 
 export type PipelineDiagnosticChannel = 'plugin' | 'upstream' | 'downstream' | 'resource' | 'relation' | 'render' | 'catalog' | 'warning';
 
@@ -22,8 +23,9 @@ export type PipelineHistoryDiagnostics = {
 /** Why a plugin sentence was not drawn, from the shared explainer. */
 export type PluginDiagnostic = {
 	name: string;
-	reason: 'plugin_not_installed' | 'plugin_disabled' | 'plugin_name_mismatch' | 'plugin_version_mismatch' | 'plugin_count_out_of_range';
+	reason: 'plugin_not_installed' | 'plugin_disabled' | 'plugin_name_mismatch' | 'plugin_version_mismatch' | 'plugin_count_out_of_range' | 'plugin_name_ambiguous' | 'plugin_old_notation';
 	suggestion?: string;
+	candidates?: string[];
 	start_byte: number;
 	end_byte: number;
 };
@@ -133,18 +135,27 @@ function omittedUnit(value: JsonObject, channel: PipelineDiagnosticChannel): { k
 export function formatPipelineDiagnostic(
 	diagnostic: PipelineDiagnostic,
 	strings: LangPack,
+	entries: PluginNameEntry[] = [],
 ): string {
 	const value = object(diagnostic.value);
 	if (!value) return strings.pipelineDiagnosticUnknown;
 	if (diagnostic.channel === 'plugin') {
 		const plugin = value as PluginDiagnostic;
-		return strings.pipelinePluginDiagnostic(plugin.reason, plugin.name, plugin.suggestion ?? null);
+		const lang = strings.code === 'ja' ? 'ja' : 'en';
+		const display = (name: string) => {
+			const entry = entries.find(item => item.qualified_name === name || [...(item.surface_ja ?? []), ...(item.surface_en ?? [])].some(n => n.normalize('NFKC').toLowerCase() === name.normalize('NFKC').toLowerCase()));
+			return entry ? pluginDisplayName(entry, lang) : name.includes('.') ? name : lang === 'ja' ? `｛${name}｝` : `{${name}}`;
+		};
+		const suggestion = plugin.suggestion ? display(plugin.suggestion) : null;
+		if (plugin.reason === 'plugin_name_ambiguous') return `${plugin.name}: ${strings.ddlPluginReason(plugin.reason, null, (plugin.candidates ?? []).map(display))}`;
+		return strings.pipelinePluginDiagnostic(plugin.reason, plugin.name, suggestion);
 	}
 	if (diagnostic.channel === 'warning') {
 		return strings.pipelineRenderWarning(kind(value) ?? 'warning', typeof value.name === 'string' ? value.name : null);
 	}
 	if (diagnostic.channel === 'catalog') {
-		const name = typeof value.qualified_name === 'string' ? `${value.qualified_name}: ` : '';
+		const entry = entries.find(item => item.qualified_name === value.qualified_name);
+		const name = entry ? `${pluginDisplayName(entry, strings.code === 'ja' ? 'ja' : 'en')}: ` : '';
 		return name + strings.pipelineDiagnosticReason(reasonOf(value));
 	}
 	const parts: string[] = [];

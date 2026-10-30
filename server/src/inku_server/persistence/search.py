@@ -186,7 +186,6 @@ class HistorySearchService:
                 JOIN history_fts ON history_fts.rowid = h.rowid
                 WHERE {visible}
                   AND h.trashed = :trashed
-                  AND h.history_visibility = 'normal'
                   {starred_clause}
                   {for_revision_clause}
                   {for_share_clause}
@@ -205,7 +204,6 @@ class HistorySearchService:
                     JOIN history_fts ON history_fts.rowid = h.rowid
                     WHERE {visible}
                       AND h.trashed = :trashed
-                      AND h.history_visibility = 'normal'
                       {starred_clause}
                       {for_revision_clause}
                       {for_share_clause}
@@ -242,7 +240,6 @@ class HistorySearchService:
             query = session.query(HistoryRow).filter(
                 self.readable_by(actor, HistoryRow.user_id, HistoryRow.id),
                 HistoryRow.trashed == (1 if trashed else 0),
-                HistoryRow.history_visibility == "normal",
             )
             if starred:
                 query = query.filter(HistoryRow.starred == 1)

@@ -4,6 +4,10 @@ The inku application code is licensed under the [repository MIT license](../LICE
 The container also carries independently licensed Python packages, native Rust
 code, and Noto Serif JP. This document does not relicense those components.
 
+The shared core embeds the America/Los_Angeles zone from the public-domain
+IANA Time Zone Database, 2026e rearguard; its provenance is recorded in
+`core/crates/inku-pipeline/data/tzdata-NOTICE.txt`.
+
 The API image also preserves Ubuntu's SQLite `3.37.2-2ubuntu0.8` binary under
 `/opt/inku-sqlite/lib/`, independently of the base distribution's SQLite.
 Its complete packaged copyright notice is
@@ -68,6 +72,12 @@ The other current cases without a standalone license file are `cesu8 1.1.0`
 (MIT or Apache-2.0, MIT selected), `jni-sys-macros 0.4.1` (MIT or Apache-2.0,
 MIT selected), and `r-efi 6.0.0` (MIT or Apache-2.0 or LGPL-2.1-or-later,
 MIT selected). Their exact source archives are linked in the generated bundle.
+
+The `defmt-parser 1.0.0` crate archive contains no standalone license file.
+Its upstream MIT license is retained at
+`src/inku_server/notices/defmt-parser-1.0.0-LICENSE-MIT.txt`, from
+https://github.com/knurling-rs/defmt/blob/4a8cdb44891ed57b8ff5a023b6bec7137c48708f/LICENSE-MIT .
+The exact crate archive is https://crates.io/api/v1/crates/defmt-parser/1.0.0/download .
 
 Before a public image release, review the actual native wheel and Python
 environment against the locked dependencies and preserve any additional

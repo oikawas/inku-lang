@@ -54,7 +54,6 @@
 		result: PaintResult | null;
 		rangePreview?: RangePreview | null;
 		unsavedRefinementPreview: boolean;
-		lineageIntermediateNotice: string | null;
 		allowEmptyOutputTabs: boolean;
 		currentRenderedAt: string | null;
 		// The three nav buttons, each with its own answer. They come decided by
@@ -187,11 +186,9 @@
 		refineDrawingModelGroups: ProviderGroup[];
 		onSelectRefineDrawingModel: (provider: Provider, model: string) => void | Promise<void>;
 		refineWildValue: boolean;
-		refineWildInherited: boolean;
 		onSetRefineWild: (value: boolean | null) => void;
 		onSaveOkugakiModel: (provider: Provider, model: string) => void | Promise<void>;
 		onSaveVisionModel: (provider: Provider, model: string) => void | Promise<void>;
-		onPromoteLineageNode: (node: LineageNode) => void | Promise<void>;
 		onSaveLineageNote: (node: LineageNode, note: string) => void | Promise<void>;
 		onAskTrashLineage: (historyIds: string[]) => void;
 		onDetachLineage: () => void;
@@ -210,7 +207,6 @@
 		result,
 		rangePreview = null,
 		unsavedRefinementPreview = false,
-		lineageIntermediateNotice = null,
 		allowEmptyOutputTabs,
 		currentRenderedAt,
 		navLatestDisabled,
@@ -315,11 +311,9 @@
 		refineDrawingModelGroups,
 		onSelectRefineDrawingModel,
 		refineWildValue,
-		refineWildInherited,
 		onSetRefineWild,
 		onSaveOkugakiModel,
 		onSaveVisionModel,
-		onPromoteLineageNode,
 		onSaveLineageNote,
 		onAskTrashLineage,
 		onDetachLineage,
@@ -460,6 +454,7 @@
 	const statusSketchState = $derived(normalizeSketchState(statusWork?.sketch_state));
 	async function openLineageRefinement(node: LineageNode, view: RefinementView): Promise<void> {
 		await onOpenLineageNode(node);
+		onSetRefineWild(null);
 		refineView = view;
 		refineReturnTab = 'lineage';
 		directRefinementActive = false;
@@ -489,6 +484,7 @@
 	}
 
 	function startDirectRefinement(node: LineageNode, view: RefinementView): void {
+		onSetRefineWild(null);
 		refineView = view;
 		refineReturnTab = 'canvas';
 		directRefinementActive = true;
@@ -851,7 +847,6 @@
 				{unsavedRefinementPreview}
 				{interpretFallbackReason}
 				{composeFallbackDrawnReason}
-				{lineageIntermediateNotice}
 				{instructionCaptionVisible}
 				{canShowInstructionCaption}
 				{displayInstructionText}
@@ -913,7 +908,6 @@
 					{refineDrawingModelId}
 					{refineDrawingModelGroups}
 					{refineWildValue}
-					{refineWildInherited}
 					onClose={requestCloseRefineModal}
 					{onGenerateVariationCandidates}
 					{onGenerateColorCatalogCandidates}
@@ -936,7 +930,7 @@
 						onDrawDescription={onDrawLineageDescription} onOpenDdlEditor={onOpenLineageDdlEditor}
 						onDrawSketchGrain={onDrawLineageSketchGrain} {stageLabel} stage1ModelLabel={runStage1ModelLabel}
 						stage2ModelLabel={runStage2ModelLabel} {runTokensIn} {runTokensOut} {runAttempt} onSaveOkugakiModel={onSaveOkugakiModel}
-						{onSaveVisionModel} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote}
+						{onSaveVisionModel} onSaveNote={onSaveLineageNote}
 						onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview}
 						onLoadBranch={onLoadLineageBranch} {autonomousRuns} {onOpenAutonomousChild} {onJuxtapose} {visionModel} {okugakiModel}
 						{visionProviderGroups} {animationExportSettings} {pngTemplates}

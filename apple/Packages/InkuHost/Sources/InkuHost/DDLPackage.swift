@@ -3,16 +3,13 @@ import InkuCore
 
 public struct ImportedMacroDefinition: Sendable, Equatable {
     public let definition: ExactJSON
-    public let summary: String
-    public init(definition: ExactJSON, summary: String) { self.definition = definition; self.summary = summary }
+    public let note: String
+    public init(definition: ExactJSON, note: String) { self.definition = definition; self.note = note }
 
-    public var qualifiedName: String {
-        (definition["namespace"].string ?? "") + "." + (definition["heading"].string ?? "")
-    }
     /// The shared catalog reads definition JSON as a string, retaining UInt64 lexemes.
     public func canonicalCandidate(index: Int) -> ExactJSON {
         .object(["source_id": .string("imported:\(index)"), "definition_json": .string(definition.text),
-                 "summary": .string(summary.isEmpty ? qualifiedName : summary)])
+                 "summary": .string(note)])
     }
 }
 
@@ -23,7 +20,23 @@ public struct DDLPackageImport: Sendable, Equatable {
     public let source: String
     public let language: String?
     public let plugins: [ImportedMacroDefinition]
-    public var names: [String] { plugins.map(\.qualifiedName) }
+    public var names: [String] {
+        let resolvedLanguage = language ?? InkuCore.resolveInstructionLanguage(text: source, requested: "auto", fallback: "ja") ?? "ja"
+        guard let catalog = try? resolveCatalog(language: resolvedLanguage) else { return [] }
+        let locks = (catalog["locks"].array ?? []).map { value -> ExactJSON in
+            var value = value
+            if let digest = value["digest"].string, !digest.hasPrefix("sha256:") { value["digest"] = .string("sha256:" + digest) }
+            return value
+        }
+        let request: ExactJSON = .object([
+            "source": .string(source), "language": .string(resolvedLanguage),
+            "definitions": .array(plugins.map(\.definition)),
+            "summaries": .array(plugins.map { .string($0.note) }),
+            "locks": .array(locks), "compiler": .null
+        ])
+        guard let answer = try? ExactJSON(data: InkuCore.pluginCalls(request.data)) else { return [] }
+        return (answer["entries"].array ?? []).compactMap { $0[resolvedLanguage == "en" ? "written_en" : "written_ja"].string }
+    }
 
     public static func read(url: URL) throws -> Self {
         try Task.checkCancellation()
@@ -46,7 +59,11 @@ public struct DDLPackageImport: Sendable, Equatable {
         try Task.checkCancellation()
         guard data.count <= maximumBytes else { throw HostError("ddl_import_too_large") }
         guard let text = String(data: data, encoding: .utf8) else { throw HostError("ddl_import_invalid_utf8") }
-        guard let file = try? ExactJSON(data: data), file["schema"].string == "inku.ddl-export.v1" else {
+        guard let file = try? ExactJSON(data: data) else {
+            return Self(source: text, language: nil, plugins: [])
+        }
+        if file["schema"].string == "inku.ddl-export.v1" { throw HostError("ddl_export_requires_v2") }
+        guard file["schema"].string == "inku.ddl-export.v2" else {
             return Self(source: text, language: nil, plugins: [])
         }
         guard let source = file["ddl"].string else { throw HostError("ddl_export_without_ddl") }
@@ -54,7 +71,7 @@ public struct DDLPackageImport: Sendable, Equatable {
         guard items.count <= maximumPlugins else { throw HostError("ddl_export_too_many_plugins") }
         let plugins = try items.map { item in
             guard item["definition"].object != nil else { throw HostError("ddl_export_invalid_plugin") }
-            return ImportedMacroDefinition(definition: item["definition"], summary: item["summary"].string ?? "")
+            return ImportedMacroDefinition(definition: item["definition"], note: item["note"].string ?? "")
         }
         let language = file["language"].string.flatMap { ["ja", "en"].contains($0) ? $0 : nil }
         let value = Self(source: source, language: language, plugins: plugins)

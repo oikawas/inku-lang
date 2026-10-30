@@ -13,6 +13,7 @@ export type HistoryItem = {
 	image_ddl?: Record<string, unknown> | null;
 	/** Read and draw's record (SPEC 12.6.7); a work drawn that way keeps it. */
 	description_ddl?: DescriptionDdlRecord | null;
+	plugin_offers?: import('./features/canvas/plugin-offers').PluginOfferRecord[] | null;
 	image_provenance?: string | null;
 	// Set only when the work is somebody else's, reached through a group scope
 	// or an explicit grant. Absent for one's own, so nothing changes for a
@@ -31,11 +32,10 @@ export type HistoryItem = {
 	batch_line_number?: number | null;
 	batch_run_id?: string | null;
 	description_hash?: string | null;
-	history_visibility?: 'normal' | 'lineage_only';
 	lineage_node_id?: string | null;
 	lineage_root_node_id?: string | null;
 	lineage_generation?: number | null;
-	lineage_state?: 'active' | 'lineage_only' | 'tombstone' | null;
+	lineage_state?: 'active' | 'tombstone' | null;
 	lineage_parent_node_id?: string | null;
 	derivation_kind?: string | null;
 	derivation_metadata?: Record<string, unknown>;

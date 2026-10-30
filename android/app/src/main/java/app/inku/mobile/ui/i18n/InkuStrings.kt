@@ -32,6 +32,51 @@ import androidx.compose.runtime.compositionLocalOf
  * (`errorModelGone: (stage) => ...`).
  */
 interface InkuStrings {
+    val nextDrawConditions: String
+    val conditionModel: String
+    val conditionCatalog: String
+    val conditionCanvas: String
+    val conditionChange: String
+    val drawRouteHeading: String
+    val drawRouteWords: String
+    val drawRoutePlan: String
+    val drawRouteImage: String
+    val drawRouteLocalUnavailable: String
+    val drawSteps: String
+    val drawSketch: String
+    val drawCompositionSwitch: String
+    val drawFlowLabel: String
+    val drawOptions: String
+    val descriptionHint: String
+    val descriptionCommentHint: String
+    val flowDescription: String
+    val flowSketch: String
+    val flowFillPlan: String
+    val flowComposition: String
+    val flowColors: String
+    val flowWrite: String
+    val flowReview: String
+    val flowPicture: String
+    val readingRead: String
+    val readingSupplied: String
+    val readingFallback: String
+    val readingOff: String
+    val readingLabel: String
+    val readingText: String
+    val readingDropped: String
+    val roundReviewed: String
+    val roundWritten: String
+    val roundAskedAgain: String
+    val roundLabel: String
+    val roundInstructions: String
+    val roundProblems: String
+    val compositionThesis: String
+    val compositionForm: String
+    val compositionMainLaw: String
+    val compositionReason: String
+    val compositionThings: String
+    val compositionMeasure: String
+    val compositionChangedLines: String
     val code: String
     val label: String
     val modelRecommendation: String
@@ -52,6 +97,10 @@ interface InkuStrings {
     val chatGptReauthenticate: String
     val chatGptEnablePlan: String
     val chatGptSignOut: String
+    val chatGptDelete: String
+    val chatGptDeleteConfirmText: String
+    val chatGptDeleteConfirm: String
+    val chatGptDeleteCancel: String
     val chatGptManageUsage: String
     val chatGptPending: String
     val chatGptConnected: String
@@ -224,6 +273,10 @@ interface InkuStrings {
 
     // --- Errors thrown below the screen -------------------------------------
     val errorServiceIdFormat: String
+    val errorProviderDailyBudget: String
+    val errorProviderInputBudget: String
+    val errorProviderInputCount: String
+    val errorDuplicateModelIds: String
     val errorServiceNotFound: (String) -> String
     val errorProviderModelsUnsupported: (String) -> String
     val errorProviderNotFoundForModel: (String) -> String
@@ -486,10 +539,20 @@ interface InkuStrings {
     val bundledPluginsTitle: String
     val ddlImportFile: String
     val ddlImportInvalid: String
+    val ddlImportRequiresV2: String
     fun ddlImportedPlugins(names: String): String
     val ddlExportWithPlugins: String
     val ddlExportWithPluginsNote: String
     val bundledPluginsSubtitle: String
+    val bundledPluginScene: String
+    val bundledPluginObject: String
+    fun bundledPluginExample(word: String): String
+    fun pluginEditorReason(reason: String, suggestion: String?, candidates: List<String>): String
+    val pluginOffersTitle: String
+    val pluginOffersNone: String
+    val pluginOffersOmitted: String
+    fun pluginOfferStage(stage: String): String
+    fun pluginOfferReason(reason: String): String
     fun bundledPluginsToggle(words: String): String
     fun cameraVisionRemoteNotice(provider: String): String
     val cameraReadyToEdit: String
@@ -557,8 +620,8 @@ interface InkuStrings {
     val generationInfoRenderEngineVersion: String
     val generationInfoCreated: String
     val generationInfoElapsed: String
-    val generationInfoOn: String
-    val generationInfoOff: String
+    val generationInfoWildLifted: String
+    val generationInfoWildNotLifted: String
     val parentSuffix: (String, String) -> String
     val downloadOf: (String) -> String
     val choiceSameAsTarget: (String) -> String

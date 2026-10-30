@@ -26,5 +26,6 @@ final class ProviderReferenceParityChecks: XCTestCase, @unchecked Sendable {
             XCTAssertEqual(resolved.model, model, reference)
         }
         XCTAssertEqual(server.count, 13)
+        XCTAssertEqual(ProviderModelReference.resolve("unknown:model", providers: providers, defaultProvider: "openai").providerID, "openai")
     }
 }

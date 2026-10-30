@@ -13,14 +13,14 @@ from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 from ...color_catalogs import RENAMED_COLOR_CATALOG_IDS, color_catalogs
 from ...layer_versions import DDL_ENGINE_VERSION, DDL_VERSION
-from ...plugins import DOCUMENT_PLUGIN_MANAGER, PLUGIN_PACKAGE_MANAGER, entries_with_fires_on
-from ...plugins.document_format import preview_path_for_qualified_name
+from ...plugins import PLUGIN_PACKAGE_MANAGER
 from ...reference import build_reference, render_markdown
 from ...saijiki import display_categories
 from ...render_engines import current_render_engine
 from ...distribution_notices import NoticesResponse, notice_bytes, notice_catalog
-from ... import provider_wire
-from ...model_settings import connection_for, model_provider_catalog, provider_for_model
+from ...model_settings import connection_for, default_user_model_settings, model_provider_catalog, normalize_model_settings, provider_for_model
+from ...verified_model_catalog import core_catalog
+from ...text_provider import send_text
 from ... import db as _db
 from ..common import MODEL_NOT_OFFERED_DETAIL, _APP_VERSION, _RELEASE_VERSION, _build_number, _env_flag, _model_offered_to, _normalize_instruction_lang, _normalize_ui_lang, _resolve_instruction_lang, _unexpected_http_error
 from ..deps import _current_user
@@ -222,8 +222,42 @@ def api_models(actor: dict = Depends(_current_user)) -> ModelSettingsResponse:
             settings, include_disabled=False, include_developer=developer_mode, purpose="llm"
         ),
         vision_catalog=vision,
-        settings={"model_settings": actor.get("model_settings") or {}},
+        settings={"model_settings": actor.get("model_settings") or {}, "model_defaults": default_user_model_settings()},
     )
+
+
+class ModelReferenceQuery(BaseModel):
+    action: str = Field(description="Reference operation supplied by the shared core")
+    ref: str = Field(default="", description="Stored or selected model reference")
+    provider: str = Field(default="", description="Provider used to qualify the reference")
+    default_provider: str = Field(default="", description="Provider used when ownership is ambiguous; an empty value uses the core default")
+    default_model: str = Field(default="", description="Model used for an empty reference")
+
+
+class ModelReferencesRequest(BaseModel):
+    queries: list[ModelReferenceQuery] = Field(max_length=2048, description="Model references to resolve in order")
+
+
+class ModelReferencesResponse(BaseModel):
+    results: list[dict] = Field(description="Shared-core reference results in request order")
+
+
+@router.post("/api/model-references", response_model=ModelReferencesResponse, summary="Resolve model references")
+def api_model_references(body: ModelReferencesRequest, actor: dict = Depends(_current_user)) -> ModelReferencesResponse:
+    """Resolve model references against active services and the caller's published ChatGPT models."""
+    clean = normalize_model_settings(_db.get_model_settings())
+    groups = [{"id": provider["id"], "label": provider["label"], "active": provider["active"],
+               "models": provider["models"]} for provider in clean["providers"].values()]
+    offered = api_models(actor)
+    chatgpt_groups = [group for group in [*(offered.drawing_catalog or []), *(offered.vision_catalog or [])]
+                      if group.get("id") == "chatgpt"]
+    if chatgpt_groups:
+        models = {model["id"]: model for group in chatgpt_groups for model in group["models"]}
+        groups.append({**chatgpt_groups[0], "models": list(models.values())})
+    providers = {group["id"]: group for group in groups}
+    results = core_catalog("reference_batch", providers=providers,
+                           queries=[query.model_dump() for query in body.queries])["results"]
+    return ModelReferencesResponse(results=results)
 
 
 PLUGIN_PREVIEW_ROUTE = "/api/saijiki/plugin-preview"
@@ -233,7 +267,7 @@ def _preview_url(qualified_name: str, *, hidpi: bool, version: str = "") -> str:
     """Where the browser fetches this word's artwork.
 
     The name rides as a query parameter rather than in the path: a qualified
-    name is `Namespace.Word` with the word in the document's own language, and
+    name is the package's `Namespace.id`, and
     a query value needs no decisions about what a path segment may hold.
     `version` changes when an administrator replaces a package word's picture,
     so the day-long cache does not keep showing the old one.
@@ -247,15 +281,7 @@ def _preview_url(qualified_name: str, *, hidpi: bool, version: str = "") -> str:
 
 def _enabled_plugin_entries() -> list[dict[str, object]]:
     entries: list[dict[str, object]] = []
-    for item in DOCUMENT_PLUGIN_MANAGER.items():
-        if item.status != "enabled":
-            continue
-        # This is the list the DDL editor holds, so it carries `fires_on_*`:
-        # without it the editor can only say a qualified name is unknown, not
-        # which plain word it would have fired.
-        entries.extend(entries_with_fires_on(item.entries))
-    # Packages installed from the Web carry their own example (a DDL call)
-    # where a document's word has firing phrases.
+    # Both installed and bundled v2 packages carry their own example.
     entries.extend(PLUGIN_PACKAGE_MANAGER.saijiki_entries())
     # v2.14: the loader says whether a picture exists at each scale; the URL is
     # this layer's to write, since this layer owns the route. A word with no
@@ -275,7 +301,7 @@ def api_saijiki(
     lang: str = Query(default="ja", pattern="^(ja|en)$", description="Language of the words in each category: ja or en. Category names are sent in both languages."),
 ) -> dict[str, object]:
     """Return the Saijiki vocabulary for display: the core categories and the
-    words of the loaded declarative plugins. Requires a signed-in user."""
+    words of enabled v2 plugin packages. Requires a signed-in user."""
     return {
         "categories": display_categories(lang),
         "plugins": _enabled_plugin_entries(),
@@ -286,7 +312,7 @@ def api_saijiki(
 def api_plugin_preview(
     name: str = Query(
         min_length=1, max_length=200,
-        description="Qualified plugin word, written as Namespace.Word with the word in the document's own language.",
+        description="Qualified plugin id, written as Namespace.id.",
     ),
     scale: str = Query(
         default="1", pattern="^[12]$",
@@ -299,12 +325,13 @@ def api_plugin_preview(
     receiving it with every Saijiki listing. Requires a signed-in user. Responds
     404 when the name matches no word of a loaded plugin.
     """
-    path = preview_path_for_qualified_name(name, hidpi=(scale == "2")) or (
-        PLUGIN_PACKAGE_MANAGER.preview_path_for_qualified_name(name, hidpi=(scale == "2"))
-    )
+    bundled = PLUGIN_PACKAGE_MANAGER.bundled_preview(name, hidpi=(scale == "2"))
+    if bundled is not None:
+        return Response(content=bundled, media_type="image/png", headers={"Cache-Control":"private, max-age=86400"})
+    path = PLUGIN_PACKAGE_MANAGER.preview_path_for_qualified_name(name, hidpi=(scale == "2"))
     if path is None:
         raise HTTPException(status_code=404, detail="no preview for that word")
-    # Immutable for a day: a picture changes only when its plugin document is
+    # Immutable for a day: a picture changes only when its plugin package is
     # replaced, and the panel asks for it on every hover.
     return FileResponse(
         path, media_type="image/png", headers={"Cache-Control": "private, max-age=86400"}
@@ -366,13 +393,9 @@ def _generate_demo_instruction(seed_phrase: str, *, model: str | None, lang: str
     # Asked as the colophon is (provider_wire): no temperature for Claude, which
     # claude-sonnet-5 refuses with a 400, nor for Gemini, which is tuned for its
     # default; room for the thinking Claude 5 does unasked and Gemini counts.
-    built = provider_wire.text_request(connection, model_id, system=_demo_instruction_system(lang), text=seed_phrase,
-                                       images=[], temperature=0.9, max_tokens=180)
-    with httpx.Client(timeout=timeout, transport=transport, follow_redirects=False) as client:
-        response = client.post(built["url"], headers=provider_wire.headers(built, str(connection.get("api_key") or "")),
-                               content=built["body"].encode("utf-8"))
+    _, response, read = send_text(connection, model_id, system=_demo_instruction_system(lang), text=seed_phrase,
+                                  images=[], temperature=0.9, max_tokens=180, timeout=timeout, transport=transport)
     response.raise_for_status()
-    read = provider_wire.read_text(built["format"], response.status_code, response.content)
     if read["outcome"] != "answer":
         raise ValueError(read.get("detail") or "demo instruction answer is malformed")
     # Gemma returns its thoughts as parts beside the answer; they are not read.

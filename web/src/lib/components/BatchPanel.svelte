@@ -2,6 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import LabelHighlight from './LabelHighlight.svelte';
+	import Tooltip from './Tooltip.svelte';
 	import PaintButton from './PaintButton.svelte';
 	import RunStatus from './RunStatus.svelte';
 	import type { ProviderAttemptCount } from '$lib/paintStream';
@@ -64,6 +65,8 @@
 		stage1ModelLabel: string;
 		stage2ModelLabel: string;
 		onRememberBatchPrompt: (prompt: string) => void | Promise<void>;
+		/** 新規作成: empties the input, left of the history picker (2026-10-27). */
+		onClearInput: () => void;
 		onSubmit: () => void | Promise<void>;
 		onStop: () => void;
 		// The shared button row and settings readout, rendered by the parent but
@@ -113,6 +116,7 @@
 		stage1ModelLabel,
 		stage2ModelLabel,
 		onRememberBatchPrompt,
+		onClearInput,
 		onSubmit,
 		onStop,
 		settings,
@@ -220,9 +224,16 @@
 
      A list of our own, not a native dropdown: how tall the browser opens one is
      the browser's to decide, and fifty stored batches want a list bounded to
-     half the window with a bar to scroll it. Same shape as the aspect menu. -->
-{#if !batchRunning && batchPromptHistory.length > 0}
+     half the window with a bar to scroll it. Same shape as the aspect menu.
+
+     新規作成 stands left of it (the author, 2026-10-27), the same ghost button
+     the describe tab carries beside its heading. -->
+{#if !batchRunning}
 	<div class="batch-history" bind:this={historyMenuWrapEl}>
+		<Tooltip placement="top-right" text={t().tooltipInputClear}>
+			<button class="ghost-btn" onclick={onClearInput}>{t().clearInputBtn}</button>
+		</Tooltip>
+		{#if batchPromptHistory.length > 0}
 		<button
 			type="button"
 			class="batch-history-trigger"
@@ -250,6 +261,7 @@
 					>{historyPromptLabel(prompt)}</button>
 				{/each}
 			</div>
+		{/if}
 		{/if}
 	</div>
 {/if}

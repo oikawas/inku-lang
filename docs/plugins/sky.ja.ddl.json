@@ -1,13 +1,12 @@
 {
-  "schema": "inku.ddl-export.v1",
+  "schema": "inku.ddl-export.v2",
   "language": "ja",
-  "ddl": "和紙。\nSky.空。\nSky.雲。\nSky.雨。",
+  "ddl": "和紙。\n｛大空｝。\n｛雲｝。\n｛雨｝。",
   "plugins": [
     {
       "definition": {
-        "schema": "inku.macro-definition.v1",
+        "schema": "inku.macro-definition.v2",
         "namespace": "Sky",
-        "heading": "Clouds",
         "version": "1.0.0",
         "parameters": {
           "band_count": {
@@ -843,17 +842,23 @@
             ]
           }
         ],
-        "aliases": [
-          "雲"
-        ]
+        "id": "Clouds",
+        "names": {
+          "ja": [
+            "雲"
+          ],
+          "en": [
+            "clouds"
+          ]
+        },
+        "kind": "scene"
       },
-      "summary": "大和絵や琳派のすやり霞のような雲を、画面の上から中ほどに横長の帯で重ねる。帯は両端が丸い細長い輪郭で、淡い墨（灰）の細筆で描き、帯の芯に金（黄）の太筆の線を一本ずつ、滲ませて通す。帯は左右にずらしながら下へ重なり、下の帯ほど短く細い。帯の数を書けばその数（1〜5本）、書かなければ3〜4本。帯の並びの左右の向きと上下の位置は四通りから選ぶ。"
+      "note": "すやり霞の雲。金の芯を通した横長の帯。"
     },
     {
       "definition": {
-        "schema": "inku.macro-definition.v1",
+        "schema": "inku.macro-definition.v2",
         "namespace": "Sky",
-        "heading": "Heavens",
         "version": "1.0.0",
         "parameters": {
           "stroke_count": {
@@ -1175,18 +1180,24 @@
             ]
           }
         ],
-        "aliases": [
-          "空"
-        ]
+        "id": "Heavens",
+        "names": {
+          "ja": [
+            "大空"
+          ],
+          "en": [
+            "heavens"
+          ]
+        },
+        "kind": "scene"
       },
-      "summary": "浮世絵や日本画の一文字ぼかしのように、画面の上端から空を暈す。横いっぱいの滲む筆を上から重ね、上ほど詰まって濃く（太筆の群青）、下へ行くほど間が開き、細筆の群青から淡い墨（灰）へ薄れる。いちばん下の三本は少しずつ短い。筆の数を書けばその数（1〜12本）、書かなければ8〜10本で、上から順に描く。"
+      "note": "一文字ぼかしの空。上端から暈す群青。"
     },
     {
       "definition": {
-        "schema": "inku.macro-definition.v1",
+        "schema": "inku.macro-definition.v2",
         "namespace": "Sky",
-        "heading": "Rain",
-        "version": "2.0.0",
+        "version": "1.0.0",
         "parameters": {
           "rain_count": {
             "type": "integer",
@@ -1207,27 +1218,28 @@
             "op": "emit",
             "binding": null,
             "fields": {
-              "movement": {
-                "expr": "semantic_ref",
-                "category": "movement",
-                "id": "place"
-              },
               "shape": {
                 "expr": "semantic_ref",
                 "category": "shape",
                 "id": "line"
               },
-              "position_x": {
-                "expr": "exact_decimal",
-                "value": "0.500"
+              "movement": {
+                "expr": "semantic_ref",
+                "category": "movement",
+                "id": "scatter"
               },
-              "position_y": {
-                "expr": "exact_decimal",
-                "value": "0.010"
+              "count": {
+                "expr": "parameter",
+                "name": "rain_count"
+              },
+              "angle": {
+                "expr": "semantic_ref",
+                "category": "angle",
+                "id": "vertical"
               },
               "length": {
                 "expr": "exact_decimal",
-                "value": "0.980"
+                "value": "0.380"
               },
               "color": {
                 "expr": "semantic_ref",
@@ -1237,575 +1249,12 @@
               "touch": {
                 "expr": "semantic_ref",
                 "category": "touch",
-                "id": "brush_thick"
-              },
-              "fluctuation_amplitude": {
-                "expr": "semantic_ref",
-                "category": "variation",
-                "id": "narrowly"
-              },
-              "fluctuation_frequency": {
-                "expr": "semantic_ref",
-                "category": "variation",
-                "id": "loosely"
-              },
-              "fluctuation_quality": {
-                "expr": "semantic_ref",
-                "category": "variation",
-                "id": "swaying"
-              },
-              "ink_spread": {
-                "expr": "semantic_ref",
-                "category": "variation",
-                "id": "bleeding"
-              }
-            }
-          },
-          {
-            "op": "emit",
-            "binding": null,
-            "fields": {
-              "movement": {
-                "expr": "semantic_ref",
-                "category": "movement",
-                "id": "place"
-              },
-              "shape": {
-                "expr": "semantic_ref",
-                "category": "shape",
-                "id": "line"
-              },
-              "position_x": {
-                "expr": "exact_decimal",
-                "value": "0.480"
-              },
-              "position_y": {
-                "expr": "exact_decimal",
-                "value": "0.024"
-              },
-              "length": {
-                "expr": "exact_decimal",
-                "value": "0.940"
-              },
-              "color": {
-                "expr": "semantic_ref",
-                "category": "color",
-                "id": "gray"
-              },
-              "touch": {
-                "expr": "semantic_ref",
-                "category": "touch",
-                "id": "brush_thin"
-              },
-              "fluctuation_amplitude": {
-                "expr": "semantic_ref",
-                "category": "variation",
-                "id": "narrowly"
-              },
-              "fluctuation_frequency": {
-                "expr": "semantic_ref",
-                "category": "variation",
-                "id": "loosely"
-              },
-              "fluctuation_quality": {
-                "expr": "semantic_ref",
-                "category": "variation",
-                "id": "swaying"
-              },
-              "ink_spread": {
-                "expr": "semantic_ref",
-                "category": "variation",
-                "id": "bleeding"
-              }
-            }
-          },
-          {
-            "op": "emit",
-            "binding": null,
-            "fields": {
-              "movement": {
-                "expr": "semantic_ref",
-                "category": "movement",
-                "id": "place"
-              },
-              "shape": {
-                "expr": "semantic_ref",
-                "category": "shape",
-                "id": "line"
-              },
-              "position_x": {
-                "expr": "exact_decimal",
-                "value": "0.530"
-              },
-              "position_y": {
-                "expr": "exact_decimal",
-                "value": "0.042"
-              },
-              "length": {
-                "expr": "exact_decimal",
-                "value": "0.880"
-              },
-              "color": {
-                "expr": "semantic_ref",
-                "category": "color",
-                "id": "gray"
-              },
-              "touch": {
-                "expr": "semantic_ref",
-                "category": "touch",
-                "id": "brush_thin"
-              },
-              "fluctuation_amplitude": {
-                "expr": "semantic_ref",
-                "category": "variation",
-                "id": "narrowly"
-              },
-              "fluctuation_frequency": {
-                "expr": "semantic_ref",
-                "category": "variation",
-                "id": "loosely"
-              },
-              "fluctuation_quality": {
-                "expr": "semantic_ref",
-                "category": "variation",
-                "id": "swaying"
-              },
-              "ink_spread": {
-                "expr": "semantic_ref",
-                "category": "variation",
-                "id": "bleeding"
-              }
-            }
-          },
-          {
-            "op": "emit",
-            "binding": null,
-            "fields": {
-              "movement": {
-                "expr": "semantic_ref",
-                "category": "movement",
-                "id": "place"
-              },
-              "shape": {
-                "expr": "semantic_ref",
-                "category": "shape",
-                "id": "line"
-              },
-              "position_x": {
-                "expr": "exact_decimal",
-                "value": "0.460"
-              },
-              "position_y": {
-                "expr": "exact_decimal",
-                "value": "0.064"
-              },
-              "length": {
-                "expr": "exact_decimal",
-                "value": "0.800"
-              },
-              "color": {
-                "expr": "semantic_ref",
-                "category": "color",
-                "id": "gray"
-              },
-              "touch": {
-                "expr": "semantic_ref",
-                "category": "touch",
-                "id": "brush_thin"
-              },
-              "fluctuation_amplitude": {
-                "expr": "semantic_ref",
-                "category": "variation",
-                "id": "narrowly"
-              },
-              "fluctuation_frequency": {
-                "expr": "semantic_ref",
-                "category": "variation",
-                "id": "loosely"
-              },
-              "fluctuation_quality": {
-                "expr": "semantic_ref",
-                "category": "variation",
-                "id": "swaying"
-              },
-              "ink_spread": {
-                "expr": "semantic_ref",
-                "category": "variation",
-                "id": "bleeding"
-              }
-            }
-          },
-          {
-            "op": "emit",
-            "binding": null,
-            "fields": {
-              "movement": {
-                "expr": "semantic_ref",
-                "category": "movement",
-                "id": "place"
-              },
-              "shape": {
-                "expr": "semantic_ref",
-                "category": "shape",
-                "id": "line"
-              },
-              "position_x": {
-                "expr": "exact_decimal",
-                "value": "0.550"
-              },
-              "position_y": {
-                "expr": "exact_decimal",
-                "value": "0.092"
-              },
-              "length": {
-                "expr": "exact_decimal",
-                "value": "0.700"
-              },
-              "color": {
-                "expr": "semantic_ref",
-                "category": "color",
-                "id": "gray"
-              },
-              "touch": {
-                "expr": "semantic_ref",
-                "category": "touch",
-                "id": "brush_thin"
-              },
-              "fluctuation_amplitude": {
-                "expr": "semantic_ref",
-                "category": "variation",
-                "id": "narrowly"
-              },
-              "fluctuation_frequency": {
-                "expr": "semantic_ref",
-                "category": "variation",
-                "id": "loosely"
-              },
-              "fluctuation_quality": {
-                "expr": "semantic_ref",
-                "category": "variation",
-                "id": "swaying"
-              },
-              "ink_spread": {
-                "expr": "semantic_ref",
-                "category": "variation",
-                "id": "bleeding"
-              }
-            }
-          },
-          {
-            "op": "vary",
-            "binding": "rain_wind",
-            "domain": "rain_wind",
-            "choices": [
-              {
-                "expr": "integer",
-                "value": 0
-              },
-              {
-                "expr": "integer",
-                "value": 1
-              },
-              {
-                "expr": "integer",
-                "value": 2
-              },
-              {
-                "expr": "integer",
-                "value": 3
-              }
-            ],
-            "body": [
-              {
-                "op": "transform",
-                "transform": {
-                  "rotate_degrees": {
-                    "expr": "cycle",
-                    "index": {
-                      "expr": "local",
-                      "name": "rain_wind"
-                    },
-                    "items": [
-                      {
-                        "expr": "number",
-                        "value": 5.0
-                      },
-                      {
-                        "expr": "number",
-                        "value": -5.0
-                      },
-                      {
-                        "expr": "number",
-                        "value": 9.0
-                      },
-                      {
-                        "expr": "number",
-                        "value": -9.0
-                      }
-                    ]
-                  }
-                },
-                "body": [
-                  {
-                    "op": "emit",
-                    "binding": null,
-                    "fields": {
-                      "shape": {
-                        "expr": "semantic_ref",
-                        "category": "shape",
-                        "id": "line"
-                      },
-                      "movement": {
-                        "expr": "semantic_ref",
-                        "category": "movement",
-                        "id": "scatter"
-                      },
-                      "count": {
-                        "expr": "integer",
-                        "value": 30
-                      },
-                      "angle": {
-                        "expr": "semantic_ref",
-                        "category": "angle",
-                        "id": "vertical"
-                      },
-                      "length": {
-                        "expr": "exact_decimal",
-                        "value": "0.240"
-                      },
-                      "color": {
-                        "expr": "semantic_ref",
-                        "category": "color",
-                        "id": "gray"
-                      },
-                      "touch": {
-                        "expr": "semantic_ref",
-                        "category": "touch",
-                        "id": "silverpoint"
-                      },
-                      "thinness": {
-                        "expr": "semantic_ref",
-                        "category": "thinness",
-                        "id": "extra_fine"
-                      }
-                    }
-                  }
-                ]
-              },
-              {
-                "op": "transform",
-                "transform": {
-                  "rotate_degrees": {
-                    "expr": "cycle",
-                    "index": {
-                      "expr": "local",
-                      "name": "rain_wind"
-                    },
-                    "items": [
-                      {
-                        "expr": "number",
-                        "value": 8.0
-                      },
-                      {
-                        "expr": "number",
-                        "value": -8.0
-                      },
-                      {
-                        "expr": "number",
-                        "value": 12.0
-                      },
-                      {
-                        "expr": "number",
-                        "value": -12.0
-                      }
-                    ]
-                  }
-                },
-                "body": [
-                  {
-                    "op": "emit",
-                    "binding": null,
-                    "fields": {
-                      "shape": {
-                        "expr": "semantic_ref",
-                        "category": "shape",
-                        "id": "line"
-                      },
-                      "movement": {
-                        "expr": "semantic_ref",
-                        "category": "movement",
-                        "id": "scatter"
-                      },
-                      "count": {
-                        "expr": "parameter",
-                        "name": "rain_count"
-                      },
-                      "angle": {
-                        "expr": "semantic_ref",
-                        "category": "angle",
-                        "id": "vertical"
-                      },
-                      "length": {
-                        "expr": "exact_decimal",
-                        "value": "0.380"
-                      },
-                      "color": {
-                        "expr": "semantic_ref",
-                        "category": "color",
-                        "id": "gray"
-                      },
-                      "touch": {
-                        "expr": "semantic_ref",
-                        "category": "touch",
-                        "id": "pen"
-                      },
-                      "thinness": {
-                        "expr": "semantic_ref",
-                        "category": "thinness",
-                        "id": "fine"
-                      }
-                    }
-                  }
-                ]
-              },
-              {
-                "op": "transform",
-                "transform": {
-                  "rotate_degrees": {
-                    "expr": "cycle",
-                    "index": {
-                      "expr": "local",
-                      "name": "rain_wind"
-                    },
-                    "items": [
-                      {
-                        "expr": "number",
-                        "value": 13.0
-                      },
-                      {
-                        "expr": "number",
-                        "value": -13.0
-                      },
-                      {
-                        "expr": "number",
-                        "value": 17.0
-                      },
-                      {
-                        "expr": "number",
-                        "value": -17.0
-                      }
-                    ]
-                  }
-                },
-                "body": [
-                  {
-                    "op": "emit",
-                    "binding": null,
-                    "fields": {
-                      "shape": {
-                        "expr": "semantic_ref",
-                        "category": "shape",
-                        "id": "line"
-                      },
-                      "movement": {
-                        "expr": "semantic_ref",
-                        "category": "movement",
-                        "id": "scatter"
-                      },
-                      "count": {
-                        "expr": "integer",
-                        "value": 12
-                      },
-                      "angle": {
-                        "expr": "semantic_ref",
-                        "category": "angle",
-                        "id": "vertical"
-                      },
-                      "length": {
-                        "expr": "exact_decimal",
-                        "value": "0.560"
-                      },
-                      "color": {
-                        "expr": "semantic_ref",
-                        "category": "color",
-                        "id": "blue"
-                      },
-                      "touch": {
-                        "expr": "semantic_ref",
-                        "category": "touch",
-                        "id": "pen"
-                      },
-                      "thinness": {
-                        "expr": "semantic_ref",
-                        "category": "thinness",
-                        "id": "fine"
-                      }
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "op": "emit",
-            "binding": null,
-            "fields": {
-              "movement": {
-                "expr": "semantic_ref",
-                "category": "movement",
-                "id": "place"
-              },
-              "shape": {
-                "expr": "semantic_ref",
-                "category": "shape",
-                "id": "line"
-              },
-              "position_x": {
-                "expr": "exact_decimal",
-                "value": "0.300"
-              },
-              "position_y": {
-                "expr": "exact_decimal",
-                "value": "0.740"
-              },
-              "length": {
-                "expr": "exact_decimal",
-                "value": "0.460"
+                "id": "pen"
               },
               "thinness": {
                 "expr": "semantic_ref",
                 "category": "thinness",
-                "id": "extra_fine"
-              },
-              "color": {
-                "expr": "semantic_ref",
-                "category": "color",
-                "id": "gray"
-              },
-              "touch": {
-                "expr": "semantic_ref",
-                "category": "touch",
-                "id": "brush_thin"
-              },
-              "fluctuation_amplitude": {
-                "expr": "semantic_ref",
-                "category": "variation",
-                "id": "narrowly"
-              },
-              "fluctuation_frequency": {
-                "expr": "semantic_ref",
-                "category": "variation",
-                "id": "loosely"
-              },
-              "fluctuation_quality": {
-                "expr": "semantic_ref",
-                "category": "variation",
-                "id": "swaying"
-              },
-              "ink_spread": {
-                "expr": "semantic_ref",
-                "category": "variation",
-                "id": "bleeding"
+                "id": "fine"
               }
             }
           },
@@ -1813,140 +1262,64 @@
             "op": "emit",
             "binding": null,
             "fields": {
-              "movement": {
-                "expr": "semantic_ref",
-                "category": "movement",
-                "id": "place"
-              },
               "shape": {
                 "expr": "semantic_ref",
                 "category": "shape",
                 "id": "line"
               },
-              "position_x": {
-                "expr": "exact_decimal",
-                "value": "0.660"
+              "movement": {
+                "expr": "semantic_ref",
+                "category": "movement",
+                "id": "scatter"
               },
-              "position_y": {
-                "expr": "exact_decimal",
-                "value": "0.765"
+              "count": {
+                "expr": "integer",
+                "value": 12
+              },
+              "angle": {
+                "expr": "semantic_ref",
+                "category": "angle",
+                "id": "vertical"
               },
               "length": {
                 "expr": "exact_decimal",
                 "value": "0.520"
               },
-              "thinness": {
-                "expr": "semantic_ref",
-                "category": "thinness",
-                "id": "extra_fine"
-              },
               "color": {
                 "expr": "semantic_ref",
                 "category": "color",
-                "id": "gray"
+                "id": "blue"
               },
               "touch": {
                 "expr": "semantic_ref",
                 "category": "touch",
-                "id": "brush_thin"
-              },
-              "fluctuation_amplitude": {
-                "expr": "semantic_ref",
-                "category": "variation",
-                "id": "narrowly"
-              },
-              "fluctuation_frequency": {
-                "expr": "semantic_ref",
-                "category": "variation",
-                "id": "loosely"
-              },
-              "fluctuation_quality": {
-                "expr": "semantic_ref",
-                "category": "variation",
-                "id": "swaying"
-              },
-              "ink_spread": {
-                "expr": "semantic_ref",
-                "category": "variation",
-                "id": "bleeding"
-              }
-            }
-          },
-          {
-            "op": "emit",
-            "binding": null,
-            "fields": {
-              "movement": {
-                "expr": "semantic_ref",
-                "category": "movement",
-                "id": "place"
-              },
-              "shape": {
-                "expr": "semantic_ref",
-                "category": "shape",
-                "id": "line"
-              },
-              "position_x": {
-                "expr": "exact_decimal",
-                "value": "0.460"
-              },
-              "position_y": {
-                "expr": "exact_decimal",
-                "value": "0.800"
-              },
-              "length": {
-                "expr": "exact_decimal",
-                "value": "0.340"
+                "id": "pen"
               },
               "thinness": {
                 "expr": "semantic_ref",
                 "category": "thinness",
-                "id": "extra_fine"
-              },
-              "color": {
-                "expr": "semantic_ref",
-                "category": "color",
-                "id": "gray"
-              },
-              "touch": {
-                "expr": "semantic_ref",
-                "category": "touch",
-                "id": "brush_thin"
-              },
-              "fluctuation_amplitude": {
-                "expr": "semantic_ref",
-                "category": "variation",
-                "id": "narrowly"
-              },
-              "fluctuation_frequency": {
-                "expr": "semantic_ref",
-                "category": "variation",
-                "id": "loosely"
-              },
-              "fluctuation_quality": {
-                "expr": "semantic_ref",
-                "category": "variation",
-                "id": "swaying"
-              },
-              "ink_spread": {
-                "expr": "semantic_ref",
-                "category": "variation",
-                "id": "bleeding"
+                "id": "fine"
               }
             }
           }
         ],
-        "aliases": [
-          "雨"
-        ]
+        "id": "Rain",
+        "names": {
+          "ja": [
+            "雨"
+          ],
+          "en": [
+            "rain"
+          ]
+        },
+        "kind": "scene"
       },
-      "summary": "広重の夕立のように、風に吹かれて斜めに降る雨を描く。画面の上端に、淡い墨（灰）の滲む横の筆を五本、下ほど短くずらして重ねて雨雲を暈し、その下に雨脚を三層に散らす。遠い雨は銀筆のごく細い短い線30本、中の雨は淡い墨のペンの線、近い雨は群青のペンの長い線12本で、遠い層ほど傾きが浅く、近い層ほど深い。画面の下の方に、淡い墨の滲む横の線を三本、雨霞として流す。風の向き（左右）と強さ（中の雨の傾き8度か12度）は四通りから選ぶ。雨脚の数（中の雨の線の数）を書けばその数（1〜80本）、書かなければ36〜48本。遠い雨と近い雨はいつも描く。"
+      "note": "広重の夕立のような、細い縦の雨脚。"
     },
     {
       "definition": {
-        "schema": "inku.macro-definition.v1",
+        "schema": "inku.macro-definition.v2",
         "namespace": "Sky",
-        "heading": "Snow",
         "version": "1.0.0",
         "parameters": {
           "flake_count": {
@@ -2082,11 +1455,18 @@
             }
           }
         ],
-        "aliases": [
-          "雪"
-        ]
+        "id": "Snow",
+        "names": {
+          "ja": [
+            "雪"
+          ],
+          "en": [
+            "snow"
+          ]
+        },
+        "kind": "scene"
       },
-      "summary": "胡粉の牡丹雪のように、画面いっぱいに雪を散らす。雪片は滲む白い点で、小さい雪片を書いた数だけ、中くらいを14、大きい牡丹雪を6散らす。白なので、薄墨地・木炭地や青・黒の地のような暗い地に描く。雪片の数（小さい雪片の数）を書けばその数（1〜80個）、書かなければ36〜48個。"
+      "note": "胡粉の牡丹雪。暗い地に向く。"
     }
   ],
   "exported_from": {}

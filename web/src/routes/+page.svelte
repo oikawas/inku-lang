@@ -5,7 +5,7 @@
 </script>
 
 <script lang="ts">
-	import { onDestroy, onMount, tick, untrack } from 'svelte';
+	import { onDestroy, onMount, setContext, tick, untrack } from 'svelte';
 	import { NoticeReader, EMPTY_NOTICE_STATE, type NoticeState } from '$lib/third-party-notices';
 	import ThirdPartyNoticesDialog from '$lib/components/ThirdPartyNoticesDialog.svelte';
 	import { pipelineDescription } from '$lib/description-labels';
@@ -13,7 +13,6 @@
 	import type { ImportedPlugin } from '$lib/features/ddl-editor/ddl-import';
 	import type { CompletionRangeWork } from '$lib/features/ddl-editor/completion-range-states';
 	import { pluginDisplayName } from '$lib/plugin-names';
-	import { pluginWarningsToShow } from '$lib/plugin-names';
 	import { limitNotesToShow } from '$lib/limitNotes';
 	import { hydrateSaijiki, hydrateSaijikiEn } from '$lib/saijiki';
 	import { SURFACE_PREVIEWS, HANDLING_PREVIEWS, FINENESS_PREVIEWS, UNDERLAYER_PREVIEWS, localizePreview, shapeSvg, type PreviewEntry } from '$lib/saijiki-surface';
@@ -32,7 +31,7 @@
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import { holeCompletionIssues } from '$lib/features/pipeline/hole-completion';
 	import { DEFAULT_SKETCH_MODE, normalizeSketchGrain, normalizeSketchState, sketchGrainLabel, sketchModeLabel, sketchModeOf, sketchStateNote, type SketchMode, type SketchState } from '$lib/sketch';
-	import { drawRouteOf, readingStateNote } from '$lib/draw-route';
+	import { compositionModeOf, drawRouteOf, readingStateNote } from '$lib/draw-route';
 	import { composeFallbackReason, composeFallbackState, composeFallbackValue } from '$lib/composeFallback';
 	import { needsFallbackRefineConfirm, rememberFallbackRefineConfirm, type FallbackRefineParent } from '$lib/fallbackRefineGate';
 	import { submitDerivationKind as submitDerivationKindOf, type DerivationKind } from '$lib/derivation';
@@ -50,25 +49,18 @@
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import { abbreviateStripModel, toggleHistoryStripField, type HistoryStripField } from '$lib/historyStripFields';
 	import {
-		PROVIDER_GROUPS,
-		DEFAULT_PROVIDER,
-		DEFAULT_MODEL,
-		modelsForProvider,
 		modelDisplayName,
 		modelShortName,
-		providerLabel,
-		providerOfModel,
-		qualifiedModelId,
-		registerModelCatalog,
-		clearChatGPTModelCatalog,
-		resolveModelRefForDisplay,
-		splitModelRef,
+		qualifiedModelRef,
+		displayModelReference,
+		splitModelReference,
 		type Provider,
 		type ProviderGroup,
 		type ModelLabel,
 		type ModelOption
 	} from '$lib/models';
 	import { setModelLabelTable } from '$lib/modelMeta';
+	import { clearChatGPTReferences, clearModelReferences, configureModelReferences, disableModelReferences, loadModelReferences, type ReferenceQuery } from '$lib/modelReferences';
 	import { t, getLang, initLang } from '$lib/i18n/index.svelte';
 	import { initMascot } from '$lib/mascot.svelte';
 	import { FALLBACK_CATALOG, catalogById, catalogNameplate, type ColorCatalog, type ColorCatalogsResponse } from '$lib/colors';
@@ -144,7 +136,6 @@
 	import { projectHistoryCurrentWork } from '$lib/features/history/current-work';
 	import {
 		focusSavedLineageChild,
-		promoteLineageNode as promoteSavedLineageNode,
 		saveLineageNote as saveSavedLineageNote
 	} from '$lib/features/history/lineage-actions';
 	import { hashDigest } from '$lib/hashIdentity';
@@ -154,7 +145,6 @@
 	const MODEL_STAGE1_KEY    = 'inku-model-stage1';
 	const PROVIDER_STAGE2_KEY = 'inku-provider-stage2';
 	const MODEL_STAGE2_KEY    = 'inku-model-stage2';
-	const DEFAULT_VISION_MODEL = 'meta/llama-3.2-90b-vision-instruct';
 	// Injected by vite.config from web/APP_VERSION, the single source shared with
 	// the server (/api/info) and the CLI. Never write the version here again.
 	const APP_VERSION = __APP_VERSION__;
@@ -171,15 +161,14 @@
 
 	type PluginEntry = {
 		qualified_name: string;
-		aliases?: string[];
-		surface_ja: string[];
-		surface_en: string[];
+		word_id?: string;
+		word_kind?: 'object' | 'scene';
+		surface_ja?: string[];
+		surface_en?: string[];
 		note_ja: string;
 		note_en: string;
-		// Carried by GET /api/saijiki so the DDL editor can tell a wrong
-		// qualified name from a name that does not exist at all.
-		fires_on_ja?: string[];
-		fires_on_en?: string[];
+		written_ja?: string;
+		written_en?: string;
 		// A package installed from the Web gives the DDL call its check drew.
 		example_ja?: string;
 		example_en?: string;
@@ -195,8 +184,6 @@
 	let previousInputMode = $state<'single' | 'image' | 'batch'>('single');
 	type TextDiffPart = { kind: "same" | "removed" | "added"; text: string };
 	const refinementSession = new RefinementSessionState();
-	let lineageIntermediateNotice = $state<string | null>(null);
-	let lineageIntermediateNoticeTimer: number | null = null;
 	let historyStarredFilterNotice = $state<string | null>(null);
 	let historyStarredFilterNoticeTimer: number | null = null;
 
@@ -336,18 +323,6 @@
 			};
 			return shapeSvg(paths[kind] ?? paths.pen);
 		};
-		if (categoryKey === "plugin-nature") {
-			const natureSvg = shapeSvg("<path d=\"M32 48 C52 28 74 68 94 48 S132 28 150 48\" stroke=\"#b95845\" stroke-width=\"5\" fill=\"none\" stroke-linecap=\"round\"/><path d=\"M34 62 C58 50 78 76 102 62 S134 50 150 62\" stroke=\"#d39a7b\" stroke-width=\"3\" fill=\"none\" stroke-linecap=\"round\"/>");
-			const naturePreviews: Record<string, PreviewEntry> = {
-				"Nature.風": { effect: "左から右へのゆるやかな揺れを全体に通します。", example: "Nature.風を通す", effectEn: "Runs a slow left-to-right sway through the whole drawing.", exampleEn: "Nature.wind", svg: natureSvg },
-				"Nature.うねり": { effect: "媒質を限定しない大きな波の揺れを全体に通します。", example: "Nature.うねりを通す", effectEn: "Runs a broad medium-free undulation through the whole drawing.", exampleEn: "Nature.undulation", svg: natureSvg },
-				"Nature.無風": { effect: "揺らぎと配置軌跡を抑え、静止に寄せます。", example: "Nature.無風", effectEn: "Suppresses sway and placement paths, settling toward stillness.", exampleEn: "Nature.stillness", svg: natureSvg },
-			};
-			naturePreviews["Nature.wind"] = naturePreviews["Nature.風"];
-			naturePreviews["Nature.undulation"] = naturePreviews["Nature.うねり"];
-			naturePreviews["Nature.stillness"] = naturePreviews["Nature.無風"];
-			return { ...base, ...localized(naturePreviews[canonicalWord] ?? naturePreviews[word] ?? naturePreviews["Nature.うねり"]) };
-		}
 		const angleSvg = (rotation: number, line = false) => shapeSvg(line
 			? `<g transform="rotate(${rotation} 90 46)"><path d="M42 46 H138" fill="none" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/></g><circle cx="90" cy="46" r="2.5" fill="#c9c2b5"/>`
 			: `<g transform="rotate(${rotation} 90 46)"><rect x="58" y="29" width="64" height="34" fill="none" stroke="#2b2b2b" stroke-width="5" rx="2"/></g><circle cx="90" cy="46" r="2.5" fill="#c9c2b5"/>`);
@@ -493,29 +468,18 @@
 	 * no firing phrases; its example is the DDL call the check drew. The fourth
 	 * is the drawing baked from the word's own expansion.
 	 */
-	function pluginPreview(entry: {
-		qualified_name: string;
-		aliases?: string[];
-		note_ja: string;
-		note_en: string;
-		fires_on_ja?: string[];
-		fires_on_en?: string[];
-		example_ja?: string;
-		example_en?: string;
-		preview_url?: string;
-		preview_url_2x?: string;
-	}, wordLang: ResolvedInstructionLang): SaijikiPreview {
+	function pluginPreview(entry: PluginEntry, wordLang: ResolvedInstructionLang): SaijikiPreview {
 		const uiLang = instructionLangOf(getLang());
 		// The note explains the word, so it is the reader's language; the firing
 		// phrase is what a description would say to reach it, so it is the DDL's.
-		const firesOn = (wordLang === 'ja' ? entry.fires_on_ja : entry.fires_on_en) ?? [];
 		const example = wordLang === 'ja' ? entry.example_ja : entry.example_en;
+		const details = [`${pluginDisplayName(entry, 'ja')} / ${pluginDisplayName(entry, 'en')}`, [...(entry.surface_ja ?? []).slice(1), ...(entry.surface_en ?? []).slice(1)].join(' / '), entry.word_kind === 'object' ? t().pluginObject : t().pluginScene, (uiLang === 'ja' ? entry.note_ja : entry.note_en) || ''].filter(Boolean).join('\n');
 		return {
 			categoryKey: 'plugin',
 			word: pluginDisplayName(entry, wordLang),
 			canonicalWord: entry.qualified_name,
-			effect: (uiLang === 'ja' ? entry.note_ja : entry.note_en) || '',
-			example: example || (firesOn[0] ?? ''),
+			effect: details,
+			example: example || `${pluginDisplayName(entry, wordLang)}${wordLang === 'ja' ? '。' : '.'}`,
 			// The fallback is the drawing, not an empty frame; it is only read
 			// when the word ships no artwork, since `image` wins where it is set.
 			svg: PLUGIN_FALLBACK_SVG,
@@ -525,7 +489,7 @@
 	}
 
 	// ── Color catalog ────────────────────────────────────────
-	// Refine dialogs: null = inherit from the parent artwork (field omitted).
+	// Null means the saved default, until this dialog chooses a value.
 	let refineWildOverride = $state<boolean | null>(null);
 	function setRefineWild(value: boolean | null) { refineWildOverride = value; }
 	let colorCatalogs = $state<ColorCatalog[]>([FALLBACK_CATALOG]);
@@ -536,18 +500,12 @@
 
 	// ── Settings tabs ────────────────────────────────────────
 	let pluginEntries = $state<PluginEntry[]>([]);
-	let availableModelCatalog = $state<ProviderGroup[]>(PROVIDER_GROUPS.filter((group) => group.id !== 'nvidia'));
+	let availableModelCatalog = $state<ProviderGroup[]>([]);
 	let demoPromptModelCatalog = $state<ProviderGroup[]>([]);
 	let availableVisionModelCatalog = $state<ProviderGroup[]>([]);
 	let availableModelsLoaded = $state(false);
-	// Teach models.ts which providers this server serves, so that a reference
-	// qualified with an operator-added provider is recognised as qualified.
-	$effect(() => {
-		registerModelCatalog(settings.modelCatalog);
-		registerModelCatalog(availableModelCatalog);
-		registerModelCatalog(demoPromptModelCatalog);
-		registerModelCatalog(availableVisionModelCatalog);
-	});
+	let modelCatalogStatus = $state<'loading' | 'ready' | 'error'>('loading');
+	setContext('model-catalog-load', { status: () => modelCatalogStatus, retry: () => loadAvailableModels() });
 
 	/**
 	 * v1.98: Turn a Server failure detail into one human-readable line.
@@ -627,7 +585,7 @@
 		chatgptAvailable: () => chatgptPlanAvailable && modelCatalogOwner === session.currentUser?.id,
 		invalidateChatGPTModels: () => {
 			modelCatalogRequest++;
-			clearChatGPTModelCatalog();
+			clearChatGPTReferences();
 			availableModelCatalog = availableModelCatalog.filter((group) => group.id !== 'chatgpt');
 			availableVisionModelCatalog = availableVisionModelCatalog.filter((group) => group.id !== 'chatgpt');
 		},
@@ -654,7 +612,7 @@
 			untrack(() => {
 				settings.chatgpt.reset();
 				if (modelCatalogOwner !== actor || !chatgptPlanAvailable) {
-					clearChatGPTModelCatalog();
+					clearChatGPTReferences();
 					availableModelCatalog = availableModelCatalog.filter((group) => group.id !== 'chatgpt');
 					availableVisionModelCatalog = availableVisionModelCatalog.filter((group) => group.id !== 'chatgpt');
 				}
@@ -699,7 +657,7 @@
 	function modelsFor(provider: Provider) {
 		const group = availableModelCatalog.find((item) => item.id === provider);
 		if (group) return group.models;
-		return availableModelsLoaded ? [] : modelsForProvider(provider);
+		return [];
 	}
 
 	function visionModelsFor(provider: Provider) {
@@ -717,8 +675,8 @@
 		visionProvider = settings.vision_provider;
 		visionModel = settings.vision_model;
 		okugakiModel = settings.okugaki_model
-			? qualifiedModelId(settings.okugaki_provider ?? settings.vision_provider, settings.okugaki_model)
-			: qualifiedModelId(settings.vision_provider, settings.vision_model);
+			? qualifiedModelRef(settings.okugaki_provider ?? settings.vision_provider, settings.okugaki_model)
+			: qualifiedModelRef(settings.vision_provider, settings.vision_model);
 		instructionCaptionVisible = settings.instruction_caption_visible !== false;
 	}
 
@@ -733,7 +691,7 @@
 	}
 
 	async function persistOkugakiModel(provider: Provider, model: string): Promise<void> {
-		const nextModel = qualifiedModelId(provider, model.trim());
+		const nextModel = qualifiedModelRef(provider, model.trim());
 		if (!nextModel || nextModel === okugakiModel) return;
 		const previous = okugakiModel;
 		okugakiModel = nextModel;
@@ -778,14 +736,15 @@
 	}
 
 	/** Put back the conditions the last work of the stopped run was drawn under. */
-	function applyBatchRunConditions(conditions: BatchRunConditions) {
+	async function applyBatchRunConditions(conditions: BatchRunConditions) {
+		await loadModelReferences([conditions.stage1Model, conditions.stage2Model].filter((ref): ref is string => !!ref).map((ref) => ({action: 'split_ref', ref})));
 		if (conditions.stage1Model) {
-			const ref = splitModelRef(conditions.stage1Model, availableModelCatalog);
+			const ref = splitModelReference(conditions.stage1Model, availableModelCatalog);
 			if (ref.provider) stage1Provider = ref.provider;
 			stage1Model = ref.model;
 		}
 		if (conditions.stage2Model) {
-			const ref = splitModelRef(conditions.stage2Model, availableModelCatalog);
+			const ref = splitModelReference(conditions.stage2Model, availableModelCatalog);
 			if (ref.provider) stage2Provider = ref.provider;
 			stage2Model = ref.model;
 		}
@@ -798,10 +757,11 @@
 		// The route first: choosing read and draw turns the sketch on, and the
 		// line after puts back the sketch the run was drawn with.
 		if (conditions.route) work.selectDrawRoute(conditions.route);
+		if (conditions.composition) work.selectCompositionMode(conditions.composition);
 		// Not conditional: a work with no prose was drawn with the layer off, and
 		// leaving the switch where it is would resume under other conditions.
 		work.sketchMode = sketchModeOf(conditions.sketchGrain);
-		if (conditions.wild !== null) wildSettings.set(conditions.wild);
+		if (conditions.wild !== null) wildSettings.setSelected(conditions.wild);
 		if (conditions.canvasAspectId) canvasAspectId = normalizeCanvasAspectId(conditions.canvasAspectId);
 	}
 
@@ -982,6 +942,8 @@
 		if (!session.currentUser) return;
 		const previousUser = session.currentUser;
 		const userId = previousUser.id;
+		try {
+		await loadModelReferences([{action: 'split_ref', ref: okugakiModel}]);
 		// What the page owns; the features add their own fields to the save.
 		const pageModelSettings: UserModelSettings = {
 			stage1_provider: stage1Provider,
@@ -990,12 +952,11 @@
 			stage2_model: stage2Model,
 			vision_provider: visionProvider,
 			vision_model: visionModel,
-			okugaki_provider: splitModelRef(okugakiModel).provider ?? visionProvider,
-			okugaki_model: splitModelRef(okugakiModel).model,
+			okugaki_provider: splitModelReference(okugakiModel).provider ?? visionProvider,
+			okugaki_model: splitModelReference(okugakiModel).model,
 			instruction_caption_visible: instructionCaptionVisible,
 		};
 		const model_settings = { ...pageModelSettings, ...collectUserSettings({ excludeIds: ['text-size'] }) };
-		try {
 			const r = await apiFetch('/api/auth/me/settings', {
 				method: 'PATCH',
 				headers: { 'Content-Type': 'application/json' },
@@ -1170,26 +1131,49 @@
 		const userId = session.currentUser?.id;
 		if (!userId) {
 			availableModelsLoaded = false;
+			modelCatalogStatus = 'loading';
 			return;
 		}
+		configureModelReferences(apiFetch);
+		modelCatalogStatus = 'loading';
+		availableModelsLoaded = false;
+		clearModelReferences();
+		availableModelCatalog = [];
+		availableVisionModelCatalog = [];
+		demoPromptModelCatalog = [];
 		try {
 			const r = await apiFetch('/api/models', { cache: 'no-store' });
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			const data = await r.json() as { catalog: ProviderGroup[]; llm_catalog?: ProviderGroup[]; drawing_catalog?: ProviderGroup[]; vision_catalog?: ProviderGroup[]; chatgpt_plan_available?: boolean; model_labels?: ModelLabel[]; settings: { model_settings?: UserModelSettings } };
+			const data = await r.json() as { catalog: ProviderGroup[]; llm_catalog?: ProviderGroup[]; drawing_catalog?: ProviderGroup[]; vision_catalog?: ProviderGroup[]; chatgpt_plan_available?: boolean; model_labels?: ModelLabel[]; settings: { model_settings?: UserModelSettings; model_defaults?: UserModelSettings } };
+			if (session.currentUser?.id !== userId || request !== modelCatalogRequest) return;
+			const groups = [data.catalog, data.llm_catalog, data.drawing_catalog, data.vision_catalog].flatMap((catalog) => catalog ?? []);
+			const queries: ReferenceQuery[] = groups.flatMap((group) => group.models.flatMap((model): ReferenceQuery[] => [
+				{ action: 'qualify_ref', provider: group.id, ref: model.id }, { action: 'split_ref', ref: model.id }
+			]));
+			const userModels = { ...data.settings.model_defaults, ...data.settings.model_settings } as UserModelSettings;
+			for (const stage of ['stage1', 'stage2', 'vision', 'okugaki'] as const) {
+				const provider = userModels?.[`${stage}_provider`];
+				const model = userModels?.[`${stage}_model`];
+				if (provider && model) queries.push({ action: 'qualify_ref', provider, ref: model }, { action: 'split_ref', ref: model });
+			}
+			await loadModelReferences(queries);
+			if (session.currentUser?.id !== userId || request !== modelCatalogRequest) return;
+			for (const group of groups) for (const model of group.models) model.qualified_id = qualifiedModelRef(group.id, model.id);
+			await loadModelReferences(groups.flatMap((group) => group.models.map((model): ReferenceQuery => ({action: 'split_ref', ref: model.qualified_id ?? ''}))));
 			if (session.currentUser?.id !== userId || request !== modelCatalogRequest) return;
 			chatgptPlanAvailable = data.chatgpt_plan_available === true;
 			setModelLabelTable(data.model_labels);
 			modelCatalogOwner = userId;
-			clearChatGPTModelCatalog();
 			availableModelCatalog = data.drawing_catalog ?? data.llm_catalog ?? data.catalog;
 			demoPromptModelCatalog = demoInstructionModelGroups(data.llm_catalog ?? data.catalog);
 			availableVisionModelCatalog = (data.vision_catalog ?? data.catalog)
 				.map((group) => ({ ...group, models: group.models.filter((model) => model.purposes?.includes('vision') && !model.unsupported_purposes?.includes('vision')) }))
 				.filter((group) => group.models.length > 0);
 			availableModelsLoaded = true;
-			if (data.settings.model_settings) {
+			modelCatalogStatus = 'ready';
+			if (Object.keys(userModels).length > 0) {
 				applyUserModelSettings(
-					{ ...session.currentUser, model_settings: data.settings.model_settings },
+					{ ...session.currentUser, model_settings: userModels },
 					{ excludeUserSettingIds: ['text-size'] }
 				);
 			}
@@ -1209,13 +1193,14 @@
 				visionModel = fallbackGroup?.models[0]?.id ?? visionModel;
 			}
 			const okugakiModelAvailable = availableVisionModelCatalog.some((group) =>
-				group.models.some((model) => qualifiedModelId(group.id, model.id) === okugakiModel)
+				group.models.some((model) => qualifiedModelRef(group.id, model.id) === okugakiModel)
 			);
 			if (!okugakiModelAvailable) {
-				okugakiModel = qualifiedModelId(visionProvider, visionModel);
+				okugakiModel = qualifiedModelRef(visionProvider, visionModel);
 			}
 			demo.reconcilePromptModel(demoPromptModelCatalog, availableModelsLoaded);
 		} catch (e) {
+			if (session.currentUser?.id === userId && request === modelCatalogRequest) modelCatalogStatus = 'error';
 			console.warn('failed to load model catalog', e);
 		}
 	}
@@ -1283,7 +1268,7 @@
 			if (data.chatgpt_plan_available !== true) {
 				modelCatalogRequest++;
 				settings.chatgpt.reset();
-				clearChatGPTModelCatalog();
+				clearChatGPTReferences();
 				availableModelCatalog = availableModelCatalog.filter((group) => group.id !== 'chatgpt');
 				availableVisionModelCatalog = availableVisionModelCatalog.filter((group) => group.id !== 'chatgpt');
 			}
@@ -1352,7 +1337,7 @@
 		settings.resetForLoggedOut();
 		chatgptPlanAvailable = false;
 		modelCatalogRequest++;
-		clearChatGPTModelCatalog();
+		disableModelReferences();
 		availableModelCatalog = availableModelCatalog.filter((group) => group.id !== 'chatgpt');
 		availableVisionModelCatalog = availableVisionModelCatalog.filter((group) => group.id !== 'chatgpt');
 		history.clear();
@@ -1362,13 +1347,13 @@
 	}
 
 	// ── Models ──────────────────────────────────────────────
-	let stage1Provider  = $state<Provider>(DEFAULT_PROVIDER);
-	let stage1Model     = $state<string>(DEFAULT_MODEL);
-	let stage2Provider  = $state<Provider>(DEFAULT_PROVIDER);
-	let stage2Model     = $state<string>(DEFAULT_MODEL);
-	let visionProvider  = $state<Provider>(DEFAULT_PROVIDER);
-	let visionModel     = $state<string>(DEFAULT_VISION_MODEL);
-	let okugakiModel    = $state<string>(qualifiedModelId(DEFAULT_PROVIDER, DEFAULT_VISION_MODEL));
+	let stage1Provider  = $state<Provider>('');
+	let stage1Model     = $state<string>('');
+	let stage2Provider  = $state<Provider>('');
+	let stage2Model     = $state<string>('');
+	let visionProvider  = $state<Provider>('');
+	let visionModel     = $state<string>('');
+	let okugakiModel    = $state<string>('');
 	let includeThinking = $state(false);
 	let currentResultStarState = $state<HistoryStarProjection | null>(null);
 	const visibleThumbCount = $derived(Math.max(1, Math.floor((windowWidth - 40) / 89)));
@@ -1489,8 +1474,8 @@
 
 	async function saveCurrentDemoToHistory(): Promise<void> {
 		await demo.saveCurrent({
-			stage1Model: qualifiedModelId(stage1Provider, stage1Model),
-			stage2Model: qualifiedModelId(stage2Provider, stage2Model),
+			stage1Model: qualifiedModelRef(stage1Provider, stage1Model),
+			stage2Model: qualifiedModelRef(stage2Provider, stage2Model),
 			effectiveCatalogId: colorCatalogSettings.effectiveId,
 			canvasAspectId: effectiveCanvasAspectId(),
 			instructionLang: work.instructionLang,
@@ -1566,8 +1551,8 @@
 			syncToItem: (item) => history.syncToItem(item)
 		},
 		models: {
-			stage1: () => qualifiedModelId(stage1Provider, stage1Model),
-			stage2: () => qualifiedModelId(stage2Provider, stage2Model),
+			stage1: () => qualifiedModelRef(stage1Provider, stage1Model),
+			stage2: () => qualifiedModelRef(stage2Provider, stage2Model),
 			label: statusModelName,
 			shortLabel: (model) => modelShortName(model)
 		},
@@ -1738,10 +1723,10 @@ async function drawLineageDescriptionEdit(node: LineageNode, text: string, signa
 			derivationKind: 'description_edit',
 			// A juxtaposition adds what it added, so the lineage can leave it out next time.
 			derivationMetadata: { edited_from_history_id: node.history.id ?? null, ...(metadata ?? {}) },
-			// null override = inherit the parent work's setting.
+			// The dialog supplies its own choice; otherwise use the saved default.
 			renderOverrides: {
 				...colorCatalogOverride(lineageCatalogId(node)),
-				...wildOverride(wild ?? node.history.render_wild === true)
+				...wildOverride(wild ?? wildSettings.enabled)
 			},
 		}, signal);
 		// A cancelled run hands back its last view instead of throwing; a stop
@@ -1756,7 +1741,7 @@ async function drawLineageDescriptionEdit(node: LineageNode, text: string, signa
 /** Redraw a saved work with the sketch off or on, as its child. The
  *  sketch is asked again (or dropped) -- replaying the stored one would leave
  *  the choice dead. */
-async function drawLineageSketchGrain(node: LineageNode, mode: SketchMode, signal?: AbortSignal): Promise<void> {
+async function drawLineageSketchGrain(node: LineageNode, mode: SketchMode, signal?: AbortSignal, wild = wildSettings.enabled): Promise<void> {
 	if (!node.history) return;
 	// Ask before the words are carried into a child (contract § stage 4).
 	if (!(await work.confirmFallbackRefine(node.history))) return;
@@ -1777,7 +1762,7 @@ async function drawLineageSketchGrain(node: LineageNode, mode: SketchMode, signa
 		signal,
 		renderOverrides: {
 			...colorCatalogOverride(lineageCatalogId(node)),
-			...wildOverride(node.history.render_wild === true)
+			...wildOverride(wild)
 		},
 	});
 	await showNewLineageChild(rendered.history_id, rendered.lineage_node_id);
@@ -1805,7 +1790,7 @@ async function drawLineageDdlEdit(node: LineageNode, editedDdl: string, signal?:
 		derivationMetadata: { edited_from_history_id: node.history.id ?? null },
 		renderOverrides: {
 			...colorCatalogOverride(lineageCatalogId(node)),
-			...wildOverride(ddlDialogWildOverride ?? node.history.render_wild === true)
+			...wildOverride(ddlDialogWildOverride ?? wildSettings.enabled)
 		},
 	}, signal);
 	await showNewLineageChild(view.result?.history_id, view.result?.lineage_node_id);
@@ -1948,20 +1933,6 @@ async function handleDdlDialogDraw(nextDdl: string, signal?: AbortSignal, import
 	}
 }
 
-async function promoteLineageNode(node: LineageNode): Promise<void> {
-	await promoteSavedLineageNode(node, {
-		apiFetch,
-		contextVersion: () => refinement.contextVersion,
-		currentItem: () => work.displayedHistoryItem,
-		setCurrentItem: (item) => { work.displayedHistoryItem = item; },
-		activeHistoryId: () => work.displayedHistoryItem?.id ?? work.result?.history_id ?? historyItems[historyCursor]?.id ?? null,
-		currentOffset: () => historyOffset,
-		syncToItem: (item) => history.syncToItem(item),
-		fetchOffset: (offset, options) => history.fetchOffset(offset, options),
-		loadLineage: (id) => lineageState.load(id, true)
-	});
-}
-
 async function saveLineageNote(node: LineageNode, note: string): Promise<void> {
 	await saveSavedLineageNote(node, note, {
 		apiFetch,
@@ -2027,11 +1998,6 @@ $effect(() => {
 
 		work.reloadError = null;
 		work.replayComparison = null;
-		if (lineageIntermediateNoticeTimer !== null) {
-			window.clearTimeout(lineageIntermediateNoticeTimer);
-			lineageIntermediateNoticeTimer = null;
-		}
-		lineageIntermediateNotice = null;
 
 		lineageState.reset();
 		if (!options.preserveLineageBrowsing) lineageBrowsingState.reset();
@@ -2059,7 +2025,8 @@ $effect(() => {
 			work.ddlGeneratedBaseline = projection.ddl;
 			work.thinking = projection.thinking;
 			work.stage1UserPrompt = projection.sourceText;
-			work.adoptSketch(projection.sketchText, projection.sketchGrain, projection.sourceText, projection.sketchState, drawRouteOf(it));
+			work.adoptSketch(projection.sketchText, projection.sketchGrain, projection.sourceText, projection.sketchState, drawRouteOf(it),
+				compositionModeOf(it));
 		}
 		work.result = projection.result;
 		work.error = null;
@@ -2237,15 +2204,6 @@ $effect(() => {
 
 	const unsavedRefinementPreview = $derived(!!work.result && !work.result.lineage_node_id && !!work.result.lineage_parent_node_id && !!work.result.derivation_kind);
 
-	function showLineageIntermediateNotice(): void {
-		lineageIntermediateNotice = t().lineageIntermediateSavedNotice;
-		if (lineageIntermediateNoticeTimer !== null) window.clearTimeout(lineageIntermediateNoticeTimer);
-		lineageIntermediateNoticeTimer = window.setTimeout(() => {
-			lineageIntermediateNotice = null;
-			lineageIntermediateNoticeTimer = null;
-		}, 5000);
-	}
-
 	/**
 	 * Say that a strip filter was cleared, because nothing else says it.
 	 *
@@ -2288,7 +2246,7 @@ async function ensureLineageParentId(): Promise<string | null> {
 		tokens_in: (work.result.tokens_in_stage1 ?? 0) + (work.result.tokens_in_stage2 ?? 0) || null,
 		tokens_out: (work.result.tokens_out_stage1 ?? 0) + (work.result.tokens_out_stage2 ?? 0) || null,
 	}, {
-		sourceText: work.input.trim(), historyVisibility: 'lineage_only',
+		sourceText: work.input.trim(), selectSaved: true,
 		lineageParentNodeId: work.result.lineage_parent_node_id,
 		derivationKind: work.result.derivation_kind,
 		derivationMetadata: work.result.derivation_metadata ?? {},
@@ -2305,7 +2263,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		work.error = t().lineageIntermediateSaveFailed;
 		throw new Error(work.error);
 	}
-	if (materializingIntermediate) showLineageIntermediateNotice();
 	return nodeId;
 }
 
@@ -2425,8 +2382,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	// say which provider ran it: the same id can be served by two of them.
 	function shortModel(m: string | null | undefined): string {
 		if (!m) return '';
-		const { provider, model } = resolveModelRefForDisplay(m);
-		const owner = providerLabel(provider);
+		const { providerLabel: owner, model } = displayModelReference(m);
 		const short = shortModelName(model);
 		return owner ? `${owner}/${short}` : short;
 	}
@@ -2466,8 +2422,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	const statusStage2ModelOnly = $derived(work.displayedHistoryItem
 		? (work.displayedHistoryItem.stage2_model ? modelShortName(work.displayedHistoryItem.stage2_model) : '-')
 		: (work.result?.stage2_model ? modelShortName(work.result.stage2_model) : '-'));
-	const nextStage1Model = $derived(statusModelName(qualifiedModelId(stage1Provider, stage1Model)));
-	const nextStage2Model = $derived(statusModelName(qualifiedModelId(stage2Provider, stage2Model)));
+	const nextStage1Model = $derived(statusModelName(qualifiedModelRef(stage1Provider, stage1Model)));
+	const nextStage2Model = $derived(statusModelName(qualifiedModelRef(stage2Provider, stage2Model)));
 	const nextCatalogName = $derived(colorCatalogSettings.isAuto ? (work.inputMode === 'image' ? t().imageCatalogAuto : t().colorCatalogAuto) : currentCatalog.name);
 	// The catalog a work was drawn with, named as it stands today. Two things
 	// the bare name cannot say are said here instead of being papered over: an
@@ -2529,10 +2485,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			? statusHistoryItem as Iteration
 			: null
 	);
-	// What a refine inherits when nothing is overridden: the work on screen, or
-	// the global setting when nothing is on screen.
-	const targetWild = $derived(work.displayedHistoryItem?.render_wild ?? work.result?.render_wild ?? wildSettings.enabled);
-	const effectiveRefineWild = $derived(refineWildOverride ?? targetWild === true);
+	const effectiveRefineWild = $derived(refineWildOverride ?? wildSettings.enabled);
 	const statusGeneration = $derived(((statusHistoryItem as { lineage_generation?: number | null } | null)?.lineage_generation) ?? null);
 
 	function formatHistoryDate(at: number): string {
@@ -2541,8 +2494,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 
 	function historyModelStage1Short(it: Iteration): string {
 		if (!it.stage1_model) return '-';
-		const { provider } = resolveModelRefForDisplay(it.stage1_model);
-		return abbreviateStripModel(providerLabel(provider), modelShortName(it.stage1_model));
+		const { providerLabel: owner } = displayModelReference(it.stage1_model);
+		return abbreviateStripModel(owner, modelShortName(it.stage1_model));
 	}
 
 	function historyModelStage1Full(it: Iteration): string {
@@ -2850,6 +2803,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						onSelectSketchMode={(mode) => (work.sketchMode = mode)}
 						drawRoute={work.drawRoute}
 						onSelectDrawRoute={work.selectDrawRoute}
+						compositionMode={work.compositionMode}
+						onSelectCompositionMode={work.selectCompositionMode}
 						bind:inputMode={work.inputMode}
 						bind:imageProvenance={work.imageProvenance}
 						uploadedImage={work.uploadedImage}
@@ -2857,7 +2812,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						imageUploading={work.imageUploading}
 						imageRunning={work.imageRunning}
 						imageCanvasAspectId={work.imageCanvasAspectId}
-						visionModelName={statusModelName(qualifiedModelId(visionProvider, visionModel))}
+						visionModelName={statusModelName(qualifiedModelRef(visionProvider, visionModel))}
 						visionModelAvailable={availableVisionModelCatalog.some((group) => group.id === visionProvider && group.models.some((model) => model.id === visionModel))}
 						onSelectImage={work.selectImage}
 						onImageProvenanceInput={work.noteImageProvenanceTyped}
@@ -2902,7 +2857,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						onResumeBatch={() => void resumeInterruptedBatch()}
 						onRetryBatchFailures={() => void retryFailedBatch()}
 						canSubmit={work.canSubmit}
-						generationDisabled={refinementSession.gridBusy || work.reloading || demoRunning || batch.resuming || work.imageFolder.running}
+						generationDisabled={modelCatalogStatus !== 'ready' || refinementSession.gridBusy || work.reloading || demoRunning || batch.resuming || work.imageFolder.running}
 						error={work.error}
 						stageLabel={work.stageLabel}
 						{canvasAspectId}
@@ -2945,6 +2900,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					{/if}
 
 					<PipelineStatus
+						{pluginEntries}
 						patch={work.pipelinePatch}
 						committedDdl={work.pipelineView?.document?.source ?? ''}
 						diagnostics={work.pipelineDiagnostics}
@@ -3056,17 +3012,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						</section>
 					{/if}
 
-					<!-- What the expansion layer removed. This complements editor-time
-					     DDL warnings by reporting the side only known after expansion. -->
-					{#if work.pluginWarningsShown.length > 0 && work.inputMode === 'single'}
-						<section class="panel-section plugin-warnings">
-							<div class="plugin-warnings-title">{t().ddlPluginWarningsTitle}</div>
-							{#each work.pluginWarningsShown as warning}
-								<p class="plugin-warning-line">{warning}</p>
-							{/each}
-						</section>
-					{/if}
-
 					<!-- Which limits took effect. The image cannot explain why ink was
 					     reduced; only this response can name the active settings. -->
 					{#if work.limitNotesShown.length > 0 && work.inputMode === 'single'}
@@ -3156,7 +3101,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				result={work.result}
 				rangePreview={ddlRangePreview}
 				{unsavedRefinementPreview}
-				{lineageIntermediateNotice}
 				allowEmptyOutputTabs={work.showingDemo}
 				{currentRenderedAt}
 				navLatestDisabled={historyNavButtonsDisabled.latest}
@@ -3184,7 +3128,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				{statusStage2ModelOnly}
 				runStage1ModelLabel={work.stage1ModelLabel}
 				runStage2ModelLabel={work.stage2ModelLabel}
-				visionModel={qualifiedModelId(visionProvider, visionModel)}
+				visionModel={qualifiedModelRef(visionProvider, visionModel)}
 				{okugakiModel}
 				visionProviderGroups={availableVisionModelCatalog}
 				{statusCatalogName}
@@ -3249,15 +3193,13 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				statusDescriptionLocked={work.descriptionLocked}
 				statusTenkei={work.displayedHistoryItem?.tenkei ?? null}
 				{developerMode}
-				refineDrawingModelId={qualifiedModelId(stage2Provider, stage2Model)}
+				refineDrawingModelId={qualifiedModelRef(stage2Provider, stage2Model)}
 				refineDrawingModelGroups={availableModelCatalog}
 				onSelectRefineDrawingModel={selectDdlDialogDrawingModel}
 				refineWildValue={effectiveRefineWild}
-				refineWildInherited={refineWildOverride === null}
 				onSetRefineWild={setRefineWild}
 				onSaveOkugakiModel={persistOkugakiModel}
 				onSaveVisionModel={persistVisionModel}
-				onPromoteLineageNode={promoteLineageNode}
 				onSaveLineageNote={saveLineageNote}
 				onAskTrashLineage={askTrash}
 				onDetachLineage={detachLineage}
@@ -3326,6 +3268,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 {#await import('$lib/components/SaijikiDrawer.svelte') then { default: SaijikiDrawer }}
 	<SaijikiDrawer
 		open={saijikiOpen}
+		ddlLang={shownDdlLang}
 		{pluginEntries}
 		bind:activePreview={activeSaijikiPreview}
 		onClose={() => (saijikiOpen = false)}
@@ -3352,7 +3295,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			returnFocusTo={ddlDialogReturnFocus}
 			drawing={ddlDialogDrawing}
 			stage2ModelLabel={work.stage2ModelLabel}
-			drawingModelId={qualifiedModelId(stage2Provider, stage2Model)}
+			drawingModelId={qualifiedModelRef(stage2Provider, stage2Model)}
 			drawingModelGroups={availableModelCatalog}
 			onSelectDrawingModel={selectDdlDialogDrawingModel}
 			runTokensIn={work.activeRunTokensIn}
@@ -3362,8 +3305,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			previewForWord={saijikiPreview}
 			previewForPlugin={pluginPreview}
 			{pluginEntries}
-			wildValue={ddlDialogWildOverride ?? (ddlDialogNode?.history?.render_wild === true)}
-			wildInherited={ddlDialogWildOverride === null}
+			wildValue={ddlDialogWildOverride ?? wildSettings.enabled}
 			onSelectWild={(next) => (ddlDialogWildOverride = next)}
 			onDraw={handleDdlDialogDraw}
 			onClose={closeDdlDialog}
@@ -3395,7 +3337,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		generatedDdlHighlighted={demoGeneratedDdlHighlighted}
 		canSaveCurrent={demo.canSaveCurrent}
 		savingCurrent={demo.savingCurrent}
-		actionDisabled={work.loading || work.reloading || refinementSession.gridBusy || batch.resuming}
+		actionDisabled={modelCatalogStatus !== 'ready' || work.loading || work.reloading || refinementSession.gridBusy || batch.resuming}
 		drawingStage1ModelLabel={work.stage1ModelLabel}
 		drawingStage2ModelLabel={work.stage2ModelLabel}
 		saveStatus={demo.saveStatus}
@@ -3408,7 +3350,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		{#snippet inputSettings()}
 			<div class="demo-drawing-conditions" inert={demoRunning}>
 				<h3>{t().nextWorkConditions}</h3>
-				<ModelCardPicker label="Stage 1/2" selectedModel={qualifiedModelId(stage1Provider, stage1Model)} providerGroups={availableModelCatalog}
+				<ModelCardPicker label="Stage 1/2" selectedModel={qualifiedModelRef(stage1Provider, stage1Model)} providerGroups={availableModelCatalog}
 					onSelect={setDrawingModel} />
 				<label class="demo-catalog-field"><span>{t().colorCatalogButton}</span>
 					<select bind:value={colorCatalogSettings.selected}>
@@ -3945,6 +3887,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	}
 	:global(.ddl-token-word) { color: #2c3e91; background: rgba(44, 62, 145, 0.08); }
 	:global(.ddl-token-emotion) { color: #9b7a66; font-style: inherit; }
+	/* A title line (DDL 27) names the chunk below it and draws nothing: a
+	   heading, with no word inside coloured. */
+	:global(.ddl-title) { color: #3d4650; font-weight: 600; }
+	:global(html[data-theme='dark'] .ddl-title) { color: #d6dde4; }
 	:global(html[data-theme='dark'] .ddl-token-shape) { color: #9cc4ff; background: rgba(92, 143, 220, 0.26); }
 	:global(html[data-theme='dark'] .ddl-token-touch) { color: #e2bf82; background: rgba(188, 139, 62, 0.24); }
 	:global(html[data-theme='dark'] .ddl-token-line) { color: #c4ccd5; background: rgba(147, 160, 176, 0.22); }
@@ -4356,23 +4302,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	.sketch-editor { font-family: inherit; width: 100%; resize: vertical; }
 	.sketch-note { margin: 0; font-size: var(--ui-font-size-12); line-height: 1.6; color: var(--fg3); }
 
-	/* The same amber as the editor's mark: one meaning, one colour. */
-	.plugin-warnings {
-		border: 1px solid var(--ddl-token-unknown-border);
-		background: var(--ddl-token-unknown-bg);
-	}
-	.plugin-warnings-title {
-		color: var(--ddl-token-unknown-fg);
-		font-size: var(--ui-font-size-11);
-		font-weight: 500;
-		margin-bottom: 4px;
-	}
-	.plugin-warning-line {
-		color: var(--fg2);
-		font-size: var(--ui-font-size-11);
-		line-height: 1.5;
-		word-break: break-word;
-	}
 	/* A limit taking effect is not a warning: nothing went wrong, a setting was
 	   honoured. So it reads in the ordinary border, not the amber one. */
 	.limit-notes {

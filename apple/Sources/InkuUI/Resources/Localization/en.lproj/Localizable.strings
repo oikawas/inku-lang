@@ -1,4 +1,7 @@
 /* Native interface text only. Artwork source, names and provider responses stay verbatim. */
+"登録を削除し、提供元での失効を確認しました。" = "Registration deleted and provider revocation confirmed.";
+"登録を削除しました。提供元での失効は確認できていません。" = "Registration deleted locally. Provider revocation could not be confirmed.";
+"画像の縦横比を使う" = "Use image aspect ratio";
 "作品の系譜" = "Lineage of the work";
 "作品の詳細" = "Work details";
 "作品へのコメント" = "Comment on the work";
@@ -129,7 +132,6 @@
 "ライブ用" = "Live";
 "ランダム" = "Random";
 "レート制限" = "Rate limits";
-"ワイルド" = "Wild";
 "一巡したあと失敗した行だけを再試行します。0なら再試行せず、中断したときも再試行しません。" = "After the first pass, retries only failed rows. 0 disables retries; interrupted runs are not retried.";
 "一覧" = "List";
 "一覧から保存作品を選択してください。" = "Select a saved work from the list.";
@@ -174,7 +176,7 @@
 "候補を閉じる" = "Close candidate";
 "停止" = "Stop";
 "停止中" = "Stopping";
-"元のワイルド設定を引き継ぐ" = "Keep the source work's Wild setting";
+"筆致制限を外すかを元の作品から引き継ぐ" = "Keep whether the source work lifted the stroke limit";
 "元の作品" = "Source work";
 "元の作品は保持し、新しい子を系譜に保存します。" = "The source work is kept; a new child is saved in the lineage.";
 "元の節点と接続を保持しています。作品本文は削除されています。" = "The original node and edges are kept. The work contents have been deleted.";
@@ -256,7 +258,7 @@
 "日本語" = "日本語";
 "日本語の形式を判定する（読み辞書の音数）" = "Judge Japanese forms (dictionary sound count)";
 "旧Markdownの語です。共通コアの定義がないため描画では省略されます。" = "A legacy Markdown word. It has no shared-core definition and is omitted during drawing.";
-"暴れる" = "Wild";
+"筆致制限を外す" = "Lift the stroke limit";
 "更新" = "Refresh";
 "書き出し" = "Export";
 "書き出しの初期設定" = "Export defaults";
@@ -534,7 +536,7 @@
 "間隔: %ld時間" = "Interval: %ld hours";
 "保持: %ld世代" = "Keep: %ld generations";
 "旧写生の区切り: %@（保存記録）" = "Legacy sketch division: %@ (saved record)";
-"シード: %@ · 暴れる: %@" = "Seed: %@ · Wild: %@";
+"シード: %@ · 筆致制限を外す: %@" = "Seed: %@ · Lift the stroke limit: %@";
 "ごみ箱 (%ld)" = "Trash (%ld)";
 "%ld 件選択" = "%ld selected";
 "%ld 作品 · お気に入り %ld · 推敲 %ld" = "%ld works · %ld starred · %ld marked for refinement";
@@ -786,7 +788,7 @@
 "中程度の変奏" = "Moderate";
 "大きな変奏" = "Sweeping";
 "変奏では元の作品のモデルを保ちます。" = "Variation keeps the original work’s models.";
-"変奏で動くものはありませんが、ワイルド設定は元の作品から変更します。" = "Variation moves nothing; the Wild setting will change from the original work.";
+"変奏で動くものはありませんが、筆致制限を外すかは元の作品から変更します。" = "Variation moves nothing; whether the stroke limit is lifted will change from the original work.";
 "この操作では、選んだモデルを構造化に使います。" = "This operation uses the selected model for the score.";
 "制作で選んだ次のモデルを使う" = "Use the next model selected for painting";
 "制作で選んだ次の描画モデルを、読み取りと構造化の両方に使います。" = "Use the next drawing model selected for painting for both reading and the score.";
@@ -1312,8 +1314,7 @@
 "比較の元になる保存作品を選択してください。" = "Choose the saved work to compare.";
 "比較する候補を指定してください。" = "Choose the comparison options.";
 "比較候補を生成中" = "Painting comparison options";
-"筆致制限（継承）" = "Stroke limit (inherited)";
-"筆致制限" = "Stroke limit";
+"（継承）" = "(inherited)";
 "超高速（LLM不要）" = "Very fast (no LLM)";
 "高速（補完の穴があるときだけLLM）" = "Fast (LLM only for holes to complete)";
 "低速（LLM・API使用）" = "Slow (LLM and API)";
@@ -1558,3 +1559,38 @@
 "はめ込み" = "Fit";
 "はめ込み中" = "Fitting…";
 "はめ込みを保存しました" = "Saved the fitted work";
+"画像フォルダを選ぶ" = "Choose an image folder";
+"続きから描く" = "Continue painting";
+"最初から描く" = "Start over";
+"前回の処理結果を確認できない画像があります。履歴を確認してください。" = "Some images have an unconfirmed result. Check the history.";
+"見比べる前の指示書" = "Instructions before review";
+"この指示書で子を描く" = "Paint a child with these instructions";
+"描き直すには画像を選び直してください。" = "Choose the image again to repaint.";
+"見比べる画を描いています…" = "Drawing the image for review…";
+"画像から色カタログを選んでいます…" = "Choosing colors from the image…";
+"画像から指示書を書いています…" = "Writing instructions from the image…";
+"画像と描いた画を見比べています…" = "Comparing the image with the drawing…";
+"ファイル名を来歴に入れる" = "Include the file name in provenance";
+"Exifを来歴に入れる" = "Include Exif in provenance";
+"画像の色カタログ選択 送った入力" = "Image catalog selection input";
+"画像の色カタログ選択 システムプロンプト" = "Image catalog selection system prompt";
+"画像から指示書を書く 送った入力" = "Image instruction writing input";
+"画像から指示書を書く システムプロンプト" = "Image instruction writing system prompt";
+"画像の見比べ 送った入力" = "Image review input";
+"画像の見比べ システムプロンプト" = "Image review system prompt";
+
+"言葉で描く" = "In words";
+"型で描く" = "Through stages";
+"画像から書く" = "From an image";
+"描き方" = "Drawing method";
+"構図・法則・配色" = "Composition, laws, colors";
+"写生（読み）" = "Sketch (reading)";
+"読んでいます" = "Reading";
+"構図と法則を決めています" = "Deciding composition and laws";
+"決め直しています" = "Deciding again";
+"書いています" = "Writing";
+"直しています" = "Correcting";
+"見て直しています" = "Reviewing the drawing";
+"保存しています" = "Saving";
+"AIの手" = "AI move";
+"親との差" = "Change from the parent";

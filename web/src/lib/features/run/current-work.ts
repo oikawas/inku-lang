@@ -11,7 +11,7 @@ import {
 } from '../../paintStream.ts';
 import type { CanvasAspectId } from '../../plugins/system/canvas-aspect/index.ts';
 import { type SketchMode } from '../../sketch.ts';
-import type { DescriptionDdlRecord, DrawRoute } from '../../draw-route.ts';
+import { compositionOption, type CompositionMode, type DescriptionDdlRecord, type DrawRoute } from '../../draw-route.ts';
 import type { ApiFetch } from '../../transport/api-fetch.ts';
 import { ConnectionFailure, GATEWAY_STATUSES, isAbort } from '../../transport/connection-failure.ts';
 import type { RenderOverrides } from '../render-payload.ts';
@@ -34,6 +34,7 @@ export type PaintScore = {
 export type Seed = number | string;
 
 export type PaintResult = {
+	plugin_offers?: import('../canvas/plugin-offers').PluginOfferRecord[];
 	image_ddl?: Record<string, unknown> | null;
 	/** Read and draw's record (SPEC 12.6.7); null on any other work. */
 	description_ddl?: DescriptionDdlRecord | null;
@@ -83,7 +84,6 @@ export type PaintResult = {
 	elapsed_stage2_ms: number;
 	elapsed_total_ms: number;
 	// Compatibility diagnostics returned for older saved work.
-	plugin_warnings?: string[] | null;
 	// Which render limits took effect and where they came from. The values say
 	// what was used; the source distinguishes a replayed ceiling (ledger I-154).
 	render_limits?: Record<string, number> | null;
@@ -124,7 +124,6 @@ export type PaintOptions = {
 	displayLabel?: string;
 	batchLineNumber?: number;
 	batchRunId?: string;
-	historyVisibility?: 'normal' | 'lineage_only';
 	lineageParentNodeId?: string | null;
 	derivationKind?: DerivationKind | null;
 	derivationMetadata?: Record<string, unknown>;
@@ -134,6 +133,8 @@ export type PaintOptions = {
 	sketchText?: string | null;
 	/** How the description is drawn; absent, the page's choice. */
 	route?: DrawRoute;
+	/** The composition and laws inside read and draw; absent, the page's choice. */
+	compositionMode?: CompositionMode;
 	// Qualified model ids apply to this run only. Absence uses the page's
 	// current model setting, which is what ordinary callers expect.
 	stage1Model?: string;
@@ -152,6 +153,7 @@ export type CurrentWorkDefaults = {
 	canvasAspectId: CanvasAspectId;
 	sketchMode: SketchMode;
 	route: DrawRoute;
+	compositionMode: CompositionMode;
 	renderPayload: Record<string, unknown>;
 };
 
@@ -193,6 +195,7 @@ export async function runCurrentWork(
 	const sketchOn = resolvedSketchMode !== 'off';
 	const route = options.route ?? defaults.route;
 	const readAndDraw = route === 'read_and_draw';
+	const composition = compositionOption(route, options.compositionMode ?? defaults.compositionMode);
 
 	capabilities.setStage1UserPrompt(text);
 	// Before the first event, name the layer requested rather than guessing the
@@ -208,6 +211,7 @@ export async function runCurrentWork(
 			body: JSON.stringify({
 				description: text,
 				route,
+				...composition,
 				sketch: sketchOn,
 				...(options.sketchText ? { sketch_text: options.sketchText } : {}),
 				stage1_model: resolvedStage1Model,
@@ -226,7 +230,6 @@ export async function runCurrentWork(
 				history_display_label: options.displayLabel ?? null,
 				batch_line_number: options.batchLineNumber ?? null,
 				batch_run_id: options.batchRunId ?? null,
-				history_visibility: options.historyVisibility ?? 'normal',
 				lineage_parent_node_id: options.lineageParentNodeId ?? null,
 				derivation_kind: options.derivationKind ?? null,
 				derivation_metadata: options.derivationMetadata ?? {},

@@ -1,5 +1,5 @@
 import { t } from '$lib/i18n/index.svelte';
-import { qualifiedModelId, type ModelOption, type Provider, type ProviderGroup } from '$lib/models';
+import { qualifiedModelRef, type ModelOption, type Provider, type ProviderGroup } from '$lib/models';
 import { registerUserSettingsContributor } from '$lib/features/user-settings';
 
 export type ModelInspectionDeps = {
@@ -61,7 +61,7 @@ function modelInspectionModelChoices(): ModelInspectionChoice[] {
 	const choices: ModelInspectionChoice[] = [];
 	for (const group of availableModelCatalog) {
 		for (const model of group.models) {
-			const id = qualifiedModelId(group.id as Provider, model.id);
+			const id = qualifiedModelRef(group.id as Provider, model.id);
 			if (seen.has(id)) continue;
 			seen.add(id);
 			choices.push({ id, label: model.label || model.id, providerLabel: group.label || String(group.id), model });
@@ -72,8 +72,8 @@ function modelInspectionModelChoices(): ModelInspectionChoice[] {
 
 const modelInspectionChoices = $derived(modelInspectionModelChoices());
 
-const modelInspectionTargetStage1Model = $derived(result?.stage1_model ?? qualifiedModelId(stage1Provider, stage1Model));
-const modelInspectionTargetStage2Model = $derived(result?.stage2_model ?? qualifiedModelId(stage2Provider, stage2Model));
+const modelInspectionTargetStage1Model = $derived(result?.stage1_model ?? qualifiedModelRef(stage1Provider, stage1Model));
+const modelInspectionTargetStage2Model = $derived(result?.stage2_model ?? qualifiedModelRef(stage2Provider, stage2Model));
 const modelInspectionTargetModel = $derived(modelInspectionTargetStage1Model);
 
 // A work drawn before the stages shared a model may name two; either one is

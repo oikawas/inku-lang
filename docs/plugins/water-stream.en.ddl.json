@@ -1,13 +1,12 @@
 {
-  "schema": "inku.ddl-export.v1",
+  "schema": "inku.ddl-export.v2",
   "language": "en",
-  "ddl": "Washi.\n8 Water.Stream.",
+  "ddl": "Washi.\n8 {stream}.",
   "plugins": [
     {
       "definition": {
-        "schema": "inku.macro-definition.v1",
+        "schema": "inku.macro-definition.v2",
         "namespace": "Water",
-        "heading": "Stream",
         "version": "1.0.0",
         "parameters": {
           "line_count": {
@@ -1301,11 +1300,18 @@
             ]
           }
         ],
-        "aliases": [
-          "水流"
-        ]
+        "id": "Stream",
+        "names": {
+          "ja": [
+            "水流"
+          ],
+          "en": [
+            "stream"
+          ]
+        },
+        "kind": "scene"
       },
-      "summary": "Draw one stream of water crossing the middle of the canvas. The flow is an S-shaped band, bulging upward in the left half and downward in the right half, made of many lines running side by side; the band swells a little in the middle of each half and narrows at both ends and at the center. Through its core runs one thick-brush ultramarine line, bleeding like tarashikomi. The other lines mix thin and thick brush, ultramarine and pale ink (gray), and sway loosely and narrowly. In each of the two inner bends of the S sits a small eddy made of joined semicircles. The written line count (1–12), or 7–9 when none is written; the core line and the two eddies are always drawn. The band's tilt (up to 16 degrees either way), its left-right direction and its height come from six arrangements."
+      "note": "An S-shaped stream with eddies, like Rinpa flowing water."
     }
   ],
   "exported_from": {}

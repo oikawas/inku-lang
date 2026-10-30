@@ -1,0 +1,655 @@
+{
+  "source": "Server provider_rate_limits.py at 7419a3d8162c4c132088092c2603b06f3a227864; estimate cases use pipeline_provider.py at 8fab20ab8afec2f67b7bdcaecd4f64425cd04d4f",
+  "cases": [
+    {"name":"estimate_tpm_off_openai","request":{"action":"estimate","kind":"openai_compatible","tpm":0,"body_bytes":300},"expected":{"decision":"estimate","input_tokens":0}},
+    {"name":"estimate_tpm_off_gemini","request":{"action":"estimate","kind":"gemini","tpm":0,"body_bytes":300},"expected":{"decision":"estimate","input_tokens":0}},
+    {"name":"estimate_bytes","request":{"action":"estimate","kind":"anthropic","tpm":16000,"body_bytes":300},"expected":{"decision":"estimate","input_tokens":428}},
+    {"name":"estimate_empty_body","request":{"action":"estimate","kind":"openai_compatible","tpm":1,"body_bytes":0},"expected":{"decision":"estimate","input_tokens":128}},
+    {"name":"estimate_gemini_needs_count","request":{"action":"estimate","kind":"gemini","tpm":16000,"body_bytes":300},"expected":{"decision":"need_count"}},
+    {"name":"estimate_count_zero","request":{"action":"estimate","kind":"gemini","tpm":16000,"body_bytes":300,"count_response":{"totalTokens":0}},"expected":{"decision":"estimate","input_tokens":0}},
+    {"name":"estimate_count_one","request":{"action":"estimate","kind":"gemini","tpm":16000,"body_bytes":300,"count_response":{"totalTokens":1}},"expected":{"decision":"estimate","input_tokens":2}},
+    {"name":"estimate_count_nine","request":{"action":"estimate","kind":"gemini","tpm":16000,"body_bytes":300,"count_response":{"totalTokens":9}},"expected":{"decision":"estimate","input_tokens":10}},
+    {"name":"estimate_count_ten","request":{"action":"estimate","kind":"gemini","tpm":16000,"body_bytes":300,"count_response":{"totalTokens":10}},"expected":{"decision":"estimate","input_tokens":11}},
+    {"name":"estimate_count_standard","request":{"action":"estimate","kind":"gemini","tpm":16000,"body_bytes":300,"count_response":{"totalTokens":4500}},"expected":{"decision":"estimate","input_tokens":4950}},
+    {"name":"estimate_count_wide_integer","request":{"action":"estimate","kind":"gemini","tpm":16000,"body_bytes":300,"count_response":{"totalTokens":18446744073709551615}},"expected":{"decision":"estimate","input_tokens":20291418481080506777}},
+    {"name":"estimate_count_negative","request":{"action":"estimate","kind":"gemini","tpm":16000,"body_bytes":300,"count_response":{"totalTokens":-1}},"expected":{"decision":"reject","reason":"input token count is unavailable"}},
+    {"name":"estimate_count_boolean","request":{"action":"estimate","kind":"gemini","tpm":16000,"body_bytes":300,"count_response":{"totalTokens":true}},"expected":{"decision":"reject","reason":"input token count is unavailable"}},
+    {"name":"estimate_count_float","request":{"action":"estimate","kind":"gemini","tpm":16000,"body_bytes":300,"count_response":{"totalTokens":1.0}},"expected":{"decision":"reject","reason":"input token count is unavailable"}},
+    {"name":"estimate_count_missing","request":{"action":"estimate","kind":"gemini","tpm":16000,"body_bytes":300,"count_response":{}},"expected":{"decision":"reject","reason":"input token count is unavailable"}},
+    {"name":"estimate_count_nonobject","request":{"action":"estimate","kind":"gemini","tpm":16000,"body_bytes":300,"count_response":[]},"expected":{"decision":"invalid_response","reason":"token count response is not an object"}},
+    {"name":"estimate_count_null","request":{"action":"estimate","kind":"gemini","tpm":16000,"body_bytes":300,"count_response":null},"expected":{"decision":"invalid_response","reason":"token count response is not an object"}},
+    {
+      "name": "first",
+      "request": {
+        "action": "admit",
+        "state": {
+          "events": [],
+          "day": "",
+          "daily": 0,
+          "not_before": 0
+        },
+        "now": 1790917200.0,
+        "kind": "gemini",
+        "limits": {
+          "rpm": 30,
+          "tpm": 16000,
+          "rpd": 3
+        },
+        "input_tokens": 10,
+        "id": "fixture"
+      },
+      "expected": {
+        "decision": "admit",
+        "state": {
+          "events": [
+            {
+              "id": "fixture",
+              "at": 1790917200.0,
+              "tokens": 10
+            }
+          ],
+          "day": "2026-10-01",
+          "daily": 1,
+          "not_before": 0
+        }
+      }
+    },
+    {
+      "name": "unlimited",
+      "request": {
+        "action": "admit",
+        "state": {
+          "events": [],
+          "day": "",
+          "daily": 0,
+          "not_before": 0
+        },
+        "now": 1790917200.0,
+        "kind": "gemini",
+        "limits": {
+          "rpm": 0,
+          "tpm": 0,
+          "rpd": 0
+        },
+        "input_tokens": 10,
+        "id": "fixture"
+      },
+      "expected": {
+        "decision": "admit",
+        "state": {
+          "events": [
+            {
+              "id": "fixture",
+              "at": 1790917200.0,
+              "tokens": 10
+            }
+          ],
+          "day": "2026-10-01",
+          "daily": 1,
+          "not_before": 0
+        }
+      }
+    },
+    {
+      "name": "too_large",
+      "request": {
+        "action": "admit",
+        "state": {
+          "events": [],
+          "day": "",
+          "daily": 0,
+          "not_before": 0
+        },
+        "now": 1790917200.0,
+        "kind": "gemini",
+        "limits": {
+          "rpm": 30,
+          "tpm": 16000,
+          "rpd": 3
+        },
+        "input_tokens": 14401,
+        "id": "fixture"
+      },
+      "expected": {
+        "decision": "reject",
+        "reason": "request exceeds the configured input-token budget"
+      }
+    },
+    {
+      "name": "expired",
+      "request": {
+        "action": "admit",
+        "state": {
+          "events": [
+            {
+              "id": "a",
+              "at": 1790917138.0,
+              "tokens": 1
+            }
+          ],
+          "day": "2026-10-01",
+          "daily": 2,
+          "not_before": 0
+        },
+        "now": 1790917200.0,
+        "kind": "gemini",
+        "limits": {
+          "rpm": 30,
+          "tpm": 16000,
+          "rpd": 3
+        },
+        "input_tokens": 10,
+        "id": "fixture"
+      },
+      "expected": {
+        "decision": "admit",
+        "state": {
+          "events": [
+            {
+              "id": "fixture",
+              "at": 1790917200.0,
+              "tokens": 10
+            }
+          ],
+          "day": "2026-10-01",
+          "daily": 3,
+          "not_before": 0
+        }
+      }
+    },
+    {
+      "name": "rpm",
+      "request": {
+        "action": "admit",
+        "state": {
+          "events": [
+            {
+              "id": "a",
+              "at": 1790917190.0,
+              "tokens": 1
+            }
+          ],
+          "day": "2026-10-01",
+          "daily": 1,
+          "not_before": 0
+        },
+        "now": 1790917200.0,
+        "kind": "gemini",
+        "limits": {
+          "rpm": 1,
+          "tpm": 0,
+          "rpd": 0
+        },
+        "input_tokens": 10,
+        "id": "fixture"
+      },
+      "expected": {
+        "decision": "wait",
+        "seconds": 52.0,
+        "state": {
+          "events": [
+            {
+              "id": "a",
+              "at": 1790917190.0,
+              "tokens": 1
+            }
+          ],
+          "day": "2026-10-01",
+          "daily": 1,
+          "not_before": 0
+        }
+      }
+    },
+    {
+      "name": "tpm",
+      "request": {
+        "action": "admit",
+        "state": {
+          "events": [
+            {
+              "id": "a",
+              "at": 1790917188.0,
+              "tokens": 50
+            }
+          ],
+          "day": "2026-10-01",
+          "daily": 1,
+          "not_before": 0
+        },
+        "now": 1790917200.0,
+        "kind": "gemini",
+        "limits": {
+          "rpm": 0,
+          "tpm": 100,
+          "rpd": 0
+        },
+        "input_tokens": 50,
+        "id": "fixture"
+      },
+      "expected": {
+        "decision": "wait",
+        "seconds": 50.0,
+        "state": {
+          "events": [
+            {
+              "id": "a",
+              "at": 1790917188.0,
+              "tokens": 50
+            }
+          ],
+          "day": "2026-10-01",
+          "daily": 1,
+          "not_before": 0
+        }
+      }
+    },
+    {
+      "name": "cooldown",
+      "request": {
+        "action": "admit",
+        "state": {
+          "events": [],
+          "day": "2026-10-01",
+          "daily": 1,
+          "not_before": 1790917290.0
+        },
+        "now": 1790917200.0,
+        "kind": "gemini",
+        "limits": {
+          "rpm": 30,
+          "tpm": 16000,
+          "rpd": 3
+        },
+        "input_tokens": 10,
+        "id": "fixture"
+      },
+      "expected": {
+        "decision": "wait",
+        "seconds": 90.0,
+        "state": {
+          "events": [],
+          "day": "2026-10-01",
+          "daily": 1,
+          "not_before": 1790917290.0
+        }
+      }
+    },
+    {
+      "name": "daily",
+      "request": {
+        "action": "admit",
+        "state": {
+          "events": [],
+          "day": "2026-10-01",
+          "daily": 3,
+          "not_before": 0
+        },
+        "now": 1790917200.0,
+        "kind": "gemini",
+        "limits": {
+          "rpm": 30,
+          "tpm": 16000,
+          "rpd": 3
+        },
+        "input_tokens": 10,
+        "id": "fixture"
+      },
+      "expected": {
+        "decision": "reject",
+        "reason": "provider daily request budget exhausted"
+      }
+    },
+    {
+      "name": "day_gemini_2026-03-08T07:59:59+00:00",
+      "request": {
+        "action": "day",
+        "now": 1772956799.0,
+        "kind": "gemini"
+      },
+      "expected": {
+        "day": "2026-03-07"
+      }
+    },
+    {
+      "name": "day_openai_2026-03-08T07:59:59+00:00",
+      "request": {
+        "action": "day",
+        "now": 1772956799.0,
+        "kind": "openai"
+      },
+      "expected": {
+        "day": "2026-03-08"
+      }
+    },
+    {
+      "name": "day_gemini_2026-03-08T08:00:00+00:00",
+      "request": {
+        "action": "day",
+        "now": 1772956800.0,
+        "kind": "gemini"
+      },
+      "expected": {
+        "day": "2026-03-08"
+      }
+    },
+    {
+      "name": "day_openai_2026-03-08T08:00:00+00:00",
+      "request": {
+        "action": "day",
+        "now": 1772956800.0,
+        "kind": "openai"
+      },
+      "expected": {
+        "day": "2026-03-08"
+      }
+    },
+    {
+      "name": "day_gemini_2026-03-08T09:59:59+00:00",
+      "request": {
+        "action": "day",
+        "now": 1772963999.0,
+        "kind": "gemini"
+      },
+      "expected": {
+        "day": "2026-03-08"
+      }
+    },
+    {
+      "name": "day_openai_2026-03-08T09:59:59+00:00",
+      "request": {
+        "action": "day",
+        "now": 1772963999.0,
+        "kind": "openai"
+      },
+      "expected": {
+        "day": "2026-03-08"
+      }
+    },
+    {
+      "name": "day_gemini_2026-03-08T10:00:00+00:00",
+      "request": {
+        "action": "day",
+        "now": 1772964000.0,
+        "kind": "gemini"
+      },
+      "expected": {
+        "day": "2026-03-08"
+      }
+    },
+    {
+      "name": "day_openai_2026-03-08T10:00:00+00:00",
+      "request": {
+        "action": "day",
+        "now": 1772964000.0,
+        "kind": "openai"
+      },
+      "expected": {
+        "day": "2026-03-08"
+      }
+    },
+    {
+      "name": "day_gemini_2026-11-01T06:59:59+00:00",
+      "request": {
+        "action": "day",
+        "now": 1793516399.0,
+        "kind": "gemini"
+      },
+      "expected": {
+        "day": "2026-10-31"
+      }
+    },
+    {
+      "name": "day_openai_2026-11-01T06:59:59+00:00",
+      "request": {
+        "action": "day",
+        "now": 1793516399.0,
+        "kind": "openai"
+      },
+      "expected": {
+        "day": "2026-11-01"
+      }
+    },
+    {
+      "name": "day_gemini_2026-11-01T07:00:00+00:00",
+      "request": {
+        "action": "day",
+        "now": 1793516400.0,
+        "kind": "gemini"
+      },
+      "expected": {
+        "day": "2026-11-01"
+      }
+    },
+    {
+      "name": "day_openai_2026-11-01T07:00:00+00:00",
+      "request": {
+        "action": "day",
+        "now": 1793516400.0,
+        "kind": "openai"
+      },
+      "expected": {
+        "day": "2026-11-01"
+      }
+    },
+    {
+      "name": "day_gemini_2026-11-01T08:59:59+00:00",
+      "request": {
+        "action": "day",
+        "now": 1793523599.0,
+        "kind": "gemini"
+      },
+      "expected": {
+        "day": "2026-11-01"
+      }
+    },
+    {
+      "name": "day_openai_2026-11-01T08:59:59+00:00",
+      "request": {
+        "action": "day",
+        "now": 1793523599.0,
+        "kind": "openai"
+      },
+      "expected": {
+        "day": "2026-11-01"
+      }
+    },
+    {
+      "name": "day_gemini_2026-11-01T09:00:00+00:00",
+      "request": {
+        "action": "day",
+        "now": 1793523600.0,
+        "kind": "gemini"
+      },
+      "expected": {
+        "day": "2026-11-01"
+      }
+    },
+    {
+      "name": "day_openai_2026-11-01T09:00:00+00:00",
+      "request": {
+        "action": "day",
+        "now": 1793523600.0,
+        "kind": "openai"
+      },
+      "expected": {
+        "day": "2026-11-01"
+      }
+    },
+    {
+      "name": "settle_23",
+      "request": {
+        "action": "settle",
+        "state": {
+          "events": [
+            {
+              "id": "a",
+              "at": 1790917200.0,
+              "tokens": 123
+            }
+          ],
+          "day": "2026-10-01",
+          "daily": 1,
+          "not_before": 0
+        },
+        "now": 1790917200.0,
+        "id": "a",
+        "input_tokens": 23
+      },
+      "expected": {
+        "state": {
+          "events": [
+            {
+              "id": "a",
+              "at": 1790917200.0,
+              "tokens": 23
+            }
+          ],
+          "day": "2026-10-01",
+          "daily": 1,
+          "not_before": 0
+        }
+      }
+    },
+    {
+      "name": "settle_None",
+      "request": {
+        "action": "settle",
+        "state": {
+          "events": [
+            {
+              "id": "a",
+              "at": 1790917200.0,
+              "tokens": 123
+            }
+          ],
+          "day": "2026-10-01",
+          "daily": 1,
+          "not_before": 0
+        },
+        "now": 1790917200.0,
+        "id": "a",
+        "input_tokens": null
+      },
+      "expected": {
+        "state": {
+          "events": [
+            {
+              "id": "a",
+              "at": 1790917200.0,
+              "tokens": 123
+            }
+          ],
+          "day": "2026-10-01",
+          "daily": 1,
+          "not_before": 1790917262.0
+        }
+      }
+    },
+    {
+      "name": "pause",
+      "request": {
+        "action": "pause",
+        "state": {
+          "events": [
+            {
+              "id": "a",
+              "at": 1790917200.0,
+              "tokens": 123
+            }
+          ],
+          "day": "2026-10-01",
+          "daily": 1,
+          "not_before": 0
+        },
+        "now": 1790917200.0,
+        "seconds": 90
+      },
+      "expected": {
+        "state": {
+          "events": [
+            {
+              "id": "a",
+              "at": 1790917200.0,
+              "tokens": 123
+            }
+          ],
+          "day": "2026-10-01",
+          "daily": 1,
+          "not_before": 1790917290.0
+        }
+      }
+    },
+    {
+      "name": "retry_none",
+      "request": {
+        "action": "retry",
+        "now": 1790917200.0,
+        "retry_after": null,
+        "raw": ""
+      },
+      "expected": {
+        "seconds": 62.0
+      }
+    },
+    {
+      "name": "retry_seconds",
+      "request": {
+        "action": "retry",
+        "now": 1790917200.0,
+        "retry_after": "81",
+        "raw": ""
+      },
+      "expected": {
+        "seconds": 81.0
+      }
+    },
+    {
+      "name": "retry_date",
+      "request": {
+        "action": "retry",
+        "now": 1790917200.0,
+        "retry_after": "Fri, 02 Oct 2026 08:00:00 GMT",
+        "raw": ""
+      },
+      "expected": {
+        "seconds": 10800.0
+      }
+    },
+    {
+      "name": "retry_retryinfo",
+      "request": {
+        "action": "retry",
+        "now": 1790917200.0,
+        "retry_after": "63",
+        "raw": "{\"error\":{\"details\":[{\"@type\":\"type.googleapis.com/google.rpc.RetryInfo\",\"retryDelay\":\"91.5s\"}]}}"
+      },
+      "expected": {
+        "seconds": 91.5
+      }
+    },
+    {
+      "name": "retry_bad",
+      "request": {
+        "action": "retry",
+        "now": 1790917200.0,
+        "retry_after": "nope",
+        "raw": "{\"error\":"
+      },
+      "expected": {
+        "seconds": 62.0
+      }
+    },
+    {
+      "name": "retry_invalid_first",
+      "request": {
+        "action": "retry",
+        "now": 1790917200.0,
+        "retry_after": null,
+        "raw": "{\"error\":{\"details\":[{\"@type\":\"type.googleapis.com/google.rpc.RetryInfo\",\"retryDelay\":\"oops\"},{\"@type\":\"type.googleapis.com/google.rpc.RetryInfo\",\"retryDelay\":\"999s\"}]}}"
+      },
+      "expected": {
+        "seconds": 62.0
+      }
+    }
+  ]
+}

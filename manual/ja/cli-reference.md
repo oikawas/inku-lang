@@ -63,7 +63,7 @@ JSON成果物は、その絵を描いたDDL層の版を `ddl_version` と `ddl_e
 
 | 旗 | 内容 |
 |---|---|
-| `--file FILE` / `-f` | 記述またはDDLをUTF-8ファイルから読む。`-` で標準入力を読みます（paintとbatchの両方）。batchは空行以外の1行が1作品 |
+| `--file FILE` / `-f` | 記述またはDDLをUTF-8ファイルから読む。`-` で標準入力を読みます（paintとbatchの両方）。batchは空行以外の1行が1作品。`--input-mode ddl`のbatchは、題の行（`「灯台」`だけの行）を作品にしない |
 | `--out-dir DIR` / `-o` | JSON / SVG / PNGの出力先 |
 | `--prefix P` | 出力ファイル名の接頭辞 |
 | `--png` | `--out-dir` を指定したとき、PNGも書き出す |
@@ -99,7 +99,8 @@ uv run inku-cli paint --image photo.jpg --provenance "2026年10月 京都・鴨�
 | `--sketch` | 写生を有効にし、元の記述を残して場所と光を補って解釈へ渡す。サーバー・Web UIとも既定はなし（off）。現行選択はなし／あり（off/on） |
 | `--sketch-grain {fine,coarse}` | 旧作品との互換用の旗。現行写生には使わない |
 | `--sketch-text TEXT` | Stage 0.5を呼ばず、この写生文を使う（保存済みまたは手で直した写生の再演） |
-| `--route {stages,read_and_draw}` | 描き方。`stages`（今の流れ。既定）か `read_and_draw`（読んで描く。記述を語り手の目から読み、DDL に書き、描いた画を見て一度直す）。読んで描くでは `--sketch` が読みを通し、`--sketch-text` は直した読みになる |
+| `--route {stages,read_and_draw}` | 描き方。`stages`（Web の「型で描く」。既定）か `read_and_draw`（Web の「言葉で描く」。記述を語り手の目から読み、DDL に書き、描いた画を見て一度直す）。`read_and_draw` では `--sketch` が読みを通し、`--sketch-text` は直した読みになる |
+| `--composition {off,on}` | `--route read_and_draw` のときだけ。`on` は記述（と読み）から先に構図と法則を決め、それに向けて指示書を書き、測って合わせ、直し、確定の前に配色を選ぶ。`off`（既定）は構図と法則を通さずに書く |
 
 変奏は廃止しました。旧強度・seedの旗は受け付けません。保存済みの変奏情報はDBに保持し、新しい描画要求へ渡しません。
 
@@ -225,7 +226,7 @@ uv run inku-cli replay WORK_ID --save-child
 
 | 旗 | 内容 |
 |---|---|
-| `ddl-export WORK_ID --output` / `-o` | 書き出し先のファイル。省略すると標準出力に書きます。出力は `inku.ddl-export.v1` のJSONで、作品のDDLと、そのDDLが名指すプラグインの定義を含みます |
+| `ddl-export WORK_ID --output` / `-o` | 書き出し先。出力は `inku.ddl-export.v2` で、作品の DDL と保存した lock が選ぶ定義・note を含みます |
 | `export-card HASH --out` / `-o` | 保存先のPNGパス。末尾が `/` のパス、または既存のディレクトリを指定すると、その中に `inku-card-<作品の短いhash>-<layout>.png` の名前で書きます。それ以外のパスは、そのままPNGファイルとして書きます。必須です |
 | `export-card --layout {square,portrait}` | `square` は1080×1080、`portrait` は1080×1350の紙です |
 | `export-card --no-seal` | 紙に小さく入る `inku` の印を入れません。省略時は入ります |
@@ -240,12 +241,11 @@ uv run inku-cli replay WORK_ID --save-child
 
 | コマンド | 内容 |
 |---|---|
-| `plugin list` | ロード済み／拒否されたプラグイン文書、namespace、version、拒否理由をJSONで取得する |
-| `plugin validate FILE` | ローカルの文書本文を管理APIへ送り、コードや外部ファイルを実行せず構文検証する |
-| `plugin reload` | サーバーを再起動せず `server/plugins/` を明示再読込する |
+| `plugin list` | ロード済み／拒否された v2 パッケージ、namespace、version、拒否理由を JSON で取得する |
+| `plugin validate FILE` | ローカルの v2 JSON または zip を管理 API の三段階の検査へ送る |
 | `reference [--md \| --json] [-o FILE]` | 実装内の語彙・定数テーブルの機械生成ダンプ。既定はMarkdown |
 
-`plugin` は管理者セッションを必要とします。`reference` はログイン済みセッションで実行できます。
+`plugin validate` は管理者セッション、`plugin list` と `reference` はログイン済みセッションを必要とします。
 
 ## 奥書
 
@@ -363,18 +363,13 @@ uv run inku-cli api GET /api/pipeline/variations/VARIATION_ID
 AIエージェントによる自動生成、評価、および系譜ツリーを辿った自律的な推敲ループで使用可能な専用コマンドです。実行手順は`inku-cli AI自律運転・テスト用リファレンス`が持ちます。
 
 ### 1. 作品系譜 (lineage)
-作品の派生ツリーを表示、または中間作品を通常履歴に昇格させます。
+作品の派生ツリーを表示します。
 
 * **系譜ツリーの表示**:
   ```sh
   uv run inku-cli lineage show WORK_ID --depth 3
   ```
   指定した作品IDを中心に、親・子ノードの関係をコンソール上にツリーテキスト表示します。`--json` を指定すると生JSONで出力します。
-* **中間作品の昇格**:
-  ```sh
-  uv run inku-cli lineage promote NODE_ID
-  ```
-  一時的な推敲で生まれた `lineage_only`（通常履歴非表示）のノードを、ユーザーの通常履歴へと昇格します。
 
 ### 2. 推敲と派生生成 (refine)
 既存作品を親ノードとして紐付け、局所的な別案を生成・保存します。
@@ -388,7 +383,7 @@ AIエージェントによる自動生成、評価、および系譜ツリーを
   ```sh
   uv run inku-cli refine save PARENT_NODE_ID --kind layout --file score.json --input-text "入力記述"
   ```
-  ローカルで調整したScore JSONを、親ノードに接続した派生（子）としてサーバー履歴へ直接インポートします。`--svg-file` でSVGを添えられます（省略するとSVGは空で保存されます）。`--visibility lineage_only` を付けると、通常の履歴には出さず系譜だけに置きます（既定は `normal`）。
+  ローカルで調整したScore JSONを、親ノードに接続した派生（子）としてサーバー履歴へ直接インポートします。`--svg-file` でSVGを添えられます（省略するとSVGは空で保存されます）。
 
 ### 3. 多モデル比較 (inspect)
 同一の記述に対して、複数のモデルがどのように解釈（DDL）および描画するかを順に実行し、比較します。

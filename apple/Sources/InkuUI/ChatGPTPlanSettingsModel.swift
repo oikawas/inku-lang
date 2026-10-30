@@ -26,6 +26,9 @@ public final class ChatGPTPlanSettingsModel {
         catch { report(error, language: app.display.preferences.language) }
         await app.synchronizePersonalPlanModels()
     }
+    public func checkConnection(app: AppModel) async {
+        await perform(app: app) { self.status = "" }
+    }
     public func setEnabled(_ enabled: Bool, app: AppModel) async {
         await perform(app: app) {
             let runtime = try app.personalPlanRuntime()
@@ -53,8 +56,11 @@ public final class ChatGPTPlanSettingsModel {
                 openURL(attempt.authorizationURL)
                 _ = try await runtime.finishAuthorization(attempt.id)
                 try Task.checkCancellation()
-                // The connected guide that follows names the next step: model settings.
+                // A connected profile has a fresh catalog before the pickers are synchronized.
+                // Catalog failure does not undo the successful authorization.
                 self.status = ""
+                do { _ = try await runtime.refreshPublication() }
+                catch { if !Task.isCancelled { self.report(error, language: app.display.preferences.language) } }
             } catch { if !Task.isCancelled { self.report(error, language: app.display.preferences.language) } }
             if let id = self.attemptID { try? await app.personalPlanRuntime().cancelAuthorization(id) }
             self.attemptID = nil
@@ -79,6 +85,13 @@ public final class ChatGPTPlanSettingsModel {
             let confirmed = try await app.personalPlanRuntime().signOut(id)
             self.status = confirmed ? "ローカル接続を解除し、提供元での失効を確認しました。"
                 : "ローカル接続を解除しました。提供元での失効は確認できていません。"
+        }
+    }
+    public func deleteProfile(_ id: String, app: AppModel) async {
+        await perform(app: app) {
+            let confirmed = try await app.personalPlanRuntime().deleteProfile(id)
+            self.status = confirmed ? "登録を削除し、提供元での失効を確認しました。"
+                : "登録を削除しました。提供元での失効は確認できていません。"
         }
     }
     public func retryQuota(_ id: String, app: AppModel) async {

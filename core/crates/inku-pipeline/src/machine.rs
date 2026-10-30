@@ -184,6 +184,10 @@ pub struct CatalogCandidate {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PipelineConfig {
+    /// Offer decisions made by this run; the host saves the config in the
+    /// immutable history fork context, including this optional record.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub plugin_offers: Vec<crate::plugin_offer::OfferRecord>,
     pub envelope_limits: crate::byte_envelope::EnvelopeLimits,
     pub language: ResolvedInstructionLanguage,
     pub compiler: CompilerOptions,
@@ -252,6 +256,10 @@ pub struct DescriptionDdlConfig {
     /// Show the written DDL's drawing to the model and ask once more. A host
     /// sets it when the model that writes reads images.
     pub review: bool,
+    /// Choose a composed work's colors before its commit (2026-10-26), when
+    /// the run has the color stage. A host sets it to draw with them.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub colors: bool,
 }
 
 /// The image a work is written from: the image the host sends, by
@@ -348,7 +356,7 @@ pub enum ReadingState {
 /// The record of a read-and-draw run, which a host keeps with the work: the
 /// description and its labels, the reading and what its check dropped, and
 /// how the writing went. It holds no image and no SVG.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DescriptionDdlRecord {
     /// The description as every request reads it, its labels cut.
@@ -384,6 +392,106 @@ pub struct DescriptionDdlRecord {
     /// Lines left out because each alone stopped the whole work.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub dropped: Vec<String>,
+    /// The composition and laws, when the run decides them (2026-10-26).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub composition: Option<DescriptionCompositionRecord>,
+}
+
+/// What became of a read-and-draw run's composition and laws.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CompositionState {
+    /// The composition is waiting to be asked for.
+    Pending,
+    /// The composer's answer is the run's composition.
+    Used,
+    /// No answer was accepted: the DDL is written as without a composition.
+    Fallback,
+}
+
+/// One answer of the composition stage: the request it answered, whether that
+/// request gave the tool's check back, and what the check found.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CompositionRound {
+    pub prompt_id: String,
+    pub prompt_digest: String,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub asked_again: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub problems: Vec<crate::description_composition::CompositionProblem>,
+}
+
+/// The measure of a composed DDL after a writing or review answer: each law
+/// and thing as written, what the fit did, whether the fit was kept (it is
+/// kept when it compiles with no more problems) and the measure the run was
+/// left with after the fit and the cards.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CompositionMeasures {
+    pub stage: LlmStage,
+    pub written: Vec<crate::description_laws::LawMeasure>,
+    pub fit: Vec<crate::description_laws::LawMeasure>,
+    pub fit_kept: bool,
+    pub after: Vec<crate::description_laws::LawMeasure>,
+}
+
+/// The record of a read-and-draw run's composition and laws (2026-10-26):
+/// what the composer answered and the targets the drawer was given, how the
+/// DDL measured and was fitted, the cards the tool built, and each sentence's
+/// thing.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DescriptionCompositionRecord {
+    pub state: CompositionState,
+    /// Why the run wrote without its composition.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fallback: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub answer: Option<crate::description_composition::CompositionAnswer>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub targets: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rounds: Vec<CompositionRound>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub measures: Vec<CompositionMeasures>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cards: Vec<crate::description_laws::CardRecord>,
+    /// Each sentence of every writing and review answer, with its thing: what
+    /// a sentence a document keeps draws.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub known: Vec<crate::description_laws::ThingSentence>,
+    /// The sentences of the DDL whose drawing the model saw, with their
+    /// things, as the tool fitted them and built its cards.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub drawn: Vec<crate::description_laws::ThingSentence>,
+    /// Each sentence's thing in the committed DDL, after its ratio sentence.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub things: Vec<u64>,
+    /// The colors chosen before the commit, when the run chose them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub colors: Option<DescriptionColorsRecord>,
+}
+
+/// What the colors did to a composed read-and-draw work (2026-10-26): the
+/// laws they chose and the lines they wrote, or why the work was committed
+/// without them.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DescriptionColorsRecord {
+    /// `used`, or `fallback` when the work was committed without its colors.
+    pub state: CompositionState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fallback: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub main_law: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub laws: Vec<String>,
+    /// The ground the colors chose, when they changed it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ground: Option<inku_score::Color>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub changes: Vec<crate::description_colors::ColorsChange>,
 }
 
 /// How a run chooses its colors: present, the run asks `choose_colors` once
@@ -482,6 +590,25 @@ pub enum SketchRequest {
 }
 
 impl SketchRequest {
+    fn is_off(&self) -> bool {
+        matches!(self, Self::Off)
+    }
+}
+
+/// Whether a read-and-draw run decides its composition and laws before it
+/// draws (2026-10-26): the author's choice, as the sketch is.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "mode", rename_all = "snake_case", deny_unknown_fields)]
+pub enum CompositionRequest {
+    /// The DDL is written from the description and its reading (the default).
+    #[default]
+    Off,
+    /// A composer decides the composition and laws first, and the drawer
+    /// draws by them.
+    On,
+}
+
+impl CompositionRequest {
     fn is_off(&self) -> bool {
         matches!(self, Self::Off)
     }
@@ -592,6 +719,10 @@ pub enum AuthoringInput {
         /// of a read-and-draw run reads.
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         source_labels: Vec<String>,
+        /// Whether a read-and-draw run decides its composition and laws first
+        /// (2026-10-26).
+        #[serde(default, skip_serializing_if = "CompositionRequest::is_off")]
+        composition: CompositionRequest,
     },
     /// A work written from an image (2026-10-24): a Vision model writes the
     /// DDL, which is committed as a DDL edit. The catalog is chosen from the
@@ -668,6 +799,8 @@ pub enum PipelineInput {
         route: DescriptionRoute,
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         source_labels: Vec<String>,
+        #[serde(default, skip_serializing_if = "CompositionRequest::is_off")]
+        composition: CompositionRequest,
     },
     CompleteHoles {
         expected_revision: DecimalU64,
@@ -811,6 +944,11 @@ pub struct LawsMove {
     /// to the DDL without its declaration, and the child declares it again.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub canvas_ratio: Option<inku_score::CanvasRatio>,
+    /// The chunk of each sentence of the saved work's DDL, when it has titles
+    /// (DDL 27). The laws are applied to the sentences without the titles,
+    /// and the child is titled again.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub titles: Vec<Option<String>>,
 }
 
 /// The provider attempt a host is running, for showing retry progress.
@@ -916,6 +1054,10 @@ impl PipelineSnapshot {
             ) {
                 return Err(ProtocolError::InvalidState);
             }
+            // A description run asks for the colors of its composed work only.
+            if self.description_ddl.is_some() && self.composed().is_none() {
+                return Err(ProtocolError::InvalidState);
+            }
         }
         if let Some(fallback) = &self.stage1_fallback {
             fallback.document()?;
@@ -967,11 +1109,27 @@ impl PipelineSnapshot {
                 self.phase,
                 PipelinePhase::AwaitingLlm {
                     stage: LlmStage::ReadDescription
+                        | LlmStage::ComposeDescription
                         | LlmStage::WriteDescriptionDdl
                         | LlmStage::ReviewDescriptionDdl,
                     ..
                 }
             )
+        {
+            return Err(ProtocolError::InvalidState);
+        }
+        // Only a run that decides its composition asks for one.
+        if matches!(
+            self.phase,
+            PipelinePhase::AwaitingLlm {
+                stage: LlmStage::ComposeDescription,
+                ..
+            }
+        ) && self
+            .description_ddl
+            .as_ref()
+            .and_then(|record| record.composition.as_ref())
+            .is_none_or(|composition| composition.state != CompositionState::Pending)
         {
             return Err(ProtocolError::InvalidState);
         }
@@ -1247,6 +1405,10 @@ impl PipelineSnapshot {
                 .config
                 .sketch_retry
                 .unwrap_or(self.config.catalog_retry),
+            // The composition decides the laws, and takes their budget.
+            LlmStage::ComposeDescription => {
+                self.config.laws_retry.unwrap_or(self.config.catalog_retry)
+            }
         }
     }
 
@@ -1258,6 +1420,7 @@ impl PipelineSnapshot {
         events: &mut Vec<PipelineEvent>,
     ) -> Result<(), ProtocolError> {
         let stage = prompt.stage;
+        self.record_plugin_offer(&prompt);
         let policy = self.retry_policy(stage);
         self.phase = PipelinePhase::AwaitingLlm {
             stage,
@@ -1274,6 +1437,48 @@ impl PipelineSnapshot {
             policy.remaining_attempt_timeout(0),
             events,
         )
+    }
+
+    fn record_plugin_offer(&mut self, prompt: &LlmPrompt) {
+        if !matches!(
+            prompt.stage,
+            LlmStage::GenerateNormalizedDdl
+                | LlmStage::WriteDescriptionDdl
+                | LlmStage::ReviewDescriptionDdl
+        ) {
+            return;
+        }
+        let Ok(message) = serde_json::from_str::<serde_json::Value>(&prompt.message) else {
+            return;
+        };
+        let Some(description) = message["description"].as_str() else {
+            return;
+        };
+        let catalog: Vec<_> = self
+            .config
+            .definitions
+            .iter()
+            .zip(&self.config.macro_summaries)
+            .map(|(definition, summary)| MacroPromptEntry {
+                definition,
+                localized_summary: summary,
+            })
+            .collect();
+        let offer = crate::plugin_offer::offer_plugins(
+            description,
+            message["current_ddl"].as_str(),
+            &catalog,
+            self.config.prompt_limits.max_offered_plugins,
+        );
+        self.config
+            .plugin_offers
+            .retain(|record| record.stage != prompt.stage);
+        self.config
+            .plugin_offers
+            .push(crate::plugin_offer::OfferRecord {
+                stage: prompt.stage,
+                offer,
+            });
     }
 }
 
@@ -1365,6 +1570,9 @@ impl PipelineSnapshot {
                         | LlmStage::WriteDescriptionDdl
                         | LlmStage::ReviewDescriptionDdl => {
                             message_names(&action.payload, "compiler_feedback")
+                        }
+                        LlmStage::ComposeDescription => {
+                            message_names(&action.payload, "composition_feedback")
                         }
                         _ => false,
                     },
@@ -1660,6 +1868,7 @@ impl PipelineSnapshot {
         attempt: u32,
         events: &mut Vec<PipelineEvent>,
     ) -> Result<(), ProtocolError> {
+        self.record_plugin_offer(&prompt);
         let policy = self.retry_policy(stage);
         let total = elapsed_ms
             .checked_add(policy.retry_delay_ms.get())
@@ -1786,6 +1995,35 @@ impl PipelineSnapshot {
         Ok(VisibleDocument::from_document(&wire.document()?))
     }
 
+    /// A laws child titled as its saved work was (DDL 27): `titles` gives the
+    /// chunk of each of the work's sentences, and the child keeps them in
+    /// order after its ratio sentence. A child whose sentences no longer line
+    /// up, or that the titles would carry past the source limit, is committed
+    /// without them.
+    fn with_carried_titles(
+        &self,
+        document: VisibleDocument,
+        titles: &[Option<String>],
+    ) -> Result<VisibleDocument, ProtocolError> {
+        let lines = document.source.split('\n').collect::<Vec<_>>();
+        let Some(head) = lines
+            .len()
+            .checked_sub(titles.len())
+            .filter(|head| *head <= 1)
+        else {
+            return Ok(document);
+        };
+        let chunks = std::iter::repeat_n(None, head)
+            .chain(titles.iter().map(Option::as_deref))
+            .collect::<Vec<_>>();
+        let source = inku_ddl::print_ddl_titles(&lines, &chunks, document.language);
+        if source == document.source || source.len() > self.config.prompt_limits.max_source_bytes {
+            return Ok(document);
+        }
+        let wire = VisibleDocument { source, ..document };
+        Ok(VisibleDocument::from_document(&wire.document()?))
+    }
+
     fn commit_stage1(
         &mut self,
         document: VisibleDocument,
@@ -1802,6 +2040,11 @@ impl PipelineSnapshot {
                 ..
             }) => self.with_ratio(document, *ratio, CanvasRatioWriting::ReplaceDeclared)?,
             Some(_) => document,
+        };
+        // ... and the work's titles, after the declaration (DDL 27).
+        let document = match self.laws_move.as_ref().map(|laws_move| &laws_move.titles) {
+            Some(titles) if !titles.is_empty() => self.with_carried_titles(document, titles)?,
+            _ => document,
         };
         if let Some(basis) = self
             .laws_basis
@@ -1990,11 +2233,23 @@ impl PipelineSnapshot {
             .map_err(|_| ProtocolError::SchemaViolation)?;
         self.completion_ranges = work.completion_ranges.filter(|record| !record.is_empty());
         // The laws read the DDL's sentences; its ratio declaration is carried
-        // apart and written again on the child (DDL 26).
+        // apart and written again on the child (DDL 26), and so are its title
+        // lines (DDL 27).
         let canvas_ratio = inku_ddl::source_canvas_ratio(&work.source, self.config.language);
+        let (sentences, titles) = inku_ddl::split_ddl_titles(&inku_ddl::without_canvas_ratio(
+            &work.source,
+            self.config.language,
+        ));
+        let titles = if titles.iter().any(Option::is_some) {
+            titles
+        } else {
+            Vec::new()
+        };
+        let untitled = (!titles.is_empty()).then(|| sentences.join("\n"));
         self.laws_move = Some(LawsMove {
             direction,
             canvas_ratio,
+            titles,
         });
         if work.description.trim().is_empty() {
             return self.fail_laws_move("no_description", None, events);
@@ -2008,7 +2263,9 @@ impl PipelineSnapshot {
                 basis.composed
             }
             (None, Some(_)) => return self.fail_laws_move("laws_without_basis", None, events),
-            (None, None) => inku_ddl::without_canvas_ratio(&work.source, self.config.language),
+            (None, None) => untitled.unwrap_or_else(|| {
+                inku_ddl::without_canvas_ratio(&work.source, self.config.language)
+            }),
         };
         let document = self.new_document(base)?;
         let plugins = crate::prompts::work_plan_plugins(&self.config.definitions);
@@ -2144,11 +2401,12 @@ impl PipelineSnapshot {
         composed: &ComposedPlan,
     ) -> Option<(LawsContext, usize)> {
         let compiled = self.compile_for_run(document)?;
-        let context = LawsContext::new(
+        let context = LawsContext::new_with_plugins(
             compiled.score()?.clone(),
             composed,
             self.config.compiler.host.palette(),
             self.config.compiler.host.canvas_format_id(),
+            &crate::prompts::work_plan_plugins(self.config.definitions.iter()),
         )?;
         let context = match &self.laws_move {
             Some(laws_move) => context.with_direction(laws_move.direction.clone()),
@@ -2496,6 +2754,19 @@ impl PipelineSnapshot {
         description: &str,
     ) -> Option<(ColorsContext, usize)> {
         let compiled = self.compile_for_run(document)?;
+        let context = self.colors_context_of(compiled.score()?, printed, handoff, description)?;
+        Some((context, shortfalls(&compiled)))
+    }
+
+    /// The colors' context of a Score, drawn with the seeds the host draws
+    /// the work with.
+    fn colors_context_of(
+        &self,
+        score: &inku_score::Score,
+        printed: &PrintedPlan,
+        handoff: &LawsHandoff,
+        description: &str,
+    ) -> Option<ColorsContext> {
         let seeds = crate::appearance::Seeds {
             render: self
                 .config
@@ -2510,8 +2781,9 @@ impl PipelineSnapshot {
                 .flatten()
                 .map(i128::from),
         };
-        let context = ColorsContext::new(colors::ColorsInput {
-            score: compiled.score()?,
+        let plugins = crate::prompts::work_plan_plugins(self.config.definitions.iter());
+        ColorsContext::new(colors::ColorsInput {
+            score,
             printed,
             handoff,
             palette: self.config.compiler.host.palette(),
@@ -2519,8 +2791,8 @@ impl PipelineSnapshot {
             seeds,
             error_policy: self.config.compiler.error_policy,
             description,
-        })?;
-        Some((context, shortfalls(&compiled)))
+            plugins: &plugins,
+        })
     }
 
     /// Read the colors reply, apply it and commit the document the colors
@@ -2535,6 +2807,9 @@ impl PipelineSnapshot {
         description: Option<String>,
         events: &mut Vec<PipelineEvent>,
     ) -> Result<(), ProtocolError> {
+        if self.description_ddl.is_some() {
+            return self.description_colors_response(response, spent_ms, description, events);
+        }
         let pending = self
             .colors
             .as_ref()
@@ -2648,6 +2923,7 @@ impl PipelineSnapshot {
                 self.config.language,
                 self.config.prompt_limits,
             )
+            .and_then(|prompt| self.with_described_things(prompt))
             .and_then(|prompt| {
                 colors::with_colors_feedback(prompt, refusal, self.config.prompt_limits)
             })
@@ -2676,7 +2952,8 @@ impl PipelineSnapshot {
         )
     }
 
-    /// Commit the document the laws left without colors and say why.
+    /// Commit the document the laws left without colors and say why; a
+    /// composed read-and-draw work is committed as its review left it.
     fn colors_fallback(
         &mut self,
         payload: serde_json::Value,
@@ -2684,6 +2961,9 @@ impl PipelineSnapshot {
     ) -> Result<(), ProtocolError> {
         self.action = None;
         let pending = self.colors.take().ok_or(ProtocolError::InternalInvariant)?;
+        if self.description_ddl.is_some() {
+            return self.description_colors_fallback(pending.document, payload, events);
+        }
         self.event(events, "colors_fallback", payload)?;
         self.commit_stage1(pending.document, &pending.reason, events)
     }
@@ -2700,6 +2980,7 @@ impl PipelineSnapshot {
         .is_ok_and(|delivery| delivery.residual_execution_is_deliverable())
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn description(
         &mut self,
         description: String,
@@ -2707,6 +2988,7 @@ impl PipelineSnapshot {
         sketch: SketchRequest,
         route: DescriptionRoute,
         source_labels: Vec<String>,
+        composition: CompositionRequest,
         events: &mut Vec<PipelineEvent>,
     ) -> Result<(), ProtocolError> {
         let _ = proposal(
@@ -2718,13 +3000,18 @@ impl PipelineSnapshot {
         {
             return Err(ProtocolError::SchemaViolation);
         }
+        // Only a read-and-draw run decides its composition and laws first.
+        if route == DescriptionRoute::Stages && composition != CompositionRequest::Off {
+            return Err(ProtocolError::InvalidPolicy);
+        }
         // A run keeps no record of the run before it in the same execution.
+        self.config.plugin_offers.clear();
         self.description_ddl = None;
         match route {
             DescriptionRoute::Stages => self.sketch = SketchRecord::from_request(sketch),
             DescriptionRoute::ReadAndDraw => {
                 self.sketch = None;
-                self.begin_read_and_draw(description.clone(), sketch, source_labels)?;
+                self.begin_read_and_draw(description.clone(), sketch, source_labels, composition)?;
             }
         }
         if auto_catalog {
@@ -3025,6 +3312,9 @@ impl PipelineSnapshot {
                 self.image_stage_failed(stage, failure, detail, events)
             }
             LlmStage::ReadDescription => self.description_reading_failed(failure, detail, events),
+            LlmStage::ComposeDescription => {
+                self.description_composition_failed(failure, detail, events)
+            }
             LlmStage::WriteDescriptionDdl | LlmStage::ReviewDescriptionDdl => {
                 self.written_stage_failed(stage, failure, detail, events)
             }
@@ -3752,6 +4042,9 @@ impl PipelineSnapshot {
             LlmStage::ReadDescription => {
                 self.description_reading_response(&response, spent_ms, events)
             }
+            LlmStage::ComposeDescription => {
+                self.description_composition_response(&response, total, events)
+            }
         }
     }
 }
@@ -3840,6 +4133,7 @@ fn advance_impl(
                 sketch,
                 route,
                 source_labels,
+                composition,
             } => {
                 state.editable()?;
                 state.revision(expected_revision)?;
@@ -3849,6 +4143,7 @@ fn advance_impl(
                     sketch,
                     route,
                     source_labels,
+                    composition,
                     &mut events,
                 )?;
             }
@@ -4006,6 +4301,8 @@ fn advance_impl(
         if variation_id.is_empty() || authoring_nonce.is_empty() {
             return Err(ProtocolError::SchemaViolation);
         }
+        let mut config = config;
+        config.plugin_offers.clear();
         config.validate()?;
         let execution_id = value_digest(
             "inku.pipeline-execution.v1",
@@ -4104,12 +4401,14 @@ fn advance_impl(
                 sketch,
                 route,
                 source_labels,
+                composition,
             } => state.description(
                 description,
                 auto_catalog,
                 sketch,
                 route,
                 source_labels,
+                composition,
                 &mut events,
             )?,
             AuthoringInput::Image {
@@ -4221,6 +4520,16 @@ impl PipelineSnapshot {
                 ..
             } => self.llm_response(
                 LlmStage::ReadDescription,
+                response,
+                elapsed_ms.get(),
+                events,
+            ),
+            EffectResult::DescriptionComposed {
+                response,
+                elapsed_ms,
+                ..
+            } => self.llm_response(
+                LlmStage::ComposeDescription,
                 response,
                 elapsed_ms.get(),
                 events,

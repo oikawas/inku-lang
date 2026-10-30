@@ -257,7 +257,6 @@ def test_history_projection_full_valid_row_is_exact_and_ordered() -> None:
         "batch_line_number": 4,
         "batch_run_id": "batch-1",
         "description_hash": "dh1:abc",
-        "history_visibility": "restricted",
         "lineage_node_id": "node-1",
         "stage1_prompt_digest": "stage1",
         "stage1_prompt_base_digest": "stage1-base",
@@ -336,11 +335,10 @@ def test_history_projection_absence_row_has_exact_base_key_set() -> None:
         "batch_line_number",
         "batch_run_id",
         "description_hash",
-        "history_visibility",
         "lineage_node_id",
     ]
     assert item["source_text"] == "input"
-    assert item["history_visibility"] == "normal"
+    assert "history_visibility" not in item
 
 
 @pytest.mark.parametrize(

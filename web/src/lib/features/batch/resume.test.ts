@@ -117,10 +117,15 @@ test('T-63  the conditions are read off the work that was drawn last', () => {
 			wild: true,
 			canvasAspectId: 'tate',
 			route: 'stages',
+			// The stages have no composition and laws of their own to resume.
+			composition: null,
 		},
 	);
-	// A read-and-draw work keeps its record, and the batch resumes on that route.
+	// A read-and-draw work keeps its record, and the batch resumes on that route,
+	// with the composition and laws as the work had them (2026-10-26).
 	assert.equal(conditionsOfWork({ description_ddl: { reading_state: 'read' } }).route, 'read_and_draw');
+	assert.equal(conditionsOfWork({ description_ddl: { reading_state: 'read' } }).composition, 'off');
+	assert.equal(conditionsOfWork({ description_ddl: { composition: { state: 'used' } } }).composition, 'on');
 });
 
 test('T-63  a condition the work never recorded is not invented', () => {
@@ -138,6 +143,7 @@ test('T-63  a condition the work never recorded is not invented', () => {
 		// Not invented: every work without the read-and-draw record was drawn
 		// by the stages, the only route there was before it.
 		route: 'stages',
+		composition: null,
 	});
 	assert.equal(conditionsOfWork({ render_wild: false }).wild, false);
 });

@@ -25,8 +25,7 @@ struct DdlAuthoringEditorSheet: View {
                 HStack(spacing: 18) {
                     DdlDrawingModelCard(model: model, reference: drawingModel, providers: providers) { showModels = true }
                     HStack(spacing: 8) {
-                        Text(model.display.localized(wildOverride == nil ? "筆致制限（継承）" : "筆致制限")).inkuFont(12).foregroundStyle(.secondary)
-                        Button(model.display.localized("暴れる")) { wildOverride = !(wildOverride ?? inheritedWild) }
+                        Button(model.display.localized("筆致制限を外す")) { wildOverride = !(wildOverride ?? inheritedWild) }
                             .buttonStyle(InkuGhostButtonStyle(active: wildOverride ?? inheritedWild))
                             .accessibilityValue(model.display.localized((wildOverride ?? inheritedWild) ? "オン" : "オフ"))
                     }.fixedSize()
@@ -75,7 +74,8 @@ struct DdlAuthoringEditorSheet: View {
             let settings = await model.hostSettings()
             providers = settings.providers
             drawingModel = SettingsModel.isBatchModelAvailable(settings.models.stage2Model, settings: settings) ? settings.models.stage2Model : ""
-            inheritedWild = (session.work ?? model.displayedWork)?.renderWild ?? false
+            inheritedWild = model.display.preferences.defaultWild ?? false
+            wildOverride = inheritedWild
         }
         .sheet(isPresented: $showModels) {
             BatchModelPickerView(model: model, initialReference: drawingModel, immediateSelection: true, title: "描画モデル") { reference in

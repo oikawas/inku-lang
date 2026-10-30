@@ -72,7 +72,7 @@ def test_v4_adds_nullable_image_fields_once_and_preserves_saved_values(tmp_path)
             assert [tuple(row[:-2]) for row in after] == [tuple(row) for row in before]
             assert all(tuple(row[-2:]) == (None, None) for row in after)
             assert connection.exec_driver_sql("SELECT version FROM schema_migrations ORDER BY version").all() == [
-                (3,), (4,), (5,),
+                (3,), (4,), (6,),
             ]
         with sqlite3.connect(first.snapshot.path) as snapshot:
             assert "image_ddl" not in {row[1] for row in snapshot.execute("PRAGMA table_info(history)")}

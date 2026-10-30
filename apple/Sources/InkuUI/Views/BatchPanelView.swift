@@ -114,11 +114,6 @@ struct BatchPanelView: View {
             Divider()
             if model.display.visible("drawing_settings") {
                 BatchConditionsView(model: model, automation: automation)
-            } else {
-                // Hiding native advanced conditions must not remove the batch's clear action.
-                Button(model.display.webCopy("clearInputBtn", "新規作成")) { automation.restoreBatchInput("") }
-                    .buttonStyle(InkuGhostButtonStyle()).disabled(controlsDisabled)
-                    .inkuTooltip(model.display.tooltip("入力をクリアする", serverKey: "tooltipInputClear"))
             }
             actions
             if inputOnly && automation.running { BatchObservationCards(model: model, automation: automation) }
@@ -170,7 +165,14 @@ struct BatchPanelView: View {
                     Text(model.display.preferences.language == "en" ? "\(paintableCount) items" : "\(paintableCount) 件")
                         .inkuFont(12).foregroundStyle(.secondary).monospacedDigit()
                 }
-                if !automation.batchPromptHistory.isEmpty { inputHistory }
+                HStack(spacing: 8) {
+                    if !automation.running {
+                        Button(model.display.webCopy("clearInputBtn", "新規作成")) { automation.restoreBatchInput("") }
+                            .buttonStyle(InkuGhostButtonStyle())
+                            .inkuTooltip(model.display.tooltip("入力をクリアする", serverKey: "tooltipInputClear"))
+                    }
+                    if !automation.batchPromptHistory.isEmpty { inputHistory }
+                }
             }
             if let error = automation.historyErrorText {
                 Text(model.display.message(error)).inkuFont(12).foregroundStyle(.red).textSelection(.enabled)
@@ -555,7 +557,7 @@ struct BatchPanelView: View {
                 model.display.localized("色カタログ") + ": " + catalog,
                 model.display.localized("用紙") + ": " + paper,
                 model.display.localized("写生") + ": " + sketch,
-                model.display.localized("暴れる") + ": " + wild].joined(separator: " · ")
+                model.display.localized("筆致制限を外す") + ": " + wild].joined(separator: " · ")
     }
 
     private var observation: some View {

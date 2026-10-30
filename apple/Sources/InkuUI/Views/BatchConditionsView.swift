@@ -39,6 +39,7 @@ struct BatchConditionsView: View {
             .disabled(model.catalogs.isEmpty)
             .inkuTooltip(tip("次のバッチで使う配色を選びます。"))
             Divider()
+            DrawConditionsView(model: model, sketch: shownSketchMode, onSketch: { automation.batchSketchMode = $0 })
             WrappingHStack(spacing: 6) { compactControls }
             .buttonStyle(InkuGhostButtonStyle())
         }
@@ -97,10 +98,8 @@ struct BatchConditionsView: View {
     }
 
     @ViewBuilder private var compactControls: some View {
-        sketchControl
         wildControl
         paperControl
-        clearControl
     }
 
     private var sketchControl: some View {
@@ -151,11 +150,11 @@ struct BatchConditionsView: View {
             guard !disabled else { return }
             model.wild.toggle()
         } label: {
-            Text(model.display.localized("暴れる") + " " + model.display.localized(shownWild.map { $0 ? "入" : "切" } ?? "未記録"))
+            Text(model.display.localized("筆致制限を外す") + " " + model.display.localized(shownWild.map { $0 ? "入" : "切" } ?? "未記録"))
         }
         .buttonStyle(InkuGhostButtonStyle(active: shownWild == true))
         .inkuTooltip(tip("次の作品の筆致を規則から外します。"))
-        .accessibilityLabel(model.display.localized("暴れる"))
+        .accessibilityLabel(model.display.localized("筆致制限を外す"))
         .accessibilityValue(model.display.localized(shownWild.map { $0 ? "入" : "切" } ?? "未記録"))
     }
 
@@ -170,14 +169,6 @@ struct BatchConditionsView: View {
             CreationPaperPicker(model: model) { showPaperPicker = false }.environment(model.display).disabled(disabled)
         }
         .accessibilityValue(shownCanvas)
-    }
-
-    private var clearControl: some View {
-        Button(model.display.webCopy("clearInputBtn", "新規作成")) {
-            guard !disabled else { return }
-            automation.restoreBatchInput("")
-        }
-        .inkuTooltip(model.display.tooltip("入力をクリアする", serverKey: "tooltipInputClear"))
     }
 
     private var details: some View {

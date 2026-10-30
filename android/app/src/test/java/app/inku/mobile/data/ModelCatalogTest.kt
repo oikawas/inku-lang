@@ -1,6 +1,10 @@
 package app.inku.mobile.data
 
 import java.io.File
+import app.inku.mobile.ui.modelRecommendationLevel
+import app.inku.mobile.ui.purposeUnsupported
+import app.inku.mobile.ui.isModelUnselectable
+import app.inku.mobile.ui.sortModels
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
@@ -22,14 +26,40 @@ class ModelCatalogTest {
         }
     }
 
+    @Test fun sharedSelectionCasesUseTheCoreSelection() {
+        val cases = JSONObject(File(System.getProperty("inku.modelCatalogCases")).readText()).getJSONArray("selection_cases")
+        for (index in 0 until cases.length()) {
+            val case = cases.getJSONObject(index)
+            val model = catalog.classify(case.getJSONObject("model"))
+            val purpose = case.getString("purpose")
+            assertEquals(case.getString("name"), case.getBoolean("unselectable"), isModelUnselectable(model))
+            assertEquals(case.getString("name"), case.getBoolean("unsupported"), purposeUnsupported(model, purpose))
+            assertEquals(case.getString("name"), case.getDouble("level"), modelRecommendationLevel(model, purpose, case.getString("stage")), 0.0)
+        }
+    }
+
+    @Test fun sharedSortCasesUseTheCoreSortKeys() {
+        val cases = JSONObject(File(System.getProperty("inku.modelCatalogCases")).readText()).getJSONArray("sort_cases")
+        for (index in 0 until cases.length()) {
+            val case = cases.getJSONObject(index)
+            val input = case.getJSONArray("models")
+            val models = (0 until input.length()).map { catalog.classify(input.getJSONObject(it)) }
+            assertEquals(case.getString("name"), case.getJSONArray("order").strings(),
+                sortModels(models, "none", { it }, { it.name }).map { it.id })
+        }
+    }
+
     @Test fun canonicalDefaultsAndChatGptMeasurementsSurviveLocalObservations() {
         val before = source.toString()
         val providers = source.getJSONObject("providers")
         providers.keys().forEach { id -> assertEquals(providers.getJSONObject(id).getJSONArray("defaults").strings(), catalog.defaults(id)) }
         val chat = catalog.resolve("chatgpt", "chatgpt:gpt-6.1-sol")
+        assertSame("unchanged observations use the cached core answer", chat, catalog.resolve("chatgpt", chat.id))
         assertEquals(30.4, chat.record.getDouble("speed_llm_seconds"), 0.0)
         assertEquals(3, chat.record.getInt("recommendation_vision"))
         val retired = catalog.resolve("chatgpt", chat.id, offered = emptySet())
+        assertNotSame("changed observations have their own answer", chat, retired)
+        assertSame("repeated observations reuse their answer", retired, catalog.resolve("chatgpt", chat.id, offered = emptySet()))
         assertEquals("eol", retired.fold)
         assertFalse(retired.publishable)
         assertTrue(catalog.resolve("chatgpt", chat.id, offered = setOf(chat.id)).publishable)

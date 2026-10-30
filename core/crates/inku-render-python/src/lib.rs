@@ -227,12 +227,32 @@ fn pipeline_resolve_macro_catalog<'py>(
 }
 
 #[pyfunction]
+fn pipeline_migrate_plugin_names<'py>(
+    py: Python<'py>,
+    input_bytes: &Bound<'py, PyBytes>,
+) -> Bound<'py, PyBytes> {
+    let input = input_bytes.as_bytes().to_vec();
+    let output = py.detach(|| inku_pipeline_uniffi::migrate_plugin_names(input));
+    PyBytes::new(py, &output)
+}
+
+#[pyfunction]
 fn pipeline_explain_plugin_diagnostics<'py>(
     py: Python<'py>,
     input_bytes: &Bound<'py, PyBytes>,
 ) -> Bound<'py, PyBytes> {
     let input = input_bytes.as_bytes().to_vec();
     let output = py.detach(|| inku_pipeline_uniffi::explain_plugin_diagnostics(input));
+    PyBytes::new(py, &output)
+}
+
+#[pyfunction]
+fn pipeline_plugin_calls<'py>(
+    py: Python<'py>,
+    input_bytes: &Bound<'py, PyBytes>,
+) -> Bound<'py, PyBytes> {
+    let input = input_bytes.as_bytes().to_vec();
+    let output = py.detach(|| inku_pipeline_uniffi::plugin_calls(input));
     PyBytes::new(py, &output)
 }
 
@@ -330,6 +350,25 @@ fn pipeline_juxtaposition<'py>(
     PyBytes::new(py, &output)
 }
 
+/// The chunk moves (まとまりの手) from the shared core: start, answer, drawn.
+#[pyfunction]
+fn pipeline_chunk_moves<'py>(
+    py: Python<'py>,
+    input_bytes: &Bound<'py, PyBytes>,
+) -> Bound<'py, PyBytes> {
+    let input = input_bytes.as_bytes().to_vec();
+    let output = py.detach(|| inku_pipeline_uniffi::chunk_moves(input));
+    PyBytes::new(py, &output)
+}
+
+/// Inspect plugin packages through the shared host-neutral JSON boundary.
+#[pyfunction]
+fn pipeline_plugin_package(py: Python<'_>, input_bytes: &Bound<'_, PyBytes>) -> String {
+    let input = input_bytes.as_bytes().to_vec();
+    let output = py.detach(|| inku_pipeline_uniffi::plugin_package(input));
+    String::from_utf8(output).expect("plugin package output is UTF-8 JSON")
+}
+
 /// The autonomous refinement (AI自動推敲) from the shared core: next, record, measure.
 #[pyfunction]
 fn pipeline_autonomous_refine<'py>(
@@ -349,6 +388,26 @@ fn pipeline_provider_wire<'py>(
 ) -> Bound<'py, PyBytes> {
     let input = input_bytes.as_bytes().to_vec();
     let output = py.detach(|| inku_pipeline_uniffi::provider_wire(input));
+    PyBytes::new(py, &output)
+}
+
+#[pyfunction]
+fn pipeline_model_catalog<'py>(
+    py: Python<'py>,
+    input_bytes: &Bound<'py, PyBytes>,
+) -> Bound<'py, PyBytes> {
+    let input = input_bytes.as_bytes().to_vec();
+    let output = py.detach(|| inku_pipeline_uniffi::model_catalog(input));
+    PyBytes::new(py, &output)
+}
+
+#[pyfunction]
+fn pipeline_provider_admission<'py>(
+    py: Python<'py>,
+    input_bytes: &Bound<'py, PyBytes>,
+) -> Bound<'py, PyBytes> {
+    let input = input_bytes.as_bytes().to_vec();
+    let output = py.detach(|| inku_pipeline_uniffi::provider_admission(input));
     PyBytes::new(py, &output)
 }
 
@@ -458,6 +517,8 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(pipeline_provider_attempt, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_resolve_palette, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_resolve_macro_catalog, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_migrate_plugin_names, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_plugin_calls, module)?)?;
     module.add_function(wrap_pyfunction!(
         pipeline_explain_plugin_diagnostics,
         module
@@ -476,7 +537,11 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(pipeline_saved_variants, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_juxtaposition, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_autonomous_refine, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_chunk_moves, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_plugin_package, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_provider_wire, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_model_catalog, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_provider_admission, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_image_input_policy, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_image_canvas, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_image_review_svg, module)?)?;

@@ -490,6 +490,9 @@ fn invocation_atom_matches(
         && written.is_some_and(|written| {
             // The visible name is the canonical name or an alias of its lock.
             written == invoked
+                || matches!(crate::parser::qualified_macro_match(document, resolved.span.start_byte),
+                    Some(crate::parser::QualifiedMacroMatch::ExactLock { end_byte, lock_index })
+                    if end_byte == resolved.span.end_byte && document.macro_locks()[lock_index].qualified_name() == invoked)
                 || document.macro_locks().iter().any(|macro_lock| {
                     macro_lock.qualified_name() == invoked
                         && macro_lock.aliases().iter().any(|alias| alias == written)
@@ -889,7 +892,7 @@ mod tests {
     fn document(definition: &MacroDefinition) -> NormalizedDdlDocument {
         let identity = definition.identity().unwrap();
         NormalizedDdlDocument::new(
-            "Bind.Owned",
+            "｛Owned｝",
             ResolvedInstructionLanguage::En,
             vec![
                 MacroLock::new(

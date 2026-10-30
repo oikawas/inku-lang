@@ -308,6 +308,68 @@ test('normal authoring keeps approval, fork, stale CAS, and legacy parent on the
 	assert.equal(calls.length, callsBeforeSupersededRelease);
 });
 
+// 2026-10-26: opening a saved work while a description was drawn moved the
+// request ordinal, and the run returned half-way, never performed or saved.
+// The drawing read as cancelled.
+function drawingInFlight(onPoll: (poll: number, controller: PipelineController) => void) {
+	const delivered = view({ phase: { tag: 'ready' }, delivery: {
+		score: {}, upstream_diagnostics: [], downstream_diagnostics: [], resource_omissions: [], relation_omissions: [] } });
+	const saved = view({ phase: { tag: 'ready' }, result: { history_id: 'new-work' } as PipelineView['result'] });
+	const commands: string[] = [];
+	const shown: Array<PipelineView | null> = [];
+	const progressed: PipelineView[] = [];
+	let polls = 0;
+	const api = {
+		start: async () => view({ busy: true }),
+		load: async () => {
+			polls += 1;
+			onPoll(polls, controller);
+			return polls < 3 ? view({ busy: true }) : delivered;
+		},
+		command: async (_active: PipelineView, command: { tag: string }) => {
+			commands.push(command.tag);
+			return command.tag === 'perform' ? saved : view({ phase: { tag: 'cancelled' } });
+		},
+		historyLink: async () => undefined,
+	};
+	const controller: PipelineController = new PipelineController(
+		api as never, () => ({}), (next) => shown.push(next), async () => {}, (next) => progressed.push(next));
+	return { controller, commands, shown, progressed };
+}
+
+test('a drawing goes on to be drawn and saved while the author opens another work', async () => {
+	const { controller, commands, shown, progressed } = drawingInFlight((poll, controller) => {
+		if (poll === 1) void controller.selectHistory('another-work', 'variation-9');
+	});
+	const ended = await controller.fromDescription('moon');
+	assert.deepEqual(commands, ['perform']);
+	assert.equal(ended.result?.history_id, 'new-work');
+	assert.equal(controller.lastRunWasShown, false);
+	// The screen keeps the opened work; the run's progress is still followed.
+	assert.equal(shown.at(-1), null);
+	assert.equal(controller.current, null);
+	assert.equal(progressed.at(-1)?.result?.history_id, 'new-work');
+});
+
+test('the stop still stops a drawing the author no longer looks at', async () => {
+	const { controller, commands } = drawingInFlight((poll, controller) => {
+		if (poll === 1) controller.clear();
+		if (poll === 2) void controller.cancel();
+	});
+	const ended = await controller.fromDescription('moon');
+	assert.deepEqual(commands, ['cancel']);
+	assert.equal(ended.result, null);
+	assert.equal(controller.current, null);
+});
+
+test('a drawing the author keeps looking at is shown to its end', async () => {
+	const { controller, commands, shown } = drawingInFlight(() => {});
+	const ended = await controller.fromDescription('moon');
+	assert.deepEqual(commands, ['perform']);
+	assert.equal(controller.lastRunWasShown, true);
+	assert.equal(shown.at(-1), ended);
+});
+
 test('a plugin explanation replaces the generic compiler entry for the same sentence', () => {
 	const listed = pipelineDiagnostics(null, {
 		upstream_diagnostics: [

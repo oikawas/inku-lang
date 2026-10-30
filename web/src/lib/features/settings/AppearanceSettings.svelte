@@ -6,6 +6,7 @@
 	import { captionSettings } from '$lib/features/canvas/caption-settings.svelte';
 	import { generationInfoSettings } from '$lib/features/canvas/generation-info-settings.svelte';
 	import { textSizeSettings } from '$lib/features/appearance/text-size.svelte';
+	import { wildSettings } from '$lib/features/wild/settings.svelte';
 	import { UI_VISIBILITY_KEYS, type UiCustomVisibility, type UiMode, type UiVisibilityKey } from '$lib/uiMode';
 	import { canAddHistoryStripField, HISTORY_STRIP_FIELDS, type HistoryStripField } from '$lib/historyStripFields';
 	import './appearance-settings.css';
@@ -60,6 +61,14 @@
 				</div>
 			</div>
 			{:else}
+			<div class="popover-group">
+				<div class="popover-group-label">{t().settingsWildDefault}</div>
+				<div class="db-test-result">{t().settingsWildDefaultDescription}</div>
+				<label class="setting-toggle">
+					<input type="checkbox" checked={wildSettings.enabled} onchange={(event) => wildSettings.set(event.currentTarget.checked)} />
+					<span>{t().wildButton}</span>
+				</label>
+			</div>
 			<div class="popover-group text-size-settings">
 				<div class="popover-group-label">{t().settingsTextSizeLabel}</div>
 				<div id="text-size-description" class="db-test-result">{t().settingsTextSizeDescription}</div>

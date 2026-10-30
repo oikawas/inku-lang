@@ -1,14 +1,16 @@
 import { pipelineDescription } from '$lib/description-labels';
 import { hasDdlBody } from '$lib/ddl-source';
-import { pluginWarningsToShow } from '$lib/plugin-names';
 import { limitNotesToShow } from '$lib/limitNotes';
 import { t, getLang } from '$lib/i18n/index.svelte';
 import { DEFAULT_SKETCH_MODE, normalizeSketchState, type SketchMode, type SketchState } from '$lib/sketch';
-import { DEFAULT_DRAW_ROUTE, drawRouteOf, sketchModeForRoute, type DrawRoute } from '$lib/draw-route';
+import {
+	DEFAULT_COMPOSITION_MODE, DEFAULT_DRAW_ROUTE, compositionModeOf, compositionOption, drawRouteOf, sketchModeForRoute,
+	type CompositionMode, type DrawRoute
+} from '$lib/draw-route';
 import { composeFallbackReason, composeFallbackState, composeFallbackValue } from '$lib/composeFallback';
 import { needsFallbackRefineConfirm, rememberFallbackRefineConfirm, type FallbackRefineParent } from '$lib/fallbackRefineGate';
 import { submitDerivationKind as submitDerivationKindOf, type DerivationKind } from '$lib/derivation';
-import { modelDisplayName, qualifiedModelId, type Provider, type ProviderGroup } from '$lib/models';
+import { modelDisplayName, qualifiedModelRef, type Provider, type ProviderGroup } from '$lib/models';
 import { AUTO_CATALOG_ID, colorCatalogOverride } from '$lib/features/color-catalog/render';
 import { colorCatalogSettings } from '$lib/features/color-catalog/settings.svelte';
 import { renderSettingsPayload, type RenderOverrides } from '$lib/features/render-payload';
@@ -101,7 +103,9 @@ export function createWorkState(deps: WorkStateDeps) {
 		if (imageRunActive) {
 			submitStopRequested = true;
 			submitAbortController?.abort();
+			// Clearing shows nothing; only the cancel stops the run behind it.
 			pipelineController.clear();
+			cancelPipelineRun();
 		}
 		imageUploadOrdinal += 1;
 		imageFile = null;
@@ -182,7 +186,8 @@ export function createWorkState(deps: WorkStateDeps) {
 
 	// Sketching (Stage 0.5). Chosen per draw, so it is plain state -- not persisted the
 	// way a user setting like the color catalog is (contract section 0.3.1).
-	let sketchMode = $state<SketchMode>(DEFAULT_SKETCH_MODE);
+	// It starts the way choosing the default route starts it: on, for read and draw.
+	let sketchMode = $state<SketchMode>(sketchModeForRoute(DEFAULT_DRAW_ROUTE, DEFAULT_SKETCH_MODE));
 
 	// How a description is drawn (SPEC 12.6.7). Chosen per draw like the sketch,
 	// never saved as a setting; a work opened from the history sets it.
@@ -193,6 +198,15 @@ export function createWorkState(deps: WorkStateDeps) {
 	function selectDrawRoute(route: DrawRoute): void {
 		if (route !== drawRoute) sketchMode = sketchModeForRoute(route, sketchMode);
 		drawRoute = route;
+	}
+
+	// The composition and laws inside read and draw (2026-10-26). Chosen per
+	// draw like the route and never saved as a setting; it stays as chosen when
+	// the route moves, and only read and draw sends it.
+	let compositionMode = $state<CompositionMode>(DEFAULT_COMPOSITION_MODE);
+
+	function selectCompositionMode(mode: CompositionMode): void {
+		compositionMode = mode;
 	}
 
 	// The prose the layer wrote for the run on screen, and the author's edit of
@@ -244,7 +258,8 @@ export function createWorkState(deps: WorkStateDeps) {
 		grain: unknown,
 		source: string | null = null,
 		state: unknown = null,
-		route: DrawRoute = DEFAULT_DRAW_ROUTE
+		route?: DrawRoute,
+		composition: CompositionMode = DEFAULT_COMPOSITION_MODE
 	): void {
 		sketchText = text;
 		sketchSource = source;
@@ -252,10 +267,18 @@ export function createWorkState(deps: WorkStateDeps) {
 		sketchEditing = false;
 		void grain;
 		sketchState = normalizeSketchState(state);
+		// A picture's run names no route: the next description keeps the
+		// author's choices (2026-10-27, when the default became read and draw).
+		if (route === undefined) {
+			if (text) sketchMode = 'on';
+			return;
+		}
 		sketchMode = text ? 'on' : DEFAULT_SKETCH_MODE;
 		// The route the work was drawn by. A read-and-draw work's reading is its
 		// sketch text; one drawn without a reading keeps the sketch off.
 		drawRoute = route;
+		// Drawn with the composition and laws, the work redraws with them.
+		compositionMode = composition;
 	}
 
 	let pendingCanvasAspectDerivation = $state<{ parentNodeId: string; fromAspectId: CanvasAspectId; toAspectId: CanvasAspectId; } | null>(null);
@@ -295,12 +318,14 @@ export function createWorkState(deps: WorkStateDeps) {
 
 	function pipelineOptions(options: PaintOptions = {}): PipelineOptions {
 		const render = renderSettingsPayload('paint', options.renderOverrides);
+		const route = options.route ?? drawRoute;
 		return {
-			route: options.route ?? drawRoute,
+			route,
+			...compositionOption(route, options.compositionMode ?? compositionMode),
 			sketch: options.sketchMode ?? sketchMode,
 			...(options.sketchText ? { sketch_text: options.sketchText } : {}),
-			stage1_model: options.stage1Model ?? qualifiedModelId(deps.models.stage1Provider(), deps.models.stage1Model()),
-			stage2_model: options.stage2Model ?? qualifiedModelId(deps.models.stage2Provider(), deps.models.stage2Model()),
+			stage1_model: options.stage1Model ?? qualifiedModelRef(deps.models.stage1Provider(), deps.models.stage1Model()),
+			stage2_model: options.stage2Model ?? qualifiedModelRef(deps.models.stage2Provider(), deps.models.stage2Model()),
 			instruction_lang: instructionLang,
 			ui_lang: getLang(),
 			catalog_id: typeof render.catalog_id === 'string' ? render.catalog_id : colorCatalogSettings.effectiveId,
@@ -313,7 +338,6 @@ export function createWorkState(deps: WorkStateDeps) {
 			history_display_label: options.displayLabel,
 			batch_line_number: options.batchLineNumber,
 			batch_run_id: options.batchRunId,
-			history_visibility: options.historyVisibility,
 			lineage_parent_node_id: options.lineageParentNodeId ?? undefined,
 			derivation_kind: options.derivationKind ?? undefined,
 			derivation_metadata: options.derivationMetadata,
@@ -322,12 +346,18 @@ export function createWorkState(deps: WorkStateDeps) {
 		};
 	}
 
+	// The run's progress, also while the author looks at another work.
+	function followRunProgress(view: PipelineView): void {
+		activeRunAttempt = view.provider_attempt ?? null;
+		// A read-and-draw run whose DDL is committed is drawn and saved next.
+		if (loading && view.route === 'read_and_draw' && view.delivery?.score && !view.result) stageLabel = t().readDrawSaving;
+	}
+
 	function adoptPipelineView(view: PipelineView | null): void {
 		pipelineView = view;
 		activeRunAttempt = view?.provider_attempt ?? null;
 		if (!view) return;
-		// A read-and-draw run whose DDL is committed is drawn and saved next.
-		if (loading && view.route === 'read_and_draw' && view.delivery?.score && !view.result) stageLabel = t().readDrawSaving;
+		followRunProgress(view);
 		if (view.image_ddl || view.image_provenance != null) {
 			imageProvenance = view.image_provenance ?? '';
 			input = '';
@@ -343,8 +373,9 @@ export function createWorkState(deps: WorkStateDeps) {
 		if (!view.result) return;
 		const painted = view.result;
 		result = painted;
+		const record = { route: view.route, description_ddl: view.description_ddl ?? painted.description_ddl };
 		adoptSketch(painted.sketch_text ?? null, painted.sketch_grain, view.description, painted.sketch_state,
-			drawRouteOf({ route: view.route, description_ddl: view.description_ddl ?? painted.description_ddl }));
+			drawRouteOf(record), compositionModeOf(record));
 		thinking = painted.thinking ?? null;
 		elapsedStage1Ms = painted.elapsed_stage1_ms;
 		elapsedStage2Ms = painted.elapsed_stage2_ms;
@@ -361,6 +392,8 @@ export function createWorkState(deps: WorkStateDeps) {
 		new PipelineApi(apiFetch),
 		() => pipelineOptions(),
 		adoptPipelineView,
+		undefined,
+		followRunProgress,
 	);
 
 	async function selectImage(file: File): Promise<void> {
@@ -387,7 +420,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		if (!uploadedImage || imageUploading || loading || reloading || pipelineBusy || refinementSession.gridBusy || demo.running || batch.resuming) return;
 		let image = uploadedImage;
 		const provenance = imageProvenance;
-		const model = qualifiedModelId(deps.models.visionProvider(), deps.models.visionModel());
+		const model = qualifiedModelRef(deps.models.visionProvider(), deps.models.visionModel());
 		const abortController = new AbortController();
 		submitAbortController = abortController;
 		submitStopRequested = false;
@@ -487,7 +520,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		const provenance = await provenanceOfFile(file);
 		const image = await api.uploadImage(file, signal);
 		signal.throwIfAborted();
-		const model = qualifiedModelId(deps.models.visionProvider(), deps.models.visionModel());
+		const model = qualifiedModelRef(deps.models.visionProvider(), deps.models.visionModel());
 		stageLabel = t().imageWritingDdl;
 		const view = await imageBatchController.fromImage(image.image_id, provenance, imageCanvasAspectId, {
 			...pipelineOptions(), stage1_model: model, stage2_model: model,
@@ -559,7 +592,11 @@ export function createWorkState(deps: WorkStateDeps) {
 		reloadError = null;
 		try {
 			const view = await run();
-			if (view.result?.history_id) {
+			if (view.result?.history_id && !pipelineController.lastRunWasShown) {
+				// The author opened another work meanwhile: the new work joins the
+				// history, and the work they look at stays, as for a picture batch.
+				await deps.history().refreshAfterServerSave();
+			} else if (view.result?.history_id) {
 				await deps.history().fetchOffset(0, { anchorId: view.result.history_id });
 				displayedHistoryItem = deps.history().items.find((item) => item.id === view.result?.history_id) ?? null;
 			}
@@ -775,13 +812,14 @@ export function createWorkState(deps: WorkStateDeps) {
 				strings: t(),
 				// Resolve injected route settings before entering the stateless run
 				// operation. A caller's one-run override still wins there.
-				stage1Model: qualifiedModelId(deps.models.stage1Provider(), deps.models.stage1Model()),
-				stage2Model: qualifiedModelId(deps.models.stage2Provider(), deps.models.stage2Model()),
+				stage1Model: qualifiedModelRef(deps.models.stage1Provider(), deps.models.stage1Model()),
+				stage2Model: qualifiedModelRef(deps.models.stage2Provider(), deps.models.stage2Model()),
 				includeThinking: deps.models.includeThinking(),
 				instructionLang,
 				canvasAspectId: effectiveCanvasAspectId(),
 				sketchMode,
 				route: drawRoute,
+				compositionMode,
 				renderPayload: renderSettingsPayload('paint', options.renderOverrides)
 			},
 			{
@@ -811,7 +849,7 @@ export function createWorkState(deps: WorkStateDeps) {
 	async function interpretOne(text: string, signal?: AbortSignal, modelOverride?: string, langOverride?: InstructionLang): Promise<InterpretResult> {
 		const uiLang = getLang();
 		stage1UserPrompt = text;
-		const resolvedStage1Model = modelOverride ?? qualifiedModelId(deps.models.stage1Provider(), deps.models.stage1Model());
+		const resolvedStage1Model = modelOverride ?? qualifiedModelRef(deps.models.stage1Provider(), deps.models.stage1Model());
 		const r = await apiFetch('/api/interpret', {
 			method: 'POST',
 			signal,
@@ -875,7 +913,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		sketch_state?: string | null;
 	}> {
 		const uiLang = getLang();
-		const resolvedStage2Model = modelOverride ?? qualifiedModelId(deps.models.stage2Provider(), deps.models.stage2Model());
+		const resolvedStage2Model = modelOverride ?? qualifiedModelRef(deps.models.stage2Provider(), deps.models.stage2Model());
 		const r = await apiFetch('/api/compose', {
 			method: 'POST',
 			signal,
@@ -940,7 +978,7 @@ export function createWorkState(deps: WorkStateDeps) {
 				...wildOverride(false),
 			}),
 			paintInstruction: (prompt, paintOptions) => {
-				const model = qualifiedModelId(deps.models.stage1Provider(), deps.models.stage1Model());
+				const model = qualifiedModelRef(deps.models.stage1Provider(), deps.models.stage1Model());
 				return paintOne(prompt, { ...paintOptions, stage1Model: model, stage2Model: model });
 			},
 			onLatestResult: (painted) => {
@@ -1063,14 +1101,16 @@ export function createWorkState(deps: WorkStateDeps) {
 				derivationMetadata: submitDerivationMetadata,
 			}, abortController.signal);
 			if (submitStopRequested) return;
-			if (view.result?.history_id && submitAbortController === abortController && !submitStopRequested) {
+			if (view.result?.history_id && submitAbortController === abortController && !submitStopRequested
+				&& pipelineController.lastRunWasShown) {
 				if (canvasAspectDerivation) pendingCanvasAspectDerivation = null;
 				lineageDetached = false;
 			}
 		} catch (cause) {
 			if (!(submitStopRequested || abortController.signal.aborted)) {
 				error = cause instanceof Error ? cause.message : String(cause);
-				result = null;
+				// The work the author opened meanwhile keeps its picture.
+				if (pipelineController.lastRunWasShown) result = null;
 			}
 		} finally {
 			if (submitAbortController === abortController) submitAbortController = null;
@@ -1082,11 +1122,12 @@ export function createWorkState(deps: WorkStateDeps) {
 	async function submitBatch(options: { resumeLines?: NumberedLine[]; retryFailedLines?: NumberedLine[]; }): Promise<void> {
 		const batchCanvasAspectId = effectiveCanvasAspectId();
 		const batchCatalogId = colorCatalogSettings.selected;
-		const batchStage1Model = qualifiedModelId(deps.models.stage1Provider(), deps.models.stage1Model());
-		const batchStage2Model = qualifiedModelId(deps.models.stage2Provider(), deps.models.stage2Model());
+		const batchStage1Model = qualifiedModelRef(deps.models.stage1Provider(), deps.models.stage1Model());
+		const batchStage2Model = qualifiedModelRef(deps.models.stage2Provider(), deps.models.stage2Model());
 		const batchSketchMode = sketchMode;
 		const batchRoute = drawRoute;
-		const batchWild = wildSettings.enabled;
+		const batchComposition = compositionMode;
+		const batchWild = wildSettings.selected;
 		// The batch owns its line failures; the previous single-work run is no longer current.
 		pipelineController.clear();
 		loading = true; error = null;
@@ -1112,13 +1153,14 @@ export function createWorkState(deps: WorkStateDeps) {
 					wild: batchWild,
 					canvasAspectId: batchCanvasAspectId,
 					route: batchRoute,
+					composition: batchRoute === 'read_and_draw' ? batchComposition : null,
 				},
 				canvasAspectId: batchCanvasAspectId,
 				renderOverrides: { ...colorCatalogOverride(batchCatalogId), ...wildOverride(batchWild) },
 				maxRetries: batchSettings.maxRetries,
 				paintLine: (text, paintOptions) => paintOne(text, {
 					...paintOptions, stage1Model: batchStage1Model, stage2Model: batchStage2Model,
-					sketchMode: batchSketchMode, route: batchRoute,
+					sketchMode: batchSketchMode, route: batchRoute, compositionMode: batchComposition,
 				}),
 				onLatestResult: (painted) => {
 					thinking = painted.thinking;
@@ -1235,6 +1277,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		const paperId = effectiveCanvasAspectId();
 		const unedited = !options.ddlEdit && replayParentNodeId !== null && ddlGeneratedBaseline !== null && ddl === ddlGeneratedBaseline;
 		const parentWorkId = displayedHistoryItem?.id ?? result?.history_id ?? null;
+		const recordedWild = displayedHistoryItem?.render_wild ?? result?.render_wild ?? false;
 		const parentAspectId = canvasAspectDerivation?.fromAspectId
 			?? displayedHistoryItem?.render_canvas_aspect_id ?? result?.render_canvas_aspect_id ?? null;
 		const declared = declaredCanvasRatio(ddl);
@@ -1283,6 +1326,7 @@ export function createWorkState(deps: WorkStateDeps) {
 				lineageParentNodeId: replayParentNodeId,
 				derivationKind: replayKind,
 				derivationMetadata: replayDerivationMetadata,
+				renderOverrides: wildOverride(unedited ? recordedWild : wildSettings.enabled),
 			}, abortController.signal);
 			if (view.result) {
 				if (canvasAspectDerivation) pendingCanvasAspectDerivation = null;
@@ -1388,7 +1432,6 @@ export function createWorkState(deps: WorkStateDeps) {
 	return {
 		get showingDemo() { return showingDemo; },
 		get instructionLang() { return instructionLang; },
-		get pluginWarningsShown() { return pluginWarningsToShow(result); },
 		get limitNotesShown() { return limitNotesToShow(result); },
 		get singleRunning() { return (activeRunMode === 'single' && loading) || reloading; },
 		get ddlEditedAfterGeneration() { return ddlEditedAfterGeneration; },
@@ -1415,10 +1458,10 @@ export function createWorkState(deps: WorkStateDeps) {
 		get composeFallbackRecord() { return composeFallbackState(composeFallbackRaw); },
 		get statusDdlOrigin() { return (displayedHistoryItem?.display_label ?? null) === 'DDL'; },
 		get stage1ModelLabel() {
-			return modelDisplayName(qualifiedModelId(deps.models.stage1Provider(), deps.models.stage1Model()), deps.models.available(), deps.models.stage1Provider());
+			return modelDisplayName(qualifiedModelRef(deps.models.stage1Provider(), deps.models.stage1Model()), deps.models.available(), deps.models.stage1Provider());
 		},
 		get stage2ModelLabel() {
-			return modelDisplayName(qualifiedModelId(deps.models.stage2Provider(), deps.models.stage2Model()), deps.models.available(), deps.models.stage2Provider());
+			return modelDisplayName(qualifiedModelRef(deps.models.stage2Provider(), deps.models.stage2Model()), deps.models.available(), deps.models.stage2Provider());
 		},
 		get inputMode() { return inputMode; },
 		set inputMode(value) { inputMode = value; },
@@ -1470,6 +1513,8 @@ export function createWorkState(deps: WorkStateDeps) {
 		set sketchMode(value) { sketchMode = value; },
 		get drawRoute() { return drawRoute; },
 		selectDrawRoute,
+		get compositionMode() { return compositionMode; },
+		selectCompositionMode,
 		get sketchText() { return sketchText; },
 		set sketchText(value) { sketchText = value; },
 		get sketchSource() { return sketchSource; },

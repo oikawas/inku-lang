@@ -1,14 +1,11 @@
-"""Generate Apple installation data from the Server-owned source defaults."""
+"""Generate Apple installation data from the shared catalog and Server defaults."""
 
 from __future__ import annotations
 
 import argparse
 import ast
 import json
-import runpy
-import shutil
 import subprocess
-import sys
 from copy import deepcopy
 from pathlib import Path
 from types import SimpleNamespace
@@ -32,46 +29,8 @@ def literal_assignment(path: Path, name: str):
     raise ValueError(f"Server constant unavailable: {name}")
 
 
-def provider_catalog() -> tuple[dict, list[dict]]:
-    # This versioned module contains data expressions only; loading it does not
-    # import Server settings, inspect credentials or contact a provider.
-    catalog = runpy.run_path(str(SERVER / "verified_model_catalog.py"))
-
-    def resolve(node):
-        if isinstance(node, ast.Name):
-            return catalog[node.id]
-        if isinstance(node, ast.List):
-            return [resolve(item) for item in node.elts]
-        if isinstance(node, ast.Dict):
-            return {resolve(key): resolve(value) for key, value in zip(node.keys, node.values)}
-        return ast.literal_eval(node)
-
-    source = ast.parse((SERVER / "model_settings.py").read_text())
-    definition = next(node.value for node in source.body if isinstance(node, ast.AnnAssign)
-                      and isinstance(node.target, ast.Name) and node.target.id == "PROVIDER_DEFINITIONS")
-    return catalog, resolve(definition)
-
-
-def provider_defaults() -> dict:
-    # Allowlist public versioned fields only. Do not call default_model_settings:
-    # that factory also reads installation URLs and API keys from the environment.
-    _, definitions = provider_catalog()
-    return {
-        "schema": "inku.provider-defaults.v1",
-        "providers": [{
-            "id": provider["id"],
-            "label": provider["label"],
-            "kind": provider["kind"],
-            "baseURL": provider["default_base_url"],
-            "requiresAPIKey": provider["requires_api_key"],
-            "credentialID": provider["id"],
-            "speedHidden": bool(provider.get("speed_developer_only")),
-        } for provider in definitions],
-    }
-
-
 def model_catalog() -> dict:
-    catalog = json.loads((SERVER / "model_catalog.json").read_text(encoding="utf-8"))
+    catalog = json.loads((ROOT / "core/crates/inku-pipeline/data/model_catalog.json").read_text(encoding="utf-8"))
     if catalog.get("schema") != "inku.model-catalog.v2":
         raise ValueError("Model catalog schema unavailable")
     return catalog
@@ -87,12 +46,9 @@ def write_json(path: Path, value: object) -> None:
 
 
 def export_model_catalog(manifest: dict) -> None:
-    catalog = model_catalog()
     manifest.pop("model_guidance", None)
-    manifest["model_catalog"] = catalog
-    manifest["provider_defaults"] = provider_defaults()
-    write_json(DESTINATION_ROOT / "apple/Packages/InkuHost/Sources/InkuHost/Resources/model-labels.json",
-               {"schema": catalog["schema"], "labels": catalog["labels"]})
+    manifest.pop("model_catalog", None)
+    manifest.pop("provider_defaults", None)
 
 
 class BindingPlaceholder:
@@ -109,7 +65,7 @@ def main() -> None:
     global ROOT, SERVER
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-root", type=Path, default=ROOT, help="Product checkout containing the canonical Server/Web resources")
-    parser.add_argument("--model-catalog-only", action="store_true", help="Refresh only the model catalog and label resources")
+    parser.add_argument("--model-catalog-only", action="store_true", help="Remove obsolete provider and model catalog copies")
     arguments = parser.parse_args()
     ROOT = arguments.source_root.resolve()
     SERVER = ROOT / "server/src/inku_server"
@@ -181,49 +137,15 @@ def main() -> None:
         "budgetMapping": budget_mapping,
         "bytesPerMark": literal_assignment(SERVER / "limits.py", "BYTES_PER_MARK"),
     }
-    # Parse versioned documents with the Server's data-only parser. Never load
-    # user installations or execute the Markdown expansion prose.
-    sys.path.insert(0, str(ROOT / "server/src"))
-    from inku_server.plugins import bundled_package_for
-    from inku_server.plugins.document_format import (
-        entry_preview_path,
-        parse_plugin_document,
-    )
-
-    legacy = []
-    bundled = []
-    plugin_words = []
-    OUTPUT.mkdir(parents=True, exist_ok=True)
-    previews = OUTPUT / "plugin-previews"
-    previews.mkdir(exist_ok=True)
-    for path in sorted((ROOT / "server/plugins").glob("*.inku-plugin.md")):
-        document = parse_plugin_document(path.read_text(encoding="utf-8"), source_path=str(path))
-        package = bundled_package_for(path)
-        if package is not None:
-            bundled.append(package)
-        source_id = f"bundled:{package}" if package is not None else path.name
-        for entry in document.entries:
-            legacy.append({"source_id": source_id,
-                           "qualified_name": entry.qualified_name(document.manifest.namespace)})
-            preview = entry_preview_path(document, entry, hidpi=True) or entry_preview_path(document, entry)
-            preview_name = None
-            if preview is not None:
-                preview_name = f"{document.manifest.namespace}-{entry.heading}.png"
-                shutil.copyfile(preview, previews / preview_name)
-            plugin_words.append({"id": entry.qualified_name(document.manifest.namespace),
-                                 "aliases": entry.alias_qualified_names(document.manifest.namespace),
-                                 "surfaces": entry.surfaces, "notes": entry.notes,
-                                 "fires_on": entry.fires_on, "preview": preview_name,
-                                 "package_id": package, "source_id": source_id, "source_file": path.name})
     macro_sources = {"maximum_entries": manifest["pipeline"]["prompt_limits"]["max_catalog_entries"],
-                     "canonical": [], "legacy": legacy, "bundled_packages": sorted(set(bundled))}
+                     "canonical": [], "legacy": [], "bundled_packages": ["Nature.leaves"]}
     saijiki = json.loads((ROOT / "core/crates/inku-ddl/assets/saijiki-v2.json").read_text(encoding="utf-8"))
     for name, value in [("server-defaults.json", manifest), ("color-catalogs.json", catalogs),
-                        ("macro-sources.json", macro_sources), ("plugin-words.json", plugin_words),
+                        ("macro-sources.json", macro_sources),
                         ("saijiki.json", saijiki)]:
         write_json(OUTPUT / name, value)
     subprocess.run(["node", str(DESTINATION_ROOT / "apple/scripts/export-web-reference.mjs"), "--source-root", str(ROOT)], check=True)
-    print(f"Generated Server defaults, {len(catalogs)} catalogs, {len(plugin_words)} plugin words and canonical Saijiki.")
+    print(f"Generated Server defaults, {len(catalogs)} catalogs and canonical Saijiki.")
 
 
 if __name__ == "__main__":

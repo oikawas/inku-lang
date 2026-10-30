@@ -20,7 +20,7 @@ Run inku-cli COMMAND --help for the complete option list. This document states w
 | models | Configure the default drawing model (shared Stage 1/2), Vision model and color catalog |
 | paint / batch | Paint one or many works from descriptions or instructions |
 | refine | Refine an existing work's composition or color |
-| lineage | Inspect lineage node trees and promote intermediate works |
+| lineage | Inspect lineage node trees |
 | colophon | Recite one origin-to-target lineage branch as an append-only reading |
 | inspect | Inspect and compare multiple inference models, one after another |
 | review | Evaluate works with Vision and submit unread words |
@@ -63,7 +63,7 @@ For limits they record the values used in `render_limits` and their origin in `r
 
 | Flag | Contents |
 |---|---|
-| `--file FILE` / `-f` | Read the description or DDL from a UTF-8 file; `-` means stdin for both paint and batch. For batch, each non-empty line is one work |
+| `--file FILE` / `-f` | Read the description or DDL from a UTF-8 file; `-` means stdin for both paint and batch. For batch, each non-empty line is one work; with `--input-mode ddl`, a title line (a line of only `"lighthouse"`) is not a work |
 | `--out-dir DIR` / `-o` | Destination for JSON, SVG, and PNG output |
 | `--prefix P` | Output filename prefix |
 | `--png` | Also write PNG when `--out-dir` is set |
@@ -100,6 +100,7 @@ uv run inku-cli paint --image photo.jpg --provenance "Taken by the Kamo River, K
 | `--sketch-grain {fine,coarse}` | Compatibility flag for old works; unused by the current sketch |
 | `--sketch-text TEXT` | Use this sketch text instead of calling Stage 0.5, replaying a saved or hand-edited sketch |
 | `--route {stages,read_and_draw}` | How the description is drawn: `stages` (the current stages, the default) or `read_and_draw` (read from the speaker's eye, written as DDL and corrected once beside its drawing). With read and draw, `--sketch` passes through the reading and `--sketch-text` is an edited reading |
+| `--composition {off,on}` | With `--route read_and_draw` only: `on` first decides a composition and laws from the description (and its reading), then writes, measures, and corrects the DDL toward them, and chooses its colors before the commit; `off` (the default) draws read and draw as before |
 
 Variation is retired. The old amplitude and seed flags are rejected. Saved variation metadata stays in the database and is never sent in a new drawing request.
 
@@ -226,7 +227,7 @@ somebody else's.
 
 | Flag | Contents |
 |---|---|
-| `ddl-export WORK_ID --output` / `-o` | The file to write. Without it, the export goes to standard output. The output is JSON with the schema `inku.ddl-export.v1`, containing the work's DDL and the plugin definitions that DDL names |
+| `ddl-export WORK_ID --output` / `-o` | Output file. The `inku.ddl-export.v2` JSON contains the work's DDL and definitions and notes selected by saved locks |
 | `export-card HASH --out` / `-o` | The destination PNG path. A path ending in `/`, or an existing directory, receives the file as `inku-card-<the work's short hash>-<layout>.png`. Any other path is written as the PNG file itself. Required |
 | `export-card --layout {square,portrait}` | `square` is a 1080×1080 sheet; `portrait` is 1080×1350 |
 | `export-card --no-seal` | Leave off the small `inku` mark printed on the sheet. By default it is printed |
@@ -241,12 +242,11 @@ somebody else's.
 
 | Command | Contents |
 |---|---|
-| `plugin list` | Report loaded and rejected plugin documents, namespaces, versions, and rejection reasons as JSON |
-| `plugin validate FILE` | Send a local document body to the administration API and validate its syntax without executing code or external files |
-| `plugin reload` | Reload `server/plugins/` explicitly, without restarting the server |
+| `plugin list` | Report loaded and rejected v2 packages, namespaces, versions, and rejection reasons as JSON |
+| `plugin validate FILE` | Send a local v2 JSON or zip to the administration API for all three checks |
 | `reference [--md \| --json] [-o FILE]` | A machine-generated dump of the implementation vocabulary and constant tables. Markdown by default |
 
-`plugin` requires an administrator session. `reference` runs under any signed-in session.
+`plugin validate` requires an administrator session; `plugin list` and `reference` run under any signed-in session.
 
 ## Colophon
 
@@ -365,18 +365,13 @@ These commands serve automated painting, evaluation, and the autonomous refineme
 
 ### 1. Lineage
 
-Show a work's derivation tree, or promote an intermediate work into ordinary history.
+Show a work's derivation tree.
 
 * **Show the lineage tree**:
   ```sh
   uv run inku-cli lineage show WORK_ID --depth 3
   ```
   Prints the parent and child relations around the given work id as a text tree. `--json` prints the raw JSON instead.
-* **Promote an intermediate work**:
-  ```sh
-  uv run inku-cli lineage promote NODE_ID
-  ```
-  Promotes a `lineage_only` node, created by temporary refinement and hidden from ordinary history, into the user's ordinary history.
 
 ### 2. Refinement and derived works
 
@@ -391,7 +386,7 @@ Attach an existing work as the parent node and produce a local option, saved int
   ```sh
   uv run inku-cli refine save PARENT_NODE_ID --kind layout --file score.json --input-text "the description"
   ```
-  Imports a locally adjusted Score JSON straight into the server's history as a child attached to the given parent node. `--svg-file` attaches an SVG (omitted, the SVG is saved empty). `--visibility lineage_only` keeps the work out of normal history and places it in the lineage only (the default is `normal`).
+  Imports a locally adjusted Score JSON straight into the server's history as a child attached to the given parent node. `--svg-file` attaches an SVG (omitted, the SVG is saved empty).
 
 ### 3. Model comparison (inspect)
 

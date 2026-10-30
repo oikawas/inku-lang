@@ -21,7 +21,7 @@ test('the prompt tab tells a recorded prompt from an unrecorded or unreadable on
 	// A server from before 2026-10-13 names no stages: it kept Stage 1 and Stage 2.
 	assert.deepEqual(
 		await loadSystemPrompts('variation/1', answering(200, { recorded: true, stage1: sent, stage2: null }, paths)),
-		{ state: 'recorded', stages: ['stage1', 'stage2'], catalog: null, image_catalog: null, image_ddl: null, image_review: null, sketch: null, reading: null, description_ddl: null, description_review: null, stage1: sent, composition: null, laws: null, colors: null, stage2: null }
+		{ state: 'recorded', stages: ['stage1', 'stage2'], catalog: null, image_catalog: null, image_ddl: null, image_review: null, sketch: null, reading: null, description_composition: null, description_ddl: null, description_review: null, stage1: sent, composition: null, laws: null, colors: null, stage2: null }
 	);
 	assert.deepEqual(paths, ['/api/pipeline/variations/variation%2F1/system-prompts']);
 	assert.deepEqual(await loadSystemPrompts('v', answering(200, { recorded: false })), { state: 'not_recorded' });
@@ -61,6 +61,7 @@ test('the sketch, the composition reading, the laws stage and the color stage co
 		image_review: null,
 		sketch,
 		reading: null,
+		description_composition: null,
 		description_ddl: null,
 		description_review: null,
 		stage1: sent,
@@ -107,4 +108,18 @@ test('a read-and-draw work shows its reading, its writing and its review, in the
 	assert.deepEqual(loaded.stages, ['sketch', 'reading', 'description_ddl', 'description_review', 'stage1', 'stage2']);
 	assert.deepEqual([loaded.reading, loaded.description_ddl, loaded.description_review], [reading, writing, review]);
 	assert.equal(loaded.stage1, null);
+	assert.equal(loaded.description_composition, null);
+});
+
+test('with the composition and laws, they come between the reading and the writing', async () => {
+	const composing = { ...sent, system: 'composer…', prompt_id: 'inku.description-composition-prompt.v1', message: '{"description":"一滴の墨"}' };
+	const loaded = await loadSystemPrompts('v', answering(200, {
+		recorded: true,
+		stages: ['description_review', 'description_ddl', 'description_composition', 'reading'],
+		reading: sent, description_composition: composing, description_ddl: sent, description_review: sent,
+	}));
+	assert.equal(loaded.state, 'recorded');
+	if (loaded.state !== 'recorded') return;
+	assert.deepEqual(loaded.stages, ['reading', 'description_composition', 'description_ddl', 'description_review']);
+	assert.deepEqual(loaded.description_composition, composing);
 });

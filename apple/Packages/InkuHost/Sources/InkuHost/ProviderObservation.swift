@@ -27,12 +27,14 @@ public struct ProviderActionIdentity: Codable, Sendable, Equatable {
 
 public enum ProviderObservationStage: String, Codable, Sendable {
     // Server `provider_stage_record`: the reading, the laws and the colors use Stage 1's model and are timed apart from it.
-    case stage1, composition, laws, colors, stage2
+    case stage1, composition, laws, colors, stage2, image, read_and_draw
     public init?(action: String) {
         switch action {
+        case "read_description", "compose_description", "write_description_ddl", "review_description_ddl": self = .read_and_draw
         case "read_composition": self = .composition
         case "choose_laws": self = .laws
         case "choose_colors": self = .colors
+        case "select_image_catalog", "write_image_ddl", "review_image_ddl": self = .image
         case "complete_visible_ddl_holes": self = .stage2
         case "generate_sketch", "select_description_catalog", "generate_normalized_ddl": self = .stage1
         default: return nil

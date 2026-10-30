@@ -46,6 +46,11 @@ fun inkuError(text: (InkuStrings) -> String): Nothing = throw InkuFailure(text)
 fun messageFor(error: Throwable, strings: InkuStrings, fallback: String): String =
     when (error) {
         is InkuFailure -> DisplaySanitizer.redact(error.text(strings))
+        is app.inku.mobile.llm.ProviderBudgetRejectedException -> when (error.reason) {
+            "provider daily request budget exhausted" -> strings.errorProviderDailyBudget
+            "request exceeds the configured input-token budget" -> strings.errorProviderInputBudget
+            else -> strings.errorProviderInputCount
+        }
         is app.inku.mobile.llm.ChatGptException -> strings.chatGptError(error.code)
         else -> safeErrorMessage(error, fallback)
     }

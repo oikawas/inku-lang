@@ -44,7 +44,7 @@ dmgを開き、Inkuを「アプリケーション」へドラッグします。m
 
 ## 対応OSとbuild環境
 
-最低OSはmacOS 14／iOS 17です。SDKの版は最低OSとは別です。確認した環境はXcode 27.0／Swift 6.4、Rust 1.95.0、XcodeGen 2.46.0です。Swift packageはtools 6.1、projectはXcodeGen 2.44.0以上を要求します。
+最低OSはmacOS 14／iOS 17です。SDKの版は最低OSとは別です。確認した環境はXcode 27.0／Swift 6.4、Rust 1.99.1、XcodeGen 2.46.0です。Swift packageはtools 6.1、projectはXcodeGen 2.44.0以上を要求します。
 
 buildにはmacOS、XcodeのCLI tools、XcodeGen、Python 3.11以上、Node.js 22.13以上、uv、公式rustupが必要です。Node.jsの[`stripTypeScriptTypes`](https://nodejs.org/download/release/v22.14.0/docs/api/module.html#modulestriptypescripttypescode-options)は明示したreference更新でWeb文言・用紙情報・歳時記previewを抽出します。通常buildはreview済み同梱snapshotを使い、Pythonとuvは固定辞書の準備にも使います。いずれのruntimeもアプリへ組み込みません。初回はCargo、SwiftPMとServerのuv.lock依存を取得するnetwork接続が必要です。
 
@@ -55,16 +55,14 @@ buildにはmacOS、XcodeのCLI tools、XcodeGen、Python 3.11以上、Node.js 22
 以下はproduct repository rootから実行します。必要なtoolとXcodeを用意した後、固定Rust toolchainとMac targetを導入してください。scriptはtoolchain導入やXcode／Apple accountの設定変更を自動実行しません。
 
 ```sh
-rustup toolchain install 1.95.0 --profile minimal --component rustfmt --component clippy
-rustup target add --toolchain 1.95.0 aarch64-apple-darwin x86_64-apple-darwin
+rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy
+rustup target add --toolchain 1.99.1 aarch64-apple-darwin x86_64-apple-darwin
 apple/scripts/build-macos.sh Release
 ```
 
 `build-macos.sh`は必要toolの確認後、resource／core／appの変更前に[停止helper](scripts/stop-existing-macos.py)を実行します。現在のユーザーが所有する既知のInku bundle IDと実行fileを検証し、PIDのidentityを再確認してSIGKILLで停止します。最大10秒で停止を確認できなければbuildを中止し、結果は`apple/build/macOS/stop-existing.json`へ記録します。未知のInku類似processは検証errorとして扱い、signalを送信しません。
 
 通常のbuildはcommit済みのreview済みreference／default／catalog snapshotを使い、`uv sync --project server --frozen`で固定したbuild用依存を用意します。[辞書準備script](scripts/prepare-meter-resources.py)がSudachi small（約113MiB）、読み設定とCMUdictをhash検証し、licenseと共にInkuHost resourceへコピーします。[3Dビューアのscript](scripts/sync-ddl3d-viewer.py)が、Webが登録した3DビューアをそのままInkuUI resourceへ写し、Webのものと比べます（下の3Dビューアの段落）。共通RustとSwift binding／XCFrameworkを生成し、`project.yml`からXcode projectを作ってmacOS appをbuildします。generic Mac destination、`ARCHS=arm64 x86_64`、`ONLY_ACTIVE_ARCH=NO`を指定し、最後に両sliceの存在を検査します。Apple account、Team、証明書を使わないunsigned local buildです。署名・公証した配布物は下の「配布物の作成」で作ります。
-
-Rust 1.95のmacOS host proc-macro stripによる[LINKEDIT alignment問題](https://github.com/rust-lang/rust/issues/157750)を避けるため、releaseのhost build dependencyだけstripを無効にします。target Rust archiveの最適化とstripは維持します。cache削除やtoolchain変更は不要です。
 
 defaultはRelease appとrelease Rustです。XcodeのDebug appを選んでも、Rustは明示指定しない限りreleaseのままです。両方をdebugにする場合は次を使います。
 
@@ -86,7 +84,7 @@ open apple/build/macOS/DerivedData/Build/Products/Release/Inku.app
 
 ### 配布物の作成
 
-配布用のdmgは次で作ります。Universal Release build、第三者通知の照合、Developer ID署名（Hardened Runtime）、dmgの作成と署名、公証とstaple、Gatekeeperの確認、SHA-256とRelease添付用の第三者通知テキストの作成までを行い、`apple/build/release/Inku-<版>-<build>/`へ出力します。版は`apple/VERSION`と`apple/BUILD_NUMBER`です。署名identityと公証のkeychain profileは引数か環境変数（`INKU_MACOS_SIGN_IDENTITY`／`INKU_MACOS_NOTARY_PROFILE`）で渡します。
+配布用のdmgは次で作ります。Universal Release build、第三者通知の照合、Developer ID署名（Hardened Runtime）、dmgの作成と署名、公証とstaple、Gatekeeperの確認、SHA-256とRelease添付用の第三者通知テキストの作成までを行い、`apple/build/release/Inku-<版>-<build>/`へ出力します。版は`apple/VERSION`、Build番号は完成appから読みます。署名identityと公証のkeychain profileは引数か環境変数（`INKU_MACOS_SIGN_IDENTITY`／`INKU_MACOS_NOTARY_PROFILE`）で渡します。
 
 ```sh
 apple/scripts/package-macos-release.sh --identity "Developer ID Application: <name> (<team>)" --notary-profile <profile>
@@ -121,7 +119,7 @@ DBのcopyや移動は行いません。指定はbundleの`InkuDatabasePath`へ�
 
 バッチでは1行に1作品分の記述を入力し、幅いっぱいの履歴、前回の再開情報、次の描画条件、新しいバッチの操作の順に使います。新規バッチのDDL入力はありません。モデルの「変更」はStage 1/2共通のサービス別card dialogを開き、仮選択して「決定」で適用します。取消・×は元の選択を保ちます。登録済みで使用中のLLMモデルが必要で、登録外の既定値は選択待ちになります。色の「変更」は先頭の「記述から自動選択」かカタログの10色見本から選び、決定または×で適用、キャンセルで破棄します。ランダムの選択肢はありません。
 
-写生の「なし／あり」と暴れるの「切／入」、キャンバスを確認して「新しいバッチを描く」を押します。写生は制作とは独立し、指定写生は新バッチへ引き継ぎません。seedは条件欄の「詳細」にあります。指示書の言語は記述の文字から自動で決まります。開始操作は条件直後に置き、狭い幅では作品領域まで縦へscrollできます。空行も元の行番号に含み、長い行は横へscrollできます。行番号は入力枠内だけに表示します。
+写生の「なし／あり」と「筆致制限を外す」の「切／入」、キャンバスを確認して「新しいバッチを描く」を押します。写生は制作とは独立し、指定写生は新バッチへ引き継ぎません。seedは条件欄の「詳細」にあります。指示書の言語は記述の文字から自動で決まります。開始操作は条件直後に置き、狭い幅では作品領域まで縦へscrollできます。空行も元の行番号に含み、長い行は横へscrollできます。行番号は入力枠内だけに表示します。
 
 履歴からの明示復元は入力欄だけを置き換えます。中断した記録は残件と開始時条件を確認して再開し、完成済み作品を描き直しません。処理中の行と表示中の成功作品の番号を区別し、結果不明の行は履歴を確認して再試行／省略を選んでください。バッチの観測作品がない場合は現在選択中の保存作品を右に残します。
 
@@ -192,7 +190,7 @@ apple/scripts/build-core.sh macos
 iOS artifactを含める場合はtargetを追加して`all`を指定します。
 
 ```sh
-rustup target add --toolchain 1.95.0 aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
+rustup target add --toolchain 1.99.1 aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
 apple/scripts/build-core.sh all
 ```
 

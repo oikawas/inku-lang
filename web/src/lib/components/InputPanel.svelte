@@ -6,10 +6,10 @@
 	import ImageFolderBatchPanel from './ImageFolderBatchPanel.svelte';
 	import type { ImageFolderBatch } from '$lib/features/batch/image-folder.svelte';
 	import CanvasAspectPlugin from './CanvasAspectPlugin.svelte';
-	import SketchSelect from './SketchSelect.svelte';
-	import RouteSelect from './RouteSelect.svelte';
+	import DrawConditions from './DrawConditions.svelte';
+	import SwitchChip from './SwitchChip.svelte';
 	import { type SketchMode } from '$lib/sketch';
-	import { type DrawRoute } from '$lib/draw-route';
+	import { type CompositionMode, type DrawRoute } from '$lib/draw-route';
 	import { wildSettings } from '$lib/features/wild/settings.svelte';
 	import PaintButton from './PaintButton.svelte';
 	import RunStatus from './RunStatus.svelte';
@@ -103,6 +103,9 @@
 		/** How a description is drawn. Chosen per draw, like the sketch. */
 		drawRoute: DrawRoute;
 		onSelectDrawRoute: (route: DrawRoute) => void;
+		/** The composition and laws inside read and draw. Chosen per draw, like the route. */
+		compositionMode: CompositionMode;
+		onSelectCompositionMode: (mode: CompositionMode) => void;
 		nextStage1Model: string;
 		nextStage2Model: string;
 		nextCatalogName: string;
@@ -176,6 +179,8 @@
 		onSelectSketchMode,
 		drawRoute,
 		onSelectDrawRoute,
+		compositionMode,
+		onSelectCompositionMode,
 		nextStage1Model,
 		nextStage2Model,
 		nextCatalogName,
@@ -288,21 +293,16 @@
 			</div>
 			<div class="condition-compact-rows">
 				{#if !pictureConditions}
-				<div class="condition-compact-row">
-					<Tooltip text={t().tooltipInputRoute}><RouteSelect value={drawRoute} {isJapanese} onSelect={onSelectDrawRoute} /></Tooltip>
+				<div class="condition-draw">
+					<DrawConditions route={drawRoute} {sketchMode} {compositionMode} {isJapanese}
+						onSelectRoute={onSelectDrawRoute} {onSelectSketchMode} {onSelectCompositionMode} />
 				</div>
-				<div class="condition-compact-row">
-					<Tooltip text={t().tooltipInputSketch}><SketchSelect value={sketchMode} {isJapanese} showValue onSelect={onSelectSketchMode} /></Tooltip>
-				</div>
-				<div class="condition-compact-row">
-					<Tooltip text={t().tooltipInputWild}>
-						<button
-							type="button"
-							class="ghost-btn wild-btn"
-							class:active={wildSettings.enabled}
-							aria-pressed={wildSettings.enabled}
-							onclick={() => wildSettings.set(!wildSettings.enabled)}
-						>{t().wildButton} {wildSettings.enabled ? t().wildEnabled : t().wildDisabled}</button>
+				<div class="condition-compact-row wild-row">
+					<!-- The line's label (the author, 2026-10-27): it heads the canvas
+					     after it too, so it names no one switch. -->
+					<span class="condition-inline-label">{isJapanese ? 'オプション' : 'Options'}</span>
+					<Tooltip text={t().tooltipInputWild} placement="top-right">
+						<SwitchChip label={t().wildButton} on={wildSettings.selected} onToggle={() => wildSettings.setSelected(!wildSettings.selected)} />
 					</Tooltip>
 				</div>
 				{/if}
@@ -327,13 +327,6 @@
 						{/if}
 					</Tooltip>
 				</div>
-				{#if inputMode === 'batch' && !pictureConditions}
-					<div class="condition-compact-row">
-						<Tooltip text={t().tooltipInputClear}>
-							<button class="ghost-btn" onclick={onClearInput}>{t().clearInputBtn}</button>
-						</Tooltip>
-					</div>
-				{/if}
 			</div>
 		</div>
 	{/snippet}
@@ -510,6 +503,7 @@
 			{stage1ModelLabel}
 			{stage2ModelLabel}
 			{onRememberBatchPrompt}
+			{onClearInput}
 			onSubmit={onSubmit}
 			onStop={onStop}
 		/>
@@ -663,7 +657,24 @@
 	.condition-compact-row :global(.canvas-aspect-plugin) { position: static; max-width: 100%; }
 	.condition-compact-row :global(.sketch-menu),
 	.condition-compact-row :global(.aspect-menu) { width: min(310px, 100%); }
-	.condition-compact-row :global(.ghost-btn) { white-space: normal; text-align: left; }
+	.condition-compact-row :global(.ghost-btn) { white-space: normal; text-align: left; border-radius: 13px; }
+	/* Its bubble anchors to the chip, not to the whole row of chips. */
+	.condition-compact-row.wild-row { gap: 8px; }
+	.condition-compact-row.wild-row :global(.tooltip-wrap) { position: relative; }
+	.condition-inline-label {
+		color: var(--fg3);
+		font-size: var(--ui-font-size-11);
+		line-height: 1.35;
+		white-space: nowrap;
+	}
+	/* The route and the steps it passes sit apart from the chips below them. */
+	.condition-draw {
+		flex: 1 0 100%;
+		min-width: 0;
+		padding-bottom: 8px;
+		margin-bottom: 2px;
+		border-bottom: 1px solid var(--border);
+	}
 	.input-label {
 		display: flex;
 		align-items: flex-start;
@@ -674,8 +685,6 @@
 	.input-label :global(.tooltip-wrap) { flex: none; }
 	.input-heading { color: var(--fg); font-size: var(--ui-font-size-14); line-height: 1.35; font-weight: 600; }
 	.input-description { margin-top: 1px; color: var(--fg2); font-size: var(--ui-font-size-12); line-height: 1.45; }
-	.wild-btn.active { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
-	.wild-btn.active:hover { background: var(--accent); }
 	.input-ta-wrap {
 		position: relative;
 		display: flex;

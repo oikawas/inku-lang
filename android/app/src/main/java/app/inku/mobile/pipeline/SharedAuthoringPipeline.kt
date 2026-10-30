@@ -18,6 +18,9 @@ data class SharedPipelineRunRequest(
     /** The server's `save_history`: false keeps a candidate's drawings out of the gallery. */
     val saveHistory: Boolean = true,
     val sketch: PipelineSketchRequest = PipelineSketchRequest.Off,
+    val route: String? = null,
+    val sourceLabelsJson: String? = null,
+    val compositionJson: String? = null,
     val parentHistoryId: String? = null,
     val inputProvenanceJson: String? = null,
     val completionRangesJson: String? = null,
@@ -50,6 +53,9 @@ class SharedAuthoringPipeline(
                     text = request.text,
                     autoCatalog = request.config.autoCatalog,
                     sketch = request.sketch,
+                    route = request.route,
+                    sourceLabelsJson = request.sourceLabelsJson,
+                    compositionJson = request.compositionJson,
                 ),
                 models = request.models,
                 context = request.context,
@@ -166,6 +172,9 @@ class SharedAuthoringPipeline(
         renderSeed: Long?,
         wild: Boolean,
         sketch: PipelineSketchRequest = PipelineSketchRequest.Off,
+        route: String? = null,
+        sourceLabelsJson: String? = null,
+        compositionJson: String? = null,
     ): PipelineRunOutcome {
         val next = host.command(
             ownerId,
@@ -175,6 +184,9 @@ class SharedAuthoringPipeline(
                 description = description,
                 autoCatalog = config.autoCatalog,
                 sketch = sketch,
+                route = route,
+                sourceLabelsJson = sourceLabelsJson,
+                compositionJson = compositionJson,
             ),
         )
         return complete(ownerId, next, config, renderSeed, wild)
@@ -202,7 +214,8 @@ class SharedAuthoringPipeline(
                     .put("error_policy", request.config.errorPolicy)
                     .put("canvas_aspect", request.config.canvasFormatId)
                     .put("catalog_id", request.config.catalogId)
-                    .put("catalog_mode", if (request.config.autoCatalog) "auto" else "fixed"),
+                    .put("catalog_mode", if (request.config.autoCatalog) "auto" else "fixed")
+                    .also { options -> request.route?.let { options.put("route", it) }; request.compositionJson?.let { options.put("composition", "on") } },
             )
             .put(
                 "macro_catalog",

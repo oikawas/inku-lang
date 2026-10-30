@@ -1,4 +1,5 @@
 import CoreGraphics
+import CryptoKit
 import Foundation
 import ImageIO
 import InkuCore
@@ -50,6 +51,14 @@ public final class AppModel {
     @ObservationIgnored public var canvasFitChoiceHandler: (@MainActor (CanvasFitQuestion) async -> CanvasFitChoice)?
     @ObservationIgnored private var canvasFitContinuation: CheckedContinuation<CanvasFitChoice, Never>?
     public var inputMode = "description"
+    public var imageInput: PreparedImageInput?
+    public var imageCanvasID = "image"
+    public private(set) var imageProvenance = ""
+    public private(set) var imageProvenanceTyped = false
+    public var imageFileName = ""
+    public var imageWarningAcknowledged = false
+    public var savedImageDDL: Data?
+    public var savedDescriptionDDL: Data?
     public var descriptionText = ""
     public var ddlText = ""
     /// The Web always requests `auto`; an explicit language remains possible for restored inputs.
@@ -59,7 +68,23 @@ public final class AppModel {
     public var seedText = ""
     public var wild = false { didSet { rememberNextConditions() } }
     public var catalogMode = "fixed" { didSet { rememberNextConditions() } }
-    public var sketchMode = "off"
+    public var sketchMode = "on"
+    public var drawRoute = "read_and_draw"
+    public var descriptionComposition = false
+    public func selectDrawRoute(_ route: String) {
+        guard ["read_and_draw", "stages"].contains(route) else { return }
+        if route == "read_and_draw", drawRoute != route { sketchMode = "on" }
+        drawRoute = route
+    }
+    public var descriptionCanReview: Bool {
+        SettingsModel.isRegisteredModelAvailable(nextGenerationHostSettings.models.stage1Model, purpose: "vision", settings: nextGenerationHostSettings)
+    }
+    private func applyDescriptionRoute(_ request: inout GenerationRequest, settings: HostSettings) {
+        guard case .description = request.authoring, drawRoute == "read_and_draw" else { return }
+        request.drawRoute = "read_and_draw"
+        request.descriptionComposition = descriptionComposition
+        request.descriptionReview = SettingsModel.isRegisteredModelAvailable(request.models.stage1Model, purpose: "vision", settings: settings)
+    }
     public var sketchText = ""
     /// Web `sketchDraft`/`sketchEditing`: the author's edit of the displayed work's sketch prose. Drawing that work's
     /// description again with the sketch on sends the edited prose instead of calling the layer (I8).
@@ -80,6 +105,12 @@ public final class AppModel {
     /// Metrics of the displayed saved work, frozen to that work's save identity.
     public private(set) var providerMetrics: [ProviderAttemptMetric] = []
     public private(set) var isBusy = false
+    public private(set) var activeSingleInputMode: String?
+    public func singleRunStatusVisible(in tab: String) -> Bool {
+        guard isBusy else { return false }
+        if tab == "image" { return activeSingleInputMode == "image" }
+        return tab == "description" && (activeSingleInputMode == "description" || activeSingleInputMode == "ddl")
+    }
     /// Failure of this automation request, independent of errors from concurrent browsing.
     public private(set) var automationFailureMessage: String?
     /// Retained between batch rows so browsing does not clear the last row's progress or failure.
@@ -134,6 +165,7 @@ public final class AppModel {
     }
     public private(set) var unreadOutputs: Set<String> = []
     private var workActionStates: [String: SavedWorkActionState] = [:]
+    public private(set) var imageWorkProvenance: [String: String] = [:]
     public private(set) var savedDisplayLabels: [String: String] = [:]
     @ObservationIgnored private var displayLabelReads: Set<String> = []
     @ObservationIgnored private var workActionReadToken = UUID()
@@ -157,11 +189,13 @@ public final class AppModel {
     @ObservationIgnored private let transport: (any ProviderTransport)?
     @ObservationIgnored private var managedTransport: (any ProviderTransport)?
     @ObservationIgnored private var personalRuntime: ChatGPTPlanRuntime?
+    @ObservationIgnored private var personalRuntimeOverride: ChatGPTPlanRuntime?
     @ObservationIgnored private let credentials = KeychainCredentialStore()
     @ObservationIgnored private var database: InkuDatabase?
     @ObservationIgnored private var host: PipelineHost?
     @ObservationIgnored private var settingsStore: ProviderSettingsStore?
     @ObservationIgnored private var settings = HostSettings()
+    @ObservationIgnored private var cachedStageDefaultProviderID = ProviderModelReference.stageDefaultProviderID
     @ObservationIgnored private var bootstrap: Bootstrap?
     /// Cancellation targets the active task, independently of the saved work being viewed.
     @ObservationIgnored private var activeExecutionID: String?
@@ -191,17 +225,61 @@ public final class AppModel {
         self.transport = transport
     }
 
+    // Allows isolated runtime fixtures without reading the user's Keychain or vault.
+    init(databaseURL: URL, transport: (any ProviderTransport)? = nil, personalRuntime: ChatGPTPlanRuntime) {
+        self.databaseURL = databaseURL
+        self.transport = transport
+        self.personalRuntimeOverride = personalRuntime
+    }
+
     public var sourceLocked: Bool { authoringAuthority == "ddl_authoritative" }
     public var developerModeEnabled: Bool { ProviderObservationPolicy.developerModeEnabled }
-    /// Names actually pinned to the visible authoring document, independent of next-work plugin preferences.
-    public var authoringMacroNames: [String] {
-        guard let data = currentView?.configurationJSON ?? selectedContext?.configuration,
-              let configuration = try? ExactJSON(data: data) else { return importedMacroNames }
-        let names = (configuration["definitions"].array ?? []).flatMap { definition -> [String] in
-            guard let namespace = definition["namespace"].string, let heading = definition["heading"].string else { return [] }
-            return ([heading] + (definition["aliases"].array ?? []).compactMap(\.string)).map { namespace + "." + $0 }
+
+    func pluginCalls(source: String, workID: String? = nil) async -> [PluginCall] {
+        guard let bootstrap else { return [] }
+        let language = instructionLanguage(for: source)
+        let disabledPackages = settings.plugins?.disabledPackageIDs ?? []
+        let disabledWords = bootstrap.pluginWords.filter { $0.packageID.map(disabledPackages.contains) ?? false }
+        let disabledIDs = disabledWords.map(\.id) + Array(disabledPackages)
+        let names: [ExactJSON] = bootstrap.pluginWords.flatMap { word in
+            (word.japanese + word.english).map { name in
+                .object(["name": .string(name), "qualified_name": .string(word.id),
+                         "enabled": .bool(!(word.packageID.map(disabledPackages.contains) ?? false))])
+            }
         }
-        return Array(Set(names + importedMacroNames)).sorted()
+        let config: ExactJSON
+        let locks: ExactJSON
+        let workContext: SavedAuthoringContext?
+        if let workID, let host { workContext = try? await host.savedAuthoringContext(workID: workID) }
+        else { workContext = selectedContext }
+        let current = workID == nil ? currentView : nil
+        if let configData = current?.configurationJSON ?? workContext?.configuration,
+           let documentData = current?.documentJSON ?? workContext?.document,
+           let savedConfig = try? ExactJSON(data: configData), let document = try? ExactJSON(data: documentData) {
+            config = savedConfig
+            locks = document["macro_locks"].array == nil ? .array([]) : document["macro_locks"]
+        } else {
+            guard let catalog = try? bootstrap.macroCatalogValue(language: language, settings: settings, importedPlugins: importedDDL?.plugins ?? []) else { return [] }
+            let entries = catalog["entries"].array ?? []
+            config = .object(["definitions": .array(entries.map { $0["definition"] }), "macro_summaries": .array(entries.map { $0["summary"] })])
+            locks = catalog["locks"]
+        }
+        let normalizedLocks = (locks.array ?? []).map { value -> ExactJSON in
+            var value = value
+            if let digest = value["digest"].string, !digest.hasPrefix("sha256:") { value["digest"] = .string("sha256:" + digest) }
+            return value
+        }
+        let enabled = normalizedLocks.compactMap { $0["qualified_name"].string }
+        let request: ExactJSON = .object(["source": .string(source), "language": .string(language),
+            "definitions": config["definitions"].array == nil ? .array([]) : config["definitions"],
+            "summaries": config["macro_summaries"].array == nil ? .array([]) : config["macro_summaries"],
+            "locks": .array(normalizedLocks), "compiler": config["compiler"], "enabled": .array(enabled.map { .string($0) }),
+            "disabled": .array(disabledIDs.map { .string($0) }), "plugin_names": .array(names)])
+        let bytes = request.data
+        let answer = await Task.detached { InkuCore.pluginCalls(bytes) }.value
+        guard !Task.isCancelled, let result = try? ExactJSON(data: answer), result["schema"].string == "inku.plugin-calls.v1" else { return [] }
+        let entries = result["entries"].array ?? []
+        return (result["calls"].array ?? []).compactMap { PluginCall($0, source: source, entries: entries) }
     }
     public var displayedWork: SavedWork? { previewWork ?? selectedWork }
     public var isPreview: Bool { previewWork != nil }
@@ -225,11 +303,17 @@ public final class AppModel {
     /// A description is drawable only when something is left once the author's numbers and comments are cut
     /// (Web `canSubmit`, state.svelte.ts:363-364).
     public var canGenerate: Bool {
-        database != nil && !isBusy && !isPreview
+        if inputMode == "image" {
+            return database != nil && !isBusy && !isPreview && imageInput != nil && !imageVisionModel.isEmpty
+        }
+        return database != nil && !isBusy && !isPreview
             && (inputMode == "ddl" ? !ddlText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                                    : DescriptionLabels.hasDrawableText(descriptionText))
             && (inputMode == "ddl" || (hasAvailableNextDrawingModel
                 && !(selectedWorkID != nil && sourceLocked)))
+    }
+    public var imageVisionModel: String {
+        AuxiliaryModel.defaultVisionModel(saved: display.preferences.visionModelReference, settings: settings)
     }
     public var canGenerateDescription: Bool {
         database != nil && !isBusy && !isPreview && hasAvailableNextDrawingModel
@@ -273,8 +357,8 @@ public final class AppModel {
             let url = try databaseURL ?? InkuDatabase.applicationSupportURL(hostIdentifier: "app.inku.macos")
             let database = try InkuDatabase(url: url)
             let store = ProviderSettingsStore(url: url.deletingLastPathComponent().appendingPathComponent("providers.json"))
-            let bootstrap = try Bootstrap()
-            let settings = try await store.load(installingDefaults: BundledProviderDefaults.loadBundled())
+            let bootstrap = try Bootstrap(pluginDataDirectory: url.deletingLastPathComponent())
+            let settings = try await store.loadNormalized()
             self.database = database
             await autonomousRefinement.restore(database: database)
             // A derived store: without it thumbnails are drawn and kept in memory, and nothing else stops.
@@ -284,7 +368,7 @@ public final class AppModel {
             library.prefetchesThumbnails = true
             library.pageCompanions = { [weak self] ids in await self?.loadWorkActionStates(workIDs: ids) }
             displayRenderer.connectFailureLog(directory: url.deletingLastPathComponent())
-            let personalRuntime = ChatGPTPlanRuntime(directory: url.deletingLastPathComponent().appendingPathComponent("personal-chatgpt", isDirectory: true))
+            let personalRuntime = personalRuntimeOverride ?? ChatGPTPlanRuntime(directory: url.deletingLastPathComponent().appendingPathComponent("personal-chatgpt", isDirectory: true))
             let ordinary: any ProviderTransport
             if let native = transport as? URLSessionProviderTransport { ordinary = native.withRateDatabase(database) }
             else { ordinary = transport ?? URLSessionProviderTransport(database: database) }
@@ -295,6 +379,7 @@ public final class AppModel {
                                      svgLimitBytes: { try await store.svgLimitBytes() })
             self.settingsStore = store
             self.settings = settings
+            updateStageDefaultProviderID()
             synchronizeNextDrawingModel(previousSettings: nil)
             pruneComparisonModels()
             self.bootstrap = bootstrap
@@ -345,6 +430,9 @@ public final class AppModel {
             return
         }
         let token = UUID()
+        let runningMode = inputMode
+        let runningImage = runningMode == "image" ? imageInput : nil
+        activeSingleInputMode = runningMode
         generationToken = token
         providerProgress = nil
         activeExecutionID = nil
@@ -353,22 +441,29 @@ public final class AppModel {
         stopping = false
         isBusy = true
         errorText = nil
-        status = "生成中"
+        status = runningMode == "description" && drawRoute == "read_and_draw" ? display.webCopy(sketchMode == "on" ? "readDrawReading" : "readDrawWriting", sketchMode == "on" ? "記述を読んでいます…" : "指示書を書いています…") : "生成中"
         let operation = Task { @MainActor [weak self] in
             guard let self else { return }
-            await self.runGeneration(host: host, bootstrap: bootstrap, token: token, parentWorkID: parentWorkID)
+            await self.runGeneration(host: host, bootstrap: bootstrap, token: token, parentWorkID: parentWorkID,
+                                     runningMode: runningMode, image: runningImage)
         }
         activeOperation = operation
         await operation.value
         finishOperation(token: token)
     }
 
-    private func runGeneration(host: PipelineHost, bootstrap: Bootstrap, token: UUID, parentWorkID: String?) async {
+    private func runGeneration(host: PipelineHost, bootstrap: Bootstrap, token: UUID, parentWorkID: String?,
+                               runningMode: String, image: PreparedImageInput?) async {
         do {
-            let freshRequest = try requestForCurrentInput(parentWorkID: parentWorkID,
-                derivationKind: parentWorkID == nil ? "new" : inputMode == "ddl" ? "ddl_edit" : "description_edit")
+            var freshRequest: GenerationRequest
+            if runningMode == "image", let image {
+                freshRequest = try requestForImage(image, provenance: imageProvenance)
+            } else {
+                freshRequest = try requestForCurrentInput(inputMode: runningMode, parentWorkID: parentWorkID,
+                    derivationKind: parentWorkID == nil ? "new" : runningMode == "ddl" ? "ddl_edit" : "description_edit")
+            }
             let request = try await pinPersonalPlanRequests([freshRequest])[0]
-            let view = try await host.generate(request) { [weak self] progress in
+            let view = try await host.generate(request, image: image) { [weak self] progress in
                 Task { @MainActor in self?.receive(progress, token: token, models: request.models) }
             }
             await recordDescriptionFeedback(request: request, view: view)
@@ -379,6 +474,9 @@ public final class AppModel {
             if let id = view.savedWorkID, let work = works.first(where: { $0.id == id }) {
                 displayWork(work)
                 selectedContext = try await host.savedAuthoringContext(workID: id)
+                savedImageDDL = selectedContext?.imageDDL
+                savedDescriptionDDL = selectedContext?.descriptionDDL
+                if savedImageDDL != nil { imageInput = nil; imageFileName = ""; imageProvenanceTyped = false }
             }
         } catch {
             guard generationToken == token, !Task.isCancelled else { return }
@@ -412,6 +510,7 @@ public final class AppModel {
         currentExecutionID = nil
         currentView = nil
         selectedContext = nil
+        savedImageDDL = nil
         holeIDs = []
         selectedHoleIDs = []
         patchProposalJSON = ""
@@ -432,6 +531,21 @@ public final class AppModel {
             let context = try await host.savedAuthoringContext(workID: work.id)
             guard displayToken == selectionToken, selectedWorkID == work.id, !isBrowsingLocked else { return }
             selectedContext = context
+            savedImageDDL = context.imageDDL
+            savedDescriptionDDL = context.descriptionDDL
+            imageProvenanceTyped = false
+            if context.imageDDL == nil {
+                drawRoute = context.drawRoute ?? "stages"
+                if let record = context.descriptionDDL, let json = try? ExactJSON(data: record) { descriptionComposition = json["composition"].object != nil }
+                else { descriptionComposition = false }
+            }
+            if context.imageDDL != nil {
+                imageInput = nil; imageFileName = ""; imageProvenance = context.imageProvenance ?? ""
+                inputMode = "image"
+            } else if inputMode == "image" {
+                imageInput = nil; imageFileName = ""; imageProvenance = ""
+                inputMode = "description"
+            }
             authoringAuthority = context.authority
             authoringOrigin = context.origin
             authoringRevision = context.revision
@@ -538,11 +652,56 @@ public final class AppModel {
         activeOperation = nil
         activeExecutionID = nil
         generationToken = nil
+        activeSingleInputMode = nil
         stopping = false
         isBusy = false
     }
 
     public func localDataDirectory() -> URL? { database?.url.deletingLastPathComponent() }
+    public var stageDefaultProviderID: String { cachedStageDefaultProviderID }
+    private func updateStageDefaultProviderID() {
+        cachedStageDefaultProviderID = ProviderModelReference.split(settings.models.stage1Model, providers: settings.providers)?.providerID
+            ?? ProviderModelReference.stageDefaultProviderID
+    }
+    func reloadPluginPackages() throws {
+        guard let directory = localDataDirectory() else { throw HostError("database_unavailable") }
+        let updated = try Bootstrap(pluginDataDirectory: directory)
+        let diagnostics = try Self.pretty(updated.macroCatalogValue(language: instructionLanguage(for: currentInputText), settings: settings,
+                                                                     importedPlugins: importedDDL?.plugins ?? []).data)
+        bootstrap = updated
+        pluginWords = updated.pluginWords.filter { settings.plugins?.isEnabled($0.packageID ?? "") ?? true }
+        macroDiagnostics = diagnostics
+    }
+
+    public func checkPluginPackage(data: Data, isArchive: Bool) async throws -> PluginPackageCheck {
+        guard !isBusy, let directory = localDataDirectory(), let bootstrap else { throw HostError("plugin_package_busy") }
+        return try await PluginPackageRepository(dataDirectory: directory).check(data: data, isArchive: isArchive, bootstrap: bootstrap)
+    }
+
+    @discardableResult
+    public func installPluginPackage(data: Data, isArchive: Bool, replace: Bool) async throws -> PluginPackageCheck {
+        guard !isBusy, let directory = localDataDirectory(), let bootstrap else { throw HostError("plugin_package_busy") }
+        let repository = PluginPackageRepository(dataDirectory: directory)
+        let checked = try await repository.check(data: data, isArchive: isArchive, bootstrap: bootstrap)
+        guard checked.ok else { return checked }
+        guard !isBusy else { throw HostError("plugin_package_busy") }
+        try repository.install(checked, replace: replace)
+        try reloadPluginPackages()
+        return checked
+    }
+
+    public func deletePluginPackage(_ id: String) async throws {
+        guard !isBusy, let directory = localDataDirectory() else { throw HostError("plugin_package_busy") }
+        let repository = PluginPackageRepository(dataDirectory: directory)
+        guard try repository.load().contains(where: { $0.id == id }) else { throw HostError("plugin_package_not_found") }
+        try repository.delete(id)
+        var updated = await hostSettings()
+        var preferences = updated.plugins ?? .init()
+        preferences.disabledPackageIDs.remove(id)
+        updated.plugins = preferences
+        try await updateHostSettings(updated)
+        try reloadPluginPackages()
+    }
     /// The database file in use, once opened.
     public var databaseFileURL: URL? { database?.url }
 
@@ -614,6 +773,7 @@ public final class AppModel {
               !isBusy || settings.plugins == self.settings.plugins else { throw HostError("settings_busy_or_unavailable") }
         var settings = settings
         if self.settings.providerDefaultsInstalled == true { settings.providerDefaultsInstalled = true }
+        if settings.inactiveBuiltinProviderIDs == nil { settings.inactiveBuiltinProviderIDs = self.settings.inactiveBuiltinProviderIDs }
         if let limits = settings.drawingLimits {
             guard let drawingLimitDefinition else { throw HostError("installation_unavailable") }
             settings.drawingLimits = drawingLimitDefinition.normalized(limits)
@@ -625,9 +785,10 @@ public final class AppModel {
             }
         }
         let diagnostics = try bootstrap.map { try Self.pretty($0.macroCatalogValue(language: instructionLanguage(for: currentInputText), settings: settings, importedPlugins: importedDDL?.plugins ?? []).data) }
-        try await settingsStore.save(settings)
+        settings = try await settingsStore.save(settings)
         let previousSettings = self.settings
         self.settings = settings
+        updateStageDefaultProviderID()
         synchronizeNextDrawingModel(previousSettings: previousSettings)
         pruneComparisonModels()
         if let bootstrap {
@@ -723,7 +884,7 @@ public final class AppModel {
                 guard freshPin == nil || freshPin == session else { throw HostError("chatgpt_session_pin_conflict") }
                 freshPin = session
             }
-            else if case .description = request.authoring {
+            else if !request.authoring.isDirect {
                 if freshPin == nil { freshPin = try await personalRuntime.pin() }
                 request.chatGPTSession = freshPin
             } else {
@@ -745,7 +906,7 @@ public final class AppModel {
         let usesPersonal = stage1 != nil || stage2 != nil
         guard usesPersonal else { return }
         if let session = request.chatGPTSession { try await personalPlanRuntime().validate(session) }
-        else if case .description = request.authoring { throw HostError("chatgpt_session_pin_required") }
+        else if !request.authoring.isDirect { throw HostError("chatgpt_session_pin_required") }
     }
 
     public func clearPreview() async {
@@ -773,6 +934,7 @@ public final class AppModel {
         guard let host else { throw HostError("pipeline_unavailable") }
         let context = try await host.savedAuthoringContext(workID: workID)
         workActionStates[workID] = SavedWorkActionState(context)
+        if context.imageDDL != nil { imageWorkProvenance[workID] = context.imageProvenance ?? "" }
         return context
     }
 
@@ -802,6 +964,13 @@ public final class AppModel {
         return nil
     }
 
+    public func workPresentationTitle(_ work: SavedWork) -> String {
+        if let provenance = imageWorkProvenance[work.id] {
+            return display.label("画像", "Image") + (provenance.isEmpty ? "" : " · " + provenance)
+        }
+        return LibraryWorkPresentation.title(work, untitled: display.localized("無題"))
+    }
+
     public func loadWorkActionState(_ work: SavedWork) async {
         await loadWorkActionStates(workIDs: [work.id])
     }
@@ -822,11 +991,15 @@ public final class AppModel {
             let labels = try await host.savedDisplayLabels(workIDs: Array(labelIDs))
             guard token == workActionReadToken, !Task.isCancelled else { return }
             let states = Dictionary(uniqueKeysWithValues: missing.map { id in
-                (id, summaries[id].map { SavedWorkActionState(origin: $0.origin, authority: $0.authority) } ?? .unavailable)
+                (id, summaries[id].map { $0.isImage ? .image : SavedWorkActionState(origin: $0.origin, authority: $0.authority) } ?? .unavailable)
             })
             // Every menu observes this dictionary. Publish the page once, not once per card, and not at all when
             // nothing new came back: an unchanged write still redraws every reader.
             if !states.isEmpty { workActionStates.merge(states) { _, new in new } }
+            let imageLabels = summaries.reduce(into: [String: String]()) { values, item in
+                if item.value.isImage { values[item.key] = item.value.imageProvenance ?? "" }
+            }
+            if !imageLabels.isEmpty { imageWorkProvenance.merge(imageLabels) { _, new in new } }
             if !labels.isEmpty { savedDisplayLabels.merge(labels) { _, new in new } }
             displayLabelReads.formUnion(labelIDs)
         } catch {
@@ -841,10 +1014,6 @@ public final class AppModel {
         let catalog = try bootstrap.macroCatalogValue(language: language, settings: settings, importedPlugins: value.plugins)
         newWork()
         importedDDL = value; importedMacroNames = value.names
-        importedMacroNames += value.plugins.flatMap { plugin in
-            guard let namespace = plugin.definition["namespace"].string else { return [String]() }
-            return (plugin.definition["aliases"].array ?? []).compactMap(\.string).map { namespace + "." + $0 }
-        }
         inputMode = "ddl"; ddlText = value.source
         macroDiagnostics = try Self.pretty(catalog.data)
         status = "DDLを読み込みました。生成して保存できます。"
@@ -886,12 +1055,46 @@ public final class AppModel {
             parentWorkID: parentWorkID, derivationKind: derivationKind, catalogMode: catalogModeOverride ?? catalogMode,
             sketch: sketch, savedConfiguration: savedConfig,
             importedPlugins: mode == "ddl" && parentWorkID == nil ? importedDDL?.plugins ?? [] : [])
+        if mode == "description" { applyDescriptionRoute(&request, settings: nextGenerationHostSettings) }
         request.captureProviderIO = developerModeEnabled && display.preferences.captureProviderIO == true
         // Server `start`: a direct DDL drawn from the selected saved work carries its completion range record.
         if mode == "ddl", parentWorkID != nil, parentWorkID == selectedWorkID {
             request.completionRanges = selectedContext?.completionRanges
             request.lawsRecords = selectedContext?.lawsRecords
         }
+        return request
+    }
+
+    public func setImageProvenanceFromUser(_ text: String) {
+        imageProvenance = text
+        imageProvenanceTyped = true
+    }
+
+    public func setImageInput(_ image: PreparedImageInput, fileName: String, automaticProvenance: String = "") {
+        let typed = imageProvenanceTyped && !imageProvenance.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? imageProvenance : nil
+        if selectedWork != nil { newWork(); inputMode = "image" }
+        imageProvenance = typed ?? automaticProvenance
+        imageProvenanceTyped = typed != nil
+        imageInput = image; imageFileName = fileName
+    }
+
+    public func requestForImage(_ image: PreparedImageInput, provenance: String, canvasID: String? = nil) throws -> GenerationRequest {
+        guard let bootstrap else { throw HostError("installation_unavailable") }
+        let vision = imageVisionModel
+        guard SettingsModel.isRegisteredModelAvailable(vision, purpose: "vision", settings: settings) else { throw HostError("vision_model_not_available") }
+        let selectedCanvasID = canvasID ?? imageCanvasID
+        let resolvedCanvasID = selectedCanvasID == "image" ? image.nearestFormatID : selectedCanvasID
+        var request = try bootstrap.request(inputMode: "description", source: "", description: "", language: "ja",
+            catalogID: catalogID, canvasID: resolvedCanvasID, seed: seedText, wild: false,
+            settings: nextGenerationHostSettings, parentWorkID: nil, derivationKind: "new",
+            catalogMode: catalogMode, sketch: .off)
+        request.authoring = .image(input: image.authoringJSON, autoCatalog: catalogMode == "auto")
+        request.imageProvenance = provenance
+        request.models.stage1Model = vision; request.models.stage2Model = vision
+        var config = try ExactJSON(data: request.configuration)
+        config["compiler"]["host"]["canvas_fit"] = .string("contain")
+        request.configuration = config.data
         return request
     }
 
@@ -919,10 +1122,12 @@ public final class AppModel {
             throw HostError("drawing_model_not_available")
         }
         // Web work/state.svelte.ts:636-641: the demo follows the catalog choice but has no wild setting (`wildOverride(false)`).
-        return try bootstrap.request(inputMode: "description", source: "", description: description,
+        var request = try bootstrap.request(inputMode: "description", source: "", description: description,
             language: instructionLanguage(for: description), catalogID: catalogID, canvasID: canvasID, seed: seedText, wild: false,
             settings: settings, parentWorkID: nil, derivationKind: "new",
             catalogMode: catalogMode == "auto" ? "auto" : "fixed", sketch: sketchMode == "on" ? .on : .off)
+        applyDescriptionRoute(&request, settings: settings)
+        return request
     }
 
     public func drawNewDDL(_ source: String, imported: DDLPackageImport? = nil,
@@ -939,12 +1144,13 @@ public final class AppModel {
                 importedPlugins: imported?.plugins ?? [])
             request.configuration = try configuration(request.configuration, canvasFit: fit, paperID: paperID)
             request = try await pinPersonalPlanRequests([request])[0]
-            return await runAutomation(request: request) != nil
+            return await runAutomation(request: request, singleInputMode: "ddl") != nil
         } catch { report(error); return false }
     }
 
     public func drawEditedDDL(work: SavedWork, source: String, wildOverride: Bool? = nil,
-                              paperID: String? = nil, presentation: CanvasFitPresentation = .workspace) async -> Bool {
+                              paperID: String? = nil, presentation: CanvasFitPresentation = .workspace,
+                              forceEdit: Bool = false) async -> Bool {
         guard !isBusy, canvasFitQuestion == nil, !work.trashed,
               !source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
         do {
@@ -952,7 +1158,7 @@ public final class AppModel {
             let saved = try await savedConfiguration(workID: work.id)
             var options = try ExactJSON(data: saved.renderOptions)
             let target = paperID ?? options["canvas_aspect_id"].string ?? work.renderCanvasAspectID ?? canvasID
-            let unchanged = source == work.ddl && wildOverride == nil
+            let unchanged = !forceEdit && source == work.ddl && wildOverride == nil
             let fit = await chooseCanvasFit(source: source, recordedWork: unchanged ? work : nil,
                                              paperID: target, presentation: presentation)
             guard fit != .cancel, !isBusy else { return false }
@@ -976,8 +1182,10 @@ public final class AppModel {
                 parentWorkID: work.id, derivationKind: "ddl_edit")
             request.completionRanges = saved.completionRanges
             request.lawsRecords = saved.lawsRecords
+            request.inheritedImageDDL = saved.imageDDL
+            request.imageProvenance = saved.imageProvenance
             request = try await pinPersonalPlanRequests([request])[0]
-            return await runAutomation(request: request) != nil
+            return await runAutomation(request: request, singleInputMode: "ddl") != nil
         } catch { report(error); return false }
     }
 
@@ -1253,8 +1461,7 @@ public final class AppModel {
         configuration["compiler"]["stage15_variation"] = .null
         configuration["catalogs"] = .array([])
         if drawingSettings != nil { configuration["compiler"]["host"]["catalog_mode"] = .string(catalog == "default" ? "default" : "explicit") }
-        options["wild"] = .bool(mode == .description ? wildOverride ?? work.renderWild ?? options["wild"].bool ?? false
-                                                    : work.renderWild ?? options["wild"].bool ?? false)
+        options["wild"] = .bool(wildOverride ?? work.renderWild ?? options["wild"].bool ?? false)
         options["svg_profile"] = .string("display")
         let sketch: SketchRequest
         if mode == .sketch {
@@ -1264,7 +1471,7 @@ public final class AppModel {
         } else if let prose = work.sketchText, !prose.isEmpty {
             sketch = text == work.effectiveSourceText.trimmingCharacters(in: .whitespacesAndNewlines) ? .supplied(prose) : .on
         } else { sketch = .off }
-        let request = GenerationRequest(authoring: .description(text, autoCatalog: false, sketch: sketch),
+        var request = GenerationRequest(authoring: .description(text, autoCatalog: false, sketch: sketch),
             configuration: configuration.data, renderOptions: options.data, clipPolicy: saved.clipPolicy,
             models: drawing.models, providers: drawing.providers,
             renderColorMaps: [catalog: options["resolved_color_map"].data], description: text,
@@ -1274,6 +1481,7 @@ public final class AppModel {
                 : ["edited_from_history_id": .string(work.id), "from_sketch_state": work.sketchState.map(ExactJSON.string) ?? .null,
                    "to_sketch_mode": .string(sketchMode)]).data)
         try Task.checkCancellation()
+        applyDescriptionRoute(&request, settings: drawing)
         let pinned = try await pinPersonalPlanRequests([request])[0]
         try Task.checkCancellation()
         return pinned
@@ -1292,7 +1500,7 @@ public final class AppModel {
         var request = GenerationRequest(authoring: .directDDL(work.ddl ?? ""), configuration: configuration.data,
             renderOptions: options.data, clipPolicy: saved.clipPolicy, models: settings.models, providers: settings.providers,
             renderColorMaps: [catalog: options["resolved_color_map"].data], description: work.effectiveSourceText,
-            parentWorkID: work.id, derivationKind: "laws_change", historyVisibility: "lineage_only")
+            parentWorkID: work.id, derivationKind: "laws_change", historyVisibility: "normal")
         request.savedLawsDirection = direction.data
         request.completionRanges = saved.completionRanges
         request.lawsRecords = saved.lawsRecords
@@ -1324,6 +1532,48 @@ public final class AppModel {
         try Task.checkCancellation()
         if let failure { throw failure }
         throw HostError(ran ? "autonomous_generation_failed" : "authoring_busy_or_unavailable")
+    }
+
+    func sendChunkPrompt(_ asked: ExactJSON, png: Data?, request: GenerationRequest) async throws -> String {
+        guard let transport = managedTransport ?? transport else { throw HostError("pipeline_unavailable") }
+        var prompt: ExactJSON = .object(["system": asked["system"], "message": asked["text"],
+            "response_schema": asked["response_schema"], "action_name": .string("generate_normalized_ddl")])
+        var images: [ExactJSON] = []
+        if let png {
+            let hash = SHA256.hash(data: png).map { String(format: "%02x", $0) }.joined()
+            prompt["images"] = .array([.object(["media_type": .string("image/png"), "byte_len": .integer(png.count), "sha256": .string(hash)])])
+            images = [.string("data:image/png;base64," + png.base64EncodedString())]
+        }
+        let digest = SHA256.hash(data: prompt.data).map { String(format: "%02x", $0) }.joined()
+        prompt["prompt_id"] = .string("inku.chunk-moves-\(asked["purpose"].string ?? "choose").v1")
+        prompt["prompt_digest"] = .string("sha256:" + digest)
+        let config = try ExactJSON(data: request.configuration)
+        prompt["instruction_language"] = config["language"]
+        var action: ExactJSON = .object(["tag": .string("generate_normalized_ddl"), "timeout_ms": .string("300000"), "delay_ms": .string("0"),
+            "payload": .object(["prompt": prompt]), "_transient_images": .array(images),
+            "identity": .object(["action_id": .string(UUID().uuidString), "attempt": .integer(1), "request_digest": .string(digest)])])
+        for attempt in 1...2 {
+            action["identity"]["attempt"] = .integer(attempt)
+            let result: Data
+            if let personal = transport as? any ChatGPTPlanEffectTransport {
+                let limit = (config["prompt_limits"]["max_response_bytes"].number ?? config["prompt_limits"]["max_response_bytes"].string).flatMap(Int.init) ?? 1_048_576
+                result = try await personal.performPersonalPlan(action: action.data, models: request.models, providers: request.providers,
+                    session: request.chatGPTSession, argumentLimit: limit, credentials: credentials, onBytes: { _ in }, onDiagnostic: { _ in })
+            } else {
+                result = try await transport.perform(action: action.data, models: request.models, providers: request.providers, credentials: credentials, onBytes: { _ in })
+            }
+            let response = try ExactJSON(data: result)
+            if response["tag"].string == "provider_failed" {
+                let failure = response["failure"].string ?? "provider_failed"
+                if attempt == 1 && ["rate_limited", "transport_timeout", "transport_unavailable"].contains(failure) {
+                    try await Task.sleep(for: .seconds(2)); continue
+                }
+                throw HostError(failure)
+            }
+            guard let text = response["response"].string else { throw HostError("unusable_answer") }
+            return text
+        }
+        throw HostError("provider_failed")
     }
 
     /// SPEC §7.8 juxtaposition: what the shared core reads for this work (Server `api_juxtaposition`). `written` is the
@@ -1590,11 +1840,12 @@ public final class AppModel {
 
     /// The busy flag remains held until cancellation has drained the active task.
     @discardableResult
-    public func performSerialized(status: String, allowsBrowsing: Bool = false,
+    public func performSerialized(status: String, allowsBrowsing: Bool = false, singleInputMode: String? = nil,
                                   operation: @escaping @MainActor (UUID) async throws -> Void) async -> Bool {
         guard !isBusy, activeOperation == nil, database != nil else { return false }
         let token = UUID()
         generationToken = token
+        activeSingleInputMode = singleInputMode
         providerProgress = nil
         activeExecutionID = nil
         if !allowsBrowsing { currentExecutionID = nil }
@@ -1627,14 +1878,15 @@ public final class AppModel {
         return succeeded
     }
 
-    public func runAutomation(request: GenerationRequest, allowsBrowsing: Bool = false) async -> SavedWork? {
+    public func runAutomation(request: GenerationRequest, image: PreparedImageInput? = nil, allowsBrowsing: Bool = false,
+                              singleInputMode: String? = nil) async -> SavedWork? {
         guard let host else { return nil }
         var result: SavedWork?
-        _ = await performSerialized(status: "生成中", allowsBrowsing: allowsBrowsing) { [weak self] token in
+        _ = await performSerialized(status: "生成中", allowsBrowsing: allowsBrowsing, singleInputMode: singleInputMode) { [weak self] token in
             guard let self else { return }
             self.automationFailureMessage = nil
             try await self.validatePinnedRequest(request)
-            let view = try await host.generate(request) { [weak self] progress in
+            let view = try await host.generate(request, image: image) { [weak self] progress in
                 Task { @MainActor in self?.receive(progress, token: token, models: request.models) }
             }
             if self.generationToken == token, !self.stopping {
@@ -1701,6 +1953,7 @@ public final class AppModel {
         importedDDL = nil; importedMacroNames = []
         selectedContext = nil
         currentView = nil
+        savedDescriptionDDL = nil; savedImageDDL = nil; imageInput = nil; imageFileName = ""; imageProvenance = ""; imageProvenanceTyped = false
         currentExecutionID = nil
         currentSVG = ""
         visibleDDL = ""
@@ -1872,14 +2125,19 @@ public final class AppModel {
         for work in works {
             try Task.checkCancellation()
             var value: ExactJSON = .object([:])
-            do { value = try ExactJSON(data: await host.savedAuthoringContext(workID: work.id).configuration) }
+            var locks: [ExactJSON] = []
+            do {
+                let context = try await host.savedAuthoringContext(workID: work.id)
+                value = try ExactJSON(data: context.configuration)
+                if let document = context.document { locks = try ExactJSON(data: document)["macro_locks"].array ?? [] }
+            }
             catch {
                 if profile != "display" || requiresPluginDefinitions { throw HostError("saved_export_plugin_context_unavailable") }
             }
             var profiles: [String: String] = [:]
             if profile != "display" { profiles[profile] = try await host.exportSVG(workID: work.id, profile: profile) }
             sources.append(ExportSource(work: work, profiles: profiles,
-                pluginDefinitions: value["definitions"].array ?? [], pluginSummaries: value["macro_summaries"].array?.compactMap(\.string) ?? [],
+                pluginDefinitions: value["definitions"].array ?? [], pluginSummaries: value["macro_summaries"].array?.compactMap(\.string) ?? [], pluginLocks: locks,
                 language: value["language"].string))
         }
         return sources
@@ -1949,6 +2207,7 @@ public final class AppModel {
             selectedContext = nil
             currentView = nil
             workActionStates = [:]
+            imageWorkProvenance = [:]
             savedDisplayLabels = [:]
             displayLabelReads = []
             workActionReadToken = UUID()
@@ -2074,10 +2333,16 @@ public final class AppModel {
             if backgroundDrawing { status = statusText(for: view) }
             else { apply(view) }
         case .providerAttempt(_, _, _, let deadline):
-            if let choosing = choosingStatus(comparison: false) { status = choosing }
+            if let stage = providerProgress?.stage, [.descriptionReading, .descriptionComposition, .descriptionWriting, .descriptionReview].contains(stage) {
+                status = providerProgress?.displayTitle(display) ?? ""
+            }
+            else if let choosing = choosingStatus(comparison: false) { status = choosing }
             else { status = providerProgress?.stage == .composition ? "構図を読んでいます" : "モデルの応答待ち（期限 \(deadline.formatted(date: .omitted, time: .standard))）" }
         case .transportBytes(_, let count):
-            if let choosing = choosingStatus(comparison: false) { status = choosing }
+            if let stage = providerProgress?.stage, [.descriptionReading, .descriptionComposition, .descriptionWriting, .descriptionReview].contains(stage) {
+                status = providerProgress?.displayTitle(display) ?? ""
+            }
+            else if let choosing = choosingStatus(comparison: false) { status = choosing }
             else { status = providerProgress?.stage == .composition ? "構図の応答を受信中" : "応答を受信中（\(count) bytes）" }
         case .providerDiagnostic(let id, let diagnostic): receive(diagnostic, executionID: id)
         case .providerMetric: break
@@ -2216,11 +2481,30 @@ public final class AppModel {
     }
     /// Web PipelineStatus prints `pipelineAttentionText` for a failed run, not a bare "failed".
     private func statusText(for view: PipelineView) -> String {
-        drawingFailureText(view) ?? Self.phaseStatus(view.phase)
+        if let failure = drawingFailureText(view) { return failure }
+        if view.phase == "score_ready", drawRoute == "read_and_draw", activeSingleInputMode == "description" { return display.webCopy("readDrawSaving", "作品を保存しています…") }
+        switch view.actionTag {
+        case "read_description": return display.webCopy("readDrawReading", "記述を読んでいます…")
+        case "compose_description": return display.webCopy("readDrawComposing", "構図と法則を決めています…")
+        case "write_description_ddl": return display.webCopy("readDrawWriting", "指示書を書いています…")
+        case "review_description_ddl": return display.webCopy("readDrawReviewing", "描いた画を見て直しています…")
+        case "select_image_catalog": return display.webCopy("imageSelectingCatalog", "画像から色カタログを選んでいます…")
+        case "write_image_ddl": return display.webCopy("imageWritingDdl", "画像から指示書を書いています…")
+        case "draw_image_review": return display.localized("見比べる画を描いています…")
+        case "review_image_ddl": return display.webCopy("imageReviewingDdl", "画像と描いた画を見比べています…")
+        default:
+            if view.phase == "score_ready", drawRoute == "read_and_draw" { return display.webCopy("readDrawSaving", "作品を保存しています…") }
+            return Self.phaseStatus(view.phase)
+        }
     }
     func drawingFailureText(_ view: PipelineView) -> String? {
-        DrawingFailureMessage.text(for: view, language: display.preferences.language,
-                                   chatGPTCode: chatGPTFailureCodes[view.executionID])
+        guard let text = DrawingFailureMessage.text(for: view, language: display.preferences.language,
+                                   chatGPTCode: chatGPTFailureCodes[view.executionID], copy: { key, fallback in self.display.webCopy(key, fallback) }) else { return nil }
+        if let delivery = view.deliveryJSON, let document = try? ExactJSON(data: delivery),
+           ["upstream_diagnostics", "downstream_diagnostics", "resource_omissions", "relation_omissions", "render_warnings", "catalog_diagnostics"].contains(where: { !(document[$0].array ?? []).isEmpty }) {
+            return text + "\n" + PipelineDiagnosticText.formatDocument(String(decoding: delivery, as: UTF8.self), display: display, pluginWords: pluginWords)
+        }
+        return text
     }
     private static func phaseStatus(_ phase: String) -> String {
         [
@@ -2237,7 +2521,7 @@ public final class AppModel {
         if let id = saved.nextCatalogID, catalogs.contains(where: { $0.id == id }) { catalogID = id }
         if let mode = saved.nextCatalogMode, ["fixed", "auto"].contains(mode) { catalogMode = mode }
         if let id = saved.nextCanvasID, canvases.contains(where: { $0.id == id }) { canvasID = id }
-        if let saved = saved.nextWild { wild = saved }
+        wild = saved.defaultWild ?? false
         nextConditionsRestored = true
     }
 
@@ -2248,7 +2532,6 @@ public final class AppModel {
         // Batch-only modes are not a next-work choice of the creation screen.
         if ["fixed", "auto"].contains(catalogMode) { next.nextCatalogMode = catalogMode }
         next.nextCanvasID = canvasID
-        next.nextWild = wild
         if next != display.preferences { display.preferences = next }
     }
 
@@ -2259,6 +2542,16 @@ public final class AppModel {
     }
 
     public func failureMessage(_ error: Error) -> String {
+        switch (error as? HostError)?.code {
+        case "image_missing", "image_expired": return display.webCopy("imageMissing", "画像を読み直してください。画像ファイルを選び直してから描いてください。")
+        case "image_invalid": return display.webCopy("imageInvalid", "画像を読めません。JPEG・PNG・GIF・TIFF のファイルを選んでください。")
+        case "image_too_large": return display.webCopy("imageTooLarge", "画像が大きすぎます。小さくしてから選んでください。")
+        case "vision_model_not_available", "image_model_not_vision": return display.webCopy("imageVisionRequired", "画像を見る Vision のモデルを選んでください。")
+        case "description_ddl_failed": return display.webCopy("descriptionDdlFailed", "記述から指示書を書けませんでした。モデルを変えて、もう一度描いてください")
+        case "description_ddl_undrawable": return display.webCopy("descriptionDdlUndrawable", "書いた指示書から何も描けませんでした。記述かモデルを変えて、もう一度描いてください")
+        case "image_ddl_failed", "image_ddl_undrawable": return display.webCopy("imageDdlFailed", "画像から指示書を書けませんでした。モデルを変えて、もう一度描いてください。")
+        default: break
+        }
         if (error as? HostError)?.code == "touch_change_unavailable" {
             return display.localized("この作品のてざわりを替えられません。")
         }
@@ -2287,7 +2580,8 @@ extension AppModel {
 
     /// Web `ddlCompletions`: the enabled saijiki words and macro names, in the language the instructions read in.
     public var ddlCompletions: DdlCompletions {
-        DdlCompletions(saijiki: saijiki, plugins: pluginWords) { [weak self] text in self?.instructionLanguage(for: text) ?? "ja" }
+        let disabled = settings.plugins?.disabledPackageIDs ?? []
+        return DdlCompletions(saijiki: saijiki, plugins: pluginWords.filter { $0.packageID.map { !disabled.contains($0) } ?? true }, uiLanguage: display.preferences.language) { [weak self] text in self?.instructionLanguage(for: text) ?? "ja" }
     }
 
     private func chooseCanvasFit(source: String, recordedWork: SavedWork? = nil, paperID: String,

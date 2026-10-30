@@ -6,11 +6,12 @@ public struct ChatGPTVerifiedIdentity: Sendable, Equatable {
     public let issuer: String
     public let subject: String
     public let email: String?
+    public let label: String
 }
 
 /// Verifies only supplied discovery/JWKS data; fetching and profile activation belong to the runtime.
 public enum ChatGPTIdentityVerifier {
-    private static let issuer = "https://auth.openai.com"
+    private static let issuer = ChatGPTEndpoints.issuer
 
     public static func verify(idToken: String, clientID: String, nonce: String?, expectedSubject: String? = nil,
                               discovery: ExactJSON, jwks: ExactJSON, now: Date = Date()) throws -> ChatGPTVerifiedIdentity {
@@ -26,57 +27,35 @@ public enum ChatGPTIdentityVerifier {
                                  discovery: ExactJSON, jwks: ExactJSON, now: Date) throws -> ChatGPTVerifiedIdentity {
         try Task.checkCancellation()
         guard !clientID.isEmpty, clientID != "dynamic_agent_client", clientID.utf8.count <= 1024,
-              idToken.utf8.count <= 65_536, discovery["issuer"].string == issuer,
-              let uri = discovery["jwks_uri"].string, let url = URLComponents(string: uri),
-              url.scheme == "https", url.host == "auth.openai.com", url.user == nil, url.password == nil,
-              url.port == nil, url.fragment == nil else { throw invalid() }
+              idToken.utf8.count <= 65_536 else { throw invalid() }
         let parts = idToken.split(separator: ".", omittingEmptySubsequences: false)
         guard parts.count == 3 else { throw invalid() }
         let header = try ExactJSON(data: base64URL(String(parts[0])))
-        let payload = try ExactJSON(data: base64URL(String(parts[1])))
+        let payloadBytes = try base64URL(String(parts[1]))
+        let payload = try ExactJSON(data: payloadBytes)
         let signature = try base64URL(String(parts[2]))
-        guard header.object != nil, payload.object != nil,
-              let algorithm = header["alg"].string, ["RS256", "ES256"].contains(algorithm),
-              let keyID = header["kid"].string, !keyID.isEmpty, keyID.utf8.count <= 256,
-              header["crit"] == .null || header["crit"].array == [], header["b64"] == .null || header["b64"].bool == true else { throw invalid() }
-        let supported: [ExactJSON]
-        if discovery.object?["id_token_signing_alg_values_supported"] == nil { supported = [.string("RS256")] }
-        else if let algorithms = discovery["id_token_signing_alg_values_supported"].array { supported = algorithms }
-        else { throw invalid() }
-        guard supported.allSatisfy({ $0.string != nil }), supported.contains(.string(algorithm)),
-              let keys = jwks["keys"].array, keys.count <= 128 else { throw invalid() }
-        let matching = keys.filter { $0["kid"].string == keyID && ($0["use"] == .null || $0["use"].string == "sig") }
-        guard matching.count == 1 else { throw invalid() }
-        let key = matching[0]
-        guard key["alg"] == .null || key["alg"].string == algorithm else { throw invalid() }
-        if key["key_ops"] != .null {
-            guard let operations = key["key_ops"].array, operations.contains(.string("verify")),
-                  operations.allSatisfy({ $0.string != nil }) else { throw invalid() }
-        }
+        guard header.object != nil, payload.object != nil else { throw invalid() }
+        _ = try ChatGPTPolicy.call("chatgpt_auth_discovery", ["discovery": discovery])
+        let selected = try ChatGPTPolicy.call("chatgpt_auth_key", ["header": header, "discovery": discovery, "keys": jwks])
+        let key = selected["key"]
+        let algorithm = try selected.requiredString("alg")
         let message = Data((String(parts[0]) + "." + String(parts[1])).utf8)
         try verifySignature(signature, message: message, key: key, algorithm: algorithm)
-        // Claims become identity only after verification against the discovery-bound key.
-        guard payload["iss"].string == issuer, let subject = payload["sub"].string, !subject.isEmpty,
-              subject.utf8.count <= 1024, let expiry = numericDate(payload["exp"]),
-              now.timeIntervalSince1970.isFinite, expiry > now.timeIntervalSince1970 else { throw invalid() }
-        if payload["nbf"] != .null {
-            guard let validFrom = numericDate(payload["nbf"]), validFrom <= now.timeIntervalSince1970 else { throw invalid() }
+        // Verify the signature first. The shared policy alone checks all claims, including iat, nbf and jti.
+        _ = try ChatGPTPolicy.call("chatgpt_auth_claims", ["claims": payload, "client_id": .string(clientID),
+            "nonce": ChatGPTPolicy.string(nonce), "now": ChatGPTPolicy.number(now.timeIntervalSince1970)])
+        let subject = try payload.requiredString("sub")
+        guard subject.utf8.count <= 1024 else { throw invalid() }
+        if let expectedSubject {
+            _ = try ChatGPTPolicy.call("chatgpt_auth_identity", ["previous": .object(["sub": .string(expectedSubject)]), "sub": .string(subject)])
         }
-        if payload["iat"] != .null {
-            guard let issued = numericDate(payload["iat"]), issued <= now.timeIntervalSince1970 else { throw invalid() }
-        }
-        let audiences: [String]
-        if let audience = payload["aud"].string { audiences = [audience] }
-        else if let array = payload["aud"].array, !array.isEmpty, array.allSatisfy({ $0.string != nil }) { audiences = array.compactMap(\.string) }
-        else { throw invalid() }
-        guard audiences.contains(clientID), audiences.allSatisfy({ !$0.isEmpty }),
-              audiences.count == 1 || payload["azp"].string == clientID else { throw invalid() }
-        if let nonce {
-            guard !nonce.isEmpty, let received = payload["nonce"].string, constantTimeEqual(received, nonce) else { throw invalid() }
-        }
-        if let expectedSubject, !constantTimeEqual(subject, expectedSubject) { throw HostError("chatgpt_identity_mismatch") }
         try Task.checkCancellation()
-        return ChatGPTVerifiedIdentity(issuer: issuer, subject: subject, email: payload["email"].string)
+        var displayInput: [String: ExactJSON] = ["claims": payload, "client_id": .string(clientID)]
+        if let raw = try? ExactJSON.rawMember("email", in: payloadBytes) {
+            displayInput["email_json"] = .string(ChatGPTPolicy.pythonJSONNumbers(String(decoding: raw, as: UTF8.self)))
+        }
+        let display = try ChatGPTPolicy.call("chatgpt_auth_display", displayInput)
+        return ChatGPTVerifiedIdentity(issuer: issuer, subject: subject, email: try display.requiredString("email"), label: try display.requiredString("label"))
     }
 
     private static func verifySignature(_ signature: Data, message: Data, key: ExactJSON, algorithm: String) throws {

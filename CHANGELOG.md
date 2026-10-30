@@ -8,9 +8,151 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-28 — The example rain redrawn as three layers slanting on the wind, with a rain cloud and mist
+### 2026-10-29 — Retire qualified plugin calls from drawing
 
-At the author's request, `Sky.Rain` is now 2.0.0, bringing out the feeling of rain in Japanese painting. After Hiroshige's *Sudden Shower over Shin-Ōhashi Bridge and Atake*, the rain is scattered in three layers, far (30 very fine silverpoint lines), middle (pale-ink pen lines, the written count) and near (12 long ultramarine pen lines), each tilted by a `transform`, the far layer least and the near layer most. The wind's direction (left or right) and strength (the middle rain at 8° or 12°) come from four choices by the composition seed. Five bleeding pale-ink strokes shade a rain cloud along the top, and three fine bleeding pale-ink lines drift low as rain mist. That `scatter` marks can be tilted by a `transform` was confirmed and used. `sky-nihonga.zip` is now `Sky.nihonga` 1.1.0 with a new Saijiki picture, and `sky.*.ddl.json` were updated; the other three sky words are unchanged. Adding 1.1.0 with "Replace" to a Server holding 1.0.0, drawing with the new rain, and checking the exported zip again were confirmed. No code changed.
+DDL no longer draws `namespace.name` calls and diagnoses the old spelling. The migration function still rewrites it to a braced name. A v1 definition remains usable through its braced name.
+
+### 2026-10-29 — Android plugin v2
+
+Migrate saved plugin spellings at startup, show the bundled words and saved offers, add editor completion and diagnostics, and carry locked definitions in DDL v2 exports. Completion matches normalized names in both languages, and settings shows each word's kind.
+
+### 2026-10-29 — Move macOS plugins to v2
+
+Read bundled words and reference checks from the shared core, and show their braced names in the Saijiki, editor, and settings. DDL export uses v2 and the work's saved locks. Database migration v6 updates saved DDL on startup and keeps a pre-migration snapshot and refusal report.
+
+### 2026-10-29 — Plugin names in the editor and Saijiki
+
+The editor marks braced words and their reasons from the shared core and offers name completion and previews. The Saijiki, settings, and check show names and kinds; each work records the words offered to AI.
+
+### 2026-10-29 — Document native wheel preparation for ChatGPT connections
+
+The connection guide now explains how to prepare and rebuild the Server's native wheel for same-PC, remote-host and container connections. Commands run inside the container use the wheel included in the image.
+
+### 2026-10-29 — Align macOS ChatGPT plan decisions with the shared core
+
+The shared core now decides callback acceptance, concurrent sign-in, operation purpose, model publication input, and registration deletion. Draw-in-words and image-to-drawing effects can use the ChatGPT plan; image effects require a model published for Vision.
+
+### 2026-10-29 — Android ChatGPT plan policy and registration deletion
+
+Use the shared core for callback, attempt, operation and publication checks. Registrations can be deleted after confirmation in Settings.
+
+### 2026-10-29 — Advance the macOS build number on every build
+
+Allocate a new number for every macOS app build. Show only that number at the bottom left, with no version or label. Use white text in dark mode.
+
+### 2026-10-29 — Reduce macOS tab switching stalls
+
+Save tab choices without blocking the screen on the settings file write. Keep the artwork and lineage views mounted across switches. Build only visible history thumbnails, reuse model-name resolutions, and avoid rereading connections and Keychain on each Settings tab switch.
+
+Keep the history strip at its content height. When a history tile has focus, the left and right arrow keys show adjacent works; movement within the current page avoids a database refresh. Save the selected Settings tab separately from observable display preferences. Keep the covered creation workspace out of hit testing and accessibility. Resolve the history tile's default provider only when connection settings change, and read connection settings and Keychain only when opening the Models page.
+
+Persist Description, Image, and Batch tab choices without invalidating all display consumers. Switching between Description and Image no longer resets Batch browsing state.
+
+### 2026-10-29 — Plugin package v2 and saved-work name migration
+
+Plugin files now carry v2 definitions, bilingual names, notes, examples, and pictures. The bundled leaves come from a shared-core v2 package. The old document reader is retired; DDL exports carry the work's locked definitions and notes in v2. Saijiki, settings, reference, and Web follow the new data, and an offline migration tool is available for saved-work names (not run on the operational database).
+
+### 2026-10-28 — Complete Android ChatGPT login in the foreground
+
+The browser acknowledges authorization immediately, and inku exchanges the token after returning to the foreground.
+
+### 2026-10-28 — Diagnose Android ChatGPT login failures
+
+Login and automatic catalog refresh failures now record a bounded diagnostic without credentials or response contents.
+
+### 2026-10-28 — Align macOS history, diagnostics and refinement with Web
+
+Align history and generation information, settings and backup actions, diagnostic messages, chunk moves, and the default brush constraint; refinement children are kept in normal history.
+
+### 2026-10-28 — Draw descriptions in words on macOS
+
+Choose whether to read a description and write its instructions, or draw through the existing stages. The saved work keeps its reading and composition record.
+
+### 2026-10-28 — Refresh ChatGPT models after login
+
+After a successful connection or reauthorization, fetch the model list once so published models appear without a manual refresh. A fetch failure leaves the connection intact and displays the error.
+
+### 2026-10-28 — Refresh Android ChatGPT models after login
+
+The personal model catalog refreshes in the background after a successful login, restoring the published choices without another manual refresh.
+
+### 2026-10-28 — Share Android ChatGPT plan decisions
+
+ChatGPT plan authorization, session and model publication decisions use the shared core while encrypted credentials remain on the device.
+
+### 2026-10-28 — Share ChatGPT plan policy on macOS
+
+ChatGPT plan publication and authentication decisions use the shared core, while signature verification and encrypted local storage stay native.
+### 2026-10-28 — Share provider admission calculations on macOS
+
+Input estimates, admission, settlement, daily boundaries and 429 delays use the shared core. The existing stored accounting format and host waiting remain in place. Auxiliary text requests now share the same budget, including Gemini token counting and 429 cooldowns.
+
+### 2026-10-28 — Share provider settings on macOS
+
+Provider settings, model references, publication, discovery and validation follow the shared core. Migration preserves removed built-in connections and the previously published models.
+
+### 2026-10-28 — Android uses shared provider admission
+
+Remote-provider admission, waiting and settlement use the shared core and persist their state on the device. Gemini counts input tokens before sending.
+
+### 2026-10-28 — Install and remove plugin packages on macOS
+
+Settings can check and install, replace, or remove JSON and ZIP plugin packages. Enabled words are available to new works and the Saijiki; saved works retain their own definitions.
+
+### 2026-10-28 — Android uses shared provider settings
+
+Android uses the shared core for provider definitions, settings, model references, list refresh and access decisions. On-device model assets and encrypted keys remain on the device, and Android retains its URL restrictions.
+
+### 2026-10-28 — Android reads model catalog and selection from the shared core
+
+Android receives the embedded model catalog, labels, selectability and ordering through JNI instead of maintaining a second classification. Model names now sort with the same collation as Web. Local observations and purpose choices remain unchanged.
+
+### 2026-10-28 — macOS reads the shared model catalog
+
+The model catalog, labels, ratings and ordering now come from the shared core; the settings list uses the same lexical order as the Web.
+### 2026-10-27 — Delete a ChatGPT plan registration on macOS
+
+The connection settings can recheck the state and delete a registration together with its published model settings. Deletion asks for confirmation and reports if provider revocation could not be confirmed.
+
+### 2026-10-27 — Paint from an image on macOS
+
+The image tab and image-folder batch prepare images with ImageIO and the shared core's image policy, then send them to a Vision model. Provenance is saved with the work and is not used for drawing; image bytes are not saved. The app warns before the first image send after launch. Folder progress is recorded for reselection and resumption.
+
+macOS image drawing and image-folder batches can use the image aspect ratio or a fixed paper, separately from the description canvas.
+
+On macOS, image provenance now follows the chosen image, and input tabs remain browsable with the running indicator on the active operation.
+
+macOS now shows image drawing progress and its stop control on the image tab.
+
+macOS running tabs now animate their underline and dot, and progress details stay within the input panel.
+
+### 2026-10-27 — Android drawing conditions and wording
+
+The studio and batch conditions now label the model, color catalog and canvas; the drawing route uses a segmented control and the steps and options use stateful switches. The flow shows its steps separately with their colors. Interface wording comes from the Japanese and English language packs.
+
+### 2026-10-27 — Draw in words on Android
+
+The studio and batch conditions now offer drawing in words or with a plan, sketching, composition and laws, and the stroke limit. The shared core reads the description and writes instructions; a model offered for Vision can review them beside the drawing. On-device LiteRT uses the plan route. The work retains its reading and round records.
+
+### 2026-10-27 — The three image functions can be called through UniFFI too
+
+The shared core's `image_input_policy`, `image_canvas` and `image_review_svg` can now be called through UniFFI (macOS's bindings) as well. The Server's CPython and Android's JNI calls, and what the functions do, are unchanged. This prepares drawing from an image on macOS.
+
+### 2026-10-27 — Android shows DDL title lines as headings
+
+Android's DDL editor and ranged DDL view set a DDL title line (DDL 27) in bold and colour no word in it, and the vocabulary bar's detected words leave title lines out. Lines are recognised by a port of the shared core's `ddl_title_name` (`ui/DdlTitles.kt`). The drawing is unchanged.
+
+### 2026-10-27 — macOS shows DDL title lines (DDL 27) as headings
+
+macOS DDL views show a title line in the heading colour with an underline, colour no word in it, and offer no word on it. The library and history strip titles skip title lines, and the unread-word reading takes the DDL without them. The rule is the core's `chunk_title.rs`, copied as `DdlTitles`. The Web copy (`ui-reference.json`) was exported again from Build 1352 (DDL 27, engine 72). Drawing is unchanged.
+
+### 2026-10-27 — macOS calls Wild "Lift the stroke limit"
+
+By the author's decision, macOS follows Web. The Creation and Batch conditions, the switch in refine, compare, work-editing and DDL-editing dialogs, autonomous refinement, and the work's provenance (Lifted / Not lifted) now say Lift the stroke limit. The dialogs drop the Stroke limit label before the button and show (inherited) after it when the setting is inherited. The Web copy (`ui-reference.json`) was exported again from Build 1351, which also brings other Web wording changed since Build 1316 (plugin and image-import settings, among others). The switch is still off by default; the `render_wild` record and drawing are unchanged.
+
+### 2026-10-27 — Android also calls Wild "Lift the stroke limit"
+
+Android's labels follow Web. The rendering switch in Settings, the Inherit / On / Off heading in refinement, the autonomous refinement heading and the Generation Info row now say `Lift the stroke limit` (`筆致制限を外す` in Japanese). Lighting it lifts the limit; it stays off by default. Generation Info and the settings card show `Lifted` or `Not lifted` (`外した`・`外さない`). The record `render_wild` and the drawing are unchanged.
 
 ### 2026-10-26 — River and Sea, and four sky words (Clouds, Heavens, Rain, Snow), added to the examples
 
@@ -342,6 +484,249 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.296 (2026-10-29 / Build1372)
+
+Updated the displayed version and Build number.
+
+## v2.15.295 (2026-10-29 / Build1371)
+
+### 2026-10-29 — Use object plugin words in composition, laws, colors, and chunks
+
+Read and measure an object word like a square of the same aspect ratio. Preserve its shape name and allow recoloring only when its definition declares a color parameter. Scene words remain plugged in shapes.
+
+### 2026-10-29 — Share ChatGPT plan authorization and registration decisions
+
+Callback, concurrent authorization, purpose and operation, publication constraints, and registration deletion decisions move into the shared core. The Server retains its HTTP 422 validation; clients are unchanged.
+
+### 2026-10-28 — Draw object words inside invisible boxes
+
+Object words use the square's placement, count, dimensions, angle and relations, then draw their definition inside a box with its aspect (DDL engine 74). Score 0.23.0 retains one body shared by copies and render engine 94 performs it. Older Scores draw as before.
+
+### 2026-10-28 — Offer plugin words named by a description
+
+The drawing prompts offer a bounded selection of words named in the description or the DDL under review. Scene words use the plan's plugins field; object words use its shape field.
+
+### 2026-10-28 — Bracketed plugin names and definition v2
+
+DDL 28 resolves bracketed names such as `{young leaves}` against locked v1 and v2 definitions. Unbound scene caller positions, sizes and similar fields are omitted individually. Object definitions are accepted but not drawn yet. Saved-work migration retains v1 definitions and locks and rewrites only the spelling.
+
+## v2.15.294 (2026-10-28 / Build1370)
+
+### 2026-10-28 — Refresh ChatGPT models after signing in
+
+After a ChatGPT plan connection or reauthorization, Web refreshes the model list automatically and restores the saved publication choices. A failed refresh leaves the connection in place and reports the error.
+
+## v2.15.293 (2026-10-28 / Build1369)
+
+### 2026-10-28 — Share the remaining ChatGPT authorization rules
+
+The shared core now owns the remaining ChatGPT plan authorization, registration and quota decisions; the Server retains HTTP, signature verification, storage and locks.
+
+## v2.15.292 (2026-10-28 / Build1368)
+
+### 2026-10-28 — Share provider admission for text requests
+
+Server Vision and demo text requests now share provider limits with drawing, including Gemini token counting and 429 cooldown. The shared core also owns the ChatGPT plan quota pause transition.
+
+## v2.15.291 (2026-10-28 / Build1367)
+
+### 2026-10-28 — Preserve token-count failure classification
+
+Non-object Gemini token-count replies are again reported as malformed; invalid counts in an object remain rate-limit failures.
+
+## v2.15.290 (2026-10-28 / Build1366)
+
+### 2026-10-28 — Share input-token admission estimates
+
+The shared core now estimates input-token reservations and validates Gemini token-count replies before admission.
+
+## v2.15.289 (2026-10-28 / Build1365)
+
+### 2026-10-28 — Fix versioned Anthropic and Gemini base URLs
+
+Model-list and send URLs no longer repeat the API version when a configured Anthropic or Gemini base URL already ends in it.
+
+## v2.15.288 (2026-10-28 / Build1364)
+
+### 2026-10-28 — Share ChatGPT plan policy
+
+The shared core now owns model publication and the pure authorization and registration decisions; the Server continues to handle communication and protected storage.
+
+## v2.15.287 (2026-10-28 / Build1363)
+
+### 2026-10-28 — Include the Android local provider in shared settings
+
+The shared provider table and settings recognize Android's always-enabled LiteRT-LM local provider.
+
+## v2.15.286 (2026-10-28 / Build1362)
+
+### 2026-10-28 — Share provider admission calculations
+
+The shared core now calculates provider budgets, admission, reconciliation and 429 waits. The Server retains persistent accounting and waiting.
+
+### 2026-10-28 — Share plugin package checks
+
+The shared core reads and checks plugin packages and produces their Saijiki pictures. The Server draws examples through its pipeline and uses the same shared checks before installation.
+
+## v2.15.285 (2026-10-28 / Build1361)
+
+### 2026-10-28 — Shared provider and model settings
+
+Moved provider and model settings, model references and list refresh decisions into the shared core. Web hides the list while loading and offers a retry if loading fails.
+
+## v2.15.284 (2026-10-28 / Build1360)
+
+### 2026-10-28 — Placeholder model list
+
+Restored selection from the placeholder model list before the catalog loads or if loading fails.
+
+## v2.15.283 (2026-10-28 / Build1359)
+
+### 2026-10-28 — Shared model catalog and picker decisions
+
+The unchanged model catalog now lives in the shared core. The Server returns its labels, availability, recommendations and ordering to the Web, and the model administration screen receives the shared assessment fields. Catalog measurement updates require a native Server rebuild.
+
+## v2.15.282 (2026-10-27 / Build1358)
+
+### 2026-10-27 — All saved works appear in history
+
+The Server and Web now save refinement intermediates, including children that did not pass the visual gate, as ordinary works. Existing lineage-only works and nodes are converted at startup after a verified database snapshot; works and lineage edges are retained. The hidden-history option and promotion action have been removed.
+
+## v2.15.281 (2026-10-27 / Build1357)
+
+### 2026-10-27 — Give the stroke limit switch its own default
+
+Settings → Display and operation now holds the browser default for `Lift the stroke limit`, initially off. The input chip changes only the current drawing. Derived works start from the default, not the parent, and use their own choice. For new Server runs, autonomous refinement, color arrangements, ground changes and touch changes, omitted or null `wild` means off. Replaying or fitting a saved work as it stands uses its recorded value. The former input-chip preference is not migrated into the new default.
+
+## v2.15.280 (2026-10-27 / Build1356)
+
+### 2026-10-27 — A chunk move names the lines that would not be drawn when it asks again
+
+A chunk move now compiles its child before drawing it, as the image tab's writing request is compiled. When the child has a line the compiler would not draw as written and the parent does not, the child is not drawn and the choose or rewrite request is asked again once with the line, the reason and a hint. A rewrite had written two colors on one shape and the compile left the shape out, and asking again without naming the line repeated it: three of the five turns in the author's run kept nothing.
+
+## v2.15.279 (2026-10-27 / Build1355)
+
+### 2026-10-27 — The chunk move stopped before it could send the parent's picture
+
+In v2.15.278 (Build 1354) every request that chooses a chunk move was refused before it was sent, and a run stopped after two turns with nothing kept (the author's run on 5173 showed it). The shared core asks a request's images to be named in its prompt too (type, length and SHA-256; the image stages, 2026-10-24), and the Server attached the parent's picture without naming it. The Server now names the parent's PNG it sends. The stand-in provider of the Server's tests now builds the request body with the core as a real one does, where an image not named is refused.
+
+macOS image drawing and image-folder batches can use the image aspect ratio or a fixed paper, separately from the description canvas.
+
+## v2.15.278 (2026-10-27 / Build1354)
+
+### 2026-10-27 — Autonomous refinement gets the chunk move
+
+The plan the author chose for refining toward abstraction (step 2 after the prototypes of revising toward abstraction). Autonomous refinement ("Leave it to the AI") has a third move, the chunk move, which takes a move on a chunk the title lines (DDL 27) divide the work into, made as the second prototype's chunk series was.
+
+- **Six moves.** Omit, simplify, move or resize, break apart, repeat and merge. The model is shown the parent's picture, the titled DDL, the list of chunks, the description, the reading's core pictures, the composition's proposition and the moves so far, and chooses only the move, the chunk, the move's options and a reason. For omit, place, break and repeat the shared core removes the sentences or rewrites their numbers (nothing is sent); for simplify and merge the model is asked once more for the new title and sentences. An answer, an application or a drawn picture that fails the checks is asked again once, and then the turn keeps nothing. The shared core's `chunk_moves` (`inku.chunk-moves.v1`) holds the rules, and `autonomous_refine` gains the kind `chunks`.
+- **Chosen alone, with a direction, and without the visible-difference gate** (the author's choice). The direction is the author's to write in the note (toward abstraction is no hidden instruction). The gate averages cells, so it misses most changes of thin lines and small shapes (15 of the 45 generations of the second prototype's chunk series would not have passed). The share is kept in the move's record (`visible.gate: false`).
+- The child is drawn from DDL with the parent's color catalog, seed, canvas ratio and "Lift the stroke limit" setting, so its description is held; its derivation kind is `chunk_move` (the lineage's label reads "Chunk move"). A work without title lines but with a composition record starts with titles printed as the commit prints them.
+- Server: `kinds` of `POST /api/refine/autonomous` takes `chunks`. With another move it is refused with 422 `autonomous_chunks_alone`, and without a note with 422 `autonomous_note_required`. A try carries `move`, `targets` and `title`. The request that chooses the move carries the parent's picture as a PNG square of 1024, and a passing failure is sent again once after 2 seconds.
+- Web: the dialog's moves to take include "Chunk move". Choosing it clears the other two, and with the direction empty the run does not start (the field's example is the prototype's direction). The list of tries shows the move and the chunk's title (and a rewrite's new title). The details of a lineage card show an autonomous refinement child's move record (turn, move, what it did, reason and change from the parent), for laws and juxtaposition children too (the record has been on the edge but shown nowhere).
+- Checks without sending: the 45 moves of the second prototype's chunk series were applied again with the product's core; the 31 that are not breaks give the prototype's DDL character for character, and the 14 breaks draw with no more diagnostics. Android and macOS keep the two moves and add this in a later step. The DDL, DDL engine and render engine versions do not change.
+
+## v2.15.277 (2026-10-27 / Build1353)
+
+### 2026-10-27 — The batch's New stands left of the history picker (Web)
+
+At the author's instruction, the Batch tab's `New` leaves the chips of the next work's conditions and stands left of `Select from history`, the same button as the Describe tab's `New` (no longer round like a chip). With no past batch, `New` stands alone. What it does is unchanged.
+
+## v2.15.276 (2026-10-27 / Build1352)
+
+### 2026-10-27 — Title lines name chunks of sentences (DDL 27, DDL engine 72)
+
+The plan the author chose, to make titles grammar (step 1 after the prototypes of revising toward abstraction). A line that is only a bracketed name, such as `"lighthouse"` (curly quotes read the same; `「灯台」` in Japanese), is read as a title that names the chunk of sentences up to the next title. Blank lines are decoration, an empty title ends a chunk, and a name used again goes on with its chunk.
+
+- **A title draws nothing.** The lexer reads a title line as blank bytes of the same length, so a title makes no instruction, takes no sentence number, adds no diagnostic and is no seed material; a titled DDL lowers to the Score of the same DDL without titles. Until now a title's words were read as drawing words, joined to the next sentence or taken as an undrawn shape with a sentence number (adding titles changed the Score of 32 of the author's 284 composed works). The semantic document names each chunk's instructions.
+- **A work drawn `In words` (`read_and_draw`) with `Composition, laws, colors` passed gets each thing's title printed when it commits.** The name is the thing's words from the description, numbered from the second where two things share it. The writing, review and color requests do not change. The record's `things` stays each sentence's thing (title and blank lines are not counted).
+- The laws stage from a saved work applies the laws without the titles and titles the child again. The language of a text is read without its title lines (the Web's copy of the rule too).
+- The Web's DDL views and instruction editor show a title line as a heading, colour no word in it and offer no word on it, and the unread words are read without the titles. The CLI's `batch --input-mode ddl` makes no work of a title line.
+- No saved DDL changes: of the 6,270 DDLs on 5173, no line is a title and no compile result changes. Android and macOS highlighting follow in their own steps.
+
+## v2.15.275 (2026-10-27 / Build1351)
+
+### 2026-10-27 — Wild is now "Lift the stroke limit" (Web)
+
+At the author's word (Wild was hard to read, and the label `Stroke limit` read as heading the canvas after it too), the Web renames it. The chip and the button say `Lift the stroke limit`; lit, the limit is lifted (off by default, as before). The line in the next work's conditions is labelled `Options`. The refine, instruction and redraw dialogs' switch is a button of the same name, without the `Stroke limit:` label before it. Generation Info shows `Lift the stroke limit` as `Lifted` or `Not lifted`. The manual follows. A work's record (`render_wild`) and how it is drawn do not change. Android and macOS still show Wild.
+
+## v2.15.274 (2026-10-27 / Build1350)
+
+### 2026-10-27 — The Web's drawing starts In words, placed first (Web)
+
+At the author's instruction, the next work's drawing starts on `In words`, and its buttons read `In words`, then `With a plan`. The sketch starts lit, as choosing In words lights it. A run in the image tab leaves the description's drawing and sketch as they were. The Server's and CLI's default (`stages`), and reading a saved work with no record of its route as With a plan, are unchanged. The hints of the drawing, the sketch, the composition, laws and colors, and Wild, which showed away from their buttons, now show above each button, and Wild has a label to its left, `Stroke limit` (the name the refine dialogs give it).
+
+### 2026-10-27 — The chip "Composition and laws" is now "Composition, laws, colors" (Web)
+
+At the author's word, the chip in the next work's conditions names what it leaves out: the colors come with the composition and laws, and no switch leaves them out alone. Its hint and the manual follow. The flow line's steps and what a run sends do not change.
+
+## v2.15.273 (2026-10-27 / Build1349)
+
+### 2026-10-27 — The drawing is now With a plan or In words, and the sketch and the composition and laws are chips of the steps it passes (Web)
+
+At the author's word (Current stages and Read and draw, and the sketch's and the composition and laws' On and Off, were hard to read), the Describe and Batch tabs' `Conditions for the next work` take the author's chosen plan C. Nothing a run does changes, and nothing it sends.
+
+- `Drawing` is two buttons: `Current stages` is now `With a plan` (the model fills the fields of a fixed plan and the program writes the instructions), and `Read and draw` is `In words` (the model writes the instructions itself and corrects them once beside the drawing).
+- A `Steps` line holds the chips `Sketch from life` and `Composition and laws`. A press lights one (passed); another turns it off. Their names and hints are the same on both drawings. With a plan always passes the composition and laws, so that chip stays lit with a lock (it was hidden before).
+- A `Flow` line shows the steps the current choices pass, in their order (for example `Description › Sketch › Composition and laws › Write in words › Look and correct › Colors › Picture`).
+- `Wild` is the same kind of chip, and the `Canvas` button has round ends.
+- The strip above the canvas names the drawing by its new name and, in Japanese, the sketch as 通した or 通さない (No answer, Not applicable and Not recorded are unchanged). Generation Info and the manual use the same names.
+
+## v2.15.272 (2026-10-27 / Build1348)
+
+### 2026-10-27 — The library's "Searching" tag stands left of Latest
+
+At the author's instruction, the "Searching “term” ×" tag that v2.15.270 put after the count now stands immediately left of Latest among the page buttons at the library's top right. What it does (clicking it clears the search) and the accent border of the search box are unchanged.
+
+## v2.15.271 (2026-10-27 / Build1347)
+
+### 2026-10-26 — The pinned Rust is 1.99.1
+
+At the author's instruction, the shared core, the Server wheel, Android and the Mac app are built with Rust 1.99.1 instead of 1.95.0. No published maturin image carries Rust 1.99.1, so the Server's Linux builder keeps the same maturin 1.13.3 image and installs the pinned toolchain in it; the wheel keeps its manylinux2014 tag. With Xcode 27.1, Rust 1.95.0's stripping left Mac libraries that would not load ("mis-aligned LINKEDIT string pool"); 1.99.1 does not, so the two stripping workarounds for 1.95 were removed. Drawings are unchanged: 5,179 saved Scores along the Server's path and 1,407 with their resources rendered the same SVG and metadata with both versions.
+
+## v2.15.270 (2026-10-27 / Build1346)
+
+### 2026-10-27 — The library shows when a search is narrowing it
+
+At the author's report: a search term left from an earlier visit stayed in the library's box, and the library showed 27 works with nothing near the count to say why. While the box holds a term, the count is followed by "Searching “term” ×" (clicking it clears the search), and the box's border takes the accent color. The history strip's search is unchanged.
+
+## v2.15.269 (2026-10-26 / Build1345)
+
+### 2026-10-26 — Read and draw's colors also reach a work with a sentence its compile left out (core)
+
+On Build 1344 a live work ("秋の夕暮れ、川べりの柳の下に小舟がひとつ繋がれている。") had a sentence left out downstream (a tiling of semicircular arcs); its Score's layers then did not match its sentences, the colors' context could not be built, and the work was committed with the DDL before its colors (the record's reason was `prompt`). A sentence the compile left out now stays as written, word for word, and only the sentences drawn are the colors' layers, numbered from 0 in order. The estimate and the checks read a copy of the Score numbered so, while the work is drawn from the run's compile, so the layers after the left-out sentence keep their shapes and places. The reason when the context cannot be built is now `context`.
+
+## v2.15.268 (2026-10-26 / Build1344)
+
+### 2026-10-26 — Read and draw with "Composition and laws: On" chooses its colors before the commit (Server and Web)
+
+The form the author chose (arm B of the colors prototype: colors applied to the reviewed picture, which the author judged better than before the colors for 8 of 10 works with both sol and Sonnet 5.5) now always runs inside "Composition and laws: On". The Server always writes `colors: true` in read and draw's configuration `description_ddl`, and the core (the previous entry) passes the color request before the commit of a run by the composition and laws. No switch was added. Off, the stages, the picture tab and the DDL tab are unchanged. The colors are sent with the Stage 1 model as the stages' colors are, and recorded, and shown in the prompt tab, under `colors`. The progress reads "Choosing the colors…". The Web adds "then choose its colors" to the composition's hints, and a "Colors" part to the generation info's "Composition and laws" section (the state, the main law and laws, the ground, the lines changed counted by how, and each changed line before and after).
+
+### 2026-10-26 — Read and draw by the composition and laws chooses its colors before the commit (core)
+
+At the author's choice, arm B of the colors in the prototype read-draw-laws-20261026 (the colors chosen on the drawing the review left; in the author's view better than the drawing without them in 8 of 10 works with each model) is in the shared core. A read-and-draw run by the composition and laws passes the color request before its commit (the color stage's `choose_colors`, with its request, checks and budget) when its host sets the field `colors` of `description_ddl` to true and the run has the color stage. Each sentence of the DDL is read as one layer, and the request is followed by a table of the thing each layer draws. A sentence whose color alone changes has its color word rewritten in place; only a sentence whose shape changes is printed again with its numbers; a ground prints the background sentence again. A sentence the colors keep is not touched. When the written DDL does not compile to the chosen colors, the DDL before them is committed. The record is `description_ddl.composition.colors`. The Server and Web do not pass the field yet, so today's works keep their bytes.
+
+## v2.15.267 (2026-10-26 / Build1343)
+
+### 2026-10-26 — Opening another work while drawing no longer stops the drawing; it is drawn and saved to the end
+
+The author reported that opening another work (from the history, the thumbnail strip, the previous and next arrows, or the lineage) or starting a new one while the description tab was drawing stopped the drawing. Moving the shared pipeline display's request ordinal made the run's polling return half-way: it never sent the command to draw and save, and showed no error (the same shape as the picture batch on 2026-10-25). Now the run is drawn and saved to the end even when the display moves to another work. The input panel keeps its progress and Stop, and Stop stops that run. When it ends, the new work joins the history and the screen stays on the work the author opened; when none was opened, the drawing is shown as before. Clearing the picture still stops the run in flight. Web only.
+
+## v2.15.266 (2026-10-26 / Build1342)
+
+### 2026-10-26 — The composition and laws' pairs that did not fit leave out the pairs no tool measures
+
+A live check of Build 1341 listed the hands of B21 (unity and variety) under the generation info's "Pairs that did not fit" as "not measured". The writer draws a hand and no tool measures it, so it did not miss. It stays in the last measure's counts and leaves the list of pairs that did not fit. Web only.
+
+## v2.15.265 (2026-10-26 / Build1341)
+
+### 2026-10-26 — The Server and Web offer read and draw's "Composition and laws"
+
+At the drawing team's request (step 2 of the shared core's composition and laws), the Server and Web gain the switch "Composition and laws" (Off or On). The Web shows it beside the route in the describe tab's and the batch's `Next draw` conditions, only while the route is `Read and draw`. `Off` is the default and sends read and draw as before (the request to the core is byte-identical). With `On`, the run option `composition: on` makes the host add `composition: {"mode": "on"}` to `authoring` and `generate_from_description`. It is not kept as a setting: opening a work sets it to whether the work has the record (`description_ddl.composition`). A child work takes its parent's switch, and a resumed batch takes it too. The new request `compose_description` is sent with the Stage 1 model and no picture, with an 8192-token answer limit, recorded under the stage `read_and_draw`, and is included in the ChatGPT plan's requests. The prompt tab gains `Composition and laws` (with what was sent), the progress "Deciding the composition and laws…" ("…again" when asked again), and the generation info a "Composition and laws" section (state, thesis, form, main law and laws, last measure, reason, things, the targets the laws set, the pairs that did not fit, cards, and the thing each sentence draws). The record is saved as it is (the database's shape is unchanged). `/api/paint` and `inku-cli --composition` choose it too. SPEC §12.6.7, the image creation guide, and the CLI reference were updated. Android and macOS are unchanged.
+
+### 2026-10-26 — Read and draw can decide its composition and laws before it draws (shared core)
+
+At the author's request (drawing the scene the words call up faithfully is close to automation; as an artwork, composition and laws come first), the prototype (ten read-and-draw descriptions drawn with sol and Sonnet 5.5, which the author judged better with composition and laws in six of ten for both models) is now in the shared core. A read-and-draw run whose input field `composition` is `{"mode": "on"}` asks the composition stage `compose_description`, after the reading, for the composition's proposition, the form, the things, the main law and the laws; the drawer marks each sentence with its thing, and the core measures each thing against its laws and fits a thing a little off by rewriting its numbers. A thing far off or drawn by no sentence is asked about once. The core builds the cards (C1 to C6) with the laws stage's builders, places a bundle of lines stacked across a law's line by its center, and a rule keeps a thing's details. A run with the default `off` is the current read and draw byte for byte, and the Server, Web, Android and macOS do not offer the choice yet (the next step). SPEC §12.6.7.
 
 ## v2.15.264 (2026-10-26 / Build1340)
 

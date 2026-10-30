@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.15.264 / Build 1340**
+**Target version: v2.15.296 / Build 1372**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -89,7 +89,7 @@ can show those instructions after painting and use the existing DDL edit path
 to paint a child. Schema v5 adds the two nullable columns to
 v4 after making a verified backup.
 
-`Drawing` set to Read and draw in the Describe and Batch tabs reads the
+`Drawing` set to In words in the Describe and Batch tabs reads the
 description from the speaker's eye, writes what that eye sees as DDL directly,
 and corrects it once beside its drawing (SPEC §12.6.7; the run option `route`).
 The composition reading, the laws and the colors are not passed through. The
@@ -409,7 +409,7 @@ and fresh host entropy.
 manual dispatch. On ordinary pushes and pull requests, `checks` runs
 **server (ruff and pytest), cli (ruff and pytest), web (`npm run check`, `test:unit`, `lint:i18n`),
 and the published documents (`check_docs.py`).** `android-native` is path-scoped to shared Rust,
-raster, JNI, and Android-host changes; it checks Rust 1.95, NDK 29, the `arm64-v8a` native library,
+raster, JNI, and Android-host changes; it checks Rust 1.99, NDK 29, the `arm64-v8a` native library,
 and focused host-JVM boundary tests.
 
 **⚠ Some surfaces are still outside it.**

@@ -4,10 +4,54 @@ import InkuPersistence
 import InkuUI
 import InkuHost
 
+func captureParityPrompt(_ action: ExactJSON) {
+    guard ProcessInfo.processInfo.environment["INKU_PARITY_CAPTURE"] == "1" else { return }
+    let value: ExactJSON = .object(["tag": action["tag"], "prompt": action["payload"]["prompt"]])
+    print("INKU_PARITY_PROMPT " + value.data.base64EncodedString())
+}
+
 @main
 struct AppCheck {
     @MainActor
     static func main() async throws {
+        if CommandLine.arguments.contains("--plugin-name-migration-only") {
+            try await runPluginNameMigrationChecks(); return
+        }
+        if let index = CommandLine.arguments.firstIndex(of: "--read-and-draw-replay-only") {
+            guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Expected temporary baseline database") }
+            try await runReadAndDrawBaselineReplay(databaseURL: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return
+        }
+        if CommandLine.arguments.contains("--read-and-draw-only") { try await runReadAndDrawChecks(); return }
+        if CommandLine.arguments.contains("--chunk-move-only") { try await runChunkMoveChecks(); return }
+        if CommandLine.arguments.contains("--lineage-migration-only") { try await runLineageMigrationReplayChecks(); return }
+        if let index = CommandLine.arguments.firstIndex(of: "--chatgpt-policy-only") {
+            guard CommandLine.arguments.indices.contains(index + 2) else { throw CheckFailure.message("Expected ChatGPT wire and addendum cases") }
+            try runChatGPTPolicyChecks(wireURL: URL(fileURLWithPath: CommandLine.arguments[index + 1]),
+                                      addendumURL: URL(fileURLWithPath: CommandLine.arguments[index + 2])); return
+        }
+        if let index = CommandLine.arguments.firstIndex(of: "--provider-admission-only") {
+            guard CommandLine.arguments.indices.contains(index + 2) else { throw CheckFailure.message("Expected admission cases and sequence") }
+            try runProviderAdmissionChecks(casesURL: URL(fileURLWithPath: CommandLine.arguments[index + 1]),
+                                           sequenceURL: URL(fileURLWithPath: CommandLine.arguments[index + 2])); return
+        }
+        if let index = CommandLine.arguments.firstIndex(of: "--provider-settings-core-only") {
+            guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Missing shared provider settings cases") }
+            try await runProviderCoreSettingsChecks(url: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return
+        }
+        if let index = CommandLine.arguments.firstIndex(of: "--plugin-package-check") {
+            guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Expected package path") }
+            try await checkPluginPackageFile(url: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return
+        }
+        if let index = CommandLine.arguments.firstIndex(of: "--plugin-package-only") {
+            guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Expected PLUGIN.ja.md path") }
+            try await runPluginPackageChecks(specURL: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return
+        }
+        if CommandLine.arguments.contains("--image-run-only") {
+            try await runImageChecks(); return
+        }
+        if CommandLine.arguments.contains("--image-opus-only") {
+            try await runImageChecks(realOpus: true); return
+        }
         if CommandLine.arguments.contains("--core-version-only") {
             print(InkuCore.versionReport); return
         }
@@ -145,6 +189,7 @@ struct AppCheck {
         if CommandLine.arguments.contains("--library-release-only") { try await runLibraryReleaseChecks(); return }
         if CommandLine.arguments.contains("--input-aids-only") { try await runInputAidChecks(); return }
         if CommandLine.arguments.contains("--tooltips-leftovers-only") { try await runTooltipAndLeftoverChecks(); return }
+        if CommandLine.arguments.contains("--ddl-title-only") { try await runDdlTitleChecks(); return }
         if CommandLine.arguments.contains("--library-browsing-only") {
             try await runLibraryBrowsingChecks(); return
         }

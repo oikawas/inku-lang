@@ -37,6 +37,8 @@ public struct BatchDrawingConditions: Codable, Sendable {
         case .description(_, let auto, let sketch):
             inputMode = "description"; self.catalogMode = catalogMode ?? (auto ? "auto" : "fixed")
             switch sketch { case .off: sketchMode = "off"; case .on: sketchMode = "on"; case .supplied: sketchMode = "supplied" }
+        case .image(_, let auto):
+            inputMode = "image"; sketchMode = "off"; self.catalogMode = catalogMode ?? (auto ? "auto" : "fixed")
         }
     }
 }
@@ -105,7 +107,20 @@ public enum DemoIntervalPolicy {
 /// Requests are pinned before the first row. A restart never resends an ambiguous row.
 @MainActor @Observable
 public final class AutomationModel {
+    let imageFolderBatch = ImageFolderBatch()
     public var workspaceInputMode = "description"
+    public func selectInputTab(_ mode: String, app: AppModel) {
+        workspaceInputMode = mode
+        if mode == "description" || mode == "image" { app.inputMode = mode }
+    }
+
+    public func inputTabRunning(_ mode: String, app: AppModel) -> Bool {
+        let batchRunning = (running && self.mode == "batch") || imageFolderBatch.running
+        if mode == "batch" { return batchRunning }
+        guard app.isBusy, !isOccupied, !imageFolderBatch.running else { return false }
+        if mode == "image" { return app.activeSingleInputMode == "image" }
+        return mode == "description" && app.activeSingleInputMode != "image"
+    }
     public var batchText = ""
     public var batchSketchMode = "off"
     public var demoSeedPhrase = "日本の四季を感じさせる文章を40語以内で生成" { didSet { persistDemoPreferences() } }
@@ -158,7 +173,7 @@ public final class AutomationModel {
     @ObservationIgnored private var batchObservationToken = UUID()
 
     public init() {}
-    public var isOccupied: Bool { running || preparing }
+    public var isOccupied: Bool { running || preparing || imageFolderBatch.running }
     public var nonEmptyBatchCount: Int { BatchInputLines.entries(in: batchText).count }
     public var completedCount: Int { rows.filter { $0.state == .succeeded || $0.state == .skipped }.count }
     public var successfulCount: Int { rows.filter { $0.state == .succeeded }.count }
@@ -290,7 +305,7 @@ public final class AutomationModel {
     }
 
     public func startBatch(app: AppModel) async {
-        guard !running, !preparing, !app.isBusy else { return }
+        guard !isOccupied, !app.isBusy else { return }
         preparing = true
         batchObservationToken = UUID()
         defer { preparing = false }
@@ -336,6 +351,12 @@ public final class AutomationModel {
         preparing = true
         batchObservationToken = UUID()
         defer { preparing = false }
+        // Web restores the route from the last saved work before resuming; each pending row still uses its frozen request.
+        if let workID = rows.reversed().first(where: { $0.state == .succeeded && $0.workID != nil })?.workID,
+           let context = try? await app.savedConfiguration(workID: workID), context.imageDDL == nil {
+            app.drawRoute = context.drawRoute ?? "stages"
+            app.descriptionComposition = context.descriptionDDL.flatMap { try? ExactJSON(data: $0) }?["composition"].object != nil
+        }
         if let originalText = journal?.originalText {
             batchText = BatchInputLines.normalizedText(originalText)
         } else if let lastLine = rows.map(\.line).max(), (1...1_000_000).contains(lastLine) {

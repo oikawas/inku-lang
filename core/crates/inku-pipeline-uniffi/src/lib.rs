@@ -10,10 +10,15 @@ mod description_meter;
 #[cfg(feature = "display")]
 mod display;
 mod macro_catalog;
+mod plugin_calls;
 mod plugin_diagnostics;
+mod plugin_name_migration;
+mod plugin_package;
+mod plugin_picture;
 mod raster;
 mod saijiki_migration;
 mod standalone;
+mod zip_reader;
 
 pub use description_labels::pipeline_description;
 #[cfg(not(target_os = "android"))]
@@ -25,7 +30,10 @@ pub use display::{
     display_tiles, prepare_display_scene,
 };
 pub use macro_catalog::resolve_macro_catalog;
+pub use plugin_calls::plugin_calls;
 pub use plugin_diagnostics::explain_plugin_diagnostics;
+pub use plugin_name_migration::migrate_plugin_names;
+pub use plugin_package::plugin_package;
 pub use raster::{
     RasterFailure, RasterFrame, RasterScene, prepare_raster_scene, raster_api_version,
     rasterize_svg, rasterize_svg_region,
@@ -191,6 +199,20 @@ pub fn juxtaposition(input_bytes: Vec<u8>) -> Vec<u8> {
     .unwrap_or_else(|_| br#"{"error":"internal_invariant"}"#.to_vec())
 }
 
+/// The chunk moves (まとまりの手, 2026-10-27): one JSON request with an
+/// `action` (`start`, `answer`, `drawn`), one JSON answer
+/// (`inku.chunk-moves.v1`) carrying the turn's state and what to do next. The
+/// host sends the requests, draws the children and saves the kept one. The
+/// Server calls it now; the binding version is unchanged: this only adds a
+/// call. A panic answers `{"error": "internal_invariant"}`.
+#[uniffi::export]
+pub fn chunk_moves(input_bytes: Vec<u8>) -> Vec<u8> {
+    catch_unwind(AssertUnwindSafe(|| {
+        inku_pipeline::chunk_moves::chunk_moves_json(&input_bytes)
+    }))
+    .unwrap_or_else(|_| br#"{"error":"internal_invariant"}"#.to_vec())
+}
+
 /// The autonomous refinement (AI自動推敲): one JSON request with an `action`
 /// (`next`, `record`, `measure`), one JSON answer (`inku.autonomous-refine.v1`).
 /// `measure` draws its two SVGs here with the shared rasterizer and counts the
@@ -219,9 +241,30 @@ pub fn provider_wire(input_bytes: Vec<u8>) -> Vec<u8> {
     .unwrap_or_else(|_| br#"{"error":"internal_invariant"}"#.to_vec())
 }
 
+/// Shared model catalog and selection decisions.
+#[uniffi::export]
+pub fn model_catalog(input_bytes: Vec<u8>) -> Vec<u8> {
+    catch_unwind(AssertUnwindSafe(|| {
+        inku_pipeline::model_catalog::model_catalog_json(&input_bytes)
+    }))
+    .unwrap_or_else(|_| br#"{"error":"internal_invariant"}"#.to_vec())
+}
+
+/// Host-independent provider admission decisions and state transitions.
+#[uniffi::export]
+pub fn provider_admission(input_bytes: Vec<u8>) -> Vec<u8> {
+    catch_unwind(AssertUnwindSafe(|| {
+        inku_pipeline::provider_admission::provider_admission_json(&input_bytes)
+    }))
+    .unwrap_or_else(|_| br#"{"error":"internal_invariant"}"#.to_vec())
+}
+
 /// How a host prepares the image a work is written from and the drawing it
-/// shows beside it (`inku.image-input-policy.v1`, 2026-10-24). A Rust helper
-/// for the Server's CPython binding; the UniFFI and JNI calls are unchanged.
+/// shows beside it (`inku.image-input-policy.v1`, 2026-10-24). The Server's
+/// CPython binding and Android's JNI call it, and macOS through UniFFI
+/// (2026-10-27, for its image tab). The binding version is unchanged: this only
+/// adds a call.
+#[uniffi::export]
 pub fn image_input_policy() -> String {
     inku_pipeline::image_ddl::image_input_policy_json()
 }
@@ -229,8 +272,9 @@ pub fn image_input_policy() -> String {
 /// The canvas of an image a host is about to send: `{"original": [width,
 /// height]}` in, `inku.image-canvas.v1` (the size to send it at, the ratio its
 /// DDL declares, the nearest paper) or `{"error": "invalid_request"}` out. A
-/// panic answers `{"error": "internal_invariant"}`. A Rust helper for the
-/// Server's CPython binding.
+/// panic answers `{"error": "internal_invariant"}`. Called as
+/// [`image_input_policy`] is.
+#[uniffi::export]
 pub fn image_canvas(input_bytes: Vec<u8>) -> Vec<u8> {
     catch_unwind(AssertUnwindSafe(|| {
         inku_pipeline::image_ddl::image_canvas_json(&input_bytes)
@@ -241,7 +285,8 @@ pub fn image_canvas(input_bytes: Vec<u8>) -> Vec<u8> {
 /// The SVG a host makes the `draw_image_review` drawing from, for a stored
 /// snapshot waiting for it: `{"options", "clip", "max_svg_bytes"?}` in,
 /// `{"svg"}` or `{"error"}` out. A panic answers `{"error":
-/// "internal_invariant"}`. A Rust helper for the Server's CPython binding.
+/// "internal_invariant"}`. Called as [`image_input_policy`] is.
+#[uniffi::export]
 pub fn image_review_svg(snapshot_bytes: Vec<u8>, request_bytes: Vec<u8>) -> Vec<u8> {
     catch_unwind(AssertUnwindSafe(|| {
         inku_pipeline::byte_envelope::image_review_svg_owned(&snapshot_bytes, &request_bytes)

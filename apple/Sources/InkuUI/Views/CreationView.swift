@@ -1,6 +1,11 @@
 import InkuPersistence
 import InkuHost
 import SwiftUI
+#if os(macOS)
+import AppKit
+import ImageIO
+import UniformTypeIdentifiers
+#endif
 
 struct BatchWorkspaceSelection {
     private enum Display { case history, latest, row(SavedWork, String) }
@@ -36,21 +41,31 @@ struct CreationView: View {
     let onLineageExport: (LineageExportRequest) -> Void
     var onPresentWork: () -> Void = {}
     var onWorkspaceWorkChange: (SavedWork?) -> Void = { _ in }
-    private var controlsDisabled: Bool { model.isBusy || automation.isOccupied }
+    private var controlsDisabled: Bool { model.isBusy || automation.isOccupied || imageBatch.running }
     private var browsingDisabled: Bool { model.isBrowsingLocked }
     @State private var showColorCatalogs = false
     @State private var showModelPicker = false
+    @State private var showImageModelPicker = false
+    @State private var showImageNotice = false
+    @State private var imageLoadError: String?
+    private var imageBatch: ImageFolderBatch { automation.imageFolderBatch }
+    @State private var batchKind = "description"
+    @State private var pendingImageBatchRestart: Bool?
     @State private var showConditionDetails = false
     @State private var showPaperPicker = false
     @State private var showSketchMenu = false
     @State private var showNewDDL = false
     @State private var rightPanelWidth: CGFloat = 0
     @State private var savedProviders: [InkuHost.ProviderSettings] = []
+    @State private var workspaceContext: SavedAuthoringContext?
     @State private var workspaceGeneration: (nodeID: String, value: Int)?
+    @State private var lineageMounted = false
     /// The 3D view's bridge; each appearance of the view mounts a new viewer through it.
     @State private var ddl3d = Ddl3DController()
     @Environment(\.inkuWindowSize) private var windowSize
     private var isBatch: Bool { automation.workspaceInputMode == "batch" }
+    private var isImage: Bool { automation.workspaceInputMode == "image" }
+    private var workspaceCovered: Bool { ui.settingsOpen || ui.libraryOpen }
     private var batchWork: SavedWork? { batchWorkspace.pinnedWork ?? (batchWorkspace.followsLatest ? automation.observedWork : nil) }
     private var usesBatchWork: Bool { isBatch && batchWork != nil }
     private var workspaceWork: SavedWork? { usesBatchWork ? batchWork : model.displayedWork }
@@ -108,13 +123,44 @@ struct CreationView: View {
             BatchModelPickerView(model: model)
                 .environment(\.inkuWindowSize, windowSize).inkuDialogFrame(.modelSelection)
         }
+        .sheet(isPresented: $showImageModelPicker) {
+            BatchModelPickerView(model: model, initialReference: model.imageVisionModel, immediateSelection: true,
+                title: "Visionモデル", purpose: "vision", onSelection: { reference in
+                    model.display.preferences.visionModelReference = reference
+                }).environment(\.inkuWindowSize, windowSize).inkuDialogFrame(.modelSelection)
+        }
+        .alert(display.webCopy("imageTab", "画像"), isPresented: $showImageNotice) {
+            Button(display.webCopy("imageUploadNoticeContinue", "了解して描画する")) {
+                model.imageWarningAcknowledged = true
+                #if os(macOS)
+                if let restart = pendingImageBatchRestart {
+                    pendingImageBatchRestart = nil
+                    Task { await imageBatch.run(app: model, restart: restart, provenance: imageProvenance) }
+                } else { Task { await model.generate() } }
+                #else
+                Task { await model.generate() }
+                #endif
+            }
+            Button(display.localized("キャンセル"), role: .cancel) { pendingImageBatchRestart = nil }
+        } message: {
+            Text(display.webCopy("imageUploadNoticeMessage", "画像から描画を行う場合、画像データがAIにアップロードされます。アップロードされたデータの扱いは、ユーザーが指定したモデルと、それをホストするプロバイダの規約に準じます。\nセンシティブなデータをアップロードしないでください。"))
+        }
         .sheet(isPresented: $showNewDDL) {
             NewDdlAuthoringSheet(model: model)
                 .environment(\.inkuWindowSize, windowSize).inkuDialogFrame(.ddlEditor)
         }
-        .onChange(of: automation.workspaceInputMode) { _, _ in batchWorkspace.invalidateReads() }
-        .onChange(of: ui.workspaceTab) { _, tab in
+        .onChange(of: automation.workspaceInputMode) { _, mode in
+            if mode == "batch" { batchWorkspace.invalidateReads() }
+        }
+        .onChange(of: model.savedImageDDL) { _, value in
+            if value != nil && !model.isBusy { automation.workspaceInputMode = "image" }
+        }
+        .onChange(of: model.inputMode) { _, value in
+            if value == "description", isImage, model.selectedWork != nil { automation.workspaceInputMode = "description" }
+        }
+        .onChange(of: ui.workspaceTab, initial: true) { _, tab in
             batchWorkspace.invalidateReads()
+            if tab == "lineage" { lineageMounted = true }
             if tab == "lineage", isBatch, batchWorkspace.followsLatest,
                let work = batchWork, let rowID = automation.observedRow?.id {
                 batchWorkspace.pin(work, rowID: rowID)
@@ -129,6 +175,13 @@ struct CreationView: View {
             guard !Task.isCancelled, workspaceWork?.lineageNodeID == nodeID,
                   let generation = generations?[nodeID] else { return }
             workspaceGeneration = (nodeID, generation)
+        }
+        .task(id: workspaceWork?.id) {
+            workspaceContext = nil
+            guard let work = workspaceWork else { return }
+            let context = try? await model.savedConfiguration(workID: work.id)
+            guard !Task.isCancelled, workspaceWork?.id == work.id else { return }
+            workspaceContext = context
         }
         .onChange(of: workspaceWork?.id) { _, _ in
             onWorkspaceWorkChange(workspaceWork)
@@ -152,6 +205,7 @@ struct CreationView: View {
                 if automation.running && automation.mode == "demo" { demoBanner }
                 if display.visible("input_modes") { inputTabs }
                 inputContents
+                if !isBatch { PipelineDiagnosticsView(raw: model.diagnosticsJSON, display: display, pluginWords: model.pluginWords) }
                 if !isBatch && display.visible("ddl_tools") {
                     HStack {
                         Spacer(minLength: 0)
@@ -170,7 +224,7 @@ struct CreationView: View {
                 }
                 statusFooter
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(width: max(0, leftPanelWidth - (compactWindow ? 24 : 32)), alignment: .leading)
             .padding(.vertical, 14).padding(.horizontal, compactWindow ? 12 : 16)
         }
         .background(InkuColor.bg)
@@ -179,19 +233,24 @@ struct CreationView: View {
     /// InputPanel.svelte:180-198: two equal underline tabs; a running tab carries a dot and `(n/N ↻r)`.
     private var inputTabs: some View {
         HStack(spacing: 0) {
-            InkuPanelTab(title: display.webCopy("modeSingle", "記述"), selected: !isBatch,
-                         running: model.isBusy && !automation.isOccupied) {
-                automation.workspaceInputMode = "description"
+            InkuPanelTab(title: display.webCopy("modeSingle", "記述"), selected: !isBatch && !isImage,
+                         running: automation.inputTabRunning("description", app: model)) {
+                automation.selectInputTab("description", app: model)
             }
             .inkuTooltip(display.tooltip("自由な自然言語で記述を入力して1枚ずつ描画します", serverKey: "tooltipInputTabSingle"))
+            #if os(macOS)
+            InkuPanelTab(title: display.webCopy("imageTab", "画像"), selected: isImage,
+                         running: automation.inputTabRunning("image", app: model)) {
+                automation.selectInputTab("image", app: model)
+            }
+            #endif
             InkuPanelTab(title: display.webCopy("modeBatch", "バッチ"), selected: isBatch,
-                         running: automation.running && automation.mode == "batch", progress: batchProgress) {
-                automation.workspaceInputMode = "batch"
+                         running: automation.inputTabRunning("batch", app: model), progress: batchProgress) {
+                automation.selectInputTab("batch", app: model)
             }
             .inkuTooltip(display.tooltip("改行区切りで複数の記述を入力し、順次連続して描画します", serverKey: "tooltipInputTabBatch"))
         }
         .overlay(alignment: .bottom) { Rectangle().fill(InkuColor.border).frame(height: 1).allowsHitTesting(false) }
-        .disabled(browsingDisabled)
     }
 
     private var batchProgress: String {
@@ -219,17 +278,172 @@ struct CreationView: View {
     private var inputContents: some View {
         VStack(alignment: .leading, spacing: 6) {
             if isBatch {
+                #if os(macOS)
+                Picker(display.localized("入力"), selection: $batchKind) {
+                    Text(display.webCopy("modeSingle", "記述")).tag("description")
+                    Text(display.webCopy("imageTab", "画像")).tag("image")
+                }.pickerStyle(.segmented).disabled(controlsDisabled)
+                if batchKind == "image" { imageFolderPanel }
+                else {
+                    BatchPanelView(model: model, automation: automation, inputOnly: true,
+                                   onObserveWork: { work, rowID in batchWorkspace.pin(work, rowID: rowID) },
+                                   followsLatestWork: batchWorkspace.followsLatest,
+                                   selectedRowID: batchWorkspace.rowID, observationRevision: $batchWorkspace.revision, ui: ui)
+                }
+                #else
                 BatchPanelView(model: model, automation: automation, inputOnly: true,
-                               onObserveWork: { work, rowID in batchWorkspace.pin(work, rowID: rowID) },
-                               followsLatestWork: batchWorkspace.followsLatest,
-                               selectedRowID: batchWorkspace.rowID, observationRevision: $batchWorkspace.revision, ui: ui)
+                    onObserveWork: { work, rowID in batchWorkspace.pin(work, rowID: rowID) },
+                    followsLatestWork: batchWorkspace.followsLatest,
+                    selectedRowID: batchWorkspace.rowID, observationRevision: $batchWorkspace.revision, ui: ui)
+                #endif
             } else {
+                #if os(macOS)
+                if isImage { imageInputPanel } else {
+                    input
+                    if display.visible("drawing_settings") { nextConditions }
+                    generationAction.padding(.top, 8)
+                }
+                #else
                 input
                 if display.visible("drawing_settings") { nextConditions }
                 generationAction.padding(.top, 8)
+                #endif
             }
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
+
+    #if os(macOS)
+    private var imageFolderPanel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Button(display.localized("画像フォルダを選ぶ")) {
+                let panel = NSOpenPanel(); panel.canChooseFiles = false; panel.canChooseDirectories = true
+                guard panel.runModal() == .OK, let url = panel.url else { return }
+                do { try imageBatch.select(url, app: model) } catch { imageLoadError = error.localizedDescription }
+            }.disabled(controlsDisabled)
+            if !imageBatch.folder.isEmpty { Text(imageBatch.folder).textSelection(.enabled).inkuFont(12) }
+            conditionRow("Vision", value: model.imageVisionModel.isEmpty ? display.localized("選択してください") : model.imageVisionModel,
+                         help: "Vision") { showImageModelPicker = true }.disabled(controlsDisabled)
+            conditionRow(display.webCopy("colorCatalogButton", "色カタログ"), value: catalogSummary, help: "") {
+                showColorCatalogs = true
+            }.disabled(controlsDisabled || model.catalogs.isEmpty)
+            imagePaperCondition
+            if imageBatch.hasJournal {
+                Text("\(imageBatch.completed) / \(imageBatch.total) · \(display.localized("失敗")) \(imageBatch.failed)")
+                ForEach(imageBatch.failures, id: \.self) { failure in
+                    Text(failure).foregroundStyle(.red).inkuFont(12).textSelection(.enabled)
+                }
+                if imageBatch.uncertain > 0 {
+                    Text(display.localized("前回の処理結果を確認できない画像があります。履歴を確認してください。"))
+                        .foregroundStyle(.orange)
+                }
+                if imageBatch.running {
+                    Button(display.localized("停止")) { Task { await imageBatch.stop(app: model) } }
+                } else {
+                    HStack {
+                        Button(display.localized("続きから描く")) { startImageBatch(restart: false) }
+                        Button(display.localized("最初から描く")) { startImageBatch(restart: true) }
+                    }.disabled(model.isBusy || automation.isOccupied || imageBatch.total == 0 || model.imageVisionModel.isEmpty)
+                }
+            }
+            if !imageBatch.status.isEmpty { Text(imageBatch.status).inkuFont(12) }
+            if let error = imageBatch.error ?? imageLoadError { Text(error).foregroundStyle(.red).inkuFont(12) }
+        }
+    }
+
+    private func startImageBatch(restart: Bool) {
+        if model.imageWarningAcknowledged { Task { await imageBatch.run(app: model, restart: restart, provenance: imageProvenance) } }
+        else { pendingImageBatchRestart = restart; showImageNotice = true }
+    }
+
+    private var imageInputPanel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(display.webCopy("imageProvenanceLabel", "来歴")).inkuFont(14, weight: .semibold)
+            editor(text: Binding(get: { model.imageProvenance }, set: { model.setImageProvenanceFromUser($0) }),
+                   readOnly: model.savedImageDDL != nil && model.imageInput == nil)
+            HStack {
+                Text(display.webCopy("imageTab", "画像")).inkuFont(14, weight: .semibold)
+                Spacer()
+                Button(display.webCopy("imageChooseFile", "画像を選ぶ")) { chooseImage() }
+                    .buttonStyle(InkuGhostButtonStyle()).disabled(controlsDisabled)
+            }
+            if let image = model.imageInput, let preview = NSImage(data: image.jpeg) {
+                Image(nsImage: preview).resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: 220)
+                Text(model.imageFileName).inkuFont(12).foregroundStyle(.secondary)
+            }
+            if let data = model.savedImageDDL, let record = try? ExactJSON(data: data) {
+                if let ddl = model.selectedWork?.ddl {
+                    Text(display.localized("指示書")).inkuFont(14, weight: .semibold)
+                    Text(ddl).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+                }
+                if let before = record["before_review"].string, !before.isEmpty {
+                    DisclosureGroup(display.localized("見比べる前の指示書")) {
+                        Text(before).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+                        if let work = model.selectedWork {
+                            Button(display.localized("この指示書で子を描く")) {
+                                Task { _ = await model.drawEditedDDL(work: work, source: before, forceEdit: true) }
+                            }.disabled(controlsDisabled)
+                        }
+                    }
+                }
+                Text(display.localized("描き直すには画像を選び直してください。")).foregroundStyle(.secondary).inkuFont(12)
+            }
+            if let imageLoadError { Text(imageLoadError).foregroundStyle(.red).inkuFont(12) }
+            conditionRow("Vision", value: model.imageVisionModel.isEmpty ? display.localized("選択してください") : model.imageVisionModel,
+                         help: "Vision") { showImageModelPicker = true }.disabled(controlsDisabled)
+            conditionRow(display.webCopy("colorCatalogButton", "色カタログ"), value: catalogSummary, help: "") {
+                showColorCatalogs = true
+            }.disabled(controlsDisabled || model.catalogs.isEmpty)
+            imagePaperCondition
+            if model.singleRunStatusVisible(in: "image") {
+                let label = model.status == display.localized("見比べる画を描いています…") ? model.status :
+                    model.providerProgress.flatMap { $0.outcome == .running ? display.localized($0.stageTitleKey) : nil }
+                    ?? display.webCopy("imageWritingDdl", "画像から指示書を書いています…")
+                runStatus(label: label, onStop: { Task { await model.cancel() } }, stopping: false)
+            } else {
+                Button(display.webCopy("generateButton", "描画する")) {
+                    if model.imageWarningAcknowledged { Task { await model.generate() } }
+                    else { showImageNotice = true }
+                }.buttonStyle(.borderedProminent).disabled(!model.canGenerate || controlsDisabled)
+            }
+        }
+        .dropDestination(for: URL.self) { urls, _ in
+            guard !controlsDisabled, let url = urls.first, url.isFileURL else { return false }
+            loadImage(url)
+            return true
+        }
+    }
+
+    private var imagePaperCondition: some View {
+        let value = model.imageCanvasID == "image" ? display.localized("画像の縦横比を使う") :
+            (model.canvases.first { $0.id == model.imageCanvasID }?.label ?? model.imageCanvasID)
+        return conditionRow(display.localized("画面比"), value: value, help: "") { showPaperPicker = true }
+            .disabled(controlsDisabled)
+            .popover(isPresented: $showPaperPicker) {
+                CreationPaperPicker(model: model, imageSelection: true) { showPaperPicker = false }.environment(display)
+            }
+    }
+
+    private func chooseImage() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.jpeg, .png, .gif, .tiff]
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        loadImage(url)
+    }
+
+    private func loadImage(_ url: URL) {
+        do {
+            let image = try ImageInput.prepare(Data(contentsOf: url))
+            model.setImageInput(image, fileName: url.lastPathComponent, automaticProvenance: imageProvenance(url: url))
+            imageLoadError = nil
+        } catch { imageLoadError = model.failureMessage(error) }
+    }
+
+    private func imageProvenance(url: URL) -> String {
+        ImageProvenance.text(url: url, includeFileName: display.preferences.imageIncludeFileName ?? true,
+                             includeExif: display.preferences.imageIncludeExif ?? true, language: display.preferences.language)
+    }
+    #endif
 
     private var descriptionLocked: Bool { model.sourceLocked && model.selectedWork != nil }
 
@@ -297,6 +511,10 @@ struct CreationView: View {
                 .accessibilityLabel(display.localized("色カタログを開く"))
                 .accessibilityValue(catalogSummary)
             Rectangle().fill(InkuColor.border).frame(height: 1)
+            if model.inputMode == "description" {
+                DrawConditionsView(model: model, sketch: model.sketchMode, onSketch: { model.sketchMode = $0 })
+                    .disabled(controlsDisabled)
+            }
             WrappingHStack(spacing: 6) { compactConditionControls }
                 .padding(.top, 2)
                 .disabled(controlsDisabled)
@@ -336,7 +554,7 @@ struct CreationView: View {
             .buttonStyle(InkuGhostButtonStyle())
             .inkuTooltip(display.tooltip("次の作品で写生を使うかを選びます。", serverKey: "tooltipInputSketch"))
             .popover(isPresented: $showSketchMenu, arrowEdge: .bottom) { sketchMenu }
-        Button(display.webCopy("wildButton", "暴れる") + " " + display.webCopy(model.wild ? "wildEnabled" : "wildDisabled", model.wild ? "入" : "切")) {
+        Button(display.webCopy("wildButton", "筆致制限を外す") + " " + display.webCopy(model.wild ? "wildEnabled" : "wildDisabled", model.wild ? "入" : "切")) {
             model.wild.toggle()
         }
         .buttonStyle(InkuGhostButtonStyle(active: model.wild))
@@ -424,7 +642,7 @@ struct CreationView: View {
                 }
                 .buttonStyle(InkuPaintButtonStyle())
                 .disabled(!automation.running || automation.stopping)
-            } else if model.isBusy {
+            } else if model.singleRunStatusVisible(in: "description") {
                 runStatus(label: model.status, onStop: { Task { await model.cancel() } }, stopping: false)
             } else if descriptionLocked {
                 // InputPanel.svelte:326-334: a held work is drawn from its description only as a new work, named as such.
@@ -433,7 +651,7 @@ struct CreationView: View {
                 }
                 .buttonStyle(InkuPaintButtonStyle())
                 .keyboardShortcut(.return, modifiers: .command)
-                .disabled(!model.canForkDescription || automation.isOccupied)
+                .disabled(!model.canForkDescription || automation.isOccupied || workspaceCovered)
                 .inkuTooltip(display.tooltip("この記述をそのまま使って、新しい作品として描き直します。", serverKey: "tooltipForkDescription"))
             } else {
                 Button { batchWorkspace.showHistory(); Task { await model.generateDescription() } } label: {
@@ -441,7 +659,7 @@ struct CreationView: View {
                 }
                 .buttonStyle(InkuPaintButtonStyle())
                 .keyboardShortcut(.return, modifiers: .command)
-                .disabled(!model.canGenerateDescription || automation.isOccupied)
+                .disabled(!model.canGenerateDescription || automation.isOccupied || workspaceCovered)
                 .inkuTooltip(tip("入力と次の生成条件から作品を描きます。"))
             }
         }
@@ -450,7 +668,7 @@ struct CreationView: View {
     /// Web RunStatus.svelte: mascot, the stage and its provider facts, and the stop button, in one bordered box.
     private func runStatus(label: String, onStop: @escaping () -> Void, stopping: Bool) -> some View {
         RunStatusView(display: display, label: label, stopping: stopping, stopTooltip: tip("実行中の描画を停止します。"),
-                      stopsWithEscape: true, onStop: onStop) { ProviderProgressView(model: model) }
+                      stopsWithEscape: !workspaceCovered, onStop: onStop) { ProviderProgressView(model: model) }
     }
 
     /// The native status line and the backup and result-log reports, which the Web has no place for.
@@ -550,7 +768,7 @@ struct CreationView: View {
     }
 
     private func metaStrip(_ work: SavedWork) -> some View {
-        let naming = ModelNaming(providers: savedProviders)
+        let naming = ModelNaming(providers: savedProviders, stageProvider: model.stageDefaultProviderID)
         let stage1 = work.stage1Model.map { naming.displayName($0) } ?? "DDL"
         let stage2 = work.stage2Model.map { naming.displayName($0) } ?? stage1
         let catalogID = work.renderColorCatalogID ?? work.catalogID
@@ -587,6 +805,12 @@ struct CreationView: View {
             }
             metaItem(display.localized("色カタログ"), maxWidth: 130, title: catalog) { Text(catalog) }
             metaItem(display.localized("キャンバス"), maxWidth: 100, title: canvas) { Text(canvas) }
+            metaItem(display.label("描き方", "Drawing"), maxWidth: 130) {
+                Text(workspaceContext?.imageDDL != nil ? display.label("画像から書く", "Written from a picture") : (workspaceContext?.drawRoute == "read_and_draw" || (workspaceContext?.drawRoute != "stages" && workspaceContext?.descriptionDDL != nil)) ? display.label("言葉で描く", "In words") : display.label("型で描く", "With a plan"))
+            }
+            metaItem(display.label("写生", "Sketch"), maxWidth: 130, title: DrawPresentation.sketchNote(work.sketchState, japanese: display.preferences.language != "en")) {
+                Text(DrawPresentation.sketchShort(work.sketchState, japanese: display.preferences.language != "en"))
+            }
             metaItem(display.label("サイズ", "Size"), maxWidth: nil) { Text(size).monospacedDigit() }
             metaItem(display.label("作成", "Created"), maxWidth: nil) { Text(created).monospacedDigit() }
         }
@@ -646,19 +870,27 @@ struct CreationView: View {
                     .background(InkuColor.bg, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(InkuColor.border2))
                     .padding(.vertical, 14)
-            } else if ui.workspaceTab == "lineage" && display.visible("work_tools") && workspaceWork != nil {
-                LineageView(model: model, onWorkAction: onWorkAction, onExport: onLineageExport, initialWork: workspaceWork,
-                            writingLocked: controlsDisabled, onBrowseWork: { _ in batchWorkspace.showHistory() },
-                            onOpenInCanvas: { work in
-                                batchWorkspace.showHistory()
-                                Task { await model.selectWork(work); ui.workspaceTab = "artwork" }
-                            }, onDetach: {
-                                batchWorkspace.showHistory(); model.detachLineage(); ui.workspaceTab = "artwork"
-                            })
-                    .background(InkuColor.bg)
-                    .padding(.horizontal, display.visible("history") ? 68 : 0)
             } else {
+                let showsLineage = ui.workspaceTab == "lineage" && display.visible("work_tools") && workspaceWork != nil
                 artwork
+                    .opacity(showsLineage ? 0 : 1)
+                    .allowsHitTesting(!showsLineage)
+                    .accessibilityHidden(showsLineage)
+                if (lineageMounted || showsLineage) && workspaceWork != nil {
+                    LineageView(model: model, onWorkAction: onWorkAction, onExport: onLineageExport, initialWork: workspaceWork,
+                                writingLocked: controlsDisabled, onBrowseWork: { _ in batchWorkspace.showHistory() },
+                                onOpenInCanvas: { work in
+                                    batchWorkspace.showHistory()
+                                    Task { await model.selectWork(work); ui.workspaceTab = "artwork" }
+                                }, onDetach: {
+                                    batchWorkspace.showHistory(); model.detachLineage(); ui.workspaceTab = "artwork"
+                                })
+                        .background(InkuColor.bg)
+                        .padding(.horizontal, display.visible("history") ? 68 : 0)
+                        .opacity(showsLineage ? 1 : 0)
+                        .allowsHitTesting(showsLineage)
+                        .accessibilityHidden(!showsLineage)
+                }
             }
         }
         .overlay(alignment: .leading) {

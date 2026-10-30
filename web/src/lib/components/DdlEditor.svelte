@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
-	import { buildPluginNameIndex, unknownPluginNames } from '$lib/plugin-names';
+	import { pluginDisplayName } from '$lib/plugin-names';
 	import { resolveInstructionLang } from '$lib/instructionLang';
 	import { createDdlEditor, type DdlEditorControl, type DdlEditorOptions } from '$lib/features/ddl-editor/codemirror';
 	import type { RangeEditorStatus } from '$lib/features/ddl-editor/codemirror-ranges';
@@ -11,6 +11,7 @@
 	import Tooltip from './Tooltip.svelte';
 	import SaijikiInline from './SaijikiInline.svelte';
 	import type { PluginEntry, PreviewForPlugin, PreviewForWord, SaijikiPreview } from '$lib/features/ddl-editor/types';
+	import { PluginCallsQuery, type PluginCall } from '$lib/features/ddl-editor/plugin-calls';
 
 	type Props = {
 		value?: string;
@@ -51,6 +52,11 @@
 	let completionStates = $state.raw<CompletionRangeState[]>([]);
 	let completionSource = $state('');
 	const completionQuery = new CompletionRangeStatesQuery();
+	const pluginQuery = new PluginCallsQuery();
+	let calls = $state.raw<PluginCall[]>([]);
+	let workEntries = $state.raw<PluginEntry[]>([]);
+	let catalogKey = '';
+	let callSource = $state('');
 	const completionLabels = $derived({ completed: t().ddlCompletionTag, numbers_changed: t().ddlCompletionNumbersTag, words_changed: t().ddlCompletionWordsTag });
 	const completionHint = $derived(completionWordsHint(completionStates, t()));
 
@@ -66,13 +72,32 @@
 		return () => { clearTimeout(timer); completionQuery.cancel(); };
 	});
 
+	$effect(() => {
+		const source = value, work = completionWork, fetchCalls = apiFetch;
+		const lang = resolveInstructionLang(source, isJapanese ? 'ja' : 'en');
+		pluginQuery.cancel(); calls = []; callSource = '';
+		const nextKey = JSON.stringify(work);
+		if (nextKey !== catalogKey) { workEntries = []; catalogKey = nextKey; }
+		if (!fetchCalls) return;
+		const timer = setTimeout(() => { void pluginQuery.load(fetchCalls, work, source, lang, (result, entries) => { calls = result; workEntries = entries; callSource = source; }); }, 180);
+		return () => { clearTimeout(timer); pluginQuery.cancel(); };
+	});
+
 	const lineNumbers = $derived(value.split('\n'));
-	const pluginNameIndex = $derived(buildPluginNameIndex(pluginEntries));
-	const unknownNames = $derived(unknownPluginNames(value, pluginNameIndex));
+	const unknownNames = $derived(calls.filter(call => call.status !== 'resolved'));
+	const visibleEntries = $derived(completionWork ? workEntries : pluginEntries);
 	const wordLang = $derived(resolveInstructionLang(value, isJapanese ? 'ja' : 'en'));
+	function reason(call: PluginCall): string {
+		const display = (name: string) => {
+			const entry = visibleEntries.find(e => e.qualified_name === name || [...(e.surface_ja ?? []), ...(e.surface_en ?? [])].some(n => n.normalize('NFKC').toLowerCase() === name.normalize('NFKC').toLowerCase()));
+			return entry ? pluginDisplayName(entry, wordLang) : name.includes('.') ? name : wordLang === 'ja' ? `｛${name}｝` : `{${name}}`;
+		};
+		return t().ddlPluginReason(call.status, call.suggestion ? display(call.suggestion) : null, (call.candidates ?? []).map(display));
+	}
 
 	function configuration(): DdlEditorOptions {
-		return { isJapanese, disabled, pluginEntries, pluginNameIndex, ranges, previewForWord, previewForPlugin,
+		return { isJapanese, disabled, pluginEntries: visibleEntries, ranges, previewForWord, previewForPlugin,
+			pluginCallSource: callSource, pluginCalls: calls, pluginReason: reason,
 			completionSource, completionStates, completionLabels,
 			lineNumbers: !compact, cursorAtEnd: compact,
 			label: t().ddlEditorInstructions, placeholder: t().ddlEditPlaceholder,
@@ -132,13 +157,11 @@
 					{#if unknownNames.length > 0}
 						<div class="ddl-unknown-names">
 							<span class="ddl-unknown-title">{t().ddlUnknownNameTitle}</span>
-							{#each unknownNames as unknown (unknown.text)}
+							{#each unknownNames as unknown (unknown.start_byte)}
 								<span class="ddl-unknown-row">
 									<code class="ddl-unknown-name">{unknown.text}</code>
 									<span class="ddl-unknown-hint">
-										{unknown.firesAs
-											? t().ddlUnknownNameFires(unknown.namespace, unknown.firesAs)
-											: t().ddlUnknownNameUnregistered}
+										{reason(unknown)}
 									</span>
 								</span>
 							{/each}
@@ -159,7 +182,7 @@
 				<SaijikiInline
 					bind:activePreview={activeSaijikiPreview}
 					{wordLang}
-					{pluginEntries}
+					pluginEntries={visibleEntries}
 					onInsertWord={insertWord}
 					{previewForWord}
 					{previewForPlugin}
@@ -265,6 +288,10 @@
 	.ddl-editor-frame :global(.cm-placeholder) { color: var(--fg3); }
 	.ddl-editor-frame :global(.cm-ddl-range-name) { text-decoration: underline dotted; text-underline-offset: 3px; cursor: pointer; }
 	.ddl-editor-frame :global(.cm-tooltip) { border: 1px solid var(--border2); background: var(--panel); color: var(--fg); }
+	.ddl-editor-frame :global(.cm-tooltip:has(.cm-ddl-plugin-hover)) { border: 1px solid var(--tooltip-border); border-radius: var(--r); background: var(--tooltip-bg); color: var(--tooltip-fg); box-shadow: var(--tooltip-shadow); }
+	.ddl-editor-frame :global(.cm-ddl-plugin-hover) { max-width: min(440px, calc(100vw - 48px)); padding: 6px 8px; font-size: var(--ui-font-size-11); line-height: 1.45; overflow-wrap: anywhere; }
+	.ddl-editor-frame :global(.cm-ddl-plugin-hover-text) { white-space: pre-line; }
+	.ddl-editor-frame :global(.cm-ddl-plugin-hover img) { display: block; max-width: 100%; width: 216px; height: auto; margin-top: 6px; }
 	.ddl-editor-frame :global(.cm-tooltip-autocomplete li[aria-selected]) { background: var(--accent); color: var(--panel); }
 	.ddl-editor-frame.readonly { opacity: .72; }
 	.compact { gap: 0; }

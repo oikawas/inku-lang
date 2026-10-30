@@ -103,7 +103,8 @@ internal fun JSONObject.stringList(key: String): List<String> = optJSONArray(key
 } ?: emptyList()
 
 internal fun JSONObject.planAllowed(): Boolean =
-    stringList("scopes").containsAll(listOf("resource.invoke", "chatgpt.tokens.use.direct"))
+    runCatching { ChatGptCore.call("chatgpt_auth_session", JSONObject().put("profile", ChatGptCore.toCore(this).put("state", "connected"))
+        .put("generation", optLong("generation"))); true }.getOrDefault(false)
 
 internal fun JSONObject.sessionRef(): ChatGptSessionRef = ChatGptSessionRef(getString("id"), getLong("generation"))
 

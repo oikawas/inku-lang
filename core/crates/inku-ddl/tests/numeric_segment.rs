@@ -592,7 +592,7 @@ fn a_macro_caller_has_nowhere_to_bind_two_points() {
     .unwrap();
     let compilation = compile_typed_ddl(
         NormalizedDdlDocument::new(
-            "Draw.Row from horizontal 0.1, vertical 0.5 to horizontal 0.9, vertical 0.5",
+            "｛Row｝ from horizontal 0.1, vertical 0.5 to horizontal 0.9, vertical 0.5",
             ResolvedInstructionLanguage::En,
             vec![lock],
         )

@@ -973,6 +973,26 @@ def _nim_vision_chat(image_path: Path, prompt: str, *, api_key: str, model: str)
         raise CliError(f"vision request failed: {exc}") from exc
     return str(payload["choices"][0]["message"]["content"]).strip()
 
+# A DDL title line (DDL 27, the rule of the shared core's `chunk_title.rs`): a
+# whole line of one bracketed name, 「灯台」 or "lighthouse" (or “lighthouse”),
+# naming the chunk of sentences after it. It draws nothing, so the sensors
+# below read a DDL without it.
+_DDL_TITLE_BRACKETS = (("「", "」"), ('"', '"'), ("“", "”"))
+
+def _ddl_title_name(line: str) -> str | None:
+    text = line.strip()
+    for open_, close in _DDL_TITLE_BRACKETS:
+        if len(text) >= len(open_) + len(close) and text.startswith(open_) and text.endswith(close):
+            inner = text[len(open_):len(text) - len(close)]
+            if open_ not in inner and close not in inner and "\n" not in inner:
+                return inner.strip()
+    return None
+
+def _without_ddl_titles(ddl: str | None) -> str | None:
+    if not ddl:
+        return ddl
+    return "\n".join(line for line in ddl.split("\n") if _ddl_title_name(line) is None)
+
 def _ddl_relation_present(ddl: str) -> bool:
     lower = ddl.lower()
     return any(marker in lower for marker in ("前の", "直前", "沿って", "触れない", "切る", "between", "along", "not touching", "cutting"))
@@ -1011,10 +1031,11 @@ def command_ddl_compare(args: argparse.Namespace) -> int:
             payload = items.get(key) or {}
             ddl = str(payload.get("ddl") or "")
             original = original or payload.get("description") or payload.get("input") or payload.get("original_description")
+            drawn = _without_ddl_titles(ddl) or ""
             variants.append({
                 "artifact_set": str(directory), "ddl": ddl,
-                "saijiki_outside_ascii_terms": _ddl_unknown_terms(ddl),
-                "relation_phrase_present": _ddl_relation_present(ddl),
+                "saijiki_outside_ascii_terms": _ddl_unknown_terms(drawn),
+                "relation_phrase_present": _ddl_relation_present(drawn),
             })
         rows.append({"key": key, "input": original, "variants": variants})
     report = {"artifact_sets": [str(item) for item in directories], "rows": rows, "note": "Side-by-side diagnostic only; no score or automatic winner."}
@@ -1884,7 +1905,7 @@ def _color_trace(
     requested_text: str | None = None,
 ) -> dict[str, Any]:
     text = requested_text or result.get("description")
-    ddl = result.get("ddl")
+    ddl = _without_ddl_titles(result.get("ddl"))
     score = result.get("score")
     details = _score_color_details(score)
     score_colors = set(details["score_colors"])
@@ -2039,6 +2060,7 @@ def _paint_payload(
         "sketch_grain": getattr(args, "sketch_grain", None),
         "sketch_text": getattr(args, "sketch_text", None),
         "route": getattr(args, "route", None),
+        "composition": getattr(args, "composition", None),
         "wild": bool(getattr(args, "wild", False)) or None,
         # None when the flag is absent, so the filter below drops the key: the
         # server must see no `limits` at all to run at its own settings.
@@ -2078,15 +2100,17 @@ def _compose_payload(
     return {k: v for k, v in payload.items() if v is not None}
 
 
-DDL_EXPORT_SCHEMA = "inku.ddl-export.v1"
+DDL_EXPORT_SCHEMA = "inku.ddl-export.v2"
 
 
 def _read_ddl_export(text: str) -> tuple[str, list[dict[str, Any]]]:
-    """An inku.ddl-export.v1 file gives its DDL and plugins; other text is DDL alone."""
+    """A v2 export gives its DDL and plugins; v1 must be exported again."""
     try:
         data = json.loads(text)
     except json.JSONDecodeError:
         return text, []
+    if isinstance(data, dict) and data.get("schema") == "inku.ddl-export.v1":
+        raise CliError("export this DDL again as inku.ddl-export.v2")
     if not isinstance(data, dict) or data.get("schema") != DDL_EXPORT_SCHEMA:
         return text, []
     ddl, plugins = data.get("ddl"), data.get("plugins", [])
@@ -2094,7 +2118,7 @@ def _read_ddl_export(text: str) -> tuple[str, list[dict[str, Any]]]:
         isinstance(item, dict) and isinstance(item.get("definition"), dict) for item in plugins
     ):
         raise CliError("the DDL export file is malformed")
-    return ddl, [{"definition": item["definition"], "summary": str(item.get("summary") or "")} for item in plugins]
+    return ddl, [{"definition": item["definition"], "note": str(item.get("note") or "")} for item in plugins]
 
 
 def command_ddl_export(args: argparse.Namespace) -> int:
@@ -2416,6 +2440,7 @@ def _image_flag_conflicts(args: argparse.Namespace) -> list[str]:
         ("--sketch-grain", args.sketch_grain),
         ("--sketch-text", args.sketch_text),
         ("--route", args.route),
+        ("--composition", args.composition),
         ("--wild", args.wild),
         ("--stage1-provider", args.stage1_provider),
         ("--stage1-model", args.stage1_model),
@@ -2736,6 +2761,9 @@ def command_batch(args: argparse.Namespace) -> int:
     client = ApiClient(args.base_url or config.base_url, config.token, timeout_seconds=timeout_seconds)
     raw = _read_text_argument(None, args.file)
     lines = [line.strip() for line in raw.splitlines() if line.strip()]
+    if getattr(args, "input_mode", "paint") == "ddl":
+        # Each line is one DDL; a title line names no sentence of its own (DDL 27).
+        lines = [line for line in lines if _ddl_title_name(line) is None]
     if not lines:
         raise CliError("batch input contains no non-empty lines")
     out_dir = Path(args.out_dir) if args.out_dir else None
@@ -3448,7 +3476,6 @@ def command_replay(args: argparse.Namespace) -> int:
                 "at": int(time.time() * 1000),
                 "input": work.get("input") or "",
                 "count_generation": False,
-                "history_visibility": "normal",
                 "lineage_parent_node_id": work["lineage_node_id"],
                 "derivation_kind": "replay",
                 "replay_work_id": work["id"],
@@ -3748,8 +3775,6 @@ def command_lineage(args: argparse.Namespace) -> int:
                     text = "[Private]"
                 elif node.get("state") == "tombstone" or node.get("redacted") == "deleted":
                     text = "[Deleted]"
-                elif node.get("state") == "lineage_only":
-                    text = "[Intermediate]"
                 
                 print("  " * indent + f"- {op} {node_id[:8]} {is_focus} : {text}")
                 for child_edge in sorted(edges_by_parent.get(node_id, []), key=lambda e: e.get("at", 0)):
@@ -3758,9 +3783,6 @@ def command_lineage(args: argparse.Namespace) -> int:
             print("Work lineage:")
             for root in roots:
                 print_tree(root["id"])
-    elif args.lineage_cmd == "promote":
-        data, _ = client.request("POST", f"/api/lineage/{args.node_id}/promote")
-        _print_json(data)
     return 0
 
 
@@ -3903,7 +3925,6 @@ def _refinement_history_body(target: dict[str, Any], data: dict[str, Any], kind:
         "sketch_text": target.get("sketch_text"),
         "sketch_grain": target.get("sketch_grain"),
         "save_artifacts": True,
-        "history_visibility": "normal",
         "lineage_parent_node_id": target.get("lineage_node_id"),
         "derivation_kind": _DERIVATION_KIND_BY_REFINE_KIND[kind],
         "derivation_metadata": metadata,
@@ -4005,7 +4026,6 @@ def command_refine(args: argparse.Namespace) -> int:
             # none of the names the server accepts, so no value worked and the
             # subcommand had never once succeeded.
             "derivation_kind": _DERIVATION_KIND_BY_REFINE_KIND[args.kind],
-            "history_visibility": args.visibility,
         }
         data, _ = client.request("POST", "/api/history", data=params)
         _print_json(data)
@@ -4398,12 +4418,15 @@ def command_plugin(args: argparse.Namespace) -> int:
     elif args.plugin_action == "validate":
         path = Path(args.file)
         try:
-            document = path.read_text(encoding="utf-8")
+            if path.suffix.lower() == ".zip":
+                upload = {"archive": base64.b64encode(path.read_bytes()).decode("ascii")}
+            else:
+                upload = {"document": path.read_text(encoding="utf-8")}
         except (OSError, UnicodeError) as exc:
-            raise CliError(f"cannot read plugin document: {exc}") from exc
-        data, _ = client.request("POST", "/api/plugins/validate", data={"document": document})
+            raise CliError(f"cannot read plugin package: {exc}") from exc
+        data, _ = client.request("POST", "/api/plugins/packages/validate", data=upload)
     else:
-        data, _ = client.request("POST", "/api/plugins/reload")
+        raise CliError("unknown plugin action")
     _print_json(data)
     return 0
 
@@ -4488,7 +4511,7 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
         "--input-mode",
         choices=["paint", "ddl"],
         default="paint",
-        help="paint: a natural-language description through Stage 1; ddl: normalized DDL directly through Stage 2/render",
+        help="paint: a natural-language description through Stage 1; ddl: normalized DDL directly through Stage 2/render (batch: each line is one DDL, and a title line is skipped)",
     )
     parser.add_argument(
         "--stage1-provider",
@@ -4526,6 +4549,11 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
         "--route",
         choices=["stages", "read_and_draw"],
         help="how a description is drawn: stages (the server default) or read_and_draw (read from the speaker's eye, written as DDL and corrected once beside its drawing); with read_and_draw, --sketch reads the description first and --sketch-text is an edited reading",
+    )
+    parser.add_argument(
+        "--composition",
+        choices=["off", "on"],
+        help="with --route read_and_draw only: on first decides a composition and laws from the description (and its reading), then writes, measures and corrects the DDL toward them, and chooses its colors before the commit; off (the server default) draws read and draw as before",
     )
     parser.add_argument(
         "--wild",
@@ -4976,13 +5004,12 @@ def build_parser() -> argparse.ArgumentParser:
     api_command.add_argument("--output", "-o", help="write the raw response body to a file")
     api_command.set_defaults(func=command_api)
 
-    plugin_cmd = subparsers.add_parser("plugin", help="inspect and reload declarative DDL plugins")
+    plugin_cmd = subparsers.add_parser("plugin", help="inspect and validate DDL plugin packages")
     _add_common_server_args(plugin_cmd)
     plugin_sub = plugin_cmd.add_subparsers(dest="plugin_action", required=True)
-    plugin_sub.add_parser("list", help="list loaded and rejected plugin documents")
-    plugin_validate = plugin_sub.add_parser("validate", help="validate one local plugin document on the server")
-    plugin_validate.add_argument("file", help="UTF-8 .inku-plugin.md file")
-    plugin_sub.add_parser("reload", help="reload the server plugin directory without restart")
+    plugin_sub.add_parser("list", help="list loaded and rejected plugin packages")
+    plugin_validate = plugin_sub.add_parser("validate", help="validate a local v2 plugin package on the server")
+    plugin_validate.add_argument("file", help="UTF-8 package.json or package zip")
     plugin_cmd.set_defaults(func=command_plugin)
 
     reference_cmd = subparsers.add_parser(
@@ -5010,11 +5037,7 @@ def build_parser() -> argparse.ArgumentParser:
     lineage_show.add_argument("--limit", type=int, default=200, help="max lineage edges to load, counted outward from the work's node (default 200)")
     lineage_show.add_argument("--json", action="store_true", help="output raw JSON")
     
-    lineage_promote = lineage_sub.add_parser("promote", help="promote a lineage-only node to regular history")
-    lineage_promote.add_argument("node_id", help="lineage node ID to promote")
-    
     lineage_show.set_defaults(func=command_lineage)
-    lineage_promote.set_defaults(func=command_lineage)
 
     colophon = subparsers.add_parser("colophon", help="recite one root-to-target lineage branch as an append-only reading")
     _add_common_server_args(colophon)
@@ -5055,7 +5078,6 @@ def build_parser() -> argparse.ArgumentParser:
     refine_save.add_argument("--svg-file", help="path to SVG file")
     refine_save.add_argument("--input-text", required=True, help="original user text")
     refine_save.add_argument("--ddl-text", help="normalized DDL text")
-    refine_save.add_argument("--visibility", choices=("normal", "lineage_only"), default="normal", help="history visibility")
 
     refine_save.set_defaults(func=command_refine)
 

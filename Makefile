@@ -21,8 +21,9 @@ git-setup:
 # The Server keeps the separately deployed native wheel out of its dependency
 # graph, so its suite builds the wheel from this checkout on every run and
 # injects it. `uv run --with <crate dir>` reuses a cached build after the Rust
-# sources change; a wheel built here cannot be stale. `rustup run` keeps the
-# pinned toolchain even where another cargo comes first on PATH.
+# sources change; a wheel built here cannot be stale. `rustup run` names the
+# pinned toolchain, but a cargo that comes earlier on PATH still builds the
+# wheel: with Homebrew's rust first, Homebrew's rustc built it (2026-10-26).
 #
 # `python -m pytest`, not `pytest`: the wheel lives only in the interpreter uv
 # layers over the project environment. Where the interpreter's path is too long

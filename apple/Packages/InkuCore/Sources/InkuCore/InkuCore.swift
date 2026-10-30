@@ -151,6 +151,11 @@ extension CoreFailure {
 
 /// A synchronous owned-byte facade. Hosts schedule heavy calls off MainActor.
 public enum InkuCore {
+    public static func imageInputPolicy() -> String { InkuCoreBindings.imageInputPolicy() }
+    public static func imageCanvas(_ input: Data) -> Data { InkuCoreBindings.imageCanvas(inputBytes: input) }
+    public static func imageReviewSvg(snapshot: Data, request: Data) -> Data {
+        InkuCoreBindings.imageReviewSvg(snapshotBytes: snapshot, requestBytes: request)
+    }
     public static let svgConsumerMaximumBytes: UInt64 = 64 * 1_024 * 1_024
     public static var versionReport: String { InkuCoreBindings.versionReport() }
     public static var rasterAPIVersion: String { InkuCoreBindings.rasterApiVersion() }
@@ -256,6 +261,26 @@ public enum InkuCore {
         InkuCoreBindings.providerWire(inputBytes: input)
     }
 
+    public static func modelCatalog(_ input: Data) -> Data {
+        InkuCoreBindings.modelCatalog(inputBytes: input)
+    }
+
+    public static func providerAdmission(_ input: Data) -> Data {
+        InkuCoreBindings.providerAdmission(inputBytes: input)
+    }
+
+    public static func pluginPackage(_ input: Data) -> Data {
+        InkuCoreBindings.pluginPackage(inputBytes: input)
+    }
+
+    public static func pluginCalls(_ input: Data) -> Data {
+        InkuCoreBindings.pluginCalls(bytes: input)
+    }
+
+    public static func migratePluginNames(_ input: Data) -> Data {
+        InkuCoreBindings.migratePluginNames(inputBytes: input)
+    }
+
     /// The juxtaposition (取り合わせ, `inku.juxtaposition.v1`): one JSON request with an `action` (`gather`, `prompt`,
     /// `check`, `join`, `same`) in, one JSON answer out. Nothing is sent or saved by the core.
     public static func juxtaposition(_ input: Data) -> Data {
@@ -265,6 +290,10 @@ public enum InkuCore {
     /// Shared autonomous refinement: next move, visible difference and lineage record.
     public static func autonomousRefine(_ input: Data) -> Data {
         InkuCoreBindings.autonomousRefine(inputBytes: input)
+    }
+
+    public static func chunkMoves(_ input: Data) -> Data {
+        InkuCoreBindings.chunkMoves(inputBytes: input)
     }
 
     /// The experimental 3D viewer's input (`inku.ddl3d.v1`, Web `snapshot()`), shared with Android:

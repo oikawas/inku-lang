@@ -210,8 +210,8 @@ Check in the Web UI:
 
 - Sign-in and sign-out
 - Painting from Japanese and English descriptions
-- Painting with Sketch from life set to `On`, and a sketch adding place and light alongside the description
-- Color catalog, model, canvas, and Wild selection
+- Painting `With a plan` with Sketch from life lit, and a sketch adding place and light alongside the description
+- Color catalog, model, canvas, and Lift the stroke limit selection
 - Refinement and model comparison
 - Provenance Details, Prompts, and JSON
 - Timeline and By lineage history modes; search by a whole render hash, its prefix or last four characters, and by a whole work UUID or its prefix

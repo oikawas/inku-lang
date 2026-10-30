@@ -18,11 +18,11 @@ class ProviderModelListFetcherTest {
 
         val gemini = providerModelListRequest("gemini", "https://generativelanguage.googleapis.com", "a+b")
         assertEquals("https://generativelanguage.googleapis.com/v1beta/models", gemini.url)
-        assertEquals(mapOf("x-goog-api-key" to "a+b"), gemini.headers)
+        assertEquals(mapOf("Accept" to "application/json", "x-goog-api-key" to "a+b"), gemini.headers)
 
         val compatible = providerModelListRequest("openai-compatible", "https://api.openai.com/v1", "secret")
         assertEquals("https://api.openai.com/v1/models", compatible.url)
-        assertEquals(mapOf("Authorization" to "Bearer secret"), compatible.headers)
+        assertEquals(mapOf("Accept" to "application/json", "Authorization" to "Bearer secret"), compatible.headers)
     }
 
     @Test

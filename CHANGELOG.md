@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-30 — Update Score support in the 3D viewer
-
-Refresh the 3D converter with the current core so it can display saved Score 0.22 works, including brushmarks.
-
 ### 2026-10-29 — Retire qualified plugin calls from drawing
 
 DDL no longer draws `namespace.name` calls and diagnoses the old spelling. The migration function still rewrites it to a braced name. A v1 definition remains usable through its braced name.
@@ -488,6 +484,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.297 (2026-10-30 / Build 1373)
+
+### 2026-10-30 — Update Score support in the 3D viewer
+
+Refresh the 3D converter with the current core so it can display saved Score 0.22 works, including brushmarks.
 
 ## macOS 1.1.6 (2026-10-30)
 

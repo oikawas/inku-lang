@@ -51,7 +51,7 @@ if [[ "$NOTARIZE" == true && -z "$NOTARY_PROFILE" ]]; then usage; fail 'Pass --n
 DIRTY="$(git -C "$ROOT" status --porcelain)"
 [[ -z "$DIRTY" || "$ALLOW_DIRTY" == true ]] || fail 'The checkout has uncommitted changes; commit them or pass --allow-dirty.'
 
-VERSION="$(tr -d '[:space:]' < "$APPLE/VERSION")"
+VERSION_FLOOR="$(tr -d '[:space:]' < "$APPLE/VERSION")"
 if [[ "$BUILD_APP" == true ]]; then
     # The release uses release Rust archives and the committed resource snapshot.
     env -u INKU_APPLE_REFERENCE_ROOT INKU_APPLE_PROFILE=release "$APPLE/scripts/build-macos.sh" Release --keep-running
@@ -67,9 +67,11 @@ python3 "$APPLE/scripts/sync-ddl3d-viewer.py" --check --app "$BUILT_APP" \
 
 plist() { /usr/libexec/PlistBuddy -c "Print :$2" "$1/Contents/Info.plist" 2>/dev/null; }
 BUILD_NUMBER="$(plist "$BUILT_APP" CFBundleVersion)"
+VERSION="$(plist "$BUILT_APP" CFBundleShortVersionString)"
 BUILD_FLOOR="$(tr -d '[:space:]' < "$APPLE/BUILD_NUMBER")"
-[[ "$(plist "$BUILT_APP" CFBundleShortVersionString)" == "$VERSION" \
-    && "$BUILD_NUMBER" =~ ^[1-9][0-9]*$ && "$BUILD_FLOOR" =~ ^[1-9][0-9]*$ \
+python3 "$APPLE/scripts/allocate-build-number.py" --version-floor "$VERSION_FLOOR" --check-version "$VERSION" \
+    || fail 'The built app version is not above the version floor.'
+[[ "$BUILD_NUMBER" =~ ^[1-9][0-9]*$ && "$BUILD_FLOOR" =~ ^[1-9][0-9]*$ \
     && "$BUILD_NUMBER" -ge "$BUILD_FLOOR" ]] || fail 'The built app version or build number is invalid.'
 [[ "$(plist "$BUILT_APP" CFBundleIdentifier)" == "$BUNDLE_ID" ]] || fail "The release bundle identifier must be $BUNDLE_ID."
 # The author's review database path is installed only into the unsigned local app.

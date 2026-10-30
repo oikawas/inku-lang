@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-30 — Allocate a macOS version for every build
+
+Advance the app's patch version and build number on every build, and use both numbers from the finished app for distribution.
+
 ### 2026-10-30 — Fix macOS work condition column widths
 
 Keep the canvas condition columns from expanding to their maximum widths, so the fields stay together on the right.

@@ -32,7 +32,7 @@ targets:
       - package: InkuApple
         product: InkuUI
     preBuildScripts:
-      # The build script supplies a freshly allocated number above BUILD_NUMBER.
+      # The build script supplies a freshly allocated version and build number.
       - name: Check bundle version
         basedOnDependencyAnalysis: false
         inputFiles:
@@ -41,10 +41,12 @@ targets:
         script: |
           version="$(tr -d '[:space:]' < "$SRCROOT/VERSION")"
           build="$(tr -d '[:space:]' < "$SRCROOT/BUILD_NUMBER")"
-          if [ "$MARKETING_VERSION" != "$version" ] || [ -z "$INKU_ALLOCATED_BUILD_NUMBER" ] || \
+          if [ -z "$INKU_ALLOCATED_VERSION" ] || [ "$MARKETING_VERSION" != "$INKU_ALLOCATED_VERSION" ] || \
+             ! python3 "$SRCROOT/scripts/allocate-build-number.py" --version-floor "$version" --check-version "$MARKETING_VERSION" || \
+             [ -z "$INKU_ALLOCATED_BUILD_NUMBER" ] || \
              [ "$CURRENT_PROJECT_VERSION" != "$INKU_ALLOCATED_BUILD_NUMBER" ] || \
              ! [ "$CURRENT_PROJECT_VERSION" -gt "$build" ] 2>/dev/null; then
-              echo "error: use apple/scripts/build-macos.sh to allocate a fresh build number"
+              echo "error: use apple/scripts/build-macos.sh to allocate a fresh version and build number"
               exit 1
           fi
     settings:

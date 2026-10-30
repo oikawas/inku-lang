@@ -40,12 +40,13 @@ python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else "Python 3
 node --input-type=module -e 'import { stripTypeScriptTypes } from "node:module"; stripTypeScriptTypes("const value: number = 1;");'
 
 # The tracked build number is the floor; the local counter allocates a new number for every build.
-MARKETING_VERSION="$(tr -d '[:space:]' < "$APPLE/VERSION")"
+VERSION_FLOOR="$(tr -d '[:space:]' < "$APPLE/VERSION")"
 BUILD_FLOOR="$(tr -d '[:space:]' < "$APPLE/BUILD_NUMBER")"
 # CFBundleShortVersionString allows at most three numeric components.
-[[ "$MARKETING_VERSION" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]] || { printf 'apple/VERSION must be 1 to 3 numbers: %s\n' "$MARKETING_VERSION" >&2; exit 2; }
+[[ "$VERSION_FLOOR" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { printf 'apple/VERSION must have three numbers: %s\n' "$VERSION_FLOOR" >&2; exit 2; }
 [[ "$BUILD_FLOOR" =~ ^[1-9][0-9]*$ ]] || { printf 'apple/BUILD_NUMBER must be a positive integer: %s\n' "$BUILD_FLOOR" >&2; exit 2; }
-BUILD_NUMBER="$(python3 "$APPLE/scripts/allocate-build-number.py" --floor "$BUILD_FLOOR")"
+ALLOCATION="$(python3 "$APPLE/scripts/allocate-build-number.py" --floor "$BUILD_FLOOR" --version-floor "$VERSION_FLOOR")"
+read -r MARKETING_VERSION BUILD_NUMBER <<< "$ALLOCATION"
 
 mkdir -p "$BUILD"
 if [[ "$STOP_EXISTING" == true ]]; then
@@ -77,6 +78,7 @@ xcodebuild \
     "MARKETING_VERSION=$MARKETING_VERSION" \
     "CURRENT_PROJECT_VERSION=$BUILD_NUMBER" \
     "INKU_ALLOCATED_BUILD_NUMBER=$BUILD_NUMBER" \
+    "INKU_ALLOCATED_VERSION=$MARKETING_VERSION" \
     CODE_SIGNING_ALLOWED=NO \
     CODE_SIGNING_REQUIRED=NO \
     CODE_SIGN_IDENTITY= \

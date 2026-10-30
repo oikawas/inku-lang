@@ -158,6 +158,12 @@ fn the_current_core_draws_the_public_ddl_inside_the_table() {
             work,
             work["ddl"].as_str().unwrap(),
         );
+        if id == "p02" || id == "p03" {
+            assert!(
+                svg.contains("stitchTiles=\"stitch\""),
+                "{id}: ink spread missing"
+            );
+        }
         for (case, needle) in [
             ("pattern href", "<pattern "),
             ("use href", "<use href="),

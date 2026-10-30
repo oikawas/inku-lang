@@ -487,7 +487,7 @@ Saved works also offer random or Vision autonomous refinement. The author sets t
 
 ## macOS 1.1.6 (2026-10-30)
 
-The Server reference is v2.15.296 / Build 1372. This release includes drawing from words and images, shared provider decisions, plugin v2 and saved-work migration, and improvements to history and the interface. The macOS Build is allocated at packaging time.
+The Server reference is v2.15.294 / Build 1370. This release includes drawing from words and images, shared provider decisions, plugin v2 and saved-work migration, and improvements to history and the interface. The macOS Build is allocated at packaging time.
 
 ## v2.15.296 (2026-10-29 / Build1372)
 

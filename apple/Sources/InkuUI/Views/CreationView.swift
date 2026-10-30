@@ -836,13 +836,18 @@ struct CreationView: View {
     @ViewBuilder private var workActionMenu: some View {
         if let work = workspaceWork, hasSavedWorkspaceWork {
             Menu {
-                SavedWorkRefinementActions(model: model, work: work, onAction: onWorkAction, writingLocked: automation.isOccupied)
+                Section {
+                    SavedWorkRefinementActions(model: model, work: work, onAction: onWorkAction, writingLocked: automation.isOccupied)
+                } header: {
+                    Text(workActionTitle(work))
+                }
             } label: {
-                Label(display.localized("作品の操作"), systemImage: "ellipsis.circle").inkuFont(12)
+                Text(display.webCopy("workActionRefine", "推敲する")).inkuFont(12)
             }
             .menuStyle(.borderlessButton)
             .popover(isPresented: Binding(get: { ui.refinementMenuWorkID == work.id }, set: { if !$0 { ui.refinementMenuWorkID = nil } })) {
                 VStack(alignment: .leading, spacing: 8) {
+                    Text(workActionTitle(work)).inkuFont(12, weight: .semibold)
                     SavedWorkRefinementActions(model: model, work: work, onAction: { target, action in
                         ui.refinementMenuWorkID = nil
                         onWorkAction(target, action)
@@ -857,6 +862,15 @@ struct CreationView: View {
         } else if workspaceWork != nil, !model.isBusy {
             Text(display.webCopy("workActionSaveFirst", "推敲するには、先に作品を保存してください。"))
                 .inkuFont(11).foregroundStyle(.tertiary).lineLimit(1)
+        }
+    }
+
+    private func workActionTitle(_ work: SavedWork) -> String {
+        let title = display.webCopy("workActionMenuTitle", "作品編集")
+        switch model.workActionState(for: work) {
+        case .userDDL: return title + " " + display.webCopy("workActionDdlOrigin", "（DDL直接生成作品）")
+        case .lockedDescription: return title + " " + display.webCopy("descriptionLockedMark", "ロック")
+        default: return title
         }
     }
 

@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-30 — Align the macOS work editing menu
+
+Match the canvas refinement menu heading and item names to the server, and show unavailable description actions with their reason for image-based works.
+
 ### 2026-10-30 — Right-align macOS work conditions
 
 Align the displayed work's conditions at the right edge above the canvas.

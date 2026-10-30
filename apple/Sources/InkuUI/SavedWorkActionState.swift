@@ -17,7 +17,7 @@ public enum SavedWorkActionState: Sendable, Equatable {
         } else { self = .unavailable }
     }
 
-    var showsDescriptionActions: Bool { self != .userDDL && self != .image }
+    var showsDescriptionActions: Bool { self != .userDDL }
     var canReadDescription: Bool { self == .description }
 
     static func isBrowsingAction(_ action: String) -> Bool {
@@ -37,6 +37,9 @@ struct SavedWorkRefinementActions: View {
         if state == .lockedDescription {
             return model.display.tooltip("編集した指示書で確定した作品です。記述を読み直す操作は使えません。", serverKey: "descriptionLockedReason")
         }
+        if state == .image {
+            return model.display.label("画像から作った作品では、記述から描き直せません。", "A work made from an image cannot be redrawn from a description.")
+        }
         return model.display.tooltip(state == nil ? "保存条件を読み込み中です。" : "この作品には操作に必要な保存条件が記録されていません。")
     }
 
@@ -52,24 +55,24 @@ struct SavedWorkRefinementActions: View {
         Group {
             Group {
                 Section(model.display.webCopy("workActionGroupLook", "色と質感")) {
-                    Button(model.display.localized("色カタログを変える"), systemImage: "paintpalette") { onAction(work, "color") }
-                    Button(model.display.localized("配色を変える"), systemImage: "arrow.triangle.swap") { onAction(work, "color-arrangement") }
-                    Button(model.display.localized("支持体を変える"), systemImage: "square.on.square") { onAction(work, "ground") }
-                    Button(model.display.localized("てざわりを変える"), systemImage: "pencil.tip") { onAction(work, "tool") }
+                    Button(model.display.webCopy("canvasVaryColor", "色カタログを変える"), systemImage: "paintpalette") { onAction(work, "color") }
+                    Button(model.display.webCopy("workActionColorArrangement", "配色を変える"), systemImage: "arrow.triangle.swap") { onAction(work, "color-arrangement") }
+                    Button(model.display.webCopy("workActionGround", "支持体を変える"), systemImage: "square.on.square") { onAction(work, "ground") }
+                    Button(model.display.webCopy("workActionTool", "てざわりを変える"), systemImage: "pencil.tip") { onAction(work, "tool") }
                 }
                 Section(model.display.webCopy("workActionGroupForm", "形と指示書")) {
                     // Layout keeps its own dialog after the reading and touch parameters are retired.
-                    Button(model.display.localized("配置を変える"), systemImage: "square.grid.2x2") { onAction(work, "layout") }
-                    Button(model.display.localized("指示書エディタ"), systemImage: "doc.text") { onAction(work, "ddl") }
+                    Button(model.display.webCopy("canvasVaryComposition", "配置を変える"), systemImage: "square.grid.2x2") { onAction(work, "layout") }
+                    Button(model.display.webCopy("workActionInstructions", "指示書エディタ"), systemImage: "doc.text") { onAction(work, "ddl") }
                         .disabled(work.ddl?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false)
                 }
                 if state?.showsDescriptionActions != false {
                     Section(model.display.webCopy("workActionGroupDescription", "記述から描き直す")) {
-                        llm(Button(model.display.localized("記述を変える"), systemImage: "text.cursor") { onAction(work, "description") }
+                        llm(Button(model.display.webCopy("workActionDescription", "記述を変える"), systemImage: "text.cursor") { onAction(work, "description") }
                             .disabled(state?.canReadDescription != true).help(state?.canReadDescription == true ? model.display.tooltip("記述を変える") : reason))
-                        llm(Button(model.display.localized("写生なし／ありで描き直す"), systemImage: "pencil.and.outline") { onAction(work, "sketch") }
+                        llm(Button(model.display.webCopy("workActionSketchGrain", "写生なし／ありで描き直す"), systemImage: "pencil.and.outline") { onAction(work, "sketch") }
                             .disabled(state?.canReadDescription != true).help(state?.canReadDescription == true ? model.display.tooltip("写生なし／ありで描き直す") : reason))
-                        llm(Button(model.display.localized("モデルを変える"), systemImage: "cpu") { onAction(work, "model") }
+                        llm(Button(model.display.webCopy("workActionModels", "モデルを変える"), systemImage: "cpu") { onAction(work, "model") }
                             .disabled(state?.canReadDescription != true).help(state?.canReadDescription == true ? model.display.tooltip("モデルを変える") : reason))
                         // WorkActionMenu.svelte:147: a sentence from another work, added after the description.
                         llm(Button(model.display.webCopy("workActionJuxtapose", "取り合わせ"), systemImage: "text.badge.plus") { onAction(work, "juxtapose") }
@@ -79,7 +82,7 @@ struct SavedWorkRefinementActions: View {
                 }
             }.disabled(model.isBusy || writingLocked || work.trashed)
             Section(model.display.webCopy("workActionGroupAi", "AIに任せる")) {
-                llm(Button(model.display.localized("AI自動推敲プロセス"), systemImage: "wand.and.stars") { onAction(work, "ai") })
+                llm(Button(model.display.webCopy("workActionAutonomous", "AI自動推敲プロセス"), systemImage: "wand.and.stars") { onAction(work, "ai") })
             }.disabled(work.trashed || ((model.isBusy || writingLocked) && !model.autonomousRefinement.running))
         }
     }

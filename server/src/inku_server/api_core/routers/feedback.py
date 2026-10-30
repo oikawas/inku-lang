@@ -38,10 +38,11 @@ def api_record_unread_words(body: UnreadWordsBody, actor: dict = Depends(_curren
 @router.get("/api/feedback/unread-words", summary="List my unread words")
 def api_my_unread_words(
     limit: int = Query(default=100, ge=1, le=500, description="Maximum number of entries to return, from 1 to 500."),
+    offset: int = Query(default=0, ge=0, description="Number of ordered entries to skip."),
     actor: dict = Depends(_current_user),
 ) -> list[dict]:
     """List the unread words recorded for the signed-in user."""
-    return _db.list_unread_words(actor["id"], limit=limit)
+    return _db.list_unread_words(actor["id"], limit=limit, offset=offset)
 
 
 @router.get("/api/admin/unread-words", summary="List unread words of all users")

@@ -71,6 +71,7 @@ class UnreadWordStore:
         user_id: str | None = None,
         *,
         limit: int = 100,
+        offset: int = 0,
     ) -> list[dict]:
         with self.session_factory() as session:
             query = session.query(UnreadWordRow)
@@ -101,4 +102,4 @@ class UnreadWordStore:
                 item["context"] = item["contexts"][0] if item["contexts"] else ""
                 if user_id is None:
                     item["user_count"] = len(users_by_word[item["word"]])
-            return items[:limit]
+            return items[offset:offset + limit]

@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-31 — Read all unread words
+
+Add an offset to the current user's unread-word listing and `inku-cli unread-words --all-pages` to retrieve more than 500 entries.
+
 ### 2026-10-30 — Fix macOS work condition column widths
 
 Keep the canvas condition columns from expanding to their maximum widths, so the fields stay together on the right.

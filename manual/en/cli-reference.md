@@ -197,7 +197,7 @@ The JSON on standard output records the engine versions at saving and now (`reco
 |---|---|
 | `history` | `--limit` / `--offset` / `--query` / `--starred` / `--for-revision` / `--for-share` / `--no-svg` (leaves each work's drawing out of the listing; `svg` comes back empty) |
 | `history-export` | `--from` / `--to` (a range of hash suffixes) / `--out-dir` / `--columns` / `--thumb-size` / `--starred` / `--for-revision` / `--for-share` |
-| `unread-words` | `--all` (administrator-only aggregate) / `--limit` |
+| `unread-words` | `--all` (administrator-only aggregate) / `--limit` / `--all-pages` (fetch all pages for the current user; requires a compatible server) |
 | `history share` | `--to-user` / `--to-group` (one or the other) / `--permission {read,write}` |
 | `history unshare` | `--to-user` / `--to-group` (one or the other) |
 | `history acl` | (the work ID only) shows who else may see or change that work |

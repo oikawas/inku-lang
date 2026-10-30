@@ -85,7 +85,7 @@ def test_persistence_feedback_owns_store_and_db_delegates(
     assert db.list_unread_words("user", limit=7) == "sentinel"
     assert calls == [
         (session_factory, "record_unread_words", ("user", ["word"], "context"), {"at": 10}),
-        (session_factory, "list_unread_words", ("user",), {"limit": 7}),
+        (session_factory, "list_unread_words", ("user",), {"limit": 7, "offset": 0}),
     ]
 
 
@@ -192,6 +192,7 @@ def test_list_preserves_filter_aggregation_order_contexts_user_count_and_limit()
     user_items = store.list_unread_words("u1")
     assert sessions[1].query_object.filters == 1
     assert [item["word"] for item in user_items] == ["beta", "alpha"]
+    assert [item["word"] for item in store.list_unread_words("u1", limit=1, offset=1)] == ["alpha"]
     alpha = user_items[1]
     assert alpha == {
         "word": "alpha",

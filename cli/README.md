@@ -1163,7 +1163,7 @@ options:
 ```
 usage: inku-cli unread-words [-h] [--base-url BASE_URL]
                              [--timeout-seconds TIMEOUT_SECONDS] [--all]
-                             [--limit LIMIT]
+                             [--all-pages] [--limit LIMIT]
 
 options:
   -h, --help            show this help message and exit
@@ -1171,6 +1171,8 @@ options:
   --timeout-seconds TIMEOUT_SECONDS
                         HTTP timeout in seconds (default: 600)
   --all                 admin-only aggregate across users
+  --all-pages           fetch all pages of the current user's unread words;
+                        requires server pagination support
   --limit LIMIT         entries to list, from 1 to 500 (default: 100); with
                         --all, up to 2000
 

@@ -3565,7 +3565,21 @@ def command_unread_words(args: argparse.Namespace) -> int:
         timeout_seconds=_resolved_timeout_seconds(args, config),
     )
     path = "/api/admin/unread-words" if args.all_users else "/api/feedback/unread-words"
+    if args.all_pages and args.all_users:
+        raise CliError("--all-pages is available for the current user only")
     data, _ = client.request("GET", path, query={"limit": args.limit})
+    if args.all_pages:
+        seen = {item["word"] for item in data}
+        if len(seen) != len(data):
+            raise CliError("unread-words returned duplicate entries")
+        while len(data) and len(data) % args.limit == 0:
+            page, _ = client.request("GET", path, query={"limit": args.limit, "offset": len(data)})
+            if not isinstance(page, list) or any(item.get("word") in seen for item in page):
+                raise CliError("unread-words pagination did not advance; the server may not support offset")
+            seen.update(item["word"] for item in page)
+            data.extend(page)
+            if len(page) < args.limit:
+                break
     _print_json({
         "scope": "all_users" if args.all_users else "current_user",
         "words": data,
@@ -4934,6 +4948,7 @@ def build_parser() -> argparse.ArgumentParser:
     unread_words = subparsers.add_parser("unread-words", help="report words the interpreter could not confidently read")
     _add_common_server_args(unread_words)
     unread_words.add_argument("--all", dest="all_users", action="store_true", help="admin-only aggregate across users")
+    unread_words.add_argument("--all-pages", action="store_true", help="fetch all pages of the current user's unread words; requires server pagination support")
     unread_words.add_argument("--limit", type=int, default=100, help="entries to list, from 1 to 500 (default: 100); with --all, up to 2000")
     unread_words.set_defaults(func=command_unread_words)
 

@@ -197,7 +197,7 @@ uv run inku-cli replay WORK_ID --save-child
 |---|---|
 | `history` | `--limit` / `--offset` / `--query` / `--starred` / `--for-revision` / `--for-share` / `--no-svg`（作品の絵を一覧に含めません。`svg`は空文字で返ります） |
 | `history-export` | `--from` / `--to`（hash下位桁の範囲）/ `--out-dir` / `--columns` / `--thumb-size` / `--starred` / `--for-revision` / `--for-share` |
-| `unread-words` | `--all`（管理者のみの全体集計）/ `--limit` |
+| `unread-words` | `--all`（管理者のみの全体集計）/ `--limit` / `--all-pages`（本人の未読語を全ページ取得。対応するサーバーが必要） |
 | `history share` | `--to-user` / `--to-group`（どちらか一方）/ `--permission {read,write}` |
 | `history unshare` | `--to-user` / `--to-group`（どちらか一方） |
 | `history acl` | （引数は作品IDのみ）いま誰がその作品を見られる／変えられるかを表示します |

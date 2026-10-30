@@ -1106,8 +1106,8 @@ def record_unread_words(user_id: str, words: list[str], context: str, *, at: int
     return _feedback.UnreadWordStore(SessionLocal).record_unread_words(user_id, words, context, at=at)
 
 
-def list_unread_words(user_id: str | None = None, *, limit: int = 100) -> list[dict]:
-    return _feedback.UnreadWordStore(SessionLocal).list_unread_words(user_id, limit=limit)
+def list_unread_words(user_id: str | None = None, *, limit: int = 100, offset: int = 0) -> list[dict]:
+    return _feedback.UnreadWordStore(SessionLocal).list_unread_words(user_id, limit=limit, offset=offset)
 
 
 def list_user_groups() -> list[dict]:

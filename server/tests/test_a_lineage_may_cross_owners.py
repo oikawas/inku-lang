@@ -299,12 +299,15 @@ def test_t23_a_deriver_cannot_star_or_trash_the_parent(world) -> None:
     assert db.get_items(world.alice["id"], [world.parent["id"]]), "the parent was trashed after all"
 
 
-def test_a_deriver_cannot_promote_the_parents_node(world) -> None:
+def test_removed_promote_route_cannot_change_the_parents_node(world) -> None:
     world.share_with(world.bob)
     world.derive(world.bob, 2_000, "bob varies it")
-    assert client.post(
-        f"/api/lineage/{world.parent_node}/promote", headers=world.bob_h
-    ).status_code == 404
+    before = db.get_items(world.alice["id"], [world.parent["id"]])[0]
+    for headers in (world.bob_h, world.alice_h):
+        assert client.post(
+            f"/api/lineage/{world.parent_node}/promote", headers=headers
+        ).status_code == 404
+    assert db.get_items(world.alice["id"], [world.parent["id"]])[0] == before
 
 
 def test_deleting_the_origins_account_is_refused_while_another_derives_from_it(world) -> None:

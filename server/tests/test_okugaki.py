@@ -84,10 +84,11 @@ def _item(user_id: str, text: str, at: int, **extra) -> dict:
     }
 
 
-def test_branch_fact_sheet_handles_lineage_only_and_tombstone():
+def test_branch_fact_sheet_handles_legacy_visibility_and_tombstone():
     user = _user()
     try:
         root = db.add_item(_item(user["id"], "root", 1000))
+        # The former lineage-only input now saves as a normal active work.
         hidden = db.add_item(_item(
             user["id"],
             "hidden",

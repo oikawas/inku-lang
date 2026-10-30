@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-30 — The example rain now slants on the wind in three layers, with a rain cloud and mist
+
+At the author's request, the drawing of the v2 example `Sky.Rain` (`{rain}`) is replaced by the 2.0.0 made on the working branch. After Hiroshige's *Sudden Shower over Shin-Ōhashi Bridge and Atake*, the rain is scattered in three layers, far (30 very fine silverpoint lines), middle (pale-ink pen lines, the written count) and near (12 long ultramarine pen lines), each tilted, under a rain cloud along the top and with rain mist low down. The wind's direction and strength come from four choices by the composition seed. The names, id, `kind: scene` and count parameter are unchanged. The note now reads "A sudden shower slanting on the wind: three layers of rain with a rain cloud and mist."; `sky-nihonga.zip` is now `Sky.nihonga` 1.1.0 with a redrawn Saijiki picture, and the definition and note in `sky.*.ddl.json` were replaced. Adding it with "Replace" to a Server holding 1.0.0, drawing `{rain}` and `｛雨｝` with the new rain, and checking the exported zip again were confirmed. No code changed.
+
 ### 2026-10-29 — Retire qualified plugin calls from drawing
 
 DDL no longer draws `namespace.name` calls and diagnoses the old spelling. The migration function still rewrites it to a braced name. A v1 definition remains usable through its braced name.

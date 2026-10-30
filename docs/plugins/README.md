@@ -14,7 +14,7 @@ These two installable examples follow the [authoring guide](../../PLUGIN.md) for
 | `Water.Sea` | 海 | sea | 水平線まで続く海原と波頭。 | Open sea to the horizon, with crests. |
 | `Sky.Clouds` | 雲 | clouds | すやり霞の雲。金の芯を通した横長の帯。 | Suyari-gasumi clouds: long bands with gold cores. |
 | `Sky.Heavens` | 大空 | heavens | 一文字ぼかしの空。上端から暈す群青。 | An ichimonji-bokashi sky: ultramarine shaded down from the top. |
-| `Sky.Rain` | 雨 | rain | 広重の夕立のような、細い縦の雨脚。 | Thin vertical rain like Hiroshige's sudden shower. |
+| `Sky.Rain` | 雨 | rain | 風に斜めに降る夕立。三層の雨脚に雨雲と雨霞を添える。 | A sudden shower slanting on the wind: three layers of rain with a rain cloud and mist. |
 | `Sky.Snow` | 雪 | snow | 胡粉の牡丹雪。暗い地に向く。 | Gofun peony snow, for a dark ground. |
 
 The name `空` conflicts with a core word, so `Sky.Heavens` now uses `大空`. DDL calls the braced primary name, such as `{stream}.` or `{heavens}.` The old qualified spelling remains readable during the saved-work migration period.

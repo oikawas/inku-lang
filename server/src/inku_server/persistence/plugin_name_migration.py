@@ -9,7 +9,6 @@ snapshot and one SQLite writer transaction.
 from __future__ import annotations
 
 import hashlib
-import json
 import time
 from collections import Counter, defaultdict
 from collections.abc import Callable, Mapping

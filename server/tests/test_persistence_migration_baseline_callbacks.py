@@ -141,6 +141,7 @@ def test_init_db_builds_owner_from_live_dependencies_and_assigns_outcome(
 
     class Outcome:
         fts_enabled = enabled
+        mode = "current"
 
     def ensure_current_schema(**kwargs):
         ensured.append(kwargs)

@@ -228,7 +228,7 @@ def test_paint_409_exposes_persisted_compiler_failure_detail(
             "stage": "stage1",
             "attempt": 1,
             "elapsed_ms": 7,
-            "detail": "macro_resolution_missing_lock",
+            "detail": "plugin_old_notation",
             "action_id": rejected_action_ids[-1],
         }
         assert raised.value.status_code == 409

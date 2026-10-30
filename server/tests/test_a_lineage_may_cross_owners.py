@@ -302,7 +302,9 @@ def test_t23_a_deriver_cannot_star_or_trash_the_parent(world) -> None:
 def test_a_deriver_cannot_promote_the_parents_node(world) -> None:
     world.share_with(world.bob)
     world.derive(world.bob, 2_000, "bob varies it")
-    assert db.promote_lineage_node(world.bob["id"], world.parent_node) is None
+    assert client.post(
+        f"/api/lineage/{world.parent_node}/promote", headers=world.bob_h
+    ).status_code == 404
 
 
 def test_deleting_the_origins_account_is_refused_while_another_derives_from_it(world) -> None:

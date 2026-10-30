@@ -301,7 +301,7 @@ test('a touch change draws four options in the chosen way, replaces them on the 
 				instructionLang: 'auto', sketchTextFor: () => null,
 				pipelineCompatibilityError: async () => new Error('unexpected error')
 			},
-			render: { fanoutLimit: () => 1 },
+			render: { fanoutLimit: () => 1, wild: () => false },
 			lineageParentId: () => 'shown-node', ensureVisibleLineageParentId: async () => 'shown-node',
 			apiFetch: async (path: string, init?: RequestInit) => {
 				const payload = JSON.parse(String(init?.body));

@@ -103,7 +103,8 @@ def test_replay_child_matches_preview_and_rejects_unbound_source(monkeypatch):
             assert parent["stage1_prompt_digest"] == "recorded-prompt"
             assert child.get("stage1_prompt_digest") is None
             assert child["interpretation_seed"] == "reading"
-            assert child["history_visibility"] == "normal"
+            with db.SessionLocal() as session:
+                assert session.query(HistoryRow).filter_by(id=child["id"]).one().history_visibility == "normal"
             assert child["lineage_parent_node_id"] == parent["lineage_node_id"]
             assert child["derivation_kind"] == "replay"
             assert db.get_items(user["id"], [parent["id"]])[0] == parent

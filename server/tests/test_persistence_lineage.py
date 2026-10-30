@@ -11,7 +11,7 @@ import pytest
 
 from inku_server import db
 from inku_server.persistence import lineage
-from inku_server.persistence.schema import HistoryRow, LineageNodeRow
+from inku_server.persistence.schema import LineageNodeRow
 
 
 class FakeScalars:

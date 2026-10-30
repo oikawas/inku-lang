@@ -480,10 +480,10 @@ def test_compact_delivery_preserves_authority_in_normal_history(tmp_path, monkey
     }]
     manifest["pipeline"]["macro_summaries"] = ["A black circle at the center"]
     effects = ProductPipelineEffects(binding, manifest)
-    source = "Example.Circle."
+    source = "｛Circle｝。"
     legacy_parent = db.add_item({
         "id": "legacy-parent", "user_id": "author", "at": 1,
-        "input": "Old description", "ddl": source, "ddl_source_origin": "legacy_expanded",
+        "input": "Old description", "ddl": "Example.Circle.", "ddl_source_origin": "legacy_expanded",
         "score": {}, "svg": "<svg id='old-parent'/>",
     })
     options, context = effects.prepare("author", "direct_ddl", source,

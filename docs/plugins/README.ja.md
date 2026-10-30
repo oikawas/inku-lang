@@ -4,6 +4,7 @@
 
 - [水の五語（zip）](water-nihonga.zip)・[JSON](water-nihonga/package.json)
 - [空の四語（zip）](sky-nihonga.zip)・[JSON](sky-nihonga/package.json)
+- [語の定義を作るスクリプト](scripts/README.ja.md)（Python。九つの語のv2定義を作り、上のファイルと照らす）
 
 | id | 日本語の主の名 | 英語の主の名 | note（日本語） | note（英語） |
 |---|---|---|---|---|

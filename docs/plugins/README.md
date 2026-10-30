@@ -4,6 +4,7 @@ These two installable examples follow the [authoring guide](../../PLUGIN.md) for
 
 - [Five water words (zip)](water-nihonga.zip) and [JSON](water-nihonga/package.json)
 - [Four sky words (zip)](sky-nihonga.zip) and [JSON](sky-nihonga/package.json)
+- [Scripts that make the word definitions](scripts/README.md) (Python; they build the nine words' v2 definitions and check them against the files above)
 
 | id | Primary Japanese name | Primary English name | Japanese note | English note |
 |---|---|---|---|---|

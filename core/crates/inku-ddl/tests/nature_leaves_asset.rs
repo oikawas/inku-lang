@@ -926,17 +926,11 @@ fn every_counted_word_expands_without_omission_at_its_maximum_count() {
                 .iter()
                 .find_map(|(_, schema)| schema.count_parameter())?;
             Some(format!(
-                "{}{}の{}。",
+                "{}{}の｛{}｝。",
                 count.maximum,
                 count.counter.japanese(),
-                format!(
-                    "｛{}｝",
-                    inku_ddl::plugin_names::v1_plugin_names(
-                        &definition.heading,
-                        &definition.aliases
-                    )
-                    .0[0]
-                )
+                inku_ddl::plugin_names::v1_plugin_names(&definition.heading, &definition.aliases).0
+                    [0]
             ))
         })
         .collect();

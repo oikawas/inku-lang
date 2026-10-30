@@ -1842,6 +1842,10 @@ pub fn build_cards(
     (sentences, records)
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "card construction needs its source and compilation context"
+)]
 fn build_card(
     sentences: &[ThingSentence],
     head: &str,
@@ -1967,7 +1971,7 @@ mod tests {
         let object = parse_with_definitions(
             "画面の横0.3、縦0.7の位置に、一辺0.2の｛舟｝を置く。",
             ResolvedInstructionLanguage::Ja,
-            &[definition.clone()],
+            std::slice::from_ref(&definition),
         )
         .expect("numeric object");
         assert_eq!(object.kind, PlaceKind::Point);
@@ -1976,7 +1980,7 @@ mod tests {
         let range = parse_with_definitions(
             "画面の横0.2〜0.8、縦0.6〜0.7の範囲に、一辺0.1の｛舟｝を5個並べる。",
             ResolvedInstructionLanguage::Ja,
-            &[definition.clone()],
+            std::slice::from_ref(&definition),
         )
         .expect("numeric object range");
         assert_eq!(range.kind, PlaceKind::Range);

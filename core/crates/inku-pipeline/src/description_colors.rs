@@ -669,13 +669,18 @@ mod tests {
             crate::plugin_offer::offer_line(&entry, inku_ddl::ResolvedInstructionLanguage::En)
                 .contains("object word (color, count, place, action, size, angle;")
         );
-        let plan =
-            plan_of_with_definitions(source, Ja, &[definition.clone()]).expect("object color plan");
+        let plan = plan_of_with_definitions(source, Ja, std::slice::from_ref(&definition))
+            .expect("object color plan");
         assert_eq!(plan.printed.plan.layers[0].shape, "TestObject.Boat");
         assert_eq!(plan.lines, [0]);
         assert_eq!(
-            recolored_line_with_definitions(source, Color::Blue, Ja, &[definition.clone()])
-                .as_deref(),
+            recolored_line_with_definitions(
+                source,
+                Color::Blue,
+                Ja,
+                std::slice::from_ref(&definition)
+            )
+            .as_deref(),
             Some("画面の横0.3、縦0.7の位置に、一辺0.2の青の｛舟｝を置く。")
         );
         assert_eq!(
@@ -683,7 +688,7 @@ mod tests {
                 "赤い｛舟｝を置く。",
                 Color::Blue,
                 Ja,
-                &[definition.clone()]
+                std::slice::from_ref(&definition)
             )
             .as_deref(),
             Some("青の｛舟｝を置く。")
@@ -693,7 +698,7 @@ mod tests {
                 "place one {boat} at center.",
                 Color::Blue,
                 inku_ddl::ResolvedInstructionLanguage::En,
-                &[definition.clone()]
+                std::slice::from_ref(&definition)
             )
             .as_deref(),
             Some("place one blue {boat} at center.")
@@ -707,8 +712,11 @@ mod tests {
             "{:?}",
             colored.validate().diagnostics()
         );
-        let parsed =
-            super::instructions_of_with_definitions("赤い｛舟｝を置く。", Ja, &[colored.clone()]);
+        let parsed = super::instructions_of_with_definitions(
+            "赤い｛舟｝を置く。",
+            Ja,
+            std::slice::from_ref(&colored),
+        );
         assert_eq!(parsed.len(), 1);
         assert!(matches!(
             parsed[0].entity.head,

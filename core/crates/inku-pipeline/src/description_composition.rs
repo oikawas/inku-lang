@@ -734,23 +734,23 @@ pub fn check_composition(
                 ));
                 continue;
             };
-            if let Some(word) = words.iter().find(|word| word.written == named.word) {
-                if !word.object || takes == Takes::Card || law == "B21" {
-                    problems.push(problem(
-                        &format!("laws.{law}"),
-                        if ja {
-                            format!(
-                                "物 {thing} の語 {} にはこの法則を当てられない。",
-                                word.written
-                            )
-                        } else {
-                            format!(
-                                "Law {law} cannot be applied to thing {thing}'s word {}.",
-                                word.written
-                            )
-                        },
-                    ));
-                }
+            if let Some(word) = words.iter().find(|word| word.written == named.word)
+                && (!word.object || takes == Takes::Card || law == "B21")
+            {
+                problems.push(problem(
+                    &format!("laws.{law}"),
+                    if ja {
+                        format!(
+                            "物 {thing} の語 {} にはこの法則を当てられない。",
+                            word.written
+                        )
+                    } else {
+                        format!(
+                            "Law {law} cannot be applied to thing {thing}'s word {}.",
+                            word.written
+                        )
+                    },
+                ));
             }
             if matches!(
                 takes,

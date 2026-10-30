@@ -5895,6 +5895,10 @@ fn write_hand(
 /// turns in numbers), its color when it changed (two alternating colors as a
 /// cycle), C2's surface and the hand its variation draws; a turn the card
 /// changed is written in numbers instead of an angle word.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "rebuilding a mark needs the original, result, and rendering choices"
+)]
 fn edit_rebuilt(
     layer: &inku_ddl::work_plan::WorkPlanLayer,
     before: &Instruction,

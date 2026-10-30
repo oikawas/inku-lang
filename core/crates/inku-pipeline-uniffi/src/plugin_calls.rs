@@ -99,15 +99,13 @@ fn run(bytes: &[u8]) -> Result<Value, ()> {
         resolve_macro_invocations(&shadow_document, &input.definitions).map_err(|_| ())?;
     let mut diagnostics: Vec<Value> = resolution.diagnostics.iter().map(|item| {
         let mut kind = item.kind;
-        if kind == Kind::MissingLock && item.surface.starts_with(['{', '｛']) {
-            if let Some(found) = shadow_resolution.resolved.iter().find(|found| found.span == item.span) {
-                if let Some(lock) = visible.macro_locks.iter().find(|lock| lock.qualified_name == found.lock.qualified_name) {
-                    if let Some(identity) = input.definitions.iter().filter_map(|definition| definition.identity().ok()).find(|identity| identity.qualified_name() == lock.qualified_name) {
-                        if identity.version() != lock.version { kind = Kind::VersionMismatch; }
-                        else if format!("sha256:{}", identity.full_digest_hex()) != lock.digest { kind = Kind::DigestMismatch; }
-                    }
-                }
-            }
+        if kind == Kind::MissingLock && item.surface.starts_with(['{', '｛'])
+            && let Some(found) = shadow_resolution.resolved.iter().find(|found| found.span == item.span)
+            && let Some(lock) = visible.macro_locks.iter().find(|lock| lock.qualified_name == found.lock.qualified_name)
+            && let Some(identity) = input.definitions.iter().filter_map(|definition| definition.identity().ok()).find(|identity| identity.qualified_name() == lock.qualified_name)
+        {
+            if identity.version() != lock.version { kind = Kind::VersionMismatch; }
+            else if format!("sha256:{}", identity.full_digest_hex()) != lock.digest { kind = Kind::DigestMismatch; }
         }
         let reason = match kind {
             Kind::OldNotation => "plugin_old_notation",
@@ -119,15 +117,15 @@ fn run(bytes: &[u8]) -> Result<Value, ()> {
         };
         json!({"reason": reason, "span": {"start_byte": item.span.start_byte, "end_byte": item.span.end_byte}})
     }).collect();
-    if let Some(compiler) = input.compiler {
-        if let Ok(delivery) = compile_committed(document, &input.definitions, &compiler) {
-            diagnostics.extend(
-                delivery
-                    .upstream_diagnostics
-                    .into_iter()
-                    .filter(|d| d["reason"] == "macro_binding_count_out_of_range"),
-            );
-        }
+    if let Some(compiler) = input.compiler
+        && let Ok(delivery) = compile_committed(document, &input.definitions, &compiler)
+    {
+        diagnostics.extend(
+            delivery
+                .upstream_diagnostics
+                .into_iter()
+                .filter(|d| d["reason"] == "macro_binding_count_out_of_range"),
+        );
     }
     let explained = super::explain_plugin_diagnostics(serde_json::to_vec(&json!({"source":input.source,"upstream_diagnostics":diagnostics,"enabled":input.enabled,"disabled":input.disabled,"plugin_names":input.plugin_names})).map_err(|_| ())?);
     let explained: Value = serde_json::from_slice(&explained).map_err(|_| ())?;

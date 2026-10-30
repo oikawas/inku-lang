@@ -276,7 +276,7 @@ mod object_tests {
         let plan = composed_plan_of(
             source,
             ResolvedInstructionLanguage::Ja,
-            &[definition.clone()],
+            std::slice::from_ref(&definition),
             crate::description_laws::LIMITS,
             &plugins,
         )
@@ -301,7 +301,7 @@ mod object_tests {
         let (layers, _) = crate::recompose::composition_layers(
             source,
             ResolvedInstructionLanguage::Ja,
-            &[definition.clone()],
+            std::slice::from_ref(&definition),
             crate::description_laws::LIMITS,
         )
         .expect("recomposable object layer");
@@ -327,7 +327,7 @@ mod object_tests {
                 .unwrap();
         let delivery = crate::core_boundary::compile_committed(
             document,
-            &[definition.clone()],
+            std::slice::from_ref(&definition),
             &config.compiler,
         )
         .unwrap();
@@ -415,7 +415,7 @@ mod object_tests {
         let plan = composed_plan_of(
             source,
             ResolvedInstructionLanguage::Ja,
-            &[colored.clone()],
+            std::slice::from_ref(&colored),
             crate::description_laws::LIMITS,
             &colored_plugins,
         )

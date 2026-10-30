@@ -755,6 +755,31 @@ struct CreationView: View {
         let size = ByteCountFormatter.string(fromByteCount: Int64(work.svg.utf8.count), countStyle: .file)
         let created = Date(timeIntervalSince1970: Double(work.at) / 1000).formatted(.dateTime.year().month(.twoDigits).day(.twoDigits).hour().minute())
         let generation = workspaceGeneration?.nodeID == work.lineageNodeID ? workspaceGeneration?.value : nil
+        func fields(compact: Bool) -> some View {
+          HStack(spacing: 0) {
+            // CanvasPanel.svelte:707,726,730: each value carries its own title, the models as "解釈 / 描画".
+            metaItem(display.localized("モデル"), maxWidth: 280, compact: compact, title: stage1 + " / " + stage2) {
+                if stage1 == stage2 {
+                    Text(stage1)
+                } else {
+                    VStack(alignment: .leading, spacing: 1) {
+                        HStack(spacing: 4) { Text(display.localized("解釈")).foregroundStyle(.tertiary); Text(stage1) }
+                        HStack(spacing: 4) { Text(display.localized("描画")).foregroundStyle(.tertiary); Text(stage2) }
+                    }
+                }
+            }
+            metaItem(display.localized("色カタログ"), maxWidth: 130, compact: compact, title: catalog) { Text(catalog) }
+            metaItem(display.localized("キャンバス"), maxWidth: 100, compact: compact, title: canvas) { Text(canvas) }
+            metaItem(display.label("描き方", "Drawing"), maxWidth: 130, compact: compact) {
+                Text(workspaceContext?.imageDDL != nil ? display.label("画像から書く", "Written from a picture") : (workspaceContext?.drawRoute == "read_and_draw" || (workspaceContext?.drawRoute != "stages" && workspaceContext?.descriptionDDL != nil)) ? display.label("言葉で描く", "In words") : display.label("型で描く", "With a plan"))
+            }
+            metaItem(display.label("写生", "Sketch"), maxWidth: 130, compact: compact, title: DrawPresentation.sketchNote(work.sketchState, japanese: display.preferences.language != "en")) {
+                Text(DrawPresentation.sketchShort(work.sketchState, japanese: display.preferences.language != "en"))
+            }
+            metaItem(display.label("サイズ", "Size"), maxWidth: nil) { Text(size).monospacedDigit() }
+            metaItem(display.label("作成", "Created"), maxWidth: nil) { Text(created).monospacedDigit() }
+          }
+        }
         return HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(display.webCopy("displayedWorkConditions", "表示中作品の描画条件"))
@@ -770,39 +795,22 @@ struct CreationView: View {
                 }
             }.lineLimit(1).fixedSize().padding(.trailing, 12)
             Spacer(minLength: 0)
-            // CanvasPanel.svelte:707,726,730: each value carries its own title, the models as "解釈 / 描画".
-            metaItem(display.localized("モデル"), maxWidth: 280, title: stage1 + " / " + stage2) {
-                if stage1 == stage2 {
-                    Text(stage1)
-                } else {
-                    VStack(alignment: .leading, spacing: 1) {
-                        HStack(spacing: 4) { Text(display.localized("解釈")).foregroundStyle(.tertiary); Text(stage1) }
-                        HStack(spacing: 4) { Text(display.localized("描画")).foregroundStyle(.tertiary); Text(stage2) }
-                    }
-                }
+            ViewThatFits(in: .horizontal) {
+                fields(compact: true).fixedSize(horizontal: true, vertical: false)
+                fields(compact: false)
             }
-            metaItem(display.localized("色カタログ"), maxWidth: 130, title: catalog) { Text(catalog) }
-            metaItem(display.localized("キャンバス"), maxWidth: 100, title: canvas) { Text(canvas) }
-            metaItem(display.label("描き方", "Drawing"), maxWidth: 130) {
-                Text(workspaceContext?.imageDDL != nil ? display.label("画像から書く", "Written from a picture") : (workspaceContext?.drawRoute == "read_and_draw" || (workspaceContext?.drawRoute != "stages" && workspaceContext?.descriptionDDL != nil)) ? display.label("言葉で描く", "In words") : display.label("型で描く", "With a plan"))
-            }
-            metaItem(display.label("写生", "Sketch"), maxWidth: 130, title: DrawPresentation.sketchNote(work.sketchState, japanese: display.preferences.language != "en")) {
-                Text(DrawPresentation.sketchShort(work.sketchState, japanese: display.preferences.language != "en"))
-            }
-            metaItem(display.label("サイズ", "Size"), maxWidth: nil) { Text(size).monospacedDigit() }
-            metaItem(display.label("作成", "Created"), maxWidth: nil) { Text(created).monospacedDigit() }
         }
         .padding(.vertical, 7)
         .accessibilityElement(children: .combine)
     }
 
-    private func metaItem<Value: View>(_ label: String, maxWidth: CGFloat?, title: String = "",
+    private func metaItem<Value: View>(_ label: String, maxWidth: CGFloat?, compact: Bool = false, title: String = "",
                                        @ViewBuilder value: () -> Value) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label).inkuFont(12).foregroundStyle(.tertiary).lineLimit(1)
             value().inkuFont(13).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
                 .frame(maxWidth: maxWidth, alignment: .leading)
-                .fixedSize(horizontal: maxWidth == nil, vertical: false)
+                .fixedSize(horizontal: compact || maxWidth == nil, vertical: false)
                 .inkuTooltip(display.tooltipValue(title))
         }
         .padding(.horizontal, 12)

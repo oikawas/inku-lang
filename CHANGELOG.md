@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-30 — Fix macOS work condition column widths
+
+Keep the canvas condition columns from expanding to their maximum widths, so the fields stay together on the right.
+
 ### 2026-10-30 — Fix macOS canvas controls
 
 Prevent the hidden lineage view from blocking the canvas controls after switching back to the artwork.

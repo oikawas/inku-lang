@@ -53,7 +53,6 @@ struct CreationView: View {
     @State private var pendingImageBatchRestart: Bool?
     @State private var showConditionDetails = false
     @State private var showPaperPicker = false
-    @State private var showSketchMenu = false
     @State private var showNewDDL = false
     @State private var rightPanelWidth: CGFloat = 0
     @State private var savedProviders: [InkuHost.ProviderSettings] = []
@@ -514,6 +513,8 @@ struct CreationView: View {
             if model.inputMode == "description" {
                 DrawConditionsView(model: model, sketch: model.sketchMode, onSketch: { model.sketchMode = $0 })
                     .disabled(controlsDisabled)
+                    .padding(.bottom, 8)
+                Rectangle().fill(InkuColor.border).frame(height: 1)
             }
             WrappingHStack(spacing: 6) { compactConditionControls }
                 .padding(.top, 2)
@@ -550,18 +551,14 @@ struct CreationView: View {
     }
 
     @ViewBuilder private var compactConditionControls: some View {
-        Button(display.localized("写生") + ": " + display.localized(model.sketchMode == "on" ? "あり" : "なし")) { showSketchMenu.toggle() }
-            .buttonStyle(InkuGhostButtonStyle())
-            .inkuTooltip(display.tooltip("次の作品で写生を使うかを選びます。", serverKey: "tooltipInputSketch"))
-            .popover(isPresented: $showSketchMenu, arrowEdge: .bottom) { sketchMenu }
-        Button(display.webCopy("wildButton", "筆致制限を外す") + " " + display.webCopy(model.wild ? "wildEnabled" : "wildDisabled", model.wild ? "入" : "切")) {
-            model.wild.toggle()
+        HStack(spacing: 8) {
+            Text(display.label("オプション", "Options")).inkuFont(11).foregroundStyle(.tertiary)
+            DrawSwitchChip(title: display.webCopy("wildButton", "筆致制限を外す"), on: model.wild) { model.wild.toggle() }
+                .accessibilityValue(display.localized(model.wild ? "オン" : "オフ"))
+                .inkuTooltip(display.tooltip("次の作品の筆致を規則から外します。", serverKey: "tooltipInputWild"))
         }
-        .buttonStyle(InkuGhostButtonStyle(active: model.wild))
-        .accessibilityValue(display.localized(model.wild ? "オン" : "オフ"))
-        .inkuTooltip(tip("次の作品の筆致を規則から外します。"))
         Button { showPaperPicker = true } label: {
-            Text(display.localized("キャンバス") + (display.preferences.language == "ja" ? "：" : ": ")
+            Text(display.webCopy("canvasAspectButton", "キャンバス") + (display.preferences.language == "ja" ? "：" : ": ")
                  + (model.canvases.first { $0.id == model.canvasID }?.label ?? model.canvasID))
         }
         .buttonStyle(InkuGhostButtonStyle())
@@ -570,29 +567,6 @@ struct CreationView: View {
             CreationPaperPicker(model: model) { showPaperPicker = false }.environment(display)
         }
         .accessibilityValue(model.canvases.first { $0.id == model.canvasID }?.name ?? model.canvasID)
-    }
-
-    /// Web SketchSelect: the two choices with what each does.
-    private var sketchMenu: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            ForEach([("off", "なし", "写生を通さず、記述だけで描く"), ("on", "あり", "記述の横に、場所の広がりや季節・時刻の光を補って描く")], id: \.0) { option in
-                Button {
-                    model.sketchMode = option.0; showSketchMenu = false
-                } label: {
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "checkmark").opacity(model.sketchMode == option.0 ? 1 : 0)
-                            Text(display.localized(option.1)).inkuFont(13, weight: .medium)
-                        }
-                        Text(display.localized(option.2)).inkuFont(12).foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true).padding(.leading, 20)
-                    }
-                    .padding(.vertical, 6).padding(.horizontal, 8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
-                }.buttonStyle(.plain)
-            }
-        }.padding(6).frame(width: 310)
     }
 
     private var conditionDetails: some View {

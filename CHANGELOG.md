@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-30 — Align macOS drawing conditions
+
+Wrap the description panel's flow by step, align the options, stroke switch, and canvas control with the server, and remove the duplicate sketch selector.
+
 ### 2026-10-30 — Align the macOS work editing menu
 
 Match the canvas refinement menu heading and item names to the server, and show unavailable description actions with their reason for image-based works.

@@ -151,6 +151,15 @@ mod tests {
     const SOLIDS: &str = include_str!("../../fixtures/solids.json");
     const RECOVERED: &str = include_str!("../../fixtures/recovered-score.json");
 
+    #[test]
+    fn score_0_22_brushmarks_remain_available_in_3d() {
+        let mut value: Value = serde_json::from_str(SOLIDS).unwrap();
+        value["score"]["version"] = json!("0.22.0");
+        value["score"]["instructions"][0]["surface"] = json!({"texture":"brushmarks"});
+        let result = convert(&value.to_string()).unwrap();
+        assert!(!result["scene"]["marks"].as_array().unwrap().is_empty());
+    }
+
     // Failure: any presence field rejects the whole saved work, even kind:none.
     #[test]
     fn presence_retains_shared_paint_and_all_instruction_marks() {

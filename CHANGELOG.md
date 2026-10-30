@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-30 — Update Score support in the 3D viewer
+
+Refresh the 3D converter with the current core so it can display saved Score 0.22 works, including brushmarks.
+
 ### 2026-10-29 — Retire qualified plugin calls from drawing
 
 DDL no longer draws `namespace.name` calls and diagnoses the old spelling. The migration function still rewrites it to a braced name. A v1 definition remains usable through its braced name.

@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-30 — macOS new work from a description button
+
+Add the server's paint mark to the “Start a new work from this description” button label.
+
 ### 2026-10-30 — Align macOS drawing conditions
 
 Wrap the description panel's flow by step, align the options, stroke switch, and canvas control with the server, and remove the duplicate sketch selector.

@@ -621,7 +621,10 @@ struct CreationView: View {
             } else if descriptionLocked {
                 // InputPanel.svelte:326-334: a held work is drawn from its description only as a new work, named as such.
                 Button { batchWorkspace.showHistory(); Task { await model.forkDescription() } } label: {
-                    Text(display.webCopy("pipelineForkDescription", "この記述から新しい作品を作る"))
+                    HStack(spacing: 8) {
+                        Text("▶").inkuFont(12).accessibilityHidden(true)
+                        Text(display.webCopy("pipelineForkDescription", "この記述から新しい作品を作る"))
+                    }
                 }
                 .buttonStyle(InkuPaintButtonStyle())
                 .keyboardShortcut(.return, modifiers: .command)

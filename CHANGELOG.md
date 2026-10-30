@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-30 — Right-align macOS work conditions
+
+Align the displayed work's conditions at the right edge above the canvas.
+
 ### 2026-10-29 — Retire qualified plugin calls from drawing
 
 DDL no longer draws `namespace.name` calls and diagnoses the old spelling. The migration function still rewrites it to a braced name. A v1 definition remains usable through its braced name.

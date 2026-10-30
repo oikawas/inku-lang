@@ -792,6 +792,7 @@ struct CreationView: View {
                     }
                 }
             }.lineLimit(1).fixedSize().padding(.trailing, 12)
+            Spacer(minLength: 0)
             // CanvasPanel.svelte:707,726,730: each value carries its own title, the models as "解釈 / 描画".
             metaItem(display.localized("モデル"), maxWidth: 280, title: stage1 + " / " + stage2) {
                 if stage1 == stage2 {

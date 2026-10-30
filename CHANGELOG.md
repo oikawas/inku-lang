@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-30 — Fix macOS canvas controls
+
+Prevent the hidden lineage view from blocking the canvas controls after switching back to the artwork.
+
 ### 2026-10-30 — macOS new work from a description button
 
 Add the server's paint mark to the “Start a new work from this description” button label.

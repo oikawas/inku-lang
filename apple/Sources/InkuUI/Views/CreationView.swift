@@ -879,6 +879,10 @@ struct CreationView: View {
                                 })
                         .background(InkuColor.bg)
                         .padding(.horizontal, display.visible("history") ? 68 : 0)
+                        // Native scroll views can still receive pointer events while their SwiftUI
+                        // parent is transparent and hit testing is disabled. Keep the lineage
+                        // mounted, but move it outside the clipped canvas when artwork is shown.
+                        .offset(x: showsLineage ? 0 : max(rightPanelWidth, windowSize?.width ?? 1320) + 128)
                         .opacity(showsLineage ? 1 : 0)
                         .allowsHitTesting(showsLineage)
                         .accessibilityHidden(!showsLineage)

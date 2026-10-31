@@ -63,13 +63,16 @@ def test_package_plan_keeps_original_note_and_preview_and_moves_example(tmp_path
     path = directory / "package.json"
     original = json.dumps(package, ensure_ascii=False).encode()
     path.write_bytes(original)
-    report, proposed = plan_packages(directory.parent)
+    journal = []
+    report, proposed = plan_packages(directory.parent, journal=journal.append)
     assert path.read_bytes() == original
     assert report["changed"] == 1 and not report["refused_records"]
     assert report["notes_with_old_tools"] == [{"package": directory.name, "word": 0, "language": "ja"}]
     moved = json.loads(proposed[path])["words"][0]
     assert moved["example_ja"] == "黒い太いガッシュの線を引く。"
     assert moved["note_ja"] == word["note_ja"] and moved["preview"] == word["preview"]
+    assert any(entry["kind"] == "document" and entry["input"]["document"]["source"] == word["example_ja"]
+               and entry["answer"]["document"]["document"]["source"] == moved["example_ja"] for entry in journal)
 
 
 def test_cutover_rolls_back_database_and_package_on_package_write_failure(tmp_path, monkeypatch):

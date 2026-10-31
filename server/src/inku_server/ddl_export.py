@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 import json
 from typing import Any
 
@@ -10,7 +10,8 @@ DDL_EXPORT_SCHEMA = "inku.ddl-export.v2"
 
 
 def migrate_v2_export(source: str, language: str, plugins: list[dict[str, Any]], *,
-                      include_details: bool = False) -> dict[str, Any]:
+                      include_details: bool = False,
+                      journal: Callable[[dict[str, Any]], None] | None = None) -> dict[str, Any]:
     """Migrate one portable export with locks derived from its own definitions."""
     import inku_render
 
@@ -18,8 +19,10 @@ def migrate_v2_export(source: str, language: str, plugins: list[dict[str, Any]],
     # A v2 definition may contain old touch IDs that the v3 catalog quite
     # correctly refuses. Migrate definitions first, then bind the document to
     # their new identities; otherwise old exported packages cannot be read.
-    first = json.loads(inku_render.pipeline_migrate_saijiki_v2(
-        json.dumps({"definitions": definitions}, ensure_ascii=False).encode()))
+    first_input = {"definitions": definitions}
+    first = json.loads(inku_render.pipeline_migrate_saijiki_v2(json.dumps(first_input, ensure_ascii=False).encode()))
+    if journal:
+        journal({"kind": "definitions", "input": first_input, "answer": first})
     entries = first.get("definitions", [])
     if (first.get("error") or len(entries) != len(definitions)
             or any(not isinstance(entry, dict) or entry.get("error") for entry in entries)):
@@ -32,6 +35,8 @@ def migrate_v2_export(source: str, language: str, plugins: list[dict[str, Any]],
                "definitions": [entry["definition"] for entry in entries]}
     result = json.loads(inku_render.pipeline_migrate_saijiki_v2(
         json.dumps(request, ensure_ascii=False).encode()))
+    if journal:
+        journal({"kind": "document", "input": request, "answer": result})
     document = result.get("document")
     migrated = result.get("definitions")
     if (result.get("error") or not isinstance(document, dict) or document.get("error")

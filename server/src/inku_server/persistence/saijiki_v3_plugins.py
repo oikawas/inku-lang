@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -20,7 +21,7 @@ _OLD_TOOL = re.compile(
 )
 
 
-def plan_packages(directory: Path) -> tuple[dict[str, Any], dict[Path, bytes]]:
+def plan_packages(directory: Path, *, journal: Callable[[dict[str, Any]], None] | None = None) -> tuple[dict[str, Any], dict[Path, bytes]]:
     """Return a private report and proposed package files, leaving the input unchanged."""
     root = directory.resolve(strict=True)
     if directory.is_symlink() or not root.is_dir():
@@ -50,7 +51,10 @@ def plan_packages(directory: Path) -> tuple[dict[str, Any], dict[Path, bytes]]:
                 raise ValueError("invalid_words")
             for index, word in enumerate(words):
                 definition = word["definition"]
-                result = json.loads(migrate_unit_v3(json.dumps({"definitions": [definition]}, ensure_ascii=False).encode()))
+                unit = {"definitions": [definition]}
+                result = json.loads(migrate_unit_v3(json.dumps(unit, ensure_ascii=False).encode()))
+                if journal:
+                    journal({"package": child.name, "word": index, "kind": "definition", "input": unit, "answer": result})
                 answer = result["definitions"][0]
                 if result.get("error") or answer.get("error"):
                     raise ValueError(json.dumps(answer.get("error") or result["error"], ensure_ascii=False))
@@ -60,8 +64,10 @@ def plan_packages(directory: Path) -> tuple[dict[str, Any], dict[Path, bytes]]:
                         report["notes_with_old_tools"].append({"package": child.name, "word": index, "language": language})
                     example = word.get(f"example_{language}")
                     if isinstance(example, str) and example:
-                        moved = migrate_v2_export(example, language, [{"definition": definition, "note": ""}],
-                                                  include_details=True)
+                        moved = migrate_v2_export(
+                            example, language, [{"definition": definition, "note": ""}], include_details=True,
+                            journal=(lambda entry: journal({"package": child.name, "word": index,
+                                                            "language": language, **entry})) if journal else None)
                         word[f"example_{language}"] = moved["ddl"]
                         for edit in moved["edit_details"]:
                             key = f"{edit['original']} -> {edit['replacement']}"

@@ -63,7 +63,7 @@ export async function importDdl(text: string, language: 'ja' | 'en', apiFetch?: 
 	try { file = record(JSON.parse(text)); } catch { /* Plain DDL needs no migration. */ }
 	if (file?.schema !== DDL_EXPORT_SCHEMA) return { ...parsed, edits: null };
 	if (file.saijiki === 'inku.saijiki.v3') return { ...parsed, edits: null };
-	if ((file.saijiki != null && file.saijiki !== 'inku.saijiki.v2') || !apiFetch) throw new Error('ddl_export_invalid');
+	if ((Object.hasOwn(file, 'saijiki') && file.saijiki !== 'inku.saijiki.v2') || !apiFetch) throw new Error('ddl_export_invalid');
 	const response = await apiFetch('/api/ddl-export/migrate-v2', {
 		method: 'POST', headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify({ ddl: parsed.ddl, language: file.language === 'en' ? 'en' : 'ja', plugins: parsed.plugins })

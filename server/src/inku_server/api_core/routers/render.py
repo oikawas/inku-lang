@@ -67,6 +67,8 @@ def migrate_ddl_export(request: DdlExportMigrationRequest) -> dict:
     if any(not isinstance(item.get("definition"), dict) or not isinstance(item.get("note", ""), str)
            for item in request.plugins):
         raise HTTPException(status_code=422, detail="invalid_export_definitions")
+    if len(json.dumps(request.plugins, ensure_ascii=False).encode("utf-8")) > 2_000_000:
+        raise HTTPException(status_code=422, detail="invalid_export_definitions")
     try:
         return migrate_v2_export(request.ddl, request.language, request.plugins)
     except (ValueError, KeyError, TypeError) as exc:

@@ -15,18 +15,21 @@ def migrate_v2_export(source: str, language: str, plugins: list[dict[str, Any]],
     import inku_render
 
     definitions = [item["definition"] for item in plugins]
-    payload = {"maximum_entries": 64, "canonical": [
-        {"source_id": str(index), "definition_json": json.dumps(definition, ensure_ascii=False),
-         "summary": ""} for index, definition in enumerate(definitions)
-    ]}
-    catalog = json.loads(inku_render.pipeline_resolve_macro_catalog(json.dumps(payload).encode()))
-    entries = catalog.get("entries", [])
-    if len(entries) != len(definitions) or catalog.get("diagnostics"):
+    # A v2 definition may contain old touch IDs that the v3 catalog quite
+    # correctly refuses. Migrate definitions first, then bind the document to
+    # their new identities; otherwise old exported packages cannot be read.
+    first = json.loads(inku_render.pipeline_migrate_saijiki_v2(
+        json.dumps({"definitions": definitions}, ensure_ascii=False).encode()))
+    entries = first.get("definitions", [])
+    if (first.get("error") or len(entries) != len(definitions)
+            or any(not isinstance(entry, dict) or entry.get("error") for entry in entries)):
         raise ValueError("invalid_export_definitions")
     locks = [{"qualified_name": entry["qualified_name"], "version": entry["version"],
-              "digest": "sha256:" + entry["digest"]} for entry in entries]
+              "digest": entry["digest"] if entry["digest"].startswith("sha256:")
+              else "sha256:" + entry["digest"]} for entry in entries]
     request = {"document": {"source": source, "language": language, "macro_locks": locks,
-                             "saijiki": "inku.saijiki.v2"}, "definitions": definitions}
+                             "saijiki": "inku.saijiki.v2"},
+               "definitions": [entry["definition"] for entry in entries]}
     result = json.loads(inku_render.pipeline_migrate_saijiki_v2(
         json.dumps(request, ensure_ascii=False).encode()))
     document = result.get("document")

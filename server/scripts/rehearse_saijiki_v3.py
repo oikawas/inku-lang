@@ -9,7 +9,7 @@ import sqlite3
 from pathlib import Path
 
 from count_saijiki_v1_migration import _resolve_guarded_database
-from inku_server.persistence.saijiki_v3_migration import _migrate_once_database, census, migrate_unit_v3
+from inku_server.persistence.saijiki_v3_migration import census, migrate_once, migrate_unit_v3
 from inku_server.persistence.saijiki_v3_plugins import plan_packages
 
 
@@ -53,13 +53,8 @@ def main() -> int:
     else:
         if package_report["refused_records"]:
             raise ValueError("package_refusals_prevent_rehearsal")
-        report = _migrate_once_database(database, migrate_unit_v3, workers=args.workers,
-                                        timeout=args.timeout, journal=journal_path, abort_on_failure=True)
-        for path, content in proposed.items():
-            # This is an isolated copy. Production package writes require the
-            # separate, coordinated one-shot gateway, which is not this script.
-            with path.open("wb") as destination:
-                destination.write(content)
+        report = migrate_once(database, packages, output / "recovery", workers=args.workers,
+                              timeout=args.timeout, journal=journal_path, allow_refused=True)
         package_report["written"] = len(proposed)
     result = {"mode": args.mode, "database": report, "packages": package_report}
     with report_path.open("x", encoding="utf-8") as destination:

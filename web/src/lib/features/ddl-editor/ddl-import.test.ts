@@ -39,4 +39,5 @@ test('an older export is migrated before the DDL is accepted', async () => {
 	assert.equal(result.ddl, '黒い太いガッシュの線を引く。');
 	assert.equal(result.edits, 1);
 	await assert.rejects(importDdl(text, 'ja', async () => new Response('', { status: 422 })));
+	await assert.rejects(importDdl(JSON.stringify({ schema: 'inku.ddl-export.v2', saijiki: null, ddl: 'x' }), 'ja', async () => Response.json({})));
 });

@@ -123,6 +123,29 @@ def _distinct(definitions: Iterable[Any]) -> list[Any]:
     return list(seen.values())
 
 
+def _historic_nature_definitions() -> dict[tuple[str, str], tuple[Any, frozenset[str]]]:
+    """Exact historical built-ins, used only where the saved definition is absent.
+
+    Their permissible original digests were independently computed by the v1
+    and v2 cores that accepted them. The v3 migration itself matches only name
+    and version, so the host must compare the original digest before fallback.
+    """
+    path = Path(__file__).resolve().parents[1] / "migration_data/nature-historical-definitions.json"
+    content = path.read_bytes()
+    if hashlib.sha256(content).hexdigest() != "ee0458950424483d6078b34452891baece5b6c410f6a1bc36ef8869cb4e0d636":
+        raise ValueError("historical_definitions_digest_mismatch")
+    value = json.loads(content)
+    if value.get("schema") != "inku.saijiki-v3-historical-definitions.v1":
+        raise ValueError("invalid_historical_definitions")
+    locks = {(item["qualified_name"], item["version"]): frozenset(item["digests"])
+             for item in value["original_locks"]}
+    definitions = {(f"{item['namespace']}.{item.get('id') or item.get('heading')}", item["version"]): item
+                   for item in value["definitions"]}
+    if definitions.keys() != locks.keys():
+        raise ValueError("historical_definition_identities_incomplete")
+    return {key: (item, locks[key]) for key, item in definitions.items()}
+
+
 _LOCK_FIELDS = ("qualified_name", "version", "digest", "aliases")
 
 
@@ -432,6 +455,33 @@ def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iter
     for key, definitions in saved_by_variation.items():
         saved_by_variation[key] = _distinct(definitions)
 
+    # Some old variations have locks but no surviving fork context containing
+    # their built-in definitions. Fill only missing identities from the exact
+    # historical built-in fixtures; never replace a saved definition. Compare
+    # the original digest here because the core matches only name and version.
+    only = set(history_ids) if history_ids is not None else None
+    limit = f" ORDER BY random() LIMIT {int(sample)}" if sample else ""
+    variation_rows: list[tuple[Any, ...]] = []
+    if only is None:
+        variation_rows = list(_rows(
+            connection, "SELECT owner_id, variation_id, revision, document_json, ddl_digest"
+                        " FROM variation_authority" + limit))
+    historic = _historic_nature_definitions()
+    for owner_id, variation_id, _revision, document_json, _digest in variation_rows:
+        document = _json(document_json)
+        if not isinstance(document, Mapping) or document.get("saijiki") not in (None, "inku.saijiki.v2"):
+            continue
+        key = (owner_id, variation_id)
+        definitions = saved_by_variation.setdefault(key, [])
+        existing = {(f"{d.get('namespace')}.{d.get('id') or d.get('heading')}", d.get("version"))
+                    for d in definitions if isinstance(d, Mapping)}
+        for lock in document.get("macro_locks") or []:
+            identity = (lock.get("qualified_name"), lock.get("version")) if isinstance(lock, Mapping) else None
+            if (identity in historic and identity not in existing
+                    and lock.get("digest") in historic[identity][1]):
+                definitions.append(historic[identity][0])
+                existing.add(identity)
+
     # Every distinct definition once; a document's unit carries the ones its locks name.
     distinct_definitions = _distinct(
         definition for definitions in saved_by_variation.values() for definition in definitions)
@@ -452,7 +502,11 @@ def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iter
     for definition in distinct_definitions:
         answer = definition_answer(definition)
         if "error" in answer:
-            counts["definitions"][f"refused:{(answer['error'] or {}).get('code')}"] += 1
+            failure = answer["error"]
+            code = failure.get("code", "unknown") if isinstance(failure, Mapping) else str(failure)
+            counts["definitions"][f"refused:{code}"] += 1
+            refused_records.append({"kind": "definitions", "id": labels[_definition_unit(definition)],
+                                    "error": answer["error"], "source": definition, "locks": 0})
         else:
             counts["definitions"]["changed" if answer.get("changed") else "unchanged"] += 1
             if answer.get("unadjusted_thinness"):
@@ -471,14 +525,7 @@ def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iter
         return chosen
 
     # The documents: each work's instructions, and each variation's committed document.
-    variation_rows: list[tuple[Any, ...]] = []
     history_rows: list[tuple[Any, ...]] = []
-    only = set(history_ids) if history_ids is not None else None
-    limit = f" ORDER BY random() LIMIT {int(sample)}" if sample else ""
-    if only is None:
-        variation_rows = list(_rows(
-            connection, "SELECT owner_id, variation_id, revision, document_json, ddl_digest"
-                        " FROM variation_authority" + limit))
     history_columns = {row[1] for row in _rows(connection, "PRAGMA table_info(history)")}
     has_expanded_ddl = "expanded_ddl" in history_columns
     expanded_projection = "expanded_ddl" if has_expanded_ddl else "NULL"
@@ -569,6 +616,8 @@ def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iter
             refused_records.append({"kind": "variation_documents", "id": f"{owner_id}/{variation_id}",
                                     "error": {"code": "unreadable_document"}})
             continue
+        if not document.get("source"):
+            tally["empty"] += 1
         if document.get("saijiki") == "inku.saijiki.v3":
             tally["current"] += 1
             continue
@@ -609,6 +658,8 @@ def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iter
         refused = False
         for column, source in (("ddl", ddl), ("expanded_ddl", expanded_ddl)):
             if not source:
+                if column == "ddl" or has_expanded_ddl:
+                    tally[f"{column}_empty"] += 1
                 continue
             tally[f"{column}_present"] += 1
             if f"{history_id}:{column}" in blank:
@@ -680,6 +731,7 @@ def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iter
 
     result.report = {
         "sample": sample,
+        "already_written": _already_written(connection),
         "core": core.report(),
         **{kind: dict(sorted(tally.items())) for kind, tally in counts.items()},
         "edits": dict(edits.most_common()),
@@ -805,9 +857,14 @@ def _migrate_once_database(database: Path, migrate: MigrateUnit, *, workers: int
     return report
 
 
-def migrate_once(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
-    """Fail closed until database and installed-package migration are coordinated."""
-    raise RuntimeError("saijiki_v3_package_coordination_not_implemented")
+def migrate_once(database: Path, packages: Path, recovery: Path, *, journal: Path,
+                 workers: int = 4, timeout: float = 120.0,
+                 allow_refused: bool = False) -> dict[str, Any]:
+    """Migrate database and installed packages under the caller's stopped-service guard."""
+    from .saijiki_v3_cutover import cutover
+
+    return cutover(database, packages, recovery, journal=journal, workers=workers, timeout=timeout,
+                   allow_refused=allow_refused)
 
 
 def _already_written(connection: Any) -> bool:

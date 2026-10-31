@@ -27,6 +27,12 @@ def _blank_list(path: Path | None) -> list[str] | None:
 
 
 def main() -> int:
+    # The old entry writes a v2 marker, but the current v1 core returns v3.
+    print("saijiki v2 rehearsal is retired; use the v3 rehearsal", file=sys.stderr)
+    return 2
+
+
+def _retired_main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-root", type=Path, required=True)
     parser.add_argument("--database", type=Path, required=True)

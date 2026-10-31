@@ -225,7 +225,13 @@ const TOOL_REWRITES: &[ToolRewrite] = &[
     tool_rewrite("ロットリング", "rotring", "ペン", "pen", "pen"),
     tool_rewrite("クレヨン", "crayon", "チョーク", "chalk", "chalk"),
     tool_rewrite("ビュラン", "burin", "エッチング", "etching", "etching"),
-    tool_rewrite("ドライポイント", "drypoint", "エッチング", "etching", "etching"),
+    tool_rewrite(
+        "ドライポイント",
+        "drypoint",
+        "エッチング",
+        "etching",
+        "etching",
+    ),
 ];
 
 impl ToolRewrite {
@@ -455,7 +461,11 @@ fn migrate_document_to_current(
     let language = document.language();
     let source = document.source();
     let old = parse_neutral_lexemes_in(from, document);
-    let mut spans = old.tokens.iter().map(|token| token.span).collect::<Vec<_>>();
+    let mut spans = old
+        .tokens
+        .iter()
+        .map(|token| token.span)
+        .collect::<Vec<_>>();
 
     let mut replacements = BTreeMap::new();
     let mut washes = Vec::new();
@@ -475,7 +485,10 @@ fn migrate_document_to_current(
                 .find(|tool| tool.canonical_surface_ja == canonical_surface_ja)
         {
             tools.push((index, tool));
-            replacements.insert(index, in_source_case(language, &token.surface, tool.word(language)));
+            replacements.insert(
+                index,
+                in_source_case(language, &token.surface, tool.word(language)),
+            );
             continue;
         }
         if from != SaijikiEdition::V1 {

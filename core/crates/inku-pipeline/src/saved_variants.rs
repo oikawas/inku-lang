@@ -78,7 +78,10 @@ fn tool_values() -> Vec<String> {
 
 /// The tools a saved Score can name, the retired ones included.
 fn readable_tool_values() -> Vec<String> {
-    readable_tools().into_iter().map(|tool| tool.value).collect()
+    readable_tools()
+        .into_iter()
+        .map(|tool| tool.value)
+        .collect()
 }
 
 /// The source instruction an instruction of the Score was drawn for.
@@ -172,10 +175,10 @@ fn tool_requires_edition_0_24(tool: &str) -> bool {
 /// Raise the Score's version to 0.24.0 unless it already names that edition or
 /// a later one. A Score without a version is read as 0.9.0.
 fn raise_to_edition_0_24(score: &mut Value) {
-    let edition = score
-        .get("version")
-        .and_then(Value::as_str)
-        .map_or(Some(inku_score::ScoreEdition::V0_9), inku_score::ScoreEdition::parse);
+    let edition = score.get("version").and_then(Value::as_str).map_or(
+        Some(inku_score::ScoreEdition::V0_9),
+        inku_score::ScoreEdition::parse,
+    );
     if edition.is_some_and(|edition| edition >= inku_score::ScoreEdition::V0_24) {
         return;
     }

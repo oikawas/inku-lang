@@ -16,8 +16,8 @@ use std::collections::BTreeMap;
 use std::ops::Range;
 
 use inku_ddl::{
-    MacroDefinition, MacroExpansionLimits, ResolvedInstructionLanguage, SaijikiAsset,
-    SemanticHead, SemanticInstruction, saijiki_asset, saijiki_v2_asset,
+    MacroDefinition, MacroExpansionLimits, ResolvedInstructionLanguage, SaijikiAsset, SemanticHead,
+    SemanticInstruction, saijiki_asset, saijiki_v2_asset,
 };
 use serde::{Deserialize, Serialize};
 

@@ -163,7 +163,8 @@ fn other_color(color: &str, pick: f64) -> Option<String> {
             .iter()
             .filter(|other| {
                 rgb(other).is_some_and(|o| {
-                    ((o[0] - own[0]).powi(2) + (o[1] - own[1]).powi(2) + (o[2] - own[2]).powi(2)).sqrt()
+                    ((o[0] - own[0]).powi(2) + (o[1] - own[1]).powi(2) + (o[2] - own[2]).powi(2))
+                        .sqrt()
                         > 0.12
                 })
             })
@@ -179,8 +180,20 @@ fn mix(a: &str, b: &str, t: f64) -> String {
     let (Some(x), Some(y)) = (rgb(a), rgb(b)) else {
         return a.to_owned();
     };
-    let linear = |c: f64| if c <= 0.04045 { c / 12.92 } else { ((c + 0.055) / 1.055).powf(2.4) };
-    let encoded = |c: f64| if c <= 0.003_130_8 { c * 12.92 } else { 1.055 * c.powf(1.0 / 2.4) - 0.055 };
+    let linear = |c: f64| {
+        if c <= 0.04045 {
+            c / 12.92
+        } else {
+            ((c + 0.055) / 1.055).powf(2.4)
+        }
+    };
+    let encoded = |c: f64| {
+        if c <= 0.003_130_8 {
+            c * 12.92
+        } else {
+            1.055 * c.powf(1.0 / 2.4) - 0.055
+        }
+    };
     let channel = |i: usize| {
         (encoded(linear(x[i]) * (1.0 - t) + linear(y[i]) * t).clamp(0.0, 1.0) * 255.0).round() as u8
     };
@@ -206,7 +219,10 @@ fn polyline_path(points: &[Point]) -> Element {
 fn fresh(prefix: &str) -> String {
     IDS.with(|ids| {
         let mut ids = ids.borrow_mut();
-        debug_assert!(!ids.0.is_empty(), "media ids are drawn inside a mark's MarkIds");
+        debug_assert!(
+            !ids.0.is_empty(),
+            "media ids are drawn inside a mark's MarkIds"
+        );
         let number = ids.1;
         ids.1 += 1;
         format!("{prefix}-{}-{number}", ids.0)
@@ -304,7 +320,8 @@ fn streak_band(
         }
         let along = (t - start) / (end - start);
         let fade = (along / 0.15).min((1.0 - along) / 0.15).clamp(0.0, 1.0);
-        let at = |fraction: f64| Point::new(a.x + (b.x - a.x) * fraction, a.y + (b.y - a.y) * fraction);
+        let at =
+            |fraction: f64| Point::new(a.x + (b.x - a.x) * fraction, a.y + (b.y - a.y) * fraction);
         near.push(at(center));
         far.push(at(center + width * fade));
     }
@@ -341,7 +358,14 @@ pub(crate) fn oil_mix_streak(
         if let Some(band) = streak_band(left, right, closed, center, width, start, end) {
             group.push(
                 path(&closed_d(&band))
-                    .attr("fill", mix(color, &other, 0.35 + 0.2 * hash01(k, seed, "oil-mix-amount")))
+                    .attr(
+                        "fill",
+                        mix(
+                            color,
+                            &other,
+                            0.35 + 0.2 * hash01(k, seed, "oil-mix-amount"),
+                        ),
+                    )
                     .attr("fill-opacity", "0.9")
                     .attr("stroke", "none"),
             );
@@ -376,12 +400,21 @@ impl Region {
     fn around(points: &[Point], reach: f64, unit: f64) -> Self {
         let (x0, y0, x1, y1) = bounds(points);
         if !(x0 <= x1 && y0 <= y1) {
-            return Self { x0: 0.0, y0: 0.0, x1: 0.0, y1: 0.0 };
+            return Self {
+                x0: 0.0,
+                y0: 0.0,
+                x1: 0.0,
+                y1: 0.0,
+            };
         }
         let grow = reach.max(0.0) + 2.0 + unit * 0.002;
-        Self { x0: x0 - grow, y0: y0 - grow, x1: x1 + grow, y1: y1 + grow }
+        Self {
+            x0: x0 - grow,
+            y0: y0 - grow,
+            x1: x1 + grow,
+            y1: y1 + grow,
+        }
     }
-
 }
 
 /// A displacement with the look the Server's PNG gave it (the author's choice,
@@ -481,7 +514,12 @@ fn local_tooth_filter(id: &str, frequency: f64, share: f64, seed: &str) -> Eleme
     let threshold = 0.5 + 0.12 * inverse_tail(share);
     let mut f = local_filter(id);
     f.push(turbulence(frequency, 2, seed, "tooth"));
-    f.push(alpha_from_noise("tooth", 10.0, 10.0 * (threshold + 0.05), "open"));
+    f.push(alpha_from_noise(
+        "tooth",
+        10.0,
+        10.0 * (threshold + 0.05),
+        "open",
+    ));
     f.push(
         Element::new("feComposite")
             .attr("in", "SourceGraphic")
@@ -507,7 +545,11 @@ fn alpha_from_noise(input: &str, slope: f64, offset: f64, result: &str) -> Eleme
         .attr("type", "matrix")
         .attr(
             "values",
-            format!("0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  {} 0 0 0 {}", n(-slope), n(offset)),
+            format!(
+                "0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  {} 0 0 0 {}",
+                n(-slope),
+                n(offset)
+            ),
         )
         .attr("result", result)
 }
@@ -528,7 +570,12 @@ fn tooth_filter(
     let threshold = 0.5 + 0.12 * inverse_tail(share);
     let mut f = filter(id, region);
     f.push(turbulence(frequency, 2, seed, "tooth"));
-    f.push(alpha_from_noise("tooth", 10.0, 10.0 * (threshold + 0.05), "open"));
+    f.push(alpha_from_noise(
+        "tooth",
+        10.0,
+        10.0 * (threshold + 0.05),
+        "open",
+    ));
     if let Some(displacement) = rough {
         for primitive in displacement.primitives("SourceGraphic", "tooth", "rough") {
             f.push(primitive);
@@ -612,8 +659,14 @@ fn scan_segments(contour: &[Point], angle: f64, spacing: f64, phase: f64) -> Vec
         for pair in hits.chunks(2) {
             if let [s, e] = pair {
                 result.push((
-                    Point::new(normal.x * offset + direction.x * s, normal.y * offset + direction.y * s),
-                    Point::new(normal.x * offset + direction.x * e, normal.y * offset + direction.y * e),
+                    Point::new(
+                        normal.x * offset + direction.x * s,
+                        normal.y * offset + direction.y * s,
+                    ),
+                    Point::new(
+                        normal.x * offset + direction.x * e,
+                        normal.y * offset + direction.y * e,
+                    ),
                 ));
             }
         }
@@ -648,7 +701,16 @@ pub(crate) fn stroke_outline(
         }
         let middle = run.len() / 2;
         let right = run[middle..].iter().rev().copied().collect::<Vec<_>>();
-        group.push(stroke(weight, &run[..middle], &right, false, color, opacity, seed.wrapping_add(order), unit));
+        group.push(stroke(
+            weight,
+            &run[..middle],
+            &right,
+            false,
+            color,
+            opacity,
+            seed.wrapping_add(order),
+            unit,
+        ));
         order += 1;
     }
     group
@@ -657,6 +719,7 @@ pub(crate) fn stroke_outline(
 /// A stroke between two banks (pixels). `closed` for a ring. Where the banks
 /// hold a non-finite point the stroke is cut there, and each piece is drawn
 /// open.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn stroke(
     weight: Weight,
     left: &[Point],
@@ -697,6 +760,7 @@ pub(crate) fn stroke(
     one_stroke(weight, left, right, closed, color, opacity, seed, unit)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn one_stroke(
     weight: Weight,
     left: &[Point],
@@ -771,31 +835,37 @@ fn watercolor_stroke(
     // Colour mixing: along parts of the edge the pigment that dried there
     // separated into another colour of the Score.
     let share = mix_share(Weight::Watercolor);
-    if share > 0.0 && hash01(0, seed, "wc-line-mix") < (share * 2.5).min(1.0) {
-        if let Some(other) = other_color(color, hash01(0, seed, "wc-line-mix-pick")) {
-            let run = |k: i64, salt: &str, low: f64, high: f64| n(width * (low + (high - low) * hash01(k, seed, salt)));
-            let mut parted = Element::new("g").attr("clip-path", format!("url(#{clip})"));
-            parted.push(
-                path(&d)
-                    .attr("fill", "none")
-                    .attr("stroke", mix(&other, color, 0.35))
-                    .attr("stroke-width", n(rim_width))
-                    .attr("stroke-opacity", n((opacity * 0.9).min(0.85)))
-                    .attr(
-                        "stroke-dasharray",
-                        format!(
-                            "{} {} {} {}",
-                            run(0, "wc-line-run", 3.0, 9.0),
-                            run(1, "wc-line-gap", 6.0, 16.0),
-                            run(2, "wc-line-run", 3.0, 9.0),
-                            run(3, "wc-line-gap", 6.0, 16.0)
-                        ),
-                    )
-                    .attr("stroke-dashoffset", n(width * 12.0 * hash01(0, seed, "wc-line-offset")))
-                    .attr("filter", format!("url(#{rim_blur})")),
-            );
-            group.push(parted);
-        }
+    if share > 0.0
+        && hash01(0, seed, "wc-line-mix") < (share * 2.5).min(1.0)
+        && let Some(other) = other_color(color, hash01(0, seed, "wc-line-mix-pick"))
+    {
+        let run = |k: i64, salt: &str, low: f64, high: f64| {
+            n(width * (low + (high - low) * hash01(k, seed, salt)))
+        };
+        let mut parted = Element::new("g").attr("clip-path", format!("url(#{clip})"));
+        parted.push(
+            path(&d)
+                .attr("fill", "none")
+                .attr("stroke", mix(&other, color, 0.35))
+                .attr("stroke-width", n(rim_width))
+                .attr("stroke-opacity", n((opacity * 0.9).min(0.85)))
+                .attr(
+                    "stroke-dasharray",
+                    format!(
+                        "{} {} {} {}",
+                        run(0, "wc-line-run", 3.0, 9.0),
+                        run(1, "wc-line-gap", 6.0, 16.0),
+                        run(2, "wc-line-run", 3.0, 9.0),
+                        run(3, "wc-line-gap", 6.0, 16.0)
+                    ),
+                )
+                .attr(
+                    "stroke-dashoffset",
+                    n(width * 12.0 * hash01(0, seed, "wc-line-offset")),
+                )
+                .attr("filter", format!("url(#{rim_blur})")),
+        );
+        group.push(parted);
     }
     group
 }
@@ -805,9 +875,19 @@ fn watercolor_stroke(
 /// hold the wash).
 fn wash_filter(id: &str, seed: Seed, unit: f64, bloom: f64, region: Region) -> Element {
     let mut f = filter(id, region);
-    f.push(turbulence(1.0 / bloom.max(1.0), 2, &noise_seed(seed, "wc-bloom"), "bloom"));
+    f.push(turbulence(
+        1.0 / bloom.max(1.0),
+        2,
+        &noise_seed(seed, "wc-bloom"),
+        "bloom",
+    ));
     f.push(alpha_from_noise("bloom", 1.6, 1.55, "bloom-alpha"));
-    f.push(turbulence(260.0 / unit.max(1.0), 2, &noise_seed(seed, "wc-granule"), "granule"));
+    f.push(turbulence(
+        260.0 / unit.max(1.0),
+        2,
+        &noise_seed(seed, "wc-granule"),
+        "granule",
+    ));
     f.push(alpha_from_noise("granule", 0.85, 1.32, "granule-alpha"));
     f.push(
         Element::new("feComposite")
@@ -848,8 +928,22 @@ fn oil_pastel_stroke(
     // Every part of the stroke lies between its banks.
     let region = Region::around(&[left, right].concat(), rough.reach(), unit);
     let mut defs = Element::new("defs");
-    defs.push(tooth_filter(&edge_tooth, frequency, 0.34, &noise_seed(seed, "op-edge"), Some(rough), region));
-    defs.push(tooth_filter(&core_tooth, frequency, 0.05, &noise_seed(seed, "op-core"), None, region));
+    defs.push(tooth_filter(
+        &edge_tooth,
+        frequency,
+        0.34,
+        &noise_seed(seed, "op-edge"),
+        Some(rough),
+        region,
+    ));
+    defs.push(tooth_filter(
+        &core_tooth,
+        frequency,
+        0.05,
+        &noise_seed(seed, "op-core"),
+        None,
+        region,
+    ));
     let mut group = Element::new("g").attr("class", "proto-oil-pastel-stroke");
     group.push(defs);
     group.push(
@@ -937,7 +1031,9 @@ fn knife_pull(
     // direction there.
     let sample = |t: f64| -> (Point, f64, Point) {
         let s = t.clamp(0.0, 1.0) * length;
-        let i = lengths.partition_point(|value| *value < s).clamp(1, count - 1);
+        let i = lengths
+            .partition_point(|value| *value < s)
+            .clamp(1, count - 1);
         let (a, b) = (spine[i - 1], spine[i]);
         let span = (lengths[i] - lengths[i - 1]).max(1e-9);
         let f = ((s - lengths[i - 1]) / span).clamp(0.0, 1.0);
@@ -953,7 +1049,10 @@ fn knife_pull(
     // along it in pixels.
     let at = |t: f64, side: f64, ahead: f64| -> Point {
         let (c, half, u) = sample(t);
-        Point::new(c.x - u.y * half * side + u.x * ahead, c.y + u.x * half * side + u.y * ahead)
+        Point::new(
+            c.x - u.y * half * side + u.x * ahead,
+            c.y + u.x * half * side + u.y * ahead,
+        )
     };
     let h = |k: i64, salt: &str| hash01(order * 512 + k, seed, salt);
     let (half0, half1) = (sample(0.0).1, sample(1.0).1);
@@ -961,48 +1060,83 @@ fn knife_pull(
     let towards_light = light();
     // +1 when the plane's left side faces the light; and whether the pull ran
     // towards the light, so that the pile's back slope is turned away from it.
-    let lit = if -middle.y * towards_light.x + middle.x * towards_light.y > 0.0 { 1.0 } else { -1.0 };
+    let lit = if -middle.y * towards_light.x + middle.x * towards_light.y > 0.0 {
+        1.0
+    } else {
+        -1.0
+    };
     let towards = middle.x * towards_light.x + middle.y * towards_light.y > 0.0;
     let share = mix_share(Weight::PaintingKnife);
-    let other = if share > 0.0 { other_color(color, h(0, "pk-mix-pick")) } else { None };
+    let other = if share > 0.0 {
+        other_color(color, h(0, "pk-mix-pick"))
+    } else {
+        None
+    };
     let mut base = bristle_tone(color, (h(0, "pk-tone") - 0.5) * 0.10);
-    if let Some(other) = other.as_deref() {
-        if whole && h(0, "pk-mix") < share {
-            base = mix(&base, other, 0.55 + 0.35 * h(0, "pk-mix-amount"));
-        }
+    if let Some(other) = other.as_deref()
+        && whole
+        && h(0, "pk-mix") < share
+    {
+        base = mix(&base, other, 0.55 + 0.35 * h(0, "pk-mix-amount"));
     }
     let dry = h(0, "pk-dry") < 0.4;
     let head = 0.10 + 0.08 * h(0, "pk-head");
-    let body_end = if dry { 0.55 + 0.15 * h(0, "pk-dry-at") } else { 1.0 };
+    let body_end = if dry {
+        0.55 + 0.15 * h(0, "pk-dry-at")
+    } else {
+        1.0
+    };
     // The pile swells the plane a little (less along a line, where every pull
     // would otherwise make a joint); a lifted end narrows a little over its
     // last fifth, where the paint ran out.
     let bulge = if whole { 0.13 } else { 0.06 };
     let swell = |t: f64| 1.0 + bulge * (-((t - head * 0.45) / (head * 0.7)).powi(2)).exp();
-    let thin = |t: f64| if !dry && t > 0.78 { 1.0 - (t - 0.78) / 0.22 * 0.12 } else { 1.0 };
+    let thin = |t: f64| {
+        if !dry && t > 0.78 {
+            1.0 - (t - 0.78) / 0.22 * 0.12
+        } else {
+            1.0
+        }
+    };
     let steps = (count * 2).clamp(8, 24);
     let along = |k: usize| body_end * k as f64 / steps as f64;
     let mut outline = Vec::new();
     for k in 0..=steps {
         let t = along(k);
-        outline.push(at(t, (1.0 + (h(k as i64, "pk-wave-l") - 0.5) * 0.12) * swell(t) * thin(t), 0.0));
+        outline.push(at(
+            t,
+            (1.0 + (h(k as i64, "pk-wave-l") - 0.5) * 0.12) * swell(t) * thin(t),
+            0.0,
+        ));
     }
     if dry {
         // A ragged edge across, where the plane gives way to streaks.
         for k in 1..6 {
             let across = 1.0 - 2.0 * f64::from(k) / 6.0;
-            outline.push(at(body_end + (h(i64::from(k), "pk-dry-edge") - 0.5) * 0.06, across, 0.0));
+            outline.push(at(
+                body_end + (h(i64::from(k), "pk-dry-edge") - 0.5) * 0.06,
+                across,
+                0.0,
+            ));
         }
     } else {
         // The lifted end: a ragged edge where the paint pulled off the blade.
         for k in 1..5 {
             let across = (1.0 - 2.0 * f64::from(k) / 5.0) * 0.8;
-            outline.push(at(1.0, across, (h(i64::from(k), "pk-tooth") - 0.4) * 0.05 * length));
+            outline.push(at(
+                1.0,
+                across,
+                (h(i64::from(k), "pk-tooth") - 0.4) * 0.05 * length,
+            ));
         }
     }
     for k in (0..=steps).rev() {
         let t = along(k);
-        outline.push(at(t, -(1.0 + (h(k as i64, "pk-wave-r") - 0.5) * 0.12) * swell(t) * thin(t), 0.0));
+        outline.push(at(
+            t,
+            -(1.0 + (h(k as i64, "pk-wave-r") - 0.5) * 0.12) * swell(t) * thin(t),
+            0.0,
+        ));
     }
     // The back of the pile, where the blade was set down: a little rounded
     // and uneven.
@@ -1021,7 +1155,11 @@ fn knife_pull(
         .attr("y1", n(from.y))
         .attr("x2", n(to.x))
         .attr("y2", n(to.y));
-    gradient.push(Element::new("stop").attr("offset", "0").attr("stop-color", &base));
+    gradient.push(
+        Element::new("stop")
+            .attr("offset", "0")
+            .attr("stop-color", &base),
+    );
     gradient.push(
         Element::new("stop")
             .attr("offset", "1")
@@ -1051,13 +1189,20 @@ fn knife_pull(
         for k in 0..lanes {
             let across = -0.92 + slot * (k as f64 + 0.5 + (h(k, "pk-lane-at") - 0.5) * 0.5);
             let band = slot * (0.45 + 0.4 * h(k, "pk-lane-w"));
-            let (start, end) = (body_end - 0.06, body_end + (1.0 - body_end) * (0.3 + 0.7 * h(k, "pk-lane-end")));
+            let (start, end) = (
+                body_end - 0.06,
+                body_end + (1.0 - body_end) * (0.3 + 0.7 * h(k, "pk-lane-end")),
+            );
             let wobble = (0..=6)
                 .map(|j| (h(k * 8 + j, "pk-lane-wobble") - 0.5) * 0.06)
                 .collect::<Vec<_>>();
             let point = |j: usize, sign: f64| {
                 let f = j as f64 / 6.0;
-                at(start + (end - start) * f, across + wobble[j] + sign * band * 0.5 * (1.0 - 0.75 * f), 0.0)
+                at(
+                    start + (end - start) * f,
+                    across + wobble[j] + sign * band * 0.5 * (1.0 - 0.75 * f),
+                    0.0,
+                )
             };
             let mut lane = (0..=6).map(|j| point(j, 1.0)).collect::<Vec<_>>();
             lane.extend((0..=6).rev().map(|j| point(j, -1.0)));
@@ -1073,7 +1218,11 @@ fn knife_pull(
             let from = head * reach * h(k, &format!("{salt}-a"));
             let to = (from + head * (0.35 + 0.5 * h(k, &format!("{salt}-b")))).min(head * 1.15);
             let lean = (h(k, &format!("{salt}-lean")) - 0.5) * 0.12;
-            vec![at(from, side, 0.0), at((from + to) * 0.5, side + lean * 0.5, 0.0), at(to, side + lean, 0.0)]
+            vec![
+                at(from, side, 0.0),
+                at((from + to) * 0.5, side + lean * 0.5, 0.0),
+                at(to, side + lean, 0.0),
+            ]
         };
         for k in 0..2 + (h(0, "pk-lumps") * 3.0) as i64 {
             let side = lit * (0.25 + 0.6 * h(k, "pk-lump-side"));
@@ -1089,16 +1238,24 @@ fn knife_pull(
             mark.push(
                 polyline_path(&lump(k, "pk-hollow", side, 0.6))
                     .attr("stroke", bristle_tone(&base, -0.14))
-                    .attr("stroke-width", n(half0 * (0.08 + 0.06 * h(k, "pk-hollow-w"))))
+                    .attr(
+                        "stroke-width",
+                        n(half0 * (0.08 + 0.06 * h(k, "pk-hollow-w"))),
+                    )
                     .attr("stroke-opacity", "0.5"),
             );
         }
         if towards {
             let back_edge = (1..6)
                 .map(|k| {
-                    let angle = -std::f64::consts::FRAC_PI_2 + std::f64::consts::PI * f64::from(k) / 6.0;
+                    let angle =
+                        -std::f64::consts::FRAC_PI_2 + std::f64::consts::PI * f64::from(k) / 6.0;
                     let depth = 0.24 * half0 * (0.6 + 0.8 * h(i64::from(k), "pk-back"));
-                    at(0.0, angle.sin() * swell(0.0) * 0.9, -angle.cos() * depth * 0.7)
+                    at(
+                        0.0,
+                        angle.sin() * swell(0.0) * 0.9,
+                        -angle.cos() * depth * 0.7,
+                    )
                 })
                 .collect::<Vec<_>>();
             mark.push(
@@ -1115,14 +1272,20 @@ fn knife_pull(
             .collect()
     };
     // The lit side and the shadowed side, each over only part of the plane.
-    let (lit_from, lit_to) = (head * 0.8 + 0.15 * h(0, "pk-lit-a"), (0.55 + 0.40 * h(0, "pk-lit-b")).min(body_end));
+    let (lit_from, lit_to) = (
+        head * 0.8 + 0.15 * h(0, "pk-lit-a"),
+        (0.55 + 0.40 * h(0, "pk-lit-b")).min(body_end),
+    );
     mark.push(
         polyline_path(&edge(lit_from, lit_to, 0.92 * lit))
             .attr("stroke", bristle_tone(&base, 0.16))
             .attr("stroke-width", n((half0 * 0.14).max(unit * 0.0007)))
             .attr("stroke-opacity", "0.55"),
     );
-    let (shade_from, shade_to) = (head + 0.2 * h(0, "pk-shade-a"), (0.60 + 0.35 * h(0, "pk-shade-b")).min(body_end));
+    let (shade_from, shade_to) = (
+        head + 0.2 * h(0, "pk-shade-a"),
+        (0.60 + 0.35 * h(0, "pk-shade-b")).min(body_end),
+    );
     mark.push(
         polyline_path(&edge(shade_from, shade_to, -0.92 * lit))
             .attr("stroke", bristle_tone(&base, -0.15))
@@ -1143,13 +1306,23 @@ fn knife_pull(
             let points = (0..=6)
                 .map(|j| {
                     let t = from + (to - from) * f64::from(j) / 6.0;
-                    at(t, across + (h(k * 8 + i64::from(j), "pk-drag-j") - 0.5) * 0.05, 0.0)
+                    at(
+                        t,
+                        across + (h(k * 8 + i64::from(j), "pk-drag-j") - 0.5) * 0.05,
+                        0.0,
+                    )
                 })
                 .collect::<Vec<_>>();
             mark.push(
                 polyline_path(&points)
-                    .attr("stroke", bristle_tone(&base, if k % 2 == 0 { 0.08 } else { -0.08 }))
-                    .attr("stroke-width", n(half0 * (0.025 + 0.035 * h(k, "pk-drag-w"))))
+                    .attr(
+                        "stroke",
+                        bristle_tone(&base, if k % 2 == 0 { 0.08 } else { -0.08 }),
+                    )
+                    .attr(
+                        "stroke-width",
+                        n(half0 * (0.025 + 0.035 * h(k, "pk-drag-w"))),
+                    )
                     .attr("stroke-opacity", n(0.22 + 0.13 * h(k, "pk-drag-o"))),
             );
         }
@@ -1161,7 +1334,11 @@ fn knife_pull(
         let lip = (0..=4)
             .map(|k| {
                 let across = 0.85 - 1.7 * f64::from(k) / 4.0;
-                at(lip_at + (h(i64::from(k), "pk-lip-j") - 0.5) * 0.04, across, 0.0)
+                at(
+                    lip_at + (h(i64::from(k), "pk-lip-j") - 0.5) * 0.04,
+                    across,
+                    0.0,
+                )
             })
             .collect::<Vec<_>>();
         mark.push(
@@ -1172,7 +1349,12 @@ fn knife_pull(
         );
         let lip_shadow = lip
             .iter()
-            .map(|p| Point::new(p.x + end_direction.x * half1 * 0.16, p.y + end_direction.y * half1 * 0.16))
+            .map(|p| {
+                Point::new(
+                    p.x + end_direction.x * half1 * 0.16,
+                    p.y + end_direction.y * half1 * 0.16,
+                )
+            })
             .collect::<Vec<_>>();
         mark.push(
             polyline_path(&lip_shadow)
@@ -1194,23 +1376,29 @@ fn knife_pull(
             mark.push(
                 polyline_path(&[start, end])
                     .attr("stroke", bristle_tone(&base, -0.04))
-                    .attr("stroke-width", n(half1 * (0.05 + 0.06 * h(k, "pk-strand-w"))))
+                    .attr(
+                        "stroke-width",
+                        n(half1 * (0.05 + 0.06 * h(k, "pk-strand-w"))),
+                    )
                     .attr("stroke-opacity", n(0.45 - 0.25 * h(k, "pk-strand-o"))),
             );
         }
     }
     // Another colour caught on the blade: a streak of it along the plane.
-    if let Some(other) = other.as_deref() {
-        if h(1, "pk-mix-streak") < share {
-            let across = (h(2, "pk-mix-side") - 0.5) * 1.2;
-            let (from, to) = (0.08 + 0.2 * h(3, "pk-mix-a"), (0.6 + 0.3 * h(4, "pk-mix-b")).min(body_end));
-            mark.push(
-                polyline_path(&edge(from, to, across))
-                    .attr("stroke", mix(other, &base, 0.2))
-                    .attr("stroke-width", n(half0 * (0.12 + 0.12 * h(5, "pk-mix-w"))))
-                    .attr("stroke-opacity", "0.75"),
-            );
-        }
+    if let Some(other) = other.as_deref()
+        && h(1, "pk-mix-streak") < share
+    {
+        let across = (h(2, "pk-mix-side") - 0.5) * 1.2;
+        let (from, to) = (
+            0.08 + 0.2 * h(3, "pk-mix-a"),
+            (0.6 + 0.3 * h(4, "pk-mix-b")).min(body_end),
+        );
+        mark.push(
+            polyline_path(&edge(from, to, across))
+                .attr("stroke", mix(other, &base, 0.2))
+                .attr("stroke-width", n(half0 * (0.12 + 0.12 * h(5, "pk-mix-w"))))
+                .attr("stroke-opacity", "0.75"),
+        );
     }
     mark
 }
@@ -1226,7 +1414,12 @@ fn knife_stroke(
     let centre = left
         .iter()
         .zip(right)
-        .map(|(l, r)| (Point::new((l.x + r.x) * 0.5, (l.y + r.y) * 0.5), (l.x - r.x).hypot(l.y - r.y)))
+        .map(|(l, r)| {
+            (
+                Point::new((l.x + r.x) * 0.5, (l.y + r.y) * 0.5),
+                (l.x - r.x).hypot(l.y - r.y),
+            )
+        })
         .collect::<Vec<_>>();
     let mut group = Element::new("g").attr("class", "proto-knife-stroke");
     if centre.len() < 2 {
@@ -1258,7 +1451,9 @@ fn knife_stroke(
     let pull_length = (width * 14.0).max(unit * 0.08).min(total / pulls);
     let at = |s: f64| -> (Point, f64) {
         let s = s.clamp(0.0, total);
-        let index = cumulative.partition_point(|value| *value < s).clamp(1, centre.len() - 1);
+        let index = cumulative
+            .partition_point(|value| *value < s)
+            .clamp(1, centre.len() - 1);
         let (a, b) = (centre[index - 1], centre[index]);
         let span = (cumulative[index] - cumulative[index - 1]).max(1e-9);
         let t = (s - cumulative[index - 1]) / span;
@@ -1269,7 +1464,12 @@ fn knife_stroke(
     };
     let tooth = fresh("pk-tooth");
     let mut defs = Element::new("defs");
-    defs.push(local_tooth_filter(&tooth, 260.0 / unit.max(1.0), 0.28, &noise_seed(seed, "pk-tooth")));
+    defs.push(local_tooth_filter(
+        &tooth,
+        260.0 / unit.max(1.0),
+        0.28,
+        &noise_seed(seed, "pk-tooth"),
+    ));
     group.push(defs);
     let mut start = 0.0;
     let mut order = 0_i64;
@@ -1337,9 +1537,20 @@ fn watercolor_fill(contour: &[Point], color: &str, opacity: f64, seed: Seed, uni
     let d = closed_d(contour);
     let (x0, y0, x1, y1) = bounds(contour);
     let size = (x1 - x0).min(y1 - y0).max(1.0);
-    let (wash, clip, rim_blur, wobble) = (fresh("wc-wash"), fresh("wc-clip"), fresh("wc-rim"), fresh("wc-wobble"));
+    let (wash, clip, rim_blur, wobble) = (
+        fresh("wc-wash"),
+        fresh("wc-clip"),
+        fresh("wc-rim"),
+        fresh("wc-wobble"),
+    );
     let mut defs = Element::new("defs");
-    defs.push(wash_filter(&wash, seed, unit, size * 0.32, Region::around(contour, 0.0, unit)));
+    defs.push(wash_filter(
+        &wash,
+        seed,
+        unit,
+        size * 0.32,
+        Region::around(contour, 0.0, unit),
+    ));
     let mut clip_path = Element::new("clipPath").attr("id", &clip);
     clip_path.push(path(&d));
     defs.push(clip_path);
@@ -1354,7 +1565,12 @@ fn watercolor_fill(contour: &[Point], color: &str, opacity: f64, seed: Seed, uni
     // the displacement's reach at most.
     let shake = Displacement::of_scale(size * 0.03);
     let mut wobble_filter = filter(&wobble, Region::around(contour, shake.reach(), unit));
-    wobble_filter.push(turbulence(1.0 / (size * 0.12), 2, &noise_seed(seed, "wc-wobble"), "edge"));
+    wobble_filter.push(turbulence(
+        1.0 / (size * 0.12),
+        2,
+        &noise_seed(seed, "wc-wobble"),
+        "edge",
+    ));
     for primitive in shake.primitives("SourceGraphic", "edge", "wobbled") {
         wobble_filter.push(primitive);
     }
@@ -1385,72 +1601,95 @@ fn watercolor_fill(contour: &[Point], color: &str, opacity: f64, seed: Seed, uni
     // another colour of the Score along a share of it, in three runs of
     // uneven length, and pale blooms of that colour drift inside the wash.
     let share = mix_share(Weight::Watercolor);
-    if share > 0.0 {
-        if let Some(other) = other_color(color, hash01(0, seed, "wc-mix-pick")) {
-            let perimeter = contour
-                .iter()
-                .zip(contour.iter().cycle().skip(1))
-                .map(|(a, b)| (b.x - a.x).hypot(b.y - a.y))
-                .sum::<f64>();
-            let part = (share * 1.5).min(0.6);
-            let runs = [0_i64, 1, 2].map(|k| 0.4 + hash01(k, seed, "wc-mix-run"));
-            let gaps = [0_i64, 1, 2].map(|k| 0.4 + hash01(k, seed, "wc-mix-gap"));
-            let (run_sum, gap_sum) = (runs.iter().sum::<f64>(), gaps.iter().sum::<f64>());
-            let dashes = (0..3)
-                .flat_map(|k| {
-                    [
-                        n(perimeter * part * runs[k] / run_sum),
-                        n(perimeter * (1.0 - part) * gaps[k] / gap_sum),
-                    ]
-                })
-                .collect::<Vec<_>>()
-                .join(" ");
-            let soft = fresh("wc-mix-soft");
-            let mut mix_defs = Element::new("defs");
-            // The blooms are kept inside the shape: what reaches it lies
-            // within the blur's reach of its box.
-            mix_defs.push(blur_filter(&soft, size * 0.05, Region::around(contour, blur_reach(size * 0.05), unit)));
-            group.push(mix_defs);
-            let mut parted = Element::new("g").attr("clip-path", format!("url(#{clip})"));
+    if share > 0.0
+        && let Some(other) = other_color(color, hash01(0, seed, "wc-mix-pick"))
+    {
+        let perimeter = contour
+            .iter()
+            .zip(contour.iter().cycle().skip(1))
+            .map(|(a, b)| (b.x - a.x).hypot(b.y - a.y))
+            .sum::<f64>();
+        let part = (share * 1.5).min(0.6);
+        let runs = [0_i64, 1, 2].map(|k| 0.4 + hash01(k, seed, "wc-mix-run"));
+        let gaps = [0_i64, 1, 2].map(|k| 0.4 + hash01(k, seed, "wc-mix-gap"));
+        let (run_sum, gap_sum) = (runs.iter().sum::<f64>(), gaps.iter().sum::<f64>());
+        let dashes = (0..3)
+            .flat_map(|k| {
+                [
+                    n(perimeter * part * runs[k] / run_sum),
+                    n(perimeter * (1.0 - part) * gaps[k] / gap_sum),
+                ]
+            })
+            .collect::<Vec<_>>()
+            .join(" ");
+        let soft = fresh("wc-mix-soft");
+        let mut mix_defs = Element::new("defs");
+        // The blooms are kept inside the shape: what reaches it lies
+        // within the blur's reach of its box.
+        mix_defs.push(blur_filter(
+            &soft,
+            size * 0.05,
+            Region::around(contour, blur_reach(size * 0.05), unit),
+        ));
+        group.push(mix_defs);
+        let mut parted = Element::new("g").attr("clip-path", format!("url(#{clip})"));
+        parted.push(
+            path(&d)
+                .attr("fill", "none")
+                .attr("stroke", mix(&other, color, 0.35))
+                .attr("stroke-width", n(size * 0.08))
+                .attr("stroke-opacity", n((opacity * 0.75).min(0.7)))
+                .attr("stroke-dasharray", dashes)
+                .attr(
+                    "stroke-dashoffset",
+                    n(perimeter * hash01(0, seed, "wc-mix-offset")),
+                )
+                .attr("filter", format!("url(#{rim_blur})")),
+        );
+        for k in 0..(share * 10.0).ceil() as i64 {
+            let Some(bloom) = other_color(color, hash01(k, seed, "wc-bloom-pick")) else {
+                continue;
+            };
+            let rx = size * (0.10 + 0.12 * hash01(k, seed, "wc-bloom-rx"));
             parted.push(
-                path(&d)
-                    .attr("fill", "none")
-                    .attr("stroke", mix(&other, color, 0.35))
-                    .attr("stroke-width", n(size * 0.08))
-                    .attr("stroke-opacity", n((opacity * 0.75).min(0.7)))
-                    .attr("stroke-dasharray", dashes)
-                    .attr("stroke-dashoffset", n(perimeter * hash01(0, seed, "wc-mix-offset")))
-                    .attr("filter", format!("url(#{rim_blur})")),
+                Element::new("ellipse")
+                    .attr(
+                        "cx",
+                        n(x0 + (x1 - x0) * (0.15 + 0.7 * hash01(k, seed, "wc-bloom-x"))),
+                    )
+                    .attr(
+                        "cy",
+                        n(y0 + (y1 - y0) * (0.15 + 0.7 * hash01(k, seed, "wc-bloom-y"))),
+                    )
+                    .attr("rx", n(rx))
+                    .attr("ry", n(rx * (0.6 + 0.4 * hash01(k, seed, "wc-bloom-ry"))))
+                    .attr("fill", bloom)
+                    .attr(
+                        "fill-opacity",
+                        n(opacity * (0.18 + 0.12 * hash01(k, seed, "wc-bloom-o"))),
+                    )
+                    .attr("filter", format!("url(#{soft})")),
             );
-            for k in 0..(share * 10.0).ceil() as i64 {
-                let Some(bloom) = other_color(color, hash01(k, seed, "wc-bloom-pick")) else {
-                    continue;
-                };
-                let rx = size * (0.10 + 0.12 * hash01(k, seed, "wc-bloom-rx"));
-                parted.push(
-                    Element::new("ellipse")
-                        .attr("cx", n(x0 + (x1 - x0) * (0.15 + 0.7 * hash01(k, seed, "wc-bloom-x"))))
-                        .attr("cy", n(y0 + (y1 - y0) * (0.15 + 0.7 * hash01(k, seed, "wc-bloom-y"))))
-                        .attr("rx", n(rx))
-                        .attr("ry", n(rx * (0.6 + 0.4 * hash01(k, seed, "wc-bloom-ry"))))
-                        .attr("fill", bloom)
-                        .attr("fill-opacity", n(opacity * (0.18 + 0.12 * hash01(k, seed, "wc-bloom-o"))))
-                        .attr("filter", format!("url(#{soft})")),
-                );
-            }
-            group.push(parted);
         }
+        group.push(parted);
     }
     group
 }
 
-fn oil_pastel_fill(contour: &[Point], color: &str, seed: Seed, unit: f64, stroke_width: f64) -> Element {
+fn oil_pastel_fill(
+    contour: &[Point],
+    color: &str,
+    seed: Seed,
+    unit: f64,
+    stroke_width: f64,
+) -> Element {
     let d = closed_d(contour);
     let (x0, y0, x1, y1) = bounds(contour);
     let size = (x1 - x0).min(y1 - y0).max(1.0);
     let width = (stroke_width * 1.5).max(size / 9.0).max(unit * 0.006);
     let frequency = 300.0 / unit.max(1.0);
-    let (clip, base_tooth, stroke_tooth) = (fresh("op-clip"), fresh("op-base"), fresh("op-strokes"));
+    let (clip, base_tooth, stroke_tooth) =
+        (fresh("op-clip"), fresh("op-base"), fresh("op-strokes"));
     let mut defs = Element::new("defs");
     let mut clip_path = Element::new("clipPath").attr("id", &clip);
     clip_path.push(path(&d));
@@ -1489,14 +1728,24 @@ fn oil_pastel_fill(contour: &[Point], color: &str, seed: Seed, unit: f64, stroke
                     Element::new("ellipse")
                         .attr("cx", n(x0 + (x1 - x0) * hash01(k, seed, "op-under-x")))
                         .attr("cy", n(y0 + (y1 - y0) * hash01(k, seed, "op-under-y")))
-                        .attr("rx", n(width * (0.8 + 1.2 * hash01(k, seed, "op-under-rx"))))
-                        .attr("ry", n(width * (0.5 + 0.7 * hash01(k, seed, "op-under-ry"))))
+                        .attr(
+                            "rx",
+                            n(width * (0.8 + 1.2 * hash01(k, seed, "op-under-rx"))),
+                        )
+                        .attr(
+                            "ry",
+                            n(width * (0.5 + 0.7 * hash01(k, seed, "op-under-ry"))),
+                        )
                         .attr("fill", mix(&other, color, 0.2)),
                 );
             }
         }
     }
-    face.push(path(&d).attr("fill", color).attr("filter", format!("url(#{base_tooth})")));
+    face.push(
+        path(&d)
+            .attr("fill", color)
+            .attr("filter", format!("url(#{base_tooth})")),
+    );
     // Short, slightly bent strokes, scattered over the face; their direction
     // turns slowly across it, so no line of strokes runs straight through.
     let base = (hash01(0, seed, "op-angle") - 0.5) * 1.2 - 0.6;
@@ -1529,8 +1778,10 @@ fn oil_pastel_fill(contour: &[Point], color: &str, seed: Seed, unit: f64, stroke
     let mut strokes = Element::new("g").attr("filter", format!("url(#{stroke_tooth})"));
     for (_, a, control, b, i) in marks {
         let pigment = if share > 0.0 && hash01(i, seed, "op-mix") < share {
-            other_color(color, hash01(i, seed, "op-mix-pick"))
-                .map_or_else(|| color.to_owned(), |other| mix(color, &other, 0.35 + 0.3 * hash01(i, seed, "op-mix-amount")))
+            other_color(color, hash01(i, seed, "op-mix-pick")).map_or_else(
+                || color.to_owned(),
+                |other| mix(color, &other, 0.35 + 0.3 * hash01(i, seed, "op-mix-amount")),
+            )
         } else {
             color.to_owned()
         };
@@ -1545,8 +1796,14 @@ fn oil_pastel_fill(contour: &[Point], color: &str, seed: Seed, unit: f64, stroke
                 n(b.y)
             ))
             .attr("fill", "none")
-            .attr("stroke", bristle_tone(&pigment, (hash01(i, seed, "op-tone") - 0.5) * 0.10))
-            .attr("stroke-width", n(width * (0.7 + 0.25 * hash01(i, seed, "op-width"))))
+            .attr(
+                "stroke",
+                bristle_tone(&pigment, (hash01(i, seed, "op-tone") - 0.5) * 0.10),
+            )
+            .attr(
+                "stroke-width",
+                n(width * (0.7 + 0.25 * hash01(i, seed, "op-width"))),
+            )
             .attr("stroke-linecap", "round"),
         );
     }
@@ -1565,7 +1822,12 @@ fn knife_fill(contour: &[Point], color: &str, seed: Seed, unit: f64) -> Element 
     let mut clip_path = Element::new("clipPath").attr("id", &clip);
     clip_path.push(path(&d));
     defs.push(clip_path);
-    defs.push(local_tooth_filter(&tooth, 260.0 / unit.max(1.0), 0.28, &noise_seed(seed, "pk-tooth")));
+    defs.push(local_tooth_filter(
+        &tooth,
+        260.0 / unit.max(1.0),
+        0.28,
+        &noise_seed(seed, "pk-tooth"),
+    ));
     let mut group = Element::new("g").attr("class", "proto-knife-face");
     group.push(defs);
     let mut face = Element::new("g").attr("clip-path", format!("url(#{clip})"));
@@ -1587,7 +1849,10 @@ fn knife_fill(contour: &[Point], color: &str, seed: Seed, unit: f64) -> Element 
                         .attr("cx", n(x0 + (x1 - x0) * hash01(k, seed, "pk-under-x")))
                         .attr("cy", n(y0 + (y1 - y0) * hash01(k, seed, "pk-under-y")))
                         .attr("rx", n(cell * (0.4 + 0.5 * hash01(k, seed, "pk-under-rx"))))
-                        .attr("ry", n(cell * (0.25 + 0.3 * hash01(k, seed, "pk-under-ry"))))
+                        .attr(
+                            "ry",
+                            n(cell * (0.25 + 0.3 * hash01(k, seed, "pk-under-ry"))),
+                        )
                         .attr("fill", mix(&other, color, 0.25))
                         .attr("fill-opacity", "0.7"),
                 );
@@ -1627,13 +1892,19 @@ fn knife_fill(contour: &[Point], color: &str, seed: Seed, unit: f64) -> Element 
             let p0 = Point::new(centre.x - cos * length * 0.5, centre.y - sin * length * 0.5);
             let p1 = Point::new(centre.x + cos * length * 0.5, centre.y + sin * length * 0.5);
             let control = Point::new(centre.x - sin * bend * 2.0, centre.y + cos * bend * 2.0);
-            let (half0, half1) = (breadth * 0.5 * 1.05, breadth * 0.5 * (0.8 + 0.15 * hash01(i, seed, "pk-taper")));
+            let (half0, half1) = (
+                breadth * 0.5 * 1.05,
+                breadth * 0.5 * (0.8 + 0.15 * hash01(i, seed, "pk-taper")),
+            );
             let spine = (0..=8)
                 .map(|k| {
                     let t = f64::from(k) / 8.0;
                     let (a, b, c) = ((1.0 - t) * (1.0 - t), 2.0 * (1.0 - t) * t, t * t);
                     (
-                        Point::new(a * p0.x + b * control.x + c * p1.x, a * p0.y + b * control.y + c * p1.y),
+                        Point::new(
+                            a * p0.x + b * control.x + c * p1.x,
+                            a * p0.y + b * control.y + c * p1.y,
+                        ),
                         half0 + (half1 - half0) * t,
                     )
                 })
@@ -1659,7 +1930,12 @@ fn bite(width: f64) -> Displacement {
 /// `region` holds the line and the bite's reach.
 fn bite_filter(id: &str, width: f64, seed: Seed, region: Region) -> Element {
     let mut f = filter(id, region);
-    f.push(turbulence(1.0 / (width * 0.9).max(0.3), 2, &noise_seed(seed, "et-bite"), "bite"));
+    f.push(turbulence(
+        1.0 / (width * 0.9).max(0.3),
+        2,
+        &noise_seed(seed, "et-bite"),
+        "bite",
+    ));
     for primitive in bite(width).primitives("SourceGraphic", "bite", "bitten") {
         f.push(primitive);
     }
@@ -1735,13 +2011,20 @@ fn etching_stroke(
         while walked + step >= next {
             let t = (next - walked) / step;
             if hash01(order, seed, "et-pit") < 0.45 {
-                let side = if hash01(order, seed, "et-pit-side") < 0.5 { -1.0 } else { 1.0 };
+                let side = if hash01(order, seed, "et-pit-side") < 0.5 {
+                    -1.0
+                } else {
+                    1.0
+                };
                 let off = width * (0.9 + 1.4 * hash01(order, seed, "et-pit-off")) * side;
                 group.push(
                     Element::new("circle")
                         .attr("cx", n(a.x + (b.x - a.x) * t - (b.y - a.y) / step * off))
                         .attr("cy", n(a.y + (b.y - a.y) * t + (b.x - a.x) / step * off))
-                        .attr("r", n(width * (0.12 + 0.18 * hash01(order, seed, "et-pit-r"))))
+                        .attr(
+                            "r",
+                            n(width * (0.12 + 0.18 * hash01(order, seed, "et-pit-r"))),
+                        )
                         .attr("fill", color)
                         .attr("fill-opacity", n(opacity * 0.55)),
                 );
@@ -1798,7 +2081,8 @@ fn etching_fill_varied(
     };
     let reach = ((x1 - x0) * heavy.x.abs() + (y1 - y0) * heavy.y.abs()).max(1.0) * 0.5;
     let weight = |p: Point| -> f64 {
-        (((p.x - centre.x) * heavy.x + (p.y - centre.y) * heavy.y) / reach * 0.5 + 0.5).clamp(0.0, 1.0)
+        (((p.x - centre.x) * heavy.x + (p.y - centre.y) * heavy.y) / reach * 0.5 + 0.5)
+            .clamp(0.0, 1.0)
     };
     let (clip, bitten) = (fresh("et-clip"), fresh("et-fill-bite"));
     let mut defs = Element::new("defs");
@@ -1820,19 +2104,29 @@ fn etching_fill_varied(
         .attr("filter", format!("url(#{bitten})"))
         .attr("fill", color)
         .attr("fill-opacity", n(opacity.min(1.0)));
-    let sets: &[(f64, bool)] = if opacity >= 0.7 { &[(0.0, false), (1.15, true)] } else { &[(0.0, false)] };
+    let sets: &[(f64, bool)] = if opacity >= 0.7 {
+        &[(0.0, false), (1.15, true)]
+    } else {
+        &[(0.0, false)]
+    };
     for (set, (turn, crossing)) in sets.iter().enumerate() {
         let gap = spacing * if *crossing { 1.1 } else { 1.0 };
         let phase = hash01(key + set as i64, seed, "et-face-phase");
-        for (index, (a, b)) in scan_segments(contour, angle + turn, gap, phase).iter().enumerate() {
-            let i = key.wrapping_mul(31).wrapping_add((set * 100_000 + index) as i64);
+        for (index, (a, b)) in scan_segments(contour, angle + turn, gap, phase)
+            .iter()
+            .enumerate()
+        {
+            let i = key
+                .wrapping_mul(31)
+                .wrapping_add((set * 100_000 + index) as i64);
             let depth = 0.85 + 0.3 * hash01(i, seed, "et-line-depth");
             let lean = (hash01(i, seed, "et-lean") - 0.5) * line * 1.2;
             let (dx, dy) = (b.x - a.x, b.y - a.y);
             let len = dx.hypot(dy).max(1e-9);
             let (nx, ny) = (-dy / len, dx / len);
             let count = ((len / (line * 8.0)).ceil() as usize).clamp(2, 24);
-            let (mut near, mut far) = (Vec::with_capacity(count + 1), Vec::with_capacity(count + 1));
+            let (mut near, mut far) =
+                (Vec::with_capacity(count + 1), Vec::with_capacity(count + 1));
             let mut widest = 0.0_f64;
             for k in 0..=count {
                 let f = k as f64 / count as f64;

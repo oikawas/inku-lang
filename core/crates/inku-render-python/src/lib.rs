@@ -538,14 +538,22 @@ impl FitTo {
         let Some(to) = self.fit_to_size(size).map(|size| size.to_size()) else {
             return resvg::tiny_skia::Transform::default();
         };
-        resvg::tiny_skia::Transform::from_scale(to.width() / from.width(), to.height() / from.height())
+        resvg::tiny_skia::Transform::from_scale(
+            to.width() / from.width(),
+            to.height() / from.height(),
+        )
     }
 }
 
 /// The PNG of `svg`, as resvg_py 0.5.0's `svg_to_bytes` drew it for the Server
 /// and the CLI, by the core's vendored resvg (whose displacement follows the
 /// specification, `core/vendor/resvg/INKU_PATCHES.md`).
-fn png_of(svg: &str, width: Option<u32>, height: Option<u32>, font_files: &[String]) -> Result<Vec<u8>, String> {
+fn png_of(
+    svg: &str,
+    width: Option<u32>,
+    height: Option<u32>,
+    font_files: &[String],
+) -> Result<Vec<u8>, String> {
     use resvg::{tiny_skia, usvg};
     let positive = |value: u32, name: &str| {
         if value == 0 {
@@ -559,8 +567,14 @@ fn png_of(svg: &str, width: Option<u32>, height: Option<u32>, font_files: &[Stri
             FitTo::Size(positive(width, "width")?, positive(height, "height")?),
             (width as f32, height as f32),
         ),
-        (Some(width), None) => (FitTo::Width(positive(width, "width")?), (width as f32, 100.0)),
-        (None, Some(height)) => (FitTo::Height(positive(height, "height")?), (100.0, height as f32)),
+        (Some(width), None) => (
+            FitTo::Width(positive(width, "width")?),
+            (width as f32, 100.0),
+        ),
+        (None, Some(height)) => (
+            FitTo::Height(positive(height, "height")?),
+            (100.0, height as f32),
+        ),
         (None, None) => (FitTo::Original, (100.0, 100.0)),
     };
     let mut fonts = usvg::fontdb::Database::new();
@@ -585,13 +599,18 @@ fn png_of(svg: &str, width: Option<u32>, height: Option<u32>, font_files: &[Stri
         style_sheet: Some(String::new()),
         ..usvg::Options::default()
     };
-    let tree = usvg::Tree::from_str(svg, &options).map_err(|error| format!("invalid SVG: {error}"))?;
+    let tree =
+        usvg::Tree::from_str(svg, &options).map_err(|error| format!("invalid SVG: {error}"))?;
     let size = fit
         .fit_to_size(tree.size().to_int_size())
         .ok_or_else(|| "target size is zero".to_owned())?;
     let mut pixmap = tiny_skia::Pixmap::new(size.width(), size.height())
         .ok_or_else(|| "cannot create pixmap".to_owned())?;
-    resvg::render(&tree, fit.fit_to_transform(tree.size().to_int_size()), &mut pixmap.as_mut());
+    resvg::render(
+        &tree,
+        fit.fit_to_transform(tree.size().to_int_size()),
+        &mut pixmap.as_mut(),
+    );
     pixmap.encode_png().map_err(|error| error.to_string())
 }
 
@@ -618,9 +637,22 @@ fn svg_to_png<'py>(
     Ok(PyBytes::new(py, &png))
 }
 
+/// The resvg `svg_to_png` draws with: the vendored crate's version and the
+/// count of inku patches on it (`core/vendor/resvg/INKU_PATCHES.md`). Another
+/// resvg draws other pixels from the same SVG, so a host records this beside
+/// the PNGs it makes (the Server's and the CLI's `rasterizer_info`).
+const RASTER_IDENTITY: (&str, &str) = ("resvg", "0.48.1+inku.2");
+
+/// `{"backend": "resvg", "version": "<vendored version>+inku.<patches>"}`.
+#[pyfunction]
+fn raster_identity_json() -> String {
+    serde_json::json!({"backend": RASTER_IDENTITY.0, "version": RASTER_IDENTITY.1}).to_string()
+}
+
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(svg_to_png, module)?)?;
+    module.add_function(wrap_pyfunction!(raster_identity_json, module)?)?;
     module.add_function(wrap_pyfunction!(core_api_version, module)?)?;
     module.add_function(wrap_pyfunction!(render_engine_id, module)?)?;
     module.add_function(wrap_pyfunction!(render_engine_version, module)?)?;
@@ -683,4 +715,28 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
         module
     )?)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    /// The identity follows the vendored crate: its version, and one `inku.N`
+    /// per local patch that INKU_PATCHES.md counts.
+    #[test]
+    fn raster_identity_names_the_vendored_resvg_and_its_patches() {
+        let manifest = include_str!("../../../vendor/resvg/Cargo.toml");
+        let version = manifest
+            .lines()
+            .find_map(|line| line.strip_prefix("version = \""))
+            .and_then(|rest| rest.strip_suffix('"'))
+            .expect("the vendored resvg names its version");
+        assert_eq!(super::RASTER_IDENTITY.1, format!("{version}+inku.2"));
+        let patches = include_str!("../../../vendor/resvg/INKU_PATCHES.md");
+        assert!(patches.contains("There are two local patches."));
+        let identity: serde_json::Value =
+            serde_json::from_str(&super::raster_identity_json()).unwrap();
+        assert_eq!(
+            identity,
+            serde_json::json!({"backend": "resvg", "version": "0.48.1+inku.2"})
+        );
+    }
 }

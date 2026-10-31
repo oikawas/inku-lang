@@ -83,3 +83,10 @@ The `raster-profile` example measures parsing and rasterization separately and
 emits raw-pixel SHA-256 digests; image comparisons run on Linux. Android's
 `SvgRasterPerformanceTest` measures the packaged JNI path and Bitmap transfer
 at preview resolution through the safe instrumentation runner.
+
+The Server and the CLI draw their PNGs with this crate through the Python
+wheel (`inku_render.svg_to_png`) and record `inku_render.raster_identity_json()`
+beside them: this crate's version and `inku.N`, N being the count of local
+patches above (`0.48.1+inku.2`). A new version or a new patch changes
+`RASTER_IDENTITY` in `inku-render-python/src/lib.rs` in the same commit; its
+test reads this file and the vendored `Cargo.toml`.

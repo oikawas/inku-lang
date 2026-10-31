@@ -278,7 +278,11 @@ impl Weight {
     pub const fn requires_edition_0_24(self) -> bool {
         matches!(
             self,
-            Self::Gouache | Self::Watercolor | Self::OilPastel | Self::PaintingKnife | Self::Etching
+            Self::Gouache
+                | Self::Watercolor
+                | Self::OilPastel
+                | Self::PaintingKnife
+                | Self::Etching
         )
     }
 }

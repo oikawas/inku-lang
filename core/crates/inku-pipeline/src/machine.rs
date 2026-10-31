@@ -11,11 +11,11 @@ use inku_ddl::{
     CanvasRatioWriting, CompilerLockState, CompilerResourceExecutionFailure,
     CompilerResourceExecutionResult, CompletionRangeRecord, MacroDefinition, MacroLock,
     NormalizedDdlDocument, RANGE_WORDS_CHANGED_HOLE_KIND, ResolvedInstructionLanguage,
-    SAIJIKI_ASSET_ID, SAIJIKI_V1_ASSET_ID, SAIJIKI_V2_ASSET_ID, ScoreDiagnosticOwner, ScoreFieldGap,
-    ScoreInstructionOrigin, ScoreMaterializationError, TypedDdlCompilation, compile_typed_ddl,
-    migrate_macro_definition_from_saijiki_v1, record_after_patch, record_keeping_numbers,
-    settle_completion_record, validate_visible_ddl_patch, validate_visible_ddl_patch_detailed,
-    visible_ddl_patch_available, with_completion_record,
+    SAIJIKI_ASSET_ID, SAIJIKI_V1_ASSET_ID, SAIJIKI_V2_ASSET_ID, ScoreDiagnosticOwner,
+    ScoreFieldGap, ScoreInstructionOrigin, ScoreMaterializationError, TypedDdlCompilation,
+    compile_typed_ddl, migrate_macro_definition_from_saijiki_v1, record_after_patch,
+    record_keeping_numbers, settle_completion_record, validate_visible_ddl_patch,
+    validate_visible_ddl_patch_detailed, visible_ddl_patch_available, with_completion_record,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;

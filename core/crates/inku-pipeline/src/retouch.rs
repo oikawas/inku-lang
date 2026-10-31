@@ -16,8 +16,8 @@ use std::collections::BTreeMap;
 use std::ops::Range;
 
 use inku_ddl::{
-    MacroDefinition, MacroExpansionLimits, ResolvedInstructionLanguage, SemanticHead,
-    SemanticInstruction, saijiki_asset,
+    MacroDefinition, MacroExpansionLimits, ResolvedInstructionLanguage, SaijikiAsset,
+    SemanticHead, SemanticInstruction, saijiki_asset, saijiki_v2_asset,
 };
 use serde::{Deserialize, Serialize};
 
@@ -36,10 +36,29 @@ pub struct Tool {
     pub en: String,
 }
 
-/// The tools a sentence can be drawn with.
+/// The tools a sentence can be drawn with: the current Saijiki's touches.
 #[must_use]
 pub fn tools() -> Vec<Tool> {
-    saijiki_asset()
+    asset_tools(saijiki_asset())
+}
+
+/// The tools a saved Score can name: the current ones, then the ones Saijiki v3
+/// retired (rotring, crayon, the two brushes, burin, drypoint), named as Saijiki v2
+/// named them. A saved Score keeps its tools (SPEC §3.3), so a host reads them by
+/// these names; a work is never given one of the retired tools again.
+#[must_use]
+pub fn readable_tools() -> Vec<Tool> {
+    let mut readable = tools();
+    let retired = asset_tools(saijiki_v2_asset())
+        .into_iter()
+        .filter(|retired| !readable.iter().any(|tool| tool.value == retired.value))
+        .collect::<Vec<_>>();
+    readable.extend(retired);
+    readable
+}
+
+fn asset_tools(asset: &SaijikiAsset) -> Vec<Tool> {
+    asset
         .categories
         .iter()
         .find(|category| category.key == TOUCH_CATEGORY)

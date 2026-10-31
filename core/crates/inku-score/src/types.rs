@@ -262,7 +262,27 @@ string_enum!(Weight {
     Burin => "burin",
     Drypoint => "drypoint",
     Computer => "computer",
+    // Saijiki v3 (てざわりの整理, 2026-10-31): the tools a document names from
+    // then on. The six they replace (rotring, crayon, brush_thin, brush_thick,
+    // burin, drypoint) stay readable and drawable for saved Scores.
+    Gouache => "gouache",
+    Watercolor => "watercolor",
+    OilPastel => "oil_pastel",
+    PaintingKnife => "painting_knife",
+    Etching => "etching",
 });
+
+impl Weight {
+    /// Whether this tool came with Saijiki v3, which needs Score 0.24.0.
+    #[must_use]
+    pub const fn requires_edition_0_24(self) -> bool {
+        matches!(
+            self,
+            Self::Gouache | Self::Watercolor | Self::OilPastel | Self::PaintingKnife | Self::Etching
+        )
+    }
+}
+
 string_enum!(Thinness {
     Fine,
     ExtraFine,
@@ -641,6 +661,15 @@ pub fn instructions_use_free_line(instructions: &[Instruction]) -> bool {
         .any(|instruction| instruction.primitive == Primitive::FreeLine)
 }
 
+/// Whether any instruction is drawn with a tool of Saijiki v3, which needs
+/// Score 0.24.0.
+#[must_use]
+pub fn instructions_use_tools_of_edition_0_24(instructions: &[Instruction]) -> bool {
+    instructions
+        .iter()
+        .any(|instruction| instruction.weight.requires_edition_0_24())
+}
+
 /// Whether any instruction lays brushmarks (刷毛目), which needs Score 0.22.0.
 #[must_use]
 pub fn instructions_use_brushmarks(instructions: &[Instruction]) -> bool {
@@ -682,10 +711,11 @@ pub enum ScoreEdition {
     V0_21,
     V0_22,
     V0_23,
+    V0_24,
 }
 
 impl ScoreEdition {
-    pub const ALL: [Self; 23] = [
+    pub const ALL: [Self; 24] = [
         Self::V0_1,
         Self::V0_2,
         Self::V0_3,
@@ -709,6 +739,7 @@ impl ScoreEdition {
         Self::V0_21,
         Self::V0_22,
         Self::V0_23,
+        Self::V0_24,
     ];
 
     /// The edition a version string names.
@@ -745,6 +776,7 @@ impl ScoreEdition {
             Self::V0_21 => "0.21.0",
             Self::V0_22 => "0.22.0",
             Self::V0_23 => "0.23.0",
+            Self::V0_24 => "0.24.0",
         }
     }
 }
@@ -2591,6 +2623,11 @@ impl Score {
         self.validate_compact_score_0_10()?;
         if !self.object_templates.is_empty() && !self.edition_at_least(ScoreEdition::V0_23) {
             return Err("object templates require Score version 0.23.0");
+        }
+        if instructions_use_tools_of_edition_0_24(&self.instructions)
+            && !self.edition_at_least(ScoreEdition::V0_24)
+        {
+            return Err("a Saijiki v3 tool requires Score version 0.24.0");
         }
         let mut owners = std::collections::BTreeSet::new();
         for template in &self.object_templates {

@@ -187,11 +187,14 @@ pub(crate) fn weight_width(weight: Weight) -> f64 {
         Weight::Pen | Weight::Computer => 2.0,
         Weight::Rotring => 1.0,
         Weight::Crayon => 4.0,
-        Weight::Chalk | Weight::BrushThin => 3.0,
+        Weight::Chalk | Weight::BrushThin | Weight::Gouache => 3.0,
         Weight::BrushThick => 8.0,
         Weight::OilPaint => 12.0,
         Weight::Burin => 3.2,
-        Weight::Drypoint => 2.6,
+        Weight::Drypoint | Weight::Etching => 2.6,
+        Weight::Watercolor => 5.0,
+        Weight::OilPastel => 7.0,
+        Weight::PaintingKnife => 12.0,
     }
 }
 
@@ -217,10 +220,16 @@ pub(crate) fn extra_thick_width(weight: Weight) -> f64 {
         Weight::Crayon => 20.0,
         Weight::Chalk => 25.0,
         Weight::BrushThin => 15.0,
+        // Gouache is the fine brush whose broad steps reach towards the thick
+        // brush's (てざわりの整理 step 5, the author's ○).
+        Weight::Gouache => 22.0,
         Weight::BrushThick => 50.0,
         Weight::OilPaint => 60.0,
         Weight::Burin => 7.0,
-        Weight::Drypoint => 6.0,
+        Weight::Drypoint | Weight::Etching => 6.0,
+        Weight::Watercolor => 45.0,
+        Weight::OilPastel => 30.0,
+        Weight::PaintingKnife => 60.0,
     }
 }
 
@@ -234,10 +243,15 @@ pub(crate) fn thick_width(weight: Weight) -> f64 {
         Weight::Rotring => 2.6,
         Weight::Crayon | Weight::Chalk => 9.0,
         Weight::BrushThin => 6.7,
+        // Gouache's thick step is the thick brush's default width.
+        Weight::Gouache => 8.0,
         Weight::BrushThick => 20.0,
         Weight::OilPaint => 27.0,
         Weight::Burin => 4.7,
-        Weight::Drypoint => 3.9,
+        Weight::Drypoint | Weight::Etching => 3.9,
+        Weight::Watercolor => 15.0,
+        Weight::OilPastel => 14.0,
+        Weight::PaintingKnife => 27.0,
     }
 }
 
@@ -338,11 +352,12 @@ pub(crate) fn weight_opacity(weight: Weight) -> f64 {
         Weight::Rotring => 0.95,
         Weight::Crayon => 0.78,
         Weight::Chalk => 0.70,
-        Weight::BrushThin => 0.90,
+        Weight::BrushThin | Weight::Gouache => 0.90,
         Weight::BrushThick => 0.86,
-        Weight::OilPaint => 1.0,
+        Weight::OilPaint | Weight::OilPastel | Weight::PaintingKnife => 1.0,
         Weight::Burin => 0.96,
-        Weight::Drypoint => 0.92,
+        Weight::Drypoint | Weight::Etching => 0.92,
+        Weight::Watercolor => 0.65,
     }
 }
 

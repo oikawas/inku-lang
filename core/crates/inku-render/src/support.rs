@@ -88,13 +88,18 @@ pub fn support_with_mark_word(support: Support, texture: SurfaceTexture) -> Supp
 
 const fn tool_support_bias(weight: Weight) -> (f64, f64) {
     match weight {
-        Weight::BrushThin | Weight::BrushThick => (1.0, 0.15),
+        Weight::BrushThin | Weight::BrushThick | Weight::Gouache => (1.0, 0.15),
         Weight::OilPaint => (0.04, 0.12),
         Weight::Crayon | Weight::Pencil => (0.10, 1.0),
         Weight::Chalk => (0.10, 1.30),
         Weight::Pen => (0.15, 0.15),
         Weight::Silverpoint => (0.05, 0.25),
-        Weight::Drypoint => (0.0, 0.35),
+        Weight::Drypoint | Weight::Etching => (0.0, 0.35),
+        // てざわりの整理 (step 3 B): the wash soaks into the paper; the pastel
+        // and the knife's paint sit on its tooth.
+        Weight::Watercolor => (1.2, 0.35),
+        Weight::OilPastel => (0.05, 0.45),
+        Weight::PaintingKnife => (0.02, 0.10),
         Weight::Burin => (0.0, 0.10),
         Weight::Rotring | Weight::Computer => (0.0, 0.0),
     }

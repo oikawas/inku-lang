@@ -81,8 +81,18 @@ pub const fn grammar(weight: Weight) -> ToolGrammar {
         },
         Weight::Crayon => hand_grammar!(0.48, 0.60, 0.38, 0.34, 0.75, 0.14, 0.18, 0.06, 0.72, 1.0),
         Weight::Chalk => hand_grammar!(0.42, 0.56, 0.42, 0.38, 0.90, 0.18, 0.20, 0.07, 0.80, 1.13),
-        Weight::BrushThin => {
+        Weight::BrushThin | Weight::Gouache => {
             hand_grammar!(0.36, 0.52, 0.66, 0.48, 0.48, 0.88, 0.28, 0.10, 0.90, 1.0)
+        }
+        // てざわりの整理 (step 3 B): a wet, soft brush; a blunt stick; a stiff blade.
+        Weight::Watercolor => {
+            hand_grammar!(0.32, 0.50, 0.72, 0.50, 0.45, 0.90, 0.30, 0.11, 0.95, 1.0)
+        }
+        Weight::OilPastel => {
+            hand_grammar!(0.52, 0.62, 0.22, 0.24, 0.30, 0.03, 0.08, 0.05, 0.65, 1.0)
+        }
+        Weight::PaintingKnife => {
+            hand_grammar!(0.80, 0.88, 0.06, 0.05, 0.03, 0.01, 0.02, 0.015, 0.30, 1.0)
         }
         Weight::BrushThick => {
             hand_grammar!(0.30, 0.48, 0.78, 0.55, 0.58, 0.92, 0.34, 0.13, 1.00, 1.0)
@@ -91,7 +101,7 @@ pub const fn grammar(weight: Weight) -> ToolGrammar {
             hand_grammar!(0.42, 0.78, 0.30, 0.18, 0.08, 0.18, 0.20, 0.035, 0.65, 1.0)
         }
         Weight::Burin => hand_grammar!(0.91, 0.86, 0.58, 0.09, 0.08, 0.98, 1.0, 0.018, 0.10, 1.0),
-        Weight::Drypoint => {
+        Weight::Drypoint | Weight::Etching => {
             hand_grammar!(0.68, 0.70, 0.44, 0.20, 0.45, 0.55, 0.48, 0.05, 0.45, 1.0)
         }
         Weight::Computer => ToolGrammar {

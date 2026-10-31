@@ -2200,8 +2200,8 @@ const EXAMPLE_DESCRIPTION: [&str; 2] = [
 /// The example's layers, the prototype's in the table the request prints.
 const EXAMPLE_LAYERS: [&str; 4] = [
     LAYER_COLUMNS,
-    "0 | line | brush_thick | 1 | black | false | place | 0.3,0.2,0.7,0.9 | 0.7,0.0",
-    "1 | circle | brush_thin | 7 | red | true | place | 0.4,0.2,0.6,0.4 | 0.03,0.03",
+    "0 | line | gouache | 1 | black | false | place | 0.3,0.2,0.7,0.9 | 0.7,0.0",
+    "1 | circle | watercolor | 7 | red | true | place | 0.4,0.2,0.6,0.4 | 0.03,0.03",
     "2 | point | chalk | 40 | white | true | scatter | 0.0,0.0,1.0,1.0 | 0.004,0.004",
 ];
 

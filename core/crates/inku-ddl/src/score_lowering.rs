@@ -3977,7 +3977,9 @@ fn lower_verified_stage15_shared<'a>(
         ScoreLoweringOutcome::Complete
     };
     let score = (objects.is_none() && outcome != ScoreLoweringOutcome::Stopped).then(|| Score {
-        version: if !object_templates.is_empty() {
+        version: if inku_score::instructions_use_tools_of_edition_0_24(&instructions) {
+            inku_score::ScoreEdition::V0_24.as_str().to_owned()
+        } else if !object_templates.is_empty() {
             inku_score::ScoreEdition::V0_23.as_str().to_owned()
         } else if inku_score::instructions_use_brushmarks(&instructions) {
             inku_score::ScoreEdition::V0_22.as_str().to_owned()

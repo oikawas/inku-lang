@@ -13,10 +13,10 @@ use sha2::{Digest, Sha256};
 use crate::ResolvedInstructionLanguage;
 
 /// Stable identity for the Saijiki asset semantics.
-pub const SAIJIKI_ASSET_ID: &str = "inku.saijiki.v2";
+pub const SAIJIKI_ASSET_ID: &str = "inku.saijiki.v3";
 
 /// The exact embedded UTF-8 source bytes for this asset edition.
-pub const SAIJIKI_ASSET_BYTES: &[u8] = include_bytes!("../assets/saijiki-v2.json");
+pub const SAIJIKI_ASSET_BYTES: &[u8] = include_bytes!("../assets/saijiki-v3.json");
 
 /// Identity of the retired first edition. Its asset is embedded only so that saved documents
 /// and Macro definitions written with it can be migrated once to the current edition (SPEC
@@ -25,17 +25,26 @@ pub const SAIJIKI_V1_ASSET_ID: &str = "inku.saijiki.v1";
 
 const SAIJIKI_V1_ASSET_BYTES: &[u8] = include_bytes!("../assets/saijiki-v1.json");
 
+/// Identity of the retired second edition (2026-09-29 to the touch reorganisation of
+/// 2026-10-31). Like the first, it is embedded only for the one-time migration of saved
+/// documents and Macro definitions, and to name the tools of saved Scores it drew.
+pub const SAIJIKI_V2_ASSET_ID: &str = "inku.saijiki.v2";
+
+const SAIJIKI_V2_ASSET_BYTES: &[u8] = include_bytes!("../assets/saijiki-v2.json");
+
 /// The Saijiki edition a reader recognizes words from.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum SaijikiEdition {
-    /// The retired edition, read only by the migration.
+    /// The retired first edition, read only by the migration.
     V1,
+    /// The retired second edition, read only by the migration.
     V2,
+    V3,
 }
 
 impl SaijikiEdition {
     /// The edition every compilation reads.
-    pub(crate) const CURRENT: Self = Self::V2;
+    pub(crate) const CURRENT: Self = Self::V3;
 
     pub(crate) fn asset(self) -> &'static SaijikiAsset {
         match self {
@@ -43,16 +52,27 @@ impl SaijikiEdition {
                 serde_json::from_slice(SAIJIKI_V1_ASSET_BYTES)
                     .expect("embedded inku.saijiki.v1 asset must remain valid JSON")
             }),
-            Self::V2 => saijiki_asset(),
+            Self::V2 => saijiki_v2_asset(),
+            Self::V3 => saijiki_asset(),
         }
     }
 
     pub(crate) fn asset_id(self) -> &'static str {
         match self {
             Self::V1 => SAIJIKI_V1_ASSET_ID,
-            Self::V2 => SAIJIKI_ASSET_ID,
+            Self::V2 => SAIJIKI_V2_ASSET_ID,
+            Self::V3 => SAIJIKI_ASSET_ID,
         }
     }
+}
+
+/// The retired second edition's asset, parsed once. Only the migration and the names of
+/// the tools that saved Scores still carry read it.
+pub fn saijiki_v2_asset() -> &'static SaijikiAsset {
+    SAIJIKI_V2_ASSET.get_or_init(|| {
+        serde_json::from_slice(SAIJIKI_V2_ASSET_BYTES)
+            .expect("embedded inku.saijiki.v2 asset must remain valid JSON")
+    })
 }
 
 /// Lossless bilingual representation of the versioned Saijiki source asset.
@@ -451,6 +471,7 @@ pub(crate) fn connected_endpoint_phrase(
 static SAIJIKI_ASSET: OnceLock<SaijikiAsset> = OnceLock::new();
 static SAIJIKI_ASSET_SHA256_HEX: OnceLock<String> = OnceLock::new();
 static SAIJIKI_V1_ASSET: OnceLock<SaijikiAsset> = OnceLock::new();
+static SAIJIKI_V2_ASSET: OnceLock<SaijikiAsset> = OnceLock::new();
 
 /// Return the parsed embedded asset, parsing it exactly once per process.
 ///
@@ -459,7 +480,7 @@ static SAIJIKI_V1_ASSET: OnceLock<SaijikiAsset> = OnceLock::new();
 pub fn saijiki_asset() -> &'static SaijikiAsset {
     SAIJIKI_ASSET.get_or_init(|| {
         serde_json::from_slice(SAIJIKI_ASSET_BYTES)
-            .expect("embedded inku.saijiki.v2 asset must remain valid JSON")
+            .expect("embedded inku.saijiki.v3 asset must remain valid JSON")
     })
 }
 

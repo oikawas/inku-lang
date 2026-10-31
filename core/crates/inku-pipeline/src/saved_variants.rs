@@ -23,7 +23,7 @@ use sha2::{Digest, Sha256};
 
 use crate::identity::python_strip;
 use crate::laws_record::LawsLayerRecord;
-use crate::retouch::{Retouch, retouch, retouch_with_record, tools};
+use crate::retouch::{Retouch, readable_tools, retouch, retouch_with_record, tools};
 
 pub const SAVED_VARIANTS_SCHEMA_ID: &str = "inku.saved-variants.v1";
 
@@ -71,8 +71,14 @@ fn default_tool() -> String {
         .unwrap_or_else(|| "pen".to_owned())
 }
 
+/// The tools a work can be given: the current Saijiki's.
 fn tool_values() -> Vec<String> {
     tools().into_iter().map(|tool| tool.value).collect()
+}
+
+/// The tools a saved Score can name, the retired ones included.
+fn readable_tool_values() -> Vec<String> {
+    readable_tools().into_iter().map(|tool| tool.value).collect()
 }
 
 /// The source instruction an instruction of the Score was drawn for.
@@ -98,7 +104,7 @@ fn score_instructions(score: &Value) -> &[Value] {
 /// (`tool_variants.drawn_tools`).
 #[must_use]
 pub fn drawn_tools(score: &Value, sentences: &[usize]) -> BTreeMap<usize, String> {
-    let known = tool_values();
+    let known = readable_tool_values();
     let default = default_tool();
     let mut drawn = BTreeMap::new();
     for instruction in score_instructions(score) {
@@ -127,9 +133,15 @@ pub fn drawn_tools(score: &Value, sentences: &[usize]) -> BTreeMap<usize, String
 
 /// The saved Score with each asked sentence's instructions drawn with its tool
 /// (`tool_variants.score_with_tools`).
+///
+/// A tool of Saijiki v3 needs Score 0.24.0, so a saved Score of an earlier
+/// edition that takes one is raised to 0.24.0; the editions accumulate, so the
+/// rest of the Score keeps its fields. A Score before 0.20.0 then joins a line
+/// to the nearest point of a closed shape's outline, as every current Score does.
 #[must_use]
 pub fn score_with_tools(score: &Value, asked: &BTreeMap<usize, String>) -> Value {
     let mut changed = score.clone();
+    let mut takes_edition_0_24 = false;
     if let Some(instructions) = changed
         .get_mut("instructions")
         .and_then(Value::as_array_mut)
@@ -140,11 +152,39 @@ pub fn score_with_tools(score: &Value, asked: &BTreeMap<usize, String>) -> Value
                 index.and_then(|index| asked.get(&index)),
                 instruction.as_object_mut(),
             ) {
+                takes_edition_0_24 |= tool_requires_edition_0_24(tool);
                 object.insert("weight".to_owned(), Value::String(tool.clone()));
             }
         }
     }
+    if takes_edition_0_24 {
+        raise_to_edition_0_24(&mut changed);
+    }
     changed
+}
+
+fn tool_requires_edition_0_24(tool: &str) -> bool {
+    inku_score::Weight::ALL
+        .iter()
+        .any(|weight| weight.requires_edition_0_24() && weight.as_str() == tool)
+}
+
+/// Raise the Score's version to 0.24.0 unless it already names that edition or
+/// a later one. A Score without a version is read as 0.9.0.
+fn raise_to_edition_0_24(score: &mut Value) {
+    let edition = score
+        .get("version")
+        .and_then(Value::as_str)
+        .map_or(Some(inku_score::ScoreEdition::V0_9), inku_score::ScoreEdition::parse);
+    if edition.is_some_and(|edition| edition >= inku_score::ScoreEdition::V0_24) {
+        return;
+    }
+    if let Some(object) = score.as_object_mut() {
+        object.insert(
+            "version".to_owned(),
+            Value::String(inku_score::ScoreEdition::V0_24.as_str().to_owned()),
+        );
+    }
 }
 
 /// A small seeded generator (SplitMix64): the host passes a new seed each time
@@ -303,9 +343,11 @@ impl TouchWork<'_> {
     }
 }
 
+/// Every tool's names, the retired ones included, so a host can name the tool a
+/// saved Score was drawn with as well as the ones offered.
 fn tool_labels() -> Value {
     Value::Array(
-        tools()
+        readable_tools()
             .into_iter()
             .map(|tool| json!({"value": tool.value, "ja": tool.ja, "en": tool.en}))
             .collect(),

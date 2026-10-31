@@ -466,7 +466,9 @@ pub fn materialize_selected_composition(
         })
         .collect::<Vec<_>>();
     let score = Score {
-        version: if !object_templates.is_empty() {
+        version: if inku_score::instructions_use_tools_of_edition_0_24(&instructions) {
+            inku_score::ScoreEdition::V0_24
+        } else if !object_templates.is_empty() {
             inku_score::ScoreEdition::V0_23
         } else if inku_score::instructions_use_brushmarks(&instructions) {
             inku_score::ScoreEdition::V0_22

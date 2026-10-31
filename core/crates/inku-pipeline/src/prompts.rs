@@ -2042,7 +2042,7 @@ fn stage1_ordered_placement_grammar_ja() -> String {
     let repeating = MarkerId::JaRepeat.surface();
     let group = MarkerId::JaGroup.surface();
     format!(
-        "順序が明示された配置は「赤{to}灰{wo}交互に{sequence_te}、円{wo}五つ並べる。」「鉛筆{to}太筆{wo}交互に{sequence_te}、線{wo}五本並べる。」「赤い円・青い線・灰{no}弧{no}順に{repeating}、八つ並べる。」のように書く。まとまりは括弧内の命令にせず、「赤い円{to}青い線{no}{group}{wo}、灰{no}弧{to}交互に5つ並べる。」のように名詞句で書く。組と単独図形を合わせた総数5なので、円と線の組3つ、弧2つになる。交互には2項、順には空でない有限列を使い、項の順序と重複を保つ。同じ有限列を散らす・敷き詰める・埋めるにも使える。総個数へ列長や組の中の図形数を掛けない。順序のない複数の指定から交互や循環を推測しない。"
+        "順序が明示された配置は「赤{to}灰{wo}交互に{sequence_te}、円{wo}五つ並べる。」「鉛筆{to}ガッシュ{wo}交互に{sequence_te}、線{wo}五本並べる。」「赤い円・青い線・灰{no}弧{no}順に{repeating}、八つ並べる。」のように書く。まとまりは括弧内の命令にせず、「赤い円{to}青い線{no}{group}{wo}、灰{no}弧{to}交互に5つ並べる。」のように名詞句で書く。組と単独図形を合わせた総数5なので、円と線の組3つ、弧2つになる。交互には2項、順には空でない有限列を使い、項の順序と重複を保つ。同じ有限列を散らす・敷き詰める・埋めるにも使える。総個数へ列長や組の中の図形数を掛けない。順序のない複数の指定から交互や循環を推測しない。"
     )
 }
 
@@ -2141,14 +2141,14 @@ fn standalone_shape_grammar_ja() -> String {
     let no = MarkerId::JaNo.surface();
     format!(
         r#"各単独図形命令を「[<位置句>] [<head前修飾句>]<head>{wo} [<並べる配置方向句>] [<数量句>] <動作>。」として組み立てる。位置句は受理位置に「{ni}」を一つ付けた句、headは描画対象一つ、数量句は数と対象に合う助数詞一つを結合した句である。数量句が既に助数詞を含むなら、命令への接続時に助数詞を加えない。動作はうごきの語形で文末を閉じる。
-色・道具・線の連続性・図形の向き・面・揺らぎ・比率・相対寸法・太さ・形・辺数はhead前修飾句へまとめる。名詞修飾は「{no}」、形容修飾は受理された形容形でheadへ結ぶ。修飾句はhead直前の接続までを含み、head自体は含まない。接続例は「赤いペンの実線の空の」＋「円」、「青いクレヨンの塗りの」＋「四角」。境界に接続語を再挿入せず、面の名詞を動詞の連体節へ展開しない。例は接続だけを示し、属性・対象・構図を今回の記述へ転写しない。
+色・道具・線の連続性・図形の向き・面・揺らぎ・比率・相対寸法・太さ・形・辺数はhead前修飾句へまとめる。名詞修飾は「{no}」、形容修飾は受理された形容形でheadへ結ぶ。修飾句はhead直前の接続までを含み、head自体は含まない。接続例は「赤いペンの実線の空の」＋「円」、「青いチョークの塗りの」＋「四角」。境界に接続語を再挿入せず、面の名詞を動詞の連体節へ展開しない。例は接続だけを示し、属性・対象・構図を今回の記述へ転写しない。
 accepted_saijiki_vocabularyのわりあい行で弧形を表す語は独立headにせず、対応する弧headの直前へ名詞修飾として一つ結ぶ。「<受理済みの弧形語>{no}弧」の形を使い、その弧の既存arc_formを決める。非弧headへ転用しない。
 図形の向きはhead前、並べる配置方向句は受理方向語に「{ni}」を一つ付けてhead後へ置く。揺らぎもhead前の属性として結び、動作の前後へ説明句として移さない。配置方向を省略した「並べる」は既定で横の左から右なので、その既定だけを言い直す語句は省く。出力前に全ての単独図形命令で、修飾句とhead、headと「{wo}」、数量句、文末動作がこの構造で結ばれることを照合する。組・順序配置・関係はそれぞれの既存構文を使い、この単独図形骨格へ縮約しない。照合内容は出力しない。"#
     )
 }
 
 const STANDALONE_SHAPE_GRAMMAR_EN: &str = r#"Assemble every standalone drawing command as <action> [<quantity>] [<pre-head modifier phrase>] <head> [<accepted line-up direction adverb>] [<position phrase>] [<complete accepted relation literal>]. A quantity is one complete count expression, the head names one drawing subject, and a position phrase contains one position preposition and the accepted place. Do not repeat a connector or count component when joining complete slots. Use an accepted movement word as the command's action.
-Keep color, tool, continuity, shape angle, surface, fluctuation, proportion, relative size, thinness, shape form, and sides in the pre-head modifier phrase. That phrase excludes the final head: "red pen solid empty" + "circle", or "blue crayon flat" + "square". Do not insert another connector at this boundary or expand a surface noun into a verbal relative clause. These examples show attachment only; do not copy their attributes, subjects, or composition.
+Keep color, tool, continuity, shape angle, surface, fluctuation, proportion, relative size, thinness, shape form, and sides in the pre-head modifier phrase. That phrase excludes the final head: "red pen solid empty" + "circle", or "blue chalk flat" + "square". Do not insert another connector at this boundary or expand a surface noun into a verbal relative clause. These examples show attachment only; do not copy their attributes, subjects, or composition.
 An arc-form term in the proportions row of accepted_saijiki_vocabulary is never an independent head. Attach one immediately before its corresponding arc head as an accepted noun modifier, in the form "<accepted arc-form term> arc"; it selects that arc's existing arc_form. Do not attach it to a non-arc head.
 Shape angles are pre-head adjectives; accepted line-up directions are post-head adverbs. Fluctuation also modifies the head rather than becoming extra wording around the action. Line-up defaults to horizontal left-to-right when direction is omitted; omit wording that only restates this default. Before output, check every standalone command's modifier/head boundary, quantity, action, and position against this structure. Groups, ordered placements, and relations retain their own existing grammar and must not be reduced to this standalone form. Do not output the checks."#;
 

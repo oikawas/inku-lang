@@ -58,12 +58,17 @@ pub(crate) const fn build_for_tool(weight: Weight) -> Build {
         | Weight::Rotring
         | Weight::Computer
         | Weight::Burin
-        | Weight::Drypoint => Build::Geometric,
+        | Weight::Drypoint
+        | Weight::Etching => Build::Geometric,
         Weight::Crayon
         | Weight::Chalk
         | Weight::BrushThin
         | Weight::BrushThick
-        | Weight::OilPaint => Build::Mixed,
+        | Weight::OilPaint
+        | Weight::Gouache
+        | Weight::Watercolor
+        | Weight::OilPastel
+        | Weight::PaintingKnife => Build::Mixed,
     }
 }
 

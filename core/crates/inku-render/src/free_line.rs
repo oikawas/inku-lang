@@ -899,6 +899,9 @@ mod tests {
             .iter()
             .filter(|weight| build_for_tool(**weight) == Build::Geometric)
             .count();
-        assert_eq!((geometric, Weight::ALL.len() - geometric), (7, 5));
+        // Saijiki v3 (2026-10-31) added etching to the fine points and gouache,
+        // watercolour, oil pastel and the painting knife to the broad tools; the six
+        // it retired stay for saved Scores.
+        assert_eq!((geometric, Weight::ALL.len() - geometric), (8, 9));
     }
 }

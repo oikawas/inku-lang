@@ -1214,7 +1214,9 @@ mod tests {
     fn a_touch_change_is_planned_and_drawn_through_the_json_boundary() {
         let mut config = crate::focused_flow::config();
         config.language = ResolvedInstructionLanguage::Ja;
-        let source = "背景を白で埋める。\n青の細筆の線を3個引く。\n赤の大きな円を1個置く。";
+        // A work saved before Saijiki v3: its DDL migrated (細筆 → ガッシュ), its Score
+        // kept as saved (brush_thin), so the plan names the tool the work was drawn with.
+        let source = "背景を白で埋める。\n青のガッシュの線を3個引く。\n赤の大きな円を1個置く。";
         let score = json!({"instructions": [
             {"weight": "brush_thin", "arrangement": {"resolved": {"owner": {"kind": "source_instruction", "instruction_index": 0}}}},
             {"arrangement": {"resolved": {"owner": {"kind": "source_instruction", "instruction_index": 1}}}},
@@ -1236,7 +1238,7 @@ mod tests {
         assert_eq!(drawn["outcome"], "ok", "{drawn}");
         assert_eq!(
             drawn["ddl"],
-            "背景を白で埋める。\n青の細筆の線を3個引く。\n赤の大きなチョークの円を1個置く。"
+            "背景を白で埋める。\n青のガッシュの線を3個引く。\n赤の大きなチョークの円を1個置く。"
         );
         assert_eq!(drawn["score"]["instructions"][1]["weight"], "chalk");
         assert_eq!(
@@ -1263,7 +1265,7 @@ mod tests {
     fn a_touch_change_writes_the_laws_record_for_the_child_source() {
         let mut config = crate::focused_flow::config();
         config.language = ResolvedInstructionLanguage::Ja;
-        let source = "背景を白で埋める。\n青の細筆の線を3個引く。\n赤の大きな円を1個置く。";
+        let source = "背景を白で埋める。\n青のガッシュの線を3個引く。\n赤の大きな円を1個置く。";
         let score = json!({"instructions": [
             {"weight": "brush_thin", "arrangement": {"resolved": {"owner": {"kind": "source_instruction", "instruction_index": 0}}}},
             {"arrangement": {"resolved": {"owner": {"kind": "source_instruction", "instruction_index": 1}}}},

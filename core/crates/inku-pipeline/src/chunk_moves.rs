@@ -2271,8 +2271,9 @@ mod tests {
     }
 
     /// The author's second run (2026-10-27): a merge drew its chunk as one
-    /// shape of two colors, and the compile left the shape out.
-    const TWO_COLORS: &str = "画面の横0.6、縦0.38の位置に、幅0.1、高さ0.34の回転340.0度の赤と緑の太筆の刷きの雲形を1個置く。";
+    /// shape of two colors, and the compile left the shape out. Its 太筆 is
+    /// written as Saijiki v3 migrates it (太いガッシュ, 2026-10-31).
+    const TWO_COLORS: &str = "画面の横0.6、縦0.38の位置に、幅0.1、高さ0.34の回転340.0度の赤と緑の太いガッシュの刷きの雲形を1個置く。";
 
     #[test]
     fn a_redrawn_line_the_compiler_would_not_draw_is_asked_again_with_its_reason() {
@@ -2308,7 +2309,7 @@ mod tests {
     #[test]
     fn a_line_the_parent_does_not_draw_either_is_not_asked_again() {
         let parent = format!(
-            "{LIGHTHOUSE}\n画面の横0.5、縦0.9の位置に、幅0.6、高さ0.08の赤と緑の太筆の刷きの雲形を1個置く。"
+            "{LIGHTHOUSE}\n画面の横0.5、縦0.9の位置に、幅0.6、高さ0.08の赤と緑の太いガッシュの刷きの雲形を1個置く。"
         );
         let found = new_problems(&config(), &Doc::of(LIGHTHOUSE), &Doc::of(&parent));
         assert!(

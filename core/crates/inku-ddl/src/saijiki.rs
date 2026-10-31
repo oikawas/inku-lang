@@ -1700,32 +1700,31 @@ mod tests {
     fn tool_guidance_is_bilingual_ordered_and_prompt_only() {
         let ja = saijiki_tool_guidance(ResolvedInstructionLanguage::Ja).unwrap();
         let en = saijiki_tool_guidance(ResolvedInstructionLanguage::En).unwrap();
+        // Saijiki v3 (2026-10-31): the eleven tools in the asset's order.
         let expected_ja = [
             "銀筆",
             "鉛筆",
             "ペン",
-            "ロットリング",
-            "クレヨン",
             "チョーク",
-            "細筆",
-            "太筆",
+            "オイルパステル",
+            "ガッシュ",
+            "水彩",
             "油彩",
-            "ビュラン",
-            "ドライポイント",
+            "ペインティングナイフ",
+            "エッチング",
             "コンピュータ",
         ];
         let expected_en = [
             "silverpoint",
             "pencil",
             "pen",
-            "rotring",
-            "crayon",
             "chalk",
-            "fine-brush",
-            "thick-brush",
+            "oil pastel",
+            "gouache",
+            "watercolor",
             "oil paint",
-            "burin",
-            "drypoint",
+            "painting knife",
+            "etching",
             "computer",
         ];
         let ja_lines = ja.lines().collect::<Vec<_>>();

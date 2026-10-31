@@ -1650,10 +1650,10 @@ mod tests {
         assert_eq!(hole.allowed_span.end_byte, 65);
 
         let mut candidate =
-            compile("背景を黒で埋める。太筆の黒い四角を中心に置く。面: 粗く塗りつぶす。");
+            compile("背景を黒で埋める。太いガッシュの黒い四角を中心に置く。面: 粗く塗りつぶす。");
         let range = SourceSpan {
             start_byte: 0,
-            end_byte: "背景を黒で埋める。太筆の黒い四角を中心に置く。".len(),
+            end_byte: "背景を黒で埋める。太いガッシュの黒い四角を中心に置く。".len(),
         };
         assert_eq!(
             candidate.compiler_lock.as_ref().unwrap().state,

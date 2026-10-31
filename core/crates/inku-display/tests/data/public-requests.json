@@ -1,12 +1,12 @@
 {
  "schema": "inku-display.public-requests.v1",
- "note": "Public DDL from the product (product/main d9cd41978e26ce6d1cbce0c68e95ad5eecdea7a9), chosen in Skia display stage 1 so that the core writes every compatibility case: pattern href (brush marks), use href with a white alpha mask (burin dots), stitchTiles (ink spread), the paper ground's ellipse gradient and large seeds.",
+ "note": "Public DDL from the product (product/main d9cd41978e26ce6d1cbce0c68e95ad5eecdea7a9), chosen in Skia display stage 1 so that the core writes every compatibility case: pattern href (brush marks), use href with a white alpha mask (burin dots), stitchTiles (ink spread), the paper ground's ellipse gradient and large seeds. Saijiki v3 (2026-10-31) migrated the DDL: the burin dots of p00 and p01 became etching, which the media draw without the mask, and no DDL writes the mask any more (the burin and the drypoint stay for saved Scores only), so the test replays a saved Score's burin dot for that case.",
  "works": [
   {
    "id": "p00",
    "from": "core/crates/inku-pipeline/tests/data/recompose-v1.json",
    "at": "$.cases[24].source",
-   "why": "エッチングの点（useのhref＋alpha mask）と筆の模様",
+   "why": "エッチングの点（v3 の移行の前はビュランの点で useのhref＋alpha mask。今は媒体が描き、mask は無い）と筆の模様",
    "language": "ja",
    "render_seed": "1",
    "canvas": "square",

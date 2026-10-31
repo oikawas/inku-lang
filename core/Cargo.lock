@@ -741,6 +741,7 @@ version = "0.1.0"
 dependencies = [
  "inku-ddl",
  "inku-pipeline",
+ "inku-render",
  "inku-svg-raster",
  "jni",
  "png",

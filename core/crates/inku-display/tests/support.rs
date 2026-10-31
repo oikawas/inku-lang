@@ -11,6 +11,8 @@ use inku_pipeline::core_boundary::{
     ClipPolicy, CompilerOptions, compile_committed, render_delivery,
 };
 use inku_pipeline::machine::{PipelineRenderOptions, VisibleDocument};
+use inku_render::render::render;
+use inku_render::types::{CanvasSize, RenderOptions, RenderRequest, Score, SvgProfile};
 use serde_json::Value;
 
 fn compat(name: &str) -> String {
@@ -182,6 +184,20 @@ fn the_current_core_draws_the_public_ddl_inside_the_table() {
         compared += 1;
     }
     assert_eq!(compared, 17);
+    // Saijiki v3 (2026-10-31) took the burin and the drypoint out of the DDL: the burin
+    // dots of p00 and p01 became etching, which the media draw without the white alpha
+    // mask, and no DDL writes the mask any more. Saved Scores keep both tools and replay
+    // on the current core, so a saved Score's burin dot keeps the case reached.
+    let dot = saved_burin_dot();
+    assert!(
+        dot.contains("mask-type:alpha"),
+        "the saved burin dot writes no alpha mask"
+    );
+    *written.entry("alpha mask").or_default() += 1;
+    let display = display_svg(&dot).unwrap_or_else(|error| panic!("saved burin dot: {error}"));
+    totals.href += display.rewrites.href;
+    totals.ellipse += display.rewrites.ellipse;
+    totals.seed += display.rewrites.seed;
     // The material still reaches every case the table and the rewrites are for.
     for case in [
         "pattern href",
@@ -239,6 +255,32 @@ fn the_current_core_draws_every_ground_inside_the_table() {
     assert_eq!(compared, 7);
     // The canvas ground still writes the case the table holds it for.
     assert!(dash_offsets > 0, "no ground writes stroke-dashoffset");
+}
+
+/// A dot of a saved Score's burin (a tool Saijiki v3 keeps for saved Scores only),
+/// replayed by the current core as a display SVG.
+fn saved_burin_dot() -> String {
+    let score: Score = serde_json::from_str(
+        r#"{"instructions":[{"primitive":"circle","center":[0.85,0.8],"radius":0.02,
+            "filled":true,"weight":"burin","color":"black","surface":{"texture":"solid"}}]}"#,
+    )
+    .expect("a saved Score");
+    render(RenderRequest {
+        score,
+        options: RenderOptions {
+            resolved_color_map: BTreeMap::new(),
+            catalog_id: None,
+            canvas: CanvasSize::new(1000.0, 1000.0),
+            canvas_aspect_id: "square".to_owned(),
+            svg_profile: SvgProfile::Display,
+            render_seed: Some(1),
+            composition_seed: None,
+            wild: false,
+            error_policy: Default::default(),
+        },
+    })
+    .expect("the saved Score replays")
+    .svg
 }
 
 /// One public work's DDL `source` drawn through the compile and render boundary the

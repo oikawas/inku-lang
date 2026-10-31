@@ -377,11 +377,12 @@ mod tests {
     }
 
     #[test]
-    fn the_saijiki_names_twelve_tools() {
+    fn the_saijiki_names_eleven_tools() {
         let read = answer("背景を白で埋める。", "ja", json!({}));
         assert_eq!(read["schema"], RETOUCH_SCHEMA_ID);
         let tools = read["tools"].as_array().expect("tools");
-        assert_eq!(tools.len(), 12);
+        // Saijiki v3 (2026-10-31): the six retired tools are not offered.
+        assert_eq!(tools.len(), 11);
         assert_eq!(
             tools[0],
             json!({"value": "silverpoint", "ja": "銀筆", "en": "silverpoint"})
@@ -390,12 +391,12 @@ mod tests {
 
     #[test]
     fn a_written_tool_is_replaced_and_a_missing_one_is_written_before_the_shape() {
-        let source = "背景を白で埋める。\n青の細筆の線を3個引く。\n赤の大きな円を1個置く。";
+        let source = "背景を白で埋める。\n青のガッシュの線を3個引く。\n赤の大きな円を1個置く。";
         let read = answer(source, "ja", json!({}));
         assert_eq!(read["outcome"], "read", "{read}");
         assert_eq!(
             read["sentences"],
-            json!([{"index": 0, "tool": "brush_thin"}, {"index": 1, "tool": null}])
+            json!([{"index": 0, "tool": "gouache"}, {"index": 1, "tool": null}])
         );
         let changed = answer(source, "ja", json!({"0": "chalk", "1": "chalk"}));
         assert_eq!(changed["outcome"], "retouched", "{changed}");
@@ -406,18 +407,18 @@ mod tests {
         let one = answer(source, "ja", json!({"1": "oil_paint"}));
         assert_eq!(
             one["source"],
-            "背景を白で埋める。\n青の細筆の線を3個引く。\n赤の大きな油彩の円を1個置く。"
+            "背景を白で埋める。\n青のガッシュの線を3個引く。\n赤の大きな油彩の円を1個置く。"
         );
     }
 
     #[test]
     fn english_sentences_take_the_english_words() {
-        let source = "Fill the background with black.\nScatter 9 green thin fine-brush small lines.\nPlace one gray large cloudform.";
-        let changed = answer(source, "en", json!({"0": "drypoint", "1": "oil_paint"}));
+        let source = "Fill the background with black.\nScatter 9 green thin gouache small lines.\nPlace one gray large cloudform.";
+        let changed = answer(source, "en", json!({"0": "etching", "1": "painting_knife"}));
         assert_eq!(changed["outcome"], "retouched", "{changed}");
         assert_eq!(
             changed["source"],
-            "Fill the background with black.\nScatter 9 green thin drypoint small lines.\nPlace one gray large oil paint cloudform."
+            "Fill the background with black.\nScatter 9 green thin etching small lines.\nPlace one gray large painting knife cloudform."
         );
     }
 

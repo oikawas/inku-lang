@@ -56,7 +56,7 @@ def test_raises_when_resvg_is_absent(monkeypatch):
     It used to fall through to cairosvg, which drops the material filters and
     returns a PNG that looks cleaner than the work is.
     """
-    _block_imports(monkeypatch, "resvg_py")
+    _block_imports(monkeypatch, "inku_render")
     assert rasterizer_backend() is None
     with pytest.raises(RasterizerUnavailable):
         svg_to_png(PLAIN_SVG, width=64)
@@ -65,7 +65,7 @@ def test_raises_when_resvg_is_absent(monkeypatch):
 def test_installing_cairosvg_does_not_bring_a_fallback_back(monkeypatch):
     """cairosvg being importable in some environment must not make it reachable."""
     pytest.importorskip("cairosvg")
-    _block_imports(monkeypatch, "resvg_py")
+    _block_imports(monkeypatch, "inku_render")
     with pytest.raises(RasterizerUnavailable):
         svg_to_png(PLAIN_SVG, width=64)
 
@@ -199,7 +199,7 @@ def test_rasterizer_info_identifies_backend_and_version():
 
 
 def test_rasterizer_info_is_empty_without_resvg(monkeypatch):
-    _block_imports(monkeypatch, "resvg_py")
+    _block_imports(monkeypatch, "inku_render")
     assert rasterizer_info() == {}
 
 

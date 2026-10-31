@@ -4,7 +4,6 @@ version = "0.1.0"
 description = "Read-only composition mirrors and SVG rasterization shared by inku server and CLI"
 requires-python = ">=3.12"
 dependencies = [
-    "resvg-py>=0.3.4",
     # `raster_metrics` opens the PNGs. It worked before this line because the
     # server and the CLI each declare pillow and this package is installed
     # editable beside them -- an accident of the layout, not a declaration.

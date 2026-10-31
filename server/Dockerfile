@@ -61,9 +61,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     UV_PYTHON_PREFERENCE=only-system \
     UV_PYTHON_DOWNLOADS=never
 
-# libcairo2 was here for cairosvg, which v2.7.10 removed entirely. resvg-py is
-# a wheel and needs no OS library of its own, so nothing in the image links
-# against cairo any more.
+# The shared core wheel supplies the resvg rasterizer; cairo is not required.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/* \

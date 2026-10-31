@@ -126,7 +126,7 @@ def test_the_instructions_name_the_new_ground():
     assert ddl("Fill the background with blue.", "charcoal_ground", "en") == "Charcoal ground.\nFill the background with blue."
 
 
-def test_the_saijiki_names_twelve_tools_with_the_pen_as_default():
-    assert CASES["conditions"]["tools"] == ["silverpoint", "pencil", "pen", "rotring", "crayon", "chalk", "brush_thin",
-                                            "brush_thick", "oil_paint", "burin", "drypoint", "computer"]
+def test_the_saijiki_names_eleven_tools_with_the_pen_as_default():
+    assert CASES["conditions"]["tools"] == ["silverpoint", "pencil", "pen", "chalk", "oil_pastel", "gouache",
+                                            "watercolor", "oil_paint", "painting_knife", "etching", "computer"]
     assert CASES["conditions"]["default_tool"] == "pen"

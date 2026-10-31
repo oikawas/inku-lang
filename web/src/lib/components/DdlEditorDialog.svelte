@@ -9,7 +9,7 @@
 	import { restoreWorkActionFocus } from './WorkActionMenu.svelte';
 	import type { Provider, ProviderGroup } from '$lib/models';
 	import type { PluginEntry, PreviewForPlugin, PreviewForWord } from '$lib/features/ddl-editor/types';
-	import { parseDdlImport, type ImportedPlugin } from '$lib/features/ddl-editor/ddl-import';
+	import { importDdl, type ImportedPlugin } from '$lib/features/ddl-editor/ddl-import';
 	import type { ProviderAttemptCount } from '$lib/paintStream';
 	import type { CompositionRange } from '$lib/composition-ranges';
 	import type { RangeEditorStatus } from '$lib/features/ddl-editor/codemirror-ranges';
@@ -58,6 +58,7 @@
 	let value = $state('');
 	let importedPlugins = $state<ImportedPlugin[]>([]);
 	let importedNames = $state<string[]>([]);
+	let importedEdits = $state<number | null>(null);
 	let importError = $state<string | null>(null);
 	let importInput = $state<HTMLInputElement>();
 	let rangeStatus = $state<RangeEditorStatus>({ preview: null, invalid: false, composing: false });
@@ -69,10 +70,11 @@
 		if (!file) return;
 		importError = null;
 		try {
-			const read = parseDdlImport(await file.text(), isJapanese ? 'ja' : 'en');
+			const read = await importDdl(await file.text(), isJapanese ? 'ja' : 'en', apiFetch);
 			value = read.ddl;
 			importedPlugins = read.plugins;
 			importedNames = read.names;
+			importedEdits = read.edits;
 		} catch (error) {
 			importError = error instanceof Error && error.message === 'ddl_export_requires_v2'
 				? t().ddlImportRequiresV2 : t().ddlImportInvalid;
@@ -104,6 +106,7 @@
 			value = initialDdl;
 			importedPlugins = [];
 			importedNames = [];
+			importedEdits = null;
 			importError = null;
 			rangeStatus = { preview: null, invalid: false, composing: false };
 			void tick().then(() => editor?.focus());
@@ -204,6 +207,7 @@
 						<input bind:this={importInput} type="file" accept=".json,.txt,.ddl,application/json,text/plain" hidden onchange={(event) => void importFile(event)} />
 						<button type="button" onclick={() => importInput?.click()}>{t().ddlImportButton}</button>
 						{#if importedNames.length}<span class="ddled-import-note" role="status">{t().ddlImportedPlugins(importedNames)}</span>{/if}
+						{#if importedEdits !== null}<span class="ddled-import-note" role="status">{t().ddlImportMigrated(importedEdits)}</span>{/if}
 						{#if importError}<span class="ddled-error" role="alert">{importError}</span>{/if}
 					</div>
 				{/if}

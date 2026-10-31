@@ -29,8 +29,8 @@ from inku_server.pipeline_candidate import CandidateExecution, PipelineBinding
 from inku_server.pipeline_defaults import default_manifest
 from inku_server.pipeline_product import ProductPipelineEffects
 
-RECORDED = "画面の横0.618034、縦0.618034の位置に、灰の細い細筆の程よい空の縦長の小さな楕円を1個置く。"
-SOURCE = f"背景を白で埋める。\n{RECORDED}\n上半分（横0〜1、縦0〜1/2）に、青の細筆の線を3個並べる。"
+RECORDED = "画面の横0.618034、縦0.618034の位置に、灰の細いガッシュの程よい空の縦長の小さな楕円を1個置く。"
+SOURCE = f"背景を白で埋める。\n{RECORDED}\n上半分（横0〜1、縦0〜1/2）に、青のガッシュの線を3個並べる。"
 LAWS = {"schema": "inku.laws-layers.v1", "layers": [{"sentences": [RECORDED], "kind": "laws", "laws": ["B1"]}]}
 BASIS = {"schema": "inku.laws-basis.v1",
          "composed": SOURCE.replace("画面の横0.618034、縦0.618034の位置に", "画面の中ほどに"),
@@ -145,7 +145,7 @@ def test_children_drawn_from_a_laws_work_keep_its_record(monkeypatch, main_layer
 
         # The touch written into the recorded sentence is written into the record.
         touched = save(parent["lineage_node_id"], "tool_change", {"tool_mode": "per_sentence", "tools": {"0": "chalk"}}, 4)
-        rewritten = RECORDED.replace("細筆", "チョーク")
+        rewritten = RECORDED.replace("ガッシュ", "チョーク")
         assert rewritten in touched["ddl"]
         assert record_of(touched["id"]) == {**LAWS, "layers": [{**LAWS["layers"][0], "sentences": [rewritten]}]}
         assert basis_of(touched["id"]) == basis

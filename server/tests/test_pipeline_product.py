@@ -218,7 +218,7 @@ def test_bundled_macro_enters_new_work_with_localized_summary_and_saved_lock(tmp
     assert snapshot["phase"]["tag"] == "score_ready"
     assert snapshot["document"]["source"] == source
     score = snapshot["delivery"]["score"]
-    assert score["version"] == "0.11.0"
+    assert score["version"] == "0.24.0"
     assert score["resource_policy"]
     contacts = [instruction["relation"] for instruction in score["instructions"]
                 if (instruction.get("relation") or {}).get("target_path_position") is not None]

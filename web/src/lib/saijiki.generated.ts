@@ -18,7 +18,7 @@ export const GENERATED_SAIJIKI: SaijikiCategory[] = [
 		key: 'tezawari',
 		label: 'てざわり',
 		en: 'touches',
-		words: ['銀筆', '鉛筆', 'ペン', 'ロットリング', 'クレヨン', 'チョーク', '細筆', '太筆', '油彩', 'ビュラン', 'ドライポイント', 'コンピュータ']
+		words: ['銀筆', '鉛筆', 'ペン', 'チョーク', 'オイルパステル', 'ガッシュ', '水彩', '油彩', 'ペインティングナイフ', 'エッチング', 'コンピュータ']
 	},
 	{
 		key: 'tsuranari',
@@ -117,7 +117,7 @@ export const GENERATED_SAIJIKI_EN: SaijikiCategory[] = [
 		key: 'tezawari',
 		label: 'てざわり',
 		en: 'touches',
-		words: ['silverpoint', 'pencil', 'pen', 'rotring', 'crayon', 'chalk', 'fine-brush', 'thick-brush', 'oil paint', 'burin', 'drypoint', 'computer']
+		words: ['silverpoint', 'pencil', 'pen', 'chalk', 'oil pastel', 'gouache', 'watercolor', 'oil paint', 'painting knife', 'etching', 'computer']
 	},
 	{
 		key: 'tsuranari',

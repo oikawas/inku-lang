@@ -7,6 +7,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import uuid
+from dataclasses import asdict
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -19,6 +20,22 @@ client = TestClient(app)
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _GENERATED_TS = _REPO_ROOT / "web" / "src" / "lib" / "saijiki.generated.ts"
+
+
+def test_all_saijiki_categories_match_the_core_v3_asset():
+    asset = json.loads((_REPO_ROOT / "core/crates/inku-ddl/assets/saijiki-v3.json").read_text())
+    assert asset["asset_id"] == "inku.saijiki.v3"
+    assert len(asset["categories"]) == len(saijiki.SAIJIKI)
+    fields = ("surface_ja", "surface_en", "score_value", "default", "prompt", "display", "marker",
+              "parser_surfaces_ja", "parser_surfaces_en", "marker_surfaces_ja", "marker_surfaces_en")
+    for expected, category in zip(asset["categories"], saijiki.SAIJIKI, strict=True):
+        assert expected["key"] == category.key
+        assert len(expected["words"]) == len(category.words)
+        for word_asset, word in zip(expected["words"], category.words, strict=True):
+            actual = json.loads(json.dumps(asdict(word), ensure_ascii=False))
+            assert {field: actual[field] for field in fields} == {
+                field: word_asset.get(field) for field in fields
+            }
 
 
 def _load_codegen():
@@ -87,10 +104,10 @@ _EXPECTED_PAIRING: dict[str, tuple[tuple[str, str], ...]] = {
         ("右上がり", "rising"), ("右下がり", "falling"), ("回転", "rotated"),
     ),
     "tezawari": (
-        ("銀筆", "silverpoint"), ("鉛筆", "pencil"), ("ペン", "pen"), ("ロットリング", "rotring"), ("クレヨン", "crayon"),
-        ("チョーク", "chalk"), ("細筆", "fine-brush"), ("太筆", "thick-brush"),
-        ("油彩", "oil paint"),
-        ("ビュラン", "burin"), ("ドライポイント", "drypoint"),
+        ("銀筆", "silverpoint"), ("鉛筆", "pencil"), ("ペン", "pen"),
+        ("チョーク", "chalk"), ("オイルパステル", "oil pastel"), ("ガッシュ", "gouache"),
+        ("水彩", "watercolor"), ("油彩", "oil paint"),
+        ("ペインティングナイフ", "painting knife"), ("エッチング", "etching"),
         ("コンピュータ", "computer"),
     ),
     "tsuranari": (

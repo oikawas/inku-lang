@@ -31,7 +31,7 @@ def count_field_description(limits: Limits = DEFAULT_LIMITS) -> str:
 COUNT_FIELD_DESCRIPTION = count_field_description(DEFAULT_LIMITS)
 
 Coord = tuple[float, float]
-ScoreVersion = Literal["0.23.0", "0.22.0", "0.21.0", "0.20.0", "0.19.0", "0.18.0", "0.17.0", "0.16.0", "0.15.0", "0.14.0", "0.13.0", "0.12.0", "0.11.0", "0.10.0", "0.9.0", "0.8.0", "0.7.0", "0.6.0", "0.5.0", "0.4.0", "0.3.0", "0.2.0", "0.1.0"]
+ScoreVersion = Literal["0.24.0", "0.23.0", "0.22.0", "0.21.0", "0.20.0", "0.19.0", "0.18.0", "0.17.0", "0.16.0", "0.15.0", "0.14.0", "0.13.0", "0.12.0", "0.11.0", "0.10.0", "0.9.0", "0.8.0", "0.7.0", "0.6.0", "0.5.0", "0.4.0", "0.3.0", "0.2.0", "0.1.0"]
 
 Primitive = Literal[
     "line",
@@ -85,6 +85,11 @@ Weight = Literal[
     "burin",
     "drypoint",
     "computer",
+    "gouache",
+    "watercolor",
+    "oil_pastel",
+    "painting_knife",
+    "etching",
 ]
 Thinness = Literal["fine", "extra_fine", "thick", "extra_thick"]
 Color = Literal[
@@ -882,10 +887,7 @@ class Instruction(BaseModel):
     weight: Weight = Field(
         default="pen",
         description=(
-            "silverpoint=銀筆 / pencil=鉛筆 / pen=ペン / rotring=ロットリング"
-            " / crayon=クレヨン / chalk=チョーク / brush_thin=細筆 / brush_thick=太筆 / oil_paint=油彩"
-            " / burin=ビュラン / drypoint=ドライポイント"
-            " / computer=格子に乗り、段に落ち、誤差なく反復するコンピュータ"
+            "silverpoint=銀筆 / pencil=鉛筆 / pen=ペン / chalk=チョーク / oil_pastel=オイルパステル / gouache=ガッシュ / watercolor=水彩 / oil_paint=油彩 / painting_knife=ペインティングナイフ / etching=エッチング / computer=格子に乗り、段に落ち、誤差なく反復するコンピュータ。rotring・crayon・brush_thin・brush_thick・burin・drypoint は歳時記 v2 までの道具で、保存した楽譜の再演のためだけに読む"
         ),
     )
     mode: InstructionMode = Field(
@@ -1612,7 +1614,12 @@ class ScoreBody(BaseModel):
     @model_validator(mode="after")
     def _validate_composite_arrangements(self) -> "Score":
         """A composite is one contiguous, non-overlapping instruction span."""
-        version = "0.22.0" if self.version == "0.23.0" else self.version
+        if self.version != "0.24.0" and any(
+            instruction.weight in {"gouache", "watercolor", "oil_pastel", "painting_knife", "etching"}
+            for instruction in self.instructions
+        ):
+            raise ValueError("a Saijiki v3 tool requires Score version 0.24.0")
+        version = "0.22.0" if self.version in {"0.23.0", "0.24.0"} else self.version
         if version == "0.1.0" and any(
             instruction.arc_form is not None for instruction in self.instructions
         ):
@@ -1934,7 +1941,7 @@ class Score(ScoreBody):
 
     @model_validator(mode="after")
     def _validate_object_templates(self) -> "Score":
-        if self.object_templates and self.version != "0.23.0":
+        if self.object_templates and self.version not in {"0.23.0", "0.24.0"}:
             raise ValueError("object templates require Score version 0.23.0")
         owners: set[int] = set()
         for template in self.object_templates:

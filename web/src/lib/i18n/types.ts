@@ -377,6 +377,7 @@ export interface LangPack {
 	ddlDiscardConfirm: string;
 	ddlImportButton: string;
 	ddlImportedPlugins: (names: string[]) => string;
+	ddlImportMigrated: (count: number) => string;
 	ddlImportInvalid: string;
 	ddlImportRequiresV2: string;
 	ddlNewDialogTitle: string;

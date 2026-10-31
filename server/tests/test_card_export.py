@@ -79,7 +79,7 @@ def test_t1_control_without_the_font_the_same_band_is_empty():
     """The control for the test above. It has no discriminating power alone."""
     document = compose_card_svg(WORK, headnote=HEADNOTE, seed=4821)
     width, height = LAYOUT_SIZES["square"]
-    png = svg_to_png(document, width=width, height=height, skip_system_fonts=True)
+    png = svg_to_png(document, width=width, height=height)
     ink, _ = _band_ink(png, _headnote_band("square", 1))
     assert ink == 0
 

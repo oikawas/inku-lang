@@ -69,7 +69,7 @@ def test_a_migrated_work_still_reads_and_a_second_run_refuses(tmp_path):
             "SELECT source, document_json, ddl_digest FROM variation_authority").one()
         executions = connection.exec_driver_sql("SELECT COUNT(*) FROM pipeline_candidate_executions").scalar()
         history = connection.exec_driver_sql("SELECT input, score, svg FROM history").one()
-    assert json.loads(document_json)["saijiki"] == "inku.saijiki.v2"
+    assert json.loads(document_json)["saijiki"] == "inku.saijiki.v3"
     assert ddl_digest == hashlib.sha256(source.encode("utf-8")).hexdigest()
     assert executions == 0
     assert tuple(history) == ("description", "{}", "<svg/>")

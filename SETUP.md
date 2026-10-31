@@ -37,7 +37,7 @@ To run from source:
 - Rust (the version `core/rust-toolchain.toml` pins), used to build the native wheel of the shared core the server loads
 - Node.js 20 or newer is recommended
 - npm
-- `resvg-py` when PNG export is needed (installed by `uv sync`)
+- The shared core native wheel for PNG export (see setup below)
 
 To run in containers:
 
@@ -255,7 +255,12 @@ Run this in another terminal:
 ```sh
 cd cli
 uv sync
+uvx maturin==1.13.3 build --manifest-path ../core/crates/inku-render-python/Cargo.toml \
+  --release --locked -i .venv/bin/python --out /tmp/inku-native
+uv pip install --python .venv/bin/python --no-deps /tmp/inku-native/*.whl
 ```
+
+PNG export requires the shared core wheel. Rebuild it whenever the core changes.
 
 The CLI connects to `http://127.0.0.1:8100` by default. Use `--base-url` or `INKU_BASE_URL` for another API URL.
 

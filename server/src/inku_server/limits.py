@@ -156,19 +156,17 @@ def max_cluster_count(limits: Limits) -> int:
 # What one mark costs to open, in bytes of SVG. The capability family is the one
 # an administrator is invited to raise, and the number on the stepper is a count
 # of marks -- which is a proxy for the quantity that actually reaches a reader,
-# and a proxy that is off by 25% depending on the tool. The panel converts, so
+# and a proxy whose cost depends on the tool. The panel converts, so
 # the person raising the number is told what they are raising it to.
 #
-# Measured 2026-08-16 on the development Mac at render engine 35, sweeping a
-# literal grid of lines from 25 to 3200 marks with the seeds fixed. These two
-# are the 400-mark row, which is the default itself: 5.17 MB with a pen and
-# 6.46 MB with a thick brush. Engine 34 produced the same bytes on all 16 pairs.
-#   run: cli/out2/911-v2.13.24-limits-capability-unit/  (sweep-engine35.json)
+# Measured 2026-10-31 on the development Mac at render engine 95: 400 black
+# horizontal lines in a 20 by 20 grid, square 1000px canvas, display, seed 1.
+# Chalk and painting knife are the lightest and heaviest of the eleven touches.
 #
 # Not a bound and not read by any drawing code -- a unit conversion, and only
 # the settings panel consumes it. Counts stay the unit coerce works in, because
 # the bytes are not knowable until after the drawing exists.
-BYTES_PER_MARK: dict[str, int] = {"pen": 12_924, "brush_thick": 16_138}
+BYTES_PER_MARK: dict[str, int] = {"chalk": 896, "painting_knife": 8_664}
 
 # Not a tuning bound -- a typo guard. Every limit here multiplies into drawing
 # cost (measured at 4.2 ms per mark on the development Mac), so a pasted phone

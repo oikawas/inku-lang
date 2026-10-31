@@ -24,7 +24,7 @@ const COMPONENTS_DIR = dirname(fileURLToPath(import.meta.url));
 const panel = readFileSync(join(COMPONENTS_DIR, '../features/settings/RenderLimitsSettings.svelte'), 'utf8');
 
 // The measured cost of one mark, as the server sends it.
-const BYTES_PER_MARK = { pen: 12924, brush_thick: 16138 };
+const BYTES_PER_MARK = { chalk: 896, painting_knife: 8664 };
 
 const OTHER_FIELDS = [
 	'max_expanded_per_instruction',
@@ -40,14 +40,14 @@ const OTHER_FIELDS = [
 test('the total says what a work will weigh, and says it in the tools spread', () => {
 	assert.equal(WEIGHTED_LIMIT_FIELD, 'max_expanded_primitives');
 
-	// The default: 400 marks is 5.17 MB with a pen and 6.46 with a thick brush.
+	// The default: 400 marks is about 0.4 MB with chalk and 3.5 with a knife.
 	const at400 = markWeight(WEIGHTED_LIMIT_FIELD, 400, BYTES_PER_MARK);
-	assert.deepEqual(at400, { low: 5.2, high: 6.5 });
+	assert.deepEqual(at400, { low: 0.4, high: 3.5 });
 
 	// It follows the number on the stepper, so raising the ceiling says so.
 	assert.deepEqual(markWeight(WEIGHTED_LIMIT_FIELD, 1200, BYTES_PER_MARK), {
-		low: 15.5,
-		high: 19.4
+		low: 1.1,
+		high: 10.4
 	});
 });
 

@@ -40,7 +40,9 @@ test-server: git-setup
 	cd server && uv run --with "$$(ls "$(NATIVE_WHEEL_DIR)"/*.whl)" python -m pytest -q -rs $(PYTEST_ARGS)
 
 test-cli: git-setup
-	cd cli && uv run pytest -q -rs $(PYTEST_ARGS)
+	rm -rf "$(NATIVE_WHEEL_DIR)"
+	rustup run $(RUST_CHANNEL) uv build --wheel core/crates/inku-render-python -o "$(NATIVE_WHEEL_DIR)"
+	cd cli && uv run --with "$$(ls "$(NATIVE_WHEEL_DIR)"/*.whl)" python -m pytest -q -rs $(PYTEST_ARGS)
 
 test-web: git-setup
 	cd web && npm run test:unit

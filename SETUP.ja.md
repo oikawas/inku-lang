@@ -37,7 +37,7 @@
 - Rust（`core/rust-toolchain.toml` が指定する版）。サーバーが読み込む共有コアの native wheel を作るのに使う
 - Node.js 20 以上を推奨
 - npm
-- SVGからPNGを生成する場合、`resvg-py`（`uv sync` で入る）
+- SVGからPNGを生成する場合、共有coreのnative wheel（下のセットアップ手順）
 
 コンテナで動かす場合:
 
@@ -254,7 +254,12 @@ OLLAMA_BASE_URL=http://host.docker.internal:11434/v1
 ```sh
 cd cli
 uv sync
+uvx maturin==1.13.3 build --manifest-path ../core/crates/inku-render-python/Cargo.toml \
+  --release --locked -i .venv/bin/python --out /tmp/inku-native
+uv pip install --python .venv/bin/python --no-deps /tmp/inku-native/*.whl
 ```
+
+PNG出力には共有coreのwheelが必要です。coreを更新したときも作り直します。
 
 CLIは既定で `http://127.0.0.1:8100` に接続する。別のAPIへ接続する場合は `--base-url` または `INKU_BASE_URL` を使う。
 

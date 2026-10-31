@@ -259,5 +259,4 @@ def build_card(
         width=width,
         height=height,
         font_files=[str(FONT_PATH)],
-        skip_system_fonts=True,
     )

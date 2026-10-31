@@ -34,6 +34,13 @@ def _blank_list(path: Path | None) -> list[str] | None:
 
 
 def main() -> int:
+    # The current core's v1 migration writes v3, so this historical entry must
+    # never record that output under the v2 completion marker.
+    print("saijiki v2 migration is retired; use the v3 migration", file=sys.stderr)
+    return 2
+
+
+def _retired_main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--database", type=Path, required=True, help="the SQLite database to migrate")
     parser.add_argument("--workers", type=int, default=min(6, os.cpu_count() or 1),

@@ -1,6 +1,6 @@
 """inku 歳時記 (Saijiki) — Server 表示・保存互換 projection.
 
-生成語彙の正は共有 core の ``assets/saijiki-v2.json`` にある。このテーブルは
+生成語彙の正は共有 core の ``assets/saijiki-v3.json`` にある。このテーブルは
 その内容と同期し、Server 側の次の読み取り用途へ投影する:
 
 - reference の旧マーカー表（保存された説明との照合用）
@@ -173,14 +173,13 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
             _w("銀筆", "silverpoint", score_value="silverpoint"),
             _w("鉛筆", "pencil", score_value="pencil"),
             _w("ペン", "pen", default=True, score_value="pen"),
-            _w("ロットリング", "rotring", score_value="rotring"),
-            _w("クレヨン", "crayon", score_value="crayon"),
             _w("チョーク", "chalk", score_value="chalk"),
-            _w("細筆", "fine-brush", score_value="brush_thin"),
-            _w("太筆", "thick-brush", score_value="brush_thick"),
+            _w("オイルパステル", "oil pastel", score_value="oil_pastel", parser_surfaces_en=("oil-pastel",)),
+            _w("ガッシュ", "gouache", score_value="gouache"),
+            _w("水彩", "watercolor", score_value="watercolor", parser_surfaces_en=("watercolour",)),
             _w("油彩", "oil paint", score_value="oil_paint"),
-            _w("ビュラン", "burin", score_value="burin"),
-            _w("ドライポイント", "drypoint", score_value="drypoint"),
+            _w("ペインティングナイフ", "painting knife", score_value="painting_knife", parser_surfaces_en=("painting-knife",)),
+            _w("エッチング", "etching", score_value="etching"),
             _w("コンピュータ", "computer", score_value="computer"),
         ),
     ),

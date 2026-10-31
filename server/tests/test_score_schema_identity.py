@@ -158,6 +158,19 @@ def test_score23_object_template_round_trip_and_edition_validation() -> None:
         Score.model_validate({**data, "object_templates": data["object_templates"] * 2})
 
 
+def test_saijiki_v3_weights_require_score_24_but_legacy_weights_remain_readable():
+    for weight in ("gouache", "watercolor", "oil_pastel", "painting_knife", "etching"):
+        data = {"version": "0.23.0", "instructions": [{"primitive": "line", "weight": weight}]}
+        with pytest.raises(ValueError, match="a Saijiki v3 tool requires Score version 0.24.0"):
+            Score.model_validate(data)
+        Score.model_validate({**data, "version": "0.24.0"})
+    for version in ("0.9.0", "0.24.0"):
+        Score.model_validate({"version": version, "instructions": [{"primitive": "line", "weight": "brush_thin"}]})
+    Score.model_validate({"version": "0.24.0", "instructions": [{"primitive": "square"}],
+                          "object_templates": [{"instruction_index": 0, "aspect": [1, 1],
+                                                "body": {"version": "0.24.0", "instructions": []}}]})
+
+
 def _canonical_score_schema_bytes() -> bytes:
     return json.dumps(
         Score.model_json_schema(),
@@ -178,7 +191,7 @@ def test_checked_in_score_schema_matches_the_live_pydantic_model() -> None:
     assert {"version", "canvas", "background", "presence", "instructions", "anchors", "transform_groups", "placement_groups", "repetition_groups", "fill_groups", "mirror_relations", "resource_policy"} <= properties.keys()
 
     assert properties["version"]["default"] == "0.9.0"
-    assert properties["version"]["enum"] == ["0.23.0", "0.22.0", "0.21.0", "0.20.0", "0.19.0", "0.18.0", "0.17.0", "0.16.0", "0.15.0", "0.14.0", "0.13.0", "0.12.0", "0.11.0", "0.10.0", "0.9.0", "0.8.0", "0.7.0", "0.6.0", "0.5.0", "0.4.0", "0.3.0", "0.2.0", "0.1.0"]
+    assert properties["version"]["enum"] == ["0.24.0", "0.23.0", "0.22.0", "0.21.0", "0.20.0", "0.19.0", "0.18.0", "0.17.0", "0.16.0", "0.15.0", "0.14.0", "0.13.0", "0.12.0", "0.11.0", "0.10.0", "0.9.0", "0.8.0", "0.7.0", "0.6.0", "0.5.0", "0.4.0", "0.3.0", "0.2.0", "0.1.0"]
     transform_group = schema["$defs"]["TransformGroup"]["properties"]
     assert {"start", "end", "rotation_degrees", "scale_x", "scale_y", "translate_x", "translate_y", "fixed_position_indices", "anchor_indices"} <= transform_group.keys()
     placement_group = schema["$defs"]["PlacementGroup"]["properties"]

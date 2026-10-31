@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-31 — Saijiki v3 and the PNG renderer
+
+Server and Web support the eleven v3 touch words and Score 0.24.0, and migrate older DDL exports when importing them. Server and CLI produce PNGs with the shared core renderer, keeping material displacement consistent with the screen.
+
 ### 2026-10-31 — Fix the macOS Rust build warning
 
 Find the pinned Rust toolchain library during the build so debug information can be stripped successfully.

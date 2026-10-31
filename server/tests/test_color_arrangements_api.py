@@ -69,7 +69,7 @@ def test_retired_catalog_arrangement_render_save_and_replay(monkeypatch):
         snapshot = run.snapshot()
         assert snapshot["phase"]["tag"] == "score_ready"
         score = snapshot["delivery"]["score"]
-        assert score["version"] in {"0.10.0", "0.11.0", "0.12.0", "0.13.0"}
+        assert score["version"] == "0.24.0"
         colors = render_color_map_for_catalog("default")
         retired = "retired-arrangement-fixture"
         initial = {"id": str(uuid.uuid4()), "user_id": user["id"], "at": 1, "input": "saved leaves",

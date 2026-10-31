@@ -433,7 +433,9 @@
 # 74: Object plugin words resolve as invisible boxes carrying Score 0.23
 # templates.
 # Their templates are performed by render engine 94.
-DDL_ENGINE_VERSION = "74"
+# 75: The five new touch words lower to Score 0.24.0 weights; Scores that do
+# not use them keep their edition. They are performed by render engine 95.
+DDL_ENGINE_VERSION = "75"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write
@@ -513,4 +515,6 @@ DDL_ENGINE_VERSION = "74"
 # to a model.
 # 28: Plugin names can be written in braces; qualified names remain readable
 # while saved works migrate.
-DDL_VERSION = "28"
+# 29 (2026-10-31): Saijiki v3 has eleven touch words. Six retired tool
+# words require migration of saved documents and definitions (SPEC §3.3).
+DDL_VERSION = "29"

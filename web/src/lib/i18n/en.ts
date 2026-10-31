@@ -390,7 +390,7 @@ export const en: LangPack = {
 	ddlEditPlaceholder: 'Fill the background with white. Draw three thin blue lines from lower left to upper right. Place small red circles while preserving open space.',
 	batchSectionLabel: 'Batch',
 	batchSectionHint: ': Write one description per line, one work each.',
-	batchPlaceholder: 'A moon rises beyond the mountains\nMist spreads at night\nBlue crayon lines drift in slow waves',
+	batchPlaceholder: 'A moon rises beyond the mountains\nMist spreads at night\nBlue watercolor lines drift in slow waves',
 	batchCount: (n) => `${n} items`,
 	batchHistoryLabel: 'Batch description history',
 	batchHistoryPlaceholder: 'Select from history',
@@ -525,6 +525,7 @@ export const en: LangPack = {
 	ddlDiscardConfirm: 'Discard',
 	ddlImportButton: 'Load',
 	ddlImportedPlugins: (names) => `Loaded ${names.length} plugin definition${names.length === 1 ? '' : 's'} (${names.join(', ')}), used for this work only.`,
+	ddlImportMigrated: (count) => `Migrated ${count} change${count === 1 ? '' : 's'} from the older Saijiki.`,
 	ddlImportInvalid: 'Could not read this DDL file.',
 	ddlImportRequiresV2: 'This export uses an old format. Export it again as v2.',
 	ddlEditorInstructions: 'Instructions',
@@ -541,7 +542,7 @@ export const en: LangPack = {
 	ddlNewDialogTitle: 'New from instructions',
 	ddlNewDialogSubtitle: 'Write the instructions directly and perform them as a standalone work.',
 	ddlEditDialogSubtitle: 'Drawing saves a new child of the chosen work.',
-	ddlSyntaxGuide: 'Instructions (DDL) quick guide\nThe instructions are not the picture itself. They are a compact visual instruction from which the picture is performed. They turn natural language into a performable description made of color, shape, place, motion, and material. This grammar is defined as DDL (Drawing Description Language).\nUse one visual instruction per line when possible.\nBasic form: color + size + shape + count + place + motion.\nExample: Fill the background with white.\nExample: Place three small red circles at upper right.\nExample: Draw a thin blue line from lower left to upper right.\nMake places concrete, such as top edge, right half, or lower left to upper right.\nAdd motion or material briefly, such as undulating, fine tremble, crayon, or pencil.',
+	ddlSyntaxGuide: 'Instructions (DDL) quick guide\nThe instructions are not the picture itself. They are a compact visual instruction from which the picture is performed. They turn natural language into a performable description made of color, shape, place, motion, and material. This grammar is defined as DDL (Drawing Description Language).\nUse one visual instruction per line when possible.\nBasic form: color + size + shape + count + place + motion.\nExample: Fill the background with white.\nExample: Place three small red circles at upper right.\nExample: Draw a thin blue line from lower left to upper right.\nMake places concrete, such as top edge, right half, or lower left to upper right.\nAdd motion or material briefly, such as undulating, fine tremble, watercolor, or pencil.',
 	ddlDialogDrawingModel: 'Drawing model',
 	ddlUnknownNameTitle: 'Plugin names',
 	ddlUnknownNameUnregistered: 'This name is not registered',
@@ -1122,7 +1123,7 @@ export const en: LangPack = {
 	settingsRenderLimitGroupTooltips: {
 		svg_output: 'The SVG limit uses the server setting at the start of drawing. It does not apply when viewing saved works.',
 		capability:
-			'How much this installation can afford to put on one work. A faster machine may raise it, and this is the only family that should follow the hardware.\n\nMeasured on the development machine at engine 35: one grid mark costs about 13 KB of SVG with a pen and about 16 KB with a thick brush. Even at the default of 400, one work reaches 5-6.5 MB and takes several seconds to draw. The higher it goes, the heavier the work is to open.\n\nThe cost per mark moves by 25% with the brush, so a count is an estimate of weight, not the weight itself.',
+			'How much this installation can afford to put on one work. A faster machine may raise it, and this is the only family that should follow the hardware.\n\nMeasured on the development machine at engine 95: one grid mark costs about 0.9 KB of SVG with chalk and about 8.7 KB with a painting knife. At the default of 400, one work is about 0.4-3.5 MB. The higher it goes, the heavier the work is to open.\n\nThe cost per mark moves about tenfold with the touch, so a count is an estimate of weight, not the weight itself.',
 		legibility:
 			'The line between a number small enough to draw as stated and one too large to count, which is shown as a band instead.\n\nA faster machine does not make an eye faster, so this family is deliberately not tied to the one above.\n\nWhat should stay steady here is the look — how much ink sits in one cluster — rather than the threshold digits. Moving the band ends moves that look too.',
 		safety:

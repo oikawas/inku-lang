@@ -68,11 +68,13 @@ def test_saijiki_enums_match_schema() -> None:
 
 def test_saijiki_prose_categories_track_enum_sizes() -> None:
     saijiki = _ref()["saijiki"]
-    # てざわり (touches) covers the Weight enum exactly. v1.92 pruned 髪/hair from
-    # the saijiki while the enum kept it for replay; the 2026-07-27 rename to
-    # 銀筆/silverpoint put the word back, so the two sides line up again.
-    weight_count = len(get_args(schema.Weight))
-    assert len(saijiki["core_categories_ja"]["てざわり"]) == weight_count
+    # v3 offers eleven touches while retaining six older Score values for replay.
+    from inku_server.saijiki import SAIJIKI
+    touches = next(category for category in SAIJIKI if category.key == "tezawari")
+    assert len(saijiki["core_categories_ja"]["てざわり"]) == 11
+    assert {word.score_value for word in touches.words} | {
+        "rotring", "crayon", "brush_thin", "brush_thick", "burin", "drypoint"
+    } == set(get_args(schema.Weight))
     assert "silverpoint" in get_args(schema.Weight)
     assert "hair" not in get_args(schema.Weight)
     # en form surfaces name Primitive values, minus polygon (collected in

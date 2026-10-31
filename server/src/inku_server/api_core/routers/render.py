@@ -54,6 +54,25 @@ _logger = logging.getLogger(__name__)
 router = APIRouter(dependencies=[Depends(_current_user)])
 
 
+class DdlExportMigrationRequest(BaseModel):
+    ddl: str = Field(max_length=100_000)
+    language: Literal["ja", "en"]
+    plugins: list[dict] = Field(default_factory=list, max_length=64)
+
+
+@router.post("/api/ddl-export/migrate-v2", summary="Migrate a Saijiki v2 DDL export")
+def migrate_ddl_export(request: DdlExportMigrationRequest) -> dict:
+    from ...ddl_export import migrate_v2_export
+
+    if any(not isinstance(item.get("definition"), dict) or not isinstance(item.get("note", ""), str)
+           for item in request.plugins):
+        raise HTTPException(status_code=422, detail="invalid_export_definitions")
+    try:
+        return migrate_v2_export(request.ddl, request.language, request.plugins)
+    except (ValueError, KeyError, TypeError) as exc:
+        raise HTTPException(status_code=422, detail="saijiki_export_migration_refused") from exc
+
+
 @router.get("/api/composition/ranges", response_model=CompositionRanges, summary="Get composition ranges")
 def composition_ranges() -> CompositionRanges:
     """Return the numeric ranges a recomposition may choose from for a DDL's layout values. Reads the core's display table without drawing. Requires a signed-in user and raises no HTTP errors of its own."""

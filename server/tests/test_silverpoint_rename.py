@@ -25,9 +25,8 @@ def test_the_weight_enum_replaced_the_name_rather_than_adding_one() -> None:
     weights = get_args(Weight)
     assert "silverpoint" in weights
     assert "hair" not in weights
-    # The rename left eleven tools. Engine 47 later added oil_paint as a tool of
-    # its own, which is an addition, not a second name for the same one.
-    assert len(weights) == 12
+    # Saved Scores retain six old values; Saijiki v3 adds five values.
+    assert len(weights) == 17
     assert "oil_paint" in weights
 
 

@@ -8,6 +8,7 @@
 
 export const DDL_EXPORT_SCHEMA = 'inku.ddl-export.v2';
 import { resolveInstructionLang } from '../../instructionLang';
+import type { ApiFetch } from '../../transport/api-fetch';
 const MAX_IMPORTED_PLUGINS = 64;
 
 export type ImportedPlugin = { definition: Record<string, unknown>; note: string };
@@ -53,4 +54,23 @@ export function parseDdlImport(text: string, language: 'ja' | 'en' = 'ja'): DdlI
 		return wordLanguage === 'ja' ? `｛${primary}｝` : `{${primary}}`;
 	});
 	return { ddl: file.ddl, plugins, names };
+}
+
+/** Migrate an older portable export before any DDL or definitions are applied. */
+export async function importDdl(text: string, language: 'ja' | 'en', apiFetch?: ApiFetch): Promise<DdlImport & { edits: number | null }> {
+	const parsed = parseDdlImport(text, language);
+	let file: Record<string, unknown> | null = null;
+	try { file = record(JSON.parse(text)); } catch { /* Plain DDL needs no migration. */ }
+	if (file?.schema !== DDL_EXPORT_SCHEMA) return { ...parsed, edits: null };
+	if (file.saijiki === 'inku.saijiki.v3') return { ...parsed, edits: null };
+	if ((file.saijiki != null && file.saijiki !== 'inku.saijiki.v2') || !apiFetch) throw new Error('ddl_export_invalid');
+	const response = await apiFetch('/api/ddl-export/migrate-v2', {
+		method: 'POST', headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ ddl: parsed.ddl, language: file.language === 'en' ? 'en' : 'ja', plugins: parsed.plugins })
+	});
+	if (!response.ok) throw new Error('ddl_export_invalid');
+	const migrated = await response.json();
+	if (typeof migrated.ddl !== 'string' || !Array.isArray(migrated.plugins) || !Number.isSafeInteger(migrated.edits) || migrated.edits < 0) throw new Error('ddl_export_invalid');
+	const normalized = parseDdlImport(JSON.stringify({ schema: DDL_EXPORT_SCHEMA, ddl: migrated.ddl, plugins: migrated.plugins }), language);
+	return { ...normalized, edits: migrated.edits };
 }

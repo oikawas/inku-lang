@@ -28,7 +28,7 @@ def test_tool_variant_render_save_and_replay(monkeypatch):
     try:
         binding = PipelineBinding()
         effects = ProductPipelineEffects(binding, default_manifest(binding))
-        source = "背景を白で埋める。\n青の細筆の線を3個引く。\n赤の大きな円を1個置く。"
+        source = "背景を白で埋める。\n青のガッシュの線を3個引く。\n赤の大きな円を1個置く。"
         with monkeypatch.context() as preparation:
             preparation.setattr(common, "_model_offered_to", lambda *args, **kwargs: True)
             config, context = effects.prepare(user["id"], "direct_ddl", source,
@@ -53,7 +53,7 @@ def test_tool_variant_render_save_and_replay(monkeypatch):
         def weights(value):
             return {i["arrangement"]["resolved"]["owner"]["instruction_index"]: i.get("weight")
                     for i in value["instructions"]}
-        assert weights(score) == {0: "brush_thin", 1: "pen"}
+        assert weights(score) == {0: "gouache", 1: "pen"}
 
         # The shipped wheel carries the core's touch change, and the work's sentences read back.
         assert callable(getattr(get_service().binding, "retouch", None))
@@ -62,10 +62,10 @@ def test_tool_variant_render_save_and_replay(monkeypatch):
         plan = client.post("/api/tool-variants/plan", json={"work_id": parent["id"]}, headers=headers)
         assert plan.status_code == 200, plan.text
         plan = plan.json()
-        assert plan["mode"] == "uniform" and plan["sentences"] == [{"index": 0, "tool": "brush_thin"}, {"index": 1, "tool": "pen"}]
+        assert plan["mode"] == "uniform" and plan["sentences"] == [{"index": 0, "tool": "gouache"}, {"index": 1, "tool": "pen"}]
         assert len(plan["entries"]) == 4 and set(plan["tools"]) == {
             "silverpoint", "pencil", "pen", "rotring", "crayon", "chalk", "brush_thin",
-            "brush_thick", "oil_paint", "burin", "drypoint", "computer"}
+            "brush_thick", "oil_paint", "burin", "drypoint", "computer", "gouache", "watercolor", "oil_pastel", "painting_knife", "etching"}
         for entry in plan["entries"]:
             tool = entry["tools"]["0"]
             assert entry["tools"] == {"0": tool, "1": tool}
@@ -74,7 +74,7 @@ def test_tool_variant_render_save_and_replay(monkeypatch):
 
         per = client.post("/api/tool-variants/plan", json={"work_id": parent["id"], "mode": "per_sentence"}, headers=headers).json()
         assert len(per["entries"]) == 4
-        assert all(entry["tools"]["0"] != "brush_thin" and entry["tools"]["1"] != "pen" for entry in per["entries"])
+        assert all(entry["tools"]["0"] != "gouache" and entry["tools"]["1"] != "pen" for entry in per["entries"])
 
         asked = {"0": "chalk", "1": "oil_paint"}
         selected = client.post("/api/render-tool-variant", json={"work_id": parent["id"], "mode": "per_sentence", "tools": asked}, headers=headers)
@@ -88,7 +88,7 @@ def test_tool_variant_render_save_and_replay(monkeypatch):
         assert {k: v for k, v in selected["score"].items() if k != "instructions"} == {k: v for k, v in score.items() if k != "instructions"}
         assert selected["render_seed"] == "77" and selected["composition_seed"] == "17"
         assert selected["svg"] != parent["svg"]
-        unchanged = client.post("/api/render-tool-variant", json={"work_id": parent["id"], "tools": {"0": "brush_thin"}}, headers=headers)
+        unchanged = client.post("/api/render-tool-variant", json={"work_id": parent["id"], "tools": {"0": "gouache"}}, headers=headers)
         assert unchanged.status_code == 422
 
         save = client.post("/api/history", json={
@@ -102,7 +102,7 @@ def test_tool_variant_render_save_and_replay(monkeypatch):
         assert child["input"] == parent["input"] and child["ddl"] == selected["ddl"]
         assert child["score"] == selected["score"] and child["svg"] == selected["svg"]
         assert child["derivation_metadata"] == {"tool_mode": "per_sentence", "tools": asked, "changes": [
-            {"index": 0, "from": "brush_thin", "to": "chalk"}, {"index": 1, "from": "pen", "to": "oil_paint"}]}
+            {"index": 0, "from": "gouache", "to": "chalk"}, {"index": 1, "from": "pen", "to": "oil_paint"}]}
         replay = client.post("/api/render-score", json={"work_id": child["id"], "score": child["score"],
             "render_seed": child["render_seed"], "composition_seed": child["composition_seed"]}, headers=headers)
         assert replay.status_code == 200, replay.text

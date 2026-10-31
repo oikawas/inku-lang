@@ -19,6 +19,7 @@ mirror in ``__init__`` stays independent of rendering, and this is a rendering t
 
 from __future__ import annotations
 
+import json
 from typing import Callable
 
 from .texture_fold import fold_texture_runs, should_fold
@@ -27,13 +28,15 @@ BACKEND_RESVG = "resvg"
 
 
 class RasterizerUnavailable(RuntimeError):
-    """resvg is not installed."""
+    """The shared core rasterizer is not installed."""
 
 
 def _resvg_renderer() -> Callable[..., bytes] | None:
     try:
-        import resvg_py
+        import inku_render
     except ImportError:
+        return None
+    if not callable(getattr(inku_render, "svg_to_png", None)):
         return None
 
     def render(
@@ -41,7 +44,6 @@ def _resvg_renderer() -> Callable[..., bytes] | None:
         width: int | None,
         height: int | None,
         font_files: list[str] | None,
-        skip_system_fonts: bool,
     ) -> bytes:
         kwargs: dict[str, object] = {}
         if width is not None:
@@ -50,9 +52,7 @@ def _resvg_renderer() -> Callable[..., bytes] | None:
             kwargs["height"] = height
         if font_files:
             kwargs["font_files"] = list(font_files)
-        if skip_system_fonts:
-            kwargs["skip_system_fonts"] = True
-        return bytes(resvg_py.svg_to_bytes(svg_string=svg, **kwargs))
+        return bytes(inku_render.svg_to_png(svg, **kwargs))
 
     return render
 
@@ -75,12 +75,8 @@ def rasterizer_info() -> dict[str, str]:
     """
     if rasterizer_backend() is None:
         return {}
-    try:
-        from importlib.metadata import version
-
-        return {"backend": BACKEND_RESVG, "version": version("resvg-py")}
-    except Exception:
-        return {"backend": BACKEND_RESVG}
+    import inku_render
+    return json.loads(inku_render.raster_identity_json())
 
 
 def svg_to_png(
@@ -89,7 +85,6 @@ def svg_to_png(
     width: int | None = None,
     height: int | None = None,
     font_files: list[str] | None = None,
-    skip_system_fonts: bool = False,
 ) -> bytes:
     """Rasterize ``svg`` to PNG bytes.
 
@@ -97,10 +92,9 @@ def svg_to_png(
     one scales the other to preserve the aspect ratio. The background stays
     transparent unless the SVG paints one.
 
-    ``font_files`` loads specific font files rather than relying on whatever the
-    host machine happens to have installed, and ``skip_system_fonts`` shuts the
-    host's own fonts out entirely. Text is only reproducible across machines when
-    both are given: the drawings themselves carry no text, but anything typeset
+    ``font_files`` loads specific font files; the shared core never loads the
+    host's system fonts. Text is reproducible across machines when the same
+    files are given: the drawings themselves carry no text, but anything typeset
     around them does, and an installed-font lookup makes the output a property of
     the machine. A ``font-family`` in the SVG has to match the loaded font's
     typographic family name (name ID 16, falling back to ID 1) exactly -- an
@@ -112,7 +106,7 @@ def svg_to_png(
     render = _resvg_renderer()
     if render is None:
         raise RasterizerUnavailable(
-            "resvg-py is not installed, and it is the only supported SVG rasterizer"
+            "the shared core PNG rasterizer is not available"
         )
     # Decided here rather than by the callers: there are nine places that
     # rasterize, and a flag any one of them could forget is a flag some of them
@@ -120,4 +114,4 @@ def svg_to_png(
     # boundary is and what was measured to put it there.
     if should_fold(width, height):
         svg = fold_texture_runs(svg)
-    return render(svg, width, height, font_files, skip_system_fonts)
+    return render(svg, width, height, font_files)

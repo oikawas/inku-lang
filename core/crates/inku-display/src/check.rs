@@ -12,6 +12,13 @@
 //! `stroke-dashoffset` was added on 2026-10-17 (I-723): the canvas ground's dashed threads
 //! write it since 2026-10-15, and Skia reads it as the dash phase, shifting the dashes
 //! as Chrome does.
+//!
+//! `gradientUnits` and `stroke-linejoin` were added on 2026-10-31 for the media of
+//! Saijiki v3 (render engine 95): the painting knife thins each pull's paint with a
+//! user-space linear gradient, and etching's lines and the media's streaks join round.
+//! Skia reads both (`SkSVGGradient`, `SkSVGNode`). Drawn without the table, the twelve
+//! knife and etching prototypes matched Chrome inside the display's measure
+//! (`topics/draw-task/tools-innvoation/RESULT-PRODUCT-STEP0.ja.md`, internal).
 
 use std::collections::HashMap;
 
@@ -76,6 +83,7 @@ const ATTRIBUTES: &[&str] = &[
     "filterUnits",
     "flood-color",
     "flood-opacity",
+    "gradientUnits",
     "height",
     "href",
     "id",
@@ -112,6 +120,7 @@ const ATTRIBUTES: &[&str] = &[
     "stroke-dasharray",
     "stroke-dashoffset",
     "stroke-linecap",
+    "stroke-linejoin",
     "stroke-opacity",
     "stroke-width",
     "style",

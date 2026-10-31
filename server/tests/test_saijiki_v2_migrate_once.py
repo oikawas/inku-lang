@@ -15,8 +15,7 @@ import pytest
 from sqlalchemy import create_engine
 
 from inku_server.persistence import legacy_v3_schema, schema
-from inku_server.persistence.saijiki_migration import BlankListInvalid, MigrationAlreadyWritten, migrate_once
-from inku_server.persistence.variation_authority import VariationAuthorityStore
+from inku_server.persistence.saijiki_migration import migrate_once
 
 
 def _canonical(value: object) -> bytes:
@@ -57,26 +56,10 @@ def _saved_database(path, saved_schema=schema) -> None:
 def test_a_migrated_work_still_reads_and_a_second_run_refuses(tmp_path):
     path = tmp_path / "inku.db"
     _saved_database(path)
-
-    report = migrate_once(path, inku_render.pipeline_migrate_saijiki_v1)
-
-    assert report["refused_records"] == []
-    engine = create_engine(f"sqlite:///{path}", future=True)
-    linked = VariationAuthorityStore(engine).read_linked_history("u", "h")
-    assert linked is not None and linked.history.source == "薄い刷きの円を置く。"
-    with engine.connect() as connection:
-        source, document_json, ddl_digest = connection.exec_driver_sql(
-            "SELECT source, document_json, ddl_digest FROM variation_authority").one()
-        executions = connection.exec_driver_sql("SELECT COUNT(*) FROM pipeline_candidate_executions").scalar()
-        history = connection.exec_driver_sql("SELECT input, score, svg FROM history").one()
-    assert json.loads(document_json)["saijiki"] == "inku.saijiki.v3"
-    assert ddl_digest == hashlib.sha256(source.encode("utf-8")).hexdigest()
-    assert executions == 0
-    assert tuple(history) == ("description", "{}", "<svg/>")
-    engine.dispose()
-
-    with pytest.raises(MigrationAlreadyWritten):
+    before = path.read_bytes()
+    with pytest.raises(RuntimeError, match="saijiki_v2_write_retired"):
         migrate_once(path, inku_render.pipeline_migrate_saijiki_v1)
+    assert path.read_bytes() == before
 
 
 def test_a_named_text_is_emptied_not_migrated_and_a_linked_work_keeps_its_instructions(tmp_path):
@@ -89,17 +72,7 @@ def test_a_named_text_is_emptied_not_migrated_and_a_linked_work_keeps_its_instru
             expanded_ddl="以下は **正規化DDL** に変換した結果です。", score="{}", svg="<svg/>", elapsed_ms=0))
     engine.dispose()
 
-    # The linked work's instructions are bound by digest: naming them writes nothing.
-    with pytest.raises(BlankListInvalid):
+    before = path.read_bytes()
+    with pytest.raises(RuntimeError, match="saijiki_v2_write_retired"):
         migrate_once(path, inku_render.pipeline_migrate_saijiki_v1, blank=["h:ddl"])
-
-    report = migrate_once(path, inku_render.pipeline_migrate_saijiki_v1, blank=["h2:expanded_ddl"])
-
-    assert [record["id"] for record in report["blanked_records"]] == ["h2:expanded_ddl"]
-    assert report["refused_records"] == []
-    engine = create_engine(f"sqlite:///{path}", future=True)
-    with engine.connect() as connection:
-        ddl, expanded, description = connection.exec_driver_sql(
-            "SELECT ddl, expanded_ddl, input FROM history WHERE id='h2'").one()
-    engine.dispose()
-    assert (ddl, expanded, description) == ("薄い刷きの円を置く。", None, "another")
+    assert path.read_bytes() == before

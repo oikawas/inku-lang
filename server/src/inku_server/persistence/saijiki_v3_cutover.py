@@ -97,7 +97,8 @@ def recover(database: Path, packages: Path, recovery: Path) -> str:
 
 
 def cutover(database: Path, packages: Path, recovery: Path, *, journal: Path,
-            workers: int = 4, timeout: float = 120.0, allow_refused: bool = False) -> dict[str, Any]:
+            workers: int = 4, timeout: float = 120.0, allow_refused: bool = False,
+            blank: list[str] | None = None) -> dict[str, Any]:
     """Migrate once; caller must stop every writer and guard this attempt externally."""
     started = time.monotonic()
     database = database.resolve(strict=True)
@@ -137,7 +138,8 @@ def cutover(database: Path, packages: Path, recovery: Path, *, journal: Path,
                 before = capture_invariants(connection)
                 report = migrate_saved_records(connection, migrate_unit_v3, workers=workers,
                                                checked=lambda: verify_invariants(connection, before),
-                                               journal=journal, timeout=timeout, abort_on_failure=not allow_refused)
+                                               journal=journal, timeout=timeout, abort_on_failure=not allow_refused,
+                                               blank=blank)
                 if report["refused_records"] and not allow_refused:
                     raise ValueError("saved_record_migration_refused")
                 summary = {"refused_records": len(report["refused_records"]), "statements": report["statements"]}

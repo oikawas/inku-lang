@@ -713,54 +713,8 @@ def migrate_once(database: Path, migrate: MigrateUnit, *, workers: int = 1,
                  progress: Progress | None = None, journal: Path | None = None,
                  timeout: float | None = None, abort_on_failure: bool = False,
                  blank: Iterable[str] | None = None) -> dict[str, Any]:
-    """Move the saved records of one SQLite database to Saijiki v2, once.
-
-    Run it while the service is stopped. It keeps a verified Backup API
-    snapshot beside the database first (``migration-backups/``), then writes
-    under a single writer lock: every key and each work's id, description,
-    Score and SVG must survive, SQLite's checks must pass, and the setting
-    ``DONE_SETTING`` records the run, so a second run refuses. Any failure
-    rolls back and keeps the snapshot. Returns the report with its timings.
-    """
-    from sqlalchemy import create_engine
-
-    from .backup import create_sqlite_snapshot
-    from .invariants import capture_invariants, require_integrity, verify_invariants
-
-    started = time.monotonic()
-    database = database.expanduser().resolve(strict=True)
-    engine = create_engine(f"sqlite:///{database}", future=True)
-    try:
-        with engine.connect() as connection:
-            if _already_written(connection):
-                raise MigrationAlreadyWritten(str(database))
-        snapshot = create_sqlite_snapshot(
-            database, database.parent / "migration-backups" / f"{database.stem}-pre-saijiki-v2-{time.time_ns()}.db")
-        snapshot_seconds = time.monotonic() - started
-        with engine.connect() as connection:
-            connection.exec_driver_sql("BEGIN IMMEDIATE")
-            try:
-                if _already_written(connection):
-                    raise MigrationAlreadyWritten(str(database))
-                before = capture_invariants(connection)
-                report = migrate_saved_records(connection, migrate, workers=workers, progress=progress,
-                                               checked=lambda: verify_invariants(connection, before),
-                                               journal=journal, timeout=timeout,
-                                               abort_on_failure=abort_on_failure, blank=blank)
-                summary = {"refused_records": len(report["refused_records"]), "statements": report["statements"]}
-                _execute(connection, "INSERT INTO app_settings(key, value, at) VALUES (?, ?, ?)",
-                         (DONE_SETTING, _canonical(summary), int(time.time() * 1000)))
-                require_integrity(connection)
-                connection.commit()
-            except Exception:
-                connection.rollback()
-                raise
-    finally:
-        engine.dispose()
-    report["snapshot"] = str(snapshot.path)
-    report["snapshot_seconds"] = round(snapshot_seconds, 1)
-    report["total_seconds"] = round(time.monotonic() - started, 1)
-    return report
+    """Refuse the retired write entry: its core now returns v3 records."""
+    raise RuntimeError("saijiki_v2_write_retired_use_v3_cutover")
 
 
 def _already_written(connection: Any) -> bool:

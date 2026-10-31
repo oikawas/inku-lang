@@ -191,7 +191,7 @@ def test_historical_builtin_fallback_never_ignores_a_wrong_digest(tmp_path):
     assert any(item["kind"] == "variation_documents" for item in result["refused_records"])
 
 
-def test_orphan_variation_can_reuse_exact_builtin_lock_from_saved_context(tmp_path):
+def test_saved_context_with_wrong_original_digest_is_refused(tmp_path):
     from pathlib import Path
 
     database = tmp_path / "saved.db"
@@ -218,10 +218,11 @@ def test_orphan_variation_can_reuse_exact_builtin_lock_from_saved_context(tmp_pa
             revision="1", origin="user_authored_ddl", authority="ddl_authoritative", source=source,
             document_json=document, ddl_digest=digest, authority_digest="0" * 64, updated_at=1))
     engine.dispose()
-    result = _migrate_once_database(database, migrate_unit_v3)
-    assert not [item for item in result["refused_records"] if item["id"].endswith("/orphan")]
+    from inku_server.persistence.saijiki_v3_migration import census
     engine = create_engine(f"sqlite:///{database}")
     with engine.connect() as connection:
-        moved = json.loads(connection.exec_driver_sql("SELECT document_json FROM variation_authority WHERE variation_id='orphan'").scalar_one())
+        result = census(connection, migrate_unit_v3)
     engine.dispose()
-    assert moved["saijiki"] == "inku.saijiki.v3"
+    refused = [item for item in result["refused_records"] if item["id"].endswith("/orphan")]
+    assert len(refused) == 1
+    assert refused[0]["error"]["code"] == "lock_digest_mismatch"

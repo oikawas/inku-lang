@@ -1,11 +1,10 @@
-"""The one-time move of saved records from Saijiki v1 to the current edition.
+"""The one-time move of saved records from Saijiki v1 or v2 to v3.
 
-Saijiki v2 (DDL 16) names its edition on every visible document; a saved
-document without the field was written with v1, and the core refuses it, and a
+Saved v2 documents name their edition; a saved document without the field was
+written with v1. The current core refuses either retired edition, and a
 saved Macro definition that only a migration makes valid, with
 ``saijiki_migration_required``. The core owns the migration itself
-(``migrate_saijiki_v1``, exposed by the native wheel as
-``pipeline_migrate_saijiki_v1``): given one saved unit -- a v1 document and the
+(``pipeline_migrate_saijiki_v1`` or ``pipeline_migrate_saijiki_v2``): given one saved unit -- a retired document and the
 definitions its locks name, or definitions alone -- it returns the unit in the
 current edition.
 
@@ -31,7 +30,7 @@ author and the draw session agreed on the same day):
   not migrated (the author, 2026-09-30).
 
 A record the core refuses is left as it was and listed; it need not be perfect
-(the author, 2026-09-30): v2 refuses an unmigrated record with
+(the author, 2026-09-30): v3 refuses an unmigrated record with
 ``saijiki_migration_required`` and nothing else breaks.
 """
 
@@ -70,7 +69,7 @@ DONE_SETTING = "saijiki_v3_saved_records"
 
 
 class MigrationAlreadyWritten(RuntimeError):
-    """The saved records were already moved to Saijiki v2; v1 would misread them."""
+    """The saved records were already moved to Saijiki v3."""
 
 
 class CoreCallFailed(RuntimeError):
@@ -127,8 +126,7 @@ def _historic_nature_definitions() -> dict[tuple[str, str], tuple[Any, frozenset
     """Exact historical built-ins, used only where the saved definition is absent.
 
     Their permissible original digests were independently computed by the v1
-    and v2 cores that accepted them. The v3 migration itself matches only name
-    and version, so the host must compare the original digest before fallback.
+    and v2 cores that accepted them. The migration core also checks old digests.
     """
     path = Path(__file__).resolve().parents[1] / "migration_data/nature-historical-definitions.json"
     content = path.read_bytes()

@@ -18,6 +18,7 @@ def main() -> int:
     parser.add_argument("--packages", type=Path, required=True)
     parser.add_argument("--recovery", type=Path, required=True)
     parser.add_argument("--author-approved", action="store_true")
+    parser.add_argument("--blank", type=Path, help="private UTF-8 file of approved history-id:column entries")
     args = parser.parse_args()
     if not args.author_approved:
         parser.error("the author must explicitly approve this cutover")
@@ -28,8 +29,15 @@ def main() -> int:
         state = recover(args.database, args.packages, args.recovery)
         print(json.dumps({"status": state}))
         return 0
+    blank = None
+    if args.blank is not None:
+        if args.blank.is_symlink() or not args.blank.is_file():
+            raise ValueError("invalid_blank_file")
+        blank = [line.strip() for line in args.blank.read_text(encoding="utf-8").splitlines() if line.strip()]
+        if len(blank) != len(set(blank)):
+            raise ValueError("duplicate_blank_id")
     report = cutover(args.database, args.packages, args.recovery,
-                     journal=args.recovery / "journal.jsonl")
+                     journal=args.recovery / "journal.jsonl", blank=blank)
     result = args.recovery / "report.json"
     with result.open("x", encoding="utf-8") as output:
         json.dump(report, output, ensure_ascii=False, sort_keys=True)

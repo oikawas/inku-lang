@@ -510,8 +510,117 @@ fn pipeline_description_label_spans(text: &str) -> String {
     inku_pipeline_uniffi::description_label_spans(text.to_owned())
 }
 
+/// How the PNG's size follows the request (resvg's command line, as resvg_py
+/// does): no width or height keeps the SVG's size, one of them scales the
+/// other with the aspect, both fit the picture inside them.
+#[derive(Clone, Copy)]
+enum FitTo {
+    Original,
+    Width(u32),
+    Height(u32),
+    Size(u32, u32),
+}
+
+impl FitTo {
+    fn fit_to_size(self, size: resvg::tiny_skia::IntSize) -> Option<resvg::tiny_skia::IntSize> {
+        match self {
+            FitTo::Original => Some(size),
+            FitTo::Width(width) => size.scale_to_width(width),
+            FitTo::Height(height) => size.scale_to_height(height),
+            FitTo::Size(width, height) => {
+                resvg::tiny_skia::IntSize::from_wh(width, height).map(|fit| size.scale_to(fit))
+            }
+        }
+    }
+
+    fn fit_to_transform(self, size: resvg::tiny_skia::IntSize) -> resvg::tiny_skia::Transform {
+        let from = size.to_size();
+        let Some(to) = self.fit_to_size(size).map(|size| size.to_size()) else {
+            return resvg::tiny_skia::Transform::default();
+        };
+        resvg::tiny_skia::Transform::from_scale(to.width() / from.width(), to.height() / from.height())
+    }
+}
+
+/// The PNG of `svg`, as resvg_py 0.5.0's `svg_to_bytes` drew it for the Server
+/// and the CLI, by the core's vendored resvg (whose displacement follows the
+/// specification, `core/vendor/resvg/INKU_PATCHES.md`).
+fn png_of(svg: &str, width: Option<u32>, height: Option<u32>, font_files: &[String]) -> Result<Vec<u8>, String> {
+    use resvg::{tiny_skia, usvg};
+    let positive = |value: u32, name: &str| {
+        if value == 0 {
+            Err(format!("{name} must be positive"))
+        } else {
+            Ok(value)
+        }
+    };
+    let (fit, default_size) = match (width, height) {
+        (Some(width), Some(height)) => (
+            FitTo::Size(positive(width, "width")?, positive(height, "height")?),
+            (width as f32, height as f32),
+        ),
+        (Some(width), None) => (FitTo::Width(positive(width, "width")?), (width as f32, 100.0)),
+        (None, Some(height)) => (FitTo::Height(positive(height, "height")?), (100.0, height as f32)),
+        (None, None) => (FitTo::Original, (100.0, 100.0)),
+    };
+    let mut fonts = usvg::fontdb::Database::new();
+    for path in font_files {
+        let data = std::fs::read(path).map_err(|error| format!("font file {path}: {error}"))?;
+        fonts.load_font_data(data);
+    }
+    // resvg_py's names on Linux, where the Server runs.
+    fonts.set_serif_family("Liberation Serif");
+    fonts.set_sans_serif_family("Liberation Sans");
+    fonts.set_cursive_family("Comic Neue");
+    fonts.set_fantasy_family("Anton");
+    fonts.set_monospace_family("Liberation Mono");
+    let options = usvg::Options {
+        dpi: 0.0,
+        font_family: "Liberation Serif".to_owned(),
+        font_size: 16.0,
+        languages: Vec::new(),
+        default_size: usvg::Size::from_wh(default_size.0, default_size.1)
+            .ok_or_else(|| "invalid size".to_owned())?,
+        fontdb: std::sync::Arc::new(fonts),
+        style_sheet: Some(String::new()),
+        ..usvg::Options::default()
+    };
+    let tree = usvg::Tree::from_str(svg, &options).map_err(|error| format!("invalid SVG: {error}"))?;
+    let size = fit
+        .fit_to_size(tree.size().to_int_size())
+        .ok_or_else(|| "target size is zero".to_owned())?;
+    let mut pixmap = tiny_skia::Pixmap::new(size.width(), size.height())
+        .ok_or_else(|| "cannot create pixmap".to_owned())?;
+    resvg::render(&tree, fit.fit_to_transform(tree.size().to_int_size()), &mut pixmap.as_mut());
+    pixmap.encode_png().map_err(|error| error.to_string())
+}
+
+/// SVG to PNG bytes for the Server and the CLI (`inku_analysis.rasterizer`),
+/// drawn as Android's raster and the screens draw it (the core's vendored
+/// resvg). The size follows resvg_py's `svg_to_bytes`: no `width` or `height`
+/// keeps the SVG's own size, one of them scales the other with the aspect,
+/// both fit the picture inside them. Text uses only `font_files` (the host's
+/// bundled faces), never the machine's fonts. A raster image embedded in the
+/// SVG (PNG, JPEG) is not decoded; an embedded SVG is drawn.
+#[pyfunction]
+#[pyo3(signature = (svg, width=None, height=None, font_files=Vec::new()))]
+fn svg_to_png<'py>(
+    py: Python<'py>,
+    svg: &str,
+    width: Option<u32>,
+    height: Option<u32>,
+    font_files: Vec<String>,
+) -> PyResult<Bound<'py, PyBytes>> {
+    let svg = svg.to_owned();
+    let png = py
+        .detach(|| png_of(&svg, width, height, &font_files))
+        .map_err(PyValueError::new_err)?;
+    Ok(PyBytes::new(py, &png))
+}
+
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_function(wrap_pyfunction!(svg_to_png, module)?)?;
     module.add_function(wrap_pyfunction!(core_api_version, module)?)?;
     module.add_function(wrap_pyfunction!(render_engine_id, module)?)?;
     module.add_function(wrap_pyfunction!(render_engine_version, module)?)?;

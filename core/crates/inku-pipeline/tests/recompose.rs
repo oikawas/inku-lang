@@ -35,8 +35,13 @@ fn definitions() -> Vec<MacroDefinition> {
         .expect("package entries")
         .iter()
         .map(|entry| {
-            MacroDefinition::from_json(&entry["definition"].to_string())
-                .expect("a bundled definition")
+            MacroDefinition::from_json(
+                &inku_ddl::migrate_macro_definition_from_saijiki_v1(&entry["definition"])
+                    .unwrap()
+                    .definition
+                    .to_string(),
+            )
+            .expect("a bundled definition")
         })
         .collect()
 }
@@ -367,7 +372,7 @@ fn a_range_joined_with_a_hyphen_moves() {
 fn a_work_with_a_joint_recomposes_and_the_joined_sentence_stays() {
     let source = "紙。\n背景を白で埋める。\n\
         右上の四半分（横1/2〜1、縦0〜1/2）に、灰の鉛筆の薄い空の横長の大きな四角を1個置く。\n\
-        左中央（横0〜1/3、縦1/3〜2/3）に、細かく小刻みに揺れる黒の細い細筆の実線の濃い粒の垂直の普通の大きさの線を1個引く、前の形に重なる。\n\
+        左中央（横0〜1/3、縦1/3〜2/3）に、細かく小刻みに揺れる黒の細いガッシュの実線の濃い粒の垂直の普通の大きさの線を1個引く、前の形に重なる。\n\
         左（横0〜1/3、縦0〜1）に、緑のペンの程よいとても小さな点を5個散らす。";
     let joined = source.lines().nth(3).expect("the joined sentence");
     assert!(joined.ends_with("、前の形に重なる。"), "{joined}");

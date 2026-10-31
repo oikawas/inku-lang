@@ -325,7 +325,7 @@ fn unique_complete_assignments_bind_typed_same_clause_facts_without_changing_i58
                 ..
             } = &actual.value
             {
-                assert_eq!(source_asset_id, "inku.saijiki.v2", "{}", case.id);
+                assert_eq!(source_asset_id, "inku.saijiki.v3", "{}", case.id);
                 assert!(!canonical_surface_ja.is_empty(), "{}", case.id);
             }
         }

@@ -315,7 +315,7 @@ fn marks_that_cannot_fade_so_are_left_out_with_a_reason() {
 /// The handling word 薄い is still read as it was, next to a fade.
 #[test]
 fn a_fade_leaves_the_handling_word_faint_as_it_is() {
-    let marks = "赤の細筆の薄い小さな円を5個並べる。";
+    let marks = "赤のガッシュの薄い小さな円を5個並べる。";
     let faint = instruction(&format!("{HORIZONTAL}{marks}"));
     let faded = instruction(&format!("{HORIZONTAL}左から右へ薄れさせて、{marks}"));
     assert_eq!(without_fade(faded), without_fade(faint));

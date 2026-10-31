@@ -22,7 +22,7 @@ const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
 #[test]
 fn ordinary_sequences_deliver_field_shape_group_and_bilingual_identity() {
     let field = execute(
-        "鉛筆と太筆を交互にして、線を五本並べる。",
+        "鉛筆とガッシュを交互にして、線を五本並べる。",
         ResolvedInstructionLanguage::Ja,
         &[],
         Vec::new(),
@@ -31,7 +31,7 @@ fn ordinary_sequences_deliver_field_shape_group_and_bilingual_identity() {
     );
     let field_score = complete_score(&field);
     let field_group = &field_score.placement_groups[0];
-    assert_eq!(field_score.version, "0.14.0");
+    assert_eq!(field_score.version, "0.24.0");
     assert_eq!(
         field_group.cycle_members.as_ref().unwrap().occurrence_count,
         5
@@ -42,7 +42,7 @@ fn ordinary_sequences_deliver_field_shape_group_and_bilingual_identity() {
             .iter()
             .map(|instruction| instruction.weight)
             .collect::<Vec<_>>(),
-        [Weight::Pencil, Weight::BrushThick]
+        [Weight::Pencil, Weight::Gouache]
     );
     assert_eq!(field_group.members.len(), 2);
     assert!(field_group.members.iter().all(|member| {
@@ -115,9 +115,9 @@ fn ordinary_sequences_deliver_field_shape_group_and_bilingual_identity() {
 
 #[test]
 fn alternation_and_a_mirror_compile_in_one_description() {
-    // The mirror makes the Score 0.15.0, which refused its own cycle members.
+    // A mirror and cyclic members remain valid when the new tool raises the Score edition.
     let result = execute(
-        "鉛筆と太筆を交互にして、線を五本並べる。左端に斜めの赤い弧を置く。右端に前の形と鏡写しの青い弧を置く。",
+        "鉛筆とガッシュを交互にして、線を五本並べる。左端に斜めの赤い弧を置く。右端に前の形と鏡写しの青い弧を置く。",
         ResolvedInstructionLanguage::Ja,
         &[],
         Vec::new(),
@@ -125,7 +125,7 @@ fn alternation_and_a_mirror_compile_in_one_description() {
         ScoreErrorPolicy::Stop,
     );
     let score = complete_score(&result);
-    assert_eq!(score.version, "0.15.0");
+    assert_eq!(score.version, "0.24.0");
     assert_eq!(score.mirror_relations.len(), 1);
     assert!(
         score
@@ -308,16 +308,16 @@ fn fill_cycle_delivers_and_u64_count_reaches_local_resource_omission() {
 #[test]
 fn a_sequence_closing_the_document_after_a_continuation_lines_up_its_own_members() {
     assert_a_continuation_leaves_the_sequence_alone(
-        "中心に、黒の線を1個引く。\n円の周囲に灰色の細筆の円を三つ、半径を順に大きくして並べる。",
-        "中心に、黒の線を1個引く。線は波打つ。\n円の周囲に灰色の細筆の円を三つ、半径を順に大きくして並べる。",
+        "中心に、黒の線を1個引く。\n円の周囲に灰色のガッシュの円を三つ、半径を順に大きくして並べる。",
+        "中心に、黒の線を1個引く。線は波打つ。\n円の周囲に灰色のガッシュの円を三つ、半径を順に大きくして並べる。",
     );
 }
 
 #[test]
 fn a_sequence_after_a_continuation_lines_up_the_members_it_names_without_it() {
     assert_a_continuation_leaves_the_sequence_alone(
-        "中心に、黒の線を1個引く。\n円の周囲に灰色の細筆の円を三つ、半径を順に大きくして並べる。\n中心に、黒の四角を1個置く。",
-        "中心に、黒の線を1個引く。線は波打つ。\n円の周囲に灰色の細筆の円を三つ、半径を順に大きくして並べる。\n中心に、黒の四角を1個置く。",
+        "中心に、黒の線を1個引く。\n円の周囲に灰色のガッシュの円を三つ、半径を順に大きくして並べる。\n中心に、黒の四角を1個置く。",
+        "中心に、黒の線を1個引く。線は波打つ。\n円の周囲に灰色のガッシュの円を三つ、半径を順に大きくして並べる。\n中心に、黒の四角を1個置く。",
     );
 }
 

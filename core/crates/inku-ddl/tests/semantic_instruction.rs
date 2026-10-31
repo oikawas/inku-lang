@@ -62,7 +62,7 @@ fn shape_angle_and_action_direction_have_distinct_exact_owners() {
 
 #[test]
 fn ja_post_head_layout_direction_keeps_exact_action_owner() {
-    let source = "黒いロットリングの小さな四角を横に二十四個並べる。";
+    let source = "黒い細いペンの小さな四角を横に二十四個並べる。";
     let document =
         NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::Ja, Vec::new()).unwrap();
     let result = associate_semantic_instructions(&document).unwrap();
@@ -86,7 +86,7 @@ fn ja_post_head_layout_direction_keeps_exact_action_owner() {
 
 #[test]
 fn ja_unresolved_predicate_fragment_does_not_steal_exact_object_predicate_owners() {
-    let source = "黒いロットリングの小さな四角を左から右へ横に二十四個並べる。";
+    let source = "黒い細いペンの小さな四角を左から右へ横に二十四個並べる。";
     let document =
         NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::Ja, Vec::new()).unwrap();
     let result = associate_semantic_instructions(&document).unwrap();
@@ -113,7 +113,7 @@ fn ja_unresolved_predicate_fragment_does_not_steal_exact_object_predicate_owners
 
 #[test]
 fn ja_unresolved_entity_fragment_does_not_steal_exact_object_predicate_owners() {
-    let source = "中心付近に黒いクレヨンの楕円を一つ置く。";
+    let source = "中心付近に黒いチョークの楕円を一つ置く。";
     let document =
         NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::Ja, Vec::new()).unwrap();
     let result = associate_semantic_instructions(&document).unwrap();
@@ -136,7 +136,7 @@ fn ja_unresolved_entity_fragment_does_not_steal_exact_object_predicate_owners() 
 
 #[test]
 fn ja_unowned_typed_modifier_does_not_steal_exact_object_predicate_owners() {
-    let source = "白いロットリングの横線を全幅に三十本並べる。";
+    let source = "白い細いペンの横線を全幅に三十本並べる。";
     let document =
         NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::Ja, Vec::new()).unwrap();
     let result = associate_semantic_instructions(&document).unwrap();

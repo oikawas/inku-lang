@@ -3,68 +3,322 @@
   "version": 1,
   "definitions": {
     "all-operators-ja": {
-      "schema": "inku.macro-definition.v1",
-      "namespace": "studio",
-      "heading": "枝組.共通",
-      "version": "1.2.3",
-      "parameters": {"density": {"type": "integer"}},
+      "body": [
+        {
+          "arguments": {
+            "offset": {
+              "expr": "number",
+              "value": 0.25
+            }
+          },
+          "component": "mark",
+          "op": "use"
+        },
+        {
+          "arguments": {
+            "offset": {
+              "expr": "number",
+              "value": 0.75
+            }
+          },
+          "component": "mark",
+          "op": "use"
+        },
+        {
+          "body": [
+            {
+              "name": "root_anchor",
+              "op": "anchor"
+            },
+            {
+              "binding": "root_mark",
+              "fields": {
+                "shape": {
+                  "category": "shape",
+                  "expr": "semantic_ref",
+                  "id": "line"
+                },
+                "touch": {
+                  "category": "touch",
+                  "expr": "semantic_ref",
+                  "id": "chalk"
+                }
+              },
+              "op": "emit"
+            },
+            {
+              "from": "root_anchor",
+              "kind": "touching",
+              "op": "relation",
+              "to": "root_mark"
+            }
+          ],
+          "op": "group"
+        },
+        {
+          "body": [
+            {
+              "body": [
+                {
+                  "binding": "tone",
+                  "body": [
+                    {
+                      "binding": null,
+                      "fields": {
+                        "color": {
+                          "expr": "local",
+                          "name": "tone"
+                        }
+                      },
+                      "op": "emit"
+                    }
+                  ],
+                  "choices": [
+                    {
+                      "category": "color",
+                      "expr": "semantic_ref",
+                      "id": "black"
+                    },
+                    {
+                      "category": "color",
+                      "expr": "semantic_ref",
+                      "id": "gray"
+                    }
+                  ],
+                  "domain": "tone_choice",
+                  "op": "vary",
+                  "range": null
+                }
+              ],
+              "op": "transform",
+              "transform": {
+                "rotate_degrees": null,
+                "scale_x": null,
+                "scale_y": null,
+                "translate_x": {
+                  "expr": "local",
+                  "name": "ordinal"
+                },
+                "translate_y": {
+                  "expr": "number",
+                  "value": 0.0
+                }
+              }
+            }
+          ],
+          "count": {
+            "expr": "parameter",
+            "name": "density"
+          },
+          "index": "ordinal",
+          "maximum": 3,
+          "op": "repeat"
+        }
+      ],
       "components": {
         "mark": {
-          "parameters": {"offset": {"type": "number"}},
           "body": [
-            {"op": "emit", "binding": "mark", "fields": {"shape": {"expr": "semantic_ref", "category": "shape", "id": "circle"}, "surface": {"expr": "semantic_ref", "category": "surface", "id": "solid"}, "touch": {"expr": "semantic_ref", "category": "touch", "id": "crayon"}}},
-            {"op": "anchor", "name": "mark_anchor"}
-          ]
+            {
+              "binding": "mark",
+              "fields": {
+                "shape": {
+                  "category": "shape",
+                  "expr": "semantic_ref",
+                  "id": "circle"
+                },
+                "surface": {
+                  "category": "surface",
+                  "expr": "semantic_ref",
+                  "id": "solid"
+                },
+                "touch": {
+                  "category": "touch",
+                  "expr": "semantic_ref",
+                  "id": "chalk"
+                }
+              },
+              "op": "emit"
+            },
+            {
+              "name": "mark_anchor",
+              "op": "anchor"
+            }
+          ],
+          "parameters": {
+            "offset": {
+              "type": "number"
+            }
+          }
         }
       },
-      "body": [
-        {"op": "use", "component": "mark", "arguments": {"offset": {"expr": "number", "value": 0.25}}},
-        {"op": "use", "component": "mark", "arguments": {"offset": {"expr": "number", "value": 0.75}}},
-        {"op": "group", "body": [
-          {"op": "anchor", "name": "root_anchor"},
-          {"op": "emit", "binding": "root_mark", "fields": {"shape": {"expr": "semantic_ref", "category": "shape", "id": "line"}, "touch": {"expr": "semantic_ref", "category": "touch", "id": "crayon"}}},
-          {"op": "relation", "kind": "touching", "from": "root_anchor", "to": "root_mark"}
-        ]},
-        {"op": "repeat", "count": {"expr": "parameter", "name": "density"}, "maximum": 3, "index": "ordinal", "body": [
-          {"op": "transform", "transform": {"translate_x": {"expr": "local", "name": "ordinal"}, "translate_y": {"expr": "number", "value": 0.0}, "scale_x": null, "scale_y": null, "rotate_degrees": null}, "body": [
-            {"op": "vary", "binding": "tone", "domain": "tone_choice", "choices": [{"expr": "semantic_ref", "category": "color", "id": "black"}, {"expr": "semantic_ref", "category": "color", "id": "gray"}], "range": null, "body": [
-              {"op": "emit", "binding": null, "fields": {"color": {"expr": "local", "name": "tone"}}}
-            ]}
-          ]}
-        ]}
-      ]
+      "heading": "枝組.共通",
+      "namespace": "studio",
+      "parameters": {
+        "density": {
+          "type": "integer"
+        }
+      },
+      "schema": "inku.macro-definition.v1",
+      "version": "1.2.3"
     },
     "digest-sensitive": {
-      "schema": "inku.macro-definition.v1",
-      "namespace": "studio",
-      "heading": "枝組.共通",
-      "version": "1.2.4",
-      "parameters": {"density": {"type": "integer"}},
+      "body": [
+        {
+          "arguments": {
+            "offset": {
+              "expr": "number",
+              "value": 0.25
+            }
+          },
+          "component": "mark",
+          "op": "use"
+        },
+        {
+          "arguments": {
+            "offset": {
+              "expr": "number",
+              "value": 0.75
+            }
+          },
+          "component": "mark",
+          "op": "use"
+        },
+        {
+          "body": [
+            {
+              "name": "root_anchor",
+              "op": "anchor"
+            },
+            {
+              "binding": "root_mark",
+              "fields": {
+                "shape": {
+                  "category": "shape",
+                  "expr": "semantic_ref",
+                  "id": "line"
+                },
+                "touch": {
+                  "category": "touch",
+                  "expr": "semantic_ref",
+                  "id": "chalk"
+                }
+              },
+              "op": "emit"
+            },
+            {
+              "from": "root_anchor",
+              "kind": "touching",
+              "op": "relation",
+              "to": "root_mark"
+            }
+          ],
+          "op": "group"
+        },
+        {
+          "body": [
+            {
+              "body": [
+                {
+                  "binding": "tone",
+                  "body": [
+                    {
+                      "binding": null,
+                      "fields": {
+                        "color": {
+                          "expr": "local",
+                          "name": "tone"
+                        }
+                      },
+                      "op": "emit"
+                    }
+                  ],
+                  "choices": [
+                    {
+                      "category": "color",
+                      "expr": "semantic_ref",
+                      "id": "black"
+                    },
+                    {
+                      "category": "color",
+                      "expr": "semantic_ref",
+                      "id": "gray"
+                    }
+                  ],
+                  "domain": "tone_choice",
+                  "op": "vary",
+                  "range": null
+                }
+              ],
+              "op": "transform",
+              "transform": {
+                "rotate_degrees": null,
+                "scale_x": null,
+                "scale_y": null,
+                "translate_x": {
+                  "expr": "local",
+                  "name": "ordinal"
+                },
+                "translate_y": {
+                  "expr": "number",
+                  "value": 0.0
+                }
+              }
+            }
+          ],
+          "count": {
+            "expr": "parameter",
+            "name": "density"
+          },
+          "index": "ordinal",
+          "maximum": 3,
+          "op": "repeat"
+        }
+      ],
       "components": {
         "mark": {
-          "parameters": {"offset": {"type": "number"}},
           "body": [
-            {"op": "emit", "binding": "mark", "fields": {"shape": {"expr": "semantic_ref", "category": "shape", "id": "circle"}, "surface": {"expr": "semantic_ref", "category": "surface", "id": "solid"}, "touch": {"expr": "semantic_ref", "category": "touch", "id": "crayon"}}},
-            {"op": "anchor", "name": "mark_anchor"}
-          ]
+            {
+              "binding": "mark",
+              "fields": {
+                "shape": {
+                  "category": "shape",
+                  "expr": "semantic_ref",
+                  "id": "circle"
+                },
+                "surface": {
+                  "category": "surface",
+                  "expr": "semantic_ref",
+                  "id": "solid"
+                },
+                "touch": {
+                  "category": "touch",
+                  "expr": "semantic_ref",
+                  "id": "chalk"
+                }
+              },
+              "op": "emit"
+            },
+            {
+              "name": "mark_anchor",
+              "op": "anchor"
+            }
+          ],
+          "parameters": {
+            "offset": {
+              "type": "number"
+            }
+          }
         }
       },
-      "body": [
-        {"op": "use", "component": "mark", "arguments": {"offset": {"expr": "number", "value": 0.25}}},
-        {"op": "use", "component": "mark", "arguments": {"offset": {"expr": "number", "value": 0.75}}},
-        {"op": "group", "body": [
-          {"op": "anchor", "name": "root_anchor"},
-          {"op": "emit", "binding": "root_mark", "fields": {"shape": {"expr": "semantic_ref", "category": "shape", "id": "line"}, "touch": {"expr": "semantic_ref", "category": "touch", "id": "crayon"}}},
-          {"op": "relation", "kind": "touching", "from": "root_anchor", "to": "root_mark"}
-        ]},
-        {"op": "repeat", "count": {"expr": "parameter", "name": "density"}, "maximum": 3, "index": "ordinal", "body": [
-          {"op": "transform", "transform": {"translate_x": {"expr": "local", "name": "ordinal"}, "translate_y": {"expr": "number", "value": 0.0}, "scale_x": null, "scale_y": null, "rotate_degrees": null}, "body": [
-            {"op": "vary", "binding": "tone", "domain": "tone_choice", "choices": [{"expr": "semantic_ref", "category": "color", "id": "black"}, {"expr": "semantic_ref", "category": "color", "id": "gray"}], "range": null, "body": [
-              {"op": "emit", "binding": null, "fields": {"color": {"expr": "local", "name": "tone"}}}
-            ]}
-          ]}
-        ]}
-      ]
+      "heading": "枝組.共通",
+      "namespace": "studio",
+      "parameters": {
+        "density": {
+          "type": "integer"
+        }
+      },
+      "schema": "inku.macro-definition.v1",
+      "version": "1.2.4"
     },
     "key-order-whitespace": {
       "schema": "inku.macro-definition.v1",
@@ -81,8 +335,8 @@
       "id": "all-operators-ja-component-reuse-bounded-vary-touch-surface",
       "definition": "all-operators-ja",
       "alternate_input_json": null,
-      "expected_canonical_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"studio\",\"heading\":\"枝組.共通\",\"version\":\"1.2.3\",\"parameters\":{\"density\":{\"type\":\"integer\"}},\"components\":{\"mark\":{\"parameters\":{\"offset\":{\"type\":\"number\"}},\"body\":[{\"op\":\"emit\",\"binding\":\"mark\",\"fields\":{\"shape\":{\"expr\":\"semantic_ref\",\"category\":\"shape\",\"id\":\"circle\"},\"surface\":{\"expr\":\"semantic_ref\",\"category\":\"surface\",\"id\":\"solid\"},\"touch\":{\"expr\":\"semantic_ref\",\"category\":\"touch\",\"id\":\"crayon\"}}},{\"op\":\"anchor\",\"name\":\"mark_anchor\"}]}},\"body\":[{\"op\":\"use\",\"component\":\"mark\",\"arguments\":{\"offset\":{\"expr\":\"number\",\"value\":0.25}}},{\"op\":\"use\",\"component\":\"mark\",\"arguments\":{\"offset\":{\"expr\":\"number\",\"value\":0.75}}},{\"op\":\"group\",\"body\":[{\"op\":\"anchor\",\"name\":\"root_anchor\"},{\"op\":\"emit\",\"binding\":\"root_mark\",\"fields\":{\"shape\":{\"expr\":\"semantic_ref\",\"category\":\"shape\",\"id\":\"line\"},\"touch\":{\"expr\":\"semantic_ref\",\"category\":\"touch\",\"id\":\"crayon\"}}},{\"op\":\"relation\",\"kind\":\"touching\",\"from\":\"root_anchor\",\"to\":\"root_mark\"}]},{\"op\":\"repeat\",\"count\":{\"expr\":\"parameter\",\"name\":\"density\"},\"maximum\":3,\"index\":\"ordinal\",\"body\":[{\"op\":\"transform\",\"transform\":{\"translate_x\":{\"expr\":\"local\",\"name\":\"ordinal\"},\"translate_y\":{\"expr\":\"number\",\"value\":0.0},\"scale_x\":null,\"scale_y\":null,\"rotate_degrees\":null},\"body\":[{\"op\":\"vary\",\"binding\":\"tone\",\"domain\":\"tone_choice\",\"choices\":[{\"expr\":\"semantic_ref\",\"category\":\"color\",\"id\":\"black\"},{\"expr\":\"semantic_ref\",\"category\":\"color\",\"id\":\"gray\"}],\"range\":null,\"body\":[{\"op\":\"emit\",\"binding\":null,\"fields\":{\"color\":{\"expr\":\"local\",\"name\":\"tone\"}}}]}]}]}]}",
-      "expected_digest": "d81d6e92d196561231b9e5528f20e750bc79eda4b354158728d73a308ddd12cf",
+      "expected_canonical_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"studio\",\"heading\":\"枝組.共通\",\"version\":\"1.2.3\",\"parameters\":{\"density\":{\"type\":\"integer\"}},\"components\":{\"mark\":{\"parameters\":{\"offset\":{\"type\":\"number\"}},\"body\":[{\"op\":\"emit\",\"binding\":\"mark\",\"fields\":{\"shape\":{\"expr\":\"semantic_ref\",\"category\":\"shape\",\"id\":\"circle\"},\"surface\":{\"expr\":\"semantic_ref\",\"category\":\"surface\",\"id\":\"solid\"},\"touch\":{\"expr\":\"semantic_ref\",\"category\":\"touch\",\"id\":\"chalk\"}}},{\"op\":\"anchor\",\"name\":\"mark_anchor\"}]}},\"body\":[{\"op\":\"use\",\"component\":\"mark\",\"arguments\":{\"offset\":{\"expr\":\"number\",\"value\":0.25}}},{\"op\":\"use\",\"component\":\"mark\",\"arguments\":{\"offset\":{\"expr\":\"number\",\"value\":0.75}}},{\"op\":\"group\",\"body\":[{\"op\":\"anchor\",\"name\":\"root_anchor\"},{\"op\":\"emit\",\"binding\":\"root_mark\",\"fields\":{\"shape\":{\"expr\":\"semantic_ref\",\"category\":\"shape\",\"id\":\"line\"},\"touch\":{\"expr\":\"semantic_ref\",\"category\":\"touch\",\"id\":\"chalk\"}}},{\"op\":\"relation\",\"kind\":\"touching\",\"from\":\"root_anchor\",\"to\":\"root_mark\"}]},{\"op\":\"repeat\",\"count\":{\"expr\":\"parameter\",\"name\":\"density\"},\"maximum\":3,\"index\":\"ordinal\",\"body\":[{\"op\":\"transform\",\"transform\":{\"translate_x\":{\"expr\":\"local\",\"name\":\"ordinal\"},\"translate_y\":{\"expr\":\"number\",\"value\":0.0},\"scale_x\":null,\"scale_y\":null,\"rotate_degrees\":null},\"body\":[{\"op\":\"vary\",\"binding\":\"tone\",\"domain\":\"tone_choice\",\"choices\":[{\"expr\":\"semantic_ref\",\"category\":\"color\",\"id\":\"black\"},{\"expr\":\"semantic_ref\",\"category\":\"color\",\"id\":\"gray\"}],\"range\":null,\"body\":[{\"op\":\"emit\",\"binding\":null,\"fields\":{\"color\":{\"expr\":\"local\",\"name\":\"tone\"}}}]}]}]}]}",
+      "expected_digest": "feac99972f2eab1c456edc2cc9c54fc9a385624a1bbed74535ec920f5b9a2a02",
       "expected_qualified_name": "studio.枝組.共通",
       "expected_version": "1.2.3",
       "expected_upper_bound": 6
@@ -101,29 +355,93 @@
       "id": "digest-sensitivity-version",
       "definition": "digest-sensitive",
       "alternate_input_json": null,
-      "expected_canonical_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"studio\",\"heading\":\"枝組.共通\",\"version\":\"1.2.4\",\"parameters\":{\"density\":{\"type\":\"integer\"}},\"components\":{\"mark\":{\"parameters\":{\"offset\":{\"type\":\"number\"}},\"body\":[{\"op\":\"emit\",\"binding\":\"mark\",\"fields\":{\"shape\":{\"expr\":\"semantic_ref\",\"category\":\"shape\",\"id\":\"circle\"},\"surface\":{\"expr\":\"semantic_ref\",\"category\":\"surface\",\"id\":\"solid\"},\"touch\":{\"expr\":\"semantic_ref\",\"category\":\"touch\",\"id\":\"crayon\"}}},{\"op\":\"anchor\",\"name\":\"mark_anchor\"}]}},\"body\":[{\"op\":\"use\",\"component\":\"mark\",\"arguments\":{\"offset\":{\"expr\":\"number\",\"value\":0.25}}},{\"op\":\"use\",\"component\":\"mark\",\"arguments\":{\"offset\":{\"expr\":\"number\",\"value\":0.75}}},{\"op\":\"group\",\"body\":[{\"op\":\"anchor\",\"name\":\"root_anchor\"},{\"op\":\"emit\",\"binding\":\"root_mark\",\"fields\":{\"shape\":{\"expr\":\"semantic_ref\",\"category\":\"shape\",\"id\":\"line\"},\"touch\":{\"expr\":\"semantic_ref\",\"category\":\"touch\",\"id\":\"crayon\"}}},{\"op\":\"relation\",\"kind\":\"touching\",\"from\":\"root_anchor\",\"to\":\"root_mark\"}]},{\"op\":\"repeat\",\"count\":{\"expr\":\"parameter\",\"name\":\"density\"},\"maximum\":3,\"index\":\"ordinal\",\"body\":[{\"op\":\"transform\",\"transform\":{\"translate_x\":{\"expr\":\"local\",\"name\":\"ordinal\"},\"translate_y\":{\"expr\":\"number\",\"value\":0.0},\"scale_x\":null,\"scale_y\":null,\"rotate_degrees\":null},\"body\":[{\"op\":\"vary\",\"binding\":\"tone\",\"domain\":\"tone_choice\",\"choices\":[{\"expr\":\"semantic_ref\",\"category\":\"color\",\"id\":\"black\"},{\"expr\":\"semantic_ref\",\"category\":\"color\",\"id\":\"gray\"}],\"range\":null,\"body\":[{\"op\":\"emit\",\"binding\":null,\"fields\":{\"color\":{\"expr\":\"local\",\"name\":\"tone\"}}}]}]}]}]}",
-      "expected_digest": "cd108f3a5c5c895ee35e2205eed95cbf12bb1081408e5c5ebd842d217f1148b9",
+      "expected_canonical_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"studio\",\"heading\":\"枝組.共通\",\"version\":\"1.2.4\",\"parameters\":{\"density\":{\"type\":\"integer\"}},\"components\":{\"mark\":{\"parameters\":{\"offset\":{\"type\":\"number\"}},\"body\":[{\"op\":\"emit\",\"binding\":\"mark\",\"fields\":{\"shape\":{\"expr\":\"semantic_ref\",\"category\":\"shape\",\"id\":\"circle\"},\"surface\":{\"expr\":\"semantic_ref\",\"category\":\"surface\",\"id\":\"solid\"},\"touch\":{\"expr\":\"semantic_ref\",\"category\":\"touch\",\"id\":\"chalk\"}}},{\"op\":\"anchor\",\"name\":\"mark_anchor\"}]}},\"body\":[{\"op\":\"use\",\"component\":\"mark\",\"arguments\":{\"offset\":{\"expr\":\"number\",\"value\":0.25}}},{\"op\":\"use\",\"component\":\"mark\",\"arguments\":{\"offset\":{\"expr\":\"number\",\"value\":0.75}}},{\"op\":\"group\",\"body\":[{\"op\":\"anchor\",\"name\":\"root_anchor\"},{\"op\":\"emit\",\"binding\":\"root_mark\",\"fields\":{\"shape\":{\"expr\":\"semantic_ref\",\"category\":\"shape\",\"id\":\"line\"},\"touch\":{\"expr\":\"semantic_ref\",\"category\":\"touch\",\"id\":\"chalk\"}}},{\"op\":\"relation\",\"kind\":\"touching\",\"from\":\"root_anchor\",\"to\":\"root_mark\"}]},{\"op\":\"repeat\",\"count\":{\"expr\":\"parameter\",\"name\":\"density\"},\"maximum\":3,\"index\":\"ordinal\",\"body\":[{\"op\":\"transform\",\"transform\":{\"translate_x\":{\"expr\":\"local\",\"name\":\"ordinal\"},\"translate_y\":{\"expr\":\"number\",\"value\":0.0},\"scale_x\":null,\"scale_y\":null,\"rotate_degrees\":null},\"body\":[{\"op\":\"vary\",\"binding\":\"tone\",\"domain\":\"tone_choice\",\"choices\":[{\"expr\":\"semantic_ref\",\"category\":\"color\",\"id\":\"black\"},{\"expr\":\"semantic_ref\",\"category\":\"color\",\"id\":\"gray\"}],\"range\":null,\"body\":[{\"op\":\"emit\",\"binding\":null,\"fields\":{\"color\":{\"expr\":\"local\",\"name\":\"tone\"}}}]}]}]}]}",
+      "expected_digest": "f34f50362e061358ba11aa48c7f8247c1c25b0334be9c21dd2c0e51ae5483ef3",
       "expected_qualified_name": "studio.枝組.共通",
       "expected_version": "1.2.4",
       "expected_upper_bound": 6
     }
   ],
   "invalid_cases": [
-    {"id": "domain-specific-operator", "input_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"macro\",\"heading\":\"bad\",\"version\":\"1.0.0\",\"parameters\":{},\"components\":{},\"body\":[{\"op\":\"grow_tree\"}]}", "expected_code": "unknown_operator"},
-    {"id": "unknown-semantic-id", "input_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"macro\",\"heading\":\"bad\",\"version\":\"1.0.0\",\"parameters\":{},\"components\":{},\"body\":[{\"op\":\"emit\",\"binding\":null,\"fields\":{\"touch\":{\"expr\":\"semantic_ref\",\"category\":\"touch\",\"id\":\"magic\"}}}]}", "expected_code": "unknown_semantic_id"},
-    {"id": "filled-authoring-field", "input_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"macro\",\"heading\":\"bad\",\"version\":\"1.0.0\",\"parameters\":{},\"components\":{},\"body\":[{\"op\":\"emit\",\"binding\":null,\"fields\":{\"filled\":{\"expr\":\"boolean\",\"value\":true}}}]}", "expected_code": "unknown_semantic_field"},
-    {"id": "wild-host-option", "input_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"macro\",\"heading\":\"bad\",\"version\":\"1.0.0\",\"parameters\":{},\"components\":{},\"body\":[{\"op\":\"emit\",\"binding\":null,\"fields\":{\"wild\":{\"expr\":\"boolean\",\"value\":true}}}]}", "expected_code": "unknown_semantic_field"},
-    {"id": "wild-semantic-reference", "input_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"macro\",\"heading\":\"bad\",\"version\":\"1.0.0\",\"parameters\":{},\"components\":{},\"body\":[{\"op\":\"emit\",\"binding\":null,\"fields\":{\"touch\":{\"expr\":\"semantic_ref\",\"category\":\"wild\",\"id\":\"enabled\"}}}]}", "expected_code": "unknown_semantic_category"},
-    {"id": "raw-score", "input_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"macro\",\"heading\":\"bad\",\"version\":\"1.0.0\",\"parameters\":{},\"components\":{},\"body\":[{\"op\":\"emit\",\"binding\":null,\"fields\":{\"score\":{\"expr\":\"integer\",\"value\":1}}}]}", "expected_code": "unknown_semantic_field"},
-    {"id": "raw-svg", "input_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"macro\",\"heading\":\"bad\",\"version\":\"1.0.0\",\"parameters\":{},\"components\":{},\"body\":[{\"op\":\"emit\",\"binding\":null,\"fields\":{\"svg\":{\"expr\":\"integer\",\"value\":1}}}]}", "expected_code": "unknown_semantic_field"},
-    {"id": "renderer-instruction", "input_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"macro\",\"heading\":\"bad\",\"version\":\"1.0.0\",\"parameters\":{},\"components\":{},\"body\":[{\"op\":\"emit\",\"binding\":null,\"fields\":{\"renderer\":{\"expr\":\"integer\",\"value\":1}}}]}", "expected_code": "unknown_semantic_field"},
-    {"id": "external-use", "input_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"macro\",\"heading\":\"bad\",\"version\":\"1.0.0\",\"parameters\":{},\"components\":{},\"body\":[{\"op\":\"use\",\"component\":\"other.mark\",\"arguments\":{}}]}", "expected_code": "external_component_reference"},
-    {"id": "component-cycle", "input_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"macro\",\"heading\":\"bad\",\"version\":\"1.0.0\",\"parameters\":{},\"components\":{\"a\":{\"parameters\":{},\"body\":[{\"op\":\"use\",\"component\":\"b\",\"arguments\":{}}]},\"b\":{\"parameters\":{},\"body\":[{\"op\":\"use\",\"component\":\"a\",\"arguments\":{}}]}},\"body\":[]}", "expected_code": "component_cycle"},
-    {"id": "undefined-anchor", "input_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"macro\",\"heading\":\"bad\",\"version\":\"1.0.0\",\"parameters\":{},\"components\":{},\"body\":[{\"op\":\"anchor\",\"name\":\"known\"},{\"op\":\"relation\",\"kind\":\"touching\",\"from\":\"known\",\"to\":\"missing\"}]}", "expected_code": "undefined_anchor"},
-    {"id": "undefined-parameter", "input_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"macro\",\"heading\":\"bad\",\"version\":\"1.0.0\",\"parameters\":{},\"components\":{},\"body\":[{\"op\":\"emit\",\"binding\":null,\"fields\":{\"touch\":{\"expr\":\"parameter\",\"name\":\"missing\"}}}]}", "expected_code": "undefined_parameter"},
-    {"id": "unbounded-repeat", "input_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"macro\",\"heading\":\"bad\",\"version\":\"1.0.0\",\"parameters\":{},\"components\":{},\"body\":[{\"op\":\"repeat\",\"count\":{\"expr\":\"integer\",\"value\":1},\"maximum\":0,\"index\":\"i\",\"body\":[]}]}", "expected_code": "unbounded_repeat"},
-    {"id": "empty-vary", "input_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"macro\",\"heading\":\"bad\",\"version\":\"1.0.0\",\"parameters\":{},\"components\":{},\"body\":[{\"op\":\"vary\",\"binding\":\"v\",\"domain\":\"finite\",\"choices\":[],\"range\":null,\"body\":[]}]}", "expected_code": "empty_vary"},
-    {"id": "non-finite-number", "input_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"macro\",\"heading\":\"bad\",\"version\":\"1.0.0\",\"parameters\":{},\"components\":{},\"body\":[{\"op\":\"transform\",\"transform\":{\"translate_x\":{\"expr\":\"number\",\"value\":NaN},\"translate_y\":null,\"scale_x\":null,\"scale_y\":null,\"rotate_degrees\":null},\"body\":[]}]}", "expected_code": "invalid_json"},
-    {"id": "duplicate-anchor", "input_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"macro\",\"heading\":\"bad\",\"version\":\"1.0.0\",\"parameters\":{},\"components\":{},\"body\":[{\"op\":\"anchor\",\"name\":\"same\"},{\"op\":\"anchor\",\"name\":\"same\"}]}", "expected_code": "duplicate_anchor_or_binding"}
+    {
+      "id": "domain-specific-operator",
+      "input_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"macro\",\"heading\":\"bad\",\"version\":\"1.0.0\",\"parameters\":{},\"components\":{},\"body\":[{\"op\":\"grow_tree\"}]}",
+      "expected_code": "unknown_operator"
+    },
+    {
+      "id": "unknown-semantic-id",
+      "input_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"macro\",\"heading\":\"bad\",\"version\":\"1.0.0\",\"parameters\":{},\"components\":{},\"body\":[{\"op\":\"emit\",\"binding\":null,\"fields\":{\"touch\":{\"expr\":\"semantic_ref\",\"category\":\"touch\",\"id\":\"magic\"}}}]}",
+      "expected_code": "unknown_semantic_id"
+    },
+    {
+      "id": "filled-authoring-field",
+      "input_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"macro\",\"heading\":\"bad\",\"version\":\"1.0.0\",\"parameters\":{},\"components\":{},\"body\":[{\"op\":\"emit\",\"binding\":null,\"fields\":{\"filled\":{\"expr\":\"boolean\",\"value\":true}}}]}",
+      "expected_code": "unknown_semantic_field"
+    },
+    {
+      "id": "wild-host-option",
+      "input_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"macro\",\"heading\":\"bad\",\"version\":\"1.0.0\",\"parameters\":{},\"components\":{},\"body\":[{\"op\":\"emit\",\"binding\":null,\"fields\":{\"wild\":{\"expr\":\"boolean\",\"value\":true}}}]}",
+      "expected_code": "unknown_semantic_field"
+    },
+    {
+      "id": "wild-semantic-reference",
+      "input_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"macro\",\"heading\":\"bad\",\"version\":\"1.0.0\",\"parameters\":{},\"components\":{},\"body\":[{\"op\":\"emit\",\"binding\":null,\"fields\":{\"touch\":{\"expr\":\"semantic_ref\",\"category\":\"wild\",\"id\":\"enabled\"}}}]}",
+      "expected_code": "unknown_semantic_category"
+    },
+    {
+      "id": "raw-score",
+      "input_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"macro\",\"heading\":\"bad\",\"version\":\"1.0.0\",\"parameters\":{},\"components\":{},\"body\":[{\"op\":\"emit\",\"binding\":null,\"fields\":{\"score\":{\"expr\":\"integer\",\"value\":1}}}]}",
+      "expected_code": "unknown_semantic_field"
+    },
+    {
+      "id": "raw-svg",
+      "input_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"macro\",\"heading\":\"bad\",\"version\":\"1.0.0\",\"parameters\":{},\"components\":{},\"body\":[{\"op\":\"emit\",\"binding\":null,\"fields\":{\"svg\":{\"expr\":\"integer\",\"value\":1}}}]}",
+      "expected_code": "unknown_semantic_field"
+    },
+    {
+      "id": "renderer-instruction",
+      "input_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"macro\",\"heading\":\"bad\",\"version\":\"1.0.0\",\"parameters\":{},\"components\":{},\"body\":[{\"op\":\"emit\",\"binding\":null,\"fields\":{\"renderer\":{\"expr\":\"integer\",\"value\":1}}}]}",
+      "expected_code": "unknown_semantic_field"
+    },
+    {
+      "id": "external-use",
+      "input_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"macro\",\"heading\":\"bad\",\"version\":\"1.0.0\",\"parameters\":{},\"components\":{},\"body\":[{\"op\":\"use\",\"component\":\"other.mark\",\"arguments\":{}}]}",
+      "expected_code": "external_component_reference"
+    },
+    {
+      "id": "component-cycle",
+      "input_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"macro\",\"heading\":\"bad\",\"version\":\"1.0.0\",\"parameters\":{},\"components\":{\"a\":{\"parameters\":{},\"body\":[{\"op\":\"use\",\"component\":\"b\",\"arguments\":{}}]},\"b\":{\"parameters\":{},\"body\":[{\"op\":\"use\",\"component\":\"a\",\"arguments\":{}}]}},\"body\":[]}",
+      "expected_code": "component_cycle"
+    },
+    {
+      "id": "undefined-anchor",
+      "input_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"macro\",\"heading\":\"bad\",\"version\":\"1.0.0\",\"parameters\":{},\"components\":{},\"body\":[{\"op\":\"anchor\",\"name\":\"known\"},{\"op\":\"relation\",\"kind\":\"touching\",\"from\":\"known\",\"to\":\"missing\"}]}",
+      "expected_code": "undefined_anchor"
+    },
+    {
+      "id": "undefined-parameter",
+      "input_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"macro\",\"heading\":\"bad\",\"version\":\"1.0.0\",\"parameters\":{},\"components\":{},\"body\":[{\"op\":\"emit\",\"binding\":null,\"fields\":{\"touch\":{\"expr\":\"parameter\",\"name\":\"missing\"}}}]}",
+      "expected_code": "undefined_parameter"
+    },
+    {
+      "id": "unbounded-repeat",
+      "input_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"macro\",\"heading\":\"bad\",\"version\":\"1.0.0\",\"parameters\":{},\"components\":{},\"body\":[{\"op\":\"repeat\",\"count\":{\"expr\":\"integer\",\"value\":1},\"maximum\":0,\"index\":\"i\",\"body\":[]}]}",
+      "expected_code": "unbounded_repeat"
+    },
+    {
+      "id": "empty-vary",
+      "input_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"macro\",\"heading\":\"bad\",\"version\":\"1.0.0\",\"parameters\":{},\"components\":{},\"body\":[{\"op\":\"vary\",\"binding\":\"v\",\"domain\":\"finite\",\"choices\":[],\"range\":null,\"body\":[]}]}",
+      "expected_code": "empty_vary"
+    },
+    {
+      "id": "non-finite-number",
+      "input_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"macro\",\"heading\":\"bad\",\"version\":\"1.0.0\",\"parameters\":{},\"components\":{},\"body\":[{\"op\":\"transform\",\"transform\":{\"translate_x\":{\"expr\":\"number\",\"value\":NaN},\"translate_y\":null,\"scale_x\":null,\"scale_y\":null,\"rotate_degrees\":null},\"body\":[]}]}",
+      "expected_code": "invalid_json"
+    },
+    {
+      "id": "duplicate-anchor",
+      "input_json": "{\"schema\":\"inku.macro-definition.v1\",\"namespace\":\"macro\",\"heading\":\"bad\",\"version\":\"1.0.0\",\"parameters\":{},\"components\":{},\"body\":[{\"op\":\"anchor\",\"name\":\"same\"},{\"op\":\"anchor\",\"name\":\"same\"}]}",
+      "expected_code": "duplicate_anchor_or_binding"
+    }
   ]
 }

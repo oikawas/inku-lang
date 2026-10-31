@@ -109,14 +109,14 @@ fn brushmarks_lays_a_closed_shapes_face_in_score_0_22() {
     // (source, language, scale, filled, intensity)
     for (source, language, scale, filled, intensity) in [
         (
-            "中心に、白の太筆の刷毛目の四角を1個置く。",
+            "中心に、白の太いガッシュの刷毛目の四角を1個置く。",
             JA,
             0.35,
             false,
             SurfaceIntensity::Normal,
         ),
         (
-            "Place one white thick-brush brushmarks square at the center.",
+            "Place one white thick gouache brushmarks square at the center.",
             EN,
             0.35,
             false,
@@ -130,35 +130,35 @@ fn brushmarks_lays_a_closed_shapes_face_in_score_0_22() {
             SurfaceIntensity::Normal,
         ),
         (
-            "中心に、赤のロットリングの刷毛目の楕円を1個置く。",
+            "中心に、赤の細いペンの刷毛目の楕円を1個置く。",
             JA,
             0.35,
             false,
             SurfaceIntensity::Normal,
         ),
         (
-            "中心に、赤の太筆の細かい刷毛目の円を1個置く。",
+            "中心に、赤の太いガッシュの細かい刷毛目の円を1個置く。",
             JA,
             0.05,
             false,
             SurfaceIntensity::Normal,
         ),
         (
-            "中心に、赤の太筆の下塗りの刷毛目の薄い三角を1個置く。",
+            "中心に、赤の太いガッシュの下塗りの刷毛目の薄い三角を1個置く。",
             JA,
             0.35,
             true,
             SurfaceIntensity::Faint,
         ),
         (
-            "Place one red thick-brush faint underpainted brushmarks triangle at the center.",
+            "Place one red thick gouache faint underpainted brushmarks triangle at the center.",
             EN,
             0.35,
             true,
             SurfaceIntensity::Faint,
         ),
         (
-            "中心に、刷毛目の白の太筆の雲形を1個置く。",
+            "中心に、刷毛目の白の太いガッシュの雲形を1個置く。",
             JA,
             0.35,
             false,
@@ -169,7 +169,15 @@ fn brushmarks_lays_a_closed_shapes_face_in_score_0_22() {
         assert_eq!(compiled.outcome, ScoreLoweringOutcome::Complete, "{source}");
         assert!(compiled.gaps.is_empty(), "{source}: {:?}", compiled.gaps);
         assert_eq!(compiled.upstream, 0, "{source}");
-        assert_eq!(compiled.score.version, "0.22.0", "{source}");
+        assert_eq!(
+            compiled.score.version,
+            if source.contains("ガッシュ") || source.contains("gouache") {
+                "0.24.0"
+            } else {
+                "0.22.0"
+            },
+            "{source}"
+        );
         let mark = only_instruction(&compiled, source);
         let surface = mark.surface.as_ref().expect(source);
         assert_eq!(surface.texture, SurfaceTexture::Brushmarks, "{source}");
@@ -187,32 +195,32 @@ fn brushmarks_without_a_face_is_left_out_alone() {
     };
     for (source, without, language, gaps) in [
         (
-            "中心に、白の太筆の刷毛目の線を1本引く。",
-            "中心に、白の太筆の線を1本引く。",
+            "中心に、白の太いガッシュの刷毛目の線を1本引く。",
+            "中心に、白の太いガッシュの線を1本引く。",
             JA,
             vec![brushmarks()],
         ),
         (
-            "Draw one white thick-brush brushmarks line at the center.",
-            "Draw one white thick-brush line at the center.",
+            "Draw one white thick gouache brushmarks line at the center.",
+            "Draw one white thick gouache line at the center.",
             EN,
             vec![brushmarks()],
         ),
         (
-            "中心に、白の太筆の刷毛目の弧を1本引く。",
-            "中心に、白の太筆の弧を1本引く。",
+            "中心に、白の太いガッシュの刷毛目の弧を1本引く。",
+            "中心に、白の太いガッシュの弧を1本引く。",
             JA,
             vec![brushmarks()],
         ),
         (
-            "中心に、白の太筆の刷毛目の自由線を1本引く。",
-            "中心に、白の太筆の自由線を1本引く。",
+            "中心に、白の太いガッシュの刷毛目の自由線を1本引く。",
+            "中心に、白の太いガッシュの自由線を1本引く。",
             JA,
             vec![brushmarks()],
         ),
         (
-            "中心に、白の太筆の細かい刷毛目の線を1本引く。",
-            "中心に、白の太筆の線を1本引く。",
+            "中心に、白の太いガッシュの細かい刷毛目の線を1本引く。",
+            "中心に、白の太いガッシュの線を1本引く。",
             JA,
             vec![
                 brushmarks(),
@@ -224,8 +232,8 @@ fn brushmarks_without_a_face_is_left_out_alone() {
         ),
         // A point takes no surface word, brushmarks included.
         (
-            "中心に、白の太筆の刷毛目の点を1個置く。",
-            "中心に、白の太筆の点を1個置く。",
+            "中心に、白の太いガッシュの刷毛目の点を1個置く。",
+            "中心に、白の太いガッシュの点を1個置く。",
             JA,
             vec![ScoreFieldGap::UnsupportedSurfaceIdentity {
                 category: "surface".into(),
@@ -252,7 +260,7 @@ fn brushmarks_without_a_face_is_left_out_alone() {
         assert_eq!(compiled.score.version, reference.score.version, "{source}");
     }
     // Nothing takes the left-out word's place on the line.
-    let compiled = compile("中心に、白の太筆の刷毛目の線を1本引く。", JA);
+    let compiled = compile("中心に、白の太いガッシュの刷毛目の線を1本引く。", JA);
     assert_eq!(
         compiled.resolutions,
         vec![Some(ScoreAppearanceResolution::Unchanged)]
@@ -263,8 +271,8 @@ fn brushmarks_without_a_face_is_left_out_alone() {
 /// two surface words do, and both are left out.
 #[test]
 fn a_sweep_and_brushmarks_on_one_mark_conflict() {
-    let compiled = compile("中心に、白の太筆の刷きの刷毛目の円を1個置く。", JA);
-    let reference = compile("中心に、白の太筆の円を1個置く。", JA);
+    let compiled = compile("中心に、白の太いガッシュの刷きの刷毛目の円を1個置く。", JA);
+    let reference = compile("中心に、白の太いガッシュの円を1個置く。", JA);
     assert_eq!(compiled.upstream, 1);
     assert!(compiled.gaps.is_empty(), "{:?}", compiled.gaps);
     assert_eq!(compiled.score.instructions, reference.score.instructions);
@@ -275,13 +283,13 @@ fn a_sweep_and_brushmarks_on_one_mark_conflict() {
 #[test]
 fn brushmarks_for_a_sweep_changes_only_the_texture_and_the_edition() {
     let sweep = "背景を黒で埋める。\n\
-                 画面の横0.5、縦0.5の位置に、白の太い太筆の薄い刷きの全幅の四角を1個置く。\n\
-                 画面の横0.5、縦0.5の位置に、白の太い太筆の薄い刷きの全幅の四角を1個置く。";
+                 画面の横0.5、縦0.5の位置に、白のごく太いガッシュの薄い刷きの全幅の四角を1個置く。\n\
+                 画面の横0.5、縦0.5の位置に、白のごく太いガッシュの薄い刷きの全幅の四角を1個置く。";
     let brushmarks = sweep.replace("刷き", "刷毛目");
     let before = compile(sweep, JA);
     let after = compile(&brushmarks, JA);
-    assert_eq!(before.score.version, "0.17.0");
-    assert_eq!(after.score.version, "0.22.0");
+    assert_eq!(before.score.version, "0.24.0");
+    assert_eq!(after.score.version, "0.24.0");
     assert_eq!(after.score.instructions.len(), 2);
     let mut rewritten = before.score.clone();
     for instruction in &mut rewritten.instructions {
@@ -289,7 +297,7 @@ fn brushmarks_for_a_sweep_changes_only_the_texture_and_the_edition() {
         assert_eq!(surface.texture, SurfaceTexture::Sweep);
         surface.texture = SurfaceTexture::Brushmarks;
     }
-    rewritten.version = "0.22.0".into();
+    rewritten.version = "0.24.0".into();
     assert_eq!(after.score, rewritten);
 }
 

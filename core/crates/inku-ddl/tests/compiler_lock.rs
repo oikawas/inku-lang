@@ -19,7 +19,7 @@ const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v12.jso
 
 #[test]
 fn unresolved_drawing_clauses_are_bounded_known_holes() {
-    let source = "青で背景を塗りつぶす\n様々な色の四角30個をクレヨンとコンピュータで塗りつぶす。";
+    let source = "青で背景を塗りつぶす\n様々な色の四角30個をチョークとコンピュータで塗りつぶす。";
     let result = compile(
         source,
         ResolvedInstructionLanguage::Ja,
@@ -52,14 +52,14 @@ fn unresolved_drawing_clauses_are_bounded_known_holes() {
             .collect::<Vec<_>>(),
         [
             "青で背景を塗りつぶす",
-            "様々な色の四角30個をクレヨンとコンピュータで塗りつぶす"
+            "様々な色の四角30個をチョークとコンピュータで塗りつぶす"
         ]
     );
 }
 
 #[test]
 fn unresolved_clause_owns_its_invalid_sequence_diagnostic() {
-    let source = "背景を灰で埋める。赤いクレヨンの折れ線を右上がりから右下がりへ交互に組み合わせて、上端から下端へ一本引く。細かく揺れる。";
+    let source = "背景を灰で埋める。赤いチョークの折れ線を右上がりから右下がりへ交互に組み合わせて、上端から下端へ一本引く。細かく揺れる。";
     let result = compile(
         source,
         ResolvedInstructionLanguage::Ja,
@@ -86,14 +86,14 @@ fn unresolved_clause_owns_its_invalid_sequence_diagnostic() {
     let hole = &result.holes[0];
     assert_eq!(
         &source[hole.allowed_span.start_byte..hole.allowed_span.end_byte],
-        "赤いクレヨンの折れ線を右上がりから右下がりへ交互に組み合わせて、上端から下端へ一本引く"
+        "赤いチョークの折れ線を右上がりから右下がりへ交互に組み合わせて、上端から下端へ一本引く"
     );
 }
 
 #[test]
 fn recoverable_fragments_do_not_block_an_anchored_clause_hole() {
     // A ground is its own sentence; the headed 「地: ...」 form is not accepted.
-    let source = "薄墨地。\n赤い細筆の横の実線を右端に一本引く。\n赤い細筆の極細の横線を前の線に沿って右から左へ波打つ軌跡に引く。";
+    let source = "薄墨地。\n赤いガッシュの横の実線を右端に一本引く。\n赤いガッシュの極細の横線を前の線に沿って右から左へ波打つ軌跡に引く。";
     let result = compile(
         source,
         ResolvedInstructionLanguage::Ja,
@@ -121,7 +121,7 @@ fn recoverable_fragments_do_not_block_an_anchored_clause_hole() {
 
 #[test]
 fn unresolved_continuation_clause_preserves_drawable_predecessor() {
-    let source = "背景を灰で埋める。赤いクレヨンの太い折れ線を右上がりから右下がりへ交互に組み合わせて右下へ引く。線が細かく波打つ。";
+    let source = "背景を灰で埋める。赤いチョークの太い折れ線を右上がりから右下がりへ交互に組み合わせて右下へ引く。線が細かく波打つ。";
     let result = compile(
         source,
         ResolvedInstructionLanguage::Ja,
@@ -148,7 +148,7 @@ fn unresolved_continuation_clause_preserves_drawable_predecessor() {
     let hole = &result.holes[0];
     assert_eq!(
         &source[hole.allowed_span.start_byte..hole.allowed_span.end_byte],
-        "赤いクレヨンの太い折れ線を右上がりから右下がりへ交互に組み合わせて右下へ引く"
+        "赤いチョークの太い折れ線を右上がりから右下がりへ交互に組み合わせて右下へ引く"
     );
 }
 

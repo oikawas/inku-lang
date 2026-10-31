@@ -119,7 +119,7 @@ fn no_diagnostics(plan: &PerformancePlan) -> bool {
 /// band, and the nest rests on the top of the building that is seen.
 #[test]
 fn a_group_resting_on_a_fill_rests_on_the_top_that_is_seen() {
-    let source = "画用紙。\n背景を白で埋める。\n下（横0〜1、縦2/3〜1）に、灰の太筆の薄い塗りの垂直の横長の特大の四角を1個埋める。\n左上の四半分（横0〜1/2、縦0〜1/2）に、細かく小刻みに波打つ黒の細いペンの実線の濃い粒の小さな線を12個引く、前の形に載る。";
+    let source = "画用紙。\n背景を白で埋める。\n下（横0〜1、縦2/3〜1）に、灰の太いガッシュの薄い塗りの垂直の横長の特大の四角を1個埋める。\n左上の四半分（横0〜1/2、縦0〜1/2）に、細かく小刻みに波打つ黒の細いペンの実線の濃い粒の小さな線を12個引く、前の形に載る。";
     let band_top = 2.0 / 3.0;
     let mut cut = 0;
     for seed in SEEDS {
@@ -145,7 +145,7 @@ fn a_group_resting_on_a_fill_rests_on_the_top_that_is_seen() {
 /// points inside the square stay in the part of it the band shows.
 #[test]
 fn shapes_inside_a_fill_stay_in_the_part_that_is_seen() {
-    let source = "画用紙。\n背景を白で埋める。\n中ほど（横0〜1、縦1/3〜2/3）に、細かくゆるやかに波打つ黄の太筆の薄い刷きの垂直の横長の特大の四角を1個埋める。\n白の鉛筆の濃いとても小さな点を20個散らす、前の形の中に。";
+    let source = "画用紙。\n背景を白で埋める。\n中ほど（横0〜1、縦1/3〜2/3）に、細かくゆるやかに波打つ黄の太いガッシュの薄い刷きの垂直の横長の特大の四角を1個埋める。\n白の鉛筆の濃いとても小さな点を20個散らす、前の形の中に。";
     let band = (1.0 / 3.0, 2.0 / 3.0);
     let mut cut = 0;
     for seed in SEEDS {

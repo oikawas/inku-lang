@@ -1969,7 +1969,7 @@ fn four_explicit_primitives_use_short_edge_size_and_axis_position_geometry() {
             LineStyle::Dashed,
         ),
         (
-            "place one gray crayon dotted empty cloudform with width 0.3, height 0.2 at horizontal 0.5, vertical 0.5.",
+            "place one gray chalk dotted empty cloudform with width 0.3, height 0.2 at horizontal 0.5, vertical 0.5.",
             "vertical",
             Primitive::Cloudform,
             Some(Point::new(0.5, 0.5)),
@@ -1977,11 +1977,11 @@ fn four_explicit_primitives_use_short_edge_size_and_axis_position_geometry() {
             None,
             Some(Point::new(0.3, 0.2)),
             Color::Gray,
-            Weight::Crayon,
+            Weight::Chalk,
             LineStyle::Dotted,
         ),
         (
-            "place one black rotring solid empty square with side length 0.2 at horizontal 0.5, vertical 0.5.",
+            "place one black thin pen solid empty square with side length 0.2 at horizontal 0.5, vertical 0.5.",
             "wide",
             Primitive::Square,
             None,
@@ -1989,7 +1989,7 @@ fn four_explicit_primitives_use_short_edge_size_and_axis_position_geometry() {
             Some(Point::new(0.5 - 2.0 / 47.0, 0.4)),
             Some(Point::new(0.2, 0.2)),
             Color::Black,
-            Weight::Rotring,
+            Weight::Pen,
             LineStyle::Solid,
         ),
         (

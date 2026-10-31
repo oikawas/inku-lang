@@ -19,7 +19,7 @@ fn embedded_asset_has_stable_identity_and_exact_digest() {
 
     assert_eq!(asset.schema_version, 1);
     assert_eq!(asset.asset_id, SAIJIKI_ASSET_ID);
-    assert_eq!(SAIJIKI_ASSET_ID, "inku.saijiki.v2");
+    assert_eq!(SAIJIKI_ASSET_ID, "inku.saijiki.v3");
     assert_eq!(
         saijiki_asset_sha256_hex(),
         Sha256::digest(SAIJIKI_ASSET_BYTES)
@@ -77,7 +77,7 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
             .iter()
             .map(|category| category.words.len())
             .sum::<usize>(),
-        102
+        101
     );
     assert_eq!(asset.relations.len(), 11);
     assert_eq!(
@@ -574,8 +574,8 @@ fn embedded_asset_keeps_hidden_pruned_nullable_override_and_score_semantics() {
         Some(&["arrange".to_owned()][..])
     );
     assert_eq!(
-        word("tezawari", "細筆").score_value.as_deref(),
-        Some("brush_thin")
+        word("tezawari", "ガッシュ").score_value.as_deref(),
+        Some("gouache")
     );
     assert_eq!(word("iro", "灰").score_value.as_deref(), Some("gray"));
     assert_eq!(word("omote", "空").score_value.as_deref(), Some("none"));

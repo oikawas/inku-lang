@@ -6,6 +6,7 @@ import argparse
 from collections import Counter
 import json
 import os
+import re
 import sqlite3
 import time
 from pathlib import Path
@@ -74,7 +75,9 @@ def main() -> int:
                         return 0
                     time.sleep(0.05)
             except Exception as error:
-                reasons[type(error).__name__] += 1
+                code = str(error)
+                reasons[f"{type(error).__name__}:{code}" if re.fullmatch(r"[a-z0-9_]{1,80}", code)
+                        else type(error).__name__] += 1
                 continue
         print(json.dumps({"status": "failed", "code": "no_migrated_fork_rendered", "reasons": reasons}))
         return 1

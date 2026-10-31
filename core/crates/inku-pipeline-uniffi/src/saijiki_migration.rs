@@ -4,11 +4,16 @@
 //! touch reorganisation of 2026-10-31) and the Macro definitions its locks name, or
 //! definitions alone. It gets the unit back in the current edition, with each lock moved
 //! to its definition's new digest, and saves it over the old one (SPEC §3.3).
+//!
+//! A lock moves only to the definition it was saved with: the supplied definition whose
+//! saved form has the lock's digest (`old_digest`), as the plugin-name migration checks. A
+//! definition of the same name and version with another digest is another definition, and
+//! the document is refused rather than rebound to it.
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use inku_ddl::{
-    InvalidDocumentStage, MacroLock, NormalizedDdlDocument, SAIJIKI_ASSET_ID,
+    InvalidDocumentStage, MacroDefinition, MacroLock, NormalizedDdlDocument, SAIJIKI_ASSET_ID,
     SAIJIKI_V1_MIGRATION_SCHEMA_ID, SAIJIKI_V2_ASSET_ID, SAIJIKI_V2_MIGRATION_SCHEMA_ID,
     SaijikiDefinitionMigration, SaijikiDocumentMigration, SaijikiMigrationError,
     migrate_document_from_saijiki_v1, migrate_document_from_saijiki_v2,
@@ -56,6 +61,13 @@ impl Retired {
         }
     }
 
+    const fn asset_id(self) -> &'static str {
+        match self {
+            Self::V1 => inku_ddl::SAIJIKI_V1_ASSET_ID,
+            Self::V2 => SAIJIKI_V2_ASSET_ID,
+        }
+    }
+
     /// Whether a saved document's edition field names this edition.
     fn writes(self, saijiki: Option<&str>) -> bool {
         match self {
@@ -89,44 +101,44 @@ fn error_value(error: &SaijikiMigrationError) -> Value {
     serde_json::to_value(error).unwrap_or_else(|_| json!({"code": error.code()}))
 }
 
-fn definition_value(migration: &SaijikiDefinitionMigration) -> Value {
+/// One definition the host supplied, and its migration.
+struct Supplied {
+    /// The digest the definition's saved form is locked by (`sha256:<hex>`): its identity
+    /// with its words spelled through the retired edition, before any rewrite. `None` when
+    /// the saved form does not read as a definition of that edition.
+    old_digest: Option<String>,
+    migration: Result<SaijikiDefinitionMigration, SaijikiMigrationError>,
+}
+
+impl Supplied {
+    fn new(retired: Retired, definition: &Value) -> Self {
+        let old_digest = MacroDefinition::from_json(&definition.to_string())
+            .ok()
+            .and_then(|saved| saved.identity_in_retired_saijiki(retired.asset_id()))
+            .map(|identity| format!("sha256:{}", identity.full_digest_hex()));
+        Self {
+            old_digest,
+            migration: retired.migrate_definition(definition),
+        }
+    }
+}
+
+fn definition_value(old_digest: Option<&str>, migration: &SaijikiDefinitionMigration) -> Value {
     json!({
         "definition": migration.definition,
         "qualified_name": migration.identity.qualified_name(),
         "version": migration.identity.version(),
+        "old_digest": old_digest,
         "digest": format!("sha256:{}", migration.identity.full_digest_hex()),
         "changed": migration.changed,
         "unadjusted_thinness": migration.unadjusted_thinness,
     })
 }
 
-fn migrate_document(
-    retired: Retired,
-    document: SavedDocument,
-    definitions: &[Result<SaijikiDefinitionMigration, SaijikiMigrationError>],
-) -> Value {
+fn migrate_document(retired: Retired, document: SavedDocument, definitions: &[Supplied]) -> Value {
     if !retired.writes(document.saijiki.as_deref()) {
         return json!({"error": {"code": "other_edition", "saijiki": document.saijiki}});
     }
-    // Each lock moves to the migrated definition of the same name and version.
-    let mut locks = Vec::new();
-    for lock in &document.macro_locks {
-        let migrated = definitions.iter().flatten().find(|migration| {
-            migration.identity.qualified_name() == lock.qualified_name
-                && migration.identity.version() == lock.version
-        });
-        let Some(migrated) = migrated else {
-            return json!({"error": {"code": "definition_not_supplied",
-                "qualified_name": lock.qualified_name, "version": lock.version}});
-        };
-        locks.push(LockedDefinition {
-            qualified_name: lock.qualified_name.clone(),
-            version: lock.version.clone(),
-            digest: format!("sha256:{}", migrated.identity.full_digest_hex()),
-            aliases: lock.aliases.clone(),
-        });
-    }
-    // The v1 source is read with the locks it was saved with; only names matter to it.
     let v1 = document
         .macro_locks
         .iter()
@@ -153,6 +165,39 @@ fn migrate_document(
             return json!({"error": error_value(&SaijikiMigrationError::InvalidDocument(stage))});
         }
     };
+    // Each lock moves to the migrated definition it was saved with: a supplied definition of
+    // the same name and version whose saved form has the lock's digest.
+    let mut locks = Vec::new();
+    for lock in &document.macro_locks {
+        let named = definitions
+            .iter()
+            .filter_map(|supplied| {
+                let migration = supplied.migration.as_ref().ok()?;
+                (migration.identity.qualified_name() == lock.qualified_name
+                    && migration.identity.version() == lock.version)
+                    .then_some((supplied.old_digest.as_deref(), migration))
+            })
+            .collect::<Vec<_>>();
+        if named.is_empty() {
+            return json!({"error": {"code": "definition_not_supplied",
+                "qualified_name": lock.qualified_name, "version": lock.version}});
+        }
+        let Some((_, migrated)) = named
+            .iter()
+            .find(|(old_digest, _)| *old_digest == Some(lock.digest.as_str()))
+        else {
+            return json!({"error": {"code": "lock_digest_mismatch",
+                "qualified_name": lock.qualified_name, "version": lock.version,
+                "lock_digest": lock.digest,
+                "old_digests": named.iter().map(|(old_digest, _)| *old_digest).collect::<Vec<_>>()}});
+        };
+        locks.push(LockedDefinition {
+            qualified_name: lock.qualified_name.clone(),
+            version: lock.version.clone(),
+            digest: format!("sha256:{}", migrated.identity.full_digest_hex()),
+            aliases: lock.aliases.clone(),
+        });
+    }
     match retired.migrate_document(&v1) {
         Ok(migration) => json!({
             "document": VisibleDocument {
@@ -177,7 +222,7 @@ fn migrate(retired: Retired, input_bytes: &[u8]) -> Option<Value> {
     let definitions = input
         .definitions
         .iter()
-        .map(|definition| retired.migrate_definition(definition))
+        .map(|definition| Supplied::new(retired, definition))
         .collect::<Vec<_>>();
     let document = input
         .document
@@ -188,8 +233,8 @@ fn migrate(retired: Retired, input_bytes: &[u8]) -> Option<Value> {
         "document": document,
         "definitions": definitions
             .iter()
-            .map(|migration| match migration {
-                Ok(migration) => definition_value(migration),
+            .map(|supplied| match &supplied.migration {
+                Ok(migration) => definition_value(supplied.old_digest.as_deref(), migration),
                 Err(error) => json!({"error": error_value(error)}),
             })
             .collect::<Vec<_>>(),
@@ -219,7 +264,10 @@ pub fn migrate_saijiki_v1(input_bytes: Vec<u8>) -> Vec<u8> {
 /// Migrate one saved Saijiki v2 unit (a document and its definitions) to the current edition
 /// (the touch reorganisation of 2026-10-31, PLAN-PRODUCT §3.3). The output has the v1 entry's
 /// shape, with the spans of tools whose thinness could not follow (`unassociated_tools`) and,
-/// per definition, the emits whose thinness could not follow (`unadjusted_thinness`).
+/// per definition, the emits whose thinness could not follow (`unadjusted_thinness`). Both
+/// entries give each definition the digest its saved form is locked by (`old_digest`), and
+/// refuse a document whose lock names a supplied definition by another digest
+/// (`lock_digest_mismatch`).
 #[uniffi::export]
 pub fn migrate_saijiki_v2(input_bytes: Vec<u8>) -> Vec<u8> {
     migrate_bytes(Retired::V2, &input_bytes)
@@ -242,7 +290,9 @@ mod tests {
             definition["heading"].as_str().unwrap()
         );
         let version = definition["version"].as_str().unwrap().to_owned();
-        let v1_digest = format!("sha256:{}", "0".repeat(64));
+        // The digest the v1 core (7ba01022) locked this 若葉 1.0.1 by.
+        let v1_digest =
+            "sha256:82ffc5c348a82ba927b315acaaa5ce4bc4c3998e2497deecd91535fb3005c8f4".to_owned();
         let output: Value = serde_json::from_slice(&migrate_saijiki_v1(
             serde_json::to_vec(&json!({
                 "document": {
@@ -274,6 +324,98 @@ mod tests {
         assert_ne!(document.macro_locks[0].digest, v1_digest);
         // The migrated unit is read by the current pipeline without a further migration.
         document.document().unwrap();
+    }
+
+    /// Change the first exact decimal, so the definition keeps its name and version but is
+    /// another definition.
+    fn edit_first_decimal(value: &mut Value) -> bool {
+        match value {
+            Value::Object(object) if object.get("expr") == Some(&json!("exact_decimal")) => {
+                object.insert("value".to_owned(), json!("0.123"));
+                true
+            }
+            Value::Object(object) => object.values_mut().any(edit_first_decimal),
+            Value::Array(items) => items.iter_mut().any(edit_first_decimal),
+            _ => false,
+        }
+    }
+
+    #[test]
+    fn a_lock_moves_only_from_the_digest_its_definition_was_saved_with() {
+        // The digest the v2 core (main 783fd7a81, render engine 94) locked 下草 1.0.0 by.
+        const SAVED: &str =
+            "sha256:88046b24987a2600eeb8b985f36bc15222202a5758a0f4a7638e514dd6af2aea";
+        let package: Value = serde_json::from_str(PACKAGE_1_0).unwrap();
+        let undergrowth = package["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|entry| entry["definition"].clone())
+            .find(|definition| definition["heading"] == "下草")
+            .unwrap();
+        let migrate = |digest: &str, definitions: &[&Value]| -> Value {
+            serde_json::from_slice(&migrate_saijiki_v2(
+                serde_json::to_vec(&json!({
+                    "document": {
+                        "source": "黒い太筆の線を引く。",
+                        "language": "ja",
+                        "saijiki": SAIJIKI_V2_ASSET_ID,
+                        "macro_locks": [{"qualified_name": "Nature.下草", "version": "1.0.0",
+                            "digest": digest}]
+                    },
+                    "definitions": definitions
+                }))
+                .unwrap(),
+            ))
+            .unwrap()
+        };
+
+        let moved = migrate(SAVED, &[&undergrowth]);
+        assert_eq!(moved["definitions"][0]["old_digest"], SAVED);
+        let document: VisibleDocument =
+            serde_json::from_value(moved["document"]["document"].clone()).unwrap();
+        assert_eq!(document.source, "黒い太いガッシュの線を引く。");
+        assert_eq!(
+            document.macro_locks[0].digest,
+            moved["definitions"][0]["digest"].as_str().unwrap()
+        );
+        assert_ne!(document.macro_locks[0].digest, SAVED);
+
+        // A lock with another digest names another definition: the document is refused,
+        // not rebound to the supplied one (the Server's report of 2026-10-31).
+        let zeros = format!("sha256:{}", "0".repeat(64));
+        assert_eq!(
+            migrate(&zeros, &[&undergrowth])["document"]["error"],
+            json!({"code": "lock_digest_mismatch", "qualified_name": "Nature.下草",
+                "version": "1.0.0", "lock_digest": zeros, "old_digests": [SAVED]})
+        );
+
+        // Of two supplied definitions with the lock's name and version, the lock moves to
+        // the one it was saved with, whichever comes first.
+        let mut edited = undergrowth.clone();
+        assert!(edit_first_decimal(&mut edited));
+        for definitions in [[&edited, &undergrowth], [&undergrowth, &edited]] {
+            let output = migrate(SAVED, &definitions);
+            let saved = output["definitions"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|definition| definition["old_digest"] == SAVED)
+                .unwrap();
+            assert_eq!(
+                output["document"]["document"]["macro_locks"][0]["digest"],
+                saved["digest"]
+            );
+            assert_eq!(
+                output["definitions"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .filter(|definition| definition["old_digest"] == SAVED)
+                    .count(),
+                1
+            );
+        }
     }
 
     #[test]

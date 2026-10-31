@@ -1,8 +1,9 @@
 //! Saijiki v3 migration and compiler contracts, independent of rendering style.
 use inku_ddl::{
-    MacroExpansionLimits, NormalizedDdlDocument, ResolvedInstructionLanguage as Lang,
-    ScoreErrorPolicy, ScoreLoweringContext, ScoreLoweringOutcome, compile_ddl_to_score,
-    migrate_document_from_saijiki_v1, migrate_document_from_saijiki_v2,
+    MacroDefinition, MacroExpansionLimits, NormalizedDdlDocument,
+    ResolvedInstructionLanguage as Lang, SAIJIKI_ASSET_ID, SAIJIKI_V1_ASSET_ID,
+    SAIJIKI_V2_ASSET_ID, ScoreErrorPolicy, ScoreLoweringContext, ScoreLoweringOutcome,
+    compile_ddl_to_score, migrate_document_from_saijiki_v1, migrate_document_from_saijiki_v2,
     migrate_macro_definition_from_saijiki_v2,
 };
 use inku_score::{Color, Weight};
@@ -105,6 +106,44 @@ fn v2_definition_migrates_direct_tools_and_is_idempotent() {
     }
     let current = migrate_macro_definition_from_saijiki_v2(&definition(tool("gouache"))).unwrap();
     assert!(!current.changed);
+}
+
+#[test]
+fn a_saved_definition_is_identified_as_its_retired_edition_locked_it() {
+    // The bundled 1.0 leaves, with the digests the cores of each edition computed for them:
+    // 下草 by the v2 core (main 783fd7a81, render engine 94), 若葉 by the v1 core (7ba01022).
+    let package: Value =
+        serde_json::from_str(include_str!("fixtures/nature-leaves-1.0-package.json")).unwrap();
+    let saved = |heading: &str| {
+        let entry = package["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|entry| entry["definition"]["heading"] == heading)
+            .unwrap();
+        MacroDefinition::from_json(&entry["definition"].to_string()).unwrap()
+    };
+    let digest = |definition: &MacroDefinition, edition: &str| {
+        definition
+            .identity_in_retired_saijiki(edition)
+            .map(|identity| identity.full_digest_hex().to_owned())
+    };
+    let undergrowth = saved("下草");
+    // Its retired tools are not current words, so it has no current identity.
+    assert!(undergrowth.identity().is_err());
+    assert_eq!(
+        digest(&undergrowth, SAIJIKI_V2_ASSET_ID).as_deref(),
+        Some("88046b24987a2600eeb8b985f36bc15222202a5758a0f4a7638e514dd6af2aea")
+    );
+    let young_leaves = saved("若葉");
+    assert_eq!(
+        digest(&young_leaves, SAIJIKI_V1_ASSET_ID).as_deref(),
+        Some("82ffc5c348a82ba927b315acaaa5ce4bc4c3998e2497deecd91535fb3005c8f4")
+    );
+    // A v1 word the v2 edition no longer read leaves no v2 identity, and only a retired
+    // edition is read this way.
+    assert_eq!(digest(&young_leaves, SAIJIKI_V2_ASSET_ID), None);
+    assert_eq!(digest(&undergrowth, SAIJIKI_ASSET_ID), None);
 }
 
 #[test]

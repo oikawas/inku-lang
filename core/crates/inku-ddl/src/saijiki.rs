@@ -600,6 +600,16 @@ pub(crate) fn canonical_semantic_id(
     canonical_semantic_id_from_asset(saijiki_asset(), category_key, lexical_id)
 }
 
+/// A semantic id spelled as `edition` spelled it, for the identity a saved Macro definition
+/// was locked by under a retired edition.
+pub(crate) fn canonical_semantic_id_in(
+    edition: SaijikiEdition,
+    category_key: &str,
+    lexical_id: &str,
+) -> Result<Option<String>, SaijikiProjectionError> {
+    canonical_semantic_id_from_asset(edition.asset(), category_key, lexical_id)
+}
+
 fn canonical_semantic_id_from_asset(
     asset: &SaijikiAsset,
     category_key: &str,

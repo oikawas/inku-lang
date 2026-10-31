@@ -1155,6 +1155,27 @@ impl MacroDefinition {
         Ok(self.identity_from_canonical(canonical_json))
     }
 
+    /// The identity a saved definition was locked by under a retired Saijiki edition
+    /// (`inku.saijiki.v1` or `inku.saijiki.v2`): its canonical form with each semantic word
+    /// spelled through that edition's asset, as the cores of that edition computed it. It is
+    /// not validated against the current vocabulary, whose retired words it may hold; a
+    /// migration compares it with a saved lock before moving the lock (SPEC §3.3). `None`
+    /// for another edition, or when a word is not in that edition or a value does not read.
+    pub fn identity_in_retired_saijiki(&self, edition: &str) -> Option<MacroDefinitionIdentity> {
+        let edition = match edition {
+            crate::saijiki::SAIJIKI_V1_ASSET_ID => crate::saijiki::SaijikiEdition::V1,
+            crate::saijiki::SAIJIKI_V2_ASSET_ID => crate::saijiki::SaijikiEdition::V2,
+            _ => return None,
+        };
+        self.qualified_name()?;
+        let mut canonical = self.clone();
+        normalize_definition_with(&mut canonical, &move |category, id| {
+            retired_semantic_ref_id(edition, category, id)
+        })?;
+        let canonical_json = serde_json::to_vec(&canonical).ok()?;
+        Some(self.identity_from_canonical(canonical_json))
+    }
+
     fn identity_from_canonical(&self, canonical_json: Vec<u8>) -> MacroDefinitionIdentity {
         let domain = if self.plugin_v2.is_some() {
             b"inku.macro-definition.v2".as_slice()
@@ -1183,29 +1204,43 @@ impl MacroDefinition {
 }
 
 fn normalize_definition_semantic_aliases(definition: &mut MacroDefinition) {
-    normalize_statement_semantic_aliases(&mut definition.body);
-    for component in definition.components.0.values_mut() {
-        normalize_statement_semantic_aliases(&mut component.body);
-    }
+    normalize_definition_with(definition, &canonical_semantic_ref_id)
+        .expect("a validated definition's exact decimals and semantic references must read");
 }
 
-fn normalize_statement_semantic_aliases(statements: &mut [Statement]) {
+/// Spell each exact decimal canonically and each semantic reference through `spell`; `None`
+/// when a value does not read or `spell` does not know a reference.
+fn normalize_definition_with(
+    definition: &mut MacroDefinition,
+    spell: &SemanticSpelling,
+) -> Option<()> {
+    normalize_statements_with(&mut definition.body, spell)?;
+    for component in definition.components.0.values_mut() {
+        normalize_statements_with(&mut component.body, spell)?;
+    }
+    Some(())
+}
+
+/// The canonical id of a semantic reference (category, id), or `None` when it is not known.
+type SemanticSpelling = dyn Fn(&str, &str) -> Option<String>;
+
+fn normalize_statements_with(statements: &mut [Statement], spell: &SemanticSpelling) -> Option<()> {
     for statement in statements {
         match statement {
             Statement::Emit { fields, .. } | Statement::Anchor { fields, .. } => {
                 for expression in fields.0.values_mut() {
-                    normalize_expression_semantic_aliases(expression);
+                    normalize_expression_with(expression, spell)?;
                 }
             }
             Statement::Use { arguments, .. } => {
                 for expression in arguments.0.values_mut() {
-                    normalize_expression_semantic_aliases(expression);
+                    normalize_expression_with(expression, spell)?;
                 }
             }
-            Statement::Group { body } => normalize_statement_semantic_aliases(body),
+            Statement::Group { body } => normalize_statements_with(body, spell)?,
             Statement::Repeat { count, body, .. } => {
-                normalize_expression_semantic_aliases(count);
-                normalize_statement_semantic_aliases(body);
+                normalize_expression_with(count, spell)?;
+                normalize_statements_with(body, spell)?;
             }
             Statement::Transform { transform, body } => {
                 for expression in [
@@ -1218,51 +1253,49 @@ fn normalize_statement_semantic_aliases(statements: &mut [Statement]) {
                 .into_iter()
                 .flatten()
                 {
-                    normalize_expression_semantic_aliases(expression);
+                    normalize_expression_with(expression, spell)?;
                 }
-                normalize_statement_semantic_aliases(body);
+                normalize_statements_with(body, spell)?;
             }
             Statement::Vary { choices, body, .. } => {
                 if let Some(choices) = choices {
                     for expression in choices {
-                        normalize_expression_semantic_aliases(expression);
+                        normalize_expression_with(expression, spell)?;
                     }
                 }
-                normalize_statement_semantic_aliases(body);
+                normalize_statements_with(body, spell)?;
             }
             Statement::Relation {
                 target_path_position,
                 ..
             } => {
                 if let Some(MacroTargetPathPosition::Exact(position)) = target_path_position {
-                    normalize_expression_semantic_aliases(position);
+                    normalize_expression_with(position, spell)?;
                 }
             }
         }
     }
+    Some(())
 }
 
-fn normalize_expression_semantic_aliases(expression: &mut Expression) {
+fn normalize_expression_with(expression: &mut Expression, spell: &SemanticSpelling) -> Option<()> {
     match expression {
         Expression::ExactDecimal { value } => {
-            *value = crate::ExactDecimal::parse(value)
-                .expect("validated exact decimal")
-                .canonical_spelling();
+            *value = crate::ExactDecimal::parse(value).ok()?.canonical_spelling();
         }
         Expression::List { items } => {
             for item in items {
-                normalize_expression_semantic_aliases(item);
+                normalize_expression_with(item, spell)?;
             }
         }
         Expression::Cycle { items, index } => {
-            normalize_expression_semantic_aliases(index);
+            normalize_expression_with(index, spell)?;
             for item in items {
-                normalize_expression_semantic_aliases(item);
+                normalize_expression_with(item, spell)?;
             }
         }
         Expression::SemanticRef { category, id } => {
-            *id = canonical_semantic_ref_id(category, id)
-                .expect("validated semantic reference must remain known");
+            *id = spell(category, id)?;
         }
         Expression::Number { .. }
         | Expression::Integer { .. }
@@ -1270,6 +1303,7 @@ fn normalize_expression_semantic_aliases(expression: &mut Expression) {
         | Expression::Parameter { .. }
         | Expression::Local { .. } => {}
     }
+    Some(())
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -2199,6 +2233,32 @@ fn known_relation(value: &str) -> bool {
 
 fn known_semantic_id(category: &str, id: &str) -> bool {
     canonical_semantic_ref_id(category, id).is_some()
+}
+
+/// A semantic reference spelled as a retired edition spelled it: an asset word or a relation
+/// through that edition's asset; the core modifiers, which no edition's asset holds, as now.
+fn retired_semantic_ref_id(
+    edition: crate::saijiki::SaijikiEdition,
+    category: &str,
+    id: &str,
+) -> Option<String> {
+    match semantic_category_authority(category)? {
+        SemanticCategoryAuthority::Relation => edition
+            .asset()
+            .relations
+            .iter()
+            .any(|relation| relation.relation_type == id)
+            .then(|| id.to_owned()),
+        SemanticCategoryAuthority::CoreModifier => {
+            crate::CoreModifierValue::from_semantic_ref(category, id)
+                .map(|value| value.as_str().to_owned())
+        }
+        SemanticCategoryAuthority::Asset(asset_key) => {
+            crate::saijiki::canonical_semantic_id_in(edition, asset_key, id)
+                .ok()
+                .flatten()
+        }
+    }
 }
 
 pub(crate) fn canonical_semantic_ref_id(category: &str, id: &str) -> Option<String> {

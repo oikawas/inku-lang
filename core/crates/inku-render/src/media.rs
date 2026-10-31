@@ -3,7 +3,8 @@
 //! fills here, and oil paint takes its mixing streaks. Each mark carries the few
 //! definitions it needs (filters and clips) inside its own group, so the
 //! document's shared definitions do not change; their ids name the mark
-//! ([`MarkIds`]). The drawing is the prototypes the author judged (steps 3 B, 5
+//! ([`MarkIds`]), and each filter is worked out over the mark's box only
+//! ([`Region`]). The drawing is the prototypes the author judged (steps 3 B, 5
 //! and 6, `topics/draw-task/tools-innvoation/DECIDED.ja.md`), with each choice
 //! fixed: the knife and watercolour mix 30%, oil paint 12%, oil pastel none, and
 //! etching is drawn with light and dark. Watercolour overlaps by plain opacity:
@@ -353,17 +354,59 @@ fn path(d: &str) -> Element {
     Element::new("path").attr("d", d)
 }
 
-/// A filter whose region is the canvas and a margin around it, in user
-/// space: a region taken from a thin stroke's bounding box cut its smudge off
-/// in a visible box.
-fn filter(id: &str) -> Element {
+/// Where one mark's filter is worked out, in user space: the mark's box grown
+/// by what the filter adds around the mark (a stroke's half width, a blur's
+/// reach, a displacement's shift) and a little more for antialiasing and the
+/// raster's rounding.
+#[derive(Clone, Copy, Debug)]
+struct Region {
+    x0: f64,
+    y0: f64,
+    x1: f64,
+    y1: f64,
+}
+
+/// How far a displacement of `scale` can move a pixel, in user units. The
+/// specification (Chrome, Skia) moves it by `scale / 2` at most; resvg 0.48.1
+/// (the Server's PNG, Android's raster) multiplies the scale in twice, so by
+/// `scale * scale / 2`, which is the farther for a wash's wobble.
+fn displacement_reach(scale: f64) -> f64 {
+    0.5 * scale * scale.max(1.0)
+}
+
+/// How far a blur of `deviation` spreads a mark, in user units: four
+/// deviations, past which a gaussian keeps under a tenth of a level.
+fn blur_reach(deviation: f64) -> f64 {
+    4.0 * deviation.max(0.01)
+}
+
+impl Region {
+    fn around(points: &[Point], reach: f64, unit: f64) -> Self {
+        let (x0, y0, x1, y1) = bounds(points);
+        if !(x0 <= x1 && y0 <= y1) {
+            return Self { x0: 0.0, y0: 0.0, x1: 0.0, y1: 0.0 };
+        }
+        let grow = reach.max(0.0) + 2.0 + unit * 0.002;
+        Self { x0: x0 - grow, y0: y0 - grow, x1: x1 + grow, y1: y1 + grow }
+    }
+}
+
+/// A filter worked out over `region` only, in user space. The prototype gave
+/// every mark's filter the canvas (a region taken from a thin stroke's bounding
+/// box, in percentages of it, cut its smudge off in a visible box), so each
+/// mark's noise was worked out over the whole canvas: 48 times today's tools on
+/// a work of 130 etched lines (てざわりの整理, 2026-10-31). In a turned group
+/// that canvas turned with the mark and cut the part of it outside. The noise
+/// is a function of the place, so a region that holds every pixel the mark
+/// paints, spreads or pulls from gives the pixels of a region without bounds.
+fn filter(id: &str, region: Region) -> Element {
     Element::new("filter")
         .attr("id", id)
         .attr("filterUnits", "userSpaceOnUse")
-        .attr("x", "-10%")
-        .attr("y", "-10%")
-        .attr("width", "120%")
-        .attr("height", "120%")
+        .attr("x", n(region.x0))
+        .attr("y", n(region.y0))
+        .attr("width", n(region.x1 - region.x0))
+        .attr("height", n(region.y1 - region.y0))
         .attr("color-interpolation-filters", "sRGB")
 }
 
@@ -419,11 +462,12 @@ fn alpha_from_noise(input: &str, slope: f64, offset: f64, result: &str) -> Eleme
 }
 
 /// Holes in a mark where the noise is high: the paper's tooth. `share` is
-/// roughly the part of the mark left open.
-fn tooth_filter(id: &str, frequency: f64, share: f64, seed: &str, roughen: f64) -> Element {
+/// roughly the part of the mark left open. `region` holds the mark and the
+/// roughening's reach (`displacement_reach(roughen)`).
+fn tooth_filter(id: &str, frequency: f64, share: f64, seed: &str, roughen: f64, region: Region) -> Element {
     // Fractal noise sits near 0.5 with a spread of about 0.12.
     let threshold = 0.5 + 0.12 * inverse_tail(share);
-    let mut f = filter(id);
+    let mut f = filter(id, region);
     f.push(turbulence(frequency, 2, seed, "tooth"));
     f.push(alpha_from_noise("tooth", 10.0, 10.0 * (threshold + 0.05), "open"));
     if roughen > 0.0 {
@@ -479,8 +523,9 @@ fn inverse_tail(share: f64) -> f64 {
     0.0
 }
 
-fn blur_filter(id: &str, deviation: f64) -> Element {
-    let mut f = filter(id);
+/// A blur; `region` holds the blurred mark and three deviations around it.
+fn blur_filter(id: &str, deviation: f64, region: Region) -> Element {
+    let mut f = filter(id, region);
     f.push(Element::new("feGaussianBlur").attr("stdDeviation", n(deviation.max(0.01))));
     f
 }
@@ -632,13 +677,25 @@ fn watercolor_stroke(
 ) -> Element {
     let d = banks_d(left, right, closed);
     let width = mean_width(left, right);
+    let banks = [left, right].concat();
+    let rim_width = (width * 0.28).max(unit * 0.0012);
     let (grain, clip, rim_blur) = (fresh("wc-grain"), fresh("wc-clip"), fresh("wc-rim"));
     let mut defs = Element::new("defs");
-    defs.push(wash_filter(&grain, seed, unit, (width * 6.0).max(unit * 0.02)));
+    defs.push(wash_filter(
+        &grain,
+        seed,
+        unit,
+        (width * 6.0).max(unit * 0.02),
+        Region::around(&banks, 0.0, unit),
+    ));
     let mut clip_path = Element::new("clipPath").attr("id", &clip);
     clip_path.push(path(&d).attr("fill-rule", "evenodd"));
     defs.push(clip_path);
-    defs.push(blur_filter(&rim_blur, width * 0.12));
+    defs.push(blur_filter(
+        &rim_blur,
+        width * 0.12,
+        Region::around(&banks, rim_width * 0.5 + blur_reach(width * 0.12), unit),
+    ));
     let mut group = Element::new("g").attr("class", "media-watercolor-stroke");
     group.push(defs);
     group.push(
@@ -653,7 +710,7 @@ fn watercolor_stroke(
         path(&d)
             .attr("fill", "none")
             .attr("stroke", bristle_tone(color, -0.10))
-            .attr("stroke-width", n((width * 0.28).max(unit * 0.0012)))
+            .attr("stroke-width", n(rim_width))
             .attr("stroke-opacity", n((opacity * 0.9).min(0.85)))
             .attr("filter", format!("url(#{rim_blur})")),
     );
@@ -669,7 +726,7 @@ fn watercolor_stroke(
                 path(&d)
                     .attr("fill", "none")
                     .attr("stroke", mix(&other, color, 0.35))
-                    .attr("stroke-width", n((width * 0.28).max(unit * 0.0012)))
+                    .attr("stroke-width", n(rim_width))
                     .attr("stroke-opacity", n((opacity * 0.9).min(0.85)))
                     .attr(
                         "stroke-dasharray",
@@ -691,9 +748,10 @@ fn watercolor_stroke(
 }
 
 /// The body of a wash: soft pale blooms at `bloom` scale and a fine
-/// granulation, both taken out of the colour's alpha.
-fn wash_filter(id: &str, seed: Seed, unit: f64, bloom: f64) -> Element {
-    let mut f = filter(id);
+/// granulation, both taken out of the colour's alpha (so `region` needs only
+/// hold the wash).
+fn wash_filter(id: &str, seed: Seed, unit: f64, bloom: f64, region: Region) -> Element {
+    let mut f = filter(id, region);
     f.push(turbulence(1.0 / bloom.max(1.0), 2, &noise_seed(seed, "wc-bloom"), "bloom"));
     f.push(alpha_from_noise("bloom", 1.6, 1.55, "bloom-alpha"));
     f.push(turbulence(260.0 / unit.max(1.0), 2, &noise_seed(seed, "wc-granule"), "granule"));
@@ -733,9 +791,11 @@ fn oil_pastel_stroke(
     let sheen = banks_d(&sheen_left, &sheen_right, closed);
     let frequency = 300.0 / unit.max(1.0);
     let (edge_tooth, core_tooth) = (fresh("op-edge"), fresh("op-core"));
+    // Every part of the stroke lies between its banks.
+    let region = Region::around(&[left, right].concat(), displacement_reach(unit * 0.002), unit);
     let mut defs = Element::new("defs");
-    defs.push(tooth_filter(&edge_tooth, frequency, 0.34, &noise_seed(seed, "op-edge"), unit * 0.002));
-    defs.push(tooth_filter(&core_tooth, frequency, 0.05, &noise_seed(seed, "op-core"), 0.0));
+    defs.push(tooth_filter(&edge_tooth, frequency, 0.34, &noise_seed(seed, "op-edge"), unit * 0.002, region));
+    defs.push(tooth_filter(&core_tooth, frequency, 0.05, &noise_seed(seed, "op-core"), 0.0, region));
     let mut group = Element::new("g").attr("class", "proto-oil-pastel-stroke");
     group.push(defs);
     group.push(
@@ -1225,12 +1285,19 @@ fn watercolor_fill(contour: &[Point], color: &str, opacity: f64, seed: Seed, uni
     let size = (x1 - x0).min(y1 - y0).max(1.0);
     let (wash, clip, rim_blur, wobble) = (fresh("wc-wash"), fresh("wc-clip"), fresh("wc-rim"), fresh("wc-wobble"));
     let mut defs = Element::new("defs");
-    defs.push(wash_filter(&wash, seed, unit, size * 0.32));
+    defs.push(wash_filter(&wash, seed, unit, size * 0.32, Region::around(contour, 0.0, unit)));
     let mut clip_path = Element::new("clipPath").attr("id", &clip);
     clip_path.push(path(&d));
     defs.push(clip_path);
-    defs.push(blur_filter(&rim_blur, size * 0.022));
-    let mut wobble_filter = filter(&wobble);
+    // The rim's stroke (half of size * 0.08) and the blur's reach.
+    defs.push(blur_filter(
+        &rim_blur,
+        size * 0.022,
+        Region::around(contour, size * 0.04 + blur_reach(size * 0.022), unit),
+    ));
+    // Everything in the group is kept inside the shape; the wobble moves it
+    // by the displacement's reach at most.
+    let mut wobble_filter = filter(&wobble, Region::around(contour, displacement_reach(size * 0.03), unit));
     wobble_filter.push(turbulence(1.0 / (size * 0.12), 2, &noise_seed(seed, "wc-wobble"), "edge"));
     wobble_filter.push(
         Element::new("feDisplacementMap")
@@ -1289,7 +1356,9 @@ fn watercolor_fill(contour: &[Point], color: &str, opacity: f64, seed: Seed, uni
                 .join(" ");
             let soft = fresh("wc-mix-soft");
             let mut mix_defs = Element::new("defs");
-            mix_defs.push(blur_filter(&soft, size * 0.05));
+            // The blooms are kept inside the shape: what reaches it lies
+            // within the blur's reach of its box.
+            mix_defs.push(blur_filter(&soft, size * 0.05, Region::around(contour, blur_reach(size * 0.05), unit)));
             group.push(mix_defs);
             let mut parted = Element::new("g").attr("clip-path", format!("url(#{clip})"));
             parted.push(
@@ -1335,8 +1404,24 @@ fn oil_pastel_fill(contour: &[Point], color: &str, seed: Seed, unit: f64, stroke
     let mut clip_path = Element::new("clipPath").attr("id", &clip);
     clip_path.push(path(&d));
     defs.push(clip_path);
-    defs.push(tooth_filter(&base_tooth, frequency, 0.18, &noise_seed(seed, "op-base"), 0.0));
-    defs.push(tooth_filter(&stroke_tooth, frequency, 0.14, &noise_seed(seed, "op-strokes"), unit * 0.0015));
+    // The face is clipped to the shape, so only what lies within its box (and
+    // the roughening's shift around it) is seen.
+    defs.push(tooth_filter(
+        &base_tooth,
+        frequency,
+        0.18,
+        &noise_seed(seed, "op-base"),
+        0.0,
+        Region::around(contour, 0.0, unit),
+    ));
+    defs.push(tooth_filter(
+        &stroke_tooth,
+        frequency,
+        0.14,
+        &noise_seed(seed, "op-strokes"),
+        unit * 0.0015,
+        Region::around(contour, displacement_reach(unit * 0.0015), unit),
+    ));
     let mut group = Element::new("g").attr("class", "proto-oil-pastel-face");
     group.push(defs);
     let mut face = Element::new("g").attr("clip-path", format!("url(#{clip})"));
@@ -1513,8 +1598,10 @@ fn knife_fill(contour: &[Point], color: &str, seed: Seed, unit: f64) -> Element 
 }
 
 /// The acid's bite: an etched line's edge wavers a little at a fine grain.
-fn bite_filter(id: &str, width: f64, seed: Seed) -> Element {
-    let mut f = filter(id);
+/// `region` holds the line and the bite's reach
+/// (`displacement_reach(width * 0.45)`).
+fn bite_filter(id: &str, width: f64, seed: Seed, region: Region) -> Element {
+    let mut f = filter(id, region);
     f.push(turbulence(1.0 / (width * 0.9).max(0.3), 2, &noise_seed(seed, "et-bite"), "bite"));
     f.push(
         Element::new("feDisplacementMap")
@@ -1561,7 +1648,10 @@ fn etching_stroke(
     }
     let bite = fresh("et-bite");
     let mut defs = Element::new("defs");
-    defs.push(bite_filter(&bite, width, seed));
+    // The line reaches half its width past the centre line (round caps and
+    // joins), and the bite moves it by the displacement's reach at most.
+    let region = Region::around(&centre, width * 0.5 + displacement_reach(width * 0.45), unit);
+    defs.push(bite_filter(&bite, width, seed, region));
     group.push(defs);
     let mut line = polyline_path(&centre);
     if closed {
@@ -1663,7 +1753,14 @@ fn etching_fill_varied(
     let mut clip_path = Element::new("clipPath").attr("id", &clip);
     clip_path.push(path(&d));
     defs.push(clip_path);
-    defs.push(bite_filter(&bite, line, seed));
+    // The face is clipped to the shape after the bite: what is seen lies in
+    // its box, and the bite pulls from the displacement's reach away at most.
+    defs.push(bite_filter(
+        &bite,
+        line,
+        seed,
+        Region::around(contour, line * 1.5 + displacement_reach(line * 0.45), unit),
+    ));
     let mut group = Element::new("g").attr("class", "proto-etching-face");
     group.push(defs);
     let mut face = Element::new("g")

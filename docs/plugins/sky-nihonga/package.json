@@ -223,7 +223,7 @@
                           "touch": {
                             "expr": "semantic_ref",
                             "category": "touch",
-                            "id": "brush_thin"
+                            "id": "gouache"
                           },
                           "fluctuation_amplitude": {
                             "expr": "semantic_ref",
@@ -351,7 +351,7 @@
                           "touch": {
                             "expr": "semantic_ref",
                             "category": "touch",
-                            "id": "brush_thin"
+                            "id": "gouache"
                           },
                           "fluctuation_amplitude": {
                             "expr": "semantic_ref",
@@ -517,7 +517,7 @@
                               "touch": {
                                 "expr": "semantic_ref",
                                 "category": "touch",
-                                "id": "brush_thin"
+                                "id": "gouache"
                               },
                               "fluctuation_amplitude": {
                                 "expr": "semantic_ref",
@@ -685,7 +685,7 @@
                               "touch": {
                                 "expr": "semantic_ref",
                                 "category": "touch",
-                                "id": "brush_thin"
+                                "id": "gouache"
                               },
                               "fluctuation_amplitude": {
                                 "expr": "semantic_ref",
@@ -815,7 +815,12 @@
                           "touch": {
                             "expr": "semantic_ref",
                             "category": "touch",
-                            "id": "brush_thick"
+                            "id": "gouache"
+                          },
+                          "thinness": {
+                            "expr": "semantic_ref",
+                            "category": "thinness",
+                            "id": "thick"
                           },
                           "fluctuation_amplitude": {
                             "expr": "semantic_ref",
@@ -1104,62 +1109,62 @@
                       {
                         "expr": "semantic_ref",
                         "category": "touch",
-                        "id": "brush_thick"
+                        "id": "gouache"
                       },
                       {
                         "expr": "semantic_ref",
                         "category": "touch",
-                        "id": "brush_thick"
+                        "id": "gouache"
                       },
                       {
                         "expr": "semantic_ref",
                         "category": "touch",
-                        "id": "brush_thick"
+                        "id": "gouache"
                       },
                       {
                         "expr": "semantic_ref",
                         "category": "touch",
-                        "id": "brush_thin"
+                        "id": "gouache"
                       },
                       {
                         "expr": "semantic_ref",
                         "category": "touch",
-                        "id": "brush_thin"
+                        "id": "gouache"
                       },
                       {
                         "expr": "semantic_ref",
                         "category": "touch",
-                        "id": "brush_thin"
+                        "id": "gouache"
                       },
                       {
                         "expr": "semantic_ref",
                         "category": "touch",
-                        "id": "brush_thin"
+                        "id": "gouache"
                       },
                       {
                         "expr": "semantic_ref",
                         "category": "touch",
-                        "id": "brush_thin"
+                        "id": "gouache"
                       },
                       {
                         "expr": "semantic_ref",
                         "category": "touch",
-                        "id": "brush_thin"
+                        "id": "gouache"
                       },
                       {
                         "expr": "semantic_ref",
                         "category": "touch",
-                        "id": "brush_thin"
+                        "id": "gouache"
                       },
                       {
                         "expr": "semantic_ref",
                         "category": "touch",
-                        "id": "brush_thin"
+                        "id": "gouache"
                       },
                       {
                         "expr": "semantic_ref",
                         "category": "touch",
-                        "id": "brush_thin"
+                        "id": "gouache"
                       }
                     ]
                   },
@@ -1383,7 +1388,12 @@
               "touch": {
                 "expr": "semantic_ref",
                 "category": "touch",
-                "id": "brush_thick"
+                "id": "gouache"
+              },
+              "thinness": {
+                "expr": "semantic_ref",
+                "category": "thinness",
+                "id": "thick"
               },
               "ink_spread": {
                 "expr": "semantic_ref",
@@ -1422,7 +1432,12 @@
               "touch": {
                 "expr": "semantic_ref",
                 "category": "touch",
-                "id": "brush_thick"
+                "id": "gouache"
+              },
+              "thinness": {
+                "expr": "semantic_ref",
+                "category": "thinness",
+                "id": "thick"
               },
               "ink_spread": {
                 "expr": "semantic_ref",
@@ -1461,7 +1476,12 @@
               "touch": {
                 "expr": "semantic_ref",
                 "category": "touch",
-                "id": "brush_thick"
+                "id": "gouache"
+              },
+              "thinness": {
+                "expr": "semantic_ref",
+                "category": "thinness",
+                "id": "thick"
               },
               "ink_spread": {
                 "expr": "semantic_ref",

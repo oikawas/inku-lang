@@ -829,7 +829,7 @@
                       "touch": {
                         "expr": "semantic_ref",
                         "category": "touch",
-                        "id": "brush_thin"
+                        "id": "gouache"
                       }
                     }
                   },
@@ -868,7 +868,7 @@
                       "touch": {
                         "expr": "semantic_ref",
                         "category": "touch",
-                        "id": "brush_thin"
+                        "id": "gouache"
                       }
                     }
                   },
@@ -1385,7 +1385,12 @@
               "touch": {
                 "expr": "semantic_ref",
                 "category": "touch",
-                "id": "brush_thick"
+                "id": "gouache"
+              },
+              "thinness": {
+                "expr": "semantic_ref",
+                "category": "thinness",
+                "id": "thick"
               }
             }
           },
@@ -1557,7 +1562,7 @@
                       "touch": {
                         "expr": "semantic_ref",
                         "category": "touch",
-                        "id": "brush_thin"
+                        "id": "gouache"
                       }
                     }
                   },
@@ -1649,7 +1654,7 @@
                       "touch": {
                         "expr": "semantic_ref",
                         "category": "touch",
-                        "id": "brush_thin"
+                        "id": "gouache"
                       }
                     }
                   },
@@ -1740,7 +1745,7 @@
         },
         "kind": "scene"
       },
-      "note_ja": "中域の水平な灰の太筆枝をゆるやかに波打たせ、その上に青葉を上下交互に、枝先の方へ斜めに出す。",
+      "note_ja": "中域の水平な灰の太いガッシュの枝をゆるやかに波打たせ、その上に青葉を上下交互に、枝先の方へ斜めに出す。",
       "note_en": "Grow summer leaves alternately above and below a wavy gray branch through the middle.",
       "preview": "previews/aoba.png"
     },
@@ -1910,7 +1915,12 @@
                           "touch": {
                             "expr": "semantic_ref",
                             "category": "touch",
-                            "id": "rotring"
+                            "id": "pen"
+                          },
+                          "thinness": {
+                            "expr": "semantic_ref",
+                            "category": "thinness",
+                            "id": "fine"
                           }
                         }
                       },
@@ -1982,7 +1992,12 @@
                           "touch": {
                             "expr": "semantic_ref",
                             "category": "touch",
-                            "id": "rotring"
+                            "id": "pen"
+                          },
+                          "thinness": {
+                            "expr": "semantic_ref",
+                            "category": "thinness",
+                            "id": "fine"
                           }
                         }
                       },
@@ -2035,7 +2050,12 @@
               "touch": {
                 "expr": "semantic_ref",
                 "category": "touch",
-                "id": "rotring"
+                "id": "pen"
+              },
+              "thinness": {
+                "expr": "semantic_ref",
+                "category": "thinness",
+                "id": "fine"
               }
             }
           },
@@ -2156,7 +2176,7 @@
                   "touch": {
                     "expr": "semantic_ref",
                     "category": "touch",
-                    "id": "crayon"
+                    "id": "chalk"
                   }
                 }
               },
@@ -2199,7 +2219,7 @@
                   "touch": {
                     "expr": "semantic_ref",
                     "category": "touch",
-                    "id": "crayon"
+                    "id": "chalk"
                   }
                 }
               },

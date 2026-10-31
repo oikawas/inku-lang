@@ -6,7 +6,7 @@ This directory contains the native SwiftUI client, developed for macOS first, an
 
 Last updated: 2026-10-23.
 
-Binding and protocol identities come from the bundled Rust core's version report; rendering layer identities use render metadata and the [Server layer definitions](../server/src/inku_server/layer_versions.py). Do not duplicate shared engine version constants in this document. The macOS app has its own version in `apple/VERSION` and build-number floor in `apple/BUILD_NUMBER`, separate from the Server and Web versions (the first release is 1.0.0, Build 1). The corresponding Server version is shown in the app's About inku window and in the changelog. Matching shared layer versions does not establish that host features and the native UI port are complete.
+Binding and protocol identities come from the bundled Rust core's version report; rendering layer identities use render metadata and the [Server layer definitions](../server/src/inku_server/layer_versions.py). Do not duplicate shared engine version constants in this document. The macOS app allocates its version and build number separately from Server and Web, with `apple/VERSION` and `apple/BUILD_NUMBER` as floors (the first release is 1.0.0, Build 1). The corresponding Server version is shown in the app's About inku window and in the changelog. Matching shared layer versions does not establish that host features and the native UI port are complete.
 
 Work identities `dh1`/`rh3`, canonical JSON, instruction-language normalization and resolution, and description-label text and excluded spans call the shared core through UniFFI. Swift keeps no copies of these rules and only converts the core's Unicode scalar offsets to the macOS editor's UTF-16 offsets. Existing stored identities are not rewritten. `ExactJSON.text` preserves number lexemes for transport, `canonicalText` exposes the core's canonical form, and the space-separated prompt format `pythonText` remains separate.
 
@@ -28,7 +28,7 @@ Bundled leaves and editor reference diagnostics use the shared core. The Saijiki
 
 The current bottom-left display contains only the build number, without the version or a label. It is white in dark mode and uses the standard text color in light mode.
 
-The bottom left shows only the app's build number in a brighter color. Each invocation of `build-macos.sh` allocates a new number even when the source is unchanged and writes it into Info.plist. The counter is stored on this Mac in `~/Library/Application Support/Inku/build-numbers` and shared across worktrees. Locking and atomic storage prevent concurrent allocations from colliding; `apple/BUILD_NUMBER` is the floor for compatibility with existing builds. A failed build does not reuse its number. Direct Xcode builds fail unless a number is supplied. Release packaging reads the finished app's number. Continuity is not guaranteed after removing the counter or on another Mac.
+The bottom left shows only the app's build number in a brighter color. Each invocation of `build-macos.sh` advances both the patch version and the build number, even when the source is unchanged, and writes them into Info.plist. For example, 1.1.6 / Build 27 is followed by 1.1.7 / Build 28. `apple/VERSION` and `apple/BUILD_NUMBER` are allocation floors; after raising the version floor, allocation starts with its next patch. The state is stored on this Mac in `~/Library/Application Support/Inku/build-numbers` and shared across worktrees. Locking and atomic storage prevent concurrent allocations from colliding. Failed builds do not reuse their numbers. Direct Xcode builds fail unless the allocated version and number are supplied. Release packaging reads both from the finished app. Continuity is not guaranteed after removing the state or on another Mac.
 
 ## 2026-10-27 Managing ChatGPT plan registrations
 
@@ -564,7 +564,7 @@ For the first macOS distribution, screens, controls, and remembered choices foll
 
 ### Version, signing, and distribution
 
-- The build writes `apple/VERSION` and a locally allocated build number above the `apple/BUILD_NUMBER` floor into Info.plist. The finished app's build number is also used for a work's provenance and a DDL export.
+- The build writes a locally allocated version and build number above the `apple/VERSION` and `apple/BUILD_NUMBER` floors into Info.plist. The finished app's build number is also used for a work's provenance and a DDL export.
 - `apple/scripts/package-macos-release.sh` produces the distribution: a Universal Release build, a check of the third-party notices, Developer ID signing (Hardened Runtime, timestamp, empty entitlements), creating and signing the `.dmg`, Apple notarization and stapling, a Gatekeeper check, and the SHA-256. The signing identity and notary profile are passed as arguments or environment variables and are not written in the source.
 - The distributed app uses bundle ID `app.inku.macos` and the default data location. The `--database` launch argument and the bundle's `InkuDatabasePath` remain for development; the distribution never contains `InkuDatabasePath`.
 - The third-party notices cover Rust crates (registry, git, path, and vendored), GRDB, the dictionaries (including the UniDic part of SudachiDict), and the font. The full texts are under License in About inku.

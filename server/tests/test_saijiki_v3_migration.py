@@ -58,7 +58,8 @@ def test_cutover_blanks_only_the_explicit_unlinked_text(tmp_path):
         connection.execute(HistoryRow.__table__.insert().values(id='bad',user_id='u',at=2,
             input='keep description',ddl='not DDL',score='{}',svg='<svg/>',elapsed_ms=0))
     engine.dispose()
-    packages=tmp_path/'plugins'; packages.mkdir()
+    packages=tmp_path/'plugins'
+    packages.mkdir()
     report=saijiki_v3_cutover.cutover(database,packages,tmp_path/'recovery',
         journal=tmp_path/'journal.jsonl',blank=['bad:ddl'])
     assert report['blanked_records']==[{'id':'bad:ddl','chars':7}]

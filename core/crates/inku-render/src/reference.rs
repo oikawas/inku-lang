@@ -21,7 +21,10 @@ use crate::materials::texture_filter_id;
 use crate::stroke::grammar;
 use crate::types::{Amplitude, Frequency, LineStyle, Thinness, Weight};
 
-const WEIGHTS: [Weight; 12] = [
+/// Every Score weight, in the Score enum's order: the twelve tools before
+/// Saijiki v3 (six of them now only replay saved Scores) and the five it added
+/// (てざわりの整理, 2026-10-31).
+const WEIGHTS: [Weight; 17] = [
     Weight::Silverpoint,
     Weight::Pencil,
     Weight::Pen,
@@ -34,6 +37,11 @@ const WEIGHTS: [Weight; 12] = [
     Weight::Burin,
     Weight::Drypoint,
     Weight::Computer,
+    Weight::Gouache,
+    Weight::Watercolor,
+    Weight::OilPastel,
+    Weight::PaintingKnife,
+    Weight::Etching,
 ];
 
 fn enum_name<T: Serialize>(value: T) -> String {
@@ -150,7 +158,25 @@ mod tests {
         let weights = reference["weight_properties"]["weights"]
             .as_array()
             .expect("weight table");
-        assert_eq!(weights.len(), 12);
+        assert_eq!(weights.len(), 17);
+        let names = weights
+            .iter()
+            .map(|weight| weight["weight"].as_str().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            names[12..],
+            [
+                "gouache",
+                "watercolor",
+                "oil_pastel",
+                "painting_knife",
+                "etching"
+            ]
+        );
+        let gouache = &weights[12];
+        assert_eq!(gouache["stroke_width"], 3.0);
+        assert_eq!(gouache["thick_stroke_width"], 8.0);
+        assert_eq!(gouache["extra_thick_stroke_width"], 22.0);
         let oil = weights
             .iter()
             .find(|weight| weight["weight"] == "oil_paint")

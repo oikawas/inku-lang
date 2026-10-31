@@ -25,12 +25,12 @@ from inku_server.pipeline_api import PipelineService
 _action = runpy.run_path(str(Path(__file__).with_name("test_persistence_variation_authority.py")))["_action"]
 
 LAWS = {"schema": "inku.laws-layers.v1", "layers": [{
-    "sentences": ["画面の横0.618034、縦0.618034の位置に、灰の細い細筆の程よい空の縦長の小さな楕円を1個置く。"],
+    "sentences": ["画面の横0.618034、縦0.618034の位置に、灰のごく細いガッシュの程よい空の縦長の小さな楕円を1個置く。"],
     "kind": "laws", "laws": ["B1"],
 }]}
-SOURCE = "背景を白で埋める。\n画面の横0.618034、縦0.618034の位置に、灰の細い細筆の程よい空の縦長の小さな楕円を1個置く。\n"
+SOURCE = "背景を白で埋める。\n画面の横0.618034、縦0.618034の位置に、灰のごく細いガッシュの程よい空の縦長の小さな楕円を1個置く。\n"
 BASIS = {"schema": "inku.laws-basis.v1",
-         "composed": "背景を白で埋める。\n画面の中ほどに、灰の細い細筆の程よい空の縦長の小さな楕円を1個置く。\n",
+         "composed": "背景を白で埋める。\n画面の中ほどに、灰のごく細いガッシュの程よい空の縦長の小さな楕円を1個置く。\n",
          "committed_digest": hashlib.sha256(SOURCE.encode()).hexdigest(), "main_layer": None, "main_law": "B1",
          "laws": {"B1": {"targets": [{"layer": 0, "at": "point_lr"}]}}, "reason": "The grey ellipse leads."}
 CONFIG = {"saved_setting": "this performance"}

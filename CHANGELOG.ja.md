@@ -12,6 +12,8 @@
 
 ServerとWebはてざわりの新しい11語とScore 0.24.0に対応し、旧いDDL書き出しを読み込むときは歳時記v3へ移す。ServerとCLIのPNGは共有coreの描き手を使い、画面と同じ材質のずらしを描く。
 
+DDL書き出しに `saijiki: inku.saijiki.v3` を持たせ、認証付き `/api/ddl-export/migrate-v2` で旧版を読み込む。保存した記録と導入済みプラグインにはサービス停止中のv3移行入口を用意する。容量の換算は墨1本あたりSVG 896〜8,664 bytes（400本で約0.4〜3.5 MB）。CLIのPNG出力にもcore wheelが必要で、描画時の `skip_system_fonts` 指定を外す。DDLは29、DDLエンジンは75。
+
 ### 2026-10-31 — macOS の Rust ビルド警告を修正
 
 固定 Rust ツールチェーンのライブラリをビルド時に参照し、デバッグ情報の削除が失敗する問題を修正する。

@@ -464,7 +464,7 @@ class RenderLimitsStatus(BaseModel):
     # Bytes of SVG one mark costs, by drawing tool. The panel turns the count on
     # the stepper into the weight a reader will actually open.
     bytes_per_mark: dict[str, int] = Field(
-        description="Approximate SVG bytes one mark costs: chalk and painting_knife, the lightest and the heaviest of the eleven touches",
+        description="Approximate SVG bytes one mark costs by drawing tool: chalk and painting_knife, the lightest and the heaviest of the eleven touches",
     )
     note: str = Field(description="Explanation of how the limits are recorded and rounded")
 

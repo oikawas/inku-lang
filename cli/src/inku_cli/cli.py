@@ -615,7 +615,7 @@ def _write_paint_outputs(
         try:
             png_path.write_bytes(_rasterize_png(str(result["svg"])))
         except RasterizerUnavailable as exc:
-            raise CliError("PNG output requires resvg-py") from exc
+            raise CliError("PNG output requires the inku_render core wheel") from exc
         paths["png"] = str(png_path)
         # Different backends and versions produce different pixels from one SVG.
         paths["png_rasterizer"] = rasterizer_info()
@@ -755,7 +755,7 @@ def _svg_occupancy_grid(svg: str, *, cells: int = 16) -> list[float]:
     try:
         buffer = io.BytesIO(_rasterize_png(svg))
     except RasterizerUnavailable as exc:
-        raise CliError("analyze --replay requires resvg-py") from exc
+        raise CliError("analyze --replay requires the inku_render core wheel") from exc
     with Image.open(buffer) as image:
         image = image.convert("L").resize((cells, cells))
         pixels = list(image.get_flattened_data())
@@ -1449,7 +1449,7 @@ def _write_history_export(
     thumb_size: int,
 ) -> dict[str, Any]:
     if rasterizer_backend() is None:
-        raise CliError("history-export requires resvg-py for contact-sheet PNGs")
+        raise CliError("history-export requires the inku_render core wheel for contact-sheet PNGs")
 
     out_dir.mkdir(parents=True, exist_ok=True)
     item_dir = out_dir / "items"

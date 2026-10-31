@@ -1683,11 +1683,11 @@ def test_png_output_fails_when_resvg_is_absent(tmp_path, monkeypatch):
     than the work is, so the CLI would rather write nothing.
     """
     def unavailable(svg, **kwargs):
-        raise cli.RasterizerUnavailable("resvg-py is not installed")
+        raise cli.RasterizerUnavailable("inku_render core wheel is not installed")
 
     monkeypatch.setattr(cli, "svg_to_png", unavailable)
 
-    with pytest.raises(cli.CliError, match="resvg-py"):
+    with pytest.raises(cli.CliError, match="inku_render core wheel"):
         cli._write_paint_outputs({"svg": "<svg></svg>"}, out_dir=tmp_path, prefix="one", png=True)
 
 

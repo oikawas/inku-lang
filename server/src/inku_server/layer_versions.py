@@ -433,8 +433,9 @@
 # 74: Object plugin words resolve as invisible boxes carrying Score 0.23
 # templates.
 # Their templates are performed by render engine 94.
-# 75: The five new touch words lower to Score 0.24.0 weights; Scores that do
-# not use them keep their edition. They are performed by render engine 95.
+# 75: The five new touch words lower to the Score 0.24.0 weights gouache,
+# watercolor, oil_pastel, painting_knife and etching; a Score that uses none
+# of them keeps its edition. They are performed by render engine 95.
 DDL_ENGINE_VERSION = "75"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
@@ -515,6 +516,10 @@ DDL_ENGINE_VERSION = "75"
 # to a model.
 # 28: Plugin names can be written in braces; qualified names remain readable
 # while saved works migrate.
-# 29 (2026-10-31): Saijiki v3 has eleven touch words. Six retired tool
-# words require migration of saved documents and definitions (SPEC §3.3).
+# 29 (2026-10-31): Saijiki v3 (`inku.saijiki.v3`). The touch category てざわり /
+# touches is eleven words: 銀筆 silverpoint, 鉛筆 pencil, ペン pen, チョーク chalk,
+# オイルパステル oil pastel, ガッシュ gouache, 水彩 watercolor, 油彩 oil paint,
+# ペインティングナイフ painting knife, エッチング etching, コンピュータ computer.
+# ロットリング, クレヨン, 細筆, 太筆, ビュラン and ドライポイント are no longer read;
+# saved documents and Macro definitions move once (SPEC §3.3).
 DDL_VERSION = "29"

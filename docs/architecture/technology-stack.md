@@ -23,7 +23,7 @@ This appendix gives one place to survey the languages, frameworks, main runtime 
 | Android app | Kotlin, Gradle Kotlin DSL | Jetpack Compose, Room 2.8.4, KSP, AndroidX, CameraX | Device UI, the shared-pipeline host, Room history, provider/model management, and in-app capture | `android/app/build.gradle.kts`; `android/app/src/` |
 | macOS app | Swift 6, SQL | SwiftUI, Observation, UniFFI, GRDB 7.11.1, system SQLite, URLSession, Keychain, CoreGraphics, WebKit (the 3D viewer) | Native UI, shared-pipeline host, persistence, providers, Skia screen display and zoomed windows, and export | `apple/Package.swift`; `apple/Packages/`; `apple/Sources/` |
 | CLI | Python 3.12 | Standard HTTP client, Pillow, `inku-analysis` | Public HTTP API operations, batch, artifact save, and functional testing | `cli/pyproject.toml`; `cli/src/inku_cli/` |
-| Shared analysis | Python 3.12 | `resvg-py`, Pillow | Read-only composition mirror, SVG raster/measurement, thumbnails | `shared/pyproject.toml`; `shared/src/inku_analysis/` |
+| Shared analysis | Python 3.12 | `inku_render` core wheel, Pillow | Read-only composition mirror, SVG raster/measurement, thumbnails | `shared/pyproject.toml`; `shared/src/inku_analysis/` |
 | Distribution | Dockerfile, YAML | Docker Compose, GHCR, GitHub Actions | API/Web images, persistent volume, CI/release | `deploy/compose.yaml`; Dockerfiles; `.github/workflows/` |
 
 ## Languages and formats

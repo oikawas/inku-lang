@@ -27,12 +27,13 @@ def migrate_v2_export(source: str, language: str, plugins: list[dict[str, Any]],
     if (first.get("error") or len(entries) != len(definitions)
             or any(not isinstance(entry, dict) or entry.get("error") for entry in entries)):
         raise ValueError("invalid_export_definitions")
+    if any(not isinstance(entry.get("old_digest"), str) for entry in entries):
+        raise ValueError("invalid_export_original_digest")
     locks = [{"qualified_name": entry["qualified_name"], "version": entry["version"],
-              "digest": entry["digest"] if entry["digest"].startswith("sha256:")
-              else "sha256:" + entry["digest"]} for entry in entries]
+              "digest": entry["old_digest"]} for entry in entries]
     request = {"document": {"source": source, "language": language, "macro_locks": locks,
                              "saijiki": "inku.saijiki.v2"},
-               "definitions": [entry["definition"] for entry in entries]}
+               "definitions": definitions}
     result = json.loads(inku_render.pipeline_migrate_saijiki_v2(
         json.dumps(request, ensure_ascii=False).encode()))
     if journal:

@@ -23,7 +23,7 @@
 | Android app | Kotlin、Gradle Kotlin DSL | Jetpack Compose、Room 2.8.4、KSP、AndroidX、CameraX | 端末UI、共有pipelineのhost、Room履歴、provider/model管理、アプリ内の撮影 | `android/app/build.gradle.kts`; `android/app/src/` |
 | macOS app | Swift 6、SQL | SwiftUI、Observation、UniFFI、GRDB 7.11.1、system SQLite、URLSession、Keychain、CoreGraphics、WebKit（3Dビューア） | native UI、共有pipeline host、保存、provider、Skiaの画面表示と拡大の窓、書き出し | `apple/Package.swift`; `apple/Packages/`; `apple/Sources/` |
 | CLI | Python 3.12 | 標準HTTP client、Pillow、`inku-analysis` | 公開HTTP API操作、batch、artifact保存、機能検査 | `cli/pyproject.toml`; `cli/src/inku_cli/` |
-| Shared analysis | Python 3.12 | `resvg-py`、Pillow | read-only composition mirror、SVG raster/measurement、thumbnail | `shared/pyproject.toml`; `shared/src/inku_analysis/` |
+| Shared analysis | Python 3.12 | `inku_render` core wheel、Pillow | read-only composition mirror、SVG raster/measurement、thumbnail | `shared/pyproject.toml`; `shared/src/inku_analysis/` |
 | Distribution | Dockerfile、YAML | Docker Compose、GHCR、GitHub Actions | API/Web image、persistent volume、CI/release | `deploy/compose.yaml`; Dockerfiles; `.github/workflows/` |
 
 ## 言語と記述形式

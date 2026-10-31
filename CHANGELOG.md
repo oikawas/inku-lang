@@ -12,6 +12,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 Server and Web support the eleven v3 touch words and Score 0.24.0, and migrate older DDL exports when importing them. Server and CLI produce PNGs with the shared core renderer, keeping material displacement consistent with the screen.
 
+DDL exports carry `saijiki: inku.saijiki.v3`; authenticated imports use `/api/ddl-export/migrate-v2`. Saved records and installed packages have a stopped-service v3 migration entry. The capacity estimate is 896–8,664 SVG bytes per mark (400 marks: about 0.4–3.5 MB). CLI PNG output requires the core wheel; rasterization no longer passes `skip_system_fonts`. DDL is 29 and the DDL engine is 75.
+
 ### 2026-10-31 — Fix the macOS Rust build warning
 
 Find the pinned Rust toolchain library during the build so debug information can be stripped successfully.

@@ -2,7 +2,7 @@
 //
 // The stepper on the limits panel counts marks. Marks are a proxy for the thing
 // that actually reaches a reader -- the weight of the file their browser opens
-// -- and a proxy that is off by 25% depending on which tool drew them. An
+// -- and a proxy whose cost depends on the tool. An
 // administrator raising the ceiling is entitled to know what they are raising it
 // to, so the panel converts on the spot.
 //

@@ -835,7 +835,7 @@ def _migrate_once_database(database: Path, migrate: MigrateUnit, *, workers: int
                  progress: Progress | None = None, journal: Path | None = None,
                  timeout: float | None = None, abort_on_failure: bool = False,
                  blank: Iterable[str] | None = None) -> dict[str, Any]:
-    """Move the saved records of one SQLite database to Saijiki v2, once.
+    """Move the saved records of one SQLite database to Saijiki v3, once.
 
     Run it while the service is stopped. It keeps a verified Backup API
     snapshot beside the database first (``migration-backups/``), then writes

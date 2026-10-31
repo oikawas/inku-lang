@@ -29,7 +29,7 @@ inku-lang/
 - Node.js and npm
 - Git or a deployment mechanism such as rsync
 - For source/systemd installations, an `inku-render-python` wheel built from the same checkout's core. The Linux build environment needs Rust (the pinned version in `core/rust-toolchain.toml`), a C linker, and maturin 1.13.3
-- (No extra OS libraries: `resvg-py`, which rasterizes PNG output, ships as a wheel)
+- PNG output uses the shared `inku_render` core wheel; rebuild and install it when updating core.
 - Optional: reverse proxy and a TLS certificate
 
 ```sh

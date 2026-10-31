@@ -259,7 +259,7 @@ uvx maturin==1.13.3 build --manifest-path ../core/crates/inku-render-python/Carg
 uv pip install --python .venv/bin/python --no-deps /tmp/inku-native/*.whl
 ```
 
-PNG出力には共有coreのwheelが必要です。coreを更新したときも作り直します。
+PNG出力には共有coreのwheelが必要である。coreを更新したときも作り直す。
 
 CLIは既定で `http://127.0.0.1:8100` に接続する。別のAPIへ接続する場合は `--base-url` または `INKU_BASE_URL` を使う。
 

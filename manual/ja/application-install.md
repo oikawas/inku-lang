@@ -29,7 +29,7 @@ inku-lang/
 - Node.jsとnpm
 - Gitまたはrsyncなどの配置手段
 - source／systemd構成では、同じcheckoutのcoreから作った`inku-render-python` wheel。ビルドするLinux環境にはRust（`core/rust-toolchain.toml`の固定版）、Cリンカー、maturin 1.13.3が必要
-- （PNG出力に使う `resvg-py` はwheelで入るため、OSライブラリの追加導入は要らない）
+- PNG出力には共有 `inku_render` core wheel が必要である。core 更新時も作り直して導入する。
 - 任意: reverse proxy、TLS証明書
 
 ```sh

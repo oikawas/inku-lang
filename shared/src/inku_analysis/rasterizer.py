@@ -1,6 +1,6 @@
 """SVG to PNG rasterization shared by the inku server and CLI.
 
-**resvg is the only backend, and that is deliberate.**
+The core wheel's ``inku_render.svg_to_png`` is the only backend.
 
 cairosvg used to stand behind it for installations without resvg. It does not
 implement feTurbulence / feDisplacementMap / feGaussianBlur, and rather than
@@ -11,7 +11,7 @@ looks clean. A rasterizer that quietly returns the wrong picture is worse than
 one that is missing, because a wrong picture gets used to decide things. It was,
 repeatedly.
 
-So there is no fallback. Where resvg is absent, rasterizing raises.
+There is no fallback. Where the core wheel is absent, rasterizing raises.
 
 This module is deliberately not re-exported from the package root: the analysis
 mirror in ``__init__`` stays independent of rendering, and this is a rendering tool.
@@ -71,7 +71,7 @@ def rasterizer_info() -> dict[str, str]:
 
     Two machines running different versions of resvg produce different pixels from
     the same SVG, so artifacts carry this to stay comparable. Returns an empty dict
-    when resvg is not installed.
+    when the core wheel is not installed.
     """
     if rasterizer_backend() is None:
         return {}
@@ -100,7 +100,7 @@ def svg_to_png(
     typographic family name (name ID 16, falling back to ID 1) exactly -- an
     unmatched family draws nothing at all rather than substituting.
 
-    Raises RasterizerUnavailable when resvg is not installed. There is no second
+    Raises RasterizerUnavailable when the core wheel is not installed. There is no second
     backend to fall back to; see the module docstring for why.
     """
     render = _resvg_renderer()

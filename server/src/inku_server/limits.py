@@ -160,7 +160,8 @@ def max_cluster_count(limits: Limits) -> int:
 # the person raising the number is told what they are raising it to.
 #
 # Measured 2026-10-31 on the development Mac at render engine 95: 400 black
-# horizontal lines in a 20 by 20 grid, square 1000px canvas, display, seed 1.
+# horizontal lines of length 0.035 in a 20 by 20 grid, Score 0.24.0, square
+# 1000px canvas, display, seed 1; SVG bytes divided by 400.
 # Chalk and painting knife are the lightest and heaviest of the eleven touches.
 #
 # Not a bound and not read by any drawing code -- a unit conversion, and only

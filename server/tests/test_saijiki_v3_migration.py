@@ -49,6 +49,25 @@ def test_v2_work_and_authority_move_together_once(tmp_path):
         _migrate_once_database(path, migrate_unit_v3)
 
 
+def test_cutover_blanks_only_the_explicit_unlinked_text(tmp_path):
+    database=tmp_path/'saved.db'
+    _saved_database(database)
+    engine=create_engine(f'sqlite:///{database}')
+    with engine.begin() as connection:
+        from inku_server.persistence.schema import HistoryRow
+        connection.execute(HistoryRow.__table__.insert().values(id='bad',user_id='u',at=2,
+            input='keep description',ddl='not DDL',score='{}',svg='<svg/>',elapsed_ms=0))
+    engine.dispose()
+    packages=tmp_path/'plugins'; packages.mkdir()
+    report=saijiki_v3_cutover.cutover(database,packages,tmp_path/'recovery',
+        journal=tmp_path/'journal.jsonl',blank=['bad:ddl'])
+    assert report['blanked_records']==[{'id':'bad:ddl','chars':7}]
+    engine=create_engine(f'sqlite:///{database}')
+    with engine.connect() as connection:
+        assert connection.exec_driver_sql("SELECT ddl,input FROM history WHERE id='bad'").one()==(None,'keep description')
+    engine.dispose()
+
+
 def test_package_plan_keeps_original_note_and_preview_and_moves_example(tmp_path):
     from pathlib import Path
 

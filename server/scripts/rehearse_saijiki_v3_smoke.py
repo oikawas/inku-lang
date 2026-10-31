@@ -50,7 +50,7 @@ def main() -> int:
         for owner, history_id, source in candidates:
             try:
                 body = LinkedHistoryForkBody(kind="direct_ddl", text=source + "\n黒い円を置く。",
-                                             options={"stage1_model": "chatgpt:gpt-6-luna", "render_seed": 1})
+                                             options={"stage1_model": "gemini:gemma-4-31b-it", "render_seed": 1})
                 view = service.fork_linked_history(owner, history_id, body)
                 execution = view["execution_id"]
                 deadline = time.monotonic() + 30

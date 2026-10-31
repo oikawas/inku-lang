@@ -18,16 +18,16 @@ const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
 
 const JA: [&str; 4] = [
     "背景を黒で埋める。",
-    "中央の縦（横1/3〜2/3、縦0〜1）に、白の細筆の程よい塗りの小さな円を5個並べる。",
-    "中心（横1/3〜2/3、縦1/3〜2/3）に、黄の細筆の程よい塗りの大きな円を5個置く。",
+    "中央の縦（横1/3〜2/3、縦0〜1）に、白のガッシュの程よい塗りの小さな円を5個並べる。",
+    "中心（横1/3〜2/3、縦1/3〜2/3）に、黄のガッシュの程よい塗りの大きな円を5個置く。",
     "画面全体（横0〜1、縦0〜1）に、白の鉛筆の薄いとても小さな点を30個散らす。",
 ];
 
 const EN: [&str; 4] = [
     "Fill the background with black.",
-    "Line up 12 white thin fine-brush temperate sweep diagonal large lines diagonally at the top (horizontal 0 to 1, vertical 0 to 1/3).",
-    "Scatter 18 white thin fine-brush faint empty small ellipses at the upper right quarter (horizontal 1/2 to 1, vertical 0 to 1/2).",
-    "Draw 8 yellow thin fine-brush temperate sweep horizontal normal-sized lines at the upper left quarter (horizontal 0 to 1/2, vertical 0 to 1/2).",
+    "Line up 12 white thin gouache temperate sweep diagonal large lines diagonally at the top (horizontal 0 to 1, vertical 0 to 1/3).",
+    "Scatter 18 white thin gouache faint empty small ellipses at the upper right quarter (horizontal 1/2 to 1, vertical 0 to 1/2).",
+    "Draw 8 yellow thin gouache temperate sweep horizontal normal-sized lines at the upper left quarter (horizontal 0 to 1/2, vertical 0 to 1/2).",
 ];
 
 /// The document with one sentence written again.
@@ -62,7 +62,7 @@ fn a_sentence_that_colors_or_fades_its_marks_moves_and_keeps_its_clauses() {
             document(
                 &JA,
                 1,
-                "中央の縦（横1/3〜2/3、縦0〜1）に、白と黄を交互にして、細筆の程よい塗りの小さな円を5個並べる。",
+                "中央の縦（横1/3〜2/3、縦0〜1）に、白と黄を交互にして、ガッシュの程よい塗りの小さな円を5個並べる。",
             ),
             ja,
             "白と黄を交互にして、",
@@ -71,7 +71,7 @@ fn a_sentence_that_colors_or_fades_its_marks_moves_and_keeps_its_clauses() {
             document(
                 &JA,
                 1,
-                "中央の縦（横1/3〜2/3、縦0〜1）に、白・黄・橙の順に繰り返して、細筆の程よい塗りの小さな円を5個並べる。",
+                "中央の縦（横1/3〜2/3、縦0〜1）に、白・黄・橙の順に繰り返して、ガッシュの程よい塗りの小さな円を5個並べる。",
             ),
             ja,
             "白・黄・橙の順に繰り返して、",
@@ -80,7 +80,7 @@ fn a_sentence_that_colors_or_fades_its_marks_moves_and_keeps_its_clauses() {
             document(
                 &JA,
                 1,
-                "中央の縦（横1/3〜2/3、縦0〜1）に、白・黄・橙の順に段々に移して、上から下へ薄れさせて、細筆の程よい塗りの小さな円を5個並べる。",
+                "中央の縦（横1/3〜2/3、縦0〜1）に、白・黄・橙の順に段々に移して、上から下へ薄れさせて、ガッシュの程よい塗りの小さな円を5個並べる。",
             ),
             ja,
             "白・黄・橙の順に段々に移して、上から下へ薄れさせて、",
@@ -98,7 +98,7 @@ fn a_sentence_that_colors_or_fades_its_marks_moves_and_keeps_its_clauses() {
             document(
                 &EN,
                 2,
-                "Scatter 18 thin fine-brush faint empty small ellipses at the upper right quarter (horizontal 1/2 to 1, vertical 0 to 1/2), repeating white, yellow, and orange in order, fading outward from the center.",
+                "Scatter 18 thin gouache faint empty small ellipses at the upper right quarter (horizontal 1/2 to 1, vertical 0 to 1/2), repeating white, yellow, and orange in order, fading outward from the center.",
             ),
             en,
             ", repeating white, yellow, and orange in order, fading outward from the center.",
@@ -128,8 +128,8 @@ fn the_clauses_do_not_change_where_the_layers_go() {
     let ja = ResolvedInstructionLanguage::Ja;
     let plain = JA.join("\n");
     for sentence in [
-        "中央の縦（横1/3〜2/3、縦0〜1）に、白と黄を交互にして、細筆の程よい塗りの小さな円を5個並べる。",
-        "中央の縦（横1/3〜2/3、縦0〜1）に、上から下へ薄れさせて、白の細筆の程よい塗りの小さな円を5個並べる。",
+        "中央の縦（横1/3〜2/3、縦0〜1）に、白と黄を交互にして、ガッシュの程よい塗りの小さな円を5個並べる。",
+        "中央の縦（横1/3〜2/3、縦0〜1）に、上から下へ薄れさせて、白のガッシュの程よい塗りの小さな円を5個並べる。",
     ] {
         let source = document(&JA, 1, sentence);
         for mode in [RecomposeMode::Principled, RecomposeMode::Chance] {

@@ -1486,7 +1486,7 @@ fn undelivered_occurrences_preserve_accepted_drawables_in_the_same_clause() {
 
 #[test]
 fn ja_unresolved_predicate_fragment_preserves_typed_drawing_in_both_resource_modes() {
-    let source = "黒いロットリングの小さな四角を左から右へ横に二十四個並べる。";
+    let source = "黒い細いペンの小さな四角を左から右へ横に二十四個並べる。";
     let budget = inku_score::ResourceBudget {
         maximum: inku_score::ResourceDemand {
             logical_objects: 64,
@@ -1528,7 +1528,7 @@ fn ja_unresolved_predicate_fragment_preserves_typed_drawing_in_both_resource_mod
         let span = diagnostic.span.unwrap();
         assert_eq!(
             &source[span.start_byte..span.end_byte],
-            "黒いロットリングの小さな四角を左から右へ横に二十四個並べる"
+            "黒い細いペンの小さな四角を左から右へ横に二十四個並べる"
         );
         let score = result.score().expect("the typed drawing survives");
         assert_eq!(score.instructions.len(), 1);
@@ -1542,7 +1542,7 @@ fn ja_unresolved_predicate_fragment_preserves_typed_drawing_in_both_resource_mod
 
 #[test]
 fn ja_unresolved_entity_fragment_preserves_typed_drawing() {
-    let source = "中心付近に黒いクレヨンの楕円を一つ置く。";
+    let source = "中心付近に黒いチョークの楕円を一つ置く。";
     let result = execute_language(
         source,
         ResolvedInstructionLanguage::Ja,
@@ -1562,14 +1562,14 @@ fn ja_unresolved_entity_fragment_preserves_typed_drawing() {
     // The unresolved part is reported as the whole clause hole it belongs to.
     assert_eq!(
         &source[span.start_byte..span.end_byte],
-        "中心付近に黒いクレヨンの楕円を一つ置く"
+        "中心付近に黒いチョークの楕円を一つ置く"
     );
     assert_eq!(result.score().unwrap().instructions.len(), 1);
 }
 
 #[test]
 fn ja_unresolved_layout_modifier_keeps_the_typed_line_up() {
-    let source = "背景を黒で埋める。白いロットリングの横線を全幅に三十本並べる。等間隔に配置する。";
+    let source = "背景を黒で埋める。白い細いペンの横線を全幅に三十本並べる。等間隔に配置する。";
     let budget = inku_score::ResourceBudget {
         maximum: inku_score::ResourceDemand {
             logical_objects: 64,
@@ -2598,7 +2598,7 @@ fn declared_macro_width_and_relative_scale_conflict_recovers_like_ordinary_ddl()
 
 #[test]
 fn unsupported_surface_clause_preserves_the_independent_completed_drawing() {
-    let source = "背景を黒で埋める。太筆の黒い四角を中心に置く。面: 粗く塗りつぶす。";
+    let source = "背景を黒で埋める。太いガッシュの黒い四角を中心に置く。面: 粗く塗りつぶす。";
     let continued = execute_language(
         source,
         ResolvedInstructionLanguage::Ja,

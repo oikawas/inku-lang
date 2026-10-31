@@ -60,7 +60,15 @@ fn execute_on(source: &str, canvas: &str) -> CompilerResourceExecutionResult {
         .as_array()
         .expect("package entries")
         .iter()
-        .map(|entry| MacroDefinition::from_json(&entry["definition"].to_string()).unwrap())
+        .map(|entry| {
+            MacroDefinition::from_json(
+                &inku_ddl::migrate_macro_definition_from_saijiki_v1(&entry["definition"])
+                    .unwrap()
+                    .definition
+                    .to_string(),
+            )
+            .unwrap()
+        })
         .collect::<Vec<_>>();
     let locks = definitions
         .iter()

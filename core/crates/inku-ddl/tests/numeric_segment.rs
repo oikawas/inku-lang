@@ -207,7 +207,7 @@ fn an_english_sentence_may_end_its_numbers_in_a_whole_number() {
 #[test]
 fn a_row_puts_its_first_and_last_mark_on_the_two_points() {
     let row = score(
-        "画面の横0.118、縦0.5から横0.882、縦0.5まで、半径0.03の青のロットリングの空の円を5個並べる。",
+        "画面の横0.118、縦0.5から横0.882、縦0.5まで、半径0.03の青の細いペンの空の円を5個並べる。",
         "square",
         240,
     );
@@ -229,8 +229,8 @@ fn a_row_puts_its_first_and_last_mark_on_the_two_points() {
 
     // The English sentence, with or without the comma, draws the same row.
     for english in [
-        "Line up 5 blue rotring empty circles radius 0.03 from horizontal 0.118, vertical 0.5 to horizontal 0.882, vertical 0.5.",
-        "line up 5 blue rotring empty circles radius 0.03 from Horizontal 0.118 Vertical 0.5 to horizontal 0.882 vertical 0.5.",
+        "Line up 5 blue thin pen empty circles radius 0.03 from horizontal 0.118, vertical 0.5 to horizontal 0.882, vertical 0.5.",
+        "line up 5 blue thin pen empty circles radius 0.03 from Horizontal 0.118 Vertical 0.5 to horizontal 0.882 vertical 0.5.",
     ] {
         assert_eq!(
             score(english, "square", 240).instructions,

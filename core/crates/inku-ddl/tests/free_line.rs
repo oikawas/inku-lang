@@ -104,7 +104,7 @@ fn execution_reasons(plan: &PerformancePlan) -> Vec<ScoreExecutionReason> {
 fn the_free_line_word_reaches_score_0_21_as_a_long_line() {
     for (source, language) in [
         (
-            "中心に、黒の細筆の自由線を1個引く。",
+            "中心に、黒のガッシュの自由線を1個引く。",
             ResolvedInstructionLanguage::Ja,
         ),
         (
@@ -115,7 +115,15 @@ fn the_free_line_word_reaches_score_0_21_as_a_long_line() {
         let compiled = compile(source, language);
         assert_eq!(compiled.outcome, ScoreLoweringOutcome::Complete, "{source}");
         let score = compiled.score;
-        assert_eq!(score.version, "0.21.0", "{source}");
+        assert_eq!(
+            score.version,
+            if source.contains("ガッシュ") {
+                "0.24.0"
+            } else {
+                "0.21.0"
+            },
+            "{source}"
+        );
         score.validate_schema_edition().unwrap();
         let free_line = &score.instructions[0];
         assert_eq!(free_line.primitive, Primitive::FreeLine, "{source}");
@@ -128,7 +136,7 @@ fn the_free_line_word_reaches_score_0_21_as_a_long_line() {
         assert!((to.y - from.y).abs() < 1.0e-9, "{source}");
     }
     let line = compile(
-        "中心に、黒の細筆の線を1個引く。",
+        "中心に、黒のガッシュの線を1個引く。",
         ResolvedInstructionLanguage::Ja,
     );
     assert_ne!(line.score.version, "0.21.0");
@@ -139,7 +147,7 @@ fn the_free_line_word_reaches_score_0_21_as_a_long_line() {
 #[test]
 fn a_size_word_and_an_angle_shape_the_free_line_as_they_shape_a_line() {
     let compiled = compile(
-        "中心に、黒の細筆の右上がりの大きな自由線を1個引く。",
+        "中心に、黒のガッシュの右上がりの大きな自由線を1個引く。",
         ResolvedInstructionLanguage::Ja,
     );
     let free_line = &compiled.score.instructions[0];
@@ -155,17 +163,17 @@ fn a_size_word_and_an_angle_shape_the_free_line_as_they_shape_a_line() {
 fn a_free_line_keeps_a_connection_and_a_touch_on_either_side() {
     for (source, current, kind) in [
         (
-            "中心に、黒のペンの円を1個置く。\n前の形につながる黒の細筆の自由線を1個引く。",
+            "中心に、黒のペンの円を1個置く。\n前の形につながる黒のガッシュの自由線を1個引く。",
             Primitive::FreeLine,
             RelationType::Connected,
         ),
         (
-            "中心に、黒の細筆の自由線を1個引く。\n前の形につながる黒のペンの線を1個引く。",
+            "中心に、黒のガッシュの自由線を1個引く。\n前の形につながる黒のペンの線を1個引く。",
             Primitive::Line,
             RelationType::Connected,
         ),
         (
-            "上に、黒のペンの線を1個引く。\n前の線に触れる黒の細筆の自由線を1個引く。",
+            "上に、黒のペンの線を1個引く。\n前の線に触れる黒のガッシュの自由線を1個引く。",
             Primitive::FreeLine,
             RelationType::Touching,
         ),
@@ -198,7 +206,7 @@ fn a_free_line_keeps_a_connection_and_a_touch_on_either_side() {
 #[test]
 fn a_connection_moves_the_free_line_start_onto_the_end_of_the_previous_line() {
     let compiled = compile(
-        "上に、黒のペンの線を1個引く。\n前の形につながる黒の細筆の自由線を1個引く。",
+        "上に、黒のペンの線を1個引く。\n前の形につながる黒のガッシュの自由線を1個引く。",
         ResolvedInstructionLanguage::Ja,
     );
     let plan = perform(&compiled.score, 7);
@@ -216,7 +224,7 @@ fn a_connection_moves_the_free_line_start_onto_the_end_of_the_previous_line() {
 #[test]
 fn a_touch_lays_the_free_line_ends_on_the_ends_of_the_previous_line() {
     let compiled = compile(
-        "上に、黒のペンの線を1個引く。\n前の線に触れる黒の細筆の自由線を1個引く。",
+        "上に、黒のペンの線を1個引く。\n前の線に触れる黒のガッシュの自由線を1個引く。",
         ResolvedInstructionLanguage::Ja,
     );
     let plan = perform(&compiled.score, 7);
@@ -238,7 +246,7 @@ fn a_touch_lays_the_free_line_ends_on_the_ends_of_the_previous_line() {
 #[test]
 fn a_free_line_drops_every_other_relation_with_its_reason_and_is_drawn() {
     let circle = "中心に、黒のペンの円を1個置く。";
-    let free_line = "黒の細筆の自由線を1個引く。";
+    let free_line = "黒のガッシュの自由線を1個引く。";
     let line = "上に、黒のペンの線を1個引く。";
     let mut sources = Vec::new();
     for phrase in [
@@ -297,7 +305,7 @@ fn a_free_line_drops_every_other_relation_with_its_reason_and_is_drawn() {
 #[test]
 fn a_mirror_of_a_free_line_is_dropped_with_its_reason_and_both_are_drawn() {
     let compiled = compile(
-        "上に、黒の細筆の自由線を1個引く。\n下に、前の形と鏡写しの黒の細筆の自由線を1個引く。",
+        "上に、黒のガッシュの自由線を1個引く。\n下に、前の形と鏡写しの黒のガッシュの自由線を1個引く。",
         ResolvedInstructionLanguage::Ja,
     );
     assert_eq!(

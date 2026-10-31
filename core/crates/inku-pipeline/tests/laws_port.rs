@@ -116,8 +116,13 @@ fn definitions() -> Vec<MacroDefinition> {
         .expect("the asset has entries")
         .iter()
         .map(|entry| {
-            MacroDefinition::from_json(&entry["definition"].to_string())
-                .expect("a bundled definition reads")
+            MacroDefinition::from_json(
+                &inku_ddl::migrate_macro_definition_from_saijiki_v1(&entry["definition"])
+                    .unwrap()
+                    .definition
+                    .to_string(),
+            )
+            .expect("a bundled definition reads")
         })
         .collect()
 }

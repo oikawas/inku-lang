@@ -28,7 +28,7 @@ struct FixtureIds {
 
 #[test]
 fn unresolved_clause_patch_keeps_typed_facts_and_resolves_the_clause() {
-    let source = "青で背景を塗りつぶす\n様々な色の四角30個をクレヨンとコンピュータで塗りつぶす。";
+    let source = "青で背景を塗りつぶす\n様々な色の四角30個をチョークとコンピュータで塗りつぶす。";
     let base = compile_typed_ddl(
         NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::Ja, Vec::new()).unwrap(),
         &[],
@@ -39,7 +39,7 @@ fn unresolved_clause_patch_keeps_typed_facts_and_resolves_the_clause() {
     assert_eq!(holes.len(), 2, "{:?}", base.holes);
     let candidate = compile_typed_ddl(
         NormalizedDdlDocument::new(
-            "背景を青で埋める\n様々な色の四角30個をクレヨンとコンピュータで塗りつぶす。",
+            "背景を青で埋める\n様々な色の四角30個をチョークとコンピュータで塗りつぶす。",
             ResolvedInstructionLanguage::Ja,
             Vec::new(),
         )
@@ -66,11 +66,11 @@ fn unresolved_clause_patch_keeps_typed_facts_and_resolves_the_clause() {
     .unwrap();
     assert_eq!(
         accepted.document.source(),
-        "背景を青で埋める\n様々な色の四角30個をクレヨンとコンピュータで塗りつぶす。"
+        "背景を青で埋める\n様々な色の四角30個をチョークとコンピュータで塗りつぶす。"
     );
     assert_eq!(accepted.compilation.holes.len(), 1);
 
-    let complete_source = "背景を青で埋める。\n青いクレヨンの塗りの四角と赤いコンピュータの塗りの四角を交互に30個並べる。";
+    let complete_source = "背景を青で埋める。\n青いチョークの塗りの四角と赤いコンピュータの塗りの四角を交互に30個並べる。";
     let complete_compilation = compile_typed_ddl(
         NormalizedDdlDocument::new(complete_source, ResolvedInstructionLanguage::Ja, Vec::new())
             .unwrap(),
@@ -94,7 +94,7 @@ fn unresolved_clause_patch_keeps_typed_facts_and_resolves_the_clause() {
                 edit(holes[0], "背景を青で埋める。"),
                 edit(
                     holes[1],
-                    "青いクレヨンの塗りの四角と赤いコンピュータの塗りの四角を交互に30個並べる",
+                    "青いチョークの塗りの四角と赤いコンピュータの塗りの四角を交互に30個並べる",
                 ),
             ],
         ),
@@ -148,7 +148,7 @@ fn patch_preserves_unchanged_local_diagnostics_outside_the_hole() {
             &base,
             vec![edit(
                 &base.holes[0],
-                "背景を黒で埋める。太筆の黒い四角を中心に置く。",
+                "背景を黒で埋める。太いガッシュの黒い四角を中心に置く。",
             )],
         ),
         &[],

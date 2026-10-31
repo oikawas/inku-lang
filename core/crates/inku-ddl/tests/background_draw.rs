@@ -449,7 +449,7 @@ fn stage1_background_and_draw_keep_bilingual_meaning_and_source_ownership() {
 
 #[test]
 fn stage1_background_with_surface_in_color_slot_keeps_local_diagnostics_and_drawable_residual() {
-    let source = "背景を刷きで埋める。下端に薄い灰の太筆の波打つ線を3本引く。中心に小さな黒いペンの点を3個散らす。";
+    let source = "背景を刷きで埋める。下端に薄い灰の太いガッシュの波打つ線を3本引く。中心に小さな黒いペンの点を3個散らす。";
     let budget = ResourceBudget {
         maximum: ResourceDemand {
             logical_objects: 400,
@@ -528,7 +528,7 @@ fn stage1_background_with_surface_in_color_slot_keeps_local_diagnostics_and_draw
     assert_eq!(score.instructions.len(), 2);
     assert_eq!(score.instructions[0].primitive, Primitive::Line);
     assert_eq!(score.instructions[0].color, Color::Gray);
-    assert_eq!(score.instructions[0].weight, Weight::BrushThick);
+    assert_eq!(score.instructions[0].weight, Weight::Gouache);
     assert_eq!(
         score.instructions[0].variation.as_ref().unwrap().quality,
         Quality::Wave

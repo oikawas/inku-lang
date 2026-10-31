@@ -141,8 +141,8 @@ fn a_fill_range_written_in_numbers_draws_as_the_position_word() {
             ResolvedInstructionLanguage::Ja,
         ),
         (
-            "下に、鉛筆と太筆を交互にして、黒い線を五本埋める。",
-            "下（横0〜1、縦2/3〜1）に、鉛筆と太筆を交互にして、黒い線を五本埋める。",
+            "下に、鉛筆とガッシュを交互にして、黒い線を五本埋める。",
+            "下（横0〜1、縦2/3〜1）に、鉛筆とガッシュを交互にして、黒い線を五本埋める。",
             ResolvedInstructionLanguage::Ja,
         ),
     ] {
@@ -155,7 +155,18 @@ fn a_fill_range_written_in_numbers_draws_as_the_position_word() {
             "{:?}",
             target.owner
         );
-        assert_eq!(numbers.version, "0.18.0");
+        assert_eq!(
+            numbers.version,
+            if numbers
+                .instructions
+                .iter()
+                .any(|i| i.weight == inku_score::Weight::Gouache)
+            {
+                "0.24.0"
+            } else {
+                "0.18.0"
+            }
+        );
         assert_eq!(
             target.geometry,
             FillTargetGeometry::Rectangle {

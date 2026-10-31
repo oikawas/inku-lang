@@ -45,7 +45,7 @@ fn full_language_projections_preserve_python_prompt_and_marker_behavior() {
     );
     assert!(!ja.prompt_block.ends_with('\n'));
     assert!(!en.prompt_block.ends_with('\n'));
-    assert_eq!(ja.texture_material_enumeration.split('・').count(), 12);
+    assert_eq!(ja.texture_material_enumeration.split('・').count(), 11);
     assert!(en.texture_material_enumeration.ends_with(", or computer"));
     assert_eq!(
         ja.shape_markers,

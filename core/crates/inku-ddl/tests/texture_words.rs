@@ -193,7 +193,7 @@ fn a_texture_word_sets_its_field_on_a_closed_shapes_named_texture() {
             },
         ),
         (
-            "中心に、赤の太筆の下塗りの密な交差線の薄い四角を1個置く。",
+            "中心に、赤の太いガッシュの下塗りの密な交差線の薄い四角を1個置く。",
             JA,
             Expected {
                 density: 0.85,
@@ -203,7 +203,7 @@ fn a_texture_word_sets_its_field_on_a_closed_shapes_named_texture() {
             },
         ),
         (
-            "Place one red thick-brush faint underpainted packed crosshatch square at the center.",
+            "Place one red thick gouache faint underpainted packed crosshatch square at the center.",
             EN,
             Expected {
                 density: 0.85,
@@ -232,14 +232,14 @@ fn a_texture_word_sets_its_field_on_a_closed_shapes_named_texture() {
 fn a_texture_word_without_a_named_texture_is_left_out_alone() {
     for (source, without, language, reason) in [
         (
-            "中心に、赤の太筆の細かい刷きの線を1本引く。",
-            "中心に、赤の太筆の刷きの線を1本引く。",
+            "中心に、赤の太いガッシュの細かい刷きの線を1本引く。",
+            "中心に、赤の太いガッシュの刷きの線を1本引く。",
             JA,
             "fine_grained",
         ),
         (
-            "Draw one red thick-brush fine-grained sweep line at the center.",
-            "Draw one red thick-brush sweep line at the center.",
+            "Draw one red thick gouache fine-grained sweep line at the center.",
+            "Draw one red thick gouache sweep line at the center.",
             EN,
             "fine_grained",
         ),

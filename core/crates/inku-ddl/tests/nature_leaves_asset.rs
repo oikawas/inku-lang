@@ -34,6 +34,16 @@ struct Entry {
     summaries: BTreeMap<String, String>,
 }
 
+fn current_package() -> Package {
+    let mut package: Package = serde_json::from_str(ASSET).unwrap();
+    for entry in &mut package.entries {
+        entry.definition = migrate_macro_definition_from_saijiki_v1(&entry.definition)
+            .unwrap()
+            .definition;
+    }
+    package
+}
+
 fn canonical(alias: &str) -> &'static str {
     match alias {
         "Nature.若葉" => "Nature.YoungLeaves",
@@ -49,7 +59,7 @@ fn canonical(alias: &str) -> &'static str {
 
 #[test]
 fn bracketed_young_leaves_bind_the_same_locked_definition() {
-    let package: Package = serde_json::from_str(ASSET).unwrap();
+    let package = current_package();
     let definitions: Vec<_> = package
         .entries
         .iter()
@@ -97,7 +107,7 @@ fn bracketed_young_leaves_bind_the_same_locked_definition() {
 
 #[test]
 fn v2_scene_keeps_v1_body_and_empty_object_keeps_its_box() {
-    let package: Package = serde_json::from_str(ASSET).unwrap();
+    let package = current_package();
     let mut raw = package.entries[0].definition.clone();
     let id = raw["heading"].clone();
     raw.as_object_mut().unwrap().remove("heading");
@@ -185,7 +195,7 @@ fn v2_scene_keeps_v1_body_and_empty_object_keeps_its_box() {
 
 #[test]
 fn bundled_nature_leaves_are_valid_bounded_definitions_that_reach_normal_score_lowering() {
-    let package: Package = serde_json::from_str(ASSET).expect("Nature package must be JSON");
+    let package = current_package();
     assert_eq!(package.schema, "inku.bundled-macro-package.v1");
     assert_eq!(package.package_id, "Nature.leaves");
     assert_eq!(package.version, "2.1.0");
@@ -328,7 +338,7 @@ fn bundled_nature_leaves_are_valid_bounded_definitions_that_reach_normal_score_l
             let branch = &score.instructions[0];
             assert_eq!(branch.primitive, Primitive::Line);
             assert_eq!(branch.color, Color::Gray);
-            assert_eq!(branch.weight, inku_score::Weight::BrushThick);
+            assert_eq!(branch.weight, inku_score::Weight::Gouache);
             let variation = branch.variation.as_ref().expect("undulating branch");
             assert_eq!(variation.frequency, inku_score::Frequency::Slow);
             assert_eq!(variation.quality, inku_score::Quality::Wave);
@@ -346,7 +356,7 @@ fn bundled_nature_leaves_are_valid_bounded_definitions_that_reach_normal_score_l
             assert!((6..=8).contains(&path_connections));
             assert!(score.instructions[1..].iter().all(|instruction| {
                 instruction.color == Color::Green
-                    && instruction.weight == inku_score::Weight::BrushThin
+                    && instruction.weight == inku_score::Weight::Gouache
                     && instruction.filled
             }));
         }
@@ -453,7 +463,7 @@ fn migrate_and_compile(
 #[test]
 fn the_bundled_package_is_its_v1_edition_migrated() {
     let previous: Package = serde_json::from_str(PACKAGE_2_0_V1).unwrap();
-    let current: Package = serde_json::from_str(ASSET).unwrap();
+    let current = current_package();
     assert_eq!(previous.version, "2.0.0");
     assert_eq!(previous.entries.len(), current.entries.len());
     let mut changed = 0;
@@ -484,7 +494,7 @@ fn the_bundled_package_is_its_v1_edition_migrated() {
         let again = migrate_macro_definition_from_saijiki_v1(&new.definition).unwrap();
         assert!(!again.changed);
     }
-    assert_eq!(changed, 4);
+    assert_eq!(changed, 7);
 }
 
 #[test]
@@ -628,7 +638,7 @@ fn a_saved_cloudform_kareha_migrates_and_keeps_its_meaning() {
 fn every_saved_1_0_edition_migrates_and_still_expands() {
     let package: Package = serde_json::from_str(PACKAGE_1_0).expect("1.0 package must be JSON");
     assert_eq!(package.version, "1.0.1");
-    let current: Package = serde_json::from_str(ASSET).expect("Nature package must be JSON");
+    let current = current_package();
     for (old, new) in package.entries.iter().zip(&current.entries) {
         let version = old.definition["version"].as_str().unwrap().to_owned();
         let name = format!(
@@ -652,7 +662,7 @@ fn every_saved_1_0_edition_migrates_and_still_expands() {
 
 #[test]
 fn a_bundled_word_draws_the_same_score_by_its_canonical_name_or_its_alias() {
-    let package: Package = serde_json::from_str(ASSET).expect("Nature package must be JSON");
+    let package = current_package();
     let definitions = package
         .entries
         .iter()
@@ -743,7 +753,7 @@ fn a_bundled_word_draws_the_same_score_by_its_canonical_name_or_its_alias() {
 
 #[test]
 fn every_bundled_word_expands_without_omission_at_many_placement_seeds() {
-    let package: Package = serde_json::from_str(ASSET).expect("Nature package must be JSON");
+    let package = current_package();
     let definitions = package
         .entries
         .iter()
@@ -801,7 +811,7 @@ fn every_bundled_word_expands_without_omission_at_many_placement_seeds() {
 
 #[test]
 fn counted_words_take_the_written_count_inside_the_word() {
-    let package: Package = serde_json::from_str(ASSET).expect("Nature package must be JSON");
+    let package = current_package();
     let definitions = package
         .entries
         .iter()
@@ -897,7 +907,7 @@ fn counted_words_take_the_written_count_inside_the_word() {
 
 #[test]
 fn every_counted_word_expands_without_omission_at_its_maximum_count() {
-    let package: Package = serde_json::from_str(ASSET).expect("Nature package must be JSON");
+    let package = current_package();
     let definitions = package
         .entries
         .iter()

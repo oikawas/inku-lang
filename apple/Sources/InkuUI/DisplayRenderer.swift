@@ -63,6 +63,10 @@ public final class DisplayRenderer: Sendable {
     /// Not shown on screen: what was drawn, and how often Skia failed and why.
     public struct Diagnostics: Sendable, Equatable {
         public var skiaWholes = 0
+        /// Cache misses that started preparing a Skia scene.
+        public var scenePreparations = 0
+        /// Concurrent preparations that reused a scene another request finished first.
+        public var scenePreparationReuses = 0
         public var skiaWindows = 0
         /// Of `skiaWindows`, drawn by Graphite in `inku-display-gpu`.
         public var gpuWindows = 0
@@ -152,7 +156,9 @@ public final class DisplayRenderer: Sendable {
             queue.async { [self] in
                 do {
                     guard Self.drawsWithSkia else { return continuation.finish() }
+                    if cancelled.withLock({ $0 }) { throw CancellationError() }
                     let hash = Array(SHA256.hash(data: Data(svg.utf8)))
+                    if cancelled.withLock({ $0 }) { throw CancellationError() }
                     if let gpu {
                         let image = try gpu.window(svg: svg, digest: hash, region: region) { cancelled.withLock { $0 } }
                         state.withLock { $0.diagnostics.skiaWindows += 1; $0.diagnostics.gpuWindows += 1 }
@@ -197,7 +203,9 @@ public final class DisplayRenderer: Sendable {
     private func draw(svg: String, width: UInt32, height: UInt32, cancelled: OSAllocatedUnfairLock<Bool>,
                       yield: (Frame) -> Void) throws {
         func checkCancellation() throws { if cancelled.withLock({ $0 }) { throw CancellationError() } }
+        try checkCancellation()
         let digest = SHA256.hash(data: Data(svg.utf8)).map { String(format: "%02x", $0) }.joined()
+        try checkCancellation()
         let wholeKey = "\(digest):\(width):\(height)"
         if let kept = state.withLock({ Self.take(&$0.wholes, wholeKey, &$0.clock) }) { yield(kept); return }
         guard Self.drawsWithSkia else {
@@ -233,10 +241,19 @@ public final class DisplayRenderer: Sendable {
 
     private func prepared(svg: String, digest: String) throws -> PreparedDisplay {
         if let scene = state.withLock({ Self.take(&$0.scenes, digest, &$0.clock) }) { return scene }
+        state.withLock { $0.diagnostics.scenePreparations += 1 }
         let scene = try InkuCore.prepareDisplay(svg: svg)
         let cost = Int(clamping: scene.pictureByteCount + scene.sourceByteCount)
-        state.withLock { Self.keep(&$0.scenes, digest, scene, cost: cost, limit: sceneCostLimit, &$0.clock) }
-        return scene
+        return state.withLock { state in
+            // Another request may have prepared the same immutable picture while
+            // this one ran. Share its scene without ever waiting for that request.
+            if let existing = Self.take(&state.scenes, digest, &state.clock) {
+                state.diagnostics.scenePreparationReuses += 1
+                return existing
+            }
+            Self.keep(&state.scenes, digest, scene, cost: cost, limit: sceneCostLimit, &state.clock)
+            return scene
+        }
     }
 
     /// The window drawn tile by tile on several threads and joined into one image in the core, so the tile

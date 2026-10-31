@@ -317,8 +317,10 @@ struct CreationView: View {
             Button(display.localized("画像フォルダを選ぶ")) {
                 let panel = NSOpenPanel(); panel.canChooseFiles = false; panel.canChooseDirectories = true
                 guard panel.runModal() == .OK, let url = panel.url else { return }
-                do { try imageBatch.select(url, app: model) } catch { imageLoadError = error.localizedDescription }
-            }.disabled(controlsDisabled)
+                Task {
+                    do { try await imageBatch.select(url, app: model) } catch { imageLoadError = error.localizedDescription }
+                }
+            }.disabled(controlsDisabled || imageBatch.selecting)
             if !imageBatch.folder.isEmpty { Text(imageBatch.folder).textSelection(.enabled).inkuFont(12) }
             conditionRow("Vision", value: model.imageVisionModel.isEmpty ? display.localized("選択してください") : model.imageVisionModel,
                          help: "Vision") { showImageModelPicker = true }.disabled(controlsDisabled)

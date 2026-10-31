@@ -7,6 +7,8 @@ import Observation
 private struct BackupManifest: Codable, Sendable {
     var lastSuccess: Date?
     var files: [String] = []
+    // Optional so manifests written by older versions remain readable.
+    var pendingDeletion: [String]?
 }
 
 public struct LocalBackupGeneration: Identifiable, Sendable {
@@ -48,7 +50,8 @@ private actor LocalMaintenanceStore {
         try JSONEncoder().encode(record).write(to: manifestURL, options: .atomic)
     }
     func snapshot() throws -> BackupSnapshot {
-        let record = try manifest()
+        var record = try manifest()
+        try finishPendingDeletions(&record)
         let folder = directory.appendingPathComponent("automatic-backups", isDirectory: true)
         guard FileManager.default.fileExists(atPath: folder.path) else {
             return BackupSnapshot(lastSuccess: record.lastSuccess, generations: [], totalBytes: 0)
@@ -82,11 +85,31 @@ private actor LocalMaintenanceStore {
         return url
     }
     func deleteRetained(name: String) throws {
-        let url = try retainedURL(name: name)
-        try FileManager.default.removeItem(at: url)
+        _ = try retainedURL(name: name)
         var record = try manifest()
-        record.files.removeAll { $0 == name }
+        if !(record.pendingDeletion ?? []).contains(name) { record.pendingDeletion = (record.pendingDeletion ?? []) + [name] }
         try JSONEncoder().encode(record).write(to: manifestURL, options: .atomic)
+        try finishPendingDeletions(&record)
+    }
+    private func finishPendingDeletions(_ record: inout BackupManifest) throws {
+        for name in record.pendingDeletion ?? [] {
+            guard record.files.contains(name), !name.contains("/"), !name.contains("\\"),
+                  (name.hasPrefix("inku-auto-") || name.hasPrefix("inku-manual-")), name.hasSuffix(".sqlite") else {
+                throw HostError("backup_not_found")
+            }
+            let folder = directory.appendingPathComponent("automatic-backups", isDirectory: true)
+            let folderValues = try folder.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+            guard folderValues.isDirectory == true, folderValues.isSymbolicLink != true else { throw HostError("backup_not_found") }
+            let url = folder.appendingPathComponent(name)
+            if FileManager.default.fileExists(atPath: url.path) {
+                let metadata = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+                guard metadata.isRegularFile == true, metadata.isSymbolicLink != true else { throw HostError("backup_not_found") }
+                try FileManager.default.removeItem(at: url)
+            }
+            record.files.removeAll { $0 == name }
+            record.pendingDeletion?.removeAll { $0 == name }
+            try JSONEncoder().encode(record).write(to: manifestURL, options: .atomic)
+        }
     }
     func completed(url: URL, retention: Int, at: Date) throws {
         let metadata = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
@@ -97,16 +120,13 @@ private actor LocalMaintenanceStore {
         record.files.append(url.lastPathComponent)
         let automatic = record.files.filter { $0.hasPrefix("inku-auto-") }
         let removed = Array(automatic.prefix(max(0, automatic.count - retention)))
-        record.files.removeAll { removed.contains($0) }
-        // Record the verified replacement before deleting any previous owned backup.
+        // Record the verified replacement and the owned deletion intent before
+        // deleting anything, so an interrupted pass can resume safely.
+        var pending = record.pendingDeletion ?? []
+        for name in removed where !pending.contains(name) { pending.append(name) }
+        record.pendingDeletion = pending
         try JSONEncoder().encode(record).write(to: manifestURL, options: .atomic)
-        for name in removed where name.hasPrefix("inku-auto-") && name.hasSuffix(".sqlite") && !name.contains("/") {
-            let old = url.deletingLastPathComponent().appendingPathComponent(name)
-            if FileManager.default.fileExists(atPath: old.path) {
-                let metadata = try old.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
-                if metadata.isRegularFile == true, metadata.isSymbolicLink != true { try FileManager.default.removeItem(at: old) }
-            }
-        }
+        try finishPendingDeletions(&record)
     }
     func log(work: SavedWork) throws {
         let folder = directory.appendingPathComponent("result-logs", isDirectory: true)

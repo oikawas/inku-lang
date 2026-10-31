@@ -25,10 +25,12 @@ struct ExportView: View {
     private let preserveOrder: Bool
     private let directCard: Bool
     private let directFormat: Bool
+    @State private var restorationRevision: UInt64
 
     init(model: AppModel, works: [SavedWork]? = nil, preserveOrder: Bool = false, directCard: Bool = false, initialFormat: SavedExportFormat? = nil,
          initialSVGProfile: String? = nil, initialPixelHeight: Int? = nil) {
         self.model = model
+        _restorationRevision = State(initialValue: model.restorationRevision)
         let candidates = works ?? model.works.filter { !$0.trashed }
         _candidates = State(initialValue: candidates)
         _selectedIDs = State(initialValue: works == nil ? Set(model.selectedWorkID.map { [$0] } ?? []) : Set(candidates.map(\.id)))
@@ -225,6 +227,10 @@ struct ExportView: View {
 
     private func begin() {
         guard !isBusy, !selection.isEmpty, options.format != .shareCard || selection.count == 1 else { return }
+        guard model.restorationRevision == restorationRevision else {
+            error = model.display.localized("作品が復元されたため、書き出し画面を開き直してください。")
+            return
+        }
         if directFormat {
             guard !directExportStarted else { return }
             directExportStarted = true

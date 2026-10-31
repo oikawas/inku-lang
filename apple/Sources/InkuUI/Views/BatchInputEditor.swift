@@ -7,6 +7,28 @@ import AppKit
 import UIKit
 #endif
 
+/// Folded UTF-16 character ranges, merged so glyph lookups can use binary search.
+struct InkuHiddenRangeIndex {
+    private let ranges: [NSRange]
+    init(_ hidden: [NSRange]) {
+        var merged: [NSRange] = []
+        for range in hidden.filter({ $0.length > 0 }).sorted(by: { $0.location < $1.location }) {
+            if let last = merged.last, range.location <= NSMaxRange(last) {
+                merged[merged.count - 1].length = max(NSMaxRange(last), NSMaxRange(range)) - last.location
+            } else { merged.append(range) }
+        }
+        ranges = merged
+    }
+    func contains(_ character: Int) -> Bool {
+        var low = 0, high = ranges.count
+        while low < high {
+            let middle = low + (high - low) / 2
+            if ranges[middle].location <= character { low = middle + 1 } else { high = middle }
+        }
+        return low > 0 && NSLocationInRange(character, ranges[low - 1])
+    }
+}
+
 /// How a native editor lays out its text. The batch box follows Web's 14px/1.65 text without wrapping and numbers its lines;
 /// the description box is the Web `.input-ta` (14px, line height 1.65, padding 9×10, wrapping) over the panel colour;
 /// the DDL editor is `.ddl-edit-ta` (14px, line height 1.7, padding 10×11, wrapping) with a line-number gutter.
@@ -267,6 +289,8 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
         private var typedInsertion = false
         private var programmaticEdit = false
         private var completionValues: [String: String] = [:]
+        private var markedSource: Data?
+        private var cachedMarks: [InkuEditorMark] = []
 
         init(text: Binding<String>) { self.text = text }
 
@@ -302,10 +326,15 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
             scroll = nil
             ruler = nil
             settings = nil
+            markedSource = nil
+            cachedMarks = []
         }
 
         func update(from settings: BatchNativeInputEditor) {
             self.settings = settings
+            // The closure may capture new plugin or completion state even when
+            // the text itself did not change.
+            markedSource = nil
             text = settings.$text
             guard let editor, let scroll else { return }
             let source = text.wrappedValue
@@ -361,7 +390,12 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
             for key in [NSAttributedString.Key.backgroundColor, .foregroundColor, .underlineStyle, .underlineColor] {
                 layout.removeTemporaryAttribute(key, forCharacterRange: full)
             }
-            for mark in settings.marks(editor.string) where mark.range.location >= 0 && NSMaxRange(mark.range) <= full.length {
+            let sourceBytes = Data(editor.string.utf8)
+            if markedSource != sourceBytes {
+                cachedMarks = settings.marks(editor.string)
+                markedSource = sourceBytes
+            }
+            for mark in cachedMarks where mark.range.location >= 0 && NSMaxRange(mark.range) <= full.length {
                 layout.addTemporaryAttributes(mark.style.attributes, forCharacterRange: mark.range)
             }
             // `.cm-ddl-range-name`: the place word of a folded range, with a dotted underline.
@@ -380,10 +414,11 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
                            font aFont: NSFont, forGlyphRange glyphRange: NSRange) -> Int {
             let hidden = rangeState.hidden
             guard !hidden.isEmpty else { return 0 }
+            let rangeIndex = InkuHiddenRangeIndex(hidden)
             var changed = false
             var properties = (0..<glyphRange.length).map { index -> NSLayoutManager.GlyphProperty in
                 let character = charIndexes[index]
-                if hidden.contains(where: { NSLocationInRange(character, $0) }) { changed = true; return .null }
+                if rangeIndex.contains(character) { changed = true; return .null }
                 return props[index]
             }
             guard changed else { return 0 }

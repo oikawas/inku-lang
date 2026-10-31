@@ -146,6 +146,8 @@ public final class LibraryModel {
     public private(set) var status = ""
     /// Web `lineage_generation` of listed works, by lineage node.
     public private(set) var generations: [String: Int] = [:]
+    /// The generation projection from the same successful read as the current flat page.
+    public private(set) var pageGenerations: [String: Int]?
     /// Web `copiedHistoryHash` / `statusHashCopied`: the copied hash says so for 1.2 s.
     public private(set) var copiedHash: String?
     public private(set) var graph: LineageGraph?
@@ -229,6 +231,7 @@ public final class LibraryModel {
         lineageIncludeID = nil
         timelinePlace = nil
         works.removeAll()
+        pageGenerations = nil
         annotations.removeAll()
         svgSizes.removeAll()
         groups.removeAll()
@@ -452,6 +455,7 @@ public final class LibraryModel {
         let requestedMinimum = layout == .grid ? 2 : 1
         let requestedSize = pageSize
         let requestedOffset = startOffset + page * pageSize
+        pageGenerations = nil
         loading = true
         // An unchanged write still redraws every view that reads the error.
         if errorText != nil { errorText = nil }
@@ -495,6 +499,7 @@ public final class LibraryModel {
                 annotations = Dictionary(uniqueKeysWithValues: result.items.map { ($0.id, $0.annotation) })
                 svgSizes = Dictionary(uniqueKeysWithValues: result.items.map { ($0.id, $0.svgBytes) })
                 generations.merge(listed) { $1 }
+                pageGenerations = listed
             }
             trashTotal = count
             loading = false

@@ -4,6 +4,44 @@ import Testing
 @testable import InkuPersistence
 
 struct LibraryParityTests {
+    @Test func recentMetadataPreservesOrderingAndTrashWithoutPayloads() async throws {
+        let file = url()
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+        let db = try InkuDatabase(url: file)
+        for (id, at) in [("a", Int64(1)), ("b", 2), ("c", 2)] {
+            let (work, node) = record(id, at: at)
+            try await db.save(work, node: node)
+        }
+        try await db.setTrashed(ids: ["b"], trashed: true)
+        let full = try await db.list()
+        let metadata = try await db.recentMetadata()
+        #expect(metadata.map(\.id) == full.map(\.id))
+        #expect(metadata.map(\.trashed) == full.map(\.trashed))
+        #expect(metadata.allSatisfy { $0.svg.isEmpty && $0.score == "{}" })
+        #expect(metadata.map(\.renderHash) == full.map(\.renderHash))
+    }
+
+    @Test func historyIndexMatchesFilteredPageWithTiedDates() async throws {
+        let file = url()
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+        let db = try InkuDatabase(url: file)
+        for (id, at) in [("a", Int64(1)), ("b", 2), ("c", 2), ("d", 3)] {
+            let (work, node) = record(id, at: at)
+            try await db.save(work, node: node)
+        }
+        try await db.setStarred(ids: ["a", "b", "c"], starred: true)
+        try await db.setTrashed(ids: ["c"], trashed: true)
+        for query in [LibraryQuery(), LibraryQuery(order: .oldest), LibraryQuery(starred: true),
+                      LibraryQuery(trashed: true), LibraryQuery(text: "b"), LibraryQuery(text: "a", canvasSearch: true)] {
+            let items = try await db.libraryPage(query: query).items
+            for (index, item) in items.enumerated() {
+                #expect(try await db.libraryIndex(id: item.id, query: query) == index)
+            }
+            #expect(try await db.libraryIndex(id: "missing", query: query) == nil)
+        }
+        #expect(try await db.libraryIndex(id: "c", query: LibraryQuery()) == nil)
+    }
+
     private func url() -> URL {
         FileManager.default.temporaryDirectory.appendingPathComponent("inku-library-parity-\(UUID().uuidString)")
             .appendingPathComponent("test.sqlite")
@@ -111,6 +149,14 @@ struct LibraryParityTests {
             childNodeID: childNode.id, derivationKind: "ddl_edit", at: child.at))
         let nodeIDs = [rootNode.id, childNode.id, "missing-node", childNode.id]
         #expect(try await db.lineageGenerations(nodeIDs: nodeIDs) == [rootNode.id: 1, childNode.id: 2])
+        let (sibling, siblingNode) = record("sibling", at: 3, root: rootNode.id)
+        let (grandchild, grandchildNode) = record("grandchild", at: 4, root: rootNode.id)
+        try await db.save(sibling, node: siblingNode, edge: LineageEdge(id: "edge-sibling", parentNodeID: rootNode.id,
+            childNodeID: siblingNode.id, derivationKind: "ddl_edit", at: sibling.at))
+        try await db.save(grandchild, node: grandchildNode, edge: LineageEdge(id: "edge-grandchild", parentNodeID: childNode.id,
+            childNodeID: grandchildNode.id, derivationKind: "ddl_edit", at: grandchild.at))
+        #expect(try await db.lineageGenerations(nodeIDs: [siblingNode.id, grandchildNode.id, childNode.id])
+                == [siblingNode.id: 2, grandchildNode.id: 3, childNode.id: 2])
         try await db.setTrashed(ids: [root.id], trashed: true)
         #expect(try await db.permanentlyDelete(ids: [root.id]) == 1)
         #expect(try await db.lineageGenerations(nodeIDs: nodeIDs) == [rootNode.id: 1, childNode.id: 2])

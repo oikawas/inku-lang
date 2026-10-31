@@ -3,7 +3,7 @@ import Observation
 import CryptoKit
 import InkuHost
 
-private struct ImageFolderRow: Codable, Identifiable {
+private struct ImageFolderRow: Codable, Identifiable, Sendable {
     var id: String { path }
     var path: String
     var size: UInt64
@@ -12,12 +12,13 @@ private struct ImageFolderRow: Codable, Identifiable {
     var workID: String?
     var error: String?
 }
-private struct ImageFolderJournal: Codable {
+private struct ImageFolderJournal: Codable, Sendable {
     var folder: String
     var rows: [ImageFolderRow]
 }
 
 @MainActor @Observable final class ImageFolderBatch {
+    private let imagePreparer: @Sendable (URL) throws -> PreparedImageInput
     private var journal: ImageFolderJournal?
     private var journalURL: URL?
     private(set) var folder = ""
@@ -27,13 +28,30 @@ private struct ImageFolderJournal: Codable {
     private(set) var uncertain = 0
     private(set) var failures: [String] = []
     private(set) var running = false
+    private(set) var selecting = false
     private(set) var status = ""
     private(set) var error: String?
     private var stopRequested = false
     var hasJournal: Bool { journal != nil }
 
-    func select(_ url: URL, app: AppModel) throws {
-        guard !running, let root = app.localDataDirectory() else { throw HostError("batch_journal_unavailable") }
+    init() { imagePreparer = { try Self.prepareImage(at: $0) } }
+    init(imagePreparer: @escaping @Sendable (URL) throws -> PreparedImageInput) { self.imagePreparer = imagePreparer }
+
+    func select(_ url: URL, app: AppModel) async throws {
+        guard !running, !selecting, let root = app.localDataDirectory() else { throw HostError("batch_journal_unavailable") }
+        selecting = true
+        defer { selecting = false }
+        let (loaded, journalURL) = try await Task.detached(priority: .userInitiated) {
+            try Self.scan(url, root: root)
+        }.value
+        try Task.checkCancellation()
+        self.journalURL = journalURL
+        journal = loaded
+        self.folder = loaded.folder; error = nil; refresh()
+        try await persist()
+    }
+
+    private nonisolated static func scan(_ url: URL, root: URL) throws -> (ImageFolderJournal, URL) {
         let folder = url.standardizedFileURL.path
         let folderDigest = SHA256.hash(data: Data(folder.utf8)).map { String(format: "%02x", $0) }.joined()
         let journalURL = root.appendingPathComponent("image-folder-\(folderDigest).json")
@@ -56,21 +74,26 @@ private struct ImageFolderJournal: Codable {
         if FileManager.default.fileExists(atPath: journalURL.path) {
             let saved = try JSONDecoder().decode(ImageFolderJournal.self, from: Data(contentsOf: journalURL))
             guard saved.folder == folder else { throw HostError("image_folder_journal_mismatch") }
+            // Keep the first saved row for a key, matching the old linear search.
+            struct Identity: Hashable { let path: String; let size: UInt64; let modified: Double }
+            var previousRows: [Identity: ImageFolderRow] = [:]
+            for previous in saved.rows {
+                let key = Identity(path: previous.path, size: previous.size, modified: previous.modified)
+                if previousRows[key] == nil { previousRows[key] = previous }
+            }
             for index in rows.indices {
-                if let previous = saved.rows.first(where: { $0.path == rows[index].path && $0.size == rows[index].size && $0.modified == rows[index].modified }) {
+                let row = rows[index]
+                if let previous = previousRows[Identity(path: row.path, size: row.size, modified: row.modified)] {
                     rows[index] = previous
                     if rows[index].state == "running" { rows[index].state = "uncertain" }
                 }
             }
         }
-        self.journalURL = journalURL
-        journal = ImageFolderJournal(folder: folder, rows: rows)
-        self.folder = folder; error = nil; refresh()
-        try persist()
+        return (ImageFolderJournal(folder: folder, rows: rows), journalURL)
     }
 
     func run(app: AppModel, restart: Bool, provenance: @escaping @MainActor (URL) -> String) async {
-        guard !running, var current = journal else { return }
+        guard !running, !selecting, var current = journal else { return }
         if restart {
             for index in current.rows.indices { current.rows[index].state = "waiting"; current.rows[index].workID = nil; current.rows[index].error = nil }
         } else {
@@ -83,11 +106,16 @@ private struct ImageFolderJournal: Codable {
         running = true; stopRequested = false; error = nil
         defer { running = false; refresh() }
         do {
-            try persist()
+            try await persist()
             for index in current.rows.indices {
                 guard !stopRequested, !Task.isCancelled else { break }
                 guard journal?.rows[index].state == "waiting" else { continue }
-                journal?.rows[index].state = "running"; try persist()
+                journal?.rows[index].state = "running"; try await persist()
+                if stopRequested || Task.isCancelled {
+                    journal?.rows[index].state = "uncertain"
+                    try await persist(); refresh()
+                    break
+                }
                 let url = URL(fileURLWithPath: current.rows[index].path)
                 status = "\(index + 1) / \(current.rows.count): \(url.lastPathComponent)"
                 do {
@@ -96,7 +124,19 @@ private struct ImageFolderJournal: Codable {
                           values.contentModificationDate?.timeIntervalSince1970 == current.rows[index].modified else {
                         throw HostError("image_changed")
                     }
-                    let image = try ImageInput.prepare(Data(contentsOf: url))
+                    guard current.rows[index].size <= UInt64(ImageInput.maximumRawBytes) else { throw HostError("image_too_large") }
+                    let imagePreparer = self.imagePreparer
+                    let image = try await Task.detached(priority: .userInitiated) {
+                        try imagePreparer(url)
+                    }.value
+                    let after = try url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
+                    guard after.fileSize.map(UInt64.init) == current.rows[index].size,
+                          after.contentModificationDate?.timeIntervalSince1970 == current.rows[index].modified else {
+                        throw HostError("image_changed")
+                    }
+                    // Preparation can now yield to Stop. Do not start a provider
+                    // request after a stop arrived while the image was decoded.
+                    guard !stopRequested, !Task.isCancelled else { throw CancellationError() }
                     let request = try app.requestForImage(image, provenance: provenance(url), canvasID: canvasID)
                     let pinned = try await app.pinPersonalPlanRequests([request])[0]
                     let work = await app.runAutomation(request: pinned, image: image, allowsBrowsing: true)
@@ -107,20 +147,47 @@ private struct ImageFolderJournal: Codable {
                     journal?.rows[index].state = stopRequested || Task.isCancelled ? "uncertain" : "failed"
                     journal?.rows[index].error = app.failureMessage(error)
                 }
-                try persist(); refresh()
+                try await persist(); refresh()
             }
             status = stopRequested ? "停止しました。" : "画像フォルダの処理が終わりました。"
         } catch { self.error = error.localizedDescription }
     }
     func stop(app: AppModel) async { stopRequested = true; await app.cancel() }
-    private func persist() throws {
+    private nonisolated static func prepareImage(at url: URL) throws -> PreparedImageInput {
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        var raw = Data()
+        let maximum = ImageInput.maximumRawBytes
+        while raw.count <= maximum {
+            let chunk = try handle.read(upToCount: min(1024 * 1024, maximum + 1 - raw.count)) ?? Data()
+            if chunk.isEmpty { break }
+            raw.append(chunk)
+        }
+        guard raw.count <= maximum else { throw HostError("image_too_large") }
+        return try ImageInput.prepare(raw)
+    }
+    private func persist() async throws {
         guard let journal, let journalURL else { throw HostError("batch_journal_unavailable") }
-        try JSONEncoder().encode(journal).write(to: journalURL, options: .atomic)
+        // Each write is awaited before the next transition or provider request.
+        try await Task.detached(priority: .utility) {
+            try JSONEncoder().encode(journal).write(to: journalURL, options: .atomic)
+        }.value
     }
     private func refresh() {
         let rows = journal?.rows ?? []
-        total = rows.count; completed = rows.filter { $0.state == "succeeded" }.count
-        failed = rows.filter { $0.state == "failed" }.count; uncertain = rows.filter { $0.state == "uncertain" }.count
-        failures = rows.filter { $0.state == "failed" }.map { URL(fileURLWithPath: $0.path).lastPathComponent + ": " + ($0.error ?? "") }
+        var succeeded = 0, failureCount = 0, uncertainCount = 0
+        var messages: [String] = []
+        for row in rows {
+            switch row.state {
+            case "succeeded": succeeded += 1
+            case "failed":
+                failureCount += 1
+                messages.append(URL(fileURLWithPath: row.path).lastPathComponent + ": " + (row.error ?? ""))
+            case "uncertain": uncertainCount += 1
+            default: break
+            }
+        }
+        total = rows.count; completed = succeeded; failed = failureCount
+        uncertain = uncertainCount; failures = messages
     }
 }

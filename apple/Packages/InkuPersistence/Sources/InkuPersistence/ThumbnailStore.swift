@@ -16,6 +16,7 @@ public actor ThumbnailStore {
 
     public nonisolated let url: URL
     private let queue: DatabaseQueue
+    private var writeGeneration: UInt64 = 0
 
     public init(url: URL) throws {
         guard url.isFileURL else { throw PersistenceError.invalidFileURL }
@@ -76,6 +77,20 @@ public actor ThumbnailStore {
         }
     }
 
+    /// A restore invalidates background work started against the previous database.
+    public func advanceWriteGeneration(to generation: UInt64) {
+        writeGeneration = max(writeGeneration, generation)
+    }
+    public func currentWriteGeneration() -> UInt64 { writeGeneration }
+
+    @discardableResult
+    public func putIfCurrent(historyID: String, scale: Int, png: Data, sourceRenderHash: String?, generation: UInt64) throws -> Bool {
+        try Task.checkCancellation()
+        guard generation == writeGeneration else { return false }
+        try put(historyID: historyID, scale: scale, png: png, sourceRenderHash: sourceRenderHash)
+        return true
+    }
+
     /// Every work stored at this scale, with the render hash it was baked from.
     public func storedHashes(scale: Int) throws -> [String: String?] {
         try queue.read { db in
@@ -105,6 +120,12 @@ public actor ThumbnailStore {
             }
             return count
         }
+    }
+
+    public func deleteIfCurrent(historyIDs: [String], generation: UInt64) throws -> Int {
+        try Task.checkCancellation()
+        guard generation == writeGeneration else { return 0 }
+        return try delete(historyIDs: historyIDs)
     }
 
     public func count(scale: Int) throws -> Int {

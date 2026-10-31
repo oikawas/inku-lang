@@ -137,6 +137,19 @@ public actor InkuDatabase {
         }
     }
 
+    /// Recent entries with the same ordering and trash visibility as `list`, without SVG or score payloads.
+    public func recentMetadata(limit: Int = 100) throws -> [SavedWork] {
+        guard (1...1000).contains(limit) else { throw PersistenceError.invalidRecord("invalid page") }
+        let columns: String = SavedWork.CodingKeys.allCases.map { column -> String in
+            if column == .svg { return "'' AS svg" }
+            if column == .score { return "'{}' AS score" }
+            return "h.\(column.rawValue)"
+        }.joined(separator: ", ")
+        return try queue.read { db in
+            try SavedWork.fetchAll(db, sql: "SELECT \(columns) FROM history h ORDER BY h.at DESC, h.id ASC LIMIT ?", arguments: [limit])
+        }
+    }
+
     /// Every stored work, trashed ones included, with the render hash of the SVG it holds (Server
     /// `history_render_hashes`). The thumbnail store compares these without reading any SVG.
     public func thumbnailSources() throws -> [(id: String, renderHash: String?)] {
@@ -190,8 +203,30 @@ public actor InkuDatabase {
     public func lineageGenerations(nodeIDs: [String]) throws -> [String: Int] {
         try queue.read { db in
             var result: [String: Int] = [:]
+            // A page often contains siblings. Reuse shared ancestors within this
+            // read snapshot, without caching across lineage mutations.
+            var memo: [String: Int] = [:]
             for id in Set(nodeIDs) where try LineageNode.fetchOne(db, key: id) != nil {
-                result[id] = try Self.generation(id: id, in: db)
+                var seen: Set<String> = []
+                var path: [String] = []
+                var current = id
+                var base = 0
+                var cyclic = false
+                while true {
+                    if let known = memo[current] { base = known; break }
+                    guard seen.insert(current).inserted else { cyclic = true; break }
+                    path.append(current)
+                    guard let parent = try String.fetchOne(db, sql: "SELECT parent_node_id FROM lineage_edges WHERE child_node_id = ?",
+                                                           arguments: [current]) else { break }
+                    current = parent
+                }
+                if cyclic {
+                    // Preserve the existing per-start cycle behavior.
+                    result[id] = try Self.generation(id: id, in: db)
+                } else {
+                    for node in path.reversed() { base += 1; memo[node] = base }
+                    result[id] = memo[id]
+                }
             }
             return result
         }
@@ -227,13 +262,15 @@ public actor InkuDatabase {
     public func libraryIndex(id: String, query: LibraryQuery = LibraryQuery()) throws -> Int? {
         try queue.read { db in
             let filter = Self.libraryFilter(query)
+            let comparison = query.order == .newest ? ">" : "<"
             return try Int.fetchOne(db, sql: """
-                SELECT position FROM (
-                    SELECT h.id AS history_id,
-                           row_number() OVER (ORDER BY h.at \(query.order == .newest ? "DESC" : "ASC"), h.id ASC) - 1 AS position
-                    \(Self.libraryJoin) WHERE \(filter.sql)
-                ) WHERE history_id = ?
-                """, arguments: filter.arguments + [id])
+                WITH target AS (
+                    SELECT h.id, h.at \(Self.libraryJoin) WHERE \(filter.sql) AND h.id = ?
+                )
+                SELECT (SELECT count(*) \(Self.libraryJoin) WHERE \(filter.sql)
+                    AND (h.at \(comparison) target.at OR (h.at = target.at AND h.id < target.id)))
+                FROM target
+                """, arguments: filter.arguments + [id] + filter.arguments)
         }
     }
 
@@ -1102,10 +1139,13 @@ public actor InkuDatabase {
               try Row.fetchAll(db, sql: "PRAGMA foreign_key_check").isEmpty else {
             throw PersistenceError.corruptDatabase
         }
-        for work in try SavedWork.fetchAll(db) { try validate(work) }
-        for edge in try LineageEdge.fetchAll(db) { try validateJSONObject(edge.metadataJSON) }
+        let works = try SavedWork.fetchCursor(db)
+        while let work = try works.next() { try validate(work) }
+        let edges = try LineageEdge.fetchCursor(db)
+        while let edge = try edges.next() { try validateJSONObject(edge.metadataJSON) }
         if (try Int.fetchOne(db, sql: "PRAGMA user_version") ?? 0) >= 2 {
-            for row in try Row.fetchAll(db, sql: "SELECT * FROM auxiliary_colophons") { try validate(colophon(row)) }
+            let colophons = try Row.fetchCursor(db, sql: "SELECT * FROM auxiliary_colophons")
+            while let row = try colophons.next() { try validate(colophon(row)) }
             let invalidUnread = try Int.fetchOne(db, sql: """
                 SELECT count(*) FROM unread_words WHERE length(word) = 0 OR length(word) > 120
                 OR length(context) > 1000 OR frequency <= 0

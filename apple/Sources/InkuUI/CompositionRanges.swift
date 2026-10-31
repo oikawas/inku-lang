@@ -1,6 +1,21 @@
 import Foundation
 import InkuCore
 
+private final class CompositionScanCache: @unchecked Sendable {
+    private let lock = NSLock()
+    private var entries: [(Data, [CompositionRanges.NumericRange])] = []
+    func get(_ key: Data) -> [CompositionRanges.NumericRange]? {
+        lock.lock(); defer { lock.unlock() }
+        return entries.first { $0.0 == key }?.1
+    }
+    func put(_ key: Data, ranges: [CompositionRanges.NumericRange]) {
+        lock.lock(); defer { lock.unlock() }
+        entries.removeAll { $0.0 == key }
+        entries.insert((key, ranges), at: 0)
+        if entries.count > 2 { entries.removeLast() }
+    }
+}
+
 /// Web `composition-ranges.ts`: numeric places written as `name (horizontal a to b, vertical c to d)`, read as the
 /// shared core's named ranges (`inku.composition-ranges.v1`). Positions are UTF-16 offsets, as in the Web.
 public enum CompositionRanges {
@@ -114,8 +129,13 @@ public enum CompositionRanges {
     private static let jaMark = try! NSRegularExpression(pattern: "^［構図］\\s*")
     private static let enMark = try! NSRegularExpression(pattern: "^\\[composition\\]\\s*")
     private static let enThe = try! NSRegularExpression(pattern: "^the\\s+")
+    private static let scanCache = CompositionScanCache()
 
     public static func scan(_ text: String) -> [NumericRange] {
+        // Swift String equality folds canonically equivalent Unicode; offsets here
+        // are UTF-16, so cache keys must preserve the exact source bytes.
+        let key = text.utf8.count <= 64 * 1024 ? Data(text.utf8) : nil
+        if let key, let cached = scanCache.get(key) { return cached }
         let ns = text as NSString
         var result: [NumericRange] = []
         for (lang, pattern) in [("ja", jaScan), ("en", enScan)] {
@@ -136,7 +156,9 @@ public enum CompositionRanges {
         }
         // Web: `filter((range, i, all) => !i || range.start >= all[i - 1].end)` on the sorted list.
         let sorted = result.sorted { $0.start < $1.start }
-        return sorted.enumerated().filter { index, range in index == 0 || range.start >= sorted[index - 1].end }.map(\.element)
+        let ranges = sorted.enumerated().filter { index, range in index == 0 || range.start >= sorted[index - 1].end }.map(\.element)
+        if let key { scanCache.put(key, ranges: ranges) }
+        return ranges
     }
 
     public static func matching(_ range: NumericRange, _ table: [Entry]) -> Entry? {

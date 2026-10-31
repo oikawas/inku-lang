@@ -1594,3 +1594,4 @@
 "保存しています" = "Saving";
 "AIの手" = "AI move";
 "親との差" = "Change from the parent";
+"作品が復元されたため、書き出し画面を開き直してください。" = "The library was restored. Reopen the export window.";

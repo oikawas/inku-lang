@@ -5,6 +5,63 @@ import InkuPersistence
 @testable import InkuHost
 
 final class HostBoundaryTests: XCTestCase, @unchecked Sendable {
+    func testCancelledProviderPersistsFinalObservation() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-cancelled-observation-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let db = try InkuDatabase(url: folder.appendingPathComponent("works.sqlite"))
+        let transport = CancelledObservationProvider()
+        defer { Task { await transport.release() } }
+        let host = PipelineHost(database: db, transport: transport, credentials: EmptyCredentials())
+        let progress = ViewCapture()
+        let generation = Task {
+            try await host.generate(fixture(.description("a red circle", autoCatalog: false)), progress: { progress.receive($0) })
+        }
+        for _ in 0..<300 {
+            if await transport.waiting { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        let waiting = await transport.waiting
+        guard waiting, let id = progress.executionID else {
+            generation.cancel(); await transport.release(); XCTFail("provider did not start"); return
+        }
+        let cancelled = try await host.cancel(executionID: id)
+        XCTAssertEqual(cancelled.phase, "cancelled")
+        await transport.release()
+        _ = try? await generation.value
+        let metrics = try await host.providerMetrics(executionID: id)
+        XCTAssertEqual(metrics.count, 1)
+        XCTAssertEqual(metrics.first?.outcome, .cancelled)
+    }
+
+    func testInvalidFailedViewReleasesGateForNextRead() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-host-gate-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let db = try InkuDatabase(url: folder.appendingPathComponent("works.sqlite"))
+        let host = PipelineHost(database: db, transport: ImmediateProvider(), credentials: EmptyCredentials())
+        let view = try await host.generate(fixture(.description("a red circle", autoCatalog: false)))
+        let loaded = try await db.loadExecution(id: view.executionID)
+        let record = try XCTUnwrap(loaded)
+        var stored = try XCTUnwrap(JSONSerialization.jsonObject(with: record.snapshot) as? [String: Any])
+        stored["svgFailure"] = "fixture"
+        stored["rendered"] = Data("invalid JSON".utf8).base64EncodedString()
+        _ = try await db.compareAndSwapExecution(id: view.executionID, expectedRevision: record.revision,
+                                                  snapshot: JSONSerialization.data(withJSONObject: stored))
+        let reopened = PipelineHost(database: db, transport: ImmediateProvider(), credentials: EmptyCredentials())
+        do { _ = try await reopened.resume(executionID: view.executionID); XCTFail("invalid view accepted") }
+        catch let error as HostError { XCTAssertEqual(error.code, "invalid_json") }
+        let flag = GateReadFlag()
+        let read = Task {
+            do { _ = try await reopened.restore(executionID: view.executionID) } catch { }
+            await flag.mark()
+        }
+        for _ in 0..<200 {
+            if await flag.finished { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        let finished = await flag.finished
+        if !finished { read.cancel() }
+        XCTAssertTrue(finished, "next read stayed behind a leaked gate")
+    }
     func testCancellationWhilePreparingReviewDoesNotSendReview() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-image-cancel-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: folder) }
@@ -314,6 +371,38 @@ final class HostBoundaryTests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(rows.isEmpty)
         let callsAfter = await transport.calls
         XCTAssertEqual(callsAfter, 1)
+    }
+}
+
+private actor GateReadFlag {
+    private(set) var finished = false
+    func mark() { finished = true }
+}
+
+private actor CancelledObservationProvider: ObservedProviderTransport {
+    private(set) var waiting = false
+    private var continuation: CheckedContinuation<Void, Never>?
+    func release() { continuation?.resume(); continuation = nil }
+    func perform(action: Data, models: ModelSelection, providers: [ProviderSettings], credentials: any CredentialStore,
+                 onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {
+        throw HostError("unexpected_unobserved_transport")
+    }
+    func performObserved(action: Data, models: ModelSelection, providers: [ProviderSettings], credentials: any CredentialStore,
+                         observation: ProviderObservationOptions, willSend: @escaping ProviderObservationHandler,
+                         didFinish: @escaping ProviderObservationHandler, onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {
+        let value = try ExactJSON(data: action)
+        let tag = try value.requiredString("tag")
+        guard let stage = ProviderObservationStage(action: tag),
+              let timeout = value["timeout_ms"].string.flatMap(UInt64.init) else { throw HostError("invalid_fixture") }
+        var metric = ProviderAttemptMetric(identity: try ProviderActionIdentity(action: action), action: tag, stage: stage,
+                                           requestedModelReference: models.stage1Model, timeoutMS: timeout)
+        try await willSend(.init(metric: metric))
+        waiting = true
+        await withCheckedContinuation { continuation = $0 }
+        metric.outcome = .cancelled
+        metric.sent = true
+        try await didFinish(.init(metric: metric))
+        throw CancellationError()
     }
 }
 

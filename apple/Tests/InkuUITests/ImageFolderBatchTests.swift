@@ -7,6 +7,58 @@ import InkuPersistence
 @testable import InkuUI
 
 @MainActor final class ImageFolderBatchTests: XCTestCase {
+    func testStopDuringPreparationDoesNotSendAndRemainsUncertain() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("inku-image-stop-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let input = root.appendingPathComponent("input")
+        try FileManager.default.createDirectory(at: input, withIntermediateDirectories: true)
+        try makePNG().write(to: input.appendingPathComponent("one.png"))
+        let transport = FolderProvider()
+        let app = AppModel(databaseURL: root.appendingPathComponent("works.sqlite"), transport: transport)
+        await app.initialize()
+        let gate = ImagePreparationGate()
+        DispatchQueue.global().asyncAfter(deadline: .now() + 2) { gate.release() }
+        let batch = ImageFolderBatch(imagePreparer: { try gate.prepare($0) })
+        try await batch.select(input, app: app)
+        let operation = Task { await batch.run(app: app, restart: false) { _ in "fixture" } }
+        for _ in 0..<200 {
+            if gate.isWaiting() { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        let started = gate.isWaiting()
+        await batch.stop(app: app)
+        gate.release()
+        await operation.value
+        XCTAssertTrue(started)
+        XCTAssertEqual(batch.uncertain, 1)
+        let calls = await transport.calls
+        XCTAssertEqual(calls, 0)
+        let reopened = ImageFolderBatch()
+        try await reopened.select(input, app: app)
+        XCTAssertEqual(reopened.uncertain, 1)
+    }
+
+    func testOversizedImageIsRejectedBeforeProviderRequest() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("inku-image-large-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let input = root.appendingPathComponent("input")
+        try FileManager.default.createDirectory(at: input, withIntermediateDirectories: true)
+        let image = input.appendingPathComponent("large.png")
+        XCTAssertTrue(FileManager.default.createFile(atPath: image.path, contents: nil))
+        let handle = try FileHandle(forWritingTo: image)
+        try handle.truncate(atOffset: UInt64(ImageInput.maximumRawBytes + 1))
+        try handle.close()
+        let transport = FolderProvider()
+        let app = AppModel(databaseURL: root.appendingPathComponent("works.sqlite"), transport: transport)
+        await app.initialize()
+        let batch = ImageFolderBatch()
+        try await batch.select(input, app: app)
+        await batch.run(app: app, restart: false) { _ in "fixture" }
+        XCTAssertEqual(batch.failed, 1)
+        let calls = await transport.calls
+        XCTAssertEqual(calls, 0)
+    }
+
     func testFailureContinuesAndReselectionResumesWithoutRepeatingSuccess() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("inku-image-folder-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -32,7 +84,7 @@ import InkuPersistence
         try await app.updateHostSettings(settings)
         app.display.preferences.visionModelReference = "fixture:vision"
         let automation = AutomationModel()
-        let batch = automation.imageFolderBatch; try batch.select(input, app: app)
+        let batch = automation.imageFolderBatch; try await batch.select(input, app: app)
         XCTAssertEqual(batch.total, 3)
         app.imageCanvasID = "square"
         await transport.blockFirstRequest()
@@ -59,7 +111,7 @@ import InkuPersistence
         try portrait.write(to: input.appendingPathComponent("4.png"))
         let portraitPaper = try ImageInput.prepare(portrait).nearestFormatID
         XCTAssertNotEqual(portraitPaper, "sd_monitor")
-        let reopened = ImageFolderBatch(); try reopened.select(input, app: app)
+        let reopened = ImageFolderBatch(); try await reopened.select(input, app: app)
         XCTAssertEqual(reopened.completed, 2)
         app.imageCanvasID = "image"
         await reopened.run(app: app, restart: false) { _ in "fixture" }
@@ -80,6 +132,19 @@ import InkuPersistence
         CGImageDestinationAddImage(destination, try XCTUnwrap(context.makeImage()), nil)
         XCTAssertTrue(CGImageDestinationFinalize(destination)); return bytes as Data
     }
+}
+
+private final class ImagePreparationGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private let semaphore = DispatchSemaphore(value: 0)
+    private var waiting = false
+    func prepare(_ url: URL) throws -> PreparedImageInput {
+        lock.lock(); waiting = true; lock.unlock()
+        semaphore.wait()
+        return try ImageInput.prepare(Data(contentsOf: url))
+    }
+    func isWaiting() -> Bool { lock.lock(); defer { lock.unlock() }; return waiting }
+    func release() { semaphore.signal() }
 }
 private actor FolderProvider: ProviderTransport {
     var calls = 0

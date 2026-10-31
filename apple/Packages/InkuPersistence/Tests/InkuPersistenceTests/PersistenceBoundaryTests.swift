@@ -4,6 +4,21 @@ import Testing
 @testable import InkuPersistence
 
 struct PersistenceBoundaryTests {
+    @Test func openingRejectsInvalidLaterHistoryWithoutWriting() async throws {
+        let url = temporaryURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let original = try InkuDatabase(url: url)
+        for index in 0..<3 {
+            let (work, node) = record("work-\(index)", at: Int64(index))
+            try await original.save(work, node: node)
+        }
+        let raw = try DatabaseQueue(path: url.path)
+        try await raw.write { try $0.execute(sql: "UPDATE history SET score = ? WHERE id = ?", arguments: ["invalid-json", "work-2"]) }
+        #expect(throws: (any Error).self) { try InkuDatabase(url: url) }
+        let persisted = try await raw.read { try String.fetchOne($0, sql: "SELECT score FROM history WHERE id = ?", arguments: ["work-2"]) }
+        #expect(persisted == "invalid-json")
+    }
+
     private func temporaryURL() -> URL {
         FileManager.default.temporaryDirectory
             .appendingPathComponent("inku-persistence-check-\(UUID().uuidString)", isDirectory: true)

@@ -615,16 +615,37 @@ private struct StandaloneCandidate: Codable, Sendable {
     var saved = false
 }
 
-private actor AsyncGate {
+actor AsyncGate {
     private var locked = false
-    private var waiters: [CheckedContinuation<Void, Never>] = []
+    private struct Waiter {
+        let id: UUID
+        let continuation: CheckedContinuation<Bool, Never>
+    }
+    private var waiters: [Waiter] = []
     func lock() async {
-        if locked { await withCheckedContinuation { waiters.append($0) } }
+        if locked { _ = await withCheckedContinuation { waiters.append(Waiter(id: UUID(), continuation: $0)) } }
         else { locked = true }
     }
+    func lockCancellable() async throws {
+        let id = UUID()
+        let acquired = await withTaskCancellationHandler {
+            if Task.isCancelled { return false }
+            if !locked { locked = true; return true }
+            return await withCheckedContinuation { waiters.append(Waiter(id: id, continuation: $0)) }
+        } onCancel: {
+            Task { await self.cancelWaiter(id) }
+        }
+        guard acquired else { throw CancellationError() }
+        if Task.isCancelled { unlock(); throw CancellationError() }
+    }
+    private func cancelWaiter(_ id: UUID) {
+        guard let index = waiters.firstIndex(where: { $0.id == id }) else { return }
+        waiters.remove(at: index).continuation.resume(returning: false)
+    }
+    func waitingCountForChecks() -> Int { waiters.count }
     func unlock() {
         if waiters.isEmpty { locked = false }
-        else { waiters.removeFirst().resume() }
+        else { waiters.removeFirst().continuation.resume(returning: true) }
     }
 }
 
@@ -721,7 +742,7 @@ private actor ExecutionDriver {
     }
 
     func start(progress: PipelineProgressHandler) async throws -> PipelineView {
-        await gate.lock(); defer { Task { await gate.unlock() } }
+        try await gate.lockCancellable(); defer { Task { await gate.unlock() } }
         guard let request = initialRequest else { throw HostError("execution_already_started") }
         var config = try ExactJSON(data: request.configuration)
         if case .image = request.authoring { config["image"] = .object(["review": .bool(true)]) }
@@ -741,11 +762,11 @@ private actor ExecutionDriver {
     }
 
     func view() async throws -> PipelineView {
-        await gate.lock(); defer { Task { await gate.unlock() } }
+        try await gate.lockCancellable(); defer { Task { await gate.unlock() } }
         return try makeView()
     }
     func bindPersonalPlanSession(_ session: ChatGPTPlanSession) async throws {
-        await gate.lock(); defer { Task { await gate.unlock() } }
+        try await gate.lockCancellable(); defer { Task { await gate.unlock() } }
         guard providerTask == nil, state.pendingProviderAction == nil else { throw HostError("provider_effect_in_flight") }
         guard state.chatGPTSession == nil || state.chatGPTSession == session else { throw HostError("chatgpt_session_changed") }
         var changed = state; changed.chatGPTSession = session
@@ -760,7 +781,7 @@ private actor ExecutionDriver {
     func perform(_ command: PipelineCommand, parentWorkID: String?, derivationKind: String?, derivationMetadata: Data?,
                  progress: @escaping PipelineProgressHandler) async throws -> PipelineView {
         if case .cancel = command { return try await cancel(progress: progress) }
-        await gate.lock()
+        try await gate.lockCancellable()
         do {
             guard !(restored && snapshot["action"].object != nil) else { throw HostError("interrupted_execution_requires_cancel") }
             guard providerTask == nil else { throw HostError("provider_effect_in_flight") }
@@ -792,7 +813,7 @@ private actor ExecutionDriver {
     }
 
     func resume(progress: @escaping PipelineProgressHandler) async throws -> PipelineView {
-        await gate.lock()
+        try await gate.lockCancellable()
         guard providerTask == nil, state.pendingProviderAction == nil else {
             await gate.unlock(); throw HostError("interrupted_execution_requires_cancel")
         }
@@ -802,15 +823,22 @@ private actor ExecutionDriver {
     }
 
     func drive(progress: @escaping PipelineProgressHandler, allowProvider: Bool = true) async throws -> PipelineView {
-        await gate.lock()
+        try await gate.lockCancellable()
         if driving || restored || state.svgFailure != nil {
-            let result = try makeView(); await gate.unlock(); return result
+            do {
+                let result = try makeView()
+                await gate.unlock()
+                return result
+            } catch {
+                await gate.unlock()
+                throw error
+            }
         }
         driving = true; await gate.unlock()
         do {
             for _ in 0..<maximumEffectSteps {
                 try Task.checkCancellation()
-                await gate.lock()
+                try await gate.lockCancellable()
                 let action = snapshot["action"]
                 if action.object == nil {
                     do {
@@ -1272,7 +1300,7 @@ private actor ExecutionDriver {
     }
 
     func saveCandidate(expectedWorkID: String? = nil) async throws -> SavedWork {
-        await gate.lock(); defer { Task { await gate.unlock() } }
+        try await gate.lockCancellable(); defer { Task { await gate.unlock() } }
         if let id = state.savedWorkID, let work = try await database.work(id: id) {
             guard expectedWorkID == nil || expectedWorkID == work.id else { throw HostError("candidate_identity_changed") }
             return work

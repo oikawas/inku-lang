@@ -22,9 +22,10 @@ public struct PreparedImageInput: Sendable {
 }
 
 public enum ImageInput {
+    public static let maximumRawBytes = 32 * 1024 * 1024
     public static func prepare(_ raw: Data) throws -> PreparedImageInput {
         guard !raw.isEmpty else { throw HostError("image_invalid") }
-        guard raw.count <= 32 * 1024 * 1024 else { throw HostError("image_too_large") }
+        guard raw.count <= maximumRawBytes else { throw HostError("image_too_large") }
         guard let source = CGImageSourceCreateWithData(raw as CFData, nil),
               let type = CGImageSourceGetType(source) as String?,
               [UTType.jpeg.identifier, UTType.png.identifier, UTType.gif.identifier, UTType.tiff.identifier].contains(type),

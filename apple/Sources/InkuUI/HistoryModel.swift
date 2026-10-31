@@ -66,10 +66,16 @@ public final class HistoryModel {
 
     /// Fetch page metadata independently of the selected work or visible ancestors.
     public func refreshGenerations() async {
-        guard let database else { return }
+        guard let database, !Task.isCancelled else { return }
         let nodeIDs = library.works.compactMap(\.lineageNodeID)
         let token = UUID()
         generationToken = token
+        if let pageGenerations = library.pageGenerations {
+            generations = pageGenerations
+            generationLoading = false
+            generationError = nil
+            return
+        }
         generationLoading = true
         generationError = nil
         generations = [:]

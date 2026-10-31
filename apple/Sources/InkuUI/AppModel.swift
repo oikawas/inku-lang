@@ -186,6 +186,7 @@ public final class AppModel {
     }()
 
     @ObservationIgnored private let databaseURL: URL?
+    @ObservationIgnored private let openDatabase: @Sendable (URL) throws -> InkuDatabase
     @ObservationIgnored private let transport: (any ProviderTransport)?
     @ObservationIgnored private var managedTransport: (any ProviderTransport)?
     @ObservationIgnored private var personalRuntime: ChatGPTPlanRuntime?
@@ -223,13 +224,21 @@ public final class AppModel {
     public init(databaseURL: URL? = nil, transport: (any ProviderTransport)? = nil) {
         self.databaseURL = databaseURL
         self.transport = transport
+        self.openDatabase = { try InkuDatabase(url: $0) }
     }
 
     // Allows isolated runtime fixtures without reading the user's Keychain or vault.
     init(databaseURL: URL, transport: (any ProviderTransport)? = nil, personalRuntime: ChatGPTPlanRuntime) {
         self.databaseURL = databaseURL
         self.transport = transport
+        self.openDatabase = { try InkuDatabase(url: $0) }
         self.personalRuntimeOverride = personalRuntime
+    }
+
+    init(databaseURL: URL, openDatabase: @escaping @Sendable (URL) throws -> InkuDatabase) {
+        self.databaseURL = databaseURL
+        self.transport = nil
+        self.openDatabase = openDatabase
     }
 
     public var sourceLocked: Bool { authoringAuthority == "ddl_authoritative" }
@@ -355,7 +364,12 @@ public final class AppModel {
         initialized = true
         do {
             let url = try databaseURL ?? InkuDatabase.applicationSupportURL(hostIdentifier: "app.inku.macos")
-            let database = try InkuDatabase(url: url)
+            // Opening validates the existing database before allowing writes and can
+            // take significant time. Keep that blocking work off the UI executor.
+            let openDatabase = self.openDatabase
+            let database = try await Task.detached(priority: .userInitiated) {
+                try openDatabase(url)
+            }.value
             let store = ProviderSettingsStore(url: url.deletingLastPathComponent().appendingPathComponent("providers.json"))
             let bootstrap = try Bootstrap(pluginDataDirectory: url.deletingLastPathComponent())
             let settings = try await store.loadNormalized()
@@ -471,7 +485,8 @@ public final class AppModel {
             guard generationToken == token, !Task.isCancelled else { return }
             apply(view)
             try await reloadWorks()
-            if let id = view.savedWorkID, let work = works.first(where: { $0.id == id }) {
+            if let id = view.savedWorkID, works.contains(where: { $0.id == id }),
+               let work = try await database?.work(id: id), generationToken == token, !Task.isCancelled {
                 displayWork(work)
                 selectedContext = try await host.savedAuthoringContext(workID: id)
                 savedImageDDL = selectedContext?.imageDDL
@@ -2120,10 +2135,21 @@ public final class AppModel {
     public func markOutputRead(_ output: String) { unreadOutputs.remove(output) }
 
     public func prepareExportSources(works: [SavedWork], profile: String = "display", requiresPluginDefinitions: Bool = false) async throws -> [ExportSource] {
-        guard !isBusy, let host else { throw HostError("export_busy_or_unavailable") }
+        guard !isBusy, let host, let database else { throw HostError("export_busy_or_unavailable") }
+        let exportRevision = restorationRevision
         var sources: [ExportSource] = []
-        for work in works {
+        for candidate in works {
             try Task.checkCancellation()
+            let work: SavedWork
+            if candidate.svg.isEmpty {
+                guard let full = try await database.work(id: candidate.id),
+                      !isBusy, restorationRevision == exportRevision,
+                      full.renderHash == candidate.renderHash, full.at == candidate.at,
+                      full.trashed == candidate.trashed else {
+                    throw HostError("saved_export_work_changed")
+                }
+                work = full
+            } else { work = candidate }
             var value: ExactJSON = .object([:])
             var locks: [ExactJSON] = []
             do {
@@ -2136,6 +2162,7 @@ public final class AppModel {
             }
             var profiles: [String: String] = [:]
             if profile != "display" { profiles[profile] = try await host.exportSVG(workID: work.id, profile: profile) }
+            guard !isBusy, restorationRevision == exportRevision else { throw HostError("saved_export_work_changed") }
             sources.append(ExportSource(work: work, profiles: profiles,
                 pluginDefinitions: value["definitions"].array ?? [], pluginSummaries: value["macro_summaries"].array?.compactMap(\.string) ?? [], pluginLocks: locks,
                 language: value["language"].string))
@@ -2271,7 +2298,7 @@ public final class AppModel {
 
     private func reloadWorks() async throws {
         guard let database else { return }
-        works = try await database.list(limit: 100)
+        works = try await database.recentMetadata(limit: 100)
         if let id = selectedWorkID {
             let selectionToken = displayToken
             let saved = try await database.work(id: id)

@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-31 — macOS startup, history, picture folders and backups
+
+Move database validation and the main picture-folder I/O and image processing off the UI executor, reuse shared ancestors when calculating history generations, limit and share dictionary counts, release the generation gate on errors, and resume interrupted backup pruning.
+
 ### 2026-10-30 — Allocate a macOS version for every build
 
 Advance the app's patch version and build number on every build, and use both numbers from the finished app for distribution.

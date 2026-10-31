@@ -368,6 +368,17 @@ pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_migrat
     unary_bytes(env, input, inku_pipeline_uniffi::migrate_saijiki_v1)
 }
 
+/// The one-time Saijiki v2 migration of one saved unit (the touch reorganisation, 2026-10-31).
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
+pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_migrateSaijikiV2(
+    env: JNIEnv<'_>,
+    _receiver: JObject<'_>,
+    input: JByteArray<'_>,
+) -> jbyteArray {
+    unary_bytes(env, input, inku_pipeline_uniffi::migrate_saijiki_v2)
+}
+
 #[unsafe(no_mangle)]
 #[allow(non_snake_case)]
 pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_renderSaved(

@@ -55,9 +55,10 @@ pub mod render_execution;
 pub mod saijiki;
 pub mod saijiki_migration;
 pub use saijiki_migration::{
-    InvalidDocumentStage, SAIJIKI_V1_MIGRATION_SCHEMA_ID, SaijikiDefinitionMigration,
-    SaijikiDocumentMigration, SaijikiMigrationEdit, SaijikiMigrationError,
-    migrate_document_from_saijiki_v1, migrate_macro_definition_from_saijiki_v1,
+    InvalidDocumentStage, SAIJIKI_V1_MIGRATION_SCHEMA_ID, SAIJIKI_V2_MIGRATION_SCHEMA_ID,
+    SaijikiDefinitionMigration, SaijikiDocumentMigration, SaijikiMigrationEdit,
+    SaijikiMigrationError, migrate_document_from_saijiki_v1, migrate_document_from_saijiki_v2,
+    migrate_macro_definition_from_saijiki_v1, migrate_macro_definition_from_saijiki_v2,
 };
 mod score_angle;
 pub mod score_diagnostics;

@@ -1,15 +1,18 @@
-//! Host entry for the one-time Saijiki v1 migration of a saved document and its definitions.
+//! Host entries for the one-time Saijiki migrations of a saved document and its definitions.
 //!
-//! A host passes one saved unit: a v1 visible document and the Macro definitions its locks
-//! name, or definitions alone. It gets the unit back in the current edition, with each lock
-//! moved to its definition's new digest, and saves it over the old one (SPEC §3.3).
+//! A host passes one saved unit: a retired-edition visible document (v1, or v2 since the
+//! touch reorganisation of 2026-10-31) and the Macro definitions its locks name, or
+//! definitions alone. It gets the unit back in the current edition, with each lock moved
+//! to its definition's new digest, and saves it over the old one (SPEC §3.3).
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use inku_ddl::{
     InvalidDocumentStage, MacroLock, NormalizedDdlDocument, SAIJIKI_ASSET_ID,
-    SAIJIKI_V1_MIGRATION_SCHEMA_ID, SaijikiDefinitionMigration, SaijikiMigrationError,
-    migrate_document_from_saijiki_v1, migrate_macro_definition_from_saijiki_v1,
+    SAIJIKI_V1_MIGRATION_SCHEMA_ID, SAIJIKI_V2_ASSET_ID, SAIJIKI_V2_MIGRATION_SCHEMA_ID,
+    SaijikiDefinitionMigration, SaijikiDocumentMigration, SaijikiMigrationError,
+    migrate_document_from_saijiki_v1, migrate_document_from_saijiki_v2,
+    migrate_macro_definition_from_saijiki_v1, migrate_macro_definition_from_saijiki_v2,
 };
 use inku_pipeline::machine::{LockedDefinition, VisibleDocument};
 use serde::Deserialize;
@@ -21,18 +24,65 @@ const MAXIMUM_INPUT_BYTES: usize = 4 * 1024 * 1024;
 #[serde(deny_unknown_fields)]
 struct MigrationInput {
     #[serde(default)]
-    document: Option<V1Document>,
+    document: Option<SavedDocument>,
     #[serde(default)]
     definitions: Vec<Value>,
 }
 
-/// A saved visible document; it has no edition field because it was written with v1.
+/// A saved visible document of a retired edition. A v1 document has no edition field; a v2
+/// document names `inku.saijiki.v2`.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct V1Document {
+struct SavedDocument {
     source: String,
     language: inku_ddl::ResolvedInstructionLanguage,
     macro_locks: Vec<LockedDefinition>,
+    #[serde(default)]
+    saijiki: Option<String>,
+}
+
+/// The retired edition a host entry migrates from.
+#[derive(Clone, Copy)]
+enum Retired {
+    V1,
+    V2,
+}
+
+impl Retired {
+    const fn schema(self) -> &'static str {
+        match self {
+            Self::V1 => SAIJIKI_V1_MIGRATION_SCHEMA_ID,
+            Self::V2 => SAIJIKI_V2_MIGRATION_SCHEMA_ID,
+        }
+    }
+
+    /// Whether a saved document's edition field names this edition.
+    fn writes(self, saijiki: Option<&str>) -> bool {
+        match self {
+            Self::V1 => saijiki.is_none_or(|edition| edition == inku_ddl::SAIJIKI_V1_ASSET_ID),
+            Self::V2 => saijiki == Some(SAIJIKI_V2_ASSET_ID),
+        }
+    }
+
+    fn migrate_document(
+        self,
+        document: &NormalizedDdlDocument,
+    ) -> Result<SaijikiDocumentMigration, SaijikiMigrationError> {
+        match self {
+            Self::V1 => migrate_document_from_saijiki_v1(document),
+            Self::V2 => migrate_document_from_saijiki_v2(document),
+        }
+    }
+
+    fn migrate_definition(
+        self,
+        definition: &Value,
+    ) -> Result<SaijikiDefinitionMigration, SaijikiMigrationError> {
+        match self {
+            Self::V1 => migrate_macro_definition_from_saijiki_v1(definition),
+            Self::V2 => migrate_macro_definition_from_saijiki_v2(definition),
+        }
+    }
 }
 
 fn error_value(error: &SaijikiMigrationError) -> Value {
@@ -46,13 +96,18 @@ fn definition_value(migration: &SaijikiDefinitionMigration) -> Value {
         "version": migration.identity.version(),
         "digest": format!("sha256:{}", migration.identity.full_digest_hex()),
         "changed": migration.changed,
+        "unadjusted_thinness": migration.unadjusted_thinness,
     })
 }
 
 fn migrate_document(
-    document: V1Document,
+    retired: Retired,
+    document: SavedDocument,
     definitions: &[Result<SaijikiDefinitionMigration, SaijikiMigrationError>],
 ) -> Value {
+    if !retired.writes(document.saijiki.as_deref()) {
+        return json!({"error": {"code": "other_edition", "saijiki": document.saijiki}});
+    }
     // Each lock moves to the migrated definition of the same name and version.
     let mut locks = Vec::new();
     for lock in &document.macro_locks {
@@ -98,7 +153,7 @@ fn migrate_document(
             return json!({"error": error_value(&SaijikiMigrationError::InvalidDocument(stage))});
         }
     };
-    match migrate_document_from_saijiki_v1(&v1) {
+    match retired.migrate_document(&v1) {
         Ok(migration) => json!({
             "document": VisibleDocument {
                 source: migration.source,
@@ -108,12 +163,13 @@ fn migrate_document(
             },
             "edits": migration.edits,
             "unassociated_sweeps": migration.unassociated_sweeps,
+            "unassociated_tools": migration.unassociated_tools,
         }),
         Err(error) => json!({"error": error_value(&error)}),
     }
 }
 
-fn migrate(input_bytes: &[u8]) -> Option<Value> {
+fn migrate(retired: Retired, input_bytes: &[u8]) -> Option<Value> {
     if input_bytes.len() > MAXIMUM_INPUT_BYTES {
         return None;
     }
@@ -121,13 +177,13 @@ fn migrate(input_bytes: &[u8]) -> Option<Value> {
     let definitions = input
         .definitions
         .iter()
-        .map(migrate_macro_definition_from_saijiki_v1)
+        .map(|definition| retired.migrate_definition(definition))
         .collect::<Vec<_>>();
     let document = input
         .document
-        .map(|document| migrate_document(document, &definitions));
+        .map(|document| migrate_document(retired, document, &definitions));
     Some(json!({
-        "schema": SAIJIKI_V1_MIGRATION_SCHEMA_ID,
+        "schema": retired.schema(),
         "saijiki": SAIJIKI_ASSET_ID,
         "document": document,
         "definitions": definitions
@@ -140,19 +196,33 @@ fn migrate(input_bytes: &[u8]) -> Option<Value> {
     }))
 }
 
-/// Migrate one saved Saijiki v1 unit (a document and its definitions) to the current edition.
-#[uniffi::export]
-pub fn migrate_saijiki_v1(input_bytes: Vec<u8>) -> Vec<u8> {
-    catch_unwind(AssertUnwindSafe(|| migrate(&input_bytes)))
+fn migrate_bytes(retired: Retired, input_bytes: &[u8]) -> Vec<u8> {
+    catch_unwind(AssertUnwindSafe(|| migrate(retired, input_bytes)))
         .ok()
         .flatten()
         .and_then(|output| serde_json::to_vec(&output).ok())
         .unwrap_or_else(|| {
             format!(
-                r#"{{"schema":"{SAIJIKI_V1_MIGRATION_SCHEMA_ID}","error":"invalid_saijiki_migration_input"}}"#
+                r#"{{"schema":"{}","error":"invalid_saijiki_migration_input"}}"#,
+                retired.schema()
             )
             .into_bytes()
         })
+}
+
+/// Migrate one saved Saijiki v1 unit (a document and its definitions) to the current edition.
+#[uniffi::export]
+pub fn migrate_saijiki_v1(input_bytes: Vec<u8>) -> Vec<u8> {
+    migrate_bytes(Retired::V1, &input_bytes)
+}
+
+/// Migrate one saved Saijiki v2 unit (a document and its definitions) to the current edition
+/// (the touch reorganisation of 2026-10-31, PLAN-PRODUCT §3.3). The output has the v1 entry's
+/// shape, with the spans of tools whose thinness could not follow (`unassociated_tools`) and,
+/// per definition, the emits whose thinness could not follow (`unadjusted_thinness`).
+#[uniffi::export]
+pub fn migrate_saijiki_v2(input_bytes: Vec<u8>) -> Vec<u8> {
+    migrate_bytes(Retired::V2, &input_bytes)
 }
 
 #[cfg(test)]

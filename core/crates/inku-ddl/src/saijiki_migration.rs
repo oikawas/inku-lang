@@ -13,14 +13,17 @@ use serde::Serialize;
 use serde_json::{Map, Value};
 
 use crate::{
-    MacroDefinition, MacroDefinitionIdentity, NormalizedDdlDocument, ResolvedInstructionLanguage,
-    SourceSpan, associate_semantic_entities,
+    CoreModifierValue, MacroDefinition, MacroDefinitionIdentity, NormalizedDdlDocument,
+    ResolvedInstructionLanguage, SourceSpan, associate_semantic_entities,
     parser::{NeutralTokenKind, parse_neutral_lexemes, parse_neutral_lexemes_in},
     saijiki::SaijikiEdition,
 };
 
 /// Stable identity of the v1 migration contract.
 pub const SAIJIKI_V1_MIGRATION_SCHEMA_ID: &str = "inku.saijiki-v1-migration.v1";
+
+/// Stable identity of the v2 migration contract (Saijiki v3, 2026-10-31).
+pub const SAIJIKI_V2_MIGRATION_SCHEMA_ID: &str = "inku.saijiki-v2-migration.v1";
 
 /// One v1 word and the current word written in its place.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -31,7 +34,7 @@ pub struct SaijikiMigrationEdit {
     pub replacement: String,
 }
 
-/// A saved document rewritten from Saijiki v1 to the current edition.
+/// A saved document rewritten from a retired Saijiki edition (v1 or v2) to the current one.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct SaijikiDocumentMigration {
     pub source: String,
@@ -40,6 +43,10 @@ pub struct SaijikiDocumentMigration {
     /// the association could not name, as in a Macro argument or a sequence. `薄い` or `faint`
     /// is written right before it, so the host can show the author where to look.
     pub unassociated_sweeps: Vec<SourceSpan>,
+    /// Spans in the migrated source of each tool written for one Saijiki v3 retired whose mark
+    /// the association could not name, as in a sequence or a Macro argument, so its thinness
+    /// word could not follow the new tool's widths (PLAN-PRODUCT §3.3).
+    pub unassociated_tools: Vec<SourceSpan>,
 }
 
 /// A saved Macro definition rewritten from Saijiki v1 to the current edition. Its version is
@@ -49,6 +56,10 @@ pub struct SaijikiDefinitionMigration {
     pub definition: Value,
     pub identity: MacroDefinitionIdentity,
     pub changed: bool,
+    /// The emits (JSON paths in the definition) whose retired tool was rewritten without
+    /// its thinness following the new tool's widths, because the tool or the thinness is
+    /// written through a parameter, a local or a cycle (Saijiki v3).
+    pub unadjusted_thinness: Vec<String>,
 }
 
 /// Why a document or definition could not be migrated.
@@ -179,6 +190,129 @@ const CHANGED_ROWS: &[(ResolvedInstructionLanguage, &str, &str)] = &[
     (EN, "yuragi", "大きく"),
 ];
 
+/// One tool Saijiki v3 retired and the tool written in its place (てざわりの整理,
+/// 2026-10-31, the author's choices of steps 3 to 7; PLAN-PRODUCT §3.3). v1 and v2 name
+/// the same twelve tools, so a v1 document takes these rewrites too.
+struct ToolRewrite {
+    /// The retired row's canonical Japanese surface, its identity in the v1 and v2 assets.
+    canonical_surface_ja: &'static str,
+    /// The retired Score value, which a Macro definition's touch names.
+    score_value: &'static str,
+    to_ja: &'static str,
+    to_en: &'static str,
+    to_score_value: &'static str,
+}
+
+const fn tool_rewrite(
+    canonical_surface_ja: &'static str,
+    score_value: &'static str,
+    to_ja: &'static str,
+    to_en: &'static str,
+    to_score_value: &'static str,
+) -> ToolRewrite {
+    ToolRewrite {
+        canonical_surface_ja,
+        score_value,
+        to_ja,
+        to_en,
+        to_score_value,
+    }
+}
+
+const TOOL_REWRITES: &[ToolRewrite] = &[
+    tool_rewrite("細筆", "brush_thin", "ガッシュ", "gouache", "gouache"),
+    tool_rewrite("太筆", "brush_thick", "ガッシュ", "gouache", "gouache"),
+    tool_rewrite("ロットリング", "rotring", "ペン", "pen", "pen"),
+    tool_rewrite("クレヨン", "crayon", "チョーク", "chalk", "chalk"),
+    tool_rewrite("ビュラン", "burin", "エッチング", "etching", "etching"),
+    tool_rewrite("ドライポイント", "drypoint", "エッチング", "etching", "etching"),
+];
+
+impl ToolRewrite {
+    fn word(&self, language: ResolvedInstructionLanguage) -> &'static str {
+        match language {
+            ResolvedInstructionLanguage::Ja => self.to_ja,
+            ResolvedInstructionLanguage::En => self.to_en,
+        }
+    }
+
+    /// Whether some thinness of the retired tool is written as another with the new one.
+    fn moves_thinness(&self) -> bool {
+        [
+            None,
+            Some(CoreModifierValue::ExtraFine),
+            Some(CoreModifierValue::Fine),
+            Some(CoreModifierValue::Thick),
+            Some(CoreModifierValue::ExtraThick),
+        ]
+        .into_iter()
+        .any(|thinness| migrated_thinness(self.score_value, thinness) != thinness)
+    }
+}
+
+/// The thinness written with the new tool for a retired tool's thinness: of the new tool's
+/// five widths, the one nearest the retired tool's width at that thinness, by width ratio
+/// (`inku-render` `marks.rs`; the rule of the step 3 A comparison, where the author found
+/// nothing lost in any pair). Intensity keeps its word: the nearest opacity is the same
+/// step for every pair.
+fn migrated_thinness(
+    score_value: &str,
+    thinness: Option<CoreModifierValue>,
+) -> Option<CoreModifierValue> {
+    use CoreModifierValue::{ExtraFine, ExtraThick, Fine, Thick};
+    match (score_value, thinness) {
+        // The thick brush is 2.8, 4.8, 8, 20 and 50 wide; gouache 1.05, 1.8, 3, 8 and 22.
+        ("brush_thick", Some(ExtraFine | Fine)) => None,
+        ("brush_thick", None) => Some(Thick),
+        ("brush_thick", Some(Thick | ExtraThick)) => Some(ExtraThick),
+        // Rotring is 0.5, 0.6, 1, 2.6 and 6.7 wide; the pen 0.7, 1.2, 2, 3.5 and 6.
+        ("rotring", Some(Fine)) => Some(ExtraFine),
+        ("rotring", None) => Some(Fine),
+        ("rotring", Some(Thick)) => None,
+        // The crayon is 1.4, 2.4, 4, 9 and 20 wide; chalk 1.05, 1.8, 3, 9 and 25.
+        ("crayon", Some(ExtraFine)) => Some(Fine),
+        ("crayon", Some(Fine)) => None,
+        // The burin is 3.2 wide by default; etching 2.6, and 3.9 thick.
+        ("burin", None) => Some(Thick),
+        (_, thinness) => thinness,
+    }
+}
+
+fn thinness_word(language: ResolvedInstructionLanguage, value: CoreModifierValue) -> &'static str {
+    match (language, value) {
+        (ResolvedInstructionLanguage::Ja, CoreModifierValue::ExtraFine) => "ごく細い",
+        (ResolvedInstructionLanguage::Ja, CoreModifierValue::Fine) => "細い",
+        (ResolvedInstructionLanguage::Ja, CoreModifierValue::ExtraThick) => "ごく太い",
+        (ResolvedInstructionLanguage::Ja, _) => "太い",
+        (ResolvedInstructionLanguage::En, CoreModifierValue::ExtraFine) => "extra-fine",
+        (ResolvedInstructionLanguage::En, CoreModifierValue::Fine) => "thin",
+        (ResolvedInstructionLanguage::En, CoreModifierValue::ExtraThick) => "extra-thick",
+        (ResolvedInstructionLanguage::En, _) => "thick",
+    }
+}
+
+fn thinness_id(value: CoreModifierValue) -> Option<&'static str> {
+    matches!(
+        value,
+        CoreModifierValue::ExtraFine
+            | CoreModifierValue::Fine
+            | CoreModifierValue::Thick
+            | CoreModifierValue::ExtraThick
+    )
+    .then(|| value.as_str())
+}
+
+fn thinness_from_id(id: &str) -> Option<CoreModifierValue> {
+    [
+        CoreModifierValue::ExtraFine,
+        CoreModifierValue::Fine,
+        CoreModifierValue::Thick,
+        CoreModifierValue::ExtraThick,
+    ]
+    .into_iter()
+    .find(|value| value.as_str() == id)
+}
+
 fn same_surface(language: ResolvedInstructionLanguage, left: &str, right: &str) -> bool {
     match language {
         ResolvedInstructionLanguage::Ja => left == right,
@@ -290,19 +424,43 @@ fn span_before_rebuild(
 ///
 /// A pale ink wash becomes a faint sweep: a surface intensity already on its mark becomes
 /// `薄い` / `faint` in place (v1 dropped it from a wash), and otherwise the faint is written
-/// before the sweep. The result is read again with the current edition and refused if it
-/// reads with more diagnostics than the v1 source did.
+/// before the sweep. The tools Saijiki v3 retired are rewritten as from v2 (below). The
+/// result is read again with the current edition and refused if it reads with more
+/// diagnostics than the v1 source did.
 pub fn migrate_document_from_saijiki_v1(
     document: &NormalizedDdlDocument,
 ) -> Result<SaijikiDocumentMigration, SaijikiMigrationError> {
+    migrate_document_to_current(document, SaijikiEdition::V1)
+}
+
+/// Rewrite one saved v2 document to the current edition, word by word at its positions.
+///
+/// A retired tool becomes the tool it was gathered into (PLAN-PRODUCT §3.3). Where its
+/// thinness reads as another step of the new tool, the thinness word on its mark is
+/// rewritten, written before the tool, or taken out. A tool whose mark the association
+/// cannot name, as in a sequence or a Macro argument, takes only the new tool's word; its
+/// span is given back so the host can show the author where to look. The result is read
+/// again with the current edition and refused if it reads with more diagnostics than the
+/// v2 source did.
+pub fn migrate_document_from_saijiki_v2(
+    document: &NormalizedDdlDocument,
+) -> Result<SaijikiDocumentMigration, SaijikiMigrationError> {
+    migrate_document_to_current(document, SaijikiEdition::V2)
+}
+
+fn migrate_document_to_current(
+    document: &NormalizedDdlDocument,
+    from: SaijikiEdition,
+) -> Result<SaijikiDocumentMigration, SaijikiMigrationError> {
     let language = document.language();
     let source = document.source();
-    let v1 = parse_neutral_lexemes_in(SaijikiEdition::V1, document);
-    let spans = v1.tokens.iter().map(|token| token.span).collect::<Vec<_>>();
+    let old = parse_neutral_lexemes_in(from, document);
+    let mut spans = old.tokens.iter().map(|token| token.span).collect::<Vec<_>>();
 
     let mut replacements = BTreeMap::new();
     let mut washes = Vec::new();
-    for (index, token) in v1.tokens.iter().enumerate() {
+    let mut tools = Vec::new();
+    for (index, token) in old.tokens.iter().enumerate() {
         let NeutralTokenKind::SaijikiWord {
             category_key,
             canonical_surface_ja,
@@ -311,6 +469,18 @@ pub fn migrate_document_from_saijiki_v1(
         else {
             continue;
         };
+        if category_key == "tezawari"
+            && let Some(tool) = TOOL_REWRITES
+                .iter()
+                .find(|tool| tool.canonical_surface_ja == canonical_surface_ja)
+        {
+            tools.push((index, tool));
+            replacements.insert(index, in_source_case(language, &token.surface, tool.word(language)));
+            continue;
+        }
+        if from != SaijikiEdition::V1 {
+            continue;
+        }
         let rewrite = WORD_REWRITES.iter().find(|rewrite| {
             rewrite.language == language
                 && rewrite.category_key == category_key
@@ -339,9 +509,12 @@ pub fn migrate_document_from_saijiki_v1(
         replacements.insert(index, in_source_case(language, &token.surface, rewrite.to));
     }
 
-    // The current association names the mark of each sweep and any intensity it carries.
+    // The current association names the mark of each sweep and any intensity it carries,
+    // and the mark of each retired tool and any thinness it carries.
     let mut unassociated = BTreeSet::new();
-    if !washes.is_empty() {
+    let mut unassociated_tools = BTreeSet::new();
+    let mut removed = BTreeSet::new();
+    if !washes.is_empty() || tools.iter().any(|(_, tool)| tool.moves_thinness()) {
         let (provisional, provisional_spans) = rebuild(source, &spans, &replacements);
         let provisional_document =
             NormalizedDdlDocument::new(provisional, language, document.macro_locks().to_vec())
@@ -379,7 +552,7 @@ pub fn migrate_document_from_saijiki_v1(
                             },
                         ));
                     };
-                    let original = &v1.tokens[index].surface;
+                    let original = &old.tokens[index].surface;
                     if !same_surface(language, original, faint_word(language)) {
                         replacements.insert(
                             index,
@@ -391,13 +564,80 @@ pub fn migrate_document_from_saijiki_v1(
                     if found.is_none() {
                         unassociated.insert(wash);
                     }
-                    let original = &v1.tokens[wash].surface;
+                    let original = &old.tokens[wash].surface;
                     let phrase = match language {
                         ResolvedInstructionLanguage::Ja => "薄い刷き",
                         ResolvedInstructionLanguage::En => "faint sweep",
                     };
                     replacements.insert(wash, in_source_case(language, original, phrase));
                 }
+            }
+        }
+        for &(index, tool) in &tools {
+            if !tool.moves_thinness() {
+                continue;
+            }
+            let entity = entities.iter().find(|entity| {
+                entity
+                    .touch
+                    .as_ref()
+                    .is_some_and(|touch| token_at(touch.provenance.source.span) == Some(index))
+            });
+            let Some(entity) = entity else {
+                unassociated_tools.insert(index);
+                continue;
+            };
+            let thinness = entity.thinness.as_ref();
+            let written = thinness.map(|thinness| thinness.value);
+            let migrated = migrated_thinness(tool.score_value, written);
+            if migrated == written {
+                continue;
+            }
+            match (thinness, migrated) {
+                (Some(thinness), migrated) => {
+                    let Some(thinness_index) = token_at(thinness.provenance.span) else {
+                        // A thinness that is not one token of its own cannot be rewritten in
+                        // place; the tool alone moves, as for a mark the association misses.
+                        unassociated_tools.insert(index);
+                        continue;
+                    };
+                    let original = &old.tokens[thinness_index].surface;
+                    if let Some(value) = migrated {
+                        replacements.insert(
+                            thinness_index,
+                            in_source_case(language, original, thinness_word(language, value)),
+                        );
+                    } else {
+                        replacements.insert(thinness_index, String::new());
+                        removed.insert(thinness_index);
+                    }
+                }
+                (None, Some(value)) => {
+                    let joiner = match language {
+                        ResolvedInstructionLanguage::Ja => "",
+                        ResolvedInstructionLanguage::En => " ",
+                    };
+                    let phrase = format!(
+                        "{}{joiner}{}",
+                        thinness_word(language, value),
+                        tool.word(language)
+                    );
+                    let original = &old.tokens[index].surface;
+                    replacements.insert(index, in_source_case(language, original, &phrase));
+                }
+                (None, None) => {}
+            }
+        }
+    }
+
+    // An English word taken out takes one space beside it with it.
+    if language == ResolvedInstructionLanguage::En {
+        for &index in &removed {
+            let span = &mut spans[index];
+            if source[span.end_byte..].starts_with(' ') {
+                span.end_byte += 1;
+            } else if source[..span.start_byte].ends_with(' ') {
+                span.start_byte -= 1;
             }
         }
     }
@@ -411,9 +651,9 @@ pub fn migrate_document_from_saijiki_v1(
                 })
             })?;
     let current_diagnostics = parse_neutral_lexemes(&migrated_document).diagnostics.len();
-    if current_diagnostics > v1.diagnostics.len() {
+    if current_diagnostics > old.diagnostics.len() {
         return Err(SaijikiMigrationError::MigratedSourceNotRecognized {
-            v1_diagnostics: v1.diagnostics.len(),
+            v1_diagnostics: old.diagnostics.len(),
             current_diagnostics,
         });
     }
@@ -421,7 +661,7 @@ pub fn migrate_document_from_saijiki_v1(
         .iter()
         .map(|(&index, replacement)| SaijikiMigrationEdit {
             span: spans[index],
-            original: v1.tokens[index].surface.clone(),
+            original: old.tokens[index].surface.clone(),
             replacement: replacement.clone(),
         })
         .collect();
@@ -429,6 +669,10 @@ pub fn migrate_document_from_saijiki_v1(
         source: migrated,
         edits,
         unassociated_sweeps: unassociated
+            .into_iter()
+            .map(|index| migrated_spans[index])
+            .collect(),
+        unassociated_tools: unassociated_tools
             .into_iter()
             .map(|index| migrated_spans[index])
             .collect(),
@@ -445,8 +689,14 @@ fn is_semantic_ref(value: &Value, category: &str, id: &str) -> bool {
         && value.get("id").and_then(Value::as_str) == Some(id)
 }
 
-/// Context-free v1 → v2 semantic reference renames.
+/// Context-free semantic reference renames: v1 → v2, and the tools Saijiki v3 retired.
 fn renamed_semantic_ref(category: &str, id: &str) -> Option<(&'static str, &'static str)> {
+    if category == "touch" {
+        return TOOL_REWRITES
+            .iter()
+            .find(|tool| tool.score_value == id)
+            .map(|tool| ("touch", tool.to_score_value));
+    }
     Some(match (category, id) {
         ("variation", "fine") => ("variation", "narrowly"),
         ("variation", "large") => ("variation", "broadly"),
@@ -699,6 +949,89 @@ fn rewrite_emit_fields(statements: &mut [Value]) {
     }
 }
 
+fn retired_tool(touch: &Value) -> Option<&'static ToolRewrite> {
+    let id = touch
+        .get("expr")
+        .and_then(Value::as_str)
+        .filter(|expr| *expr == "semantic_ref")
+        .and_then(|_| touch.get("category").and_then(Value::as_str))
+        .filter(|category| *category == "touch")
+        .and_then(|_| touch.get("id").and_then(Value::as_str))?;
+    TOOL_REWRITES.iter().find(|tool| tool.score_value == id)
+}
+
+/// Whether an expression names, anywhere in it, a retired tool whose thinness moves.
+fn names_tool_moving_thinness(value: &Value) -> bool {
+    match value {
+        Value::Object(object) => {
+            retired_tool(value).is_some_and(ToolRewrite::moves_thinness)
+                || object.values().any(names_tool_moving_thinness)
+        }
+        Value::Array(items) => items.iter().any(names_tool_moving_thinness),
+        _ => false,
+    }
+}
+
+/// Write each mark of a retired tool with the new one and, where the thinness is written
+/// as one word or not at all, with the thinness PLAN-PRODUCT §3.3 gives it. A thinness
+/// written through a parameter, a local or a cycle, and a tool named through one, keep
+/// their thinness: no single word stands for every mark, and a thinness has no word for
+/// the default to mix into a cycle. Their emits are listed in `unadjusted`.
+fn rewrite_emit_tools(statements: &mut [Value], path: &str, unadjusted: &mut Vec<String>) {
+    for (index, statement) in statements.iter_mut().enumerate() {
+        let here = format!("{path}[{index}]");
+        if statement.get("op").and_then(Value::as_str) == Some("emit")
+            && let Some(fields) = statement.get_mut("fields").and_then(Value::as_object_mut)
+        {
+            match fields.get("touch").and_then(retired_tool) {
+                Some(tool) => {
+                    let written = match fields.get("thinness") {
+                        None => Some(None),
+                        Some(thinness) => (thinness.get("expr").and_then(Value::as_str)
+                            == Some("semantic_ref")
+                            && thinness.get("category").and_then(Value::as_str)
+                                == Some("thinness"))
+                        .then(|| thinness.get("id").and_then(Value::as_str))
+                        .flatten()
+                        .and_then(thinness_from_id)
+                        .map(Some),
+                    };
+                    match written {
+                        Some(written) => {
+                            match migrated_thinness(tool.score_value, written).and_then(thinness_id)
+                            {
+                                Some(id) => {
+                                    fields.insert(
+                                        "thinness".to_owned(),
+                                        semantic_ref("thinness", id),
+                                    );
+                                }
+                                None => {
+                                    fields.remove("thinness");
+                                }
+                            }
+                        }
+                        None if tool.moves_thinness() => unadjusted.push(format!("{here}.fields")),
+                        None => {}
+                    }
+                    fields.insert(
+                        "touch".to_owned(),
+                        semantic_ref("touch", tool.to_score_value),
+                    );
+                }
+                None => {
+                    if fields.get("touch").is_some_and(names_tool_moving_thinness) {
+                        unadjusted.push(format!("{here}.fields"));
+                    }
+                }
+            }
+        }
+        if let Some(body) = statement.get_mut("body").and_then(Value::as_array_mut) {
+            rewrite_emit_tools(body, &format!("{here}.body"), unadjusted);
+        }
+    }
+}
+
 fn rewrite_semantic_refs(value: &mut Value, path: &str) -> Result<(), SaijikiMigrationError> {
     match value {
         Value::Object(object) => {
@@ -746,9 +1079,29 @@ fn rewrite_semantic_refs(value: &mut Value, path: &str) -> Result<(), SaijikiMig
 ///
 /// Semantic references move to their current words; a pale ink wash on a mark becomes a
 /// faint sweep and blurring becomes bleeding ink; a surface parameter that reaches only
-/// surface intensities becomes a handling parameter. The version is kept. A definition with
-/// no v1 word is returned unchanged, so migrating twice is harmless.
+/// surface intensities becomes a handling parameter; a tool Saijiki v3 retired is rewritten
+/// as from v2 (below). The version is kept. A definition with no retired word is returned
+/// unchanged, so migrating twice is harmless.
 pub fn migrate_macro_definition_from_saijiki_v1(
+    definition: &Value,
+) -> Result<SaijikiDefinitionMigration, SaijikiMigrationError> {
+    migrate_macro_definition_to_current(definition)
+}
+
+/// Rewrite one saved v2 Macro definition to the current edition.
+///
+/// Each mark of a tool Saijiki v3 retired takes the tool it was gathered into, and its
+/// thinness the step PLAN-PRODUCT §3.3 gives it where the thinness is written as one word
+/// or not at all. The version is kept; the digest changes and a work's lock moves to it. A
+/// definition with no retired tool is returned unchanged. The v1 rewrites find nothing in
+/// a v2 definition, so the two editions share one rewrite.
+pub fn migrate_macro_definition_from_saijiki_v2(
+    definition: &Value,
+) -> Result<SaijikiDefinitionMigration, SaijikiMigrationError> {
+    migrate_macro_definition_to_current(definition)
+}
+
+fn migrate_macro_definition_to_current(
     definition: &Value,
 ) -> Result<SaijikiDefinitionMigration, SaijikiMigrationError> {
     let mut migrated = definition.clone();
@@ -756,12 +1109,14 @@ pub fn migrate_macro_definition_from_saijiki_v1(
         .as_object_mut()
         .ok_or(SaijikiMigrationError::UnreadableDefinition)?;
     retype_handling_parameters(root)?;
+    let mut unadjusted_thinness = Vec::new();
     for scope in scopes(root) {
         if let Some(body) = scope_object_mut(root, &scope)
             .and_then(|object| object.get_mut("body"))
             .and_then(Value::as_array_mut)
         {
             rewrite_emit_fields(body);
+            rewrite_emit_tools(body, &format!("{scope}.body"), &mut unadjusted_thinness);
         }
     }
     rewrite_semantic_refs(&mut migrated, "$")?;
@@ -791,6 +1146,7 @@ pub fn migrate_macro_definition_from_saijiki_v1(
         changed: migrated != *definition,
         definition: migrated,
         identity,
+        unadjusted_thinness,
     })
 }
 

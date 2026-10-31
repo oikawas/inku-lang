@@ -33,6 +33,14 @@ for target in "${TARGETS[@]}"; do
     fi
 done
 
+# Some rustup macOS toolchains ship rust-objcopy with an rpath that does not
+# reach the toolchain's libLLVM.dylib. Scope the lookup fix to this build and
+# preserve any library paths supplied by the caller.
+RUST_SYSROOT="$("$RUSTUP_BIN" run "$CHANNEL" rustc --print sysroot)"
+if [[ -f "$RUST_SYSROOT/lib/libLLVM.dylib" ]]; then
+    export INKU_RUST_DYLD_LIBRARY_PATH="$RUST_SYSROOT/lib"
+fi
+
 mkdir -p "$BUILD/generated" "$BUILD/headers" "$BUILD/macos" "$PACKAGE/Sources/InkuCoreBindings" "$PACKAGE/Artifacts"
 export CARGO_TARGET_DIR="$RUST_TARGET"
 export MACOSX_DEPLOYMENT_TARGET=14.0

@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-31 — Fix the macOS Rust build warning
+
+Find the pinned Rust toolchain library during the build so debug information can be stripped successfully.
+
 ### 2026-10-31 — macOS startup, history, picture folders and backups
 
 Move database validation and the main picture-folder I/O and image processing off the UI executor, reuse shared ancestors when calculating history generations, limit and share dictionary counts, release the generation gate on errors, and resume interrupted backup pruning.

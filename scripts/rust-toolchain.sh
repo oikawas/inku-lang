@@ -107,6 +107,11 @@ export CARGO="$CARGO_BIN"
 export RUSTC="$RUSTC_BIN"
 export RUSTDOC="$RUSTDOC_BIN"
 export RUSTUP_TOOLCHAIN="$CHANNEL"
+# macOS can clear DYLD_* while launching shell scripts. Restore the explicitly
+# requested toolchain library path only after this wrapper has started.
+if [[ -n "${INKU_RUST_DYLD_LIBRARY_PATH:-}" ]]; then
+    export DYLD_LIBRARY_PATH="$INKU_RUST_DYLD_LIBRARY_PATH${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+fi
 
 cd "$ROOT/core"
 if [[ "$BATCH" == true ]]; then

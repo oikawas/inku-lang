@@ -99,6 +99,7 @@ def recover(database: Path, packages: Path, recovery: Path) -> str:
 def cutover(database: Path, packages: Path, recovery: Path, *, journal: Path,
             workers: int = 4, timeout: float = 120.0, allow_refused: bool = False) -> dict[str, Any]:
     """Migrate once; caller must stop every writer and guard this attempt externally."""
+    started = time.monotonic()
     database = database.resolve(strict=True)
     if packages.is_symlink():
         raise ValueError("invalid_package_root")
@@ -123,7 +124,9 @@ def cutover(database: Path, packages: Path, recovery: Path, *, journal: Path,
                         "mode": path.stat().st_mode & 0o777})
     manifest = {"database": str(database), "packages": str(packages), "files": entries}
     _atomic(recovery / "manifest.json", _canonical(manifest).encode(), 0o600)
+    snapshot_started = time.monotonic()
     snapshot = create_sqlite_snapshot(database, recovery / "database-before.db")
+    snapshot_seconds = round(time.monotonic() - snapshot_started, 1)
     engine = create_engine(f"sqlite:///{database}", future=True)
     try:
         with engine.connect() as connection:
@@ -156,5 +159,7 @@ def cutover(database: Path, packages: Path, recovery: Path, *, journal: Path,
         engine.dispose()
     if recover(database, packages, recovery) != "committed":
         raise RuntimeError("commit_not_recorded")
-    report.update(snapshot=str(snapshot.path), packages=package_report, recovery=str(recovery))
+    report.update(snapshot=str(snapshot.path), snapshot_seconds=snapshot_seconds, packages=package_report,
+                  recovery=str(recovery), recovery_state="committed", integrity="ok", invariants="ok",
+                  total_seconds=round(time.monotonic() - started, 1))
     return report

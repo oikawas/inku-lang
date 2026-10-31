@@ -186,3 +186,39 @@ def test_historical_builtin_fallback_never_ignores_a_wrong_digest(tmp_path):
     engine.dispose()
     result = _migrate_once_database(database, migrate_unit_v3)
     assert any(item["kind"] == "variation_documents" for item in result["refused_records"])
+
+
+def test_orphan_variation_can_reuse_exact_builtin_lock_from_saved_context(tmp_path):
+    from pathlib import Path
+
+    database = tmp_path / "saved.db"
+    _saved_database(database)
+    fixture = Path(__file__).resolve().parents[2] / "core/crates/inku-ddl/tests/fixtures/nature-leaves-1.0-package.json"
+    definitions = [item["definition"] for item in json.loads(fixture.read_text())["entries"]]
+    definition = next(item for item in definitions if item["heading"] == "下草")
+    lock = {"qualified_name": "Nature.下草", "version": "1.0.0", "digest": "sha256:" + "a" * 64}
+    source = "黒い太筆の線を引く。"
+    digest = hashlib.sha256(source.encode()).hexdigest()
+    document = json.dumps({"source": source, "language": "ja", "saijiki": "inku.saijiki.v2",
+                           "macro_locks": [lock]}, ensure_ascii=False)
+    engine = create_engine(f"sqlite:///{database}")
+    with engine.begin() as connection:
+        context = json.loads(connection.exec_driver_sql("SELECT fork_context_bytes FROM pipeline_history_links").scalar_one())
+        context["config"]["definitions"] = [definition]
+        context["macro_catalog"]["definition_locks"] = [lock]
+        raw = json.dumps(context, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode()
+        connection.exec_driver_sql("UPDATE pipeline_history_links SET fork_context_bytes=?,fork_context_digest=?",
+                                   (raw, hashlib.sha256(raw).hexdigest()))
+        from inku_server.persistence.schema import VariationAuthorityRow
+        connection.execute(VariationAuthorityRow.__table__.insert().values(
+            owner_id="u", variation_id="orphan", protocol_version="inku.variation-authority.v1",
+            revision="1", origin="user_authored_ddl", authority="ddl_authoritative", source=source,
+            document_json=document, ddl_digest=digest, authority_digest="0" * 64, updated_at=1))
+    engine.dispose()
+    result = _migrate_once_database(database, migrate_unit_v3)
+    assert not [item for item in result["refused_records"] if item["id"].endswith("/orphan")]
+    engine = create_engine(f"sqlite:///{database}")
+    with engine.connect() as connection:
+        moved = json.loads(connection.exec_driver_sql("SELECT document_json FROM variation_authority WHERE variation_id='orphan'").scalar_one())
+    engine.dispose()
+    assert moved["saijiki"] == "inku.saijiki.v3"

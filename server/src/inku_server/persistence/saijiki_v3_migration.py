@@ -425,6 +425,26 @@ def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iter
     # The frozen catalogs of the performances, and the definitions each variation saved.
     links: dict[str, _Link] = {}
     saved_by_variation: dict[tuple[str, str], list[Any]] = {}
+    builtin_by_lock: dict[tuple[str, str, str], dict[str, Any]] = {}
+    local_by_lock: dict[tuple[str, str, str, str, str], dict[str, Any]] = {}
+
+    def add_bound(owner: str, variation: str, definitions: list[Any], locks: Any) -> None:
+        for lock in document_locks(locks):
+            if not isinstance(lock, Mapping):
+                continue
+            name, version, digest = lock.get("qualified_name"), lock.get("version"), lock.get("digest")
+            if not all(isinstance(value, str) for value in (name, version, digest)):
+                continue
+            for definition in definitions:
+                if not isinstance(definition, Mapping):
+                    continue
+                actual = f"{definition.get('namespace')}.{definition.get('id') or definition.get('heading')}"
+                if (actual, definition.get("version")) != (name, version):
+                    continue
+                encoded = _canonical(definition)
+                local_by_lock.setdefault((owner, variation, name, version, digest), {})[encoded] = definition
+                if name.startswith("Nature."):
+                    builtin_by_lock.setdefault((name, version, digest), {})[encoded] = definition
     for owner_id, history_id, variation_id, context_bytes, context_digest in _rows(
         connection, "SELECT owner_id, history_id, variation_id, fork_context_bytes, fork_context_digest"
                     " FROM pipeline_history_links"
@@ -443,6 +463,7 @@ def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iter
         links[history_id] = _Link(owner_id, history_id, context, definitions,
                                   locks if isinstance(locks, list) else [])
         saved_by_variation.setdefault((owner_id, variation_id), []).extend(definitions)
+        add_bound(owner_id, variation_id, definitions, locks)
     for owner_id, variation_id, state_bytes in _rows(
         connection, f"SELECT owner_id, variation_id, state_bytes FROM {DISCARDED_TABLE}"
     ):
@@ -450,15 +471,18 @@ def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iter
         wrapper = _json(state_bytes)
         snapshot = wrapper.get("snapshot") if isinstance(wrapper, Mapping) else None
         if isinstance(snapshot, Mapping):
-            saved_by_variation.setdefault((owner_id, variation_id), []).extend(
-                _definitions_of(snapshot.get("config")))
+            definitions = _definitions_of(snapshot.get("config"))
+            saved_by_variation.setdefault((owner_id, variation_id), []).extend(definitions)
+            document = snapshot.get("document")
+            add_bound(owner_id, variation_id, definitions,
+                      document.get("macro_locks") if isinstance(document, Mapping) else [])
     for key, definitions in saved_by_variation.items():
         saved_by_variation[key] = _distinct(definitions)
 
-    # Some old variations have locks but no surviving fork context containing
-    # their built-in definitions. Fill only missing identities from the exact
-    # historical built-in fixtures; never replace a saved definition. Compare
-    # the original digest here because the core matches only name and version.
+    # Some old variations have locks but no fork context. Recover only a unique
+    # built-in definition paired with the same complete lock in a checksum-
+    # verified saved context, or a checked-in historical built-in whose original
+    # digest was independently computed. Never substitute on name/version alone.
     only = set(history_ids) if history_ids is not None else None
     limit = f" ORDER BY random() LIMIT {int(sample)}" if sample else ""
     variation_rows: list[tuple[Any, ...]] = []
@@ -472,19 +496,25 @@ def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iter
         if not isinstance(document, Mapping) or document.get("saijiki") not in (None, "inku.saijiki.v2"):
             continue
         key = (owner_id, variation_id)
-        definitions = saved_by_variation.setdefault(key, [])
-        existing = {(f"{d.get('namespace')}.{d.get('id') or d.get('heading')}", d.get("version"))
-                    for d in definitions if isinstance(d, Mapping)}
-        for lock in document.get("macro_locks") or []:
+        definitions = []
+        for lock in document_locks(document.get("macro_locks")):
             identity = (lock.get("qualified_name"), lock.get("version")) if isinstance(lock, Mapping) else None
-            if (identity in historic and identity not in existing
-                    and lock.get("digest") in historic[identity][1]):
+            if identity is None or not isinstance(lock, Mapping):
+                continue
+            lock_key = (*identity, lock.get("digest"))
+            local = local_by_lock.get((owner_id, variation_id, *lock_key), {})
+            saved = local if local else builtin_by_lock.get(lock_key, {})
+            if len(saved) == 1:
+                definitions.append(next(iter(saved.values())))
+            elif not saved and identity in historic and lock.get("digest") in historic[identity][1]:
                 definitions.append(historic[identity][0])
-                existing.add(identity)
+        saved_by_variation[key] = _distinct(definitions)
 
     # Every distinct definition once; a document's unit carries the ones its locks name.
-    distinct_definitions = _distinct(
-        definition for definitions in saved_by_variation.values() for definition in definitions)
+    distinct_definitions = _distinct([
+        *(definition for definitions in saved_by_variation.values() for definition in definitions),
+        *(definition for link in links.values() for definition in link.definitions),
+    ])
     labels: dict[bytes, str] = {}
     for definition in distinct_definitions:
         name = (f"{definition.get('namespace')}.{definition.get('heading')}@{definition.get('version')}"

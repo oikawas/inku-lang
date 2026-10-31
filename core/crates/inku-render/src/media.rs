@@ -366,14 +366,6 @@ struct Region {
     y1: f64,
 }
 
-/// How far a displacement of `scale` can move a pixel, in user units. The
-/// specification (Chrome, Skia) moves it by `scale / 2` at most; resvg 0.48.1
-/// (the Server's PNG, Android's raster) multiplies the scale in twice, so by
-/// `scale * scale / 2`, which is the farther for a wash's wobble.
-fn displacement_reach(scale: f64) -> f64 {
-    0.5 * scale * scale.max(1.0)
-}
-
 /// How far a blur of `deviation` spreads a mark, in user units: four
 /// deviations, past which a gaussian keeps under a tenth of a level.
 fn blur_reach(deviation: f64) -> f64 {
@@ -388,6 +380,65 @@ impl Region {
         }
         let grow = reach.max(0.0) + 2.0 + unit * 0.002;
         Self { x0: x0 - grow, y0: y0 - grow, x1: x1 + grow, y1: y1 + grow }
+    }
+
+}
+
+/// A displacement with the look the Server's PNG gave it (the author's choice,
+/// てざわりの整理 2026-10-31), drawn alike by every renderer. resvg 0.48.1 (the
+/// Server's and the CLI's PNG, Android's raster) multiplied a displacement's
+/// scale in twice and read its map premultiplied: with scale `s` it moved a
+/// pixel by `s * s` times the map's premultiplied channel less one half, where
+/// Chrome and Skia (the screens) move it by `s` times the plain channel, so a
+/// wash's edge wobbled eight times as much in the PNG as on the screen. The
+/// filter now writes that look as the specification reads it: a scale of
+/// `k = s * s` on a map made opaque (its colour is then its premultiplied
+/// colour). Chrome, Skia and a resvg that follows the specification (the core's
+/// vendored resvg with upstream's fix, and the Server's PNG drawn by it) move a
+/// pixel by `k` times that channel. A resvg 0.48.1 would move it `k * k`: no
+/// PNG may be drawn by one.
+#[derive(Clone, Copy, Debug)]
+struct Displacement {
+    /// How far the filter moves a pixel per unit of the map's channel, in
+    /// canvas units.
+    k: f64,
+}
+
+impl Displacement {
+    /// The PNG's look of the scale `scale`: `k = scale * scale`.
+    fn of_scale(scale: f64) -> Self {
+        Self { k: scale * scale }
+    }
+
+    /// How far it can move a pixel, in canvas units.
+    fn reach(self) -> f64 {
+        0.5 * self.k
+    }
+
+    /// `input` moved by the noise `noise`, made opaque first.
+    fn primitives(self, input: &str, noise: &str, result: &str) -> [Element; 3] {
+        let (ground, map) = (format!("{noise}-ground"), format!("{noise}-map"));
+        [
+            Element::new("feFlood")
+                .attr("flood-color", "#000000")
+                .attr("flood-opacity", "1")
+                .attr("result", &ground),
+            Element::new("feComposite")
+                .attr("in", noise)
+                .attr("in2", &ground)
+                .attr("operator", "arithmetic")
+                .attr("k1", "0")
+                .attr("k2", "1")
+                .attr("k3", "1")
+                .attr("result", &map),
+            Element::new("feDisplacementMap")
+                .attr("in", input)
+                .attr("in2", &map)
+                .attr("scale", n(self.k))
+                .attr("xChannelSelector", "R")
+                .attr("yChannelSelector", "G")
+                .attr("result", result),
+        ]
     }
 }
 
@@ -463,23 +514,25 @@ fn alpha_from_noise(input: &str, slope: f64, offset: f64, result: &str) -> Eleme
 
 /// Holes in a mark where the noise is high: the paper's tooth. `share` is
 /// roughly the part of the mark left open. `region` holds the mark and the
-/// roughening's reach (`displacement_reach(roughen)`).
-fn tooth_filter(id: &str, frequency: f64, share: f64, seed: &str, roughen: f64, region: Region) -> Element {
+/// roughening's reach. With `rough`, the filter also roughens the mark's edge
+/// by that displacement.
+fn tooth_filter(
+    id: &str,
+    frequency: f64,
+    share: f64,
+    seed: &str,
+    rough: Option<Displacement>,
+    region: Region,
+) -> Element {
     // Fractal noise sits near 0.5 with a spread of about 0.12.
     let threshold = 0.5 + 0.12 * inverse_tail(share);
     let mut f = filter(id, region);
     f.push(turbulence(frequency, 2, seed, "tooth"));
     f.push(alpha_from_noise("tooth", 10.0, 10.0 * (threshold + 0.05), "open"));
-    if roughen > 0.0 {
-        f.push(
-            Element::new("feDisplacementMap")
-                .attr("in", "SourceGraphic")
-                .attr("in2", "tooth")
-                .attr("scale", n(roughen))
-                .attr("xChannelSelector", "R")
-                .attr("yChannelSelector", "G")
-                .attr("result", "rough"),
-        );
+    if let Some(displacement) = rough {
+        for primitive in displacement.primitives("SourceGraphic", "tooth", "rough") {
+            f.push(primitive);
+        }
         f.push(
             Element::new("feComposite")
                 .attr("in", "rough")
@@ -791,11 +844,12 @@ fn oil_pastel_stroke(
     let sheen = banks_d(&sheen_left, &sheen_right, closed);
     let frequency = 300.0 / unit.max(1.0);
     let (edge_tooth, core_tooth) = (fresh("op-edge"), fresh("op-core"));
+    let rough = Displacement::of_scale(unit * 0.002);
     // Every part of the stroke lies between its banks.
-    let region = Region::around(&[left, right].concat(), displacement_reach(unit * 0.002), unit);
+    let region = Region::around(&[left, right].concat(), rough.reach(), unit);
     let mut defs = Element::new("defs");
-    defs.push(tooth_filter(&edge_tooth, frequency, 0.34, &noise_seed(seed, "op-edge"), unit * 0.002, region));
-    defs.push(tooth_filter(&core_tooth, frequency, 0.05, &noise_seed(seed, "op-core"), 0.0, region));
+    defs.push(tooth_filter(&edge_tooth, frequency, 0.34, &noise_seed(seed, "op-edge"), Some(rough), region));
+    defs.push(tooth_filter(&core_tooth, frequency, 0.05, &noise_seed(seed, "op-core"), None, region));
     let mut group = Element::new("g").attr("class", "proto-oil-pastel-stroke");
     group.push(defs);
     group.push(
@@ -1295,18 +1349,15 @@ fn watercolor_fill(contour: &[Point], color: &str, opacity: f64, seed: Seed, uni
         size * 0.022,
         Region::around(contour, size * 0.04 + blur_reach(size * 0.022), unit),
     ));
-    // Everything in the group is kept inside the shape; the wobble moves it
-    // by the displacement's reach at most.
-    let mut wobble_filter = filter(&wobble, Region::around(contour, displacement_reach(size * 0.03), unit));
+    // The edge's wobble, with the look of the Server's PNG (`Displacement`).
+    // Everything in the group is kept inside the shape; the wobble moves it by
+    // the displacement's reach at most.
+    let shake = Displacement::of_scale(size * 0.03);
+    let mut wobble_filter = filter(&wobble, Region::around(contour, shake.reach(), unit));
     wobble_filter.push(turbulence(1.0 / (size * 0.12), 2, &noise_seed(seed, "wc-wobble"), "edge"));
-    wobble_filter.push(
-        Element::new("feDisplacementMap")
-            .attr("in", "SourceGraphic")
-            .attr("in2", "edge")
-            .attr("scale", n(size * 0.03))
-            .attr("xChannelSelector", "R")
-            .attr("yChannelSelector", "G"),
-    );
+    for primitive in shake.primitives("SourceGraphic", "edge", "wobbled") {
+        wobble_filter.push(primitive);
+    }
     defs.push(wobble_filter);
     let mut group = Element::new("g")
         .attr("class", "media-watercolor-wash")
@@ -1405,13 +1456,14 @@ fn oil_pastel_fill(contour: &[Point], color: &str, seed: Seed, unit: f64, stroke
     clip_path.push(path(&d));
     defs.push(clip_path);
     // The face is clipped to the shape, so only what lies within its box (and
-    // the roughening's shift around it) is seen.
+    // the roughening's reach around it) is seen.
+    let rough = Displacement::of_scale(unit * 0.0015);
     defs.push(tooth_filter(
         &base_tooth,
         frequency,
         0.18,
         &noise_seed(seed, "op-base"),
-        0.0,
+        None,
         Region::around(contour, 0.0, unit),
     ));
     defs.push(tooth_filter(
@@ -1419,8 +1471,8 @@ fn oil_pastel_fill(contour: &[Point], color: &str, seed: Seed, unit: f64, stroke
         frequency,
         0.14,
         &noise_seed(seed, "op-strokes"),
-        unit * 0.0015,
-        Region::around(contour, displacement_reach(unit * 0.0015), unit),
+        Some(rough),
+        Region::around(contour, rough.reach(), unit),
     ));
     let mut group = Element::new("g").attr("class", "proto-oil-pastel-face");
     group.push(defs);
@@ -1597,20 +1649,20 @@ fn knife_fill(contour: &[Point], color: &str, seed: Seed, unit: f64) -> Element 
     group
 }
 
+/// How the acid bites a line of `width`: the displacement of scale
+/// `width * 0.45` with the look of the Server's PNG (`Displacement`).
+fn bite(width: f64) -> Displacement {
+    Displacement::of_scale(width * 0.45)
+}
+
 /// The acid's bite: an etched line's edge wavers a little at a fine grain.
-/// `region` holds the line and the bite's reach
-/// (`displacement_reach(width * 0.45)`).
+/// `region` holds the line and the bite's reach.
 fn bite_filter(id: &str, width: f64, seed: Seed, region: Region) -> Element {
     let mut f = filter(id, region);
     f.push(turbulence(1.0 / (width * 0.9).max(0.3), 2, &noise_seed(seed, "et-bite"), "bite"));
-    f.push(
-        Element::new("feDisplacementMap")
-            .attr("in", "SourceGraphic")
-            .attr("in2", "bite")
-            .attr("scale", n(width * 0.45))
-            .attr("xChannelSelector", "R")
-            .attr("yChannelSelector", "G"),
-    );
+    for primitive in bite(width).primitives("SourceGraphic", "bite", "bitten") {
+        f.push(primitive);
+    }
     f
 }
 
@@ -1646,12 +1698,12 @@ fn etching_stroke(
         width *= 0.72 + 0.62 * depth;
         opacity = (opacity * (0.82 + 0.18 * depth)).min(1.0);
     }
-    let bite = fresh("et-bite");
+    let bitten = fresh("et-bite");
     let mut defs = Element::new("defs");
     // The line reaches half its width past the centre line (round caps and
     // joins), and the bite moves it by the displacement's reach at most.
-    let region = Region::around(&centre, width * 0.5 + displacement_reach(width * 0.45), unit);
-    defs.push(bite_filter(&bite, width, seed, region));
+    let region = Region::around(&centre, width * 0.5 + bite(width).reach(), unit);
+    defs.push(bite_filter(&bitten, width, seed, region));
     group.push(defs);
     let mut line = polyline_path(&centre);
     if closed {
@@ -1672,7 +1724,7 @@ fn etching_stroke(
         line.attr("stroke", color)
             .attr("stroke-width", n(width))
             .attr("stroke-opacity", n(opacity))
-            .attr("filter", format!("url(#{bite})")),
+            .attr("filter", format!("url(#{bitten})")),
     );
     // Pits of foul biting: a few dots beside the line.
     let gap = |k: i64, salt: &str| width * 18.0 * (0.5 + hash01(k, seed, salt));
@@ -1748,7 +1800,7 @@ fn etching_fill_varied(
     let weight = |p: Point| -> f64 {
         (((p.x - centre.x) * heavy.x + (p.y - centre.y) * heavy.y) / reach * 0.5 + 0.5).clamp(0.0, 1.0)
     };
-    let (clip, bite) = (fresh("et-clip"), fresh("et-fill-bite"));
+    let (clip, bitten) = (fresh("et-clip"), fresh("et-fill-bite"));
     let mut defs = Element::new("defs");
     let mut clip_path = Element::new("clipPath").attr("id", &clip);
     clip_path.push(path(&d));
@@ -1756,16 +1808,16 @@ fn etching_fill_varied(
     // The face is clipped to the shape after the bite: what is seen lies in
     // its box, and the bite pulls from the displacement's reach away at most.
     defs.push(bite_filter(
-        &bite,
+        &bitten,
         line,
         seed,
-        Region::around(contour, line * 1.5 + displacement_reach(line * 0.45), unit),
+        Region::around(contour, line * 1.5 + bite(line).reach(), unit),
     ));
     let mut group = Element::new("g").attr("class", "proto-etching-face");
     group.push(defs);
     let mut face = Element::new("g")
         .attr("clip-path", format!("url(#{clip})"))
-        .attr("filter", format!("url(#{bite})"))
+        .attr("filter", format!("url(#{bitten})"))
         .attr("fill", color)
         .attr("fill-opacity", n(opacity.min(1.0)));
     let sets: &[(f64, bool)] = if opacity >= 0.7 { &[(0.0, false), (1.15, true)] } else { &[(0.0, false)] };

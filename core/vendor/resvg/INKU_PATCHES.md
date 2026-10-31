@@ -9,7 +9,24 @@ standalone lockfile are omitted; `core/Cargo.lock` pins dependencies.
 The README's chart links point to the upstream commit because the published
 crate does not include those images.
 
-The local patch is confined to `src/filter/turbulence.rs` and its Rayon
+There are two local patches. The displacement patch (2026-10-31) is confined
+to `src/filter/displacement_map.rs` and `apply_displacement_map` in
+`src/filter/mod.rs`, and backports upstream's fix (resvg CHANGELOG, Unreleased
+after 0.49.0, #1157: "`feDisplacementMap` no longer applies `scale` twice", and
+the map is read with non-premultiplied colors). resvg 0.48.1 multiplied the
+`scale` attribute in twice and read the map premultiplied, so with scale `s`
+it moved a pixel by `s * s` times the premultiplied channel where Chrome and
+Skia move it by `s` times the plain channel: a scale of 8 moved a square 32 px
+in resvg 0.48.1 and 4 px in Chrome. The patch takes upstream's two changes as
+they are. Every `feDisplacementMap` drawn by `inku-svg-raster` (Android's
+thumbnails, exports and pictures for a model, and works outside the display
+table) now moves pixels as the screens do; today's tools, whose displacement
+scales are about 1.0 to 2.4, move theirs about that many times less than
+before. The media of Saijiki v3 write the look resvg 0.48.1 gave them as a
+specification displacement (`inku-render/src/media.rs`, `Displacement`), so
+they must not be drawn by an unpatched resvg 0.48.1 (the Server's `resvg_py`).
+
+The turbulence patch is confined to `src/filter/turbulence.rs` and its Rayon
 dependency in `Cargo.toml`. It computes lattice coordinates and interpolation
 weights once per axis and octave, then evaluates RGBA together. Gradient
 vectors are stored contiguously in channel order instead of thousands of
@@ -42,7 +59,10 @@ evidence of optimal performance for all Macs or works, or lower app memory.
 Its `raster_equivalence` integration test compares every pixel with that
 independent upstream renderer at preview resolution, including a full region
 above the parallel threshold, stitched turbulence below that threshold, and
-the zero-octave boundary. When updating resvg, compare the
+the zero-octave boundary. Its fixtures set every `feDisplacementMap` scale to
+0 before both renders, since the displacement patch departs from 0.48.1 on
+purpose; a separate test pins the displacement patch to the specification's
+amount. When updating resvg, compare the
 upstream algorithm and re-evaluate this patch instead of silently carrying it
 onto a different implementation.
 

@@ -61,7 +61,64 @@ fn optimized_turbulence_preserves_upstream_images() {
     });
 }
 
+/// `svg` with every `feDisplacementMap` scale set to 0: the vendored resvg's
+/// displacement follows the specification on purpose (INKU_PATCHES.md), so the
+/// comparison with resvg 0.48.1 keeps to the turbulence.
+fn without_displacement(svg: &str) -> String {
+    let mut out = String::with_capacity(svg.len());
+    let mut rest = svg;
+    while let Some(start) = rest.find("<feDisplacementMap") {
+        let end = start + rest[start..].find('>').expect("a closed tag");
+        out.push_str(&rest[..start]);
+        let tag = &rest[start..end];
+        match tag.find(" scale=\"") {
+            Some(at) => {
+                let value_end = at + 8 + tag[at + 8..].find('"').expect("a closed value");
+                out.push_str(&tag[..at]);
+                out.push_str(" scale=\"0\"");
+                out.push_str(&tag[value_end + 1..]);
+            }
+            None => out.push_str(tag),
+        }
+        rest = &rest[end..];
+    }
+    out.push_str(rest);
+    out
+}
+
+/// The displacement patch (upstream #1157): the scale moves a pixel once, and
+/// the map is read with non-premultiplied colours, as Chrome and Skia read it.
+/// A map of red 255 and scale 8 moves the square 4 px to the left (resvg 0.48.1
+/// moved it 32 px), also when the map is half transparent (0.48.1 read its
+/// premultiplied red, about 128, and hardly moved it).
+#[test]
+fn displacement_moves_as_the_specification_reads_it() {
+    for opacity in ["1", "0.5"] {
+        let svg = format!(
+            r#"<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect width="200" height="200" fill="white"/><filter id="d" filterUnits="userSpaceOnUse" x="0" y="0" width="200" height="200" color-interpolation-filters="sRGB"><feFlood flood-color="rgb(255,128,128)" flood-opacity="{opacity}" result="map"/><feDisplacementMap in="SourceGraphic" in2="map" scale="8" xChannelSelector="R" yChannelSelector="G"/></filter><rect x="80" y="80" width="40" height="40" fill="black" filter="url(#d)"/></svg>"#
+        );
+        let raster = rasterize(
+            &svg,
+            RasterOptions {
+                target_width: Some(200),
+                target_height: Some(200),
+            },
+        )
+        .expect("raster");
+        let row = 100 * raster.stride as usize;
+        let black = (0..raster.width as usize)
+            .filter(|x| raster.pixels[row + x * 4] < 64)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            (black.first().copied(), black.last().copied()),
+            (Some(76), Some(115)),
+            "map opacity {opacity}"
+        );
+    }
+}
+
 fn compare(name: &str, svg: &str, side: u32) {
+    let svg = &without_displacement(svg);
     let started = Instant::now();
     let tree = usvg::Tree::from_str(svg, &usvg::Options::default()).expect("upstream parse");
     let intrinsic = tree.size();

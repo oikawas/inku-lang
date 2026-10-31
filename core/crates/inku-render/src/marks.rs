@@ -180,6 +180,19 @@ pub(crate) struct MarkStyle {
     dash: Option<String>,
 }
 
+/// The tool whose drawing a tool of Saijiki v3 follows where it has none of its own.
+/// Gouache is the fine brush, its broad widths aside (`thick_width`,
+/// `extra_thick_width`); etching's textured faces, plate and the rest are drypoint's,
+/// as in the prototypes the author judged, while its lines and flat faces are its own
+/// (`media`). Widths, opacities and the hand read the tool itself.
+pub(crate) const fn drawn_as(weight: Weight) -> Weight {
+    match weight {
+        Weight::Gouache => Weight::BrushThin,
+        Weight::Etching => Weight::Drypoint,
+        other => other,
+    }
+}
+
 pub(crate) fn weight_width(weight: Weight) -> f64 {
     match weight {
         Weight::Silverpoint => 0.5,

@@ -22,7 +22,7 @@ use crate::stroke::{
 use crate::support::{Support, support_with_mark_word};
 use crate::svg::{Element, closed_polyline_path, format_number, points_list, write_number};
 use crate::types::{
-    Amplitude, CanvasSize, Instruction, LineStyle, Point, Primitive, Quality, Weight,
+    Amplitude, CanvasSize, Instruction, LineStyle, Point, Primitive, Quality, SvgProfile, Weight,
 };
 
 pub(crate) fn rotate(
@@ -658,6 +658,21 @@ pub(crate) fn hand_line(
     if let Some(band) = band {
         group.set_attr("opacity", format_number(style.stroke_opacity));
         group.push(flat_band_element(&band, &style.color, "flat-brush-v1"));
+    } else if crate::media::owns(instruction.weight) && context.profile != SvgProfile::Compat {
+        // The media of Saijiki v3 draw their own line along the hand's outline (Compat,
+        // without filters and clips, draws the plain outline below).
+        let _ids = crate::media::MarkIds::enter(format!(
+            "l{}-{}",
+            context.instruction_index, context.mark_index
+        ));
+        group.push(crate::media::stroke_outline(
+            instruction.weight,
+            &outline,
+            &style.color,
+            style.stroke_opacity,
+            seed,
+            context.canvas.unit(),
+        ));
     } else if instruction.weight == Weight::OilPaint {
         let middle = outline.len() / 2;
         let right = outline[middle..].iter().rev().copied().collect::<Vec<_>>();
@@ -764,6 +779,26 @@ pub(crate) fn hand_contour(
             group.push(flat_band_element(&band, &style.color, "flat-brush-v1"));
             return with_texture_filter(group, instruction.weight, context.use_filters);
         }
+    }
+    if crate::media::owns(instruction.weight) && context.profile != SvgProfile::Compat {
+        // A filled face of these media carries its own edge (`media::fill`).
+        if closed && style.fill && crate::accepted_fills::solid_fill(instruction) {
+            return Element::new("g").attr("class", "media-edge-in-face");
+        }
+        let _ids = crate::media::MarkIds::enter(format!(
+            "c{}-{}",
+            context.instruction_index, context.mark_index
+        ));
+        return crate::media::stroke(
+            instruction.weight,
+            &stroke.left,
+            &stroke.right,
+            stroke.closed,
+            &style.color,
+            style.stroke_opacity,
+            context.seed_for(instruction),
+            context.canvas.unit(),
+        );
     }
     if instruction.weight == Weight::OilPaint {
         return oil_paint_stroke(

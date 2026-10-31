@@ -41,7 +41,7 @@ struct DryEnd {
 }
 
 const fn dry_end(weight: Weight) -> DryEnd {
-    match weight {
+    match crate::marks::drawn_as(weight) {
         Weight::BrushThin => DryEnd {
             streak_root: 0.9,
             shortest: 1.0,
@@ -69,8 +69,14 @@ const LIGHT_STEP: f64 = 0.015;
 const DARK_WIDTH: f64 = 0.025;
 const LIGHT_WIDTH: f64 = 0.02;
 
+/// The brushes lay a sweep as a flat band: the fine and thick brush, gouache (the fine
+/// brush), and watercolour (its sweep is the brush's band, as in the prototype the
+/// author judged, step 3 B).
 const fn flat_weight(weight: Weight) -> bool {
-    matches!(weight, Weight::BrushThin | Weight::BrushThick)
+    matches!(
+        crate::marks::drawn_as(weight),
+        Weight::BrushThin | Weight::BrushThick | Weight::Watercolor
+    )
 }
 
 /// Whether the mark's brush lays a flat band: a sweep of the thin or thick brush.

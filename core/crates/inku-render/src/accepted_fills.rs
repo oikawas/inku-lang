@@ -46,6 +46,7 @@ pub(crate) fn solid_fill(instruction: &Instruction) -> bool {
 
 fn active_for_closed_contour(instruction: &Instruction, closed_contour: bool) -> bool {
     instruction.weight != Weight::OilPaint
+        && !crate::media::owns(instruction.weight)
         && solid_fill(instruction)
         && (closed_contour
             || matches!(
@@ -136,7 +137,7 @@ fn group_for_closed_contour(
         );
     }
     if matches!(
-        instruction.weight,
+        crate::marks::drawn_as(instruction.weight),
         Weight::Burin | Weight::Drypoint | Weight::BrushThin | Weight::BrushThick
     ) {
         group.attr("mask", format!("url(#{}-mask)", identifier(context)))
@@ -257,8 +258,10 @@ fn interior_for_closed_contour(
     );
     // A brush fill lays a darker deposit through a second band set, turned
     // 35° from the first, over the unchanged 0.92 floor (render engine 88).
-    if matches!(instruction.weight, Weight::BrushThin | Weight::BrushThick)
-        && context.profile != SvgProfile::Compat
+    if matches!(
+        crate::marks::drawn_as(instruction.weight),
+        Weight::BrushThin | Weight::BrushThick
+    ) && context.profile != SvgProfile::Compat
     {
         fill.push(
             Element::new("path")
@@ -634,7 +637,7 @@ fn engraving(
     geometry: MarkGeometry,
     context: MarkContext<'_>,
 ) -> Vec<Element> {
-    let dry = instruction.weight == Weight::Drypoint;
+    let dry = crate::marks::drawn_as(instruction.weight) == Weight::Drypoint;
     let weight = if dry { "drypoint" } else { "burin" };
     let id = identifier(context);
     let half = level(
@@ -1078,7 +1081,7 @@ pub(crate) fn brush_tile_definition(weight: Weight) -> Option<Element> {
 
 /// Whether a brush weight needs the shared tile in a non-compat document.
 pub(crate) fn uses_brush_tile(instruction: &Instruction, weight: Weight) -> bool {
-    instruction.weight == weight && solid_fill(instruction)
+    crate::marks::drawn_as(instruction.weight) == weight && solid_fill(instruction)
 }
 
 pub(crate) const BRUSH_TILE_WEIGHTS: [Weight; 2] = [Weight::BrushThin, Weight::BrushThick];
@@ -1099,7 +1102,7 @@ fn brush_mask(
     geometry: MarkGeometry,
     context: MarkContext<'_>,
 ) -> Vec<Element> {
-    let Some((name, size, _, _)) = brush_recipe(instruction.weight) else {
+    let Some((name, size, _, _)) = brush_recipe(crate::marks::drawn_as(instruction.weight)) else {
         return Vec::new();
     };
     let id = identifier(context);
@@ -1202,7 +1205,7 @@ fn definitions_for_closed_contour(
     if context.profile == SvgProfile::Compat || instruction.weight == Weight::Rotring {
         return Vec::new();
     }
-    match instruction.weight {
+    match crate::marks::drawn_as(instruction.weight) {
         Weight::Burin | Weight::Drypoint => engraving(instruction, geometry, context),
         Weight::BrushThin | Weight::BrushThick => brush_mask(instruction, geometry, context),
         Weight::Chalk => vec![chalk_filter(instruction, context)],

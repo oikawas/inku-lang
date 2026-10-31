@@ -463,6 +463,11 @@ pub(crate) fn oil_paint_stroke(
             );
         }
     }
+    // A share of the passes carry a streak of another colour of the same Score
+    // (the author's choice of 12%, てざわりの整理 step 6).
+    if let Some(streak) = crate::media::oil_mix_streak(left, right, style.color, seed, closed) {
+        group.push(streak);
+    }
     group
 }
 
@@ -477,7 +482,7 @@ struct TextureSpec {
 }
 
 fn texture_spec(weight: Weight) -> Option<TextureSpec> {
-    match weight {
+    match crate::marks::drawn_as(weight) {
         Weight::Pencil => Some(TextureSpec {
             margin: 12,
             base_frequency: Some(0.9),
@@ -541,7 +546,7 @@ fn texture_spec(weight: Weight) -> Option<TextureSpec> {
 
 #[must_use]
 pub fn texture_filter_id(weight: Weight) -> Option<&'static str> {
-    match weight {
+    match crate::marks::drawn_as(weight) {
         Weight::Pencil => Some("texture-pencil"),
         Weight::Crayon => Some("texture-crayon"),
         Weight::Chalk => Some("texture-chalk"),
@@ -600,7 +605,7 @@ pub fn texture_filter(weight: Weight, canvas: CanvasSize) -> Option<Element> {
 #[must_use]
 pub fn with_texture_filter(mut element: Element, weight: Weight, enabled: bool) -> Element {
     if enabled
-        && weight != Weight::Drypoint
+        && crate::marks::drawn_as(weight) != Weight::Drypoint
         && let Some(id) = texture_filter_id(weight)
     {
         element.set_attr("filter", format!("url(#{id})"));

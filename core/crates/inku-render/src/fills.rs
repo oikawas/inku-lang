@@ -490,6 +490,23 @@ pub(crate) fn render_interior_fill(
         return None;
     }
     let opacity = style.fill_opacity.unwrap_or(style.stroke_opacity);
+    if crate::media::owns(instruction.weight) && context.profile != SvgProfile::Compat {
+        // The media of Saijiki v3 lay their own face, edge included. Compat, which uses
+        // no filter and no clip, lays the plain face below and records the degradation.
+        let _ids = crate::media::MarkIds::enter(format!(
+            "f{}-{}",
+            context.instruction_index, context.mark_index
+        ));
+        return Some(crate::media::fill(
+            instruction.weight,
+            contour,
+            &style.color,
+            opacity,
+            context.seed_for(instruction),
+            context.canvas.unit(),
+            style.width,
+        ));
+    }
     if instruction.weight == Weight::OilPaint {
         return Some(oil_paint_fill(
             instruction,

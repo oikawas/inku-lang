@@ -148,7 +148,7 @@ fn closed_path(points: &[Point]) -> String {
 /// How far a pass of 刷き bleeds at its edges, per 1,000 units of the short
 /// side (render engine 90): the tool's displacement and this blur.
 fn sweep_bleed(weight: Weight) -> f64 {
-    match weight {
+    match crate::marks::drawn_as(weight) {
         Weight::BrushThick => 3.0,
         Weight::BrushThin => 1.5,
         _ => 2.0,
@@ -1160,7 +1160,7 @@ pub(crate) fn render_surface(
                 .attr("fill", "white")
                 .attr("stroke", "none");
             if context.use_filters
-                && instruction.weight != Weight::Drypoint
+                && crate::marks::drawn_as(instruction.weight) != Weight::Drypoint
                 && let Some(id) = texture_filter_id(instruction.weight)
             {
                 path.set_attr("filter", format!("url(#{id})"));

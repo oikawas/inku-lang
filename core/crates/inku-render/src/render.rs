@@ -175,9 +175,10 @@ pub fn build_render_metadata(score: &Score, profile: SvgProfile) -> RenderMetada
         render_texture_profile: profile,
         texture_degraded: profile == SvgProfile::Compat
             && (!render_surface_textures.is_empty()
-                || visible_instructions
-                    .iter()
-                    .any(|(_, instruction)| instruction.ink_spread.is_some())),
+                || visible_instructions.iter().any(|(_, instruction)| {
+                    // The media of Saijiki v3 draw plain lines and faces in Compat.
+                    instruction.ink_spread.is_some() || crate::media::owns(instruction.weight)
+                })),
         render_canvas_ground: canvas_ground(score),
         render_surface_textures,
         execution: None,
@@ -891,6 +892,24 @@ fn render_impl(
         support_for_ground(ground.material)
     });
     let oil_fill_pass_limit = crate::fills::oil_fill_pass_limit(&performance.score.instructions);
+    // The Score's colours, resolved, for the mixing of the media (Saijiki v3): a share of
+    // the knife's planes, a watercolour's edges and oil paint's passes take another
+    // colour of the same Score. The scope ends with this render.
+    let _media_palette = crate::media::PaletteScope::enter(
+        performance
+            .score
+            .instructions
+            .iter()
+            .map(|instruction| {
+                crate::palette::resolve_color(
+                    instruction.color,
+                    instruction.color_hint.as_deref(),
+                    &request.options.resolved_color_map,
+                    &assignment,
+                )
+            })
+            .collect(),
+    );
     let mut ordered = performance
         .performed_instructions()
         .enumerate()
@@ -930,7 +949,7 @@ fn render_impl(
                         .iter()
                         .flat_map(|template| template.body.instructions.iter()),
                 )
-                .any(|instruction| instruction.weight == weight)
+                .any(|instruction| crate::marks::drawn_as(instruction.weight) == weight)
                 && let Some(filter) = texture_filter(weight, request.options.canvas)
             {
                 material_definitions.push(filter);
@@ -1243,7 +1262,7 @@ fn render_impl(
             )
             .any(|instruction| {
                 matches!(
-                    instruction.weight,
+                    crate::marks::drawn_as(instruction.weight),
                     crate::types::Weight::Burin | crate::types::Weight::Drypoint
                 )
             });

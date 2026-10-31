@@ -8,6 +8,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-31 — The touches reorganised (Saijiki v3, render engine 95)
+
+The touches go from twelve words to eleven. Rotring merges into pen, crayon into chalk, fine-brush and thick-brush into gouache, and burin and drypoint into etching; oil pastel, watercolor, and painting knife are added (DDL 29, DDL engine 75). Saved instructions and plugin definitions move once to the new words, and each width word moves to the step nearest the original width. A lock moves only to the definition whose digest matches the one it was saved with. A work that uses a new tool becomes Score 0.24.0.
+
+Render engine 95 draws watercolor, oil pastel, the painting knife, and etching each in its own way, and mixes another colour of the work into part of the painting knife's, watercolor's, and oil paint's marks. The six retired tools in saved Scores are drawn as before. The resvg the shared core bundles carries the upstream fix that applies `feDisplacementMap`'s `scale` once, and the core's Python wheel gains a PNG entry (`inku_render.svg_to_png`).
+
 ### 2026-10-31 — Saijiki v3 and the PNG renderer
 
 Server and Web support the eleven v3 touch words and Score 0.24.0, and migrate older DDL exports when importing them. Server and CLI produce PNGs with the shared core renderer, keeping material displacement consistent with the screen.

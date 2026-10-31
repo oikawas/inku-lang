@@ -94,7 +94,7 @@ JSON Scoreのキーは英語で統一する。
 - 品質指標、類似度、Vision所見は監査の鏡であり、生成ゲートや「最良枝」の自動選択に接続しない。
 - 言語上のmacroはdomain別codeや個別文法を足さず、一つの汎用`MacroDefinition`形式で
   記述する。保存済みMacro定義と旧作品のScore／SVGは互換性を保ち、新作の意味は共有compilerが決定する。
-- 語彙の正本は共有Rustの`core/crates/inku-ddl/assets/saijiki-v2.json`である。共有Stage 1 promptはそのprojectionを使い、Serverの表示表・Web／Android歳時記・referenceも同じ語彙へ揃える。
+- 語彙の正本は共有Rustの`core/crates/inku-ddl/assets/saijiki-v3.json`である。共有Stage 1 promptはそのprojectionを使い、Serverの表示表・Web／Android歳時記・referenceも同じ語彙へ揃える。
 - 日本語と英語の挙動を揃え、英語だけの要件を追加しない。
 - **エンジンは後戻りしない**（SPEC.ja §15.8）。
 過去の描画エンジンをシステムとして保持せず、版を選び直す機構も作らない。
@@ -123,11 +123,11 @@ Render Engine・DDL・Score・アプリ・配布物の現在の値と上げる�
 
 ### 語彙
 
-正本は共有Rustの `core/crates/inku-ddl/assets/saijiki-v2.json` で、Serverの `schema.py` の Literal と saijiki テーブル（`saijiki.py`）はその投影である。
+正本は共有Rustの `core/crates/inku-ddl/assets/saijiki-v3.json` で、Serverの `schema.py` の Literal と saijiki テーブル（`saijiki.py`）はその投影である。
 
 - 図形 10 — `line` / `circle` / `ellipse` / `triangle` / `square` / `polygon` / `arc` / `point` / `cloudform` / `free_line`
 - 線種 4 — `solid` / `dashed` / `dotted` / `dash_dot`
-- 道具 12 — `silverpoint` / `pencil` / `pen` / `rotring` / `crayon` / `chalk` / `brush_thin` / `brush_thick` / `oil_paint` / `burin` / `drypoint` / `computer`
+- 道具 11 — `silverpoint` / `pencil` / `pen` / `chalk` / `oil_pastel` / `gouache` / `watercolor` / `oil_paint` / `painting_knife` / `etching` / `computer`（歳時記 v3。保存済みScoreは、再演だけのために退いた6つの値 `rotring` / `crayon` / `brush_thin` / `brush_thick` / `burin` / `drypoint` も持つ）
 - 細さ 4 — `fine` / `extra_fine` / `thick` / `extra_thick`（道具から独立した太さの軸。太い側は Score 0.16.0 以上）
 - 色 9 — `white` / `black` / `blue` / `red` / `green` / `gray` / `yellow` / `orange` / `purple`
 - 面の質感 9・面の向き 5・地の素材 7

@@ -4,7 +4,7 @@ DDL（Drawing Description Language）は、形、道具、置き場所と、そ�
 
 本章が扱うのは **可視 DDL** である。自由な記述を DDL へ解釈する段階と、DDL をコンパイラが読む段階は異なる。自由記述で「夕暮れのように」と書けても、その表現がそのまま DDL の修飾語になるわけではない。DDL から描く場合は、受理済みの語と構文で意味を完結させる。
 
-記述の意味は [SPEC.ja.md](../../SPEC.ja.md)、語形は共有 core の[歳時記](../../core/crates/inku-ddl/assets/saijiki-v2.json)、数と句の結び方は[パーサー](../../core/crates/inku-ddl/src/parser.rs)および[共有文法](../../core/crates/inku-pipeline/src/prompts.rs)に従う。本章の基準ソースは `97b50a52367554a94e9f364b90dc538d0f6b68bc`。後述する「受理」は、このソースの文法・実装上の条件を指す。実際の個数は作品の資源制限、色は作品の配色条件にも従う。
+記述の意味は [SPEC.ja.md](../../SPEC.ja.md)、語形は共有 core の[歳時記](../../core/crates/inku-ddl/assets/saijiki-v3.json)、数と句の結び方は[パーサー](../../core/crates/inku-ddl/src/parser.rs)および[共有文法](../../core/crates/inku-pipeline/src/prompts.rs)に従う。本章の基準ソースは `97b50a52367554a94e9f364b90dc538d0f6b68bc`。後述する「受理」は、このソースの文法・実装上の条件を指す。実際の個数は作品の資源制限、色は作品の配色条件にも従う。
 
 ## 1. 文法の原則
 
@@ -31,7 +31,7 @@ DDL（Drawing Description Language）は、形、道具、置き場所と、そ�
 | 役割 | 修飾句の例 | 続く図形 |
 |---|---|---|
 | 色・道具・連続性・面 | `赤いペンの実線の空の` | `円` |
-| 色・道具・面 | `青いクレヨンの塗りの` | `四角` |
+| 色・道具・面 | `青いチョークの塗りの` | `四角` |
 | 揺らぎ・色・太さ | `細かく揺れる黒い細い` | `線` |
 
 `赤い`・`青い`・`白い`・`黒い`は色の形容形である。その他の色も、`灰の`・`黄の`・`橙の`・`紫の`・`緑の`のように名詞で結べる。語をつないだだけで新しい語を作らず、歳時記にある表面形を使う。
@@ -172,10 +172,10 @@ DDL の言語は `ja` または `en`。アプリケーションが `auto` を選
 数値寸法の前後にも修飾を置ける。
 
 ```ddl-ja
-赤い太筆の長さ0.6の線を1本引く。
+赤い太いガッシュの長さ0.6の線を1本引く。
 ```
 
-`長さ0.6の赤い太筆の線を1本引く。`と同じ意味である。ただし、別の図形名を越えて修飾は移らない。`赤い円の長さ0.6の線`を、赤い線の標準表記として使わない。
+`長さ0.6の赤い太いガッシュの線を1本引く。`と同じ意味である。ただし、別の図形名を越えて修飾は移らない。`赤い円の長さ0.6の線`を、赤い線の標準表記として使わない。
 
 ### 3.3 主語継続：同じ対象へ後から指定する
 
@@ -258,7 +258,7 @@ place a circle at center. the circle red.
 | 太い | thick |
 | ごく太い | extra-thick |
 
-`太筆`は道具の名、`太い`はその道具で残す痕の太さ。`薄い`は濃さであり、線を細くする語ではない。
+道具の名は太さを言わない。`太いガッシュ`の`ガッシュ`は道具の名、`太い`はその道具で残す痕の太さ。`薄い`は濃さであり、線を細くする語ではない。
 
 図形の大小は歳時記カテゴリではなく、次の有限な core 修飾である。倍率は、個数に依存しない通常寸法への倍率。
 
@@ -353,11 +353,11 @@ fill small red circles at the bottom (horizontal 0 to 1, vertical 2/3 to 1).
 ### 3.9 二点間：並べる端、線の端
 
 ```ddl-ja
-画面の横0.118、縦0.5から横0.882、縦0.5まで、半径0.03の青のロットリングの空の円を5個並べる。
+画面の横0.118、縦0.5から横0.882、縦0.5まで、半径0.03の青の細いペンの空の円を5個並べる。
 ```
 
 ```ddl-en
-Line up 5 blue rotring empty circles radius 0.03 from horizontal 0.118, vertical 0.5 to horizontal 0.882, vertical 0.5.
+Line up 5 blue thin pen empty circles radius 0.03 from horizontal 0.118, vertical 0.5 to horizontal 0.882, vertical 0.5.
 ```
 
 並べる先頭と最後の痕の中心を、この二点に置く。中間は等間隔。右から左、下から上、斜めの二点も書ける。先頭は最初に書いた点であり、常に左になるわけではない。
@@ -457,7 +457,7 @@ a group of <shape A> and <shape B>
 **交互**は2項だけ。
 
 ```ddl-ja
-鉛筆と太筆を交互にして、線を五本並べる。
+鉛筆とガッシュを交互にして、線を五本並べる。
 ```
 
 色の列だけでなく、同じ属性カテゴリの道具なども交互にできる。異なる属性カテゴリを混ぜて「色と道具の交互」にしない。色や道具を二つ並べただけでは、交互を推測しない。
@@ -573,7 +573,7 @@ connected partway along the previous arc
 
 ### 3.17 道具・連続性・面・濃さ
 
-道具は `鉛筆の`・`太筆の`などの名詞修飾。色・形と独立に指定する。道具を省略した場合の実行時解決はペンだが、にじみや質感から太筆を推測して明示扱いにすることはない。
+道具は `鉛筆の`・`ガッシュの`などの名詞修飾。色・形と独立に指定する。道具を省略した場合の実行時解決はペンだが、にじみや質感から道具を推測して明示扱いにすることはない（にじみを水彩に、刷きをガッシュに読み替えない）。
 
 連続性は実線・破線・点線・一点鎖線。これらは痕の線の連なり方であり、面の技法とは別である。英語の `solid`は連続性の実線、面の塗りは `flat`なので、両者を区別する。
 
@@ -609,7 +609,7 @@ connected partway along the previous arc
 | 下塗り | underpainted | 質感の下へ画材の塗りを敷く |
 
 ```ddl-ja
-中心に、赤の太筆の下塗りの密な交差線の薄い四角を1個置く。
+中心に、赤の太いガッシュの下塗りの密な交差線の薄い四角を1個置く。
 ```
 
 閉じた形の名前付き質感7種（刷き・刷毛目・粒・点描・平行線・交差線・アクアチント）に使える。線・弧・自由線・点、空、塗り、面省略には付けない。未対応の組み合わせでは `unsupported_surface_fineness`・`unsupported_surface_underlayer`を記録し、その修飾だけを外す。
@@ -806,11 +806,11 @@ place one red circle radius 0.1 at horizontal 0.5, vertical 0.5.
 
 ## 4. 歳時記：全語彙と受理する別形
 
-日本語を正本とする。語の綴りは `inku.saijiki.v2`（`core/crates/inku-ddl/assets/saijiki-v2.json`）に合わせる。本節は15カテゴリの全102行と、別表の「あいだ」11行を扱う。102行には、表示される98行、表示しないが直接DDLで使える3行、受理しない廃止行1行が含まれる。「あいだ」は画面では16番目のカテゴリとして並ぶ。
+日本語を正本とする。語の綴りは `inku.saijiki.v3`（`core/crates/inku-ddl/assets/saijiki-v3.json`）に合わせる。本節は15カテゴリの全101行と、別表の「あいだ」11行を扱う。101行には、表示される97行、表示しないが直接DDLで使える3行、受理しない廃止行1行が含まれる。「あいだ」は画面では16番目のカテゴリとして並ぶ。
 
 ### 読み方と書き方
 
-表の「日本語」「英語」は同じ語の正規表記である。指示書の言語で一方を使う。英語の空白やハイフンも語の一部で、`free line`、`oil paint`、`fine-brush`、`left-edge`のように書く。表の例は語を使う短い形であり、作品の見え方を固定する見本ではない。位置や大きさを省略した部分は、後述の解決規則と演奏によって決まる。
+表の「日本語」「英語」は同じ語の正規表記である。指示書の言語で一方を使う。英語の空白やハイフンも語の一部で、`free line`、`oil paint`、`painting knife`、`left-edge`のように書く。表の例は語を使う短い形であり、作品の見え方を固定する見本ではない。位置や大きさを省略した部分は、後述の解決規則と演奏によって決まる。
 
 形を名詞の中心にし、その前に属性を付け、動作へ結ぶ。例えば `赤の鉛筆の薄い点描の円を置く。` と書く。地は図形の属性にせず、`和紙。` のように独立した文にする。`地: 和紙`、`面: 点描`という見出し形式は使わない。面なら `点描の円を置く。` と書く。
 
@@ -824,7 +824,7 @@ place one red circle radius 0.1 at horizontal 0.5, vertical 0.5.
 |---|---|---|---:|---|
 | `katachi` | かたち | forms | 10 | 公開9、非表示の受理語1 |
 | `katamuki` | かたむき | angles | 8 | 公開6、非表示の受理語2 |
-| `tezawari` | てざわり | touches | 12 | 公開 |
+| `tezawari` | てざわり | touches | 11 | 公開 |
 | `tsuranari` | つらなり | continuity | 4 | 公開 |
 | `omote` | おもて | surfaces | 9 | 公開 |
 | `sabaki` | さばき | handling | 3 | 公開 |
@@ -887,16 +887,17 @@ place one red circle radius 0.1 at horizontal 0.5, vertical 0.5.
 |---|---|---|---|
 | 銀筆 | `silverpoint` | 揺れのほとんどない細かな線の痕。 | `銀筆の線を引く。` / `Draw a silverpoint line.` |
 | 鉛筆 | `pencil` | 連続した揺れ、薄い副線、微細な粒を持つ痕。 | `鉛筆の線を引く。` / `Draw a pencil line.` |
-| ペン | `pen` | インクにわずかなむらを持つ痕。資料上の既定注記がある。 | `ペンの線を引く。` / `Draw a pen line.` |
-| ロットリング | `rotring` | 均一な線幅と角端を持つ硬い製図線。 | `ロットリングの線を引く。` / `Draw a rotring line.` |
-| クレヨン | `crayon` | 蝋の擦れに短い途切れと粒状の欠けが残る。 | `クレヨンの線を引く。` / `Draw a crayon line.` |
-| チョーク | `chalk` | 粉状のかすれ、細かな隙間、軽いぼけを持つ。 | `チョークの線を引く。` / `Draw a chalk line.` |
-| 細筆 | `fine-brush` | 墨の濃淡と副線を伴う筆跡。 | `細筆の線を引く。` / `Draw a fine-brush line.` |
-| 太筆 | `thick-brush` | 筆圧と擦れた副線、軽いぼかしを持つ。 | `太筆の線を引く。` / `Draw a thick-brush line.` |
-| 油彩 | `oil paint` | 絵具が残る筆跡に刷毛筋と重なりが現れる。 | `油彩の線を引く。` / `Draw an oil paint line.` |
-| ビュラン | `burin` | 硬い彫線と丸い端を持つ。 | `ビュランの線を引く。` / `Draw a burin line.` |
-| ドライポイント | `drypoint` | まくれによる柔らかな毛羽立ち、にじみ、かすれを持つ。 | `ドライポイントの線を引く。` / `Draw a drypoint line.` |
+| ペン | `pen` | インクの線の痕。わずかなむらがあり、均一で硬い製図線にもなる。資料上の既定注記がある。 | `ペンの線を引く。` / `Draw a pen line.` |
+| チョーク | `chalk` | 色の粉や蝋の擦れに、かすれと細かな隙間、粒状の欠けが残る。 | `チョークの線を引く。` / `Draw a chalk line.` |
+| オイルパステル | `oil pastel` | 蝋と油の不透明な色を厚く擦り重ね、短い運びの跡と紙の目が残る。 | `オイルパステルの線を引く。` / `Draw an oil pastel line.` |
+| ガッシュ | `gouache` | 水で溶いた不透明な色がつやの無い平らな塗りに乾き、筆の濃淡と擦れた副線が残る。 | `ガッシュの線を引く。` / `Draw a gouache line.` |
+| 水彩 | `watercolor` | 水で溶いた透ける色が紙にしみ、重なると濃くなり、縁に色が溜まる。 | `水彩の線を引く。` / `Draw a watercolor line.` |
+| 油彩 | `oil paint` | 油で練った絵具を厚く塗り重ね、刷毛筋と盛り上がり、つやのある重なりが残る。 | `油彩の線を引く。` / `Draw an oil paint line.` |
+| ペインティングナイフ | `painting knife` | ナイフで盛って伸ばした絵具の平らな面に、稜と縁、かすれが残る。 | `ペインティングナイフの線を引く。` / `Draw a painting knife line.` |
+| エッチング | `etching` | 酸で腐食させた太さのそろった線に、わずかな荒れと丸い端が残り、線の重ねで陰を作る。 | `エッチングの線を引く。` / `Draw an etching line.` |
 | コンピュータ | `computer` | 同じ周期で正確に反復する線の揺れ。 | `コンピュータの線を引く。` / `Draw a computer line.` |
+
+歳時記 v3（2026-10-31）で、てざわりの語を12から11にした。ロットリングはペンに、クレヨンはチョークに、細筆・太筆はガッシュに、ビュラン・ドライポイントはエッチングにまとめ、オイルパステル・水彩・ペインティングナイフを足した。旧い6語は今の指示書では読まない。保存した指示書とプラグインの定義は、版の移行で一度だけ新しい語へ書き換え、太さの語も元の幅に最も近い段へ直す（例: `ロットリングの線` は `細いペンの線`、`太筆の線` は `太いガッシュの線`）。保存したScoreの旧い道具は、今までの描き方のまま描く。英語は `oil-pastel`・`painting-knife`・`watercolour` も同じ語として読む。
 
 ### 4.4. つらなり — continuity
 
@@ -934,7 +935,7 @@ place one red circle radius 0.1 at horizontal 0.5, vertical 0.5.
 | 点の痕 | 面の9語を受理しない。点自体は丸い塗られた痕として残る。 |
 | 三日月の弧 | 面の明示指定は塗りだけを受理する。空・7質感は受理しない。 |
 
-刷きは自らの「薄さ」を持たない。薄くしたいときは `薄い刷き` と書く。開いた痕の刷きは道具の幅の3倍の帯、道具の不透明度の0.8倍になる。太い・ごく太いの帯は、既定の幅の3倍に、太さの語が丸筆に足す幅だけを足した幅になる（例: 太筆のごく太いは、短辺1000当たり150でなく66）。面の刷きは一掃き0.6倍の膜を二度、刷毛目は一本ずつ0.5倍で重ねる。道具とさばきも見え方に作用する。
+刷きは自らの「薄さ」を持たない。薄くしたいときは `薄い刷き` と書く。開いた痕の刷きは道具の幅の3倍の帯、道具の不透明度の0.8倍になる。太い・ごく太いの帯は、既定の幅の3倍に、太さの語が丸筆に足す幅だけを足した幅になる（例: 油彩のごく太いは、短辺1000当たり180でなく84）。面の刷きは一掃き0.6倍の膜を二度、刷毛目は一本ずつ0.5倍で重ねる。道具とさばきも見え方に作用する。
 
 `塗りの弧`は、両端のTouchingで閉じる弧の内側を塗る意図にも使える。単独の通常弧や線に塗りを書くだけで、別の閉じた形を作る意味にはならない。
 
@@ -1133,13 +1134,14 @@ place one red circle radius 0.1 at horizontal 0.5, vertical 0.5.
 
 | 分類 | 語・例 | 扱い |
 |---|---|---|
-| 現行parser別表記 | 三角形、四角形、長方形、`rectangle`、`lines`、横、縦、英語の4つの空白付きedge、`arrange`・`line up`、縦に長い・細長い・横に長い | 対応する正規行と同じidentity。公開の綴りは上の表のまま。 |
+| 現行parser別表記 | 三角形、四角形、長方形、`rectangle`、`lines`、横、縦、英語の4つの空白付きedge、`arrange`・`line up`、縦に長い・細長い・横に長い、`oil-pastel`・`painting-knife`・`watercolour` | 対応する正規行と同じidentity。公開の綴りは上の表のまま。 |
 | 現行文法形 | 白い・赤色など、英語形名詞の複数形、`horizontally`・`vertically`・`diagonally`、`sways`・`undulates` | 許された文法変化。語や個数の追加ではない。 |
 | 非表示の受理語 | 多角形、左上がり、左下がり | promptと表示には出さないが、markerが有効なので直接DDLで認識する。 |
 | 廃止row | 描く | assetに墓標として残り、parserの候補にならない。英語表面はない。 |
-| v1移行専用の旧語 | 薄墨 / `pale ink wash`、ゆっくり / `slowly`、速く / `quickly`、震える / `trembling`・`trembles`、滲む / `blurring`、中央 / `middle`、点描の意味の点 | 新しいv2指示書の別名としては受理しない。保存文書の版移行で現行語へ書き換える。形の点と、地の薄墨地は現役の別語。 |
+| v1移行専用の旧語 | 薄墨 / `pale ink wash`、ゆっくり / `slowly`、速く / `quickly`、震える / `trembling`・`trembles`、滲む / `blurring`、中央 / `middle`、点描の意味の点 | 今の指示書の別名としては受理しない。保存文書の版移行で現行語へ書き換える。形の点と、地の薄墨地は現役の別語。 |
+| v2移行専用の旧語 | ロットリング / `rotring`、クレヨン / `crayon`、細筆 / `fine-brush`、太筆 / `thick-brush`、ビュラン / `burin`、ドライポイント / `drypoint` | 今の指示書の別名としては受理しない。保存文書とプラグインの定義の版移行で、ペン・チョーク・ガッシュ・エッチングへ書き換え、太さの語も直す（4.3）。 |
 | v1での振幅表現 | `fine`・`finely`、`large`・`largely` | 振幅なら`narrowly`・`broadly`へ版移行する。現在の`large`は図形の大小という別の文法役割。 |
-| 内部値 | `brush_thin`、`brush_thick`、`oil_paint`、面の`none`・`solid`、`fine_grained`、`line_up`、`not_touching`など | Score・typed meaning・下絵の識別子であり、英語本文の`fine-brush`・`flat`・`fine-grained`・`line-up`等と取り違えない。 |
+| 内部値 | `oil_pastel`、`painting_knife`、`oil_paint`、面の`none`・`solid`、`fine_grained`、`line_up`、`not_touching`など | Score・typed meaning・下絵の識別子であり、英語本文の`oil pastel`・`flat`・`fine-grained`・`line-up`等と取り違えない。保存したScoreだけが持つ旧い道具の値（`rotring`・`crayon`・`brush_thin`・`brush_thick`・`burin`・`drypoint`）は、DDLから届かない。 |
 | 語の注記 | `（既定）`、`(default)`、道具の物理説明文 | 辞書を読む人や下絵向けの説明。DDL語そのものではない。 |
 
 ### 歳時記の外にある有限文法
@@ -1156,13 +1158,13 @@ place one red circle radius 0.1 at horizontal 0.5, vertical 0.5.
 | 組・繰返し・薄れ・色の推移 | 組、繰り返して、左から右へ薄れさせて、順に段々に移して | 本文の構造や配列への指定。新カテゴリや語彙チップを作らない。 |
 | キャンバス形式 | `square`・`a4`・`wide`などの選択肢 | 描く紙のホスト側の選択で、形式の名を DDL 本文に書かない。DDL が書くのは組んだ比の宣言「画面比W:H。」（3.27）。同じ綴りの形・比率語と混同しない。 |
 | 題の行 | `「灯台」`・`「」` / `"lighthouse"`・`""` | 括弧で囲んだ名だけの行で、次の題までの文のまとまりに名を付ける（3.1）。描かず、文の番号を取らない。中の語は描く語として読まない。 |
-| 語彙Macro | `Nature.YoungLeaves`などの修飾名 | 登録された別の語彙カタログ。コア歳時記102行へ算入しない。 |
+| 語彙Macro | `Nature.YoungLeaves`などの修飾名 | 登録された別の語彙カタログ。コア歳時記101行へ算入しない。 |
 
 ### 出典と確認範囲
 
-語の綴り・フラグ・順序は `core/crates/inku-ddl/assets/saijiki-v2.json`、認識対象と投影は `src/saijiki.rs`、別表記・文法形は `src/parser.rs`と`src/shape_constraint.rs`に基づく。受理条件は `src/score_lowering.rs`、`src/geometry.rs`、`src/score_angle.rs`、`src/fluctuation.rs`、`assets/work-plan-capabilities-v2.json`と、該当のfixture／テスト本文を照合した。面の受理と目に見える演奏の差は `inku-render/src/surfaces.rs`・`marks.rs`・`support.rs`を確認した。UIの短い説明は `web/src/routes/+page.svelte`と`web/src/lib/saijiki-surface.ts`も参照した。
+語の綴り・フラグ・順序は `core/crates/inku-ddl/assets/saijiki-v3.json`、認識対象と投影は `src/saijiki.rs`、別表記・文法形は `src/parser.rs`と`src/shape_constraint.rs`に基づく。受理条件は `src/score_lowering.rs`、`src/geometry.rs`、`src/score_angle.rs`、`src/fluctuation.rs`、`assets/work-plan-capabilities-v2.json`と、該当のfixture／テスト本文を照合した。面の受理と目に見える演奏の差は `inku-render/src/surfaces.rs`・`marks.rs`・`support.rs`を確認した。UIの短い説明は `web/src/routes/+page.svelte`と`web/src/lib/saijiki-surface.ts`も参照した。
 
-基準commitは`97b50a52367554a94e9f364b90dc538d0f6b68bc`。語形と受理境界はこの版のソースに対応する。実際の描画では、前の対象を必要とする関係句、作品の条件、資源制限も確認する。
+基準commitは`97b50a52367554a94e9f364b90dc538d0f6b68bc`。語形と受理境界はこの版のソースに対応する。ただし、てざわりの語（4.3）・行数と、例の道具の語は、歳時記 v3（2026-10-31）に合わせて直し、全ての例を v3 の core で compile して確かめた。実際の描画では、前の対象を必要とする関係句、作品の条件、資源制限も確認する。
 
 ## 5. 複雑な DDL 50例
 
@@ -1202,8 +1204,8 @@ Place one black empty square side length 0.2 at horizontal 0.5, vertical 0.7.
 
 ```text
 画用紙。
-画面の横0.3、縦0.4の位置に、半径0.12の青のロットリングの空の円を1個置く。
-画面の横0.7、縦0.4の位置に、直径0.24の赤のロットリングの空の円を1個置く。
+画面の横0.3、縦0.4の位置に、半径0.12の青の細いペンの空の円を1個置く。
+画面の横0.7、縦0.4の位置に、直径0.24の赤の細いペンの空の円を1個置く。
 画面の横0.2、縦0.75から横0.8、縦0.75まで、半径0.01の黒の点を7個並べる。
 ```
 
@@ -1211,8 +1213,8 @@ Place one black empty square side length 0.2 at horizontal 0.5, vertical 0.7.
 
 ```text
 Drawing paper.
-Place one blue rotring empty circle radius 0.12 at horizontal 0.3, vertical 0.4.
-Place one red rotring empty circle diameter 0.24 at horizontal 0.7, vertical 0.4.
+Place one blue thin pen empty circle radius 0.12 at horizontal 0.3, vertical 0.4.
+Place one red thin pen empty circle diameter 0.24 at horizontal 0.7, vertical 0.4.
 Line up 7 black points radius 0.01 from horizontal 0.2, vertical 0.75 to horizontal 0.8, vertical 0.75.
 ```
 
@@ -1248,7 +1250,7 @@ Draw one black horizontal line length 0.4 at horizontal 0.5, vertical 0.75.
 和紙。
 上に、大きな青の空の横長の楕円を1個置く。
 下に、小さな赤の塗りの縦長の楕円を3個並べる。
-左端に、黒の細筆の垂直の線を1個引く。
+左端に、黒のガッシュの垂直の線を1個引く。
 ```
 
 英語DDL：
@@ -1257,7 +1259,7 @@ Draw one black horizontal line length 0.4 at horizontal 0.5, vertical 0.75.
 Washi.
 Place one large blue empty wide ellipse at the top.
 Line up 3 small red flat tall ellipses at the bottom.
-Draw one black fine-brush vertical line at left-edge.
+Draw one black gouache vertical line at left-edge.
 ```
 
 ### 5.05. 暗い地に白い痕
@@ -1271,7 +1273,7 @@ Draw one black fine-brush vertical line at left-edge.
 背景を黒で埋める。
 上に、白のチョークの薄い塗りの大きな円を1個置く。
 下に、白の鉛筆の小さな三角を5個並べる。
-中心に、白の細筆の水平の線を1個引く。
+中心に、白のガッシュの水平の線を1個引く。
 ```
 
 英語DDL：
@@ -1281,7 +1283,7 @@ Charcoal ground.
 Fill the background with black.
 Place one large white chalk faint flat circle at the top.
 Line up 5 small white pencil triangles at the bottom.
-Draw one white fine-brush horizontal line at the center.
+Draw one white gouache horizontal line at the center.
 ```
 
 ### 5.06. 薄墨地とにじむ輪郭
@@ -1293,8 +1295,8 @@ Draw one white fine-brush horizontal line at the center.
 ```text
 薄墨地。
 背景を白で埋める。
-上に、青の太筆の薄い刷きの横長の楕円を1個置く。
-下に、にじみの赤の細筆の空の円を3個並べる。
+上に、青の太いガッシュの薄い刷きの横長の楕円を1個置く。
+下に、にじみの赤のガッシュの空の円を3個並べる。
 中心に、黒のペンの点線の水平の線を1個引く。
 ```
 
@@ -1303,8 +1305,8 @@ Draw one white fine-brush horizontal line at the center.
 ```text
 Ink wash ground.
 Fill the background with white.
-Place one blue thick-brush faint sweep wide ellipse at the top.
-Line up 3 red fine-brush bleeding empty circles at the bottom.
+Place one blue thick gouache faint sweep wide ellipse at the top.
+Line up 3 red gouache bleeding empty circles at the bottom.
 Draw one black pen dotted horizontal line at the center.
 ```
 
@@ -1316,20 +1318,20 @@ Draw one black pen dotted horizontal line at the center.
 
 ```text
 紙。
-画面の横0.5、縦0.2の位置に、長さ0.6の黒のロットリングの実線の水平の線を1個引く。
-画面の横0.5、縦0.4の位置に、長さ0.6の黒のロットリングの破線の水平の線を1個引く。
-画面の横0.5、縦0.6の位置に、長さ0.6の黒のロットリングの点線の水平の線を1個引く。
-画面の横0.5、縦0.8の位置に、長さ0.6の黒のロットリングの一点鎖線の水平の線を1個引く。
+画面の横0.5、縦0.2の位置に、長さ0.6の黒の細いペンの実線の水平の線を1個引く。
+画面の横0.5、縦0.4の位置に、長さ0.6の黒の細いペンの破線の水平の線を1個引く。
+画面の横0.5、縦0.6の位置に、長さ0.6の黒の細いペンの点線の水平の線を1個引く。
+画面の横0.5、縦0.8の位置に、長さ0.6の黒の細いペンの一点鎖線の水平の線を1個引く。
 ```
 
 英語DDL：
 
 ```text
 Paper.
-Draw one black rotring solid horizontal line length 0.6 at horizontal 0.5, vertical 0.2.
-Draw one black rotring dashed horizontal line length 0.6 at horizontal 0.5, vertical 0.4.
-Draw one black rotring dotted horizontal line length 0.6 at horizontal 0.5, vertical 0.6.
-Draw one black rotring dash-dot horizontal line length 0.6 at horizontal 0.5, vertical 0.8.
+Draw one black thin pen solid horizontal line length 0.6 at horizontal 0.5, vertical 0.2.
+Draw one black thin pen dashed horizontal line length 0.6 at horizontal 0.5, vertical 0.4.
+Draw one black thin pen dotted horizontal line length 0.6 at horizontal 0.5, vertical 0.6.
+Draw one black thin pen dash-dot horizontal line length 0.6 at horizontal 0.5, vertical 0.8.
 ```
 
 ### 5.08. 画材の交互と鏡写し
@@ -1340,7 +1342,7 @@ Draw one black rotring dash-dot horizontal line length 0.6 at horizontal 0.5, ve
 
 ```text
 紙。
-鉛筆と太筆を交互にして、黒い線を五本並べる。
+鉛筆とガッシュを交互にして、黒い線を五本並べる。
 左端に斜めの赤い弧を置く。
 右端に前の形と鏡写しの青い弧を置く。
 ```
@@ -1349,22 +1351,22 @@ Draw one black rotring dash-dot horizontal line length 0.6 at horizontal 0.5, ve
 
 ```text
 Paper.
-Line up five black lines, alternating pencil and thick-brush.
+Line up five black lines, alternating pencil and gouache.
 Place a diagonal red arc at left-edge.
 Place a blue arc at right-edge, mirrored with the previous shape.
 ```
 
 ### 5.09. 三つの細い道具
 
-ねらい：銀筆、ビュラン、ドライポイントを別々の痕へ指定する。
+ねらい：銀筆、細いペン、エッチングを別々の痕へ指定する。
 
 日本語DDL：
 
 ```text
 画用紙。
 上に、灰の銀筆の細い水平の線を3個並べる。
-中心に、黒のビュランの空の円を3個並べる。
-下に、赤のドライポイントの小さな半円の弧を5個並べる。
+中心に、黒の細いペンの空の円を3個並べる。
+下に、赤のエッチングの小さな半円の弧を5個並べる。
 ```
 
 英語DDL：
@@ -1372,8 +1374,8 @@ Place a blue arc at right-edge, mirrored with the previous shape.
 ```text
 Drawing paper.
 Line up 3 gray silverpoint thin horizontal lines at the top.
-Line up 3 black burin empty circles at the center.
-Line up 5 small red drypoint semicircle arcs at the bottom.
+Line up 3 black thin pen empty circles at the center.
+Line up 5 small red etching semicircle arcs at the bottom.
 ```
 
 ### 5.10. 刷きの膜と刷毛目の筋
@@ -1385,8 +1387,8 @@ Line up 5 small red drypoint semicircle arcs at the bottom.
 ```text
 カンバス。
 背景を灰で埋める。
-画面の横0.3、縦0.5の位置に、一辺0.3の白の太筆の刷きの四角を1個置く。
-画面の横0.7、縦0.5の位置に、一辺0.3の白の太筆の刷毛目の四角を1個置く。
+画面の横0.3、縦0.5の位置に、一辺0.3の白の太いガッシュの刷きの四角を1個置く。
+画面の横0.7、縦0.5の位置に、一辺0.3の白の太いガッシュの刷毛目の四角を1個置く。
 ```
 
 英語DDL：
@@ -1394,8 +1396,8 @@ Line up 5 small red drypoint semicircle arcs at the bottom.
 ```text
 Canvas.
 Fill the background with gray.
-Place one white thick-brush sweep square side length 0.3 at horizontal 0.3, vertical 0.5.
-Place one white thick-brush brushmarks square side length 0.3 at horizontal 0.7, vertical 0.5.
+Place one white thick gouache sweep square side length 0.3 at horizontal 0.3, vertical 0.5.
+Place one white thick gouache brushmarks square side length 0.3 at horizontal 0.7, vertical 0.5.
 ```
 
 ### 5.11. きめの大きさを変える
@@ -1408,7 +1410,7 @@ Place one white thick-brush brushmarks square side length 0.3 at horizontal 0.7,
 紙。
 上に、赤のペンの細かい点描の円を1個置く。
 下に、青のペンの粗い粒の楕円を1個置く。
-中心に、黒のロットリングの水平の線を1個引く。
+中心に、黒の細いペンの水平の線を1個引く。
 ```
 
 英語DDL：
@@ -1417,7 +1419,7 @@ Place one white thick-brush brushmarks square side length 0.3 at horizontal 0.7,
 Paper.
 Place one red pen fine-grained stipple circle at the top.
 Place one blue pen coarse-grained grain ellipse at the bottom.
-Draw one black rotring horizontal line at the center.
+Draw one black thin pen horizontal line at the center.
 ```
 
 ### 5.12. 下塗りの上に線の面
@@ -1428,18 +1430,18 @@ Draw one black rotring horizontal line at the center.
 
 ```text
 カンバス。
-上に、赤の太筆の下塗りの密な交差線の薄い四角を1個置く。
+上に、赤の太いガッシュの下塗りの密な交差線の薄い四角を1個置く。
 下に、青のペンの下塗りの疎な平行線の楕円を1個置く。
-中心に、黒の細筆の小さな空の円を3個並べる。
+中心に、黒のガッシュの小さな空の円を3個並べる。
 ```
 
 英語DDL：
 
 ```text
 Canvas.
-Place one red thick-brush faint underpainted packed crosshatch square at the top.
+Place one red thick gouache faint underpainted packed crosshatch square at the top.
 Place one blue pen underpainted sparse hatch ellipse at the bottom.
-Line up 3 small black fine-brush empty circles at the center.
+Line up 3 small black gouache empty circles at the center.
 ```
 
 ### 5.13. 密な点描と疎な点描
@@ -1474,7 +1476,7 @@ Line up 7 small black pen points at the bottom.
 メゾチント。
 背景を白で埋める。
 上に、赤のペンの疎なアクアチントの雲形を1個置く。
-下に、黄の太筆の下塗りの細かいアクアチントの三角を3個並べる。
+下に、黄の太いガッシュの下塗りの細かいアクアチントの三角を3個並べる。
 ```
 
 英語DDL：
@@ -1483,7 +1485,7 @@ Line up 7 small black pen points at the bottom.
 Mezzotint.
 Fill the background with white.
 Place one red pen sparse aquatint cloudform at the top.
-Line up 3 yellow thick-brush underpainted fine-grained aquatint triangles at the bottom.
+Line up 3 yellow thick gouache underpainted fine-grained aquatint triangles at the bottom.
 ```
 
 ### 5.15. 振れ幅の異なる揺れ
@@ -1494,18 +1496,18 @@ Line up 3 yellow thick-brush underpainted fine-grained aquatint triangles at the
 
 ```text
 和紙。
-上に、細かく揺れる青の細筆の水平の線を1個引く。
-下に、大きく揺れる赤の細筆の水平の線を1個引く。
-中心に、黒のロットリングの小さな空の円を5個並べる。
+上に、細かく揺れる青のガッシュの水平の線を1個引く。
+下に、大きく揺れる赤のガッシュの水平の線を1個引く。
+中心に、黒の細いペンの小さな空の円を5個並べる。
 ```
 
 英語DDL：
 
 ```text
 Washi.
-Draw one blue fine-brush narrowly swaying horizontal line at the top.
-Draw one red fine-brush broadly swaying horizontal line at the bottom.
-Line up 5 small black rotring empty circles at the center.
+Draw one blue gouache narrowly swaying horizontal line at the top.
+Draw one red gouache broadly swaying horizontal line at the bottom.
+Line up 5 small black thin pen empty circles at the center.
 ```
 
 ### 5.16. 波の間隔を変える
@@ -1518,7 +1520,7 @@ Line up 5 small black rotring empty circles at the center.
 画用紙。
 上に、細かくゆるやかに波打つ青のペンの水平の線を1個引く。
 下に、細かく小刻みに波打つ赤のペンの水平の線を1個引く。
-中心に、灰の太筆の薄い塗りの横長の楕円を1個置く。
+中心に、灰の太いガッシュの薄い塗りの横長の楕円を1個置く。
 ```
 
 英語DDL：
@@ -1527,7 +1529,7 @@ Line up 5 small black rotring empty circles at the center.
 Drawing paper.
 Draw one blue pen narrowly loosely undulating horizontal line at the top.
 Draw one red pen narrowly tightly undulating horizontal line at the bottom.
-Place one gray thick-brush faint flat wide ellipse at the center.
+Place one gray thick gouache faint flat wide ellipse at the center.
 ```
 
 ### 5.17. 半円と三日月の弧
@@ -1539,7 +1541,7 @@ Place one gray thick-brush faint flat wide ellipse at the center.
 ```text
 紙。
 上に、赤のペンの半幅の半円の弧を1個置く。
-中心に、青の細筆の全幅の三日月の弧を1個置く。
+中心に、青のガッシュの全幅の三日月の弧を1個置く。
 下に、灰の鉛筆の小さな空の円を7個並べる。
 ```
 
@@ -1548,7 +1550,7 @@ Place one gray thick-brush faint flat wide ellipse at the center.
 ```text
 Paper.
 Place one red pen half-width semicircle arc at the top.
-Place one blue fine-brush full-width crescent arc at the center.
+Place one blue gouache full-width crescent arc at the center.
 Line up 7 small gray pencil empty circles at the bottom.
 ```
 
@@ -1560,8 +1562,8 @@ Line up 7 small gray pencil empty circles at the bottom.
 
 ```text
 和紙。
-上に、黒の細筆の半幅の上弦の弧を1個置く。
-下に、黒の細筆の半幅の下弦の弧を1個置く。
+上に、黒のガッシュの半幅の上弦の弧を1個置く。
+下に、黒のガッシュの半幅の下弦の弧を1個置く。
 中心に、赤のペンの小さな点を9個並べる。
 ```
 
@@ -1569,8 +1571,8 @@ Line up 7 small gray pencil empty circles at the bottom.
 
 ```text
 Washi.
-Place one black fine-brush half-width waxing arc at the top.
-Place one black fine-brush half-width waning arc at the bottom.
+Place one black gouache half-width waxing arc at the top.
+Place one black gouache half-width waning arc at the bottom.
 Line up 9 small red pen points at the center.
 ```
 
@@ -1582,7 +1584,7 @@ Line up 9 small red pen points at the center.
 
 ```text
 紙。
-画面の横0.15、縦0.2から横0.85、縦0.7まで、青の細筆の自由線を1個引く。
+画面の横0.15、縦0.2から横0.85、縦0.7まで、青のガッシュの自由線を1個引く。
 画面の横0.15、縦0.8から横0.85、縦0.3まで、灰の鉛筆の破線の線を1個引く。
 上に、赤のペンの小さな空の円を3個並べる。
 ```
@@ -1591,7 +1593,7 @@ Line up 9 small red pen points at the center.
 
 ```text
 Paper.
-Draw one blue fine-brush free line from horizontal 0.15, vertical 0.2 to horizontal 0.85, vertical 0.7.
+Draw one blue gouache free line from horizontal 0.15, vertical 0.2 to horizontal 0.85, vertical 0.7.
 Draw one gray pencil dashed line from horizontal 0.15, vertical 0.8 to horizontal 0.85, vertical 0.3.
 Line up 3 small red pen empty circles at the top.
 ```
@@ -1605,7 +1607,7 @@ Line up 3 small red pen empty circles at the top.
 ```text
 和紙。
 中心に、黒のペンの円を1個置く。
-前の形につながる黒の細筆の自由線を1個引く。
+前の形につながる黒のガッシュの自由線を1個引く。
 前の形につながる赤のペンの線を1個引く。
 ```
 
@@ -1614,7 +1616,7 @@ Line up 3 small red pen empty circles at the top.
 ```text
 Washi.
 Place one black pen circle at the center.
-Draw one black fine-brush free line connected to the previous shape.
+Draw one black gouache free line connected to the previous shape.
 Draw one red pen line connected to the previous shape.
 ```
 
@@ -1693,7 +1695,7 @@ Line up 3 green empty circles at the bottom.
 ```text
 画用紙。
 中心に、黒の鉛筆の水平の線を1個置く。
-中心に、前の線に沿って、青の細筆の線を1個置く。
+中心に、前の線に沿って、青のガッシュの線を1個置く。
 下に、赤の小さな空の円を5個並べる。
 ```
 
@@ -1702,7 +1704,7 @@ Line up 3 green empty circles at the bottom.
 ```text
 Drawing paper.
 Place one black pencil horizontal line at the center.
-Place one blue fine-brush line at the center along the previous line.
+Place one blue gouache line at the center along the previous line.
 Line up 5 small red empty circles at the bottom.
 ```
 
@@ -1738,7 +1740,7 @@ Line up 7 small blue points at the top.
 和紙。
 中心に、赤の塗りの円を1個置く。
 前の形に触れない青の空の四角を中心に1個置く。
-下に、黒の細筆の小さな弧を3個並べる。
+下に、黒のガッシュの小さな弧を3個並べる。
 ```
 
 英語DDL：
@@ -1747,7 +1749,7 @@ Line up 7 small blue points at the top.
 Washi.
 Place one red flat circle at the center.
 Place one blue empty square at the center not touching the previous shape.
-Line up 3 small black fine-brush arcs at the bottom.
+Line up 3 small black gouache arcs at the bottom.
 ```
 
 ### 5.27. 前の二つの間に置く
@@ -1781,7 +1783,7 @@ Place one small green flat square at the center between the previous two.
 ```text
 カンバス。
 背景を黒で埋める。
-中心に、黄の太筆の薄い刷きの大きな四角を1個置く。
+中心に、黄の太いガッシュの薄い刷きの大きな四角を1個置く。
 白の鉛筆のとても小さな点を40個散らす、前の形の中に。
 ```
 
@@ -1790,7 +1792,7 @@ Place one small green flat square at the center between the previous two.
 ```text
 Canvas.
 Fill the background with black.
-Place one large yellow thick-brush faint sweep square at the center.
+Place one large yellow thick gouache faint sweep square at the center.
 Scatter 40 very small white pencil points inside the previous shape.
 ```
 
@@ -1803,8 +1805,8 @@ Scatter 40 very small white pencil points inside the previous shape.
 ```text
 画用紙。
 背景を白で埋める。
-下に、灰の太筆の薄い塗りの大きな横長の四角を1個置く。
-黄のクレヨンの濃い塗りの小さな円を12個散らす、前の形に載る。
+下に、灰の太いガッシュの薄い塗りの大きな横長の四角を1個置く。
+黄のチョークの濃い塗りの小さな円を12個散らす、前の形に載る。
 上に、黒のペンの水平の線を1個引く。
 ```
 
@@ -1813,8 +1815,8 @@ Scatter 40 very small white pencil points inside the previous shape.
 ```text
 Drawing paper.
 Fill the background with white.
-Place one large gray thick-brush faint flat wide square at the bottom.
-Scatter 12 small yellow crayon dense flat circles resting on the previous shape.
+Place one large gray thick gouache faint flat wide square at the bottom.
+Scatter 12 small yellow chalk dense flat circles resting on the previous shape.
 Draw one black pen horizontal line at the top.
 ```
 
@@ -1826,7 +1828,7 @@ Draw one black pen horizontal line at the top.
 
 ```text
 紙。
-中心に、赤の太筆の薄い塗りの四角を1個置く。
+中心に、赤の太いガッシュの薄い塗りの四角を1個置く。
 前の形に重なる青の空の円を中心に1個置く。
 前の形を横切る長さ0.5の黒の斜めの線を中心に1個引く。
 ```
@@ -1835,7 +1837,7 @@ Draw one black pen horizontal line at the top.
 
 ```text
 Paper.
-Place one red thick-brush faint flat square at the center.
+Place one red thick gouache faint flat square at the center.
 Place one blue empty circle at the center overlapping the previous shape.
 Draw one black diagonal line length 0.5 at the center crossing the previous shape.
 ```
@@ -1872,7 +1874,7 @@ Line up 9 small black pencil points at the bottom.
 紙。
 赤い円と青い四角を中心に重ねて置く。
 上に、黄の小さな三角を3個並べる。
-下に、黒の細筆の半幅の弧を1個引く。
+下に、黒のガッシュの半幅の弧を1個引く。
 ```
 
 英語DDL：
@@ -1881,7 +1883,7 @@ Line up 9 small black pencil points at the bottom.
 Paper.
 Place a red circle and a blue square overlapping at the center.
 Line up 3 small yellow triangles at the top.
-Draw one black fine-brush half-width arc at the bottom.
+Draw one black gouache half-width arc at the bottom.
 ```
 
 ### 5.33. 三種類の形を繰り返す
@@ -1916,7 +1918,7 @@ Scatter 5 small yellow points at the bottom.
 紙。
 赤い円と青い線の組を、灰の弧と交互に5つ並べる。
 上に、黒の鉛筆の小さな点を7個並べる。
-下に、緑の太筆の薄い塗りの四角を1個置く。
+下に、緑の太いガッシュの薄い塗りの四角を1個置く。
 ```
 
 英語DDL：
@@ -1925,7 +1927,7 @@ Scatter 5 small yellow points at the bottom.
 Paper.
 Line up five, alternating a group of a red circle and a blue line with a gray arc.
 Line up 7 small black pencil points at the top.
-Place one green thick-brush faint flat square at the bottom.
+Place one green thick gouache faint flat square at the bottom.
 ```
 
 ### 5.35. 二色の交互を別の列へ
@@ -1938,7 +1940,7 @@ Place one green thick-brush faint flat square at the bottom.
 紙。
 上に、赤と灰を交互にして、小さな空の円を5個並べる。
 下に、青と黄を交互にして、小さな塗りの四角を7個並べる。
-中心に、黒のロットリングの水平の線を1個引く。
+中心に、黒の細いペンの水平の線を1個引く。
 ```
 
 英語DDL：
@@ -1947,7 +1949,7 @@ Place one green thick-brush faint flat square at the bottom.
 Paper.
 Line up 5 small empty circles at the top, alternating red and gray.
 Line up 7 small flat squares at the bottom, alternating blue and yellow.
-Draw one black rotring horizontal line at the center.
+Draw one black thin pen horizontal line at the center.
 ```
 
 ### 5.36. 三色の巡りを散らす
@@ -1981,7 +1983,7 @@ Place one white pen empty wide ellipse at the bottom.
 ```text
 紙。
 画面の横0〜1、縦0〜1の範囲に、白と青を交互にして、一辺0.142857の塗りの四角を49個敷き詰める。
-中心に、赤の太筆の空の大きな円を1個置く。
+中心に、赤の太いガッシュの空の大きな円を1個置く。
 下に、黒のペンの半幅の水平の線を1個引く。
 ```
 
@@ -1990,7 +1992,7 @@ Place one white pen empty wide ellipse at the bottom.
 ```text
 Paper.
 Tile 49 flat squares side length 0.142857 in the range horizontal 0 to 1, vertical 0 to 1, alternating white and blue.
-Place one large red thick-brush empty circle at the center.
+Place one large red thick gouache empty circle at the center.
 Draw one black pen half-width horizontal line at the bottom.
 ```
 
@@ -2116,7 +2118,7 @@ Scatter 3 small red points at the top.
 紙。
 画面の横0.1〜0.9、縦0.3〜0.9の範囲に、半径0.06の黒の空の六角形を9個敷き詰める。
 画面の横0.1、縦0.15から横0.9、縦0.15まで、半径0.04の赤の塗りの六角形を7個並べる。
-中心に、青の細筆の小さな空の円を1個置く。
+中心に、青のガッシュの小さな空の円を1個置く。
 ```
 
 英語DDL：
@@ -2125,7 +2127,7 @@ Scatter 3 small red points at the top.
 Paper.
 Tile 9 black empty hexagon radius 0.06 in the range horizontal 0.1 to 0.9, vertical 0.3 to 0.9.
 Line up 7 red flat hexagon radius 0.04 from horizontal 0.1, vertical 0.15 to horizontal 0.9, vertical 0.15.
-Place one small blue fine-brush empty circle at the center.
+Place one small blue gouache empty circle at the center.
 ```
 
 ### 5.44. 小さい、普通、大きい
@@ -2204,7 +2206,7 @@ Draw one black pen half-width horizontal line at the bottom.
 カンバス。
 背景を黒で埋める。
 画面全体（横0〜1、縦0〜1）に、赤・橙・黄の順に繰り返して、中心から外へ薄れさせて、とても小さな点を30個散らす。
-中心に、白のロットリングの空の小さな円を1個置く。
+中心に、白の細いペンの空の小さな円を1個置く。
 ```
 
 英語DDL：
@@ -2213,7 +2215,7 @@ Draw one black pen half-width horizontal line at the bottom.
 Canvas.
 Fill the background with black.
 Scatter 30 very small points in the whole canvas (horizontal 0 to 1, vertical 0 to 1), repeating red, orange, and yellow in order, fading outward from the center.
-Place one small white rotring empty circle at the center.
+Place one small white thin pen empty circle at the center.
 ```
 
 ### 5.48. 巡る色と一度だけ移る色
@@ -2248,7 +2250,7 @@ Draw one black pencil horizontal line at the center.
 紙。
 上の帯（横0.1〜0.9、縦0.1〜0.4）に、黄・橙・赤の順に段々に移して、小さな四角を6個敷き詰める。
 下の帯（横0.1〜0.9、縦0.6〜0.9）に、回転45度の青の空の小さな四角を9個敷き詰める。
-中心に、黒の細筆の半幅の水平の線を1個引く。
+中心に、黒のガッシュの半幅の水平の線を1個引く。
 ```
 
 英語DDL：
@@ -2257,7 +2259,7 @@ Draw one black pencil horizontal line at the center.
 Paper.
 Tile 6 small squares in the upper band (horizontal 0.1 to 0.9, vertical 0.1 to 0.4), shifting through yellow, orange, and red in order.
 Tile 9 small blue empty squares rotated 45 degrees in the lower band (horizontal 0.1 to 0.9, vertical 0.6 to 0.9).
-Draw one black fine-brush half-width horizontal line at the center.
+Draw one black gouache half-width horizontal line at the center.
 ```
 
 ### 5.50. 地、質感、列、道筋を重ねる
@@ -2269,10 +2271,10 @@ Draw one black fine-brush half-width horizontal line at the center.
 ```text
 和紙。
 背景を白で埋める。
-下の帯（横0〜1、縦2/3〜1）に、灰の太筆の薄い刷きの横長の大きな四角を1個置く。
-画面の横0.5、縦0.35の位置に、幅0.35、高さ0.2の赤の太筆の下塗りの細かい刷毛目の雲形を1個置く。
+下の帯（横0〜1、縦2/3〜1）に、灰の太いガッシュの薄い刷きの横長の大きな四角を1個置く。
+画面の横0.5、縦0.35の位置に、幅0.35、高さ0.2の赤の太いガッシュの下塗りの細かい刷毛目の雲形を1個置く。
 画面の横0.1、縦0.7から横0.9、縦0.7まで、青と黄を交互にして、半径0.025の空の円を9個並べる。
-画面の横0.15、縦0.15から横0.85、縦0.55まで、黒の細筆の自由線を1個引く。
+画面の横0.15、縦0.15から横0.85、縦0.55まで、黒のガッシュの自由線を1個引く。
 ```
 
 英語DDL：
@@ -2280,8 +2282,8 @@ Draw one black fine-brush half-width horizontal line at the center.
 ```text
 Washi.
 Fill the background with white.
-Place one large gray thick-brush faint sweep wide square in the lower band (horizontal 0 to 1, vertical 2/3 to 1).
-Place one red thick-brush underpainted fine-grained brushmarks cloudform width 0.35, height 0.2 at horizontal 0.5, vertical 0.35.
+Place one large gray thick gouache faint sweep wide square in the lower band (horizontal 0 to 1, vertical 2/3 to 1).
+Place one red thick gouache underpainted fine-grained brushmarks cloudform width 0.35, height 0.2 at horizontal 0.5, vertical 0.35.
 Line up 9 empty circles radius 0.025 from horizontal 0.1, vertical 0.7 to horizontal 0.9, vertical 0.7, alternating blue and yellow.
-Draw one black fine-brush free line from horizontal 0.15, vertical 0.15 to horizontal 0.85, vertical 0.55.
+Draw one black gouache free line from horizontal 0.15, vertical 0.15 to horizontal 0.85, vertical 0.55.
 ```

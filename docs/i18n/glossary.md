@@ -132,6 +132,9 @@ composition / color catalog と食い違って見える（→ §8）。
 | 揺らぎ | **sway** | 名詞 | ~~fluctuation~~（計測器）、~~jitter~~（信号） |
 | 添景 | **staffage** | 名詞。v2.11.0 で軸ごと畳んだ（記録の表示にのみ残る） | ~~decoration~~、~~props~~ |
 | 銀筆 | **silverpoint** | 名詞。Score の `weight` 値と同綴り・小文字 | ~~hair~~（画材として存在しない語だった）、~~metalpoint~~ |
+| ペインティングナイフ | **painting knife** | 名詞。歳時記のてざわり（歳時記 v3、2026-10-31）。画面に絵具を盛って伸ばす道具の正確な名（作者の選択）。Score の値は `painting_knife`。DDL は `painting-knife` も読む | ~~`palette knife`~~（本来はパレットの上で混ぜ・掻き取る道具。英語の表示に `palette` を書かない決まりにも当たる） |
+| オイルパステル | **oil pastel** | 名詞。歳時記のてざわり（歳時記 v3）。Score の値は `oil_pastel`。DDL は `oil-pastel` も読む | ~~crayon~~（歳時記 v3 でチョークにまとめた別の道具）、商標の名 |
+| 水彩 | **watercolor** | 名詞。歳時記のてざわり（歳時記 v3）。米国綴りを正にし、DDL は英国綴り `watercolour` も同じ語として読む | ~~aquarelle~~ |
 | 歳時記 | **Saijiki** | 固有名詞・大文字。カテゴリ鍵のローマ字（`katachi` ほか）は正しい英語表記 | ~~almanac~~ 単独 |
 | 鏡写し | **mirrored** | 歳時記のあいだ。二つの形・まとまりの間の軸に対する位置と向きの鏡像 | 色・画材の複製とはしない |
 | 載る | **resting on** | 歳時記のあいだ。直前の形の上の縁に下端を接して載せる | 短い形は resting on |

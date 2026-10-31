@@ -11,7 +11,7 @@
 **Turn a sentence into a picture.**
 
 > **一文を、絵にする。**
-> `inku`（インク）は、シンプルな文章から抽象絵画のベクターグラフィック（SVG形式）を生み出す、アプリケーションです。中核を成すのは、 オリジナルの絵画言語DDL（Drawing Description Language）。DDLは、「中央に丸を置く」「クレヨンで緑の線を100本引く」といった自然言語を受け付ける、柔軟なスクリプティング言語です。
+> `inku`（インク）は、シンプルな文章から抽象絵画のベクターグラフィック（SVG形式）を生み出す、アプリケーションです。中核を成すのは、 オリジナルの絵画言語DDL（Drawing Description Language）。DDLは、「中央に丸を置く」「チョークで緑の線を100本引く」といった自然言語を受け付ける、柔軟なスクリプティング言語です。
 > **日本語の全文は [日本語版 README](README.ja.md) にあります。**
 
 <table align="center">
@@ -22,7 +22,7 @@
 </tr>
 </table>
 
-`inku` is an application that turns simple writing into abstract paintings as vector graphics in SVG format. At its core is DDL (Drawing Description Language), an original language for drawing. DDL is a flexible scripting language that accepts natural-language instructions such as “Place a circle in the center” or “Draw one hundred green lines in crayon.”
+`inku` is an application that turns simple writing into abstract paintings as vector graphics in SVG format. At its core is DDL (Drawing Description Language), an original language for drawing. DDL is a flexible scripting language that accepts natural-language instructions such as “Place a circle in the center” or “Draw one hundred green lines in chalk.”
 
 ```
 A blue line slowly loosens across the night water.
@@ -268,7 +268,7 @@ The reference dictionary is called **Saijiki**（歳時記）— a word borrowed
 |---|---|---|
 | forms | かたち | circle, ellipse, triangle, square, line, arc, free line, point, cloudform |
 | angles | かたむき | horizontal, vertical, diagonal, rising, falling, rotated |
-| touches | てざわり | silverpoint, pencil, pen, rotring, crayon, chalk, fine-brush, thick-brush, oil paint, burin, drypoint, computer |
+| touches | てざわり | silverpoint, pencil, pen, chalk, oil pastel, gouache, watercolor, oil paint, painting knife, etching, computer |
 | continuity | つらなり | solid, dashed, dotted, dash-dot |
 | surfaces | おもて | empty, flat, sweep, brushmarks, grain, stipple, hatch, crosshatch, aquatint |
 | handling | さばき | dense, temperate, faint |
@@ -285,7 +285,7 @@ The reference dictionary is called **Saijiki**（歳時記）— a word borrowed
 
 Surfaces name the inside of a closed shape or the way a mark sits; handling names how the ink is laid on any mark; fineness and underlayer name how the texture of a closed shape is laid (the size and spacing of its dots or lines, and the fill beneath it); grounds name the canvas itself, the support. A ground is written as a sentence of its own, such as "Washi." Words from registered plugins (for the bundled `Nature.leaves`, words such as "YoungLeaves" and "FallenLeaves") appear in the Saijiki in the same way as the core words.
 
-The source of truth for the vocabulary is the Saijiki definition held by the shared core (`core/crates/inku-ddl/assets/saijiki-v2.json`). The table above lists the words the app's Saijiki displays; `inku-cli reference --md` produces a machine-generated listing at any time.
+The source of truth for the vocabulary is the Saijiki definition held by the shared core (`core/crates/inku-ddl/assets/saijiki-v3.json`). The table above lists the words the app's Saijiki displays; `inku-cli reference --md` produces a machine-generated listing at any time.
 
 Only physical, observable words belong to the core. Emotional evaluation — "beautifully," "delicately," "boldly" — is excluded, because evaluation belongs to the viewer, not the writer. Read the gallery descriptions again and you will find not one evaluative word among them.
 
@@ -324,7 +324,7 @@ During development, we always move forward while comparing with saved reference 
 - **Shared core** — the flow of the processing, the Typed Compiler, the score, and the Renderer are gathered in a shared Rust core that the server (Python) and Android (Kotlin) both call
 - **Primitives and arrangement** — point, line, circle, ellipse, arc, square, triangle, cloudform, free line; placing, lining up, drawing, scattering, filling, and tiling, with paths such as waves and diagonal bands, and "alternating" or "in order" sequences
 - **Regions and relations** — scores can state eleven kinds of relation between elements ("along the previous line," "not touching the previous shape," "mirrored with the previous shape") that the performance resolves
-- **Material rendering** — silverpoint, pencil, pen, rotring, crayon, chalk, brushes, oil paint, burin, and drypoint, differentiated through the shared stroke engine's width, tracking, and sparse events plus tool-specific edges. Surface qualities (flat, sweep, stipple, hatch, crosshatch, aquatint, and more) and grounds (washi, charcoal ground, canvas, mezzotint, and more) can be chosen too
+- **Material rendering** — silverpoint, pencil, pen, chalk, oil pastel, gouache, watercolor, oil paint, painting knife, and etching, differentiated through the shared stroke engine's width, tracking, and sparse events plus tool-specific edges and media. Surface qualities (flat, sweep, stipple, hatch, crosshatch, aquatint, and more) and grounds (washi, charcoal ground, canvas, mezzotint, and more) can be chosen too
 - **Plugins** — namespaced vocabulary macros such as `Nature.leaves` with visible names such as `{young leaves}`; they may expand only into core vocabulary and cannot modify the core. When a description names one of their words, the underdrawing can choose it. Instructions that use an unregistered plugin draw everything else and give the reason on that sentence alone. Instructions can be exported together with their plugin definitions and imported elsewhere
 - **History and editions** — DB-backed history with stars, search, thumbnails, and exact reproduction via seeds and edition IDs
 - **Batch / CLI** — designed for straightforward operation by AI agents, the CLI provides access to every inku API. `inku-cli` supports login, painting, batch generation, contact sheets, and everything else available through the GUI

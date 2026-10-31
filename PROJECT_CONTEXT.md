@@ -123,7 +123,7 @@ Never infer parentage from similarity, time, or matching hashes.
 - Metrics, similarity, and vision reviews are diagnostic mirrors, not generation gates or automatic best-branch selectors.
 - Language-level macros use one generic `MacroDefinition` format rather than domain-specific code
   or grammars. Saved Macro definitions and old Score/SVG artifacts retain compatibility; the shared compiler determines new-work meaning.
-- The shared Rust asset `core/crates/inku-ddl/assets/saijiki-v2.json` is the vocabulary authority. Shared Stage 1 prompts use its projection; the Server display table, Web/Android Saijiki, and reference follow the same vocabulary.
+- The shared Rust asset `core/crates/inku-ddl/assets/saijiki-v3.json` is the vocabulary authority. Shared Stage 1 prompts use its projection; the Server display table, Web/Android Saijiki, and reference follow the same vocabulary.
 - Japanese and English behavior must stay aligned.
 Do not introduce English-only requirements.
 - **The engine does not go backwards** (SPEC "Design Principles", principle 9).
@@ -154,12 +154,12 @@ The current values of Render Engine, DDL, Score, the application, and the distri
 
 ### Vocabulary
 
-The shared Rust asset `core/crates/inku-ddl/assets/saijiki-v2.json` is canonical; the Literals in
+The shared Rust asset `core/crates/inku-ddl/assets/saijiki-v3.json` is canonical; the Literals in
 the Server's `schema.py` and the saijiki table (`saijiki.py`) are projections of it.
 
 - 10 primitives — `line` / `circle` / `ellipse` / `triangle` / `square` / `polygon` / `arc` / `point` / `cloudform` / `free_line`
 - 4 line styles — `solid` / `dashed` / `dotted` / `dash_dot`
-- 12 tools — `silverpoint` / `pencil` / `pen` / `rotring` / `crayon` / `chalk` / `brush_thin` / `brush_thick` / `oil_paint` / `burin` / `drypoint` / `computer`
+- 11 tools — `silverpoint` / `pencil` / `pen` / `chalk` / `oil_pastel` / `gouache` / `watercolor` / `oil_paint` / `painting_knife` / `etching` / `computer` (Saijiki v3; saved Scores also keep the six retired values `rotring` / `crayon` / `brush_thin` / `brush_thick` / `burin` / `drypoint`, which only replay)
 - 4 thinness values — `fine` / `extra_fine` / `thick` / `extra_thick` (an axis independent of the tool; the thick side from Score 0.16.0)
 - 9 colors — `white` / `black` / `blue` / `red` / `green` / `gray` / `yellow` / `orange` / `purple`
 - 9 surface textures, 5 surface directions, 7 ground materials

@@ -80,7 +80,7 @@ The moon rises beyond the mountain
 ```
 
 ```text
-A blue crayon line undulates loosely
+A blue chalk line undulates loosely
 ```
 
 ```text
@@ -111,7 +111,7 @@ Place three small red circles in the upper right.
 | Color | white, black, blue, red, green, gray, yellow, orange, purple |
 | Place | top, bottom, center, left edge, right edge, upper edge, lower edge, corner |
 | Motion | place, arrange, fill, scatter, draw, tile |
-| Touch | pencil, pen, rotring, crayon, chalk, fine brush, broad brush, burin, drypoint |
+| Touch | silverpoint, pencil, pen, chalk, oil pastel, gouache, watercolor, oil paint, painting knife, etching, computer |
 | Continuity | solid, dashed, dotted, dash-dot |
 | Surfaces | empty, flat, sweep, brushmarks (on a closed shape), grain, stipple, hatch, crosshatch, aquatint |
 | Handling | dense, temperate, faint |
@@ -124,7 +124,7 @@ No layer adds what the description does not ask for. What is written is performe
 
 **Naming a sheet with `Ground:` changes how the mark runs** (v2.13.31). Each of the seven supports carries its own absorbency and tooth, so the same description with the same settings leaves a different mark on washi than on canvas. How much it shows depends on the tool: a pen picks up almost nothing from the sheet. **`Surface: grain` and the sway `bleeding` now stay where they are when they land on a line or an arc** (also v2.13.31; Saijiki v2 moved bleeding from the surfaces to the sways). These two say how the mark runs rather than how an inside is, so they make that one instruction work the sheet harder (up to three times). **`Surface: sweep` stays there too** (v2.13.35; Saijiki v2's word for the retired pale ink wash, which becomes `faint sweep`). A sweep is not about the sheet but about the stroke (a broad sweep of the brush), so instead of working the sheet it **draws that one mark as a broader band** (three times the width, at 0.8 of the tool's opacity); for a paler band, add the handling word `faint`. **Before v2.13.35, a wash named on a line or an arc was drawn nowhere at all.** The other surface words move to the closed shape before them as before, and are dropped where there is none.
 
-**A `free line` is a line whose path between its start and its end the drawing decides** (v2.15.147). Write it as you write a line, as in `Draw one black pen rising free line at center`; angle, place, draw, scatter, and line up work as they do for a line. The path is built from three to seven parts (straight runs, arcs, and free bends), and the tool decides how: tools that draw with a fine point (silverpoint, pencil, pen, rotring, computer, burin, drypoint) use only straight runs and arcs, while tools that draw with a tip or a face (crayon, chalk, fine brush, broad brush, oil paint) use free bends too. The bends turn away from the edges of the paper and from the shapes drawn before it (lines and free lines aside). With no size written, it is 0.55 of the short edge long (about twice a line). One sentence that draws several gives each its own path. **When drawing from a description** (v2.15.149), interpretation (Stage 1) is told to choose a free line only when the description names one, or when what it describes is a line without a set shape, such as a track left behind or a path something took. If no angle is written, the composition reading writes one from how the layer moves (rising → up to the right, falling → down to the right, flowing → level).
+**A `free line` is a line whose path between its start and its end the drawing decides** (v2.15.147). Write it as you write a line, as in `Draw one black pen rising free line at center`; angle, place, draw, scatter, and line up work as they do for a line. The path is built from three to seven parts (straight runs, arcs, and free bends), and the tool decides how: tools that draw with a fine point (silverpoint, pencil, pen, etching, computer) use only straight runs and arcs, while tools that draw with a tip or a face (chalk, oil pastel, gouache, watercolor, oil paint, painting knife) use free bends too. The bends turn away from the edges of the paper and from the shapes drawn before it (lines and free lines aside). With no size written, it is 0.55 of the short edge long (about twice a line). One sentence that draws several gives each its own path. **When drawing from a description** (v2.15.149), interpretation (Stage 1) is told to choose a free line only when the description names one, or when what it describes is a line without a set shape, such as a track left behind or a path something took. If no angle is written, the composition reading writes one from how the layer moves (rising → up to the right, falling → down to the right, flowing → level).
 
 An explicit count is retained in the meaning of the instructions. The current drawing budget does not silently substitute a representative count. If a single primitive exceeds the budget, the permitted prefix is drawn and diagnostics report the requested and performed counts. Older count rewriting and representation belong to saved-format compatibility. See [Server configuration](server-configuration.md) for details.
 
@@ -363,7 +363,7 @@ Choosing, saving, and discarding options work as in 8.2.
 
 ### 8.6 Change the Touches
 
-Choose `Change the touches` in the work-editing menu to open a dialog that replaces only the touches of the work's sentences (the saijiki's touches: twelve drawing tools such as silverpoint, pencil, pen, crayon, chalk, fine-brush and oil paint) with other tools. Opening it draws nothing. Choose a way with the radio and press `Make four options` to see four options:
+Choose `Change the touches` in the work-editing menu to open a dialog that replaces only the touches of the work's sentences (the saijiki's touches: eleven drawing tools such as silverpoint, pencil, pen, chalk, gouache, watercolor and oil paint) with other tools. Opening it draws nothing. Choose a way with the radio and press `Make four options` to see four options:
 
 - `Same tool for every sentence` (the default): each option gives every sentence one tool, and is named after it.
 - `A different tool for each sentence`: each sentence draws a tool other than its own, and the option lists which sentence took which tool.
@@ -754,6 +754,6 @@ Flags you omit fall back to the server defaults. Sketch from life defaults to of
 Write observable physical words, not only words of emotional judgment.
 
 ```text
-Place one broad-brush black line at the center.
+Place one thick black gouache line at the center.
 Arrange seven gray circles around it, slightly scattered.
 ```

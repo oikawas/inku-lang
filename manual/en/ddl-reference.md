@@ -4,7 +4,7 @@ DDL (Drawing Description Language) writes forms, tools, positions, and their rel
 
 The subject here is **visible DDL**. Interpreting a free description and compiling DDL are separate stages. A description may say “like dusk,” but that phrase does not thereby become a DDL modifier. Direct DDL must express its meaning with accepted words and finite constructions.
 
-Meaning follows [SPEC.md](../../SPEC.md), vocabulary follows the shared core's [Saijiki asset](../../core/crates/inku-ddl/assets/saijiki-v2.json), and numeric and phrase attachment follows the [parser](../../core/crates/inku-ddl/src/parser.rs) and [shared grammar](../../core/crates/inku-pipeline/src/prompts.rs). The reference source is `97b50a52367554a94e9f364b90dc538d0f6b68bc`. “Accepted” below describes that source's grammar and implementation boundaries. Executed counts also depend on resource limits, and actual colors depend on the work's color conditions.
+Meaning follows [SPEC.md](../../SPEC.md), vocabulary follows the shared core's [Saijiki asset](../../core/crates/inku-ddl/assets/saijiki-v3.json), and numeric and phrase attachment follows the [parser](../../core/crates/inku-ddl/src/parser.rs) and [shared grammar](../../core/crates/inku-pipeline/src/prompts.rs). The reference source is `97b50a52367554a94e9f364b90dc538d0f6b68bc`. “Accepted” below describes that source's grammar and implementation boundaries. Executed counts also depend on resource limits, and actual colors depend on the work's color conditions.
 
 ## 1. Grammar principles
 
@@ -33,7 +33,7 @@ Japanese joins noun modifiers with `の` and uses accepted adjective forms for a
 | Role | Japanese modifier phrase | Following head |
 |---|---|---|
 | Color, tool, continuity, surface | `赤いペンの実線の空の` | `円` |
-| Color, tool, surface | `青いクレヨンの塗りの` | `四角` |
+| Color, tool, surface | `青いチョークの塗りの` | `四角` |
 | Sway, color, width | `細かく揺れる黒い細い` | `線` |
 
 Japanese accepts color adjectives `赤い`, `青い`, `白い`, and `黒い`. Colors also attach as nouns, including `灰の`, `黄の`, `橙の`, `紫の`, and `緑の`. Use the listed surface forms rather than inventing compound vocabulary.
@@ -171,10 +171,10 @@ This has the same ownership as `四つの大きな赤い円を置く。`, `赤�
 Modifiers can also stand before a numeric dimension:
 
 ```ddl-ja
-赤い太筆の長さ0.6の線を1本引く。
+赤い太いガッシュの長さ0.6の線を1本引く。
 ```
 
-It means the same as `長さ0.6の赤い太筆の線を1本引く。` A modifier does not travel past another drawing head: `赤い円の長さ0.6の線` is not a standard way to say “red line.”
+It means the same as `長さ0.6の赤い太いガッシュの線を1本引く。` A modifier does not travel past another drawing head: `赤い円の長さ0.6の線` is not a standard way to say “red line.”
 
 ### 3.3 Subject continuation
 
@@ -253,7 +253,7 @@ A free line has two ends like a line; performance decides the path between them.
 | thick | 太い |
 | extra-thick | ごく太い |
 
-Width is separate from tool identity. `thick-brush` names a tool; `thick` modifies its mark. `faint` controls handling rather than making a line thin.
+Width is separate from tool identity, and a tool's name does not state a width. In `thick gouache`, `gouache` names a tool and `thick` modifies its mark. `faint` controls handling rather than making a line thin.
 
 Relative size is finite core grammar, rather than a Saijiki category. Its factor applies to normal geometry independently of count.
 
@@ -344,11 +344,11 @@ Do not give one object separate numeric, range, and named position authorities. 
 ### 3.9 Two points: row ends and line ends
 
 ```ddl-en
-Line up 5 blue rotring empty circles radius 0.03 from horizontal 0.118, vertical 0.5 to horizontal 0.882, vertical 0.5.
+Line up 5 blue thin pen empty circles radius 0.03 from horizontal 0.118, vertical 0.5 to horizontal 0.882, vertical 0.5.
 ```
 
 ```ddl-ja
-画面の横0.118、縦0.5から横0.882、縦0.5まで、半径0.03の青のロットリングの空の円を5個並べる。
+画面の横0.118、縦0.5から横0.882、縦0.5まで、半径0.03の青の細いペンの空の円を5個並べる。
 ```
 
 The first and last mark centers land on those two points, with equal steps between them. Points may run right to left, bottom to top, or diagonally. The first written point owns the first occurrence.
@@ -448,7 +448,7 @@ Do not define it with parenthesized commands. Internal primitive count and outer
 **Alternation takes exactly two entries.**
 
 ```ddl-ja
-鉛筆と太筆を交互にして、線を五本並べる。
+鉛筆とガッシュを交互にして、線を五本並べる。
 ```
 
 A field sequence can alternate colors or tools from one attribute category. Do not mix different categories as if a color and a tool were two equivalent entries. Listing multiple colors or tools without order does not imply alternation.
@@ -564,7 +564,7 @@ A current free line supports endpoint-connected and touching relationships. A co
 
 ### 3.17 Tools, continuity, surfaces, and handling
 
-Tools are independent modifiers, such as `pencil` and `thick-brush`, or Japanese 鉛筆の and 太筆の. Omitted tool resolves to pen during execution; a texture or bleeding word does not silently make thick-brush explicit.
+Tools are independent modifiers, such as `pencil` and `gouache`, or Japanese 鉛筆の and ガッシュの. Omitted tool resolves to pen during execution; a texture or bleeding word does not silently make a tool explicit (bleeding is not read as watercolor, nor sweep as gouache).
 
 Continuity is solid, dashed, dotted, or dash-dot. It describes the continuity of a mark's line, separately from a surface. English `solid` is continuity, while `flat` names the filled surface.
 
@@ -598,7 +598,7 @@ Handling is dense, temperate, or faint: 濃い, 程よい, 薄い. It controls i
 | underpainted | 下塗り | The tool's fill beneath the texture |
 
 ```ddl-ja
-中心に、赤の太筆の下塗りの密な交差線の薄い四角を1個置く。
+中心に、赤の太いガッシュの下塗りの密な交差線の薄い四角を1個置く。
 ```
 
 These apply to the seven named textures of closed forms: sweep, brushmarks, grain, stipple, hatch, crosshatch, and aquatint. They do not apply to line, arc, free line, point, empty, flat, or an omitted surface. Invalid combinations retain the mark and omit the modifier with `unsupported_surface_fineness` or `unsupported_surface_underlayer`.
@@ -795,11 +795,11 @@ place one red circle radius 0.1 at horizontal 0.5, vertical 0.5.
 
 ## 4. Saijiki: complete vocabulary and accepted spellings
 
-Japanese is canonical. Spellings follow `inku.saijiki.v2` in `core/crates/inku-ddl/assets/saijiki-v2.json`. This section covers all 102 rows in its 15 categories and all 11 rows in the separate relations table. The 102 include 98 displayed rows, three hidden rows accepted in direct DDL, and one retired row that is not accepted. The interface shows relations as the sixteenth category.
+Japanese is canonical. Spellings follow `inku.saijiki.v3` in `core/crates/inku-ddl/assets/saijiki-v3.json`. This section covers all 101 rows in its 15 categories and all 11 rows in the separate relations table. The 101 include 97 displayed rows, three hidden rows accepted in direct DDL, and one retired row that is not accepted. The interface shows relations as the sixteenth category.
 
 ### Reading and writing the words
 
-The Japanese and English columns give the canonical spellings of the same word. Use the spelling for the instructions' language. Spaces and hyphens belong to the English word: `free line`, `oil paint`, `fine-brush`, and `left-edge`. The examples show short ways to use a word; they do not fix the appearance of a work. Omitted positions and sizes follow the resolution rules below and the performance.
+The Japanese and English columns give the canonical spellings of the same word. Use the spelling for the instructions' language. Spaces and hyphens belong to the English word: `free line`, `oil paint`, `painting knife`, and `left-edge`. The examples show short ways to use a word; they do not fix the appearance of a work. Omitted positions and sizes follow the resolution rules below and the performance.
 
 Use a form as the head noun, attach attributes to it, and join it to an action. For example: `赤の鉛筆の薄い点描の円を置く。` A ground is a separate sentence, such as `和紙。` / `Washi.`, rather than an attribute of a form. Do not use headings such as `地: 和紙` or `面: 点描`. Write a surface as a modifier: `点描の円を置く。` / `Place a stipple circle.`
 
@@ -813,7 +813,7 @@ The `default=true` flags on pen, solid, empty, and black annotate the reference 
 |---|---|---|---:|---|
 | `katachi` | かたち | forms | 10 | Nine public, one hidden accepted word |
 | `katamuki` | かたむき | angles | 8 | Six public, two hidden accepted words |
-| `tezawari` | てざわり | touches | 12 | Public |
+| `tezawari` | てざわり | touches | 11 | Public |
 | `tsuranari` | つらなり | continuity | 4 | Public |
 | `omote` | おもて | surfaces | 9 | Public |
 | `sabaki` | さばき | handling | 3 | Public |
@@ -876,16 +876,17 @@ Touches describe the tool's trace, rather than line width itself. All ten primit
 |---|---|---|---|
 | 銀筆 | `silverpoint` | A fine line trace with almost no sway. | `銀筆の線を引く。` / `Draw a silverpoint line.` |
 | 鉛筆 | `pencil` | A continuously swaying trace with faint secondary lines and fine grain. | `鉛筆の線を引く。` / `Draw a pencil line.` |
-| ペン | `pen` | A trace with slight ink variation. Carries the reference's default annotation. | `ペンの線を引く。` / `Draw a pen line.` |
-| ロットリング | `rotring` | A hard drafting line with uniform width and square ends. | `ロットリングの線を引く。` / `Draw a rotring line.` |
-| クレヨン | `crayon` | Wax rubbing with short breaks and granular gaps. | `クレヨンの線を引く。` / `Draw a crayon line.` |
-| チョーク | `chalk` | Powdery scratchiness, fine gaps, and light blur. | `チョークの線を引く。` / `Draw a chalk line.` |
-| 細筆 | `fine-brush` | A brush trace with ink-density changes and secondary lines. | `細筆の線を引く。` / `Draw a fine-brush line.` |
-| 太筆 | `thick-brush` | Brush pressure, rubbed secondary traces, and light blur. | `太筆の線を引く。` / `Draw a thick-brush line.` |
-| 油彩 | `oil paint` | Loaded paint traces with bristle ridges and overlapping strokes. | `油彩の線を引く。` / `Draw an oil paint line.` |
-| ビュラン | `burin` | A hard engraved line with round ends. | `ビュランの線を引く。` / `Draw a burin line.` |
-| ドライポイント | `drypoint` | Soft burr fuzz, bleeding, and scratchiness. | `ドライポイントの線を引く。` / `Draw a drypoint line.` |
+| ペン | `pen` | An ink line trace with slight variation; it can also be a uniform, hard drafting line. Carries the reference's default annotation. | `ペンの線を引く。` / `Draw a pen line.` |
+| チョーク | `chalk` | Colored powdery or waxy rubbing with scratchiness, fine gaps, and granular breaks. | `チョークの線を引く。` / `Draw a chalk line.` |
+| オイルパステル | `oil pastel` | Opaque waxy, oily color rubbed on thickly, leaving short stroke marks and the paper's tooth. | `オイルパステルの線を引く。` / `Draw an oil pastel line.` |
+| ガッシュ | `gouache` | Opaque water-based color that dries to a flat, matte coat, with brush tonal variation and rubbed secondary lines. | `ガッシュの線を引く。` / `Draw a gouache line.` |
+| 水彩 | `watercolor` | Transparent water-thinned color soaks into the paper, deepens where it overlaps, and pools at the edges. | `水彩の線を引く。` / `Draw a watercolor line.` |
+| 油彩 | `oil paint` | Oil-bound paint laid on thickly, with bristle ridges, raised impasto, and glossy overlapping strokes. | `油彩の線を引く。` / `Draw an oil paint line.` |
+| ペインティングナイフ | `painting knife` | Paint heaped and spread with a knife into flat planes, leaving ridges, edges, and dry streaks. | `ペインティングナイフの線を引く。` / `Draw a painting knife line.` |
+| エッチング | `etching` | Acid-bitten lines of even width with slightly rough edges and round ends; shading is built by layering lines. | `エッチングの線を引く。` / `Draw an etching line.` |
 | コンピュータ | `computer` | Line sway that repeats exactly at the same period. | `コンピュータの線を引く。` / `Draw a computer line.` |
+
+Saijiki v3 (2026-10-31) reduced the touches from twelve to eleven. `rotring` merged into `pen`, `crayon` into `chalk`, `fine-brush` and `thick-brush` into `gouache`, and `burin` and `drypoint` into `etching`; `oil pastel`, `watercolor`, and `painting knife` were added. Current instructions do not read the six retired words. Saved instructions and plugin definitions are rewritten once into the new words by the edition migration, which also moves each width word to the step nearest the original width (for example, `rotring line` becomes `thin pen line`, and `thick-brush line` becomes `thick gouache line`). A saved Score's retired tools are performed as before. English also reads `oil-pastel`, `painting-knife`, and `watercolour` as the same words.
 
 ### 4.4. Continuity — つらなり
 
@@ -923,7 +924,7 @@ Surfaces are state nouns describing a closed face or a trace. Handling describes
 | A point mark | Accepts none of the nine surface words. The point remains a round filled mark. |
 | A crescent arc | Accepts only flat as an explicit surface. Empty and the seven textures are not accepted. |
 
-Sweep has no faintness of its own. Add faint handling for `薄い刷き` / `faint sweep`. An open mark's sweep is a band three times the tool width at 0.8 of the tool opacity. A thick or extra-thick band adds to three default widths only what the thinness word adds to a round mark (for example, an extra-thick thick-brush sweep is 66 per 1000 of the short side, not 150). On a face, sweep makes two films at 0.6 opacity per pass; brushmarks layers each band at 0.5. The tool and handling also affect the result.
+Sweep has no faintness of its own. Add faint handling for `薄い刷き` / `faint sweep`. An open mark's sweep is a band three times the tool width at 0.8 of the tool opacity. A thick or extra-thick band adds to three default widths only what the thinness word adds to a round mark (for example, an extra-thick oil paint sweep is 84 per 1000 of the short side, not 180). On a face, sweep makes two films at 0.6 opacity per pass; brushmarks layers each band at 0.5. The tool and handling also affect the result.
 
 `塗りの弧` / `a flat arc` can also express the fill inside a closed contour made by two touching arcs. Adding flat to an ordinary arc or line alone does not invent another closed form.
 
@@ -1122,13 +1123,14 @@ Each canonical word appears in one row above. The current asset has no configure
 
 | Class | Words or examples | Treatment |
 |---|---|---|
-| Current parser spellings | 三角形, 四角形, 長方形, `rectangle`, `lines`, 横, 縦, the four English edge words with spaces, `arrange`, `line up`, 縦に長い, 細長い, 横に長い | The same identities as their canonical rows; public spellings remain those in the tables. |
+| Current parser spellings | 三角形, 四角形, 長方形, `rectangle`, `lines`, 横, 縦, the four English edge words with spaces, `arrange`, `line up`, 縦に長い, 細長い, 横に長い, `oil-pastel`, `painting-knife`, `watercolour` | The same identities as their canonical rows; public spellings remain those in the tables. |
 | Current grammatical forms | 白い, 赤色, regular English form plurals, `horizontally`, `vertically`, `diagonally`, `sways`, `undulates` | Permitted grammar changes, rather than additional words or counts. |
 | Hidden accepted words | 多角形, 左上がり, 左下がり | Absent from `prompt` and display projections, but recognized in direct DDL because their markers are enabled. |
 | Retired row | 描く | Remains as a tombstone in the asset; not a parser candidate. Has no English surface. |
-| Words used only in v1 migration | 薄墨 / `pale ink wash`, ゆっくり / `slowly`, 速く / `quickly`, 震える / `trembling`, `trembles`, 滲む / `blurring`, 中央 / `middle`, and 点 meaning stipple | Not aliases in new v2 instructions. Saved documents migrate to the current words. The point form and ink wash ground remain distinct current words. |
+| Words used only in v1 migration | 薄墨 / `pale ink wash`, ゆっくり / `slowly`, 速く / `quickly`, 震える / `trembling`, `trembles`, 滲む / `blurring`, 中央 / `middle`, and 点 meaning stipple | Not aliases in current instructions. Saved documents migrate to the current words. The point form and ink wash ground remain distinct current words. |
+| Words used only in v2 migration | ロットリング / `rotring`, クレヨン / `crayon`, 細筆 / `fine-brush`, 太筆 / `thick-brush`, ビュラン / `burin`, ドライポイント / `drypoint` | Not aliases in current instructions. The edition migration of saved documents and plugin definitions rewrites them to pen, chalk, gouache, and etching, and corrects the width words (4.3). |
 | v1 amplitude spellings | `fine`, `finely`, `large`, `largely` | Migrate to `narrowly` and `broadly` when they mean amplitude. Current `large` has the separate grammatical role of form size. |
-| Internal values | `brush_thin`, `brush_thick`, `oil_paint`, surface `none` and `solid`, `fine_grained`, `line_up`, `not_touching` | Score, typed meaning, or underdrawing identifiers. Keep them distinct from written DDL such as `fine-brush`, `flat`, `fine-grained`, and `line-up`. |
+| Internal values | `oil_pastel`, `painting_knife`, `oil_paint`, surface `none` and `solid`, `fine_grained`, `line_up`, `not_touching` | Score, typed meaning, or underdrawing identifiers. Keep them distinct from written DDL such as `oil pastel`, `flat`, `fine-grained`, and `line-up`. The retired tool values only saved Scores carry (`rotring`, `crayon`, `brush_thin`, `brush_thick`, `burin`, `drypoint`) cannot be reached from DDL. |
 | Word annotations | `（既定）`, `(default)`, and tool guidance sentences | Explanations for readers or the underdrawing, rather than the DDL words themselves. |
 
 ### Finite grammar outside the Saijiki
@@ -1145,13 +1147,13 @@ The following constructions are available grammar, rather than new rows in the 1
 | Groups, repetition, fading, color shift | 組, 繰り返して, 左から右へ薄れさせて, 順に段々に移して | Instructions about structure and distribution; no additional category or word chip. |
 | Canvas formats | Host options such as `square`, `a4`, and `wide` | The paper, selected outside the DDL text; a format name is not written in DDL. What a DDL writes is the declaration of the ratio it was laid out in, `Aspect ratio W:H.` (3.27). Distinct from form and proportion words with the same spelling. |
 | Title lines | `"lighthouse"`, `""` / `「灯台」`, `「」` | A line of only a quoted name; it names the chunk of sentences up to the next title (3.1). It draws nothing and takes no sentence number, and its words are not read as drawing words. |
-| Vocabulary Macros | Qualified names such as `Nature.YoungLeaves` | A separate registered vocabulary catalog, outside the core Saijiki's 102 rows. |
+| Vocabulary Macros | Qualified names such as `Nature.YoungLeaves` | A separate registered vocabulary catalog, outside the core Saijiki's 101 rows. |
 
 ### Sources and verification scope
 
-Spellings, flags, and order come from `core/crates/inku-ddl/assets/saijiki-v2.json`. `src/saijiki.rs` defines recognition eligibility and projections; `src/parser.rs` and `src/shape_constraint.rs` define parser spellings and grammar. Acceptance was compared with `src/score_lowering.rs`, `src/geometry.rs`, `src/score_angle.rs`, `src/fluctuation.rs`, `assets/work-plan-capabilities-v2.json`, and the relevant existing fixture and test source. The distinction between accepted surfaces and visible performance was checked in `inku-render/src/surfaces.rs`, `marks.rs`, and `support.rs`. Short interface explanations also informed the text: `web/src/routes/+page.svelte` and `web/src/lib/saijiki-surface.ts`.
+Spellings, flags, and order come from `core/crates/inku-ddl/assets/saijiki-v3.json`. `src/saijiki.rs` defines recognition eligibility and projections; `src/parser.rs` and `src/shape_constraint.rs` define parser spellings and grammar. Acceptance was compared with `src/score_lowering.rs`, `src/geometry.rs`, `src/score_angle.rs`, `src/fluctuation.rs`, `assets/work-plan-capabilities-v2.json`, and the relevant existing fixture and test source. The distinction between accepted surfaces and visible performance was checked in `inku-render/src/surfaces.rs`, `marks.rs`, and `support.rs`. Short interface explanations also informed the text: `web/src/routes/+page.svelte` and `web/src/lib/saijiki-surface.ts`.
 
-The reference commit is `97b50a52367554a94e9f364b90dc538d0f6b68bc`. Spellings and acceptance boundaries follow that source version. Actual performance also requires the prior objects a relation names, the work's drawing conditions, and sufficient resources.
+The reference commit is `97b50a52367554a94e9f364b90dc538d0f6b68bc`. Spellings and acceptance boundaries follow that source version, except that the touch words (4.3), the row counts, and the examples' tool words were brought to Saijiki v3 (2026-10-31), and every example was compiled with the v3 core. Actual performance also requires the prior objects a relation names, the work's drawing conditions, and sufficient resources.
 
 ## 5. Fifty complex DDL examples
 
@@ -1191,8 +1193,8 @@ English DDL:
 
 ```text
 Drawing paper.
-Place one blue rotring empty circle radius 0.12 at horizontal 0.3, vertical 0.4.
-Place one red rotring empty circle diameter 0.24 at horizontal 0.7, vertical 0.4.
+Place one blue thin pen empty circle radius 0.12 at horizontal 0.3, vertical 0.4.
+Place one red thin pen empty circle diameter 0.24 at horizontal 0.7, vertical 0.4.
 Line up 7 black points radius 0.01 from horizontal 0.2, vertical 0.75 to horizontal 0.8, vertical 0.75.
 ```
 
@@ -1200,8 +1202,8 @@ Japanese DDL (reference):
 
 ```text
 画用紙。
-画面の横0.3、縦0.4の位置に、半径0.12の青のロットリングの空の円を1個置く。
-画面の横0.7、縦0.4の位置に、直径0.24の赤のロットリングの空の円を1個置く。
+画面の横0.3、縦0.4の位置に、半径0.12の青の細いペンの空の円を1個置く。
+画面の横0.7、縦0.4の位置に、直径0.24の赤の細いペンの空の円を1個置く。
 画面の横0.2、縦0.75から横0.8、縦0.75まで、半径0.01の黒の点を7個並べる。
 ```
 
@@ -1237,7 +1239,7 @@ English DDL:
 Washi.
 Place one large blue empty wide ellipse at the top.
 Line up 3 small red flat tall ellipses at the bottom.
-Draw one black fine-brush vertical line at left-edge.
+Draw one black gouache vertical line at left-edge.
 ```
 
 Japanese DDL (reference):
@@ -1246,7 +1248,7 @@ Japanese DDL (reference):
 和紙。
 上に、大きな青の空の横長の楕円を1個置く。
 下に、小さな赤の塗りの縦長の楕円を3個並べる。
-左端に、黒の細筆の垂直の線を1個引く。
+左端に、黒のガッシュの垂直の線を1個引く。
 ```
 
 ### 5.05. White marks on a dark ground
@@ -1260,7 +1262,7 @@ Charcoal ground.
 Fill the background with black.
 Place one large white chalk faint flat circle at the top.
 Line up 5 small white pencil triangles at the bottom.
-Draw one white fine-brush horizontal line at the center.
+Draw one white gouache horizontal line at the center.
 ```
 
 Japanese DDL (reference):
@@ -1270,7 +1272,7 @@ Japanese DDL (reference):
 背景を黒で埋める。
 上に、白のチョークの薄い塗りの大きな円を1個置く。
 下に、白の鉛筆の小さな三角を5個並べる。
-中心に、白の細筆の水平の線を1個引く。
+中心に、白のガッシュの水平の線を1個引く。
 ```
 
 ### 5.06. An ink wash ground and bleeding contours
@@ -1282,8 +1284,8 @@ English DDL:
 ```text
 Ink wash ground.
 Fill the background with white.
-Place one blue thick-brush faint sweep wide ellipse at the top.
-Line up 3 red fine-brush bleeding empty circles at the bottom.
+Place one blue thick gouache faint sweep wide ellipse at the top.
+Line up 3 red gouache bleeding empty circles at the bottom.
 Draw one black pen dotted horizontal line at the center.
 ```
 
@@ -1292,8 +1294,8 @@ Japanese DDL (reference):
 ```text
 薄墨地。
 背景を白で埋める。
-上に、青の太筆の薄い刷きの横長の楕円を1個置く。
-下に、にじみの赤の細筆の空の円を3個並べる。
+上に、青の太いガッシュの薄い刷きの横長の楕円を1個置く。
+下に、にじみの赤のガッシュの空の円を3個並べる。
 中心に、黒のペンの点線の水平の線を1個引く。
 ```
 
@@ -1305,20 +1307,20 @@ English DDL:
 
 ```text
 Paper.
-Draw one black rotring solid horizontal line length 0.6 at horizontal 0.5, vertical 0.2.
-Draw one black rotring dashed horizontal line length 0.6 at horizontal 0.5, vertical 0.4.
-Draw one black rotring dotted horizontal line length 0.6 at horizontal 0.5, vertical 0.6.
-Draw one black rotring dash-dot horizontal line length 0.6 at horizontal 0.5, vertical 0.8.
+Draw one black thin pen solid horizontal line length 0.6 at horizontal 0.5, vertical 0.2.
+Draw one black thin pen dashed horizontal line length 0.6 at horizontal 0.5, vertical 0.4.
+Draw one black thin pen dotted horizontal line length 0.6 at horizontal 0.5, vertical 0.6.
+Draw one black thin pen dash-dot horizontal line length 0.6 at horizontal 0.5, vertical 0.8.
 ```
 
 Japanese DDL (reference):
 
 ```text
 紙。
-画面の横0.5、縦0.2の位置に、長さ0.6の黒のロットリングの実線の水平の線を1個引く。
-画面の横0.5、縦0.4の位置に、長さ0.6の黒のロットリングの破線の水平の線を1個引く。
-画面の横0.5、縦0.6の位置に、長さ0.6の黒のロットリングの点線の水平の線を1個引く。
-画面の横0.5、縦0.8の位置に、長さ0.6の黒のロットリングの一点鎖線の水平の線を1個引く。
+画面の横0.5、縦0.2の位置に、長さ0.6の黒の細いペンの実線の水平の線を1個引く。
+画面の横0.5、縦0.4の位置に、長さ0.6の黒の細いペンの破線の水平の線を1個引く。
+画面の横0.5、縦0.6の位置に、長さ0.6の黒の細いペンの点線の水平の線を1個引く。
+画面の横0.5、縦0.8の位置に、長さ0.6の黒の細いペンの一点鎖線の水平の線を1個引く。
 ```
 
 ### 5.08. Alternating tools and a mirror
@@ -1329,7 +1331,7 @@ English DDL:
 
 ```text
 Paper.
-Line up five black lines, alternating pencil and thick-brush.
+Line up five black lines, alternating pencil and gouache.
 Place a diagonal red arc at left-edge.
 Place a blue arc at right-edge, mirrored with the previous shape.
 ```
@@ -1338,22 +1340,22 @@ Japanese DDL (reference):
 
 ```text
 紙。
-鉛筆と太筆を交互にして、黒い線を五本並べる。
+鉛筆とガッシュを交互にして、黒い線を五本並べる。
 左端に斜めの赤い弧を置く。
 右端に前の形と鏡写しの青い弧を置く。
 ```
 
 ### 5.09. Three fine tools
 
-Aim: Give separate marks silverpoint, burin, and drypoint tools.
+Aim: Give separate marks silverpoint, thin pen, and etching tools.
 
 English DDL:
 
 ```text
 Drawing paper.
 Line up 3 gray silverpoint thin horizontal lines at the top.
-Line up 3 black burin empty circles at the center.
-Line up 5 small red drypoint semicircle arcs at the bottom.
+Line up 3 black thin pen empty circles at the center.
+Line up 5 small red etching semicircle arcs at the bottom.
 ```
 
 Japanese DDL (reference):
@@ -1361,8 +1363,8 @@ Japanese DDL (reference):
 ```text
 画用紙。
 上に、灰の銀筆の細い水平の線を3個並べる。
-中心に、黒のビュランの空の円を3個並べる。
-下に、赤のドライポイントの小さな半円の弧を5個並べる。
+中心に、黒の細いペンの空の円を3個並べる。
+下に、赤のエッチングの小さな半円の弧を5個並べる。
 ```
 
 ### 5.10. The film of sweep and the strokes of brushmarks
@@ -1374,8 +1376,8 @@ English DDL:
 ```text
 Canvas.
 Fill the background with gray.
-Place one white thick-brush sweep square side length 0.3 at horizontal 0.3, vertical 0.5.
-Place one white thick-brush brushmarks square side length 0.3 at horizontal 0.7, vertical 0.5.
+Place one white thick gouache sweep square side length 0.3 at horizontal 0.3, vertical 0.5.
+Place one white thick gouache brushmarks square side length 0.3 at horizontal 0.7, vertical 0.5.
 ```
 
 Japanese DDL (reference):
@@ -1383,8 +1385,8 @@ Japanese DDL (reference):
 ```text
 カンバス。
 背景を灰で埋める。
-画面の横0.3、縦0.5の位置に、一辺0.3の白の太筆の刷きの四角を1個置く。
-画面の横0.7、縦0.5の位置に、一辺0.3の白の太筆の刷毛目の四角を1個置く。
+画面の横0.3、縦0.5の位置に、一辺0.3の白の太いガッシュの刷きの四角を1個置く。
+画面の横0.7、縦0.5の位置に、一辺0.3の白の太いガッシュの刷毛目の四角を1個置く。
 ```
 
 ### 5.11. Change the size of the texture
@@ -1397,7 +1399,7 @@ English DDL:
 Paper.
 Place one red pen fine-grained stipple circle at the top.
 Place one blue pen coarse-grained grain ellipse at the bottom.
-Draw one black rotring horizontal line at the center.
+Draw one black thin pen horizontal line at the center.
 ```
 
 Japanese DDL (reference):
@@ -1406,7 +1408,7 @@ Japanese DDL (reference):
 紙。
 上に、赤のペンの細かい点描の円を1個置く。
 下に、青のペンの粗い粒の楕円を1個置く。
-中心に、黒のロットリングの水平の線を1個引く。
+中心に、黒の細いペンの水平の線を1個引く。
 ```
 
 ### 5.12. Lines over an underpainted face
@@ -1417,18 +1419,18 @@ English DDL:
 
 ```text
 Canvas.
-Place one red thick-brush faint underpainted packed crosshatch square at the top.
+Place one red thick gouache faint underpainted packed crosshatch square at the top.
 Place one blue pen underpainted sparse hatch ellipse at the bottom.
-Line up 3 small black fine-brush empty circles at the center.
+Line up 3 small black gouache empty circles at the center.
 ```
 
 Japanese DDL (reference):
 
 ```text
 カンバス。
-上に、赤の太筆の下塗りの密な交差線の薄い四角を1個置く。
+上に、赤の太いガッシュの下塗りの密な交差線の薄い四角を1個置く。
 下に、青のペンの下塗りの疎な平行線の楕円を1個置く。
-中心に、黒の細筆の小さな空の円を3個並べる。
+中心に、黒のガッシュの小さな空の円を3個並べる。
 ```
 
 ### 5.13. Packed and sparse stipple
@@ -1463,7 +1465,7 @@ English DDL:
 Mezzotint.
 Fill the background with white.
 Place one red pen sparse aquatint cloudform at the top.
-Line up 3 yellow thick-brush underpainted fine-grained aquatint triangles at the bottom.
+Line up 3 yellow thick gouache underpainted fine-grained aquatint triangles at the bottom.
 ```
 
 Japanese DDL (reference):
@@ -1472,7 +1474,7 @@ Japanese DDL (reference):
 メゾチント。
 背景を白で埋める。
 上に、赤のペンの疎なアクアチントの雲形を1個置く。
-下に、黄の太筆の下塗りの細かいアクアチントの三角を3個並べる。
+下に、黄の太いガッシュの下塗りの細かいアクアチントの三角を3個並べる。
 ```
 
 ### 5.15. Different amplitudes of sway
@@ -1483,18 +1485,18 @@ English DDL:
 
 ```text
 Washi.
-Draw one blue fine-brush narrowly swaying horizontal line at the top.
-Draw one red fine-brush broadly swaying horizontal line at the bottom.
-Line up 5 small black rotring empty circles at the center.
+Draw one blue gouache narrowly swaying horizontal line at the top.
+Draw one red gouache broadly swaying horizontal line at the bottom.
+Line up 5 small black thin pen empty circles at the center.
 ```
 
 Japanese DDL (reference):
 
 ```text
 和紙。
-上に、細かく揺れる青の細筆の水平の線を1個引く。
-下に、大きく揺れる赤の細筆の水平の線を1個引く。
-中心に、黒のロットリングの小さな空の円を5個並べる。
+上に、細かく揺れる青のガッシュの水平の線を1個引く。
+下に、大きく揺れる赤のガッシュの水平の線を1個引く。
+中心に、黒の細いペンの小さな空の円を5個並べる。
 ```
 
 ### 5.16. Change the spacing of waves
@@ -1507,7 +1509,7 @@ English DDL:
 Drawing paper.
 Draw one blue pen narrowly loosely undulating horizontal line at the top.
 Draw one red pen narrowly tightly undulating horizontal line at the bottom.
-Place one gray thick-brush faint flat wide ellipse at the center.
+Place one gray thick gouache faint flat wide ellipse at the center.
 ```
 
 Japanese DDL (reference):
@@ -1516,7 +1518,7 @@ Japanese DDL (reference):
 画用紙。
 上に、細かくゆるやかに波打つ青のペンの水平の線を1個引く。
 下に、細かく小刻みに波打つ赤のペンの水平の線を1個引く。
-中心に、灰の太筆の薄い塗りの横長の楕円を1個置く。
+中心に、灰の太いガッシュの薄い塗りの横長の楕円を1個置く。
 ```
 
 ### 5.17. Semicircle and crescent arcs
@@ -1528,7 +1530,7 @@ English DDL:
 ```text
 Paper.
 Place one red pen half-width semicircle arc at the top.
-Place one blue fine-brush full-width crescent arc at the center.
+Place one blue gouache full-width crescent arc at the center.
 Line up 7 small gray pencil empty circles at the bottom.
 ```
 
@@ -1537,7 +1539,7 @@ Japanese DDL (reference):
 ```text
 紙。
 上に、赤のペンの半幅の半円の弧を1個置く。
-中心に、青の細筆の全幅の三日月の弧を1個置く。
+中心に、青のガッシュの全幅の三日月の弧を1個置く。
 下に、灰の鉛筆の小さな空の円を7個並べる。
 ```
 
@@ -1549,8 +1551,8 @@ English DDL:
 
 ```text
 Washi.
-Place one black fine-brush half-width waxing arc at the top.
-Place one black fine-brush half-width waning arc at the bottom.
+Place one black gouache half-width waxing arc at the top.
+Place one black gouache half-width waning arc at the bottom.
 Line up 9 small red pen points at the center.
 ```
 
@@ -1558,8 +1560,8 @@ Japanese DDL (reference):
 
 ```text
 和紙。
-上に、黒の細筆の半幅の上弦の弧を1個置く。
-下に、黒の細筆の半幅の下弦の弧を1個置く。
+上に、黒のガッシュの半幅の上弦の弧を1個置く。
+下に、黒のガッシュの半幅の下弦の弧を1個置く。
 中心に、赤のペンの小さな点を9個並べる。
 ```
 
@@ -1571,7 +1573,7 @@ English DDL:
 
 ```text
 Paper.
-Draw one blue fine-brush free line from horizontal 0.15, vertical 0.2 to horizontal 0.85, vertical 0.7.
+Draw one blue gouache free line from horizontal 0.15, vertical 0.2 to horizontal 0.85, vertical 0.7.
 Draw one gray pencil dashed line from horizontal 0.15, vertical 0.8 to horizontal 0.85, vertical 0.3.
 Line up 3 small red pen empty circles at the top.
 ```
@@ -1580,7 +1582,7 @@ Japanese DDL (reference):
 
 ```text
 紙。
-画面の横0.15、縦0.2から横0.85、縦0.7まで、青の細筆の自由線を1個引く。
+画面の横0.15、縦0.2から横0.85、縦0.7まで、青のガッシュの自由線を1個引く。
 画面の横0.15、縦0.8から横0.85、縦0.3まで、灰の鉛筆の破線の線を1個引く。
 上に、赤のペンの小さな空の円を3個並べる。
 ```
@@ -1594,7 +1596,7 @@ English DDL:
 ```text
 Washi.
 Place one black pen circle at the center.
-Draw one black fine-brush free line connected to the previous shape.
+Draw one black gouache free line connected to the previous shape.
 Draw one red pen line connected to the previous shape.
 ```
 
@@ -1603,7 +1605,7 @@ Japanese DDL (reference):
 ```text
 和紙。
 中心に、黒のペンの円を1個置く。
-前の形につながる黒の細筆の自由線を1個引く。
+前の形につながる黒のガッシュの自由線を1個引く。
 前の形につながる赤のペンの線を1個引く。
 ```
 
@@ -1682,7 +1684,7 @@ English DDL:
 ```text
 Drawing paper.
 Place one black pencil horizontal line at the center.
-Place one blue fine-brush line at the center along the previous line.
+Place one blue gouache line at the center along the previous line.
 Line up 5 small red empty circles at the bottom.
 ```
 
@@ -1691,7 +1693,7 @@ Japanese DDL (reference):
 ```text
 画用紙。
 中心に、黒の鉛筆の水平の線を1個置く。
-中心に、前の線に沿って、青の細筆の線を1個置く。
+中心に、前の線に沿って、青のガッシュの線を1個置く。
 下に、赤の小さな空の円を5個並べる。
 ```
 
@@ -1727,7 +1729,7 @@ English DDL:
 Washi.
 Place one red flat circle at the center.
 Place one blue empty square at the center not touching the previous shape.
-Line up 3 small black fine-brush arcs at the bottom.
+Line up 3 small black gouache arcs at the bottom.
 ```
 
 Japanese DDL (reference):
@@ -1736,7 +1738,7 @@ Japanese DDL (reference):
 和紙。
 中心に、赤の塗りの円を1個置く。
 前の形に触れない青の空の四角を中心に1個置く。
-下に、黒の細筆の小さな弧を3個並べる。
+下に、黒のガッシュの小さな弧を3個並べる。
 ```
 
 ### 5.27. Place a shape between the previous two
@@ -1770,7 +1772,7 @@ English DDL:
 ```text
 Canvas.
 Fill the background with black.
-Place one large yellow thick-brush faint sweep square at the center.
+Place one large yellow thick gouache faint sweep square at the center.
 Scatter 40 very small white pencil points inside the previous shape.
 ```
 
@@ -1779,7 +1781,7 @@ Japanese DDL (reference):
 ```text
 カンバス。
 背景を黒で埋める。
-中心に、黄の太筆の薄い刷きの大きな四角を1個置く。
+中心に、黄の太いガッシュの薄い刷きの大きな四角を1個置く。
 白の鉛筆のとても小さな点を40個散らす、前の形の中に。
 ```
 
@@ -1792,8 +1794,8 @@ English DDL:
 ```text
 Drawing paper.
 Fill the background with white.
-Place one large gray thick-brush faint flat wide square at the bottom.
-Scatter 12 small yellow crayon dense flat circles resting on the previous shape.
+Place one large gray thick gouache faint flat wide square at the bottom.
+Scatter 12 small yellow chalk dense flat circles resting on the previous shape.
 Draw one black pen horizontal line at the top.
 ```
 
@@ -1802,8 +1804,8 @@ Japanese DDL (reference):
 ```text
 画用紙。
 背景を白で埋める。
-下に、灰の太筆の薄い塗りの大きな横長の四角を1個置く。
-黄のクレヨンの濃い塗りの小さな円を12個散らす、前の形に載る。
+下に、灰の太いガッシュの薄い塗りの大きな横長の四角を1個置く。
+黄のチョークの濃い塗りの小さな円を12個散らす、前の形に載る。
 上に、黒のペンの水平の線を1個引く。
 ```
 
@@ -1815,7 +1817,7 @@ English DDL:
 
 ```text
 Paper.
-Place one red thick-brush faint flat square at the center.
+Place one red thick gouache faint flat square at the center.
 Place one blue empty circle at the center overlapping the previous shape.
 Draw one black diagonal line length 0.5 at the center crossing the previous shape.
 ```
@@ -1824,7 +1826,7 @@ Japanese DDL (reference):
 
 ```text
 紙。
-中心に、赤の太筆の薄い塗りの四角を1個置く。
+中心に、赤の太いガッシュの薄い塗りの四角を1個置く。
 前の形に重なる青の空の円を中心に1個置く。
 前の形を横切る長さ0.5の黒の斜めの線を中心に1個引く。
 ```
@@ -1861,7 +1863,7 @@ English DDL:
 Paper.
 Place a red circle and a blue square overlapping at the center.
 Line up 3 small yellow triangles at the top.
-Draw one black fine-brush half-width arc at the bottom.
+Draw one black gouache half-width arc at the bottom.
 ```
 
 Japanese DDL (reference):
@@ -1870,7 +1872,7 @@ Japanese DDL (reference):
 紙。
 赤い円と青い四角を中心に重ねて置く。
 上に、黄の小さな三角を3個並べる。
-下に、黒の細筆の半幅の弧を1個引く。
+下に、黒のガッシュの半幅の弧を1個引く。
 ```
 
 ### 5.33. Repeat three kinds of shapes
@@ -1905,7 +1907,7 @@ English DDL:
 Paper.
 Line up five, alternating a group of a red circle and a blue line with a gray arc.
 Line up 7 small black pencil points at the top.
-Place one green thick-brush faint flat square at the bottom.
+Place one green thick gouache faint flat square at the bottom.
 ```
 
 Japanese DDL (reference):
@@ -1914,7 +1916,7 @@ Japanese DDL (reference):
 紙。
 赤い円と青い線の組を、灰の弧と交互に5つ並べる。
 上に、黒の鉛筆の小さな点を7個並べる。
-下に、緑の太筆の薄い塗りの四角を1個置く。
+下に、緑の太いガッシュの薄い塗りの四角を1個置く。
 ```
 
 ### 5.35. Two alternating-color rows
@@ -1927,7 +1929,7 @@ English DDL:
 Paper.
 Line up 5 small empty circles at the top, alternating red and gray.
 Line up 7 small flat squares at the bottom, alternating blue and yellow.
-Draw one black rotring horizontal line at the center.
+Draw one black thin pen horizontal line at the center.
 ```
 
 Japanese DDL (reference):
@@ -1936,7 +1938,7 @@ Japanese DDL (reference):
 紙。
 上に、赤と灰を交互にして、小さな空の円を5個並べる。
 下に、青と黄を交互にして、小さな塗りの四角を7個並べる。
-中心に、黒のロットリングの水平の線を1個引く。
+中心に、黒の細いペンの水平の線を1個引く。
 ```
 
 ### 5.36. Scatter a three-color cycle
@@ -1970,7 +1972,7 @@ English DDL:
 ```text
 Paper.
 Tile 49 flat squares side length 0.142857 in the range horizontal 0 to 1, vertical 0 to 1, alternating white and blue.
-Place one large red thick-brush empty circle at the center.
+Place one large red thick gouache empty circle at the center.
 Draw one black pen half-width horizontal line at the bottom.
 ```
 
@@ -1979,7 +1981,7 @@ Japanese DDL (reference):
 ```text
 紙。
 画面の横0〜1、縦0〜1の範囲に、白と青を交互にして、一辺0.142857の塗りの四角を49個敷き詰める。
-中心に、赤の太筆の空の大きな円を1個置く。
+中心に、赤の太いガッシュの空の大きな円を1個置く。
 下に、黒のペンの半幅の水平の線を1個引く。
 ```
 
@@ -2105,7 +2107,7 @@ English DDL:
 Paper.
 Tile 9 black empty hexagon radius 0.06 in the range horizontal 0.1 to 0.9, vertical 0.3 to 0.9.
 Line up 7 red flat hexagon radius 0.04 from horizontal 0.1, vertical 0.15 to horizontal 0.9, vertical 0.15.
-Place one small blue fine-brush empty circle at the center.
+Place one small blue gouache empty circle at the center.
 ```
 
 Japanese DDL (reference):
@@ -2114,7 +2116,7 @@ Japanese DDL (reference):
 紙。
 画面の横0.1〜0.9、縦0.3〜0.9の範囲に、半径0.06の黒の空の六角形を9個敷き詰める。
 画面の横0.1、縦0.15から横0.9、縦0.15まで、半径0.04の赤の塗りの六角形を7個並べる。
-中心に、青の細筆の小さな空の円を1個置く。
+中心に、青のガッシュの小さな空の円を1個置く。
 ```
 
 ### 5.44. Small, normal, and large
@@ -2193,7 +2195,7 @@ English DDL:
 Canvas.
 Fill the background with black.
 Scatter 30 very small points in the whole canvas (horizontal 0 to 1, vertical 0 to 1), repeating red, orange, and yellow in order, fading outward from the center.
-Place one small white rotring empty circle at the center.
+Place one small white thin pen empty circle at the center.
 ```
 
 Japanese DDL (reference):
@@ -2202,7 +2204,7 @@ Japanese DDL (reference):
 カンバス。
 背景を黒で埋める。
 画面全体（横0〜1、縦0〜1）に、赤・橙・黄の順に繰り返して、中心から外へ薄れさせて、とても小さな点を30個散らす。
-中心に、白のロットリングの空の小さな円を1個置く。
+中心に、白の細いペンの空の小さな円を1個置く。
 ```
 
 ### 5.48. Colors that repeat and colors that shift once
@@ -2237,7 +2239,7 @@ English DDL:
 Paper.
 Tile 6 small squares in the upper band (horizontal 0.1 to 0.9, vertical 0.1 to 0.4), shifting through yellow, orange, and red in order.
 Tile 9 small blue empty squares rotated 45 degrees in the lower band (horizontal 0.1 to 0.9, vertical 0.6 to 0.9).
-Draw one black fine-brush half-width horizontal line at the center.
+Draw one black gouache half-width horizontal line at the center.
 ```
 
 Japanese DDL (reference):
@@ -2246,7 +2248,7 @@ Japanese DDL (reference):
 紙。
 上の帯（横0.1〜0.9、縦0.1〜0.4）に、黄・橙・赤の順に段々に移して、小さな四角を6個敷き詰める。
 下の帯（横0.1〜0.9、縦0.6〜0.9）に、回転45度の青の空の小さな四角を9個敷き詰める。
-中心に、黒の細筆の半幅の水平の線を1個引く。
+中心に、黒のガッシュの半幅の水平の線を1個引く。
 ```
 
 ### 5.50. Layer a ground, textures, a row, and a path
@@ -2258,10 +2260,10 @@ English DDL:
 ```text
 Washi.
 Fill the background with white.
-Place one large gray thick-brush faint sweep wide square in the lower band (horizontal 0 to 1, vertical 2/3 to 1).
-Place one red thick-brush underpainted fine-grained brushmarks cloudform width 0.35, height 0.2 at horizontal 0.5, vertical 0.35.
+Place one large gray thick gouache faint sweep wide square in the lower band (horizontal 0 to 1, vertical 2/3 to 1).
+Place one red thick gouache underpainted fine-grained brushmarks cloudform width 0.35, height 0.2 at horizontal 0.5, vertical 0.35.
 Line up 9 empty circles radius 0.025 from horizontal 0.1, vertical 0.7 to horizontal 0.9, vertical 0.7, alternating blue and yellow.
-Draw one black fine-brush free line from horizontal 0.15, vertical 0.15 to horizontal 0.85, vertical 0.55.
+Draw one black gouache free line from horizontal 0.15, vertical 0.15 to horizontal 0.85, vertical 0.55.
 ```
 
 Japanese DDL (reference):
@@ -2269,8 +2271,8 @@ Japanese DDL (reference):
 ```text
 和紙。
 背景を白で埋める。
-下の帯（横0〜1、縦2/3〜1）に、灰の太筆の薄い刷きの横長の大きな四角を1個置く。
-画面の横0.5、縦0.35の位置に、幅0.35、高さ0.2の赤の太筆の下塗りの細かい刷毛目の雲形を1個置く。
+下の帯（横0〜1、縦2/3〜1）に、灰の太いガッシュの薄い刷きの横長の大きな四角を1個置く。
+画面の横0.5、縦0.35の位置に、幅0.35、高さ0.2の赤の太いガッシュの下塗りの細かい刷毛目の雲形を1個置く。
 画面の横0.1、縦0.7から横0.9、縦0.7まで、青と黄を交互にして、半径0.025の空の円を9個並べる。
-画面の横0.15、縦0.15から横0.85、縦0.55まで、黒の細筆の自由線を1個引く。
+画面の横0.15、縦0.15から横0.85、縦0.55まで、黒のガッシュの自由線を1個引く。
 ```

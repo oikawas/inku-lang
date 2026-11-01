@@ -15,7 +15,9 @@
 //! Those earlier built-ins are kept here (`assets/nature-historical-definitions.json`, the
 //! Server's table of 2026-10-31), and such a lock moves to one of them only when its saved
 //! form has the lock's digest, as for a supplied one. A supplied definition is used first;
-//! a name and version alone never choose one.
+//! a name and version alone never choose one. The earlier built-ins a document's locks moved
+//! to come back with the document (`recovered_definitions`, each in the shape of a
+//! `definitions` entry), so a host that saves a work's definitions with it can save them.
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::OnceLock;
@@ -218,10 +220,18 @@ fn migrate_document(retired: Retired, document: SavedDocument, definitions: &[Su
     // the same name and version whose saved form has the lock's digest, or else an earlier
     // built-in with that digest.
     let mut locks = Vec::new();
+    // The earlier built-ins a lock moved to: the host saves them with the work, as it saves
+    // the supplied ones from `definitions`.
+    let mut recovered = Vec::new();
     for lock in &document.macro_locks {
-        let Some(migrated) =
-            saved_with(definitions, lock).or_else(|| saved_with(historical(retired), lock))
-        else {
+        let Some(migrated) = saved_with(definitions, lock).or_else(|| {
+            let built_in = saved_with(historical(retired), lock)?;
+            let value = definition_value(Some(lock.digest.as_str()), built_in);
+            if !recovered.contains(&value) {
+                recovered.push(value);
+            }
+            Some(built_in)
+        }) else {
             let named = definitions
                 .iter()
                 .filter(|supplied| {
@@ -258,6 +268,7 @@ fn migrate_document(retired: Retired, document: SavedDocument, definitions: &[Su
             "edits": migration.edits,
             "unassociated_sweeps": migration.unassociated_sweeps,
             "unassociated_tools": migration.unassociated_tools,
+            "recovered_definitions": recovered,
         }),
         Err(error) => json!({"error": error_value(&error)}),
     }
@@ -576,10 +587,20 @@ mod tests {
                 ))
                 .unwrap()
             };
-            // The lock moves as it would with its definition supplied.
+            // The lock moves as it would with its definition supplied, and the migrated
+            // definition comes back with the document for the host to save with the work.
             let with = unit(vec![definition.clone()]);
             let without = unit(Vec::new());
             assert_eq!(without["definitions"], json!([]), "{name}");
+            assert_eq!(
+                with["document"]["recovered_definitions"],
+                json!([]),
+                "{name}"
+            );
+            assert_eq!(
+                without["document"]["recovered_definitions"], with["definitions"],
+                "{name}"
+            );
             assert_eq!(
                 without["document"]["document"], with["document"]["document"],
                 "{name}"

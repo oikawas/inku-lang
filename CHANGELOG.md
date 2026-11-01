@@ -11,10 +11,13 @@ This file records changes chronologically. If a historical note conflicts with t
 ### 2026-11-01 — Saijiki v3 on macOS
 
 Support the new touch vocabulary and render engine 95. DB v7 backs up and migrates saved works; DDL exports identify their Saijiki edition and older exports are migrated on import.
+### 2026-11-01 — Match fork catalog locks
+
+Preserve and report fork catalog locks whose original digest does not match a migrated definition.
 
 ### 2026-11-01 — Saijiki migration of locks without a saved definition
 
-For old works that kept a lock without saving its definition, the shared core now holds the built-in Nature definitions earlier releases shipped (the same table as the Server's). The Saijiki migration entries move such a lock to a definition of that table only when no supplied definition matches and the table's definition has the lock's digest; a name and version alone never choose one. The entries' input and output are unchanged.
+For old works that kept a lock without saving its definition, the shared core now holds the built-in Nature definitions earlier releases shipped (the same table as the Server's). The Saijiki migration entries move such a lock to a definition of that table only when no supplied definition matches and the table's definition has the lock's digest; a name and version alone never choose one. A definition moved from the table comes back in the document answer's `recovered_definitions`, in the shape of a `definitions` entry, for a host that saves definitions with its works.
 
 ### 2026-11-01 — Synthetic display comparisons
 

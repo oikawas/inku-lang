@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+Resolve missing history instruction languages from saved fork configuration or DDL before Saijiki migration.
+
 Preserve and report fork catalog locks whose original digest does not match a migrated definition.
 
 ### 2026-11-01 — Saijiki migration of locks without a saved definition

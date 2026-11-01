@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-11-01 — Synthetic display comparisons
+
+Add synthetic pictures for the painting knife's `gradientUnits="userSpaceOnUse"` fade and the `stroke-linejoin="round"` used by etching and other media. Tests compare them with fixed Chrome images and check that removing each attribute fails the same yardstick. Both pictures also enter the support-table and CPU/Graphite comparisons.
+
 ### 2026-10-31 — The touches reorganised (Saijiki v3, render engine 95)
 
 The touches go from twelve words to eleven. Rotring merges into pen, crayon into chalk, fine-brush and thick-brush into gouache, and burin and drypoint into etching; oil pastel, watercolor, and painting knife are added (DDL 29, DDL engine 75). Saved instructions and plugin definitions move once to the new words, and each width word moves to the step nearest the original width. A lock moves only to the definition whose digest matches the one it was saved with. A work that uses a new tool becomes Score 0.24.0.

@@ -38,6 +38,16 @@ not match Chrome, so the test sees the gradients.
 made its picture the same way. Without its offsets it does not match Chrome, so the
 test sees them.
 
+`user-space-gradient` is the painting knife's thinning: linear gradients with
+`gradientUnits="userSpaceOnUse"`, numeric endpoints and one colour fading in opacity.
+`round-join` is the round join used by etching lines and the media's ridges, with
+thick strokes and acute corners. Both are large, dark, noise-free synthetic pictures
+(2026-11-01). Chrome 156.0.8078.74 made their pictures the same way as C1, each at
+200 × 200 pixels. Removing `gradientUnits` restores objectBoundingBox; removing
+`stroke-linejoin` restores miter. Neither control matches Chrome under the same
+yardstick. Both pictures also join the CPU/Graphite comparison at 1x and in a 4x
+window.
+
 ## `public-requests.json` (C6)
 
 The 17 public DDL texts of stage 1 (with where each was taken from) and the exact

@@ -239,6 +239,51 @@ fn dash_offsets_match_chrome() {
     );
 }
 
+/// The painting knife's thinning uses coordinates in user space (2026-11-01).
+/// Removing the units restores objectBoundingBox, changing the fade. Chrome's
+/// picture is captured once as for C1; the control must fail the same yardstick.
+#[test]
+fn user_space_gradients_match_chrome() {
+    attribute_matches_chrome(
+        "user-space-gradient",
+        r#" gradientUnits="userSpaceOnUse""#,
+        2,
+    );
+}
+
+/// Etching lines and the media's ridges join with round corners (2026-11-01).
+/// Thick, acute corners make the default miter visibly different from Chrome's
+/// round joins, while retaining the core's round line caps.
+#[test]
+fn round_joins_match_chrome() {
+    attribute_matches_chrome("round-join", r#" stroke-linejoin="round""#, 1);
+}
+
+fn attribute_matches_chrome(name: &str, attribute: &str, count: usize) {
+    let svg = String::from_utf8(data(&format!("compat/{name}.svg"))).unwrap();
+    assert_eq!(svg.matches(attribute).count(), count, "{name}: {attribute}");
+    let (width, height, reference) = chrome(&format!("compat/{name}-chrome.png"));
+    let drawn = difference(
+        width,
+        height,
+        &over_white(&whole(&svg, width, height)),
+        &reference,
+    );
+    let without = svg.replace(attribute, "");
+    let control = difference(
+        width,
+        height,
+        &over_white(&whole(&without, width, height)),
+        &reference,
+    );
+    eprintln!("{name}: {drawn:?}, without {attribute} {control:?}");
+    assert!(drawn.passes(), "{name}: {drawn:?}");
+    assert!(
+        !control.passes(),
+        "{name} matches Chrome without {attribute}: {control:?}"
+    );
+}
+
 /// C4. 512px tiles drawn on eight threads from one scene, stitched, against one piece
 /// (stage 1: the window's position changes filter results slightly, so not identical).
 #[test]

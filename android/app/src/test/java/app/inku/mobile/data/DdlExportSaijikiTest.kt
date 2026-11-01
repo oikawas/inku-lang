@@ -5,6 +5,20 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class DdlExportSaijikiTest {
+    @Test fun englishLegacyDdlWithoutLanguageMigratesInJapaneseUi() {
+        for (schema in listOf(DdlExport.SCHEMA, "inku.history_item")) {
+            for (language in listOf(null, "", "auto")) {
+                val file = JSONObject().put("schema", schema).put("ddl", "Draw a blue fine-brush line.")
+                if (language != null) file.put("language", language)
+                val result = DdlExport.parse(file.toString(), "ja")
+                assertEquals("Draw a blue gouache line.", result.ddl)
+                assertEquals(1, result.migratedChanges)
+                assertEquals("Migrated 1 change from the older Saijiki.", app.inku.mobile.ui.i18n.InkuStringsEn.ddlImportMigrated(result.migratedChanges))
+            }
+        }
+        assertEquals("Migrated 2 changes from the older Saijiki.", app.inku.mobile.ui.i18n.InkuStringsEn.ddlImportMigrated(2))
+    }
+
     @Test fun exportEditionAndLegacyImport() {
         val export = DdlExport.build("赤いガッシュの線。", "ja", null, null, JSONObject())
         assertEquals("inku.saijiki.v3", export.getString("saijiki"))

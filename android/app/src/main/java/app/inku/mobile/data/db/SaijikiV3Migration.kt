@@ -328,7 +328,9 @@ internal class SaijikiV3Migration(
                     for (entry in recovered) {
                         val definition = entry.get("definition")
                         val existing = link.definitions.indexOfFirst {
-                            definitionAnswer(it).optString("qualified_name") == entry.optString("qualified_name")
+                            val saved = definitionAnswer(it)
+                            saved.optString("qualified_name") == entry.optString("qualified_name") &&
+                                saved.optString("version") == entry.optString("version")
                         }
                         if (existing >= 0) {
                             // The saved lock selected the recovered content, not the mismatched supplied copy.

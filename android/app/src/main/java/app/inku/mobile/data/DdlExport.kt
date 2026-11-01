@@ -94,8 +94,10 @@ object DdlExport {
                 require(!entry.has("error")) { "invalid_export_definitions" }
                 locks.put(JSONObject().put("qualified_name", entry.getString("qualified_name")).put("version", entry.getString("version")).put("digest", entry.getString("old_digest")))
             }
+            val migrationLanguage = file.optString("language").takeIf { it == "ja" || it == "en" }
+                ?: InstructionLanguages.ofDdl(selected.ddl.orEmpty(), null, null, fallbackLanguage)
             val answer = ask(JSONObject().put("definitions", definitions).put("document", JSONObject()
-                .put("source", selected.ddl.orEmpty()).put("language", file.optString("language", fallbackLanguage))
+                .put("source", selected.ddl.orEmpty()).put("language", migrationLanguage)
                 .put("saijiki", "inku.saijiki.v2").put("macro_locks", locks)))
             require(!answer.has("error")) { "saijiki_export_migration_refused" }
             val document = answer.getJSONObject("document")

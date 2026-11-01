@@ -106,6 +106,41 @@ class SaijikiV3MigrationTest {
         }
     }
 
+    @Test fun recoveredDefinitionDoesNotReplaceAnotherVersionOfTheSameName() {
+        HostSqlite().use { host ->
+            schema(host)
+            val entries = JSONObject(productFile("core/crates/inku-ddl/tests/fixtures/nature-leaves-1.0-package.json").readText()).getJSONArray("entries")
+            val other = (0 until entries.length()).map { entries.getJSONObject(it).getJSONObject("definition") }
+                .first { it.getString("heading") == "下草" }.put("version", "9.9.9")
+            val expected = JSONObject(NativePipelineBridge.migrateSaijikiV2(JSONObject().put("definitions", org.json.JSONArray().put(other)).toString().toByteArray()).decodeToString())
+                .getJSONArray("definitions").getJSONObject(0).getJSONObject("definition")
+            val lock = JSONObject().put("qualified_name", "Nature.下草").put("version", "1.0.0")
+                .put("digest", "sha256:88046b24987a2600eeb8b985f36bc15222202a5758a0f4a7638e514dd6af2aea")
+            val context = JSONObject().put("ddl_digest", "old").put("config", JSONObject()
+                .put("language", "ja").put("definitions", org.json.JSONArray().put(other)).put("macro_summaries", org.json.JSONArray().put("別の版")))
+                .put("macro_catalog", JSONObject().put("definition_locks", org.json.JSONArray().put(lock)))
+            val bytes = app.inku.mobile.data.lineage.LineagePlanner.canonicalJson(context).toByteArray()
+            val digest = java.security.MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+            host.db.execSQL("INSERT INTO history_items VALUES ('other-version', '黒い太筆の線を引く。', 'ja')")
+            host.db.execSQL("INSERT INTO pipeline_history_links VALUES ('u', 'other-version', 'v', ?, ?, 'old')", arrayOf<Any>(bytes, digest))
+            val report = migration().runOnce(host.db)!!
+            assertEquals(0, report.getJSONArray("refused_records").length())
+            host.db.query("SELECT fork_context_bytes FROM pipeline_history_links").use {
+                assertTrue(it.moveToFirst())
+                val config = JSONObject(it.getBlob(0).decodeToString()).getJSONObject("config")
+                val definitions = config.getJSONArray("definitions")
+                assertEquals(2, definitions.length())
+                assertEquals(
+                    app.inku.mobile.data.lineage.LineagePlanner.canonicalJson(JSONObject(expected.toString())),
+                    app.inku.mobile.data.lineage.LineagePlanner.canonicalJson(JSONObject(definitions.getJSONObject(0).toString())),
+                )
+                assertEquals("9.9.9", definitions.getJSONObject(0).getString("version"))
+                assertEquals("1.0.0", definitions.getJSONObject(1).getString("version"))
+                assertEquals(2, config.getJSONArray("macro_summaries").length())
+            }
+        }
+    }
+
     /** Explicit opt-in, on a separately copied database only. No device access. */
     @Test fun coreHistoricalFallbackRecoversAnOtherwiseMissingDefinition() {
         HostSqlite().use { host ->

@@ -148,6 +148,21 @@ public final class AppModel {
     public private(set) var patchProposalJSON = ""
     public private(set) var patchCandidate = ""
     public private(set) var completionIssues: [HoleCompletionIssue] = []
+    /// The creation panel and the editor dismissal share this exact pending execution state.
+    public var patchReview: PipelinePatchReview? {
+        guard authoringPhase == "awaiting_patch_approval", !patchProposalJSON.isEmpty,
+              let executionID = currentExecutionID else { return nil }
+        return PipelinePatchReview(executionID: executionID, proposal: patchProposalJSON,
+                                   committedDDL: visibleDDL, proposedDDL: patchCandidate)
+    }
+    public var completionNoticeExecutionID: String? {
+        (!completionIssues.isEmpty || patchReview != nil) ? currentExecutionID : nil
+    }
+    public func shouldReturnToCreation(afterSaving saved: Bool, previousReview: PipelinePatchReview?,
+                                       previousIssues: [HoleCompletionIssue], previousNoticeExecutionID: String?) -> Bool {
+        saved || (patchReview != nil && patchReview != previousReview)
+            || (!completionIssues.isEmpty && (completionIssues != previousIssues || completionNoticeExecutionID != previousNoticeExecutionID))
+    }
     /// Web DdlViewer: the displayed work's instructions as the author is editing them in the box. Typing never
     /// draws; "Draw from instructions" draws this text once. Another work starts from its own instructions.
     public private(set) var ddlBoxDraftWorkID: String?
@@ -2045,7 +2060,15 @@ public final class AppModel {
 
     private func performCommand(executionID: String, command: PipelineCommand, kind: String) async {
         guard let host else { return }
-        let parentID = selectedWorkID
+        let parentID: String?
+        switch command {
+        case .approvePatch, .declinePatch, .completeHoles:
+            // Completion belongs to the execution that proposed it. Its original parent is already
+            // pinned by the host; the currently displayed work may be unrelated or absent.
+            parentID = nil
+        default:
+            parentID = selectedWorkID
+        }
         _ = await performSerialized(status: "DDLを処理中") { [weak self] token in
             guard let self else { return }
             self.activeExecutionID = executionID

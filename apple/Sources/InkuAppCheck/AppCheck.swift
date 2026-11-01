@@ -264,6 +264,9 @@ struct AppCheck {
         if CommandLine.arguments.contains("--completion-ranges-only") {
             try await runCompletionRangeChecks(); return
         }
+        if CommandLine.arguments.contains("--completion-approval-only") {
+            try await runCompletionApprovalChecks(); return
+        }
         if CommandLine.arguments.contains("--completion-issues-only") {
             try runCompletionIssueChecks(); return
         }

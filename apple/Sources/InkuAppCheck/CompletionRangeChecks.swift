@@ -45,7 +45,11 @@ import InkuUI
     let reopened = AppModel(databaseURL: databaseURL, transport: transport)
     await reopened.initialize()
     try await reopened.updateHostSettings(HostSettings(providers: [provider], models: ModelSelection(stage1Model: "check:m", stage2Model: "check:m")))
-    guard let again = reopened.works.first(where: { $0.id == saved.id }) else { throw CheckFailure.message("Saved work missing after reopening") }
+    // `works` holds the lightweight recent-metadata projection; opening an editor needs the complete saved work.
+    guard reopened.works.contains(where: { $0.id == saved.id }),
+          let again = try await InkuDatabase(url: databaseURL).work(id: saved.id) else {
+        throw CheckFailure.message("Saved work missing after reopening")
+    }
     await reopened.selectWork(again)
     guard states(reopened, ddl) == [.completed], states(reopened, words) == [.wordsChanged] else {
         throw CheckFailure.message("Saved states: \(states(reopened, ddl)) \(states(reopened, words))")
@@ -55,7 +59,7 @@ import InkuUI
     await reopened.commitDDL()
     let kinds = await transport.completionKinds
     guard kinds.count == before + 1, kinds.last?.contains("range_words_changed") == true else {
-        throw CheckFailure.message("Drawing renamed words from the saved work asked \(kinds.dropFirst(before)) instead of completing the range again")
+        throw CheckFailure.message("Drawing renamed words from the saved work asked \(kinds.dropFirst(before)) instead of completing the range again: \(reopened.authoringPhase) \(reopened.errorText ?? reopened.status)")
     }
     print("Completion ranges passed: an approved completion's range is saved with the work (1 range); completed, numbers-changed and words-changed read from the live and the reopened work; a renamed range drawn from the reopened work is completed again (range_words_changed). Real core, fixture provider.")
 }

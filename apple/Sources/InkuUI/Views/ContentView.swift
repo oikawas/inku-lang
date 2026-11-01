@@ -413,6 +413,13 @@ public struct ContentView: View {
         ui.settingsOpen = false
         if let tab { ui.workspaceTab = tab }
     }
+    private func showCompletionInCreation() {
+        batchWorkspace.showHistory()
+        automation.selectInputTab("description", app: model)
+        ui.exitCanvasFullScreen()
+        ui.leftPanelCollapsed = false
+        showCreation(tab: "artwork")
+    }
     private func openLibrary() {
         ui.settingsOpen = false
         ui.libraryOpen = true
@@ -497,10 +504,10 @@ public struct ContentView: View {
                 .environment(model.display)
                 .inkuDialogFrame(.replay)
         case .ddl(let session):
-            DdlAuthoringEditorSheet(model: model, session: session).id(session.id).environment(model.display)
+            DdlAuthoringEditorSheet(model: model, session: session, onPendingReview: showCompletionInCreation).id(session.id).environment(model.display)
                 .inkuDialogFrame(.ddlEditor)
         case .newDDL(let session):
-            NewDdlAuthoringSheet(model: model, initialImport: session.imported).id(session.id).environment(model.display)
+            NewDdlAuthoringSheet(model: model, initialImport: session.imported, onPendingReview: showCompletionInCreation).id(session.id).environment(model.display)
                 .inkuDialogFrame(.ddlEditor)
         case .comparison(let session):
             ComparisonView(model: model, work: session.work, kind: session.kind, onCommitted: refinementCommitted).id(session.id).environment(model.display)
@@ -574,7 +581,15 @@ public struct ContentView: View {
             // Web DdlViewer: the box's draft is what is drawn, once.
             let source = model.ddlBoxText(for: work)
             guard DDLSource.hasBody(source) else { return }
-            Task { await model.drawEditedDDL(work: work, source: source, paperID: model.canvasID) }
+            Task {
+                let previous = model.patchReview, previousIssues = model.completionIssues
+                let previousExecution = model.completionNoticeExecutionID
+                let saved = await model.drawEditedDDL(work: work, source: source, paperID: model.canvasID)
+                if !saved && model.shouldReturnToCreation(afterSaving: false, previousReview: previous,
+                                                         previousIssues: previousIssues, previousNoticeExecutionID: previousExecution) {
+                    showCompletionInCreation()
+                }
+            }
         // The editor opens on the box's draft; its discard returns to the work's saved instructions.
         case "ddl": dialog = .ddl(DdlEditingSession(work: work, draft: model.ddlBoxText(for: work)))
         case "color": dialog = .comparison(ComparisonSession(work: work, kind: .catalog))

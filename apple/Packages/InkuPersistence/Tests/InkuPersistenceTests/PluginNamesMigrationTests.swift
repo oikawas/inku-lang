@@ -66,17 +66,21 @@ struct PluginNamesMigrationTests {
             "canvas_format_registry_digest": registryDigest, "resolved_catalog_id": "default", "catalog_mode": "default", "background": "white", "palette": palette],
             "composition_seed": seed, "macro_expansion_limits": ["max_invocations": "64", "max_depth": "16", "max_evaluation_steps": "8192", "max_nodes_per_invocation": "128", "max_total_nodes": "512"],
             "stage15_variation": NSNull(), "error_policy": "omit_and_continue", "hard_resource_policy": ["identity": "test.plugin-v6", "budget": budget], "operational_resource_budget": budget]
+        let v3Result = try #require(JSONSerialization.jsonObject(with: InkuCore.migrateSaijikiV2(try json(["definitions": [definition]]))) as? [String: Any])
+        let v3Entry = try #require((v3Result["definitions"] as? [[String: Any]])?.first)
+        let v3Definition = try #require(v3Entry["definition"] as? [String: Any])
+        var v3Lock = lock
+        v3Lock["digest"] = try #require(v3Entry["digest"] as? String)
         func compiled(_ ddl: String) throws -> [String: Any] {
-            let request = try json(["document": ["source": ddl, "language": "ja", "macro_locks": [lock], "saijiki": "inku.saijiki.v2"], "definitions": [definition], "compiler": compiler])
+            let request = try json(["document": ["source": ddl, "language": "ja", "macro_locks": [v3Lock], "saijiki": "inku.saijiki.v3"], "definitions": [v3Definition], "compiler": compiler])
             return try #require(try JSONSerialization.jsonObject(with: InkuCore.compile(request)) as? [String: Any])
         }
-        let before = try compiled(source), after = try compiled(try #require(goodWork?.ddl))
-        let beforeScore = try #require(before["score"] as? [String: Any]), afterScore = try #require(after["score"] as? [String: Any])
-        #expect(!(beforeScore["instructions"] as? [Any] ?? []).isEmpty)
-        #expect(try json(beforeScore) == json(afterScore))
+        let after = try compiled(try #require(goodWork?.ddl))
+        let afterScore = try #require(after["score"] as? [String: Any])
+        #expect(!(afterScore["instructions"] as? [Any] ?? []).isEmpty)
         let reader = try DatabaseQueue(path: file.path)
         try await reader.read { db in
-            #expect(try Int.fetchOne(db, sql: "PRAGMA user_version") == 6)
+            #expect(try Int.fetchOne(db, sql: "PRAGMA user_version") == 7)
             let ack = try #require(try Data.fetchOne(db, sql: "SELECT acknowledgement FROM effect_acknowledgements WHERE execution_id = 'good'"))
             let payload = try #require(try Data.fetchOne(db, sql: "SELECT save_payload FROM effect_acknowledgements WHERE execution_id = 'good'"))
             #expect(try String.fetchOne(db, sql: "SELECT json_extract(CAST(? AS TEXT), '$.performance.document.source')", arguments: [ack]) == "｛若葉｝。")

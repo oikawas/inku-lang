@@ -8,7 +8,17 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-11-01 — Instruction language in Saijiki migration
+
 Resolve missing history instruction languages from saved fork configuration or DDL before Saijiki migration.
+
+### 2026-11-01 — Saijiki v3 on macOS
+
+Support the new touch vocabulary and render engine 95. DB v7 backs up and migrates saved works; DDL exports identify their Saijiki edition and older exports are migrated on import.
+
+Show DDL completion proposals in the creation panel for approval or rejection, together with any unresolved completion issues.
+
+### 2026-11-01 — Match fork catalog locks
 
 Preserve and report fork catalog locks whose original digest does not match a migrated definition.
 

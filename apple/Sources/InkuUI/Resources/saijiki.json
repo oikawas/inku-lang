@@ -1,5 +1,5 @@
 {
-  "asset_id": "inku.saijiki.v2",
+  "asset_id": "inku.saijiki.v3",
   "categories": [
     {
       "key": "katachi",
@@ -329,8 +329,8 @@
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
           "physical_description": {
-            "en": "A line trace with slight ink variation.",
-            "ja": "インクにわずかなむらがある線の痕。"
+            "en": "An ink line trace with slight variation; it can also be a uniform, hard drafting line.",
+            "ja": "インクの線の痕。わずかなむらがあり、均一で硬い製図線にもなる。"
           },
           "prompt": true,
           "score_value": "pen",
@@ -344,38 +344,8 @@
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
           "physical_description": {
-            "en": "A hard drafting line with uniform width and square ends.",
-            "ja": "均一な線幅と角端を持つ硬い製図線。"
-          },
-          "prompt": true,
-          "score_value": "rotring",
-          "surface_en": "rotring",
-          "surface_ja": "ロットリング"
-        },
-        {
-          "default": false,
-          "display": true,
-          "marker": null,
-          "marker_surfaces_en": null,
-          "marker_surfaces_ja": null,
-          "physical_description": {
-            "en": "Wax rubbing with short breaks and granular gaps.",
-            "ja": "蝋の擦れに、短い途切れと粒状の欠けが残る。"
-          },
-          "prompt": true,
-          "score_value": "crayon",
-          "surface_en": "crayon",
-          "surface_ja": "クレヨン"
-        },
-        {
-          "default": false,
-          "display": true,
-          "marker": null,
-          "marker_surfaces_en": null,
-          "marker_surfaces_ja": null,
-          "physical_description": {
-            "en": "Powdery scratchiness, fine gaps, and light blur.",
-            "ja": "粉状のかすれと細かな隙間、軽いぼけが残る。"
+            "en": "Colored powdery or waxy rubbing with scratchiness, fine gaps, and granular breaks.",
+            "ja": "色の粉や蝋の擦れに、かすれと細かな隙間、粒状の欠けが残る。"
           },
           "prompt": true,
           "score_value": "chalk",
@@ -388,14 +358,18 @@
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
+          "parser_surfaces_en": [
+            "oil-pastel"
+          ],
+          "parser_surfaces_ja": null,
           "physical_description": {
-            "en": "A brush trace with ink-density variation and secondary lines.",
-            "ja": "墨の濃淡と副線を伴う筆跡。"
+            "en": "Opaque waxy, oily color rubbed on thickly, leaving short stroke marks and the paper's tooth.",
+            "ja": "蝋と油の不透明な色を厚く擦り重ね、短い運びの跡と紙の目が残る。"
           },
           "prompt": true,
-          "score_value": "brush_thin",
-          "surface_en": "fine-brush",
-          "surface_ja": "細筆"
+          "score_value": "oil_pastel",
+          "surface_en": "oil pastel",
+          "surface_ja": "オイルパステル"
         },
         {
           "default": false,
@@ -404,13 +378,32 @@
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
           "physical_description": {
-            "en": "Brush pressure and rubbed secondary traces with light blur.",
-            "ja": "筆圧と擦れた副線に、軽いぼかしが残る。"
+            "en": "Opaque water-based color that dries to a flat, matte coat, with brush tonal variation and rubbed secondary lines.",
+            "ja": "水で溶いた不透明な色が、つやの無い平らな塗りに乾き、筆の濃淡と擦れた副線が残る。"
           },
           "prompt": true,
-          "score_value": "brush_thick",
-          "surface_en": "thick-brush",
-          "surface_ja": "太筆"
+          "score_value": "gouache",
+          "surface_en": "gouache",
+          "surface_ja": "ガッシュ"
+        },
+        {
+          "default": false,
+          "display": true,
+          "marker": null,
+          "marker_surfaces_en": null,
+          "marker_surfaces_ja": null,
+          "parser_surfaces_en": [
+            "watercolour"
+          ],
+          "parser_surfaces_ja": null,
+          "physical_description": {
+            "en": "Transparent water-thinned color soaks into the paper, deepens where it overlaps, and pools at the edges.",
+            "ja": "水で溶いた透ける色が紙にしみ、重なると濃くなり、縁に色が溜まる。"
+          },
+          "prompt": true,
+          "score_value": "watercolor",
+          "surface_en": "watercolor",
+          "surface_ja": "水彩"
         },
         {
           "default": false,
@@ -419,8 +412,8 @@
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
           "physical_description": {
-            "en": "Loaded paint traces with bristle ridges and overlapping strokes.",
-            "ja": "絵具の残る筆跡に、刷毛筋と重なりが現れる。"
+            "en": "Oil-bound paint laid on thickly, with bristle ridges, raised impasto, and glossy overlapping strokes.",
+            "ja": "油で練った絵具を厚く塗り重ね、刷毛筋と盛り上がり、つやのある重なりが残る。"
           },
           "prompt": true,
           "score_value": "oil_paint",
@@ -433,14 +426,18 @@
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
+          "parser_surfaces_en": [
+            "painting-knife"
+          ],
+          "parser_surfaces_ja": null,
           "physical_description": {
-            "en": "A hard engraved line with round ends.",
-            "ja": "硬い彫線と丸い端。"
+            "en": "Paint heaped and spread with a knife into flat planes, leaving ridges, edges, and dry streaks.",
+            "ja": "ナイフで盛って伸ばした絵具の平らな面に、稜と縁、かすれが残る。"
           },
           "prompt": true,
-          "score_value": "burin",
-          "surface_en": "burin",
-          "surface_ja": "ビュラン"
+          "score_value": "painting_knife",
+          "surface_en": "painting knife",
+          "surface_ja": "ペインティングナイフ"
         },
         {
           "default": false,
@@ -449,13 +446,13 @@
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
           "physical_description": {
-            "en": "Soft burr fuzz with bleeding and scratchiness.",
-            "ja": "まくれによる柔らかな毛羽立ちとにじみ、かすれが残る。"
+            "en": "Acid-bitten lines of even width with slightly rough edges and round ends; shading is built by layering lines.",
+            "ja": "酸で腐食させた太さのそろった線に、わずかな荒れと丸い端が残り、線の重ねで陰を作る。"
           },
           "prompt": true,
-          "score_value": "drypoint",
-          "surface_en": "drypoint",
-          "surface_ja": "ドライポイント"
+          "score_value": "etching",
+          "surface_en": "etching",
+          "surface_ja": "エッチング"
         },
         {
           "default": false,

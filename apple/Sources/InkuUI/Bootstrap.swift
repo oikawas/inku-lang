@@ -112,7 +112,7 @@ struct Bootstrap {
         registry = try Self.object(InkuCore.canvasRegistry)
         macroSources = try Self.object(resource("macro-sources"))
         let vocabulary = try Self.object(resource("saijiki"))
-        guard vocabulary["asset_id"] as? String == "inku.saijiki.v2",
+        guard vocabulary["asset_id"] as? String == "inku.saijiki.v3",
               let categories = vocabulary["categories"] as? [[String: Any]] else {
             throw HostError("bundled_vocabulary_invalid")
         }

@@ -14,7 +14,7 @@ func runToolChangeChecks(folder: URL) async throws {
     let app = AppModel(databaseURL: url, transport: transport)
     await app.initialize()
     app.language = "ja"; app.seedText = "42"
-    let source = "背景を白で埋める。\n青の細筆の線を3個引く。\n赤の大きな円を1個置く。"
+    let source = "画面比1:1。\n背景を白で埋める。\n青のガッシュの線を3個引く。\n赤の大きな円を1個置く。"
     guard await app.drawNewDDL(source), let parent = app.selectedWork, parent.ddl == source else {
         throw CheckFailure.message("Touch parent failed: \(app.errorText ?? app.status)")
     }
@@ -81,7 +81,7 @@ func runToolChangeChecks(folder: URL) async throws {
         }
         let read = try ExactJSON(data: InkuCore.retouch(ExactJSON.object(["config": try ExactJSON(data: parentContext.configuration),
             "source": .string(work.ddl!), "tools": .object([:])]).data))
-        guard read["outcome"].string == "read", read["tools"].array?.count == 12 else {
+        guard read["outcome"].string == "read", read["tools"].array?.count == 11 else {
             throw CheckFailure.message("Touch candidate cannot be read with the parent's saved configuration")
         }
         for sentence in read["sentences"].array ?? [] {
@@ -130,7 +130,7 @@ func runToolChangeChecks(folder: URL) async throws {
           await transport.calls == 0 else { throw CheckFailure.message("Unchangeable work offered touch options") }
     try metadata.data.write(to: folder.appendingPathComponent("saved-metadata.json"))
     try Data(saved.ddl!.utf8).write(to: folder.appendingPathComponent("saved.ddl"))
-    print("Touch changes PASS: opening=0 with execution/history unchanged; button uniform=4; second press saves its checked prior option then replaces with per_sentence=4, new IDs, prior selection=0 and numbers=1...4; 12 core tools; only owned Score weights change; DDL reads back; parent seeds/colors/ground/options/model/input preserved; draft ignored; next-four history=2; selected adoption=3 with tool_change metadata; saved child replay/retouch works; all-pen skips pen; no shape offers no options; provider=0. Isolated SQLite only.")
+    print("Touch changes PASS: opening=0 with execution/history unchanged; button uniform=4; second press saves its checked prior option then replaces with per_sentence=4, new IDs, prior selection=0 and numbers=1...4; 11 core tools; only owned Score weights change; DDL reads back; parent seeds/colors/ground/options/model/input preserved; draft ignored; next-four history=2; selected adoption=3 with tool_change metadata; saved child replay/retouch works; all-pen skips pen; no shape offers no options; provider=0. Isolated SQLite only.")
 }
 
 private actor ToolChangeNoProvider: ProviderTransport {

@@ -151,7 +151,7 @@ struct BatchPanelView: View {
                     .overlay(alignment: .topLeading) {
                         // BatchPanel.svelte:191 `batchPlaceholder`: three example lines beside the gutter.
                         if automation.batchText.isEmpty {
-                            Text(model.display.webCopy("batchPlaceholder", "山の向こうに月が昇る\n夜の霧が広がる\n青いクレヨンの線がゆっくり波打つ"))
+                            Text(model.display.webCopy("batchPlaceholder", "山の向こうに月が昇る\n夜の霧が広がる\n青い水彩の線がゆっくり波打つ"))
                                 .inkuFont(14).foregroundStyle(.tertiary).lineSpacing(6 * model.display.preferences.textScale)
                                 .padding(.leading, 44).padding(.top, 9).allowsHitTesting(false)
                         }

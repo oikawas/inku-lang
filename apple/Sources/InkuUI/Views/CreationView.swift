@@ -145,7 +145,13 @@ struct CreationView: View {
             Text(display.webCopy("imageUploadNoticeMessage", "画像から描画を行う場合、画像データがAIにアップロードされます。アップロードされたデータの扱いは、ユーザーが指定したモデルと、それをホストするプロバイダの規約に準じます。\nセンシティブなデータをアップロードしないでください。"))
         }
         .sheet(isPresented: $showNewDDL) {
-            NewDdlAuthoringSheet(model: model)
+            NewDdlAuthoringSheet(model: model, onPendingReview: {
+                batchWorkspace.showHistory()
+                automation.selectInputTab("description", app: model)
+                ui.exitCanvasFullScreen()
+                ui.leftPanelCollapsed = false
+                ui.libraryOpen = false; ui.settingsOpen = false; ui.workspaceTab = "artwork"
+            })
                 .environment(\.inkuWindowSize, windowSize).inkuDialogFrame(.ddlEditor)
         }
         .onChange(of: automation.workspaceInputMode) { _, mode in
@@ -204,7 +210,6 @@ struct CreationView: View {
                 if automation.running && automation.mode == "demo" { demoBanner }
                 if display.visible("input_modes") { inputTabs }
                 inputContents
-                if !isBatch { PipelineDiagnosticsView(raw: model.diagnosticsJSON, display: display, pluginWords: model.pluginWords) }
                 if !isBatch && display.visible("ddl_tools") {
                     HStack {
                         Spacer(minLength: 0)
@@ -214,6 +219,8 @@ struct CreationView: View {
                             .inkuTooltip(display.tooltip("記述を介さず、指示書を直接書いて独立した作品として描画します", serverKey: "tooltipDdlNew"))
                     }.padding(.top, -6)
                 }
+                if !isBatch { PipelineCompletionView(model: model) }
+                if !isBatch { PipelineDiagnosticsView(raw: model.diagnosticsJSON, display: display, pluginWords: model.pluginWords) }
                 if !isBatch, let work = workspaceWork {
                     CreationDisplayedProcess(model: model, work: work, saved: hasSavedWorkspaceWork,
                                              disabled: controlsDisabled, onWorkAction: onWorkAction)

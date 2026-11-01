@@ -59,6 +59,21 @@ public actor InkuDatabase {
                     throw error
                 }
             }
+            if try inspection.read({ try Int.fetchOne($0, sql: "PRAGMA user_version") ?? 0 }) < 7 {
+                let backupURL = self.url.deletingLastPathComponent().appendingPathComponent(".inku-before-v7-\(UUID().uuidString).sqlite")
+                let backup = try DatabaseQueue(path: backupURL.path)
+                do {
+                    try inspection.backup(to: backup)
+                    try backup.writeWithoutTransaction { try $0.execute(sql: "PRAGMA journal_mode = DELETE") }
+                    try backup.read { try Self.validateRestore($0) }
+                    try backup.close()
+                    try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: backupURL.path)
+                } catch {
+                    try? backup.close()
+                    try? FileManager.default.removeItem(at: backupURL)
+                    throw error
+                }
+            }
             try inspection.close()
         } else {
             try FileManager.default.createDirectory(
@@ -72,6 +87,7 @@ public actor InkuDatabase {
             try queue.write { db in try db.execute(sql: Self.schemaSQL()) }
         } else {
             let reportURL = self.url.deletingLastPathComponent().appendingPathComponent(".inku-plugin-names-v6-\(UUID().uuidString).json")
+            let v7ReportURL = self.url.deletingLastPathComponent().appendingPathComponent(".inku-saijiki-v3-v7-\(UUID().uuidString).json")
             do { try queue.write { db in
                 if try Int.fetchOne(db, sql: "PRAGMA user_version") == 1 {
                     try Self.validateSchema(db)
@@ -97,8 +113,16 @@ public actor InkuDatabase {
                     try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: reportURL.path)
                     try db.execute(sql: Self.resourceSQL("migration-v6"))
                 }
+                if try Int.fetchOne(db, sql: "PRAGMA user_version") == 6 {
+                    try Self.validateSchema(db)
+                    let report = try SaijikiV3Migration.run(db)
+                    try report.write(to: v7ReportURL, options: .atomic)
+                    try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: v7ReportURL.path)
+                    try db.execute(sql: Self.resourceSQL("migration-v7"))
+                }
             } } catch {
                 try? FileManager.default.removeItem(at: reportURL)
+                try? FileManager.default.removeItem(at: v7ReportURL)
                 throw error
             }
         }
@@ -969,8 +993,9 @@ public actor InkuDatabase {
         try original.backup(to: isolated)
         try isolated.read { try Self.validateRestore($0) }
         let reportURL = url.deletingLastPathComponent().appendingPathComponent(".inku-plugin-names-v6-restore-\(UUID().uuidString).json")
+        let v7ReportURL = url.deletingLastPathComponent().appendingPathComponent(".inku-saijiki-v3-v7-restore-\(UUID().uuidString).json")
         var restored = false
-        defer { if !restored { try? FileManager.default.removeItem(at: reportURL) } }
+        defer { if !restored { try? FileManager.default.removeItem(at: reportURL); try? FileManager.default.removeItem(at: v7ReportURL) } }
         try isolated.write { db in
             if try Int.fetchOne(db, sql: "PRAGMA user_version") == 1 {
                 try db.execute(sql: Self.resourceSQL("migration-v2"))
@@ -990,6 +1015,12 @@ public actor InkuDatabase {
                 try encoder.encode(report).write(to: reportURL, options: .atomic)
                 try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: reportURL.path)
                 try db.execute(sql: Self.resourceSQL("migration-v6"))
+            }
+            if try Int.fetchOne(db, sql: "PRAGMA user_version") == 6 {
+                let report = try SaijikiV3Migration.run(db)
+                try report.write(to: v7ReportURL, options: .atomic)
+                try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: v7ReportURL.path)
+                try db.execute(sql: Self.resourceSQL("migration-v7"))
             }
         }
         try isolated.read { try Self.validateRestore($0) }
@@ -1082,7 +1113,7 @@ public actor InkuDatabase {
         return try String(contentsOf: resource, encoding: .utf8)
     }
 
-    private static func schemaSQL(version: Int = 6) throws -> String {
+    private static func schemaSQL(version: Int = 7) throws -> String {
         let baseline = try resourceSQL("schema-v1")
         if version == 1 { return baseline }
         let second = baseline + "\n" + (try resourceSQL("migration-v2"))
@@ -1092,7 +1123,9 @@ public actor InkuDatabase {
         let fourth = third + "\n" + (try resourceSQL("migration-v4"))
         if version == 4 { return fourth }
         let fifth = fourth + "\n" + (try resourceSQL("migration-v5"))
-        return version == 5 ? fifth : fifth + "\n" + (try resourceSQL("migration-v6"))
+        if version == 5 { return fifth }
+        let sixth = fifth + "\n" + (try resourceSQL("migration-v6"))
+        return version == 6 ? sixth : sixth + "\n" + (try resourceSQL("migration-v7"))
     }
 
     private struct SchemaObject: Equatable {
@@ -1114,7 +1147,7 @@ public actor InkuDatabase {
     }
 
     private static func validateSchema(_ db: Database) throws {
-        guard let version = try Int.fetchOne(db, sql: "PRAGMA user_version"), [1, 2, 3, 4, 5, 6].contains(version) else {
+        guard let version = try Int.fetchOne(db, sql: "PRAGMA user_version"), [1, 2, 3, 4, 5, 6, 7].contains(version) else {
             throw PersistenceError.unknownSchema
         }
         let expected = try DatabaseQueue()
@@ -1126,6 +1159,7 @@ public actor InkuDatabase {
         if version >= 4 { identifiers.append("swift-v4-remove-export-mark") }
         if version >= 5 { identifiers.append("swift-v5-show-lineage-works") }
         if version >= 6 { identifiers.append("swift-v6-plugin-names-v2") }
+        if version >= 7 { identifiers.append("swift-v7-saijiki-v3") }
         guard try schemaObjects(in: db) == expectedObjects,
               try String.fetchAll(db, sql: "SELECT identifier FROM schema_migrations ORDER BY identifier")
                 == identifiers else {

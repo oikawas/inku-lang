@@ -10,7 +10,9 @@ extension DisplaySettings {
 
     /// A Web function text such as `chatgptModelsLoaded(count)`, exported as a `%@` template.
     func webCopyFormat(_ key: String, _ fallback: String, _ arguments: CVarArg...) -> String {
-        let template = ServerTips.template(key, language: preferences.language, argumentCount: arguments.count) ?? localized(fallback)
+        let templateKey = key == "ddlImportMigrated" && preferences.language == "en" && arguments.count == 1 && String(describing: arguments[0]) == "1"
+            ? "ddlImportMigrated.one" : key
+        let template = ServerTips.template(templateKey, language: preferences.language, argumentCount: arguments.count) ?? localized(fallback)
         return String(format: template, locale: Locale(identifier: preferences.language),
                       arguments: arguments.map { String(describing: $0) })
     }

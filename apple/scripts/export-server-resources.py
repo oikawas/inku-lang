@@ -139,7 +139,7 @@ def main() -> None:
     }
     macro_sources = {"maximum_entries": manifest["pipeline"]["prompt_limits"]["max_catalog_entries"],
                      "canonical": [], "legacy": [], "bundled_packages": ["Nature.leaves"]}
-    saijiki = json.loads((ROOT / "core/crates/inku-ddl/assets/saijiki-v2.json").read_text(encoding="utf-8"))
+    saijiki = json.loads((ROOT / "core/crates/inku-ddl/assets/saijiki-v3.json").read_text(encoding="utf-8"))
     for name, value in [("server-defaults.json", manifest), ("color-catalogs.json", catalogs),
                         ("macro-sources.json", macro_sources),
                         ("saijiki.json", saijiki)]:

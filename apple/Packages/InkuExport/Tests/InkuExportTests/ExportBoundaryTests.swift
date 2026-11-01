@@ -131,6 +131,7 @@ final class ExportBoundaryTests: XCTestCase, @unchecked Sendable {
         let lock: ExactJSON = .object(["qualified_name": .string("Nature.leaves"), "version": .string("1.0.0")])
         let exported = try ExactJSON(data: ExportService.ddl(ExportSource(work: work, pluginDefinitions: [definition, unused, definition], pluginSummaries: ["saved definition"], pluginLocks: [lock])))
         XCTAssertEqual(exported["schema"].string, "inku.ddl-export.v2")
+        XCTAssertEqual(exported["saijiki"].string, "inku.saijiki.v3")
         XCTAssertEqual(exported["ddl"].string, work.ddl)
         let plugins = try XCTUnwrap(exported["plugins"].array)
         XCTAssertEqual(plugins.count, 1)

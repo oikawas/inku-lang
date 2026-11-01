@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 struct DdlAuthoringEditorSheet: View {
     @Bindable var model: AppModel
     @Bindable var session: DdlEditingSession
+    var onPendingReview: () -> Void = {}
     @Environment(\.dismiss) private var dismiss
     @State private var showModels = false
     @State private var drawingModel = ""
@@ -58,7 +59,16 @@ struct DdlAuthoringEditorSheet: View {
                                 .keyboardShortcut(.cancelAction)
                                 .inkuTooltip(tip("編集中の変更を破棄して閉じます。"))
                             Button(model.display.webCopy("submitBtn", "描画する")) {
-                                Task { if await session.commit(to: model, wildOverride: wildOverride) { dismiss() } }
+                                Task {
+                                    let previous = model.patchReview
+                                    let previousIssues = model.completionIssues
+                                    let previousExecution = model.completionNoticeExecutionID
+                                    let saved = await session.commit(to: model, wildOverride: wildOverride)
+                                    if model.shouldReturnToCreation(afterSaving: saved, previousReview: previous, previousIssues: previousIssues, previousNoticeExecutionID: previousExecution) {
+                                        if !saved { onPendingReview() }
+                                        dismiss()
+                                    }
+                                }
                             }
                             .buttonStyle(.borderedProminent)
                             .disabled(!session.canSubmit(to: model) || rangeBlocked)
@@ -94,6 +104,7 @@ struct DdlAuthoringEditorSheet: View {
 @MainActor
 struct NewDdlAuthoringSheet: View {
     @Bindable var model: AppModel
+    var onPendingReview: () -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var draft = ""
     @State private var drawingModel = ""
@@ -107,8 +118,9 @@ struct NewDdlAuthoringSheet: View {
     @State private var insertion: InkuEditorInsertion?
     @State private var rangeBlocked = false
 
-    init(model: AppModel, initialImport: DDLPackageImport? = nil) {
+    init(model: AppModel, initialImport: DDLPackageImport? = nil, onPendingReview: @escaping () -> Void = {}) {
         self.model = model
+        self.onPendingReview = onPendingReview
         _draft = State(initialValue: initialImport?.source ?? "")
         _importedDocument = State(initialValue: initialImport)
     }
@@ -125,6 +137,10 @@ struct NewDdlAuthoringSheet: View {
                         Button(model.display.localized("DDLファイルを読み込む…"), systemImage: "doc.badge.arrow.up") { showImport = true }
                         if let importedDocument, !importedDocument.names.isEmpty {
                             Text(model.display.localized("この新しい作品に定義を持ち込みます: ") + importedDocument.names.joined(separator: ", "))
+                                .inkuFont(12).textSelection(.enabled)
+                        }
+                        if let count = importedDocument?.migratedEdits {
+                            Text(model.display.webCopyFormat("ddlImportMigrated", "旧い歳時記から %@ 箇所を書き換えました。", count))
                                 .inkuFont(12).textSelection(.enabled)
                         }
                     }
@@ -144,7 +160,16 @@ struct NewDdlAuthoringSheet: View {
                         } else {
                             Button(model.display.localized("キャンセル")) { dismiss() }.keyboardShortcut(.cancelAction)
                             Button(model.display.webCopy("submitBtn", "描画する")) {
-                                Task { if await model.drawNewDDL(draft, imported: importedDocument) { dismiss() } }
+                                Task {
+                                    let previous = model.patchReview
+                                    let previousIssues = model.completionIssues
+                                    let previousExecution = model.completionNoticeExecutionID
+                                    let saved = await model.drawNewDDL(draft, imported: importedDocument)
+                                    if model.shouldReturnToCreation(afterSaving: saved, previousReview: previous, previousIssues: previousIssues, previousNoticeExecutionID: previousExecution) {
+                                        if !saved { onPendingReview() }
+                                        dismiss()
+                                    }
+                                }
                             }.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
                                 .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || rangeBlocked)
                         }

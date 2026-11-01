@@ -105,6 +105,13 @@ struct AppCheck {
         if CommandLine.arguments.contains("--fanout-demo-parity-only") {
             try await runFanoutDemoParityChecks(); return
         }
+        if CommandLine.arguments.contains("--saijiki-v3-only") {
+            try runSaijikiV3Checks(); return
+        }
+        if let index = CommandLine.arguments.firstIndex(of: "--saijiki-v3-display-only") {
+            guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Missing isolated display fixture folder") }
+            try await runSaijikiV3DisplayChecks(folder: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return
+        }
         if CommandLine.arguments.contains("--library-parity-only") {
             try await runLibraryParityChecks(); return
         }
@@ -256,6 +263,9 @@ struct AppCheck {
         }
         if CommandLine.arguments.contains("--completion-ranges-only") {
             try await runCompletionRangeChecks(); return
+        }
+        if CommandLine.arguments.contains("--completion-approval-only") {
+            try await runCompletionApprovalChecks(); return
         }
         if CommandLine.arguments.contains("--completion-issues-only") {
             try runCompletionIssueChecks(); return

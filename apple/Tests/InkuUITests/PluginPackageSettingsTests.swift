@@ -23,16 +23,20 @@ import InkuHost
         let typed = "｛わか"
         let completion = app.ddlCompletions.match(text: typed, caret: (typed as NSString).length)
         XCTAssertTrue(completion?.items.contains("｛若葉｝") == true)
-        for source in ["｛若葉｝。", "｛わかば｝。", "{young leaves}.", "Nature.YoungLeaves。"] {
+        for source in ["｛若葉｝。", "｛わかば｝。", "{young leaves}."] {
             let calls = await app.pluginCalls(source: source)
             XCTAssertEqual(calls.first?.status, "resolved", source)
         }
         let mistyped = await app.pluginCalls(source: "｛若刃｝。")
         XCTAssertEqual(mistyped.first?.status, "plugin_name_mismatch")
         XCTAssertEqual(mistyped.first?.suggestion, "若葉")
-        for source in ["｛菖蒲｝。", "Nature.若葉。"] {
+        for source in ["｛菖蒲｝。"] {
             let calls = await app.pluginCalls(source: source)
             XCTAssertEqual(calls.first?.status, "plugin_not_installed", source)
+        }
+        for source in ["Nature.YoungLeaves。", "Nature.若葉。"] {
+            let calls = await app.pluginCalls(source: source)
+            XCTAssertEqual(calls.first?.status, "plugin_old_notation", source)
         }
         for source in ["{}", "｛ ｝", "{\"a\":1}"] {
             let calls = await app.pluginCalls(source: source)
@@ -47,6 +51,19 @@ import InkuHost
         try await app.updateHostSettings(host)
         let settings = PluginSettingsModel()
         await settings.load(model: app)
+        var legacyDefinition = try XCTUnwrap(definition as? [String: Any])
+        var body = try XCTUnwrap(legacyDefinition["body"] as? [[String: Any]])
+        var fields = try XCTUnwrap(body[0]["fields"] as? [String: Any])
+        var touch = try XCTUnwrap(fields["touch"] as? [String: Any])
+        touch["id"] = "brush_thin"; fields["touch"] = touch; body[0]["fields"] = fields; legacyDefinition["body"] = body
+        let legacyWord: [String: Any] = ["definition": legacyDefinition, "note_ja": "星", "example_ja": "｛星｝。", "example_en": "{stars}."]
+        let legacyFile = folder.appendingPathComponent("old-touch.json")
+        try JSONSerialization.data(withJSONObject: ["schema": "inku.plugin-package.v2", "namespace": "Sky", "name": "oldtouch", "version": "1.0.0", "words": [legacyWord]]).write(to: legacyFile)
+        await settings.choose(legacyFile, model: app)
+        let legacyCheck = try XCTUnwrap(settings.check)
+        XCTAssertFalse(legacyCheck.ok)
+        let legacyProblems = legacyCheck.report["words"].array?.first?["problems"].array ?? []
+        XCTAssertTrue(legacyProblems.contains { $0["code"].string == "unknown_semantic_id" && ($0["path"].string ?? "").contains("touch") })
         await settings.choose(file, model: app)
         XCTAssertEqual(settings.check?.ok, true)
         await settings.install(model: app)

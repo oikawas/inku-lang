@@ -2,6 +2,8 @@
 
 ## 2026-11-01 歳時記 v3・描画エンジン 95
 
+本文の移行言語は保存された instruction_lang_resolved を優先する。空なら同じ作品の保存 config の言語を使い、それも無ければアプリと共通の本文の言語判定で補う。英語の本文を日本語に固定して旧い道具を残さない。
+
 作品の移行で core が表から補った `recovered_definitions` は、既存の派生記録の `config.definitions` に重複を除いて保存し、その元の digest が合う catalog の lock も付け替える。変奏文書には定義の保存欄を新設しない。
 
 作品を読む前に `SaijikiV3Migration` が保存した v1・v2 を一つの transaction で移し、v2 の印を残して `saijiki_v3_saved_records` を記録する。版の無い文書は core の v1、v2 の文書と定義だけは v2 の口を使う。v3 はそのまま、ほかの版は断る。作品の本文は v2 の印があれば v2、無ければ v1 とする。例外では全てを戻す。断られた単位はそのまま残し `files/saijiki-v3-migration.json` に列挙する。実行の状態は捨て、楽譜・SVG・記述は保持する。

@@ -3,6 +3,7 @@ package app.inku.mobile.data.db
 import androidx.sqlite.db.SupportSQLiteDatabase
 import app.inku.mobile.data.DdlSource
 import app.inku.mobile.data.lineage.LineagePlanner
+import app.inku.mobile.pipeline.InstructionLanguages
 import java.security.MessageDigest
 import java.util.Base64
 import org.json.JSONArray
@@ -283,10 +284,12 @@ internal class SaijikiV3Migration(
             while (cursor.moveToNext()) {
                 val historyId = cursor.getString(0)
                 val ddl = if (cursor.isNull(1)) null else cursor.getString(1)
-                val language = cursor.getString(2)?.takeIf { it == "ja" || it == "en" } ?: "ja"
                 present += historyId
                 count("history", "rows")
                 val link = links[historyId]
+                val language = cursor.getString(2)?.takeIf { it == "ja" || it == "en" }
+                    ?: link?.context?.optJSONObject("config")?.optString("language")?.takeIf { it == "ja" || it == "en" }
+                    ?: InstructionLanguages.ofDdl(ddl.orEmpty(), null, null, "ja")
                 if (link != null) count("history", "linked")
                 val locks = link?.let { documentLocks(it.catalogLocks) } ?: JSONArray()
                 val definitions = link?.let { locked(it.definitions, locks) }.orEmpty()

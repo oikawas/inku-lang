@@ -54,6 +54,27 @@ class SaijikiV3MigrationTest {
         }
     }
 
+    @Test fun missingHistoryLanguageUsesSavedConfigOrDdlDetection() {
+        HostSqlite().use { host ->
+            schema(host)
+            host.db.execSQL("INSERT INTO app_settings VALUES ('saijiki_v2_saved_records', '{}', 0)")
+            val source = "Draw a blue fine-brush line."
+            val context = JSONObject().put("ddl_digest", "old").put("config", JSONObject().put("language", "en"))
+                .put("macro_catalog", JSONObject().put("definition_locks", org.json.JSONArray()))
+            val bytes = app.inku.mobile.data.lineage.LineagePlanner.canonicalJson(context).toByteArray()
+            val digest = java.security.MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+            host.db.execSQL("INSERT INTO pipeline_history_links VALUES ('u', 'linked', 'v', ?, ?, 'old')", arrayOf<Any>(bytes, digest))
+            for (id in listOf("linked", "unlinked")) host.db.execSQL("INSERT INTO history_items VALUES (?, ?, NULL)", arrayOf<Any>(id, source))
+            val report = migration().runOnce(host.db)!!
+            assertEquals(0, report.getJSONArray("refused_records").length())
+            host.db.query("SELECT normalized_ddl FROM history_items").use {
+                var count = 0
+                while (it.moveToNext()) { assertEquals("Draw a blue gouache line.", it.getString(0)); count++ }
+                assertEquals(2, count)
+            }
+        }
+    }
+
     @Test fun boundDefinitionsRecoverAcrossVariationsAndOnlyMatchingDigestsMove() {
         HostSqlite().use { host ->
             schema(host)

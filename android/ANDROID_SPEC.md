@@ -2,6 +2,8 @@
 
 ## 2026-11-01 Saijiki v3 / render engine 95
 
+History migration prefers its saved instruction_lang_resolved, then the work's saved config language, then the app's shared DDL language detection. Missing language metadata must not leave retired English tools unmigrated by treating the text as Japanese.
+
 Definitions returned by the core as `recovered_definitions` are deduplicated into the work's existing fork-context `config.definitions`; catalog locks move only when their original digest matches. No new definition field is created on variation documents.
 
 Before reading works, `SaijikiV3Migration` moves saved v1/v2 records in one transaction, retaining the v2 marker and recording `saijiki_v3_saved_records`. Editionless documents use the v1 core entry; v2 documents and definition-only units use v2. V3 stays unchanged, other editions are refused. History uses v2 if its old marker exists, otherwise v1. Exceptions roll back all writes; refused units stay intact in `files/saijiki-v3-migration.json`. Execution snapshots are discarded; Scores, SVGs and descriptions are preserved.

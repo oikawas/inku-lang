@@ -15,6 +15,66 @@ from inku_server.persistence.variation_authority import VariationAuthorityStore
 from tests.test_saijiki_v2_migrate_once import _saved_database
 
 
+def test_missing_history_language_uses_saved_config_or_ddl(tmp_path):
+    from inku_server.persistence.schema import HistoryRow
+
+    database = tmp_path / "saved.db"
+    _saved_database(database)
+    english = "Draw a blue fine-brush line."
+    japanese = "黒い太筆の線を引く。"
+    engine = create_engine(f"sqlite:///{database}")
+    with engine.begin() as connection:
+        context = json.loads(connection.exec_driver_sql("SELECT fork_context_bytes FROM pipeline_history_links").scalar_one())
+        context["config"]["language"] = "en"
+        context["ddl_digest"] = hashlib.sha256(english.encode()).hexdigest()
+        raw = json.dumps(context, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+        connection.exec_driver_sql("UPDATE pipeline_history_links SET ddl_digest=?,fork_context_bytes=?,fork_context_digest=?",
+                                   (context["ddl_digest"], raw, hashlib.sha256(raw).hexdigest()))
+        connection.exec_driver_sql("UPDATE history SET ddl=?, instruction_lang_resolved=NULL WHERE id='h'", (english,))
+        for ident, source in (("unlinked-en", english), ("unlinked-ja", japanese)):
+            connection.execute(HistoryRow.__table__.insert().values(
+                id=ident, user_id="u", at=2, input="description", ddl=source, score="{}", svg="<svg/>", elapsed_ms=0))
+    engine.dispose()
+
+    result = _migrate_once_database(database, migrate_unit_v3)
+    assert result["refused_records"] == []
+    engine = create_engine(f"sqlite:///{database}")
+    with engine.connect() as connection:
+        values = dict(connection.exec_driver_sql("SELECT id,ddl FROM history").all())
+    engine.dispose()
+    assert values == {"h": "Draw a blue gouache line.", "unlinked-en": "Draw a blue gouache line.",
+                      "unlinked-ja": "黒い太いガッシュの線を引く。"}
+
+
+@pytest.mark.parametrize(("field", "config_language", "source", "expected"), [
+    ("en", "ja", "Draw a blue fine-brush line.", "Draw a blue gouache line."),
+    (None, "en", "黒い太筆の線を引く。", "黒い太筆の線を引く。"),
+])
+def test_history_language_precedence_also_applies_to_expanded_ddl(tmp_path, field, config_language, source, expected):
+    from inku_server.persistence import legacy_v3_schema
+
+    database = tmp_path / "saved.db"
+    _saved_database(database, legacy_v3_schema)
+    engine = create_engine(f"sqlite:///{database}")
+    with engine.begin() as connection:
+        context = json.loads(connection.exec_driver_sql("SELECT fork_context_bytes FROM pipeline_history_links").scalar_one())
+        context["config"]["language"] = config_language
+        context["ddl_digest"] = hashlib.sha256(source.encode()).hexdigest()
+        raw = json.dumps(context, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+        connection.exec_driver_sql("UPDATE pipeline_history_links SET ddl_digest=?,fork_context_bytes=?,fork_context_digest=?",
+                                   (context["ddl_digest"], raw, hashlib.sha256(raw).hexdigest()))
+        connection.exec_driver_sql("UPDATE history SET ddl=?, expanded_ddl=?, instruction_lang_resolved=? WHERE id='h'",
+                                   (source, "Draw a red fine-brush line.", field))
+    engine.dispose()
+    result = _migrate_once_database(database, migrate_unit_v3)
+    assert result["refused_records"] == []
+    engine = create_engine(f"sqlite:///{database}")
+    with engine.connect() as connection:
+        assert connection.exec_driver_sql("SELECT ddl,expanded_ddl FROM history WHERE id='h'").one() == (
+            expected, "Draw a red gouache line.")
+    engine.dispose()
+
+
 def test_fork_catalog_locks_move_only_for_the_original_digest():
     from inku_server.persistence.saijiki_v3_migration import _Link, _link_statement
 

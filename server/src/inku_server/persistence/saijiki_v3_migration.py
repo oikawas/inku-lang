@@ -48,6 +48,8 @@ from multiprocessing.connection import wait as wait_for
 from pathlib import Path
 from typing import Any
 
+from ..language_support.registry import resolve_instruction_lang
+
 MigrateUnit = Callable[[bytes], bytes]
 Progress = Callable[[str], None]
 
@@ -601,12 +603,19 @@ def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iter
     history_units: dict[tuple[str, str], bytes] = {}
     for history_id, ddl, expanded_ddl, language in history_rows:
         link = links.get(history_id)
+        config = link.context.get("config") if link else None
+        saved_language = config.get("language") if isinstance(config, Mapping) else None
+        if language not in {"ja", "en"}:
+            if isinstance(saved_language, str) and saved_language in {"ja", "en"}:
+                language = saved_language
+            else:
+                language = resolve_instruction_lang(ddl or "", "auto", fallback="ja")
         locks = document_locks(link.catalog_locks) if link else []
         definitions = locked(link.definitions, locks) if link else []
         for column, source in (("ddl", ddl), ("expanded_ddl", expanded_ddl)):
             if source and f"{history_id}:{column}" not in blank:
                 history_units[(history_id, column)] = _document_unit(
-                    source, language if language in {"ja", "en"} else "ja", locks, definitions)
+                    source, language, locks, definitions)
     labels = {}
     for (history_id, column), unit in history_units.items():
         labels.setdefault(unit, f"{history_id}:{column}")

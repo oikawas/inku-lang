@@ -141,6 +141,8 @@ export type PaintOptions = {
 	stage2Model?: string;
 	// Runs after interpretation settles and before rendering starts.
 	onStage1?: (event: PaintStage1Event) => void;
+	/** Own this run's progress when several paints are active at once. */
+	onProgress?: (event: import('../../paintStream.ts').PaintProgressEvent | null) => void;
 };
 
 export type CurrentWorkDefaults = {

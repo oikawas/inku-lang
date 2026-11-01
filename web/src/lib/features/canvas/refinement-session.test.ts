@@ -29,6 +29,28 @@ function candidate(id: string): FakeCandidate {
 	return { id, label: id, selected: false, result: {} };
 }
 
+test('parallel model progress follows a named running lane and ignores stale updates', () => {
+	const session = new RefinementSessionState(fakeElapsed());
+	const run = session.beginGrid({ includesReading: true, taskLabel: 'models', count: 2 });
+	session.setPlans(run, ['A', 'B']);
+	session.seatSlot(run, 0, 'running');
+	session.seatSlot(run, 1, 'running');
+	const sample = (action: string) => ({ event: 'progress' as const,
+		run_progress: { current: { kind: 'provider' as const, action }, finished: [] }, previous: null,
+		total: { input_tokens: 1, output_tokens: 2, unreported_sends: 0 }, received_bytes: null });
+	session.setSlotProgress(run, 1, sample('B'));
+	assert.equal(session.gridProgressLabel, 'B');
+	assert.equal(session.gridProgress?.run_progress.current?.action, 'B');
+	session.setSlotProgress(run, 0, sample('A'));
+	assert.equal(session.gridProgressLabel, 'A');
+	session.finishSlot(run, 0);
+	assert.equal(session.gridProgressLabel, 'B');
+	session.setSlotProgress(new AbortController(), 1, sample('stale'));
+	assert.equal(session.gridProgress?.run_progress.current?.action, 'B');
+	session.reset();
+	assert.equal(session.gridProgress, null);
+});
+
 test('T-308: single and grid sessions own busy, elapsed, and initial progress', () => {
 	const elapsed = fakeElapsed();
 	const session = new RefinementSessionState(elapsed);

@@ -46,6 +46,7 @@
 		runTokensIn: number | null;
 		runTokensOut: number | null;
 		runAttempt?: ProviderAttemptCount | null;
+		runProgress?: import('$lib/paintStream').PaintProgressEvent | null;
 		onSaveOkugakiModel: (provider: Provider, model: string) => void | Promise<void>;
 		onSaveNote: (node: LineageNode, note: string) => void | Promise<void>;
 		onAskTrash: (historyIds: string[]) => void;
@@ -95,7 +96,7 @@
 	}
 
 	type ArrowPath = { id: string; path: string; tombstone: boolean };
-	let { graph, loading, focusRequest = 0, error, isJapanese, onOpenNode, onOpenNodeInCanvas, onToggleStar, onToggleForRevision, onOpenRefinement, onDrawDescription, onOpenDdlEditor, onDrawSketchGrain, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, runAttempt = null, onSaveOkugakiModel, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, autonomousRuns, onOpenAutonomousChild, onJuxtapose, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, pngTemplates = [], onDownloadSavedWorkSVG, onDownloadSavedWorkPNG, onDownloadSavedWorkCard, onDownloadSavedWorkDdl, onDownloadSavedWorkAnimation, onDownloadSavedWorkContactSheet, onValidateSavedWorkExport, browsingState }: Props = $props();
+	let { graph, loading, focusRequest = 0, error, isJapanese, onOpenNode, onOpenNodeInCanvas, onToggleStar, onToggleForRevision, onOpenRefinement, onDrawDescription, onOpenDdlEditor, onDrawSketchGrain, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, runAttempt = null, runProgress = null, onSaveOkugakiModel, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, autonomousRuns, onOpenAutonomousChild, onJuxtapose, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, pngTemplates = [], onDownloadSavedWorkSVG, onDownloadSavedWorkPNG, onDownloadSavedWorkCard, onDownloadSavedWorkDdl, onDownloadSavedWorkAnimation, onDownloadSavedWorkContactSheet, onValidateSavedWorkExport, browsingState }: Props = $props();
 
 	let handledFocusRequest = 0;
 	$effect(() => {
@@ -973,7 +974,7 @@ $effect(() => {
 {/if}
 
 {#if activeSketchNode}
-	<WorkEditDialog node={activeSketchNode} mode="sketch-grain" {isJapanese} {stageLabel} {stage1ModelLabel} {stage2ModelLabel} tokensIn={runTokensIn} tokensOut={runTokensOut} attempt={runAttempt} onClose={() => (activeSketchNode = null)} onDrawDescription={onDrawDescription} {onDrawSketchGrain} />
+	<WorkEditDialog node={activeSketchNode} mode="sketch-grain" {isJapanese} {stageLabel} {stage1ModelLabel} {stage2ModelLabel} tokensIn={runTokensIn} tokensOut={runTokensOut} attempt={runAttempt} progress={runProgress} onClose={() => (activeSketchNode = null)} onDrawDescription={onDrawDescription} {onDrawSketchGrain} />
 {/if}
 
 {#if okugakiOpen}

@@ -96,13 +96,14 @@
 					</div>
 					{#if busy}
 						<RunStatus
-							label={t().refineGeneratingTask(refinementSession.gridTaskLabel)}
+							label={`${t().refineGeneratingTask(refinementSession.gridTaskLabel)}${refinementSession.gridProgressLabel ? ` · ${refinementSession.gridProgressLabel}` : ''}`}
 							progressDone={refinementSession.gridDone}
 							progressTotal={refinementSession.gridTotal}
 							model={refinementSession.gridSlotLabels.filter(Boolean).join(' · ')}
 							elapsedMs={refinementSession.elapsedMs}
 							tokensIn={refinementSession.tokensIn}
 							tokensOut={refinementSession.tokensOut}
+							progress={refinementSession.gridProgress ?? null}
 							onStop={refinementSession.gridBusy && refinementSession.gridCanAbort ? () => refinementSession.abort() : null}
 						/>
 						{#if refinementSession.gridBusy}

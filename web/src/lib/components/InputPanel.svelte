@@ -470,6 +470,7 @@
 			{runTokensIn}
 			{runTokensOut}
 			{runAttempt}
+			{runProgress}
 			bind:batchInput
 			{lineNumbersText}
 			{batchNonEmpty}

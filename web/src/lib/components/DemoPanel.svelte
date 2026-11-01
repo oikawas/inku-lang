@@ -20,6 +20,7 @@
 		runTokensIn: number | null;
 		runTokensOut: number | null;
 		runAttempt?: ProviderAttemptCount | null;
+		runProgress?: import('$lib/paintStream').PaintProgressEvent | null;
 		waitingSeconds: number | null;
 		currentLiveMs: number | null;
 		currentElapsedMs: number | null;
@@ -54,6 +55,7 @@
 		runTokensIn,
 		runTokensOut,
 		runAttempt = null,
+		runProgress = null,
 		waitingSeconds,
 		currentLiveMs,
 		currentElapsedMs,
@@ -202,6 +204,7 @@
 				tokensIn={totalTokensIn || runTokensIn}
 				tokensOut={totalTokensOut || runTokensOut}
 				attempt={runAttempt}
+				progress={waitingSeconds === null ? runProgress : null}
 				onStop={onStop}
 			/>
 		{:else}

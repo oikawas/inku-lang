@@ -836,7 +836,7 @@ export function createWorkState(deps: WorkStateDeps) {
 				updateGenerationCount: (count) => session.updateGenerationCount(count),
 				adoptPipelineView: options.batchRunId ? undefined : (view) => pipelineController.adopt(view),
 				setProviderAttempt: (attempt) => { activeRunAttempt = attempt; },
-				setProgress: (progress) => { activeRunProgress = progress; }
+				setProgress: options.onProgress ?? ((progress) => { activeRunProgress = progress; })
 			}
 		);
 	}

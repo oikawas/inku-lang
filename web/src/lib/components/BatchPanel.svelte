@@ -35,6 +35,7 @@
 		runTokensIn: number | null;
 		runTokensOut: number | null;
 		runAttempt?: ProviderAttemptCount | null;
+		runProgress?: import('$lib/paintStream').PaintProgressEvent | null;
 		batchActiveTokensIn: number | null;
 		batchActiveTokensOut: number | null;
 		batchTokensInTotal: number;
@@ -93,6 +94,7 @@
 		runTokensIn,
 		runTokensOut,
 		runAttempt = null,
+		runProgress = null,
 		batchActiveTokensIn,
 		batchActiveTokensOut,
 		batchTokensInTotal,
@@ -313,6 +315,7 @@
 			tokensIn={batchTokensInTotal || runTokensIn}
 			tokensOut={batchTokensOutTotal || runTokensOut}
 			attempt={runAttempt}
+			progress={batchWaitingLine === null ? runProgress : null}
 			onStop={onStop}
 		/>
 	</div>

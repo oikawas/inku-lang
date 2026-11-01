@@ -39,6 +39,8 @@ export type RefinementSession = {
 	readonly gridTotal: number;
 	readonly gridSlots: VariationSlotState[];
 	readonly gridSlotLabels: string[];
+	readonly gridProgress?: import('../../paintStream.ts').PaintProgressEvent | null;
+	readonly gridProgressLabel?: string;
 	readonly status: string | null;
 	readonly elapsedMs: number;
 	readonly tokensIn: number | null;
@@ -99,6 +101,13 @@ export class RefinementSessionState implements RefinementSession {
 	// Parallel arrays preserve one visible lane and label per candidate.
 	gridSlots = $state<VariationSlotState[]>([]);
 	gridSlotLabels = $state<string[]>([]);
+	private slotProgress = $state<(import('../../paintStream.ts').PaintProgressEvent | null)[]>([]);
+
+	get gridProgressIndex(): number {
+		return this.gridSlots.findIndex((state, index) => state === 'running' && this.slotProgress[index] != null);
+	}
+	get gridProgress() { return this.slotProgress[this.gridProgressIndex] ?? null; }
+	get gridProgressLabel() { return this.gridSlotLabels[this.gridProgressIndex] ?? ''; }
 	status = $state<string | null>(null);
 	previewId = $state<string | null>(null);
 	colorArrangementExhausted = $state(false);
@@ -146,6 +155,7 @@ export class RefinementSessionState implements RefinementSession {
 		// for the whole operation, not only after its first request starts.
 		this.gridSlotLabels = Array.from({ length: input.count }, () => '');
 		this.gridSlots = Array.from({ length: input.count }, () => 'waiting');
+		this.slotProgress = Array.from({ length: input.count }, () => null);
 		return controller;
 	}
 
@@ -178,6 +188,11 @@ export class RefinementSessionState implements RefinementSession {
 		if (!this.seatSlot(controller, index, 'done')) return false;
 		this.gridDone += 1;
 		return true;
+	}
+
+	setSlotProgress(controller: AbortController, index: number, progress: import('../../paintStream.ts').PaintProgressEvent | null): void {
+		if (!this.isActive(controller) || this.gridSlots[index] !== 'running') return;
+		this.slotProgress = this.slotProgress.map((value, i) => i === index ? progress : value);
 	}
 
 	commitCandidates(controller: AbortController, candidates: VariationCandidate[]): boolean {
@@ -240,6 +255,7 @@ export class RefinementSessionState implements RefinementSession {
 		this.gridTotal = 0;
 		this.gridSlots = [];
 		this.gridSlotLabels = [];
+		this.slotProgress = [];
 		this.status = null;
 	}
 

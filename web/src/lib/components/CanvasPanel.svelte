@@ -147,6 +147,7 @@
 		runTokensIn: number | null;
 		runTokensOut: number | null;
 		runAttempt?: ProviderAttemptCount | null;
+		runProgress?: import('$lib/paintStream').PaintProgressEvent | null;
 		/** The whole feature, so a new field costs no line here. */
 		modelInspection: ModelInspection;
 		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4) => void | Promise<void>;
@@ -278,6 +279,7 @@
 		runTokensIn = null,
 		runTokensOut = null,
 		runAttempt = null,
+		runProgress = null,
 		modelInspection,
 		onGenerateVariationCandidates,
 		onGenerateColorCatalogCandidates,
@@ -929,7 +931,7 @@
 						onToggleForRevision={onToggleLineageForRevision} onOpenRefinement={openLineageRefinement}
 						onDrawDescription={onDrawLineageDescription} onOpenDdlEditor={onOpenLineageDdlEditor}
 						onDrawSketchGrain={onDrawLineageSketchGrain} {stageLabel} stage1ModelLabel={runStage1ModelLabel}
-						stage2ModelLabel={runStage2ModelLabel} {runTokensIn} {runTokensOut} {runAttempt} onSaveOkugakiModel={onSaveOkugakiModel}
+						stage2ModelLabel={runStage2ModelLabel} {runTokensIn} {runTokensOut} {runAttempt} {runProgress} onSaveOkugakiModel={onSaveOkugakiModel}
 						{onSaveVisionModel} onSaveNote={onSaveLineageNote}
 						onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview}
 						onLoadBranch={onLoadLineageBranch} {autonomousRuns} {onOpenAutonomousChild} {onJuxtapose} {visionModel} {okugakiModel}
@@ -1015,6 +1017,7 @@
 		tokensIn={runTokensIn}
 		tokensOut={runTokensOut}
 		attempt={runAttempt}
+		progress={runProgress}
 		onClose={closeDirectEdit}
 		onDrawDescription={onDrawLineageDescription}
 		onDrawSketchGrain={onDrawLineageSketchGrain}

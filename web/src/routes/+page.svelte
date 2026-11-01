@@ -2789,6 +2789,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 								tokensIn={work.activeRunTokensIn}
 								tokensOut={work.activeRunTokensOut}
 								attempt={work.activeRunAttempt}
+								progress={demo.waitingSeconds === null ? work.activeRunProgress : null}
 								onStop={work.stopDemo}
 							/>
 						</div>
@@ -3162,6 +3163,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				runTokensIn={work.activeRunTokensIn}
 				runTokensOut={work.activeRunTokensOut}
 				runAttempt={work.activeRunAttempt}
+				runProgress={work.activeRunProgress}
 				{modelInspection}
 				onGenerateVariationCandidates={refinement.generateVariationCandidates}
 				onGenerateColorCatalogCandidates={refinement.generateColorCatalogCandidates}
@@ -3322,6 +3324,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		runTokensIn={work.activeRunTokensIn}
 		runTokensOut={work.activeRunTokensOut}
 		runAttempt={work.activeRunAttempt}
+		runProgress={work.activeRunProgress}
 		waitingSeconds={demo.waitingSeconds}
 		currentLiveMs={demo.currentLiveMs}
 		currentElapsedMs={demo.currentElapsedMs}

@@ -280,7 +280,8 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 	// The work drawn again from its description by another model, which draws
 	// both stages. The render settings are the work's own, as for the other
 	// options, so only the model differs.
-	async function renderModelCandidate(model: string, label: string, signal: AbortSignal): Promise<VariationCandidate> {
+	async function renderModelCandidate(model: string, label: string, signal: AbortSignal,
+		onProgress: NonNullable<import('../run/current-work.ts').PaintOptions['onProgress']>): Promise<VariationCandidate> {
 		const target = refinementTarget();
 		const source = target.source;
 		const r = await work.paintOne(source, {
@@ -296,6 +297,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 			lineageParentNodeId: deps.lineageParentId(),
 			stage1Model: model,
 			stage2Model: model,
+			onProgress,
 		});
 		return {
 			id: modelCandidateId(model),
@@ -565,7 +567,8 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 			refinementSession.setPlans(abortController, pending.map((model) => deps.models.shortLabel(model)));
 			const results = await runRefinementFanout(pending.map((model, index) => async () => {
 				try {
-					return await renderModelCandidate(model, labels[index], abortController.signal);
+					return await renderModelCandidate(model, labels[index], abortController.signal,
+						(progress) => refinementSession.setSlotProgress(abortController, index, progress));
 				} catch (e) {
 					if (abortController.signal.aborted) throw e;
 					failed[model] = e instanceof Error ? e.message : String(e);

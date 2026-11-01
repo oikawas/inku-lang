@@ -21,12 +21,13 @@
 		tokensIn: number | null;
 		tokensOut: number | null;
 		attempt?: ProviderAttemptCount | null;
+		progress?: import('$lib/paintStream').PaintProgressEvent | null;
 		onClose: () => void;
 		onDrawDescription: (node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null) => void | Promise<void>;
 		onDrawSketchGrain: (node: LineageNode, mode: SketchMode, signal?: AbortSignal, wild?: boolean) => void | Promise<void>;
 	};
 
-	let { node, mode, isJapanese, stageLabel, stage1ModelLabel, stage2ModelLabel, tokensIn, tokensOut, attempt = null, onClose, onDrawDescription, onDrawSketchGrain }: Props = $props();
+	let { node, mode, isJapanese, stageLabel, stage1ModelLabel, stage2ModelLabel, tokensIn, tokensOut, attempt = null, progress = null, onClose, onDrawDescription, onDrawSketchGrain }: Props = $props();
 	let draft = $state('');
 	let wildOverride = $state(wildSettings.enabled);
 	let sketchMode = $state<SketchMode>('on');
@@ -116,7 +117,7 @@
 	</div>
 	<footer>
 		{#if drawing}
-			<RunStatus variant="inline" label={stageLabel || t().pipelineWorking} stage1Model={stage1ModelLabel} stage2Model={stage2ModelLabel} {elapsedMs} tokensIn={tokensIn} tokensOut={tokensOut} {attempt} onStop={() => controller?.abort()} />
+			<RunStatus variant="inline" label={stageLabel || t().pipelineWorking} stage1Model={stage1ModelLabel} stage2Model={stage2ModelLabel} {elapsedMs} tokensIn={tokensIn} tokensOut={tokensOut} {attempt} progress={mode === 'sketch-grain' ? progress : null} onStop={() => controller?.abort()} />
 		{:else}
 				<WildToggle value={wildOverride} onSelect={(next) => (wildOverride = next)} />
 			{#if mode !== 'description'}

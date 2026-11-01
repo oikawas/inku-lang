@@ -419,6 +419,8 @@ def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iter
     tool_records: list[dict[str, object]] = []
     thinness_records: list[dict[str, object]] = []
     blanked_records: list[dict[str, object]] = []
+    unmatched_locks: list[dict[str, object]] = []
+    counts["history_links"]["unmatched_locks"] = 0
 
     # The frozen catalogs of the performances, and the definitions each variation saved.
     links: dict[str, _Link] = {}
@@ -716,6 +718,8 @@ def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iter
                 link_definitions.append(answer.get("definition"))
         if refused:
             # A work is one unit with its link: the link's digest binds it to the instructions.
+            if link:
+                _link_statement(link, link_definitions, None, definition_answer, unmatched_locks)
             tally["rows_left"] += 1
             continue
 
@@ -729,7 +733,7 @@ def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iter
                     "UPDATE history SET ddl=? WHERE id=?", (new_ddl, history_id)))
             tally["rows_written"] += 1
         if link:
-            statement = _link_statement(link, link_definitions, new_ddl, definition_answer)
+            statement = _link_statement(link, link_definitions, new_ddl, definition_answer, unmatched_locks)
             if statement:
                 result.statements.append(statement)
                 counts["history_links"]["written"] += 1
@@ -747,9 +751,10 @@ def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iter
                 counts["history_links"]["refused"] += 1
                 refused_records.append({"kind": "history_links", "id": f"{link.owner_id}/{history_id}",
                                         "error": failed["error"]})
+                _link_statement(link, [], None, definition_answer, unmatched_locks)
                 continue
             statement = _link_statement(link, [answer.get("definition") for answer in answers], None,
-                                        definition_answer)
+                                        definition_answer, unmatched_locks)
             if statement:
                 result.statements.append(statement)
                 counts["history_links"]["written"] += 1
@@ -757,6 +762,7 @@ def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iter
     counts["executions"]["discarded"] = counts["executions"]["rows"]
     result.discards.append((f"DELETE FROM {DISCARDED_TABLE}", ()))
 
+    counts["history_links"]["unmatched_locks"] = len(unmatched_locks)
     result.report = {
         "sample": sample,
         "already_written": _already_written(connection),
@@ -765,6 +771,7 @@ def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iter
         "edits": dict(edits.most_common()),
         "refused_records": refused_records,
         "blanked_records": blanked_records,
+        "unmatched_lock_records": unmatched_locks,
         "unassociated_sweep_records": sweep_records,
         "unassociated_tool_records": tool_records,
         "unadjusted_thinness_records": thinness_records,
@@ -773,15 +780,24 @@ def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iter
 
 
 def _link_statement(link: _Link, definitions: list[Any], ddl: str | None,
-                    definition_answer: Callable[[Any], dict[str, Any]]) -> tuple[str, tuple[Any, ...]] | None:
+                    definition_answer: Callable[[Any], dict[str, Any]],
+                    unmatched_locks: list[dict[str, object]]) -> tuple[str, tuple[Any, ...]] | None:
     """Rewrite one frozen fork context: its definitions, its locks, and the work's digest."""
     moved = {}
     for definition in link.definitions:
         answer = definition_answer(definition)
-        moved[(answer.get("qualified_name"), answer.get("version"))] = str(answer.get("digest", ""))
+        old_digest = answer.get("old_digest")
+        if isinstance(old_digest, str) and old_digest:
+            key = (answer.get("qualified_name"), answer.get("version"), old_digest.removeprefix("sha256:"))
+            moved[key] = str(answer.get("digest", ""))
     locks = []
     for lock in link.catalog_locks:
-        digest = moved.get((lock.get("qualified_name"), lock.get("version"))) if isinstance(lock, Mapping) else None
+        old_digest = lock.get("digest") if isinstance(lock, Mapping) else None
+        key = ((lock.get("qualified_name"), lock.get("version"), old_digest.removeprefix("sha256:"))
+               if isinstance(lock, Mapping) and isinstance(old_digest, str) else None)
+        digest = moved.get(key)
+        if not digest:
+            unmatched_locks.append({"id": f"{link.owner_id}/{link.history_id}", "lock": lock})
         # The catalog keeps bare hex; sha256: is the document's form.
         locks.append({**lock, "digest": digest.removeprefix("sha256:")} if digest else lock)
     context = dict(link.context)

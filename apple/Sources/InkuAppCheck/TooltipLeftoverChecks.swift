@@ -235,7 +235,29 @@ private actor LeftoverDrawingProvider: ProviderTransport {
                  onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {
         calls += 1
         let input = try ExactJSON(data: action)
-        return ExactJSON.object(["tag": .string("normalized_ddl_generated"), "identity": input["identity"],
-            "response": .string(#"{"normalized_ddl":"place one red circle at center."}"#), "elapsed_ms": .string("1")]).data
+        let result: String, response: String
+        switch try input.requiredString("tag") {
+        case "generate_normalized_ddl":
+            result = "normalized_ddl_generated"
+            response = #"{"normalized_ddl":"place one red circle at center."}"#
+        case "read_description":
+            result = "description_read"
+            response = #"{"viewpoint":{"speaker":"我","speaker_quote":"我","eye":"妹の姿を見る。","addressee_quote":"妹","speaker_seen_quote":""},"core":["紫の姿"],"items":[{"kind":"scene","quote":"紫の にほへる妹","image":"紫の円"}],"reading":"紫の姿を読んだ。"}"#
+        case "compose_description":
+            result = "description_composed"
+            response = #"{"thesis":"紫の妹を左上に置く。","form":"one_corner","things":[{"thing":1,"what":"妹","role":"focal","kind":"cluster","quote":"妹"},{"thing":2,"what":"紫の影","role":"accent","kind":"cluster","quote":"紫"}],"main_law":"B1","laws":{"B1":{"targets":[{"thing":1,"at":"point_ul"}]}},"reason":"妹を画の中心にする。"}"#
+        case "write_description_ddl":
+            result = "description_ddl_written"
+            response = #"{"ddl":"place one red circle at center.","figures":[]}"#
+        case "review_description_ddl":
+            result = "description_ddl_reviewed"
+            response = #"{"ddl":"place one red circle at center.","figures":[]}"#
+        case "choose_colors":
+            result = "colors_chosen"
+            response = #"{"main_law":"C9","laws":{"C9":{"color":"red","layer":1,"area":"15-30","others":"keep"}},"reason":"影を赤くする。"}"#
+        default: throw HostError("unexpected_fixture_action")
+        }
+        return ExactJSON.object(["tag": .string(result), "identity": input["identity"],
+            "response": .string(response), "elapsed_ms": .string("1")]).data
     }
 }

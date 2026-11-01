@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- Server and Web: show finished stages, per-send and total tokens, ChatGPT bytes received, and final rendering from the stream and pipeline JSON views.
-
-- Core: add `run_progress` to read the current operation and structured completed stages from a saved pipeline snapshot.
-
 - macOS: show drawing failure reasons in the Web wording, with the cause and attempt count for the corresponding stage.
 
 - macOS: restore the “Build N” tooltip and update the tooltip parity markers and counts.
@@ -546,6 +542,11 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.301 (2026-11-02 / Build 1377)
+
+- Server and Web: show finished stages, per-send and total tokens, ChatGPT bytes received, and final rendering from the stream and pipeline JSON views.
+- Core: add `run_progress` to read the current operation and structured completed stages from a saved pipeline snapshot.
 
 ## v2.15.300 (2026-11-01 / Build 1376)
 

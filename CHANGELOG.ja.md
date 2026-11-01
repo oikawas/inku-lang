@@ -8,10 +8,6 @@
 
 ## 未リリース
 
-- Server・Web：描画中の完了した段、送信ごとの token と合計、ChatGPT の受信量、最後の描画を stream と pipeline の JSON view から表示する。
-
-- core：保存した pipeline snapshot から、進行中の処理と完了した段の構造化情報を読む `run_progress` を追加する。
-
 - macOS：描画失敗時に core の理由を Web と同じ文で表示し、対応する段の失敗原因と試行回数を添える。
 
 - macOS：ビルド番号の「Build N」の吹き出しを戻し、吹き出し照合表の目印と件数を更新する。
@@ -546,6 +542,11 @@ macOSの`dh1`・`rh3`と正準JSON、指示言語の判定、記述ラベルの�
 Anthropicの対象Claudeモデルは通常描画とVisionでも思考用8,192 tokenを出力枠に加え、pipeline応答が `max_tokens` で切れたときは内容が読めても拒否して診断を残す。
 
 保存作品からランダムまたはVisionの自律推敲を開始できる。世代数、色・配置の対象、Wildを指定し、直前の作品を親として各世代を保存する。途中の世代は系譜専用、最終世代は通常の作品一覧にも表示する。Visionは作品画像への限定された助言を使い、観察と次の方向を表示する。画像の送信はこの専用助言requestに限り、既存の接続・ChatGPTプランのsession pinを保つ。
+
+## v2.15.301（2026-11-02 / Build 1377）
+
+- Server・Web：描画中の完了した段、送信ごとの token と合計、ChatGPT の受信量、最後の描画を stream と pipeline の JSON view から表示する。
+- core：保存した pipeline snapshot から、進行中の処理と完了した段の構造化情報を読む `run_progress` を追加する。
 
 ## v2.15.300（2026-11-01 / Build 1376）
 

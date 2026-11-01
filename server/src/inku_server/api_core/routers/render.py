@@ -92,6 +92,7 @@ class ComposeRequest(BaseModel):
     ddl: str = Field(..., min_length=1, max_length=100_000, description="正規化DDL テキスト")
     batch_run_id: str | None = Field(default=None, max_length=200, description="Identifier of the client batch while drawing this item.")
     batch_line_number: int | None = Field(default=None, ge=1, description="Line number in the client batch.")
+    batch_lease: str | None = Field(default=None, max_length=200, description="Lease for the client batch.")
     model: str | None = Field(
         default=None, description="Stage 2 モデル名 (未指定時は利用者の Stage 2 既定)"
     )
@@ -253,6 +254,7 @@ class PaintRequest(BaseModel):
     history_display_label: str | None = Field(default=None, description="バッチ番号やdemoなどの表示ラベル")
     batch_line_number: int | None = Field(default=None, description="Line number of this drawing in a batch run, recorded with the history row. None when not part of a batch.")
     batch_run_id: str | None = Field(default=None, description="Identifier of the batch run this drawing belongs to. None when not part of a batch.")
+    batch_lease: str | None = Field(default=None, max_length=200, description="Lease for the client batch.")
     lineage_parent_node_id: str | None = Field(default=None, description="Lineage node id of the work this drawing is derived from. Omitted (None) starts a new lineage. Recorded only when save_history is true.")
     derivation_kind: str | None = Field(default=None, description="How this drawing derives from its parent, recorded on the lineage edge when save_history is true (for example ddl_edit or description_edit). With a lineage parent and no kind given, the server records ddl_edit or description_edit; without a parent, no kind is recorded.")
     derivation_metadata: dict[str, object] = Field(default_factory=dict, description="Extra values stored with the lineage edge for this derivation when save_history is true. Defaults to an empty object.")

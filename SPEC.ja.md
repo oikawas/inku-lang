@@ -1359,7 +1359,9 @@ Shared compiler consumerでは、StopとOmitAndContinueはLLM fallbackではな�
 
 pipeline の JSON view は同じ内容を `progress` に含める。Web が最後の `perform` の応答を待つ間は、描画中の local 作業を表示する。
 
-`GET /api/pipeline/activity` は、その Server process が実行・待機している自分の pipeline 描画を返す。各項目は execution・variation、実行中／worker 待ち／描画中の状態、進行中の action と、送られた場合の batch ID・行番号を持つ。`all_users=true` は管理者だけが使え、全利用者の項目と process の描画枠の使用数を返す。これは履歴でも全 process の一覧でもなく、クライアント側のバッチが作品間で待っているかは分からない。空の一覧をバッチ全体の停止の証拠にしない。
+`GET /api/pipeline/activity` は、その Server process が実行・待機している自分の pipeline 描画と、登録されたバッチの予定数・完了数・状態を返す。`all_users=true` は管理者だけが使え、全利用者の項目と process の描画枠の使用数を返す。バッチは開始時に実行権を受け、処理中は15秒ごとに生存を通知し、完了・明示停止・中断を通知する。90秒間通知がない場合は期限切れとして扱い、同じ batch の描画が残っていれば状態は不確定とする。期限切れはクライアントの停止の証明ではない。再開時は新しい実行権を発行し、古い実行権による描画開始を断る。観測は応答した単一 process 内の描画に限り、未登録の旧クライアントのバッチや他 process の動作は分からない。
+
+記述バッチの再開候補は、登録された元の計画・条件と同じ batch ID の保存作品を照合し、保存済みの行を再送しない。描画が続いているか不確定な間は再開を提示しない。画像フォルダは同じフォルダの選び直しを必要とし、ブラウザの localStorage に記録した送信時のファイル順と保存済み作品を照合してから続ける。localStorage を失うとその照合はできない。旧クライアントの未登録バッチには従来の履歴からの推測を用いる。
 
 ### 12.11 中間フィルタ（Stage 1.5）
 

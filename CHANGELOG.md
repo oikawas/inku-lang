@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Record batch totals, lifecycle and liveness; reconcile active drawings and saved works before offering interrupted-batch resumption.
+
 - CLI and Server: `inku-cli activity` shows live pipeline drawings and batch items; administrators can use `--all` for all users and active render slots.
 
 - macOS: show drawing failure reasons in the Web wording, with the cause and attempt count for the corresponding stage.

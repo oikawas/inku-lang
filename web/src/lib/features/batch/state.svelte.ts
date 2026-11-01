@@ -1,7 +1,8 @@
 import type { ApiFetch } from '../../transport/api-fetch.ts';
-import { isConnectionFailure, type ConnectionFailure } from '../../transport/connection-failure.ts';
+import { isConnectionFailure, ConnectionFailure } from '../../transport/connection-failure.ts';
 import type { PaintOptions, PaintResult } from '../run/current-work.ts';
 import type { BatchFailure, BatchFailureReport } from './failure-report.svelte.ts';
+import { startBatchLease, type BatchLeaseRecord } from './lease.ts';
 import { dropFailedLine, planRetryRound } from './retry.ts';
 import {
 	batchStoppedPartWay,
@@ -24,7 +25,6 @@ export const BATCH_PROMPT_HISTORY_MAX_TEXT = 20_000;
 // to the paged scan after the author selects it.
 const BATCH_RESUME_PROBE_LIMIT = 20;
 const BATCH_RESUME_SCAN_PAGE = 100;
-const BATCH_RESUME_SCAN_MAX = 500;
 
 // A line whose connection was cut (a restart of the Server, 2026-10-21) waits
 // for the Server and is sent again, not counted as a failure: every 2s for the
@@ -294,6 +294,38 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 	async refreshResume(): Promise<void> {
 		const discovery = ++this.resumeDiscovery;
 		if (this.resuming) return;
+		if (this.deps.signedIn()) {
+			try {
+				const response = await this.deps.apiFetch('/api/pipeline/batches', { cache: 'no-store' });
+				if (response.status !== 404) {
+					if (!response.ok) throw new Error(`HTTP ${response.status}`);
+					const data = await response.json() as { batches?: BatchLeaseRecord[] };
+					if (Array.isArray(data.batches)) {
+						if (this.resumeDiscovery !== discovery || this.resuming) return;
+						if (this.interruptedSnapshot) {
+							const own = data.batches.find((item) => item.run_id === this.interruptedSnapshot?.runId);
+							this.resume = own && (own.state === 'interrupted' || own.state === 'lease_expired' || own.state === 'stopped')
+								? this.sessionResumeCandidate(this.interruptedSnapshot) : null;
+							return;
+						}
+						const record = data.batches.find((item) => item.kind === 'web');
+						if (record) {
+							const lines = numberedBatchLines(record.prompt, this.deps.paintable);
+							this.resume = (record.state === 'interrupted' || record.state === 'lease_expired') && lines.length === record.total
+								? { prompt: record.prompt, lines, runId: record.run_id, work: null,
+									conditions: record.conditions, pending: null, source: 'history' }
+								: null;
+							return;
+						}
+					}
+				}
+			} catch (cause) {
+				// An unreadable lease is not evidence that a run has stopped.
+				this.resume = null;
+				this.warn('failed to check the batch lease', cause);
+				return;
+			}
+		}
 		if (this.interruptedSnapshot) {
 			this.resume = this.sessionResumeCandidate(this.interruptedSnapshot);
 			return;
@@ -372,7 +404,7 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 			await run;
 		} finally {
 			this.resuming = false;
-			if (this.interruptedSnapshot) this.resume = this.sessionResumeCandidate(this.interruptedSnapshot);
+			if (this.interruptedSnapshot) await this.refreshResume();
 		}
 	}
 
@@ -458,6 +490,7 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 		const batchRunId = snapshot.runId;
 		this.total = lineTotal;
 		let interrupted = false;
+		let lease: Awaited<ReturnType<typeof startBatchLease>> = null;
 
 		const isCurrent = (): boolean => (
 			this.runIdentity === identity
@@ -477,6 +510,11 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 				const back = await this.waitForServer(item.line, isCurrent, abortController.signal);
 				if (back === null) return null;
 				if (!back) {
+					this.serverLost = true;
+					return null;
+				}
+				const settled = await this.waitForBatchToSettle(batchRunId, isCurrent, abortController.signal);
+				if (!settled) {
 					this.serverLost = true;
 					return null;
 				}
@@ -507,12 +545,20 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 			this.activeLine = item.line;
 			let saved = false;
 			try {
+				if (lease) {
+					try { await lease.refresh(); }
+					catch (cause) {
+						if (abortController.signal.aborted) return null;
+						return new ConnectionFailure('unreachable', cause instanceof Error ? cause.message : String(cause), { cause });
+					}
+				}
 				const painted = await options.paintLine(item.input, {
 					historyInput: `#${item.line} ${item.input}`,
 					sourceText: item.input,
 					displayLabel: `#${item.line}`,
 					batchLineNumber: item.line,
 					batchRunId,
+					batchLease: lease?.lease,
 					canvasAspectId: options.canvasAspectId,
 					renderOverrides: options.renderOverrides,
 					signal: abortController.signal,
@@ -566,6 +612,12 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 		};
 
 		try {
+			lease = await startBatchLease(this.deps.apiFetch, batchRunId, snapshot.prompt, snapshot.conditions,
+				snapshot.lines.length, () => snapshot.completed.length, () => {
+					this.stopRequested = true;
+					this.interrupted = true;
+					abortController.abort();
+				});
 			for (let index = 0; index < paintLines.length; index += 1) {
 				if (!isCurrent()) { interrupted = true; this.interrupted = true; break; }
 				this.current = index + 1;
@@ -628,6 +680,11 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 				!paintLines.some((item) => item.line === line.line)))) this.interruptedSnapshot = null;
 			await this.refreshResume();
 		} finally {
+			if (lease) {
+				const state = this.serverLost || interrupted ? 'interrupted'
+					: this.stopRequested ? 'stopped' : snapshot.pending.length ? 'interrupted' : 'completed';
+				await lease.finish(state).catch((cause) => this.warn('failed to close the batch lease', cause));
+			}
 			if (this.abortController === abortController) {
 				this.abortController = null;
 				this.stopRequested = false;
@@ -640,6 +697,7 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 				this.activeTokensIn = null;
 				this.activeTokensOut = null;
 			}
+			if (lease) await this.refreshResume();
 		}
 	}
 
@@ -730,7 +788,8 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 		const response = await this.deps.apiFetch(`/api/history?${params.toString()}`, { cache: 'no-store' });
 		if (!response.ok) throw new Error(`HTTP ${response.status}`);
 		const data = await response.json() as { items?: TWork[] };
-		return Array.isArray(data.items) ? data.items : [];
+		if (!Array.isArray(data.items)) throw new Error('History response is invalid');
+		return data.items;
 	}
 
 	/**
@@ -768,24 +827,43 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 		}
 	}
 
+	/** Do not repeat a cut request while the server is still finishing its work. */
+	private async waitForBatchToSettle(runId: string, isCurrent: () => boolean, signal: AbortSignal): Promise<boolean> {
+		const wait = this.deps.serverWait ?? BATCH_SERVER_WAIT;
+		const sleep = this.deps.sleep ?? abortableDelay;
+		const now = this.deps.now ?? Date.now;
+		const started = now();
+		while (isCurrent()) {
+			try {
+				const response = await this.deps.apiFetch('/api/pipeline/activity', { cache: 'no-store', signal });
+				if (response.status === 404) return true; // Older Server has only the historical recovery path.
+				if (response.ok) {
+					const body = await response.json() as { executions?: Array<{ batch_run_id?: string }> };
+					if (Array.isArray(body.executions) && !body.executions.some((item) => item.batch_run_id === runId)) return true;
+				}
+			} catch { /* Recheck until the same bounded server wait ends. */ }
+			if (now() - started >= wait.limitMs) return false;
+			await sleep(wait.firstIntervalMs, signal);
+		}
+		return false;
+	}
+
 	/** The work a batch line saved, looked up among the newest works as resume does. */
 	private async savedLineWork(runId: string, line: number): Promise<TWork | null> {
-		const works = await this.fetchWorksPage(0, BATCH_RESUME_PROBE_LIMIT);
+		const works = await this.collectRunWorks(runId, Number.POSITIVE_INFINITY);
 		return works.find((work) => (work.batch_run_id ?? null) === runId && work.batch_line_number === line) ?? null;
 	}
 
-	/** Walk backward only until this run has been passed or enough works exist. */
+	/** Walk the listing until every needed work is found or the listing ends. */
 	private async collectRunWorks(runId: string | null, need: number): Promise<TWork[]> {
 		const collected: TWork[] = [];
-		for (let offset = 0; offset < BATCH_RESUME_SCAN_MAX; offset += BATCH_RESUME_SCAN_PAGE) {
+		for (let offset = 0; ; offset += BATCH_RESUME_SCAN_PAGE) {
 			const page = await this.fetchWorksPage(offset, BATCH_RESUME_SCAN_PAGE);
 			if (page.length === 0) break;
 			const mine = page.filter((item) =>
 				typeof item.batch_line_number === 'number'
 				&& (runId === null || (item.batch_run_id ?? null) === runId));
 			collected.push(...mine);
-			// Works from one run are contiguous; newer unrelated works may precede it.
-			if (mine.length === 0 && collected.length > 0) break;
 			if (collected.length >= need) break;
 			if (page.length < BATCH_RESUME_SCAN_PAGE) break;
 		}

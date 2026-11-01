@@ -124,6 +124,7 @@ export type PaintOptions = {
 	displayLabel?: string;
 	batchLineNumber?: number;
 	batchRunId?: string;
+	batchLease?: string;
 	lineageParentNodeId?: string | null;
 	derivationKind?: DerivationKind | null;
 	derivationMetadata?: Record<string, unknown>;
@@ -233,6 +234,7 @@ export async function runCurrentWork(
 				history_display_label: options.displayLabel ?? null,
 				batch_line_number: options.batchLineNumber ?? null,
 				batch_run_id: options.batchRunId ?? null,
+				...(options.batchLease ? { batch_lease: options.batchLease } : {}),
 				lineage_parent_node_id: options.lineageParentNodeId ?? null,
 				derivation_kind: options.derivationKind ?? null,
 				derivation_metadata: options.derivationMetadata ?? {},

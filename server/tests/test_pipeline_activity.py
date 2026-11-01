@@ -11,6 +11,7 @@ from sqlalchemy import create_engine
 
 from inku_server import db
 from inku_server.persistence.variation_authority import VariationAuthorityStore
+from inku_server.persistence.schema import AppSettingRow
 from inku_server.pipeline_api import PipelineService, pipeline_router
 from inku_server.pipeline_candidate import PipelineBinding
 
@@ -20,6 +21,7 @@ def test_activity_observes_running_batch_and_enforces_scope(tmp_path, monkeypatc
     engine = create_engine(f"sqlite:///{tmp_path / 'activity.db'}")
     store = VariationAuthorityStore(engine)
     store.install_schema()
+    AppSettingRow.__table__.create(engine)
     started, release = threading.Event(), threading.Event()
 
     def provider(action):
@@ -60,6 +62,19 @@ def test_activity_observes_running_batch_and_enforces_scope(tmp_path, monkeypatc
             assert client.get("/api/pipeline/activity", headers={"X-Owner": "alice"}).json()["executions"] == []
             with run._track_render():
                 assert client.get("/api/pipeline/activity", headers={"X-Owner": "alice"}).json()["executions"][0]["state"] == "rendering"
+            response = client.post("/api/pipeline/batches", headers={"X-Owner": "alice"}, json={
+                "run_id": "tracked", "kind": "web", "total": 2, "prompt": "first\nsecond", "conditions": {},
+            })
+            assert response.status_code == 200
+            lease = response.json()["lease"]
+            status = client.get("/api/pipeline/activity", headers={"X-Owner": "alice"}).json()["batches"]
+            assert status[0]["total"] == 2 and status[0]["state"] == "running"
+            assert "prompt" not in status[0] and "lease" not in status[0]
+            assert client.get("/api/pipeline/batches", headers={"X-Owner": "bob"}).json()["batches"] == []
+            heartbeat = client.post("/api/pipeline/batches/tracked/heartbeat", headers={"X-Owner": "alice"},
+                                    json={"lease": lease, "completed": 1, "state": "running"})
+            assert heartbeat.status_code == 200
+            assert client.get("/api/pipeline/batches", headers={"X-Owner": "alice"}).json()["batches"][0]["completed"] == 1
     finally:
         release.set()
         service.close()

@@ -8,9 +8,12 @@ Command line client for controlling an inku API server.
 An administrator can use `inku-cli activity --all` for all users and the
 current server process's active render-slot count. Identified batch items show
 their batch ID and line; new CLI batches supply those identifiers for both
-description and DDL draws. Older clients and image-folder batches may not.
-The result only covers the process answering the request. A client batch can
-be waiting between drawings, so an empty list does not prove it has stopped.
+description and DDL draws. Older clients and previously started image-folder
+batches may not.
+Registered batches also report their planned and completed counts, state, and
+the time of their last heartbeat. An expired lease is not proof that the client
+stopped. Observed drawings cover only the process answering the request;
+unregistered older clients and work in other processes are not accounted for.
 
 ## Signing in, and when it is not needed
 

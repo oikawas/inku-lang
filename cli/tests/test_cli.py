@@ -257,6 +257,10 @@ def test_ddl_commands_send_performance_options_only_when_requested(command, flag
         def request(self, method, path, *, data=None, **kwargs):
             if (method, path) == ("GET", "/api/color-catalogs"):
                 return {"default_catalog_id": "default", "catalogs": list(CATALOG_DATA["catalogs"].values())}, None
+            if path == "/api/pipeline/batches":
+                return {"lease": "lease-1"}, None
+            if path.startswith("/api/pipeline/batches/"):
+                return {"ok": True}, None
             assert (method, path) == ("POST", "/api/compose")
             sent.append(data)
             return {"svg": "<svg/>", "score": {}}, None
@@ -289,6 +293,10 @@ def test_a_ddl_batch_draws_no_title_line(monkeypatch, tmp_path, capsys):
         def request(self, method, path, *, data=None, **kwargs):
             if (method, path) == ("GET", "/api/color-catalogs"):
                 return {"default_catalog_id": "default", "catalogs": list(CATALOG_DATA["catalogs"].values())}, None
+            if path == "/api/pipeline/batches":
+                return {"lease": "lease-1"}, None
+            if path.startswith("/api/pipeline/batches/"):
+                return {"ok": True}, None
             assert (method, path) == ("POST", "/api/compose")
             sent.append(data)
             return {"svg": "<svg/>", "score": {}}, None

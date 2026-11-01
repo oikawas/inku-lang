@@ -13,7 +13,7 @@ import logging
 import threading
 import time
 import uuid
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from typing import Callable
 
 from .api_core.models import json_seeds
@@ -294,7 +294,8 @@ class CandidateExecution:
                 written = (context_updates or {}).get("description", payload.get("description", ""))
                 self.context = {**self.context, "description": written}
             try:
-                return self._advance(payload)
+                with self._track_render() if payload["tag"] == "render" else nullcontext():
+                    return self._advance(payload)
             except Exception:
                 self.context = previous_context
                 raise
@@ -460,7 +461,7 @@ class CandidateExecution:
             render_step = getattr(self.binding, "step_with_svg_limit", None)
             if not callable(render_step):
                 raise _svg_limit_binding_unavailable()
-            with self._track_render(), _render_capacity(self.owner_id):
+            with _render_capacity(self.owner_id):
                 svg_limit = _generated_svg_limit_bytes()
                 output_bytes, svg = render_step(snapshot_bytes, input_bytes, svg_limit)
                 if svg is not None:

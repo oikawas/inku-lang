@@ -13,6 +13,7 @@ from sqlalchemy import or_, select, text
 
 from .access import has_permission_group
 from .schema import (
+    AppSettingRow,
     ExternalIdentityRow,
     HistoryAclRow,
     HistoryRow,
@@ -857,6 +858,10 @@ class UserAccountDeleter:
                 session.query(table).filter(table.owner_id == user_id).delete(
                     synchronize_session=False
                 )
+            from .batch_runs import batch_prefix
+            session.query(AppSettingRow).filter(AppSettingRow.key.startswith(batch_prefix(user_id))).delete(
+                synchronize_session=False
+            )
             session.delete(row)
             session.commit()
         if deleted_history_ids and self.after_history_delete_fn is not None:

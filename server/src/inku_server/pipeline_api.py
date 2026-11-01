@@ -370,7 +370,7 @@ class PipelineService:
     def start(self, owner: str, kind: str, text: str, *, parent: dict | None = None, source_work: dict | None = None,
               canvas_format_id: str | None = None, canvas_aspect: str | None = None,
               options: dict | None = None, prepared: tuple[dict, dict] | None = None,
-              direction: dict | None = None, image_id: str | None = None) -> dict:
+              direction: dict | None = None, image_id: str | None = None, batch_lease: str | None = None) -> dict:
         """Start from a description, direct DDL, transient image, or `saved_laws`:
         the laws stage again on a saved work's DDL (`text`), with the records
         `source_work` keeps and the refinement's `direction` (the AI
@@ -378,6 +378,8 @@ class PipelineService:
         description = text if kind == "description" else (source_work or {}).get("description", "")
         drawn = "" if kind == "image" else (_drawn_description(text) if kind == "description" else text)
         context = {"description": description, "committed_description": description, "parent": parent, "derivation_kind": "new"}
+        if batch_lease is not None:
+            context["batch_lease"] = batch_lease
         if kind == "image":
             if parent is not None or source_work is not None or not image_id:
                 raise CandidateHostError("invalid_image_start")
@@ -788,6 +790,21 @@ class PipelineService:
         return run.view()
 
     def command(self, owner: str, execution_id: str, payload: dict) -> dict:
+        if payload.get("tag") == "perform":
+            run = self.execution(owner, execution_id)
+            lease = run.context.get("batch_lease")
+            if lease:
+                from .persistence.batch_runs import BatchRuns
+                with self._lock:
+                    BatchRuns(self.store.engine).require(owner, run.context["host_options"]["batch_run_id"], lease)
+                    run._render_in_flight = True
+                try:
+                    return self._command(owner, execution_id, payload)
+                finally:
+                    run._render_in_flight = False
+        return self._command(owner, execution_id, payload)
+
+    def _command(self, owner: str, execution_id: str, payload: dict) -> dict:
         if payload.get("tag") == "cancel":
             from .chatgpt_runtime import cancel_execution
             cancel_execution(owner, execution_id)
@@ -969,12 +986,49 @@ def laws_records_of(store, owner: str, history_id: str) -> dict[str, object]:
     return store.read_derived_laws_records(owner, history_id)
 
 
+class BatchStartBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    run_id: str = Field(min_length=1, max_length=200)
+    kind: Literal["web", "cli", "image"]
+    total: int = Field(ge=1, le=100000)
+    prompt: str = Field(default="", max_length=20000)
+    conditions: dict = Field(default_factory=dict)
+
+
+class BatchUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    lease: str = Field(min_length=1, max_length=200)
+    completed: int = Field(ge=0, le=100000)
+    state: Literal["running", "completed", "stopped", "interrupted"] = "running"
+
+
 def pipeline_router(service: PipelineService | Callable[[], PipelineService], actor_dependency: Callable,
                     *, binding_for: Callable[[], PipelineBinding] | None = None) -> APIRouter:
     router = APIRouter(prefix="/api/pipeline")
 
     def current_service() -> PipelineService:
         return service if isinstance(service, PipelineService) else service()
+
+    def active_batch_ids(owner: str | None) -> set[str]:
+        return {item["batch_run_id"] for item in current_service().activity(owner) if item.get("batch_run_id")}
+
+    @router.post("/batches", summary="Start or resume a client batch lease")
+    def start_batch(body: BatchStartBody, actor: dict = Depends(actor_dependency)):
+        from .persistence.batch_runs import BatchRuns
+        service = current_service()
+        with service._lock:
+            return BatchRuns(service.store.engine).start(actor["id"], body.model_dump(), active_batch_ids(actor["id"]))
+
+    @router.post("/batches/{run_id}/heartbeat", summary="Update a client batch lease")
+    def update_batch(body: BatchUpdateBody, run_id: str = Path(max_length=200), actor: dict = Depends(actor_dependency)):
+        from .persistence.batch_runs import BatchRuns
+        BatchRuns(current_service().store.engine).update(actor["id"], run_id, body.lease, body.completed, body.state)
+        return {"ok": True}
+
+    @router.get("/batches", summary="Read the caller's client batches")
+    def batches(actor: dict = Depends(actor_dependency)):
+        from .persistence.batch_runs import BatchRuns
+        return {"batches": BatchRuns(current_service().store.engine).list(actor["id"], active_batch_ids(actor["id"]))}
 
     @router.get("/activity", summary="Observe currently active pipeline work")
     def activity(all_users: bool = False, actor: dict = Depends(actor_dependency)):
@@ -984,8 +1038,13 @@ def pipeline_router(service: PipelineService | Callable[[], PipelineService], ac
             if not db.has_permission_group(actor, "admins"):
                 raise HTTPException(403, "administrator permission is required")
         from .api_core.state import _render_slots
+        from .persistence.batch_runs import BatchRuns
+        owner = None if all_users else actor["id"]
+        batches = BatchRuns(current_service().store.engine).list(owner, active_batch_ids(owner))
+        # The activity overview never needs descriptions or saved settings.
+        batches = [{key: value for key, value in batch.items() if key not in {"prompt", "conditions"}} for batch in batches]
         return {"scope": "all_users" if all_users else "current_user", "process_scope": "current_process",
-                "executions": current_service().activity(None if all_users else actor["id"]),
+                "executions": current_service().activity(owner), "batches": batches,
                 "render_slots_active": _render_slots.active if all_users else None,
                 "batch_waiting_known": False}
 
@@ -1029,7 +1088,18 @@ def pipeline_router(service: PipelineService | Callable[[], PipelineService], ac
     @router.post("/variations", summary="Start a variation")
     def start(body: NewVariationBody, actor: dict = Depends(actor_dependency)):
         """Start a new variation from a description, DDL source or prepared image and return its state. The run continues in the background; read its progress with GET /api/pipeline/variations/{variation_id}. Requires a signed-in user; returns 400 for a description made only of labels, 422 for invalid options, canvas or image choices, and 429 when all authoring workers are busy."""
-        return current_service().start(actor["id"], body.kind, body.text, image_id=body.image_id, canvas_format_id=body.canvas_format_id, canvas_aspect=body.canvas_aspect, options=body.options)
+        service = current_service()
+        options = dict(body.options)
+        lease = options.pop("batch_lease", None)
+        if lease is None:
+            return service.start(actor["id"], body.kind, body.text, image_id=body.image_id, canvas_format_id=body.canvas_format_id, canvas_aspect=body.canvas_aspect, options=options)
+        from .persistence.batch_runs import BatchRuns
+        run_id = options.get("batch_run_id")
+        if not isinstance(run_id, str) or not isinstance(lease, str):
+            raise HTTPException(422, "batch_id_required")
+        with service._lock:
+            BatchRuns(service.store.engine).require(actor["id"], run_id, lease)
+            return service.start(actor["id"], body.kind, body.text, image_id=body.image_id, canvas_format_id=body.canvas_format_id, canvas_aspect=body.canvas_aspect, options=options, batch_lease=lease)
 
     @router.post("/images", response_model=PreparedImageView, summary="Upload an image for an image variation", openapi_extra={
         "requestBody": {"required": True, "content": {

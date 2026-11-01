@@ -101,8 +101,8 @@ func runTooltipAndLeftoverChecks() async throws {
     failing.inputMode = "description"; failing.descriptionText = "A red circle above black dots scattered at the bottom"
     failing.seedText = "42"; failing.sketchMode = "off"; failing.catalogMode = "fixed"; failing.catalogID = "default"
     await failing.generate()
-    let expectedFailure = "処理の結果を確認してください。 理由: 記述の解釈を完了できませんでした（モデルに接続できませんでした。4回試しました）"
-        + " 詳細: 指示書生成処理・処理中に接続が失われました（生成要求、NSURLErrorDomain -1005、transport_unavailable）。"
+    let expectedFailure = "処理の結果を確認してください。 理由: 記述から指示書を書けませんでした。モデルを変えて、もう一度描いてください（モデルに接続できませんでした。4回試しました）"
+        + " 詳細: 記述の指示書生成処理・処理中に接続が失われました（生成要求、NSURLErrorDomain -1005、transport_unavailable）。"
     guard failing.status == expectedFailure else {
         throw CheckFailure.message("Failed drawing status differs from Web: \(failing.status)")
     }

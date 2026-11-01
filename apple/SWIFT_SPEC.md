@@ -20,6 +20,10 @@ Options and replacements for Change the touches, Change the ground and Change th
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-11-01 Drawing failure reason
+
+On macOS, drawing failures show the core phase reason using the Web wording. The model failure cause and attempt count are appended only when the failed action belongs to that reason's stage; details identify the failed operation and its diagnosis.
+
 ## 2026-11-01 Build number tooltip and parity
 
 The macOS build number at the lower left shows a “Build N” tooltip. The Web tooltip parity table follows the moved Swift markers and locations and the current site counts.

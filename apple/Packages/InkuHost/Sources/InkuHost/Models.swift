@@ -201,6 +201,7 @@ public struct PipelineView: Sendable {
     /// Holes the completion left uncompleted, shown when the author must decide or edit (Web holeCompletionIssues).
     public var completionIssues: [HoleCompletionIssue] = []
     public var actionTag: String? = nil
+    public var phaseReason: String? = nil
 }
 
 /// One range a completion wrote, as the author has since left it (core `completion_range_states`).

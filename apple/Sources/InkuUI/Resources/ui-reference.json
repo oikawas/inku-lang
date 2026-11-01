@@ -2,7 +2,7 @@
   "schema": "inku.apple-ui-reference.v1",
   "version": "v2.15.300",
   "build": "1376",
-  "buildDate": "2026-11-01T07:18:42.710Z",
+  "buildDate": "2026-11-01T14:21:05.709Z",
   "versions": {
     "ddlSpec": "30",
     "ddlEngine": "76",
@@ -1489,6 +1489,16 @@
         "chunkMove.break": "崩す",
         "chunkMove.repeat": "くり返す",
         "chunkMove.merge": "溶かす",
+        "attentionReason.stage1_failed": "記述の解釈を完了できませんでした",
+        "attentionReason.hole_completion_failed": "DDLの補完候補を作れませんでした",
+        "attentionReason.description_ddl_failed": "記述から指示書を書けませんでした。モデルを変えて、もう一度描いてください",
+        "attentionReason.description_ddl_undrawable": "書いた指示書から何も描けませんでした。記述かモデルを変えて、もう一度描いてください",
+        "attentionReason.hole_completion_context_limit": "文脈が長すぎてDDLの補完候補を作れませんでした",
+        "attentionReason.patch_declined": "補完候補を採用しませんでした",
+        "attentionReason.hole_request_unavailable": "補完が必要な箇所を準備できませんでした",
+        "attentionReason.compiler_diagnostics": "確認または修正が必要な箇所があります",
+        "attentionReason.host_commit_failed": "作品の保存を完了できませんでした",
+        "attentionReason.compiler_boundary_failed": "DDLを楽譜へ変換できませんでした",
         "descriptionDdlFailed": "記述から指示書を書けませんでした。モデルを変えて、もう一度描いてください",
         "descriptionDdlUndrawable": "書いた指示書から何も描けませんでした。記述かモデルを変えて、もう一度描いてください",
         "limitWeightFormat": "この本数なら 1 枚およそ %@〜%@ MB（細い筆致〜太い筆致）"
@@ -3235,6 +3245,16 @@
         "chunkMove.break": "Break apart",
         "chunkMove.repeat": "Repeat",
         "chunkMove.merge": "Merge",
+        "attentionReason.stage1_failed": "the description could not be interpreted",
+        "attentionReason.hole_completion_failed": "a DDL completion proposal could not be prepared",
+        "attentionReason.description_ddl_failed": "no instructions could be written from the description; change the model and draw again",
+        "attentionReason.description_ddl_undrawable": "the instructions written drew nothing; change the description or the model and draw again",
+        "attentionReason.hole_completion_context_limit": "the context was too long to prepare a DDL completion proposal",
+        "attentionReason.patch_declined": "the completion proposal was declined",
+        "attentionReason.hole_request_unavailable": "the parts requiring completion could not be prepared",
+        "attentionReason.compiler_diagnostics": "some parts need review or editing",
+        "attentionReason.host_commit_failed": "the work could not be saved",
+        "attentionReason.compiler_boundary_failed": "the DDL could not be converted into a score",
         "descriptionDdlFailed": "no instructions could be written from the description; change the model and draw again",
         "descriptionDdlUndrawable": "the instructions written drew nothing; change the description or the model and draw again",
         "limitWeightFormat": "About %@-%@ MB per work at this count (thin to thick tool)"
@@ -4252,7 +4272,7 @@
     }
   },
   "source": {
-    "commit": "656c7242df2136721519bfa2fc8497f8008841aa",
+    "commit": "a3ca51e5ac05342d57f01a7c0ae1e6d36ea92395",
     "files": {
       "web/src/lib/plugins/system/canvas-aspect/index.ts": "51431fe06ed38cfb11f7e08a87b85b68dacdeda646525242fb561c234cf0c9ff",
       "web/src/routes/+page.svelte": "ce49f36f444e2fdb516c8c665c236b9264818bead3f451c7cc439367388b3f2f",

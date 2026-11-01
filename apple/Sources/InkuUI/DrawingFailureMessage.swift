@@ -14,12 +14,6 @@ enum DrawingFailureMessage {
         let failure = events.last { $0["tag"].string == "failed" }?["payload"]
         let action = failure?["stage"].string
         let reason = failure?["reason"].string
-        if reason == "description_ddl_failed" {
-            return copy?("descriptionDdlFailed", "記述から指示書を書けませんでした。モデルを変えて、もう一度描いてください") ?? (english ? "no instructions could be written from the description; change the model and draw again" : "記述から指示書を書けませんでした。モデルを変えて、もう一度描いてください")
-        }
-        if reason == "description_ddl_undrawable" {
-            return copy?("descriptionDdlUndrawable", "書いた指示書から何も描けませんでした。記述かモデルを変えて、もう一度描いてください") ?? (english ? "the instructions written drew nothing; change the description or the model and draw again" : "書いた指示書から何も描けませんでした。記述かモデルを変えて、もう一度描いてください")
-        }
         if action == "write_image_ddl" || reason == "image_ddl_failed" || reason == "image_ddl_undrawable" {
             return english ? "Instructions could not be written from the image. Choose another model and paint again."
                 : "画像から指示書を書けませんでした。モデルを変えて、もう一度描いてください。"
@@ -37,12 +31,18 @@ enum DrawingFailureMessage {
             ?? (english ? "Drawing processing" : "描画処理")
         let diagnostic = metric?.diagnostic
 
-        let phaseReason = action.flatMap { phaseReasons[$0] }.map { english ? $0.1 : $0.0 } ?? stage
-        var web = (english ? "Review the result of this operation. Reason: " : "処理の結果を確認してください。 理由: ") + phaseReason
+        let phaseReason = view.phaseReason.map { copy?("attentionReason." + $0, $0) ?? $0 }
+            ?? action.flatMap { phaseReasons[$0] }.map { english ? $0.1 : $0.0 } ?? stage
+        let attention = copy?("pipelineNeedsAttention", english ? "Review the result of this operation." : "処理の結果を確認してください。")
+            ?? (english ? "Review the result of this operation." : "処理の結果を確認してください。")
+        var web = attention + (english ? " Reason: " : " 理由: ") + phaseReason
+        let matchingStage = view.phaseReason.flatMap { reasonStages[$0] }.map { actions in
+            action.map { actions.contains($0) } ?? false
+        } ?? false
         let credentials = reason == "provider_rejected" && diagnostic?.hostCode == "credentials_unavailable"
-        if let chatGPTCode, finalMetric?.outcome != .completed {
+        if matchingStage, let chatGPTCode, finalMetric?.outcome != .completed {
             web += " " + ChatGPTStatusCopy.text(chatGPTCode, language: language)
-        } else if let reason, let text = credentials ? (english ? "the model has no API key" : "モデルのAPIキーがありません")
+        } else if matchingStage, let reason, let text = credentials ? (english ? "the model has no API key" : "モデルのAPIキーがありません")
             : causes[reason].map({ english ? $0.1 : $0.0 }) {
             let attempts = finalMetric.map { Int($0.identity.attempt) } ?? 1
             web += english ? " (" + text + (attempts > 1 ? "; tried \(attempts) times" : "") + ")"
@@ -104,6 +104,11 @@ enum DrawingFailureMessage {
     }
 
     private static let stages: [String: (String, String)] = [
+        "read_description": ("記述の読み取り処理", "Description reading processing"),
+        "compose_description": ("構図と法則の処理", "Composition and laws processing"),
+        "write_description_ddl": ("記述の指示書生成処理", "Description DDL writing processing"),
+        "review_description_ddl": ("記述の指示書の見直し処理", "Description DDL review processing"),
+        "draw_image_review": ("見直し用の描画処理", "Review drawing processing"),
         "select_image_catalog": ("画像の色カタログ選択", "Image catalog selection"),
         "write_image_ddl": ("画像の指示書生成", "Image instruction writing"),
         "review_image_ddl": ("画像の見比べ", "Image review"),
@@ -115,6 +120,12 @@ enum DrawingFailureMessage {
         "choose_laws": ("法則の段の処理", "Laws stage processing"),
         "choose_colors": ("配色の段の処理", "Color stage processing"),
         "complete_visible_ddl_holes": ("指示書補完処理", "DDL hole-completion processing"),
+    ]
+    private static let reasonStages: [String: Set<String>] = [
+        "stage1_failed": ["generate_normalized_ddl"],
+        "hole_completion_failed": ["complete_visible_ddl_holes"],
+        "description_ddl_failed": ["read_description", "compose_description", "write_description_ddl", "review_description_ddl"],
+        "description_ddl_undrawable": ["read_description", "compose_description", "write_description_ddl", "review_description_ddl"],
     ]
     /// Web ja.ts/en.ts pipelineAttentionReason for the phase a failed action stops.
     private static let phaseReasons: [String: (String, String)] = [

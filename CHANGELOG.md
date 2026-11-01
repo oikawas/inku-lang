@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: show drawing failure reasons in the Web wording, with the cause and attempt count for the corresponding stage.
+
 - macOS: restore the “Build N” tooltip and update the tooltip parity markers and counts.
 
 - macOS: remove the duplicate stage name and inner box during drawing, and remove the canvas-wide gesture tooltip.

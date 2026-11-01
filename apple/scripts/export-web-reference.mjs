@@ -63,6 +63,14 @@ async function copyFor(language) {
   }
   // Preserve the numeric singular branch instead of evaluating it with a string placeholder.
   dynamicTexts['ddlImportMigrated.one'] = pack.ddlImportMigrated(1).replace('1', '%@');
+  for (const reason of ['stage1_failed', 'hole_completion_failed', 'description_ddl_failed', 'description_ddl_undrawable',
+    'hole_completion_context_limit', 'patch_declined', 'hole_request_unavailable', 'compiler_diagnostics',
+    'host_commit_failed', 'compiler_boundary_failed']) {
+    const prefix = language === 'ja' ? '理由: ' : 'Reason: ';
+    const value = pack.pipelineAttentionReason(reason);
+    if (!value.startsWith(prefix) || value === prefix + reason) throw new Error(`pipelineAttentionReason missing: ${language} ${reason}`);
+    texts['attentionReason.' + reason] = value.slice(prefix.length);
+  }
   for (const [key, reason] of Object.entries({ descriptionDdlFailed: 'description_ddl_failed', descriptionDdlUndrawable: 'description_ddl_undrawable' })) {
     const prefix = language === 'ja' ? '理由: ' : 'Reason: ';
     const value = pack.pipelineAttentionReason(reason);

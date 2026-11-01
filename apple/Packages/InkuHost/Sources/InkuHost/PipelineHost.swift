@@ -84,7 +84,7 @@ public actor PipelineHost {
                 patchProposalJSON: nil, eventsJSON: Data("[]".utf8), busy: false, interruptedProvider: false,
                 description: stored.candidate.work.effectiveSourceText, configurationJSON: context["configuration"].data,
                 documentJSON: context["document"].data, deliveryJSON: nil, promptJSON: nil, holeIDs: [], candidateWork: stored.candidate.work,
-                providerMetrics: try metrics(in: context))
+                providerMetrics: try metrics(in: context), phaseReason: nil)
         }
         return try await execution(executionID).cancel(progress: { _ in })
     }
@@ -521,7 +521,7 @@ public actor PipelineHost {
             patchProposalJSON: nil, eventsJSON: Data("[]".utf8), busy: false, interruptedProvider: false,
             description: work.effectiveSourceText, configurationJSON: config.data, documentJSON: document.data,
             deliveryJSON: delivery.data, promptJSON: nil, holeIDs: [], candidateWork: candidate.work,
-            providerMetrics: try metrics(in: context))
+            providerMetrics: try metrics(in: context), phaseReason: nil)
         progress(.changed(view))
         return view
     }
@@ -1340,7 +1340,8 @@ private actor ExecutionDriver {
                             providerMetrics: state.providerObservations?.map(\.metric) ?? [],
                             completionRangesJSON: snapshot["completion_ranges"].object == nil ? nil : snapshot["completion_ranges"].data,
                             completionIssues: state.svgFailure == nil ? HoleCompletionIssue.issues(snapshot: snapshot) : [],
-                            actionTag: snapshot["action"]["tag"].string)
+                            actionTag: snapshot["action"]["tag"].string,
+                            phaseReason: state.svgFailure == nil ? snapshot["phase"]["reason"].string : nil)
     }
     private func executionID() throws -> String { try snapshot.requiredString("execution_id") }
     private func canonicalUnsigned(_ value: ExactJSON, key: String) throws -> UInt64 {

@@ -20,6 +20,10 @@ Options and replacements for Change the touches, Change the ground and Change th
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-11-01 Run status and canvas tooltip
+
+Progress in creation, automation, comparison and AI refinement shows the stage name once, with model, timing and tokens without an inner box. Batch progress remains unchanged. The canvas-wide wheel and drag tooltip is removed; tooltips on zoom and other buttons remain.
+
 ## 2026-11-01 Following the colour and tool phrases (DDL 30)
 
 The bundled `ui-reference.json` was regenerated with `export-web-reference.mjs` from main `656c7242d` (Web/Server v2.15.300, Build 1376). New works now record DDL 30 (was 29) and DDL engine 76 (was 75) in their provenance; render engine stays 95. No text, function text, canvas metadata or Saijiki preview changed; only the versions, build and source fields did. Compiling the colour and tool "で"/with/in phrases arrives with the next rebuild of the installed app, because build-macos.sh builds the core from the checkout.

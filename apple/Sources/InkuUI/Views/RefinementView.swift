@@ -47,7 +47,7 @@ public struct RefinementView: View {
                 }.disabled(controlsDisabled)
                 if refinement.running {
                     RunStatusView(display: model.display, label: refinement.saving ? "選択した候補を保存中" : "候補の準備中",
-                        stopping: refinement.stopping || closing, onStop: { Task { await refinement.stop(app: model) } }) { ProviderProgressView(model: model) }
+                        stopping: refinement.stopping || closing, onStop: { Task { await refinement.stop(app: model) } }) { ProviderProgressView(model: model, embedded: true) }
                     if !refinement.saving {
                         VariationLanesView(display: model.display, states: refinement.slots.map {
                             switch $0.state { case .waiting: .waiting; case .running: .running; case .ready, .failed: .done }

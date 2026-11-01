@@ -654,7 +654,7 @@ struct CreationView: View {
     /// Web RunStatus.svelte: mascot, the stage and its provider facts, and the stop button, in one bordered box.
     private func runStatus(label: String, onStop: @escaping () -> Void, stopping: Bool) -> some View {
         RunStatusView(display: display, label: label, stopping: stopping, stopTooltip: tip("実行中の描画を停止します。"),
-                      stopsWithEscape: !workspaceCovered, onStop: onStop) { ProviderProgressView(model: model) }
+                      stopsWithEscape: !workspaceCovered, onStop: onStop) { ProviderProgressView(model: model, embedded: true) }
     }
 
     /// The native status line and the backup and result-log reports, which the Web has no place for.

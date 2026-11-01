@@ -1020,7 +1020,6 @@
 "この語は参照のみです。DDLに挿入する定義が同梱されていません。" = "This word is for reference only. Its definition is not bundled, so it cannot be inserted into DDL.";
 "ツールチップを非表示" = "Hide tooltips";
 "ツールチップを表示" = "Show tooltips";
-"マウスホイールで拡大・縮小、ドラッグで移動します。" = "Use the mouse wheel to zoom and drag to pan.";
 "既定値を入力欄に戻します。変更を保存するまで適用しません。" = "Restore the defaults in these fields. Apply them with Save changes.";
 "制限値には整数を入力してください。" = "Enter whole numbers for the limits.";
 "現在: %ld" = "Current: %ld";

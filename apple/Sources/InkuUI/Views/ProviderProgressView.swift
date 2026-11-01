@@ -4,7 +4,11 @@ import SwiftUI
 @MainActor
 public struct ProviderProgressView: View {
     @Bindable private var model: AppModel
-    public init(model: AppModel) { self.model = model }
+    private let embedded: Bool
+    public init(model: AppModel, embedded: Bool = false) {
+        self.model = model
+        self.embedded = embedded
+    }
 
     public var body: some View {
         if let snapshot = model.providerProgress {
@@ -20,9 +24,13 @@ public struct ProviderProgressView: View {
 
     private func content(_ snapshot: ProviderProgressSnapshot, at date: Date) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 8) { stage(snapshot); requestedModel(snapshot) }
-                VStack(alignment: .leading, spacing: 2) { stage(snapshot); requestedModel(snapshot) }
+            if embedded {
+                requestedModel(snapshot)
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) { stage(snapshot); requestedModel(snapshot) }
+                    VStack(alignment: .leading, spacing: 2) { stage(snapshot); requestedModel(snapshot) }
+                }
             }
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 10) { timing(snapshot, at: date); tokens(snapshot) }
@@ -30,8 +38,12 @@ public struct ProviderProgressView: View {
             }.inkuFont(12).foregroundStyle(.secondary).monospacedDigit()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 10).padding(.vertical, 6)
-        .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
+        .padding(.horizontal, embedded ? 0 : 10).padding(.vertical, embedded ? 0 : 6)
+        .background {
+            if !embedded {
+                RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.06))
+            }
+        }
         .accessibilityElement(children: .combine)
     }
 

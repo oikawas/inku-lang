@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: remove the duplicate stage name and inner box during drawing, and remove the canvas-wide gesture tooltip.
+
 - macOS: regenerate the bundled Web reference from Build 1376 so new works record DDL 30 and DDL engine 76 in their provenance.
 
 - Android: migrate English instructions with missing language metadata using the saved config language or shared DDL language detection.

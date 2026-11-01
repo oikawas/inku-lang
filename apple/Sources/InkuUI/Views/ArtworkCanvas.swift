@@ -90,7 +90,6 @@ struct ArtworkCanvas: View {
                     .frame(width: geometry.size.width, height: geometry.size.height)
                 } else {
                     interactiveCanvas(size: geometry.size, box: fit.box)
-                        .inkuTooltip(display.tooltip("マウスホイールで拡大・縮小、ドラッグで移動します。"))
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -151,7 +150,6 @@ struct ArtworkCanvas: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(.quaternary))
-                    .inkuTooltip(display.tooltip("マウスホイールで拡大・縮小、ドラッグで移動します。"))
                     .task(id: requestKey(box: CGSize(width: geometry.size.width - 36, height: geometry.size.height - 36))) {
                         await render(box: CGSize(width: geometry.size.width - 36, height: geometry.size.height - 36))
                     }

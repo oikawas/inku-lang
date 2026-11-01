@@ -38,6 +38,24 @@ not match Chrome, so the test sees the gradients.
 made its picture the same way. Without its offsets it does not match Chrome, so the
 test sees them.
 
+`user-space-gradient` is the painting knife's thinning: linear gradients with
+`gradientUnits="userSpaceOnUse"`, numeric endpoints and one colour fading in opacity.
+`round-join` is the round join used by etching lines and the media's ridges, with
+thick strokes and acute corners. Both are large, dark, noise-free synthetic pictures
+(2026-11-01). Chrome 156.0.8078.74 made their pictures the same way as C1, each at
+200 × 200 pixels. Removing `gradientUnits` restores objectBoundingBox; removing
+`stroke-linejoin` restores miter. Neither control matches Chrome under the same
+yardstick. The Skia/Chrome C2 comparison keeps both pictures unchanged.
+
+The CPU/Graphite comparison at 1x and in a 4x window uses `user-space-gradient` and
+`round-join-gentle`. The latter keeps the same stroke width and round caps and joins,
+with 90-degree corners. Along steep lines (about 74 degrees), CPU and Graphite edge
+coverage differs at 1x regardless of join shape: miter differs in 0.725% of pixels,
+and thin round lines in 0.60-0.64%, above the 0.5% yardstick (I-726). This is why
+Graphite uses the gentler picture. It is compared only with the CPU and has no
+Chrome reference image. The original acute picture and its Chrome reference remain
+in C2.
+
 ## `public-requests.json` (C6)
 
 The 17 public DDL texts of stage 1 (with where each was taken from) and the exact

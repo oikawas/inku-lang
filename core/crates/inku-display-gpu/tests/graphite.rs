@@ -2,9 +2,16 @@
 //! CPU draws it. The works are the display's compatibility pictures without noise
 //! (feTurbulence draws its grain differently on the GPU, as the 2026-10-11 survey
 //! found; `alpha-mask-gray` is outside the support table), with the two linear gradients
-//! the core writes (2026-10-12) and the canvas ground's dash offsets (2026-10-17), each
+//! the core writes (2026-10-12), the canvas ground's dash offsets (2026-10-17), and
+//! user-space gradients and round joins (2026-11-01), each
 //! whole at 1x and as a 4x window off the centre, compared with the CPU window by the
 //! author's yardstick.
+//!
+//! Graphite uses `round-join-gentle`, whose corners are 90 degrees. Along steep lines
+//! (about 74 degrees), CPU and Graphite edge coverage differs at 1x regardless of
+//! join shape: miter differs in 0.725% of pixels, and thin round lines in 0.60-0.64%,
+//! above the 0.5% yardstick (I-726). The acute `round-join` remains in the separate
+//! Skia/Chrome C2 comparison; the Graphite comparison needs no Chrome picture.
 #![cfg(all(feature = "graphite", target_os = "macos"))]
 
 use inku_display::{RasterRegionOptions, prepare_scene};
@@ -14,7 +21,7 @@ use inku_display_gpu::GpuWindows;
 mod comparison;
 use comparison::{difference, over_white};
 
-const WORKS: [&str; 7] = [
+const WORKS: [&str; 9] = [
     "ellipse-gradient",
     "use-href",
     "pattern-href",
@@ -22,12 +29,15 @@ const WORKS: [&str; 7] = [
     "linear-gradient-wash",
     "linear-gradient-field",
     "dash-offset",
+    "user-space-gradient",
+    "round-join-gentle",
 ];
 
 #[test]
 fn gpu_windows_stand_where_the_cpu_draws_them() {
     let mut gpu = GpuWindows::new().expect("Graphite on this Mac");
     let mut compared = 0;
+    let mut mismatches = Vec::new();
     for work in WORKS {
         let path = format!(
             "{}/../inku-display/tests/data/compat/{work}.svg",
@@ -66,9 +76,12 @@ fn gpu_windows_stand_where_the_cpu_draws_them() {
                 &over_white(&cpu),
             );
             eprintln!("{work} {region:?}: {difference:?}");
-            assert!(difference.passes(), "{work} {region:?}: {difference:?}");
+            if !difference.passes() {
+                mismatches.push(format!("{work} {region:?}: {difference:?}"));
+            }
             compared += 1;
         }
     }
-    assert_eq!(compared, 14);
+    assert_eq!(compared, 18);
+    assert!(mismatches.is_empty(), "{}", mismatches.join("\n"));
 }

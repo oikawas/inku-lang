@@ -9,8 +9,16 @@
 //! saved form has the lock's digest (`old_digest`), as the plugin-name migration checks. A
 //! definition of the same name and version with another digest is another definition, and
 //! the document is refused rather than rebound to it.
+//!
+//! A lock whose definition the host did not supply may name a built-in Nature leaf as an
+//! earlier release shipped it (some old variations kept the lock without the definition).
+//! Those earlier built-ins are kept here (`assets/nature-historical-definitions.json`, the
+//! Server's table of 2026-10-31), and such a lock moves to one of them only when its saved
+//! form has the lock's digest, as for a supplied one. A supplied definition is used first;
+//! a name and version alone never choose one.
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::sync::OnceLock;
 
 use inku_ddl::{
     InvalidDocumentStage, MacroDefinition, MacroLock, NormalizedDdlDocument, SAIJIKI_ASSET_ID,
@@ -123,6 +131,47 @@ impl Supplied {
     }
 }
 
+/// The built-in Nature leaves as earlier releases shipped them, with the digests the v1 and
+/// v2 cores locked them by (`inku.saijiki-v3-historical-definitions.v1`).
+const HISTORICAL_DEFINITIONS: &str = include_str!("../assets/nature-historical-definitions.json");
+
+/// The earlier built-ins, read through the retired edition once per edition.
+fn historical(retired: Retired) -> &'static [Supplied] {
+    static V1: OnceLock<Vec<Supplied>> = OnceLock::new();
+    static V2: OnceLock<Vec<Supplied>> = OnceLock::new();
+    let cell = match retired {
+        Retired::V1 => &V1,
+        Retired::V2 => &V2,
+    };
+    cell.get_or_init(|| {
+        let table: Value = serde_json::from_str(HISTORICAL_DEFINITIONS).unwrap_or(Value::Null);
+        table["definitions"]
+            .as_array()
+            .map(|definitions| {
+                definitions
+                    .iter()
+                    .map(|definition| Supplied::new(retired, definition))
+                    .collect()
+            })
+            .unwrap_or_default()
+    })
+}
+
+/// The migrated definition a lock was saved with: among `candidates`, one of the lock's name
+/// and version whose saved form has the lock's digest.
+fn saved_with<'a>(
+    candidates: &'a [Supplied],
+    lock: &LockedDefinition,
+) -> Option<&'a SaijikiDefinitionMigration> {
+    candidates.iter().find_map(|supplied| {
+        let migration = supplied.migration.as_ref().ok()?;
+        (migration.identity.qualified_name() == lock.qualified_name
+            && migration.identity.version() == lock.version
+            && supplied.old_digest.as_deref() == Some(lock.digest.as_str()))
+        .then_some(migration)
+    })
+}
+
 fn definition_value(old_digest: Option<&str>, migration: &SaijikiDefinitionMigration) -> Value {
     json!({
         "definition": migration.definition,
@@ -166,30 +215,30 @@ fn migrate_document(retired: Retired, document: SavedDocument, definitions: &[Su
         }
     };
     // Each lock moves to the migrated definition it was saved with: a supplied definition of
-    // the same name and version whose saved form has the lock's digest.
+    // the same name and version whose saved form has the lock's digest, or else an earlier
+    // built-in with that digest.
     let mut locks = Vec::new();
     for lock in &document.macro_locks {
-        let named = definitions
-            .iter()
-            .filter_map(|supplied| {
-                let migration = supplied.migration.as_ref().ok()?;
-                (migration.identity.qualified_name() == lock.qualified_name
-                    && migration.identity.version() == lock.version)
-                    .then_some((supplied.old_digest.as_deref(), migration))
-            })
-            .collect::<Vec<_>>();
-        if named.is_empty() {
-            return json!({"error": {"code": "definition_not_supplied",
-                "qualified_name": lock.qualified_name, "version": lock.version}});
-        }
-        let Some((_, migrated)) = named
-            .iter()
-            .find(|(old_digest, _)| *old_digest == Some(lock.digest.as_str()))
+        let Some(migrated) =
+            saved_with(definitions, lock).or_else(|| saved_with(historical(retired), lock))
         else {
+            let named = definitions
+                .iter()
+                .filter(|supplied| {
+                    supplied.migration.as_ref().is_ok_and(|migration| {
+                        migration.identity.qualified_name() == lock.qualified_name
+                            && migration.identity.version() == lock.version
+                    })
+                })
+                .map(|supplied| supplied.old_digest.as_deref())
+                .collect::<Vec<_>>();
+            if named.is_empty() {
+                return json!({"error": {"code": "definition_not_supplied",
+                    "qualified_name": lock.qualified_name, "version": lock.version}});
+            }
             return json!({"error": {"code": "lock_digest_mismatch",
                 "qualified_name": lock.qualified_name, "version": lock.version,
-                "lock_digest": lock.digest,
-                "old_digests": named.iter().map(|(old_digest, _)| *old_digest).collect::<Vec<_>>()}});
+                "lock_digest": lock.digest, "old_digests": named}});
         };
         locks.push(LockedDefinition {
             qualified_name: lock.qualified_name.clone(),
@@ -414,6 +463,140 @@ mod tests {
                     .filter(|definition| definition["old_digest"] == SAVED)
                     .count(),
                 1
+            );
+        }
+    }
+
+    #[test]
+    fn the_earlier_built_ins_are_the_servers_table_and_reproduce_its_digests() {
+        use sha2::{Digest, Sha256};
+        // The same bytes the Server pins (`saijiki_v3_migration._historic_nature_definitions`).
+        assert_eq!(
+            Sha256::digest(HISTORICAL_DEFINITIONS.as_bytes())
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>(),
+            "ee0458950424483d6078b34452891baece5b6c410f6a1bc36ef8869cb4e0d636"
+        );
+        let table: Value = serde_json::from_str(HISTORICAL_DEFINITIONS).unwrap();
+        assert_eq!(table["schema"], "inku.saijiki-v3-historical-definitions.v1");
+        let entries = table["original_locks"].as_array().unwrap();
+        assert_eq!(entries.len(), 20);
+        assert_eq!(historical(Retired::V1).len(), 20);
+        assert_eq!(historical(Retired::V2).len(), 20);
+        // A digest the table lists is one a definition of the table is saved with, read
+        // through v1 or v2, but for two: 2.1.0 of FallenLeaves and Undergrowth also shipped
+        // as another definition under the same version, which the table does not hold. A
+        // lock by those digests is refused (`lock_digest_mismatch`), as on the Server.
+        let mut digests = 0;
+        let mut unreproduced = Vec::new();
+        for entry in entries {
+            for digest in entry["digests"].as_array().unwrap() {
+                let lock = LockedDefinition {
+                    qualified_name: entry["qualified_name"].as_str().unwrap().to_owned(),
+                    version: entry["version"].as_str().unwrap().to_owned(),
+                    digest: digest.as_str().unwrap().to_owned(),
+                    aliases: Vec::new(),
+                };
+                if saved_with(historical(Retired::V1), &lock).is_none()
+                    && saved_with(historical(Retired::V2), &lock).is_none()
+                {
+                    unreproduced.push(format!("{} {}", lock.qualified_name, &lock.digest[..13]));
+                }
+                digests += 1;
+            }
+        }
+        assert_eq!(digests, 22);
+        assert_eq!(
+            unreproduced,
+            [
+                "Nature.FallenLeaves sha256:e3a829",
+                "Nature.Undergrowth sha256:0f3702"
+            ]
+        );
+        for retired in [Retired::V1, Retired::V2] {
+            assert!(
+                historical(retired)
+                    .iter()
+                    .all(|supplied| supplied.migration.is_ok())
+            );
+        }
+    }
+
+    #[test]
+    fn a_lock_without_its_definition_moves_to_the_earlier_built_in_it_was_saved_with() {
+        // The digests the v2 core (783fd7a81) locked 下草 1.0.0 by and the v1 core (7ba01022)
+        // locked 若葉 1.0.1 by; neither definition is supplied.
+        const UNDERGROWTH: &str =
+            "sha256:88046b24987a2600eeb8b985f36bc15222202a5758a0f4a7638e514dd6af2aea";
+        const YOUNG_LEAVES: &str =
+            "sha256:82ffc5c348a82ba927b315acaaa5ce4bc4c3998e2497deecd91535fb3005c8f4";
+        let package: Value = serde_json::from_str(PACKAGE_1_0).unwrap();
+        let supplied = |heading: &str| {
+            package["entries"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|entry| entry["definition"].clone())
+                .find(|definition| definition["heading"] == heading)
+                .unwrap()
+        };
+        let cases = [
+            (
+                migrate_saijiki_v2 as fn(Vec<u8>) -> Vec<u8>,
+                json!(SAIJIKI_V2_ASSET_ID),
+                "Nature.下草",
+                "1.0.0",
+                UNDERGROWTH,
+                supplied("下草"),
+            ),
+            (
+                migrate_saijiki_v1,
+                Value::Null,
+                "Nature.若葉",
+                "1.0.1",
+                YOUNG_LEAVES,
+                supplied("若葉"),
+            ),
+        ];
+        for (entry, saijiki, name, version, digest, definition) in cases {
+            let unit = |definitions: Vec<Value>| -> Value {
+                let mut document = json!({
+                    "source": format!("{name}。黒い太筆の線を引く。"),
+                    "language": "ja",
+                    "macro_locks": [{"qualified_name": name, "version": version,
+                        "digest": digest}]
+                });
+                if !saijiki.is_null() {
+                    document["saijiki"] = saijiki.clone();
+                }
+                serde_json::from_slice(&entry(
+                    serde_json::to_vec(&json!({"document": document, "definitions": definitions}))
+                        .unwrap(),
+                ))
+                .unwrap()
+            };
+            // The lock moves as it would with its definition supplied.
+            let with = unit(vec![definition.clone()]);
+            let without = unit(Vec::new());
+            assert_eq!(without["definitions"], json!([]), "{name}");
+            assert_eq!(
+                without["document"]["document"], with["document"]["document"],
+                "{name}"
+            );
+            assert_eq!(
+                without["document"]["document"]["macro_locks"][0]["digest"],
+                with["definitions"][0]["digest"],
+                "{name}"
+            );
+            // A supplied definition of the same name and version saved with another digest
+            // does not hide the earlier built-in the lock names.
+            let mut edited = definition.clone();
+            assert!(edit_first_decimal(&mut edited));
+            assert_eq!(
+                unit(vec![edited])["document"]["document"],
+                with["document"]["document"],
+                "{name}"
             );
         }
     }

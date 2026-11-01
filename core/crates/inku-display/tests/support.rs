@@ -99,6 +99,13 @@ fn the_core_s_linear_gradients_are_inside_the_table() {
 }
 
 #[test]
+fn the_core_s_user_space_gradients_and_round_joins_are_inside_the_table() {
+    for name in ["user-space-gradient", "round-join"] {
+        assert!(display_svg(&compat(name)).is_ok(), "{name}");
+    }
+}
+
+#[test]
 fn what_the_table_does_not_hold_is_left_to_resvg() {
     let head = r#"<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10">"#;
     for (body, code) in [

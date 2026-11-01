@@ -80,6 +80,42 @@ def _events(response) -> list[dict]:
     return [json.loads(line) for line in response.text.splitlines() if line]
 
 
+def test_progress_reports_each_send_and_totals_without_changing_saved_usage(monkeypatch) -> None:
+    from inku_server.pipeline_product import _add_provider_usage, usage_result
+
+    class ProgressService(_Service):
+        def __init__(self):
+            super().__init__([_running(1), _view(busy=False, document=DDL, score={"instructions": [{}]})])
+            self.context = {"host_options": {}}
+            self.run = SimpleNamespace(context=self.context, snapshot=lambda: {}, binding=SimpleNamespace(
+                run_progress=lambda _: json.dumps({"run_progress": {"current": {"kind": "provider", "action": "read_description"}, "finished": []}}).encode()))
+
+        def execution(self, owner, execution_id):
+            return self.run
+
+        def get(self, owner, variation_id):
+            def fake_provider():
+                return {"input_tokens": 7252, "output_tokens": 367}
+            used = fake_provider()
+            _add_provider_usage(self.context, "read_and_draw", used)
+            self.context["provider_sends"] = [{"action": "read_description", "attempt": 1, **used}]
+            return super().get(owner, variation_id)
+
+        def command(self, owner, execution_id, command):
+            self.run.performance_save_observer()
+            return super().command(owner, execution_id, command)
+
+    service = ProgressService()
+    events = _events(_client(monkeypatch, service).post('/api/paint/stream', json={"description": "円"}))
+    progress = [event for event in events if event["event"] == "progress"]
+    assert progress[-2]["run_progress"]["current"] == {"kind": "local", "action": "render"}
+    assert progress[-1]["run_progress"]["current"] == {"kind": "local", "action": "save"}
+    assert progress[-1]["previous"] == {"action": "read_description", "input_tokens": 7252, "output_tokens": 367}
+    saved = usage_result(service.context["provider_usage"])
+    assert progress[-1]["total"]["input_tokens"] == saved["tokens_in"]
+    assert progress[-1]["total"]["output_tokens"] == saved["tokens_out"]
+
+
 def test_the_stream_names_each_layer_in_order_before_the_drawing(monkeypatch) -> None:
     service = _Service([
         _view(busy=True, sketch={"state": "pending"}),

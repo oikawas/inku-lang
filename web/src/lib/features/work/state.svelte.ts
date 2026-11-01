@@ -731,6 +731,7 @@ export function createWorkState(deps: WorkStateDeps) {
 	// The model call that paint waits on, as its pipeline view or its stream
 	// reports it; null between calls and once the paint finishes.
 	let activeRunAttempt = $state<ProviderAttemptCount | null>(null);
+	let activeRunProgress = $state<import('../../paintStream.ts').PaintProgressEvent | null>(null);
 
 	// Flows that issue several paints per run keep their own running totals.
 	function addTokens(total: number | null, delta: number | null | undefined): number | null {
@@ -834,7 +835,8 @@ export function createWorkState(deps: WorkStateDeps) {
 				attachSavedLineage: () => { lineageDetached = false; },
 				updateGenerationCount: (count) => session.updateGenerationCount(count),
 				adoptPipelineView: options.batchRunId ? undefined : (view) => pipelineController.adopt(view),
-				setProviderAttempt: (attempt) => { activeRunAttempt = attempt; }
+				setProviderAttempt: (attempt) => { activeRunAttempt = attempt; },
+				setProgress: (progress) => { activeRunProgress = progress; }
 			}
 		);
 	}
@@ -1549,6 +1551,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		get activeRunTokensIn() { return activeRunTokensIn; },
 		get activeRunTokensOut() { return activeRunTokensOut; },
 		get activeRunAttempt() { return activeRunAttempt; },
+		get activeRunProgress() { return activeRunProgress; },
 		sketchTextFor,
 		sketchPayloadFor,
 		adoptSketch,

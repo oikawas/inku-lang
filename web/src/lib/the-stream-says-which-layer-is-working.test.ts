@@ -11,6 +11,7 @@ import { ja } from './i18n/ja.ts';
 import { en } from './i18n/en.ts';
 import type { LangPack } from './i18n/types.ts';
 import { paintStageHandlers, paintStageLabel, providerAttemptText, readPaintStream, runningStageLabel } from './paintStream.ts';
+import { finishedText, localWork, stageName, tokenCount } from './runProgress.ts';
 
 const DONE = { event: 'done', ddl: '黒い円を中心に置く。', svg: '<svg/>' };
 
@@ -26,6 +27,20 @@ const streamFromBytes = (chunks: Uint8Array[]) =>
 	}));
 
 const describeError = (detail: unknown, status: number) => `HTTP ${status}: ${String(detail)}`;
+
+test('progress events reach the indicator with localized details and token counts', async () => {
+	const progress = { event: 'progress', run_progress: { current: { kind: 'local', action: 'draw_image_review' }, finished: [
+		{ action: 'compose_description', outcome: 'ready', facts: { things: 3, main_law: 'B3' } }
+	] }, previous: { action: 'compose_description', input_tokens: 7252, output_tokens: 367 },
+		total: { input_tokens: 9573, output_tokens: 809, unreported_sends: 0 }, received_bytes: 4096 };
+	let received: typeof progress | undefined;
+	await readPaintStream(streamOf([progress, DONE]), { describeError, onProgress: (event) => { received = event as typeof progress; } });
+	assert.deepEqual(received, progress);
+	assert.equal(finishedText(progress.run_progress.finished[0], ja), '構図：物 3 つ・主の法則 B3');
+	assert.equal(localWork(progress.run_progress.current.action, en), 'Drawing for review…');
+	assert.equal(stageName(progress.previous.action, ja), '構図');
+	assert.equal(tokenCount(progress.previous.input_tokens), '7,252');
+});
 
 // ---------------------------------------------------------------- T-248
 

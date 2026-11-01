@@ -17,6 +17,8 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import { getMascot } from '$lib/mascot.svelte';
 	import { providerAttemptText, type ProviderAttemptCount } from '$lib/paintStream';
+	import type { PaintProgressEvent } from '$lib/paintStream';
+	import { finishedText, localWork, stageName, tokenCount } from '$lib/runProgress';
 
 	type Props = {
 		label: string;
@@ -33,6 +35,7 @@
 		progressTotal?: number | null;
 		/** The model call being waited on, when the run reports one. */
 		attempt?: ProviderAttemptCount | null;
+		progress?: PaintProgressEvent | null;
 		tokensIn?: number | null;
 		tokensOut?: number | null;
 		stopLabel?: string;
@@ -50,6 +53,7 @@
 		progressDone = null,
 		progressTotal = null,
 		attempt = null,
+		progress = null,
 		tokensIn = null,
 		tokensOut = null,
 		stopLabel,
@@ -89,14 +93,24 @@
 		{#if getMascot() === 'yuragi'}<YuragiMascot />{:else}<IncuMascot />{/if}
 	</div>
 	<div class="run-info">
-		<span class="run-label">{label}</span>
+		<span class="run-label">{progress?.run_progress.current?.kind === 'local' ? localWork(progress.run_progress.current.action, t()) : label}</span>
 		{#if modelLine}<span class="run-model">{modelLine}</span>{/if}
 		<span class="run-meta">
 			{#if progressText}<span class="run-progress">{progressText}</span>{/if}
 			{#if attemptText}<span class:run-progress={(attempt?.attempt ?? 1) > 1}>{attemptText}</span>{/if}
 			{#if elapsedText}<span>{elapsedText}</span>{/if}
+			{#if progress?.received_bytes != null}<span>{t().runStatusReceived(String(Math.floor(progress.received_bytes / 1024)))}</span>{/if}
 			<span>{tokenText}</span>
 		</span>
+		{#if progress?.run_progress.finished.length}
+			<span class="run-detail">{progress.run_progress.finished.map((item) => `✓ ${finishedText(item, t())}`).join('　')}</span>
+		{/if}
+		{#if progress}
+			<span class="run-detail">
+				{#if progress.previous}{t().runStatusPreviousTokens(stageName(progress.previous.action, t()), tokenCount(progress.previous.input_tokens), tokenCount(progress.previous.output_tokens))} ／ {/if}
+				{progress.total.unreported_sends ? t().runStatusPartialTokens(tokenCount(progress.total.input_tokens), tokenCount(progress.total.output_tokens)) : t().runStatusTotalTokens(tokenCount(progress.total.input_tokens), tokenCount(progress.total.output_tokens))}
+			</span>
+		{/if}
 	</div>
 	{#if children}<div class="run-extra">{@render children()}</div>{/if}
 	{#if onStop}<StopButton onclick={onStop}>{stopLabel ?? t().stopBtn}</StopButton>{/if}
@@ -160,8 +174,9 @@
 		font-size: var(--ui-font-size-11);
 		color: var(--fg3);
 		font-variant-numeric: tabular-nums;
-		white-space: nowrap;
+		flex-wrap: wrap;
 	}
+	.run-detail { font-size: var(--ui-font-size-11); color: var(--fg3); overflow-wrap: anywhere; }
 	.run-status.inline .run-meta {
 		justify-content: flex-end;
 	}

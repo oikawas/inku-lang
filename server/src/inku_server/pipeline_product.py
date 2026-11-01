@@ -524,6 +524,10 @@ class ProductPipelineEffects:
             stage = "stage2" if action["tag"] == "complete_visible_ddl_holes" else "stage1"
             # The reading, the laws stage and the color stage use Stage 1's limits and are timed apart from it.
             recorded = provider_stage_record(action["tag"])
+            def received_bytes(count):
+                context["provider_receiving"] = {"action": action["tag"],
+                    "attempt": int(action["identity"]["attempt"]), "bytes": count}
+
             transport = SingleAttemptProvider(ProviderOptions(
                 settings=db.get_model_settings(), stage1_model=options.get("stage1_model", configured["stage1_model"]),
                 stage2_model=options.get("stage2_model", configured["stage2_model"]),
@@ -534,7 +538,7 @@ class ProductPipelineEffects:
                 chatgpt_owner=owner, chatgpt_profile=options.get("chatgpt_profile"),
                 chatgpt_generation=options.get("chatgpt_generation"),
                 chatgpt_cancel=execution_cancel(owner, context.get("execution_id", "")) if options.get("chatgpt_profile") else None,
-            ), images=images, observation=(
+            ), images=images, on_bytes=received_bytes, observation=(
                 ProviderObservationStore(
                     db.engine,
                     limit=max(16 * 1024 * 1024, self.manifest["pipeline"]["prompt_limits"]["max_response_bytes"]),
@@ -544,7 +548,10 @@ class ProductPipelineEffects:
             ) if options.get("developer_capture_provider_io") is True else None)
             record_system_prompt(context, action)
             _increment_stage_stat("submitted")
-            result = transport(action)
+            try:
+                result = transport(action)
+            finally:
+                context.pop("provider_receiving", None)
             if result["tag"] != "provider_failed":
                 _increment_stage_stat("completed")
             elif result["failure"] == "transport_timeout":
@@ -554,6 +561,11 @@ class ProductPipelineEffects:
             metrics = context.setdefault("metrics", {})
             metrics[recorded] = metrics.get(recorded, 0) + int(result["elapsed_ms"])
             _add_provider_usage(context, recorded, getattr(transport, "usage", None))
+            used = getattr(transport, "usage", None) or {}
+            context.setdefault("provider_sends", []).append({
+                "action": action["tag"], "attempt": int(action["identity"]["attempt"]),
+                "input_tokens": used.get("input_tokens"), "output_tokens": used.get("output_tokens"),
+            })
             if result["tag"] == "provider_failed":
                 context["provider_failure"] = {
                     "failure": result["failure"],

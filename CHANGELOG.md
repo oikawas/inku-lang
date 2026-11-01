@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Server and Web: show finished stages, per-send and total tokens, ChatGPT bytes received, and local rendering and saving while drawing.
+
 - Core: add `run_progress` to read the current operation and structured completed stages from a saved pipeline snapshot.
 
 - macOS: show drawing failure reasons in the Web wording, with the cause and attempt count for the corresponding stage.

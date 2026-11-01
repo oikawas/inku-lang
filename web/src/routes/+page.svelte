@@ -2865,6 +2865,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						runTokensIn={work.activeRunTokensIn}
 						runTokensOut={work.activeRunTokensOut}
 						runAttempt={work.activeRunAttempt}
+						runProgress={work.activeRunProgress}
 						{nextStage1Model}
 						{nextStage2Model}
 						{nextCatalogName}

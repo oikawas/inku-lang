@@ -61,6 +61,7 @@
 		runTokensIn: number | null;
 		runTokensOut: number | null;
 		runAttempt?: ProviderAttemptCount | null;
+		runProgress?: import('$lib/paintStream').PaintProgressEvent | null;
 		singleDdlReady: boolean;
 		batchActiveLine: number | null;
 		batchObservedLine: number | null;
@@ -139,6 +140,7 @@
 		runTokensIn,
 		runTokensOut,
 		runAttempt = null,
+		runProgress = null,
 		singleDdlReady,
 		batchActiveLine,
 		batchObservedLine,
@@ -384,6 +386,7 @@
 				tokensIn={runTokensIn}
 				tokensOut={runTokensOut}
 				attempt={runAttempt}
+				progress={runProgress}
 				onStop={onStop}
 			/>
 			</div>

@@ -175,6 +175,9 @@ class PipelineBinding:
             self.plugin_calls = getattr(module, "pipeline_plugin_calls", None)
             # Optional for the same reason; views then carry no attempt.
             self.provider_attempt = getattr(module, "pipeline_provider_attempt", None)
+            # The Python package's public re-exports predate this core entry;
+            # the rebuilt native module already exposes it directly.
+            self.run_progress = getattr(importlib.import_module("inku_render._native"), "pipeline_run_progress", None)
             # Older compatible wheels rebuild the saved DDL without choosing its ranges again.
             self.recompose = getattr(module, "pipeline_recompose", None)
             # The display keeps the complete DDL when this table is unavailable.

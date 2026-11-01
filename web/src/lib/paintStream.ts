@@ -56,6 +56,14 @@ export type PaintAttemptEvent = {
 	elapsed_ms: number;
 };
 
+export type PaintProgressEvent = {
+	event: 'progress';
+	run_progress: { current: { kind: 'provider' | 'local'; action: string } | null; finished: Array<{ action: string; outcome: string; facts: Record<string, string | number | boolean> }> };
+	previous: { action: string; input_tokens: number | null; output_tokens: number | null } | null;
+	total: { input_tokens: number | null; output_tokens: number | null; unreported_sends: number };
+	received_bytes: number | null;
+};
+
 /**
  * What the running indicator counts: this attempt of at most so many. The
  * call's action, when the run reports it, lets the indicator name the
@@ -73,6 +81,7 @@ export type PaintStreamHandlers = {
 	onScore?: (event: PaintScoreEvent) => void;
 	/** A model call began or, with null, the last one ended. */
 	onAttempt?: (event: PaintAttemptEvent) => void;
+	onProgress?: (event: PaintProgressEvent) => void;
 	/**
 	 * Turns an in-band error event into the message the reader sees. The page
 	 * owns that wording (it reads the language pack and the provider failure
@@ -112,6 +121,8 @@ export async function readPaintStream<T>(
 			handlers.onScore?.(event as unknown as PaintScoreEvent);
 		} else if (event.event === 'attempt') {
 			handlers.onAttempt?.(event as unknown as PaintAttemptEvent);
+		} else if (event.event === 'progress') {
+			handlers.onProgress?.(event as unknown as PaintProgressEvent);
 		} else if (event.event === 'error') {
 			throw new Error(handlers.describeError(event.detail, Number(event.status ?? 500)));
 		} else if (event.event === 'done') {

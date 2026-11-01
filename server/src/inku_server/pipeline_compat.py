@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import queue
+import threading
 import time
 from collections.abc import Callable, Iterator
 from typing import Any
@@ -399,6 +401,30 @@ def _progress(owner: str, view: dict, started: float, sent: set[str]) -> Iterato
     """Each layer that has settled in this view and has not been reported yet,
     then the provider attempt when it has changed."""
     elapsed = int((time.monotonic() - started) * 1000)
+    run = _service().execution(owner, view["execution_id"])
+    projection = getattr(getattr(run, "binding", None), "run_progress", None)
+    if projection is not None:
+        progress = json.loads(projection(json.dumps(run.snapshot(), ensure_ascii=False).encode())).get("run_progress")
+        if progress is not None:
+            context = run.context
+            sends = list(context.get("provider_sends", []))
+            from .pipeline_product import usage_result
+            usage = context.get("provider_usage") or {}
+            totals = usage_result(usage)
+            previous = ({key: sends[-1][key] for key in ("action", "input_tokens", "output_tokens")}
+                        if sends else None)
+            receiving = context.get("provider_receiving")
+            event = {"event": "progress", "run_progress": progress, "previous": previous,
+                     "total": {"input_tokens": totals["tokens_in"], "output_tokens": totals["tokens_out"],
+                               "unreported_sends": sum(entry["unreported_sends"] for entry in usage.values())},
+                     "received_bytes": receiving.get("bytes") if receiving else None}
+            key = "progress:" + json.dumps(event, sort_keys=True, ensure_ascii=False)
+            old = next((item for item in sent if item.startswith("progress:")), None)
+            if key != old:
+                if old is not None:
+                    sent.remove(old)
+                sent.add(key)
+                yield event
     sketch = view.get("sketch") or {}
     if "sketch" not in sent and sketch.get("state") in _SKETCH_SETTLED:
         sent.add("sketch")
@@ -462,7 +488,35 @@ def paint_events(owner: str, data: dict[str, Any], idempotency_key: str | None) 
                 yield {"event": "wait", "elapsed_ms": int((last_line - started) * 1000)}
             time.sleep(_POLL_SECONDS)
             view = service.get(owner, view["variation_id"])
-        view = _settled(owner, view, perform=True)
+        if view.get("delivery") is None or view.get("result") is not None:
+            view = _settled(owner, view, perform=True)
+        else:
+            # Rendering and persistence are synchronous host work. Run them in a
+            # worker so the stream can name both operations before they begin.
+            run = service.execution(owner, view["execution_id"])
+            messages = queue.Queue()
+            run.performance_save_observer = lambda: messages.put(("local", "save"))
+            def perform():
+                try:
+                    messages.put(("result", _settled(owner, view, perform=True)))
+                except Exception as error:
+                    messages.put(("error", error))
+                finally:
+                    run.performance_save_observer = None
+            latest = next((item for item in sent if item.startswith("progress:")), None)
+            base = json.loads(latest.removeprefix("progress:")) if latest else None
+            if base is not None:
+                yield {**base, "run_progress": {**base["run_progress"], "current": {"kind": "local", "action": "render"}}}
+            threading.Thread(target=perform, daemon=True).start()
+            while True:
+                kind, value = messages.get()
+                if kind == "local" and base is not None:
+                    yield {**base, "run_progress": {**base["run_progress"], "current": {"kind": "local", "action": value}}}
+                elif kind == "error":
+                    raise value
+                elif kind == "result":
+                    view = value
+                    break
         yield from _progress(owner, view, started, sent)
     except GeneratorExit:
         _end_abandoned_run(owner, view)

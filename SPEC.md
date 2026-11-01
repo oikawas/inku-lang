@@ -2260,6 +2260,8 @@ implementation order.
 
 ### 12.10 Handling Latency
 
+`POST /api/paint/stream` also emits `progress` when its content changes: core `run_progress` (current work and finished stages), the last completed send in `previous`, token totals and the number of unreported sends in `total`, and `received_bytes` only while receiving a ChatGPT plan response. Final rendering and saving are reported as local work. This display does not change the usage columns saved with a work.
+
 `POST /api/paint/stream` reports finite progress as `sketch` (when the sketch
 layer ran), `stage1`, `score`, and `done`. It also sends `attempt` whenever a
 model-call attempt begins and once the last one has ended; its

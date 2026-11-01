@@ -8,6 +8,8 @@
 
 ## 未リリース
 
+- Server・Web：描画中の完了した段、送信ごとの token と合計、ChatGPT の受信量、描画・保存の作業を表示する。
+
 - core：保存した pipeline snapshot から、進行中の処理と完了した段の構造化情報を読む `run_progress` を追加する。
 
 - macOS：描画失敗時に core の理由を Web と同じ文で表示し、対応する段の失敗原因と試行回数を添える。

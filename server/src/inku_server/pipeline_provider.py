@@ -74,7 +74,8 @@ def resolved_drawing_model(model: str | None, actor: dict | None) -> str:
 class SingleAttemptProvider:
     def __init__(self, options: ProviderOptions, *, transport: httpx.AsyncBaseTransport | None = None,
                  observation: tuple[ProviderObservationStore, str, str] | None = None,
-                 rate_budget: ProviderRateBudget | None = None, images: list[str] | None = None):
+                 rate_budget: ProviderRateBudget | None = None, images: list[str] | None = None,
+                 on_bytes=None):
         if options.max_tokens <= 0 or options.max_response_bytes <= 0:
             raise ValueError("positive provider limits required")
         self.options = options
@@ -82,6 +83,7 @@ class SingleAttemptProvider:
         self.observation = observation
         self.rate_budget = rate_budget
         self.images = list(images) if images is not None else None
+        self.on_bytes = on_bytes
         self.failure_detail: str | None = None
         self._observation_truncated = False
 
@@ -133,7 +135,7 @@ class SingleAttemptProvider:
                     model, action, started + timeout, self.options.max_response_bytes, self.options.chatgpt_cancel,
                     (self.observation[0], self.observation[2]) if self.observation else None,
                     purpose="vision" if action["tag"] in provider_wire.IMAGE_EFFECTS else "llm",
-                    images=self.images, transport=self.transport, usage=chatgpt_usage,
+                    images=self.images, transport=self.transport, usage=chatgpt_usage, on_bytes=self.on_bytes,
                 ))
             else:
                 connection = connection_for(provider_id, self.options.settings)

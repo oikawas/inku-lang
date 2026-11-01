@@ -163,7 +163,7 @@ async def catalog(owner: str, profile_id: str, generation: int, deadline: float,
 async def request(owner: str, profile_id: str, generation: int, model: str, action: dict, deadline: float,
                   limit: int, cancel=None, observation=None, *, purpose: str = "llm",
                   transport: httpx.AsyncBaseTransport | None = None, images: list[str] | None = None,
-                  usage: list | None = None) -> str:
+                  usage: list | None = None, on_bytes=None) -> str:
     image_effect = auth_policy("operation", purpose=purpose, tag=action["tag"])["image_effect"]
 
     def capture_body(body: bytes) -> bytes:
@@ -214,6 +214,8 @@ async def request(owner: str, profile_id: str, generation: int, model: str, acti
                                 raw.extend(content)
                             raise response_error(json.loads(content), status, response.headers.get("x-request-id"))
                         iterator = response.aiter_bytes()
+                        received = 0
+                        reported = 0
                         while True:
                             try:
                                 chunk = await guarded(anext(iterator), check, deadline)
@@ -222,6 +224,10 @@ async def request(owner: str, profile_id: str, generation: int, model: str, acti
                             if observation:
                                 raw.extend(chunk[:max(0, decoder.wire_limit + 1 - len(raw))])
                             decoder.feed(chunk)
+                            received += len(chunk)
+                            if on_bytes is not None and received // 4096 > reported // 4096:
+                                reported = received
+                                on_bytes(received)
                         check()
                         return decoder.finish()
                     finally:

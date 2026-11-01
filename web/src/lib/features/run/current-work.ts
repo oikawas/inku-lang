@@ -168,6 +168,7 @@ export type CurrentWorkCapabilities = {
 	adoptPipelineView?: (view: PipelineView) => void;
 	/** The model call being waited on; null once there is none. */
 	setProviderAttempt?: (attempt: ProviderAttemptCount | null) => void;
+	setProgress?: (progress: import('../../paintStream.ts').PaintProgressEvent | null) => void;
 };
 
 export type CurrentWorkResult = { ddl: string; thinking: string | null } & PaintResult;
@@ -257,6 +258,7 @@ export async function runCurrentWork(
 	try {
 		result = await readPaintStream<CurrentWorkResult>(response, {
 			describeError: capabilities.describeApiError,
+			onProgress: (event) => capabilities.setProgress?.(event),
 			onAttempt: (event) => capabilities.setProviderAttempt?.(event.provider_attempt),
 			...paintStageHandlers(defaults.strings, capabilities.setStageLabel, {
 				sketchOn,
@@ -269,6 +271,7 @@ export async function runCurrentWork(
 		});
 	} finally {
 		capabilities.setProviderAttempt?.(null);
+		capabilities.setProgress?.(null);
 	}
 
 	capabilities.setActiveRunTokens(null, null);

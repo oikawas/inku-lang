@@ -291,6 +291,7 @@ internal class SaijikiV3Migration(
                 val locks = link?.let { documentLocks(it.catalogLocks) } ?: JSONArray()
                 val definitions = link?.let { locked(it.definitions, locks) }.orEmpty()
                 val migratedTexts = linkedMapOf<String, String>()
+                var recovered = emptyList<JSONObject>()
                 var refusedWork = false
                 if (DdlSource.hasBody(ddl)) {
                     val source = checkNotNull(ddl)
@@ -302,6 +303,7 @@ internal class SaijikiV3Migration(
                     if (answer == null) {
                         refusedWork = true
                     } else {
+                        recovered = answer.optJSONArray("recovered_definitions")?.objects().orEmpty()
                         val migratedSource = answer.getJSONObject("document").getString("source")
                         if (migratedSource != source) migratedTexts["ddl"] = migratedSource
                     }
@@ -320,6 +322,18 @@ internal class SaijikiV3Migration(
                         }
                         linkDefinitions += answer.get("definition")
                     }
+                    for (entry in recovered) {
+                        val definition = entry.get("definition")
+                        val existing = link.definitions.indexOfFirst {
+                            definitionAnswer(it).optString("qualified_name") == entry.optString("qualified_name")
+                        }
+                        if (existing >= 0) {
+                            // The saved lock selected the recovered content, not the mismatched supplied copy.
+                            linkDefinitions[existing] = definition
+                        } else if (linkDefinitions.none { LineagePlanner.canonicalJson(it) == LineagePlanner.canonicalJson(definition) }) {
+                            linkDefinitions += definition
+                        }
+                    }
                 }
                 if (refusedWork) {
                     // A work is one unit with its link: the link's digest binds it to the instructions.
@@ -332,7 +346,7 @@ internal class SaijikiV3Migration(
                     count("history", "rows_written")
                 }
                 if (link != null) {
-                    linkStatement(link, linkDefinitions, newDdl)?.let {
+                    linkStatement(link, linkDefinitions, newDdl, recovered)?.let {
                         statements += it
                         count("history_links", "written")
                     }
@@ -372,9 +386,8 @@ internal class SaijikiV3Migration(
     }
 
     /** Rewrite one frozen fork context: its definitions, its locks, and the work's digest. */
-    private fun linkStatement(link: Link, definitions: List<Any>, ddl: String?): Pair<String, Array<Any?>>? {
-        val moved = link.definitions.associate { definition ->
-            val answer = definitionAnswer(definition)
+    private fun linkStatement(link: Link, definitions: List<Any>, ddl: String?, recovered: List<JSONObject> = emptyList()): Pair<String, Array<Any?>>? {
+        val moved = (link.definitions.map(::definitionAnswer) + recovered).associate { answer ->
             Triple(answer.optString("qualified_name"), answer.optString("version"), answer.optString("old_digest").removePrefix("sha256:")) to answer.optString("digest")
         }
         val locks = JSONArray()
@@ -392,6 +405,15 @@ internal class SaijikiV3Migration(
         val config = context.optJSONObject("config") ?: JSONObject()
         if (definitions.isNotEmpty() || config.has("definitions")) {
             config.put("definitions", JSONArray(definitions))
+        }
+        if (definitions.size > link.definitions.size) {
+            val summaries = config.optJSONArray("macro_summaries") ?: JSONArray()
+            while (summaries.length() < definitions.size) {
+                val definition = definitions[summaries.length()] as? JSONObject
+                summaries.put(definition?.optString("heading")?.takeIf { it.isNotEmpty() }
+                    ?: definition?.optString("id").orEmpty())
+            }
+            config.put("macro_summaries", summaries)
         }
         context.put("config", config)
         context.put("macro_catalog", (context.optJSONObject("macro_catalog") ?: JSONObject()).put("definition_locks", locks))

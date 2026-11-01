@@ -1,8 +1,33 @@
 import Foundation
+import InkuCore
 import Testing
 @testable import InkuHost
 
 struct DDLPackageMigrationTests {
+    @Test func importAdoptsRecoveredDefinitionsFromCoreAnswer() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let table = try ExactJSON(data: Data(contentsOf: root.appendingPathComponent("core/crates/inku-pipeline-uniffi/assets/nature-historical-definitions.json")))
+        let definitions = try #require(table["definitions"].array)
+        let initial = try ExactJSON(data: InkuCore.migrateSaijikiV2(ExactJSON.object(["definitions": .array([definitions[14]])]).data))
+        let identity = try #require(initial["definitions"].array?.first)
+        let lock: ExactJSON = .object(["qualified_name": identity["qualified_name"], "version": identity["version"], "digest": identity["old_digest"]])
+        let request: ExactJSON = .object(["definitions": .array([]), "document": .object(["source": .string("｛若葉｝。"), "language": .string("ja"), "macro_locks": .array([lock]), "saijiki": .string("inku.saijiki.v2")])])
+        let response = InkuCore.migrateSaijikiV2(request.data)
+        let recovered = try ExactJSON(data: response)["document"]["recovered_definitions"].array
+        #expect(recovered?.count == 1)
+        let file: ExactJSON = .object(["schema": .string("inku.ddl-export.v2"), "language": .string("ja"), "ddl": .string("｛若葉｝。"), "plugins": .array([])])
+        var call = 0
+        let result = try DDLPackageImport.parse(file.data) { input in
+            call += 1
+            return call == 1 ? InkuCore.migrateSaijikiV2(input) : response
+        }
+        #expect(call == 2)
+        #expect(result.plugins.count == 1)
+        #expect(result.plugins.first?.definition == recovered?.first?["definition"])
+        #expect(result.plugins.first?.note == "")
+    }
+
     @Test func legacyPackageMigratesBundledDefinitionBeforeResolvingCatalog() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()

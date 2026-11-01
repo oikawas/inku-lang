@@ -57,6 +57,10 @@ public struct DDLPackageImport: Sendable, Equatable {
     }
 
     public static func parse(_ data: Data) throws -> Self {
+        try parse(data, migrate: InkuCore.migrateSaijikiV2)
+    }
+
+    static func parse(_ data: Data, migrate: (Data) -> Data) throws -> Self {
         try Task.checkCancellation()
         guard data.count <= maximumBytes else { throw HostError("ddl_import_too_large") }
         guard let text = String(data: data, encoding: .utf8) else { throw HostError("ddl_import_invalid_utf8") }
@@ -79,7 +83,7 @@ public struct DDLPackageImport: Sendable, Equatable {
         var migratedEdits: Int?
         if file.object?["saijiki"] == nil {
             let definitions = plugins.map(\.definition)
-            let first = try ExactJSON(data: InkuCore.migrateSaijikiV2(ExactJSON.object(["definitions": .array(definitions)]).data))
+            let first = try ExactJSON(data: migrate(ExactJSON.object(["definitions": .array(definitions)]).data))
             guard first["error"] == .null, let entries = first["definitions"].array,
                   entries.count == definitions.count else { throw HostError("ddl_export_invalid") }
             let locks: [ExactJSON] = try entries.map { entry in
@@ -93,16 +97,19 @@ public struct DDLPackageImport: Sendable, Equatable {
             let request: ExactJSON = .object(["definitions": .array(definitions), "document": .object([
                 "source": .string(source), "language": .string(resolvedLanguage), "macro_locks": .array(locks),
                 "saijiki": .string("inku.saijiki.v2")])])
-            let result = try ExactJSON(data: InkuCore.migrateSaijikiV2(request.data))
+            let result = try ExactJSON(data: migrate(request.data))
             guard result["error"] == .null, result["document"]["error"] == .null,
                   let migratedSource = result["document"]["document"]["source"].string,
                   let edits = result["document"]["edits"].array, let entries = result["definitions"].array,
-                  entries.count == plugins.count, entries.allSatisfy({ $0["error"] == .null && $0["definition"].object != nil }) else {
+                  let recovered = result["document"]["recovered_definitions"].array,
+                  entries.count == plugins.count, entries.count + recovered.count <= maximumPlugins,
+                  (entries + recovered).allSatisfy({ $0["error"] == .null && $0["definition"].object != nil && $0["digest"].string != nil }) else {
                 throw HostError("ddl_export_invalid")
             }
             outputSource = migratedSource
             migratedEdits = edits.count
             plugins = zip(entries, plugins).map { ImportedMacroDefinition(definition: $0.0["definition"], note: $0.1.note) }
+            plugins += recovered.map { ImportedMacroDefinition(definition: $0["definition"], note: "") }
         } else if file["saijiki"].string != "inku.saijiki.v3" {
             throw HostError("ddl_export_invalid")
         }

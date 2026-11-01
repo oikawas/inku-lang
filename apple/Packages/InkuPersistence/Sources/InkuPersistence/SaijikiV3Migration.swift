@@ -49,7 +49,9 @@ enum SaijikiV3Migration {
             if let error = entries.compactMap({ $0["error"] as? [String: Any] }).first {
                 refuse(error["code"] as? String ?? "definition_refused"); continue
             }
-            guard let output = doc["document"] as? [String: Any], let newSource = output["source"] as? String,
+            guard let recovered = doc["recovered_definitions"] as? [[String: Any]],
+                  recovered.allSatisfy({ $0["error"] == nil && $0["definition"] is [String: Any] && $0["digest"] is String }),
+                  let output = doc["document"] as? [String: Any], let newSource = output["source"] as? String,
                   let locks = output["macro_locks"] as? [[String: Any]],
                   let edits = doc["edits"] as? [[String: Any]], let tools = doc["unassociated_tools"] as? [[String: Any]],
                   let sweeps = doc["unassociated_sweeps"] as? [[String: Any]],
@@ -57,12 +59,17 @@ enum SaijikiV3Migration {
                   entries.count == originalCount,
                   entries.allSatisfy({ $0["definition"] is [String: Any] }),
                   let newDocument = try value(db, answer, "$.document.document"),
-                  let newDefinitions = try String.fetchOne(db, sql: "SELECT json_group_array(json_extract(value, '$.definition')) FROM json_each(CAST(? AS TEXT), '$.definitions')", arguments: [answer]) else {
+                  let newDefinitions = try String.fetchOne(db, sql: """
+                    SELECT json_group_array(json(definition)) FROM (
+                        SELECT json_extract(value, '$.definition') AS definition FROM json_each(CAST(? AS TEXT), '$.definitions')
+                        UNION ALL
+                        SELECT json_extract(value, '$.definition') AS definition FROM json_each(CAST(? AS TEXT), '$.document.recovered_definitions')
+                    )
+                    """, arguments: [answer, answer]) else {
                 refuse("invalid_core_response"); continue
             }
-            // The core can move a historical lock without returning that definition.
-            // Do not save a v3 context that cannot supply its new digest to compilation.
-            let returnedDigests = Set(entries.compactMap { $0["digest"] as? String })
+            // Check the identity returned by core; never bind a lock by name or version here.
+            let returnedDigests = Set((entries + recovered).compactMap { $0["digest"] as? String })
             guard locks.allSatisfy({ lock in
                 guard let digest = lock["digest"] as? String else { return false }
                 return returnedDigests.contains(digest)
@@ -84,7 +91,7 @@ enum SaijikiV3Migration {
             }
             if !tools.isEmpty { unassociatedTools.append(["id": id, "spans": tools]) }
             if !sweeps.isEmpty { unassociatedSweeps.append(["id": id, "spans": sweeps]) }
-            for entry in entries {
+            for entry in entries + recovered {
                 if let paths = entry["unadjusted_thinness"] as? [String], !paths.isEmpty {
                     unadjusted.append(["id": id, "qualified_name": entry["qualified_name"] ?? "", "version": entry["version"] ?? "", "paths": paths])
                 }

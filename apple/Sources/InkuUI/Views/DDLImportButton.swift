@@ -65,7 +65,7 @@ final class DDLImportController {
                 self.appliedNames = Set(model.importedMacroNames)
                 self.message = imported.names.isEmpty ? "DDLを読み込みました。" : "この新しい作品に定義を持ち込みます: " + imported.names.joined(separator: ", ")
                 if let count = imported.migratedEdits {
-                    self.message += " " + model.display.localizedFormat("旧い歳時記から %@ 箇所を書き換えました。", String(count))
+                    self.message += " " + model.display.webCopyFormat("ddlImportMigrated", "旧い歳時記から %@ 箇所を書き換えました。", count)
                 }
                 // Navigation guards include isReading; release it before the success callback.
                 self.isReading = false

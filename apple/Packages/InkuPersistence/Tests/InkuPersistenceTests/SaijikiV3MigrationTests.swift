@@ -5,7 +5,7 @@ import Testing
 @testable import InkuPersistence
 
 struct SaijikiV3MigrationTests {
-    @Test func missingHistoricalDefinitionIsPreservedWhenCoreReturnsOnlyLock() async throws {
+    @Test func recoversHistoricalDefinitionAndPreservesUnknownDigest() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-v7-missing-definition-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
@@ -27,7 +27,11 @@ struct SaijikiV3MigrationTests {
         let answer = try #require(JSONSerialization.jsonObject(with: InkuCore.migrateSaijikiV2(request)) as? [String: Any])
         #expect((answer["document"] as? [String: Any])?["error"] == nil)
         #expect((answer["definitions"] as? [Any])?.isEmpty == true)
+        #expect(((answer["document"] as? [String: Any])?["recovered_definitions"] as? [Any])?.count == 1)
         let ack = try JSONSerialization.data(withJSONObject: ["work_id": "historical", "performance": ["document": document, "configuration": ["definitions": []]]])
+        var unknownLock = lock; unknownLock["digest"] = "sha256:" + String(repeating: "0", count: 64)
+        var unknownDocument = document; unknownDocument["macro_locks"] = [unknownLock]
+        let unknownAck = try JSONSerialization.data(withJSONObject: ["work_id": "unknown", "performance": ["document": unknownDocument, "configuration": ["definitions": []]]])
         let payload = try JSONSerialization.data(withJSONObject: ["work": ["ddl": source]])
         let resources = package.appendingPathComponent("Sources/InkuPersistence/Resources")
         let old = try DatabaseQueue(path: file.path)
@@ -38,18 +42,42 @@ struct SaijikiV3MigrationTests {
             try db.execute(sql: "INSERT INTO history (id, at, input, ddl, score, svg) VALUES ('historical', 1, 'fixture', ?, '{}', '<svg/>')", arguments: [source])
             try db.execute(sql: "INSERT INTO execution_snapshots (id, revision, snapshot) VALUES ('historical', 0, ?)", arguments: [Data("history".utf8)])
             try db.execute(sql: "INSERT INTO effect_acknowledgements (execution_id, effect_id, revision, snapshot, acknowledgement, save_payload) VALUES ('historical', 'save', 0, ?, ?, ?)", arguments: [Data("history".utf8), ack, payload])
+            try db.execute(sql: "INSERT INTO history (id, at, input, ddl, score, svg) VALUES ('unknown', 1, 'fixture', ?, '{}', '<svg/>')", arguments: [source])
+            try db.execute(sql: "INSERT INTO execution_snapshots (id, revision, snapshot) VALUES ('unknown', 0, ?)", arguments: [Data("history".utf8)])
+            try db.execute(sql: "INSERT INTO effect_acknowledgements (execution_id, effect_id, revision, snapshot, acknowledgement, save_payload) VALUES ('unknown', 'save', 0, ?, ?, ?)", arguments: [Data("history".utf8), unknownAck, payload])
         }
         try old.close()
         let migrated = try InkuDatabase(url: file)
         #expect(try await migrated.work(id: "historical")?.ddl == source)
+        #expect(try await migrated.work(id: "unknown")?.ddl == source)
         let reader = try DatabaseQueue(path: file.path)
-        let savedAck = try await reader.read { try Data.fetchOne($0, sql: "SELECT acknowledgement FROM effect_acknowledgements WHERE execution_id='historical'") }
-        #expect(savedAck == ack)
+        let savedAck = try #require(try await reader.read { try Data.fetchOne($0, sql: "SELECT acknowledgement FROM effect_acknowledgements WHERE execution_id='historical'") })
+        let unchangedAck = try await reader.read { try Data.fetchOne($0, sql: "SELECT acknowledgement FROM effect_acknowledgements WHERE execution_id='unknown'") }
+        #expect(unchangedAck == unknownAck)
+        let parsed = try #require(JSONSerialization.jsonObject(with: savedAck) as? [String: Any])
+        let performance = try #require(parsed["performance"] as? [String: Any])
+        let migratedDocument = try #require(performance["document"] as? [String: Any])
+        let configuration = try #require(performance["configuration"] as? [String: Any])
+        let savedDefinitions = try #require(configuration["definitions"] as? [[String: Any]])
+        #expect(savedDefinitions.count == 1)
+        #expect(migratedDocument["saijiki"] as? String == "inku.saijiki.v3")
+        let registry = try #require(JSONSerialization.jsonObject(with: InkuCore.canvasRegistry) as? [String: Any])
+        let registryDigest = try #require(registry["digest"] as? String)
+        let seed = "42"
+        let paletteInput = try JSONSerialization.data(withJSONObject: ["color_map": [:], "catalog_id": "default", "render_seed": seed, "background": "white"])
+        let palette = try #require(JSONSerialization.jsonObject(with: InkuCore.resolvePalette(paletteInput)) as? [String: Any])
+        let budget: [String: Any] = ["maximum": ["logical_objects": 400, "primitive_marks": 400, "object_templates": 64, "maximum_per_template_primitive_marks": 240, "maximum_resolved_count": 2000, "template_nodes": 512, "anchor_instances": 400, "transform_instances": 400, "placement_instances": 400, "fill_instances": 400]]
+        let compiler: [String: Any] = ["host": ["canvas_format_id": "square", "canvas_format_registry_id": "inku.canvas-format-registry.v1", "canvas_format_registry_digest": registryDigest, "resolved_catalog_id": "default", "catalog_mode": "default", "background": "white", "palette": palette], "composition_seed": seed, "macro_expansion_limits": ["max_invocations": "64", "max_depth": "16", "max_evaluation_steps": "8192", "max_nodes_per_invocation": "128", "max_total_nodes": "512"], "stage15_variation": NSNull(), "error_policy": "omit_and_continue", "hard_resource_policy": ["identity": "test.historical-v7", "budget": budget], "operational_resource_budget": budget]
+        let compileInput = try JSONSerialization.data(withJSONObject: ["document": migratedDocument, "definitions": savedDefinitions, "compiler": compiler])
+        let compiled = try #require(JSONSerialization.jsonObject(with: InkuCore.compile(compileInput)) as? [String: Any])
+        #expect(compiled["score"] is [String: Any])
+        #expect(compiled["outcome"] as? String != "stopped")
         try reader.close()
         let files = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
         let reportURL = try #require(files.first { $0.lastPathComponent.hasPrefix(".inku-saijiki-v3-v7-") })
         let report = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: reportURL)) as? [String: Any])
-        #expect((report["refused"] as? [[String: String]])?.first?["reason"] == "migrated_definition_not_returned")
+        #expect((report["refused"] as? [[String: String]])?.first?["id"] == "unknown")
+        #expect((report["refused"] as? [[String: String]])?.first?["reason"] == "definition_not_supplied")
     }
 
     /// Only an explicitly named disposable SQLite backup may be passed here.

@@ -2,7 +2,7 @@
   "schema": "inku.apple-ui-reference.v1",
   "version": "v2.15.298",
   "build": "1374",
-  "buildDate": "2026-11-01T00:32:16.155Z",
+  "buildDate": "2026-11-01T00:41:22.219Z",
   "versions": {
     "ddlSpec": "29",
     "ddlEngine": "75",
@@ -1605,7 +1605,8 @@
         "historyReplayVersionMismatch": "この作品は engine %@ で描かれました。いま画面にあるのは engine %@ による描き直しです。",
         "historyReplayVersionNotRecorded": "この作品を描いた engine の版は記録されていません。いま画面にあるのは engine %@ による描き直しです。",
         "replayComparisonProvisionalSeed": "Seedを補完した暫定表示（seed: %@）",
-        "provenanceTokenSends": "送信 %@ 回"
+        "provenanceTokenSends": "送信 %@ 回",
+        "ddlImportMigrated.one": "旧い歳時記から %@ 箇所を書き換えました。"
       },
       "dynamicKeys": [
         "imageFolderSummary",
@@ -3350,7 +3351,8 @@
         "historyReplayVersionMismatch": "This work was performed by engine %@. What you see now is a new impression by engine %@.",
         "historyReplayVersionNotRecorded": "The engine that performed this work was not recorded. What you see now is a new impression by engine %@.",
         "replayComparisonProvisionalSeed": "Provisional display with a supplemented seed (seed: %@)",
-        "provenanceTokenSends": "%@ sends"
+        "provenanceTokenSends": "%@ sends",
+        "ddlImportMigrated.one": "Migrated %@ change from the older Saijiki."
       },
       "dynamicKeys": [
         "imageFolderSummary",
@@ -4250,7 +4252,7 @@
     }
   },
   "source": {
-    "commit": "82fe45c47bbc781f4ac0668cb39a55b203862dfd",
+    "commit": "22ab44419fb3267a11d98f108b927464a86e00f7",
     "files": {
       "web/src/lib/plugins/system/canvas-aspect/index.ts": "51431fe06ed38cfb11f7e08a87b85b68dacdeda646525242fb561c234cf0c9ff",
       "web/src/routes/+page.svelte": "ce49f36f444e2fdb516c8c665c236b9264818bead3f451c7cc439367388b3f2f",

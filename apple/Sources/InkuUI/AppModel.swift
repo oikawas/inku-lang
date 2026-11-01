@@ -1038,7 +1038,7 @@ public final class AppModel {
         macroDiagnostics = try Self.pretty(catalog.data)
         status = "DDLを読み込みました。生成して保存できます。"
         if let count = value.migratedEdits {
-            status += " " + display.label("旧い歳時記から \(count) 箇所を書き換えました。", "Migrated \(count) changes from the older Saijiki.")
+            status += " " + display.webCopyFormat("ddlImportMigrated", "旧い歳時記から %@ 箇所を書き換えました。", count)
         }
     }
 

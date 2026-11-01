@@ -436,7 +436,9 @@
 # 75: The five new touch words lower to the Score 0.24.0 weights gouache,
 # watercolor, oil_pastel, painting_knife and etching; a Score that uses none
 # of them keeps its edition. They are performed by render engine 95.
-DDL_ENGINE_VERSION = "75"
+# 76: Color and tool phrases with Japanese で and English with or in bind to
+# the shape when a clause contains exactly one shape.
+DDL_ENGINE_VERSION = "76"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write
@@ -522,4 +524,6 @@ DDL_ENGINE_VERSION = "75"
 # ペインティングナイフ painting knife, エッチング etching, コンピュータ computer.
 # ロットリング, クレヨン, 細筆, 太筆, ビュラン and ドライポイント are no longer read;
 # saved documents and Macro definitions move once (SPEC §3.3).
-DDL_VERSION = "29"
+# 30 (2026-11-01): Color and tool phrases may use Japanese で or English with
+# and in, binding to the shape when a clause contains exactly one shape.
+DDL_VERSION = "30"

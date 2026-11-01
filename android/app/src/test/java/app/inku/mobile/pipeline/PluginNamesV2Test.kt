@@ -1,6 +1,6 @@
 package app.inku.mobile.pipeline
 
-import app.inku.mobile.data.db.SaijikiV1Migration
+import app.inku.mobile.data.db.SaijikiV3Migration
 import app.inku.mobile.data.db.productFile
 import org.json.JSONArray
 import org.json.JSONObject
@@ -29,7 +29,7 @@ class PluginNamesV2Test {
         val entries = catalog.getJSONArray("entries")
         val definitions = JSONArray().also { out -> for (i in 0 until entries.length()) out.put(entries.getJSONObject(i).getJSONObject("definition")) }
         val input = JSONObject().put("source", "😀｛若葉｝。｛未登録の語｝。").put("language", "ja")
-            .put("definitions", definitions).put("locks", SaijikiV1Migration.documentLocks(catalog.getJSONArray("locks")))
+            .put("definitions", definitions).put("locks", SaijikiV3Migration.documentLocks(catalog.getJSONArray("locks")))
             .put("compiler", JSONObject.NULL).put("plugin_names", JSONArray(pluginNameEntries(words, true)))
             .put("enabled", JSONArray(words.map { it.qualifiedName }))
         val output = JSONObject(NativePipelineBridge.pluginCalls(input.toString().toByteArray()).decodeToString())

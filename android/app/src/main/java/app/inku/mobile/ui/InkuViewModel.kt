@@ -207,7 +207,7 @@ data class InkuUiState(
     val historyDescriptionLocked: Boolean? = null,
     val historyAuthorityLoading: Boolean = false,
     val descriptionForkRequested: Boolean = false,
-    val batchText: String = "赤い円を5個、横に並べる\n黒い太筆の線を3本、斜めに置く\n緑の四角を12個、散らす",
+    val batchText: String = "赤い円を5個、横に並べる\n黒いガッシュの線を3本、斜めに置く\n緑の四角を12個、散らす",
     val batchPromptHistory: List<String> = emptyList(),
     val batchTotal: Int = 0,
     val batchCurrent: Int = 0,
@@ -1576,7 +1576,10 @@ class InkuViewModel @JvmOverloads constructor(
             historyDescriptionLocked = null,
             importedPlugins = parsed.plugins,
             importedPluginNames = parsed.names,
-            message = if (parsed.names.isEmpty()) null else strings().ddlImportedPlugins(parsed.names.joinToString(", ")),
+            message = listOfNotNull(
+                parsed.names.takeIf { it.isNotEmpty() }?.let { strings().ddlImportedPlugins(it.joinToString(", ")) },
+                parsed.migratedChanges.takeIf { it > 0 }?.let { strings().ddlImportMigrated(it) },
+            ).joinToString(" ").ifEmpty { null },
         )
         return true
     }

@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Android: migrate saved Saijiki v1/v2 records transactionally to v3 through shared core JNI, preserving saved Scores/SVGs and matching frozen locks by original digest. Portable DDL imports migrate v2 exports and report edit counts; exports name v3. Vocabulary previews now show the eleven current tools.
+
 ### 2026-11-01 — Saijiki migration of locks without a saved definition
 
 For old works that kept a lock without saving its definition, the shared core now holds the built-in Nature definitions earlier releases shipped (the same table as the Server's). The Saijiki migration entries move such a lock to a definition of that table only when no supplied definition matches and the table's definition has the lock's digest; a name and version alone never choose one. The entries' input and output are unchanged.

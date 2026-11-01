@@ -43,7 +43,7 @@ class HistoryDdlUnifiedMigrationTest {
                 )
             }
             host.db.execSQL("INSERT INTO lineage_nodes(id, history_id, state, at) VALUES ('root', 'null-transfer', 'active', 7)")
-            host.db.execSQL("INSERT INTO app_settings(key, value_json, updated_at) VALUES (?, '{\"kept\":true}', 8)", arrayOf(SaijikiV1Migration.DONE_SETTING))
+            host.db.execSQL("INSERT INTO app_settings(key, value_json, updated_at) VALUES (?, '{\"kept\":true}', 8)", arrayOf(SaijikiV3Migration.DONE_SETTING))
             val objectsBefore = host.rows("SELECT type, name, sql FROM sqlite_master WHERE type IN ('index', 'trigger') AND sql IS NOT NULL ORDER BY name")
             val otherTables = entities.filter { it != history }.associate { entity ->
                 val table = entity.getString("tableName")
@@ -96,7 +96,7 @@ class HistoryDdlUnifiedMigrationTest {
                 assertEquals(signature(host), signature(fresh))
             }
             // Already-completed Saijiki migration must keep its marker and every work.
-            val alreadyMoved = SaijikiV1Migration({ error("already migrated") }, discardExecutions = true)
+            val alreadyMoved = SaijikiV3Migration({ error("already migrated") }, discardExecutions = true)
             assertNull(alreadyMoved.runOnce(host.db))
         }
     }
@@ -112,7 +112,7 @@ class HistoryDdlUnifiedMigrationTest {
             )
             InkuDatabase.MIGRATION_13_14.migrate(host.db)
             val calls = mutableListOf<String>()
-            val migration = SaijikiV1Migration({ bytes ->
+            val migration = SaijikiV3Migration({ bytes ->
                 val source = JSONObject(bytes.toString(Charsets.UTF_8)).getJSONObject("document").getString("source")
                 calls += source
                 JSONObject().put("document", JSONObject().put("document", JSONObject().put("source", "current word")))

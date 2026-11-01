@@ -2,6 +2,7 @@ package app.inku.mobile.data
 
 import app.inku.mobile.pipeline.ImportedPluginDefinition
 import app.inku.mobile.pipeline.InstructionLanguages
+import app.inku.mobile.pipeline.NativePipelineBridge
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
@@ -45,6 +46,7 @@ object DdlExport {
         }
         return DdlSource.putJson(JSONObject(), source, ddlSourceOrigin)
             .put("schema", SCHEMA)
+            .put("saijiki", "inku.saijiki.v3")
             .put("language", language)
             .put("plugins", plugins)
             .put("exported_from", exportedFrom)
@@ -56,6 +58,7 @@ object DdlExport {
         /** Canonical names of the carried plugins, for the author-facing notice. */
         val names: List<String>,
         val ddlSourceOrigin: String? = null,
+        val migratedChanges: Int = 0,
     )
 
     /** Any text that is not an export -- JSON or not -- is the author's DDL as written. */
@@ -71,7 +74,43 @@ object DdlExport {
         require(file.has("ddl") || file.has("normalized_ddl") || file.has("expanded_ddl")) {
             "ddl_export_without_ddl"
         }
-        val selected = DdlSource.fromJson(file)
+        var selected = DdlSource.fromJson(file)
+        var migratedChanges = 0
+        val edition = file.optString("saijiki")
+        require(edition.isEmpty() || edition == "inku.saijiki.v2" || edition == "inku.saijiki.v3") { "other_edition" }
+        if (edition != "inku.saijiki.v3") {
+            val items = file.optJSONArray("plugins") ?: JSONArray()
+            require(items.length() <= MAX_IMPORTED_PLUGINS) { "ddl_export_too_many_plugins" }
+            val definitions = JSONArray()
+            for (index in 0 until items.length()) definitions.put(items.getJSONObject(index).getJSONObject("definition"))
+            fun ask(input: JSONObject): JSONObject = JSONObject(NativePipelineBridge.migrateSaijikiV2(input.toString().toByteArray(Charsets.UTF_8)).toString(Charsets.UTF_8))
+            val first = ask(JSONObject().put("definitions", definitions))
+            require(!first.has("error")) { "invalid_export_definitions" }
+            val entries = first.getJSONArray("definitions")
+            require(entries.length() == definitions.length()) { "invalid_export_definitions" }
+            val locks = JSONArray()
+            for (index in 0 until entries.length()) {
+                val entry = entries.getJSONObject(index)
+                require(!entry.has("error")) { "invalid_export_definitions" }
+                locks.put(JSONObject().put("qualified_name", entry.getString("qualified_name")).put("version", entry.getString("version")).put("digest", entry.getString("old_digest")))
+            }
+            val answer = ask(JSONObject().put("definitions", definitions).put("document", JSONObject()
+                .put("source", selected.ddl.orEmpty()).put("language", file.optString("language", fallbackLanguage))
+                .put("saijiki", "inku.saijiki.v2").put("macro_locks", locks)))
+            require(!answer.has("error")) { "saijiki_export_migration_refused" }
+            val document = answer.getJSONObject("document")
+            require(!document.has("error")) { "saijiki_export_migration_refused" }
+            val migrated = answer.getJSONArray("definitions")
+            require(migrated.length() == items.length()) { "saijiki_export_migration_refused" }
+            for (index in 0 until migrated.length()) {
+                val entry = migrated.getJSONObject(index)
+                require(!entry.has("error")) { "saijiki_export_migration_refused" }
+                items.getJSONObject(index).put("definition", entry.getJSONObject("definition"))
+            }
+            file.put("plugins", items)
+            selected = selected.copy(ddl = selected.ddl?.let { document.getJSONObject("document").getString("source") })
+            migratedChanges = document.optJSONArray("edits")?.length() ?: 0
+        }
         val language = InstructionLanguages.ofDdl(selected.ddl.orEmpty(), null, null, fallbackLanguage)
         fun primary(definition: JSONObject): String =
             definition.optJSONObject("names")?.optJSONArray(language)?.optString(0).orEmpty()
@@ -96,6 +135,6 @@ object DdlExport {
         val names = plugins.map { plugin ->
             name(JSONObject(plugin.definitionJson))
         }
-        return Import(selected.ddl, plugins, names, selected.origin)
+        return Import(selected.ddl, plugins, names, selected.origin, migratedChanges)
     }
 }

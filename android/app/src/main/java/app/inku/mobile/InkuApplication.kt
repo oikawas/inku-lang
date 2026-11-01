@@ -4,7 +4,7 @@ import android.app.Application
 import android.util.Log
 import app.inku.mobile.data.db.InkuDatabase
 import app.inku.mobile.data.db.RoomV10ResetCoordinator
-import app.inku.mobile.data.db.SaijikiV1Migration
+import app.inku.mobile.data.db.SaijikiV3Migration
 import app.inku.mobile.data.db.PluginNamesV2Migration
 import app.inku.mobile.data.model.CanvasAspects
 import app.inku.mobile.pipeline.NativePipelineBridge
@@ -16,7 +16,7 @@ import kotlinx.coroutines.cancel
 private const val MIGRATION_LOG_TAG = "InkuMigration"
 
 /** The report of the Saijiki v2 migration, kept in the app's files for the count. */
-internal const val MIGRATION_REPORT = "saijiki-v2-migration.json"
+internal const val MIGRATION_REPORT = "saijiki-v3-migration.json"
 
 class InkuApplication : Application() {
     val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -100,14 +100,14 @@ class InkuApplication : Application() {
      */
     private fun migrateSavedRecords(db: androidx.sqlite.db.SupportSQLiteDatabase) {
         val report = runCatching {
-            SaijikiV1Migration(NativePipelineBridge::migrateSaijikiV1, discardExecutions = true).runOnce(db)
+            SaijikiV3Migration(NativePipelineBridge::migrateSaijikiV1, NativePipelineBridge::migrateSaijikiV2, discardExecutions = true).runOnce(db)
         }.getOrElse { error ->
-            Log.e(MIGRATION_LOG_TAG, "Saijiki v2 migration failed; nothing was written", error)
+            Log.e(MIGRATION_LOG_TAG, "Saijiki v3 migration failed; nothing was written", error)
             return
         }
         if (report != null) {
             runCatching { filesDir.resolve(MIGRATION_REPORT).writeText(report.toString(1)) }
-            Log.i(MIGRATION_LOG_TAG, "Saijiki v2 migration written: ${report.optLong("total_ms")} ms, " +
+            Log.i(MIGRATION_LOG_TAG, "Saijiki v3 migration written: ${report.optLong("total_ms")} ms, " +
                 "${report.optInt("statements")} statements, ${report.optJSONArray("refused_records")?.length() ?: 0} refused records")
         }
         val pluginReport = runCatching { PluginNamesV2Migration(NativePipelineBridge::migratePluginNames).runOnce(db) }

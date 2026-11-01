@@ -119,7 +119,7 @@ class ToolChangeDeviceTest {
         repository = repo
         val parent = repo.composeFromDdl(
             description = "tool parent",
-            ddl = "背景を白で埋める。\n青の細筆の線を3個引く。\n赤の大きな円を1個置く。",
+            ddl = "背景を白で埋める。\n青のガッシュの線を3個引く。\n赤の大きな円を1個置く。",
             catalogId = "ink_season", canvasAspect = "square",
             stage1ModelId = "test-stage1", stage2ModelId = "test-stage2",
             seeds = PaintSeeds(renderSeed = 4242L, compositionSeed = 77L),

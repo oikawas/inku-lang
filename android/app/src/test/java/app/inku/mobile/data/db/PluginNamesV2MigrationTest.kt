@@ -68,7 +68,7 @@ class PluginNamesV2MigrationTest {
             .put("macro_catalog", JSONObject().put("definition_locks", JSONArray().put(lock)))
         val contextBytes = LineagePlanner.canonicalJson(context).toByteArray()
         val document = JSONObject().put("source", source).put("language", "ja")
-            .put("macro_locks", SaijikiV1Migration.documentLocks(JSONArray().put(lock)))
+            .put("macro_locks", SaijikiV3Migration.documentLocks(JSONArray().put(lock)))
         db.execSQL("INSERT INTO history_items VALUES (?, ?, ?, ?, ?)", arrayOf<Any>("h", source, "ja", "score", "svg"))
         db.execSQL("INSERT INTO pipeline_history_links VALUES (?, ?, ?, ?, ?, ?)", arrayOf<Any>("u", "h", "v", contextBytes, digest(contextBytes), oldDigest))
         db.execSQL("INSERT INTO variation_authority VALUES (?, ?, ?, ?, ?, ?)", arrayOf<Any>("u", "v", "1", source, LineagePlanner.canonicalJson(document), oldDigest))

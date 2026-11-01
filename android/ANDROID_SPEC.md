@@ -1,5 +1,13 @@
 # inku Android Implementation Notes
 
+## 2026-11-01 Saijiki v3 / render engine 95
+
+Before reading works, `SaijikiV3Migration` moves saved v1/v2 records in one transaction, retaining the v2 marker and recording `saijiki_v3_saved_records`. Editionless documents use the v1 core entry; v2 documents and definition-only units use v2. V3 stays unchanged, other editions are refused. History uses v2 if its old marker exists, otherwise v1. Exceptions roll back all writes; refused units stay intact in `files/saijiki-v3-migration.json`. Execution snapshots are discarded; Scores, SVGs and descriptions are preserved.
+
+Definitions come from a complete matching lock in the same variation, then a unique Nature definition bound to the same name/version/digest in another context, then the core's historical fallback. Link locks move only on `(qualified_name, version, old_digest)`.
+
+DDL and history exports carry `saijiki: inku.saijiki.v3`. V2 imports (including missing edition) migrate definitions to obtain original digests, then migrate document and definitions together. Other editions and core refusals use the invalid-file notice; successful changes show their count. Plain DDL is current-edition input. Current tools are silverpoint, pencil, pen, chalk, oil pastel, gouache, watercolor, oil paint, painting knife, etching and computer. Saved Scores using the six retired tool values remain readable.
+
 This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.

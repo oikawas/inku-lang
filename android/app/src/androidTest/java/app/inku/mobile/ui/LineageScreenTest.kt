@@ -462,7 +462,7 @@ class LineageScreenTest {
     private companion object {
         const val STAGE_MODEL = "gpt-4o-mini"
         const val ROOT_DESCRIPTION = "赤い円を5個、横に並べる"
-        const val CHILD_DESCRIPTION = "黒い太筆の線を3本、斜めに置く"
+        const val CHILD_DESCRIPTION = "黒いガッシュの線を3本、斜めに置く"
         const val GRAND_DESCRIPTION = "青い三角を2つ、上に重ねる"
         const val FIRST_DRAWING = "緑の四角を4つ、下に敷く"
         const val EDITED_DDL = "紫の線を2本、中央に並べる"

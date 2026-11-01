@@ -42,7 +42,8 @@ function makeState(
 ) {
 	const reports: unknown[] = [];
 	const state = new BatchState({
-		apiFetch,
+		apiFetch: (path, init) => path.startsWith('/api/pipeline/batches') || path === '/api/pipeline/activity'
+			? Promise.resolve(new Response('', { status: 404 })) : apiFetch(path, init),
 		signedIn: () => true,
 		paintable: (text) => text.trim().length > 0,
 		setFailureReport: (report) => reports.push(report),
@@ -51,6 +52,77 @@ function makeState(
 	});
 	return { state, reports };
 }
+
+test('an expired registered batch can resume even before its first saved work, but an active batch cannot', async () => {
+	const record = { run_id: 'recorded-run', kind: 'web', total: 2, completed: 0,
+		state: 'running', prompt: 'first\nsecond', conditions: {
+			stage1Model: null, stage2Model: null, catalogId: null, catalogMode: null,
+			sketchGrain: null, wild: null, canvasAspectId: null,
+		}, updated_at: 1 };
+	const state = new BatchState({
+		apiFetch: async (path) => path === '/api/pipeline/batches'
+			? jsonResponse({ batches: [record] }) : jsonResponse({ items: [] }),
+		signedIn: () => true, paintable: (text) => !!text.trim(), setFailureReport: () => {},
+	});
+	await state.refreshResume();
+	assert.equal(state.canResume, false);
+	record.state = 'uncertain';
+	await state.refreshResume();
+	assert.equal(state.canResume, false);
+	record.state = 'interrupted';
+	await state.refreshResume();
+	assert.equal(state.canResume, true);
+	assert.equal(state.resume?.runId, 'recorded-run');
+	assert.deepEqual(state.resume?.lines.map((line) => line.input), ['first', 'second']);
+});
+
+test('resume reconciles saved lines and sends only the remaining line with the new lease', async () => {
+	const conditions = { stage1Model: null, stage2Model: null, catalogId: null, catalogMode: null,
+		sketchGrain: null, wild: null, canvasAspectId: null };
+	const record = { run_id: 'run-old', kind: 'web', total: 2, completed: 0, state: 'lease_expired',
+		prompt: 'first\nsecond', conditions, updated_at: 1 };
+	const calls: Array<{ line: number | undefined; lease: string | undefined }> = [];
+	const state = new BatchState({
+		apiFetch: async (path, init) => {
+			if (path === '/api/pipeline/batches' && init?.method === 'POST') return jsonResponse({ lease: 'new-lease' });
+			if (path.startsWith('/api/pipeline/batches/')) return jsonResponse({ ok: true });
+			if (path === '/api/pipeline/batches') return jsonResponse({ batches: [record] });
+			if (path.startsWith('/api/history')) return jsonResponse({ items: [{ batch_run_id: 'run-old', batch_line_number: 1 }] });
+			throw new Error(`unexpected ${path}`);
+		},
+		signedIn: () => true, paintable: (text) => !!text.trim(), setFailureReport: () => {},
+	});
+	await state.refreshResume();
+	await state.resumeInterrupted({ blocked: () => false, applyConditions: () => {}, run: (lines) => state.run({
+		resumeLines: lines, canvasAspectId: 'square', maxRetries: 0,
+		paintLine: async (_text, options) => { calls.push({ line: options.batchLineNumber, lease: options.batchLease }); return result(2); },
+		onLatestResult: () => {}, refreshAfterServerSave: async () => {}, refreshAfterRun: async () => {},
+	}) });
+	assert.deepEqual(calls, [{ line: 2, lease: 'new-lease' }]);
+});
+
+test('a cut batch waits for its still-running server work before checking history', async () => {
+	let checks = 0, paints = 0, clock = 0;
+	const state = new BatchState({
+		apiFetch: async (path) => {
+			if (path.startsWith('/api/pipeline/batches')) return new Response('', { status: 404 });
+			if (path === '/api/pipeline/activity') return jsonResponse({ executions: ++checks === 1 ? [{ batch_run_id: 'run-fixed' }] : [] });
+			if (path.startsWith('/api/history')) return jsonResponse({ items: [{ batch_run_id: 'run-fixed', batch_line_number: 1 }] });
+			return jsonResponse({});
+		},
+		signedIn: () => true, paintable: (text) => !!text.trim(), setFailureReport: () => {},
+		createRunId: () => 'run-fixed', now: () => clock,
+		sleep: async (ms) => { clock += ms; },
+	});
+	state.input = 'first';
+	await state.run({ canvasAspectId: 'square', maxRetries: 0,
+		paintLine: async () => { paints += 1; throw new ConnectionFailure('unreachable', 'cut'); },
+		onLatestResult: () => {}, refreshAfterServerSave: async () => {}, refreshAfterRun: async () => {},
+	});
+	assert.equal(checks, 2);
+	assert.equal(paints, 1);
+	assert.equal(state.success, 1);
+});
 
 test('manual failure retry paints only errors, keeps original conditions and numbering, and removes recovered errors', async () => {
 	const { state, reports } = makeState();
@@ -131,7 +203,7 @@ test('manual failure retry restores full persisted descriptions beyond the displ
 		catalogMode: null, sketchGrain: null, wild: false, canvasAspectId: 'square' };
 	let report = { success: 1, total: 2, failures: [{ line: 3, input: full.slice(0, 300), message: 'failed' }],
 		retry: { prompt: `saved\n\n${full}`, runId: 'persisted-run', conditions, failedLines: [3], pendingLines: [3] } };
-	const state = new BatchState({ apiFetch: async () => jsonResponse({ items: [] }), signedIn: () => true,
+	const state = new BatchState({ apiFetch: async (path) => path.startsWith('/api/pipeline/batches') || path === '/api/pipeline/activity' ? new Response('', { status: 404 }) : jsonResponse({ items: [] }), signedIn: () => true,
 		paintable: (text) => text.trim().length > 0,
 		getFailureReport: () => report,
 		setFailureReport: (value) => { report = value as typeof report; },
@@ -228,7 +300,7 @@ test('T-805: cancel owns the signal and rejects a late result from the stopped r
 		refreshAfterRun: async () => {},
 	});
 
-	await Promise.resolve();
+	while (!pending) await new Promise((resolve) => setTimeout(resolve, 0));
 	state.stop();
 	assert.equal(seenSignal?.aborted, true);
 	pending?.resolve(result(1));
@@ -468,6 +540,7 @@ function outageState(upAfter: number, options: { limitMs?: number; onSleep?: () 
 	const reports: unknown[] = [];
 	const state = new BatchState({
 		apiFetch: async (path) => {
+			if (path.startsWith('/api/pipeline/batches') || path === '/api/pipeline/activity') return new Response('', { status: 404 });
 			if (path.startsWith('/api/info')) {
 				server.probes += 1;
 				if (server.down && server.probes >= upAfter) server.down = false;

@@ -19,6 +19,7 @@ import {
 export type ImageFolderRunOptions<TFile extends FolderFile> = {
 	/** Start over: forget which pictures of this folder are done. */
 	fromStart: boolean;
+	batchRunId?: string;
 	/** Paints and saves one picture; throws when it could not. */
 	paintPicture: (file: TFile, signal: AbortSignal) => Promise<void>;
 	/** A cut connection stops the run (resumable) instead of failing one picture. */
@@ -58,6 +59,7 @@ export class ImageFolderBatch<TFile extends FolderFile = File> {
 	success = $state(0);
 	/** Why the last run stopped by itself; null when the author stopped it or it ended. */
 	stopReason = $state<string | null>(null);
+	resumeBlocked = $state(false);
 
 	private readonly store: ImageFolderStorage;
 	private abortController: AbortController | null = null;
@@ -83,6 +85,7 @@ export class ImageFolderBatch<TFile extends FolderFile = File> {
 		this.interrupted = false;
 		this.stopReason = null;
 		this.success = 0;
+		this.resumeBlocked = !!this.record?.batchRunId;
 	}
 
 	get record(): ImageFolderRecord | null {
@@ -103,6 +106,15 @@ export class ImageFolderBatch<TFile extends FolderFile = File> {
 		return this.record?.failures ?? [];
 	}
 
+	markServerCompleted(lines: readonly number[]): void {
+		const record = this.record;
+		if (!record?.batchKeys) return;
+		const done = new Set(record.done);
+		for (const line of lines) if (record.batchKeys[line - 1]) done.add(record.batchKeys[line - 1]);
+		this.history = rememberFolder(this.history, { ...record, done: [...done], updatedAt: Date.now() });
+		this.store.saveHistory(this.history);
+	}
+
 	async run(options: ImageFolderRunOptions<TFile>): Promise<void> {
 		if (this.running || this.pictures.length === 0) return;
 		const name = this.folderName;
@@ -110,6 +122,7 @@ export class ImageFolderBatch<TFile extends FolderFile = File> {
 			? { name, total: this.pictures.length, done: [], failures: [], updatedAt: Date.now() }
 			: { ...this.record, total: this.pictures.length, updatedAt: Date.now() };
 		const queue = picturesToPaint(this.pictures, record);
+		if (options.batchRunId) record = { ...record, batchRunId: options.batchRunId, batchKeys: queue.map(pictureKey) };
 		const save = (next: ImageFolderRecord) => {
 			record = next;
 			this.history = rememberFolder(this.history, next);

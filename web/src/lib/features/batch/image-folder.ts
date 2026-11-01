@@ -43,6 +43,8 @@ export type ImageFolderRecord = {
 	/** Pictures that failed in the last run; they are painted again on resume. */
 	failures: ImageFolderFailure[];
 	updatedAt: number;
+	batchRunId?: string;
+	batchKeys?: string[];
 };
 
 export function relativePathOf(file: FolderFile): string {

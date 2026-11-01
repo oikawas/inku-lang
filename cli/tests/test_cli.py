@@ -58,6 +58,31 @@ def test_api_parser_supports_all_public_http_methods():
         assert args.func is cli.command_api
 
 
+def test_activity_requests_the_correct_scope_without_interpreting_missing_runs_as_idle(monkeypatch, capsys):
+    calls = []
+    class Client:
+        def __init__(self, *_args, **_kwargs):
+            pass
+        def request(self, method, path, **kwargs):
+            calls.append((method, path, kwargs.get("query")))
+            return {"executions": [], "batch_waiting_known": False, "process_scope": "current_process"}, None
+    monkeypatch.setattr(cli, "ApiClient", Client)
+    monkeypatch.setattr(cli, "load_config", lambda: cli.CliConfig(base_url="http://example.test"))
+    for argv in (["activity"], ["activity", "--all"]):
+        args = cli.build_parser().parse_args(argv)
+        assert args.func(args) == 0
+        assert json.loads(capsys.readouterr().out)["batch_waiting_known"] is False
+    assert calls == [("GET", "/api/pipeline/activity", None),
+                     ("GET", "/api/pipeline/activity", {"all_users": "true"})]
+
+
+def test_batch_metadata_goes_to_both_paint_and_ddl_requests():
+    args = cli.build_parser().parse_args(["batch", "--file", "-"])
+    args.batch_run_id, args.batch_line_number = "batch-1", 2
+    for payload in (cli._paint_payload(args, "a circle"), cli._compose_payload(args, "a circle")):
+        assert (payload["batch_run_id"], payload["batch_line_number"]) == ("batch-1", 2)
+
+
 def test_api_json_body_accepts_inline_and_rejects_conflicting_sources(tmp_path):
     inline = argparse.Namespace(data='{"ok":true}', file=None)
     assert cli._api_json_body(inline) == {"ok": True}
@@ -232,6 +257,10 @@ def test_ddl_commands_send_performance_options_only_when_requested(command, flag
         def request(self, method, path, *, data=None, **kwargs):
             if (method, path) == ("GET", "/api/color-catalogs"):
                 return {"default_catalog_id": "default", "catalogs": list(CATALOG_DATA["catalogs"].values())}, None
+            if path == "/api/pipeline/batches":
+                return {"lease": "lease-1"}, None
+            if path.startswith("/api/pipeline/batches/"):
+                return {"ok": True}, None
             assert (method, path) == ("POST", "/api/compose")
             sent.append(data)
             return {"svg": "<svg/>", "score": {}}, None
@@ -264,6 +293,10 @@ def test_a_ddl_batch_draws_no_title_line(monkeypatch, tmp_path, capsys):
         def request(self, method, path, *, data=None, **kwargs):
             if (method, path) == ("GET", "/api/color-catalogs"):
                 return {"default_catalog_id": "default", "catalogs": list(CATALOG_DATA["catalogs"].values())}, None
+            if path == "/api/pipeline/batches":
+                return {"lease": "lease-1"}, None
+            if path.startswith("/api/pipeline/batches/"):
+                return {"ok": True}, None
             assert (method, path) == ("POST", "/api/compose")
             sent.append(data)
             return {"svg": "<svg/>", "score": {}}, None

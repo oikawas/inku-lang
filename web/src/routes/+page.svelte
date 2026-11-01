@@ -2665,6 +2665,14 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		const externalHistoryRefreshTimer = window.setInterval(() => {
 			void history.refreshExternal();
 		}, HISTORY_EXTERNAL_REFRESH_MS);
+		const checkBatchAfterDisconnect = () => {
+			if (work.inputMode === 'batch' && !batch.running && !batch.resuming) {
+				void batch.refreshResume();
+				void work.refreshImageBatchResume();
+			}
+		};
+		const batchLeaseTimer = window.setInterval(checkBatchAfterDisconnect, 15_000);
+		window.addEventListener('online', checkBatchAfterDisconnect);
 		// Coming back to the tab still refreshes at once; what it no longer does
 		// is jump the floor. Both of these fire on a single alt-tab.
 		function onHistoryVisibilityChange() {
@@ -2694,6 +2702,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			window.removeEventListener('resize', onResize);
 			document.removeEventListener('keydown', handleKeydown, true);
 			window.clearInterval(externalHistoryRefreshTimer);
+			window.clearInterval(batchLeaseTimer);
+			window.removeEventListener('online', checkBatchAfterDisconnect);
 			document.removeEventListener('visibilitychange', onHistoryVisibilityChange);
 			window.removeEventListener('focus', onHistoryWindowFocus);
 		};

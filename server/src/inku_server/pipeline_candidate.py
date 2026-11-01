@@ -13,6 +13,7 @@ import logging
 import threading
 import time
 import uuid
+from contextlib import contextmanager, nullcontext
 from typing import Callable
 
 from .api_core.models import json_seeds
@@ -253,6 +254,7 @@ class CandidateExecution:
         self._lock = threading.RLock()
         self._fresh = False
         self._provider_in_flight = False
+        self._render_in_flight = False
         # The provider action this host is running and when it began, in epoch ms.
         self._attempt_began: tuple[dict, int] | None = None
         # Pixel bytes never enter context, snapshots, transcripts or history.
@@ -300,7 +302,8 @@ class CandidateExecution:
                 written = (context_updates or {}).get("description", payload.get("description", ""))
                 self.context = {**self.context, "description": written}
             try:
-                return self._advance(payload)
+                with self._track_render() if payload["tag"] == "render" else nullcontext():
+                    return self._advance(payload)
             except Exception:
                 self.context = previous_context
                 raise
@@ -435,6 +438,14 @@ class CandidateExecution:
             if self._snapshot is None:
                 raise CandidateHostError("execution_not_started")
             return json.loads(_bytes(self._snapshot))
+
+    @contextmanager
+    def _track_render(self):
+        self._render_in_flight = True
+        try:
+            yield
+        finally:
+            self._render_in_flight = False
 
     def _advance(self, payload: dict) -> dict:
         limits = self.config["envelope_limits"]

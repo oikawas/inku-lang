@@ -228,6 +228,7 @@ def test_deleter_preserves_history_gate_and_complete_cleanup_order() -> None:
         "provider_observations",
         "variation_authority_actions",
         "variation_authority",
+        "app_settings",
     ]
     history_acl_delete = next(event for event in cascade.events if event[:2] == ("bulk-delete", "history_acl"))
     assert history_acl_delete[2] == {"synchronize_session": False}
@@ -260,6 +261,7 @@ def test_deleter_removes_only_the_accounts_pipeline_rows() -> None:
 
     from inku_server.persistence.schema import (
         Base,
+        AppSettingRow,
         PipelineCandidateExecutionRow,
         PipelineHistoryLinkRow,
         UserAccountRow,
@@ -291,7 +293,12 @@ def test_deleter_removes_only_the_accounts_pipeline_rows() -> None:
         lambda actor, column: column == actor["id"],
         lambda *_args: None,
     )
+    from inku_server.persistence.batch_runs import batch_prefix
+    with sessions() as session:
+        session.add_all([AppSettingRow(key=batch_prefix(owner) + 'run', value='{}', at=1) for owner in ('gone', 'stays')])
+        session.commit()
     assert deleter.delete_user("gone") is True
     with sessions() as session:
         assert {row.owner_id for row in session.query(PipelineHistoryLinkRow)} == {"stays"}
         assert {row.owner_id for row in session.query(PipelineCandidateExecutionRow)} == {"stays"}
+        assert {row.key for row in session.query(AppSettingRow)} == {batch_prefix('stays') + 'run'}

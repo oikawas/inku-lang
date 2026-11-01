@@ -36,7 +36,7 @@
 
 	const pending = $derived(folder.pending.length);
 	const done = $derived(folder.doneCount);
-	const disabled = $derived(busy || !visionModelAvailable);
+	const disabled = $derived(busy || !visionModelAvailable || folder.resumeBlocked);
 	const pastFolders = $derived(folder.history.filter((item) => item.name !== folder.folderName || folder.pictures.length === 0));
 
 	function chooseFolder() {
@@ -82,6 +82,7 @@
 	{/if}
 </div>
 {#if folder.folderName && folder.pictures.length === 0}<p class="batch-info">{t().imageFolderEmpty}</p>{/if}
+{#if folder.resumeBlocked}<p class="batch-info">{t().batchResumeScanning}</p>{/if}
 
 <section class="batch-next-conditions" aria-label={t().batchNextConditionsLabel}>
 	<div class="batch-next-conditions-head"><span>{t().batchNextConditionsLabel}</span></div>

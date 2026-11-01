@@ -325,6 +325,19 @@ def draw_plugin_example(owner: str, ddl: str, language: str, imported: list[dict
     return ExampleDrawing(svg=str(result.get("svg") or ""), marks=marks, reasons=reasons)
 
 
+def _start_batch_guarded(service, owner: str, data: dict, start: Callable[[], dict]) -> dict:
+    lease = data.get("batch_lease")
+    if lease is None:
+        return start()
+    run_id = data.get("batch_run_id")
+    if not run_id:
+        raise HTTPException(422, "batch_id_required")
+    from .persistence.batch_runs import BatchRuns
+    with service._lock:
+        BatchRuns(service.store.engine).require(owner, run_id, lease)
+        return start()
+
+
 def compose(owner: str, data: dict[str, Any], reader_left: Callable[[], bool] | None = None) -> dict:
     options = _options(data, save_history=False)
     # The old compose endpoint produced a candidate and never counted it as a
@@ -350,7 +363,7 @@ def compose(owner: str, data: dict[str, Any], reader_left: Callable[[], bool] | 
         source, recomposition, prepared = _recompose(service, owner, data, options, source_work)
     view = _settled(
         owner,
-        service.start(
+        _start_batch_guarded(service, owner, data, lambda: service.start(
             owner,
             "direct_ddl",
             source,
@@ -359,7 +372,8 @@ def compose(owner: str, data: dict[str, Any], reader_left: Callable[[], bool] | 
             canvas_aspect=data.get("canvas_aspect"),
             options=options,
             prepared=prepared,
-        ),
+            **({"batch_lease": data["batch_lease"]} if data.get("batch_lease") else {}),
+        )),
         perform=True,
         reader_left=reader_left,
     )
@@ -370,13 +384,15 @@ def _start_paint(owner: str, data: dict[str, Any], idempotency_key: str | None) 
     options = _options(data, save_history=bool(data.get("save_history", False)))
     if idempotency_key:
         options["request_idempotency_key"] = idempotency_key
-    return _service().start(
+    service = _service()
+    return _start_batch_guarded(service, owner, data, lambda: service.start(
         owner,
         "description",
         data["description"],
         canvas_aspect=data.get("canvas_aspect"),
         options=options,
-    )
+        **({"batch_lease": data["batch_lease"]} if data.get("batch_lease") else {}),
+    ))
 
 
 def paint(

@@ -15,6 +15,59 @@ from inku_server.persistence.variation_authority import VariationAuthorityStore
 from tests.test_saijiki_v2_migrate_once import _saved_database
 
 
+def test_fork_catalog_locks_move_only_for_the_original_digest():
+    from inku_server.persistence.saijiki_v3_migration import _Link, _link_statement
+
+    matched = {"qualified_name": "Nature.下草", "version": "1.0.0", "digest": "a" * 64}
+    unmatched = {**matched, "digest": "b" * 64}
+    context = {"ddl_digest": "old", "config": {"definitions": ["definition"]},
+               "macro_catalog": {"definition_locks": [matched, unmatched]}}
+    link = _Link("u", "h", context, ["definition"], [matched, unmatched])
+    records = []
+    answer = {"qualified_name": matched["qualified_name"], "version": matched["version"],
+              "old_digest": "sha256:" + "a" * 64, "digest": "sha256:" + "c" * 64}
+    statement = _link_statement(link, ["new definition"], None, lambda _: answer, records)
+    assert statement is not None
+    new_context = json.loads(statement[1][1])
+    assert new_context["macro_catalog"]["definition_locks"] == [{**matched, "digest": "c" * 64}, unmatched]
+    assert records == [{"id": "u/h", "lock": unmatched}]
+
+
+def test_migration_reports_and_preserves_unmatched_fork_lock(tmp_path):
+    from pathlib import Path
+    from inku_server.persistence.saijiki_v3_migration import _definition_unit
+
+    fixture = Path(__file__).resolve().parents[2] / "core/crates/inku-ddl/tests/fixtures/nature-leaves-1.0-package.json"
+    definition = next(item["definition"] for item in json.loads(fixture.read_text())["entries"]
+                      if item["definition"]["heading"] == "下草")
+    answer = json.loads(migrate_unit_v3(_definition_unit(definition)))["definitions"][0]
+    lock = {"qualified_name": answer["qualified_name"], "version": answer["version"],
+            "digest": answer["old_digest"].removeprefix("sha256:")}
+    other = {**lock, "digest": "0" * 64}
+    database = tmp_path / "saved.db"
+    _saved_database(database)
+    engine = create_engine(f"sqlite:///{database}")
+    with engine.begin() as connection:
+        context = json.loads(connection.exec_driver_sql("SELECT fork_context_bytes FROM pipeline_history_links").scalar_one())
+        context["config"]["definitions"] = [definition]
+        context["macro_catalog"]["definition_locks"] = [lock, other]
+        raw = json.dumps(context, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+        connection.exec_driver_sql("UPDATE pipeline_history_links SET fork_context_bytes=?, fork_context_digest=?",
+                                   (raw, hashlib.sha256(raw).hexdigest()))
+        # An orphan link is migrated even without a history document to reject its mismatched lock.
+        connection.exec_driver_sql("DELETE FROM history WHERE id='h'")
+    engine.dispose()
+    report = _migrate_once_database(database, migrate_unit_v3)
+    assert report["history_links"]["unmatched_locks"] == 1
+    assert report["unmatched_lock_records"] == [{"id": "u/h", "lock": other}]
+    engine = create_engine(f"sqlite:///{database}")
+    with engine.connect() as connection:
+        moved = json.loads(connection.exec_driver_sql("SELECT fork_context_bytes FROM pipeline_history_links").scalar_one())
+    engine.dispose()
+    assert moved["macro_catalog"]["definition_locks"] == [
+        {**lock, "digest": answer["digest"].removeprefix("sha256:")}, other]
+
+
 def test_v2_work_and_authority_move_together_once(tmp_path):
     path = tmp_path / "saved.db"
     _saved_database(path)

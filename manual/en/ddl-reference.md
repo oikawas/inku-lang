@@ -176,6 +176,27 @@ Modifiers can also stand before a numeric dimension:
 
 It means the same as `長さ0.6の赤い太いガッシュの線を1本引く。` A modifier does not travel past another drawing head: `赤い円の長さ0.6の線` is not a standard way to say “red line.”
 
+Color and tool can also be written as a phrase with `with` or `in`: an optional article, then a color, a tool, or a color and a tool. The phrase may follow the shape or open the sentence before a comma.
+
+```ddl-en
+draw 100 green lines with chalk.
+draw a line in red chalk.
+place a circle in red at the center.
+With chalk, draw a green line.
+```
+
+These mean the same as `draw 100 green chalk lines.`, `draw a red chalk line.`, `place a red circle at the center.`, and `draw a green chalk line.` `with` is read only when the phrase contains a tool, so `with red` is not a color; `in` takes a color, a tool, or both. Japanese writes the same phrase with で (`チョークで`, `黒いペンで`), before the shape phrase or between を and the action. A phrase is associated only when its sentence (a line ended by a newline counts as one) has exactly one shape. These stay diagnostics as before:
+
+| Writing | Result |
+|---|---|
+| `With chalk, draw a line and a circle.` | Two shapes; the tool has no single owner |
+| `draw a pen line with chalk.` / `draw a blue line in red.` | Conflicting tools or colors |
+| `in red, blue, green` | Listed colors are not a phrase |
+| `In chalk.` | No shape |
+| `fill the background with blue.` | The background sentence (§3.21) |
+
+The recommended form remains the modifier before the noun, which Stage 1 writes.
+
 ### 3.3 Subject continuation
 
 ```ddl-en

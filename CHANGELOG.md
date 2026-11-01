@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- core: color and tool can be written as an English `with` or `in` phrase (`draw 100 green lines with chalk.`, `draw a line in red.`) and a Japanese で phrase (`チョークで緑の線を100本引く。`, `緑の線をチョークで引く。`, `黒いペンで`). These words were silently omitted as `ambiguous_entity_ownership` and drawn with the pen and default color, and a Japanese phrase between を and the action stopped the sentence. A phrase is associated only when its clause has one shape, and gives the same Score as the prenominal form. Clauses with two or more shapes, groups, fill, the background sentence, and listed colors or tools are unchanged. The semantic AST schema is `inku.semantic-entity-association.v20` (DDL 30, DDL engine 76).
+
 - Android: migrate English instructions with missing language metadata using the saved config language or shared DDL language detection.
 
 - Android: migrate saved Saijiki v1/v2 records transactionally to v3 through shared core JNI, preserving saved Scores/SVGs and matching frozen locks by original digest. Portable DDL imports migrate v2 exports and report edit counts; exports name v3. Vocabulary previews now show the eleven current tools.

@@ -8,6 +8,8 @@
 
 ## 未リリース
 
+- core：色と道具を「で」の句（「チョークで緑の線を100本引く。」「緑の線をチョークで引く。」「黒いペンで」）と、英語の `with`・`in` の句（`draw 100 green lines with chalk.`、`draw a line in red.`）でも書けるようにした。前は句の語が `ambiguous_entity_ownership` で黙って省かれ、ペン・既定の色で描かれていた。「を」と動作の語の間に置いた文は止まっていた。節に図形が一つのときだけ結び、名詞の前に書いた文と同じ楽譜になる。図形が二つ以上の文、組、埋める、背景の文、並べた色・道具は今までどおり。意味の AST の schema は `inku.semantic-entity-association.v20`（DDL 30・DDL engine 76）。
+
 - Android：保存した言語欄が空の英語の指示書も、保存 config の言語または本文の判定を使って歳時記 v3 に移す。
 
 - Android：保存した歳時記 v1・v2 を共通 core の JNI で一つの transaction で v3 に移す。楽譜・SVG を保持し、保存した lock を元の digest で照合する。v2 の DDL 書き出しは読み込み時に移して箇所数を知らせ、書き出しに v3 を記す。歳時記の説明図を現在の11語に合わせた。

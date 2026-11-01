@@ -132,6 +132,8 @@ PNGは正本SVGを写す派生出力であり、縮小してもSVGの材質・�
 
 日本語では「1つ〜9つ」、十個を表す「10／十／とお」、および「1個・2個・10個・11個」などを使える。「10つ・11つ」は個数表現として採用しない。名詞の前の修飾語は、個数句「N＋助数詞＋の」の前にも後ろにも置ける。「大きな四つの赤い円」「赤い大きな四つの円」「四つの大きな赤い円」は同じ意味で、「細い三本の黒い線を引く」も「三本の細い黒い線を引く」と同じく線3本を引く（DDL 13）。英語もgroup ofで組を記述し、`Line up five, alternating a group of a red circle and a blue line with a gray arc.` は同じ5単位となる。
 
+色と道具は、名詞の前の「の」の句のほかに、「で」の句でも書ける（DDL 30）。「で」の句は「で」の直前に続く色・道具の語とその間の「の」だけでできた句で（「チョークで」「赤で」「黒いペンで」「灰色のガッシュで」）、図形の句の前（「チョークで緑の線を100本引く。」）にも、「を」と動作の語の間（「緑の線を100本チョークで引く。」「円を赤で中心に置く。」）にも置ける。英語は`with`・`in`の句で、冠詞を置いてよく、続けて色・道具・色と道具（`red chalk`）を書く。図形の後ろ（`draw 100 green lines with chalk.`・`draw a line in red chalk.`・`place a circle in red at the center.`）にも、文の頭の「,」の前（`With chalk, draw a green line.`）にも置ける。`with`は道具を含むときだけ読み（`with red`は読まない）、`in`は色だけ・道具だけ・色と道具のどれでもよい。句は同じ節（改行で分けた行を含む）に図形がちょうど一つのときだけその図形に結び、名詞の前に書いた同じ文と同じScoreになる。図形の句にも同じ種類の値があれば、名詞の前に二度書いたときと同じ`conflicting_colors`・`conflicting_touches`になる。次は今までどおり結ばない：一つの節に図形が二つ以上、組、プラグインの呼び出し、埋める（「で」は模様の句の区切り）、背景の文（「背景を青で埋める。」・`fill the background with blue.`）、図形の無い文（「チョークで。」）、並べた色・道具（「赤と青で」・`in red, blue, green`）、関係節（「ペンで書いた四角」）、面・質感の「で」。推奨の書き方と、Stage 1・言葉で描く・補完の指示文は名詞の前の句のまま変えない。
+
 色列は共有Scoreの既存 `Arrangement.color_cycle` を維持する。その他の列は完全なmember templateを既存の配置／fillへ保持し、Score 0.14の`cycle_members.occurrence_count`から順番に選ぶ。各配置の先頭から列を始め、旧作品の必要最小Score版、既存の資源上限、個数省略の規則を保つ。`繰り返して`も組の表記も通常文法であり、別の歳時記語は増やさない。
 
 キャンバス形式は語彙でもpluginでもなく、shared core の `inku.canvas-format-registry.v1` が所有する resolved host option である。11形式は `square` / `golden` / `a4` / `b4` / `pillar` / `oban` / `wide` / `byobu` / `vertical` / `sd_monitor` / `hd_monitor` とし、形式の ID は visible DDL やmacro定義へ書かない。形式は描く紙であり、DDL が書くのは、その DDL を組んだ比の宣言「画面比W:H。」である（§19、DDL 26）。

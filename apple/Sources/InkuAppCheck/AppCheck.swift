@@ -108,6 +108,10 @@ struct AppCheck {
         if CommandLine.arguments.contains("--saijiki-v3-only") {
             try runSaijikiV3Checks(); return
         }
+        if let index = CommandLine.arguments.firstIndex(of: "--saijiki-v3-display-only") {
+            guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Missing isolated display fixture folder") }
+            try await runSaijikiV3DisplayChecks(folder: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return
+        }
         if CommandLine.arguments.contains("--library-parity-only") {
             try await runLibraryParityChecks(); return
         }

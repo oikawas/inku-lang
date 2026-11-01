@@ -50,6 +50,7 @@ enum SaijikiV3Migration {
                 refuse(error["code"] as? String ?? "definition_refused"); continue
             }
             guard let output = doc["document"] as? [String: Any], let newSource = output["source"] as? String,
+                  let locks = output["macro_locks"] as? [[String: Any]],
                   let edits = doc["edits"] as? [[String: Any]], let tools = doc["unassociated_tools"] as? [[String: Any]],
                   let sweeps = doc["unassociated_sweeps"] as? [[String: Any]],
                   let originalCount = try Int.fetchOne(db, sql: "SELECT json_array_length(?)", arguments: [definitions]),
@@ -59,6 +60,13 @@ enum SaijikiV3Migration {
                   let newDefinitions = try String.fetchOne(db, sql: "SELECT json_group_array(json_extract(value, '$.definition')) FROM json_each(CAST(? AS TEXT), '$.definitions')", arguments: [answer]) else {
                 refuse("invalid_core_response"); continue
             }
+            // The core can move a historical lock without returning that definition.
+            // Do not save a v3 context that cannot supply its new digest to compilation.
+            let returnedDigests = Set(entries.compactMap { $0["digest"] as? String })
+            guard locks.allSatisfy({ lock in
+                guard let digest = lock["digest"] as? String else { return false }
+                return returnedDigests.contains(digest)
+            }) else { refuse("migrated_definition_not_returned"); continue }
             try db.execute(sql: "UPDATE history SET ddl = ? WHERE id = ?", arguments: [newSource, id])
             try db.execute(sql: """
                 UPDATE effect_acknowledgements

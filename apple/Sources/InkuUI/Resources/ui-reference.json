@@ -2,7 +2,7 @@
   "schema": "inku.apple-ui-reference.v1",
   "version": "v2.15.298",
   "build": "1374",
-  "buildDate": "2026-11-01T00:18:32.955Z",
+  "buildDate": "2026-11-01T00:32:16.155Z",
   "versions": {
     "ddlSpec": "29",
     "ddlEngine": "75",
@@ -4250,7 +4250,7 @@
     }
   },
   "source": {
-    "commit": "6ac8a8f242e70f492097b128869f6f3d27d7f761",
+    "commit": "82fe45c47bbc781f4ac0668cb39a55b203862dfd",
     "files": {
       "web/src/lib/plugins/system/canvas-aspect/index.ts": "51431fe06ed38cfb11f7e08a87b85b68dacdeda646525242fb561c234cf0c9ff",
       "web/src/routes/+page.svelte": "ce49f36f444e2fdb516c8c665c236b9264818bead3f451c7cc439367388b3f2f",

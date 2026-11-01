@@ -24,6 +24,8 @@ Options and replacements for Change the touches, Change the ground and Change th
 
 macOS uses Saijiki v3 and render engine 95. DB v7 first makes a verified backup, then asks the shared core to migrate each saved document, its definitions, and locks from v2. Refused works remain unchanged and their reasons are recorded; Score, SVG, and historical execution records are retained. DDL exports name Saijiki v3, and older v2 exports without an edition are migrated by the core on import with the change count shown.
 
+If the core does not return a definition for a migrated lock digest, the work is retained without migration rather than saving an incomplete context.
+
 ## 2026-10-29 Plugin v2 and saved-work migration
 
 Bundled leaves and editor reference diagnostics use the shared core. The Saijiki, completion, settings, and generation information show braced names. Portable DDL uses `inku.ddl-export.v2` and the work's locks; v1 files are refused. On startup, database migration v6 verifies a `.inku-before-v6-*.sqlite` snapshot before updating the saved DDL copies, leaves refused works intact, and writes a JSON report beside the database. Definitions, locks, Score, and SVG are retained.

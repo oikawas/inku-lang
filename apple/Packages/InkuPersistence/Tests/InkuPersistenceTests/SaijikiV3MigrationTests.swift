@@ -5,6 +5,53 @@ import Testing
 @testable import InkuPersistence
 
 struct SaijikiV3MigrationTests {
+    @Test func missingHistoricalDefinitionIsPreservedWhenCoreReturnsOnlyLock() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-v7-missing-definition-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let file = folder.appendingPathComponent("works.sqlite")
+        let package = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let root = package.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let table = root.appendingPathComponent("core/crates/inku-pipeline-uniffi/assets/nature-historical-definitions.json")
+        let data = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: table)) as? [String: Any])
+        let definitions = try #require(data["definitions"] as? [[String: Any]])
+        let definition = definitions[14]
+        let firstInput = try JSONSerialization.data(withJSONObject: ["definitions": [definition]])
+        let first = try #require(JSONSerialization.jsonObject(with: InkuCore.migrateSaijikiV2(firstInput)) as? [String: Any])
+        let entry = try #require((first["definitions"] as? [[String: Any]])?.first)
+        let lock: [String: Any] = ["qualified_name": try #require(entry["qualified_name"] as? String),
+            "version": try #require(entry["version"] as? String), "digest": try #require(entry["old_digest"] as? String)]
+        let source = "｛若葉｝。"
+        let document: [String: Any] = ["source": source, "language": "ja", "saijiki": "inku.saijiki.v2", "macro_locks": [lock]]
+        let request = try JSONSerialization.data(withJSONObject: ["document": document, "definitions": []])
+        let answer = try #require(JSONSerialization.jsonObject(with: InkuCore.migrateSaijikiV2(request)) as? [String: Any])
+        #expect((answer["document"] as? [String: Any])?["error"] == nil)
+        #expect((answer["definitions"] as? [Any])?.isEmpty == true)
+        let ack = try JSONSerialization.data(withJSONObject: ["work_id": "historical", "performance": ["document": document, "configuration": ["definitions": []]]])
+        let payload = try JSONSerialization.data(withJSONObject: ["work": ["ddl": source]])
+        let resources = package.appendingPathComponent("Sources/InkuPersistence/Resources")
+        let old = try DatabaseQueue(path: file.path)
+        try await old.write { db in
+            for name in ["schema-v1", "migration-v2", "migration-v3", "migration-v4", "migration-v5", "migration-v6"] {
+                try db.execute(sql: String(contentsOf: resources.appendingPathComponent(name + ".sql"), encoding: .utf8))
+            }
+            try db.execute(sql: "INSERT INTO history (id, at, input, ddl, score, svg) VALUES ('historical', 1, 'fixture', ?, '{}', '<svg/>')", arguments: [source])
+            try db.execute(sql: "INSERT INTO execution_snapshots (id, revision, snapshot) VALUES ('historical', 0, ?)", arguments: [Data("history".utf8)])
+            try db.execute(sql: "INSERT INTO effect_acknowledgements (execution_id, effect_id, revision, snapshot, acknowledgement, save_payload) VALUES ('historical', 'save', 0, ?, ?, ?)", arguments: [Data("history".utf8), ack, payload])
+        }
+        try old.close()
+        let migrated = try InkuDatabase(url: file)
+        #expect(try await migrated.work(id: "historical")?.ddl == source)
+        let reader = try DatabaseQueue(path: file.path)
+        let savedAck = try await reader.read { try Data.fetchOne($0, sql: "SELECT acknowledgement FROM effect_acknowledgements WHERE execution_id='historical'") }
+        #expect(savedAck == ack)
+        try reader.close()
+        let files = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
+        let reportURL = try #require(files.first { $0.lastPathComponent.hasPrefix(".inku-saijiki-v3-v7-") })
+        let report = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: reportURL)) as? [String: Any])
+        #expect((report["refused"] as? [[String: String]])?.first?["reason"] == "migrated_definition_not_returned")
+    }
+
     /// Only an explicitly named disposable SQLite backup may be passed here.
     @Test func migrateExplicitRehearsalCopy() async throws {
         guard let path = ProcessInfo.processInfo.environment["INKU_V7_REHEARSAL_DB"], !path.isEmpty else { return }

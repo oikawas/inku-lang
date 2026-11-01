@@ -12,39 +12,15 @@ This file records changes chronologically. If a historical note conflicts with t
 
 - Android: migrate saved Saijiki v1/v2 records transactionally to v3 through shared core JNI, preserving saved Scores/SVGs and matching frozen locks by original digest. Portable DDL imports migrate v2 exports and report edit counts; exports name v3. Vocabulary previews now show the eleven current tools.
 
-### 2026-11-01 — Instruction language in Saijiki migration
-
-Resolve missing history instruction languages from saved fork configuration or DDL before Saijiki migration.
-
 ### 2026-11-01 — Saijiki v3 on macOS
 
 Support the new touch vocabulary and render engine 95. DB v7 backs up and migrates saved works; DDL exports identify their Saijiki edition and older exports are migrated on import.
 
 Show DDL completion proposals in the creation panel for approval or rejection, together with any unresolved completion issues.
 
-### 2026-11-01 — Match fork catalog locks
-
-Preserve and report fork catalog locks whose original digest does not match a migrated definition.
-
-### 2026-11-01 — Saijiki migration of locks without a saved definition
-
-For old works that kept a lock without saving its definition, the shared core now holds the built-in Nature definitions earlier releases shipped (the same table as the Server's). The Saijiki migration entries move such a lock to a definition of that table only when no supplied definition matches and the table's definition has the lock's digest; a name and version alone never choose one. A definition moved from the table comes back in the document answer's `recovered_definitions`, in the shape of a `definitions` entry, for a host that saves definitions with its works.
-
 ### 2026-11-01 — Synthetic display comparisons
 
 Add synthetic pictures for the painting knife's `gradientUnits="userSpaceOnUse"` fade and the `stroke-linejoin="round"` used by etching and other media. Tests compare them with fixed Chrome images and check that removing each attribute fails the same yardstick. Support-table and CPU/Graphite comparisons cover them too. The Graphite join comparison uses a separate picture with 90-degree corners to separate the edge-coverage difference on steep lines (I-726); the Skia/Chrome comparison retains the acute original.
-
-### 2026-10-31 — The touches reorganised (Saijiki v3, render engine 95)
-
-The touches go from twelve words to eleven. Rotring merges into pen, crayon into chalk, fine-brush and thick-brush into gouache, and burin and drypoint into etching; oil pastel, watercolor, and painting knife are added (DDL 29, DDL engine 75). Saved instructions and plugin definitions move once to the new words, and each width word moves to the step nearest the original width. A lock moves only to the definition whose digest matches the one it was saved with. A work that uses a new tool becomes Score 0.24.0.
-
-Render engine 95 draws watercolor, oil pastel, the painting knife, and etching each in its own way, and mixes another colour of the work into part of the painting knife's, watercolor's, and oil paint's marks. The six retired tools in saved Scores are drawn as before. The resvg the shared core bundles carries the upstream fix that applies `feDisplacementMap`'s `scale` once, and the core's Python wheel gains a PNG entry (`inku_render.svg_to_png`).
-
-### 2026-10-31 — Saijiki v3 and the PNG renderer
-
-Server and Web support the eleven v3 touch words and Score 0.24.0, and migrate older DDL exports when importing them. Server and CLI produce PNGs with the shared core renderer, keeping material displacement consistent with the screen.
-
-DDL exports carry `saijiki: inku.saijiki.v3`; authenticated imports use `/api/ddl-export/migrate-v2`. Saved records and installed packages have a stopped-service v3 migration entry. The capacity estimate is 896–8,664 SVG bytes per mark (400 marks: about 0.4–3.5 MB). CLI PNG output requires the core wheel; rasterization no longer passes `skip_system_fonts`. DDL is 29 and the DDL engine is 75.
 
 ### 2026-10-31 — Fix the macOS Rust build warning
 
@@ -558,6 +534,32 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.299 (2026-11-01 / Build 1375)
+
+### 2026-11-01 — Instruction language in Saijiki migration
+
+Resolve missing history instruction languages from saved fork configuration or DDL before Saijiki migration.
+
+### 2026-11-01 — Match fork catalog locks
+
+Preserve and report fork catalog locks whose original digest does not match a migrated definition.
+
+### 2026-11-01 — Saijiki migration of locks without a saved definition
+
+For old works that kept a lock without saving its definition, the shared core now holds the built-in Nature definitions earlier releases shipped (the same table as the Server's). The Saijiki migration entries move such a lock to a definition of that table only when no supplied definition matches and the table's definition has the lock's digest; a name and version alone never choose one. A definition moved from the table comes back in the document answer's `recovered_definitions`, in the shape of a `definitions` entry, for a host that saves definitions with its works.
+
+### 2026-10-31 — The touches reorganised (Saijiki v3, render engine 95)
+
+The touches go from twelve words to eleven. Rotring merges into pen, crayon into chalk, fine-brush and thick-brush into gouache, and burin and drypoint into etching; oil pastel, watercolor, and painting knife are added (DDL 29, DDL engine 75). Saved instructions and plugin definitions move once to the new words, and each width word moves to the step nearest the original width. A lock moves only to the definition whose digest matches the one it was saved with. A work that uses a new tool becomes Score 0.24.0.
+
+Render engine 95 draws watercolor, oil pastel, the painting knife, and etching each in its own way, and mixes another colour of the work into part of the painting knife's, watercolor's, and oil paint's marks. The six retired tools in saved Scores are drawn as before. The resvg the shared core bundles carries the upstream fix that applies `feDisplacementMap`'s `scale` once, and the core's Python wheel gains a PNG entry (`inku_render.svg_to_png`).
+
+### 2026-10-31 — Saijiki v3 and the PNG renderer
+
+Server and Web support the eleven v3 touch words and Score 0.24.0, and migrate older DDL exports when importing them. Server and CLI produce PNGs with the shared core renderer, keeping material displacement consistent with the screen.
+
+DDL exports carry `saijiki: inku.saijiki.v3`; authenticated imports use `/api/ddl-export/migrate-v2`. Saved records and installed packages have a stopped-service v3 migration entry. The capacity estimate is 896–8,664 SVG bytes per mark (400 marks: about 0.4–3.5 MB). CLI PNG output requires the core wheel; rasterization no longer passes `skip_system_fonts`. DDL is 29 and the DDL engine is 75.
 
 ## v2.15.298 (2026-10-31 / Build 1374)
 

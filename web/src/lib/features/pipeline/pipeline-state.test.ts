@@ -23,7 +23,7 @@ function view(overrides: Partial<PipelineView> = {}): PipelineView {
 test('the run reports local rendering while the perform response is pending', async () => {
 	const ready = view({ phase: { tag: 'ready' }, delivery: { score: {}, upstream_diagnostics: [],
 		downstream_diagnostics: [], resource_omissions: [], relation_omissions: [] },
-		progress: { run_progress: { current: null, finished: [] }, previous: null,
+		progress: { run_progress: { current: null, finished: [] }, stage_tokens: {},
 			total: { input_tokens: 12, output_tokens: 3, unreported_sends: 0 }, received_bytes: null } });
 	let resolvePerform!: (value: PipelineView) => void;
 	const held = new Promise<PipelineView>((resolve) => { resolvePerform = resolve; });

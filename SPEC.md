@@ -2260,7 +2260,7 @@ implementation order.
 
 ### 12.10 Handling Latency
 
-`POST /api/paint/stream` also emits `progress` when its content changes: core `run_progress` (current work and finished stages), the last completed send in `previous`, token totals and the number of unreported sends in `total`, and `received_bytes` only while receiving a ChatGPT plan response. Final rendering is reported as local work before it begins; final saving has no separate event. This display does not change the usage columns saved with a work.
+`POST /api/paint/stream` also emits `progress` when its content changes: core `run_progress` (current work and finished stages), `stage_tokens` (input and output counts and unreported sends by action, including retries), token totals and the number of unreported sends in `total`, and `received_bytes` only while receiving a ChatGPT plan response. Pipeline views use the same projection. The Web displays finished stages in order, followed by the current stage and a total on the last line. Final rendering is reported as local work before it begins; final saving has no separate event. This display does not change the usage columns saved with a work.
 
 Pipeline JSON views include the same payload in `progress`. While Web waits for the final `perform` response, it shows rendering as local work.
 

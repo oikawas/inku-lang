@@ -59,7 +59,7 @@ export type PaintAttemptEvent = {
 export type PaintProgressEvent = {
 	event: 'progress';
 	run_progress: { current: { kind: 'provider' | 'local'; action: string } | null; finished: Array<{ action: string; outcome: string; facts: Record<string, string | number | boolean> }> };
-	previous: { action: string; input_tokens: number | null; output_tokens: number | null } | null;
+	stage_tokens: Record<string, { input_tokens: number | null; output_tokens: number | null; unreported_sends: number }>;
 	total: { input_tokens: number | null; output_tokens: number | null; unreported_sends: number };
 	received_bytes: number | null;
 };

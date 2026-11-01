@@ -485,7 +485,7 @@ export const en: LangPack = {
 	runFinishedReady: (stage) => `${stage}: complete`, runFinishedFallback: (stage) => `${stage}: continued with defaults`,
 	runFinishedRetried: (stage) => `${stage}: asked again`, runLocalReview: 'Drawing for review…',
 	runLocalRender: 'Drawing…', runLocalSave: 'Saving…',
-	runStatusPreviousTokens: (stage, input, output) => `Previous (${stage}) input ${input} · output ${output}`,
+	runStatusStageTokens: (input, output) => `input ${input} · output ${output}`,
 	runStatusTotalTokens: (input, output) => `Total input ${input} · output ${output}`,
 	runStatusPartialTokens: (input, output) => `Total (partly unknown) input ${input} · output ${output}`,
 	runStatusReceived: (kb) => `Received ${kb} KB`,

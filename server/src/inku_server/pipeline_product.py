@@ -565,6 +565,7 @@ class ProductPipelineEffects:
             context.setdefault("provider_sends", []).append({
                 "action": action["tag"], "attempt": int(action["identity"]["attempt"]),
                 "input_tokens": used.get("input_tokens"), "output_tokens": used.get("output_tokens"),
+                "usage_reported": getattr(transport, "usage", None) is not None,
             })
             if result["tag"] == "provider_failed":
                 context["provider_failure"] = {

@@ -347,7 +347,7 @@ export interface LangPack {
 	runLocalReview: string;
 	runLocalRender: string;
 	runLocalSave: string;
-	runStatusPreviousTokens: (stage: string, input: string, output: string) => string;
+	runStatusStageTokens: (input: string, output: string) => string;
 	runStatusTotalTokens: (input: string, output: string) => string;
 	runStatusPartialTokens: (input: string, output: string) => string;
 	runStatusReceived: (kb: string) => string;

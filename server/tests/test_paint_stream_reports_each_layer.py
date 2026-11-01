@@ -115,7 +115,7 @@ def test_progress_reports_each_send_and_totals_without_changing_saved_usage(monk
     events = _events(_client(monkeypatch, service).post('/api/paint/stream', json={"description": "円"}))
     progress = [event for event in events if event["event"] == "progress"]
     assert progress[-1]["run_progress"]["current"] == {"kind": "local", "action": "render"}
-    assert progress[-1]["previous"] == {"action": "read_description", "input_tokens": 7252, "output_tokens": 367}
+    assert progress[-1]["stage_tokens"] == {"read_description": {"input_tokens": 7252, "output_tokens": 367, "unreported_sends": 0}}
     saved = usage_result(service.context["provider_usage"])
     assert progress[-1]["total"]["input_tokens"] == saved["tokens_in"]
     assert progress[-1]["total"]["output_tokens"] == saved["tokens_out"]

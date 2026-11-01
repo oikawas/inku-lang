@@ -70,10 +70,18 @@ def progress_projection(binding, state: dict, context: dict) -> dict | None:
     sends = list(context.get("provider_sends", []))
     usage = context.get("provider_usage") or {}
     totals = usage_result(usage)
-    previous = ({key: sends[-1][key] for key in ("action", "input_tokens", "output_tokens")}
-                if sends else None)
+    stages = {}
+    for send in sends:
+        row = stages.setdefault(send["action"], {"input_tokens": None, "output_tokens": None, "unreported_sends": 0})
+        reported = send.get("usage_reported", any(send.get(key) is not None for key in ("input_tokens", "output_tokens")))
+        if not reported:
+            row["unreported_sends"] += 1
+        for key in ("input_tokens", "output_tokens"):
+            value = send.get(key)
+            if value is not None:
+                row[key] = (row[key] or 0) + int(value)
     receiving = context.get("provider_receiving")
-    return {"run_progress": progress, "previous": previous,
+    return {"run_progress": progress, "stage_tokens": stages,
             "total": {"input_tokens": totals["tokens_in"], "output_tokens": totals["tokens_out"],
                       "unreported_sends": sum(entry["unreported_sends"] for entry in usage.values())},
             "received_bytes": receiving.get("bytes") if receiving else None}

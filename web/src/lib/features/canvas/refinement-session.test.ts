@@ -36,7 +36,7 @@ test('parallel model progress follows a named running lane and ignores stale upd
 	session.seatSlot(run, 0, 'running');
 	session.seatSlot(run, 1, 'running');
 	const sample = (action: string) => ({ event: 'progress' as const,
-		run_progress: { current: { kind: 'provider' as const, action }, finished: [] }, previous: null,
+		run_progress: { current: { kind: 'provider' as const, action }, finished: [] }, stage_tokens: {},
 		total: { input_tokens: 1, output_tokens: 2, unreported_sends: 0 }, received_bytes: null });
 	session.setSlotProgress(run, 1, sample('B'));
 	assert.equal(session.gridProgressLabel, 'B');

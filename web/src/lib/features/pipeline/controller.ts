@@ -310,7 +310,7 @@ export class PipelineController {
 			) {
 				// The synchronous perform request does not answer until rendering and
 				// saving finish, so expose its local work while awaiting that reply.
-				const progress = next.progress ?? { run_progress: { current: null, finished: [] }, previous: null,
+				const progress = next.progress ?? { run_progress: { current: null, finished: [] }, stage_tokens: {},
 					total: { input_tokens: 0, output_tokens: 0, unreported_sends: 0 }, received_bytes: null };
 				show({ ...next, progress: { ...progress, received_bytes: null,
 					run_progress: { ...progress.run_progress, current: { kind: 'local', action: 'render' } } } });

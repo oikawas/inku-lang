@@ -483,7 +483,7 @@ export const ja: LangPack = {
 	runFinishedReady: (stage) => `${stage}：完了`, runFinishedFallback: (stage) => `${stage}：既定の形で続けました`,
 	runFinishedRetried: (stage) => `${stage}：問い直しました`, runLocalReview: '見直し用に描いています…',
 	runLocalRender: '描いています…', runLocalSave: '保存しています…',
-	runStatusPreviousTokens: (stage, input, output) => `前の段（${stage}）入力 ${input}・出力 ${output}`,
+	runStatusStageTokens: (input, output) => `入力 ${input}・出力 ${output}`,
 	runStatusTotalTokens: (input, output) => `合計 入力 ${input}・出力 ${output}`,
 	runStatusPartialTokens: (input, output) => `合計（一部不明）入力 ${input}・出力 ${output}`,
 	runStatusReceived: (kb) => `受信 ${kb} KB`,

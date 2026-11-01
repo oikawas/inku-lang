@@ -1355,7 +1355,7 @@ Shared compiler consumerでは、StopとOmitAndContinueはLLM fallbackではな�
 
 `POST /api/paint/stream` は `sketch`（写生層が動いた場合）、`stage1`、`score`、`done` の順に有限な進行を知らせる。modelの呼出しの試行が始まるたびと、最後の試行が終わったときには`attempt`も送る。その`provider_attempt`は`action`・`attempt`・`max_attempts`を持ち、終わりはnullとする。何も落ち着かない間も、10秒ごとに経過時間だけの`wait`を送る。中継が無通信の本文を打ち切らないように（Webの中継のNodeは300秒で打ち切る）、また読み手が去ったことを知るためである。読み手が去った（停止した、ページを閉じた）実行は取り消す。流れを使わない`/api/paint`・`/api/interpret`・`/api/compose`も、待つ間に1秒ごとに読み手が残っているかを確かめ、去っていれば実行を取り消す（応答は499）。Webの中継は、ブラウザの接続が閉じたらAPIへの要求を中断する。`stage1` は正規化 DDL と診断 metadata を先に表示でき、`done` は通常応答を返す。保存済み作品の「別の構図」と「DDL から描画」は保存済み DDL から再開し、Stage 1 を呼び直さない。独立した Stage 1 キャッシュや将来の並列化を現行契約には含めない。
 
-`progress` は内容が変わるたびに、core の `run_progress`（現在の作業と完了した段）、最後に終わった送信の `previous`、全送信の token 合計と数を返さなかった送信数の `total`、ChatGPT プランの受信中だけの `received_bytes` を送る。最後の描画の前にも local の作業として知らせる。最後の保存について別の出来事は送らない。これは描画中の表示であり、作品に保存する使用量の列は変えない。
+`progress` は内容が変わるたびに、core の `run_progress`（現在の作業と完了した段）、再試行を含む action ごとの入出力数と未報告送信数の `stage_tokens`、全送信の token 合計と数を返さなかった送信数の `total`、ChatGPT プランの受信中だけの `received_bytes` を送る。pipeline view も同じ値を使う。Web は完了した段を順に並べ、現在の段に続いて最下段に合計を出す。最後の描画の前にも local の作業として知らせる。最後の保存について別の出来事は送らない。これは描画中の表示であり、作品に保存する使用量の列は変えない。
 
 pipeline の JSON view は同じ内容を `progress` に含める。Web が最後の `perform` の応答を待つ間は、描画中の local 作業を表示する。
 

@@ -251,13 +251,38 @@ def test_pipeline_view_and_stream_share_progress_from_fake_provider(tmp_path, mo
     run.run_effect()
     view = run.view()
     assert observed[0]["received_bytes"] == 4096
-    assert view["progress"]["previous"] == {"action": "generate_normalized_ddl", "input_tokens": 123, "output_tokens": 45}
+    assert view["progress"]["stage_tokens"] == {"generate_normalized_ddl": {"input_tokens": 123, "output_tokens": 45, "unreported_sends": 0}}
+    assert "previous" not in view["progress"]
     assert view["progress"]["total"] == {"input_tokens": 123, "output_tokens": 45, "unreported_sends": 0}
     monkeypatch.setattr(pipeline_compat, "_service", lambda: SimpleNamespace(execution=lambda *_: run))
     events = list(pipeline_compat._progress("acceptance", view, time.monotonic(), set()))
     streamed = next(event for event in events if event["event"] == "progress")
     assert {key: value for key, value in streamed.items() if key != "event"} == view["progress"]
     engine.dispose()
+
+
+def test_progress_groups_retries_and_unreported_sends_by_action():
+    from inku_server.pipeline_candidate import progress_projection
+    from inku_server.pipeline_product import _add_provider_usage
+
+    class Binding:
+        def run_progress(self, _state):
+            return b'{"run_progress":{"current":null,"finished":[]}}'
+
+    context = {"provider_sends": []}
+    for action, used in [("read_description", {"input_tokens": 10, "output_tokens": 2}),
+                         ("read_description", None),
+                         ("read_description", {"input_tokens": 5, "output_tokens": 3}),
+                         ("choose_colors", {"input_tokens": 7, "output_tokens": 1})]:
+        _add_provider_usage(context, "stage1", used)
+        context["provider_sends"].append({"action": action, "usage_reported": used is not None, **(used or {})})
+    progress = progress_projection(Binding(), {}, context)
+    assert progress["stage_tokens"] == {
+        "read_description": {"input_tokens": 15, "output_tokens": 5, "unreported_sends": 1},
+        "choose_colors": {"input_tokens": 7, "output_tokens": 1, "unreported_sends": 0},
+    }
+    for key in ("input_tokens", "output_tokens", "unreported_sends"):
+        assert sum(row[key] or 0 for row in progress["stage_tokens"].values()) == progress["total"][key]
 
 
 def test_core_failures_are_persisted_and_logged_once_per_transition(caplog):

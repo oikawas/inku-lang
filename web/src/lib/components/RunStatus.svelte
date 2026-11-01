@@ -18,7 +18,7 @@
 	import { getMascot } from '$lib/mascot.svelte';
 	import { providerAttemptText, type ProviderAttemptCount } from '$lib/paintStream';
 	import type { PaintProgressEvent } from '$lib/paintStream';
-	import { finishedText, localWork, stageName, tokenCount } from '$lib/runProgress';
+	import { finishedText, localWork, tokenCount } from '$lib/runProgress';
 
 	type Props = {
 		label: string;
@@ -88,26 +88,34 @@
 	);
 </script>
 
-<div class="run-status" class:inline={variant === 'inline'} aria-live="polite">
+<div class="run-status" class:inline={variant === 'inline'} class:has-progress={!!progress} aria-live="polite">
 	<div class="run-mascot">
 		{#if getMascot() === 'yuragi'}<YuragiMascot />{:else}<IncuMascot />{/if}
 	</div>
 	<div class="run-info">
-		<span class="run-label">{progress?.run_progress.current?.kind === 'local' ? localWork(progress.run_progress.current.action, t()) : label}</span>
-		{#if modelLine}<span class="run-model">{modelLine}</span>{/if}
-		<span class="run-meta">
+		{#if progress}
+			{#if modelLine}<span class="run-model run-ellipsis">{modelLine}</span>{/if}
+			{#each progress.run_progress.finished as item}
+				{@const tokens = progress.stage_tokens[item.action]}
+				<span class="run-stage">
+					<span class="run-ellipsis">✓ {finishedText(item, t())}</span>
+					{#if tokens}<span class="run-stage-tokens">{t().runStatusStageTokens(tokenCount(tokens.input_tokens), tokenCount(tokens.output_tokens))}</span>{/if}
+				</span>
+			{/each}
+			<span class="run-label">… {progress.run_progress.current?.kind === 'local' ? localWork(progress.run_progress.current.action, t()) : label}</span>
+		{:else}
+			<span class="run-label">{label}</span>
+			{#if modelLine}<span class="run-model">{modelLine}</span>{/if}
+		{/if}
+		<span class="run-meta" class:run-meta-log={progress}>
 			{#if progressText}<span class="run-progress">{progressText}</span>{/if}
 			{#if attemptText}<span class:run-progress={(attempt?.attempt ?? 1) > 1}>{attemptText}</span>{/if}
 			{#if elapsedText}<span>{elapsedText}</span>{/if}
 			{#if progress?.received_bytes != null}<span>{t().runStatusReceived(String(Math.floor(progress.received_bytes / 1024)))}</span>{/if}
-			<span>{tokenText}</span>
+			{#if !progress}<span>{tokenText}</span>{/if}
 		</span>
-		{#if progress?.run_progress.finished.length}
-			<span class="run-detail">{progress.run_progress.finished.map((item) => `✓ ${finishedText(item, t())}`).join('　')}</span>
-		{/if}
 		{#if progress}
-			<span class="run-detail">
-				{#if progress.previous}{t().runStatusPreviousTokens(stageName(progress.previous.action, t()), tokenCount(progress.previous.input_tokens), tokenCount(progress.previous.output_tokens))} ／ {/if}
+			<span class="run-detail run-total">
 				{progress.total.unreported_sends ? t().runStatusPartialTokens(tokenCount(progress.total.input_tokens), tokenCount(progress.total.output_tokens)) : t().runStatusTotalTokens(tokenCount(progress.total.input_tokens), tokenCount(progress.total.output_tokens))}
 			</span>
 		{/if}
@@ -136,6 +144,7 @@
 		border: 0;
 		background: transparent;
 	}
+	.run-status.inline.has-progress { flex: 0 1 auto; }
 	.run-mascot {
 		flex: 0 0 auto;
 		display: flex;
@@ -154,6 +163,7 @@
 		align-items: flex-end;
 		text-align: right;
 	}
+	.run-status.inline.has-progress .run-info { flex: 1 1 auto; align-items: stretch; }
 	.run-label {
 		font-size: var(--ui-font-size-12);
 		font-weight: 500;
@@ -177,6 +187,12 @@
 		flex-wrap: wrap;
 	}
 	.run-detail { font-size: var(--ui-font-size-11); color: var(--fg3); overflow-wrap: anywhere; }
+	.run-ellipsis { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.run-stage { display: flex; gap: 8px; min-width: 0; font-size: var(--ui-font-size-11); color: var(--fg3); }
+	.run-stage-tokens { flex: 0 0 auto; margin-left: auto; white-space: nowrap; font-variant-numeric: tabular-nums; }
+	.run-meta-log { flex-wrap: nowrap; white-space: nowrap; }
+	.run-meta-log > span { flex: 0 0 auto; }
+	.run-total { white-space: nowrap; font-variant-numeric: tabular-nums; }
 	.run-status.inline .run-meta {
 		justify-content: flex-end;
 	}

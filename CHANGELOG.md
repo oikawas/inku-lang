@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Server and Web: show drawing progress as a growing stage log with per-action token counts and a final total; retries count toward their action.
+
 - macOS: show drawing failure reasons in the Web wording, with the cause and attempt count for the corresponding stage.
 
 - macOS: restore the “Build N” tooltip and update the tooltip parity markers and counts.

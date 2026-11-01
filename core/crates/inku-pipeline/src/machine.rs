@@ -931,7 +931,31 @@ pub struct PipelineSnapshot {
     /// starts and kept after it commits, for the host to save with the work.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description_ddl: Option<DescriptionDdlRecord>,
+    /// Completed steps of this run, without prompts, prose, or usage counters.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub run_finished: Vec<RunFinished>,
     pub snapshot_digest: String,
+}
+
+/// One completed step retained in the sealed snapshot for progress displays.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RunFinished {
+    pub action: String,
+    pub outcome: String,
+    pub facts: BTreeMap<String, serde_json::Value>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct RunProgress {
+    pub current: Option<RunCurrent>,
+    pub finished: Vec<RunFinished>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct RunCurrent {
+    pub kind: &'static str,
+    pub action: String,
 }
 
 /// A run of the laws stage from a saved work (2026-10-20).
@@ -980,6 +1004,158 @@ pub struct StepOutput {
 }
 
 impl PipelineSnapshot {
+    /// Read progress only from this validated, sealed snapshot.
+    pub fn run_progress(&self) -> Result<RunProgress, ProtocolError> {
+        self.validate()?;
+        let current = match (&self.phase, &self.action) {
+            (PipelinePhase::AwaitingLlm { stage, .. }, Some(action))
+                if action.tag == stage.action_name() =>
+            {
+                Some(RunCurrent {
+                    kind: "provider",
+                    action: action.tag.clone(),
+                })
+            }
+            (
+                PipelinePhase::AwaitingImageReviewDrawing
+                | PipelinePhase::AwaitingVisibleDdlCommit { .. },
+                Some(action),
+            ) => Some(RunCurrent {
+                kind: "local",
+                action: action.tag.clone(),
+            }),
+            _ => None,
+        };
+        Ok(RunProgress {
+            current,
+            finished: self.run_finished.clone(),
+        })
+    }
+
+    fn record_progress(&mut self, previous: Option<(LlmStage, u32)>, events: &[PipelineEvent]) {
+        let has = |tag: &str| events.iter().any(|event| event.tag == tag);
+        if (has("description_review_skipped")
+            || has("image_review_skipped")
+            || has("description_review_fallback")
+            || has("image_review_fallback"))
+            && let Some(written) = self.run_finished.iter_mut().rev().find(|entry| {
+                matches!(
+                    entry.action.as_str(),
+                    "write_description_ddl" | "write_image_ddl"
+                )
+            })
+        {
+            written.facts.insert("review_skipped".into(), json!(true));
+        }
+        let Some((stage, attempt)) = previous else {
+            return;
+        };
+        if matches!(&self.phase, PipelinePhase::AwaitingLlm { stage: next, .. } if *next == stage) {
+            return;
+        }
+        if matches!(
+            self.phase,
+            PipelinePhase::Failed { .. } | PipelinePhase::Cancelled
+        ) {
+            return;
+        }
+        if matches!(
+            stage,
+            LlmStage::ReviewDescriptionDdl | LlmStage::ReviewImageDdl
+        ) && (has("description_review_fallback") || has("image_review_fallback"))
+        {
+            return;
+        }
+        if matches!(self.phase, PipelinePhase::NeedsUserEdit { .. })
+            && !has("visible_patch_proposed")
+        {
+            return;
+        }
+        let fallback = match stage {
+            LlmStage::SelectDescriptionCatalog | LlmStage::SelectImageCatalog => {
+                has("catalog_fallback")
+            }
+            LlmStage::GenerateSketch => events
+                .iter()
+                .any(|event| event.tag == "sketch_ready" && event.payload["state"] == "fallback"),
+            LlmStage::ReadDescription => has("description_reading_fallback"),
+            LlmStage::ComposeDescription => has("description_composition_fallback"),
+            LlmStage::ReadComposition => has("composition_fallback"),
+            LlmStage::ChooseLaws => has("laws_fallback"),
+            LlmStage::ChooseColors => has("colors_fallback"),
+            LlmStage::GenerateNormalizedDdl => has("stage1_fallback"),
+            _ => false,
+        };
+        let outcome = if fallback {
+            "fallback"
+        } else if attempt > 1 {
+            "retried"
+        } else {
+            "ready"
+        };
+        let mut facts = BTreeMap::new();
+        match stage {
+            LlmStage::SelectDescriptionCatalog | LlmStage::SelectImageCatalog => {
+                facts.insert(
+                    "catalog_id".into(),
+                    json!(self.config.compiler.host.resolved_catalog_id()),
+                );
+            }
+            LlmStage::ReadDescription => {
+                if let Some(record) = &self.description_ddl {
+                    facts.insert("dropped_items".into(), json!(record.dropped_items.len()));
+                }
+            }
+            LlmStage::ComposeDescription => {
+                if let Some(event) = events
+                    .iter()
+                    .find(|event| event.tag == "description_composition_ready")
+                {
+                    for key in ["things", "main_law"] {
+                        if let Some(value) = event.payload.get(key) {
+                            facts.insert(key.into(), value.clone());
+                        }
+                    }
+                    if let Some(laws) = event.payload["laws"].as_array() {
+                        facts.insert("laws".into(), json!(laws.len()));
+                    }
+                }
+            }
+            LlmStage::ChooseColors | LlmStage::ChooseLaws => {
+                let tag = if stage == LlmStage::ChooseColors {
+                    "colors_chosen"
+                } else {
+                    "laws_chosen"
+                };
+                if let Some(value) = events
+                    .iter()
+                    .find(|event| event.tag == tag)
+                    .and_then(|event| event.payload.get("main_law"))
+                    .filter(|value| value.is_string())
+                {
+                    facts.insert("main_law".into(), value.clone());
+                }
+            }
+            LlmStage::WriteDescriptionDdl | LlmStage::WriteImageDdl
+                if !matches!(
+                    self.phase,
+                    PipelinePhase::AwaitingImageReviewDrawing
+                        | PipelinePhase::AwaitingLlm {
+                            stage: LlmStage::ReviewDescriptionDdl | LlmStage::ReviewImageDdl,
+                            ..
+                        }
+                ) =>
+            {
+                facts.insert("review_skipped".into(), json!(true));
+            }
+            _ => {}
+        }
+        self.run_finished.push(RunFinished {
+            action: stage.action_name().into(),
+            outcome: outcome.into(),
+            facts,
+        });
+    }
     fn seal(&mut self) -> Result<(), ProtocolError> {
         self.snapshot_digest.clear();
         self.snapshot_digest = value_digest("inku.pipeline-snapshot.v1", self)?;
@@ -4073,6 +4249,18 @@ fn advance_impl(
     max_svg_bytes: Option<usize>,
 ) -> Result<StepOutput, ProtocolError> {
     input.validate("input")?;
+    let previous = if matches!(&input.payload, PipelineInput::EffectResult { .. }) {
+        snapshot
+            .as_ref()
+            .and_then(|state| match (&state.phase, &state.action) {
+                (PipelinePhase::AwaitingLlm { stage, .. }, Some(action)) => {
+                    Some((*stage, action.identity.attempt))
+                }
+                _ => None,
+            })
+    } else {
+        None
+    };
     let mut events = Vec::new();
     let mut rendered = None;
     let mut state = if let Some(mut state) = snapshot {
@@ -4101,6 +4289,7 @@ fn advance_impl(
                 source,
             } => {
                 state.editable()?;
+                state.run_finished.clear();
                 state.revision(expected_revision)?;
                 let changed = state
                     .document
@@ -4136,6 +4325,7 @@ fn advance_impl(
                 composition,
             } => {
                 state.editable()?;
+                state.run_finished.clear();
                 state.revision(expected_revision)?;
                 state.description(
                     description,
@@ -4152,6 +4342,7 @@ fn advance_impl(
                 hole_ids,
             } => {
                 state.editable()?;
+                state.run_finished.clear();
                 state.revision(expected_revision)?;
                 state.complete_holes(hole_ids, &mut events)?;
             }
@@ -4340,6 +4531,7 @@ fn advance_impl(
             image_ddl: None,
             image_fallback: None,
             description_ddl: None,
+            run_finished: Vec::new(),
             snapshot_digest: String::new(),
         };
         state.event(
@@ -4418,6 +4610,7 @@ fn advance_impl(
         }
         state
     };
+    state.record_progress(previous, &events);
     state.seal()?;
     Ok(StepOutput {
         snapshot: state,

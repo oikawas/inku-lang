@@ -1082,6 +1082,10 @@ mod tests {
         // Without a review the written DDL is committed as it is.
         let state = write(&state, GOOD).snapshot;
         assert_eq!(committed_source(&state), declared(GOOD));
+        assert_eq!(
+            progress(&state)["run_progress"]["finished"][0],
+            json!({"action":"write_description_ddl", "outcome":"ready", "facts":{"review_skipped":true}})
+        );
     }
 
     #[test]
@@ -1358,6 +1362,96 @@ mod tests {
 
     fn golden() -> Value {
         json!({"B1": {"targets": [{"thing": 1, "at": "point_ul"}]}})
+    }
+
+    fn progress(state: &PipelineSnapshot) -> Value {
+        serde_json::from_slice(&crate::byte_envelope::run_progress_owned(
+            &serde_json::to_vec(state).unwrap(),
+        ))
+        .unwrap()
+    }
+
+    #[test]
+    fn run_progress_tracks_description_and_local_review_from_snapshot() {
+        let mut config = read_config(true);
+        config.catalogs = vec![candidate("default")];
+        let mut input = authoring(SketchRequest::On, true);
+        if let AuthoringInput::Description { composition, .. } = &mut input {
+            *composition = CompositionRequest::On;
+        }
+        let initial = start_with(config, input).snapshot;
+        let selected = reply(
+            &initial,
+            EffectResult::DescriptionCatalogSelected {
+                identity: initial.action.as_ref().unwrap().identity.clone(),
+                response: json!({"catalog_id": "default"}).to_string(),
+                elapsed_ms: DecimalU64::new(20),
+            },
+        )
+        .snapshot;
+        let read = answer_text(&selected, &reading().to_string()).snapshot;
+        let writing = answer_text(&read, &composition(golden()).to_string()).snapshot;
+        let sample = progress(&writing);
+        assert_eq!(
+            sample,
+            json!({"run_progress": {"current": {"kind":"provider", "action":"write_description_ddl"}, "finished": [
+                {"action":"select_description_catalog", "outcome":"ready", "facts":{"catalog_id":"default"}},
+                {"action":"read_description", "outcome":"ready", "facts":{"dropped_items":1}},
+                {"action":"compose_description", "outcome":"ready", "facts":{"things":2,"main_law":"B1","laws":1}}
+            ]}})
+        );
+        eprintln!("description progress: {sample}");
+        let drawing = sentences(
+            &writing,
+            &[(0, "背景を白で埋める。"), (1, WOMAN), (2, SHADE)],
+        )
+        .snapshot;
+        let sample = progress(&drawing);
+        assert_eq!(
+            sample["run_progress"]["current"],
+            json!({"kind":"local", "action":"draw_image_review"})
+        );
+        assert_eq!(
+            sample["run_progress"]["finished"][3],
+            json!({"action":"write_description_ddl", "outcome":"ready", "facts":{}})
+        );
+        eprintln!("review drawing progress: {sample}");
+        let cancelled = run(
+            Some(&drawing),
+            &envelope(Some(&drawing), PipelineInput::Cancel),
+        )
+        .snapshot;
+        assert!(progress(&cancelled)["run_progress"]["current"].is_null());
+        assert_eq!(
+            crate::byte_envelope::run_progress_owned(b"bad"),
+            br#"{"error":"invalid_snapshot"}"#
+        );
+        let mut tampered = serde_json::to_value(&writing).unwrap();
+        tampered["sequence"] = json!("999");
+        assert_eq!(
+            crate::byte_envelope::run_progress_owned(&serde_json::to_vec(&tampered).unwrap()),
+            br#"{"error":"invalid_snapshot"}"#
+        );
+    }
+
+    #[test]
+    fn run_progress_records_reading_fallback_and_retried_composition() {
+        let state = composed_start(SketchRequest::On).snapshot;
+        let state = failed(&state).snapshot;
+        let state = failed(&state).snapshot;
+        assert_eq!(
+            progress(&state)["run_progress"]["finished"][0],
+            json!({"action":"read_description", "outcome":"fallback", "facts":{"dropped_items":0}})
+        );
+        let mut invalid = composition(golden());
+        invalid["laws"]["B1"]["targets"][0]["thing"] = json!(99);
+        let again = answer_text(&state, &invalid.to_string()).snapshot;
+        assert_eq!(tag(&again), "compose_description");
+        let finished = answer_text(&again, &composition(golden()).to_string()).snapshot;
+        assert_eq!(
+            progress(&finished)["run_progress"]["finished"][1]["outcome"],
+            "retried"
+        );
     }
 
     fn sentences(state: &PipelineSnapshot, items: &[(u64, &str)]) -> StepOutput {

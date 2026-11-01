@@ -101,6 +101,23 @@ pub fn provider_attempt_owned(snapshot_bytes: &[u8]) -> Vec<u8> {
     }
 }
 
+/// Progress from a validated stored snapshot; no events or clock are required.
+pub fn run_progress_owned(snapshot_bytes: &[u8]) -> Vec<u8> {
+    let progress = serde_json::from_slice::<LimitSnapshot>(snapshot_bytes)
+        .ok()
+        .filter(|limits| {
+            let limits = limits.config.envelope_limits;
+            limits.validate().is_ok() && snapshot_bytes.len() <= limits.max_snapshot_bytes
+        })
+        .and_then(|_| serde_json::from_slice::<PipelineSnapshot>(snapshot_bytes).ok())
+        .and_then(|snapshot| snapshot.run_progress().ok());
+    match progress {
+        Some(progress) => serde_json::to_vec(&json!({ "run_progress": progress }))
+            .expect("run progress serializes"),
+        None => br#"{"error":"invalid_snapshot"}"#.to_vec(),
+    }
+}
+
 /// The SVG a host makes the `draw_image_review` drawing from, for a stored
 /// snapshot waiting for it (the image stages, 2026-10-24). The request gives
 /// the host's render options and clip policy, and its SVG allowance when it

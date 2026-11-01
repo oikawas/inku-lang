@@ -654,6 +654,49 @@ mod tests {
     }
 
     #[test]
+    fn run_progress_tracks_image_write_and_commit_without_prose() {
+        let initial = start(image_config(true), false).snapshot;
+        let drawing = answer(&initial, GOOD).snapshot;
+        let progress = drawing.run_progress().unwrap();
+        assert_eq!(
+            serde_json::to_value(&progress).unwrap(),
+            json!({
+                "current": {"kind":"local", "action":"draw_image_review"},
+                "finished": [{"action":"write_image_ddl", "outcome":"ready", "facts":{}}]
+            })
+        );
+        let reviewing = reply(&drawing, drawn(&drawing, drawing_image())).snapshot;
+        let committed = answer(&reviewing, REVIEWED).snapshot;
+        assert_eq!(
+            committed.run_progress().unwrap().current.unwrap().action,
+            "commit_visible_normalized_ddl"
+        );
+        let ready = run(
+            Some(&committed),
+            &envelope(Some(&committed), ack(&committed)),
+        )
+        .snapshot;
+        assert_eq!(ready.run_progress().unwrap().finished.len(), 2);
+        assert!(ready.run_progress().unwrap().current.is_none());
+        let mut request = render_request();
+        let a4 = inku_score::lookup_canvas_format("a4").unwrap();
+        request["options"]["canvas_aspect_id"] = json!("a4");
+        request["options"]["canvas"] = json!({"width": a4.width_units, "height": a4.height_units});
+        request["options"]["render_seed"] = Value::Null;
+        let render = serde_json::from_value(
+            json!({"tag": "render", "options": request["options"], "clip": request["clip"]}),
+        )
+        .unwrap();
+        let done = run(Some(&ready), &envelope(Some(&ready), render)).snapshot;
+        assert!(matches!(done.phase, PipelinePhase::Completed));
+        assert!(done.run_progress().unwrap().current.is_none());
+    }
+
+    fn drawing_image() -> PromptImage {
+        drawing(724, 1024)
+    }
+
+    #[test]
     fn the_host_draws_the_review_from_the_snapshot_at_the_drawing_size() {
         let started = start(image_config(true), false).snapshot;
         let state = answer(&started, GOOD).snapshot;

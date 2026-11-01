@@ -2566,6 +2566,13 @@ fn a_composing_run_reads_the_settled_plan_and_commits_marked_ranges() {
     let state = reading_requested.snapshot;
     let action = state.action.as_ref().unwrap();
     assert_eq!(action.tag, "read_composition");
+    assert_eq!(
+        serde_json::to_value(state.run_progress().unwrap()).unwrap(),
+        json!({
+            "current": {"kind":"provider", "action":"read_composition"},
+            "finished": [{"action":"generate_normalized_ddl", "outcome":"ready", "facts":{}}]
+        })
+    );
     assert!(state.composition.is_some());
     let message = action.payload["prompt"]["message"].as_str().unwrap();
     assert!(

@@ -206,6 +206,17 @@ fn pipeline_provider_attempt<'py>(
     PyBytes::new(py, &output)
 }
 
+/// Read structured progress for a saved pipeline snapshot.
+#[pyfunction]
+fn pipeline_run_progress<'py>(
+    py: Python<'py>,
+    snapshot_bytes: &Bound<'py, PyBytes>,
+) -> Bound<'py, PyBytes> {
+    let snapshot = snapshot_bytes.as_bytes().to_vec();
+    let output = py.detach(|| inku_pipeline_uniffi::run_progress(snapshot));
+    PyBytes::new(py, &output)
+}
+
 #[pyfunction]
 fn pipeline_resolve_palette<'py>(
     py: Python<'py>,
@@ -668,6 +679,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(pipeline_step, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_step_with_svg_limit, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_provider_attempt, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_run_progress, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_resolve_palette, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_resolve_macro_catalog, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_migrate_plugin_names, module)?)?;

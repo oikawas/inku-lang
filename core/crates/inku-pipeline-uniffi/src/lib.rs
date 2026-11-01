@@ -120,6 +120,15 @@ pub fn provider_attempt(snapshot_bytes: Vec<u8>) -> Vec<u8> {
     .unwrap_or_else(|_| br#"{"error":"invalid_snapshot"}"#.to_vec())
 }
 
+/// Read structured run progress from the sealed snapshot.
+#[uniffi::export]
+pub fn run_progress(snapshot_bytes: Vec<u8>) -> Vec<u8> {
+    catch_unwind(AssertUnwindSafe(|| {
+        inku_pipeline::byte_envelope::run_progress_owned(&snapshot_bytes)
+    }))
+    .unwrap_or_else(|_| br#"{"error":"invalid_snapshot"}"#.to_vec())
+}
+
 /// Another composition read from a work's visible instructions (draw-system05):
 /// the request names the pipeline configuration, the source, the mode
 /// (`principled` or `chance`), the seed and the work. The answer carries the
@@ -613,6 +622,14 @@ pub fn render_saved_svg_limited(input_bytes: Vec<u8>, max_svg_bytes: u64) -> Nat
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn run_progress_refuses_unreadable_snapshot_at_binding_boundary() {
+        assert_eq!(
+            run_progress(b"invalid".to_vec()),
+            br#"{"error":"invalid_snapshot"}"#
+        );
+    }
 
     fn small_saved_input() -> Vec<u8> {
         let budget = inku_score::ResourceBudget {

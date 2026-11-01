@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Core: add `run_progress` to read the current operation and structured completed stages from a saved pipeline snapshot.
+
 - macOS: show drawing failure reasons in the Web wording, with the cause and attempt count for the corresponding stage.
 
 - macOS: restore the “Build N” tooltip and update the tooltip parity markers and counts.

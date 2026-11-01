@@ -22,7 +22,7 @@ use crate::{
 };
 
 /// Stable identity for the single-head semantic AST.
-pub const SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID: &str = "inku.semantic-entity-association.v19";
+pub const SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID: &str = "inku.semantic-entity-association.v20";
 
 /// Source-independent semantic identity projected from one accepted Saijiki row.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -759,6 +759,7 @@ pub struct SemanticAssociationResult {
     pub delivered_compound_reference_count: usize,
     pub macro_parameter_binding: Option<MacroParameterBindingResult>,
     pub(crate) clause_topology: ClauseTopologyEvidence,
+    pub(crate) instrument_phrase_atoms: BTreeSet<usize>,
 }
 
 impl SemanticAssociationResult {
@@ -1842,6 +1843,7 @@ struct AssociationRegion {
 #[derive(Default)]
 struct PreHeadPhraseOwnership {
     modifier_starts_by_head: BTreeMap<usize, BTreeSet<usize>>,
+    instrument_phrase_atoms: BTreeSet<usize>,
 }
 
 impl PreHeadPhraseOwnership {
@@ -2707,6 +2709,7 @@ fn build_semantic_entities(
     }
 
     associate_fill_geometry_ownership(document, &clause_stream, &regions, &mut pre_head_ownership);
+    associate_instrument_phrases(document, &clause_stream, &regions, &mut pre_head_ownership);
     let mut entities = Vec::new();
     for (region_index, region) in regions {
         associate_region(
@@ -2870,6 +2873,194 @@ fn build_semantic_entities(
         delivered_compound_reference_count,
         macro_parameter_binding,
         clause_topology,
+        instrument_phrase_atoms: pre_head_ownership.instrument_phrase_atoms,
+    }
+}
+
+// These phrases only add owners in a single-primitive sentence. Keep the
+// original atoms and spans so diagnostics and the action association agree.
+fn associate_instrument_phrases(
+    document: &NormalizedDdlDocument,
+    stream: &ClauseStream,
+    regions: &BTreeMap<usize, AssociationRegion>,
+    ownership: &mut PreHeadPhraseOwnership,
+) {
+    for (clause_index, clause) in stream.clauses.iter().enumerate() {
+        let Some(region) = regions.get(&sentence_region_index(stream, clause.span)) else {
+            continue;
+        };
+        let [SemanticHead::Primitive(head)] = region.heads.as_slice() else {
+            continue;
+        };
+        if head.provenance.source.clause_index != clause_index {
+            continue;
+        }
+        let atoms = &clause.atoms;
+        if atoms.iter().any(|atom| {
+            matches!(
+                atom,
+                ClauseAtom::GrammarMarker {
+                    marker_id: MarkerId::JaGroup | MarkerId::EnGroupOf,
+                    ..
+                }
+            )
+        }) {
+            continue;
+        }
+        // Fill has its own two operand grammar, including the background form.
+        if atoms.iter().any(|atom| matches!(atom, ClauseAtom::RemainingRole(term)
+            if term.role == RemainingRoleKind::Motion && crate::project_macro_semantic_ref(&term.category_key, &term.canonical_surface_ja)
+                .is_some_and(|id| id.category == "movement" && id.canonical_id == "fill"))) { continue; }
+        let kind = |atom: &ClauseAtom| match atom {
+            ClauseAtom::CoreRole(term) if term.role == CoreRoleKind::Color => 1,
+            ClauseAtom::CoreRole(term) if term.role == CoreRoleKind::Touch => 2,
+            _ => 0,
+        };
+        let gap = |a: SourceSpan, b: SourceSpan| &document.source()[a.end_byte..b.start_byte];
+        for (i, atom) in atoms.iter().enumerate() {
+            let ClauseAtom::GrammarMarker { marker_id, .. } = atom else {
+                continue;
+            };
+            let mut indices = Vec::new();
+            let mut all_indices = Vec::new();
+            match marker_id {
+                MarkerId::JaDe => {
+                    if i == 0
+                        || kind(&atoms[i - 1]) == 0
+                        || !gap(atoms[i - 1].span(), atom.span()).trim().is_empty()
+                    {
+                        continue;
+                    }
+                    let mut j = i;
+                    while j > 0 {
+                        let prev = &atoms[j - 1];
+                        if !gap(prev.span(), atoms[j].span()).trim().is_empty() {
+                            break;
+                        }
+                        if kind(prev) != 0 {
+                            indices.push(j - 1);
+                        } else if !matches!(
+                            prev,
+                            ClauseAtom::GrammarMarker {
+                                marker_id: MarkerId::JaNo,
+                                ..
+                            }
+                        ) {
+                            break;
+                        }
+                        all_indices.push(j - 1);
+                        j -= 1;
+                    }
+                    if j >= 2
+                        && matches!(
+                            atoms[j - 1],
+                            ClauseAtom::GrammarMarker {
+                                marker_id: MarkerId::JaTo,
+                                ..
+                            }
+                        )
+                        && kind(&atoms[j - 2]) != 0
+                    {
+                        continue;
+                    }
+                    if head.provenance.source.span.end_byte <= atoms[j].span().start_byte
+                        && !atoms.iter().any(|candidate| matches!(candidate, ClauseAtom::GrammarMarker { marker_id: MarkerId::JaWo, span } if head.provenance.source.span.end_byte <= span.start_byte && span.end_byte <= atoms[j].span().start_byte))
+                    {
+                        continue;
+                    }
+                    // A relative clause or another predicate between the phrase and head is not a modifier.
+                    let (lo, hi) = if atom.span().end_byte <= head.provenance.source.span.start_byte
+                    {
+                        (atom.span().end_byte, head.provenance.source.span.start_byte)
+                    } else {
+                        (
+                            head.provenance.source.span.end_byte,
+                            atoms[i - all_indices.len()].span().start_byte,
+                        )
+                    };
+                    if lo <= hi
+                        && atoms.iter().any(|a| {
+                            lo <= a.span().start_byte
+                                && a.span().end_byte <= hi
+                                && matches!(
+                                    a,
+                                    ClauseAtom::UnresolvedDiagnostic(_)
+                                        | ClauseAtom::RemainingRole(crate::RemainingRoleTerm {
+                                            role: RemainingRoleKind::Motion,
+                                            ..
+                                        })
+                                )
+                        })
+                    {
+                        continue;
+                    }
+                    all_indices.push(i);
+                }
+                MarkerId::EnWith | MarkerId::EnIn => {
+                    let mut j = i + 1;
+                    if j < atoms.len()
+                        && matches!(
+                            atoms[j],
+                            ClauseAtom::GrammarMarker {
+                                marker_id: MarkerId::EnA | MarkerId::EnAn | MarkerId::EnThe,
+                                ..
+                            }
+                        )
+                    {
+                        all_indices.push(j);
+                        j += 1;
+                    }
+                    while j < atoms.len()
+                        && kind(&atoms[j]) != 0
+                        && gap(atoms[j - 1].span(), atoms[j].span()).trim().is_empty()
+                    {
+                        indices.push(j);
+                        all_indices.push(j);
+                        j += 1;
+                    }
+                    if indices.len() == 2
+                        && (kind(&atoms[indices[0]]) != 1 || kind(&atoms[indices[1]]) != 2)
+                    {
+                        continue;
+                    }
+                    if indices.is_empty()
+                        || (*marker_id == MarkerId::EnWith
+                            && !indices.iter().any(|&k| kind(&atoms[k]) == 2))
+                    {
+                        continue;
+                    }
+                    // A following comma-separated color/tool continues a list, not a phrase.
+                    if j < atoms.len() && kind(&atoms[j]) != 0 {
+                        continue;
+                    }
+                    let head_start = head.provenance.source.span.start_byte;
+                    if atom.span().start_byte < head_start {
+                        let tail = atoms[*indices.last().unwrap()].span().end_byte;
+                        let prefix =
+                            &document.source()[clause.span.start_byte..atom.span().start_byte];
+                        let after = &document.source()[tail..head_start];
+                        if !prefix.trim().is_empty() || !after.trim_start().starts_with(',') {
+                            continue;
+                        }
+                    }
+                    all_indices.push(i);
+                }
+                _ => continue,
+            }
+            if indices.iter().filter(|&&k| kind(&atoms[k]) == 1).count() > 1
+                || indices.iter().filter(|&&k| kind(&atoms[k]) == 2).count() > 1
+            {
+                continue;
+            }
+            for &k in &indices {
+                ownership.insert(head.provenance.source.span, atoms[k].span());
+            }
+            for k in all_indices {
+                ownership
+                    .instrument_phrase_atoms
+                    .insert(atoms[k].span().start_byte);
+            }
+        }
     }
 }
 

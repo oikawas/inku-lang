@@ -2591,7 +2591,7 @@ fn japanese_predicate_segment_is_clear(
         .atoms
         .iter()
         .filter(|atom| start_byte <= atom.span().start_byte && atom.span().end_byte <= end_byte)
-        .all(|atom| match atom {
+        .all(|atom| association.instrument_phrase_atoms.contains(&atom.span().start_byte) || match atom {
             ClauseAtom::FunctionWord { surface, span, .. }
                 if crate::parser::is_japanese_counter_surface(surface)
                     && association.clause_stream.clauses[clause_index].atoms.iter().any(|candidate|
@@ -2688,54 +2688,59 @@ fn english_entity_to_marker_gap_is_clear(
         .atoms
         .iter()
         .filter(|atom| start_byte <= atom.span().start_byte && atom.span().end_byte <= end_byte)
-        .all(|atom| match atom {
-            ClauseAtom::RemainingRole(term) => matches!(
-                term.role,
-                RemainingRoleKind::Place | RemainingRoleKind::Angle
-            ),
-            ClauseAtom::FunctionWord {
-                geometry_keyword: Some(_),
-                ..
-            }
-            | ClauseAtom::FunctionWord {
-                exact_decimal: Some(_),
-                ..
-            } => true,
-            ClauseAtom::FunctionWord { surface, .. } => {
-                crate::parser::is_group_layout_function_word(surface)
-            }
-            ClauseAtom::GrammarMarker { span, .. } => {
-                association
-                    .clause_topology
-                    .determiner_starts
-                    .contains(&span.start_byte)
-                    || (attachment_marker_at(association, clause_index, span.start_byte)
-                        == Some(AttachmentMarkerKind::English(
-                            EnglishAttachmentMarkerKind::With,
-                        ))
-                        && association.ast.entities.iter().any(|entity| {
-                            entity.head.source().clause_index == clause_index
-                                && entity.head.source().span.end_byte == start_byte
-                                && entity
-                                    .explicit_geometry
-                                    .iter()
-                                    .chain(&entity.additional_explicit_geometries)
-                                    .any(|geometry| {
-                                        span.end_byte <= geometry.source().span.start_byte
-                                            && geometry.source().span.end_byte <= end_byte
-                                    })
-                        }))
-                    || matches!(
-                        attachment_marker_at(association, clause_index, span.start_byte),
-                        Some(AttachmentMarkerKind::English(
-                            EnglishAttachmentMarkerKind::At
-                                | EnglishAttachmentMarkerKind::In
-                                | EnglishAttachmentMarkerKind::On
-                                | EnglishAttachmentMarkerKind::To
-                        ))
-                    )
-            }
-            _ => false,
+        .all(|atom| {
+            association
+                .instrument_phrase_atoms
+                .contains(&atom.span().start_byte)
+                || match atom {
+                    ClauseAtom::RemainingRole(term) => matches!(
+                        term.role,
+                        RemainingRoleKind::Place | RemainingRoleKind::Angle
+                    ),
+                    ClauseAtom::FunctionWord {
+                        geometry_keyword: Some(_),
+                        ..
+                    }
+                    | ClauseAtom::FunctionWord {
+                        exact_decimal: Some(_),
+                        ..
+                    } => true,
+                    ClauseAtom::FunctionWord { surface, .. } => {
+                        crate::parser::is_group_layout_function_word(surface)
+                    }
+                    ClauseAtom::GrammarMarker { span, .. } => {
+                        association
+                            .clause_topology
+                            .determiner_starts
+                            .contains(&span.start_byte)
+                            || (attachment_marker_at(association, clause_index, span.start_byte)
+                                == Some(AttachmentMarkerKind::English(
+                                    EnglishAttachmentMarkerKind::With,
+                                ))
+                                && association.ast.entities.iter().any(|entity| {
+                                    entity.head.source().clause_index == clause_index
+                                        && entity.head.source().span.end_byte == start_byte
+                                        && entity
+                                            .explicit_geometry
+                                            .iter()
+                                            .chain(&entity.additional_explicit_geometries)
+                                            .any(|geometry| {
+                                                span.end_byte <= geometry.source().span.start_byte
+                                                    && geometry.source().span.end_byte <= end_byte
+                                            })
+                                }))
+                            || matches!(
+                                attachment_marker_at(association, clause_index, span.start_byte),
+                                Some(AttachmentMarkerKind::English(
+                                    EnglishAttachmentMarkerKind::At
+                                        | EnglishAttachmentMarkerKind::In
+                                        | EnglishAttachmentMarkerKind::On
+                                        | EnglishAttachmentMarkerKind::To
+                                ))
+                            )
+                    }
+                    _ => false,
+                }
         })
 }
 

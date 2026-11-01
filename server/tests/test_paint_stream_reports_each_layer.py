@@ -101,19 +101,26 @@ def test_progress_reports_each_send_and_totals_without_changing_saved_usage(monk
             self.context["provider_sends"] = [{"action": "read_description", "attempt": 1, **used}]
             return super().get(owner, variation_id)
 
-        def command(self, owner, execution_id, command):
-            self.run.performance_save_observer()
-            return super().command(owner, execution_id, command)
-
     service = ProgressService()
     events = _events(_client(monkeypatch, service).post('/api/paint/stream', json={"description": "円"}))
     progress = [event for event in events if event["event"] == "progress"]
-    assert progress[-2]["run_progress"]["current"] == {"kind": "local", "action": "render"}
-    assert progress[-1]["run_progress"]["current"] == {"kind": "local", "action": "save"}
+    assert progress[-1]["run_progress"]["current"] == {"kind": "local", "action": "render"}
     assert progress[-1]["previous"] == {"action": "read_description", "input_tokens": 7252, "output_tokens": 367}
     saved = usage_result(service.context["provider_usage"])
     assert progress[-1]["total"]["input_tokens"] == saved["tokens_in"]
     assert progress[-1]["total"]["output_tokens"] == saved["tokens_out"]
+
+    # Closing at the render event must not start a concurrent performance.
+    service = ProgressService()
+    monkeypatch.setattr(pipeline_compat, "_service", lambda: service)
+    stream = pipeline_compat.paint_events("author-1", {"description": "円"}, None)
+    for event in stream:
+        if event.get("run_progress", {}).get("current") == {"kind": "local", "action": "render"}:
+            break
+    else:
+        pytest.fail("render progress was not emitted")
+    stream.close()
+    assert {"tag": "perform"} not in service.commands
 
 
 def test_the_stream_names_each_layer_in_order_before_the_drawing(monkeypatch) -> None:

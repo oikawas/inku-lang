@@ -5,8 +5,6 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import queue
-import threading
 import time
 from collections.abc import Callable, Iterator
 from typing import Any
@@ -488,35 +486,12 @@ def paint_events(owner: str, data: dict[str, Any], idempotency_key: str | None) 
                 yield {"event": "wait", "elapsed_ms": int((last_line - started) * 1000)}
             time.sleep(_POLL_SECONDS)
             view = service.get(owner, view["variation_id"])
-        if view.get("delivery") is None or view.get("result") is not None:
-            view = _settled(owner, view, perform=True)
-        else:
-            # Rendering and persistence are synchronous host work. Run them in a
-            # worker so the stream can name both operations before they begin.
-            run = service.execution(owner, view["execution_id"])
-            messages = queue.Queue()
-            run.performance_save_observer = lambda: messages.put(("local", "save"))
-            def perform():
-                try:
-                    messages.put(("result", _settled(owner, view, perform=True)))
-                except Exception as error:
-                    messages.put(("error", error))
-                finally:
-                    run.performance_save_observer = None
+        if view.get("delivery") is not None and view.get("result") is None:
             latest = next((item for item in sent if item.startswith("progress:")), None)
             base = json.loads(latest.removeprefix("progress:")) if latest else None
             if base is not None:
                 yield {**base, "run_progress": {**base["run_progress"], "current": {"kind": "local", "action": "render"}}}
-            threading.Thread(target=perform, daemon=True).start()
-            while True:
-                kind, value = messages.get()
-                if kind == "local" and base is not None:
-                    yield {**base, "run_progress": {**base["run_progress"], "current": {"kind": "local", "action": value}}}
-                elif kind == "error":
-                    raise value
-                elif kind == "result":
-                    view = value
-                    break
+        view = _settled(owner, view, perform=True)
         yield from _progress(owner, view, started, sent)
     except GeneratorExit:
         _end_abandoned_run(owner, view)

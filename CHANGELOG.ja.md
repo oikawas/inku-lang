@@ -8,7 +8,7 @@
 
 ## 未リリース
 
-- Server・Web：描画中の完了した段、送信ごとの token と合計、ChatGPT の受信量、描画・保存の作業を表示する。
+- Server・Web：描画中の完了した段、送信ごとの token と合計、ChatGPT の受信量、最後の描画を表示する。
 
 - core：保存した pipeline snapshot から、進行中の処理と完了した段の構造化情報を読む `run_progress` を追加する。
 

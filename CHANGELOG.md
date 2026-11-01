@@ -8,7 +8,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- Server and Web: show finished stages, per-send and total tokens, ChatGPT bytes received, and local rendering and saving while drawing.
+- Server and Web: show finished stages, per-send and total tokens, ChatGPT bytes received, and final rendering while drawing.
 
 - Core: add `run_progress` to read the current operation and structured completed stages from a saved pipeline snapshot.
 

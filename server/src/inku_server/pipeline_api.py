@@ -290,9 +290,6 @@ class PipelineService:
                     projection = {"rendered": rendered, "completion_ranges": snapshot["completion_ranges"]}
                 digest = hashlib.sha256(json.dumps(projection, sort_keys=True).encode()).hexdigest()
                 if digest != host_context.get("render_digest"):
-                    observer = getattr(run, "performance_save_observer", None)
-                    if observer is not None:
-                        observer()
                     host_context["result"] = self.project_result(owner, snapshot, host_context, rendered)
                     host_context["render_digest"] = digest
             state_bytes = json.dumps(

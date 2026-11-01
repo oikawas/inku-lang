@@ -13,6 +13,7 @@ import logging
 import threading
 import time
 import uuid
+from contextlib import contextmanager
 from typing import Callable
 
 from .api_core.models import json_seeds
@@ -245,6 +246,7 @@ class CandidateExecution:
         self._lock = threading.RLock()
         self._fresh = False
         self._provider_in_flight = False
+        self._render_in_flight = False
         # The provider action this host is running and when it began, in epoch ms.
         self._attempt_began: tuple[dict, int] | None = None
         # Pixel bytes never enter context, snapshots, transcripts or history.
@@ -428,6 +430,14 @@ class CandidateExecution:
                 raise CandidateHostError("execution_not_started")
             return json.loads(_bytes(self._snapshot))
 
+    @contextmanager
+    def _track_render(self):
+        self._render_in_flight = True
+        try:
+            yield
+        finally:
+            self._render_in_flight = False
+
     def _advance(self, payload: dict) -> dict:
         limits = self.config["envelope_limits"]
         state = self._snapshot
@@ -450,7 +460,7 @@ class CandidateExecution:
             render_step = getattr(self.binding, "step_with_svg_limit", None)
             if not callable(render_step):
                 raise _svg_limit_binding_unavailable()
-            with _render_capacity(self.owner_id):
+            with self._track_render(), _render_capacity(self.owner_id):
                 svg_limit = _generated_svg_limit_bytes()
                 output_bytes, svg = render_step(snapshot_bytes, input_bytes, svg_limit)
                 if svg is not None:

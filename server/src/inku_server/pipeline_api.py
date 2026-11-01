@@ -264,6 +264,31 @@ class PipelineService:
         for run in self._runs.values():
             run.image_data.clear()
 
+    def activity(self, owner: str | None) -> list[dict]:
+        """Observe this process's live work without acquiring a rendering run's lock."""
+        with self._lock:
+            entries = list(self._runs.items())
+            jobs = dict(self._jobs)
+        active = []
+        for (run_owner, execution_id), run in entries:
+            if owner is not None and run_owner != owner:
+                continue
+            job = jobs.get((run_owner, execution_id))
+            rendering = run._render_in_flight
+            if not rendering and (job is None or job.done()):
+                continue
+            state = run._snapshot or {}
+            options = run.context.get("host_options") or {}
+            action = state.get("action") or {}
+            active.append({
+                "execution_id": execution_id, "variation_id": state.get("variation_id"),
+                "state": "rendering" if rendering else ("running" if job.running() else "queued"),
+                "action": "render" if rendering else action.get("tag"),
+                "batch_run_id": options.get("batch_run_id"),
+                "batch_line_number": options.get("batch_line_number"),
+            })
+        return active
+
     def _host(self, owner: str, config: dict, context: dict) -> CandidateExecution:
         def provider(action):
             if action["tag"] == "draw_image_review":
@@ -950,6 +975,19 @@ def pipeline_router(service: PipelineService | Callable[[], PipelineService], ac
 
     def current_service() -> PipelineService:
         return service if isinstance(service, PipelineService) else service()
+
+    @router.get("/activity", summary="Observe currently active pipeline work")
+    def activity(all_users: bool = False, actor: dict = Depends(actor_dependency)):
+        """Observe this process only; batch clients may be between requests. All users requires admin."""
+        if all_users:
+            from . import db
+            if not db.has_permission_group(actor, "admins"):
+                raise HTTPException(403, "administrator permission is required")
+        from .api_core.state import _render_slots
+        return {"scope": "all_users" if all_users else "current_user", "process_scope": "current_process",
+                "executions": current_service().activity(None if all_users else actor["id"]),
+                "render_slots_active": _render_slots.active if all_users else None,
+                "batch_waiting_known": False}
 
     @router.get("/canvas-formats", summary="List canvas formats")
     def canvas_formats(actor: dict = Depends(actor_dependency)):

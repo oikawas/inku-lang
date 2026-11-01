@@ -90,6 +90,8 @@ _LIMITS_FIELD_DESCRIPTION = (
 
 class ComposeRequest(BaseModel):
     ddl: str = Field(..., min_length=1, max_length=100_000, description="正規化DDL テキスト")
+    batch_run_id: str | None = Field(default=None, max_length=200, description="Identifier of the client batch while drawing this item.")
+    batch_line_number: int | None = Field(default=None, ge=1, description="Line number in the client batch.")
     model: str | None = Field(
         default=None, description="Stage 2 モデル名 (未指定時は利用者の Stage 2 既定)"
     )

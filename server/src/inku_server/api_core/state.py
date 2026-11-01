@@ -90,6 +90,11 @@ class _RenderCapacity:
         with self._lock:
             return self._limit
 
+    @property
+    def active(self) -> int:
+        with self._lock:
+            return self._active
+
     def set_limit(self, limit: int) -> None:
         with self._lock:
             self._limit = max(1, limit)

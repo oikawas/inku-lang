@@ -2264,6 +2264,8 @@ implementation order.
 
 Pipeline JSON views include the same payload in `progress`. While Web waits for the final `perform` response, it shows rendering as local work.
 
+`GET /api/pipeline/activity` reports the caller's running or queued pipeline drawings in the current server process, including execution and variation IDs, state, action, and any supplied batch ID and line number. Only an administrator may use `all_users=true` to see all users' entries and this process's active render-slot count. This is not history or an inventory of all processes; a client batch between drawings cannot be detected, so an empty list does not prove the batch has stopped.
+
 `POST /api/paint/stream` reports finite progress as `sketch` (when the sketch
 layer ran), `stage1`, `score`, and `done`. It also sends `attempt` whenever a
 model-call attempt begins and once the last one has ended; its

@@ -1359,6 +1359,8 @@ Shared compiler consumerでは、StopとOmitAndContinueはLLM fallbackではな�
 
 pipeline の JSON view は同じ内容を `progress` に含める。Web が最後の `perform` の応答を待つ間は、描画中の local 作業を表示する。
 
+`GET /api/pipeline/activity` は、その Server process が実行・待機している自分の pipeline 描画を返す。各項目は execution・variation、実行中／worker 待ち／描画中の状態、進行中の action と、送られた場合の batch ID・行番号を持つ。`all_users=true` は管理者だけが使え、全利用者の項目と process の描画枠の使用数を返す。これは履歴でも全 process の一覧でもなく、クライアント側のバッチが作品間で待っているかは分からない。空の一覧をバッチ全体の停止の証拠にしない。
+
 ### 12.11 中間フィルタ（Stage 1.5）
 
 Stage 1.5 は LLM を使わない決定的な typed transformation である。入力は lock 検証済みの `CanonicalReady` typed meaning とし、自由 prose は受け取らない。出力は共有lowererが読むeffective DDL / typed meaningである。2026-09-27に`place:center`の焦点への読み替えと変奏の軸を外し、2026-10-04に明示変奏を廃止した。Stage 1.5は入力の検証とeffective meaningの同一性だけを担う。

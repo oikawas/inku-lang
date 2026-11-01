@@ -2048,6 +2048,8 @@ def _paint_payload(
         "save_history": args.save_history,
         "save_artifacts": args.save_artifacts,
         "history_input": args.history_input,
+        "batch_run_id": getattr(args, "batch_run_id", None),
+        "batch_line_number": getattr(args, "batch_line_number", None),
         "catalog_id": color_catalog,
         "canvas_aspect": getattr(args, "canvas_aspect", None),
         "render_seed": getattr(args, "render_seed", None),
@@ -2086,6 +2088,8 @@ def _compose_payload(
     # is the same shape the web sends when it draws a new instruction sheet.
     payload: dict[str, Any] = {
         "ddl": ddl,
+        "batch_run_id": getattr(args, "batch_run_id", None),
+        "batch_line_number": getattr(args, "batch_line_number", None),
         "model": stage2_model if stage2_model is not None else args.stage1_model,
         "instruction_lang": args.instruction_lang,
         "ui_lang": args.ui_lang,
@@ -2766,6 +2770,7 @@ def command_batch(args: argparse.Namespace) -> int:
         lines = [line for line in lines if _ddl_title_name(line) is None]
     if not lines:
         raise CliError("batch input contains no non-empty lines")
+    args.batch_run_id = uuid.uuid4().hex
     out_dir = Path(args.out_dir) if args.out_dir else None
     results: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
@@ -2791,6 +2796,7 @@ def command_batch(args: argparse.Namespace) -> int:
     result_index_by_line: dict[tuple[int, int | None], int] = {}
 
     def process_line(index: int, line: str, *, retry_timeout: bool = False) -> dict[str, Any]:
+        args.batch_line_number = index
         progress_label = (
             f"retrying timeout {index}/{len(lines)}"
             if retry_timeout
@@ -4619,6 +4625,15 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     else:
         parser.add_argument("--full-json", action="store_true", help="print the full paint response")
 
+def command_activity(args: argparse.Namespace) -> int:
+    config = load_config()
+    client = ApiClient(args.base_url or config.base_url, config.token,
+                       timeout_seconds=_resolved_timeout_seconds(args, config))
+    data, _ = client.request("GET", "/api/pipeline/activity", query={"all_users": "true"} if args.all else None)
+    _print_json(data)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="inku-cli", description="Control an inku API server from the command line")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -4636,6 +4651,11 @@ def build_parser() -> argparse.ArgumentParser:
     me = subparsers.add_parser("me", help="show the current logged-in user")
     _add_common_server_args(me)
     me.set_defaults(func=command_me)
+
+    activity = subparsers.add_parser("activity", help="show current pipeline work and active render slots")
+    _add_common_server_args(activity)
+    activity.add_argument("--all", action="store_true", help="show all users and render-slot count (administrator only)")
+    activity.set_defaults(func=command_activity)
 
     models = subparsers.add_parser("models", help="show or set CLI default LLM and Vision models")
     _add_common_server_args(models)

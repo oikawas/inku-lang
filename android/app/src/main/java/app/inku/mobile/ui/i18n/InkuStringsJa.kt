@@ -655,6 +655,7 @@ object InkuStringsJa : InkuStrings {
     override val bundledPluginsTitle = "同梱プラグイン"
     override val ddlImportFile = "読込"
     override val ddlImportInvalid = "DDLファイルを読めませんでした"
+    override fun ddlImportMigrated(count: Int) = "旧い歳時記から $count 箇所を書き換えました。"
     override val ddlImportRequiresV2 = "この書き出しは古い形式です。v2 で書き出し直してください。"
     override fun ddlImportedPlugins(names: String) = "DDLと一緒にプラグイン定義を読み込みました（$names）。次の新しい作品だけに使います。"
     override val ddlExportWithPlugins = "DDL（プラグイン定義付き）"

@@ -541,6 +541,7 @@ interface InkuStrings {
     val ddlImportInvalid: String
     val ddlImportRequiresV2: String
     fun ddlImportedPlugins(names: String): String
+    fun ddlImportMigrated(count: Int): String
     val ddlExportWithPlugins: String
     val ddlExportWithPluginsNote: String
     val bundledPluginsSubtitle: String

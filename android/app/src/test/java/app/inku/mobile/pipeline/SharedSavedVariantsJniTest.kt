@@ -75,7 +75,7 @@ class SharedSavedVariantsJniTest {
             .put(JSONObject().put("arrangement", JSONObject()
                 .put("resolved", JSONObject().put("owner", JSONObject()
                     .put("kind", "source_instruction").put("instruction_index", 1))))))
-        val source = "背景を白で埋める。\n青の細筆の線を3個引く。\n赤の大きな円を1個置く。"
+        val source = "背景を白で埋める。\n青のガッシュの線を3個引く。\n赤の大きな円を1個置く。"
         val count = cases.getJSONObject("conditions").getInt("count")
         assertEquals(4, count)
         for (mode in listOf("uniform", "per_sentence")) {
@@ -88,7 +88,9 @@ class SharedSavedVariantsJniTest {
                 val labels = answer.getJSONArray("tool_labels")
                 val values = JSONArray()
                 for (index in 0 until labels.length()) values.put(labels.getJSONObject(index).getString("value"))
-                assertJsonEquals("tool labels", cases.getJSONObject("conditions").getJSONArray("tools"), values)
+                val expectedLabels = JSONArray(cases.getJSONObject("conditions").getJSONArray("tools").toString())
+                listOf("rotring", "crayon", "brush_thin", "brush_thick", "burin", "drypoint").forEach(expectedLabels::put)
+                assertJsonEquals("tool labels including saved legacy values", expectedLabels, values)
                 val drawn = answer.getJSONArray("sentences")
                 assertEquals(2, drawn.length())
                 assertEquals("brush_thin", drawn.getJSONObject(0).getString("tool"))

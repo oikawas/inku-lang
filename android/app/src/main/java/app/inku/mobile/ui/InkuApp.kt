@@ -7246,6 +7246,7 @@ internal fun launchShareIntent(context: Context, payload: SharePayload) {
 private fun historyExportJson(item: HistoryItemEntity): JSONObject {
     return JSONObject().apply {
         put("schema", "inku.history_item")
+        put("saijiki", "inku.saijiki.v3")
         put("schema_version", "0.2.0")
         put("id", item.id)
         put("created_at", item.createdAt)
@@ -8718,14 +8719,6 @@ private fun firstSvgFillColor(svgText: String): Color? {
         ?: return null
     if (fill.equals("none", ignoreCase = true) || fill.startsWith("url(", ignoreCase = true)) return null
     return runCatching { parseColor(fill) }.getOrNull()
-}
-
-private fun strokeWidthPx(weight: String): Float = when (weight) {
-    "brush_thick" -> 8f
-    "crayon" -> 4f
-    "chalk", "brush_thin" -> 3f
-    "pencil" -> 1.5f
-    else -> 2f
 }
 
 private fun ratio(value: Double): Float = value.coerceIn(0.0, 1.0).toFloat()

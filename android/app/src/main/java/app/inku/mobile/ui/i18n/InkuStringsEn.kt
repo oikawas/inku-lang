@@ -683,6 +683,7 @@ object InkuStringsEn : InkuStrings {
     override val bundledPluginsTitle = "Bundled plugins"
     override val ddlImportFile = "Open"
     override val ddlImportInvalid = "The DDL file could not be read"
+    override fun ddlImportMigrated(count: Int) = "Migrated $count change${if (count == 1) "" else "s"} from the older Saijiki."
     override val ddlImportRequiresV2 = "This export uses an old format. Export it again as v2."
     override fun ddlImportedPlugins(names: String) = "Read plugin definitions with the DDL ($names). They are used by the next new work only."
     override val ddlExportWithPlugins = "DDL (with plugin definitions)"

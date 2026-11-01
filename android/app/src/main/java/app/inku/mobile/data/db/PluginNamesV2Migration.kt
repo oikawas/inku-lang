@@ -62,7 +62,7 @@ internal class PluginNamesV2Migration(
                     if (link != null && link.digest != sha(source.toByteArray())) {
                         refused.put(problem("history", id, "link_digest_mismatch")); continue
                     }
-                    val locks = SaijikiV1Migration.documentLocks(link?.context?.optJSONObject("macro_catalog")?.optJSONArray("definition_locks"))
+                    val locks = SaijikiV3Migration.documentLocks(link?.context?.optJSONObject("macro_catalog")?.optJSONArray("definition_locks"))
                     val language = cursor.getString(2).takeIf { it == "ja" || it == "en" } ?: "ja"
                     val new = ask("history", id, source, language, locks, link?.let { definitions(it.context) }.orEmpty()) ?: continue
                     if (new == source) continue

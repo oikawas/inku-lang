@@ -447,7 +447,7 @@ class SharedPipelineConfigBuilder(
         val entries = catalog.requiredArray("entries").objects()
         val input = JSONObject().put("source", "").put("language", language)
             .put("definitions", JSONArray(entries.map { it.requiredObject("definition") }))
-            .put("locks", app.inku.mobile.data.db.SaijikiV1Migration.documentLocks(catalog.requiredArray("locks")))
+            .put("locks", app.inku.mobile.data.db.SaijikiV3Migration.documentLocks(catalog.requiredArray("locks")))
             .put("compiler", JSONObject.NULL)
         val result = JSONObject(NativePipelineBridge.pluginCalls(input.toString().toByteArray()).decodeToString())
         return (result.optJSONArray("entries") ?: JSONArray()).objects().map { entry ->

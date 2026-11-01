@@ -68,7 +68,7 @@ class WordingLintTest {
         val EXCLUDED = setOf(
             "世界の人と動物、自然と都市を主題として96文字の短文を作って。感情豊かに、季節や、人生と人のつながり、人生、世代、神。色々な観点から。",
             "青い鉛筆の線を12本、波打つ軌跡に沿って散らす",
-            "赤い円を5個、横に並べる\n黒い太筆の線を3本、斜めに置く\n緑の四角を12個、散らす",
+            "赤い円を5個、横に並べる\n黒いガッシュの線を3本、斜めに置く\n緑の四角を12個、散らす",
             "日本語",
             // The other two the contract names, in `InkuRepository` (:464, :471
             // at the branch point): the seed sentence the demo asks a model for,

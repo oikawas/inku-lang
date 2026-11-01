@@ -3,23 +3,25 @@ package app.inku.mobile.data.db
 import androidx.sqlite.db.SupportSQLiteDatabase
 import app.inku.mobile.data.DdlSource
 import app.inku.mobile.data.lineage.LineagePlanner
+import app.inku.mobile.pipeline.InstructionLanguages
 import java.security.MessageDigest
 import java.util.Base64
+import java.util.IdentityHashMap
 import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * The one-time move of the saved records from Saijiki v1 to the current edition.
+ * The one-time move of saved Saijiki v1/v2 records to v3.
  *
- * Saijiki v2 (DDL 16) names its edition on every visible document; a saved
+ * Saijiki names its edition on every visible document; a saved
  * document without the field was written with v1, and the core refuses it, and
  * a saved Macro definition that only a migration makes valid, with
  * `saijiki_migration_required` (SPEC §3.3). The core owns the migration itself
- * (`migrate_saijiki_v1`): given one saved unit -- a v1 document and the
+ * (`migrate_saijiki_v1` / `migrate_saijiki_v2`): given one saved unit -- a document and the
  * definitions its locks name, or definitions alone -- it returns the unit in
  * the current edition.
  *
- * This is the Server's `persistence/saijiki_migration.py` (product `99a23771`)
+ * This follows the Server's `persistence/saijiki_v3_migration.py`
  * on the same tables, run once at startup before anything reads a work:
  *
  * - the committed document of each variation (`variation_authority`): its
@@ -38,19 +40,28 @@ import org.json.JSONObject
  * with the setting [DONE_SETTING], so a failure writes nothing and the next
  * start tries again, and a second run after success does nothing.
  */
-internal class SaijikiV1Migration(
+internal class SaijikiV3Migration(
     private val migrate: (ByteArray) -> ByteArray,
+    private val migrateV2: (ByteArray) -> ByteArray = app.inku.mobile.pipeline.NativePipelineBridge::migrateSaijikiV2,
     private val discardExecutions: Boolean,
     private val now: () -> Long = System::currentTimeMillis,
     private val elapsedMillis: () -> Long = { System.nanoTime() / 1_000_000 },
 ) {
-    private val answers = HashMap<String, JSONObject>()
+    // Only unique definitions are retained. Document replies contain whole catalogs
+    // and must die with their unit rather than accumulate for the whole database.
+    private val definitionsByDigest = linkedMapOf<String, Any>()
+    private val definitionDigests = IdentityHashMap<Any, String>()
+    private val definitionAnswers = HashMap<String, JSONObject>()
     private var coreCalls = 0
     private var coreMillis = 0L
+    private var coreMaxMillis = 0L
 
     /** Writes the migration once; null when it was already written. */
     fun runOnce(db: SupportSQLiteDatabase): JSONObject? {
         if (alreadyWritten(db)) return null
+        coreCalls = 0
+        coreMillis = 0
+        coreMaxMillis = 0
         val started = elapsedMillis()
         db.beginTransaction()
         try {
@@ -63,6 +74,9 @@ internal class SaijikiV1Migration(
                 .put("statements", plan.statements.size)
                 .put("core_calls", coreCalls)
                 .put("core_ms", coreMillis)
+                .put("core_max_ms", coreMaxMillis)
+                .put("unique_definitions", definitionsByDigest.size)
+                .put("definition_core_calls", definitionAnswers.size)
                 .put("total_ms", elapsedMillis() - started)
             val summary = JSONObject()
                 .put("refused_records", report.getJSONArray("refused_records").length())
@@ -74,7 +88,11 @@ internal class SaijikiV1Migration(
             db.setTransactionSuccessful()
             return report
         } finally {
-            db.endTransaction()
+            try { db.endTransaction() } finally {
+                definitionsByDigest.clear()
+                definitionDigests.clear()
+                definitionAnswers.clear()
+            }
         }
     }
 
@@ -87,7 +105,8 @@ internal class SaijikiV1Migration(
     private class Link(
         val ownerId: String,
         val historyId: String,
-        val context: JSONObject,
+        val contextBytes: ByteArray,
+        val language: String?,
         val definitions: List<Any>,
         val catalogLocks: JSONArray,
     )
@@ -102,10 +121,28 @@ internal class SaijikiV1Migration(
         val edits = linkedMapOf<String, Int>()
         val refused = JSONArray()
         val sweeps = JSONArray()
+        val tools = JSONArray()
+        val thinness = JSONArray()
+        val historyEdition = db.query("SELECT 1 FROM app_settings WHERE key = 'saijiki_v2_saved_records'").use {
+            if (it.moveToFirst()) "inku.saijiki.v2" else null
+        }
 
         // The frozen catalogs of the performances, and the definitions each variation saved.
         val links = linkedMapOf<String, Link>()
-        val savedByVariation = linkedMapOf<Pair<String, String>, MutableList<Any>>()
+        val localByLock = linkedMapOf<List<String>, MutableMap<String, Any>>()
+        val builtinByLock = linkedMapOf<List<String>, MutableMap<String, Any>>()
+        fun addBound(owner: String, variation: String, definitions: List<Any>, locks: JSONArray) {
+            for (lock in documentLocks(locks).objects()) {
+                val key = listOf(lock.optString("qualified_name"), lock.optString("version"), lock.optString("digest"))
+                for (definition in definitions.filterIsInstance<JSONObject>()) {
+                    val name = "${definition.optString("namespace")}.${definition.optString("id").ifEmpty { definition.optString("heading") }}"
+                    if (name != key[0] || definition.optString("version") != key[1]) continue
+                    val encoded = definitionDigest(definition)
+                    localByLock.getOrPut(listOf(owner, variation) + key) { linkedMapOf() }[encoded] = definition
+                    if (name.startsWith("Nature.")) builtinByLock.getOrPut(key) { linkedMapOf() }[encoded] = definition
+                }
+            }
+        }
         db.query(
             "SELECT owner_id, history_id, variation_id, fork_context_bytes, fork_context_digest" +
                 " FROM pipeline_history_links",
@@ -121,10 +158,11 @@ internal class SaijikiV1Migration(
                     refused.put(refusal("history_links", "$ownerId/$historyId", JSONObject().put("code", "unreadable_context")))
                     continue
                 }
-                val definitions = definitionsOf(context.optJSONObject("config"))
+                val definitions = definitionsOf(context.optJSONObject("config")).map(::internDefinition)
                 val locks = context.optJSONObject("macro_catalog")?.optJSONArray("definition_locks") ?: JSONArray()
-                links[historyId] = Link(ownerId, historyId, context, definitions, locks)
-                savedByVariation.getOrPut(ownerId to cursor.getString(2)) { mutableListOf() }.addAll(definitions)
+                links[historyId] = Link(ownerId, historyId, bytes,
+                    context.optJSONObject("config")?.optString("language"), definitions, locks)
+                addBound(ownerId, cursor.getString(2), definitions, locks)
             }
         }
         var executions = 0
@@ -133,29 +171,33 @@ internal class SaijikiV1Migration(
                 executions += 1
                 val snapshot = runCatching {
                     val wrapper = JSONObject(cursor.getBlob(2).toString(Charsets.UTF_8))
-                    JSONObject(Base64.getDecoder().decode(wrapper.getString("snapshot_base64")).toString(Charsets.UTF_8))
+                    wrapper.optJSONObject("snapshot") ?: JSONObject(Base64.getDecoder().decode(wrapper.getString("snapshot_base64")).toString(Charsets.UTF_8))
                 }.getOrNull() ?: continue
-                savedByVariation.getOrPut(cursor.getString(0) to cursor.getString(1)) { mutableListOf() }
-                    .addAll(definitionsOf(snapshot.optJSONObject("config")))
+                val definitions = definitionsOf(snapshot.optJSONObject("config")).map(::internDefinition)
+                addBound(cursor.getString(0), cursor.getString(1), definitions,
+                    snapshot.optJSONObject("document")?.optJSONArray("macro_locks") ?: JSONArray())
             }
         }
         counts.getOrPut("executions") { linkedMapOf() }["rows"] = executions
 
         // Every distinct definition once; a document's unit carries the ones its locks name.
-        for (definition in distinct(savedByVariation.values.flatten())) {
+        for (definition in definitionsByDigest.values) {
             val answer = definitionAnswer(definition)
             if (answer.has("error")) {
                 count("definitions", "refused:${answer.optJSONObject("error")?.optString("code")}")
+                refused.put(refusal("definitions", LineagePlanner.canonicalJson(definition), answer.getJSONObject("error"))
+                    .put("source", definition).put("locks", 0))
             } else {
                 count("definitions", if (answer.optBoolean("changed")) "changed" else "unchanged")
+                if ((answer.optJSONArray("unadjusted_thinness")?.length() ?: 0) > 0) thinness.put(answer)
             }
         }
 
         fun locked(definitions: List<Any>, locks: JSONArray): List<Any> {
-            val names = locks.objects().map { it.opt("qualified_name") to it.opt("version") }.toSet()
+            val names = locks.objects().map { Triple(it.optString("qualified_name"), it.optString("version"), it.optString("digest").removePrefix("sha256:")) }.toSet()
             return definitions.filter { definition ->
                 val answer = definitionAnswer(definition)
-                (answer.opt("qualified_name") to answer.opt("version")) in names
+                Triple(answer.optString("qualified_name"), answer.optString("version"), answer.optString("old_digest").removePrefix("sha256:")) in names
             }
         }
 
@@ -173,6 +215,11 @@ internal class SaijikiV1Migration(
                 return null
             }
             val documentEdits = migrated.optJSONArray("edits") ?: JSONArray()
+            val unassociatedTools = migrated.optJSONArray("unassociated_tools") ?: JSONArray()
+            if (unassociatedTools.length() > 0) {
+                count(kind, "with_unassociated_tools")
+                tools.put(JSONObject().put("kind", kind).put("id", recordId).put("unassociated_tools", unassociatedTools))
+            }
             for (edit in documentEdits.objects()) {
                 val key = "${edit.opt("original")} -> ${edit.opt("replacement")}"
                 edits[key] = (edits[key] ?: 0) + 1
@@ -202,15 +249,27 @@ internal class SaijikiV1Migration(
                     refused.put(refusal("variation_documents", "$ownerId/$variationId", JSONObject().put("code", "unreadable_document")))
                     continue
                 }
-                if (document.has("saijiki")) {
+                if (document.optString("saijiki") == "inku.saijiki.v3") {
                     count("variation_documents", "current")
                     continue
                 }
-                count("variation_documents", "v1")
+                val edition = if (document.has("saijiki")) document.optString("saijiki") else null
+                if (edition != null && edition != "inku.saijiki.v2") {
+                    count("variation_documents", "refused")
+                    refused.put(refusal("variation_documents", "$ownerId/$variationId", JSONObject().put("code", "other_edition"))
+                        .put("source", document.optString("source")).put("locks", document.optJSONArray("macro_locks")?.length() ?: 0))
+                    continue
+                }
+                count("variation_documents", if (edition == null) "v1" else "v2")
                 val locks = documentLocks(document.optJSONArray("macro_locks"))
-                val definitions = locked(distinct(savedByVariation[ownerId to variationId].orEmpty()), locks)
+                val definitions = distinct(locks.objects().mapNotNull { lock ->
+                    val key = listOf(lock.optString("qualified_name"), lock.optString("version"), lock.optString("digest"))
+                    val local = localByLock[listOf(ownerId, variationId) + key].orEmpty()
+                    val candidates = if (local.isNotEmpty()) local else builtinByLock[key].orEmpty()
+                    candidates.values.singleOrNull()
+                })
                 val source = document.optString("source")
-                val unit = documentUnit(source, document.optString("language"), locks, definitions)
+                val unit = documentUnit(source, document.optString("language"), locks, definitions, edition)
                 val migrated = documentAnswer(
                     "variation_documents", "$ownerId/$variationId", unit, source,
                     document.optJSONArray("macro_locks")?.length() ?: 0,
@@ -238,25 +297,31 @@ internal class SaijikiV1Migration(
             while (cursor.moveToNext()) {
                 val historyId = cursor.getString(0)
                 val ddl = if (cursor.isNull(1)) null else cursor.getString(1)
-                val language = cursor.getString(2)?.takeIf { it == "ja" || it == "en" } ?: "ja"
                 present += historyId
                 count("history", "rows")
-                val link = links[historyId]
+                // Replace each consumed input context with its planned output bytes;
+                // do not retain all parsed catalogs alongside all SQL parameters.
+                val link = links.remove(historyId)
+                val language = cursor.getString(2)?.takeIf { it == "ja" || it == "en" }
+                    ?: link?.language?.takeIf { it == "ja" || it == "en" }
+                    ?: InstructionLanguages.ofDdl(ddl.orEmpty(), null, null, "ja")
                 if (link != null) count("history", "linked")
                 val locks = link?.let { documentLocks(it.catalogLocks) } ?: JSONArray()
                 val definitions = link?.let { locked(it.definitions, locks) }.orEmpty()
                 val migratedTexts = linkedMapOf<String, String>()
+                var recovered = emptyList<JSONObject>()
                 var refusedWork = false
                 if (DdlSource.hasBody(ddl)) {
                     val source = checkNotNull(ddl)
                     count("history", "ddl_present")
                     val answer = documentAnswer(
-                        "history", "$historyId:ddl", documentUnit(source, language, locks, definitions),
+                        "history", "$historyId:ddl", documentUnit(source, language, locks, definitions, historyEdition),
                         source, link?.catalogLocks?.length() ?: 0,
                     )
                     if (answer == null) {
                         refusedWork = true
                     } else {
+                        recovered = answer.optJSONArray("recovered_definitions")?.objects().orEmpty()
                         val migratedSource = answer.getJSONObject("document").getString("source")
                         if (migratedSource != source) migratedTexts["ddl"] = migratedSource
                     }
@@ -275,6 +340,20 @@ internal class SaijikiV1Migration(
                         }
                         linkDefinitions += answer.get("definition")
                     }
+                    for (entry in recovered) {
+                        val definition = entry.get("definition")
+                        val existing = link.definitions.indexOfFirst {
+                            val saved = definitionAnswer(it)
+                            saved.optString("qualified_name") == entry.optString("qualified_name") &&
+                                saved.optString("version") == entry.optString("version")
+                        }
+                        if (existing >= 0) {
+                            // The saved lock selected the recovered content, not the mismatched supplied copy.
+                            linkDefinitions[existing] = definition
+                        } else if (linkDefinitions.none { LineagePlanner.canonicalJson(it) == LineagePlanner.canonicalJson(definition) }) {
+                            linkDefinitions += definition
+                        }
+                    }
                 }
                 if (refusedWork) {
                     // A work is one unit with its link: the link's digest binds it to the instructions.
@@ -287,7 +366,7 @@ internal class SaijikiV1Migration(
                     count("history", "rows_written")
                 }
                 if (link != null) {
-                    linkStatement(link, linkDefinitions, newDdl)?.let {
+                    linkStatement(link, linkDefinitions, newDdl, recovered)?.let {
                         statements += it
                         count("history_links", "written")
                     }
@@ -320,19 +399,20 @@ internal class SaijikiV1Migration(
             report = report
                 .put("edits", JSONObject(edits as Map<*, *>))
                 .put("refused_records", refused)
-                .put("unassociated_sweep_records", sweeps),
+                .put("unassociated_sweep_records", sweeps)
+                .put("unassociated_tool_records", tools)
+                .put("unadjusted_thinness_records", thinness),
         )
     }
 
     /** Rewrite one frozen fork context: its definitions, its locks, and the work's digest. */
-    private fun linkStatement(link: Link, definitions: List<Any>, ddl: String?): Pair<String, Array<Any?>>? {
-        val moved = link.definitions.associate { definition ->
-            val answer = definitionAnswer(definition)
-            (answer.opt("qualified_name") to answer.opt("version")) to answer.optString("digest")
+    private fun linkStatement(link: Link, definitions: List<Any>, ddl: String?, recovered: List<JSONObject> = emptyList()): Pair<String, Array<Any?>>? {
+        val moved = (link.definitions.map(::definitionAnswer) + recovered).associate { answer ->
+            Triple(answer.optString("qualified_name"), answer.optString("version"), answer.optString("old_digest").removePrefix("sha256:")) to answer.optString("digest")
         }
         val locks = JSONArray()
         for (lock in link.catalogLocks.objects()) {
-            val digest = moved[lock.opt("qualified_name") to lock.opt("version")]
+            val digest = moved[Triple(lock.optString("qualified_name"), lock.optString("version"), lock.optString("digest").removePrefix("sha256:"))]
             // The catalog keeps bare hex; sha256: is the document's form.
             locks.put(
                 if (digest.isNullOrEmpty()) lock else JSONObject(lock.toString()).put("digest", digest.removePrefix("sha256:")),
@@ -340,11 +420,20 @@ internal class SaijikiV1Migration(
         }
         // Changed in place: a copy through its text would respell numbers (1.0 as 1)
         // and rewrite a context that did not change. Each link is rewritten once.
-        val original = LineagePlanner.canonicalJson(link.context)
-        val context = link.context
+        val context = JSONObject(link.contextBytes.toString(Charsets.UTF_8))
+        val original = LineagePlanner.canonicalJson(context)
         val config = context.optJSONObject("config") ?: JSONObject()
         if (definitions.isNotEmpty() || config.has("definitions")) {
             config.put("definitions", JSONArray(definitions))
+        }
+        if (definitions.size > link.definitions.size) {
+            val summaries = config.optJSONArray("macro_summaries") ?: JSONArray()
+            while (summaries.length() < definitions.size) {
+                val definition = definitions[summaries.length()] as? JSONObject
+                summaries.put(definition?.optString("heading")?.takeIf { it.isNotEmpty() }
+                    ?: definition?.optString("id").orEmpty())
+            }
+            config.put("macro_summaries", summaries)
         }
         context.put("config", config)
         context.put("macro_catalog", (context.optJSONObject("macro_catalog") ?: JSONObject()).put("definition_locks", locks))
@@ -357,13 +446,17 @@ internal class SaijikiV1Migration(
             arrayOf<Any?>(context.getString("ddl_digest"), bytes, sha256(bytes), link.ownerId, link.historyId)
     }
 
-    /** The core's answer for one unit, asked once per distinct unit. */
-    private fun ask(unit: String): JSONObject = answers.getOrPut(unit) {
+    /** A document answer is consumed immediately, never cached with its catalog. */
+    private fun ask(unit: String): JSONObject {
         val started = elapsedMillis()
-        val output = migrate(unit.toByteArray(Charsets.UTF_8))
+        val document = JSONObject(unit).optJSONObject("document")
+        val call = if (document != null && !document.has("saijiki")) migrate else migrateV2
+        val output = call(unit.toByteArray(Charsets.UTF_8))
         coreCalls += 1
-        coreMillis += elapsedMillis() - started
-        runCatching { JSONObject(output.toString(Charsets.UTF_8)) }
+        val duration = elapsedMillis() - started
+        coreMillis += duration
+        coreMaxMillis = maxOf(coreMaxMillis, duration)
+        return runCatching { JSONObject(output.toString(Charsets.UTF_8)) }
             .getOrElse { JSONObject().put("error", JSONObject().put("code", "unreadable_answer")) }
             .let { answer ->
                 // An input the core could not read at all comes back as a bare code.
@@ -373,17 +466,41 @@ internal class SaijikiV1Migration(
     }
 
     private fun definitionAnswer(definition: Any): JSONObject {
-        val answer = ask(LineagePlanner.canonicalJson(JSONObject().put("definitions", JSONArray().put(definition))))
-        return answer.optJSONArray("definitions")?.optJSONObject(0)
-            ?: JSONObject().put("error", answer.optJSONObject("error") ?: JSONObject().put("code", "unknown"))
+        return definitionAnswers.getOrPut(definitionDigest(definition)) {
+            val answer = ask(LineagePlanner.canonicalJson(JSONObject().put("definitions", JSONArray().put(definition))))
+            answer.optJSONArray("definitions")?.optJSONObject(0)
+                ?: JSONObject().put("error", answer.optJSONObject("error") ?: JSONObject().put("code", "unknown"))
+        }
     }
+
+    private fun definitionDigest(definition: Any): String = definitionDigests.getOrPut(definition) {
+        sha256(LineagePlanner.canonicalJson(definition).toByteArray(Charsets.UTF_8))
+    }
+
+    private fun internDefinition(definition: Any): Any {
+        val digest = sha256(LineagePlanner.canonicalJson(definition).toByteArray(Charsets.UTF_8))
+        return definitionsByDigest.getOrPut(digest) {
+            definitionDigests[definition] = digest
+            definition
+        }
+    }
+
+    private fun distinct(definitions: List<Any>): List<Any> =
+        definitions.associateBy(::definitionDigest).values.toList()
+
+    private fun documentUnit(source: String, language: String, locks: JSONArray, definitions: List<Any>, edition: String?): String =
+        LineagePlanner.canonicalJson(
+            JSONObject()
+                .put("document", JSONObject().put("source", source).put("language", language).put("macro_locks", locks).apply { if (edition != null) put("saijiki", edition) })
+                .put("definitions", JSONArray(distinct(definitions))),
+        )
 
     companion object {
         /** The table whose rows the migration discards instead of moving. */
         const val DISCARDED_TABLE = "pipeline_candidate_executions"
 
         /** The app setting that records the migration was written; the Server's name. */
-        const val DONE_SETTING = "saijiki_v2_saved_records"
+        const val DONE_SETTING = "saijiki_v3_saved_records"
 
         private val LOCK_FIELDS = listOf("qualified_name", "version", "digest", "aliases")
 
@@ -412,21 +529,10 @@ internal class SaijikiV1Migration(
             return moved
         }
 
-        private fun documentUnit(source: String, language: String, locks: JSONArray, definitions: List<Any>): String =
-            LineagePlanner.canonicalJson(
-                JSONObject()
-                    .put("document", JSONObject().put("source", source).put("language", language).put("macro_locks", locks))
-                    .put("definitions", JSONArray(distinct(definitions))),
-            )
-
         private fun definitionsOf(config: JSONObject?): List<Any> {
             val definitions = config?.optJSONArray("definitions") ?: return emptyList()
             return (0 until definitions.length()).map { definitions.get(it) }
         }
-
-        /** Each saved definition once: many performances freeze the same catalog. */
-        private fun distinct(definitions: List<Any>): List<Any> =
-            definitions.associateBy { LineagePlanner.canonicalJson(it) }.values.toList()
 
         private fun refusal(kind: String, id: String, error: JSONObject): JSONObject =
             JSONObject().put("kind", kind).put("id", id).put("error", error)

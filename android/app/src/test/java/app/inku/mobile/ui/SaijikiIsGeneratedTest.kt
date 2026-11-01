@@ -53,7 +53,7 @@ class SaijikiIsGeneratedTest {
         for (lang in UiLanguage.entries) {
             val groups = saijikiGroups(lang)
             assertEquals("$lang: display categories", 16, groups.size)
-            assertEquals("$lang: display words", 110, groups.sumOf { it.words.size })
+            assertEquals("$lang: display words", 109, groups.sumOf { it.words.size })
             val grounds = groups.first { it.key == "ji" }.words
             assertEquals("$lang: grounds words", 8, grounds.size)
             assertEquals(if (lang == UiLanguage.Ja) "画面比" else "aspect ratio", grounds.last())
@@ -98,12 +98,12 @@ class SaijikiIsGeneratedTest {
     fun testTouchWordsMatchTheServerOrderIncludingTheSilverpoint() {
         val touch = saijikiGroups(UiLanguage.Ja).first { it.key == "tezawari" }
         assertEquals(
-            listOf("銀筆", "鉛筆", "ペン", "ロットリング", "クレヨン", "チョーク", "細筆", "太筆", "油彩", "ビュラン", "ドライポイント", "コンピュータ"),
+            listOf("銀筆", "鉛筆", "ペン", "チョーク", "オイルパステル", "ガッシュ", "水彩", "油彩", "ペインティングナイフ", "エッチング", "コンピュータ"),
             touch.words,
         )
         val touchEn = saijikiGroups(UiLanguage.En).first { it.key == "tezawari" }
         assertEquals(
-            listOf("silverpoint", "pencil", "pen", "rotring", "crayon", "chalk", "fine-brush", "thick-brush", "oil paint", "burin", "drypoint", "computer"),
+            listOf("silverpoint", "pencil", "pen", "chalk", "oil pastel", "gouache", "watercolor", "oil paint", "painting knife", "etching", "computer"),
             touchEn.words,
         )
     }
@@ -158,7 +158,7 @@ class SaijikiIsGeneratedTest {
             assertTrue("$lang: does not recognise brushmarks", "brushmarks" in words)
             assertTrue("$lang: does not recognise 画面比", "画面比" in words)
             assertTrue("$lang: does not recognise aspect ratio", "aspect ratio" in words)
-            assertEquals("$lang: detection surfaces", 220, words.size)
+            assertEquals("$lang: detection surfaces", 218, words.size)
         }
     }
 

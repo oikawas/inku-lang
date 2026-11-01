@@ -307,7 +307,7 @@ class LineageDeclarationWiringTest {
         useModel()
         awaitStartupWithoutSelection(parent)
         chooseFromHistory(parent)
-        vm().setDdl("黒い太筆の線を3本、斜めに置く")
+        vm().setDdl("黒いガッシュの線を3本、斜めに置く")
         settle("the edited DDL to reach the shared state") {
             vm().state.value.ddlEditedAfterGeneration && vm().state.value.ddl.isNotBlank()
         }
@@ -367,7 +367,7 @@ class LineageDeclarationWiringTest {
         // fails T-2.
         startViewModel()
         useModel()
-        vm().setBatchText("赤い円を5個、横に並べる\n黒い太筆の線を3本、斜めに置く")
+        vm().setBatchText("赤い円を5個、横に並べる\n黒いガッシュの線を3本、斜めに置く")
         settle("the batch text to reach the shared state") {
             vm().state.value.batchText.lines().size == 2
         }
@@ -518,7 +518,7 @@ class LineageDeclarationWiringTest {
         // drawing vocabulary all lands on the same score, so these two name
         // shapes, counts and colours.
         const val FIRST_DRAWING = "赤い円を5個、横に並べる"
-        const val SECOND_DRAWING = "黒い太筆の線を3本、斜めに置く"
+        const val SECOND_DRAWING = "黒いガッシュの線を3本、斜めに置く"
         const val PARENT_CANVAS = "square"
         const val CHILD_CANVAS = "hd_monitor"
         const val TIMEOUT_MS = 120_000L

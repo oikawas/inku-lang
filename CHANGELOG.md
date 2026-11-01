@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Android: migrate English instructions with missing language metadata using the saved config language or shared DDL language detection.
+
+- Android: migrate saved Saijiki v1/v2 records transactionally to v3 through shared core JNI, preserving saved Scores/SVGs and matching frozen locks by original digest. Portable DDL imports migrate v2 exports and report edit counts; exports name v3. Vocabulary previews now show the eleven current tools.
+
 ### 2026-11-01 — Instruction language in Saijiki migration
 
 Resolve missing history instruction languages from saved fork configuration or DDL before Saijiki migration.

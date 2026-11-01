@@ -213,7 +213,7 @@ class CatalogSelectionWiringTest {
         // whole batch, so a line that chose again would show up as two
         // catalogues across the two rows.
         useCatalog("cool_material")
-        viewModel.setBatchText("赤い円を5個、横に並べる\n黒い太筆の線を3本、斜めに置く")
+        viewModel.setBatchText("赤い円を5個、横に並べる\n黒いガッシュの線を3本、斜めに置く")
         settle("the batch text to reach the shared state") {
             viewModel.state.value.batchText.lines().size == 2
         }
@@ -243,7 +243,7 @@ class CatalogSelectionWiringTest {
         // so the second description starts a new work, as a reader would.
         viewModel.clearPrompt()
         settle("the new work to start") { viewModel.state.value.selectedHistory == null }
-        promptFor("黒い太筆の線を3本、斜めに置く")
+        promptFor("黒いガッシュの線を3本、斜めに置く")
         viewModel.draw()
 
         val saved = awaitSavedRuns(2)

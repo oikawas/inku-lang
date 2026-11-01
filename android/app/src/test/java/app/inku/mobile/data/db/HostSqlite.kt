@@ -13,8 +13,8 @@ internal fun productFile(path: String): File = generateSequence(File(".").canoni
     .first { File(it, "persistence/contract.json").isFile }.resolve(path)
 
 /** Runs the production SQLite calls against a private Python stdlib SQLite connection. */
-internal class HostSqlite : AutoCloseable {
-    private val process = ProcessBuilder("python3", "-u", "-c", PYTHON).start()
+internal class HostSqlite(databasePath: String = ":memory:") : AutoCloseable {
+    private val process = ProcessBuilder("python3", "-u", "-c", PYTHON, databasePath).start()
     private val input = process.outputStream.bufferedWriter()
     private val output = process.inputStream.bufferedReader()
     private var transactionSuccessful = false
@@ -98,7 +98,7 @@ internal class HostSqlite : AutoCloseable {
     companion object {
         private val PYTHON = """
             import base64, json, sqlite3, sys
-            db = sqlite3.connect(':memory:', isolation_level=None)
+            db = sqlite3.connect(sys.argv[1], isolation_level=None)
             def encode(value):
                 return {'blob': base64.b64encode(value).decode()} if isinstance(value, bytes) else value
             for line in sys.stdin:

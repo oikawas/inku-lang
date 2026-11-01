@@ -139,6 +139,60 @@ fn tool_and_color_phrases_match_noun_modifiers() {
 }
 
 #[test]
+fn instrument_phrases_match_noun_modifiers_across_newline_clauses() {
+    for (language, source, reference) in [
+        (
+            Language::Ja,
+            "エッチングで雲形を散らす\nチョークで雲形を並べる",
+            "エッチングの雲形を散らす\nチョークの雲形を並べる",
+        ),
+        (
+            Language::En,
+            "draw a line in red\nplace a circle with chalk at the center",
+            "draw a red line\nplace a chalk circle at the center",
+        ),
+    ] {
+        let actual = compile(source, language);
+        let expected = compile(reference, language);
+        assert_eq!(
+            expected.outcome(),
+            ScoreLoweringOutcome::Complete,
+            "{reference}: {:?} {:?}",
+            expected.upstream_diagnostics(),
+            expected.downstream_diagnostics()
+        );
+        assert_eq!(
+            actual.outcome(),
+            ScoreLoweringOutcome::Complete,
+            "{source}: {:?} {:?}",
+            actual.upstream_diagnostics(),
+            actual.downstream_diagnostics()
+        );
+        assert_eq!(actual.score(), expected.score(), "{source}");
+    }
+}
+
+#[test]
+fn multiple_heads_in_one_clause_still_exclude_instrument_phrase() {
+    let result = compile("チョークで線と円を置く。", Language::Ja);
+    assert_eq!(result.outcome(), ScoreLoweringOutcome::Stopped);
+    for reason in ["ambiguous_action_ownership", "ambiguous_entity_ownership"] {
+        assert!(
+            result
+                .upstream_diagnostics()
+                .iter()
+                .any(|diagnostic| diagnostic.reason == reason)
+        );
+    }
+    assert!(
+        result
+            .downstream_diagnostics()
+            .iter()
+            .any(|diagnostic| format!("{:?}", diagnostic.reason) == "UnsupportedCoordinatedGroup")
+    );
+}
+
+#[test]
 fn existing_non_phrase_outcomes_are_preserved() {
     use Language::{En, Ja};
     use ScoreLoweringOutcome::{Complete, CompleteWithOmissions, Stopped};

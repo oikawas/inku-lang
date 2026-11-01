@@ -2877,7 +2877,7 @@ fn build_semantic_entities(
     }
 }
 
-// These phrases only add owners in a single-primitive sentence. Keep the
+// These phrases only add owners in a single-primitive clause. Keep the
 // original atoms and spans so diagnostics and the action association agree.
 fn associate_instrument_phrases(
     document: &NormalizedDdlDocument,
@@ -2889,12 +2889,13 @@ fn associate_instrument_phrases(
         let Some(region) = regions.get(&sentence_region_index(stream, clause.span)) else {
             continue;
         };
-        let [SemanticHead::Primitive(head)] = region.heads.as_slice() else {
+        let mut heads = region
+            .heads
+            .iter()
+            .filter(|head| head.source().clause_index == clause_index);
+        let (Some(SemanticHead::Primitive(head)), None) = (heads.next(), heads.next()) else {
             continue;
         };
-        if head.provenance.source.clause_index != clause_index {
-            continue;
-        }
         let atoms = &clause.atoms;
         if atoms.iter().any(|atom| {
             matches!(

@@ -10,6 +10,7 @@
 // 2026-10-20 (Web Build1294, fb2414e18): the juxtaposition menu item's `title=` (the held reason) is added with the
 // app's juxtaposition: 171 sites.
 // 2026-10-21: autonomous refinement no longer has color/layout cost tooltips: 169 sites.
+// 2026-11-01: update moved markers and paths and restore the AppRail build tooltip.
 
 /// One Web tooltip site and the Swift source that carries it, or why the single-user app has none.
 struct TooltipParityEntry {
@@ -48,7 +49,7 @@ let tooltipParityTable: [TooltipParityEntry] = [
     .init(web: "CanvasArtworkWorkspace.svelte:220", swift: "Views/CreationControls.swift", marker: "starred ? \"starOn\" : \"starOff\""),
     .init(web: "CanvasArtworkWorkspace.svelte:234", swift: "Views/LibraryPresentation.swift", marker: "marked ? \"forRevisionOn\" : \"forRevisionOff\""),
     .init(web: "CanvasArtworkWorkspace.svelte:271", excluded: "単一利用者モードのWebは共有対象の印を出さない（daf6469d1）"),
-    .init(web: "CanvasArtworkWorkspace.svelte:278", swift: "Views/CreationControls.swift", marker: "copiedHash == hash ? \"コピーしました\" : \"クリックでfull hashをコピーします\""),
+    .init(web: "CanvasArtworkWorkspace.svelte:278", swift: "Views/CreationControls.swift", marker: "serverKey: model.library.copiedHash == id ? \"historyHashCopied\" : \"historyIdCopyTitle\""),
     .init(web: "CanvasArtworkWorkspace.svelte:288", swift: "Views/CreationControls.swift", marker: "serverKey: \"historyReplayTitle\""),
     .init(web: "CanvasArtworkWorkspace.svelte:302", swift: "Views/CreationControls.swift", marker: "tooltip(\"選択中作品の生成情報を表示\")"),
     .init(web: "CanvasArtworkWorkspace.svelte:319", swift: "Views/CreationControls.swift", marker: "tooltip(\"歳時記の語と説明を参照します。\", serverKey: \"tooltipSaijikiToggle\")"),
@@ -126,11 +127,11 @@ let tooltipParityTable: [TooltipParityEntry] = [
     .init(web: "HistoryManager.svelte:1105", swift: "Views/LibraryView.swift", marker: "serverKey: \"historyPreviewTitle\""),
     .init(web: "HistoryManager.svelte:1123", swift: "Views/LibraryPresentation.swift", marker: "work.starred ? \"starOn\" : \"starOff\""),
     .init(web: "HistoryManager.svelte:1130", swift: "Views/LibraryPresentation.swift", marker: "marked ? \"forRevisionOn\" : \"forRevisionOff\""),
-    .init(web: "HistoryManager.svelte:1134", swift: "Views/LibraryView.swift", marker: "inkuTooltip(hashCopyTooltip(hash))"),
+    .init(web: "HistoryManager.svelte:1134", swift: "Views/LibraryView.swift", marker: "inkuTooltip(hashCopyTooltip(row.work.id))"),
     .init(web: "HistoryManager.svelte:1165", swift: "Views/LibraryView.swift", marker: "selected ? \"作品の選択を解除\" : \"作品を選択\""),
     .init(web: "HistoryManager.svelte:1171", swift: "Views/LibraryView.swift", marker: "serverKey: \"historyPreviewTitle\""),
     .init(web: "HistoryManager.svelte:1180", swift: "Views/LibraryPresentation.swift", marker: "work.starred ? \"starOn\" : \"starOff\""),
-    .init(web: "HistoryManager.svelte:1198", swift: "Views/LibraryView.swift", marker: "inkuTooltip(hashCopyTooltip(hash))"),
+    .init(web: "HistoryManager.svelte:1198", swift: "Views/LibraryView.swift", marker: "library.copiedHash == hash ? model.display.tooltip(\"コピーしました\", serverKey: \"historyHashCopied\")"),
     .init(web: "HistoryManager.svelte:1208", swift: "Views/LibraryPresentation.swift", marker: "marked ? \"forRevisionOn\" : \"forRevisionOff\""),
     .init(web: "HistoryManager.svelte:1212", excluded: "作品ごとの共有設定は単一利用者アプリに無い"),
     .init(web: "HistoryManager.svelte:1215", swift: "Views/LibraryView.swift", marker: "serverKey: \"historyTrashItemTitle\""),
@@ -148,10 +149,10 @@ let tooltipParityTable: [TooltipParityEntry] = [
     .init(web: "InputPanel.svelte:220", swift: "Views/CreationView.swift", marker: "tooltipValue(value)"),
     .init(web: "InputPanel.svelte:227", swift: "Views/CreationView.swift", marker: "tip(\"次の作品の配色を選びます。\")"),
     .init(web: "InputPanel.svelte:232", swift: "Views/CreationView.swift", marker: "tooltipValue(value)"),
-    .init(web: "InputPanel.svelte:236", swift: "Views/CreationView.swift", marker: "serverKey: \"tooltipInputSketch\""),
-    .init(web: "InputPanel.svelte:239", swift: "Views/CreationView.swift", marker: "tip(\"次の作品の筆致を規則から外します。\")"),
+    .init(web: "InputPanel.svelte:236", swift: "Views/DrawConditionsView.swift", marker: "webCopy(\"tooltipInputSketch\""),
+    .init(web: "InputPanel.svelte:239", swift: "Views/CreationView.swift", marker: "serverKey: \"tooltipInputWild\""),
     .init(web: "InputPanel.svelte:250", swift: "Views/CreationView.swift", marker: "tip(\"用紙の形と意図を見て、次の作品の用紙を選びます。\")"),
-    .init(web: "InputPanel.svelte:263", swift: "Views/BatchConditionsView.swift", marker: "serverKey: \"tooltipInputClear\""),
+    .init(web: "InputPanel.svelte:263", swift: "Views/BatchPanelView.swift", marker: "serverKey: \"tooltipInputClear\""),
     .init(web: "InputPanel.svelte:288", swift: "Views/CreationView.swift", marker: "serverKey: \"tooltipInputClear\""),
     .init(web: "InputPanel.svelte:332", swift: "Views/CreationView.swift", marker: "serverKey: \"tooltipForkDescription\""),
     .init(web: "InputPanel.svelte:336", swift: "Views/CreationView.swift", marker: "tip(\"入力と次の生成条件から作品を描きます。\")"),

@@ -121,7 +121,7 @@ struct AppRailView: View {
         .padding(.vertical, 4).padding(.horizontal, 2)
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .combine)
-        .inkuTooltip(display.tooltipValue(build), placement: .right)
+        .inkuTooltip(display.tooltipValue("Build \(build)"), placement: .right)
     }
 
     private var uiModeLabel: String {

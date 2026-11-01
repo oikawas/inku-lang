@@ -10,7 +10,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ### 2026-11-01 — Synthetic display comparisons
 
-Add synthetic pictures for the painting knife's `gradientUnits="userSpaceOnUse"` fade and the `stroke-linejoin="round"` used by etching and other media. Tests compare them with fixed Chrome images and check that removing each attribute fails the same yardstick. Both pictures also enter the support-table and CPU/Graphite comparisons.
+Add synthetic pictures for the painting knife's `gradientUnits="userSpaceOnUse"` fade and the `stroke-linejoin="round"` used by etching and other media. Tests compare them with fixed Chrome images and check that removing each attribute fails the same yardstick. Support-table and CPU/Graphite comparisons cover them too. The Graphite join comparison uses a separate picture with 90-degree corners to separate the edge-coverage difference on steep lines (I-726); the Skia/Chrome comparison retains the acute original.
 
 ### 2026-10-31 — The touches reorganised (Saijiki v3, render engine 95)
 

@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-11-01 — Saijiki migration of locks without a saved definition
+
+For old works that kept a lock without saving its definition, the shared core now holds the built-in Nature definitions earlier releases shipped (the same table as the Server's). The Saijiki migration entries move such a lock to a definition of that table only when no supplied definition matches and the table's definition has the lock's digest; a name and version alone never choose one. The entries' input and output are unchanged.
+
 ### 2026-11-01 — Synthetic display comparisons
 
 Add synthetic pictures for the painting knife's `gradientUnits="userSpaceOnUse"` fade and the `stroke-linejoin="round"` used by etching and other media. Tests compare them with fixed Chrome images and check that removing each attribute fails the same yardstick. Support-table and CPU/Graphite comparisons cover them too. The Graphite join comparison uses a separate picture with 90-degree corners to separate the edge-coverage difference on steep lines (I-726); the Skia/Chrome comparison retains the acute original.

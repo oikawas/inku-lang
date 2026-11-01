@@ -1,12 +1,12 @@
 {
   "schema": "inku.apple-ui-reference.v1",
-  "version": "v2.15.294",
-  "build": "1370",
-  "buildDate": "2026-10-28T13:31:53.853Z",
+  "version": "v2.15.298",
+  "build": "1374",
+  "buildDate": "2026-11-01T00:18:32.955Z",
   "versions": {
-    "ddlSpec": "28",
-    "ddlEngine": "73",
-    "renderEngine": "93"
+    "ddlSpec": "29",
+    "ddlEngine": "75",
+    "renderEngine": "95"
   },
   "canvasMetadata": {
     "square": {
@@ -257,6 +257,9 @@
         "saijikiLabel": "歳時記:",
         "saijikiToggleBtn": "歳時記",
         "saijikiTitle": "歳時記",
+        "saijikiPlugins": "プラグイン",
+        "pluginObject": "物の語",
+        "pluginScene": "情景の語",
         "saijikiHint": "語彙を選ぶと、描画への効き方と作例を表示します。",
         "currentSetting": "現在の設定",
         "saveCurrentBtn": "現在を保存",
@@ -291,7 +294,7 @@
         "ddlEditPlaceholder": "背景を白で埋める。青い細い線を左下から右上へ三本引く。赤い小さな円を余白を残して配置する。",
         "batchSectionLabel": "バッチ",
         "batchSectionHint": "：一行に1作品分の記述を入力。",
-        "batchPlaceholder": "山の向こうに月が昇る\n夜の霧が広がる\n青いクレヨンの線がゆっくり波打つ",
+        "batchPlaceholder": "山の向こうに月が昇る\n夜の霧が広がる\n青い水彩の線がゆっくり波打つ",
         "batchHistoryLabel": "バッチ記述履歴",
         "batchHistoryPlaceholder": "履歴から選択",
         "batchHistoryApply": "復元",
@@ -382,6 +385,7 @@
         "ddlDiscardConfirm": "破棄する",
         "ddlImportButton": "読み込む",
         "ddlImportInvalid": "DDLファイルを読み込めませんでした。",
+        "ddlImportRequiresV2": "この書き出しは古い形式です。v2 で書き出し直してください。",
         "ddlEditorInstructions": "指示書",
         "ddlEditorArtwork": "編集中の作品",
         "ddlEditorNoArtwork": "描画後に作品が表示されます",
@@ -395,9 +399,9 @@
         "ddlNewDialogTitle": "指示書から新規作成",
         "ddlNewDialogSubtitle": "指示書を直接書いて、独立した作品として描画します。",
         "ddlEditDialogSubtitle": "描画すると、選択した作品の子として系譜へ保存します。",
-        "ddlSyntaxGuide": "指示書（DDL）簡易ガイド\n指示書は、絵そのものではなく、絵を生成するための短い視覚指示です。自然文を、色・かたち・場所・動き・てざわりに分解した「演奏用の記述」として扱います。これらの文法を、DDL (Drawing Description Language)として定義しています。\n1行に1つの視覚指示を書くと安定します。\n基本形: 色 + 大きさ + かたち + 数 + 場所 + 動き。\n例: 背景を白で埋める。\n例: 赤い小さな円を右上に三個置く。\n例: 青い細い線を左下から右上へ引く。\n場所は「上端」「右半分」「左下から右上へ」のように具体化します。\n動きや質感は「波打つ」「細かく揺れる」「クレヨン」「鉛筆」のように短く添えます。",
+        "ddlSyntaxGuide": "指示書（DDL）簡易ガイド\n指示書は、絵そのものではなく、絵を生成するための短い視覚指示です。自然文を、色・かたち・場所・動き・てざわりに分解した「演奏用の記述」として扱います。これらの文法を、DDL (Drawing Description Language)として定義しています。\n1行に1つの視覚指示を書くと安定します。\n基本形: 色 + 大きさ + かたち + 数 + 場所 + 動き。\n例: 背景を白で埋める。\n例: 赤い小さな円を右上に三個置く。\n例: 青い細い線を左下から右上へ引く。\n場所は「上端」「右半分」「左下から右上へ」のように具体化します。\n動きや質感は「波打つ」「細かく揺れる」「水彩」「鉛筆」のように短く添えます。",
         "ddlDialogDrawingModel": "描画モデル",
-        "ddlUnknownNameTitle": "このサーバーにない名前",
+        "ddlUnknownNameTitle": "プラグインの名前",
         "ddlUnknownNameUnregistered": "この名前は登録されていません",
         "ddlPluginWarningsTitle": "プラグインからの警告",
         "renderLimitNotesTitle": "効いた上限",
@@ -1036,8 +1040,6 @@
         "settingsUserPlugins": "語彙プラグイン",
         "settingsPluginDrawn": "描画に使う",
         "settingsPluginDrawnHint": "開発側がJSONで書いた定義を持つパッケージです。語を書くと、この定義で描きます。削除はできないので、使わないときは無効にします。",
-        "settingsPluginNotDrawn": "描画には使われない",
-        "settingsPluginNotDrawnHint": "定義を持たない旧形式の文書です。「展開」の文は絵に使われず、この語を書いても省かれて診断が出ます。片付けるときは削除してください。",
         "settingsPluginWords": "語の一覧",
         "settingsUserPluginsAddTitle": "プラグインを追加",
         "settingsUserPluginsAddDescription": "プラグインのファイル（inku.plugin-package.v2 の JSON か、それと絵をまとめた zip）を選ぶと、すぐに検査し、歳時記に出る説明・例・絵を見せます。書き方は PLUGIN.md にあります。",
@@ -1053,6 +1055,7 @@
         "settingsPluginPackageInstalled": "{id} を追加しました。新しい作品で使え、歳時記にも出ます。",
         "settingsPluginPackageExists": "同じ名前のプラグインがもう入っています。もう一度選んで「置き換える」を押してください。",
         "settingsPluginPackageHint": "管理者が追加したプラグインです。語を書くと、この定義で描きます。使わないときは無効にするか、削除します。",
+        "settingsPluginNotLoaded": "読み込めない",
         "settingsPluginPackageDeleteHint": "保存済みの作品は、保存した定義でそのまま描けます。",
         "settingsPluginPictureReplace": "絵を差し替える",
         "settingsPluginPictureReset": "元の絵に戻す",
@@ -1549,8 +1552,9 @@
         "batchWaitingForServer": "サーバーに再びつながるのを待っています（%@ 行目をもう一度送ります）…",
         "settingsDownloadFolderCurrent": "保存先: %@",
         "ddlLabelIn": "指示書（英語DDL）",
+        "ddlImportMigrated": "旧い歳時記から %@ 箇所を書き換えました。",
         "ddlEditorStatus": "%@ 行・%@ 文字",
-        "ddlUnknownNameFires": "「%@.」を外すと「%@」として効きます",
+        "ddlPluginReason": "この Server にない名前です。",
         "recomposeReason": "別の構図を使えないため、構図の範囲を保つ。",
         "colorArrangementCandidate": "配色 %@",
         "toolChangePerSentenceCandidate": "文ごと %@",
@@ -1667,8 +1671,9 @@
         "settingsDownloadFolderCurrent",
         "ddlLabelIn",
         "ddlImportedPlugins",
+        "ddlImportMigrated",
         "ddlEditorStatus",
-        "ddlUnknownNameFires",
+        "ddlPluginReason",
         "recomposeReason",
         "colorArrangementCandidate",
         "toolChangePerSentenceCandidate",
@@ -1800,7 +1805,7 @@
       },
       "limitGroupTooltips": {
         "svg_output": "SVG上限は描画開始時のサーバー設定を使います。保存済み作品の表示には適用しません。",
-        "capability": "この設置の機材が、一枚にどれだけ描けるかを決めます。速い機械なら上げられる、ここだけが機材に合わせて動かす族です。\n\n実測（エンジン 35・開発機）: 格子の墨 1 本が SVG のおよそ 13 KB（ペン）〜16 KB（太筆）にあたります。既定の 400 本でも、一枚が 5〜6.5 MB・描画に数秒かかります。上げるほど閲覧側が重くなります。\n\n一本あたりの費用は筆致で 25% 変わるので、本数は重さの目安であって重さそのものではありません。",
+        "capability": "この設置の機材が、一枚にどれだけ描けるかを決めます。速い機械なら上げられる、ここだけが機材に合わせて動かす族です。\n\n実測（エンジン 95・開発機）: 格子の墨 1 本が SVG のおよそ 0.9 KB（チョーク）〜8.7 KB（ペインティングナイフ）にあたります。既定の 400 本で、一枚がおよそ 0.4〜3.5 MB です。上げるほど閲覧側が重くなります。\n\n一本あたりの費用は筆致で約 10 倍変わるので、本数は重さの目安であって重さそのものではありません。",
         "legibility": "そのまま数えて描く数と、数えきれないので群れとして見せる数の境目です。\n\n機械が速くなっても人の目は速くなりません。だからこの族は上の「この機械が描ける量」とは連動させません。\n\nここで保ちたいのは閾値の数字ではなく見え方です —— 一つの群れに入る墨の量が一定に見えること。代表化の上下端を動かすと、その見え方も動きます。",
         "safety": "誤入力と暴走を止めるためだけの数です。ここを動かしても絵は良くなりません。\n\n本番の実績は指示 27 個が最大（中央値 4）なので、既定値は実在の作品に一度も当たっていません。ふつうは既定のままにしてください。"
       },
@@ -1997,6 +2002,9 @@
         "saijikiLabel": "saijiki:",
         "saijikiToggleBtn": "Saijiki",
         "saijikiTitle": "Saijiki",
+        "saijikiPlugins": "Plugins",
+        "pluginObject": "Object word",
+        "pluginScene": "Scene word",
         "saijikiHint": "Pick a word to see how it affects the drawing, with an example.",
         "currentSetting": "Current settings",
         "saveCurrentBtn": "Save current",
@@ -2031,7 +2039,7 @@
         "ddlEditPlaceholder": "Fill the background with white. Draw three thin blue lines from lower left to upper right. Place small red circles while preserving open space.",
         "batchSectionLabel": "Batch",
         "batchSectionHint": ": Write one description per line, one work each.",
-        "batchPlaceholder": "A moon rises beyond the mountains\nMist spreads at night\nBlue crayon lines drift in slow waves",
+        "batchPlaceholder": "A moon rises beyond the mountains\nMist spreads at night\nBlue watercolor lines drift in slow waves",
         "batchHistoryLabel": "Batch description history",
         "batchHistoryPlaceholder": "Select from history",
         "batchHistoryApply": "Restore",
@@ -2122,6 +2130,7 @@
         "ddlDiscardConfirm": "Discard",
         "ddlImportButton": "Load",
         "ddlImportInvalid": "Could not read this DDL file.",
+        "ddlImportRequiresV2": "This export uses an old format. Export it again as v2.",
         "ddlEditorInstructions": "Instructions",
         "ddlEditorArtwork": "The work being edited",
         "ddlEditorNoArtwork": "The work appears after drawing",
@@ -2135,9 +2144,9 @@
         "ddlNewDialogTitle": "New from instructions",
         "ddlNewDialogSubtitle": "Write the instructions directly and perform them as a standalone work.",
         "ddlEditDialogSubtitle": "Drawing saves a new child of the chosen work.",
-        "ddlSyntaxGuide": "Instructions (DDL) quick guide\nThe instructions are not the picture itself. They are a compact visual instruction from which the picture is performed. They turn natural language into a performable description made of color, shape, place, motion, and material. This grammar is defined as DDL (Drawing Description Language).\nUse one visual instruction per line when possible.\nBasic form: color + size + shape + count + place + motion.\nExample: Fill the background with white.\nExample: Place three small red circles at upper right.\nExample: Draw a thin blue line from lower left to upper right.\nMake places concrete, such as top edge, right half, or lower left to upper right.\nAdd motion or material briefly, such as undulating, fine tremble, crayon, or pencil.",
+        "ddlSyntaxGuide": "Instructions (DDL) quick guide\nThe instructions are not the picture itself. They are a compact visual instruction from which the picture is performed. They turn natural language into a performable description made of color, shape, place, motion, and material. This grammar is defined as DDL (Drawing Description Language).\nUse one visual instruction per line when possible.\nBasic form: color + size + shape + count + place + motion.\nExample: Fill the background with white.\nExample: Place three small red circles at upper right.\nExample: Draw a thin blue line from lower left to upper right.\nMake places concrete, such as top edge, right half, or lower left to upper right.\nAdd motion or material briefly, such as undulating, fine tremble, watercolor, or pencil.",
         "ddlDialogDrawingModel": "Drawing model",
-        "ddlUnknownNameTitle": "Not on this server",
+        "ddlUnknownNameTitle": "Plugin names",
         "ddlUnknownNameUnregistered": "This name is not registered",
         "ddlPluginWarningsTitle": "Plugin warnings",
         "renderLimitNotesTitle": "Limits that took effect",
@@ -2776,8 +2785,6 @@
         "settingsUserPlugins": "Vocabulary plugins",
         "settingsPluginDrawn": "Used for drawing",
         "settingsPluginDrawnHint": "A package with definitions the developers wrote in JSON. Its words are drawn with those definitions. It cannot be deleted; switch it off when it is not wanted.",
-        "settingsPluginNotDrawn": "Not used for drawing",
-        "settingsPluginNotDrawnHint": "A legacy document without definitions. Its expansion text is not drawn from, and writing its words leaves them out with a diagnostic. Delete it to tidy up.",
         "settingsPluginWords": "Words",
         "settingsUserPluginsAddTitle": "Add a plugin",
         "settingsUserPluginsAddDescription": "Choose a plugin file (inku.plugin-package.v2 JSON, or a zip holding it with its pictures). It is checked at once, and you see the note, example and picture the Saijiki will show. PLUGIN.md says how to write one.",
@@ -2793,6 +2800,7 @@
         "settingsPluginPackageInstalled": "Added {id}. New works can use it, and it is in the Saijiki.",
         "settingsPluginPackageExists": "A plugin with the same name is already installed. Choose the file again and press Replace.",
         "settingsPluginPackageHint": "A plugin an administrator added. Its words are drawn with these definitions. Switch it off or delete it when it is not wanted.",
+        "settingsPluginNotLoaded": "Not loaded",
         "settingsPluginPackageDeleteHint": "Saved works still draw with the definitions they saved.",
         "settingsPluginPictureReplace": "Replace picture",
         "settingsPluginPictureReset": "Back to the original picture",
@@ -3289,8 +3297,9 @@
         "batchWaitingForServer": "waiting for the server to answer again (line %@ will be sent once more)…",
         "settingsDownloadFolderCurrent": "Saving to: %@",
         "ddlLabelIn": "Instructions (English DDL)",
+        "ddlImportMigrated": "Migrated %@ changes from the older Saijiki.",
         "ddlEditorStatus": "%@ lines · %@ characters",
-        "ddlUnknownNameFires": "Drop the “%@.” and it fires as “%@”",
+        "ddlPluginReason": "This name is not on this Server.",
         "recomposeReason": "Another composition is unavailable, so the composition ranges are kept.",
         "colorArrangementCandidate": "Color arrangement %@",
         "toolChangePerSentenceCandidate": "Per sentence %@",
@@ -3407,8 +3416,9 @@
         "settingsDownloadFolderCurrent",
         "ddlLabelIn",
         "ddlImportedPlugins",
+        "ddlImportMigrated",
         "ddlEditorStatus",
-        "ddlUnknownNameFires",
+        "ddlPluginReason",
         "recomposeReason",
         "colorArrangementCandidate",
         "toolChangePerSentenceCandidate",
@@ -3540,7 +3550,7 @@
       },
       "limitGroupTooltips": {
         "svg_output": "The SVG limit uses the server setting at the start of drawing. It does not apply when viewing saved works.",
-        "capability": "How much this installation can afford to put on one work. A faster machine may raise it, and this is the only family that should follow the hardware.\n\nMeasured on the development machine at engine 35: one grid mark costs about 13 KB of SVG with a pen and about 16 KB with a thick brush. Even at the default of 400, one work reaches 5-6.5 MB and takes several seconds to draw. The higher it goes, the heavier the work is to open.\n\nThe cost per mark moves by 25% with the brush, so a count is an estimate of weight, not the weight itself.",
+        "capability": "How much this installation can afford to put on one work. A faster machine may raise it, and this is the only family that should follow the hardware.\n\nMeasured on the development machine at engine 95: one grid mark costs about 0.9 KB of SVG with chalk and about 8.7 KB with a painting knife. At the default of 400, one work is about 0.4-3.5 MB. The higher it goes, the heavier the work is to open.\n\nThe cost per mark moves about tenfold with the touch, so a count is an estimate of weight, not the weight itself.",
         "legibility": "The line between a number small enough to draw as stated and one too large to count, which is shown as a band instead.\n\nA faster machine does not make an eye faster, so this family is deliberately not tied to the one above.\n\nWhat should stay steady here is the look — how much ink sits in one cluster — rather than the threshold digits. Moving the band ends moves that look too.",
         "safety": "Numbers that only stop a typing mistake or a runaway. Nothing here makes a drawing better.\n\nThe largest work in production carries 27 instructions (median 4), so the defaults have never bound a real one. Leave the family alone unless something is wrong."
       },
@@ -3685,20 +3695,6 @@
       "exampleJa": "ペンの線を引く",
       "exampleEn": "Draw a pen line"
     },
-    "tezawari:ロットリング": {
-      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M22 52 L158 40\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"2.4\" stroke-linecap=\"butt\"/></svg>",
-      "effectJa": "共有筆致を遮断した、均一で硬い製図線。",
-      "effectEn": "A uniform, hard drafting line that blocks the shared touch.",
-      "exampleJa": "ロットリングの線",
-      "exampleEn": "A rotring line"
-    },
-    "tezawari:クレヨン": {
-      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M22 57 C58 35 108 62 158 38\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"8\" opacity=\"0.66\" stroke-dasharray=\"12 2 3 2\"/><path d=\"M22 52 C65 40 110 56 158 42\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"2\" opacity=\"0.35\"/></svg>",
-      "effectJa": "太い主線に擦れた副線と粒を重ねる。",
-      "effectEn": "Lays scuffed secondary strokes and grain over a thick main stroke.",
-      "exampleJa": "青いクレヨンの線",
-      "exampleEn": "A blue crayon line"
-    },
     "tezawari:チョーク": {
       "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M22 56 C58 35 105 61 158 39\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"7\" opacity=\"0.38\" stroke-dasharray=\"8 4 2 5\"/><g fill=\"#2b2b2b\" opacity=\"0.22\"><circle cx=\"39\" cy=\"53\" r=\"1.8\"/><circle cx=\"70\" cy=\"47\" r=\"1.3\"/><circle cx=\"111\" cy=\"51\" r=\"1.6\"/><circle cx=\"145\" cy=\"43\" r=\"1.4\"/></g></svg>",
       "effectJa": "幅の崩れ、途切れ、粉状の粒を含む淡い線。",
@@ -3706,40 +3702,47 @@
       "exampleJa": "白いチョークの線",
       "exampleEn": "A white chalk line"
     },
-    "tezawari:細筆": {
-      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M22 55 C54 31 108 63 158 38 C126 53 67 48 22 55 Z\" fill=\"#2b2b2b\" opacity=\"0.9\"/></svg>",
-      "effectJa": "入りと抜きが細く、筆圧で幅が大きく変わる。",
-      "effectEn": "Thin at entry and release, with width changing widely under pressure.",
-      "exampleJa": "細筆の線を引く",
-      "exampleEn": "Draw a fine-brush line"
+    "tezawari:オイルパステル": {
+      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M22 56 C58 35 105 61 158 39\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"10\" stroke-linecap=\"round\" opacity=\"0.88\"/><g fill=\"#fffdf8\" opacity=\"0.75\"><circle cx=\"31\" cy=\"47.6\" r=\"1\"/><circle cx=\"44\" cy=\"44.2\" r=\"0.8\"/><circle cx=\"57\" cy=\"42.4\" r=\"1.1\"/><circle cx=\"73\" cy=\"43.4\" r=\"0.8\"/><circle cx=\"90\" cy=\"47.2\" r=\"1\"/><circle cx=\"108\" cy=\"50.4\" r=\"0.9\"/><circle cx=\"126\" cy=\"48.6\" r=\"1.1\"/><circle cx=\"144\" cy=\"42.6\" r=\"0.8\"/><circle cx=\"36\" cy=\"58.2\" r=\"0.9\"/><circle cx=\"52\" cy=\"53.6\" r=\"1.1\"/><circle cx=\"68\" cy=\"52.2\" r=\"0.8\"/><circle cx=\"85\" cy=\"55.6\" r=\"1\"/><circle cx=\"101\" cy=\"59.2\" r=\"0.8\"/><circle cx=\"118\" cy=\"59.6\" r=\"1.1\"/><circle cx=\"137\" cy=\"54.4\" r=\"0.9\"/><circle cx=\"152\" cy=\"48.6\" r=\"0.8\"/></g><path d=\"M30 52 C62 40 104 57 150 42\" fill=\"none\" stroke=\"#fffdf8\" stroke-width=\"1\" opacity=\"0.3\"/></svg>",
+      "effectJa": "紙の目が抜ける縁と、詰まった芯の二層で引く、蝋の不透明な線。",
+      "effectEn": "An opaque waxy line in two layers: an edge where the paper's tooth shows through and a dense core.",
+      "exampleJa": "オイルパステルの線を引く",
+      "exampleEn": "Draw an oil pastel line"
     },
-    "tezawari:太筆": {
-      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M22 56 C47 25 105 68 158 37 C128 60 62 54 22 56 Z\" fill=\"#2b2b2b\" opacity=\"0.84\"/><path d=\"M35 54 C72 42 112 58 151 41\" fill=\"none\" stroke=\"#fffdf8\" stroke-width=\"1.2\" opacity=\"0.45\"/></svg>",
-      "effectJa": "大きな幅変化と穂先の筋を持つ太い筆線。",
-      "effectEn": "A thick brush stroke with wide width changes and streaks from the tip.",
-      "exampleJa": "黒の太筆の線を引く",
-      "exampleEn": "Draw a black thick-brush line"
+    "tezawari:ガッシュ": {
+      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M22 55 C54 30 108 64 158 38 C126 54 67 48 22 55 Z\" fill=\"#2b2b2b\"/><path d=\"M40 52 C70 42 108 57 146 42\" fill=\"none\" stroke=\"#fffdf8\" stroke-width=\"1.1\" opacity=\"0.35\" stroke-dasharray=\"14 5 9 6\"/></svg>",
+      "effectJa": "不透明でつやの無い平らな色。入りと抜きが細く、筆圧で幅が変わる。",
+      "effectEn": "Flat, matte, opaque color, thin at entry and release, with width changing under pressure.",
+      "exampleJa": "ガッシュの線を引く",
+      "exampleEn": "Draw a gouache line"
+    },
+    "tezawari:水彩": {
+      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M22 57 C52 27 104 70 158 36 C130 62 66 54 22 57 Z\" fill=\"#2b2b2b\" opacity=\"0.3\"/><path d=\"M64 54 C88 43 120 60 158 36 C140 55 104 61 64 54 Z\" fill=\"#2b2b2b\" opacity=\"0.22\"/><path d=\"M22 57 C52 27 104 70 158 36 C130 62 66 54 22 57 Z\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"1.8\" opacity=\"0.5\"/></svg>",
+      "effectJa": "透ける色を重ね、重なると濃くなる。縁の内側に色が溜まり、楽譜のほかの色が少し混ざる。",
+      "effectEn": "Layers transparent color that deepens where it overlaps and pools inside the edge, taking in a little of the work's other colors.",
+      "exampleJa": "青い水彩の塗りの円を置く",
+      "exampleEn": "Place a blue watercolor flat circle"
     },
     "tezawari:油彩": {
       "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M20 58 C47 20 106 72 160 34 C132 62 65 56 20 58 Z\" fill=\"#2b2b2b\" opacity=\"0.9\"/><path d=\"M27 56 C64 37 111 59 154 39\" fill=\"none\" stroke=\"#fffdf8\" stroke-width=\"2\" opacity=\"0.42\"/><path d=\"M31 60 C68 44 112 63 151 45\" fill=\"none\" stroke=\"#8d5a42\" stroke-width=\"1.4\" opacity=\"0.52\"/></svg>",
-      "effectJa": "厚みのある色層と筆筋を重ねる。",
-      "effectEn": "Layers a dense paint body with visible brush streaks.",
+      "effectJa": "厚みのある色層と筆筋を重ね、一部の運びに楽譜のほかの色の筋が混ざる。",
+      "effectEn": "Layers a dense paint body with visible brush streaks; some strokes carry thin streaks of the work's other colors.",
       "exampleJa": "油彩の赤い線を引く",
       "exampleEn": "Draw a red oil paint line"
     },
-    "tezawari:ビュラン": {
-      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M22 55 C56 42 106 57 158 39 C119 55 67 51 22 55 Z\" fill=\"#2b2b2b\"/></svg>",
-      "effectJa": "入りと抜きが細く、中央に彫りの勢いが集まる硬い線。",
-      "effectEn": "A hard line, thin at both ends, with the cutting force gathered at the center.",
-      "exampleJa": "ビュランの線を引く",
-      "exampleEn": "Draw a burin line"
+    "tezawari:ペインティングナイフ": {
+      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M20 50 C36 45 50 42 66 41 L68 49 C52 52 38 56 22 61 Z\" fill=\"#2b2b2b\" opacity=\"0.93\"/><path d=\"M60 46 C78 46 94 48 110 51 L110 57 C94 56 78 56 61 57 Z\" fill=\"#2b2b2b\" opacity=\"0.84\"/><path d=\"M104 51 C116 46 128 41 140 37 L142 43 C130 48 118 53 105 58 Z\" fill=\"#2b2b2b\" opacity=\"0.9\"/><path d=\"M21 50 C36 45 50 42 66 41 M61 46 C78 46 94 48 110 51 M104 51 C116 46 128 41 140 37\" fill=\"none\" stroke=\"#fffdf8\" stroke-width=\"1.2\" opacity=\"0.6\"/><path d=\"M140 38 L160 31 M141 40 L159 36 M141 42 L156 40\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"1\" opacity=\"0.6\" stroke-linecap=\"round\"/></svg>",
+      "effectJa": "ナイフの一引きで絵具を平らに盛って伸ばし、稜と影、かすれて割れる終わりを残す。ほかの色が面に混ざることもある。",
+      "effectEn": "Each pull of the knife heaps paint and spreads it flat, leaving a ridge with its shadow and an end that breaks into dry streaks; other colors may mix into a plane.",
+      "exampleJa": "ペインティングナイフの赤い線を引く",
+      "exampleEn": "Draw a red painting knife line"
     },
-    "tezawari:ドライポイント": {
-      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><defs><filter id=\"touch-soft\"><feGaussianBlur stdDeviation=\"1.8\"/></filter></defs><path d=\"M22 55 C56 40 107 58 158 39 C118 54 67 52 22 55 Z\" fill=\"#2b2b2b\"/><path d=\"M23 59 C58 44 108 62 159 43\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"5\" opacity=\"0.28\" filter=\"url(#touch-soft)\"/></svg>",
-      "effectJa": "緩い中膨らみと、片側だけの柔らかなburrを伴う線。",
-      "effectEn": "A line with a slight mid-swell and a soft burr on one side only.",
-      "exampleJa": "ドライポイントの線",
-      "exampleEn": "A drypoint line"
+    "tezawari:エッチング": {
+      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M22 54 C58 36 106 58 158 38\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"2.2\" stroke-linecap=\"round\"/><g fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"0.9\" stroke-linecap=\"round\" opacity=\"0.85\"><path d=\"M52 66 L74 52\"/><path d=\"M60 68 L82 54\"/><path d=\"M68 70 L90 56\"/><path d=\"M76 71 L98 57\"/><path d=\"M84 72 L106 58\"/><path d=\"M92 72 L114 58\"/></g><g fill=\"#2b2b2b\" opacity=\"0.6\"><circle cx=\"118\" cy=\"49.6\" r=\"0.6\"/><circle cx=\"41\" cy=\"48.5\" r=\"0.5\"/></g></svg>",
+      "effectJa": "太さのそろった線に、腐食の細かな荒れと丸い端。面は向きを変えた細い平行線で陰を作る。",
+      "effectEn": "Lines of even width with finely bitten edges and round ends; surfaces build shade from fine parallel lines at varied angles.",
+      "exampleJa": "エッチングの線を引く",
+      "exampleEn": "Draw an etching line"
     },
     "tezawari:コンピュータ": {
       "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M22 52 H34 V46 H46 V40 H58 V46 H70 V52 H82 V58 H94 V64 H106 V58 H118 V52 H130 V46 H142 V40 H158\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"2.4\" stroke-linejoin=\"round\"/><path d=\"M22 36 H158 M22 68 H158\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"0.9\" stroke-dasharray=\"22 9\" stroke-linecap=\"round\" opacity=\"0.576\"/></svg>",
@@ -4247,18 +4250,18 @@
     }
   },
   "source": {
-    "commit": "6f7fd57177a39663b2b01ff288987aebeffa40cb",
+    "commit": "6ac8a8f242e70f492097b128869f6f3d27d7f761",
     "files": {
       "web/src/lib/plugins/system/canvas-aspect/index.ts": "51431fe06ed38cfb11f7e08a87b85b68dacdeda646525242fb561c234cf0c9ff",
-      "web/src/routes/+page.svelte": "e355815d7bd4716d20e9314977556281a30169ae4083ed27ece02ea8217825d2",
+      "web/src/routes/+page.svelte": "ce49f36f444e2fdb516c8c665c236b9264818bead3f451c7cc439367388b3f2f",
       "web/src/lib/saijiki-surface.ts": "d04c5d559cd1ed0889b7e93da0893c2600c158f81cc81ea1d04b0647982469fd",
       "web/src/lib/instructionLang.ts": "871891775120d2dbddabb516c2a18765e7ff5c44612a6d2fca3473fa3f3e46cb",
-      "web/APP_VERSION": "743b9cad7e4d1bfc60c2dd5c1695763479d9699320d063272bfd045ae7815ae2",
-      "web/BUILD_NUMBER": "3415a54f39dafb0735b88066db27af0c7c514fad4fc1f3ba5c5852011e71b4c2",
-      "server/src/inku_server/layer_versions.py": "ef35ed8436f784c49cc7112515ceaf7d7da419efa3ff39fe2072d6ce09f84b95",
-      "core/crates/inku-render/src/lib.rs": "c4ea71cbaa469e25d2c7b63d92543975eaa6de02605491b379303c3aab23b504",
-      "web/src/lib/i18n/ja.ts": "d0c39212873d7e6ada73528a76db86fe1bc696b1832c1809e0d638ba93bf19e2",
-      "web/src/lib/i18n/en.ts": "8daa3ce26f101e9c16c4bc6a8c0937f480dca2393727719d3a5c38f96bc5aaed"
+      "web/APP_VERSION": "9f634d11bbda8cb439b319b0e55bc9875968422da0a03a2f7721c144a168443f",
+      "web/BUILD_NUMBER": "0a36cf536672780aa2c91f581e7dacc59d984fb1c8dd4338fcb7afbc12a5770f",
+      "server/src/inku_server/layer_versions.py": "6556fc298dcaff422818a5912db0e98fc441246dee413f3e16eaeca6a8da5d3a",
+      "core/crates/inku-render/src/lib.rs": "a5b98b64009acf8e0e50bb9c00bb24518d636810abbf1aefe245ed3e1b6a4812",
+      "web/src/lib/i18n/ja.ts": "e81173288aa6beb0221810bba95c8f96b061bb9f7a42319185907040172b1542",
+      "web/src/lib/i18n/en.ts": "7ea959580f40a698ed71a46925d1f2e8abf0236d76950de1a271860c3afae276"
     },
     "tooltipKeys": [
       "tooltipAppRailLang",

@@ -14,7 +14,7 @@ func runSavedScoreVariantChecks(folder: URL) async throws {
     let app = AppModel(databaseURL: url, transport: transport)
     await app.initialize()
     app.language = "ja"; app.seedText = "42"
-    let ddl = "カンバス。\n背景を白で埋める。\n青の細筆の線を3個引く。\n赤の大きな円を1個置く。"
+    let ddl = "画面比1:1。\nカンバス。\n背景を白で埋める。\n青のガッシュの線を3個引く。\n赤の大きな円を1個置く。"
     guard await app.drawNewDDL(ddl), let parent = app.selectedWork else { throw CheckFailure.message("Variant parent failed: \(app.errorText ?? app.status)") }
     let db = try InkuDatabase(url: url)
     let context = try await app.savedConfiguration(workID: parent.id)
@@ -35,7 +35,8 @@ func runSavedScoreVariantChecks(folder: URL) async throws {
         guard changed["canvas"]["ground"]["material"].string == candidate.plan.ground?.value else { throw CheckFailure.message("Ground option names another material") }
         changed["canvas"]["ground"]["material"] = score["canvas"]["ground"]["material"]
         guard changed == score, candidate.work.renderColorMap == parent.renderColorMap,
-              candidate.work.ddl?.components(separatedBy: "\n").dropFirst().joined(separator: "\n") == ddl.components(separatedBy: "\n").dropFirst().joined(separator: "\n") else {
+              candidate.work.ddl?.components(separatedBy: "\n").first == "画面比1:1。",
+              candidate.work.ddl?.components(separatedBy: "\n").dropFirst(2).joined(separator: "\n") == ddl.components(separatedBy: "\n").dropFirst(2).joined(separator: "\n") else {
             throw CheckFailure.message("Ground changed another Score field or DDL sentence")
         }
         try sameSavedFacts(candidate.work, parent)
@@ -49,7 +50,7 @@ func runSavedScoreVariantChecks(folder: URL) async throws {
     guard await ground.saveSelected(app: app), let groundChild = try await db.work(id: firstGround.work.id),
           let groundEdge = try await db.edge(childNodeID: groundChild.lineageNodeID!),
           groundEdge.parentNodeID == parent.lineageNodeID, groundEdge.derivationKind == "ground_change",
-          groundChild.ddl?.hasPrefix("紙。\n") == true else { throw CheckFailure.message("Ground saved with wrong parent or source") }
+          groundChild.ddl?.hasPrefix("画面比1:1。\n紙。\n") == true else { throw CheckFailure.message("Ground saved with wrong parent or source") }
     let groundMetadata = try ExactJSON(data: Data(groundEdge.metadataJSON.utf8))
     guard groundMetadata["ground_material"].string == "paper", groundMetadata["parent_ground_material"].string == "canvas" else { throw CheckFailure.message("Ground metadata lost provenance") }
 
@@ -111,7 +112,7 @@ func runSavedScoreVariantChecks(folder: URL) async throws {
     guard await app.drawNewDDL("Place 1 red circle."), let plain = app.selectedWork else { throw CheckFailure.message("Plain parent failed") }
     let plainGround = SavedScoreVariantModel(work: plain, kind: .ground)
     await plainGround.initialize(app: app)
-    guard plainGround.candidates.count == 7, plainGround.candidates.first?.work.ddl?.hasPrefix("Paper.\n") == true else { throw CheckFailure.message("Plain/English ground did not offer seven named supports") }
+    guard plainGround.candidates.count == 7, plainGround.candidates.first?.work.ddl?.contains("Paper.\n") == true else { throw CheckFailure.message("Plain/English ground did not offer seven named supports") }
     print("Saved Score variants PASS: core plans; 8-option replacement and reopen cursor; 6/7 core grounds; only ground material changes; seeds/options/input/models preserved; separate preview/selection; selected-only history and exact core metadata; exact child replay; parent/drafts unchanged; provider=0. Isolated SQLite only.")
 }
 
@@ -151,7 +152,7 @@ func makeRefinementUIFixture(folder: URL) async throws {
     await app.commitDDL()
     guard app.errorText == nil, app.selectedWorkID != described.id else { throw CheckFailure.message("GUI locked-description fixture failed") }
     app.language = "ja"
-    guard await app.drawNewDDL("カンバス。\n背景を白で埋める。\n青の細筆の線を3個引く。\n赤の大きな円を1個置く。") else { throw CheckFailure.message("GUI DDL fixture failed") }
+    guard await app.drawNewDDL("カンバス。\n背景を白で埋める。\n青のガッシュの線を3個引く。\n赤の大きな円を1個置く。") else { throw CheckFailure.message("GUI DDL fixture failed") }
     print("GUI fixture ready: three saved works (description, locked description, direct DDL), synthetic transport only; future model options use the named loopback fixture.")
 }
 

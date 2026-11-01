@@ -95,8 +95,8 @@ import InkuHost
                     Text(copy.limitLabels[key] ?? key)
                     Text(copy.limitHints[key] ?? "").inkuFont(12).foregroundStyle(.secondary)
                     if ["max_expanded_primitives", "max_expanded_per_instruction"].contains(key),
-                       let value = Int(draft[key] ?? ""), let low = definition.bytesPerMark["pen"],
-                       let high = definition.bytesPerMark["brush_thick"] {
+                       let value = Int(draft[key] ?? ""), let low = definition.bytesPerMark["chalk"],
+                       let high = definition.bytesPerMark["painting_knife"] {
                         Text(String(format: copy.text("limitWeightFormat"),
                                     String(format: "%.1f", Double(max(1, value)) * Double(low) / 1_000_000),
                                     String(format: "%.1f", Double(max(1, value)) * Double(high) / 1_000_000)))

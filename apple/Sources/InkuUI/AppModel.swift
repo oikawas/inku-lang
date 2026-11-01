@@ -545,6 +545,10 @@ public final class AppModel {
         do {
             let context = try await host.savedAuthoringContext(workID: work.id)
             guard displayToken == selectionToken, selectedWorkID == work.id, !isBrowsingLocked else { return }
+            if let document = context.document,
+               (try ExactJSON(data: document))["saijiki"].string != "inku.saijiki.v3" {
+                throw HostError("saijiki_migration_required")
+            }
             selectedContext = context
             savedImageDDL = context.imageDDL
             savedDescriptionDDL = context.descriptionDDL
@@ -573,6 +577,7 @@ public final class AppModel {
             eventsJSON = try presentation.eventsJSON.map(Self.pretty) ?? ""
         } catch {
             guard displayToken == selectionToken, selectedWorkID == work.id, !isBrowsingLocked else { return }
+            if (error as? HostError)?.code == "saijiki_migration_required" { errorText = failureMessage(error) }
             promptAvailability = .unavailable
             authoringAuthority = "legacy_unknown"
             authoringOrigin = work.ddlSourceOrigin ?? "legacy_unknown"
@@ -1032,6 +1037,9 @@ public final class AppModel {
         inputMode = "ddl"; ddlText = value.source
         macroDiagnostics = try Self.pretty(catalog.data)
         status = "DDLを読み込みました。生成して保存できます。"
+        if let count = value.migratedEdits {
+            status += " " + display.label("旧い歳時記から \(count) 箇所を書き換えました。", "Migrated \(count) changes from the older Saijiki.")
+        }
     }
 
     /// Web `CompletionRangeStatesQuery`: the displayed work's own execution when it is current, else its saved record.
@@ -2121,7 +2129,7 @@ public final class AppModel {
             })
             let locksJSON = try ExactJSON(data: locks)
             var document = selectedContext?.document.flatMap { try? ExactJSON(data: $0) } ?? .object([
-                "source": .string(ddlText), "language": .string(language), "macro_locks": locksJSON, "saijiki": .string("inku.saijiki.v2"),
+                "source": .string(ddlText), "language": .string(language), "macro_locks": locksJSON, "saijiki": .string("inku.saijiki.v3"),
             ])
             document["source"] = .string(ddlText)
             let input = ExactJSON.object(["document": document, "definitions": config["definitions"], "compiler": config["compiler"]]).data
@@ -2570,6 +2578,7 @@ public final class AppModel {
 
     public func failureMessage(_ error: Error) -> String {
         switch (error as? HostError)?.code {
+        case "saijiki_migration_required": return display.label("この作品は旧い歳時記の語で保存されていて、移行が済むまで開けません。", "This work was saved in the words of an older Saijiki and cannot be opened until it is migrated.")
         case "image_missing", "image_expired": return display.webCopy("imageMissing", "画像を読み直してください。画像ファイルを選び直してから描いてください。")
         case "image_invalid": return display.webCopy("imageInvalid", "画像を読めません。JPEG・PNG・GIF・TIFF のファイルを選んでください。")
         case "image_too_large": return display.webCopy("imageTooLarge", "画像が大きすぎます。小さくしてから選んでください。")

@@ -6,7 +6,12 @@ public struct HostError: Error, LocalizedError, Sendable, Equatable {
     public let code: String
     public let svgLimitMiB: Int?
     public init(_ code: String, svgLimitMiB: Int? = nil) { self.code = code; self.svgLimitMiB = svgLimitMiB }
-    public var errorDescription: String? { code }
+    public var errorDescription: String? {
+        if code == "saijiki_migration_required" {
+            return "この作品は旧い歳時記の語で保存されていて、移行が済むまで開けません。"
+        }
+        return code
+    }
 }
 
 public enum SketchRequest: Codable, Sendable {

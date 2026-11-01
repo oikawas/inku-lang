@@ -105,6 +105,9 @@ struct AppCheck {
         if CommandLine.arguments.contains("--fanout-demo-parity-only") {
             try await runFanoutDemoParityChecks(); return
         }
+        if CommandLine.arguments.contains("--saijiki-v3-only") {
+            try runSaijikiV3Checks(); return
+        }
         if CommandLine.arguments.contains("--library-parity-only") {
             try await runLibraryParityChecks(); return
         }

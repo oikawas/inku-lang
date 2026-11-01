@@ -127,6 +127,10 @@ struct NewDdlAuthoringSheet: View {
                             Text(model.display.localized("この新しい作品に定義を持ち込みます: ") + importedDocument.names.joined(separator: ", "))
                                 .inkuFont(12).textSelection(.enabled)
                         }
+                        if let count = importedDocument?.migratedEdits {
+                            Text(model.display.label("旧い歳時記から \(count) 箇所を書き換えました。", "Migrated \(count) changes from the older Saijiki."))
+                                .inkuFont(12).textSelection(.enabled)
+                        }
                     }
                 }.disabled(model.isBusy || importing)
             } actions: {

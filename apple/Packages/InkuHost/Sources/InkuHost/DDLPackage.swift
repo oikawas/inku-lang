@@ -20,6 +20,7 @@ public struct DDLPackageImport: Sendable, Equatable {
     public let source: String
     public let language: String?
     public let plugins: [ImportedMacroDefinition]
+    public let migratedEdits: Int?
     public var names: [String] {
         let resolvedLanguage = language ?? InkuCore.resolveInstructionLanguage(text: source, requested: "auto", fallback: "ja") ?? "ja"
         guard let catalog = try? resolveCatalog(language: resolvedLanguage) else { return [] }
@@ -60,21 +61,52 @@ public struct DDLPackageImport: Sendable, Equatable {
         guard data.count <= maximumBytes else { throw HostError("ddl_import_too_large") }
         guard let text = String(data: data, encoding: .utf8) else { throw HostError("ddl_import_invalid_utf8") }
         guard let file = try? ExactJSON(data: data) else {
-            return Self(source: text, language: nil, plugins: [])
+            return Self(source: text, language: nil, plugins: [], migratedEdits: nil)
         }
         if file["schema"].string == "inku.ddl-export.v1" { throw HostError("ddl_export_requires_v2") }
         guard file["schema"].string == "inku.ddl-export.v2" else {
-            return Self(source: text, language: nil, plugins: [])
+            return Self(source: text, language: nil, plugins: [], migratedEdits: nil)
         }
         guard let source = file["ddl"].string else { throw HostError("ddl_export_without_ddl") }
         let items = file["plugins"].array ?? []
         guard items.count <= maximumPlugins else { throw HostError("ddl_export_too_many_plugins") }
-        let plugins = try items.map { item in
+        var plugins = try items.map { item in
             guard item["definition"].object != nil else { throw HostError("ddl_export_invalid_plugin") }
             return ImportedMacroDefinition(definition: item["definition"], note: item["note"].string ?? "")
         }
         let language = file["language"].string.flatMap { ["ja", "en"].contains($0) ? $0 : nil }
-        let value = Self(source: source, language: language, plugins: plugins)
+        var outputSource = source
+        var migratedEdits: Int?
+        if file.object?["saijiki"] == nil {
+            let definitions = plugins.map(\.definition)
+            let first = try ExactJSON(data: InkuCore.migrateSaijikiV2(ExactJSON.object(["definitions": .array(definitions)]).data))
+            guard first["error"] == .null, let entries = first["definitions"].array,
+                  entries.count == definitions.count else { throw HostError("ddl_export_invalid") }
+            let locks: [ExactJSON] = try entries.map { entry in
+                guard entry["error"] == .null, let name = entry["qualified_name"].string,
+                      let version = entry["version"].string, let digest = entry["old_digest"].string else {
+                    throw HostError("ddl_export_invalid")
+                }
+                return .object(["qualified_name": .string(name), "version": .string(version), "digest": .string(digest)])
+            }
+            let resolvedLanguage = language ?? InkuCore.resolveInstructionLanguage(text: source, requested: "auto", fallback: "ja") ?? "ja"
+            let request: ExactJSON = .object(["definitions": .array(definitions), "document": .object([
+                "source": .string(source), "language": .string(resolvedLanguage), "macro_locks": .array(locks),
+                "saijiki": .string("inku.saijiki.v2")])])
+            let result = try ExactJSON(data: InkuCore.migrateSaijikiV2(request.data))
+            guard result["error"] == .null, result["document"]["error"] == .null,
+                  let migratedSource = result["document"]["document"]["source"].string,
+                  let edits = result["document"]["edits"].array, let entries = result["definitions"].array,
+                  entries.count == plugins.count, entries.allSatisfy({ $0["error"] == .null && $0["definition"].object != nil }) else {
+                throw HostError("ddl_export_invalid")
+            }
+            outputSource = migratedSource
+            migratedEdits = edits.count
+            plugins = zip(entries, plugins).map { ImportedMacroDefinition(definition: $0.0["definition"], note: $0.1.note) }
+        } else if file["saijiki"].string != "inku.saijiki.v3" {
+            throw HostError("ddl_export_invalid")
+        }
+        let value = Self(source: outputSource, language: language, plugins: plugins, migratedEdits: migratedEdits)
         // Reject the whole carried catalog on any omitted/invalid definition or duplicate name.
         let resolved = try value.resolveCatalog(language: language ?? "ja")
         try Task.checkCancellation()

@@ -213,7 +213,7 @@ public enum ExportService {
             plugins.append(.object(["definition": source.pluginDefinitions[index], "note": .string(index < source.pluginSummaries.count ? source.pluginSummaries[index] : "")]))
         }
         return ExactJSON.object([
-            "schema": .string("inku.ddl-export.v2"), "language": .string(source.language),
+            "schema": .string("inku.ddl-export.v2"), "saijiki": .string("inku.saijiki.v3"), "language": .string(source.language),
             "ddl": .string(text), "plugins": .array(plugins),
             "exported_from": .object(["build_number": .optional(buildNumber), "render_engine_version": .optional(source.work.renderEngineVersion)])
         ]).data

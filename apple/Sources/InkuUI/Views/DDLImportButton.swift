@@ -64,6 +64,9 @@ final class DDLImportController {
                 self.importedNames = imported.names
                 self.appliedNames = Set(model.importedMacroNames)
                 self.message = imported.names.isEmpty ? "DDLを読み込みました。" : "この新しい作品に定義を持ち込みます: " + imported.names.joined(separator: ", ")
+                if let count = imported.migratedEdits {
+                    self.message += " " + model.display.localizedFormat("旧い歳時記から %@ 箇所を書き換えました。", String(count))
+                }
                 // Navigation guards include isReading; release it before the success callback.
                 self.isReading = false
                 onImported?()
@@ -77,7 +80,7 @@ final class DDLImportController {
                     case "ddl_export_without_ddl": model.errorText = model.display.localized("このDDL packageには指示書がありません。")
                     case "ddl_export_requires_v2": model.errorText = model.display.label("元の作品から v2 で書き出し直してください。", "Export the original work again in v2 format.")
                     case "ddl_export_too_many_plugins": model.errorText = model.display.localized("持ち込めるプラグイン定義は64件までです。")
-                    case "ddl_export_invalid_plugin", "imported_macro_catalog_incomplete": model.errorText = model.display.localized("プラグイン定義を確認できませんでした。元の作品からもう一度書き出してください。")
+                    case "ddl_export_invalid", "ddl_export_invalid_plugin", "imported_macro_catalog_incomplete": model.errorText = model.display.localized("プラグイン定義を確認できませんでした。元の作品からもう一度書き出してください。")
                     case "authoring_busy", "ddl_import_busy_or_unavailable": model.errorText = model.display.localized("描画の準備が完了してから読み込んでください。")
                     case "ddl_import_context_changed": model.errorText = model.display.localized("読み込み中に制作内容が変わったため、取り込みを中止しました。もう一度ファイルを選択してください。")
                     default: model.errorText = model.display.localizedFormat("DDLファイルを読み込めませんでした: %@", failure.localizedDescription)

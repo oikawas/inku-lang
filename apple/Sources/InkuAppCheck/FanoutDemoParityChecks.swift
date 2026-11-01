@@ -90,7 +90,7 @@ func runFanoutDemoParityChecks() async throws {
     let app = AppModel(databaseURL: url, transport: transport)
     await app.initialize()
     app.language = "ja"; app.seedText = "42"
-    guard await app.drawNewDDL("背景を白で埋める。\n青の細筆の線を3個引く。\n赤の大きな円を1個置く。"), let parent = app.selectedWork else {
+    guard await app.drawNewDDL("背景を白で埋める。\n青のガッシュの線を3個引く。\n赤の大きな円を1個置く。"), let parent = app.selectedWork else {
         throw CheckFailure.message("Next-four parent failed: \(app.errorText ?? app.status)")
     }
     let database = try InkuDatabase(url: url)

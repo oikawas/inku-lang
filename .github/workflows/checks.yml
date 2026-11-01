@@ -72,6 +72,8 @@ jobs:
       - name: Lint
         working-directory: cli
         run: uv run ruff check src tests scripts
+      - name: Pinned Rust toolchain
+        run: rustup toolchain install "$(sed -n 's/^channel = "\(.*\)"/\1/p' core/rust-toolchain.toml)" --profile minimal
       - name: Test
         run: make test-cli
 

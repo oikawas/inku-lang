@@ -20,6 +20,10 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-11-01 色・道具の句（DDL 30）への追随
+
+同梱の`ui-reference.json`を`export-web-reference.mjs`でmain `656c7242d`（Web/Server v2.15.300、Build 1376）から作り直した。新しい作品の来歴に記すDDLは29→30、DDL engineは75→76、Render engine ver.は95のまま。文言・関数の文言・キャンバスの情報・歳時記の見本の差は無く、変わったのはversions、build・source の欄だけ。色・道具の「で」・with・inの句のcompileは、build-macos.shがcheckoutのcoreを作るので固定アプリの作り直しで入る。
+
 ## 2026-11-01 歳時記 v3 と保存作品の移行
 
 macOS は歳時記 v3 と描画エンジン 95 を使う。DB v7 は検証済みの控えを作ってから、保存文書とその定義・lock を共通 core で v2 から移す。断られた作品は変えず理由を記録し、Score・SVG と過去の実行記録は保持する。DDL の書き出しに歳時記 v3 を記し、版の欄がない旧い v2 書き出しは読み込み時に core で移して変更数を示す。

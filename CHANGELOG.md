@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: regenerate the bundled Web reference from Build 1376 so new works record DDL 30 and DDL engine 76 in their provenance.
+
 - Android: migrate English instructions with missing language metadata using the saved config language or shared DDL language detection.
 
 - Android: migrate saved Saijiki v1/v2 records transactionally to v3 through shared core JNI, preserving saved Scores/SVGs and matching frozen locks by original digest. Portable DDL imports migrate v2 exports and report edit counts; exports name v3. Vocabulary previews now show the eleven current tools.

@@ -2262,6 +2262,8 @@ implementation order.
 
 `POST /api/paint/stream` also emits `progress` when its content changes: core `run_progress` (current work and finished stages), the last completed send in `previous`, token totals and the number of unreported sends in `total`, and `received_bytes` only while receiving a ChatGPT plan response. Final rendering is reported as local work before it begins; final saving has no separate event. This display does not change the usage columns saved with a work.
 
+Pipeline JSON views include the same payload in `progress`. While Web waits for the final `perform` response, it shows rendering as local work.
+
 `POST /api/paint/stream` reports finite progress as `sketch` (when the sketch
 layer ran), `stage1`, `score`, and `done`. It also sends `attempt` whenever a
 model-call attempt begins and once the last one has ended; its

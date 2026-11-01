@@ -57,6 +57,28 @@ def _bytes(value: dict) -> bytes:
     return json.dumps(value, ensure_ascii=False, allow_nan=False, separators=(",", ":")).encode()
 
 
+def progress_projection(binding, state: dict, context: dict) -> dict | None:
+    """The same progress payload for a pipeline view and a paint stream."""
+    report = getattr(binding, "run_progress", None)
+    if report is None:
+        return None
+    progress = json.loads(report(_bytes(state))).get("run_progress")
+    if progress is None:
+        return None
+    from .pipeline_product import usage_result
+
+    sends = list(context.get("provider_sends", []))
+    usage = context.get("provider_usage") or {}
+    totals = usage_result(usage)
+    previous = ({key: sends[-1][key] for key in ("action", "input_tokens", "output_tokens")}
+                if sends else None)
+    receiving = context.get("provider_receiving")
+    return {"run_progress": progress, "previous": previous,
+            "total": {"input_tokens": totals["tokens_in"], "output_tokens": totals["tokens_out"],
+                      "unreported_sends": sum(entry["unreported_sends"] for entry in usage.values())},
+            "received_bytes": receiving.get("bytes") if receiving else None}
+
+
 def _nonnegative_int(value: object) -> int | None:
     try:
         parsed = int(value)  # type: ignore[arg-type]
@@ -372,6 +394,9 @@ class CandidateExecution:
             attempt = self._provider_attempt(state)
             if attempt is not None:
                 result["provider_attempt"] = attempt
+            progress = progress_projection(self.binding, state, self.context)
+            if progress is not None:
+                result["progress"] = progress
             if self.context.get("hole_completion_check") is not None:
                 result["hole_completion_check"] = self.context["hole_completion_check"]
             if self.context.get("host_options", {}).get("developer_capture_provider_io") is True:

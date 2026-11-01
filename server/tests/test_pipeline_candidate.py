@@ -226,6 +226,40 @@ def test_a_running_model_call_is_numbered_and_given_a_deadline(tmp_path):
     engine.dispose()
 
 
+def test_pipeline_view_and_stream_share_progress_from_fake_provider(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from inku_server import pipeline_compat
+    from inku_server.pipeline_product import _add_provider_usage
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'progress.db'}")
+    store = VariationAuthorityStore(engine)
+    store.install_schema()
+    observed = []
+
+    def provider(action):
+        run.context["provider_receiving"] = {"action": action["tag"], "attempt": 1, "bytes": 4096}
+        observed.append(run.view()["progress"])
+        run.context.pop("provider_receiving")
+        used = {"input_tokens": 123, "output_tokens": 45}
+        _add_provider_usage(run.context, "stage1", used)
+        run.context.setdefault("provider_sends", []).append({"action": action["tag"], "attempt": 1, **used})
+        return {"tag": "normalized_ddl_generated", "identity": action["identity"],
+                "response": json.dumps({"normalized_ddl": "place one black circle at center."}), "elapsed_ms": "1"}
+
+    run = CandidateExecution(PipelineBinding(), store, owner_id="acceptance", config=_fixture_config(), provider=provider)
+    run.start_new({"tag": "description", "description": "One quiet black circle", "auto_catalog": False})
+    run.run_effect()
+    view = run.view()
+    assert observed[0]["received_bytes"] == 4096
+    assert view["progress"]["previous"] == {"action": "generate_normalized_ddl", "input_tokens": 123, "output_tokens": 45}
+    assert view["progress"]["total"] == {"input_tokens": 123, "output_tokens": 45, "unreported_sends": 0}
+    monkeypatch.setattr(pipeline_compat, "_service", lambda: SimpleNamespace(execution=lambda *_: run))
+    events = list(pipeline_compat._progress("acceptance", view, time.monotonic(), set()))
+    streamed = next(event for event in events if event["event"] == "progress")
+    assert {key: value for key, value in streamed.items() if key != "event"} == view["progress"]
+    engine.dispose()
+
+
 def test_core_failures_are_persisted_and_logged_once_per_transition(caplog):
     class FixtureBinding:
         def step(self, snapshot_bytes, _input_bytes):

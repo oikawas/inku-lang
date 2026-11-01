@@ -399,30 +399,16 @@ def _progress(owner: str, view: dict, started: float, sent: set[str]) -> Iterato
     """Each layer that has settled in this view and has not been reported yet,
     then the provider attempt when it has changed."""
     elapsed = int((time.monotonic() - started) * 1000)
-    run = _service().execution(owner, view["execution_id"])
-    projection = getattr(getattr(run, "binding", None), "run_progress", None)
-    if projection is not None:
-        progress = json.loads(projection(json.dumps(run.snapshot(), ensure_ascii=False).encode())).get("run_progress")
-        if progress is not None:
-            context = run.context
-            sends = list(context.get("provider_sends", []))
-            from .pipeline_product import usage_result
-            usage = context.get("provider_usage") or {}
-            totals = usage_result(usage)
-            previous = ({key: sends[-1][key] for key in ("action", "input_tokens", "output_tokens")}
-                        if sends else None)
-            receiving = context.get("provider_receiving")
-            event = {"event": "progress", "run_progress": progress, "previous": previous,
-                     "total": {"input_tokens": totals["tokens_in"], "output_tokens": totals["tokens_out"],
-                               "unreported_sends": sum(entry["unreported_sends"] for entry in usage.values())},
-                     "received_bytes": receiving.get("bytes") if receiving else None}
-            key = "progress:" + json.dumps(event, sort_keys=True, ensure_ascii=False)
-            old = next((item for item in sent if item.startswith("progress:")), None)
-            if key != old:
-                if old is not None:
-                    sent.remove(old)
-                sent.add(key)
-                yield event
+    progress = view.get("progress")
+    if progress is not None:
+        event = {"event": "progress", **progress}
+        key = "progress:" + json.dumps(event, sort_keys=True, ensure_ascii=False)
+        old = next((item for item in sent if item.startswith("progress:")), None)
+        if key != old:
+            if old is not None:
+                sent.remove(old)
+            sent.add(key)
+            yield event
     sketch = view.get("sketch") or {}
     if "sketch" not in sent and sketch.get("state") in _SKETCH_SETTLED:
         sent.add("sketch")

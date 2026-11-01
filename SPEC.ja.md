@@ -1357,6 +1357,8 @@ Shared compiler consumerでは、StopとOmitAndContinueはLLM fallbackではな�
 
 `progress` は内容が変わるたびに、core の `run_progress`（現在の作業と完了した段）、最後に終わった送信の `previous`、全送信の token 合計と数を返さなかった送信数の `total`、ChatGPT プランの受信中だけの `received_bytes` を送る。最後の描画の前にも local の作業として知らせる。最後の保存について別の出来事は送らない。これは描画中の表示であり、作品に保存する使用量の列は変えない。
 
+pipeline の JSON view は同じ内容を `progress` に含める。Web が最後の `perform` の応答を待つ間は、描画中の local 作業を表示する。
+
 ### 12.11 中間フィルタ（Stage 1.5）
 
 Stage 1.5 は LLM を使わない決定的な typed transformation である。入力は lock 検証済みの `CanonicalReady` typed meaning とし、自由 prose は受け取らない。出力は共有lowererが読むeffective DDL / typed meaningである。2026-09-27に`place:center`の焦点への読み替えと変奏の軸を外し、2026-10-04に明示変奏を廃止した。Stage 1.5は入力の検証とeffective meaningの同一性だけを担う。

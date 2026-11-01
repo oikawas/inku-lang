@@ -349,6 +349,7 @@ export function createWorkState(deps: WorkStateDeps) {
 	// The run's progress, also while the author looks at another work.
 	function followRunProgress(view: PipelineView): void {
 		activeRunAttempt = view.provider_attempt ?? null;
+		activeRunProgress = view.progress ? { event: 'progress', ...view.progress } : null;
 		// A read-and-draw run whose DDL is committed is drawn and saved next.
 		if (loading && view.route === 'read_and_draw' && view.delivery?.score && !view.result) stageLabel = t().readDrawSaving;
 	}
@@ -356,6 +357,7 @@ export function createWorkState(deps: WorkStateDeps) {
 	function adoptPipelineView(view: PipelineView | null): void {
 		pipelineView = view;
 		activeRunAttempt = view?.provider_attempt ?? null;
+		activeRunProgress = view?.progress ? { event: 'progress', ...view.progress } : null;
 		if (!view) return;
 		followRunProgress(view);
 		if (view.image_ddl || view.image_provenance != null) {
@@ -513,6 +515,8 @@ export function createWorkState(deps: WorkStateDeps) {
 		() => pipelineOptions(),
 		// The canvas follows the batch only while the author is on its tab.
 		(view) => { if (followsImageBatch()) adoptPipelineView(view); },
+		undefined,
+		(view) => { if (followsImageBatch()) followRunProgress(view); },
 	);
 
 	async function paintPictureFile(file: File, signal: AbortSignal): Promise<void> {
@@ -522,13 +526,18 @@ export function createWorkState(deps: WorkStateDeps) {
 		signal.throwIfAborted();
 		const model = qualifiedModelRef(deps.models.visionProvider(), deps.models.visionModel());
 		stageLabel = t().imageWritingDdl;
-		const view = await imageBatchController.fromImage(image.image_id, provenance, imageCanvasAspectId, {
-			...pipelineOptions(), stage1_model: model, stage2_model: model,
-			sketch: 'off', sketch_text: undefined, wild: false, instruction_lang: 'ja',
-			canvas_aspect: imageCanvasAspectId === 'image' ? image.nearest_format_id : imageCanvasAspectId,
-			canvas_fit: 'contain',
-		}, signal);
-		activeRunAttempt = null;
+		let view: PipelineView;
+		try {
+			view = await imageBatchController.fromImage(image.image_id, provenance, imageCanvasAspectId, {
+				...pipelineOptions(), stage1_model: model, stage2_model: model,
+				sketch: 'off', sketch_text: undefined, wild: false, instruction_lang: 'ja',
+				canvas_aspect: imageCanvasAspectId === 'image' ? image.nearest_format_id : imageCanvasAspectId,
+				canvas_fit: 'contain',
+			}, signal);
+		} finally {
+			activeRunAttempt = null;
+			activeRunProgress = null;
+		}
 		if (view.image_failure) throw new Error(describeApiError(view.image_failure, 422));
 		if (view.phase.tag === 'failed') throw new Error(describeApiError({ code: view.phase.reason ?? 'image_ddl_failed' }, 422));
 		// Only a saved work counts as painted; anything short of that is a failure
@@ -575,7 +584,7 @@ export function createWorkState(deps: WorkStateDeps) {
 					: cause instanceof Error ? cause.message : String(cause),
 			});
 		} finally {
-			stopTimer(); loading = false; activeRunMode = null; stageLabel = '';
+			stopTimer(); loading = false; activeRunMode = null; stageLabel = ''; activeRunProgress = null;
 		}
 	}
 
@@ -610,6 +619,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		} finally {
 			pipelineBusy = false;
 			activeRunAttempt = null;
+			activeRunProgress = null;
 		}
 	}
 

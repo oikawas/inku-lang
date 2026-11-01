@@ -422,7 +422,7 @@
 		{/if}
 		{@render inputSettings()}
 		{#if singleRunning && !hideRunStatus}
-			<RunStatus label={stageLabel || t().imageWritingDdl} stage1Model={visionModelName} elapsedMs={liveMs} tokensIn={runTokensIn} tokensOut={runTokensOut} attempt={runAttempt} onStop={onStop} />
+			<RunStatus label={stageLabel || t().imageWritingDdl} stage1Model={visionModelName} elapsedMs={liveMs} tokensIn={runTokensIn} tokensOut={runTokensOut} attempt={runAttempt} progress={runProgress} onStop={onStop} />
 		{:else}
 			<PaintButton onclick={onSubmitImage} disabled={!uploadedImage || imageUploading || !visionModelAvailable || generationDisabled || singleRunning}>{t().submitBtn}</PaintButton>
 			{#if !visionModelAvailable}<p role="status">{t().imageVisionRequired}</p>{/if}
@@ -458,6 +458,7 @@
 				{runTokensIn}
 				{runTokensOut}
 				{runAttempt}
+				{runProgress}
 				{error}
 				onRun={onRunImageFolder}
 				{onStop}

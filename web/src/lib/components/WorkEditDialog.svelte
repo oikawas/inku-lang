@@ -117,7 +117,7 @@
 	</div>
 	<footer>
 		{#if drawing}
-			<RunStatus variant="inline" label={stageLabel || t().pipelineWorking} stage1Model={stage1ModelLabel} stage2Model={stage2ModelLabel} {elapsedMs} tokensIn={tokensIn} tokensOut={tokensOut} {attempt} progress={mode === 'sketch-grain' ? progress : null} onStop={() => controller?.abort()} />
+			<RunStatus variant="inline" label={stageLabel || t().pipelineWorking} stage1Model={stage1ModelLabel} stage2Model={stage2ModelLabel} {elapsedMs} tokensIn={tokensIn} tokensOut={tokensOut} {attempt} {progress} onStop={() => controller?.abort()} />
 		{:else}
 				<WildToggle value={wildOverride} onSelect={(next) => (wildOverride = next)} />
 			{#if mode !== 'description'}

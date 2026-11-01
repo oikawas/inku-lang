@@ -93,13 +93,23 @@ def test_progress_reports_each_send_and_totals_without_changing_saved_usage(monk
         def execution(self, owner, execution_id):
             return self.run
 
+        def with_progress(self, view):
+            from inku_server.pipeline_candidate import progress_projection
+            return {**view, "progress": progress_projection(self.run.binding, {}, self.context)}
+
+        def start(self, owner, kind, text, **kwargs):
+            return self.with_progress(super().start(owner, kind, text, **kwargs))
+
         def get(self, owner, variation_id):
             def fake_provider():
                 return {"input_tokens": 7252, "output_tokens": 367}
             used = fake_provider()
             _add_provider_usage(self.context, "read_and_draw", used)
             self.context["provider_sends"] = [{"action": "read_description", "attempt": 1, **used}]
-            return super().get(owner, variation_id)
+            return self.with_progress(super().get(owner, variation_id))
+
+        def command(self, owner, execution_id, command):
+            return self.with_progress(super().command(owner, execution_id, command))
 
     service = ProgressService()
     events = _events(_client(monkeypatch, service).post('/api/paint/stream', json={"description": "円"}))

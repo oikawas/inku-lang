@@ -1035,6 +1035,7 @@
 		tokensIn={runTokensIn}
 		tokensOut={runTokensOut}
 		attempt={runAttempt}
+		progress={runProgress}
 		onClose={() => (directJuxtaposeNode = null)}
 		{onSaveVisionModel}
 		{onJuxtapose}

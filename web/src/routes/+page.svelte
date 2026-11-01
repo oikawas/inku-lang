@@ -2925,6 +2925,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 							tokensIn={work.activeRunTokensIn}
 							tokensOut={work.activeRunTokensOut}
 							attempt={work.activeRunAttempt}
+							progress={work.activeRunProgress}
 							onStop={work.stopDdlRender}
 						/>
 					{/snippet}
@@ -3301,6 +3302,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			runTokensIn={work.activeRunTokensIn}
 			runTokensOut={work.activeRunTokensOut}
 			runAttempt={work.activeRunAttempt}
+			runProgress={work.activeRunProgress}
 			error={ddlDialogError}
 			previewForWord={saijikiPreview}
 			previewForPlugin={pluginPreview}

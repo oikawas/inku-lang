@@ -21,6 +21,7 @@
 		tokensIn: number | null;
 		tokensOut: number | null;
 		attempt?: ProviderAttemptCount | null;
+		progress?: import('$lib/paintStream').PaintProgressEvent | null;
 		onClose: () => void;
 		onSaveVisionModel: (provider: Provider, model: string) => void | Promise<void>;
 		/** Four sentences from the author's other works; `exclude` holds those shown before. */
@@ -28,7 +29,7 @@
 		onDrawDescription: (node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null, metadata?: Record<string, unknown>) => void | Promise<void>;
 	};
 
-	let { node, visionModel, visionProviderGroups, stageLabel, stage1ModelLabel, stage2ModelLabel, tokensIn, tokensOut, attempt = null, onClose, onSaveVisionModel, onJuxtapose, onDrawDescription }: Props = $props();
+	let { node, visionModel, visionProviderGroups, stageLabel, stage1ModelLabel, stage2ModelLabel, tokensIn, tokensOut, attempt = null, progress = null, onClose, onSaveVisionModel, onJuxtapose, onDrawDescription }: Props = $props();
 	let selectedModel = $state('');
 	let wild = $state(wildSettings.enabled);
 	$effect(() => { if (!selectedModel) selectedModel = visionModel; });
@@ -150,7 +151,7 @@
 	<footer>
 		<WildToggle value={wild} disabled={busy} onSelect={(next) => (wild = next)} />
 		{#if busy}
-			<RunStatus variant="inline" label={asking ? t().juxtaposeAsking : (stageLabel || t().pipelineWorking)} stage1Model={asking ? null : stage1ModelLabel} stage2Model={asking ? null : stage2ModelLabel} {elapsedMs} tokensIn={asking ? null : tokensIn} tokensOut={asking ? null : tokensOut} attempt={asking ? null : attempt} onStop={() => controller?.abort()} />
+			<RunStatus variant="inline" label={asking ? t().juxtaposeAsking : (stageLabel || t().pipelineWorking)} stage1Model={asking ? null : stage1ModelLabel} stage2Model={asking ? null : stage2ModelLabel} {elapsedMs} tokensIn={asking ? null : tokensIn} tokensOut={asking ? null : tokensOut} attempt={asking ? null : attempt} progress={asking ? null : progress} onStop={() => controller?.abort()} />
 		{:else}
 			<button type="button" onclick={close}>{t().pipelineCancel}</button>
 			{#if result}

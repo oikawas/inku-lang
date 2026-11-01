@@ -970,7 +970,7 @@ $effect(() => {
 {/if}
 
 {#if activeEditNode}
-	<WorkEditDialog node={activeEditNode} mode="description" {isJapanese} {stageLabel} {stage1ModelLabel} {stage2ModelLabel} tokensIn={runTokensIn} tokensOut={runTokensOut} attempt={runAttempt} onClose={() => (activeEditNode = null)} onDrawDescription={onDrawDescription} {onDrawSketchGrain} />
+	<WorkEditDialog node={activeEditNode} mode="description" {isJapanese} {stageLabel} {stage1ModelLabel} {stage2ModelLabel} tokensIn={runTokensIn} tokensOut={runTokensOut} attempt={runAttempt} progress={runProgress} onClose={() => (activeEditNode = null)} onDrawDescription={onDrawDescription} {onDrawSketchGrain} />
 {/if}
 
 {#if activeSketchNode}
@@ -1000,7 +1000,7 @@ $effect(() => {
 {/if}
 
 {#if activeJuxtaposeNode}
-	<JuxtaposeDialog node={activeJuxtaposeNode} {visionModel} {visionProviderGroups} {stageLabel} {stage1ModelLabel} {stage2ModelLabel} tokensIn={runTokensIn} tokensOut={runTokensOut} attempt={runAttempt} onClose={() => (activeJuxtaposeNode = null)} {onSaveVisionModel} {onJuxtapose} {onDrawDescription} />
+	<JuxtaposeDialog node={activeJuxtaposeNode} {visionModel} {visionProviderGroups} {stageLabel} {stage1ModelLabel} {stage2ModelLabel} tokensIn={runTokensIn} tokensOut={runTokensOut} attempt={runAttempt} progress={runProgress} onClose={() => (activeJuxtaposeNode = null)} {onSaveVisionModel} {onJuxtapose} {onDrawDescription} />
 {/if}
 
 {#if activeAIRefineNode}

@@ -74,6 +74,7 @@ export type PipelineView = {
 	} | null;
 	busy: boolean;
 	provider_attempt?: PipelineProviderAttempt;
+	progress?: Omit<import('../../paintStream.ts').PaintProgressEvent, 'event'> | null;
 	hole_completion_check?: PipelineHoleCompletionCheck;
 	/** The last model-call failure, kept so a failed stage can say what happened. */
 	provider_failure?: { failure: string; stage: string; attempt: number; elapsed_ms?: number; detail?: string; chatgpt?: { code: string; action: string; request_id?: string; param?: string } };

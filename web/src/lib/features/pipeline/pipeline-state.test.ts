@@ -20,6 +20,25 @@ function view(overrides: Partial<PipelineView> = {}): PipelineView {
 	};
 }
 
+test('the run reports local rendering while the perform response is pending', async () => {
+	const ready = view({ phase: { tag: 'ready' }, delivery: { score: {}, upstream_diagnostics: [],
+		downstream_diagnostics: [], resource_omissions: [], relation_omissions: [] },
+		progress: { run_progress: { current: null, finished: [] }, previous: null,
+			total: { input_tokens: 12, output_tokens: 3, unreported_sends: 0 }, received_bytes: null } });
+	let resolvePerform!: (value: PipelineView) => void;
+	const held = new Promise<PipelineView>((resolve) => { resolvePerform = resolve; });
+	const seen: PipelineView[] = [];
+	const api = { start: async () => ready, command: async () => held };
+	const controller = new PipelineController(api as never, () => ({}), () => {}, async () => {}, (next) => seen.push(next));
+	const running = controller.fromDescription('a circle');
+	await new Promise((resolve) => setTimeout(resolve, 0));
+	assert.deepEqual(seen.at(-1)?.progress?.run_progress.current, { kind: 'local', action: 'render' });
+	assert.equal(seen.at(-1)?.progress?.total.input_tokens, 12);
+	resolvePerform(view({ ...ready, result: { svg: '<svg/>' } as PipelineView['result'] }));
+	await running;
+	assert.equal(seen.at(-1)?.result?.svg, '<svg/>');
+});
+
 test('a persisted SVG refusal stops automatic performance and preserves its exact detail', async () => {
 	const detail = { code: 'generated_svg_too_large', limit_mib: 3, limit_bytes: 3 * 1024 * 1024 };
 	const refused = view({

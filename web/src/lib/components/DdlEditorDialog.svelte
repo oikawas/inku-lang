@@ -33,6 +33,7 @@
 		runTokensIn: number | null;
 		runTokensOut: number | null;
 		runAttempt?: ProviderAttemptCount | null;
+		runProgress?: import('$lib/paintStream').PaintProgressEvent | null;
 		error: string | null;
 		previewForWord: PreviewForWord;
 		previewForPlugin: PreviewForPlugin;
@@ -51,7 +52,7 @@
 	let {
 		open, mode, isJapanese, initialDdl, savedDdl = null, discardDisabled = false, onConfirmDiscard, returnFocusTo = null, drawing,
 		stage2ModelLabel, drawingModelId, drawingModelGroups, onSelectDrawingModel,
-		runTokensIn, runTokensOut, runAttempt = null, error, previewForWord, previewForPlugin,
+		runTokensIn, runTokensOut, runAttempt = null, runProgress = null, error, previewForWord, previewForPlugin,
 		pluginEntries = [], ranges = [], completionWork = null, apiFetch, artworkUrl = null, wildValue = false, onSelectWild, onDraw, onClose,
 	}: Props = $props();
 
@@ -220,7 +221,7 @@
 			<footer class="ddled-foot">
 				{#if error}<div class="ddled-error" role="alert">{error}</div>{/if}
 				{#if drawing}
-					<RunStatus variant="inline" label={t().stageImageGenerating} stage2Model={stage2ModelLabel} {elapsedMs} tokensIn={runTokensIn} tokensOut={runTokensOut} attempt={runAttempt} onStop={stopDraw} />
+					<RunStatus variant="inline" label={t().stageImageGenerating} stage2Model={stage2ModelLabel} {elapsedMs} tokensIn={runTokensIn} tokensOut={runTokensOut} attempt={runAttempt} progress={runProgress} onStop={stopDraw} />
 				{:else}
 					<div class="ddled-actions">
 						{#if mode === 'edit' && savedDdl !== null && onConfirmDiscard}

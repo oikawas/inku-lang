@@ -17,6 +17,7 @@
 		runTokensIn: number | null;
 		runTokensOut: number | null;
 		runAttempt?: ProviderAttemptCount | null;
+		runProgress?: import('$lib/paintStream').PaintProgressEvent | null;
 		error: string | null;
 		onRun: (fromStart: boolean) => void | Promise<void>;
 		onStop: () => void;
@@ -28,7 +29,7 @@
 
 	let {
 		folder, busy, visionModelName, visionModelAvailable, stageLabel, liveMs,
-		runTokensIn, runTokensOut, runAttempt = null, error, onRun, onStop, settings, sourceSwitch,
+		runTokensIn, runTokensOut, runAttempt = null, runProgress = null, error, onRun, onStop, settings, sourceSwitch,
 	}: Props = $props();
 
 	let folderInputEl = $state<HTMLInputElement | null>(null);
@@ -96,6 +97,7 @@
 			tokensIn={runTokensIn}
 			tokensOut={runTokensOut}
 			attempt={runAttempt}
+			progress={runProgress}
 			{onStop}
 		/>
 	</div>

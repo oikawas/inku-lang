@@ -37,7 +37,7 @@ public struct ComparisonView: View {
                             .inkuFont(11).foregroundStyle(.secondary)
                         if comparison.running {
                             RunStatusView(display: model.display, label: comparison.status, stopping: comparison.stopping,
-                                onStop: { Task { await comparison.stop(app: model) } }) { ProviderProgressView(model: model, embedded: true) }
+                                onStop: { Task { await comparison.stop(app: model) } }, journalModel: model) { ProviderProgressView(model: model, embedded: true) }
                             if !comparison.saving {
                                 VariationLanesView(display: model.display, states: comparison.laneStates.map {
                                     switch $0 { case .waiting: .waiting; case .running: .running; case .done: .done }

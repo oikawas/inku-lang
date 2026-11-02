@@ -354,6 +354,7 @@ public struct ReplayOptions: Sendable {
 
 public enum PipelineProgress: Sendable {
     case changed(PipelineView)
+    case runProgress(executionID: String, report: Data)
     case providerAttempt(executionID: String, report: Data, beganAt: Date, deadline: Date)
     case transportBytes(executionID: String, count: Int)
     case providerDiagnostic(executionID: String, diagnostic: ChatGPTPlanDiagnostic)

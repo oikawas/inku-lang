@@ -92,7 +92,7 @@ public struct WorkEditView: View {
                 // WorkEditDialog.svelte:118: the drawing indicator at the end of the footer row.
                 Spacer()
                 RunStatusView(display: model.display, label: model.isBusy ? model.status : "生成の準備中", variant: .inline,
-                              stopping: editor.stopping, onStop: { Task { await editor.stop(app: model) } })
+                              stopping: editor.stopping, onStop: { Task { await editor.stop(app: model) } }, journalModel: model) { EmptyView() }
             } else {
                 wildControl
                 if editor.mode != .description {

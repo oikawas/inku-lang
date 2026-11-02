@@ -237,6 +237,10 @@ public enum InkuCore {
         InkuCoreBindings.providerAttempt(snapshotBytes: snapshot)
     }
 
+    public static func runProgress(snapshot: Data) -> Data {
+        InkuCoreBindings.runProgress(snapshotBytes: snapshot)
+    }
+
     /// `inku.composition-ranges.v1`: the named composition ranges and corners the hosts fold in their display.
     public static func compositionRanges() -> Data {
         Data(InkuCoreBindings.compositionRanges().utf8)

@@ -111,7 +111,7 @@ public struct JuxtaposeView: View {
                               label: juxtapose.asking ? model.display.webCopy("juxtaposeAsking", "一文を選んでいます…")
                                   : (model.isBusy ? model.status : "生成の準備中"),
                               variant: .inline, stopping: juxtapose.stopping,
-                              onStop: { Task { await juxtapose.stop(app: model) } }) {
+                              onStop: { Task { await juxtapose.stop(app: model) } }, journalModel: juxtapose.asking ? nil : model) {
                     if let startedAt = juxtapose.startedAt {
                         TimelineView(.periodic(from: startedAt, by: 0.1)) { context in
                             Text(model.display.webCopyFormat("runStatusElapsed", "経過 %@s",

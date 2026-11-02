@@ -315,7 +315,7 @@ struct BatchPanelView: View {
                 // BatchPanel.svelte:280: the running batch shows the drawing indicator with its progress.
                 RunStatusView(display: model.display, label: runningLabel, stopping: automation.stopping,
                               stopTooltip: tip("実行中のバッチを停止します。未処理の行は後で再開できます。"),
-                              onStop: { Task { await automation.stop(app: model) } }) { runProgress }
+                              onStop: { Task { await automation.stop(app: model) } }, journalModel: model) { runProgress }
             } else {
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 8) { newBatchLabel; newBatchButton }

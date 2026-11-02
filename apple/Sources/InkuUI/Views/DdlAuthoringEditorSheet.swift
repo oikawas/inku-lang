@@ -39,7 +39,7 @@ struct DdlAuthoringEditorSheet: View {
                     if model.isBusy {
                         // DdlEditorDialog.svelte:219: the drawing indicator replaces the footer actions.
                         RunStatusView(display: model.display, label: model.status, variant: .inline,
-                                      onStop: { Task { await model.cancel() } })
+                                      onStop: { Task { await model.cancel() } }, journalModel: model) { EmptyView() }
                     } else {
                         HStack(spacing: 8) {
                             if let target = session.discardTarget {
@@ -156,7 +156,7 @@ struct NewDdlAuthoringSheet: View {
                             Button(model.display.localized("停止")) { importTask?.cancel() }
                         } else if model.isBusy {
                             RunStatusView(display: model.display, label: model.status, variant: .inline,
-                                          onStop: { Task { await model.cancel() } })
+                                          onStop: { Task { await model.cancel() } }, journalModel: model) { EmptyView() }
                         } else {
                             Button(model.display.localized("キャンセル")) { dismiss() }.keyboardShortcut(.cancelAction)
                             Button(model.display.webCopy("submitBtn", "描画する")) {

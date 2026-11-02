@@ -758,7 +758,7 @@ private actor ExecutionDriver {
         let saved = try await database.compareAndSwapExecution(id: id, expectedRevision: nil, snapshot: encoded(next.state))
         adopt(next, revision: saved.revision)
         initialRequest = nil
-        let result = try makeView(); progress(.changed(result)); return result
+        let result = try makeView(); try emitProgress(progress, view: result); return result
     }
 
     func view() async throws -> PipelineView {
@@ -797,7 +797,7 @@ private actor ExecutionDriver {
             if case .generateFromDescription(_, let text, _, _) = command { state.description = text }
             do { try await advance(command.payload()) }
             catch { state = oldState; throw error }
-            progress(.changed(try makeView()))
+            try emitProgress(progress, view: makeView())
             await gate.unlock()
         } catch { await gate.unlock(); throw error }
         return try await drive(progress: progress)
@@ -809,7 +809,7 @@ private actor ExecutionDriver {
         if !["completed", "needs_user_edit", "failed", "cancelled"].contains(snapshot["phase"]["tag"].string ?? "") {
             try await advance(.object(["tag": .string("cancel")]), clearProvider: true)
         }
-        let result = try makeView(); progress(.changed(result)); return result
+        let result = try makeView(); try emitProgress(progress, view: result); return result
     }
 
     func resume(progress: @escaping PipelineProgressHandler) async throws -> PipelineView {
@@ -843,8 +843,11 @@ private actor ExecutionDriver {
                 if action.object == nil {
                     do {
                         if snapshot["phase"]["tag"].string == "score_ready" {
+                            var report = try ExactJSON(data: InkuCore.runProgress(snapshot: state.snapshot))
+                            report["run_progress"]["current"] = .object(["kind": .string("local"), "action": .string("render")])
+                            progress(.runProgress(executionID: try executionID(), report: report.data))
                             try await advance(.object(["tag": .string("render"), "options": try renderOptionsForDelivery(), "clip": try ExactJSON(data: state.clipPolicy)]))
-                            progress(.changed(try makeView()))
+                            try emitProgress(progress, view: makeView())
                         }
                         if state.rendered != nil && state.savedWorkID == nil { try await saveRendered(progress: progress) }
                         let result = try makeView(); driving = false
@@ -853,7 +856,7 @@ private actor ExecutionDriver {
                 }
                 guard let tag = action["tag"].string else { await gate.unlock(); throw HostError("pipeline_schema_violation") }
                 if tag == "commit_visible_normalized_ddl" {
-                    do { try await commitVisibleDDL(action); progress(.changed(try makeView())); await gate.unlock() }
+                    do { try await commitVisibleDDL(action); try emitProgress(progress, view: makeView()); await gate.unlock() }
                     catch { await gate.unlock(); throw error }
                 } else if tag == "draw_image_review" {
                     do {
@@ -887,14 +890,14 @@ private actor ExecutionDriver {
                         }
                         try Task.checkCancellation()
                         try await advance(.object(["tag": .string("effect_result"), "result": result]))
-                        progress(.changed(try makeView())); await gate.unlock()
+                        try emitProgress(progress, view: makeView()); await gate.unlock()
                     } catch { await gate.unlock(); throw error }
                 } else if ["generate_sketch", "select_description_catalog", "generate_normalized_ddl", "read_composition",
                            "choose_laws", "choose_colors", "complete_visible_ddl_holes", "select_image_catalog", "write_image_ddl", "review_image_ddl", "read_description", "compose_description", "write_description_ddl", "review_description_ddl"].contains(tag) {
                     if !allowProvider {
                         restored = true; driving = false
                         do {
-                            let result = try makeView(); progress(.changed(result)); await gate.unlock(); return result
+                            let result = try makeView(); try emitProgress(progress, view: result); await gate.unlock(); return result
                         } catch { await gate.unlock(); throw error }
                     }
                     let task: Task<Data, Error>
@@ -989,7 +992,7 @@ private actor ExecutionDriver {
                     do {
                         if snapshot["action"] == action {
                             try await advance(.object(["tag": .string("effect_result"), "result": try ExactJSON(data: response)]), clearProvider: true)
-                            progress(.changed(try makeView()))
+                            try emitProgress(progress, view: makeView())
                         }
                         await gate.unlock()
                     } catch { await gate.unlock(); throw error }
@@ -1271,14 +1274,14 @@ private actor ExecutionDriver {
             let committed = try await database.commitEffect(id: executionID(), expectedRevision: revision,
                 effectID: "prepare-candidate:" + (try snapshot.requiredString("sequence")), snapshot: encoded(savedState), acknowledgement: acknowledgement.data)
             state = savedState; databaseRevision = committed.execution.revision
-            progress(.changed(try makeView()))
+            try emitProgress(progress, view: makeView())
             return
         }
         let acknowledgement = SavedPerformance.acknowledgement(workID: id, context: performance)
         let committed = try await database.commitEffect(id: executionID(), expectedRevision: revision, effectID: effectID,
                                                        snapshot: encoded(savedState), acknowledgement: acknowledgement, work: work, node: node, edge: edge)
         state = savedState; databaseRevision = committed.execution.revision
-        progress(.saved(executionID: try executionID(), workID: id)); progress(.changed(try makeView()))
+        progress(.saved(executionID: try executionID(), workID: id)); try emitProgress(progress, view: makeView())
     }
 
     /// Current Server pipeline_product.sketch_result maps only this run's new result.
@@ -1318,6 +1321,11 @@ private actor ExecutionDriver {
             work: candidate.work, node: candidate.node, edge: candidate.edge)
         state = savedState; databaseRevision = committed.execution.revision
         return candidate.work
+    }
+
+    private func emitProgress(_ progress: PipelineProgressHandler, view: PipelineView) throws {
+        progress(.changed(view))
+        progress(.runProgress(executionID: view.executionID, report: InkuCore.runProgress(snapshot: state.snapshot)))
     }
 
     private func makeView() throws -> PipelineView {

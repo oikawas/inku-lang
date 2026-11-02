@@ -8,7 +8,7 @@ public enum ProviderObservationPolicy {
     }
 }
 
-public struct ProviderActionIdentity: Codable, Sendable, Equatable {
+public struct ProviderActionIdentity: Codable, Sendable, Hashable {
     public let actionID: String
     public let attempt: UInt32
     public let requestDigest: String

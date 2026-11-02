@@ -102,6 +102,9 @@ public final class AppModel {
     public private(set) var scoreJSON = ""
     public private(set) var status = "準備中"
     public private(set) var providerProgress: ProviderProgressSnapshot?
+    private var progressJournals: [String: RunProgressJournal] = [:]
+    var runJournal: RunProgressJournal? { activeExecutionID.flatMap { progressJournals[$0] } }
+    var runModelReference: String? { activeExecutionID.flatMap { providerModelsByExecution[$0]?.stage1Model } }
     /// Metrics of the displayed saved work, frozen to that work's save identity.
     public private(set) var providerMetrics: [ProviderAttemptMetric] = []
     public private(set) var isBusy = false
@@ -465,6 +468,7 @@ public final class AppModel {
         generationToken = token
         providerProgress = nil
         activeExecutionID = nil
+        progressJournals.removeAll()
         currentExecutionID = nil
         backgroundDrawing = false
         stopping = false
@@ -2403,7 +2407,7 @@ public final class AppModel {
             else if let choosing = choosingStatus(comparison: false) { status = choosing }
             else { status = providerProgress?.stage == .composition ? "構図の応答を受信中" : "応答を受信中（\(count) bytes）" }
         case .providerDiagnostic(let id, let diagnostic): receive(diagnostic, executionID: id)
-        case .providerMetric: break
+        case .providerMetric, .runProgress: break
         case .saved(_, _): status = "作品を保存しました"
         }
     }
@@ -2422,7 +2426,7 @@ public final class AppModel {
             else if providerProgress?.stage == .composition { status = comparison ? "比較候補の構図の応答を受信中" : "構図の応答を受信中" }
             else { status = comparison ? "比較候補を受信中（\(count) bytes）" : "応答を受信中（\(count) bytes）" }
         case .providerDiagnostic(let id, let diagnostic): receive(diagnostic, executionID: id)
-        case .providerMetric: break
+        case .providerMetric, .runProgress: break
         case .saved: break
         }
     }
@@ -2433,6 +2437,10 @@ public final class AppModel {
     }
     private func receiveProviderProgress(_ progress: PipelineProgress, models: ModelSelection?, comparison: Bool) {
         switch progress {
+        case .runProgress(let id, let data):
+            guard let value = try? ExactJSON(data: data), value["run_progress"].object != nil else { break }
+            if progressJournals[id] == nil { progressJournals[id] = RunProgressJournal(report: value["run_progress"]) }
+            else { progressJournals[id]?.report = value["run_progress"] }
         case .providerAttempt(let id, let report, let beganAt, let deadline):
             activeExecutionID = id
             if let models { providerModelsByExecution[id] = models }
@@ -2448,6 +2456,8 @@ public final class AppModel {
             if providerProgress?.executionID == id { providerProgress?.receive(bytes: bytes) }
         case .providerMetric(let id, let metric):
             if providerProgress?.executionID == id { providerProgress?.receive(metric: metric) }
+            if progressJournals[id] == nil { progressJournals[id] = RunProgressJournal(report: .object([:])) }
+            progressJournals[id]?.receive(metric)
         case .providerDiagnostic, .saved: break
         }
     }

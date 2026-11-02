@@ -408,6 +408,41 @@ def test_core_failures_are_persisted_and_logged_once_per_transition(caplog):
     assert "raw response marker" not in caplog.text
 
 
+def test_reading_fallback_is_logged_once_without_provider_text(caplog):
+    class FixtureBinding:
+        def step(self, snapshot_bytes, _input_bytes):
+            if snapshot_bytes:
+                snapshot = json.loads(snapshot_bytes)
+                snapshot["action"] = None
+                events = [{"tag": "description_reading_fallback", "payload": {
+                    "failure": "transport_timeout", "detail": "no_core_image", "response": "PRIVATE RESPONSE"}}]
+            else:
+                snapshot = {"execution_id": "execution-1", "variation_id": "variation-1", "sequence": "0",
+                            "authority": {"revision": "0"}, "document": None, "phase": {"tag": "awaiting_llm"},
+                            "delivery": None, "action": {"tag": "read_description", "delay_ms": "0",
+                            "identity": {"attempt": 2, "action_id": "action-1"}}}
+                events = []
+            return json.dumps({"kind": "output", "payload": {"result": {
+                "snapshot": snapshot, "events": events, "rendered": None}}}).encode()
+
+    def provider(action):
+        return {"tag": "provider_failed", "identity": action["identity"], "failure": "transport_timeout",
+                "elapsed_ms": "123", "response": "PRIVATE RESPONSE"}
+
+    run = CandidateExecution(FixtureBinding(), object(), owner_id="acceptance", config=_fixture_config(), provider=provider)
+    with caplog.at_level(logging.WARNING, logger="inku_server.pipeline_candidate"):
+        run.start_new({"tag": "description", "description": "PRIVATE PROMPT", "auto_catalog": False})
+        run.run_effect()
+    lines = [record.getMessage() for record in caplog.records if record.getMessage().startswith("pipeline_fallback ")]
+    assert len(lines) == 1
+    assert json.loads(lines[0].removeprefix("pipeline_fallback ")) == {
+        "event": "description_reading_fallback", "failure": "transport_timeout", "detail": "no_core_image",
+        "stage": "read_and_draw", "action_id": "action-1", "attempt": 2, "elapsed_ms": 123,
+        "execution_id": "execution-1", "variation_id": "variation-1",
+    }
+    assert "PRIVATE" not in caplog.text
+
+
 def test_matching_safe_provider_detail_is_persisted_and_logged(caplog):
     class FixtureBinding:
         def step(self, snapshot_bytes, _input_bytes):

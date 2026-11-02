@@ -370,6 +370,12 @@ export interface LangPack {
 	/** While the color stage's model call runs (2026-10-20). */
 	stageChoosingColors: string;
 	batchProgress: (current: number, total: number) => string;
+	workActionCompositionForm: string;
+	compositionFormCurrent: string;
+	compositionFormSwitchNotice: string;
+	compositionFormExpired: string;
+	compositionFormNames: readonly string[];
+	compositionFormDescriptions: readonly string[];
 	batchRowOfTotal: (current: number, total: number) => string;
 	batchElapsed: (time: string) => string;
 	elapsedSeconds: (s: string) => string;

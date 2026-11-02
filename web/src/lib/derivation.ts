@@ -15,6 +15,7 @@ export type DerivationKind =
 	| 'description_edit'
 	| 'replay'
 	| 'canvas_aspect_change'
+	| 'composition_form_change'
 	// The saved Score fitted into another paper (DDL 26, 2026-10-23).
 	| 'canvas_fit'
 	// Sketch from life (Stage 0.5, v2.10): redrawn at a different grain.
@@ -34,6 +35,7 @@ const JA: Record<string, string> = {
 	description_edit: '記述編集',
 	replay: '再描画',
 	canvas_aspect_change: 'キャンバス変更',
+	composition_form_change: '構図の形',
 	canvas_fit: 'はめ込み',
 	variation: '変奏（旧）',
 	sketch_grain_change: '写生の有無',
@@ -56,6 +58,7 @@ const EN: Record<string, string> = {
 	description_edit: 'Description edit',
 	replay: 'Replay',
 	canvas_aspect_change: 'Canvas change',
+	composition_form_change: 'Composition form',
 	canvas_fit: 'Fit',
 	variation: 'Variation (retired)',
 	sketch_grain_change: 'Sketch from life',

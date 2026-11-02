@@ -23,6 +23,10 @@
 | 日本語（正本） | 英語 | 用法 | 退けた訳・注 |
 |---|---|---|---|
 | 記述 | **description** | 名詞。動詞は write | ~~prompt~~（思想に反する） |
+| 構図の形を変える | **Change the composition form** | 推敲の操作 | 7形から選ぶ |
+| 一角／全面／帯 | **One corner / All over / Bands** | 構図の形 | — |
+| 分ける線／格子 | **Dividing line / Grid** | 構図の形 | — |
+| 群れと逸れ／不等辺の三角 | **Flock and stray / Unequal triangle** | 構図の形 | — |
 | 解釈（Stage 1） | **interpretation** / **interpret** | 名詞／動詞 | ~~reading~~（読み取りと混線する） |
 | 下絵（Stage 1 の出力） | **underdrawing** | 名詞。LLM が返す閉じた型の設計で、指示書はここから決定的に印字される。浮世絵の絵師の下絵（彫師が版木を彫る元）に倣った名。2026-09-25 に「作品計画」から改名。実装の識別子 `work_plan` と schema ID は変えない | ~~work plan~~（旧称）、~~sketch~~（写生と紛れる）、~~plan~~ 単独（lowerer の symbolic Plan と紛れる） |
 | 指示書（正規化DDL） | **instructions** | **常に複数形**。初出は "Instructions (normalized DDL)" | ~~instruction~~（単数）、~~spec~~ |

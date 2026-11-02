@@ -51,6 +51,7 @@ LINEAGE_DERIVATION_KINDS = {
     "renga_reply",
     "external_seed_change",
     "canvas_aspect_change",
+    "composition_form_change",
     # The saved Score fitted into another paper (はめ込み, 2026-10-23). It reads
     # no description, so a description-locked parent's child stays locked.
     "canvas_fit",

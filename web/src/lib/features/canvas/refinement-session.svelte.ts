@@ -4,7 +4,7 @@ import type { RecomposeMode } from './recomposition.ts';
 
 export type RefineKind = 'layout' | 'color';
 /** Which dialog the refinement modal shows: parameters, models, color catalog, or layout. */
-export type RefinementView = 'compare' | 'color' | 'layout' | 'color-arrangement' | 'ground' | 'tool';
+export type RefinementView = 'compare' | 'color' | 'layout' | 'color-arrangement' | 'ground' | 'tool' | 'composition-form';
 
 export type VariationCandidate = {
 	id: string;
@@ -14,6 +14,7 @@ export type VariationCandidate = {
 	result: PaintResult & { ddl: string; thinking: string | null };
 	selected: boolean;
 	saved?: boolean;
+	executionId?: string;
 	/** Lines under the label, such as which sentence took which tool. */
 	details?: string[];
 };

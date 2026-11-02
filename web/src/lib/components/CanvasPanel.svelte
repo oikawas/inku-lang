@@ -154,6 +154,7 @@
 		onGenerateColorCatalogCandidates: () => void | Promise<void>;
 		onGenerateColorArrangementCandidates: () => void | Promise<void>;
 		onGenerateGroundCandidates: () => void | Promise<void>;
+		onGenerateCompositionFormCandidates: (form: import('$lib/features/canvas/composition-form').CompositionForm, count: 1 | 4) => void | Promise<void>;
 		onGenerateToolCandidates: () => void | Promise<void>;
 		/** Draws the work with each model picked in the "change the model" dialog. */
 		onGenerateModelCandidates: () => void | Promise<void>;
@@ -285,6 +286,7 @@
 		onGenerateColorCatalogCandidates,
 		onGenerateColorArrangementCandidates,
 		onGenerateGroundCandidates,
+		onGenerateCompositionFormCandidates,
 		onGenerateToolCandidates,
 		onGenerateModelCandidates,
 		onSaveSelectedVariationCandidates,
@@ -528,6 +530,7 @@
 			case 'models':
 				startDirectRefinement(node, 'compare');
 				break;
+			case 'composition-form': startDirectRefinement(node, 'composition-form'); break;
 			case 'juxtapose': directJuxtaposeNode = node; break;
 			case 'autonomous': directAIRefineNode = node; break;
 		}
@@ -905,6 +908,8 @@
 					{refinementSession}
 					{modelInspection}
 					{statusDescriptionLocked}
+					compositionForm={statusWork?.description_ddl?.composition?.answer?.form ?? null}
+					compositionFormSwitch={!statusWork?.description_ddl?.composition}
 					{statusStage1Model}
 					{statusStage2Model}
 					{refineDrawingModelId}
@@ -915,6 +920,7 @@
 					{onGenerateColorCatalogCandidates}
 					{onGenerateColorArrangementCandidates}
 					{onGenerateGroundCandidates}
+					{onGenerateCompositionFormCandidates}
 					{onGenerateToolCandidates}
 					{onGenerateModelCandidates}
 					catalogName={statusCatalogName}

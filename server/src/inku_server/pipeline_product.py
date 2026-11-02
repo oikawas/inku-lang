@@ -145,6 +145,7 @@ class RunOptions(BaseModel):
     # §12.6.7): off (the default) or on. Only read and draw sends it; left
     # out, a child takes its parent's, like the route.
     composition: Literal["off", "on"] | None = None
+    composition_form: Literal["one_corner", "all_over", "bands", "dividing_line", "grid", "flock_and_stray", "unequal_triangle"] | None = None
     history_display_label: str | None = None
     batch_line_number: int | None = None
     batch_run_id: str | None = None
@@ -366,6 +367,8 @@ class ProductPipelineEffects:
                 options[key] = ""
         requested_limits = options.pop("limits", None)
         previous = deepcopy((work or {}).get("host_options", {}))
+        # The form is a choice for this execution, not a setting inherited by children.
+        previous.pop("composition_form", None)
         for retired in ("variation_amplitude", "variation_seed"):
             previous.pop(retired, None)
         metadata = (work or {}).get("metadata", {})
@@ -380,6 +383,10 @@ class ProductPipelineEffects:
         if imported_plugins and work and "saved_config" in work:
             raise CandidateHostError("imported_plugins_require_new_work")
         selected = {**previous, **options}
+        if selected.get("composition_form") is not None and (
+            kind != "description" or selected.get("route") != "read_and_draw" or selected.get("composition") != "on"
+        ):
+            raise CandidateHostError("invalid_authoring_options")
         # Request save metadata belongs to this operation, not to its parent.
         for key in ("request_idempotency_key", "history_at", "history_input", "history_source_text"):
             if key not in options:

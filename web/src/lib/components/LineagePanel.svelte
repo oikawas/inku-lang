@@ -469,6 +469,7 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 			case 'instructions': onOpenDdlEditor(node); break;
 			case 'sketch-grain': openSketchDialog(node); break;
 			case 'models': await onOpenRefinement(node, 'compare'); break;
+			case 'composition-form': await onOpenRefinement(node, 'composition-form'); break;
 			case 'juxtapose': activeJuxtaposeNode = node; break;
 			case 'autonomous': activeAIRefineNode = node; break;
 		}

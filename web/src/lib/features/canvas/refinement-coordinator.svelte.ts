@@ -12,6 +12,9 @@ import { RefinementSessionState, type RefineKind, type VariationCandidate } from
 import { saveRefinementCandidates } from '$lib/features/canvas/refinement-actions';
 import { otherCatalogIds, planRefinementCandidates, runRefinementFanout } from '$lib/features/canvas/refinement-fanout';
 import { layoutCandidateResult, requestLayoutComposition, type RecomposeMode, type LayoutComposeResponse } from './recomposition.ts';
+import { PipelineApi } from '../pipeline/api';
+import { PipelineController } from '../pipeline/controller';
+import type { CompositionForm } from './composition-form';
 
 type Iteration = HistoryItem;
 type RefinementWork = Pick<WorkState,
@@ -596,6 +599,60 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		return contextVersion === targetIdentityVersion ? failed : {};
 	}
 
+	async function generateCompositionFormCandidates(form: CompositionForm, count: 1 | 4): Promise<void> {
+		const workId = refinementWorkId();
+		const target = refinementTarget();
+		if (!workId || !target.source || !work.result || refinementSession.gridBusy) return;
+		const version = targetIdentityVersion;
+		const parentNode = await deps.ensureVisibleLineageParentId();
+		if (!parentNode || version !== targetIdentityVersion) return;
+		const parent = work.result;
+		const from = work.displayedHistoryItem?.description_ddl?.composition?.answer?.form ?? null;
+		const controller = refinementSession.beginGrid({ includesReading: true, taskLabel: t().workActionCompositionForm, count });
+		const timer = window.setTimeout(() => refinementSession.enableAbort(controller), 3000);
+		try {
+			const plans = Array.from({ length: count }, (_, index) => async (): Promise<VariationCandidate> => {
+				const api = new PipelineApi(apiFetch);
+				const pipeline = new PipelineController(api, () => ({}), () => {}, undefined, (view) => {
+					refinementSession.setSlotProgress(controller, index, view.progress ? { event: 'progress', ...view.progress } : null);
+				});
+				const cancel = () => { void pipeline.cancel().catch(() => {}); };
+				controller.signal.addEventListener('abort', cancel, { once: true });
+				try {
+					await pipeline.selectHistory(workId, null, controller.signal);
+					const view = await pipeline.fromDescription(target.source, {
+						route: 'read_and_draw', composition: 'on', composition_form: form,
+						sketch: 'on', ...(target.sketchText ? { sketch_text: target.sketchText } : {}),
+						stage1_model: parent.stage1_model ?? deps.models.stage1(), stage2_model: parent.stage2_model ?? deps.models.stage2(),
+						catalog_id: refinementCatalogId(), catalog_mode: 'fixed', canvas_aspect: refinementCanvasAspectId(),
+						...(parent.render_seed != null ? { render_seed: parent.render_seed } : {}),
+						save_history: false, save_artifacts: false, count_generation: true,
+						lineage_parent_node_id: parentNode, derivation_kind: 'composition_form_change',
+						derivation_metadata: { form_from: from, form_to: form },
+					}, controller.signal);
+					controller.signal.throwIfAborted();
+					if (!view.result?.ddl || !view.result.svg) throw new Error(t().pipelineAttentionReason('host_commit_failed'));
+					return { id: view.execution_id, executionId: view.execution_id, label: String(index + 1), selected: false,
+						result: { ...view.result, ddl: view.result.ddl, thinking: view.result.thinking ?? null,
+							lineage_parent_node_id: parentNode, derivation_kind: 'composition_form_change',
+							derivation_metadata: { form_from: from, form_to: form } } };
+				} finally { controller.signal.removeEventListener('abort', cancel); }
+			});
+			refinementSession.setPlans(controller, plans.map((_, index) => String(index + 1)));
+			const candidates = await runRefinementFanout(plans, deps.render.fanoutLimit(), {
+				onStart: (index) => refinementSession.seatSlot(controller, index, 'running'),
+				onDone: (index) => refinementSession.finishSlot(controller, index),
+			});
+			refinementSession.commitCandidates(controller, candidates);
+			for (const candidate of candidates) refinementSession.addTokens(controller, work.paintTokensIn(candidate.result), work.paintTokensOut(candidate.result));
+		} catch (error) {
+			if (!controller.signal.aborted) refinementSession.failGrid(controller, error instanceof Error ? error.message : String(error));
+		} finally {
+			window.clearTimeout(timer);
+			refinementSession.finishGrid(controller);
+		}
+	}
+
 	/** True when every chosen option is now in the history. */
 	async function saveSelectedVariationCandidates(): Promise<boolean> {
 		const contextVersion = targetIdentityVersion;
@@ -612,6 +669,18 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 				fallbackCatalogId: () => deps.catalog.effectiveId()
 			}, {
 				saveHistory: deps.pushHistory,
+				saveExecution: async (candidate) => {
+					const response = await apiFetch(`/api/pipeline/executions/${encodeURIComponent(candidate.executionId!)}/save`, {
+						method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+							lineage_parent_node_id: candidate.result.lineage_parent_node_id,
+							derivation_kind: 'composition_form_change', derivation_metadata: candidate.result.derivation_metadata ?? {},
+						}),
+					});
+					if (response.status === 404) throw new Error(t().compositionFormExpired);
+					if (!response.ok) throw await apiError(response);
+					const saved = await response.json() as PaintResult;
+					return { ...candidate.result, ...saved, id: saved.history_id!, at: saved.history_at ?? Date.now(), input: refinementTarget().source } as Iteration;
+				},
 				isCurrentContext: () => contextVersion === targetIdentityVersion,
 				markSaved: (id) => refinementSession.markSaved(id),
 				isCurrentResult: (candidateResult) => work.result === candidateResult,
@@ -625,6 +694,9 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 				refinementSession.setStatus(t().pipelineAttentionReason('host_commit_failed'));
 			}
 			return outcome === 'complete';
+		} catch (error) {
+			if (contextVersion === targetIdentityVersion) refinementSession.setStatus(error instanceof Error ? error.message : String(error));
+			return false;
 		} finally {
 			if (contextVersion === targetIdentityVersion) refinementSession.finishSave();
 		}
@@ -642,6 +714,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		generateGroundCandidates,
 		generateToolCandidates,
 		generateModelCandidates,
+		generateCompositionFormCandidates,
 		saveSelectedVariationCandidates,
 	};
 }

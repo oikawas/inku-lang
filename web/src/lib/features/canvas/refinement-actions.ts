@@ -12,6 +12,7 @@ export type SaveRefinementCandidatesInput = {
 
 export type SaveRefinementCandidatesCapabilities = {
 	saveHistory: (item: HistoryItem, options: SaveHistoryOptions) => Promise<HistoryItem | null>;
+	saveExecution?: (candidate: VariationCandidate) => Promise<HistoryItem | null>;
 	isCurrentContext: () => boolean;
 	markSaved: (id: string) => void;
 	isCurrentResult: (result: CandidateResult) => boolean;
@@ -33,7 +34,10 @@ export async function saveRefinementCandidates(
 	for (const [index, candidate] of input.candidates.entries()) {
 		const result = candidate.result;
 		const sourceText = input.sourceText();
-		const saved = await capabilities.saveHistory({
+		if (candidate.executionId && !capabilities.saveExecution) return 'failed';
+		const saved = candidate.executionId && capabilities.saveExecution
+			? await capabilities.saveExecution(candidate)
+			: await capabilities.saveHistory({
 			...result,
 			input: sourceText,
 			ddl: result.ddl,

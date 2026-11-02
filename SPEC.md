@@ -1175,6 +1175,8 @@ part I rewrote" and "the degree to which the LLM read it" on a single screen.
 
 ### 7.8 The Reference Web Application
 
+The “Change the composition form” refinement offers seven forms and draws one or four candidates from the parent's reading; when none exists it asks for a reading. It switches to In words with composition enabled and saves selected executions as children. A description-locked work cannot use it.
+
 The information dialog's License section opens Show third-party licenses. Following the Swift layout, a grouped list on the left selects an item whose version, license, source, and selectable, copyable full notice appear on the right. The reader displays the Web's bundled MIT notices and the running Server's distribution notices, dictionaries including UniDic, and fonts. Container-specific SQLite, CPython, and Rust notices appear only when that Server actually ships the files. Failure to fetch one catalog leaves the other readable, with an error and retry action. Narrow screens place the list above the text. Reading notices requires no login, and notice text is never interpreted as HTML. Tab stays within the child dialog; Escape or Close returns focus to the information dialog's opener.
 
 What follows records what the reference interface actually provides.  It is
@@ -2104,6 +2106,8 @@ A run may start from an image instead of a description (`AuthoringInput::Image`;
 - Versions: the protocol (1.0.0), the binding version and the core API version are unchanged. The Server's Python binding adds `pipeline_image_input_policy`, `pipeline_image_canvas` and `pipeline_image_review_svg` (the UniFFI and JNI calls are unchanged).
 
 ### 12.6.7 A Work Read and Drawn From Its Description (Writing DDL Directly, 2026-10-25)
+
+The Server accepts `composition_form` only for In words with composition enabled, and does not inherit it into a child. An owner can save a selected completed execution with its reading and composition record. Repeated saves return the same work without counting the generation twice.
 
 The work's definitions and locks let the reader measure an object word's numeric position, range, and size like a square. A scene word with no numeric place is outside that measurement.
 

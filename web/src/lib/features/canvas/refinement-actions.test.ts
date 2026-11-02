@@ -35,6 +35,19 @@ function candidate(
 	};
 }
 
+test('a selected pipeline candidate saves its own execution rather than redrawing its score', async () => {
+	const selected = { ...candidate('a'), executionId: 'execution-a' };
+	const calls: string[] = [];
+	const outcome = await saveRefinementCandidates({ candidates: [selected], sourceText: () => 'source', fallbackCatalogId: () => 'default' }, {
+		saveHistory: async () => { throw new Error('must not redraw'); },
+		saveExecution: async (item) => { calls.push(item.executionId!); return { id: 'saved', at: 1, input: 'source' }; },
+		isCurrentContext: () => true, markSaved: (id) => { calls.push(id); },
+		isCurrentResult: () => false, adoptSavedIdentity: () => {},
+	});
+	assert.equal(outcome, 'complete');
+	assert.deepEqual(calls, ['execution-a', 'a']);
+});
+
 test('T-316/T-318: candidates save sequentially with canonical fields and only current identity adopts', async () => {
 	const first = candidate('first', { render_color_catalog_id: null });
 	const current = candidate('current', { render_color_catalog_id: 'candidate-catalog' });

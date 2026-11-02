@@ -34,6 +34,7 @@ export async function saveRefinementCandidates(
 	for (const [index, candidate] of input.candidates.entries()) {
 		const result = candidate.result;
 		const sourceText = input.sourceText();
+		if (candidate.executionId && !capabilities.saveExecution) return 'failed';
 		const saved = candidate.executionId && capabilities.saveExecution
 			? await capabilities.saveExecution(candidate)
 			: await capabilities.saveHistory({

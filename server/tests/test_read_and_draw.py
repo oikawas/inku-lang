@@ -309,7 +309,7 @@ def test_only_read_and_draw_with_the_composition_on_asks_the_core_for_it():
     assert fields(route="stages", composition="on") == {}
 
 
-def test_composition_form_candidate_saves_its_actual_execution_once(host, composed):
+def test_composition_form_candidate_saves_its_actual_execution_once(host, composed, monkeypatch):
     client, service, _, sent = host
     parent = _wait(service, _start(client, composition="on")["execution_id"])
     parent = service.command("owner", parent["execution_id"], {"tag": "perform"})
@@ -330,6 +330,8 @@ def test_composition_form_candidate_saves_its_actual_execution_once(host, compos
     path = f"/api/pipeline/executions/{candidate['execution_id']}/save"
     first = client.post(path, json=body, headers={"x-owner": "owner"})
     assert first.status_code == 200, first.text
+    # A completed run may leave the in-memory pool; its stored execution can be restored.
+    service._runs.pop(("owner", candidate["execution_id"]))
     second = client.post(path, json=body, headers={"x-owner": "owner"})
     assert second.status_code == 200 and first.json()["history_id"] == second.json()["history_id"]
     item = db.get_items("owner", [first.json()["history_id"]])[0]
@@ -339,6 +341,9 @@ def test_composition_form_candidate_saves_its_actual_execution_once(host, compos
         assert session.get(UserAccountRow, "owner").image_generation_count == count
     assert client.post(path, json=body, headers={"x-owner": "other"}).status_code == 404
     assert client.post(f"/api/pipeline/executions/{parent['execution_id']}/save", json=body, headers={"x-owner": "owner"}).status_code == 409
+    assert client.post(path, json={**body, "lineage_parent_node_id": "wrong"}, headers={"x-owner": "owner"}).status_code == 422
+    monkeypatch.setattr(db, "history_description_locked", lambda _history_id: True)
+    assert client.post(path, json=body, headers={"x-owner": "owner"}).status_code == 409
 
 
 @pytest.mark.parametrize("options", [
@@ -356,7 +361,7 @@ def test_composition_form_rejects_invalid_route_or_value(host, options):
 
 def test_a_child_keeps_its_parents_composition(host, composed):
     client, service, _, sent = host
-    parent = _wait(service, _start(client, composition="on")["execution_id"])
+    parent = _wait(service, _start(client, composition="on", composition_form="one_corner")["execution_id"])
     parent = service.command("owner", parent["execution_id"], {"tag": "perform"})
     sent.clear()
     forked = client.post(f"/api/pipeline/variations/{parent['variation_id']}/fork-description", headers={"x-owner": "owner"},
@@ -367,6 +372,7 @@ def test_a_child_keeps_its_parents_composition(host, composed):
     assert [entry["tag"] for entry in sent] == ["compose_description", "write_description_ddl", "review_description_ddl",
                                                 "choose_colors"]
     assert child["description_ddl"]["composition"]["state"] == "used"
+    assert "requested_form" not in child["description_ddl"]["composition"]
     assert child["description_ddl"]["composition"]["colors"]["state"] == "used"
 
 

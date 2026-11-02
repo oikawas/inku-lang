@@ -974,7 +974,7 @@ class PipelineService:
             form_from = (description.get("composition") or {}).get("answer") or {}
             metadata = {"form_from": form_from.get("form"), "form_to": settings["composition_form"]}
             context = deepcopy(run.context)
-            context["host_options"] = {**settings, "save_history": True, "count_generation": False,
+            context["host_options"] = {**settings, "save_history": True, "save_artifacts": True, "count_generation": False,
                                        "derivation_kind": body.derivation_kind, "derivation_metadata": metadata}
             return self.project_result(owner, snapshot, context, run._rendered)
 

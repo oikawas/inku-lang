@@ -85,13 +85,13 @@ fn words(lang: Language) -> Vec<String> {
         .collect()
 }
 fn axis_schema(values: &[&str]) -> Value {
-    json!({"type":"object","additionalProperties":false,"required":["value","quote"],"properties":{"value":{"type":"string","enum":values},"quote":{"type":"string"}}})
+    json!({"type":"object","additionalProperties":false,"propertyOrdering":["value","quote"],"required":["value","quote"],"properties":{"value":{"type":"string","enum":values},"quote":{"type":"string"}}})
 }
 pub fn reading_schema(lang: Language) -> Value {
-    json!({"type":"object","additionalProperties":false,"required":["note","brightness","vividness","warmth","colors"],"properties":{
+    json!({"type":"object","additionalProperties":false,"propertyOrdering":["note","brightness","vividness","warmth","colors"],"required":["note","brightness","vividness","warmth","colors"],"properties":{
         "note":{"type":"string"}, "brightness":axis_schema(&["bright","middle","dark","none"]),
         "vividness":axis_schema(&["vivid","muted","none"]), "warmth":axis_schema(&["warm","cool","none"]),
-        "colors":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["word","lightness","vividness","quote"],"properties":{
+        "colors":{"type":"array","items":{"type":"object","additionalProperties":false,"propertyOrdering":["word","lightness","vividness","quote"],"required":["word","lightness","vividness","quote"],"properties":{
             "word":{"type":"string","enum":words(lang)},"lightness":{"type":"string","enum":["light","deep","none"]},"vividness":{"type":"string","enum":["vivid","muted","none"]},"quote":{"type":"string"}}}}}})
 }
 

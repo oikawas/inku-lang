@@ -1331,9 +1331,36 @@ mod tests {
             let p = prompt(&first);
             assert_eq!(p["prompt_id"], crate::catalog_reading::READING_ID);
             assert_eq!(p["system"], trial[read_id]["system"]);
-            assert_eq!(p["response_schema"], trial[read_id]["response_schema"]);
+            let mut normalized = p["response_schema"].clone();
             assert_eq!(
-                serde_json::to_vec(&p["response_schema"]).unwrap(),
+                normalized["propertyOrdering"],
+                json!(["note", "brightness", "vividness", "warmth", "colors"])
+            );
+            normalized
+                .as_object_mut()
+                .unwrap()
+                .remove("propertyOrdering");
+            for axis in ["brightness", "vividness", "warmth"] {
+                assert_eq!(
+                    normalized["properties"][axis]["propertyOrdering"],
+                    json!(["value", "quote"])
+                );
+                normalized["properties"][axis]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("propertyOrdering");
+            }
+            assert_eq!(
+                normalized["properties"]["colors"]["items"]["propertyOrdering"],
+                json!(["word", "lightness", "vividness", "quote"])
+            );
+            normalized["properties"]["colors"]["items"]
+                .as_object_mut()
+                .unwrap()
+                .remove("propertyOrdering");
+            assert_eq!(normalized, trial[read_id]["response_schema"]);
+            assert_eq!(
+                serde_json::to_vec(&normalized).unwrap(),
                 serde_json::to_vec(&trial[read_id]["response_schema"]).unwrap()
             );
             assert_eq!(p["message"], json!({"description":POEM}).to_string());

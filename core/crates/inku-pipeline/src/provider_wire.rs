@@ -2400,6 +2400,80 @@ mod tests {
     }
 
     #[test]
+    fn catalog_reading_schema_property_order_matches_trial_in_provider_bodies() {
+        fn properties(schema: &super::Value) -> Vec<String> {
+            let Some(super::Value::Object(members)) = super::get(schema, "properties") else {
+                panic!("missing properties")
+            };
+            members.iter().map(|(key, _)| key.clone()).collect()
+        }
+        fn item<'a>(schema: &'a super::Value, name: &str) -> &'a super::Value {
+            super::get(super::get(schema, "properties").unwrap(), name).unwrap()
+        }
+        let fixture =
+            super::python_loads(include_str!("../tests/fixtures/catalog-color-trial.json"))
+                .unwrap();
+        for (language, row) in [
+            (inku_ddl::ResolvedInstructionLanguage::Ja, "B-ja-poem-01"),
+            (inku_ddl::ResolvedInstructionLanguage::En, "B-en-01"),
+        ] {
+            let expected =
+                super::get(super::get(&fixture, row).unwrap(), "response_schema").unwrap();
+            let prompt = serde_json::json!({"system":"s", "message":"m", "action_name":"select_description_catalog", "response_schema":crate::catalog_reading::reading_schema(language)});
+            for (provider, request) in [
+                (
+                    "chatgpt",
+                    serde_json::json!({"action":"chatgpt_request", "model":"m", "answer_limit":65536, "prompt":prompt}),
+                ),
+                (
+                    "anthropic",
+                    serde_json::json!({"action":"pipeline_request", "model":"m", "max_tokens":1024, "connection":{"id":"x", "kind":"anthropic", "base_url":"https://api.anthropic.com"}, "prompt":prompt}),
+                ),
+                (
+                    "openai",
+                    serde_json::json!({"action":"pipeline_request", "model":"gpt-4o", "max_tokens":1024, "connection":{"id":"openai", "kind":"openai_compatible", "base_url":"https://api.openai.com/v1"}, "prompt":prompt}),
+                ),
+                (
+                    "openai_chat",
+                    serde_json::json!({"action":"pipeline_request", "model":"m", "max_tokens":1024, "connection":{"id":"x", "kind":"openai_compatible", "base_url":"http://127.0.0.1:8080/v1"}, "prompt":prompt}),
+                ),
+            ] {
+                let answer = ask(&request);
+                assert_eq!(answer["outcome"], "ok", "{provider}: {answer}");
+                let body = super::python_loads(answer["body"].as_str().unwrap()).unwrap();
+                let first = &super::as_array(super::get(&body, "tools")).unwrap()[0];
+                let schema = match provider {
+                    "chatgpt" => super::get(
+                        &super::as_array(super::get(first, "tools")).unwrap()[0],
+                        "parameters",
+                    )
+                    .unwrap(),
+                    "anthropic" => super::get(first, "input_schema").unwrap(),
+                    "openai" => super::get(first, "parameters").unwrap(),
+                    _ => super::get(super::get(first, "function").unwrap(), "parameters").unwrap(),
+                };
+                assert_eq!(
+                    properties(schema),
+                    properties(expected),
+                    "{language:?} {provider} root"
+                );
+                for axis in ["brightness", "vividness", "warmth"] {
+                    assert_eq!(
+                        properties(item(schema, axis)),
+                        properties(item(expected, axis)),
+                        "{language:?} {provider} {axis}"
+                    );
+                }
+                assert_eq!(
+                    properties(super::get(item(schema, "colors"), "items").unwrap()),
+                    properties(super::get(item(expected, "colors"), "items").unwrap()),
+                    "{language:?} {provider} color"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn the_images_a_prompt_names_follow_its_message_in_each_dialect() {
         let (prompt, url) = image_prompt();
         let request = |kind: &str, base_url: &str| {

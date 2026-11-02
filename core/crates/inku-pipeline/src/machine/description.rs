@@ -1264,13 +1264,338 @@ mod tests {
             &state,
             EffectResult::DescriptionCatalogSelected {
                 identity,
-                response: json!({"catalog_id": "night"}).to_string(),
+                response: color_reading("purple", "紫", "ja").to_string(),
                 elapsed_ms: DecimalU64::new(20),
             },
         )
         .snapshot;
+        let order = state
+            .catalog_reading
+            .as_ref()
+            .unwrap()
+            .candidate_order
+            .clone();
+        let position = order.iter().position(|id| id == "night").unwrap();
+        let state = catalog_reply(
+            &state,
+            &json!({"catalog_id":format!("k{:02}",position + 1)}).to_string(),
+        )
+        .snapshot;
         assert_eq!(tag(&state), "read_description");
         assert_eq!(state.config.compiler.host.resolved_catalog_id(), "night");
+    }
+
+    fn color_reading(_word: &str, quote: &str, lang: &str) -> Value {
+        json!({"note":"light", "brightness":{"value":"dark","quote":quote},
+            "vividness":{"value":"none","quote":""}, "warmth":{"value":"cool","quote":quote},
+            "colors":[{"word":if lang == "ja" {"紫"} else {"purple"}, "lightness":"deep", "vividness":"muted", "quote":quote}]})
+    }
+
+    fn catalog_reply(state: &PipelineSnapshot, response: &str) -> StepOutput {
+        reply(
+            state,
+            EffectResult::DescriptionCatalogSelected {
+                identity: state.action.as_ref().unwrap().identity.clone(),
+                response: response.into(),
+                elapsed_ms: DecimalU64::new(20),
+            },
+        )
+    }
+
+    fn auto_catalog_start(seed: Option<u64>) -> PipelineSnapshot {
+        let mut config = read_config(false);
+        config.catalogs = vec![candidate("default"), candidate("night")];
+        config.catalog_seed = seed.map(DecimalU64::new);
+        start_with(config, authoring(SketchRequest::On, true)).snapshot
+    }
+
+    #[test]
+    fn catalog_prompts_match_trial_systems_schema_and_ordered_messages() {
+        let trial: Value = serde_json::from_str(include_str!(
+            "../../tests/fixtures/catalog-color-trial.json"
+        ))
+        .unwrap();
+        for (language, read_id, choice_id) in [
+            (
+                ResolvedInstructionLanguage::Ja,
+                "B-ja-poem-01",
+                "C-ja-poem-01",
+            ),
+            (ResolvedInstructionLanguage::En, "B-en-01", "C-en-01"),
+        ] {
+            let mut config = read_config(false);
+            config.language = language;
+            config.catalogs = vec![candidate("default"), candidate("night")];
+            config.catalog_seed = Some(DecimalU64::new(17));
+            let first = start_with(config.clone(), authoring(SketchRequest::On, true)).snapshot;
+            let p = prompt(&first);
+            assert_eq!(p["prompt_id"], crate::catalog_reading::READING_ID);
+            assert_eq!(p["system"], trial[read_id]["system"]);
+            assert_eq!(p["response_schema"], trial[read_id]["response_schema"]);
+            assert_eq!(
+                serde_json::to_vec(&p["response_schema"]).unwrap(),
+                serde_json::to_vec(&trial[read_id]["response_schema"]).unwrap()
+            );
+            assert_eq!(p["message"], json!({"description":POEM}).to_string());
+            let answer = color_reading(
+                "purple",
+                "紫",
+                if language == ResolvedInstructionLanguage::Ja {
+                    "ja"
+                } else {
+                    "en"
+                },
+            );
+            let second = catalog_reply(&first, &answer.to_string()).snapshot;
+            let p = prompt(&second);
+            assert_eq!(p["prompt_id"], crate::catalog_reading::CHOICE_ID);
+            assert_eq!(p["system"], trial[choice_id]["system"]);
+            let schema: Value = json!({"type":"object","additionalProperties":false,"required":["catalog_id"],"properties":{"catalog_id":{"type":"string","enum":["k01","k02"]}}});
+            assert_eq!(p["response_schema"], schema);
+            let raw = p["message"].as_str().unwrap();
+            assert!(
+                raw.find("\"description\"").unwrap() < raw.find("\"reading\"").unwrap()
+                    && raw.find("\"reading\"").unwrap() < raw.find("\"candidates\"").unwrap()
+            );
+            assert!(
+                !raw.contains("label")
+                    && !raw.contains("night")
+                    && !raw.contains("the default catalog")
+            );
+            let color_words = if language == ResolvedInstructionLanguage::Ja {
+                vec!["白", "黒", "灰", "赤", "橙", "黄", "緑", "青", "紫"]
+            } else {
+                vec![
+                    "white", "black", "gray", "red", "orange", "yellow", "green", "blue", "purple",
+                ]
+            };
+            let color_part = raw
+                .split("\"colors\":{")
+                .nth(1)
+                .unwrap()
+                .split('}')
+                .next()
+                .unwrap();
+            let offsets: Vec<_> = color_words
+                .iter()
+                .map(|word| color_part.find(&format!("\"{word}\"")).unwrap())
+                .collect();
+            assert!(offsets.windows(2).all(|pair| pair[0] < pair[1]));
+            let reading_part = raw
+                .split("\"reading\":{")
+                .nth(1)
+                .unwrap()
+                .split(",\"candidates\"")
+                .next()
+                .unwrap();
+            let reading_keys = ["note", "brightness", "vividness", "warmth", "colors"];
+            let offsets: Vec<_> = reading_keys
+                .iter()
+                .map(|key| reading_part.find(&format!("\"{key}\"")).unwrap())
+                .collect();
+            assert!(offsets.windows(2).all(|pair| pair[0] < pair[1]));
+            assert_eq!(
+                second.catalog_reading.as_ref().unwrap().candidate_order,
+                ["default", "night"]
+            );
+            let repeat = start_with(config, authoring(SketchRequest::On, true)).snapshot;
+            let repeat = catalog_reply(&repeat, &answer.to_string()).snapshot;
+            assert_eq!(
+                second.catalog_reading.as_ref().unwrap().candidate_order,
+                repeat.catalog_reading.as_ref().unwrap().candidate_order
+            );
+        }
+    }
+
+    #[test]
+    fn catalog_reading_anchors_counts_caps_and_formats() {
+        let mut value = color_reading("purple", "紫", "ja");
+        value["brightness"]["quote"] = json!("not there");
+        value["warmth"]["quote"] = json!("「紫 / の」");
+        value["colors"] = json!((0..8).map(|i| json!({"word":"紫","lightness":"deep","vividness":"muted","quote":if i == 0 {"not there"} else {"紫"}})).collect::<Vec<_>>());
+        let record = crate::catalog_reading::parse_reading(
+            &value.to_string(),
+            POEM,
+            ResolvedInstructionLanguage::Ja,
+            read_config(false).prompt_limits,
+        )
+        .unwrap();
+        assert_eq!(
+            (
+                record.dropped_axes,
+                record.dropped_colors,
+                record.reading.colors.len()
+            ),
+            (1, 2, 6)
+        );
+        assert_eq!(record.reading.brightness.value, "none");
+        assert_eq!(record.reading.warmth.value, "cool");
+        assert!(
+            record
+                .reading_text
+                .contains("- 温度: 冷たい（「「紫 / の」」から）")
+        );
+        let en = crate::catalog_reading::parse_reading(
+            &color_reading("purple", "\"PURPLE / SEA\"", "en").to_string(),
+            "Purple　Sea",
+            ResolvedInstructionLanguage::En,
+            read_config(false).prompt_limits,
+        )
+        .unwrap();
+        assert_eq!(en.dropped_axes, 0);
+        assert!(en.reading_text.contains("- color: purple, deep, muted"));
+        let mut limits = read_config(false).prompt_limits;
+        limits.max_catalog_serialized_bytes = 1;
+        assert!(
+            crate::catalog_reading::choice_prompt(
+                POEM,
+                &record,
+                &[candidate("default")],
+                None,
+                ResolvedInstructionLanguage::Ja,
+                limits
+            )
+            .is_err()
+        );
+        value["warmth"]["value"] = json!("outside");
+        assert!(
+            crate::catalog_reading::parse_reading(
+                &value.to_string(),
+                POEM,
+                ResolvedInstructionLanguage::Ja,
+                read_config(false).prompt_limits
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn catalog_seed_empty_reading_and_choice_retry_have_independent_budgets() {
+        let empty = json!({"note":"", "brightness":{"value":"none","quote":""}, "vividness":{"value":"none","quote":""}, "warmth":{"value":"none","quote":""}, "colors":[]}).to_string();
+        let english_empty = crate::catalog_reading::parse_reading(
+            &empty,
+            "some words",
+            ResolvedInstructionLanguage::En,
+            read_config(false).prompt_limits,
+        )
+        .unwrap();
+        assert_eq!(
+            english_empty.reading_text,
+            "Light and color: nothing could be read from the description"
+        );
+        let first = auto_catalog_start(Some(17));
+        let selected = catalog_reply(&first, &empty);
+        assert_ne!(tag(&selected.snapshot), "select_description_catalog");
+        assert_eq!(
+            selected
+                .snapshot
+                .catalog_reading
+                .as_ref()
+                .unwrap()
+                .method
+                .as_deref(),
+            Some("seed")
+        );
+        assert_eq!(
+            selected.snapshot.config.compiler.host.resolved_catalog_id(),
+            "night"
+        );
+        assert_eq!(
+            selected
+                .snapshot
+                .catalog_reading
+                .as_ref()
+                .unwrap()
+                .reading_text,
+            "光と色: 記述から読めるものが無い"
+        );
+        let again = catalog_reply(&auto_catalog_start(Some(17)), &empty).snapshot;
+        assert_eq!(
+            selected.snapshot.config.compiler.host.resolved_catalog_id(),
+            again.config.compiler.host.resolved_catalog_id()
+        );
+        let first = auto_catalog_start(None);
+        let read_retry = failed(&first).snapshot;
+        assert_eq!(read_retry.action.as_ref().unwrap().identity.attempt, 2);
+        let choice = catalog_reply(&read_retry, &empty).snapshot;
+        assert_eq!(choice.action.as_ref().unwrap().identity.attempt, 1);
+        let choice_retry = catalog_reply(&choice, r#"{"catalog_id":"k99"}"#).snapshot;
+        assert_eq!(choice_retry.action.as_ref().unwrap().identity.attempt, 2);
+        let output = catalog_reply(&choice_retry, r#"{"catalog_id":"k99"}"#);
+        assert_eq!(
+            event(&output, "catalog_fallback").unwrap()["request"],
+            "choice"
+        );
+        assert_eq!(
+            output.snapshot.config.compiler.host.catalog_mode(),
+            CatalogMode::AutoFallbackDefault
+        );
+        let read_retry = failed(&auto_catalog_start(None)).snapshot;
+        let fallback = failed(&read_retry);
+        assert_eq!(
+            event(&fallback, "catalog_fallback").unwrap()["request"],
+            "reading"
+        );
+        let mut invalid: Value = serde_json::from_str(&empty).unwrap();
+        invalid["brightness"]["value"] = json!("outside");
+        let retry = catalog_reply(&auto_catalog_start(None), &invalid.to_string()).snapshot;
+        assert_eq!(retry.action.as_ref().unwrap().identity.attempt, 2);
+        let fallback = catalog_reply(&retry, &invalid.to_string());
+        assert_eq!(
+            event(&fallback, "catalog_fallback").unwrap()["request"],
+            "reading"
+        );
+        let mut config = read_config(false);
+        config.catalogs = vec![candidate("night")];
+        let input = envelope(
+            None,
+            PipelineInput::Start {
+                variation_id: "no-default".into(),
+                authoring_nonce: "1".into(),
+                config: Box::new(config),
+                authority: VariationAuthorityState::new_description(),
+                authoring: authoring(SketchRequest::On, true),
+            },
+        );
+        assert_eq!(run_error(None, &input)["payload"]["code"], "invalid_policy");
+    }
+
+    #[test]
+    fn catalog_choice_maps_id_and_old_prompt_remains_usable() {
+        let first = auto_catalog_start(None);
+        let choice =
+            catalog_reply(&first, &color_reading("purple", "紫", "ja").to_string()).snapshot;
+        let expected = choice.catalog_reading.as_ref().unwrap().candidate_order[0].clone();
+        let result = catalog_reply(&choice, r#"{"catalog_id":"k01"}"#);
+        let record = result.snapshot.catalog_reading.unwrap();
+        assert_eq!(record.catalog_id.as_deref(), Some(expected.as_str()));
+        assert_eq!(record.method.as_deref(), Some("model"));
+        assert_eq!(record.selected_position, Some(0));
+        let mut legacy = auto_catalog_start(None);
+        let entries = legacy
+            .config
+            .catalogs
+            .iter()
+            .map(|c| c.prompt.clone())
+            .collect::<Vec<_>>();
+        let prompt = crate::prompts::build_catalog_selection_prompt(
+            POEM,
+            legacy.config.language,
+            &entries,
+            legacy.config.prompt_limits,
+        )
+        .unwrap();
+        let mut events = Vec::new();
+        legacy
+            .begin_llm(prompt, Some(POEM.into()), Vec::new(), &mut events)
+            .unwrap();
+        legacy.seal().unwrap();
+        let result = catalog_reply(&legacy, r#"{"catalog_id":"night"}"#);
+        assert_eq!(
+            result.snapshot.config.compiler.host.resolved_catalog_id(),
+            "night"
+        );
+        assert!(result.snapshot.catalog_reading.is_none());
     }
 
     #[test]
@@ -1750,15 +2075,16 @@ mod tests {
             *composition = CompositionRequest::On { form: None };
         }
         let initial = start_with(config, input).snapshot;
-        let selected = reply(
+        let choice = reply(
             &initial,
             EffectResult::DescriptionCatalogSelected {
                 identity: initial.action.as_ref().unwrap().identity.clone(),
-                response: json!({"catalog_id": "default"}).to_string(),
+                response: color_reading("purple", "紫", "ja").to_string(),
                 elapsed_ms: DecimalU64::new(20),
             },
         )
         .snapshot;
+        let selected = catalog_reply(&choice, r#"{"catalog_id":"k01"}"#).snapshot;
         let read = answer_text(&selected, &reading().to_string()).snapshot;
         let writing = answer_text(&read, &composition(golden()).to_string()).snapshot;
         let sample = progress(&writing);

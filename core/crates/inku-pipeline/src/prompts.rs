@@ -1889,6 +1889,8 @@ pub(crate) fn finish_prompt(mut prompt: LlmPrompt) -> Result<LlmPrompt, PromptEr
     // its composition, as their prototypes sent them.
     let id = prompt.prompt_id.as_str();
     if id != HOLE_COMPLETION_PROMPT_ID
+        && id != crate::catalog_reading::READING_ID
+        && id != crate::catalog_reading::CHOICE_ID
         && id != crate::composition_reading::COMPOSITION_READING_PROMPT_ID
         && id != crate::description_ddl::DESCRIPTION_READING_PROMPT_ID
         && id != crate::description_composition::DESCRIPTION_COMPOSITION_PROMPT_ID

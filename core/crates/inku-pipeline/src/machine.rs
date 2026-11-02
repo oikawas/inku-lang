@@ -38,11 +38,10 @@ use crate::prompts::{
     DescriptionCatalogEntry, HOLE_COMPLETION_PROMPT_ID, HoleCompletionResult,
     HolePatchEditResponse, HolePatchResponse, LEGACY_HOLE_COMPLETION_PROMPT_ID, LlmPrompt,
     LlmStage, MacroPromptEntry, PREVIOUS_HOLE_COMPLETION_PROMPT_IDS, PromptImage, PromptLimits,
-    Stage1Context, build_catalog_selection_prompt, build_hole_completion_prompt,
-    build_sketch_prompt, build_stage1_prompt_for_run, parse_catalog_selection_response,
-    parse_hole_completion_response, parse_hole_patch_response, parse_sketch_response,
-    parse_stage1_response_and_plan_with_plugins, with_hole_completion_feedback,
-    with_stage1_background_feedback, with_stage1_compiler_feedback,
+    Stage1Context, build_hole_completion_prompt, build_sketch_prompt, build_stage1_prompt_for_run,
+    parse_catalog_selection_response, parse_hole_completion_response, parse_hole_patch_response,
+    parse_sketch_response, parse_stage1_response_and_plan_with_plugins,
+    with_hole_completion_feedback, with_stage1_background_feedback, with_stage1_compiler_feedback,
 };
 use crate::protocol::{
     ActionEcho, DecimalU64, EffectAction, EffectResult, Envelope, PROTOCOL_NAME, PROTOCOL_VERSION,
@@ -194,6 +193,9 @@ pub struct PipelineConfig {
     pub definitions: Vec<MacroDefinition>,
     pub macro_summaries: Vec<String>,
     pub catalogs: Vec<CatalogCandidate>,
+    /// Optional render seed for the description catalog choice.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub catalog_seed: Option<DecimalU64>,
     pub prompt_limits: PromptLimits,
     pub catalog_retry: RetryPolicy,
     pub stage1_retry: RetryPolicy,
@@ -937,6 +939,9 @@ pub struct PipelineSnapshot {
     /// starts and kept after it commits, for the host to save with the work.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description_ddl: Option<DescriptionDdlRecord>,
+    /// Anchored light/color reading and the catalog choice for this execution.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub catalog_reading: Option<crate::catalog_reading::CatalogReadingRecord>,
     /// Completed steps of this run, without prompts, prose, or usage counters.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub run_finished: Vec<RunFinished>,
@@ -3194,6 +3199,7 @@ impl PipelineSnapshot {
         // A run keeps no record of the run before it in the same execution.
         self.config.plugin_offers.clear();
         self.description_ddl = None;
+        self.catalog_reading = None;
         match route {
             DescriptionRoute::Stages => self.sketch = SketchRecord::from_request(sketch),
             DescriptionRoute::ReadAndDraw => {
@@ -3210,16 +3216,9 @@ impl PipelineSnapshot {
             {
                 return Err(ProtocolError::InvalidPolicy);
             }
-            let candidates = self
-                .config
-                .catalogs
-                .iter()
-                .map(|candidate| candidate.prompt.clone())
-                .collect::<Vec<_>>();
-            let prompt = build_catalog_selection_prompt(
+            let prompt = crate::catalog_reading::reading_prompt(
                 &description,
                 self.config.language,
-                &candidates,
                 self.config.prompt_limits,
             )
             .map_err(|_| ProtocolError::SchemaViolation)?;
@@ -3424,6 +3423,18 @@ impl PipelineSnapshot {
             }
             return self.event(events, "retry_scheduled", payload);
         }
+        let catalog_request = self
+            .action
+            .as_ref()
+            .and_then(|action| action.payload["prompt"]["prompt_id"].as_str())
+            .map(|id| {
+                if id == crate::catalog_reading::CHOICE_ID {
+                    "choice"
+                } else {
+                    "reading"
+                }
+            })
+            .unwrap_or("reading");
         self.action = None;
         match stage {
             LlmStage::GenerateSketch => self.finish_sketch(
@@ -3435,7 +3446,7 @@ impl PipelineSnapshot {
             ),
             LlmStage::SelectDescriptionCatalog => {
                 self.select_catalog("default", CatalogMode::AutoFallbackDefault)?;
-                self.event(events, "catalog_fallback", json!({"catalog_id": "default", "catalog_mode": "auto_fallback_default", "failure": failure}))?;
+                self.event(events, "catalog_fallback", json!({"catalog_id": "default", "catalog_mode": "auto_fallback_default", "failure": failure, "request": catalog_request}))?;
                 self.after_description_catalog(
                     description.ok_or(ProtocolError::InternalInvariant)?,
                     events,
@@ -4090,6 +4101,72 @@ impl PipelineSnapshot {
                 )
             }
             LlmStage::SelectDescriptionCatalog => {
+                let prompt_id = self
+                    .action
+                    .as_ref()
+                    .and_then(|action| action.payload["prompt"]["prompt_id"].as_str())
+                    .ok_or(ProtocolError::InvalidState)?
+                    .to_owned();
+                let description = description.ok_or(ProtocolError::InternalInvariant)?;
+                if prompt_id == crate::catalog_reading::READING_ID {
+                    let record = match crate::catalog_reading::parse_reading(
+                        &response,
+                        &description,
+                        self.config.language,
+                        self.config.prompt_limits,
+                    ) {
+                        Ok(record) => record,
+                        Err(_) => {
+                            return self.failure(
+                                ProviderFailure::SchemaViolation,
+                                spent_ms,
+                                events,
+                            );
+                        }
+                    };
+                    let empty = record.reading.empty();
+                    self.event(events, "catalog_reading_ready", json!({"dropped_axes": record.dropped_axes, "dropped_colors": record.dropped_colors, "empty": empty}))?;
+                    self.catalog_reading = Some(record);
+                    if empty && let Some(seed) = self.config.catalog_seed {
+                        let id = crate::catalog_reading::seed_choice(&self.config.catalogs, seed)
+                            .ok_or(ProtocolError::InvalidPolicy)?;
+                        self.select_catalog(&id, CatalogMode::AutoSelected)?;
+                        let record = self
+                            .catalog_reading
+                            .as_mut()
+                            .ok_or(ProtocolError::InternalInvariant)?;
+                        record.method = Some("seed".into());
+                        record.catalog_id = Some(id.clone());
+                        self.event(
+                            events,
+                            "catalog_chosen",
+                            json!({"catalog_id": id, "method": "seed", "position": null}),
+                        )?;
+                        return self.after_description_catalog(description, events);
+                    }
+                    let (prompt, order) = match crate::catalog_reading::choice_prompt(
+                        &description,
+                        self.catalog_reading
+                            .as_ref()
+                            .ok_or(ProtocolError::InternalInvariant)?,
+                        &self.config.catalogs,
+                        self.config.catalog_seed,
+                        self.config.language,
+                        self.config.prompt_limits,
+                    ) {
+                        Ok(value) => value,
+                        Err(_) => {
+                            self.select_catalog("default", CatalogMode::AutoFallbackDefault)?;
+                            self.event(events, "catalog_fallback", json!({"catalog_id":"default", "catalog_mode":"auto_fallback_default", "failure":"schema_violation", "request":"choice"}))?;
+                            return self.after_description_catalog(description, events);
+                        }
+                    };
+                    self.catalog_reading
+                        .as_mut()
+                        .ok_or(ProtocolError::InternalInvariant)?
+                        .candidate_order = order;
+                    return self.begin_llm(prompt, Some(description), Vec::new(), events);
+                }
                 let selected =
                     match parse_catalog_selection_response(&response, self.config.prompt_limits) {
                         Ok(value) => value,
@@ -4101,16 +4178,46 @@ impl PipelineSnapshot {
                             );
                         }
                     };
-                if self
-                    .select_catalog(&selected.catalog_id, CatalogMode::AutoSelected)
-                    .is_err()
-                {
+                let (id, position) = if prompt_id == crate::catalog_reading::CHOICE_ID {
+                    let Some(record) = self.catalog_reading.as_ref() else {
+                        return Err(ProtocolError::InvalidState);
+                    };
+                    let Some(index) =
+                        record
+                            .candidate_order
+                            .iter()
+                            .enumerate()
+                            .find_map(|(index, _)| {
+                                (selected.catalog_id == format!("k{:02}", index + 1))
+                                    .then_some(index)
+                            })
+                    else {
+                        return self.failure(ProviderFailure::SchemaViolation, spent_ms, events);
+                    };
+                    (record.candidate_order[index].clone(), Some(index))
+                } else if prompt_id == crate::prompts::CATALOG_SELECTION_PROMPT_ID {
+                    (selected.catalog_id, None)
+                } else {
+                    return Err(ProtocolError::InvalidState);
+                };
+                if self.select_catalog(&id, CatalogMode::AutoSelected).is_err() {
                     return self.failure(ProviderFailure::SchemaViolation, spent_ms, events);
                 }
-                self.after_description_catalog(
-                    description.ok_or(ProtocolError::InternalInvariant)?,
-                    events,
-                )
+                if let Some(position) = position {
+                    let record = self
+                        .catalog_reading
+                        .as_mut()
+                        .ok_or(ProtocolError::InvalidState)?;
+                    record.method = Some("model".into());
+                    record.selected_position = Some(position);
+                    record.catalog_id = Some(id.clone());
+                    self.event(
+                        events,
+                        "catalog_chosen",
+                        json!({"catalog_id": id, "method":"model", "position":position}),
+                    )?;
+                }
+                self.after_description_catalog(description, events)
             }
             LlmStage::GenerateNormalizedDdl => {
                 let plugins = crate::prompts::work_plan_plugins(&self.config.definitions);
@@ -4542,6 +4649,7 @@ fn advance_impl(
             image_ddl: None,
             image_fallback: None,
             description_ddl: None,
+            catalog_reading: None,
             run_finished: Vec::new(),
             snapshot_digest: String::new(),
         };

@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Core: automatic color catalog selection reads anchored light and colors from the description, then chooses from anonymous candidates' actual colors.
+
 - Android: show finished stages, current work, tokens and received bytes as a drawing journal, with the batch line and elapsed time above it.
 
 - Web and Server: choose among seven composition forms in refinement, draw one or four candidates, and save selected executions as children with their reading and composition records.

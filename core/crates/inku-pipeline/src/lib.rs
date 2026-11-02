@@ -6,6 +6,8 @@ pub mod appearance;
 pub mod authority;
 pub mod autonomous_refine;
 pub mod byte_envelope;
+pub mod catalog_reading;
+mod catalog_reading_text;
 pub mod chunk_moves;
 pub mod colors;
 pub mod completion_ranges;

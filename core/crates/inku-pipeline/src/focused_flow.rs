@@ -99,6 +99,7 @@ pub(crate) fn config() -> PipelineConfig {
         definitions: vec![],
         macro_summaries: vec![],
         catalogs: vec![],
+        catalog_seed: None,
         prompt_limits: PromptLimits {
             max_offered_plugins: 8,
             max_catalog_entries: 16,

@@ -312,6 +312,50 @@ def test_a_ddl_batch_draws_no_title_line(monkeypatch, tmp_path, capsys):
     capsys.readouterr()
 
 
+@pytest.mark.parametrize("command", ["paint", "batch"])
+@pytest.mark.parametrize("requested_seed", [None, 5124908295885826], ids=["generated-seed", "requested-seed"])
+def test_ddl_history_uses_seeds_returned_by_compose(command, requested_seed, monkeypatch, tmp_path, capsys):
+    calls = []
+    returned_seed = requested_seed if requested_seed is not None else 4992997112751038
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def request(self, method, path, *, data=None, **kwargs):
+            if (method, path) == ("GET", "/api/color-catalogs"):
+                return {"default_catalog_id": "default", "catalogs": list(CATALOG_DATA["catalogs"].values())}, None
+            if path == "/api/pipeline/batches":
+                return {"lease": "lease-1"}, None
+            if path.startswith("/api/pipeline/batches/"):
+                return {"ok": True}, None
+            calls.append((method, path, data))
+            if (method, path) == ("POST", "/api/compose"):
+                return {"svg": "<svg/>", "score": {}, "render_seed": returned_seed, "composition_seed": 0}, None
+            if (method, path) == ("POST", "/api/history"):
+                return {"id": "saved"}, None
+            raise AssertionError((method, path))
+
+    monkeypatch.setattr(cli, "ApiClient", FakeClient)
+    monkeypatch.setattr(cli, "load_config", lambda: cli.CliConfig())
+    if command == "batch":
+        source = tmp_path / "input.ddl"
+        source.write_text("円を置く。\n", encoding="utf-8")
+        argv = ["batch", "--file", str(source)]
+    else:
+        argv = ["paint", "円を置く。"]
+    argv += ["--input-mode", "ddl", "--save-history", "--no-progress", "--out-dir", str(tmp_path / "out")]
+    if requested_seed is not None:
+        argv += ["--render-seed", str(requested_seed)]
+    assert cli.main(argv) == 0
+    [compose] = [data for _, path, data in calls if path == "/api/compose"]
+    [saved] = [data for _, path, data in calls if path == "/api/history"]
+    assert compose.get("render_seed") == requested_seed
+    assert saved["render_seed"] == returned_seed
+    assert saved["composition_seed"] == 0
+    capsys.readouterr()
+
+
 def test_history_payload_from_compose_result():
     parser = cli.build_parser()
     args = parser.parse_args(["paint", "白い背景に黒い線を一本引く。", "--input-mode", "ddl", "--save-history"])

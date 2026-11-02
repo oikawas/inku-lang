@@ -2162,6 +2162,8 @@ def _compose_response_as_paint_result(
         "svg": result.get("svg"),
         "stage1_model": None,
         "stage2_model": result.get("stage2_model") or stage2_model,
+        "render_seed": result.get("render_seed"),
+        "composition_seed": result.get("composition_seed"),
         "render_build_number": result.get("render_build_number"),
         "render_color_profile": result.get("render_color_profile"),
         "render_engine_id": result.get("render_engine_id"),
@@ -2262,6 +2264,8 @@ def _history_payload_from_result(
         "render_canvas_aspect": result.get("render_canvas_aspect"),
         "render_canvas_aspect_id": result.get("render_canvas_aspect_id"),
         "render_canvas_aspect_ratio": result.get("render_canvas_aspect_ratio"),
+        "render_seed": result.get("render_seed"),
+        "composition_seed": result.get("composition_seed"),
         "canvas_aspect": getattr(args, "canvas_aspect", None),
         # The CLI is a sender to /api/history too, and it was dropping all three:
         # a work it saved recorded nothing about the layer, and the server has to

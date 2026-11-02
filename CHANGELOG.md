@@ -12,10 +12,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 - Align macOS automatic catalog selection with color reading and the run seed, showing the selection and prompts in saved works.
 
-- Server and Web: use the run's seed for color catalog selection from a description and show the light and color reading, selection method, and sent text with the work.
-
-- Core: automatic color catalog selection reads anchored light and colors from the description, then chooses from anonymous candidates' actual colors.
-
 - Android: show finished stages, current work, tokens and received bytes as a drawing journal, with the batch line and elapsed time above it.
 
 - Web and Server: choose among seven composition forms in refinement, draw one or four candidates, and save selected executions as children with their reading and composition records.
@@ -560,6 +556,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.306 (2026-11-02 / Build 1382)
+
+- Server and Web: use the run's seed for color catalog selection from a description and show the light and color reading, selection method, and sent text with the work.
+
+- Core: automatic color catalog selection reads anchored light and colors from the description, then chooses from anonymous candidates' actual colors.
 
 ## v2.15.305 (2026-11-02 / Build 1381)
 

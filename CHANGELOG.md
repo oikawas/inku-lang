@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Core: expose the newest Score version this core can read and write through the Python binding.
+
 - Web: show per-work elapsed time and the average completed-work time in batches, label token counts and wrap long status details.
 
 - Server and CLI: show running autonomous refinements in activity and identify their child executions in the responding process.

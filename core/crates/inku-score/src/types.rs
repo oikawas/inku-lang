@@ -719,6 +719,9 @@ pub enum ScoreEdition {
 }
 
 impl ScoreEdition {
+    /// The newest Score edition this core can read and write.
+    pub const LATEST: Self = Self::V0_24;
+
     pub const ALL: [Self; 24] = [
         Self::V0_1,
         Self::V0_2,

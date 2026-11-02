@@ -48,6 +48,7 @@ from ._native import (
     render_with_resources,
     render_with_svg_limit,
     renderer_reference_json,
+    score_version,
     svg_to_png,
 )
 
@@ -99,5 +100,6 @@ __all__ = (
     "render_with_resources",
     "render_with_svg_limit",
     "renderer_reference_json",
+    "score_version",
     "svg_to_png",
 )

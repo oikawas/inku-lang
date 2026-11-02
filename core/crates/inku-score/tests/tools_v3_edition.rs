@@ -1,5 +1,10 @@
-use inku_score::read_saved_score_json;
+use inku_score::{ScoreEdition, read_saved_score_json};
 use serde_json::json;
+
+#[test]
+fn latest_score_edition_is_the_last_supported_edition() {
+    assert_eq!(Some(&ScoreEdition::LATEST), ScoreEdition::ALL.last());
+}
 
 #[test]
 fn new_weights_require_score_024_and_retired_weights_remain_readable() {

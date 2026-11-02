@@ -56,6 +56,11 @@ fn core_api_version() -> &'static str {
 }
 
 #[pyfunction]
+fn score_version() -> &'static str {
+    inku_score::ScoreEdition::LATEST.as_str()
+}
+
+#[pyfunction]
 fn render_engine_id() -> &'static str {
     inku_render::render_engine_identity().0
 }
@@ -665,6 +670,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(svg_to_png, module)?)?;
     module.add_function(wrap_pyfunction!(raster_identity_json, module)?)?;
     module.add_function(wrap_pyfunction!(core_api_version, module)?)?;
+    module.add_function(wrap_pyfunction!(score_version, module)?)?;
     module.add_function(wrap_pyfunction!(render_engine_id, module)?)?;
     module.add_function(wrap_pyfunction!(render_engine_version, module)?)?;
     module.add_function(wrap_pyfunction!(default_color_map_json, module)?)?;
@@ -731,6 +737,15 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn score_version_names_the_latest_supported_edition() {
+        assert_eq!(super::score_version(), "0.24.0");
+        assert_eq!(
+            super::score_version(),
+            inku_score::ScoreEdition::LATEST.as_str()
+        );
+    }
+
     /// The identity follows the vendored crate: its version, and one `inku.N`
     /// per local patch that INKU_PATCHES.md counts.
     #[test]

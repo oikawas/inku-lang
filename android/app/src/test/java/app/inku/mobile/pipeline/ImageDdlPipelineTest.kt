@@ -36,6 +36,7 @@ class ImageDdlPipelineTest {
         val metadata = JSONObject(result.renderMetadataJson)
         val record = metadata.getJSONObject("catalog_reading")
         assertEquals("model", record.getString("method"))
+        assertEquals(record.getJSONArray("candidate_order").getString(0), record.getString("catalog_id"))
         assertEquals(record.getJSONArray("candidate_order").getString(0), metadata.getString("catalog_id"))
         val prompts = metadata.getJSONObject("sent_system_prompts")
         assertEquals(readingId, prompts.getJSONObject("catalog_reading").getString("prompt_id"))

@@ -476,9 +476,6 @@ object InkuStringsEn : InkuStrings {
     override val svgDisplayNote = "Standard SVG for viewing on the web"
     override val mascotYuragi = "Yuragi (crab)"
     override val exportHeightPx = "Y axis px"
-    override val demoRunningButton = "■  Demo running"
-    override val runningButton = "■  Running"
-    override val drawingButton = "■  Drawing"
     override val drawFromDdlButton = "▶  Draw from instructions"
     override val demoStartButton = "▶  Start the demo"
     override val batchDrawButton = "▶  Draw the batch"
@@ -603,6 +600,41 @@ object InkuStringsEn : InkuStrings {
     override val paint = "Paint"
     override val drawingModel = "Drawing model"
     override val drawing = "Drawing"
+    override val imageSelectingCatalog = "Choosing colors from the image…"
+    override val imageWritingDdl = "Writing instructions from the image…"
+    override val imageRevisingDdl = "Revising the instructions…"
+    override val imageReviewingDdl = "Comparing the image with the drawing…"
+    override val readDrawReading = "Reading the description…"
+    override val readDrawComposing = "Deciding the composition and laws…"
+    override val readDrawRecomposing = "Deciding the composition and laws again…"
+    override val readDrawWriting = "Writing the instructions…"
+    override val readDrawRevising = "Revising the instructions…"
+    override val readDrawReviewing = "Correcting the instructions beside the drawing…"
+    override val stageReadingComposition = "Reading the composition…"
+    override val stageChoosingColors = "Choosing the colors…"
+    override val stageChoosingLaws = "Choosing the laws…"
+    override val runStageCatalog = "Color catalog"; override val runStageReading = "Reading"; override val runStageComposition = "Composition"; override val runStageWriting = "Writing"
+    override val runStageReview = "Review"; override val runStageColors = "Colors"; override val runStageLaws = "Laws"; override val runStageInterpret = "Interpretation"
+    override val runStageSketch = "Sketch"; override val runStageCompositionReading = "Reading composition"; override val runStageCompletion = "Completion"
+    override val runStageImageCatalog = "Image color catalog"; override val runStageImageWriting = "Writing from image"; override val runStageImageReview = "Image review"
+    override val runFinishedReading = "Read"; override val runFinishedReadingDropped: (String) -> String = { "Read ($it words omitted)" }
+    override val runFinishedComposition: (String, String) -> String = { things, law -> "Composition: $things objects · main law $law" }
+    override val runFinishedWriting = "Written"; override val runFinishedReview = "Reviewed and revised"
+    override val runFinishedCatalog: (String, String) -> String = { stage, catalog -> "$stage: $catalog" }
+    override val runFinishedLaw: (String, String) -> String = { stage, law -> "$stage: main law $law" }
+    override val runFinishedReady: (String) -> String = { "$it: complete" }
+    override val runFinishedFallback: (String) -> String = { "$it: continued with defaults" }
+    override val runFinishedRetried: (String) -> String = { "$it: asked again" }
+    override val runLocalReview = "Drawing for review…"; override val runLocalRender = "Drawing…"; override val runLocalSave = "Saving…"
+    override val runStatusStageTokens: (String, String) -> String = { input, output -> "input $input · output $output" }
+    override val runStatusTotalTokens: (String, String) -> String = { input, output -> "Total input $input · output $output" }
+    override val runStatusPartialTokens: (String, String) -> String = { input, output -> "Total (partly unknown) input $input · output $output" }
+    override val runStatusReceived: (String) -> String = { "Received $it KB" }; override val runStatusElapsed: (String) -> String = { "Elapsed ${it}s" }
+    override val batchRowOfTotal: (Int, Int) -> String = { current, total -> "line $current of $total" }
+    override val batchElapsed: (String) -> String = { "$it since the batch started" }
+    override val elapsedSeconds: (String) -> String = { "$it s" }
+    override val elapsedMinutes: (String, String) -> String = { m, s -> "$m min $s s" }
+    override val elapsedHours: (String, String, String) -> String = { h, m, s -> "$h h $m min $s s" }
     override val runStatusAwaitingReply: (Int, Int) -> String = { attempt, maxAttempts -> "Awaiting reply (try $attempt/$maxAttempts)" }
     override val runStatusRetrying: (Int, Int) -> String = { attempt, maxAttempts -> "Retrying (try $attempt/$maxAttempts)" }
     override val runStatusAskingAgain: (Int, Int) -> String = { attempt, maxAttempts -> "Asking again with the reasons the proposal was refused ($attempt/$maxAttempts)" }
@@ -799,8 +831,6 @@ object InkuStringsEn : InkuStrings {
     override val modelsToCompare: (Int) -> String = { max -> "Models to compare (at most $max)" }
     override val downloadStateOf: (String, String) -> String = { state, progress -> "State: $state$progress" }
     override val generationOf: (Int) -> String = { n -> "Gen. $n" }
-    override val batchElapsedTally: (String, Int, Int) -> String = { elapsed, success, failures -> "$elapsed in all / $success drawn / $failures failed" }
-    override val batchProgress: (Int, Int) -> String = { current, total -> "Progress $current / $total" }
 
     override val exportTemplateBuiltinDescription: (Int) -> String = { px -> "PNG / Y axis ${px}px" }
 

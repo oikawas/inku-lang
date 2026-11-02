@@ -446,7 +446,7 @@ class ChatGptPlanManager internal constructor(
                 val token = accessToken(ref)
                 // Refinement advice reads Server's Vision text stream; drawing
                 // effects still require their completed namespace function.
-                val stream = ChatGptStream(built)
+                val stream = ChatGptStream(built, request.onReceivedBytes)
                 val response = http.request("$CHATGPT_RESOURCE/responses", "POST", token, built.body, timeoutMs = request.timeoutMs ?: 60_000,
                     check = ::check, onChunk = stream::feed)
                 if (response.status !in 200..299) throw chatGptResponseError(runCatching { JSONObject(response.body) }.getOrDefault(JSONObject()), response.status)

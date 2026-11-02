@@ -39,6 +39,7 @@ class AndroidWorkPipeline(
     private val bundledPluginsEnabled: suspend () -> Boolean = { true },
     /** Told which model call a run waits on (see [SharedPipelineHost]). */
     onProviderAttempt: (executionId: String, attempt: ProviderAttempt?) -> Unit = { _, _ -> },
+    onRunProgress: (executionId: String, progress: RunProgress?) -> Unit = { _, _ -> },
     private val pinModelSession: (PipelineModelSelection) -> PipelineModelSelection = { it },
     /**
      * Saves a drawing made before a run's holes are completed, or one a run
@@ -73,6 +74,7 @@ class AndroidWorkPipeline(
         executionStore = executionStore,
         maxEffectSteps = configBuilder.policy.maximumEffectSteps,
         onProviderAttempt = onProviderAttempt,
+        onRunProgress = onRunProgress,
         readSvgLimitBytes = readSvgLimitBytes,
         safePerformance = object : SafePerformancePort {
             override fun renderCommand(view: PipelineView): PipelineCommand.Render? {

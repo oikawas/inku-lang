@@ -337,9 +337,6 @@ interface InkuStrings {
     val svgDisplayNote: String
     val mascotYuragi: String
     val exportHeightPx: String
-    val demoRunningButton: String
-    val runningButton: String
-    val drawingButton: String
     val drawFromDdlButton: String
     val demoStartButton: String
     val batchDrawButton: String
@@ -473,6 +470,32 @@ interface InkuStrings {
     val paint: String
     val drawingModel: String
     val drawing: String
+    val imageSelectingCatalog: String
+    val imageWritingDdl: String
+    val imageRevisingDdl: String
+    val imageReviewingDdl: String
+    val readDrawReading: String
+    val readDrawComposing: String
+    val readDrawRecomposing: String
+    val readDrawWriting: String
+    val readDrawRevising: String
+    val readDrawReviewing: String
+    val stageReadingComposition: String
+    val stageChoosingColors: String
+    val stageChoosingLaws: String
+    val runStageCatalog: String; val runStageReading: String; val runStageComposition: String; val runStageWriting: String
+    val runStageReview: String; val runStageColors: String; val runStageLaws: String; val runStageInterpret: String
+    val runStageSketch: String; val runStageCompositionReading: String; val runStageCompletion: String
+    val runStageImageCatalog: String; val runStageImageWriting: String; val runStageImageReview: String
+    val runFinishedReading: String; val runFinishedReadingDropped: (String) -> String
+    val runFinishedComposition: (String, String) -> String; val runFinishedWriting: String; val runFinishedReview: String
+    val runFinishedCatalog: (String, String) -> String; val runFinishedLaw: (String, String) -> String
+    val runFinishedReady: (String) -> String; val runFinishedFallback: (String) -> String; val runFinishedRetried: (String) -> String
+    val runLocalReview: String; val runLocalRender: String; val runLocalSave: String
+    val runStatusStageTokens: (String, String) -> String; val runStatusTotalTokens: (String, String) -> String
+    val runStatusPartialTokens: (String, String) -> String; val runStatusReceived: (String) -> String; val runStatusElapsed: (String) -> String
+    val batchRowOfTotal: (Int, Int) -> String; val batchElapsed: (String) -> String
+    val elapsedSeconds: (String) -> String; val elapsedMinutes: (String, String) -> String; val elapsedHours: (String, String, String) -> String
     /** The running row's first attempt at a model call (web `runStatusAwaitingReply`). */
     val runStatusAwaitingReply: (attempt: Int, maxAttempts: Int) -> String
     /** A later attempt: the one before failed or timed out (web `runStatusRetrying`). */
@@ -646,8 +669,6 @@ interface InkuStrings {
     val modelsToCompare: (Int) -> String
     val downloadStateOf: (String, String) -> String
     val generationOf: (Int) -> String
-    val batchElapsedTally: (String, Int, Int) -> String
-    val batchProgress: (Int, Int) -> String
 
     // --- Export -------------------------------------------------------------
     val exportTemplateBuiltinDescription: (Int) -> String

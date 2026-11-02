@@ -27,6 +27,7 @@ class SharedPipelineHost(
      * same execution finds the call taken and must not blank it.
      */
     private val onProviderAttempt: (executionId: String, attempt: ProviderAttempt?) -> Unit = { _, _ -> },
+    private val onRunProgress: (executionId: String, progress: RunProgress?) -> Unit = { _, _ -> },
     /** Draws and saves a Score before its holes are completed, as the server does; null draws nothing early. */
     private val safePerformance: SafePerformancePort? = null,
     /** Why a model attempt failed beyond its class (`credentials_unavailable`), by action id. */
@@ -38,6 +39,7 @@ class SharedPipelineHost(
     private val imageReview: ImageReviewPort? = null,
 ) {
     private val sessions = mutableMapOf<String, Session>()
+    private val progressTrackers = java.util.concurrent.ConcurrentHashMap<String, ProgressTracker>()
     private val sessionsMutex = Mutex()
 
     init {
@@ -128,6 +130,8 @@ class SharedPipelineHost(
             svgOutputFailureLimitBytes = output.svgOutputFailureLimitBytes,
         )
         val snapshot = session.snapshot()
+        progressTrackers[snapshot.requiredString("execution_id")] = ProgressTracker(snapshot.requiredString("execution_id"))
+        publishProgress(session)
         executionStore.create(
             ownerId = request.ownerId,
             executionId = snapshot.requiredString("execution_id"),
@@ -154,6 +158,10 @@ class SharedPipelineHost(
         val updatedHostContextJson = hostContextJson?.let { JSONObject(it).toString() }
         return withSession(ownerId, executionId) { session ->
             session.mutex.withLock {
+                if (command is PipelineCommand.Render) {
+                    progressTracker(session).render()
+                    publishProgress(session, refresh = false)
+                }
                 val previousContext = session.context
                 val previousHostContextJson = session.hostContextJson
                 if (command is PipelineCommand.GenerateFromDescription) {
@@ -286,6 +294,7 @@ class SharedPipelineHost(
     private suspend fun driveWithCancellation(session: Session, allowRefusedDrive: Boolean = false): PipelineView {
         if (!allowRefusedDrive && session.mutex.withLock { session.svgOutputFailure }) return view(session)
         session.mutex.withLock { session.drivers += 1 }
+        publishProgress(session)
         return try {
             drive(session, allowRefusedDrive).let { view -> if (view.phaseTag in STOPPED_PHASES) performSafely(session) ?: view else view }
         } catch (cancelled: CancellationException) {
@@ -299,6 +308,11 @@ class SharedPipelineHost(
                     session.drivers -= 1
                     val snapshot = session.snapshot()
                     val action = snapshot.optJSONObject("action")?.optString("tag")
+                    if (session.drivers == 0) {
+                        val id = snapshot.requiredString("execution_id")
+                        runCatching { onRunProgress(id, null) }
+                        if (snapshot.requiredObject("phase").requiredString("tag") in TERMINAL_PHASES) progressTrackers.remove(id)
+                    }
                     if (session.drivers == 0 && action !in setOf("draw_image_review", "review_description_ddl")) {
                         images?.release(snapshot.optJSONObject("description_ddl"))
                     }
@@ -443,7 +457,21 @@ class SharedPipelineHost(
         return try {
             val delayMs = action.requiredCanonicalUnsigned("delay_ms")
             if (delayMs > 0L) delay(delayMs)
-            val resultJson = providerEffect.perform(actionKey, session.models)
+            val tracker = progressTracker(session)
+            var lastKb = -1L
+            val resultJson = providerEffect.performObserved(actionKey, session.models,
+                onUsage = { input, output ->
+                    tracker.usage(action.requiredString("tag"), input, output)
+                    publishProgress(session, refresh = false)
+                },
+                onReceived = { bytes ->
+                    val kb = bytes?.div(1024)
+                    if (kb == null || kb != lastKb) {
+                        lastKb = kb ?: -1L
+                        tracker.received(bytes)
+                        publishProgress(session, refresh = false)
+                    }
+                })
             session.mutex.withLock {
                 if (!sameAction(session.snapshot().optJSONObject("action"), action)) {
                     return@withLock false
@@ -568,6 +596,19 @@ class SharedPipelineHost(
         )
     }.getOrNull()
 
+    private fun progressTracker(session: Session): ProgressTracker {
+        val id = session.snapshot().requiredString("execution_id")
+        return progressTrackers.computeIfAbsent(id) { ProgressTracker(it) }
+    }
+
+    private fun publishProgress(session: Session, refresh: Boolean = true) {
+        val id = runCatching { session.snapshot().requiredString("execution_id") }.getOrNull() ?: return
+        val tracker = progressTracker(session)
+        if (refresh) runCatching { tracker.update(binding.runProgress(session.snapshotBytes)) }
+            .onFailure { tracker.unavailable() }
+        runCatching { onRunProgress(id, tracker.value()) }
+    }
+
     private suspend fun advanceLocked(session: Session, payload: JSONObject) {
         val previous = session.snapshot()
         val limits = limitsFrom(previous.requiredObject("config"))
@@ -621,6 +662,7 @@ class SharedPipelineHost(
             session.svgOutputFailureLimitBytes = priorSvgOutputFailureLimitBytes
             throw PipelineHostException("execution_snapshot_conflict")
         }
+        publishProgress(session)
     }
 
     private fun parseOutput(bytes: ByteArray, messageId: String, limits: Limits, detachedSvg: String?, maxSvgBytes: Long): StepResult {

@@ -30,6 +30,7 @@ object NativePipelineBridge : SharedPipelineBinding {
     external override fun imageReviewSvg(snapshotBytes: ByteArray, requestBytes: ByteArray): ByteArray
     external override fun completionRangeStates(inputBytes: ByteArray): ByteArray
     external override fun providerAttempt(snapshotBytes: ByteArray): ByteArray
+    external override fun runProgress(snapshotBytes: ByteArray): ByteArray
     external override fun pipelineDescription(text: String): String
     external override fun descriptionHash(text: String): String
     external override fun descriptionLabelSpans(text: String): String

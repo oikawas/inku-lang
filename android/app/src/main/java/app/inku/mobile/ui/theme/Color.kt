@@ -223,7 +223,6 @@ val HistoryBadgeSurface = Color(0xCC24211E)
 val MiniPillSurface = Color(0xDD253338)
 
 /** The drawing action button when it is not tonal. */
-val DrawingActionSurface = Color(0xFF694336)
 
 // --- Borders and hairlines --------------------------------------------------
 

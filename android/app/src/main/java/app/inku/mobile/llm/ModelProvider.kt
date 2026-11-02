@@ -41,6 +41,8 @@ data class ModelRequest(
      * URLs of those images in the same order. The core checks one against the other.
      */
     val pipelineImages: PipelineImages? = null,
+    /** Bytes received for this request, observed only for streamed responses. */
+    val onReceivedBytes: ((Long) -> Unit)? = null,
 )
 
 class PipelineImages(val referencesJson: String, val dataUrls: List<String>)

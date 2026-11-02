@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Android: show finished stages, current work, tokens and received bytes as a drawing journal, with the batch line and elapsed time above it.
+
 - CLI and Server: `inku-cli activity` shows live pipeline drawings and batch items; administrators can use `--all` for all users and active render slots.
 
 - macOS: check for saved rows before resuming an interrupted batch and redraw unsaved rows.

@@ -71,6 +71,9 @@ interface SharedPipelineBinding {
     fun providerAttempt(snapshotBytes: ByteArray): ByteArray =
         """{"provider_attempt":null}""".encodeToByteArray()
 
+    fun runProgress(snapshotBytes: ByteArray): ByteArray =
+        """{"run_progress":null}""".encodeToByteArray()
+
     /**
      * The description every layer reads, with the author's leading numbers and
      * bracketed comments cut by the one shared rule. A binding without it

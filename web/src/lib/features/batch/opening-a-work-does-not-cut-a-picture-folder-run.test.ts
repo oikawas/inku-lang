@@ -27,6 +27,7 @@ runeHost.$state = Object.assign(identity, { raw: identity });
 runeHost.$derived = Object.assign(identity, { by: <T>(read: () => T): T => read() });
 
 const { createWorkState } = await import('../work/state.svelte.ts');
+const { pictureKey } = await import('./image-folder.ts');
 
 type Work = ReturnType<typeof createWorkState>;
 
@@ -53,6 +54,7 @@ function pictureServer(onFirstPoll: () => void) {
 	const performed: string[] = [];
 	const fetch = async (path: string, init?: RequestInit): Promise<Response> => {
 		const method = init?.method ?? 'GET';
+		if (path.startsWith('/api/pipeline/batches')) return json({}, 404);
 		if (path === '/api/pipeline/images' && method === 'POST') {
 			return json({ image_id: `i${started + 1}`, thumbnail: '', original_width: 10, original_height: 10, width: 10, height: 10, nearest_format_id: 'square' });
 		}
@@ -98,7 +100,7 @@ function pictureWork(fetch: (path: string, init?: RequestInit) => Promise<Respon
 }
 
 async function finished(work: Work): Promise<void> {
-	for (let i = 0; i < 200 && work.imageFolder.running; i += 1) await new Promise((resolve) => setTimeout(resolve, 25));
+	for (let i = 0; i < 200 && (work.loading || work.imageFolder.running); i += 1) await new Promise((resolve) => setTimeout(resolve, 25));
 	assert.equal(work.imageFolder.running, false, 'the batch did not finish');
 }
 
@@ -118,6 +120,7 @@ test('opening a saved work while a picture runs does not cut that picture short'
 
 test('a picture whose run ends without a saved work is a failure, not a success', async () => {
 	const fetch = async (path: string, init?: RequestInit): Promise<Response> => {
+		if (path.startsWith('/api/pipeline/batches')) return json({}, 404);
 		if (path === '/api/pipeline/images') return json({ image_id: 'i1', thumbnail: '', original_width: 1, original_height: 1, width: 1, height: 1, nearest_format_id: 'square' });
 		if (path === '/api/pipeline/variations' && init?.method === 'POST') return json(view(1, 'awaiting_patch_approval'));
 		throw new Error(`unexpected request ${path}`);
@@ -128,4 +131,30 @@ test('a picture whose run ends without a saved work is a failure, not a success'
 	await finished(work);
 	assert.equal(work.imageFolder.success, 0);
 	assert.equal(work.imageFolder.pending.length, 1, 'Continue paints it again');
+});
+
+test('image resume remains blocked while a prior run is live and reconciles a saved picture after interruption', async () => {
+	let state = 'running';
+	const fetch = async (path: string): Promise<Response> => {
+		if (path === '/api/pipeline/batches') return json({ batches: [{ run_id: 'old', kind: 'image', state, total: 2 }] });
+		if (path.startsWith('/api/history?')) return json({ items: [{ batch_run_id: 'old', batch_line_number: 1 }] });
+		throw new Error(`unexpected ${path}`);
+	};
+	const { work } = pictureWork(fetch);
+	const pictures = [new File([new Uint8Array(4)], '1.jpg'), new File([new Uint8Array(4)], '2.jpg')];
+	work.imageFolder.history = [{ name: '', total: 2, done: [], failures: [], updatedAt: 1,
+		batchRunId: 'old', batchKeys: pictures.map(pictureKey) }];
+	// Files picked without a containing folder have an empty folder name and no
+	// history identity, so give them the paths the folder input normally yields.
+	Object.defineProperty(pictures[0], 'webkitRelativePath', { value: 'trip/1.jpg' });
+	Object.defineProperty(pictures[1], 'webkitRelativePath', { value: 'trip/2.jpg' });
+	work.imageFolder.history[0].name = 'trip';
+	work.imageFolder.history[0].batchKeys = pictures.map(pictureKey);
+	work.imageFolder.pick(pictures);
+	assert.equal(await work.refreshImageBatchResume(), false);
+	assert.equal(work.imageFolder.resumeBlocked, true);
+	state = 'lease_expired';
+	assert.equal(await work.refreshImageBatchResume(true), true);
+	assert.equal(work.imageFolder.resumeBlocked, false);
+	assert.deepEqual(work.imageFolder.pending.map((item) => item.name), ['2.jpg']);
 });

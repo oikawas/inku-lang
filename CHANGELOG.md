@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- CLI and Server: `inku-cli activity` shows live pipeline drawings and batch items; administrators can use `--all` for all users and active render slots.
+
 - macOS: check for saved rows before resuming an interrupted batch and redraw unsaved rows.
 
 - macOS: show completed drawing stages, per-stage tokens and totals as a journal.
@@ -548,6 +550,11 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.302 (2026-11-02 / Build 1378)
+
+- Server and Web: show drawing progress as a growing stage log with per-action token counts and a final total; retries count toward their action.
+- Record batch totals, lifecycle and liveness; reconcile active drawings and saved works before offering interrupted-batch resumption.
 
 ## v2.15.301 (2026-11-02 / Build 1377)
 

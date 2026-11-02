@@ -28,7 +28,8 @@ import type { AutonomousRun, AutonomousRunsApi } from '$lib/features/autonomous/
 import type { SessionState } from '$lib/features/session/state.svelte';
 import { BatchState } from '$lib/features/batch/state.svelte';
 import { ImageFolderBatch } from '$lib/features/batch/image-folder.svelte';
-import { isConnectionFailure } from '$lib/transport/connection-failure';
+import { startBatchLease, type BatchLeaseRecord } from '$lib/features/batch/lease';
+import { ConnectionFailure, isConnectionFailure } from '$lib/transport/connection-failure';
 import { DemoState } from '$lib/features/demo/state.svelte';
 import { RefinementSessionState } from '$lib/features/canvas/refinement-session.svelte';
 import { HistoryBrowsingState } from '$lib/features/history/browsing-state.svelte';
@@ -519,7 +520,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		(view) => { if (followsImageBatch()) followRunProgress(view); },
 	);
 
-	async function paintPictureFile(file: File, signal: AbortSignal): Promise<void> {
+	async function paintPictureFile(file: File, signal: AbortSignal, runId?: string, lease?: string): Promise<void> {
 		const api = new PipelineApi(apiFetch);
 		const provenance = await provenanceOfFile(file);
 		const image = await api.uploadImage(file, signal);
@@ -531,6 +532,7 @@ export function createWorkState(deps: WorkStateDeps) {
 			view = await imageBatchController.fromImage(image.image_id, provenance, imageCanvasAspectId, {
 				...pipelineOptions(), stage1_model: model, stage2_model: model,
 				sketch: 'off', sketch_text: undefined, wild: false, instruction_lang: 'ja',
+				batch_run_id: runId, batch_line_number: runId ? imageFolder.current : undefined, batch_lease: lease,
 				canvas_aspect: imageCanvasAspectId === 'image' ? image.nearest_format_id : imageCanvasAspectId,
 				canvas_fit: 'contain',
 			}, signal);
@@ -562,6 +564,36 @@ export function createWorkState(deps: WorkStateDeps) {
 		afterImageUploadNotice(() => { void paintImageFolder(fromStart); });
 	}
 
+	async function refreshImageBatchResume(reconcile = false): Promise<boolean> {
+		const record = imageFolder.record;
+		if (!record?.batchRunId) { imageFolder.resumeBlocked = false; return true; }
+		imageFolder.resumeBlocked = true;
+		try {
+			const response = await apiFetch('/api/pipeline/batches', { cache: 'no-store' });
+			if (!response.ok) return false;
+			const data = await response.json() as { batches?: BatchLeaseRecord[] };
+			const found = data.batches?.find((item) => item.run_id === record.batchRunId);
+			if (imageFolder.record?.batchRunId !== record.batchRunId) return false;
+			if (!found || found.state === 'running' || found.state === 'uncertain') return false;
+			if (!record.batchKeys || record.batchKeys.length !== found.total) return false;
+			if (reconcile) {
+				const lines: number[] = [];
+				for (let offset = 0; ; offset += 100) {
+					const page = await apiFetch(`/api/history?offset=${offset}&limit=100&include_svg=false`, { cache: 'no-store' });
+					if (!page.ok) return false;
+					const values = await page.json() as { items?: Array<{ batch_run_id?: string; batch_line_number?: number }> };
+					if (!Array.isArray(values.items)) return false;
+					for (const item of values.items) if (item.batch_run_id === record.batchRunId && typeof item.batch_line_number === 'number') lines.push(item.batch_line_number);
+					if (values.items.length < 100) break;
+				}
+				if (imageFolder.record?.batchRunId !== record.batchRunId) return false;
+				imageFolder.markServerCompleted(lines);
+			}
+			imageFolder.resumeBlocked = false;
+			return true;
+		} catch { return false; }
+	}
+
 	async function paintImageFolder(fromStart: boolean): Promise<void> {
 		if (imageFolder.running || loading || reloading || pipelineBusy || refinementSession.gridBusy || demo.running || batch.running || batch.resuming) return;
 		loading = true;
@@ -575,15 +607,33 @@ export function createWorkState(deps: WorkStateDeps) {
 		pipelineController.clear();
 		adoptSketch(null, null, null, 'off');
 		startTimer();
+		let lease: Awaited<ReturnType<typeof startBatchLease>> = null;
+		const runId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+			? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 		try {
+			if (!(await refreshImageBatchResume(!fromStart))) throw new Error('The previous image batch may still be running.');
+			const total = fromStart ? imageFolder.pictures.length : imageFolder.pending.length;
+			if (total === 0) return;
+			lease = await startBatchLease(apiFetch, runId, '', {}, total, () => imageFolder.success,
+				() => imageFolder.stop(), 'image');
 			await imageFolder.run({
 				fromStart,
-				paintPicture: paintPictureFile,
+				batchRunId: lease ? runId : undefined,
+				paintPicture: async (file, signal) => {
+					if (lease) {
+						try { await lease.refresh(); }
+						catch (cause) { throw new ConnectionFailure('unreachable', String(cause), { cause }); }
+					}
+					await paintPictureFile(file, signal, lease ? runId : undefined, lease?.lease);
+				},
 				stopsTheRun: pictureRunLost,
 				describe: (cause) => cause instanceof PipelineApiError ? describeApiError(cause.detail, cause.status)
 					: cause instanceof Error ? cause.message : String(cause),
 			});
+		} catch (cause) {
+			error = cause instanceof Error ? cause.message : String(cause);
 		} finally {
+			if (lease) await lease.finish(imageFolder.interrupted ? (imageFolder.stopReason ? 'interrupted' : 'stopped') : imageFolder.success === imageFolder.total ? 'completed' : 'interrupted').catch(() => undefined);
 			stopTimer(); loading = false; activeRunMode = null; stageLabel = ''; activeRunProgress = null;
 		}
 	}
@@ -1562,6 +1612,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		get activeRunTokensOut() { return activeRunTokensOut; },
 		get activeRunAttempt() { return activeRunAttempt; },
 		get activeRunProgress() { return activeRunProgress; },
+		refreshImageBatchResume,
 		sketchTextFor,
 		sketchPayloadFor,
 		adoptSketch,

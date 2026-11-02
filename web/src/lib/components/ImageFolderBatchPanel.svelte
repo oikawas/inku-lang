@@ -3,6 +3,7 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import PaintButton from './PaintButton.svelte';
 	import RunStatus from './RunStatus.svelte';
+	import BatchRunSummary from './BatchRunSummary.svelte';
 	import type { ImageFolderBatch } from '$lib/features/batch/image-folder.svelte';
 	import type { ProviderAttemptCount } from '$lib/paintStream';
 
@@ -36,7 +37,7 @@
 
 	const pending = $derived(folder.pending.length);
 	const done = $derived(folder.doneCount);
-	const disabled = $derived(busy || !visionModelAvailable);
+	const disabled = $derived(busy || !visionModelAvailable || folder.resumeBlocked);
 	const pastFolders = $derived(folder.history.filter((item) => item.name !== folder.folderName || folder.pictures.length === 0));
 
 	function chooseFolder() {
@@ -82,6 +83,7 @@
 	{/if}
 </div>
 {#if folder.folderName && folder.pictures.length === 0}<p class="batch-info">{t().imageFolderEmpty}</p>{/if}
+{#if folder.resumeBlocked}<p class="batch-info">{t().batchResumeScanning}</p>{/if}
 
 <section class="batch-next-conditions" aria-label={t().batchNextConditionsLabel}>
 	<div class="batch-next-conditions-head"><span>{t().batchNextConditionsLabel}</span></div>
@@ -90,6 +92,7 @@
 
 {#if folder.running}
 	<div class="batch-progress-wrap">
+		<BatchRunSummary current={folder.summaryCurrent} total={folder.summaryTotal} startedAt={folder.startedAt} />
 		<RunStatus
 			label={`${t().imageFolderProgress(folder.current, folder.total, folder.activePath)}${stageLabel ? ` · ${stageLabel}` : ''}`}
 			stage1Model={visionModelName}

@@ -36,6 +36,17 @@ function memoryStore(history: ImageFolderRecord[] = []) {
 
 const neverLost = { stopsTheRun: () => false, describe: (cause: unknown) => String(cause) };
 
+test('saved server lines reconcile a disconnected picture batch before retry', () => {
+	const pictures = [file('trip/1.jpg'), file('trip/2.jpg'), file('trip/3.jpg')];
+	const { store } = memoryStore([{ name: 'trip', total: 3, done: [], failures: [], updatedAt: 1,
+		batchRunId: 'run-1', batchKeys: pictures.map(pictureKey) }]);
+	const folder = new ImageFolderBatch<FolderFile>(store);
+	folder.pick(pictures);
+	assert.equal(folder.resumeBlocked, true);
+	folder.markServerCompleted([1, 2]);
+	assert.deepEqual(folder.pending.map((item) => item.webkitRelativePath), ['trip/3.jpg']);
+});
+
 test('a picked folder keeps only its pictures, in the order Finder shows them', () => {
 	const files = [
 		file('trip/10.jpg'), file('trip/2.JPG'), file('trip/notes.txt'), file('trip/.DS_Store'),
@@ -93,7 +104,12 @@ test('a stopped run resumes from the next picture after the folder is picked aga
 	assert.equal(again.doneCount, 2);
 	assert.deepEqual(again.pending.map((item) => item.webkitRelativePath), ['trip/3.jpg']);
 	const resumed: string[] = [];
-	await again.run({ ...neverLost, fromStart: false, paintPicture: async (picture) => { resumed.push(picture.webkitRelativePath ?? ''); } });
+	await again.run({ ...neverLost, fromStart: false, paintPicture: async (picture) => {
+		assert.equal(again.summaryTotal, 3);
+		assert.equal(again.summaryCurrent, 3);
+		assert.ok(again.startedAt > 0);
+		resumed.push(picture.webkitRelativePath ?? '');
+	} });
 	assert.deepEqual(resumed, ['trip/3.jpg']);
 	assert.equal(again.interrupted, false);
 	assert.equal(again.pending.length, 0);

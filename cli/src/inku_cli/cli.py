@@ -2048,6 +2048,9 @@ def _paint_payload(
         "save_history": args.save_history,
         "save_artifacts": args.save_artifacts,
         "history_input": args.history_input,
+        "batch_run_id": getattr(args, "batch_run_id", None),
+        "batch_line_number": getattr(args, "batch_line_number", None),
+        "batch_lease": getattr(args, "batch_lease", None),
         "catalog_id": color_catalog,
         "canvas_aspect": getattr(args, "canvas_aspect", None),
         "render_seed": getattr(args, "render_seed", None),
@@ -2086,6 +2089,9 @@ def _compose_payload(
     # is the same shape the web sends when it draws a new instruction sheet.
     payload: dict[str, Any] = {
         "ddl": ddl,
+        "batch_run_id": getattr(args, "batch_run_id", None),
+        "batch_line_number": getattr(args, "batch_line_number", None),
+        "batch_lease": getattr(args, "batch_lease", None),
         "model": stage2_model if stage2_model is not None else args.stage1_model,
         "instruction_lang": args.instruction_lang,
         "ui_lang": args.ui_lang,
@@ -2156,6 +2162,8 @@ def _compose_response_as_paint_result(
         "svg": result.get("svg"),
         "stage1_model": None,
         "stage2_model": result.get("stage2_model") or stage2_model,
+        "render_seed": result.get("render_seed"),
+        "composition_seed": result.get("composition_seed"),
         "render_build_number": result.get("render_build_number"),
         "render_color_profile": result.get("render_color_profile"),
         "render_engine_id": result.get("render_engine_id"),
@@ -2256,6 +2264,8 @@ def _history_payload_from_result(
         "render_canvas_aspect": result.get("render_canvas_aspect"),
         "render_canvas_aspect_id": result.get("render_canvas_aspect_id"),
         "render_canvas_aspect_ratio": result.get("render_canvas_aspect_ratio"),
+        "render_seed": result.get("render_seed"),
+        "composition_seed": result.get("composition_seed"),
         "canvas_aspect": getattr(args, "canvas_aspect", None),
         # The CLI is a sender to /api/history too, and it was dropping all three:
         # a work it saved recorded nothing about the layer, and the server has to
@@ -2755,7 +2765,72 @@ def command_paint(args: argparse.Namespace) -> int:
 def _http_502_count(failures: list[dict[str, Any]]) -> int:
     return sum(str(item.get("message") or "").count("HTTP 502") for item in failures)
 
+class _BatchLease:
+    def __init__(self, client: ApiClient, run_id: str, total: int):
+        self.client, self.run_id, self.total = client, run_id, total
+        self.completed = 0
+        self.done = threading.Event()
+        self.lost = threading.Event()
+        try:
+            data, _ = client.request("POST", "/api/pipeline/batches", data={
+                "run_id": run_id, "kind": "cli", "total": total, "prompt": "", "conditions": {},
+            })
+        except CliError as error:
+            if str(error).startswith("HTTP 404:"):
+                self.lease = None
+                return
+            raise
+        self.lease = data.get("lease")
+        if not isinstance(self.lease, str):
+            raise CliError("server returned an invalid batch lease")
+        self.thread = threading.Thread(target=self._heartbeat, daemon=True)
+        self.thread.start()
+
+    def _send(self, state: str) -> None:
+        if self.lease:
+            self.client.request("POST", f"/api/pipeline/batches/{self.run_id}/heartbeat",
+                                data={"lease": self.lease, "completed": self.completed, "state": state})
+
+    def _heartbeat(self) -> None:
+        while not self.done.wait(15):
+            try:
+                self._send("running")
+            except CliError as error:
+                if str(error).startswith("HTTP 409:"):
+                    self.lost.set()
+                    return
+
+    def refresh(self) -> None:
+        if self.lost.is_set():
+            raise CliError("batch lease was taken over")
+        self._send("running")
+
+    def finish(self, state: str) -> None:
+        self.done.set()
+        if self.lease:
+            self.thread.join(timeout=2)
+            try:
+                self._send(state)
+            except CliError as error:
+                print(f"batch status could not be closed: {error}", file=sys.stderr)
+
+
 def command_batch(args: argparse.Namespace) -> int:
+    args._batch_tracker = None
+    state = "interrupted"
+    try:
+        result = _command_batch(args)
+        state = "completed" if result == 0 else "interrupted"
+        return result
+    except KeyboardInterrupt:
+        state = "stopped"
+        raise
+    finally:
+        if args._batch_tracker is not None:
+            args._batch_tracker.finish(state)
+
+
+def _command_batch(args: argparse.Namespace) -> int:
     config = load_config()
     timeout_seconds = _resolved_timeout_seconds(args, config)
     client = ApiClient(args.base_url or config.base_url, config.token, timeout_seconds=timeout_seconds)
@@ -2766,6 +2841,7 @@ def command_batch(args: argparse.Namespace) -> int:
         lines = [line for line in lines if _ddl_title_name(line) is None]
     if not lines:
         raise CliError("batch input contains no non-empty lines")
+    args.batch_run_id = uuid.uuid4().hex
     out_dir = Path(args.out_dir) if args.out_dir else None
     results: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
@@ -2787,10 +2863,16 @@ def command_batch(args: argparse.Namespace) -> int:
     _print_color_catalog_summary(color_catalog, catalog_data)
     input_mode = getattr(args, "input_mode", "paint")
     composition_count = max(1, int(getattr(args, "composition_count", 1) or 1))
+    tracker = _BatchLease(client, args.batch_run_id, len(lines) * composition_count)
+    args._batch_tracker = tracker
+    args.batch_lease = tracker.lease
+    completed_items: set[tuple[int, int | None]] = set()
     pending_timeout_retries: list[tuple[int, str, int | None]] = []
     result_index_by_line: dict[tuple[int, int | None], int] = {}
 
     def process_line(index: int, line: str, *, retry_timeout: bool = False) -> dict[str, Any]:
+        args.batch_line_number = index
+        tracker.refresh()
         progress_label = (
             f"retrying timeout {index}/{len(lines)}"
             if retry_timeout
@@ -2880,6 +2962,8 @@ def command_batch(args: argparse.Namespace) -> int:
         if timeout_reasons:
             entry["server_timeout_reasons"] = timeout_reasons
             entry["server_timeout_retry_attempted"] = retry_timeout
+        completed_items.add((index, current_composition_seed))
+        tracker.completed = len(completed_items)
         return entry
 
     work_items = [(index, line, composition_index if composition_count > 1 else getattr(args, "composition_seed", None)) for index, line in enumerate(lines, start=1) for composition_index in range(composition_count)]
@@ -4619,6 +4703,15 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     else:
         parser.add_argument("--full-json", action="store_true", help="print the full paint response")
 
+def command_activity(args: argparse.Namespace) -> int:
+    config = load_config()
+    client = ApiClient(args.base_url or config.base_url, config.token,
+                       timeout_seconds=_resolved_timeout_seconds(args, config))
+    data, _ = client.request("GET", "/api/pipeline/activity", query={"all_users": "true"} if args.all else None)
+    _print_json(data)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="inku-cli", description="Control an inku API server from the command line")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -4636,6 +4729,11 @@ def build_parser() -> argparse.ArgumentParser:
     me = subparsers.add_parser("me", help="show the current logged-in user")
     _add_common_server_args(me)
     me.set_defaults(func=command_me)
+
+    activity = subparsers.add_parser("activity", help="show current pipeline work and active render slots")
+    _add_common_server_args(activity)
+    activity.add_argument("--all", action="store_true", help="show all users and render-slot count (administrator only)")
+    activity.set_defaults(func=command_activity)
 
     models = subparsers.add_parser("models", help="show or set CLI default LLM and Vision models")
     _add_common_server_args(models)

@@ -2,6 +2,19 @@
 
 Command line client for controlling an inku API server.
 
+## Observe current drawing activity
+
+`inku-cli activity` reports this account's live pipeline executions as JSON.
+An administrator can use `inku-cli activity --all` for all users and the
+current server process's active render-slot count. Identified batch items show
+their batch ID and line; new CLI batches supply those identifiers for both
+description and DDL draws. Older clients and previously started image-folder
+batches may not.
+Registered batches also report their planned and completed counts, state, and
+the time of their last heartbeat. An expired lease is not proof that the client
+stopped. Observed drawings cover only the process answering the request;
+unregistered older clients and work in other processes are not accounted for.
+
 ## Signing in, and when it is not needed
 
 Most commands need a session: run `inku-cli login` once and it is stored.
@@ -226,16 +239,17 @@ no value at all, which is not the same as carrying the defaults.
 
 ```
 usage: inku-cli [-h]
-                {login,logout,me,models,paint,batch,contact-sheet,rasterize,measure-raster,analyze,ddl-compare,vision-review,ddl-export,render-score,replay,render-local,demo-instruction,history,unread-words,history-export,export-card,api,plugin,reference,version,lineage,colophon,refine,inspect,review,user,single-user,group,config}
+                {login,logout,me,activity,models,paint,batch,contact-sheet,rasterize,measure-raster,analyze,ddl-compare,vision-review,ddl-export,render-score,replay,render-local,demo-instruction,history,unread-words,history-export,export-card,api,plugin,reference,version,lineage,colophon,refine,inspect,review,user,single-user,group,config}
                 ...
 
 Control an inku API server from the command line
 
 positional arguments:
-  {login,logout,me,models,paint,batch,contact-sheet,rasterize,measure-raster,analyze,ddl-compare,vision-review,ddl-export,render-score,replay,render-local,demo-instruction,history,unread-words,history-export,export-card,api,plugin,reference,version,lineage,colophon,refine,inspect,review,user,single-user,group,config}
+  {login,logout,me,activity,models,paint,batch,contact-sheet,rasterize,measure-raster,analyze,ddl-compare,vision-review,ddl-export,render-score,replay,render-local,demo-instruction,history,unread-words,history-export,export-card,api,plugin,reference,version,lineage,colophon,refine,inspect,review,user,single-user,group,config}
     login               log in and store an API session
     logout              log out and clear the stored session
     me                  show the current logged-in user
+    activity            show current pipeline work and active render slots
     models              show or set CLI default LLM and Vision models
     paint               generate one drawing
     batch               generate drawings from a prompt list
@@ -331,6 +345,22 @@ options:
   --base-url BASE_URL   inku API base URL (default: http://127.0.0.1:8100)
   --timeout-seconds TIMEOUT_SECONDS
                         HTTP timeout in seconds (default: 600)
+
+```
+
+### `inku-cli activity`
+
+```
+usage: inku-cli activity [-h] [--base-url BASE_URL]
+                         [--timeout-seconds TIMEOUT_SECONDS] [--all]
+
+options:
+  -h, --help            show this help message and exit
+  --base-url BASE_URL   inku API base URL (default: http://127.0.0.1:8100)
+  --timeout-seconds TIMEOUT_SECONDS
+                        HTTP timeout in seconds (default: 600)
+  --all                 show all users and render-slot count (administrator
+                        only)
 
 ```
 

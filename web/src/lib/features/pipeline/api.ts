@@ -106,6 +106,7 @@ export type PipelineOptions = {
 	history_display_label?: string;
 	batch_line_number?: number;
 	batch_run_id?: string;
+	batch_lease?: string;
 	lineage_parent_node_id?: string;
 	derivation_kind?: string;
 	derivation_metadata?: Record<string, unknown>;

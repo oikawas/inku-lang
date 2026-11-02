@@ -1,5 +1,6 @@
 import type { LangPack } from './i18n/types.ts';
 import type { PaintProgressEvent } from './paintStream.ts';
+import { runningStageLabel, type ProviderAttemptCount } from './paintStream.ts';
 
 export function stageName(action: string, s: LangPack): string {
 	const names: Record<string, string> = {
@@ -18,6 +19,23 @@ export function localWork(action: string, s: LangPack): string {
 	if (action === 'draw_image_review') return s.runLocalReview;
 	if (action === 'commit_visible_normalized_ddl' || action === 'save') return s.runLocalSave;
 	return s.runLocalRender;
+}
+
+export function currentWork(
+	current: PaintProgressEvent['run_progress']['current'],
+	label: string,
+	attempt: ProviderAttemptCount | null,
+	s: LangPack
+): string {
+	if (!current) return label;
+	if (current.kind === 'local') return localWork(current.action, s);
+	const matchingAttempt = attempt?.action === current.action ? attempt : null;
+	return runningStageLabel(`${stageName(current.action, s)}…`, {
+		attempt: matchingAttempt?.attempt ?? 1,
+		max_attempts: matchingAttempt?.max_attempts ?? 1,
+		asked_again: matchingAttempt?.asked_again,
+		action: current.action
+	}, s);
 }
 
 export function finishedText(item: PaintProgressEvent['run_progress']['finished'][number], s: LangPack): string {

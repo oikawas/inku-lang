@@ -13,6 +13,9 @@ public struct SavedWorkPresentation: Sendable {
     public let eventsJSON: Data?
     public let provenance: GenerationProvenance?
 
+    /// The saved prompt stage, including the two calls that share the catalog action.
+    public static func promptStage(for record: ExactJSON) -> String? { SavedPresentation.promptStage(for: record) }
+
     init(context: ExactJSON) throws {
         let record = context["presentation"]
         guard record != .null else {
@@ -39,7 +42,7 @@ public struct SavedWorkPresentation: Sendable {
 
 enum SavedPresentation {
     /// Server `_SYSTEM_PROMPT_STAGES`: the actions the prompt tab shows, in the order a work calls them.
-    static let promptStages = [("select_description_catalog", "catalog"), ("read_description", "reading"), ("compose_description", "description_composition"),
+    static let promptStages = [("select_description_catalog", "catalog_reading"), ("select_description_catalog", "catalog"), ("read_description", "reading"), ("compose_description", "description_composition"),
                                ("write_description_ddl", "description_ddl"), ("review_description_ddl", "description_review"),
                                ("select_image_catalog", "image_catalog"), ("write_image_ddl", "image_ddl"),
                                ("review_image_ddl", "image_review"), ("generate_sketch", "sketch"), ("generate_normalized_ddl", "stage1"),
@@ -47,6 +50,14 @@ enum SavedPresentation {
                                ("complete_visible_ddl_holes", "stage2")]
     /// A work saved before 2026-10-13 kept Stage 1 and Stage 2 only.
     static let earlierPromptStages = ["stage1", "stage2"]
+
+    static func promptStage(for record: ExactJSON) -> String? {
+        guard let action = record["action"].string else { return nil }
+        if action == "select_description_catalog" {
+            return record["prompt"]["prompt_id"].string == "inku.description-color-reading-prompt.v1" ? "catalog_reading" : "catalog"
+        }
+        return promptStages.first { $0.0 == action }?.1
+    }
 
     static func replay(context: ExactJSON, rendered: ExactJSON) throws -> ExactJSON {
         _ = try SavedWorkPresentation(context: context)
@@ -78,12 +89,15 @@ enum SavedPresentation {
                         provenance: GenerationProvenance? = nil) throws -> ExactJSON {
         let records = try prompts.map { try ExactJSON(data: $0).array ?? [] } ?? []
         // Server records only the last actually requested prompt of each stage.
-        let latest = promptStages.compactMap { tag, _ in records.last { $0["action"].string == tag } }
+        let latest = promptStages.compactMap { _, stage in records.last { promptStage(for: $0) == stage } }
         let hasImage = records.contains { ["select_image_catalog", "write_image_ddl", "review_image_ddl"].contains($0["action"].string ?? "") }
         let hasReadAndDraw = records.contains { ["read_description", "compose_description", "write_description_ddl", "review_description_ddl"].contains($0["action"].string ?? "") }
         let hasCatalogChoice = records.contains { $0["action"].string == "select_description_catalog" }
+        let hasCatalogReading = records.contains { promptStage(for: $0) == "catalog_reading" }
         let stages = promptStages.filter { entry in
-            (hasImage || !entry.1.hasPrefix("image_")) && (entry.1 != "catalog" || (!hasImage && hasCatalogChoice)) && (hasReadAndDraw || !["reading", "description_composition", "description_ddl", "description_review"].contains(entry.1))
+            (hasImage || !entry.1.hasPrefix("image_")) && (entry.1 != "catalog" || (!hasImage && hasCatalogChoice))
+                && (entry.1 != "catalog_reading" || (!hasImage && hasCatalogReading))
+                && (hasReadAndDraw || !["reading", "description_composition", "description_ddl", "description_review"].contains(entry.1))
         }
         let metadata = rendered["metadata"]
         var diagnostics: ExactJSON = .object([

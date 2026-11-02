@@ -151,6 +151,21 @@ struct CreationWorkInfoView: View {
                     row(copy("provenanceLabelSeedText", "種テキスト"), work.seedText, hint: "provenanceHintSeedText")
                     row(copy("provenanceLabelWild", "筆致制限を外す"), work.renderWild.map { copy($0 ? "provenanceWildOn" : "provenanceWildOff", $0 ? "外した" : "外さない") }, hint: "provenanceHintWild")
                     row(model.display.localized("色カタログ"), work.renderColorCatalogName ?? work.renderColorCatalogID ?? work.catalogID, hint: "provenanceHintCatalog")
+                    if let data = information?.context?.catalogReading, let record = try? ExactJSON(data: data), record.object != nil {
+                        let detail = CatalogReadingDetails(record, japanese: model.display.preferences.language != "en")
+                        HStack(alignment: .firstTextBaseline, spacing: 16) {
+                            Text(model.display.label("選び方", "Selection")).foregroundStyle(.secondary).frame(width: 190, alignment: .leading)
+                            Text(detail.method).frame(maxWidth: .infinity, alignment: .leading)
+                        }.inkuFont(13)
+                        if !detail.text.isEmpty {
+                            HStack(alignment: .top, spacing: 16) {
+                                Text(model.display.label("色の読み", "Color reading")).foregroundStyle(.secondary).frame(width: 190, alignment: .leading)
+                                Text(detail.text).inkuFont(12, design: .monospaced).fixedSize(horizontal: false, vertical: true)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        }
+                        if let dropped = detail.dropped { Text(dropped).inkuFont(12).foregroundStyle(.secondary) }
+                    }
                     colorMap(work)
                     row(model.display.localized("キャンバス"), work.renderCanvasAspect ?? work.renderCanvasAspectID, hint: "provenanceHintCanvas")
                     row(copy("provenanceLabelCanvasRatio", "キャンバスの比率"), work.renderCanvasAspectRatio.map { String(format: "%.3f", $0) }, hint: "provenanceHintCanvasRatio")
@@ -195,6 +210,10 @@ struct CreationWorkInfoView: View {
     private func prompts(_ work: SavedWork) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
+                if information?.context?.imageDDL == nil,
+                   information?.prompt(stage: "catalog_reading") != nil || information?.presentation?.promptStages.contains("catalog_reading") == true {
+                    sentStage("select_description_catalog", stage: "catalog_reading", input: copy("promptCatalogReadingInput", "色の読み 送った入力"), system: copy("promptCatalogReadingSystem", "色の読み システムプロンプト"))
+                }
                 if information?.context?.imageDDL == nil,
                    information?.prompt("select_description_catalog") != nil || catalogWasAutomatic {
                     sentStage("select_description_catalog", stage: "catalog", input: copy("promptCatalogInput", "色カタログの選択 送った入力"), system: copy("promptCatalogSystem", "色カタログの選択 システムプロンプト"))
@@ -322,16 +341,16 @@ struct CreationWorkInfoView: View {
 
     /// The sketch and the composition reading: what each was given, then its system prompt.
     @ViewBuilder private func sentStage(_ action: String, stage: String, input: String, system: String) -> some View {
-        if let message = information?.prompt(action)?["message"].string, !message.isEmpty {
-            promptText(input, message, id: action + "-input")
+        if let message = information?.prompt(stage: stage)?["message"].string, !message.isEmpty {
+            promptText(input, message, id: stage + "-input")
         }
         systemPrompt(action, stage: stage, title: system)
     }
 
     @ViewBuilder private func systemPrompt(_ action: String, stage: String, title: String) -> some View {
-        if let system = information?.prompt(action)?["system"].string {
-            promptText(title, system, id: action, collapsible: true)
-            if let digest = information?.prompt(action)?["prompt_digest"].string, !digest.isEmpty {
+        if let system = information?.prompt(stage: stage)?["system"].string {
+            promptText(title, system, id: stage, collapsible: true)
+            if let digest = information?.prompt(stage: stage)?["prompt_digest"].string, !digest.isEmpty {
                 (Text(copy("promptDigestLabel", "プロンプト digest") + ": ") + Text(digest).fontDesign(.monospaced))
                     .inkuFont(11).foregroundStyle(.tertiary).textSelection(.enabled)
                     .inkuTooltip(model.display.tooltip("", serverKey: "promptDigestHint"))

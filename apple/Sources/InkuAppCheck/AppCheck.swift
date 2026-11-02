@@ -166,6 +166,9 @@ struct AppCheck {
         if CommandLine.arguments.contains("--canvas-fit-only") {
             try runCanvasFitChecks(); return
         }
+        if CommandLine.arguments.contains("--catalog-reading-host-only") {
+            try await runCatalogReadingHostCheck(); return
+        }
         if CommandLine.arguments.contains("--server-host-parity-only") {
             try await runServerHostParityChecks(); return
         }

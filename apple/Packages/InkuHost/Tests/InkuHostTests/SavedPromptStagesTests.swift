@@ -54,4 +54,23 @@ final class SavedPromptStagesTests: XCTestCase {
         XCTAssertTrue(try capture([Self.entry("select_description_catalog", "system")]).promptStages.contains("catalog"))
         XCTAssertFalse(try capture([Self.entry("write_image_ddl", "system")]).promptStages.contains("catalog"))
     }
+    func testCatalogReadingAndChoiceAreDistinctAndLegacyIsPreserved() throws {
+        func entry(_ id: String, _ message: String) -> ExactJSON {
+            .object(["action": .string("select_description_catalog"), "prompt": .object(["prompt_id": .string(id), "message": .string(message)])])
+        }
+        func capture(_ entries: [ExactJSON]) throws -> SavedWorkPresentation {
+            let record = try SavedPresentation.capture(delivery: .object([:]), rendered: .object([:]), prompts: ExactJSON.array(entries).data,
+                events: Data("[]".utf8), configuration: .object([:]), document: .object([:]))
+            return try SavedWorkPresentation(context: .object(["presentation": record]))
+        }
+        let reading = "inku.description-color-reading-prompt.v1"
+        let choice = "inku.description-catalog-choice-prompt.v1"
+        let modern = try capture([entry(reading, "first"), entry(reading, "retry"), entry(choice, "choice")])
+        XCTAssertEqual(modern.promptStages.prefix(2), ["catalog_reading", "catalog"])
+        let prompts = try XCTUnwrap(modern.promptJSON).withUnsafeBytes { try ExactJSON(data: Data($0)).array }
+        XCTAssertEqual(prompts?.map { $0["prompt"]["message"].string ?? "" }, ["retry", "choice"])
+        let legacy = try capture([entry("old-prompt", "legacy")])
+        XCTAssertEqual(legacy.promptStages, ["catalog", "sketch", "stage1", "composition", "laws", "colors", "stage2"])
+    }
+
 }

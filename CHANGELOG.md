@@ -10,6 +10,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 - Android: pass the drawing seed to automatic color catalog selection from a description and retain the reading, selection method, and sent prompts with the work.
 
+- Align macOS automatic catalog selection with color reading and the run seed, showing the selection and prompts in saved works.
+
 - Server and Web: use the run's seed for color catalog selection from a description and show the light and color reading, selection method, and sent text with the work.
 
 - Core: automatic color catalog selection reads anchored light and colors from the description, then chooses from anonymous candidates' actual colors.

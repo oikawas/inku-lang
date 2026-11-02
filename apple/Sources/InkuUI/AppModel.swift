@@ -1139,6 +1139,7 @@ public final class AppModel {
         request.imageProvenance = provenance
         request.models.stage1Model = vision; request.models.stage2Model = vision
         var config = try ExactJSON(data: request.configuration)
+        if var fields = config.object { fields.removeValue(forKey: "catalog_seed"); config = .object(fields) }
         config["compiler"]["host"]["canvas_fit"] = .string("contain")
         request.configuration = config.data
         return request
@@ -1754,6 +1755,7 @@ public final class AppModel {
         }
         config["compiler"]["host"] = try reseed(config["compiler"]["host"])
         config["compiler"]["composition_seed"] = .string(seed)
+        if config.object?["catalog_seed"] != nil { config["catalog_seed"] = .string(seed) }
         if let catalogs = config["catalogs"].array {
             config["catalogs"] = .array(try catalogs.map { entry in
                 var next = entry; next["resolved"] = try reseed(entry["resolved"]); return next

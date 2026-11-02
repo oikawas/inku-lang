@@ -104,6 +104,7 @@ public final class AppModel {
     public private(set) var providerProgress: ProviderProgressSnapshot?
     private var progressJournals: [String: RunProgressJournal] = [:]
     var runJournal: RunProgressJournal? { activeExecutionID.flatMap { progressJournals[$0] } }
+    var runJournalExecutionID: String? { activeExecutionID }
     var runModelReference: String? { activeExecutionID.flatMap { providerModelsByExecution[$0]?.stage1Model } }
     /// Metrics of the displayed saved work, frozen to that work's save identity.
     public private(set) var providerMetrics: [ProviderAttemptMetric] = []

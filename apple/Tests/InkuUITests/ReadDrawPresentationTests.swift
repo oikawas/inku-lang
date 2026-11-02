@@ -3,6 +3,21 @@ import InkuHost
 @testable import InkuUI
 
 @MainActor final class ReadDrawPresentationTests: XCTestCase {
+    func testJournalUsesCurrentActionAndNotAnEarlierAttempt() throws {
+        let display = DisplaySettings()
+        display.preferences.language = "ja"
+        let report = ExactJSON.object(["provider_attempt": .object(["action": .string("compose_description"),
+            "attempt": .number("2"), "max_attempts": .number("4"), "asked_again": .bool(true)])]).data
+        let attempt = try XCTUnwrap(ProviderProgressSnapshot.start(executionID: "run", report: report, beganAt: Date(), deadline: Date(), models: nil, comparison: false, previous: nil))
+        func current(_ action: String, kind: String = "provider") -> ExactJSON {
+            .object(["kind": .string(kind), "action": .string(action)])
+        }
+        XCTAssertEqual(RunJournalView.currentLabel(current("compose_description"), label: "batch", attempt: attempt, display: display), "構図と法則を決め直しています…")
+        XCTAssertEqual(RunJournalView.currentLabel(current("write_description_ddl"), label: "batch", attempt: attempt, display: display), "指示書を書いています…")
+        XCTAssertEqual(RunJournalView.currentLabel(current("select_description_catalog"), label: "batch", attempt: attempt, display: display), "色カタログ…")
+        XCTAssertEqual(RunJournalView.currentLabel(current("draw_image_review", kind: "local"), label: "batch", attempt: attempt, display: display), "見直し用に描いています…")
+        XCTAssertEqual(RunJournalView.currentLabel(.null, label: "batch", attempt: attempt, display: display), display.message("batch"))
+    }
     func testFlowAndSketchFollowWeb() {
         let stages = DrawPresentation.flow(route: "stages", sketch: true, composition: false, japanese: true)
         XCTAssertEqual(stages.map(\.label), ["記述", "写生", "型を埋める", "構図と法則", "配色", "画"])

@@ -9,7 +9,11 @@ struct RunJournalView: View {
     private var display: DisplaySettings { model.display }
 
     var body: some View {
-        let snapshot = model.providerProgress
+        let snapshot = model.providerProgress.flatMap { $0.executionID == model.runJournalExecutionID ? $0 : nil }
+        let current = journal.report["current"]
+        let matchingAttempt = snapshot.flatMap {
+            current["kind"].string == "provider" && current["action"].string == $0.action && $0.awaitingReply ? $0 : nil
+        }
         TimelineView(.periodic(from: snapshot?.stageBeganAt ?? Date(), by: 0.5)) { context in
             VStack(alignment: .leading, spacing: 2) {
                 if let reference = snapshot?.modelReference ?? model.runModelReference, !reference.isEmpty {
@@ -23,15 +27,15 @@ struct RunJournalView: View {
                         }
                     }
                 }
-                Text("… " + currentLabel).inkuFont(12, weight: .semibold).foregroundStyle(.primary)
+                Text("… " + Self.currentLabel(current, label: label, attempt: matchingAttempt, display: display)).inkuFont(12, weight: .semibold).foregroundStyle(.primary)
                     .lineLimit(1).truncationMode(.tail).frame(maxWidth: .infinity, alignment: .leading)
                 HStack(spacing: 8) {
-                    if let snapshot, snapshot.awaitingReply {
+                    if let snapshot = matchingAttempt {
                         Text(format(snapshot.askedAgain ? "runStatusAskingAgain" : snapshot.attempt > 1 ? "runStatusRetrying" : "runStatusAwaitingReply",
                                     "応答待ち（%@/%@回目）", String(snapshot.attempt), String(snapshot.maxAttempts)))
                     }
                     Text(format("runStatusElapsed", "経過 %@秒", String(format: "%.1f", max(0, context.date.timeIntervalSince(journal.beganAt)))))
-                    if let snapshot {
+                    if let snapshot = matchingAttempt {
                         if snapshot.modelReference?.hasPrefix("chatgpt:") == true, let bytes = snapshot.receivedBytes, snapshot.awaitingReply {
                             Text(format("runStatusReceived", "受信 %@ KB", String(bytes / 1024)))
                         }
@@ -47,13 +51,29 @@ struct RunJournalView: View {
         }
     }
 
-    private var currentLabel: String {
-        let current = journal.report["current"]
-        guard current["kind"].string == "local" else { return display.message(label) }
-        switch current["action"].string {
-        case "draw_image_review": return display.webCopy("runLocalReview", "見直し用に描いています…")
-        case "commit_visible_normalized_ddl", "save": return display.webCopy("runLocalSave", "保存しています…")
-        default: return display.webCopy("runLocalRender", "描いています…")
+    static func currentLabel(_ current: ExactJSON, label: String, attempt: ProviderProgressSnapshot?, display: DisplaySettings) -> String {
+        guard current.object != nil else { return display.message(label) }
+        let action = current["action"].string ?? ""
+        if current["kind"].string == "local" {
+            switch action {
+            case "draw_image_review": return display.webCopy("runLocalReview", "見直し用に描いています…")
+            case "commit_visible_normalized_ddl", "save": return display.webCopy("runLocalSave", "保存しています…")
+            default: return display.webCopy("runLocalRender", "描いています…")
+            }
+        }
+        let askedAgain = attempt?.action == action && attempt?.askedAgain == true
+        switch action {
+        case "select_image_catalog": return display.webCopy("imageSelectingCatalog", "画像から色カタログを選んでいます…")
+        case "write_image_ddl": return display.webCopy(askedAgain ? "imageRevisingDdl" : "imageWritingDdl", askedAgain ? "指示書を直しています…" : "画像から指示書を書いています…")
+        case "review_image_ddl": return display.webCopy(askedAgain ? "imageRevisingDdl" : "imageReviewingDdl", askedAgain ? "指示書を直しています…" : "画像と描いた画を見比べています…")
+        case "read_description": return display.webCopy("readDrawReading", "記述を読んでいます…")
+        case "compose_description": return display.webCopy(askedAgain ? "readDrawRecomposing" : "readDrawComposing", askedAgain ? "構図と法則を決め直しています…" : "構図と法則を決めています…")
+        case "write_description_ddl": return display.webCopy(askedAgain ? "readDrawRevising" : "readDrawWriting", askedAgain ? "指示書を直しています…" : "指示書を書いています…")
+        case "review_description_ddl": return display.webCopy(askedAgain ? "readDrawRevising" : "readDrawReviewing", askedAgain ? "指示書を直しています…" : "描いた画を見て直しています…")
+        case "read_composition": return display.webCopy("stageReadingComposition", "構図の読み中…")
+        case "choose_colors": return display.webCopy("stageChoosingColors", "配色の選択中…")
+        case "choose_laws": return display.webCopy("stageChoosingLaws", "法則の選択中…")
+        default: return stage(action, display: display) + "…"
         }
     }
 
@@ -65,12 +85,12 @@ struct RunJournalView: View {
         let template = ServerTips.template(key, language: display.preferences.language, argumentCount: values.count) ?? fallback
         return String(format: template, locale: Locale(identifier: display.preferences.language), arguments: values)
     }
-    private func stage(_ action: String) -> String {
+    private static func stage(_ action: String, display: DisplaySettings) -> String {
         let keys = ["select_description_catalog": "runStageCatalog", "read_description": "runStageReading", "compose_description": "runStageComposition", "write_description_ddl": "runStageWriting", "review_description_ddl": "runStageReview", "choose_colors": "runStageColors", "choose_laws": "runStageLaws", "generate_normalized_ddl": "runStageInterpret", "generate_sketch": "runStageSketch", "read_composition": "runStageCompositionReading", "complete_visible_ddl_holes": "runStageCompletion", "select_image_catalog": "runStageImageCatalog", "write_image_ddl": "runStageImageWriting", "review_image_ddl": "runStageImageReview"]
         return keys[action].map { display.webCopy($0, action) } ?? action
     }
     private func finished(_ item: ExactJSON) -> String {
-        let action = item["action"].string ?? "", title = stage(action), facts = item["facts"]
+        let action = item["action"].string ?? "", title = Self.stage(action, display: display), facts = item["facts"]
         switch item["outcome"].string {
         case "fallback": return format("runFinishedFallback", "%@：既定の形で続けました", title)
         case "retried": return format("runFinishedRetried", "%@：問い直しました", title)

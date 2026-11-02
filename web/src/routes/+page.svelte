@@ -265,6 +265,7 @@
 	let currentRenderEngineVersion = $state<string | null>(null);
 	let currentDdlVersion = $state<string | null>(null);
 	let currentDdlEngineVersion = $state<string | null>(null);
+	let currentScoreVersion = $state<string | null>(null);
 	let exportTemplates = $state<ExportTemplate[]>(DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item })));
 	let exportTemplateStatus = $state<string | null>(null);
 
@@ -1248,13 +1249,14 @@
 		currentRenderEngineVersion = null;
 		currentDdlVersion = null;
 		currentDdlEngineVersion = null;
+		currentScoreVersion = null;
 		try {
 			const r = await fetch('/api/info', {
 				cache: 'no-store',
 				credentials: 'same-origin'
 			});
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			const data = await r.json() as { developer_mode?: boolean; single_user_mode?: boolean; chatgpt_plan_available?: boolean; thumbnail_hidpi?: boolean; render_engine_version?: string; ddl_version?: string; ddl_engine_version?: string };
+			const data = await r.json() as { developer_mode?: boolean; single_user_mode?: boolean; chatgpt_plan_available?: boolean; thumbnail_hidpi?: boolean; render_engine_version?: string; ddl_version?: string; ddl_engine_version?: string; score_version?: string };
 			developerMode = data.developer_mode === true;
 			singleUserMode = data.single_user_mode === true;
 			if (singleUserMode) {
@@ -1273,10 +1275,10 @@
 			currentRenderEngineVersion = typeof data.render_engine_version === 'string'
 				? data.render_engine_version
 				: null;
-			// The three server layer versions the app info panel shows. They come from the
-			// same call the render engine version does, so one answer carries all.
+			// The layer versions come from the same public info response.
 			currentDdlVersion = typeof data.ddl_version === 'string' ? data.ddl_version : null;
 			currentDdlEngineVersion = typeof data.ddl_engine_version === 'string' ? data.ddl_engine_version : null;
+			currentScoreVersion = typeof data.score_version === 'string' ? data.score_version : null;
 		} catch (error) {
 			console.warn('failed to load public app info', error);
 		}
@@ -3467,6 +3469,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					<dd>{currentDdlVersion ?? t().historyVersionNotRecorded}</dd>
 					<dt><Tooltip placement="bottom" text={t().appInfoHintDdlEngine}><span>DDL engine ver.</span></Tooltip></dt>
 					<dd>{currentDdlEngineVersion ?? t().historyVersionNotRecorded}</dd>
+					<dt><Tooltip placement="bottom" text={t().appInfoHintScoreVersion}><span>Score ver.</span></Tooltip></dt>
+					<dd>{currentScoreVersion ?? t().historyVersionNotRecorded}</dd>
 					<dt><Tooltip placement="bottom" text={t().appInfoHintRenderEngine}><span>Render engine ver.</span></Tooltip></dt>
 					<dd>{currentRenderEngineVersion ?? t().historyVersionNotRecorded}</dd>
 					<dt><Tooltip placement="bottom" text={t().appInfoHintBindingProtocol}><span>Binding protocol ver.</span></Tooltip></dt>

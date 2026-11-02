@@ -163,6 +163,7 @@ export interface LangPack {
 	/** What each running version in the info panel is; the work's own record is provenanceHint*. */
 	appInfoHintDdlSpec: string;
 	appInfoHintDdlEngine: string;
+	appInfoHintScoreVersion: string;
 	appInfoHintRenderEngine: string;
 	appInfoHintBindingProtocol: string;
 	appInfoClose: string;
@@ -1535,6 +1536,7 @@ export interface LangPack {
 	provenanceHintRenderEngine: string;
 	provenanceHintDdlSpec: string;
 	provenanceHintTransformLayer: string;
+	provenanceHintScoreVersion: string;
 	provenanceHintStage1PromptDigest: string;
 	provenanceHintStage1PromptBaseDigest: string;
 	provenanceHintStage2PromptDigest: string;

@@ -72,6 +72,7 @@ class AppInfoResponse(BaseModel):
     render_engine_version: str = Field(description="Version of the active render engine.")
     ddl_version: str = Field(description="Version of the DDL format that this server reads and writes.")
     ddl_engine_version: str = Field(description="Version of the DDL engine that interprets DDL.")
+    score_version: str = Field(description="Newest Score version the shared core can read and write.")
 
 
 class ColorCatalogsResponse(BaseModel):
@@ -127,6 +128,7 @@ def api_info() -> AppInfoResponse:
     reports the active render engine, the DDL versions and the single-user flag.
     """
     from ...chatgpt_runtime import availability
+    from inku_render import score_version
     available, reason = availability()
     engine = current_render_engine()
     return AppInfoResponse(
@@ -143,6 +145,7 @@ def api_info() -> AppInfoResponse:
         render_engine_version=engine.version,
         ddl_version=DDL_VERSION,
         ddl_engine_version=DDL_ENGINE_VERSION,
+        score_version=score_version(),
     )
 
 

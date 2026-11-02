@@ -17,6 +17,7 @@ import urllib.request
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from typing import get_args
 
 import pytest
 from fastapi.testclient import TestClient
@@ -39,7 +40,7 @@ from inku_server.model_settings import (
     update_model_settings,
     update_user_model_settings,
 )
-from inku_server.schema import Score
+from inku_server.schema import Score, ScoreVersion
 
 client = TestClient(app)
 
@@ -93,10 +94,15 @@ def test_info_reports_version_build_number_and_developer_mode(monkeypatch):
     assert data["render_engine_version"] == importlib.import_module("inku_render").render_engine_version()
     assert data["ddl_version"] == DDL_VERSION
     assert data["ddl_engine_version"] == DDL_ENGINE_VERSION
+    assert data["score_version"] == importlib.import_module("inku_render").score_version()
 
     monkeypatch.setenv("INKU_DEVELOPER_MODE", "1")
     enabled = client.get("/api/info")
     assert enabled.json()["developer_mode"] is True
+
+
+def test_score_schema_latest_matches_native_core():
+    assert get_args(ScoreVersion)[0] == importlib.import_module("inku_render").score_version()
 
 
 def test_info_reads_current_render_engine_at_request_time(monkeypatch):

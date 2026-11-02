@@ -21,8 +21,10 @@
 	import { tokenStageLabel, tokenStageRows, type ProviderUsage } from './generation-info-tokens';
 	import { offerName, offerReason, offerStage, type PluginOfferRecord } from './plugin-offers';
 	import { catalogReadingDetails, catalogReadingForWork, type CatalogReading } from './catalog-reading';
+	import { scoreVersionDisplay } from './score-version';
 
 	export type GenerationInfoWork = {
+		score?: { version?: string | null } | null;
 		plugin_offers?: PluginOfferRecord[] | null;
 		image_ddl?: Record<string, unknown> | null;
 		/** The read-and-draw record; present only on a work drawn that way. */
@@ -200,6 +202,7 @@
 	const detailEngineVersion = $derived(statusHistoryItem?.render_engine_version ?? result?.render_engine_version ?? '');
 	const detailDdlVersion = $derived(statusHistoryItem?.ddl_version ?? result?.ddl_version ?? '');
 	const detailDdlEngineVersion = $derived(statusHistoryItem?.ddl_engine_version ?? result?.ddl_engine_version ?? '');
+	const detailScoreVersion = $derived(scoreVersionDisplay(statusHistoryItem ? statusHistoryItem.score : result?.score, t().historyVersionNotRecorded));
 	const detailBuild = $derived(statusHistoryItem?.render_build_number ?? result?.render_build_number ?? '');
 	const detailImageRecord = $derived(statusHistoryItem?.image_ddl ?? result?.image_ddl ?? null);
 	const detailImageProvenance = $derived(statusHistoryItem?.image_provenance ?? result?.image_provenance ?? '');
@@ -576,9 +579,10 @@
 						{@render term(t().provenanceLabelWorkId, t().provenanceHintWorkId)}<dd class="detail-copy-row"><code>{workId ?? (hasSketchDetails ? t().provenanceWorkNotSaved : '-')}</code><button type="button" disabled={!workId} onclick={copyWorkId} aria-label={`${t().provenanceLabelWorkId}: ${t().promptCopy}`}>{workId && copiedWorkId === workId ? t().promptCopied : t().promptCopy}</button></dd>
 						{@render term(detailRenderHashLabel, t().provenanceHintRenderHash)}<dd class="detail-copy-row"><code>{detailRenderHash || '-'}</code><button type="button" disabled={!statusHashLabel} onclick={onCopyStatusHash}>{statusHashCopied ? t().promptCopied : t().promptCopy}</button></dd>
 						{@render term(detailDescriptionHashLabel, t().provenanceHintDescriptionHash)}<dd><code>{detailDescriptionHash || '-'}</code></dd>
-						{@render term('Render engine version', t().provenanceHintRenderEngine)}<dd>{detailEngineVersion || '-'}</dd>
 						{@render term(t().provenanceLabelDdlSpec, t().provenanceHintDdlSpec)}<dd>{detailDdlVersion || t().historyVersionNotRecorded}</dd>
 						{@render term(t().provenanceLabelTransformLayer, t().provenanceHintTransformLayer)}<dd>{detailDdlEngineVersion || t().historyVersionNotRecorded}</dd>
+						{@render term('Score version', t().provenanceHintScoreVersion)}<dd>{detailScoreVersion}</dd>
+						{@render term('Render engine version', t().provenanceHintRenderEngine)}<dd>{detailEngineVersion || '-'}</dd>
 						{@render term('Build', t().provenanceHintBuild)}<dd>{detailBuild || '-'}</dd>
 					</dl>
 				</section>

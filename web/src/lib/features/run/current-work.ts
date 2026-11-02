@@ -24,6 +24,7 @@ export type InstructionLang = 'auto' | 'ja' | 'en';
 export type PaintScore = {
 	instructions: unknown[];
 	canvas?: string | null;
+	version?: string | null;
 };
 
 /**

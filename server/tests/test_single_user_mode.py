@@ -176,7 +176,7 @@ def test_app_info_preserves_existing_fields_and_names_current_capabilities():
     # thumbnail size only where the server keeps it, and this is how it learns.
     assert current - before == {
         "single_user_mode", "thumbnail_hidpi",
-        "chatgpt_plan_available", "chatgpt_plan_unavailable_reason",
+        "chatgpt_plan_available", "chatgpt_plan_unavailable_reason", "score_version",
     }
     assert before - current == set()
 

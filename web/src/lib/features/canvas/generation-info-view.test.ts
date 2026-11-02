@@ -3,12 +3,26 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
+import { scoreVersionDisplay } from './score-version.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const read = (path: string): string => {
 	try { return readFileSync(join(HERE, path), 'utf8'); }
 	catch { return ''; }
 };
+
+test('Score version distinguishes the current core from the actual saved work', () => {
+	assert.equal(scoreVersionDisplay({ version: '0.9.0' }, 'not recorded'), '0.9.0');
+	assert.equal(scoreVersionDisplay({}, 'not recorded'), 'not recorded');
+	assert.equal(scoreVersionDisplay(null, 'not recorded'), '-');
+	const view = read('./CanvasGenerationInfo.svelte');
+	assert.match(view, /statusHistoryItem \? statusHistoryItem\.score : result\?\.score/);
+	assert.match(view, /provenanceLabelDdlSpec[\s\S]*provenanceLabelTransformLayer[\s\S]*'Score version'[\s\S]*'Render engine version'/);
+	const page = read('../../../routes/+page.svelte');
+	assert.match(page, /data\.score_version/);
+	assert.match(page, /DDL Spec\. ver\.[\s\S]*DDL engine ver\.[\s\S]*Score ver\.[\s\S]*Render engine ver\.[\s\S]*Binding protocol ver\./);
+	assert.match(page, /currentScoreVersion \?\? t\(\)\.historyVersionNotRecorded/);
+});
 
 test('T-334: generation information has one feature-local focused view', () => {
 	const view = read('./CanvasGenerationInfo.svelte');

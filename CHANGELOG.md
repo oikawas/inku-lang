@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Server and Web: show the latest supported Score version in Info and each work's Score version in its details.
+
 - Core: expose the newest Score version this core can read and write through the Python binding.
 
 - Web: show per-work elapsed time and the average completed-work time in batches, label token counts and wrap long status details.

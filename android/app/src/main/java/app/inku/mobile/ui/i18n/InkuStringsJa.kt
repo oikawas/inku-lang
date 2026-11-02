@@ -450,9 +450,6 @@ object InkuStringsJa : InkuStrings {
     override val svgDisplayNote = "Web表示向けの標準SVG"
     override val mascotYuragi = "Yuragi (蟹)"
     override val exportHeightPx = "Y軸px"
-    override val demoRunningButton = "■  デモ実行中"
-    override val runningButton = "■  実行中"
-    override val drawingButton = "■  描画中"
     override val drawFromDdlButton = "▶  DDLから描画"
     override val demoStartButton = "▶  デモ開始"
     override val batchDrawButton = "▶  バッチ描画"
@@ -804,8 +801,6 @@ object InkuStringsJa : InkuStrings {
     override val modelsToCompare: (Int) -> String = { max -> "比較するモデル (最大 $max)" }
     override val downloadStateOf: (String, String) -> String = { state, progress -> "状態: $state$progress" }
     override val generationOf: (Int) -> String = { n -> "第${n}世代" }
-    override val batchElapsedTally: (String, Int, Int) -> String = { elapsed, success, failures -> "累計 $elapsed / 成功 $success / 失敗 $failures" }
-    override val batchProgress: (Int, Int) -> String = { current, total -> "進捗 $current / $total" }
 
     override val exportTemplateBuiltinDescription: (Int) -> String = { px -> "PNG / Y軸 ${px}px" }
 

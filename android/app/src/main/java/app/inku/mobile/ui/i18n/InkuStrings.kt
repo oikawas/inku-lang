@@ -337,9 +337,6 @@ interface InkuStrings {
     val svgDisplayNote: String
     val mascotYuragi: String
     val exportHeightPx: String
-    val demoRunningButton: String
-    val runningButton: String
-    val drawingButton: String
     val drawFromDdlButton: String
     val demoStartButton: String
     val batchDrawButton: String
@@ -672,8 +669,6 @@ interface InkuStrings {
     val modelsToCompare: (Int) -> String
     val downloadStateOf: (String, String) -> String
     val generationOf: (Int) -> String
-    val batchElapsedTally: (String, Int, Int) -> String
-    val batchProgress: (Int, Int) -> String
 
     // --- Export -------------------------------------------------------------
     val exportTemplateBuiltinDescription: (Int) -> String

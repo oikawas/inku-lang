@@ -217,7 +217,6 @@ data class InkuUiState(
     val batchActiveLine: Int? = null,
     val batchActiveDdl: String? = null,
     val batchActiveElapsedMs: Long? = null,
-    val batchElapsedMs: Long = 0L,
     val batchLatestHashShort: String? = null,
     val batchRetryLimit: Int = 0,
     val batchRetryRound: Int = 0,
@@ -3156,14 +3155,13 @@ class InkuViewModel @JvmOverloads constructor(
             localState.value = localState.value.copy(
                 isDrawing = true,
                 batchTotal = snapshot.lines.size,
-                batchStartedAt = System.currentTimeMillis(),
+                batchStartedAt = startedAt,
                 batchCurrent = 0,
                 batchSuccess = success,
                 batchFailures = emptyList(),
                 batchActiveLine = null,
                 batchActiveDdl = null,
                 batchActiveElapsedMs = null,
-                batchElapsedMs = 0L,
                 batchLatestHashShort = null,
                 batchCanRetry = false,
                 batchRetryRound = 0,
@@ -3180,7 +3178,6 @@ class InkuViewModel @JvmOverloads constructor(
                         batchActiveLine = lineNumber,
                         batchActiveDdl = null,
                         batchActiveElapsedMs = null,
-                        batchElapsedMs = System.currentTimeMillis() - startedAt,
                         message = strings().batchRunning(index + 1, lines.size),
                     )
                     runCatching {
@@ -3225,7 +3222,6 @@ class InkuViewModel @JvmOverloads constructor(
                                 batchFailures = failures,
                                 batchActiveDdl = item.normalizedDdl.orEmpty(),
                                 batchActiveElapsedMs = System.currentTimeMillis() - itemStartedAt,
-                                batchElapsedMs = System.currentTimeMillis() - startedAt,
                                 batchLatestHashShort = item.renderHashShort,
                                 message = strings().batchRunning(index + 1, lines.size),
                             )
@@ -3245,7 +3241,6 @@ class InkuViewModel @JvmOverloads constructor(
                             batchSuccess = success,
                             batchFailures = failures,
                             batchActiveElapsedMs = System.currentTimeMillis() - itemStartedAt,
-                            batchElapsedMs = System.currentTimeMillis() - startedAt,
                             message = strings().batchRunning(index + 1, lines.size),
                         )
                     }
@@ -3269,7 +3264,6 @@ class InkuViewModel @JvmOverloads constructor(
                 batchActiveLine = null,
                 batchActiveDdl = null,
                 batchActiveElapsedMs = null,
-                batchElapsedMs = System.currentTimeMillis() - startedAt,
                 batchCanRetry = failures.isNotEmpty(),
                 message = strings().batchCompleted(success, failures.size, snapshot.lines.size),
             )

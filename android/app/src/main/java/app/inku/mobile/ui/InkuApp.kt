@@ -1890,7 +1890,7 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
         if (imeWasVisible && !imeVisible && state.descriptionFocused) focusManager.clearFocus()
         imeWasVisible = imeVisible
     }
-    val writeImeBar = state.descriptionFocused && state.composeMode == ComposeMode.Write
+    val writeImeBar = state.descriptionFocused && state.composeMode == ComposeMode.Write && !state.isDrawing
     val batchImeBar = batchEditorFocused && imeVisible && state.composeMode == ComposeMode.Batch && !state.isDrawing
     // The pinned bar lies over the bottom of the scroll. Room of the same
     // height at the end lets the field it follows scroll clear of it.
@@ -1993,19 +1993,15 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
             if (writeImeBar) {
                 ImeActionBar(
                     idleText = "▶  ${drawActionLabel(S)}",
-                    runningText = S.drawingButton,
                     state = state,
                     onClick = viewModel::draw,
-                    onStop = viewModel::stopDrawing,
                     modifier = barModifier,
                 )
             } else if (batchImeBar) {
                 ImeActionBar(
                     idleText = S.batchDrawButton,
-                    runningText = S.runningButton,
                     state = state,
                     onClick = viewModel::runBatch,
-                    onStop = viewModel::stopDrawing,
                     modifier = barModifier,
                 )
             }
@@ -2548,12 +2544,11 @@ private fun systemAnimationsEnabled(context: Context): Boolean = runCatching {
 @Composable
 private fun ImeActionBar(
     idleText: String,
-    runningText: String,
     state: InkuUiState,
     onClick: () -> Unit,
-    onStop: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    if (state.isDrawing) return
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surface,
@@ -2563,10 +2558,8 @@ private fun ImeActionBar(
         Box(modifier = Modifier.padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceM)) {
             DrawingActionButton(
                 idleText = idleText,
-                runningText = runningText,
                 state = state,
                 onClick = onClick,
-                onStop = onStop,
             )
         }
     }
@@ -3457,10 +3450,8 @@ private fun DrawPanel(
         if (!state.descriptionFocused) {
             DrawingActionButton(
                 idleText = drawActionLabel(S),
-                runningText = S.drawingButton,
                 state = state,
                 onClick = viewModel::draw,
-                onStop = viewModel::stopDrawing,
             )
         }
         // 解釈 is the half of this screen one reaches for after the drawing, so
@@ -3502,10 +3493,8 @@ private fun DrawPanel(
                     )
                     DrawingActionButton(
                         idleText = S.drawFromDdlButton,
-                        runningText = S.drawingButton,
                         state = state,
                         onClick = viewModel::drawFromDdl,
-                        onStop = viewModel::stopDrawing,
                         tonal = true,
                         enabled = DdlSource.hasBody(state.ddl),
                     )
@@ -3581,14 +3570,12 @@ private fun BatchPanel(
             }
         }
         if (state.isDrawing && state.batchTotal > 0) {
-            BatchProgressPanel(state, viewModel)
+            BatchProgressPanel(state)
         } else {
             DrawingActionButton(
                 idleText = S.batchDrawButton,
-                runningText = S.runningButton,
                 state = state,
                 onClick = viewModel::runBatch,
-                onStop = viewModel::stopDrawing,
             )
         }
         if (state.batchFailures.isNotEmpty() && !state.isDrawing) {
@@ -3599,7 +3586,7 @@ private fun BatchPanel(
                 enabled = state.batchCanRetry,
             )
         }
-        state.message?.let { Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall) }
+        if (!state.isDrawing) state.message?.let { Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall) }
         MetaPanel(state)
     }
 }
@@ -3705,22 +3692,11 @@ internal fun removeBatchEditorLine(lines: List<String>, index: Int): String {
 }
 
 @Composable
-private fun BatchProgressPanel(state: InkuUiState, viewModel: InkuViewModel) {
+private fun BatchProgressPanel(state: InkuUiState) {
     Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(Dimens.radiusCard), modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(Dimens.spaceL), verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
-                    Text(S.batchProgress(state.batchCurrent, state.batchTotal), style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        S.batchElapsedTally(formatDuration(state.batchElapsedMs), state.batchSuccess, state.batchFailures.size),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    state.batchLatestHashShort?.let {
-                        Text(S.latestOf(it), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                    }
-                }
-                SecondarySmallButton(text = S.stop, onClick = viewModel::stopDrawing)
+            state.batchLatestHashShort?.let {
+                Text(S.latestOf(it), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
             }
             state.batchActiveLine?.let { line ->
                 Text(S.lineNumber(line), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
@@ -3787,10 +3763,8 @@ private fun DemoPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Mo
 
         DrawingActionButton(
             idleText = S.demoStartButton,
-            runningText = S.demoRunningButton,
             state = state,
             onClick = viewModel::startDemo,
-            onStop = viewModel::stopDrawing,
         )
 
         if (state.demoGeneratedDdl != null) {
@@ -8218,51 +8192,14 @@ private fun NavigationMark(destination: BottomNavigationDestination, color: Colo
 @Composable
 private fun DrawingActionButton(
     idleText: String,
-    runningText: String,
     state: InkuUiState,
     onClick: () -> Unit,
-    onStop: () -> Unit,
     tonal: Boolean = false,
     enabled: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
-    if (state.isDrawing) {
-        Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-            Surface(
-                modifier = Modifier.weight(1f).height(Dimens.buttonHeightLarge),
-                shape = RoundedCornerShape(Dimens.radiusCard),
-                color = if (tonal) MaterialTheme.colorScheme.surfaceVariant else DrawingActionSurface,
-                tonalElevation = Dimens.hairline,
-            ) {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    LinearProgressIndicator(
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .fillMaxWidth()
-                            .height(Dimens.spaceXs),
-                        color = MaterialTheme.colorScheme.secondary,
-                        trackColor = ProgressTrack,
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxSize().padding(horizontal = Dimens.spaceL),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
-                    ) {
-                        Text(runningText, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-                        Spacer(Modifier.weight(1f))
-                        Text(
-                            state.message ?: "LLM working",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            }
-            SecondaryActionButton(text = S.stop, onClick = onStop, modifier = Modifier.width(Dimens.chipWidth))
-        }
-    } else if (tonal) {
+    if (state.isDrawing) return
+    if (tonal) {
         SecondaryActionButton(text = idleText, onClick = onClick, enabled = enabled, modifier = modifier)
     } else {
         Button(

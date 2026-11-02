@@ -21,6 +21,10 @@ struct SavedGenerationInformation: Sendable {
         prompts?.last { $0["action"].string == action }?["prompt"]
     }
 
+    func prompt(stage: String) -> ExactJSON? {
+        prompts?.last { SavedWorkPresentation.promptStage(for: $0) == stage }?["prompt"]
+    }
+
     func pluginOffers(japanese: Bool) -> [String] {
         guard let data = context?.configuration, let config = try? ExactJSON(data: data) else { return [] }
         return Self.pluginOffers(configuration: config, japanese: japanese)
@@ -75,6 +79,24 @@ struct SavedGenerationInformation: Sendable {
         // A partial record does not become an invented aggregate.
         guard values.count == metrics.filter({ $0.sent }).count else { return nil }
         return values.reduce(UInt64(0)) { $0 &+ $1 }.formatted()
+    }
+}
+
+/// Web `catalogReadingDetails`: preserve the recorded reading rather than rebuilding it.
+struct CatalogReadingDetails: Equatable {
+    let method: String
+    let text: String
+    let dropped: String?
+    init(_ record: ExactJSON, japanese: Bool) {
+        switch record["method"].string {
+        case "model": method = japanese ? "光と色の読みから選んだ" : "Chosen from the light and color reading"
+        case "seed": method = japanese ? "読めるものが無く、実行の種で選んだ" : "Nothing could be read; chosen by the run's seed"
+        default: method = japanese ? "選びに失敗し既定のカタログ" : "The choice failed; the default catalog"
+        }
+        text = record["reading_text"].string ?? ""
+        let axes = record["dropped_axes"].number.flatMap(Int.init) ?? 0
+        let colors = record["dropped_colors"].number.flatMap(Int.init) ?? 0
+        dropped = axes + colors > 0 ? (japanese ? "記述に無いため落とした項目：軸 \(axes)・色 \(colors)" : "Dropped as not in the description: \(axes) axes, \(colors) colors") : nil
     }
 }
 

@@ -212,6 +212,8 @@ struct DrawingLogView: View {
         case "effect_requested": "モデルへ要求"
         case "retry_scheduled": "再試行"
         case "catalog_fallback": "既定カタログで続行"
+        case "catalog_reading_ready": "色の読みを完了"
+        case "catalog_chosen": "色カタログを選択"
         case "sketch_ready": "写生の処理を完了"
         case "failed": "失敗"; case "cancelled": "停止済み"; case "completed": "完了"
         default: event.tag

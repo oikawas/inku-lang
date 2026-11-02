@@ -22,6 +22,8 @@ Options and replacements for Change the touches, Change the ground and Change th
 
 ## 2026-11-02 Drawing progress
 
+Automatic catalog selection for descriptions passes the run seed and saves the core color reading and choice, showing the reading and choice separately in work information and prompts.
+
 For pipeline drawings, macOS displays the model, completed stages and their token counts, the current stage, attempt, elapsed time and received bytes, and the total in journal order. Stage and total counts aggregate each send and distinguish unreported usage.
 The current stage is emphasized in 12-point semibold text with the primary color and truncated at the end when needed; the total line is right-aligned.
 Batch drawing also displays the current work's journal and shows the conditions frozen at the start using the same rows as single drawing.

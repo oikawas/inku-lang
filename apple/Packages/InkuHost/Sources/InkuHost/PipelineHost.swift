@@ -188,7 +188,8 @@ public actor PipelineHost {
             imageDDL: context["image_ddl"].object == nil ? nil : context["image_ddl"].data,
             imageProvenance: context["image_provenance"].string,
             drawRoute: context["route"].string ?? (context["description_ddl"].object == nil ? "stages" : "read_and_draw"),
-            descriptionDDL: context["description_ddl"].object == nil ? nil : context["description_ddl"].data)
+            descriptionDDL: context["description_ddl"].object == nil ? nil : context["description_ddl"].data,
+            catalogReading: context["catalog_reading"].object == nil ? nil : context["catalog_reading"].data)
     }
 
     public func savedAuthoringSummaries(workIDs: [String]) async throws -> [String: SavedAuthoringSummary] {
@@ -1263,6 +1264,7 @@ private actor ExecutionDriver {
         performance["configuration"] = snapshot["config"]
         performance["document"] = snapshot["document"]
         performance["authority"] = snapshot["authority"]
+        if snapshot["catalog_reading"].object != nil { performance["catalog_reading"] = snapshot["catalog_reading"] }
         if snapshot["description_ddl"].object != nil {
             performance["description_ddl"] = snapshot["description_ddl"]
             performance["route"] = .string("read_and_draw")

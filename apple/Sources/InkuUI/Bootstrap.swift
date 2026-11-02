@@ -320,7 +320,9 @@ struct Bootstrap {
         config["compiler"] = compiler
         let exactCatalog = saved == nil ? try macroCatalogValue(language: language, settings: settings, importedPlugins: importedPlugins) : nil
         config["catalogs"] = [] as [Any]
+        config.removeValue(forKey: "catalog_seed")
         if catalogMode == "auto" {
+            config["catalog_seed"] = actualSeed
             config["catalogs"] = try catalogRecords.map { record in
                 guard let id = record["id"] as? String,
                       let name = record["name"] as? String else { throw HostError("color_catalogs_invalid") }

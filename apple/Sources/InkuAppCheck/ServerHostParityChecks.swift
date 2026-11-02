@@ -1,4 +1,7 @@
 import Foundation
+import CoreGraphics
+import ImageIO
+import UniformTypeIdentifiers
 import InkuHost
 import InkuPersistence
 import InkuUI
@@ -34,6 +37,38 @@ func runServerHostParityChecks() async throws {
           modes[other.id]?.host == "explicit", modes[other.id]?.candidate == "explicit" else {
         throw CheckFailure.message("Auto catalog modes differ from Server: \(modes)")
     }
+
+    // The catalog seed belongs only to automatic description selection and follows the actual run seed.
+    app.catalogMode = "auto"
+    let auto = try app.requestForCurrentInput()
+    let autoConfig = try ExactJSON(data: auto.configuration)
+    let autoOptions = try ExactJSON(data: auto.renderOptions)
+    guard autoConfig["catalog_seed"].string == autoOptions["render_seed"].string,
+          autoConfig["catalog_seed"].string == "42" else { throw CheckFailure.message("Auto catalog seed differs from the render seed") }
+    let demo = try app.makeDemoRequest(template: auto, description: app.descriptionText, randomizeSeed: true)
+    let demoConfig = try ExactJSON(data: demo.configuration), demoOptions = try ExactJSON(data: demo.renderOptions)
+    guard demoConfig["catalog_seed"].string == demoOptions["render_seed"].string,
+          demoConfig["catalog_seed"].string != "42" else { throw CheckFailure.message("Demo did not reseed its catalog") }
+    for mode in ["fixed", "random"] {
+        app.catalogMode = mode
+        guard try ExactJSON(data: app.requestForCurrentInput().configuration).object?["catalog_seed"] == nil else {
+            throw CheckFailure.message("Unexpected catalog seed in \(mode)")
+        }
+    }
+    let vision = ProviderSettings(id: "vision", baseURL: URL(string: "http://127.0.0.1:1")!, requiresAPIKey: false,
+        models: [.init(id: "model", purposes: ["vision"])])
+    try await app.updateHostSettings(HostSettings(providers: [service, vision], models: ModelSelection(stage1Model: "check:pinned", stage2Model: "check:pinned")))
+    app.display.preferences.visionModelReference = "vision:model"
+    guard let context = CGContext(data: nil, width: 2, height: 2, bitsPerComponent: 8, bytesPerRow: 0,
+        space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+        let image = context.makeImage() else { throw CheckFailure.message("Image fixture") }
+    let data = NSMutableData()
+    guard let destination = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil) else { throw CheckFailure.message("Image fixture encoder") }
+    CGImageDestinationAddImage(destination, image, nil)
+    guard CGImageDestinationFinalize(destination) else { throw CheckFailure.message("Image fixture encode") }
+    app.catalogMode = "auto"
+    let imageRequest = try app.requestForImage(ImageInput.prepare(data as Data), provenance: "")
+    guard try ExactJSON(data: imageRequest.configuration).object?["catalog_seed"] == nil else { throw CheckFailure.message("Image has catalog seed") }
 
     // Failure (D16): a failed drawing shows the native wording ("サービスが要求を拒否しました", "試行N") instead of
     // Web's pipelineAttentionText; the native diagnosis must stay as details.

@@ -314,6 +314,7 @@ public struct SavedAuthoringContext: Sendable {
     public var imageProvenance: String?
     public var drawRoute: String?
     public var descriptionDDL: Data?
+    public var catalogReading: Data?
     public var originKind: AuthoringOrigin? { AuthoringOrigin(rawValue: origin) }
 }
 

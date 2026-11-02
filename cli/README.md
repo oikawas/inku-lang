@@ -4,7 +4,7 @@ Command line client for controlling an inku API server.
 
 ## Observe current drawing activity
 
-`inku-cli activity` reports this account's live pipeline executions as JSON.
+`inku-cli activity` reports this account's live pipeline executions and autonomous refinement runs as JSON.
 An administrator can use `inku-cli activity --all` for all users and the
 current server process's active render-slot count. Identified batch items show
 their batch ID and line; new CLI batches supply those identifiers for both
@@ -14,6 +14,10 @@ Registered batches also report their planned and completed counts, state, and
 the time of their last heartbeat. An expired lease is not proof that the client
 stopped. Observed drawings cover only the process answering the request;
 unregistered older clients and work in other processes are not accounted for.
+`autonomous_runs` comes from the run database, including runs between moves;
+`executions[].autonomous_run_id` identifies children observed by this process.
+On Server startup, recovery marks abandoned running runs as interrupted. Older
+Servers do not return `autonomous_runs`; its absence means the state is unknown.
 
 ## Signing in, and when it is not needed
 
@@ -249,7 +253,8 @@ positional arguments:
     login               log in and store an API session
     logout              log out and clear the stored session
     me                  show the current logged-in user
-    activity            show current pipeline work and active render slots
+    activity            show pipeline executions, autonomous runs and render
+                        slots
     models              show or set CLI default LLM and Vision models
     paint               generate one drawing
     batch               generate drawings from a prompt list

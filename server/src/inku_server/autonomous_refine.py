@@ -241,6 +241,14 @@ class RunStore:
             ).order_by(AutonomousRunRow.created_at.desc())).first()
             return self._run(row) if row is not None else None
 
+    def list_running(self, owner: str | None = None) -> list[dict[str, Any]]:
+        with self._sessions() as session:
+            query = select(AutonomousRunRow).where(AutonomousRunRow.state == "running")
+            if owner is not None:
+                query = query.where(AutonomousRunRow.owner_id == owner)
+            rows = session.scalars(query.order_by(AutonomousRunRow.created_at.desc())).all()
+            return [self._run(row) for row in rows]
+
     def for_history(self, owner: str, history_id: str, limit: int = 5) -> list[dict[str, Any]]:
         with self._sessions() as session:
             rows = session.scalars(select(AutonomousRunRow).where(
@@ -308,6 +316,7 @@ class AutonomousRunner:
         self._pool = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="inku-autonomous")
         self._lock = threading.Lock()
         self._stops: dict[str, threading.Event] = {}
+        self._children: dict[str, str] = {}
         self._closing = False
 
     # -- the API --------------------------------------------------------------
@@ -370,6 +379,23 @@ class AutonomousRunner:
 
     def for_history(self, owner: str, history_id: str) -> list[dict[str, Any]]:
         return self.store.for_history(owner, history_id)
+
+    def activity(self, owner: str | None) -> tuple[list[dict], dict[str, str]]:
+        """DB-wide runs and this process's in-flight child execution IDs."""
+        runs = self.store.list_running(owner)
+        with self._lock:
+            children = dict(self._children)
+            stopping = {run["id"]: bool((stop := self._stops.get(run["id"])) and stop.is_set()) for run in runs}
+        active_ids = {run["id"] for run in runs}
+        rows = []
+        for run in runs:
+            current = run.get("current")
+            rows.append({"run_id": run["id"], "history_id": run["history_id"],
+                         "kinds": run["settings"]["kinds"], "moves": run["settings"]["moves"],
+                         "turns_taken": len(run["turns"]),
+                         "current": {key: current[key] for key in ("turn", "attempt", "kind")} if current else None,
+                         "stopping": stopping[run["id"]], "created_at": run["created_at"], "updated_at": run["updated_at"]})
+        return rows, {execution: run_id for execution, run_id in children.items() if run_id in active_ids}
 
     def recover(self) -> None:
         """When the Server starts: the runs it was taking were cut off."""
@@ -450,7 +476,8 @@ class AutonomousRunner:
             run["error"] = f"{type(error).__name__}: {error}"[:500]
             self._finish(run, "failed", "error")
         finally:
-            self._stops.pop(run["id"], None)
+            with self._lock:
+                self._stops.pop(run["id"], None)
 
     @staticmethod
     def _add(run: dict[str, Any], step: dict[str, Any], taken: dict[str, Any]) -> None:
@@ -483,7 +510,7 @@ class AutonomousRunner:
         options["wild"] = settings.get("wild") is True
         return options
 
-    def _settle(self, owner: str, start: Callable[[], dict], stop: threading.Event) -> dict:
+    def _settle(self, owner: str, start: Callable[[], dict], stop: threading.Event, *, run_id: str | None = None) -> dict:
         """Start a pipeline run and take it to its saved child; a stop cancels it."""
         from .pipeline_compat import _settled
 
@@ -496,12 +523,20 @@ class AutonomousRunner:
                     raise
             if stop.wait(_CAPACITY_WAIT_SECONDS):
                 raise _Stopped
+        execution_id = view["execution_id"]
+        if run_id is not None:
+            with self._lock:
+                self._children[execution_id] = run_id
         try:
             return _settled(owner, view, perform=True, reader_left=stop.is_set)
         except HTTPException as error:
             if error.status_code == 499:
                 raise _Stopped from None
             raise
+        finally:
+            if run_id is not None:
+                with self._lock:
+                    self._children.pop(execution_id, None)
 
     @staticmethod
     def _phase_reason(error: HTTPException) -> str | None:
@@ -545,7 +580,7 @@ class AutonomousRunner:
         try:
             view = self._settle(owner, lambda: service.start(
                 owner, "saved_laws", str(source_work.get("source") or ""), parent=relation,
-                source_work=source_work, options=options, direction=direction), stop)
+                source_work=source_work, options=options, direction=direction), stop, run_id=run["id"])
         except HTTPException as error:
             reason = self._phase_reason(error)
             if reason is not None:
@@ -605,7 +640,7 @@ class AutonomousRunner:
             return service.fork_legacy(owner, parent["id"], "description", joined, options=options)
 
         try:
-            view = self._settle(owner, start, stop)
+            view = self._settle(owner, start, stop, run_id=run["id"])
         except HTTPException as error:
             return _try("juxtaposition", "failed", reason=self._phase_reason(error) or _code(error),
                         sentence=choice["sentence"], rank=rank)
@@ -738,7 +773,7 @@ class AutonomousRunner:
                 try:
                     view = self._settle(owner, lambda: service.start(
                         owner, "direct_ddl", ddl, parent=relation,
-                        source_work={**source_work, "chunk_plugin_offers": list(chunk_offers.values())}, options=options), stop)
+                        source_work={**source_work, "chunk_plugin_offers": list(chunk_offers.values())}, options=options), stop, run_id=run["id"])
                     child = view["result"]
                     saved = _db.get_items(owner, [child["history_id"]])
                     drawn_item = saved[0] if saved else {}

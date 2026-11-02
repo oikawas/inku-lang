@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Server and CLI: show running autonomous refinements in activity and identify their child executions in the responding process.
+
 - Android: pass the drawing seed to automatic color catalog selection from a description and retain the reading, selection method, and sent prompts with the work.
 
 - Align macOS automatic catalog selection with color reading and the run seed, showing the selection and prompts in saved works.

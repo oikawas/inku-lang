@@ -2271,6 +2271,8 @@ Pipeline JSON views include the same payload in `progress`. While Web waits for 
 
 `GET /api/pipeline/activity` reports the caller's pipeline drawings and registered batches, including their planned and completed counts. Only an administrator may use `all_users=true` to see all users' entries and this process's active render-slot count. A batch obtains a lease on start, reports liveness every 15 seconds, and reports completion, an explicit stop, or interruption. A lease without a heartbeat for 90 seconds expires; a matching drawing still running makes the state uncertain. Expiration does not prove the client stopped. Resumption issues a new lease and refuses new drawings with the old one. Observed drawings belong to the responding server process; older unregistered clients and other processes remain outside this observation.
 
+`autonomous_runs` lists running entries from the run database for the caller or, for an administrator, all users, including intervals between moves. `executions[].autonomous_run_id` identifies only children tracked by the responding process. Server startup marks leftover running runs as interrupted.
+
 Description-batch resumption checks the registered original plan and settings against saved works with the same batch ID and does not resend saved lines. Resume is not offered while a drawing is active or uncertain. An image folder must be picked again; its submitted order, kept in the browser's localStorage, is reconciled with saved works before resumption. Losing localStorage loses that reconciliation. Older unregistered batches retain the history-based fallback.
 
 `POST /api/paint/stream` reports finite progress as `sketch` (when the sketch

@@ -1051,7 +1051,8 @@ class BatchUpdateBody(BaseModel):
 
 
 def pipeline_router(service: PipelineService | Callable[[], PipelineService], actor_dependency: Callable,
-                    *, binding_for: Callable[[], PipelineBinding] | None = None) -> APIRouter:
+                    *, binding_for: Callable[[], PipelineBinding] | None = None,
+                    autonomous_runner_for: Callable | None = None) -> APIRouter:
     router = APIRouter(prefix="/api/pipeline")
 
     def current_service() -> PipelineService:
@@ -1080,7 +1081,7 @@ def pipeline_router(service: PipelineService | Callable[[], PipelineService], ac
 
     @router.get("/activity", summary="Observe currently active pipeline work")
     def activity(all_users: bool = False, actor: dict = Depends(actor_dependency)):
-        """Observe this process only; batch clients may be between requests. All users requires admin."""
+        """Runs are DB-wide; execution and child observations are process-local. All users requires admin."""
         if all_users:
             from . import db
             if not db.has_permission_group(actor, "admins"):
@@ -1091,8 +1092,16 @@ def pipeline_router(service: PipelineService | Callable[[], PipelineService], ac
         batches = BatchRuns(current_service().store.engine).list(owner, active_batch_ids(owner))
         # The activity overview never needs descriptions or saved settings.
         batches = [{key: value for key, value in batch.items() if key not in {"prompt", "conditions"}} for batch in batches]
+        if autonomous_runner_for is None:
+            from .autonomous_refine import get_runner
+            runner = get_runner()
+        else:
+            runner = autonomous_runner_for()
+        autonomous_runs, children = runner.activity(owner)
+        executions = [{**entry, "autonomous_run_id": children.get(entry["execution_id"])}
+                      for entry in current_service().activity(owner)]
         return {"scope": "all_users" if all_users else "current_user", "process_scope": "current_process",
-                "executions": current_service().activity(owner), "batches": batches,
+                "executions": executions, "batches": batches, "autonomous_runs": autonomous_runs,
                 "render_slots_active": _render_slots.active if all_users else None,
                 "batch_waiting_known": False}
 

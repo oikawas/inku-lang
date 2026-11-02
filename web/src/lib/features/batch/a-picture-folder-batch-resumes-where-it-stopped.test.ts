@@ -93,7 +93,12 @@ test('a stopped run resumes from the next picture after the folder is picked aga
 	assert.equal(again.doneCount, 2);
 	assert.deepEqual(again.pending.map((item) => item.webkitRelativePath), ['trip/3.jpg']);
 	const resumed: string[] = [];
-	await again.run({ ...neverLost, fromStart: false, paintPicture: async (picture) => { resumed.push(picture.webkitRelativePath ?? ''); } });
+	await again.run({ ...neverLost, fromStart: false, paintPicture: async (picture) => {
+		assert.equal(again.summaryTotal, 3);
+		assert.equal(again.summaryCurrent, 3);
+		assert.ok(again.startedAt > 0);
+		resumed.push(picture.webkitRelativePath ?? '');
+	} });
 	assert.deepEqual(resumed, ['trip/3.jpg']);
 	assert.equal(again.interrupted, false);
 	assert.equal(again.pending.length, 0);

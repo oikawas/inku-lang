@@ -5,6 +5,7 @@
 	import Tooltip from './Tooltip.svelte';
 	import PaintButton from './PaintButton.svelte';
 	import RunStatus from './RunStatus.svelte';
+	import BatchRunSummary from './BatchRunSummary.svelte';
 	import type { ProviderAttemptCount } from '$lib/paintStream';
 
 	type BatchFailure = {
@@ -31,6 +32,9 @@
 		batchActiveDdlHighlighted: string;
 		batchTotal: number;
 		batchCurrent: number;
+		batchSummaryCurrent: number;
+		batchSummaryTotal: number;
+		batchStartedAt: number;
 		batchRetryRound: number;
 		runTokensIn: number | null;
 		runTokensOut: number | null;
@@ -90,6 +94,9 @@
 		batchActiveDdlHighlighted,
 		batchTotal,
 		batchCurrent,
+		batchSummaryCurrent,
+		batchSummaryTotal,
+		batchStartedAt,
 		batchRetryRound,
 		runTokensIn,
 		runTokensOut,
@@ -303,6 +310,7 @@
 
 {#if batchRunning && batchTotal > 0}
 	<div class="batch-progress-wrap">
+		<BatchRunSummary current={batchSummaryCurrent} total={batchSummaryTotal} startedAt={batchStartedAt} />
 		<RunStatus
 			label={batchWaitingLine !== null
 				? t().batchWaitingForServer(batchWaitingLine)

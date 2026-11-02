@@ -71,6 +71,9 @@
 		batchActiveDdlHighlighted: string;
 		batchTotal: number;
 		batchCurrent: number;
+		batchSummaryCurrent: number;
+		batchSummaryTotal: number;
+		batchStartedAt: number;
 		batchRetryRound: number;
 		batchActiveTokensIn: number | null;
 		batchActiveTokensOut: number | null;
@@ -150,6 +153,9 @@
 		batchActiveDdlHighlighted,
 		batchTotal,
 		batchCurrent,
+		batchSummaryCurrent,
+		batchSummaryTotal,
+		batchStartedAt,
 		batchRetryRound,
 		batchActiveTokensIn,
 		batchActiveTokensOut,
@@ -484,6 +490,9 @@
 			{batchActiveDdlHighlighted}
 			{batchTotal}
 			{batchCurrent}
+			{batchSummaryCurrent}
+			{batchSummaryTotal}
+			{batchStartedAt}
 			{batchRetryRound}
 			{batchActiveTokensIn}
 			{batchActiveTokensOut}

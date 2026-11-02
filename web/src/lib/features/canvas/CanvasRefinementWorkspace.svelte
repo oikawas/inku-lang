@@ -4,6 +4,7 @@
 	import RefinementGroundView from './RefinementGroundView.svelte';
 	import RefinementToolView from './RefinementToolView.svelte';
 	import RefinementModelCompareView from './RefinementModelCompareView.svelte';
+	import RefinementCompositionFormView from './RefinementCompositionFormView.svelte';
 	import './refinement-workspace.css';
 	import { t } from '$lib/i18n/index.svelte';
 	import type { Provider, ProviderGroup } from '$lib/models';
@@ -27,6 +28,8 @@
 		refinementSession: RefinementSession;
 		modelInspection: ModelInspection;
 		statusDescriptionLocked: boolean;
+		compositionForm: string | null;
+		compositionFormSwitch: boolean;
 		statusStage1Model: string;
 		statusStage2Model: string;
 		refineDrawingModelId: string;
@@ -39,6 +42,7 @@
 		onGenerateColorCatalogCandidates: () => void | Promise<void>;
 		onGenerateColorArrangementCandidates: () => void | Promise<void>;
 		onGenerateGroundCandidates: () => void | Promise<void>;
+		onGenerateCompositionFormCandidates: (form: import('./composition-form').CompositionForm, count: 1 | 4) => void | Promise<void>;
 		onGenerateToolCandidates: () => void | Promise<void>;
 		onGenerateModelCandidates: () => void | Promise<void>;
 		onSaveAndClose: () => void | Promise<void>;
@@ -59,6 +63,8 @@
 		refinementSession,
 		modelInspection,
 		statusDescriptionLocked,
+		compositionForm,
+		compositionFormSwitch,
 		statusStage1Model,
 		statusStage2Model,
 		refineDrawingModelId,
@@ -70,6 +76,7 @@
 		onGenerateColorCatalogCandidates,
 		onGenerateColorArrangementCandidates,
 		onGenerateGroundCandidates,
+		onGenerateCompositionFormCandidates,
 		onGenerateToolCandidates,
 		onGenerateModelCandidates,
 		onSaveAndClose,
@@ -79,7 +86,7 @@
 	}: Props = $props();
 
 	const dialogTitle = $derived(
-		view === 'layout'
+		view === 'composition-form' ? t().workActionCompositionForm : view === 'layout'
 				? t().canvasVaryComposition
 				: view === 'color-arrangement'
 					? t().workActionColorArrangement
@@ -173,6 +180,10 @@
 		<!-- Comparing models reads the description again, which a work its DDL
 		     holds is not drawn from. -->
 		<p class="refine-held-note">{t().descriptionLockedReason}</p>
+	{:else if view === 'composition-form'}
+		<RefinementCompositionFormView {isJapanese} {resultAvailable} {artworkUrl} {canvasAspectWidth} {canvasAspectHeight}
+			{refinementSession} {compositionForm} {compositionFormSwitch}
+			onGenerateCandidates={onGenerateCompositionFormCandidates} {onSaveAndClose} {onDiscardAndClose} />
 	{:else}
 		<RefinementModelCompareView
 			{isJapanese}

@@ -1,5 +1,5 @@
 <script module lang="ts">
-	export type WorkAction = 'layout' | 'color-catalog' | 'color-arrangement' | 'ground' | 'tool' | 'description' | 'instructions' | 'sketch-grain' | 'models' | 'juxtapose' | 'autonomous';
+	export type WorkAction = 'layout' | 'color-catalog' | 'color-arrangement' | 'ground' | 'tool' | 'description' | 'instructions' | 'sketch-grain' | 'models' | 'juxtapose' | 'autonomous' | 'composition-form';
 
 	let lastWorkActionTrigger: HTMLButtonElement | null = null;
 
@@ -28,7 +28,7 @@
 	};
 
 	let { node, isJapanese, variant, open, available = undefined, unavailableReason, onRequestOpen, onOpenChange, onAction }: Props = $props();
-	const READS_THE_DESCRIPTION = new Set<WorkAction>(['description', 'sketch-grain', 'models', 'juxtapose']);
+	const READS_THE_DESCRIPTION = new Set<WorkAction>(['description', 'sketch-grain', 'models', 'juxtapose', 'composition-form']);
 	let triggerEl = $state<HTMLButtonElement | null>(null);
 	let menuEl = $state<HTMLDivElement | null>(null);
 	let wrapperEl = $state<HTMLDivElement | null>(null);
@@ -142,6 +142,7 @@
 				<div class="work-action-group" role="group" aria-label={t().workActionGroupDescription}>
 					<div class="work-action-group-label" aria-hidden="true">{t().workActionGroupDescription}</div>
 					<button type="button" role="menuitem" aria-disabled={descriptionLocked} class:held={descriptionLocked} title={descriptionLocked ? t().descriptionLockedReason : undefined} onclick={(event) => select('description', event)}>{t().workActionDescription}{@render llmMark()}</button>
+					<button type="button" role="menuitem" aria-disabled={descriptionLocked} class:held={descriptionLocked} title={descriptionLocked ? t().descriptionLockedReason : undefined} onclick={(event) => select('composition-form', event)}>{t().workActionCompositionForm}{@render llmMark()}</button>
 					<button type="button" role="menuitem" aria-disabled={descriptionLocked} class:held={descriptionLocked} title={descriptionLocked ? t().descriptionLockedReason : undefined} onclick={(event) => select('sketch-grain', event)}>{t().workActionSketchGrain}{@render llmMark()}</button>
 					<button type="button" role="menuitem" aria-disabled={descriptionLocked} class:held={descriptionLocked} title={descriptionLocked ? t().descriptionLockedReason : undefined} onclick={(event) => select('models', event)}>{t().workActionModels}{@render llmMark()}</button>
 					<button type="button" role="menuitem" aria-disabled={descriptionLocked} class:held={descriptionLocked} title={descriptionLocked ? t().descriptionLockedReason : undefined} onclick={(event) => select('juxtapose', event)}>{t().workActionJuxtapose}{@render llmMark()}</button>

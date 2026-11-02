@@ -3183,6 +3183,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onGenerateColorCatalogCandidates={refinement.generateColorCatalogCandidates}
 				onGenerateColorArrangementCandidates={refinement.generateColorArrangementCandidates}
 				onGenerateGroundCandidates={refinement.generateGroundCandidates}
+				onGenerateCompositionFormCandidates={refinement.generateCompositionFormCandidates}
 				onGenerateToolCandidates={refinement.generateToolCandidates}
 				onGenerateModelCandidates={generateModelCandidates}
 				onSaveSelectedVariationCandidates={refinement.saveSelectedVariationCandidates}

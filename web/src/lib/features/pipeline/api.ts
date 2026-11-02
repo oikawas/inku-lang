@@ -89,6 +89,9 @@ export type PipelineOptions = {
 	route?: DrawRoute;
 	/** The composition and laws inside read and draw; left out, a fork takes its parent's. */
 	composition?: CompositionMode;
+	composition_form?: string;
+	save_history?: boolean;
+	save_artifacts?: boolean;
 	sketch?: 'off' | 'on';
 	sketch_text?: string;
 	stage1_model?: string;

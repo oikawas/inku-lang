@@ -38,6 +38,7 @@ DESCRIPTION_READING_KINDS = frozenset({
     "model_comparison",
     "language_comparison",
     "canvas_aspect_change",
+    "composition_form_change",
 })
 
 _MAX_DEPTH = 256

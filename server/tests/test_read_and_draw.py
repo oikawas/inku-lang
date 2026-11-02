@@ -303,9 +303,55 @@ def test_only_read_and_draw_with_the_composition_on_asks_the_core_for_it():
         return _route_fields({"host_options": options}, POEM)
 
     assert fields(route="read_and_draw", composition="on")["composition"] == {"mode": "on"}
+    assert fields(route="read_and_draw", composition="on", composition_form="bands")["composition"] == {"mode": "on", "form": "bands"}
     assert "composition" not in fields(route="read_and_draw", composition="off")
     assert "composition" not in fields(route="read_and_draw")
     assert fields(route="stages", composition="on") == {}
+
+
+def test_composition_form_candidate_saves_its_actual_execution_once(host, composed):
+    client, service, _, sent = host
+    parent = _wait(service, _start(client, composition="on")["execution_id"])
+    parent = service.command("owner", parent["execution_id"], {"tag": "perform"})
+    parent_result = parent["result"]
+    fork = client.post(f"/api/pipeline/variations/{parent['variation_id']}/fork-description", headers={"x-owner": "owner"},
+        json={"expected_revision": parent["authority"]["revision"], "description": POEM, "options": {
+            "route": "read_and_draw", "composition": "on", "composition_form": "one_corner",
+            "save_history": False, "save_artifacts": False, "count_generation": True,
+            "lineage_parent_node_id": parent_result["lineage_node_id"], "derivation_kind": "composition_form_change"}})
+    assert fork.status_code == 200, fork.text
+    candidate = _wait(service, fork.json()["execution_id"])
+    assert candidate["description_ddl"]["composition"]["requested_form"] == "one_corner"
+    assert json.loads(next(row["message"] for row in reversed(sent) if row["tag"] == "compose_description"))["composition_form"] == "one_corner"
+    done = service.command("owner", candidate["execution_id"], {"tag": "perform"})
+    assert not done["result"].get("history_id")
+    count = done["result"]["user_generation_count"]
+    body = {"lineage_parent_node_id": parent_result["lineage_node_id"], "derivation_kind": "composition_form_change", "derivation_metadata": {}}
+    path = f"/api/pipeline/executions/{candidate['execution_id']}/save"
+    first = client.post(path, json=body, headers={"x-owner": "owner"})
+    assert first.status_code == 200, first.text
+    second = client.post(path, json=body, headers={"x-owner": "owner"})
+    assert second.status_code == 200 and first.json()["history_id"] == second.json()["history_id"]
+    item = db.get_items("owner", [first.json()["history_id"]])[0]
+    assert item["description_ddl"]["composition"]["requested_form"] == "one_corner"
+    assert item["derivation_metadata"] == {"form_from": "one_corner", "form_to": "one_corner"}
+    with db.SessionLocal() as session:
+        assert session.get(UserAccountRow, "owner").image_generation_count == count
+    assert client.post(path, json=body, headers={"x-owner": "other"}).status_code == 404
+    assert client.post(f"/api/pipeline/executions/{parent['execution_id']}/save", json=body, headers={"x-owner": "owner"}).status_code == 409
+
+
+@pytest.mark.parametrize("options", [
+    {"route": "stages", "composition": "on", "composition_form": "bands"},
+    {"route": "read_and_draw", "composition": "off", "composition_form": "bands"},
+    {"route": "read_and_draw", "composition": "on", "composition_form": "not_a_form"},
+])
+def test_composition_form_rejects_invalid_route_or_value(host, options):
+    client, _, _, _ = host
+    response = client.post("/api/pipeline/variations", headers={"x-owner": "owner"}, json={
+        "kind": "description", "text": POEM, "options": {"stage1_model": "openai:fixture-vision", **options},
+    })
+    assert response.status_code == 422
 
 
 def test_a_child_keeps_its_parents_composition(host, composed):

@@ -8,8 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-- Core: the reader, composition and drawer for drawing in words bring underlying intent in poetry and other descriptions into the picture through paired things, traces and faint images; places without things use a background color suited to time, light and place.
-
 - Android: show finished stages, current work, tokens and received bytes as a drawing journal, with the batch line and elapsed time above it.
 
 - Web and Server: choose among seven composition forms in refinement, draw one or four candidates, and save selected executions as children with their reading and composition records.
@@ -554,6 +552,10 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.305 (2026-11-02 / Build 1381)
+
+- Core: the reader, composition and drawer for drawing in words bring underlying intent in poetry and other descriptions into the picture through paired things, traces and faint images; places without things use a background color suited to time, light and place.
 
 ## v2.15.304 (2026-11-02 / Build 1380)
 

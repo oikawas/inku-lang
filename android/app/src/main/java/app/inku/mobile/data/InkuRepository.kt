@@ -145,6 +145,8 @@ class InkuRepository(
     private val activeModelProvider: ModelProvider = modelProviderOverride ?: modelRouter
     private val sharedPipelineStore = RoomSharedPipelineStore(database)
     private val providerAttemptState = MutableStateFlow<ProviderAttempt?>(null)
+    private val runProgressState = MutableStateFlow<app.inku.mobile.pipeline.RunProgress?>(null)
+    val runProgress: StateFlow<app.inku.mobile.pipeline.RunProgress?> = runProgressState.asStateFlow()
 
     /**
      * The model call the running drawing waits on, for the running row (the
@@ -173,6 +175,11 @@ class InkuRepository(
             onProviderAttempt = { executionId, attempt ->
                 providerAttemptState.update { current ->
                     attempt ?: current.takeIf { it?.executionId != executionId }
+                }
+            },
+            onRunProgress = { executionId, progress ->
+                runProgressState.update { current ->
+                    progress ?: current.takeIf { it?.executionId != executionId }
                 }
             },
             saveSafePerformance = { result ->

@@ -19,6 +19,12 @@ import org.json.JSONObject
 
 fun interface PipelineProviderEffect {
     suspend fun perform(actionJson: String, models: PipelineModelSelection): String
+    suspend fun performObserved(
+        actionJson: String,
+        models: PipelineModelSelection,
+        onUsage: (Int?, Int?) -> Unit,
+        onReceived: (Long?) -> Unit,
+    ): String = perform(actionJson, models)
 }
 
 /** Executes one action once. Retry, fallback, and response judgment stay in Rust. */
@@ -35,7 +41,15 @@ class SingleAttemptModelEffectProvider(
     private val onFailure: (actionId: String, failure: String, detail: String?, cause: Throwable) -> Unit =
         { _, _, _, _ -> },
 ) : PipelineProviderEffect {
-    override suspend fun perform(actionJson: String, models: PipelineModelSelection): String {
+    override suspend fun perform(actionJson: String, models: PipelineModelSelection): String =
+        performObserved(actionJson, models, { _, _ -> }, {})
+
+    override suspend fun performObserved(
+        actionJson: String,
+        models: PipelineModelSelection,
+        onUsage: (Int?, Int?) -> Unit,
+        onReceived: (Long?) -> Unit,
+    ): String {
         val action = JSONObject(actionJson)
         val tag = action.requiredString("tag")
         val resultTag = when (tag) {
@@ -95,19 +109,25 @@ class SingleAttemptModelEffectProvider(
                         pipelineAction = prompt.requiredString("action_name"),
                         chatGptSession = models.chatGptSession,
                         pipelineImages = pipelineImages,
+                        onReceivedBytes = { bytes -> runCatching { onReceived(bytes) } },
                     ),
-                ).text
+                )
             }
-            effectResult(resultTag, identity, response, elapsedMs(started)).toString()
+            runCatching { onUsage(response.promptTokens, response.completionTokens) }
+            effectResult(resultTag, identity, response.text, elapsedMs(started)).toString()
         } catch (timeout: TimeoutCancellationException) {
+            runCatching { onUsage(null, null) }
             failed(identity, "transport_timeout", timeout, elapsedMs(started))
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
+            runCatching { onUsage(null, null) }
             if (error is ModelProviderHttpException) {
                 Log.w(PROVIDER_LOG_TAG, providerHttpErrorLine(tag, modelId, error))
             }
             failed(identity, failureCode(error), error, elapsedMs(started))
+        } finally {
+            runCatching { onReceived(null) }
         }
     }
 

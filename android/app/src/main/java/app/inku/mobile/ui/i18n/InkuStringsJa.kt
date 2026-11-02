@@ -576,6 +576,28 @@ object InkuStringsJa : InkuStrings {
     override val paint = "描画する"
     override val drawingModel = "描画モデル"
     override val drawing = "描画中"
+    override val runStageCatalog = "色カタログ"; override val runStageReading = "読む"; override val runStageComposition = "構図"; override val runStageWriting = "書く"
+    override val runStageReview = "見直し"; override val runStageColors = "配色"; override val runStageLaws = "法則"; override val runStageInterpret = "解釈"
+    override val runStageSketch = "写生"; override val runStageCompositionReading = "構図の読み"; override val runStageCompletion = "補完"
+    override val runStageImageCatalog = "画像の色カタログ"; override val runStageImageWriting = "画像から書く"; override val runStageImageReview = "画像の見直し"
+    override val runFinishedReading = "読みました"; override val runFinishedReadingDropped: (String) -> String = { "読みました（$it 語を外した）" }
+    override val runFinishedComposition: (String, String) -> String = { things, law -> "構図：物 $things つ・主の法則 $law" }
+    override val runFinishedWriting = "書きました"; override val runFinishedReview = "見て直しました"
+    override val runFinishedCatalog: (String, String) -> String = { stage, catalog -> "$stage：$catalog" }
+    override val runFinishedLaw: (String, String) -> String = { stage, law -> "$stage：主の法則 $law" }
+    override val runFinishedReady: (String) -> String = { "$it：完了" }
+    override val runFinishedFallback: (String) -> String = { "$it：既定の形で続けました" }
+    override val runFinishedRetried: (String) -> String = { "$it：問い直しました" }
+    override val runLocalReview = "見直し用に描いています…"; override val runLocalRender = "描いています…"; override val runLocalSave = "保存しています…"
+    override val runStatusStageTokens: (String, String) -> String = { input, output -> "入力 $input・出力 $output" }
+    override val runStatusTotalTokens: (String, String) -> String = { input, output -> "合計 入力 $input・出力 $output" }
+    override val runStatusPartialTokens: (String, String) -> String = { input, output -> "合計（一部不明）入力 $input・出力 $output" }
+    override val runStatusReceived: (String) -> String = { "受信 $it KB" }; override val runStatusElapsed: (String) -> String = { "経過 ${it}s" }
+    override val batchRowOfTotal: (Int, Int) -> String = { current, total -> "$total 行中 $current 行目" }
+    override val batchElapsed: (String) -> String = { "バッチ開始から $it" }
+    override val elapsedSeconds: (String) -> String = { "$it 秒" }
+    override val elapsedMinutes: (String, String) -> String = { m, s -> "$m 分 $s 秒" }
+    override val elapsedHours: (String, String, String) -> String = { h, m, s -> "$h 時間 $m 分 $s 秒" }
     override val runStatusAwaitingReply: (Int, Int) -> String = { attempt, maxAttempts -> "応答待ち（$attempt/${maxAttempts}回目）" }
     override val runStatusRetrying: (Int, Int) -> String = { attempt, maxAttempts -> "再試行中（$attempt/${maxAttempts}回目）" }
     override val runStatusAskingAgain: (Int, Int) -> String = { attempt, maxAttempts -> "断られた案を理由を添えて問い直し中（$attempt/${maxAttempts}回目）" }

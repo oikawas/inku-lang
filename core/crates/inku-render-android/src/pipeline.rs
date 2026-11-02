@@ -400,6 +400,16 @@ pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_provid
     unary_bytes(env, snapshot, inku_pipeline_uniffi::provider_attempt)
 }
 
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
+pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_runProgress(
+    env: JNIEnv<'_>,
+    _receiver: JObject<'_>,
+    snapshot: JByteArray<'_>,
+) -> jbyteArray {
+    unary_bytes(env, snapshot, inku_pipeline_uniffi::run_progress)
+}
+
 /// The description every layer reads: Server's label cut, from the one shared copy.
 #[unsafe(no_mangle)]
 #[allow(non_snake_case)]

@@ -2131,6 +2131,9 @@ private fun CameraDevelopmentSurface(state: InkuUiState, viewModel: InkuViewMode
                         photoLabel = cameraOriginalPhotoWords(!state.uiLanguage.isEnglish).label,
                         modifier = Modifier.fillMaxWidth().weight(1f),
                     )
+                    if (state.isDrawing) {
+                        RunStatusRow(state, viewModel)
+                    }
                     Text(
                         presentation.message,
                         modifier = Modifier.semantics {
@@ -2584,8 +2587,11 @@ private fun ImeActionBar(
 internal fun RunStatusRow(state: InkuUiState, viewModel: InkuViewModel) {
     if (!state.isRunning) return
     val attempt by viewModel.providerAttempt.collectAsState()
+    val reportedProgress by viewModel.runProgress.collectAsState()
+    val showJournal = state.isDrawing || (state.refinementBusy && state.refinementSubview == RefinementSubview.Model)
+    val journal = reportedProgress.takeIf { showJournal }
     // A drawing's own row; refinement candidates are made several at once.
-    val attemptText = if (state.isDrawing) providerAttemptText(attempt, S) else ""
+    val attemptText = if (showJournal) providerAttemptText(attempt, S) else ""
     val parityStrings = savedWorkParityStrings(state.uiLanguage)
     // Web `runningStageLabel`: the stages after Stage 1 say what is being asked.
     val stageLabel = if (!state.isDrawing) null else when (attempt?.action) {
@@ -2603,7 +2609,18 @@ internal fun RunStatusRow(state: InkuUiState, viewModel: InkuViewModel) {
             delay(RUN_STATUS_TICK_MS)
         }
     }
-    val progress = if (state.batchTotal > 1) "${state.batchCurrent} / ${state.batchTotal}   " else ""
+    val batchStartedAt = state.batchStartedAt.takeIf { state.isDrawing && state.batchCurrent > 0 }
+    val progress = if (batchStartedAt == null && state.batchTotal > 1) "${state.batchCurrent} / ${state.batchTotal}   " else ""
+    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
+    if (batchStartedAt != null) {
+        Text(
+            S.batchRowOfTotal(state.batchCurrent, state.batchTotal) + "　" +
+                S.batchElapsed(batchElapsedTime(System.currentTimeMillis() - batchStartedAt, S)),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1, softWrap = false,
+        )
+    }
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(Dimens.radiusCard),
@@ -2617,6 +2634,37 @@ internal fun RunStatusRow(state: InkuUiState, viewModel: InkuViewModel) {
         ) {
             MascotWidget(mascotKind = state.mascotKind)
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
+                if (journal != null) {
+                    Text(state.refinementRunningModel.takeIf { state.refinementBusy && state.refinementSubview == RefinementSubview.Model }
+                        ?: selectedModelLabel(state), style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    journal.finished.forEach { item ->
+                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Text("✓ " + finishedText(item, S), modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            journal.stageTokens[item.action]?.let { usage ->
+                                Text(S.runStatusStageTokens(tokenCount(usage.input), tokenCount(usage.output)),
+                                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1, softWrap = false)
+                            }
+                        }
+                    }
+                    Text("… " + currentWork(journal.current, state.message?.takeIf { it.isNotBlank() } ?: S.drawing, attempt, S),
+                        style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    val elapsed = S.runStatusElapsed(String.format(java.util.Locale.US, "%.1f", elapsedMs / 1000.0))
+                    val received = journal.receivedBytes?.let { S.runStatusReceived((it / 1024).toString()) }
+                    Text(listOf(attemptText, elapsed, received.orEmpty()).filter { it.isNotEmpty() }.joinToString("　"),
+                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1, softWrap = false)
+                    val input = tokenCount(journal.total.input)
+                    val output = tokenCount(journal.total.output)
+                    Text(if (journal.total.unreportedSends > 0) S.runStatusPartialTokens(input, output) else S.runStatusTotalTokens(input, output),
+                        modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.End,
+                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1, softWrap = false)
+                } else {
                 Text(
                     stageLabel ?: state.message?.takeIf { it.isNotBlank() } ?: S.drawing,
                     style = MaterialTheme.typography.labelMedium,
@@ -2649,6 +2697,7 @@ internal fun RunStatusRow(state: InkuUiState, viewModel: InkuViewModel) {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                }
             }
             if (state.autonomousStatus.busy) MiniPill(
                 text = savedWorkParityStrings(state.uiLanguage).autonomousTitle,
@@ -2657,6 +2706,7 @@ internal fun RunStatusRow(state: InkuUiState, viewModel: InkuViewModel) {
             MiniPill(
                 text = S.stop,
                 onClick = when {
+                    state.cameraCaptureState.locksCameraInteraction -> viewModel::cancelCameraDevelopment
                     state.autonomousStatus.busy -> viewModel::stopAutonomousRefinement
                     state.juxtaposition?.busy == true -> viewModel::stopJuxtaposition
                     state.refinementBusy -> viewModel::abortRefinementCandidates
@@ -2664,6 +2714,7 @@ internal fun RunStatusRow(state: InkuUiState, viewModel: InkuViewModel) {
                 },
             )
         }
+    }
     }
 }
 
@@ -4229,6 +4280,9 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
+        if (state.refinementBusy && state.refinementSubview == RefinementSubview.Model) {
+            RunStatusRow(state, viewModel)
+        }
         RefinementProgressLanes(
             lanes = refinementProgressLanes(
                 candidateCount = state.refinementPlannedCount,

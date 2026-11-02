@@ -178,7 +178,7 @@ private fun built(answer: JSONObject, mode: String, answerLimit: Int): ChatGptRe
  * event and the answer to their limits and reads the events in order, so the
  * answer is the one an incremental reader gave however the bytes came.
  */
-internal class ChatGptStream(private val request: ChatGptRequest) {
+internal class ChatGptStream(private val request: ChatGptRequest, private val onReceivedBytes: ((Long) -> Unit)? = null) {
     private val wire = ByteArrayOutputStream()
     var usage: JSONObject? = null
         private set
@@ -186,6 +186,7 @@ internal class ChatGptStream(private val request: ChatGptRequest) {
     fun feed(chunk: ByteArray) {
         if (wire.size().toLong() + chunk.size > request.wireLimit) throw ChatGptException("chatgpt_response_too_large")
         wire.write(chunk)
+        runCatching { onReceivedBytes?.invoke(wire.size().toLong()) }
     }
 
     fun finish(): String {

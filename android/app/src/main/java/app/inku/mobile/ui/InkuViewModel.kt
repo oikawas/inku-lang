@@ -211,6 +211,7 @@ data class InkuUiState(
     val batchPromptHistory: List<String> = emptyList(),
     val batchTotal: Int = 0,
     val batchCurrent: Int = 0,
+    val batchStartedAt: Long? = null,
     val batchSuccess: Int = 0,
     val batchFailures: List<BatchFailure> = emptyList(),
     val batchActiveLine: Int? = null,
@@ -340,6 +341,7 @@ data class InkuUiState(
     val refinementPlannedCount: Int = 0,
     val refinementRoundStartCount: Int = 0,
     val refinementBusy: Boolean = false,
+    val refinementRunningModel: String? = null,
     // 「開始3秒後から共通デザインの停止ボタンでAPI要求を中断できる」.
     val refinementCanAbort: Boolean = false,
     val refinementStatus: String? = null,
@@ -624,6 +626,7 @@ class InkuViewModel @JvmOverloads constructor(
 
     /** The model call the running drawing waits on; the running row shows it. */
     val providerAttempt: StateFlow<ProviderAttempt?> = repository.providerAttempt
+    val runProgress = repository.runProgress
 
     init {
         viewModelScope.launch {
@@ -3153,6 +3156,7 @@ class InkuViewModel @JvmOverloads constructor(
             localState.value = localState.value.copy(
                 isDrawing = true,
                 batchTotal = snapshot.lines.size,
+                batchStartedAt = System.currentTimeMillis(),
                 batchCurrent = 0,
                 batchSuccess = success,
                 batchFailures = emptyList(),
@@ -3834,6 +3838,9 @@ class InkuViewModel @JvmOverloads constructor(
                 )
                 jobs.forEach { job ->
                     try {
+                        if (current.refinementSubview == RefinementSubview.Model) {
+                            localState.value = localState.value.copy(refinementRunningModel = job.label)
+                        }
                         val started = System.currentTimeMillis()
                         val (plan, result) = withContext(Dispatchers.IO) {
                             job.render?.invoke() ?: (job.plan to repository.renderRefinementCandidate(parent, job.plan))
@@ -3893,7 +3900,7 @@ class InkuViewModel @JvmOverloads constructor(
                 }
             }
             abortTimer.cancel()
-            localState.value = localState.value.copy(refinementBusy = false, refinementCanAbort = false)
+            localState.value = localState.value.copy(refinementBusy = false, refinementCanAbort = false, refinementRunningModel = null)
         }
         refinementJob = run
         run.invokeOnCompletion { cause ->

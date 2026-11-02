@@ -18,7 +18,7 @@
 	import { getMascot } from '$lib/mascot.svelte';
 	import { providerAttemptText, type ProviderAttemptCount } from '$lib/paintStream';
 	import type { PaintProgressEvent } from '$lib/paintStream';
-	import { finishedText, localWork, tokenCount } from '$lib/runProgress';
+	import { currentWork, finishedText, tokenCount } from '$lib/runProgress';
 
 	type Props = {
 		label: string;
@@ -102,7 +102,7 @@
 					{#if tokens}<span class="run-stage-tokens">{t().runStatusStageTokens(tokenCount(tokens.input_tokens), tokenCount(tokens.output_tokens))}</span>{/if}
 				</span>
 			{/each}
-			<span class="run-label">… {progress.run_progress.current?.kind === 'local' ? localWork(progress.run_progress.current.action, t()) : label}</span>
+			<span class="run-label">… {currentWork(progress.run_progress.current, label, attempt, t())}</span>
 		{:else}
 			<span class="run-label">{label}</span>
 			{#if modelLine}<span class="run-model">{modelLine}</span>{/if}

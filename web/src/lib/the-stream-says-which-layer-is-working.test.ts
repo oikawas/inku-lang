@@ -11,7 +11,7 @@ import { ja } from './i18n/ja.ts';
 import { en } from './i18n/en.ts';
 import type { LangPack } from './i18n/types.ts';
 import { paintStageHandlers, paintStageLabel, providerAttemptText, readPaintStream, runningStageLabel } from './paintStream.ts';
-import { finishedText, localWork, stageName, tokenCount } from './runProgress.ts';
+import { currentWork, finishedText, localWork, stageName, tokenCount } from './runProgress.ts';
 
 const DONE = { event: 'done', ddl: '黒い円を中心に置く。', svg: '<svg/>' };
 
@@ -27,6 +27,18 @@ const streamFromBytes = (chunks: Uint8Array[]) =>
 	}));
 
 const describeError = (detail: unknown, status: number) => `HTTP ${status}: ${String(detail)}`;
+
+test('the progress log names its current action without relying on the fallback label', () => {
+	for (const strings of [ja, en]) {
+		assert.equal(currentWork({ kind: 'provider', action: 'read_description' }, 'DDL', null, strings), strings.readDrawReading);
+		assert.equal(currentWork({ kind: 'provider', action: 'select_description_catalog' }, 'DDL', null, strings), `${strings.runStageCatalog}…`);
+		const retry = { action: 'write_description_ddl', attempt: 2, max_attempts: 4, asked_again: true };
+		assert.equal(currentWork({ kind: 'provider', action: 'write_description_ddl' }, 'DDL', retry, strings), strings.readDrawRevising);
+		assert.equal(currentWork({ kind: 'provider', action: 'compose_description' }, 'DDL', retry, strings), strings.readDrawComposing);
+		assert.equal(currentWork({ kind: 'local', action: 'render' }, 'DDL', null, strings), strings.runLocalRender);
+		assert.equal(currentWork(null, 'DDL', null, strings), 'DDL');
+	}
+});
 
 test('progress events reach the indicator with localized details and token counts', async () => {
 	const progress = { event: 'progress', run_progress: { current: { kind: 'local', action: 'draw_image_review' }, finished: [

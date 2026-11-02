@@ -20,7 +20,7 @@
 	import { generationInfoSettings } from './generation-info-settings.svelte';
 	import { tokenStageLabel, tokenStageRows, type ProviderUsage } from './generation-info-tokens';
 	import { offerName, offerReason, offerStage, type PluginOfferRecord } from './plugin-offers';
-	import { catalogReadingDetails, type CatalogReading } from './catalog-reading';
+	import { catalogReadingDetails, catalogReadingForWork, type CatalogReading } from './catalog-reading';
 
 	export type GenerationInfoWork = {
 		plugin_offers?: PluginOfferRecord[] | null;
@@ -206,7 +206,7 @@
 	// Read and draw (SPEC 12.6.7): the reading, what its anchor check dropped,
 	// each answer the run read, and whether the drawing was seen.
 	const detailReadRecord = $derived(statusHistoryItem?.description_ddl ?? result?.description_ddl ?? null);
-	const catalogReading = $derived(statusHistoryItem?.catalog_reading ?? result?.catalog_reading ?? null);
+	const catalogReading = $derived(catalogReadingForWork(statusHistoryItem, result));
 	const catalogReadingInfo = $derived(catalogReading ? catalogReadingDetails(catalogReading, isJapanese) : null);
 	const detailPluginOffers = $derived(statusHistoryItem?.plugin_offers ?? result?.plugin_offers ?? null);
 	const detailReadDropped = $derived(droppedReadingLines(detailReadRecord));

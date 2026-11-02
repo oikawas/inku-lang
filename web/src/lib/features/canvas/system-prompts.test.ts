@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { loadSystemPrompts } from './system-prompts';
-import { catalogReadingDetails } from './catalog-reading.ts';
+import { catalogReadingDetails, catalogReadingForWork } from './catalog-reading.ts';
 
 const sent = {
 	system: 'work planner…',
@@ -109,6 +109,8 @@ test('color reading precedes choice and old works retain their existing stages',
 });
 
 test('catalog reading describes model, seed, fallback and dropped counts in both languages', () => {
+	assert.equal(catalogReadingForWork({}, { catalog_reading: { method: 'model' } }), null);
+	assert.deepEqual(catalogReadingForWork(null, { catalog_reading: { method: 'seed' } }), { method: 'seed' });
 	assert.equal(catalogReadingDetails({ method: 'model', reading_text: '明るい', dropped_axes: 1, dropped_colors: 2 }, true).dropped, '記述に無いため落とした項目：軸 1・色 2');
 	assert.equal(catalogReadingDetails({ method: 'model' }, false).method, 'Chosen from the light and color reading');
 	assert.equal(catalogReadingDetails({ method: 'seed' }, true).method, '読めるものが無く、実行の種で選んだ');

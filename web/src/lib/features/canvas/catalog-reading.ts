@@ -5,6 +5,10 @@ export type CatalogReading = {
 	dropped_colors?: number;
 };
 
+export function catalogReadingForWork(saved: { catalog_reading?: CatalogReading | null } | null, result: { catalog_reading?: CatalogReading | null } | null): CatalogReading | null {
+	return saved ? saved.catalog_reading ?? null : result?.catalog_reading ?? null;
+}
+
 export function catalogReadingDetails(record: CatalogReading, isJapanese: boolean): { method: string; text: string; dropped: string | null } {
 	const axes = record.dropped_axes ?? 0;
 	const colors = record.dropped_colors ?? 0;

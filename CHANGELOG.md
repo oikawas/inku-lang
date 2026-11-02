@@ -14,8 +14,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 - macOS: show completed drawing stages, per-stage tokens and totals as a journal.
 
-- Server and Web: show drawing progress as a growing stage log with per-action token counts and a final total; retries count toward their action.
-
 - macOS: show drawing failure reasons in the Web wording, with the cause and attempt count for the corresponding stage.
 
 - macOS: restore the “Build N” tooltip and update the tooltip parity markers and counts.
@@ -550,6 +548,11 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.303 (2026-11-02 / Build 1379)
+
+- Server: allow 300 seconds per attempt and 540 seconds total for reading, composition, laws and colors, and log fallback events.
+- Web: emphasize the current drawing stage, align totals to the right, and show batch position and elapsed time.
 
 ## v2.15.302 (2026-11-02 / Build 1378)
 

@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Core: the reader, composition and drawer for drawing in words bring underlying intent in poetry and other descriptions into the picture through paired things, traces and faint images; places without things use a background color suited to time, light and place.
+
 - Android: show finished stages, current work, tokens and received bytes as a drawing journal, with the batch line and elapsed time above it.
 
 - Web and Server: choose among seven composition forms in refinement, draw one or four candidates, and save selected executions as children with their reading and composition records.

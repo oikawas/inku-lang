@@ -1373,9 +1373,9 @@ mod tests {
                 "73ba5928cb248d50694a7dd183f273c1f878bcc7018a034a16888c068048ed53",
             ],
             [
-                "be11a2d4d2f2c5712fd40de24a83d60077a212b05934bd8e10c6663bcae32c92",
+                "f1ca35ac50e85c49fd9318a5c07cd68caf27beb539d2aab554943db7251da09a",
                 "50b52d6b19f33a7f20ce1a119eb67744bbcaddc80f9b3d9d76277c3aae319afc",
-                "c622a91fc67a79dff4fd7047fde6a068edc6378e17569c64f91a244c93aaa3ab",
+                "d54256be1ed17ac9c3dab3c80e06845c51ca8e2dbc80d6c7bf9ac4e55e01fde1",
             ],
             [
                 "9890fe4284ca16533bd5045b353105bca1c22ef042c31e7be11bfddb3b2278a0",
@@ -1383,9 +1383,9 @@ mod tests {
                 "4921a59d2c012a8aaebfc206b9e2c8712c8c848201cc89cc710b6472a6ae3934",
             ],
             [
-                "fe569f24019211b7fe44ce2e2e1e4df9ffb6eec3b93286154bea090d57d76dad",
+                "dbb30ee5952bb3cae5f36fdde7092ab8a201040d237f0b4ec6d73994757f641d",
                 "332401119613fd6bd84bf793aea2eb9cd53f598bcfbc964ab46f556cafce8feb",
-                "9b9c0a2214f3822580342f229b501daf91f891587b79fbd191ad8b08c99d3a40",
+                "12ef15c07e0c2e6beeff4c980cf9bca9f9082d090de77e99e33309009971d2db",
             ],
         ];
         let mut index = 0;
@@ -2009,7 +2009,7 @@ mod tests {
             "{system}"
         );
         assert!(system.contains("# 構図の理論"));
-        assert!(system.contains("11. 記述が名指す物と、読みの核の像の物は"));
+        assert!(system.contains("11. 記述が名指す物と、読みの核の像の物と、読みの託す物（correlative）・余白（absence）の項目が書く物は"));
         assert!(!system.contains("# response_schema"));
         assert!(message(&state).get("reading").is_some());
 

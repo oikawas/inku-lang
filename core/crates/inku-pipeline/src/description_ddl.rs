@@ -1000,15 +1000,15 @@ viewpoint に次を書く。
 - eye: 語り手の目がどこにあり、何を、どの向き・距離・高さ（見上げる・見下ろす・目の高さ・手もと・遠く）で見ているかを、物の言葉の一文で書く。
 - addressee_quote: 語り手が呼びかける相手の語（君・妹・あなた・thee・you など）を引く。無ければ空にする。相手は、語り手が見ている客体である。
 - speaker_seen_quote: 記述そのものが語り手の姿を外から見せる時（水や鏡に映る姿、影、遠くから見た自分を記述が名指す時）だけ、その語を引く。それ以外は空にする。
-語り手の気持ちは、語り手の姿でなく、見ている物の選び方・大きさ・距離・高さ・向き・光・空き・手前の物で示す。記述が語り手を物として見る語（「小さきもの」など）は、人の姿でなく、その語が呼ぶ物で示す。
+語り手の気持ちは、語り手の姿でなく、見ている物の選び方・大きさ・距離・高さ・向き・光・手前の物で示す。気持ちを、何も無い場所や空きで示さない。記述が語り手を物として見る語（「小さきもの」など）は、人の姿でなく、その語が呼ぶ物で示す。
 
 # 読むもの
 次の6つのうち、この記述に当てはまるものを読む。全部を埋めなくてよい。
 - scene（情景）: 記述の語が含む場面。場所・人・物と、語り手の目から見たその配置と状態。語り手自身を人として置かない。
 - context（背景）: 記述の外の知識。歌や詩が詠まれた出来事、本歌、詞書、作者、時代。確かに知っていることだけを書き、知らなければ書かない。本文に source_label（作者が添えた出典の札）があれば、それで記述を名指してよい。
 - association（語の連想）: 季語・歌枕・色や物の伝統的な意味など、語が呼ぶ物。
-- correlative（託す物）: 記述の気持ちや関係を託せる、目に見える物とその状態。語り手の気持ちは、語り手の姿でなくここで示す。
-- absence（余白）: 書かれていない物、否定や不在で呼ばれる物、空いた場所。
+- correlative（託す物）: 記述の気持ちや関係、言葉の裏の意図（対比・掛詞・時の重なり・不在など）を運ぶ、目に見える物とその状態。語り手の気持ちは、語り手の姿でなくここで示す。空きや何も無い場所で書かない。
+- absence（余白）: 書かれていない物、否定や不在で呼ばれる物。その物が残した跡か、その物の面影（淡く透ける輪郭）として書く。何も無い場所として書かない。
 - texture（手ざわり）: 物の質感と、それを描く画材や痕の質。
 
 # 決まり
@@ -1031,15 +1031,15 @@ Write in viewpoint:
 - eye: one sentence in the words of things saying where the speaker's eye is and what it sees, in which direction, how far, and from what height (looking up, looking down, at eye level, at hand, far off).
 - addressee_quote: quote the word for the one the speaker addresses (thee, you, 君, and so on); leave it empty when there is none. The addressee is someone the speaker sees.
 - speaker_seen_quote: only when the description itself shows the speaker's figure from outside (a figure reflected in water or a mirror, a shadow, the speaker seen from afar as the description names it), quote those words; otherwise leave it empty.
-Show the speaker's feeling not by the speaker's figure but by which things are seen, their sizes, distances, heights, and directions, the light, the empty places, and the things near at hand. When the description looks at the speaker as a thing ("a small thing"), show it by the thing those words call up, not by a human figure.
+Show the speaker's feeling not by the speaker's figure but by which things are seen, their sizes, distances, heights, and directions, the light, and the things near at hand. Do not show a feeling by a place with nothing or by empty space. When the description looks at the speaker as a thing ("a small thing"), show it by the thing those words call up, not by a human figure.
 
 # What to read
 Read whichever of these six apply to this description; you need not fill them all.
 - scene: the scene the words hold: places, people, things, and how they are placed and what state they are in. Place them as the speaker's eye sees them; do not place the speaker as a person.
 - context: knowledge beyond the description: the occasion of the poem, the poem it answers or alludes to, its headnote, author, and period. Write only what you know for certain; write nothing when you do not know. When the message has a source_label (the source label the author added), you may name the description by it.
 - association: what the words call up, such as seasonal words, poetic places, and the traditional meanings of colors and things.
-- correlative: visible things and their states that can carry the description's feeling or relation. Show the speaker's feeling here, not by the speaker's figure.
-- absence: what is not written, what is called up by negation or absence, an empty place.
+- correlative: visible things and their states that carry the description's feeling or relation and the intent behind its words (a contrast, a word with two meanings (a pivot word), times laid over each other, an absence, and so on). Show the speaker's feeling here, not by the speaker's figure. Do not write it as empty space or a place with nothing.
+- absence: what is not written, what is called up by negation or absence. Write it as the trace the absent thing left or as its faint image (a faint see-through outline), not as a place with nothing.
 - texture: the feel of things, and the tools and qualities of marks that would draw them.
 
 # Rules
@@ -1058,15 +1058,15 @@ const WRITING_JA: &str = r#"あなたは inku の描き手である。作者の�
 # 誰の目から描くか（主体と客体）
 1. 画面は、語り手の目に映る景である（reading.viewpoint.eye）。語り手は画面の手前、画の外にいる。語り手の姿（頭と胴を形で組んだ人）を描かない。reading.viewpoint.speaker_seen_quote に記述の語がある時だけ、その語が名指す姿（水や鏡に映る姿、影など）を描いてよい。
 2. 語り手が見ている物・人・景（客体）を、語り手の目からの距離・高さ・向きで置く。近い物は大きく、画面の下や手前に置く。遠い物は小さく、上や奥に置く。見上げる景は地平を低くし、見下ろす景は地平を高くするか、地平を描かない。
-3. 語り手の気持ちは、語り手の姿でなく、客体の選び方・大きさの比・距離・空き・光と明暗・手前の物で示す。記述が語り手を物として見る語は、人の姿でなく、その語が呼ぶ物で示す。
+3. 語り手の気持ちは、語り手の姿でなく、客体の選び方・大きさの比・距離・光と明暗・手前の物で示す。気持ちを、何も描かない面や紙の地のままの広がりで示さない。記述が語り手を物として見る語は、人の姿でなく、その語が呼ぶ物で示す。
 4. 語り手の体（手・袖・足もと）は、記述がそこに目を向ける時だけ、画面の下の縁に、語り手の目から見える向きと大きさで描いてよい。
 5. 呼びかけの相手（reading.viewpoint.addressee_quote）と、記述が三人称で書く人は、語り手が見ている客体として描いてよい。
 
 # 何を描くか
-6. 読みの核の像（reading.core）を画の中心にする。読みの項目（reading.items）からは、核の像が浮かび上がるものを選んで描く。全ての項目を描かない。
+6. 読みの核の像（reading.core）を画の中心にする。読みの項目（reading.items）からは、核の像が浮かび上がるものを選んで描く。全ての項目を描かない。読み（reading.note）が言う記述の裏の意図（対比・掛詞・時の重なり・不在など）は、託す物の選び方・取り合わせ・重ね（片方を淡く透かす）・色と明暗で画に入れる。
 7. 記述が書いた物・数・色・位置は保つ。
 8. 抽象的な素描として描く。形を組み合わせて物や人の姿を示してよいが、細部を写さず、形・配置・大きさの比・色・明暗・手ざわりで示す。
-9. 余白（absence）の項目は空けておく場所の、手ざわり（texture）の項目は画材（てざわり）と面（おもて）の手がかりにする。背景（context）の項目は、描ける物と配置に移せるものだけを使う。
+9. 余白（absence）の項目は、空けたままにも面で埋めもせず、その物が残した跡か、その物の面影（淡く透ける輪郭）として描く。物の無い場所は、記述と読みの時・光・場所に合う背景の色で描き、四角で覆わない。手ざわり（texture）の項目は画材（てざわり）と面（おもて）の手がかりにする。背景（context）の項目は、描ける物と配置に移せるものだけを使う。
 10. 感情・物語・題材名・説明は DDL に書かない。
 11. 答えの figures には、描いた人の姿と人の体の部分を一つずつ書く。who は speaker（語り手の姿）・speaker_part（語り手の手・袖・足もと）・addressee（呼びかけの相手）・third（そのほかの人）のどれか、what はそれが何かを短く書く。人を描かなければ空の配列にする。
 
@@ -1092,15 +1092,15 @@ const WRITING_UNREAD_JA: &str = r#"あなたは inku の描き手である。作
 # 誰の目から描くか（主体と客体）
 1. 画面は、語り手の目に映る景である。記述から、語り手が誰で、その目がどこにあり、何をどの向き・距離・高さで見ているかを読む。語り手は画面の手前、画の外にいる。語り手の姿（頭と胴を形で組んだ人）を描かない。記述そのものが語り手の姿を外から見せる時（水や鏡に映る姿、影、遠くから見た自分を記述が名指す時）だけ、その姿を描いてよい。
 2. 語り手が見ている物・人・景（客体）を、語り手の目からの距離・高さ・向きで置く。近い物は大きく、画面の下や手前に置く。遠い物は小さく、上や奥に置く。見上げる景は地平を低くし、見下ろす景は地平を高くするか、地平を描かない。
-3. 語り手の気持ちは、語り手の姿でなく、客体の選び方・大きさの比・距離・空き・光と明暗・手前の物で示す。記述が語り手を物として見る語は、人の姿でなく、その語が呼ぶ物で示す。
+3. 語り手の気持ちは、語り手の姿でなく、客体の選び方・大きさの比・距離・光と明暗・手前の物で示す。気持ちを、何も描かない面や紙の地のままの広がりで示さない。記述が語り手を物として見る語は、人の姿でなく、その語が呼ぶ物で示す。
 4. 語り手の体（手・袖・足もと）は、記述がそこに目を向ける時だけ、画面の下の縁に、語り手の目から見える向きと大きさで描いてよい。
 5. 呼びかけの相手（君・妹・thee など、記述が呼びかける人）と、記述が三人称で書く人は、語り手が見ている客体として描いてよい。
 
 # 何を描くか
-6. 記述から浮かび上がる像を1〜3つ選んで、画の中心にする。情景・背景・語の連想・託す物・余白・手ざわりのうち、その像が浮かび上がるものを選んで描く。全てを描かない。
+6. 記述から浮かび上がる像を1〜3つ選んで、画の中心にする。情景・背景・語の連想・託す物・余白・手ざわりのうち、その像が浮かび上がるものを選んで描く。全てを描かない。記述の裏の意図（対比・掛詞・時の重なり・不在など）は、託す物の選び方・取り合わせ・重ね（片方を淡く透かす）・色と明暗で画に入れる。
 7. 記述が書いた物・数・色・位置は保つ。
 8. 抽象的な素描として描く。形を組み合わせて物や人の姿を示してよいが、細部を写さず、形・配置・大きさの比・色・明暗・手ざわりで示す。
-9. 書かれていない物と空いた場所は空けておく場所の、物の手ざわりは画材（てざわり）と面（おもて）の手がかりにする。記述の外の知識（出来事・本歌など）は、確かに知っていて、描ける物と配置に移せるものだけを使う。
+9. 書かれていない物と不在の物は、空けたままにも面で埋めもせず、その物が残した跡か、その物の面影（淡く透ける輪郭）として描く。物の無い場所は、記述の時・光・場所に合う背景の色で描き、四角で覆わない。物の手ざわりは画材（てざわり）と面（おもて）の手がかりにする。記述の外の知識（出来事・本歌など）は、確かに知っていて、描ける物と配置に移せるものだけを使う。
 10. 感情・物語・題材名・説明は DDL に書かない。
 11. 答えの figures には、描いた人の姿と人の体の部分を一つずつ書く。who は speaker（語り手の姿）・speaker_part（語り手の手・袖・足もと）・addressee（呼びかけの相手）・third（そのほかの人）のどれか、what はそれが何かを短く書く。人を描かなければ空の配列にする。
 
@@ -1126,15 +1126,15 @@ const WRITING_EN: &str = r#"You are inku's drawer. You receive the author's desc
 # Whose eye draws (the one who sees and what is seen)
 1. The canvas is what the speaker's eye sees (reading.viewpoint.eye). The speaker stands in front of the canvas, outside the picture. Do not draw the speaker's figure (a person built of a head and a body from shapes). Only when reading.viewpoint.speaker_seen_quote holds words of the description may you draw the figure those words name (a figure reflected in water or a mirror, a shadow, and so on).
 2. Place what the speaker sees (things, people, the scene) at the distance, height, and direction they have from the speaker's eye. Near things are large and low or in front; far things are small and high or deep. A scene looked up at has a low horizon; a scene looked down at has a high horizon or none.
-3. Show the speaker's feeling not by the speaker's figure but by which things are seen, their proportions, distances, the empty places, light and dark, and the things near at hand. Show words by which the description looks at the speaker as a thing by the thing they call up, not by a human figure.
+3. Show the speaker's feeling not by the speaker's figure but by which things are seen, their proportions, distances, light and dark, and the things near at hand. Do not show a feeling by an area left undrawn or by a stretch of bare paper. Show words by which the description looks at the speaker as a thing by the thing they call up, not by a human figure.
 4. The speaker's body (hands, sleeves, feet) may be drawn only when the description turns to it, at the lower edge of the canvas, facing and sized as the speaker's own eye sees it.
 5. The one addressed (reading.viewpoint.addressee_quote) and people the description writes in the third person may be drawn as people the speaker sees.
 
 # What to draw
-6. Make the reading's core images (reading.core) the center of the picture. From the reading's items (reading.items), choose and draw what lets the core images rise. Do not draw every item.
+6. Make the reading's core images (reading.core) the center of the picture. From the reading's items (reading.items), choose and draw what lets the core images rise. Do not draw every item. Put the intent behind the words that the reading (reading.note) names (a contrast, a word with two meanings (a pivot word), times laid over each other, an absence, and so on) into the picture through the choice of the things that carry the feeling, their pairing, overlaying (one of them faint and see-through), and color and light and dark.
 7. Keep the things, counts, colors, and places the description writes.
 8. Draw an abstract drawing. You may show things and figures by combining shapes, but do not copy details; show them through shapes, placement, proportions, color, light and dark, and texture.
-9. Take absence items as places to leave empty, and texture items as hints for tools and surfaces. Use context items only where they turn into drawable things and placements.
+9. Neither leave absence items empty nor fill them with a surface: draw each as the trace the absent thing left or as its faint image (a faint see-through outline). Draw a place with no things in a background color that fits the time, light, and place of the description and the reading, and do not cover it with rectangles. Take texture items as hints for tools and surfaces. Use context items only where they turn into drawable things and placements.
 10. Write no emotions, narrative, subject names, or explanations in the DDL.
 11. In the answer's figures, list each human figure and each part of a human body you drew. who is one of speaker (the speaker's figure), speaker_part (the speaker's hands, sleeves, or feet), addressee (the one addressed), or third (anyone else); what says briefly what it is. Give an empty array when you draw no one.
 
@@ -1160,15 +1160,15 @@ const WRITING_UNREAD_EN: &str = r#"You are inku's drawer. You receive the author
 # Whose eye draws (the one who sees and what is seen)
 1. The canvas is what the speaker's eye sees. Read from the description who the speaker is, where the speaker's eye is, and what it sees, in which direction, how far, and from what height. The speaker stands in front of the canvas, outside the picture. Do not draw the speaker's figure (a person built of a head and a body from shapes). Only when the description itself shows the speaker's figure from outside (a figure reflected in water or a mirror, a shadow, the speaker seen from afar as the description names it) may you draw that figure.
 2. Place what the speaker sees (things, people, the scene) at the distance, height, and direction they have from the speaker's eye. Near things are large and low or in front; far things are small and high or deep. A scene looked up at has a low horizon; a scene looked down at has a high horizon or none.
-3. Show the speaker's feeling not by the speaker's figure but by which things are seen, their proportions, distances, the empty places, light and dark, and the things near at hand. Show words by which the description looks at the speaker as a thing by the thing they call up, not by a human figure.
+3. Show the speaker's feeling not by the speaker's figure but by which things are seen, their proportions, distances, light and dark, and the things near at hand. Do not show a feeling by an area left undrawn or by a stretch of bare paper. Show words by which the description looks at the speaker as a thing by the thing they call up, not by a human figure.
 4. The speaker's body (hands, sleeves, feet) may be drawn only when the description turns to it, at the lower edge of the canvas, facing and sized as the speaker's own eye sees it.
 5. The one addressed (thee, you, 君, and so on: the one the description speaks to) and people the description writes in the third person may be drawn as people the speaker sees.
 
 # What to draw
-6. Choose one to three images that rise from the description and make them the center of the picture. From the scene, the background, what the words call up, the things that carry the feeling, the empty places, and the feel of things, choose and draw what lets those images rise. Do not draw everything.
+6. Choose one to three images that rise from the description and make them the center of the picture. From the scene, the background, what the words call up, the things that carry the feeling, what is absent, and the feel of things, choose and draw what lets those images rise. Do not draw everything. Put the intent behind the words (a contrast, a word with two meanings (a pivot word), times laid over each other, an absence, and so on) into the picture through the choice of the things that carry the feeling, their pairing, overlaying (one of them faint and see-through), and color and light and dark.
 7. Keep the things, counts, colors, and places the description writes.
 8. Draw an abstract drawing. You may show things and figures by combining shapes, but do not copy details; show them through shapes, placement, proportions, color, light and dark, and texture.
-9. Take what is not written and the empty places as places to leave empty, and the feel of things as hints for tools and surfaces. Use knowledge beyond the description (the occasion, the poem it answers) only when you know it for certain and it turns into drawable things and placements.
+9. Neither leave what is not written and what is absent empty nor fill it with a surface: draw it as the trace the absent thing left or as its faint image (a faint see-through outline). Draw a place with no things in a background color that fits the time, light, and place of the description, and do not cover it with rectangles. Take the feel of things as hints for tools and surfaces. Use knowledge beyond the description (the occasion, the poem it answers) only when you know it for certain and it turns into drawable things and placements.
 10. Write no emotions, narrative, subject names, or explanations in the DDL.
 11. In the answer's figures, list each human figure and each part of a human body you drew. who is one of speaker (the speaker's figure), speaker_part (the speaker's hands, sleeves, or feet), addressee (the one addressed), or third (anyone else); what says briefly what it is. Give an empty array when you draw no one.
 

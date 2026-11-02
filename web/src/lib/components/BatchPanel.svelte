@@ -6,6 +6,7 @@
 	import PaintButton from './PaintButton.svelte';
 	import RunStatus from './RunStatus.svelte';
 	import BatchRunSummary from './BatchRunSummary.svelte';
+	import { tokenCount } from '$lib/runProgress';
 	import type { ProviderAttemptCount } from '$lib/paintStream';
 
 	type BatchFailure = {
@@ -35,6 +36,8 @@
 		batchSummaryCurrent: number;
 		batchSummaryTotal: number;
 		batchStartedAt: number;
+		batchWorkStartedAt: number | null;
+		batchAverageWorkMs: number | null;
 		batchRetryRound: number;
 		runTokensIn: number | null;
 		runTokensOut: number | null;
@@ -97,6 +100,8 @@
 		batchSummaryCurrent,
 		batchSummaryTotal,
 		batchStartedAt,
+		batchWorkStartedAt,
+		batchAverageWorkMs,
 		batchRetryRound,
 		runTokensIn,
 		runTokensOut,
@@ -172,9 +177,10 @@
 		if (!batchResuming) void onSubmit();
 	}
 
-	function tokenPair(input: number | null, output: number | null): string {
-		return `${input ?? '-'}→${output ?? '-'}tok`;
-	}
+	const workElapsedMs = $derived.by(() => {
+		void liveMs;
+		return batchWorkStartedAt === null ? 0 : Math.max(0, Date.now() - batchWorkStartedAt);
+	});
 </script>
 
 <svelte:window
@@ -310,7 +316,7 @@
 
 {#if batchRunning && batchTotal > 0}
 	<div class="batch-progress-wrap">
-		<BatchRunSummary current={batchSummaryCurrent} total={batchSummaryTotal} startedAt={batchStartedAt} />
+		<BatchRunSummary current={batchSummaryCurrent} total={batchSummaryTotal} startedAt={batchStartedAt} averageWorkMs={batchAverageWorkMs} />
 		<RunStatus
 			label={batchWaitingLine !== null
 				? t().batchWaitingForServer(batchWaitingLine)
@@ -319,7 +325,7 @@
 					: t().batchProgress(batchCurrent, batchTotal)}
 			stage1Model={stage1ModelLabel}
 			stage2Model={stage2ModelLabel}
-			elapsedMs={liveMs}
+			elapsedMs={workElapsedMs}
 			tokensIn={batchTokensInTotal || runTokensIn}
 			tokensOut={batchTokensOutTotal || runTokensOut}
 			attempt={runAttempt}
@@ -359,7 +365,7 @@
 				<!-- The line the instructions below came from, not the one being
 				     painted: the two differ for the length of every line. -->
 				{#if batchObservedLine !== null}<span>{t().batchActiveLine(batchObservedLine)}</span>{/if}
-				<span><span class="batch-metric-label">{t().statsTokens}</span>{tokenPair(batchActiveTokensIn, batchActiveTokensOut)}</span>
+				<span>{t().runStatusTokens(tokenCount(batchActiveTokensIn), tokenCount(batchActiveTokensOut))}</span>
 			</div>
 		</div>
 		<div class="batch-observe-body">{@html batchActiveDdlHighlighted}</div>
@@ -611,13 +617,6 @@
 		word-break: break-word;
 	}
 	.batch-progress-wrap { margin-top: 8px; }
-	.batch-metric-label {
-		display: inline-block;
-		min-width: 3.9em;
-		margin-right: 5px;
-		color: var(--fg3);
-		font-variant-numeric: normal;
-	}
 	.error-text { color: var(--danger); font-size: var(--ui-font-size-12); white-space: pre-line; }
 	.batch-summary {
 		margin-top: 8px;

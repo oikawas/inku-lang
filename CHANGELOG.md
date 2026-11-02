@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Web: show per-work elapsed time and the average completed-work time in batches, label token counts and wrap long status details.
+
 - Server and CLI: show running autonomous refinements in activity and identify their child executions in the responding process.
 
 - Android: pass the drawing seed to automatic color catalog selection from a description and retain the reading, selection method, and sent prompts with the work.

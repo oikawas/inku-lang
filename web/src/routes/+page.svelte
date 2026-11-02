@@ -2849,6 +2849,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						batchSummaryCurrent={batch.summaryCurrent}
 						batchSummaryTotal={batch.summaryTotal}
 						batchStartedAt={batch.startedAt}
+						batchWorkStartedAt={batch.workStartedAt}
+						batchAverageWorkMs={batch.averageWorkMs}
 						batchRetryRound={batch.retryRound}
 						batchActiveTokensIn={batch.activeTokensIn}
 						batchActiveTokensOut={batch.activeTokensOut}

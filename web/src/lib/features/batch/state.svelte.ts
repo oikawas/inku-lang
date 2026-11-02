@@ -139,6 +139,10 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 	resume = $state<BatchResumeCandidate<TWork> | null>(null);
 	running = $state(false);
 	startedAt = $state(0);
+	workStartedAt = $state<number | null>(null);
+	averageWorkMs = $state<number | null>(null);
+	private workDurationTotal = 0;
+	private workDurationCount = 0;
 	/** Original plan size; current/total continue to describe the active retry round. */
 	summaryTotal = $state(0);
 	interrupted = $state(false);
@@ -509,6 +513,7 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 
 		/** true = painted, string = failure message, null = interrupted or stale. */
 		const paintBatchLine = async (item: NumberedLine): Promise<true | string | null> => {
+			this.workStartedAt = null;
 			// A connection a restart of the Server cut is not the line's failure: wait
 			// for the Server, and send the line again unless it was saved before the cut.
 			for (let cuts = 1; ; cuts += 1) {
@@ -537,6 +542,7 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 				if (savedWork) {
 					this.markSnapshotCompleted(snapshot, item);
 					this.success += 1;
+					this.recordWorkDuration(savedWork.at);
 					try {
 						await options.refreshAfterServerSave();
 					} catch (cause) {
@@ -560,6 +566,7 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 						return new ConnectionFailure('unreachable', cause instanceof Error ? cause.message : String(cause), { cause });
 					}
 				}
+				if (this.workStartedAt === null) this.workStartedAt = (this.deps.now ?? Date.now)();
 				const painted = await options.paintLine(item.input, {
 					historyInput: `#${item.line} ${item.input}`,
 					sourceText: item.input,
@@ -575,6 +582,7 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 				saved = true;
 				this.markSnapshotCompleted(snapshot, item);
 				this.success += 1;
+				this.recordWorkDuration();
 
 				// These observer quantities settle together and always describe one work.
 				this.observedLine = item.line;
@@ -717,6 +725,10 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 	}
 
 	private resetForRun(): void {
+		this.workStartedAt = null;
+		this.averageWorkMs = null;
+		this.workDurationTotal = 0;
+		this.workDurationCount = 0;
 		this.current = 0;
 		this.interrupted = false;
 		this.total = 0;
@@ -740,6 +752,17 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 		this.waitingForServer = null;
 		this.serverLost = false;
 		this.deps.setFailureReport(null);
+	}
+
+	private recordWorkDuration(savedAt?: number | null): void {
+		if (this.workStartedAt === null) return;
+		const now = (this.deps.now ?? Date.now)();
+		// A recovered work can have been saved while the connection was down.
+		// Use its timestamp only when it fits the client's observed interval.
+		const ended = savedAt != null && savedAt >= this.workStartedAt && savedAt <= now ? savedAt : now;
+		this.workDurationTotal += Math.max(0, ended - this.workStartedAt);
+		this.workDurationCount += 1;
+		this.averageWorkMs = this.workDurationTotal / this.workDurationCount;
 	}
 
 	private emptyConditions(): BatchRunConditions {

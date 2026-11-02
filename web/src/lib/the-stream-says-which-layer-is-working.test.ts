@@ -54,6 +54,19 @@ test('progress events reach the indicator with localized details and token count
 	assert.equal(tokenCount(progress.stage_tokens.compose_description.input_tokens), '7,252');
 });
 
+test('token counts and batch averages carry localized units', () => {
+	assert.equal(ja.runStatusTokens('123', '456'), '入力 123・出力 456 token');
+	assert.equal(en.runStatusTokens('123', '456'), 'input 123 · output 456 tokens');
+	assert.equal(ja.runStatusStageTokens('2,419', '273'), '入力 2,419・出力 273 token');
+	assert.equal(en.runStatusStageTokens('2,419', '273'), 'input 2,419 · output 273 tokens');
+	assert.equal(ja.runStatusTotalTokens('18,715', '3,875'), '合計 入力 18,715・出力 3,875 token');
+	assert.equal(en.runStatusTotalTokens('18,715', '3,875'), 'Total input 18,715 · output 3,875 tokens');
+	assert.equal(ja.runStatusPartialTokens('1', '−'), '合計（一部不明）入力 1・出力 − token');
+	assert.equal(en.runStatusPartialTokens('1', '−'), 'Total (partly unknown) input 1 · output − tokens');
+	assert.equal(ja.batchAverageWork('2 分 29 秒'), '1 枚 平均 2 分 29 秒');
+	assert.equal(en.batchAverageWork('2 min 29 s'), 'avg 2 min 29 s per work');
+});
+
 // ---------------------------------------------------------------- T-248
 
 test('T-248  an event this build has no word for is read and dropped', async () => {

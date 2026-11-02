@@ -82,8 +82,8 @@
 	);
 	const tokenText = $derived(
 		t().runStatusTokens(
-			tokensIn === null || tokensIn === undefined ? '-' : String(tokensIn),
-			tokensOut === null || tokensOut === undefined ? '-' : String(tokensOut)
+			tokenCount(tokensIn),
+			tokenCount(tokensOut)
 		)
 	);
 </script>
@@ -190,8 +190,8 @@
 	.run-ellipsis { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.run-stage { display: flex; gap: 8px; min-width: 0; font-size: var(--ui-font-size-11); color: var(--fg3); }
 	.run-stage-tokens { flex: 0 0 auto; margin-left: auto; white-space: nowrap; font-variant-numeric: tabular-nums; }
-	.run-meta-log { flex-wrap: nowrap; white-space: nowrap; }
-	.run-meta-log > span { flex: 0 0 auto; }
+	.run-meta-log { flex-wrap: wrap; min-width: 0; }
+	.run-meta-log > span { flex: 0 1 auto; min-width: 0; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.run-total { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 	.run-status.inline .run-meta {
 		justify-content: flex-end;

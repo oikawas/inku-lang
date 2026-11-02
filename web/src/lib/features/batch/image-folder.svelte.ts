@@ -52,6 +52,8 @@ export class ImageFolderBatch<TFile extends FolderFile = File> {
 	folderName = $state('');
 	running = $state(false);
 	startedAt = $state(0);
+	workStartedAt = $state<number | null>(null);
+	averageWorkMs = $state<number | null>(null);
 	/** The last run was stopped, by the author or by a lost connection. */
 	interrupted = $state(false);
 	current = $state(0);
@@ -141,6 +143,10 @@ export class ImageFolderBatch<TFile extends FolderFile = File> {
 		this.stopRequested = false;
 		this.running = true;
 		this.startedAt = Date.now();
+		this.workStartedAt = null;
+		this.averageWorkMs = null;
+		let workDurationTotal = 0;
+		let workDurationCount = 0;
 		this.interrupted = false;
 		this.stopReason = null;
 		this.success = 0;
@@ -154,7 +160,12 @@ export class ImageFolderBatch<TFile extends FolderFile = File> {
 				this.current = index + 1;
 				this.activePath = relativePathOf(file);
 				try {
+					this.workStartedAt = Date.now();
 					await options.paintPicture(file, abortController.signal);
+					if (!abortController.signal.aborted) {
+						workDurationTotal += Math.max(0, Date.now() - this.workStartedAt);
+						this.averageWorkMs = workDurationTotal / ++workDurationCount;
+					}
 					this.success += 1;
 					save({
 						...record,

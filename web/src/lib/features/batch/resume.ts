@@ -20,6 +20,7 @@ export type NumberedLine = {
  * `$state`, and pulling it in would drag the Svelte compiler into node:test.
  */
 export type BatchWork = {
+	at?: number | null;
 	batch_line_number?: number | null;
 	batch_run_id?: string | null;
 	source_text?: string | null;

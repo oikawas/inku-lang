@@ -36,6 +36,26 @@ function memoryStore(history: ImageFolderRecord[] = []) {
 
 const neverLost = { stopsTheRun: () => false, describe: (cause: unknown) => String(cause) };
 
+test('picture batch times each saved work separately and excludes failures and stops', async (context) => {
+	let clock = 100_000;
+	context.mock.method(Date, 'now', () => clock);
+	const { store } = memoryStore();
+	const folder = new ImageFolderBatch<FolderFile>(store);
+	folder.pick([file('f/1.jpg'), file('f/2.jpg'), file('f/3.jpg')]);
+	await folder.run({ ...neverLost, fromStart: true, paintPicture: async (picture) => {
+		if (picture.name === '1.jpg') { assert.equal(folder.averageWorkMs, null); assert.equal(folder.workStartedAt, 100_000); clock += 10_000; }
+		if (picture.name === '2.jpg') { assert.equal(folder.workStartedAt, 110_000); clock += 100_000; throw new Error('fail'); }
+		if (picture.name === '3.jpg') { assert.equal(folder.workStartedAt, 210_000); assert.equal(folder.averageWorkMs, 10_000); clock += 30_000; }
+	} });
+	assert.equal(folder.averageWorkMs, 20_000);
+	await folder.run({ ...neverLost, fromStart: false, paintPicture: async () => {
+		assert.equal(folder.averageWorkMs, null);
+		folder.stop();
+		clock += 5_000;
+	} });
+	assert.equal(folder.averageWorkMs, null);
+});
+
 test('saved server lines reconcile a disconnected picture batch before retry', () => {
 	const pictures = [file('trip/1.jpg'), file('trip/2.jpg'), file('trip/3.jpg')];
 	const { store } = memoryStore([{ name: 'trip', total: 3, done: [], failures: [], updatedAt: 1,

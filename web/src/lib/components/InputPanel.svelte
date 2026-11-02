@@ -74,6 +74,8 @@
 		batchSummaryCurrent: number;
 		batchSummaryTotal: number;
 		batchStartedAt: number;
+		batchWorkStartedAt: number | null;
+		batchAverageWorkMs: number | null;
 		batchRetryRound: number;
 		batchActiveTokensIn: number | null;
 		batchActiveTokensOut: number | null;
@@ -156,6 +158,8 @@
 		batchSummaryCurrent,
 		batchSummaryTotal,
 		batchStartedAt,
+		batchWorkStartedAt,
+		batchAverageWorkMs,
 		batchRetryRound,
 		batchActiveTokensIn,
 		batchActiveTokensOut,
@@ -493,6 +497,8 @@
 			{batchSummaryCurrent}
 			{batchSummaryTotal}
 			{batchStartedAt}
+			{batchWorkStartedAt}
+			{batchAverageWorkMs}
 			{batchRetryRound}
 			{batchActiveTokensIn}
 			{batchActiveTokensOut}

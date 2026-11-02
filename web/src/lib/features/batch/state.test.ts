@@ -53,6 +53,54 @@ function makeState(
 	return { state, reports };
 }
 
+test('each batch work starts its own clock and a cut connection keeps that start', async () => {
+	let clock = 100_000, secondSends = 0, probes = 0;
+	const state = new BatchState({
+		apiFetch: async (path) => path.startsWith('/api/pipeline/batches') || path === '/api/pipeline/activity'
+			? new Response('', { status: 404 }) : path === '/api/info' && probes++ === 0
+				? new Response('', { status: 503 }) : jsonResponse({ items: [] }),
+		signedIn: () => true, paintable: (text) => !!text.trim(), setFailureReport: () => {},
+		now: () => clock, sleep: async (ms) => { clock += ms; }, createRunId: () => 'run-clock',
+	});
+	state.input = 'first\nsecond';
+	const starts: Array<number | null> = [];
+	await state.run({ canvasAspectId: 'square', maxRetries: 0,
+		paintLine: async (_text, options) => {
+			starts.push(state.workStartedAt);
+			if (options.batchLineNumber === 1) { clock += 10_000; return result(1); }
+			if (++secondSends === 1) { clock += 3_000; throw new ConnectionFailure('cut', 'cut'); }
+			clock += 4_000;
+			return result(2);
+		},
+		onLatestResult: () => {}, refreshAfterServerSave: async () => {}, refreshAfterRun: async () => {},
+	});
+	assert.deepEqual(starts, [100_000, 110_000, 110_000]);
+	assert.equal(state.averageWorkMs, 9_500);
+});
+
+test('batch average uses saved works only and begins empty on each run', async () => {
+	let clock = 100_000;
+	const state = new BatchState({ apiFetch: async (path) => path.startsWith('/api/pipeline/batches')
+		? new Response('', { status: 404 }) : jsonResponse({ items: [] }),
+		signedIn: () => true, paintable: (text) => !!text.trim(), setFailureReport: () => {}, now: () => clock });
+	state.input = 'first\nfail\nlast';
+	await state.run({ canvasAspectId: 'square', maxRetries: 0,
+		paintLine: async (text, options) => {
+			if (text === 'first') { assert.equal(state.averageWorkMs, null); clock += 10_000; }
+			if (text === 'fail') { clock += 100_000; throw new Error('failed'); }
+			if (text === 'last') { assert.equal(state.averageWorkMs, 10_000); clock += 30_000; }
+			return result(options.batchLineNumber!);
+		},
+		onLatestResult: () => {}, refreshAfterServerSave: async () => {}, refreshAfterRun: async () => {},
+	});
+	assert.equal(state.averageWorkMs, 20_000);
+	await state.run({ canvasAspectId: 'square', maxRetries: 0,
+		paintLine: async () => { assert.equal(state.averageWorkMs, null); state.stop(); return result(1); },
+		onLatestResult: () => {}, refreshAfterServerSave: async () => {}, refreshAfterRun: async () => {},
+	});
+	assert.equal(state.averageWorkMs, null);
+});
+
 test('an expired registered batch can resume even before its first saved work, but an active batch cannot', async () => {
 	const record = { run_id: 'recorded-run', kind: 'web', total: 2, completed: 0,
 		state: 'running', prompt: 'first\nsecond', conditions: {
@@ -107,7 +155,7 @@ test('a cut batch waits for its still-running server work before checking histor
 		apiFetch: async (path) => {
 			if (path.startsWith('/api/pipeline/batches')) return new Response('', { status: 404 });
 			if (path === '/api/pipeline/activity') return jsonResponse({ executions: ++checks === 1 ? [{ batch_run_id: 'run-fixed' }] : [] });
-			if (path.startsWith('/api/history')) return jsonResponse({ items: [{ batch_run_id: 'run-fixed', batch_line_number: 1 }] });
+			if (path.startsWith('/api/history')) return jsonResponse({ items: [{ batch_run_id: 'run-fixed', batch_line_number: 1, at: 1000 }] });
 			return jsonResponse({});
 		},
 		signedIn: () => true, paintable: (text) => !!text.trim(), setFailureReport: () => {},
@@ -122,6 +170,7 @@ test('a cut batch waits for its still-running server work before checking histor
 	assert.equal(checks, 2);
 	assert.equal(paints, 1);
 	assert.equal(state.success, 1);
+	assert.equal(state.averageWorkMs, 1000);
 });
 
 test('a resumed batch summary uses the original total and counts pending positions', async () => {

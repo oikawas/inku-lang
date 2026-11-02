@@ -39,6 +39,10 @@
 	const done = $derived(folder.doneCount);
 	const disabled = $derived(busy || !visionModelAvailable || folder.resumeBlocked);
 	const pastFolders = $derived(folder.history.filter((item) => item.name !== folder.folderName || folder.pictures.length === 0));
+	const workElapsedMs = $derived.by(() => {
+		void liveMs;
+		return folder.workStartedAt === null ? 0 : Math.max(0, Date.now() - folder.workStartedAt);
+	});
 
 	function chooseFolder() {
 		if (!folder.running) folderInputEl?.click();
@@ -92,11 +96,11 @@
 
 {#if folder.running}
 	<div class="batch-progress-wrap">
-		<BatchRunSummary current={folder.summaryCurrent} total={folder.summaryTotal} startedAt={folder.startedAt} />
+		<BatchRunSummary current={folder.summaryCurrent} total={folder.summaryTotal} startedAt={folder.startedAt} averageWorkMs={folder.averageWorkMs} />
 		<RunStatus
 			label={`${t().imageFolderProgress(folder.current, folder.total, folder.activePath)}${stageLabel ? ` · ${stageLabel}` : ''}`}
 			stage1Model={visionModelName}
-			elapsedMs={liveMs}
+			elapsedMs={workElapsedMs}
 			tokensIn={runTokensIn}
 			tokensOut={runTokensOut}
 			attempt={runAttempt}

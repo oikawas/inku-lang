@@ -126,7 +126,9 @@ pub fn with_composition_plugins(
     let rule = crate::plugin_offer::rule(prompt.instruction_language);
     let at = prompt.system.len() - rule.len();
     prompt.system.insert_str(at, instruction);
+    let forms = prompt.response_schema["properties"]["form"]["enum"].clone();
     prompt.response_schema = composition_response_schema_for(&words);
+    prompt.response_schema["properties"]["form"]["enum"] = forms;
     let schema =
         serde_json::to_string(&prompt.response_schema).map_err(|_| PromptError::Serialization)?;
     Ok(hash_prompt(prompt, &schema))
@@ -254,7 +256,44 @@ pub fn build_description_composition_prompt(
     language: ResolvedInstructionLanguage,
     limits: PromptLimits,
 ) -> Result<LlmPrompt, PromptError> {
-    let message = description_message(context, language, None);
+    build_description_composition_prompt_with_form(context, language, limits, None)
+}
+
+/// Build the same request with an optional author-selected form.
+pub(crate) fn build_description_composition_prompt_with_form(
+    context: &DescriptionDdlContext<'_>,
+    language: ResolvedInstructionLanguage,
+    limits: PromptLimits,
+    form: Option<&str>,
+) -> Result<LlmPrompt, PromptError> {
+    let mut message = description_message(context, language, None);
+    let mut system = composition_system(language, context.reading.is_some());
+    let mut schema = composition_response_schema();
+    if let Some(form) = form {
+        let mut value: Value =
+            serde_json::from_str(&message).map_err(|_| PromptError::Serialization)?;
+        value["composition_form"] = json!(form);
+        message = value.to_string();
+        let at = index(language);
+        let old = RULES[at]
+            .lines()
+            .find(|line| line.starts_with("2. "))
+            .expect("composition rule 2 exists");
+        let (prefix, fixed) = if at == 0 {
+            (
+                "2. form（画の型）を一つ選ぶ。",
+                "2. form（画の型）は本文の composition_form に決めてある。その型で組む。ほかの型を選ばない。型の意味：",
+            )
+        } else {
+            (
+                "2. Choose one form: ",
+                "2. The form is fixed by composition_form in the message. Compose in that form; do not choose another. What the forms mean: ",
+            )
+        };
+        let replacement = old.replacen(prefix, fixed, 1);
+        system = system.replacen(old, &replacement, 1);
+        schema["properties"]["form"]["enum"] = json!([form]);
+    }
     require_within(
         "description_message",
         message.len(),
@@ -264,9 +303,9 @@ pub fn build_description_composition_prompt(
         DESCRIPTION_COMPOSITION_PROMPT_ID,
         LlmStage::ComposeDescription,
         language,
-        composition_system(language, context.reading.is_some()),
+        system,
         message,
-        composition_response_schema(),
+        schema,
         Vec::new(),
     )
 }
@@ -592,6 +631,26 @@ pub fn check_composition(
     limits: PromptLimits,
     words: &[CompositionPluginWord],
 ) -> Result<CompositionAnswer, Vec<CompositionProblem>> {
+    check_composition_with_form(
+        response_text,
+        description,
+        reading,
+        language,
+        limits,
+        words,
+        None,
+    )
+}
+
+pub(crate) fn check_composition_with_form(
+    response_text: &str,
+    description: &str,
+    reading: Option<&DescriptionReading>,
+    language: ResolvedInstructionLanguage,
+    limits: PromptLimits,
+    words: &[CompositionPluginWord],
+    form: Option<&str>,
+) -> Result<CompositionAnswer, Vec<CompositionProblem>> {
     let ja = language == ResolvedInstructionLanguage::Ja;
     let problem = |place: &str, reason: String| CompositionProblem {
         place: place.to_owned(),
@@ -619,7 +678,11 @@ pub fn check_composition(
             .to_owned(),
         )]);
     };
-    if let Err(refusal) = conform(&value, &composition_response_schema_for(words), "answer") {
+    let mut schema = composition_response_schema_for(words);
+    if let Some(form) = form {
+        schema["properties"]["form"]["enum"] = json!([form]);
+    }
+    if let Err(refusal) = conform(&value, &schema, "answer") {
         return Err(vec![problem(
             "answer",
             if ja { refusal.ja } else { refusal.en },

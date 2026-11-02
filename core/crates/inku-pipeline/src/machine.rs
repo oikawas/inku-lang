@@ -444,6 +444,9 @@ pub struct CompositionMeasures {
 #[serde(deny_unknown_fields)]
 pub struct DescriptionCompositionRecord {
     pub state: CompositionState,
+    /// The author's requested composition form, when specified.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requested_form: Option<String>,
     /// Why the run wrote without its composition.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fallback: Option<String>,
@@ -605,7 +608,10 @@ pub enum CompositionRequest {
     Off,
     /// A composer decides the composition and laws first, and the drawer
     /// draws by them.
-    On,
+    On {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        form: Option<String>,
+    },
 }
 
 impl CompositionRequest {
@@ -3178,6 +3184,11 @@ impl PipelineSnapshot {
         }
         // Only a read-and-draw run decides its composition and laws first.
         if route == DescriptionRoute::Stages && composition != CompositionRequest::Off {
+            return Err(ProtocolError::InvalidPolicy);
+        }
+        if let CompositionRequest::On { form: Some(form) } = &composition
+            && !crate::description_composition::FORMS.contains(&form.as_str())
+        {
             return Err(ProtocolError::InvalidPolicy);
         }
         // A run keeps no record of the run before it in the same execution.

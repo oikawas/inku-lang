@@ -25,8 +25,8 @@ use crate::description_colors::{
     plan_of_with_definitions, with_layer_things,
 };
 use crate::description_composition::{
-    build_description_composition_prompt, check_composition, composition_plugin_words,
-    composition_targets, laws_text, with_composition_plugins,
+    build_description_composition_prompt_with_form, check_composition_with_form,
+    composition_plugin_words, composition_targets, laws_text, with_composition_plugins,
     with_description_composition_feedback,
 };
 use crate::description_ddl::{
@@ -41,9 +41,10 @@ use crate::prompts::{LlmPrompt, LlmStage, PromptError, PromptImage};
 use crate::protocol::{PipelineEvent, ProtocolError, ProviderFailure};
 
 impl DescriptionCompositionRecord {
-    fn pending() -> Self {
+    fn pending(requested_form: Option<String>) -> Self {
         Self {
             state: CompositionState::Pending,
+            requested_form,
             fallback: None,
             answer: None,
             targets: Vec::new(),
@@ -140,8 +141,12 @@ impl PipelineSnapshot {
             before_review: None,
             drawing: None,
             dropped: Vec::new(),
-            composition: (composition == CompositionRequest::On)
-                .then(DescriptionCompositionRecord::pending),
+            composition: match composition {
+                CompositionRequest::Off => None,
+                CompositionRequest::On { form } => {
+                    Some(DescriptionCompositionRecord::pending(form))
+                }
+            },
         });
         Ok(())
     }
@@ -271,10 +276,14 @@ impl PipelineSnapshot {
         let prompt = if pending {
             let record = self.description_record()?;
             let context = self.description_context(record)?;
-            let prompt = build_description_composition_prompt(
+            let prompt = build_description_composition_prompt_with_form(
                 &context,
                 self.config.language,
                 self.config.prompt_limits,
+                record
+                    .composition
+                    .as_ref()
+                    .and_then(|composition| composition.requested_form.as_deref()),
             )
             .map_err(|_| ProtocolError::SchemaViolation)?;
             with_composition_plugins(
@@ -319,13 +328,17 @@ impl PipelineSnapshot {
             self.config.language,
             self.config.prompt_limits,
         );
-        let checked = check_composition(
+        let checked = check_composition_with_form(
             response,
             &record.description,
             record.reading.as_ref(),
             self.config.language,
             self.config.prompt_limits,
             &words,
+            record
+                .composition
+                .as_ref()
+                .and_then(|composition| composition.requested_form.as_deref()),
         );
         let action = self.action.as_ref().ok_or(ProtocolError::InvalidState)?;
         let asked_again = message_names(&action.payload, "composition_feedback");
@@ -1339,9 +1352,366 @@ mod tests {
                 sketch,
                 route,
                 source_labels,
-                composition: CompositionRequest::On,
+                composition: CompositionRequest::On { form: None },
             },
         )
+    }
+
+    #[test]
+    fn unspecified_composition_preserves_baseline_bytes() {
+        use sha2::{Digest, Sha256};
+        let hash = |value: &[u8]| {
+            Sha256::digest(value)
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>()
+        };
+        let expected = [
+            [
+                "4f8e171a429eb87c7f59a03344ed51672c3f3000c903fd651fdc2d776ae6a603",
+                "98b75c87f921452e3c2e5ae22e0a49e4d3b31a876f67744c1bd016d7d75789af",
+                "73ba5928cb248d50694a7dd183f273c1f878bcc7018a034a16888c068048ed53",
+            ],
+            [
+                "be11a2d4d2f2c5712fd40de24a83d60077a212b05934bd8e10c6663bcae32c92",
+                "50b52d6b19f33a7f20ce1a119eb67744bbcaddc80f9b3d9d76277c3aae319afc",
+                "c622a91fc67a79dff4fd7047fde6a068edc6378e17569c64f91a244c93aaa3ab",
+            ],
+            [
+                "9890fe4284ca16533bd5045b353105bca1c22ef042c31e7be11bfddb3b2278a0",
+                "8c698e36a4323515d5f4f70227a8c7c5f84fc404d30efd0e60c5f31a970cc2a5",
+                "4921a59d2c012a8aaebfc206b9e2c8712c8c848201cc89cc710b6472a6ae3934",
+            ],
+            [
+                "fe569f24019211b7fe44ce2e2e1e4df9ffb6eec3b93286154bea090d57d76dad",
+                "332401119613fd6bd84bf793aea2eb9cd53f598bcfbc964ab46f556cafce8feb",
+                "9b9c0a2214f3822580342f229b501daf91f891587b79fbd191ad8b08c99d3a40",
+            ],
+        ];
+        let mut index = 0;
+        for language in [
+            ResolvedInstructionLanguage::Ja,
+            ResolvedInstructionLanguage::En,
+        ] {
+            for read in [false, true] {
+                let mut config = read_config(false);
+                config.language = language;
+                let mut request = authoring(
+                    if read {
+                        SketchRequest::Supplied { text: "妹".into() }
+                    } else {
+                        SketchRequest::Off
+                    },
+                    false,
+                );
+                if let AuthoringInput::Description { composition, .. } = &mut request {
+                    *composition = CompositionRequest::On { form: None };
+                }
+                let state = start_with(config, request).snapshot;
+                let p = prompt(&state);
+                let record = state
+                    .description_ddl
+                    .as_ref()
+                    .unwrap()
+                    .composition
+                    .as_ref()
+                    .unwrap();
+                assert_eq!(
+                    [
+                        hash(p["system"].as_str().unwrap().as_bytes()),
+                        hash(p["message"].as_str().unwrap().as_bytes()),
+                        hash(&serde_json::to_vec(&state).unwrap())
+                    ],
+                    expected[index],
+                    "{language:?} read={read}"
+                );
+                assert_eq!(
+                    hash(&serde_json::to_vec(&p["response_schema"]).unwrap()),
+                    "feb9c305a434ced1147b6d784a5bb63da9d93bb51ba97626e69e6da6e238238f"
+                );
+                assert_eq!(
+                    hash(&serde_json::to_vec(record).unwrap()),
+                    "e08ff4aec917544328b4ca2be4a23ce025a53e3083cb259f6aa696c0c5b616c1"
+                );
+                index += 1;
+            }
+        }
+    }
+
+    fn requested_form_start(
+        language: ResolvedInstructionLanguage,
+        read: bool,
+        form: &str,
+    ) -> PipelineSnapshot {
+        let mut config = read_config(false);
+        config.language = language;
+        let mut request = authoring(
+            if read {
+                SketchRequest::Supplied { text: "妹".into() }
+            } else {
+                SketchRequest::Off
+            },
+            false,
+        );
+        if let AuthoringInput::Description { composition, .. } = &mut request {
+            *composition = CompositionRequest::On {
+                form: Some(form.into()),
+            };
+        }
+        start_with(config, request).snapshot
+    }
+
+    #[test]
+    fn selected_form_changes_only_the_requested_prompt_parts_in_both_languages() {
+        for language in [
+            ResolvedInstructionLanguage::Ja,
+            ResolvedInstructionLanguage::En,
+        ] {
+            for read in [false, true] {
+                for form in crate::description_composition::FORMS {
+                    let state = requested_form_start(language, read, form);
+                    let prompt = prompt(&state);
+                    let message: Value =
+                        serde_json::from_str(prompt["message"].as_str().unwrap()).unwrap();
+                    assert_eq!(message["composition_form"], form);
+                    assert_eq!(
+                        prompt["response_schema"]["properties"]["form"]["enum"],
+                        json!([form])
+                    );
+                    assert_eq!(
+                        state
+                            .description_ddl
+                            .as_ref()
+                            .unwrap()
+                            .composition
+                            .as_ref()
+                            .unwrap()
+                            .requested_form
+                            .as_deref(),
+                        Some(form)
+                    );
+                    let system = prompt["system"].as_str().unwrap();
+                    let line = system.lines().find(|line| line.starts_with("2. ")).unwrap();
+                    let record = state.description_ddl.as_ref().unwrap();
+                    let context = state.description_context(record).unwrap();
+                    let original =
+                        crate::description_composition::build_description_composition_prompt(
+                            &context,
+                            language,
+                            state.config.prompt_limits,
+                        )
+                        .unwrap();
+                    let original_line = original
+                        .system
+                        .lines()
+                        .find(|line| line.starts_with("2. "))
+                        .unwrap();
+                    let (fixed_prefix, original_prefix) = if language
+                        == ResolvedInstructionLanguage::Ja
+                    {
+                        (
+                            "2. form（画の型）は本文の composition_form に決めてある。その型で組む。ほかの型を選ばない。型の意味：",
+                            "2. form（画の型）を一つ選ぶ。",
+                        )
+                    } else {
+                        (
+                            "2. The form is fixed by composition_form in the message. Compose in that form; do not choose another. What the forms mean: ",
+                            "2. Choose one form: ",
+                        )
+                    };
+                    assert_eq!(
+                        line.replacen(fixed_prefix, original_prefix, 1),
+                        original_line
+                    );
+                    assert_eq!(system.replacen(line, original_line, 1), original.system);
+                    let mut original_message = message.clone();
+                    original_message
+                        .as_object_mut()
+                        .unwrap()
+                        .remove("composition_form");
+                    assert_eq!(
+                        original_message,
+                        serde_json::from_str::<Value>(&original.message).unwrap()
+                    );
+                    let mut original_schema = prompt["response_schema"].clone();
+                    original_schema["properties"]["form"]["enum"] =
+                        json!(crate::description_composition::FORMS);
+                    assert_eq!(original_schema, original.response_schema);
+                    if language == ResolvedInstructionLanguage::Ja {
+                        assert!(line.starts_with("2. form（画の型）は本文の composition_form に決めてある。その型で組む。ほかの型を選ばない。型の意味："), "{line}");
+                        assert!(
+                            line.contains("bands（横の帯を重ねる）")
+                                && line.contains("unequal_triangle（主・従・添えの不等辺の三角）")
+                        );
+                    } else {
+                        assert!(line.starts_with("2. The form is fixed by composition_form in the message. Compose in that form; do not choose another. What the forms mean: "), "{line}");
+                        assert!(line.contains("bands (stack horizontal bands)") && line.contains("unequal_triangle (an unequal triangle of focal, secondary and accent)"));
+                    }
+                    assert!(system.contains("\"form\":\"one_corner\""));
+                }
+            }
+        }
+        assert_eq!(
+            serde_json::to_string(&CompositionRequest::On { form: None }).unwrap(),
+            r#"{"mode":"on"}"#
+        );
+        assert_eq!(
+            serde_json::to_string(&CompositionRequest::On {
+                form: Some("bands".into())
+            })
+            .unwrap(),
+            r#"{"mode":"on","form":"bands"}"#
+        );
+        assert!(
+            serde_json::from_str::<CompositionRequest>(r#"{"mode":"on","extra":true}"#).is_err()
+        );
+    }
+
+    #[test]
+    fn wrong_selected_form_is_asked_again_then_falls_back() {
+        let first = requested_form_start(ResolvedInstructionLanguage::Ja, false, "bands");
+        let wrong = composition(golden()).to_string();
+        let retry = answer_text(&first, &wrong).snapshot;
+        assert_eq!(tag(&retry), "compose_description");
+        assert_eq!(message(&retry)["composition_form"], "bands");
+        assert!(
+            message(&retry)["composition_feedback"]["problems"]
+                .as_array()
+                .is_some_and(|problems| !problems.is_empty())
+        );
+        assert_eq!(
+            prompt(&retry)["response_schema"]["properties"]["form"]["enum"],
+            json!(["bands"])
+        );
+        assert!(
+            prompt(&retry)["system"]
+                .as_str()
+                .unwrap()
+                .contains("form（画の型）は本文の composition_form に決めてある")
+        );
+        let fallback = answer_text(&retry, &wrong).snapshot;
+        assert_eq!(tag(&fallback), "write_description_ddl");
+        let record = fallback
+            .description_ddl
+            .as_ref()
+            .unwrap()
+            .composition
+            .as_ref()
+            .unwrap();
+        assert_eq!(record.state, CompositionState::Fallback);
+        assert_eq!(record.requested_form.as_deref(), Some("bands"));
+        assert_eq!(record.rounds.len(), 2);
+        let mut right = composition(golden());
+        right["form"] = json!("bands");
+        let accepted = answer_text(&retry, &right.to_string()).snapshot;
+        assert_eq!(tag(&accepted), "write_description_ddl");
+        assert_eq!(
+            accepted
+                .description_ddl
+                .as_ref()
+                .unwrap()
+                .composition
+                .as_ref()
+                .unwrap()
+                .answer
+                .as_ref()
+                .unwrap()
+                .form,
+            "bands"
+        );
+    }
+
+    #[test]
+    fn plugin_schema_keeps_the_selected_form_on_initial_and_retry_requests() {
+        let asset: Value = serde_json::from_str(include_str!(
+            "../../../inku-ddl/tests/fixtures/nature-leaves-2.1-v1.json"
+        ))
+        .unwrap();
+        let definition =
+            inku_ddl::MacroDefinition::from_json(&asset["entries"][0]["definition"].to_string())
+                .unwrap();
+        let mut config = read_config(false);
+        config.definitions = vec![definition];
+        config.macro_summaries = vec!["若葉を描く。".into()];
+        let request = AuthoringInput::Description {
+            description: "若葉と妹".into(),
+            auto_catalog: false,
+            sketch: SketchRequest::Off,
+            route: DescriptionRoute::ReadAndDraw,
+            source_labels: vec![],
+            composition: CompositionRequest::On {
+                form: Some("bands".into()),
+            },
+        };
+        let first = start_with(config, request).snapshot;
+        assert_eq!(
+            prompt(&first)["response_schema"]["properties"]["form"]["enum"],
+            json!(["bands"])
+        );
+        assert!(prompt(&first)["response_schema"]["properties"]["things"]["items"]["properties"]["word"]["enum"].is_array());
+        let answer = json!({"thesis":"妹と若葉", "form":"one_corner", "things":[{"thing":1,"what":"妹","role":"focal","kind":"cluster","quote":"妹","word":""},{"thing":2,"what":"若葉","role":"field","kind":"surface","quote":"若葉","word":"｛若葉｝"}],"main_law":"B1","laws":{"B1":{"targets":[{"thing":1,"at":"point_ul"}]}},"reason":"妹"});
+        let retry = answer_text(&first, &answer.to_string()).snapshot;
+        assert_eq!(tag(&retry), "compose_description");
+        assert_eq!(
+            prompt(&retry)["response_schema"]["properties"]["form"]["enum"],
+            json!(["bands"])
+        );
+        assert_eq!(message(&retry)["composition_form"], "bands");
+    }
+
+    #[test]
+    fn invalid_form_and_stage_route_are_refused_for_start_and_regeneration() {
+        let invalid = CompositionRequest::On {
+            form: Some("other".into()),
+        };
+        for (route, composition) in [
+            (DescriptionRoute::ReadAndDraw, invalid),
+            (
+                DescriptionRoute::Stages,
+                CompositionRequest::On {
+                    form: Some("bands".into()),
+                },
+            ),
+        ] {
+            let mut request = authoring(SketchRequest::Off, false);
+            if let AuthoringInput::Description {
+                composition: c,
+                route: r,
+                ..
+            } = &mut request
+            {
+                *c = composition.clone();
+                *r = route;
+            }
+            let start = envelope(
+                None,
+                PipelineInput::Start {
+                    variation_id: "bad-form".into(),
+                    authoring_nonce: "bad".into(),
+                    config: Box::new(read_config(false)),
+                    authority: VariationAuthorityState::new_description(),
+                    authoring: request,
+                },
+            );
+            assert_eq!(run_error(None, &start)["payload"]["code"], "invalid_policy");
+            let state =
+                start_with(read_config(false), authoring(SketchRequest::Off, false)).snapshot;
+            let state = write(&state, GOOD).snapshot;
+            let state = run(Some(&state), &envelope(Some(&state), ack(&state))).snapshot;
+            let input = PipelineInput::GenerateFromDescription {
+                expected_revision: DecimalU64::new(state.authority.revision()),
+                description: POEM.into(),
+                auto_catalog: false,
+                sketch: SketchRequest::Off,
+                route,
+                source_labels: vec![],
+                composition,
+            };
+            assert_eq!(
+                run_error(Some(&state), &envelope(Some(&state), input))["payload"]["code"],
+                "invalid_policy"
+            );
+        }
     }
 
     /// A composition that puts the woman (thing 1) on the golden section's
@@ -1377,7 +1747,7 @@ mod tests {
         config.catalogs = vec![candidate("default")];
         let mut input = authoring(SketchRequest::On, true);
         if let AuthoringInput::Description { composition, .. } = &mut input {
-            *composition = CompositionRequest::On;
+            *composition = CompositionRequest::On { form: None };
         }
         let initial = start_with(config, input).snapshot;
         let selected = reply(
@@ -1496,7 +1866,7 @@ mod tests {
                     sketch: SketchRequest::Off,
                     route: DescriptionRoute::ReadAndDraw,
                     source_labels: Vec::new(),
-                    composition: CompositionRequest::On,
+                    composition: CompositionRequest::On { form: None },
                 },
             )
             .snapshot
@@ -1505,7 +1875,7 @@ mod tests {
         let context = empty
             .description_context(empty.description_record().unwrap())
             .unwrap();
-        let original = super::build_description_composition_prompt(
+        let original = crate::description_composition::build_description_composition_prompt(
             &context,
             empty.config.language,
             empty.config.prompt_limits,
@@ -1603,7 +1973,7 @@ mod tests {
                 sketch: SketchRequest::Off,
                 route: DescriptionRoute::ReadAndDraw,
                 source_labels: Vec::new(),
-                composition: CompositionRequest::On,
+                composition: CompositionRequest::On { form: None },
             },
         )
         .snapshot;
@@ -1760,7 +2130,7 @@ mod tests {
                         sketch: SketchRequest::Off,
                         route: DescriptionRoute::Stages,
                         source_labels: Vec::new(),
-                        composition: CompositionRequest::On,
+                        composition: CompositionRequest::On { form: None },
                     },
                 },
             ),
@@ -1863,7 +2233,7 @@ mod tests {
                 sketch,
                 route,
                 source_labels,
-                composition: CompositionRequest::On,
+                composition: CompositionRequest::On { form: None },
             },
         )
         .snapshot

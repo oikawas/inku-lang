@@ -192,7 +192,7 @@
 	.run-stage-tokens { flex: 0 0 auto; margin-left: auto; white-space: nowrap; font-variant-numeric: tabular-nums; }
 	.run-meta-log { flex-wrap: nowrap; white-space: nowrap; }
 	.run-meta-log > span { flex: 0 0 auto; }
-	.run-total { white-space: nowrap; font-variant-numeric: tabular-nums; }
+	.run-total { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 	.run-status.inline .run-meta {
 		justify-content: flex-end;
 	}

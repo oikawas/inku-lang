@@ -110,7 +110,7 @@ def activity_host(tmp_path, monkeypatch):
 def _autonomous(run_id="run-1", owner="alice", created_at=1):
     return {"id": run_id, "owner_id": owner, "history_id": "work-1", "state": "running",
             "settings": {"kinds": ["laws"], "moves": 5, "note": "private note", "model": "private model", "language": "ja", "wild": True},
-            "turns": [{"attempts": [{"attempt": 1}]}], "current": None, "created_at": created_at}
+            "turns": [{"attempts": [{"attempt": 1, "outcome": "kept"}]}], "current": None, "created_at": created_at}
 
 
 def test_activity_lists_between_moves_for_owner_and_admin(activity_host):
@@ -120,6 +120,8 @@ def test_activity_lists_between_moves_for_owner_and_admin(activity_host):
     mine = client.get('/api/pipeline/activity', headers={'X-Owner': 'alice'}).json()
     assert [run["run_id"] for run in mine["autonomous_runs"]] == ["run-1"]
     assert mine["autonomous_runs"][0]["current"] is None
+    theirs = client.get('/api/pipeline/activity', headers={'X-Owner': 'bob'}).json()
+    assert [run["run_id"] for run in theirs["autonomous_runs"]] == ["run-2"]
     assert client.get('/api/pipeline/activity?all_users=true', headers={'X-Owner': 'bob'}).status_code == 403
     all_runs = client.get('/api/pipeline/activity?all_users=true', headers={'X-Owner': 'admin'}).json()["autonomous_runs"]
     assert [run["run_id"] for run in all_runs] == ["run-2", "run-1"]
@@ -149,7 +151,7 @@ def test_activity_marks_only_the_inflight_child_and_clears_it(activity_host, mon
         release.set()
         thread.join(5)
     assert runner.activity("alice")[1] == {}
-    for error in (RuntimeError("failed"), HTTPException(499)):
+    for error in (RuntimeError("failed"), HTTPException(499, detail="stopped")):
         def failed(_owner, _view, **_kwargs):
             raise error
         monkeypatch.setattr(pipeline_compat, "_settled", failed)
@@ -182,3 +184,6 @@ def test_activity_never_exposes_run_private_settings_or_owner(activity_host):
     assert result["current"] == {"turn": 2, "attempt": 3, "kind": "laws"}
     assert result["turns_taken"] == 1
     assert "private" not in json.dumps(result)
+    run["turns"].append({"attempts": [{"attempt": 1, "outcome": "failed"}]})
+    runner.store.save(run)
+    assert client.get('/api/pipeline/activity', headers={'X-Owner': 'alice'}).json()["autonomous_runs"][0]["turns_taken"] == 1

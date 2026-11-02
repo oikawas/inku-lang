@@ -390,9 +390,15 @@ class AutonomousRunner:
         rows = []
         for run in runs:
             current = run.get("current")
+            tries_per_turn = 1 if run["settings"]["kinds"] == ["chunks"] else 2
+            turns_taken = sum(
+                any(attempt.get("outcome") == "kept" for attempt in turn["attempts"])
+                or sum(attempt.get("outcome") != "unavailable" for attempt in turn["attempts"]) >= tries_per_turn
+                for turn in run["turns"]
+            )
             rows.append({"run_id": run["id"], "history_id": run["history_id"],
                          "kinds": run["settings"]["kinds"], "moves": run["settings"]["moves"],
-                         "turns_taken": len(run["turns"]),
+                         "turns_taken": turns_taken,
                          "current": {key: current[key] for key in ("turn", "attempt", "kind")} if current else None,
                          "stopping": stopping[run["id"]], "created_at": run["created_at"], "updated_at": run["updated_at"]})
         return rows, {execution: run_id for execution, run_id in children.items() if run_id in active_ids}

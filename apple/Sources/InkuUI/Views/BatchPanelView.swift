@@ -309,6 +309,14 @@ struct BatchPanelView: View {
                 }
             } else if automation.running {
                 // BatchPanel.svelte:280: the running batch shows the drawing indicator with its progress.
+                if let startedAt = automation.batchStartedAt, automation.batchRowStartedAt != nil {
+                    TimelineView(.periodic(from: startedAt, by: 1)) { context in
+                        Text(BatchProgressCopy.line(current: currentBatchRow, total: automation.rows.count,
+                                                    elapsed: context.date.timeIntervalSince(startedAt), display: model.display))
+                            .inkuFont(12).foregroundStyle(.primary).lineLimit(1).truncationMode(.tail)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
                 RunStatusView(display: model.display, label: runningLabel, stopping: automation.stopping,
                               stopTooltip: tip("実行中のバッチを停止します。未処理の行は後で再開できます。"),
                               onStop: { Task { await automation.stop(app: model) } }, journalModel: model,
@@ -360,9 +368,13 @@ struct BatchPanelView: View {
             .inkuFont(13).monospacedDigit()
     }
 
-    private var runningLabel: String {
-        let current = automation.activeRow.flatMap { active in automation.rows.firstIndex { $0.id == active.id } }.map { $0 + 1 }
+    private var currentBatchRow: Int {
+        automation.activeRow.flatMap { active in automation.rows.firstIndex { $0.id == active.id } }.map { $0 + 1 }
             ?? (automation.completedCount + automation.failedCount)
+    }
+
+    private var runningLabel: String {
+        let current = currentBatchRow
         return automation.currentRetryRound > 0
             ? model.display.webCopyFormat("batchRetryProgress", "%@ / %@ / %@", automation.currentRetryRound, current, automation.rows.count)
             : model.display.webCopyFormat("batchProgress", "%@ / %@", current, automation.rows.count)

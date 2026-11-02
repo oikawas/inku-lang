@@ -166,6 +166,7 @@ public final class AutomationModel {
     public private(set) var batchConditions: BatchDrawingConditions?
     public private(set) var observedWork: SavedWork?
     public private(set) var currentRetryRound = 0
+    public private(set) var batchStartedAt: Date?
     public private(set) var batchRowStartedAt: Date?
     private var observedRowID: String?
     @ObservationIgnored private var store: BatchJournalStore?
@@ -352,6 +353,7 @@ public final class AutomationModel {
 
     public func resumeBatch(app: AppModel) async {
         guard !running, !preparing, !app.isBusy, canResume else { return }
+        let resumedAt = Date()
         preparing = true
         resuming = true
         batchObservationToken = UUID()
@@ -395,7 +397,7 @@ public final class AutomationModel {
         do { try await saveJournal() } catch { errorText = error.localizedDescription; return }
         resuming = false
         preparing = false
-        await runBatch(app: app)
+        await runBatch(app: app, startedAt: resumedAt)
     }
 
     /// Web `retryFailed`: draws only the failed rows again with their original text, line numbers and the
@@ -414,11 +416,11 @@ public final class AutomationModel {
         await runBatch(app: app, only: failed)
     }
 
-    private func runBatch(app: AppModel, only scope: Set<String>? = nil) async {
+    private func runBatch(app: AppModel, only scope: Set<String>? = nil, startedAt: Date = Date()) async {
         guard let initial = journal else { return }
         let runToken = UUID()
         token = runToken; running = true; stopping = false; mode = "batch"; errorText = nil
-        batchRowStartedAt = nil
+        batchStartedAt = startedAt; batchRowStartedAt = nil
         let task = Task { @MainActor [weak self] in
             guard let self else { return }
             do {
@@ -616,7 +618,7 @@ public final class AutomationModel {
     private func finish(_ runToken: UUID) {
         guard token == runToken else { return }
         if mode == "demo" { demoEndedAt = Date(); demoWaitUntil = nil; demoDrawing = false }
-        batchRowStartedAt = nil; operation = nil; token = nil
+        batchStartedAt = nil; batchRowStartedAt = nil; operation = nil; token = nil
         running = false; stopping = false
     }
     private func saveJournal() async throws {

@@ -509,6 +509,8 @@ export const en: LangPack = {
 	compositionFormCurrent: 'Current form',
 	compositionFormSwitchNotice: 'Draws using In words with composition enabled',
 	compositionFormExpired: 'The candidate is no longer available. Draw it again.',
+	compositionFormNames: ['One corner', 'All over', 'Bands', 'Dividing line', 'Grid', 'Flock and stray', 'Unequal triangle'],
+	compositionFormDescriptions: ['Push the focal thing to one side and leave wide space', 'Spread evenly and erase the center', 'Stack horizontal bands', 'Divide the field with a line', 'Grid', 'A flock and one that strays', 'An unequal triangle of focal, secondary and accent'],
 	batchRowOfTotal: (current, total) => `line ${current} of ${total}`,
 	batchElapsed: (time) => `${time} since the batch started`,
 	elapsedSeconds: (s) => `${s} s`,

@@ -28,7 +28,7 @@
 		<div class="refine-target-controls"><section class="refine-action-section">
 			{#if compositionFormSwitch}<p>{t().compositionFormSwitchNotice}</p>{/if}
 			<div class="form-options" role="radiogroup" aria-label={t().workActionCompositionForm}>
-				{#each compositionFormOptions(isJapanese) as form}
+				{#each compositionFormOptions(t()) as form}
 					<label><input type="radio" name="composition-form" value={form.id} bind:group={selected} disabled={busy} />
 						<span><strong>{form.name}</strong>{#if form.id === compositionForm} ({t().compositionFormCurrent}){/if}<br />{form.description}</span>
 					</label>

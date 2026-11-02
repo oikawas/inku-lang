@@ -507,6 +507,8 @@ export const ja: LangPack = {
 	compositionFormCurrent: '今の形',
 	compositionFormSwitchNotice: '言葉で描く＋構図ありに切り替えて描きます',
 	compositionFormExpired: '候補が見つかりません。もう一度候補を作ってください。',
+	compositionFormNames: ['一角', '全面', '帯', '分ける線', '格子', '群れと逸れ', '不等辺の三角'],
+	compositionFormDescriptions: ['主を片隅や片側に寄せて広く空ける', '全面に均して中心を消す', '横の帯を重ねる', '場を分ける線', '格子', '群れと一つの逸脱', '主・従・添えの不等辺の三角'],
 	batchRowOfTotal: (current, total) => `${total} 行中 ${current} 行目`,
 	batchElapsed: (time) => `バッチ開始から ${time}`,
 	elapsedSeconds: (s) => `${s} 秒`,

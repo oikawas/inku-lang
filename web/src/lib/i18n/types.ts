@@ -374,6 +374,8 @@ export interface LangPack {
 	compositionFormCurrent: string;
 	compositionFormSwitchNotice: string;
 	compositionFormExpired: string;
+	compositionFormNames: readonly string[];
+	compositionFormDescriptions: readonly string[];
 	batchRowOfTotal: (current: number, total: number) => string;
 	batchElapsed: (time: string) => string;
 	elapsedSeconds: (s: string) => string;

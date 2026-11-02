@@ -100,11 +100,13 @@ def default_manifest(binding: PipelineBinding) -> dict:
                               "max_catalog_serialized_bytes": 1024 * 1024,
                               "max_source_bytes": 400_000, "max_response_bytes": 1024 * 1024},
             "catalog_retry": deepcopy(retry), "stage1_retry": stage1_retry, "hole_retry": deepcopy(retry),
+            "sketch_retry": deepcopy(stage1_retry), "composition_retry": deepcopy(stage1_retry),
+            "laws_retry": deepcopy(stage1_retry), "colors_retry": deepcopy(stage1_retry),
             # Place the layers whose place the description does not state, from a
             # reading of the description (COMPOSITION-PRODUCT-DESIGN).
             "composition": {"read": True},
             # Then lay the laws a reader chooses for the composed plan, printed in
-            # numbers before the commit (SPEC 12.6.4). Its budget is the catalog's.
+            # numbers before the commit (SPEC 12.6.4).
             "laws": {},
             # Then the color laws a reader chooses for the document the laws
             # left (SPEC 12.6.5), a default since 2026-10-20. The run's render

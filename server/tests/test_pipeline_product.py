@@ -43,6 +43,22 @@ def test_stage1_default_budget_is_separate_from_legacy_request_timeout(
         "total_timeout_ms": "540000",
         "retry_delay_ms": "2000",
     }
+    for name in ("sketch_retry", "composition_retry", "laws_retry", "colors_retry"):
+        assert manifest["pipeline"][name] == manifest["pipeline"]["stage1_retry"]
+        assert manifest["pipeline"][name] is not manifest["pipeline"]["stage1_retry"]
+
+
+def test_reading_budgets_follow_custom_stage1_environment(monkeypatch):
+    monkeypatch.setenv("INKU_LLM_STAGE1_ATTEMPT_TIMEOUT_SECONDS", "321")
+    monkeypatch.setenv("INKU_LLM_STAGE1_TOTAL_TIMEOUT_SECONDS", "654")
+    config = default_manifest(PipelineBinding())["pipeline"]
+    for name in ("sketch_retry", "composition_retry", "laws_retry", "colors_retry"):
+        assert config[name] == config["stage1_retry"]
+        assert config[name]["attempt_timeout_ms"] == "321000"
+        assert config[name]["total_timeout_ms"] == "654000"
+    _apply_developer_options(config, {"developer_disable_llm_retries": True}, developer_mode=True)
+    assert all(config[name]["max_attempts"] == 1 for name in (
+        "catalog_retry", "stage1_retry", "hole_retry", "sketch_retry", "composition_retry", "laws_retry", "colors_retry"))
 
 
 def test_developer_retry_opt_in_does_not_change_the_normal_default():

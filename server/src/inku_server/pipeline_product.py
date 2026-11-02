@@ -46,8 +46,10 @@ def _apply_developer_options(config: dict, options: dict, *, developer_mode: boo
     if requested and not developer_mode:
         raise CandidateHostError("developer_mode_required")
     if options.get("developer_disable_llm_retries") is True:
-        for name in ("catalog_retry", "stage1_retry", "hole_retry"):
-            config[name]["max_attempts"] = 1
+        for name in ("catalog_retry", "stage1_retry", "hole_retry", "sketch_retry",
+                     "composition_retry", "laws_retry", "colors_retry"):
+            if name in config:
+                config[name]["max_attempts"] = 1
     # The color stage is a default (2026-10-20), and a saved work's run keeps
     # the configuration it was saved with: the option adds the stage to a run
     # whose configuration has none, such as a child of a work saved before.

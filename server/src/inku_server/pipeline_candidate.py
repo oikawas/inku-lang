@@ -31,6 +31,17 @@ _PIPELINE_FAILURES = {
     "semantic_violation",
 }
 _PIPELINE_FAILURE_DETAILS = {"credentials_unavailable"}
+_FALLBACK_STAGES = {
+    "description_reading_fallback": "read_and_draw",
+    "description_composition_fallback": "read_and_draw",
+    "composition_fallback": "composition",
+    "laws_fallback": "laws",
+    "colors_fallback": "colors",
+    "catalog_fallback": "catalog",
+    "description_review_fallback": "read_and_draw",
+    "image_review_fallback": "image",
+}
+_FALLBACK_FAILURES = _PIPELINE_FAILURES | {"prompt", "context", "compile", "refused", "failed", "undrawable"}
 _HOLE_COMPLETION_STATUSES = {"validated", "rejected", "unresolved"}
 _ACTION_STAGES = {
     "read_description": "read_and_draw",
@@ -184,6 +195,38 @@ def _pipeline_failures(state: dict | None, envelope: dict, result: dict) -> list
         if elapsed_ms is not None:
             diagnostic["elapsed_ms"] = elapsed_ms
         projected.append((transition, diagnostic))
+    return projected
+
+
+def _pipeline_fallbacks(state: dict | None, envelope: dict, result: dict) -> list[dict]:
+    """Log only the core's fixed fallback events and safe diagnostic fields."""
+    action = (state or {}).get("action") or {}
+    identity = action.get("identity") or {}
+    effect = envelope.get("payload") or {}
+    effect_result = effect.get("result") or {} if effect.get("tag") == "effect_result" else {}
+    from .chatgpt_provider import safe_identifier
+
+    projected = []
+    for event in result.get("events") or []:
+        if not isinstance(event, dict) or event.get("tag") not in _FALLBACK_STAGES:
+            continue
+        name = event["tag"]
+        payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
+        failure = payload.get("failure", payload.get("reason"))
+        diagnostic = {"event": name, "stage": _FALLBACK_STAGES[name]}
+        if isinstance(failure, str) and failure in _FALLBACK_FAILURES:
+            diagnostic["failure"] = failure
+        detail = _safe_compiler_failure_detail(payload.get("detail"))
+        if detail is not None:
+            diagnostic["detail"] = detail
+        action_id = safe_identifier(identity.get("action_id"))
+        if action_id is not None:
+            diagnostic["action_id"] = action_id
+        for key, value in (("attempt", identity.get("attempt")), ("elapsed_ms", effect_result.get("elapsed_ms"))):
+            parsed = _nonnegative_int(value)
+            if parsed is not None:
+                diagnostic[key] = parsed
+        projected.append(diagnostic)
     return projected
 
 
@@ -506,6 +549,12 @@ class CandidateExecution:
         # when the same acknowledged source and Score remain active.
         if rendered is None and state and next_snapshot["document"] == state["document"] and next_snapshot["delivery"] is not None:
             rendered = self._rendered
+        for diagnostic in _pipeline_fallbacks(state, envelope, result):
+            _logger.warning("pipeline_fallback %s", json.dumps({
+                "execution_id": next_snapshot["execution_id"],
+                "variation_id": next_snapshot["variation_id"],
+                **diagnostic,
+            }, sort_keys=True, separators=(",", ":")))
         for transition, diagnostic in _pipeline_failures(state, envelope, result):
             existing = self.context.get("provider_failure")
             if (

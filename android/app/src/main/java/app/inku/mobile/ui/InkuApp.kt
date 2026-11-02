@@ -6936,7 +6936,7 @@ private fun GenerationInfoSheet(item: HistoryItemEntity, viewModel: InkuViewMode
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
                         ) {
-                            if (row.field != GenerationInfoField.CatalogReadingDropped) Text(
+                            Text(
                                 generationInfoFieldLabel(row.field),
                                 modifier = Modifier.weight(0.42f),
                                 style = MaterialTheme.typography.labelSmall,

@@ -3,6 +3,7 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import PaintButton from './PaintButton.svelte';
 	import RunStatus from './RunStatus.svelte';
+	import BatchRunSummary from './BatchRunSummary.svelte';
 	import type { ImageFolderBatch } from '$lib/features/batch/image-folder.svelte';
 	import type { ProviderAttemptCount } from '$lib/paintStream';
 
@@ -91,6 +92,7 @@
 
 {#if folder.running}
 	<div class="batch-progress-wrap">
+		<BatchRunSummary current={folder.summaryCurrent} total={folder.summaryTotal} startedAt={folder.startedAt} />
 		<RunStatus
 			label={`${t().imageFolderProgress(folder.current, folder.total, folder.activePath)}${stageLabel ? ` · ${stageLabel}` : ''}`}
 			stage1Model={visionModelName}

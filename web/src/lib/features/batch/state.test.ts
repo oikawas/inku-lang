@@ -124,6 +124,24 @@ test('a cut batch waits for its still-running server work before checking histor
 	assert.equal(state.success, 1);
 });
 
+test('a resumed batch summary uses the original total and counts pending positions', async () => {
+	const { state } = makeState();
+	state.input = 'first\n\nsecond\nthird';
+	const shown: number[] = [];
+	await state.run({
+		resumeLines: [{ line: 3, input: 'second' }, { line: 4, input: 'third' }],
+		canvasAspectId: 'square', maxRetries: 0,
+		paintLine: async (_text, options) => {
+			assert.equal(state.summaryTotal, 3);
+			assert.ok(state.startedAt > 0);
+			shown.push(state.summaryCurrent);
+			return result(options.batchLineNumber!);
+		},
+		onLatestResult: () => {}, refreshAfterServerSave: async () => {}, refreshAfterRun: async () => {},
+	});
+	assert.deepEqual(shown, [2, 3]);
+});
+
 test('manual failure retry paints only errors, keeps original conditions and numbering, and removes recovered errors', async () => {
 	const { state, reports } = makeState();
 	const original = 'saved\n\nfailed\nother failure';

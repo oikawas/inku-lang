@@ -18,7 +18,7 @@
 	import { getMascot } from '$lib/mascot.svelte';
 	import { providerAttemptText, type ProviderAttemptCount } from '$lib/paintStream';
 	import type { PaintProgressEvent } from '$lib/paintStream';
-	import { finishedText, localWork, tokenCount } from '$lib/runProgress';
+	import { currentWork, finishedText, tokenCount } from '$lib/runProgress';
 
 	type Props = {
 		label: string;
@@ -102,7 +102,7 @@
 					{#if tokens}<span class="run-stage-tokens">{t().runStatusStageTokens(tokenCount(tokens.input_tokens), tokenCount(tokens.output_tokens))}</span>{/if}
 				</span>
 			{/each}
-			<span class="run-label">… {progress.run_progress.current?.kind === 'local' ? localWork(progress.run_progress.current.action, t()) : label}</span>
+			<span class="run-label">… {currentWork(progress.run_progress.current, label, attempt, t())}</span>
 		{:else}
 			<span class="run-label">{label}</span>
 			{#if modelLine}<span class="run-model">{modelLine}</span>{/if}
@@ -166,7 +166,7 @@
 	.run-status.inline.has-progress .run-info { flex: 1 1 auto; align-items: stretch; }
 	.run-label {
 		font-size: var(--ui-font-size-12);
-		font-weight: 500;
+		font-weight: 600;
 		color: var(--fg);
 		white-space: nowrap;
 		overflow: hidden;
@@ -192,7 +192,7 @@
 	.run-stage-tokens { flex: 0 0 auto; margin-left: auto; white-space: nowrap; font-variant-numeric: tabular-nums; }
 	.run-meta-log { flex-wrap: nowrap; white-space: nowrap; }
 	.run-meta-log > span { flex: 0 0 auto; }
-	.run-total { white-space: nowrap; font-variant-numeric: tabular-nums; }
+	.run-total { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 	.run-status.inline .run-meta {
 		justify-content: flex-end;
 	}

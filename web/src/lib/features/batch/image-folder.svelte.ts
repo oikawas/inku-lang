@@ -51,10 +51,15 @@ export class ImageFolderBatch<TFile extends FolderFile = File> {
 	pictures = $state<TFile[]>([]);
 	folderName = $state('');
 	running = $state(false);
+	startedAt = $state(0);
 	/** The last run was stopped, by the author or by a lost connection. */
 	interrupted = $state(false);
 	current = $state(0);
 	total = $state(0);
+	summaryTotal = $state(0);
+	get summaryCurrent(): number {
+		return this.current > 0 ? this.summaryTotal - this.total + this.current : 0;
+	}
 	activePath = $state('');
 	success = $state(0);
 	/** Why the last run stopped by itself; null when the author stopped it or it ended. */
@@ -135,11 +140,13 @@ export class ImageFolderBatch<TFile extends FolderFile = File> {
 		this.abortController = abortController;
 		this.stopRequested = false;
 		this.running = true;
+		this.startedAt = Date.now();
 		this.interrupted = false;
 		this.stopReason = null;
 		this.success = 0;
 		this.current = 0;
 		this.total = queue.length;
+		this.summaryTotal = this.pictures.length;
 		try {
 			for (const [index, file] of queue.entries()) {
 				if (this.stopRequested) break;

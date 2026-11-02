@@ -138,9 +138,15 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 	promptHistory = $state<string[]>([]);
 	resume = $state<BatchResumeCandidate<TWork> | null>(null);
 	running = $state(false);
+	startedAt = $state(0);
+	/** Original plan size; current/total continue to describe the active retry round. */
+	summaryTotal = $state(0);
 	interrupted = $state(false);
 	current = $state(0);
 	total = $state(0);
+	get summaryCurrent(): number {
+		return this.current > 0 ? this.summaryTotal - this.total + this.current : 0;
+	}
 	retryRound = $state(0);
 	success = $state(0);
 	failures = $state<BatchFailure[]>([]);
@@ -467,6 +473,7 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 		this.abortController = abortController;
 		this.stopRequested = false;
 		this.running = true;
+		this.startedAt = Date.now();
 		// A caller may need asynchronous lineage work before it invokes this
 		// owner. Keep the selection guarded until this run has claimed `running`.
 		if (resumingSnapshot) this.resuming = false;
@@ -487,6 +494,7 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 		};
 		this.interruptedSnapshot = snapshot;
 		this.lastSnapshot = snapshot;
+		this.summaryTotal = snapshot.lines.length;
 		const batchRunId = snapshot.runId;
 		this.total = lineTotal;
 		let interrupted = false;

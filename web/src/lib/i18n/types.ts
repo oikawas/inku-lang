@@ -370,6 +370,11 @@ export interface LangPack {
 	/** While the color stage's model call runs (2026-10-20). */
 	stageChoosingColors: string;
 	batchProgress: (current: number, total: number) => string;
+	batchRowOfTotal: (current: number, total: number) => string;
+	batchElapsed: (time: string) => string;
+	elapsedSeconds: (s: string) => string;
+	elapsedMinutes: (m: string, s: string) => string;
+	elapsedHours: (h: string, m: string, s: string) => string;
 	batchRetryProgress: (current: number, total: number, round: number) => string;
 	/** While a batch waits for the Server to answer again before sending a cut line once more (2026-10-21). */
 	batchWaitingForServer: (line: number) => string;

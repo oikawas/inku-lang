@@ -828,7 +828,7 @@ export const en: LangPack = {
 
 	promptCatalogInput: 'Color catalog choice input as sent',
 	promptCatalogReadingInput: 'Color reading input as sent',
-	promptCatalogReadingSystem: 'Color reading',
+	promptCatalogReadingSystem: 'Color reading system prompt',
 	promptCatalogSystem: 'Color catalog choice system prompt',
 	promptImageCatalogInput: 'Catalog choice for the picture input as sent',
 	promptImageCatalogSystem: 'Catalog choice for the picture system prompt',

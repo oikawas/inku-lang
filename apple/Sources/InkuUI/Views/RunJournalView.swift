@@ -40,6 +40,7 @@ struct RunJournalView: View {
                 Text(format(journal.total.unreported > 0 ? "runStatusPartialTokens" : "runStatusTotalTokens",
                             journal.total.unreported > 0 ? "合計（一部不明）入力 %@・出力 %@" : "合計 入力 %@・出力 %@",
                             count(journal.total.input), count(journal.total.output))).fixedSize().lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
             }
             .inkuFont(11).foregroundStyle(.secondary).monospacedDigit()
             .frame(maxWidth: .infinity, alignment: .leading)

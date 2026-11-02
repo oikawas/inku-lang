@@ -23,7 +23,7 @@ Options and replacements for Change the touches, Change the ground and Change th
 ## 2026-11-02 Drawing progress
 
 For pipeline drawings, macOS displays the model, completed stages and their token counts, the current stage, attempt, elapsed time and received bytes, and the total in journal order. Stage and total counts aggregate each send and distinguish unreported usage.
-The current stage is emphasized in 12-point semibold text with the primary color, truncating the end when it does not fit on one line.
+The current stage is emphasized in 12-point semibold text with the primary color and truncated at the end when needed; the total line is right-aligned.
 
 ## 2026-11-01 Drawing failure reason
 

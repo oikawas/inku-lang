@@ -473,6 +473,19 @@ interface InkuStrings {
     val paint: String
     val drawingModel: String
     val drawing: String
+    val imageSelectingCatalog: String
+    val imageWritingDdl: String
+    val imageRevisingDdl: String
+    val imageReviewingDdl: String
+    val readDrawReading: String
+    val readDrawComposing: String
+    val readDrawRecomposing: String
+    val readDrawWriting: String
+    val readDrawRevising: String
+    val readDrawReviewing: String
+    val stageReadingComposition: String
+    val stageChoosingColors: String
+    val stageChoosingLaws: String
     val runStageCatalog: String; val runStageReading: String; val runStageComposition: String; val runStageWriting: String
     val runStageReview: String; val runStageColors: String; val runStageLaws: String; val runStageInterpret: String
     val runStageSketch: String; val runStageCompositionReading: String; val runStageCompletion: String

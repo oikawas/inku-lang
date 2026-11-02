@@ -4,7 +4,6 @@ import app.inku.mobile.pipeline.ProgressCurrent
 import app.inku.mobile.pipeline.ProgressItem
 import app.inku.mobile.pipeline.ProviderAttempt
 import app.inku.mobile.ui.i18n.InkuStrings
-import app.inku.mobile.ui.i18n.InkuStringsJa
 import java.util.Locale
 
 internal fun stageName(action: String, s: InkuStrings): String = when (action) {
@@ -49,23 +48,17 @@ internal fun currentWork(current: ProgressCurrent?, label: String, attempt: Prov
         else -> s.runLocalRender
     }
     val again = attempt?.takeIf { it.action == current.action }?.askedAgain == true
-    val ja = s === InkuStringsJa
     return when (current.action) {
-        "select_image_catalog" -> if (ja) "画像から色カタログを選んでいます…" else "Choosing colors from the image…"
-        "write_image_ddl" -> if (again) { if (ja) "指示書を直しています…" else "Revising the instructions…" }
-            else if (ja) "画像から指示書を書いています…" else "Writing instructions from the image…"
-        "review_image_ddl" -> if (again) { if (ja) "指示書を直しています…" else "Revising the instructions…" }
-            else if (ja) "画像と描いた画を見比べています…" else "Comparing the image with the drawing…"
-        "read_description" -> if (ja) "記述を読んでいます…" else "Reading the description…"
-        "compose_description" -> if (again) { if (ja) "構図と法則を決め直しています…" else "Deciding the composition and laws again…" }
-            else if (ja) "構図と法則を決めています…" else "Deciding the composition and laws…"
-        "write_description_ddl" -> if (again) { if (ja) "指示書を直しています…" else "Revising the instructions…" }
-            else if (ja) "指示書を書いています…" else "Writing the instructions…"
-        "review_description_ddl" -> if (again) { if (ja) "指示書を直しています…" else "Revising the instructions…" }
-            else if (ja) "描いた画を見て直しています…" else "Correcting the instructions beside the drawing…"
-        "read_composition" -> if (ja) "構図の読み中…" else "Reading the composition…"
-        "choose_colors" -> if (ja) "配色の選択中…" else "Choosing the colors…"
-        "choose_laws" -> if (ja) "法則の選択中…" else "Choosing the laws…"
+        "select_image_catalog" -> s.imageSelectingCatalog
+        "write_image_ddl" -> if (again) s.imageRevisingDdl else s.imageWritingDdl
+        "review_image_ddl" -> if (again) s.imageRevisingDdl else s.imageReviewingDdl
+        "read_description" -> s.readDrawReading
+        "compose_description" -> if (again) s.readDrawRecomposing else s.readDrawComposing
+        "write_description_ddl" -> if (again) s.readDrawRevising else s.readDrawWriting
+        "review_description_ddl" -> if (again) s.readDrawRevising else s.readDrawReviewing
+        "read_composition" -> s.stageReadingComposition
+        "choose_colors" -> s.stageChoosingColors
+        "choose_laws" -> s.stageChoosingLaws
         else -> stageName(current.action, s) + "…"
     }
 }

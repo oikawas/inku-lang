@@ -23,7 +23,8 @@ struct RunJournalView: View {
                         }
                     }
                 }
-                Text("… " + currentLabel).lineLimit(1).truncationMode(.tail).frame(maxWidth: .infinity, alignment: .leading)
+                Text("… " + currentLabel).inkuFont(12, weight: .semibold).foregroundStyle(.primary)
+                    .lineLimit(1).truncationMode(.tail).frame(maxWidth: .infinity, alignment: .leading)
                 HStack(spacing: 8) {
                     if let snapshot, snapshot.awaitingReply {
                         Text(format(snapshot.askedAgain ? "runStatusAskingAgain" : snapshot.attempt > 1 ? "runStatusRetrying" : "runStatusAwaitingReply",

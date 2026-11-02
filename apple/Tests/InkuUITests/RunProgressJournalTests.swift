@@ -1,8 +1,31 @@
 import XCTest
 import InkuHost
+import Observation
 @testable import InkuUI
 
 final class RunProgressJournalTests: XCTestCase {
+    @MainActor func testJournalObservationFollowsExecutionAndProgress() {
+        let app = AppModel()
+        let executionChanged = expectation(description: "journal execution became available")
+        withObservationTracking {
+            XCTAssertNil(app.runJournal)
+        } onChange: { executionChanged.fulfill() }
+        let attempt = ExactJSON.object(["provider_attempt": .object(["action": .string("read_description"),
+            "attempt": .number("1"), "max_attempts": .number("4")])]).data
+        app.receiveProviderProgress(.providerAttempt(executionID: "run", report: attempt, beganAt: Date(), deadline: Date()), models: nil, comparison: false)
+        XCTAssertEqual(app.runJournalExecutionID, "run")
+        XCTAssertNil(app.runJournal)
+
+        let journalChanged = expectation(description: "journal report became available")
+        withObservationTracking {
+            XCTAssertNil(app.runJournal)
+        } onChange: { journalChanged.fulfill() }
+        let report = ExactJSON.object(["run_progress": .object(["current": .object(["kind": .string("provider"),
+            "action": .string("read_description")]), "finished": .array([])])]).data
+        app.receiveProviderProgress(.runProgress(executionID: "run", report: report), models: nil, comparison: false)
+        XCTAssertEqual(app.runJournal?.report["current"]["action"].string, "read_description")
+        wait(for: [executionChanged, journalChanged], timeout: 1)
+    }
     func testRetryAndMissingUsageAreCountedOncePerSend() {
         var journal = RunProgressJournal(report: .object([:]))
         func metric(_ id: String, _ attempt: UInt32, _ action: String, _ usage: ProviderUsage?) -> ProviderAttemptMetric {

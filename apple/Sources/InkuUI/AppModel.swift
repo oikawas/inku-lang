@@ -103,9 +103,10 @@ public final class AppModel {
     public private(set) var status = "準備中"
     public private(set) var providerProgress: ProviderProgressSnapshot?
     private var progressJournals: [String: RunProgressJournal] = [:]
-    var runJournal: RunProgressJournal? { activeExecutionID.flatMap { progressJournals[$0] } }
-    var runJournalExecutionID: String? { activeExecutionID }
-    var runModelReference: String? { activeExecutionID.flatMap { providerModelsByExecution[$0]?.stage1Model } }
+    private var journalExecutionID: String?
+    var runJournal: RunProgressJournal? { journalExecutionID.flatMap { progressJournals[$0] } }
+    var runJournalExecutionID: String? { journalExecutionID }
+    var runModelReference: String? { journalExecutionID.flatMap { providerModelsByExecution[$0]?.stage1Model } }
     /// Metrics of the displayed saved work, frozen to that work's save identity.
     public private(set) var providerMetrics: [ProviderAttemptMetric] = []
     public private(set) var isBusy = false
@@ -218,7 +219,9 @@ public final class AppModel {
     @ObservationIgnored private var cachedStageDefaultProviderID = ProviderModelReference.stageDefaultProviderID
     @ObservationIgnored private var bootstrap: Bootstrap?
     /// Cancellation targets the active task, independently of the saved work being viewed.
-    @ObservationIgnored private var activeExecutionID: String?
+    @ObservationIgnored private var activeExecutionID: String? {
+        didSet { journalExecutionID = activeExecutionID }
+    }
     @ObservationIgnored private var currentExecutionID: String?
     @ObservationIgnored private var displayToken = UUID()
     @ObservationIgnored private var generationToken: UUID?
@@ -2436,7 +2439,7 @@ public final class AppModel {
         chatGPTFailureCodes[executionID] = diagnostic.code
         errorText = ChatGPTStatusCopy.text(diagnostic.code, language: display.preferences.language)
     }
-    private func receiveProviderProgress(_ progress: PipelineProgress, models: ModelSelection?, comparison: Bool) {
+    func receiveProviderProgress(_ progress: PipelineProgress, models: ModelSelection?, comparison: Bool) {
         switch progress {
         case .runProgress(let id, let data):
             guard let value = try? ExactJSON(data: data), value["run_progress"].object != nil else { break }

@@ -25,6 +25,7 @@ Options and replacements for Change the touches, Change the ground and Change th
 For pipeline drawings, macOS displays the model, completed stages and their token counts, the current stage, attempt, elapsed time and received bytes, and the total in journal order. Stage and total counts aggregate each send and distinguish unreported usage.
 The current stage is emphasized in 12-point semibold text with the primary color and truncated at the end when needed; the total line is right-aligned.
 Batch drawing also displays the current work's journal and shows the conditions frozen at the start using the same rows as single drawing.
+When resuming an interrupted batch, macOS checks each row's execution record and saved work, marks saved rows complete, and redraws rows for which no saved work is found.
 
 ## 2026-11-01 Drawing failure reason
 

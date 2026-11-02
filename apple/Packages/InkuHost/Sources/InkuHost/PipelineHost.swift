@@ -22,7 +22,14 @@ public actor PipelineHost {
         self.svgLimitBytes = svgLimitBytes
     }
 
-    public func generate(_ request: GenerationRequest, image: PreparedImageInput? = nil, progress: @escaping PipelineProgressHandler = { _ in }) async throws -> PipelineView {
+    public func generate(_ request: GenerationRequest, image: PreparedImageInput? = nil,
+                         progress: @escaping PipelineProgressHandler = { _ in }) async throws -> PipelineView {
+        try await generate(request, image: image, onStarted: nil, progress: progress)
+    }
+
+    public func generate(_ request: GenerationRequest, image: PreparedImageInput? = nil,
+                         onStarted: (@Sendable (String) async throws -> Void)?,
+                         progress: @escaping PipelineProgressHandler = { _ in }) async throws -> PipelineView {
         var request = try request.normalizedForNewWork()
         if request.captureProviderIO == true, !ProviderObservationPolicy.developerModeEnabled {
             throw HostError("developer_provider_observations_not_available")
@@ -51,6 +58,8 @@ public actor PipelineHost {
         let started = try await driver.start(progress: progress)
         executions[started.executionID] = driver
         defer { Task { await driver.clearImages() } }
+        try await onStarted?(started.executionID)
+        try Task.checkCancellation()
         return try await withTaskCancellationHandler {
             try await driver.drive(progress: progress)
         } onCancel: {
@@ -99,6 +108,15 @@ public actor PipelineHost {
 
     /// Restore is read-only: an unfinished paid call is never automatically repeated.
     public func restore(executionID: String) async throws -> PipelineView { try await execution(executionID).view() }
+
+    /// A committed work and its execution snapshot are saved together; never infer completion from a request alone.
+    public func savedWorkForExecution(_ id: String) async throws -> SavedWork? {
+        guard let record = try await database.loadExecution(id: id) else { return nil }
+        let execution = try JSONDecoder().decode(StoredExecution.self, from: record.snapshot)
+        guard execution.schema == "inku.swift-pipeline-execution.v1" else { throw HostError("invalid_execution_snapshot") }
+        guard let workID = execution.savedWorkID else { return nil }
+        return try await database.work(id: workID)
+    }
 
     /// An explicit resume finishes durable local effects only; provider work stays stopped.
     public func resume(executionID: String, progress: @escaping PipelineProgressHandler = { _ in }) async throws -> PipelineView {

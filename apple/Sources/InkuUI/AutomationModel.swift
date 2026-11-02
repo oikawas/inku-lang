@@ -12,6 +12,8 @@ public struct BatchRow: Codable, Sendable, Identifiable {
     public var state: State = .waiting
     public var attempts = 0
     public var workID: String?
+    /// Written before the row's pipeline starts sending or saving; absent in older journals.
+    public var executionID: String?
     public var error: String?
 }
 
@@ -158,6 +160,7 @@ public final class AutomationModel {
     public private(set) var demoCurrentMetrics: [ProviderAttemptMetric] = []
     public private(set) var demoTotalMetrics: [ProviderAttemptMetric] = []
     public private(set) var preparing = false
+    public private(set) var resuming = false
     public private(set) var batchPromptHistory: [String] = []
     public private(set) var historyErrorText: String?
     public private(set) var batchConditions: BatchDrawingConditions?
@@ -348,10 +351,32 @@ public final class AutomationModel {
     }
 
     public func resumeBatch(app: AppModel) async {
-        guard !running, !preparing, !app.isBusy, canResume, uncertainCount == 0 else { return }
+        guard !running, !preparing, !app.isBusy, canResume else { return }
         preparing = true
+        resuming = true
         batchObservationToken = UUID()
-        defer { preparing = false }
+        defer { preparing = false; resuming = false }
+        do {
+            var resolved = rows
+            for index in resolved.indices where resolved[index].state == .uncertain {
+                if let id = resolved[index].executionID, let work = try await app.savedAutomationWork(executionID: id) {
+                    resolved[index].state = .succeeded
+                    resolved[index].workID = work.id
+                } else {
+                    resolved[index].state = .waiting
+                    resolved[index].workID = nil
+                }
+                resolved[index].error = nil
+            }
+            guard var next = journal, let store else { throw HostError("batch_journal_unavailable") }
+            next.rows = resolved
+            try await store.save(next)
+            journal = next
+            rows = resolved
+        } catch {
+            errorText = "バッチの保存結果を確認できませんでした: \(error.localizedDescription)"
+            return
+        }
         // Web restores the route from the last saved work before resuming; each pending row still uses its frozen request.
         if let workID = rows.reversed().first(where: { $0.state == .succeeded && $0.workID != nil })?.workID,
            let context = try? await app.savedConfiguration(workID: workID), context.imageDDL == nil {
@@ -368,6 +393,7 @@ public final class AutomationModel {
         for index in rows.indices where rows[index].state == .failed { rows[index].state = .waiting }
         journal?.round = 0
         do { try await saveJournal() } catch { errorText = error.localizedDescription; return }
+        resuming = false
         preparing = false
         await runBatch(app: app)
     }
@@ -407,10 +433,17 @@ public final class AutomationModel {
                         try Task.checkCancellation()
                         guard self.token == runToken else { return }
                         self.rows[index].state = .running; self.rows[index].attempts += 1; self.rows[index].error = nil
+                        self.rows[index].executionID = nil
                         self.status = "\(index + 1) / \(self.rows.count)（元の\(self.rows[index].line)行目）\(round > 0 ? "・再試行\(round)" : "")"
                         try await self.saveJournal()
                         self.batchRowStartedAt = Date()
-                        let result = await app.runAutomation(request: self.rows[index].request, allowsBrowsing: true)
+                        let rowID = self.rows[index].id
+                        let result = await app.runAutomation(request: self.rows[index].request, allowsBrowsing: true) { executionID in
+                            guard self.token == runToken, !self.stopping,
+                                  let rowIndex = self.rows.firstIndex(where: { $0.id == rowID && $0.state == .running }) else { throw CancellationError() }
+                            self.rows[rowIndex].executionID = executionID
+                            try await self.saveJournal()
+                        }
                         self.batchRowStartedAt = nil
                         if let result {
                             self.rows[index].state = .succeeded; self.rows[index].workID = result.id

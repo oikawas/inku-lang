@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- macOS: check for saved rows before resuming an interrupted batch and redraw unsaved rows.
+
 - macOS: show completed drawing stages, per-stage tokens and totals as a journal.
 
 - Server and Web: show drawing progress as a growing stage log with per-action token counts and a final total; retries count toward their action.

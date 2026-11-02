@@ -1925,14 +1925,15 @@ public final class AppModel {
     }
 
     public func runAutomation(request: GenerationRequest, image: PreparedImageInput? = nil, allowsBrowsing: Bool = false,
-                              singleInputMode: String? = nil) async -> SavedWork? {
+                              singleInputMode: String? = nil,
+                              onExecutionStarted: (@MainActor @Sendable (String) async throws -> Void)? = nil) async -> SavedWork? {
         guard let host else { return nil }
         var result: SavedWork?
         _ = await performSerialized(status: "生成中", allowsBrowsing: allowsBrowsing, singleInputMode: singleInputMode) { [weak self] token in
             guard let self else { return }
             self.automationFailureMessage = nil
             try await self.validatePinnedRequest(request)
-            let view = try await host.generate(request, image: image) { [weak self] progress in
+            let view = try await host.generate(request, image: image, onStarted: onExecutionStarted) { [weak self] progress in
                 Task { @MainActor in self?.receive(progress, token: token, models: request.models) }
             }
             if self.generationToken == token, !self.stopping {
@@ -1973,6 +1974,11 @@ public final class AppModel {
             }
         }
         return result
+    }
+
+    func savedAutomationWork(executionID: String) async throws -> SavedWork? {
+        guard let host else { throw HostError("database_unavailable") }
+        return try await host.savedWorkForExecution(executionID)
     }
 
     /// Detach the next drawing without erasing the author's current text or sketch.

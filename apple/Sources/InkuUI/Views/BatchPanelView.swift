@@ -290,17 +290,13 @@ struct BatchPanelView: View {
             Text(model.display.webCopyFormat("batchResumeCompleted", "%@", automation.completedCount)).inkuFont(12).foregroundStyle(.secondary)
             Text(model.display.webCopy("batchResumeRestores", "再開時に元の入力と描画条件を復元します。完了済みの作品は描き直しません。"))
                 .inkuFont(12).foregroundStyle(.secondary)
-            if automation.uncertainCount > 0 {
-                Text(model.display.localized("要確認の行を確認してから再開してください。"))
-                    .inkuFont(12).foregroundStyle(.secondary)
-            }
         }.fixedSize(horizontal: false, vertical: true)
     }
 
     private var resumeButton: some View {
-        Button(model.display.webCopy("batchResumeBtn", "中断時点から再開")) { Task { await automation.resumeBatch(app: model) } }
+        Button(model.display.webCopy(automation.resuming ? "batchResumeScanning" : "batchResumeBtn", automation.resuming ? "再開する行を確認中…" : "中断時点から再開")) { Task { await automation.resumeBatch(app: model) } }
             .buttonStyle(InkuGhostButtonStyle())
-            .disabled(controlsDisabled || automation.uncertainCount > 0)
+            .disabled(controlsDisabled || automation.resuming)
             .inkuTooltip(tip("前回の開始時の条件で、未処理の行と失敗した行を再開します。"))
     }
 

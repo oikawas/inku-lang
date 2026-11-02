@@ -40,7 +40,6 @@ import InkuUI
     try JSONSerialization.data(withJSONObject: object).write(to: journalURL, options: .atomic)
     let recovered = AutomationModel()
     await recovered.connect(app: app)
-    await recovered.resumeBatch(app: app)
     guard recovered.uncertainCount == 1, await transport.models.count == firstCallCount * 2 else { throw CheckFailure.message("Recovery resent an ambiguous request") }
     await recovered.resolveUncertain(id: recovered.rows[0].id, retry: false)
     guard recovered.rows[0].state == .skipped, !recovered.canResume,

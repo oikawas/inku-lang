@@ -14,6 +14,7 @@ struct RunStatusView<Info: View>: View {
     var stopsWithEscape = false
     var onStop: (() -> Void)?
     var journalModel: AppModel? = nil
+    var journalActive = true
     @ViewBuilder var info: () -> Info
 
     var body: some View {
@@ -21,7 +22,7 @@ struct RunStatusView<Info: View>: View {
         HStack(alignment: .center, spacing: 10) {
             MascotView(kind: mascot, accessibilityText: display.localized(mascot == "yuragi" ? "Yuragiが描画中" : "Incuが描画中"))
             VStack(alignment: variant == .inline ? .trailing : .leading, spacing: 2) {
-                if let journalModel, journalModel.isBusy, let journal = journalModel.runJournal {
+                if let journalModel, journalActive, let journal = journalModel.runJournal {
                     RunJournalView(model: journalModel, journal: journal, label: label)
                 } else {
                     Text(display.message(label)).inkuFont(12, weight: .medium).lineLimit(variant == .inline ? 1 : 2)

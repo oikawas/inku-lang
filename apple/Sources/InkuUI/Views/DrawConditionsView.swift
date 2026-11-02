@@ -5,7 +5,11 @@ import SwiftUI
     @Bindable var model: AppModel
     let sketch: String
     let onSketch: (String) -> Void
+    var frozenRoute: String? = nil
+    var frozenComposition: Bool? = nil
     private var display: DisplaySettings { model.display }
+    private var route: String { frozenRoute ?? model.drawRoute }
+    private var composition: Bool { frozenComposition ?? model.descriptionComposition }
     var body: some View {
         Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 8) {
             GridRow {
@@ -23,7 +27,7 @@ import SwiftUI
                 WrappingHStack(spacing: 6) {
                     DrawSwitchChip(title: display.label("写生", "Sketch from life"), on: sketch == "on") { onSketch(sketch == "on" ? "off" : "on") }
                         .inkuTooltip(display.preferences.showTooltips ? display.webCopy("tooltipInputSketch", "") : "")
-                    DrawSwitchChip(title: display.label("構図・法則・配色", "Composition, laws, colors"), on: model.drawRoute == "stages" || model.descriptionComposition, locked: model.drawRoute == "stages") { model.descriptionComposition.toggle() }
+                    DrawSwitchChip(title: display.label("構図・法則・配色", "Composition, laws, colors"), on: route == "stages" || composition, locked: route == "stages") { model.descriptionComposition.toggle() }
                         .inkuTooltip(display.preferences.showTooltips ? display.webCopy("tooltipInputComposition", "") : "")
                 }
             }
@@ -39,13 +43,13 @@ import SwiftUI
     }
     private func routeButton(_ route: String, _ title: String) -> some View {
         Button { model.selectDrawRoute(route); if route == "read_and_draw" { onSketch("on") } } label: {
-            Text(title).inkuFont(12, weight: model.drawRoute == route ? .semibold : .regular)
+            Text(title).inkuFont(12, weight: self.route == route ? .semibold : .regular)
                 .frame(maxWidth: .infinity).frame(height: 26)
-                .background(model.drawRoute == route ? InkuColor.bg2 : Color.clear, in: RoundedRectangle(cornerRadius: 5))
-        }.buttonStyle(.plain).accessibilityAddTraits(model.drawRoute == route ? .isSelected : [])
+                .background(self.route == route ? InkuColor.bg2 : Color.clear, in: RoundedRectangle(cornerRadius: 5))
+        }.buttonStyle(.plain).accessibilityAddTraits(self.route == route ? .isSelected : [])
     }
     private var drawingFlow: some View {
-        let steps = DrawPresentation.flow(route: model.drawRoute, sketch: sketch == "on", composition: model.descriptionComposition, japanese: display.preferences.language != "en")
+        let steps = DrawPresentation.flow(route: route, sketch: sketch == "on", composition: composition, japanese: display.preferences.language != "en")
         return WrappingHStack(spacing: 4) {
             ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
                 HStack(spacing: 4) {

@@ -30,7 +30,10 @@ private enum DemoModelPicker: String, Identifiable {
                 if automation.running {
                     // DemoPanel.svelte:196: the running demo shows the drawing indicator.
                     RunStatusView(display: model.display, label: automation.status, stopping: automation.stopping,
-                                  onStop: { Task { await automation.stop(app: model) } }, journalModel: model) { ProviderProgressView(model: model, embedded: true) }
+                                  onStop: { Task { await automation.stop(app: model) } }, journalModel: model,
+                                  journalActive: automation.demoDrawing) {
+                        if automation.demoDrawing { ProviderProgressView(model: model, embedded: true) }
+                    }
                 } else if automation.isOccupied {
                     HStack {
                         ProgressView().controlSize(.small)

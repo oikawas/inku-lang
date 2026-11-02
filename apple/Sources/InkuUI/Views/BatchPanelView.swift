@@ -315,7 +315,8 @@ struct BatchPanelView: View {
                 // BatchPanel.svelte:280: the running batch shows the drawing indicator with its progress.
                 RunStatusView(display: model.display, label: runningLabel, stopping: automation.stopping,
                               stopTooltip: tip("実行中のバッチを停止します。未処理の行は後で再開できます。"),
-                              onStop: { Task { await automation.stop(app: model) } }, journalModel: model) { runProgress }
+                              onStop: { Task { await automation.stop(app: model) } }, journalModel: model,
+                              journalActive: automation.batchRowStartedAt != nil) { runProgress }
             } else {
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 8) { newBatchLabel; newBatchButton }
@@ -523,7 +524,7 @@ struct BatchPanelView: View {
                         .inkuTooltip(tip("この行を描き始めてからの時間です。写生・色カタログ・指示書生成と各応答待ちを含みます。"))
                 }
             }
-            ProviderProgressView(model: model)
+            if automation.batchRowStartedAt != nil { ProviderProgressView(model: model) }
         }
     }
 

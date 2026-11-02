@@ -345,7 +345,8 @@ struct CreationView: View {
                         .foregroundStyle(.orange)
                 }
                 if imageBatch.running {
-                    RunStatusView(display: display, label: imageBatch.status, onStop: { Task { await imageBatch.stop(app: model) } }, journalModel: model) { EmptyView() }
+                    RunStatusView(display: display, label: imageBatch.status, onStop: { Task { await imageBatch.stop(app: model) } }, journalModel: model,
+                                  journalActive: imageBatch.drawing) { EmptyView() }
                 } else {
                     HStack {
                         Button(display.localized("続きから描く")) { startImageBatch(restart: false) }
@@ -525,8 +526,7 @@ struct CreationView: View {
                     .padding(.bottom, 8)
                 Rectangle().fill(InkuColor.border).frame(height: 1)
             }
-            WrappingHStack(spacing: 6) { compactConditionControls }
-                .padding(.top, 2)
+            DrawingCompactConditions(model: model, wild: model.wild, canvasID: model.canvasID, showPaperPicker: $showPaperPicker)
                 .disabled(controlsDisabled)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -538,44 +538,7 @@ struct CreationView: View {
     }
 
     private func conditionRow(_ label: String, value: String, help: String, showsPlan: Bool = false, action: @escaping () -> Void) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 8) {
-                Text(label).inkuFont(12, weight: .medium).foregroundStyle(.secondary)
-                Spacer(minLength: 0)
-                Button(display.webCopy("editButton", "変更"), action: action)
-                    .buttonStyle(InkuGhostButtonStyle())
-                    .inkuTooltip(help)
-            }
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(value).inkuFont(14).lineLimit(2).truncationMode(.middle)
-                    .inkuTooltip(display.tooltipValue(value))
-                if showsPlan {
-                    Link(display.webCopy("chatgptPlanLabel", "ChatGPTプラン"), destination: URL(string: "https://chatgpt.com/settings/usage")!)
-                        .inkuFont(11).inkuTooltip(display.tooltip("ChatGPTプランの使用状況を開きます。", serverKey: "chatgptManageUsage"))
-                }
-                Spacer(minLength: 0)
-            }.frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(.vertical, 7)
-    }
-
-    @ViewBuilder private var compactConditionControls: some View {
-        HStack(spacing: 8) {
-            Text(display.label("オプション", "Options")).inkuFont(11).foregroundStyle(.tertiary)
-            DrawSwitchChip(title: display.webCopy("wildButton", "筆致制限を外す"), on: model.wild) { model.wild.toggle() }
-                .accessibilityValue(display.localized(model.wild ? "オン" : "オフ"))
-                .inkuTooltip(display.tooltip("次の作品の筆致を規則から外します。", serverKey: "tooltipInputWild"))
-        }
-        Button { showPaperPicker = true } label: {
-            Text(display.webCopy("canvasAspectButton", "キャンバス") + (display.preferences.language == "ja" ? "：" : ": ")
-                 + (model.canvases.first { $0.id == model.canvasID }?.label ?? model.canvasID))
-        }
-        .buttonStyle(InkuGhostButtonStyle())
-        .inkuTooltip(tip("用紙の形と意図を見て、次の作品の用紙を選びます。"))
-        .popover(isPresented: $showPaperPicker) {
-            CreationPaperPicker(model: model) { showPaperPicker = false }.environment(display)
-        }
-        .accessibilityValue(model.canvases.first { $0.id == model.canvasID }?.name ?? model.canvasID)
+        DrawingConditionRow(display: display, label: label, value: value, help: help, showsPlan: showsPlan, action: action)
     }
 
     private var conditionDetails: some View {

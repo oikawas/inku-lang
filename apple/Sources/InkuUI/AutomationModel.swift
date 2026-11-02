@@ -151,6 +151,7 @@ public final class AutomationModel {
     public private(set) var demoEndedAt: Date?
     public private(set) var demoGeneratingPrompt = ""
     public private(set) var demoWaitUntil: Date?
+    public private(set) var demoDrawing = false
     public private(set) var demoCurrentSaved = false
     public private(set) var savingDemo = false
     public private(set) var demoSaveStatus = ""
@@ -498,7 +499,10 @@ public final class AutomationModel {
                         request.provenance = provenance
                         request.saveHistory = saveWorks
                         self.status = "デモの作品を生成中"
-                        guard let work = await app.runAutomation(request: request) else {
+                        self.demoDrawing = true
+                        let drawing = await app.runAutomation(request: request)
+                        self.demoDrawing = false
+                        guard let work = drawing else {
                             try Task.checkCancellation(); throw HostError(app.errorText ?? "demo_generation_failed")
                         }
                         try Task.checkCancellation()
@@ -578,7 +582,7 @@ public final class AutomationModel {
 
     private func finish(_ runToken: UUID) {
         guard token == runToken else { return }
-        if mode == "demo" { demoEndedAt = Date(); demoWaitUntil = nil }
+        if mode == "demo" { demoEndedAt = Date(); demoWaitUntil = nil; demoDrawing = false }
         batchRowStartedAt = nil; operation = nil; token = nil
         running = false; stopping = false
     }

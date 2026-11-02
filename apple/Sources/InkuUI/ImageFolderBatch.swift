@@ -28,6 +28,7 @@ private struct ImageFolderJournal: Codable, Sendable {
     private(set) var uncertain = 0
     private(set) var failures: [String] = []
     private(set) var running = false
+    private(set) var drawing = false
     private(set) var selecting = false
     private(set) var status = ""
     private(set) var error: String?
@@ -104,7 +105,7 @@ private struct ImageFolderJournal: Codable, Sendable {
         journal = current
         let canvasID = app.imageCanvasID
         running = true; stopRequested = false; error = nil
-        defer { running = false; refresh() }
+        defer { running = false; drawing = false; refresh() }
         do {
             try await persist()
             for index in current.rows.indices {
@@ -139,7 +140,9 @@ private struct ImageFolderJournal: Codable, Sendable {
                     guard !stopRequested, !Task.isCancelled else { throw CancellationError() }
                     let request = try app.requestForImage(image, provenance: provenance(url), canvasID: canvasID)
                     let pinned = try await app.pinPersonalPlanRequests([request])[0]
+                    drawing = true
                     let work = await app.runAutomation(request: pinned, image: image, allowsBrowsing: true)
+                    drawing = false
                     if stopRequested || Task.isCancelled { journal?.rows[index].state = "uncertain" }
                     else if let work { journal?.rows[index].state = "succeeded"; journal?.rows[index].workID = work.id }
                     else { journal?.rows[index].state = "failed"; journal?.rows[index].error = app.automationFailureMessage ?? "生成できませんでした。" }

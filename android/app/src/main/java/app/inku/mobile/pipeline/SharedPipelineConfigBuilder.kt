@@ -171,6 +171,11 @@ class SharedPipelineConfigBuilder(
                     .put("max_output_bytes", policy.maxOutputBytes),
             )
             .put("language", request.resolvedLanguage)
+            .also { config ->
+                if (autoCatalog && request.imageReview == null && request.renderSeed != null) {
+                    config.put("catalog_seed", java.lang.Long.toUnsignedString(request.renderSeed))
+                }
+            }
             .put("composition", composition)
             .also { config ->
                 if (colorsStage) {

@@ -636,6 +636,12 @@ interface InkuStrings {
     val generationInfoSeedText: String
     val generationInfoRenderWild: String
     val generationInfoColorCatalog: String
+    val catalogReadingSelection: String
+    val catalogReadingLabel: String
+    val catalogReadingModel: String
+    val catalogReadingSeed: String
+    val catalogReadingFallback: String
+    val catalogReadingDropped: (Int, Int) -> String
     val generationInfoColorMap: String
     val generationInfoCanvasAspect: String
     val generationInfoCanvasRatio: String

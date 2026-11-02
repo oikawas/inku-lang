@@ -18,6 +18,55 @@ import org.junit.Test
  */
 class ImageDdlPipelineTest {
     @Test
+    fun textCatalogReadingAndSeedFallbackAreSavedWithoutLeakingToFixedChild() = runBlocking {
+        val readingId = "inku.description-color-reading-prompt.v1"
+        val choiceId = "inku.description-catalog-choice-prompt.v1"
+        val reading = """{"note":"light","brightness":{"value":"dark","quote":"紫"},"vividness":{"value":"none","quote":""},"warmth":{"value":"cool","quote":"紫"},"colors":[{"word":"紫","lightness":"deep","vividness":"muted","quote":"紫"}]}"""
+        val empty = """{"note":"","brightness":{"value":"none","quote":""},"vividness":{"value":"none","quote":""},"warmth":{"value":"none","quote":""},"colors":[]}"""
+        val writing = """{"ddl":"中心に赤の円を1個置く。","figures":[]}"""
+        fun fixture(answer: String) = Fixture(mapOf(readingId to answer, choiceId to """{"catalog_id":"k01"}""",
+            "write_description_ddl" to writing))
+        val request = PaintRequest(description = "紫の妹", stage1Model = "anthropic:claude-opus-5-5",
+            stage2Model = "anthropic:claude-opus-5-5", colorCatalogId = "auto", canvasAspect = "square",
+            autoRepair = true, renderSeed = 7, uiLang = "ja", sketch = SketchInput(text = "紫の妹"),
+            readAndDraw = true)
+        val first = fixture(reading)
+        val result = first.pipeline.paint(request)
+        assertEquals(listOf(readingId, choiceId), first.promptIds.filter { it == readingId || it == choiceId })
+        val metadata = JSONObject(result.renderMetadataJson)
+        val record = metadata.getJSONObject("catalog_reading")
+        assertEquals("model", record.getString("method"))
+        assertEquals(record.getJSONArray("candidate_order").getString(0), metadata.getString("catalog_id"))
+        val prompts = metadata.getJSONObject("sent_system_prompts")
+        assertEquals(readingId, prompts.getJSONObject("catalog_reading").getString("prompt_id"))
+        assertEquals(choiceId, prompts.getJSONObject("catalog").getString("prompt_id"))
+        val stages = metadata.getJSONArray("sent_system_prompt_stages").toString()
+        assertTrue(stages.contains("catalog_reading"))
+        assertTrue(stages.contains("catalog"))
+
+        val link = result.managedHistoryLink!!
+        val history = app.inku.mobile.data.db.HistoryItemEntity(
+            id = "parent", createdAt = 1, updatedAt = 1, originalInput = request.description,
+            normalizedDdl = result.normalizedDdl, scoreJson = result.scoreJson, displaySvg = result.displaySvg,
+            stage1Model = request.stage1Model, stage2Model = request.stage2Model, renderMetadataJson = result.renderMetadataJson,
+            renderHash = result.renderHash, renderHashShort = result.renderHashShort, colorCatalogId = metadata.getString("catalog_id"),
+            canvasAspect = "square", starred = false, trashed = false, elapsedMs = null, tokenMetadataJson = null)
+        val forkContext = JSONObject(link.contextJson)
+            .put("config", JSONObject(link.snapshotJson).getJSONObject("config")).toString()
+        first.parent = app.inku.mobile.data.db.ManagedHistoryRead(history, "managed", link.variationId,
+            link.revision, link.ddlDigest, forkContext)
+        val child = first.pipeline.paint(request.copy(colorCatalogId = "default", parentHistoryId = "parent"))
+        val childSnapshot = JSONObject(child.managedHistoryLink!!.snapshotJson)
+        assertFalse(childSnapshot.getJSONObject("config").has("catalog_seed"))
+        assertFalse(JSONObject(child.renderMetadataJson).has("catalog_reading"))
+
+        val fallback = fixture(empty)
+        val seeded = fallback.pipeline.paint(request)
+        assertEquals(listOf(readingId), fallback.promptIds.filter { it == readingId || it == choiceId })
+        assertEquals("seed", JSONObject(seeded.renderMetadataJson).getJSONObject("catalog_reading").getString("method"))
+    }
+
+    @Test
     fun sourceLabelsUseCoreScalarOffsetsIncludingEmoji() {
         val labels = descriptionSourceLabels(NativePipelineBridge, "1. 🌸花 [ 作者 ] ［本］")
         assertEquals(listOf("作者", "本"), (0 until labels.length()).map { labels.getString(it) })
@@ -83,6 +132,9 @@ class ImageDdlPipelineTest {
 
     private class Fixture(private val answers: Map<String, String>) {
         val requests = mutableListOf<ModelRequest>()
+        val promptIds = mutableListOf<String>()
+        var currentPromptId: String? = null
+        var parent: app.inku.mobile.data.db.ManagedHistoryRead? = null
         /** The Anthropic body each request would be sent as. */
         val bodies = mutableListOf<JSONObject>()
         /** The ChatGPT plan body each request would be sent as. */
@@ -93,7 +145,11 @@ class ImageDdlPipelineTest {
             override fun stepSvgLimited(snapshotBytes: ByteArray, inputEnvelopeBytes: ByteArray, maxSvgBytes: Long): NativeSvgOutput {
                 val payload = JSONObject(inputEnvelopeBytes.decodeToString()).getJSONObject("payload")
                 if (payload.optString("tag") == "start") starts += payload
-                return NativePipelineBridge.stepSvgLimited(snapshotBytes, inputEnvelopeBytes, maxSvgBytes)
+                val result = NativePipelineBridge.stepSvgLimited(snapshotBytes, inputEnvelopeBytes, maxSvgBytes)
+                currentPromptId = runCatching { JSONObject(result.jsonBytes.decodeToString())
+                    .getJSONObject("payload").getJSONObject("result").getJSONObject("snapshot")
+                    .getJSONObject("action").getJSONObject("payload").getJSONObject("prompt").getString("prompt_id") }.getOrNull()
+                return result
             }
         }
         private val executions = mutableMapOf<String, ByteArray>()
@@ -101,9 +157,10 @@ class ImageDdlPipelineTest {
             override val providerId = "anthropic"
             override suspend fun generate(request: ModelRequest): ModelResponse {
                 requests += request
+                promptIds += currentPromptId.orEmpty()
                 bodies += JSONObject(ProviderWireTransport.build("anthropic", "anthropic", "https://api.anthropic.com", request).getString("body"))
                 chatGptBodies += JSONObject(chatGptRequest(request.copy(modelId = "chatgpt:gpt-6-luna")).body)
-                val answer = answers[request.pipelineAction] ?: error("unexpected ${request.pipelineAction}")
+                val answer = currentPromptId?.let { answers[it] } ?: answers[request.pipelineAction] ?: error("unexpected ${request.pipelineAction} $currentPromptId")
                 return ModelResponse(answer, request.modelId)
             }
         }, object : PipelineCommitStore {
@@ -123,7 +180,7 @@ class ImageDdlPipelineTest {
                 executions[executionId] = stateBytes.copyOf(); return true
             }
             override suspend fun load(ownerId: String, executionId: String) = executions[executionId]?.copyOf()
-        }, { null }, bundledPluginsEnabled = { false }, imageReviewPng = { svg, _, _ ->
+        }, { parent }, bundledPluginsEnabled = { false }, imageReviewPng = { svg, _, _ ->
             reviewSvgs += svg
             REVIEW_PNG
         })

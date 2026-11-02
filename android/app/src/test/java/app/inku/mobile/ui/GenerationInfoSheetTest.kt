@@ -15,6 +15,30 @@ import org.junit.Test
 class GenerationInfoSheetTest {
 
     @Test
+    fun catalogReadingRowsAndPromptVisibilityMatchTheSavedWork() {
+        val record = org.json.JSONObject("""{"catalog_reading":{"method":"model","reading_text":"紫\n青","dropped_axes":1,"dropped_colors":2}}""")
+        val rows = catalogReadingRows(record)
+        assertEquals("光と色の読みから選んだ", generationInfoDisplayValue(rows[0], InkuStringsJa))
+        assertEquals("紫\n青", rows[1].value)
+        assertEquals("Dropped as not in the description: 1 axes, 2 colors", generationInfoDisplayValue(rows[2], InkuStringsEn))
+        record.getJSONObject("catalog_reading").put("method", "seed").put("dropped_axes", 0).put("dropped_colors", 0)
+        assertEquals("Nothing could be read; chosen by the run's seed", generationInfoDisplayValue(catalogReadingRows(record)[0], InkuStringsEn))
+        assertEquals(2, catalogReadingRows(record).size)
+        record.getJSONObject("catalog_reading").remove("method")
+        assertEquals("選びに失敗し既定のカタログ", generationInfoDisplayValue(catalogReadingRows(record)[0], InkuStringsJa))
+        assertTrue(catalogReadingRows(org.json.JSONObject()).isEmpty())
+
+        val prompts = app.inku.mobile.data.refinement.SentPrompts.Recorded(emptySet(), emptyMap())
+        val strings = app.inku.mobile.ui.i18n.savedWorkParityStrings(app.inku.mobile.ui.i18n.UiLanguage.Ja)
+        val fixed = renderSentPrompts(prompts, strings, false)
+        assertFalse(fixed.contains("色の読み"))
+        assertFalse(fixed.contains("色カタログの選択"))
+        val auto = renderSentPrompts(prompts, strings, true)
+        assertTrue(auto.contains("色の読み"))
+        assertTrue(auto.contains("色カタログの選択"))
+    }
+
+    @Test
     fun existingHistoryFieldsAreGroupedWithoutLineageOrTokenRows() {
         val item = historyItem(
             renderMetadataJson = """

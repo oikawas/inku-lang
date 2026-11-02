@@ -503,9 +503,11 @@ class SharedPipelineHost(
     /** Keep the last attempted prompt of each sent stage in this execution's sidecar. */
     private fun recordSentPrompt(session: Session, action: JSONObject) {
         val tag = action.requiredString("tag")
-        val stage = DESCRIPTION_PROMPT_STAGES[tag] ?: ACTION_STAGES[tag] ?: return
-        if (stage !in SYSTEM_PROMPT_STAGES) return
         val prompt = action.optJSONObject("payload")?.optJSONObject("prompt") ?: return
+        val stage = if (tag == "select_description_catalog" &&
+            prompt.optString("prompt_id") == "inku.description-color-reading-prompt.v1") "catalog_reading"
+        else DESCRIPTION_PROMPT_STAGES[tag] ?: ACTION_STAGES[tag] ?: return
+        if (stage !in SYSTEM_PROMPT_STAGES) return
         // A malformed or older action must not turn a completed model call into
         // a pipeline failure merely because its observational record is absent.
         val required = listOf("system", "prompt_id", "prompt_digest", "instruction_language")
@@ -985,8 +987,8 @@ class SharedPipelineHost(
             "review_description_ddl" to "description_review",
         )
         /** The server's `_SYSTEM_PROMPT_STAGES` (`pipeline_product.py`), in the order a work calls them. */
-        val SYSTEM_PROMPT_STAGES = listOf("sketch", "stage1", "composition", "laws", "colors", "stage2", "reading", "description_composition", "description_ddl", "description_review")
+        val SYSTEM_PROMPT_STAGES = listOf("catalog_reading", "catalog", "sketch", "stage1", "composition", "laws", "colors", "stage2", "reading", "description_composition", "description_ddl", "description_review")
         /** The server's `_MESSAGE_STAGES`: the stages whose sent message is kept too. */
-        val MESSAGE_STAGES = setOf("sketch", "composition", "laws", "colors", "reading", "description_composition", "description_ddl", "description_review")
+        val MESSAGE_STAGES = setOf("catalog_reading", "catalog", "sketch", "composition", "laws", "colors", "reading", "description_composition", "description_ddl", "description_review")
     }
 }

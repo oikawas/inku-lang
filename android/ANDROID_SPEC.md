@@ -1,5 +1,9 @@
 # inku Android Implementation Notes
 
+## 2026-11-02 Color catalog reading and choice
+
+Automatic selection from a description receives the drawing seed and records the reading and choice prompts separately. Work information shows the selection method, color reading, and items dropped because they were absent from the description. Fixed catalogs and image selection do not retain a description catalog seed, and a child does not inherit the reading record. The Room version is unchanged.
+
 ## 2026-11-01 Saijiki v3 / render engine 95
 
 History migration prefers its saved instruction_lang_resolved, then the work's saved config language, then the app's shared DDL language detection. Missing language metadata must not leave retired English tools unmigrated by treating the text as Japanese.

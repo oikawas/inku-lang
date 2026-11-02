@@ -765,6 +765,7 @@ class AndroidWorkPipeline(
         loggedRenderWarnings(metadata, "pipeline performance")?.let { diagnostics.put("render_warnings", it) }
         metadata.put("pipeline_diagnostics", diagnostics)
         snapshot.optJSONObject("completion_ranges")?.let { metadata.put("completion_ranges", it) }
+        snapshot.optJSONObject("catalog_reading")?.let { metadata.put("catalog_reading", it) }
         // The work keeps the layers its laws placed and their basis, as the
         // server keeps them in the work's fork context.
         putLawsRecords(metadata, lawsRecordsOf(snapshot))
@@ -953,7 +954,7 @@ class AndroidWorkPipeline(
         // The labels are gone before the language is read, and DDL is read as DDL.
         val language = InstructionLanguages.resolveWithUiLang(drawn, requestedLang, uiLang)
         val config = when {
-            inherited != null -> deriveSavedConfig(inherited.config, request, renderSeed, language)
+            inherited != null -> deriveSavedConfig(inherited.config, request, renderSeed, language, imageReview)
             saved == null -> configBuilder.build(
                 SharedPipelineConfigRequest(
                     resolvedLanguage = language,
@@ -977,7 +978,7 @@ class AndroidWorkPipeline(
                     macroLocksJson = macroCatalog.requiredArray("definition_locks").toString(),
                     macroDiagnosticsJson = macroCatalog.requiredArray("diagnostics").toString(),
                 )
-                if (preserveSavedConfig) parentConfig else deriveSavedConfig(parentConfig, request, renderSeed, language)
+                if (preserveSavedConfig) parentConfig else deriveSavedConfig(parentConfig, request, renderSeed, language, imageReview)
             }
         }
         val effectiveConfig = if (descriptionFlow && request.readAndDraw) {
@@ -1067,6 +1068,7 @@ class AndroidWorkPipeline(
         request: PaintRequest,
         renderSeed: Long,
         language: String,
+        imageReview: Boolean?,
     ): PreparedPipelineConfig {
         val colorMaps = ColorCatalogs.all.associate { it.id to it.renderMap }
         val config = JSONObject(saved.configJson)
@@ -1080,6 +1082,8 @@ class AndroidWorkPipeline(
             throw PipelineHostException("unknown_canvas_format")
         }
         val auto = request.colorCatalogId == "auto"
+        if (auto && imageReview == null) config.put("catalog_seed", java.lang.Long.toUnsignedString(renderSeed))
+        else config.remove("catalog_seed")
         val selectedCatalogId = if (auto) "default" else request.colorCatalogId
         if (!colorMaps.containsKey(selectedCatalogId)) {
             throw PipelineHostException("unknown_color_catalog")

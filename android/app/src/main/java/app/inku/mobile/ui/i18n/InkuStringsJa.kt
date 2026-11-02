@@ -768,6 +768,12 @@ object InkuStringsJa : InkuStrings {
     override val generationInfoSeedText = "種テキスト"
     override val generationInfoRenderWild = "筆致制限を外す"
     override val generationInfoColorCatalog = "色カタログ"
+    override val catalogReadingSelection = "選び方"
+    override val catalogReadingLabel = "色の読み"
+    override val catalogReadingModel = "光と色の読みから選んだ"
+    override val catalogReadingSeed = "読めるものが無く、実行の種で選んだ"
+    override val catalogReadingFallback = "選びに失敗し既定のカタログ"
+    override val catalogReadingDropped: (Int, Int) -> String = { axes, colors -> "記述に無いため落とした項目：軸 $axes・色 $colors" }
     override val generationInfoColorMap = "色の対応"
     override val generationInfoCanvasAspect = "キャンバス"
     override val generationInfoCanvasRatio = "キャンバスの比率"

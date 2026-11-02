@@ -3250,7 +3250,9 @@ private fun CanvasHeroCard(
     if (!presentation && showControls) item?.let {
         renderTabCopyText(
             state.renderTab,
-            promptText = sentPrompts?.let { prompts -> renderSentPrompts(prompts, savedWorkParityStrings(state.uiLanguage)) }
+            promptText = sentPrompts?.let { prompts ->
+                renderSentPrompts(prompts, savedWorkParityStrings(state.uiLanguage), catalogReadingPromptsExpected(it))
+            }
                 ?: savedWorkParityStrings(state.uiLanguage).sentPromptLoading,
             jsonText = renderJsonText(it),
         )?.let { text ->
@@ -6630,7 +6632,9 @@ private fun CanvasPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: 
                     } else {
                         renderTabCopyText(
                             state.renderTab,
-                            promptText = sentPrompts?.let { renderSentPrompts(it, savedWorkParityStrings(state.uiLanguage)) }
+                            promptText = sentPrompts?.let {
+                                renderSentPrompts(it, savedWorkParityStrings(state.uiLanguage), catalogReadingPromptsExpected(item))
+                            }
                                 ?: savedWorkParityStrings(state.uiLanguage).sentPromptLoading,
                             jsonText = renderJsonText(item),
                         )?.let { text ->
@@ -6687,6 +6691,9 @@ internal enum class GenerationInfoField {
     SeedText,
     RenderWild,
     ColorCatalog,
+    CatalogReadingMethod,
+    CatalogReadingText,
+    CatalogReadingDropped,
     CanvasAspect,
     CanvasRatio,
     RenderHash,
@@ -6706,6 +6713,18 @@ internal data class GenerationInfoSection(
     val rows: List<GenerationInfoRow>,
     val colorMapEntries: List<GenerationInfoColorMapEntry> = emptyList(),
 )
+
+internal fun catalogReadingRows(metadata: JSONObject): List<GenerationInfoRow> {
+    val reading = metadata.optJSONObject("catalog_reading") ?: return emptyList()
+    val rows = mutableListOf(GenerationInfoRow(GenerationInfoField.CatalogReadingMethod, reading.optString("method", "")))
+    reading.optString("reading_text", "").takeIf { it.isNotEmpty() }?.let {
+        rows.add(GenerationInfoRow(GenerationInfoField.CatalogReadingText, it))
+    }
+    val axes = reading.optInt("dropped_axes", 0)
+    val colors = reading.optInt("dropped_colors", 0)
+    if (axes + colors > 0) rows.add(GenerationInfoRow(GenerationInfoField.CatalogReadingDropped, "$axes,$colors"))
+    return rows
+}
 
 internal fun generationInfoColorMapEntries(renderMetadataJson: String): List<GenerationInfoColorMapEntry> =
     workColorSnapshot(renderMetadataJson)
@@ -6823,6 +6842,7 @@ internal fun generationInfoSections(item: HistoryItemEntity): List<GenerationInf
                         columnOrMetadata(item.colorCatalogId, "render_color_catalog_id"),
                     ),
                 ),
+                *catalogReadingRows(metadata).toTypedArray(),
                 GenerationInfoRow(GenerationInfoField.CanvasAspect, columnOrMetadata(item.canvasAspect, "render_canvas_aspect")),
                 GenerationInfoRow(GenerationInfoField.CanvasRatio, metadataValue("render_canvas_aspect_ratio")),
             ),
@@ -6916,7 +6936,7 @@ private fun GenerationInfoSheet(item: HistoryItemEntity, viewModel: InkuViewMode
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
                         ) {
-                            Text(
+                            if (row.field != GenerationInfoField.CatalogReadingDropped) Text(
                                 generationInfoFieldLabel(row.field),
                                 modifier = Modifier.weight(0.42f),
                                 style = MaterialTheme.typography.labelSmall,
@@ -7025,6 +7045,9 @@ private fun generationInfoFieldLabel(field: GenerationInfoField): String = when 
     GenerationInfoField.SeedText -> S.generationInfoSeedText
     GenerationInfoField.RenderWild -> S.generationInfoRenderWild
     GenerationInfoField.ColorCatalog -> S.generationInfoColorCatalog
+    GenerationInfoField.CatalogReadingMethod -> S.catalogReadingSelection
+    GenerationInfoField.CatalogReadingText -> S.catalogReadingLabel
+    GenerationInfoField.CatalogReadingDropped -> ""
     GenerationInfoField.CanvasAspect -> S.generationInfoCanvasAspect
     GenerationInfoField.CanvasRatio -> S.generationInfoCanvasRatio
     GenerationInfoField.RenderHash -> S.generationInfoRenderHash
@@ -7040,6 +7063,14 @@ private fun generationInfoDisplayValue(row: GenerationInfoRow): String =
     generationInfoDisplayValue(row, S)
 
 internal fun generationInfoDisplayValue(row: GenerationInfoRow, strings: InkuStrings): String = when {
+    row.field == GenerationInfoField.CatalogReadingMethod -> when (row.value) {
+        "model" -> strings.catalogReadingModel
+        "seed" -> strings.catalogReadingSeed
+        else -> strings.catalogReadingFallback
+    }
+    row.field == GenerationInfoField.CatalogReadingDropped -> row.value.split(",").let {
+        strings.catalogReadingDropped(it[0].toInt(), it[1].toInt())
+    }
     row.field == GenerationInfoField.InputOrigin && row.value == "camera" -> strings.generationInfoInputOriginCamera
     row.field == GenerationInfoField.InputOrigin && row.value == "photo_picker" -> strings.generationInfoInputOriginPhotoPicker
     row.field == GenerationInfoField.InputRoute && row.value == "local_description_to_nim" -> strings.generationInfoInputRouteLocalDescriptionToNim
@@ -7101,12 +7132,19 @@ private fun RenderTextView(text: String, modifier: Modifier = Modifier, ddl: Str
     }
 }
 
-private fun renderSentPrompts(prompts: SentPrompts, strings: app.inku.mobile.ui.i18n.SavedWorkParityStrings): String = when (prompts) {
+internal fun catalogReadingPromptsExpected(item: HistoryItemEntity): Boolean =
+    item.catalogMode == "auto" && runCatching { JSONObject(item.renderMetadataJson).optJSONObject("image_ddl") == null }.getOrDefault(false)
+
+internal fun renderSentPrompts(prompts: SentPrompts, strings: app.inku.mobile.ui.i18n.SavedWorkParityStrings, autoDescription: Boolean): String = when (prompts) {
     SentPrompts.NotRecorded -> strings.sentPromptNotRecorded
     SentPrompts.Unavailable -> strings.sentPromptUnavailable
     is SentPrompts.Recorded -> buildString {
+        var first = true
         PromptStage.entries.forEachIndexed { index, stage ->
-            if (index > 0) appendLine()
+            if (stage in setOf(PromptStage.CatalogReading, PromptStage.Catalog) &&
+                !autoDescription && prompts.prompts[stage] == null) return@forEachIndexed
+            if (!first) appendLine()
+            first = false
             appendLine(strings.sentPromptStages[index])
             if (stage !in prompts.stages) {
                 appendLine(strings.sentPromptNotRecorded)

@@ -798,6 +798,12 @@ object InkuStringsEn : InkuStrings {
     override val generationInfoSeedText = "Seed text"
     override val generationInfoRenderWild = "Lift the stroke limit"
     override val generationInfoColorCatalog = "Color catalog"
+    override val catalogReadingSelection = "Selection"
+    override val catalogReadingLabel = "Color reading"
+    override val catalogReadingModel = "Chosen from the light and color reading"
+    override val catalogReadingSeed = "Nothing could be read; chosen by the run's seed"
+    override val catalogReadingFallback = "The choice failed; the default catalog"
+    override val catalogReadingDropped: (Int, Int) -> String = { axes, colors -> "Dropped as not in the description: $axes axes, $colors colors" }
     override val generationInfoColorMap = "Color map"
     override val generationInfoCanvasAspect = "Canvas"
     override val generationInfoCanvasRatio = "Canvas ratio"

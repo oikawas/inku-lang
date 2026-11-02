@@ -3,6 +3,7 @@ package app.inku.mobile.pipeline
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 /**
@@ -15,6 +16,17 @@ import org.junit.Test
  * shown to change nothing that reaches the core.
  */
 class SharedPipelineConfigBudgetTest {
+
+    @Test
+    fun catalogSeedIsPresentOnlyForSeededTextAutoSelection() {
+        val builder = SharedPipelineConfigBuilder(RecordingBinding())
+        val base = SharedPipelineConfigRequest("ja", "square", "auto", renderSeed = -1L, bundledPluginsEnabled = false)
+        fun config(request: SharedPipelineConfigRequest) = JSONObject(builder.build(request).configJson)
+        assertEquals("18446744073709551615", config(base).getString("catalog_seed"))
+        assertFalse(config(base.copy(catalogSelectionId = "default")).has("catalog_seed"))
+        assertFalse(config(base.copy(imageReview = true)).has("catalog_seed"))
+        assertFalse(config(base.copy(renderSeed = null)).has("catalog_seed"))
+    }
 
     private class RecordingBinding : SharedPipelineBinding {
         val macroInputs = mutableListOf<String>()

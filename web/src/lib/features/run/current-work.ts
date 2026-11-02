@@ -38,6 +38,7 @@ export type PaintResult = {
 	image_ddl?: Record<string, unknown> | null;
 	/** Read and draw's record (SPEC 12.6.7); null on any other work. */
 	description_ddl?: DescriptionDdlRecord | null;
+	catalog_reading?: import('../canvas/catalog-reading.ts').CatalogReading | null;
 	/** The tokens by stage (2026-10-26); null when the drawing sent nothing. */
 	provider_usage?: ProviderUsage | null;
 	image_provenance?: string | null;

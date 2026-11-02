@@ -368,6 +368,7 @@ class PaintResponse(BaseModel):
     compiler_outcome: str | None = Field(default=None, description="Outcome of the score compiler for this drawing.")
     pipeline_diagnostics: dict[str, object] | None = Field(default=None, description="Diagnostics recorded by the pipeline for this drawing. None when none were recorded.")
     description_ddl: dict | None = Field(default=None, description="The record of a drawing made by reading its description (route read_and_draw): the reading, its state, the items dropped and each round. Metadata only, never image bytes. None for the stages.")
+    catalog_reading: dict | None = Field(default=None, description="Light and color reading and selection method when a color catalog was chosen automatically from the description, on either drawing route; otherwise None.")
     provider_usage: dict[str, ProviderStageUsage] | None = Field(default=None, description="The tokens the drawing's sends used, by the stage they are timed under. Only stages that sent appear. None when nothing was sent.")
 
 

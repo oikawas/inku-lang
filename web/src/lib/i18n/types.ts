@@ -705,6 +705,8 @@ export interface LangPack {
 
 	// Prompts tab
 	promptCatalogInput: string;
+	promptCatalogReadingInput: string;
+	promptCatalogReadingSystem: string;
 	promptCatalogSystem: string;
 	promptImageCatalogInput: string;
 	promptImageCatalogSystem: string;

@@ -477,7 +477,7 @@ export const en: LangPack = {
 	runStageCatalog: 'Color catalog', runStageReading: 'Reading', runStageComposition: 'Composition', runStageWriting: 'Writing',
 	runStageReview: 'Review', runStageColors: 'Colors', runStageLaws: 'Laws', runStageInterpret: 'Interpretation',
 	runStageSketch: 'Sketch', runStageCompositionReading: 'Reading composition', runStageCompletion: 'Completion',
-	runStageImageCatalog: 'Image color catalog', runStageImageWriting: 'Writing from image', runStageImageReview: 'Image review',
+	runStageImageCatalog: 'Picture color catalog', runStageImageWriting: 'Writing from picture', runStageImageReview: 'Picture review',
 	runFinishedReading: 'Read', runFinishedReadingDropped: (count) => `Read (${count} words omitted)`,
 	runFinishedComposition: (things, law) => `Composition: ${things} objects · main law ${law}`,
 	runFinishedWriting: 'Written', runFinishedReview: 'Reviewed and revised',
@@ -827,6 +827,8 @@ export const en: LangPack = {
 	shareTargetOff: 'Share with group',
 
 	promptCatalogInput: 'Color catalog choice input as sent',
+	promptCatalogReadingInput: 'Color reading input as sent',
+	promptCatalogReadingSystem: 'Color reading',
 	promptCatalogSystem: 'Color catalog choice system prompt',
 	promptImageCatalogInput: 'Catalog choice for the picture input as sent',
 	promptImageCatalogSystem: 'Catalog choice for the picture system prompt',

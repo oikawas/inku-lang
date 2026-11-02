@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+- Server and Web: use the run's seed for color catalog selection from a description and show the light and color reading, selection method, and sent text with the work.
+
 - Core: automatic color catalog selection reads anchored light and colors from the description, then chooses from anonymous candidates' actual colors.
 
 - Android: show finished stages, current work, tokens and received bytes as a drawing journal, with the batch line and elapsed time above it.

@@ -16,6 +16,7 @@ export type SentSystemPrompt = {
  *  stages after it, with the composition and laws between the reading and
  *  the writing when they are on (2026-10-26). */
 export const PROMPT_STAGES = [
+	'catalog_reading',
 	'catalog',
 	'image_catalog',
 	'image_ddl',
@@ -77,6 +78,7 @@ export async function loadSystemPrompts(
 		return {
 			state: 'recorded',
 			stages: PROMPT_STAGES.filter((stage) => kept.includes(stage)),
+			catalog_reading: sentPrompt(body.catalog_reading),
 			catalog: sentPrompt(body.catalog),
 			image_catalog: sentPrompt(body.image_catalog),
 			image_ddl: sentPrompt(body.image_ddl),

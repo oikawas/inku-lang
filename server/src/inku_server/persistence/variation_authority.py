@@ -58,7 +58,7 @@ LAWS_RECORD_DERIVATIONS = frozenset(
 LAWS_RECORD_KEYS = ("laws_layers", "laws_basis")
 # The snapshot's records a saved work keeps beside its config, each only when
 # the run made it. Read and draw's record (SPEC §12.6.7) joined them 2026-10-26.
-_OPTIONAL_FORK_CONTEXT_KEYS = ("completion_ranges", *LAWS_RECORD_KEYS, "description_ddl")
+_OPTIONAL_FORK_CONTEXT_KEYS = ("completion_ranges", *LAWS_RECORD_KEYS, "description_ddl", "catalog_reading")
 # The host's records a saved work keeps, each only when the run made it: the
 # tokens its sends used by stage (2026-10-26).
 _OPTIONAL_HOST_CONTEXT_KEYS = ("provider_usage", "chunk_plugin_offers")
@@ -798,7 +798,7 @@ def history_link_records(
     """The diagnostics and the optional records (read and draw's, the tokens by
     stage) frozen on one history link, each record only when it was kept."""
     payload, pipeline_diagnostics = _decode_history_fork_context_payload(row)
-    records = {key: payload[key] for key in ("description_ddl", "provider_usage") if payload.get(key) is not None}
+    records = {key: payload[key] for key in ("description_ddl", "catalog_reading", "provider_usage") if payload.get(key) is not None}
     from ..macro_catalog import plugin_offer_records
     offers = plugin_offer_records(payload["config"], payload.get("chunk_plugin_offers", []))
     if offers:

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { loadSystemPrompts } from './system-prompts';
+import { catalogReadingDetails } from './catalog-reading.ts';
 
 const sent = {
 	system: 'work planner…',
@@ -21,7 +22,7 @@ test('the prompt tab tells a recorded prompt from an unrecorded or unreadable on
 	// A server from before 2026-10-13 names no stages: it kept Stage 1 and Stage 2.
 	assert.deepEqual(
 		await loadSystemPrompts('variation/1', answering(200, { recorded: true, stage1: sent, stage2: null }, paths)),
-		{ state: 'recorded', stages: ['stage1', 'stage2'], catalog: null, image_catalog: null, image_ddl: null, image_review: null, sketch: null, reading: null, description_composition: null, description_ddl: null, description_review: null, stage1: sent, composition: null, laws: null, colors: null, stage2: null }
+		{ state: 'recorded', stages: ['stage1', 'stage2'], catalog_reading: null, catalog: null, image_catalog: null, image_ddl: null, image_review: null, sketch: null, reading: null, description_composition: null, description_ddl: null, description_review: null, stage1: sent, composition: null, laws: null, colors: null, stage2: null }
 	);
 	assert.deepEqual(paths, ['/api/pipeline/variations/variation%2F1/system-prompts']);
 	assert.deepEqual(await loadSystemPrompts('v', answering(200, { recorded: false })), { state: 'not_recorded' });
@@ -55,6 +56,7 @@ test('the sketch, the composition reading, the laws stage and the color stage co
 	assert.deepEqual(loaded, {
 		state: 'recorded',
 		stages: ['sketch', 'stage1', 'composition', 'laws', 'colors', 'stage2'],
+		catalog_reading: null,
 		catalog: null,
 		image_catalog: null,
 		image_ddl: null,
@@ -92,6 +94,27 @@ test('the sketch, the composition reading, the laws stage and the color stage co
 	);
 	assert.equal(drawnFrom.state === 'recorded' && drawnFrom.stages.join(), 'catalog,image_catalog,image_ddl,image_review');
 	assert.deepEqual(drawnFrom.state === 'recorded' && [drawnFrom.catalog, drawnFrom.image_ddl, drawnFrom.image_review], [catalog, picture, null]);
+});
+
+test('color reading precedes choice and old works retain their existing stages', async () => {
+	const reading = { ...sent, prompt_id: 'inku.description-color-reading-prompt.v1', message: 'description' };
+	const choice = { ...sent, prompt_id: 'inku.description-catalog-choice-prompt.v1', message: 'reading' };
+	const current = await loadSystemPrompts('v', answering(200, { recorded: true, stages: ['catalog', 'catalog_reading'], catalog_reading: reading, catalog: choice }));
+	assert.equal(current.state, 'recorded');
+	if (current.state !== 'recorded') return;
+	assert.deepEqual(current.stages, ['catalog_reading', 'catalog']);
+	assert.deepEqual([current.catalog_reading, current.catalog], [reading, choice]);
+	const old = await loadSystemPrompts('v', answering(200, { recorded: true, stages: ['catalog'], catalog: choice }));
+	assert.equal(old.state === 'recorded' && old.stages.includes('catalog_reading'), false);
+});
+
+test('catalog reading describes model, seed, fallback and dropped counts in both languages', () => {
+	assert.equal(catalogReadingDetails({ method: 'model', reading_text: '明るい', dropped_axes: 1, dropped_colors: 2 }, true).dropped, '記述に無いため落とした項目：軸 1・色 2');
+	assert.equal(catalogReadingDetails({ method: 'model' }, false).method, 'Chosen from the light and color reading');
+	assert.equal(catalogReadingDetails({ method: 'seed' }, true).method, '読めるものが無く、実行の種で選んだ');
+	assert.equal(catalogReadingDetails({}, false).method, 'The choice failed; the default catalog');
+	assert.equal(catalogReadingDetails({ dropped_axes: 0, dropped_colors: 0 }, true).dropped, null);
+	assert.equal(catalogReadingDetails({ dropped_axes: 1, dropped_colors: 2 }, false).dropped, 'Dropped as not in the description: 1 axes, 2 colors');
 });
 
 test('a read-and-draw work shows its reading, its writing and its review, in the order it called them', async () => {

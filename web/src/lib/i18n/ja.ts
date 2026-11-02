@@ -825,6 +825,8 @@ export const ja: LangPack = {
 	shareTargetOff: 'グループ共有する',
 
 	promptCatalogInput: '色カタログの選択 送った入力',
+	promptCatalogReadingInput: '色の読み 送った入力',
+	promptCatalogReadingSystem: '色の読み システムプロンプト',
 	promptCatalogSystem: '色カタログの選択 システムプロンプト',
 	promptImageCatalogInput: '画像の色カタログの選択 送った入力',
 	promptImageCatalogSystem: '画像の色カタログの選択 システムプロンプト',

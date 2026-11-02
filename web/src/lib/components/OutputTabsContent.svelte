@@ -68,10 +68,12 @@
 	// The color catalog chosen from the description, and a work from a picture's
 	// three requests (SPEC 12.6.6), recorded since 2026-10-26.
 	let catalogSystemExpanded = $state(false);
+	let catalogReadingSystemExpanded = $state(false);
 	let imageCatalogSystemExpanded = $state(false);
 	let imageDdlSystemExpanded = $state(false);
 	let imageReviewSystemExpanded = $state(false);
 	const catalogSystem = $derived(systemPrompts.state === 'recorded' ? systemPrompts.catalog : null);
+	const catalogReadingSystem = $derived(systemPrompts.state === 'recorded' ? systemPrompts.catalog_reading : null);
 	const imageCatalogSystem = $derived(systemPrompts.state === 'recorded' ? systemPrompts.image_catalog : null);
 	const imageDdlSystem = $derived(systemPrompts.state === 'recorded' ? systemPrompts.image_ddl : null);
 	const imageReviewSystem = $derived(systemPrompts.state === 'recorded' ? systemPrompts.image_review : null);
@@ -101,7 +103,7 @@
 
 <!-- The sketch, the composition reading, the laws stage and the color stage: what each was given, then its system prompt. -->
 {#snippet sentStage(
-	kind: 'catalog' | 'image_catalog' | 'image_ddl' | 'image_review' | 'sketch' | 'composition' | 'laws' | 'colors' | 'reading' | 'description_composition' | 'description_ddl' | 'description_review',
+	kind: 'catalog_reading' | 'catalog' | 'image_catalog' | 'image_ddl' | 'image_review' | 'sketch' | 'composition' | 'laws' | 'colors' | 'reading' | 'description_composition' | 'description_ddl' | 'description_review',
 	inputLabel: string,
 	systemLabel: string,
 	sent: SentSystemPrompt | null,
@@ -146,6 +148,9 @@
 
 {#if outputTab === 'prompts'}
 	<div class="prompt-section" bind:this={scrollEl}>
+		{#if catalogReadingSystem || (catalogChosen && systemPrompts.state === 'recorded' && systemPrompts.stages.includes('catalog_reading'))}
+			{@render sentStage('catalog_reading', t().promptCatalogReadingInput, t().promptCatalogReadingSystem, catalogReadingSystem, catalogReadingSystemExpanded, () => (catalogReadingSystemExpanded = !catalogReadingSystemExpanded))}
+		{/if}
 		{#if catalogChosen || catalogSystem}
 			{@render sentStage('catalog', t().promptCatalogInput, t().promptCatalogSystem, catalogSystem, catalogSystemExpanded, () => (catalogSystemExpanded = !catalogSystemExpanded))}
 		{/if}

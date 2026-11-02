@@ -95,7 +95,7 @@ def test_a_drawing_shows_the_stage_1_system_prompt_it_sent(author, sent):
     assert body["stage2"] is None
     assert body["sketch"] is None and body["composition"] is None and body["laws"] is None
     assert body["colors"] is None
-    assert body["stages"] == ["catalog", "image_catalog", "image_ddl", "image_review",
+    assert body["stages"] == ["catalog_reading", "catalog", "image_catalog", "image_ddl", "image_review",
                               "sketch", "stage1", "composition", "laws", "colors", "stage2",
                               "reading", "description_composition", "description_ddl", "description_review"]
 
@@ -165,12 +165,29 @@ def test_a_prompt_without_a_message_is_kept_without_one():
     assert "message" not in context["system_prompts"]["composition"]
 
 
+def test_color_reading_and_choice_keep_separate_latest_attempts_and_legacy_choice():
+    context = {"system_prompts": {}}
+    reading = _action("select_description_catalog", 1, "reading")
+    reading["payload"]["prompt"]["prompt_id"] = "inku.description-color-reading-prompt.v1"
+    choice = _action("select_description_catalog", 1, "choice")
+    choice["payload"]["prompt"]["prompt_id"] = "inku.description-catalog-choice-prompt.v1"
+    record_system_prompt(context, reading)
+    record_system_prompt(context, choice)
+    assert context["system_prompts"]["catalog_reading"]["message"] == "select_description_catalog message"
+    assert context["system_prompts"]["catalog"]["system"] == "choice"
+    legacy = _action("select_description_catalog", 2, "legacy")
+    record_system_prompt(context, legacy)
+    assert context["system_prompts"]["catalog"]["system"] == "legacy"
+    assert context["system_prompts"]["catalog_reading"]["system"] == "reading"
+
+
 def test_an_execution_from_before_the_sketch_and_the_reading_kept_stage_1_and_stage_2():
     kept = {"stage1": {"system": "planner"}, "stage2": None}
     # Saved before 2026-10-13: no list of stages.
     assert system_prompts_view({"system_prompts": kept}) == {
         "recorded": True,
         "stages": ["stage1", "stage2"],
+        "catalog_reading": None,
         "catalog": None,
         "image_catalog": None,
         "image_ddl": None,

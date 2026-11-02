@@ -119,6 +119,76 @@ def _start(client, *, model="openai:fixture-vision", **options):
     return started.json()
 
 
+@pytest.mark.parametrize("kind,mode,expected", [
+    ("description", "auto", "71"), ("description", "fixed", None),
+    ("description", "random", None), ("image", "auto", None),
+])
+def test_catalog_seed_follows_only_description_auto(host, kind, mode, expected):
+    _, _, effects, _ = host
+    config, _ = effects.prepare("owner", kind, POEM, {"stage1_model": "openai:fixture-vision", "render_seed": 71,
+                                                      "catalog_mode": mode}, None)
+    assert config.get("catalog_seed") == expected
+    # A saved config cannot carry its old seed into another run.
+    parent = {"saved_config": config, "host_options": {"stage1_model": "openai:fixture-vision", "catalog_mode": mode}, "metadata": {}}
+    config2, _ = effects.prepare("owner", kind, POEM, {"render_seed": 93, "catalog_mode": mode}, parent)
+    assert config2.get("catalog_seed") == ("93" if expected else None)
+
+
+@pytest.mark.parametrize("method", ["model", "seed"])
+def test_real_core_catalog_reading_is_saved_and_not_inherited(host, method):
+    from inku_server.api_core.deps import _current_user
+    from inku_server.api_core.routers.history import router as history_router
+    client, service, _, sent = host
+    client.app.include_router(history_router)
+    client.app.dependency_overrides[_current_user] = lambda: {"id": "owner", "role": "user"}
+    prompt_ids = []
+
+    def provider(_owner, context, images=()):
+        def perform(action):
+            tag = action["tag"]
+            prompt = action["payload"]["prompt"]
+            record_system_prompt(context, action)
+            if tag == "select_description_catalog":
+                prompt_ids.append(prompt["prompt_id"])
+                if prompt["prompt_id"] == "inku.description-color-reading-prompt.v1":
+                    value = "none" if method == "seed" else "bright"
+                    response = {"note": "", "brightness": {"value": value, "quote": "" if method == "seed" else "紫"},
+                                "vividness": {"value": "none", "quote": ""}, "warmth": {"value": "none", "quote": ""}, "colors": []}
+                else:
+                    response = {"catalog_id": "k01"}
+                result_tag = "description_catalog_selected"
+            else:
+                result_tag, response = ANSWERS[tag]
+            return {"tag": result_tag, "identity": action["identity"], "response": json.dumps(response, ensure_ascii=False), "elapsed_ms": "1"}
+        return perform
+
+    service.provider_with_context = provider
+    started = _start(client, model="openai:fixture-text", catalog_mode="auto", render_seed=71)
+    view = _wait(service, started["execution_id"])
+    assert view["phase"]["tag"] == "score_ready", view
+    done = service.command("owner", view["execution_id"], {"tag": "perform"})
+    record = done["result"]["catalog_reading"]
+    assert record["method"] == method
+    assert record["catalog_id"] == done["result"]["catalog_id"]
+    assert len(prompt_ids) == (2 if method == "model" else 1)
+    if method == "model":
+        assert record["catalog_id"] == record["candidate_order"][0]
+        prompts = service.system_prompts("owner", view["variation_id"])
+        assert prompts["catalog_reading"]["prompt_id"] == prompt_ids[0]
+        assert prompts["catalog"]["prompt_id"] == prompt_ids[1]
+    response = client.get("/api/history")
+    assert response.status_code == 200, response.text
+    item = next(item for item in response.json()["items"] if item["id"] == done["result"]["history_id"])
+    assert item["catalog_reading"] == record
+    child = client.post(f"/api/pipeline/variations/{view['variation_id']}/fork-description", headers={"x-owner": "owner"},
+        json={"expected_revision": done["authority"]["revision"], "description": POEM,
+              "options": {"catalog_mode": "fixed", "save_artifacts": False}})
+    assert child.status_code == 200, child.text
+    child_view = _wait(service, child.json()["execution_id"])
+    child_done = service.command("owner", child_view["execution_id"], {"tag": "perform"})
+    assert "catalog_reading" not in child_done["result"]
+
+
 def test_a_description_is_read_written_seen_and_saved_with_its_reading(host):
     client, service, _, sent = host
     view = _wait(service, _start(client, sketch="on")["execution_id"])

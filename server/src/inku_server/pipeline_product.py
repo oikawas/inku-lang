@@ -265,11 +265,12 @@ _SYSTEM_PROMPT_STAGES = {
     "write_description_ddl": "description_ddl",
     "review_description_ddl": "description_review",
 }
+_SYSTEM_PROMPT_STAGE_NAMES = ["catalog_reading", *_SYSTEM_PROMPT_STAGES.values()]
 # The stages whose message the tab shows as sent too (2026-10-13): no other
 # view shows what the sketch, the composition reading, the laws stage, the
 # color stage and read and draw's reading were given.
 _MESSAGE_STAGES = {"sketch", "composition", "laws", "colors", "reading", "description_composition",
-                   "catalog", "image_catalog", "image_ddl", "image_review"}
+                   "catalog", "catalog_reading", "image_catalog", "image_ddl", "image_review"}
 # The requests given the image tab's answer limit: the image tab's DDL and
 # read and draw's, as they were measured (8192 tokens, 2026-10-25; the
 # composition and laws answered at most 1,662 tokens, 2026-10-26).
@@ -290,6 +291,8 @@ def record_system_prompt(context: dict, action: dict) -> None:
     """
     stage = _SYSTEM_PROMPT_STAGES.get(action["tag"])
     prompt = (action.get("payload") or {}).get("prompt")
+    if action["tag"] == "select_description_catalog" and isinstance(prompt, dict) and prompt.get("prompt_id") == "inku.description-color-reading-prompt.v1":
+        stage = "catalog_reading"
     # A record for the reader: an action without a prompt draws as before.
     if stage is None or not isinstance(prompt, dict):
         return
@@ -315,11 +318,11 @@ def system_prompts_view(context: dict) -> dict:
     """
     prompts = context.get("system_prompts")
     if not isinstance(prompts, dict):
-        return {"recorded": False, "stages": [], **{stage: None for stage in _SYSTEM_PROMPT_STAGES.values()}}
+        return {"recorded": False, "stages": [], **{stage: None for stage in _SYSTEM_PROMPT_STAGE_NAMES}}
     return {
         "recorded": True,
         "stages": list(context.get("system_prompt_stages", _EARLIER_STAGES)),
-        **{stage: prompts.get(stage) for stage in _SYSTEM_PROMPT_STAGES.values()},
+        **{stage: prompts.get(stage) for stage in _SYSTEM_PROMPT_STAGE_NAMES},
     }
 
 
@@ -453,6 +456,10 @@ class ProductPipelineEffects:
         config["catalogs"] = [{"prompt": {"catalog_id": entry["id"], "label": entry["name"],
                                           "description": entry["sub_ja" if language == "ja" else "sub"]},
                                "resolved": resolved[entry["id"]]} for entry in catalogs] if mode == "auto" else []
+        if mode == "auto" and kind == "description":
+            config["catalog_seed"] = str(seed)
+        else:
+            config.pop("catalog_seed", None)
         actor = db.get_user(owner)
         # One model draws both stages (2026-09-30, the author). A request that
         # still names two keeps the Stage 1 one; one that names only Stage 2
@@ -518,7 +525,7 @@ class ProductPipelineEffects:
         # Present from the start, so a work whose stage never called a model
         # reads as "not sent" and one drawn before the record as "not recorded".
         return config, {"host_options": selected, "color_maps": color_maps, "macro_catalog": catalog_context,
-                        "system_prompts": {}, "system_prompt_stages": list(_SYSTEM_PROMPT_STAGES.values()),
+                        "system_prompts": {}, "system_prompt_stages": list(_SYSTEM_PROMPT_STAGE_NAMES),
                         "render_limits_source": self.settings.limits_source(work, requested_limits),
                         "auto_catalog": kind in {"description", "image"} and mode == "auto",
                         "sketch_request": sketch_request_for(kind, options), "metrics": {}}
@@ -665,6 +672,8 @@ class ProductPipelineEffects:
             "pipeline_variation_id": snapshot["variation_id"], "pipeline_revision": snapshot["authority"]["revision"],
         }
         description_ddl = snapshot.get("description_ddl")
+        if snapshot.get("catalog_reading") is not None:
+            result["catalog_reading"] = deepcopy(snapshot["catalog_reading"])
         if description_ddl is not None:
             # The work keeps its record with its config (the history link); the
             # reading stands where a sketch does, so the author reads and edits it there.

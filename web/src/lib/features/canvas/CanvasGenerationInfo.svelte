@@ -20,12 +20,14 @@
 	import { generationInfoSettings } from './generation-info-settings.svelte';
 	import { tokenStageLabel, tokenStageRows, type ProviderUsage } from './generation-info-tokens';
 	import { offerName, offerReason, offerStage, type PluginOfferRecord } from './plugin-offers';
+	import { catalogReadingDetails, type CatalogReading } from './catalog-reading';
 
 	export type GenerationInfoWork = {
 		plugin_offers?: PluginOfferRecord[] | null;
 		image_ddl?: Record<string, unknown> | null;
 		/** The read-and-draw record; present only on a work drawn that way. */
 		description_ddl?: DescriptionDdlRecord | null;
+		catalog_reading?: CatalogReading | null;
 		image_provenance?: string | null;
 		note?: string | null;
 		starred?: boolean;
@@ -204,6 +206,8 @@
 	// Read and draw (SPEC 12.6.7): the reading, what its anchor check dropped,
 	// each answer the run read, and whether the drawing was seen.
 	const detailReadRecord = $derived(statusHistoryItem?.description_ddl ?? result?.description_ddl ?? null);
+	const catalogReading = $derived(statusHistoryItem?.catalog_reading ?? result?.catalog_reading ?? null);
+	const catalogReadingInfo = $derived(catalogReading ? catalogReadingDetails(catalogReading, isJapanese) : null);
 	const detailPluginOffers = $derived(statusHistoryItem?.plugin_offers ?? result?.plugin_offers ?? null);
 	const detailReadDropped = $derived(droppedReadingLines(detailReadRecord));
 	const detailReadReviewed = $derived(!!detailReadRecord?.rounds?.some((round) => round.stage === 'review_description_ddl'));
@@ -545,6 +549,11 @@
 							<dt><span>{isJapanese ? '添景' : 'Staffage'}</span></dt><dd>{statusTenkei}</dd>
 						{/if}
 						{@render term(isJapanese ? '色カタログ' : 'Color catalog', t().provenanceHintCatalog)}<dd>{statusCatalogName}</dd>
+						{#if catalogReadingInfo}
+							<dt><span>{isJapanese ? '選び方' : 'Selection'}</span></dt><dd>{catalogReadingInfo.method}</dd>
+							{#if catalogReadingInfo.text}<dt><span>{isJapanese ? '色の読み' : 'Color reading'}</span></dt><dd><pre class="detail-read-text">{catalogReadingInfo.text}</pre></dd>{/if}
+							{#if catalogReadingInfo.dropped}<dt></dt><dd>{catalogReadingInfo.dropped}</dd>{/if}
+						{/if}
 						{#if detailColorMap.length > 0}
 							{@render term(t().provenanceLabelColorMap, t().provenanceHintColorMap)}<dd class="detail-color-map">
 								{#each detailColorMap as entry (entry.key)}

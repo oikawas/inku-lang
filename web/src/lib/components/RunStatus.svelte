@@ -166,7 +166,7 @@
 	.run-status.inline.has-progress .run-info { flex: 1 1 auto; align-items: stretch; }
 	.run-label {
 		font-size: var(--ui-font-size-12);
-		font-weight: 500;
+		font-weight: 600;
 		color: var(--fg);
 		white-space: nowrap;
 		overflow: hidden;

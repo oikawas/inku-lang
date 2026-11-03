@@ -227,11 +227,11 @@ Change one tool word in the DDL, and the same shapes are drawn another way. In t
 On the night of the blackout, candles flickered to life in the apartment windows, one by one, until an uneven grid of light emerged from the darkness.
 ```
 
-<!-- Work 763e2b5a and its children 506cc532, e5abfbb4, ff141585, 2bf6d565, a8715026, drawn with "Change the touches" (Same tool for every sentence) in the work edit menu, exported with the web's "Transition animation" (GIF, 480×480, cut, 0.8 s each, endless loop, 0.26 MiB. I-030). The DDL names a tool in only 13 of its 33 drawing sentences; "Same tool for every sentence" writes the tool word into the other 20 too -->
+<!-- Work 763e2b5a and its children e5abfbb4 (etching), 506cc532 (silverpoint), ff141585, 2bf6d565, a8715026, drawn with "Change the touches" (Same tool for every sentence) in the work edit menu, exported with the web's "Transition animation" (GIF, 480×480, cut, 0.8 s each, endless loop. I-030). The web exported the works oldest first (silverpoint before etching); frames 2 and 3 were then swapped to match the Japanese version, with every frame's pixels unchanged (0.25 MiB). The DDL names a tool in only 13 of its 33 drawing sentences; "Same tool for every sentence" writes the tool word into the other 20 too -->
 <p align="center">
-  <img src="docs/assets/readme/candle-touches.en.gif" width="420" alt="The same picture of an apartment block, with candles lit in nine windows, changes its tool every 0.8 seconds. The original. A picture in grainy, fine horizontal streaks. A picture scored in fine slanting parallel lines. A picture with a gray wash spreading wide over the ground. Coarse-pixel windows on a bright pale blue and pink ground. A picture crossed by broad gray, white, and orange strokes of a knife">
+  <img src="docs/assets/readme/candle-touches.en.gif" width="420" alt="The same picture of an apartment block, with candles lit in nine windows, changes its tool every 0.8 seconds. The original. A picture scored in fine slanting parallel lines. A picture in grainy, fine horizontal streaks. A picture with a gray wash spreading wide over the ground. Coarse-pixel windows on a bright pale blue and pink ground. A picture crossed by broad gray, white, and orange strokes of a knife">
 </p>
-<p align="center"><sub>Frames in order: the original (pen, watercolor) → silverpoint → etching → watercolor → computer → painting knife</sub></p>
+<p align="center"><sub>Frames in order: the original (pen, watercolor) → etching → silverpoint → watercolor → computer → painting knife</sub></p>
 <p align="center"><sub>Model GPT-6.1 Sol · color catalog Lantern &amp; Dew · seed 8069091770428325</sub></p>
 
 In the original picture, a large gray square stands for the apartment block on a black ground, and gray window rectangles are lined up on it, five across and four down. Nine of the windows glow with an orange or yellow oval of light, each with a small candle and a flame inside.
